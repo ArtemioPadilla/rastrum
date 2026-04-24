@@ -1,10 +1,13 @@
 -- Rastrum v0.1 Supabase Schema
--- Run in Supabase SQL Editor
--- Region: sa-east-1 (São Paulo) or mx-central-1 (Mexico City) for LGPDPPSO compliance
+-- Apply with: `make db-apply` (or `psql "$SUPABASE_DB" -f <this-file>`)
+-- Region: us-east-1 (dev) — consider sa-east-1 / mx-central-1 for LGPDPPSO later.
 --
 -- Scope: v0.1 ships a plain (non-partitioned) observations table. Partitioning
 -- is deferred until the table exceeds ~1M rows — see docs/specs/infra/future-migrations.md
 -- pgvector is also deferred; enabled at v0.5 when Scout/RAG lands.
+--
+-- Idempotency: this file is safe to replay. Tables use IF NOT EXISTS, policies
+-- and triggers drop-before-create. Data is never touched.
 
 -- ============================================================
 -- EXTENSIONS
@@ -17,7 +20,7 @@ CREATE EXTENSION IF NOT EXISTS "postgis";
 -- ============================================================
 -- USERS
 -- ============================================================
-CREATE TABLE public.users (
+CREATE TABLE IF NOT EXISTS public.users (
   id                uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   username          text UNIQUE CHECK (username ~ '^[a-zA-Z0-9_]{3,30}$'),
   display_name      text CHECK (length(display_name) <= 80),
@@ -45,6 +48,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
@@ -52,7 +56,7 @@ CREATE TRIGGER on_auth_user_created
 -- ============================================================
 -- TAXA
 -- ============================================================
-CREATE TABLE public.taxa (
+CREATE TABLE IF NOT EXISTS public.taxa (
   id                    uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   gbif_taxon_key        integer UNIQUE,
   scientific_name       text NOT NULL,
@@ -82,12 +86,12 @@ CREATE TABLE public.taxa (
   updated_at            timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_taxa_scientific_name ON taxa(scientific_name);
-CREATE INDEX idx_taxa_gbif ON taxa(gbif_taxon_key);
-CREATE INDEX idx_taxa_family ON taxa(family);
+CREATE INDEX IF NOT EXISTS idx_taxa_scientific_name ON taxa(scientific_name);
+CREATE INDEX IF NOT EXISTS idx_taxa_gbif ON taxa(gbif_taxon_key);
+CREATE INDEX IF NOT EXISTS idx_taxa_family ON taxa(family);
 
 -- Taxon usage history (never rewrite historical IDs)
-CREATE TABLE public.taxon_usage_history (
+CREATE TABLE IF NOT EXISTS public.taxon_usage_history (
   id                  uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   observation_id      uuid NOT NULL,
   original_name       text NOT NULL,
@@ -100,7 +104,7 @@ CREATE TABLE public.taxon_usage_history (
 -- ============================================================
 -- OBSERVATIONS (plain table; partition later if >1M rows)
 -- ============================================================
-CREATE TABLE public.observations (
+CREATE TABLE IF NOT EXISTS public.observations (
   id                    uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   observer_id           uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   observed_at           timestamptz NOT NULL DEFAULT now(),
@@ -165,18 +169,18 @@ CREATE TABLE public.observations (
 );
 
 -- Indexes
-CREATE INDEX idx_obs_observer ON observations(observer_id, observed_at DESC);
-CREATE INDEX idx_obs_location ON observations USING GIST(location);
-CREATE INDEX idx_obs_location_obs ON observations USING GIST(location_obscured);
-CREATE INDEX idx_obs_sync ON observations(sync_status) WHERE sync_status = 'pending';
-CREATE INDEX idx_obs_primary_taxon ON observations(primary_taxon_id);
-CREATE INDEX idx_obs_public ON observations(sync_status, obscure_level)
+CREATE INDEX IF NOT EXISTS idx_obs_observer ON observations(observer_id, observed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_obs_location ON observations USING GIST(location);
+CREATE INDEX IF NOT EXISTS idx_obs_location_obs ON observations USING GIST(location_obscured);
+CREATE INDEX IF NOT EXISTS idx_obs_sync ON observations(sync_status) WHERE sync_status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_obs_primary_taxon ON observations(primary_taxon_id);
+CREATE INDEX IF NOT EXISTS idx_obs_public ON observations(sync_status, obscure_level)
   WHERE sync_status = 'synced';
 
 -- ============================================================
 -- IDENTIFICATIONS
 -- ============================================================
-CREATE TABLE public.identifications (
+CREATE TABLE IF NOT EXISTS public.identifications (
   id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   observation_id  uuid NOT NULL,
   taxon_id        uuid REFERENCES taxa(id),
@@ -192,13 +196,13 @@ CREATE TABLE public.identifications (
   created_at      timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_id_observation ON identifications(observation_id);
-CREATE INDEX idx_id_taxon ON identifications(taxon_id);
+CREATE INDEX IF NOT EXISTS idx_id_observation ON identifications(observation_id);
+CREATE INDEX IF NOT EXISTS idx_id_taxon ON identifications(taxon_id);
 
 -- ============================================================
 -- MEDIA FILES
 -- ============================================================
-CREATE TABLE public.media_files (
+CREATE TABLE IF NOT EXISTS public.media_files (
   id                  uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   observation_id      uuid NOT NULL,
   media_type          text NOT NULL CHECK (media_type IN ('photo','audio','video')),
@@ -226,7 +230,7 @@ CREATE TABLE public.media_files (
   created_at          timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_media_observation ON media_files(observation_id);
+CREATE INDEX IF NOT EXISTS idx_media_observation ON media_files(observation_id);
 
 -- ============================================================
 -- RLS POLICIES
@@ -239,19 +243,24 @@ ALTER TABLE public.media_files ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.taxa ENABLE ROW LEVEL SECURITY;
 
 -- Users: public read, self-update
+DROP POLICY IF EXISTS "users_public_read" ON public.users;
 CREATE POLICY "users_public_read" ON public.users FOR SELECT USING (true);
+DROP POLICY IF EXISTS "users_self_update" ON public.users;
 CREATE POLICY "users_self_update" ON public.users FOR UPDATE
   USING ((SELECT auth.uid()) = id);
 
 -- Taxa: public read
+DROP POLICY IF EXISTS "taxa_public_read" ON public.taxa;
 CREATE POLICY "taxa_public_read" ON public.taxa FOR SELECT USING (true);
 
 -- Observations: owner full access, public read for synced non-sensitive rows.
 -- obscure_level is denormalized onto observations (see trigger below) so the
 -- policy can stay single-table and inexpensive.
+DROP POLICY IF EXISTS "obs_owner" ON public.observations;
 CREATE POLICY "obs_owner" ON public.observations FOR ALL
   USING ((SELECT auth.uid()) = observer_id);
 
+DROP POLICY IF EXISTS "obs_public_read" ON public.observations;
 CREATE POLICY "obs_public_read" ON public.observations FOR SELECT
   USING (
     sync_status = 'synced'
@@ -262,6 +271,7 @@ CREATE POLICY "obs_public_read" ON public.observations FOR SELECT
   );
 
 -- Identifications: tied to observation access
+DROP POLICY IF EXISTS "id_owner" ON public.identifications;
 CREATE POLICY "id_owner" ON public.identifications FOR ALL
   USING (
     observation_id IN (
@@ -269,12 +279,14 @@ CREATE POLICY "id_owner" ON public.identifications FOR ALL
     )
   );
 
+DROP POLICY IF EXISTS "id_public_read" ON public.identifications;
 CREATE POLICY "id_public_read" ON public.identifications FOR SELECT
   USING (
     observation_id IN (SELECT id FROM observations WHERE sync_status = 'synced')
   );
 
 -- Media: same as observations
+DROP POLICY IF EXISTS "media_owner" ON public.media_files;
 CREATE POLICY "media_owner" ON public.media_files FOR ALL
   USING (
     observation_id IN (
@@ -282,6 +294,7 @@ CREATE POLICY "media_owner" ON public.media_files FOR ALL
     )
   );
 
+DROP POLICY IF EXISTS "media_public_read" ON public.media_files;
 CREATE POLICY "media_public_read" ON public.media_files FOR SELECT
   USING (
     observation_id IN (SELECT id FROM observations WHERE sync_status = 'synced')
@@ -325,6 +338,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+DROP TRIGGER IF EXISTS update_obs_count_trigger ON public.observations;
 CREATE TRIGGER update_obs_count_trigger
   AFTER INSERT OR UPDATE OF sync_status ON public.observations
   FOR EACH ROW
@@ -367,12 +381,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+DROP TRIGGER IF EXISTS sync_primary_id_trigger ON public.identifications;
 CREATE TRIGGER sync_primary_id_trigger
   AFTER INSERT OR UPDATE OF is_primary, taxon_id ON public.identifications
   FOR EACH ROW
   EXECUTE FUNCTION public.sync_primary_identification();
 
 -- Only one primary identification per observation.
-CREATE UNIQUE INDEX uniq_primary_id_per_obs
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_primary_id_per_obs
   ON public.identifications(observation_id)
   WHERE is_primary = true;
