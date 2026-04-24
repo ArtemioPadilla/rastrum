@@ -1547,6 +1547,7 @@ Extracted automatically from JPEG, HEIC, PNG, RAW files:
 ## Strategic & Technical Dossier (External Analysis)
 
 > This section integrates a comprehensive 17-page external strategic review of Rastrum.
+> **Note:** The founding team has existing professional commitments (AWS exclusivity) that constrain direct public association with competing cloud providers or public co-founder visibility. All funding and partnership strategies must account for this. The project should be structured so the founding team participates through a legal entity (A.C. or SAPI) rather than as a named individual where conflict risk exists.
 > Opinions are explicitly flagged **[OPINION]**; hard numbers include sources.
 > Source document: *Rastrum v1: A Strategic and Technical Dossier for a LATAM Biodiversity Platform* (April 2026)
 
@@ -1565,7 +1566,7 @@ CONABIO political instability, founder burnout, potential iNaturalist LATAM pivo
 the architectural and governance decisions laid out below.
 This dossier integrates market research, product-market-fit analysis, technical architecture, feature
 prioritization, funding, monetization, and legal/governance into an actionable playbook. **Opinions are
-flagged; hard numbers are sourced.** It is designed to let Artemio decide whether to pursue Rastrum
+flagged; hard numbers are sourced.** It is designed to let the founding team decide whether to pursue Rastrum
 seriously, write grant applications, refine the architecture, build an MVP, attract a community, and monetize
 without compromising the mission.
 --## 1. Market position and the gap Rastrum fills
@@ -1893,7 +1894,7 @@ automatically. Faces in photos (biometric under LFPDPPP + GDPR Art. 9) and Indig
 blur via TensorFlow Lite before upload** and make Indigenous self-identification strictly opt-in with clear
 purpose explanation.
 ## 10. Funding roadmap — the 18-month playbook
-**Before any paid grant dollar arrives, Artemio should close ~$400K+ in cloud and tech credits this month.**
+**Before any paid grant dollar arrives, the founding team should close ~$400K+ in cloud and tech credits this month.**
 These are 30-minute-to-2-hour applications, almost all self-serve, no legal entity required. The immediate
 stack: **AWS Activate Founders ($1K, 7–10 days); NVIDIA Inception (up to $100K AWS Activate + $150K
 Nebius + GPU preferred pricing; free, no equity)**; Microsoft for Startups Founders Hub (up to $150K Azure +
@@ -1907,13 +1908,13 @@ The grant pipeline sequences by probability × size × fit × timing:
 is the single highest-EV target — $10K Solver baseline + up to $150K AI for Humanity Prize via Patrick J.
 McGovern Foundation; Indigenous Communities + Climate tracks both fit. **National Geographic Society
 Level II Explorer grant (up to $100K, ~6-month LOI-to-decision)** — apply under Wildlife + Human
-Ingenuity/Tech; Artemio eligible as individual. **Mohamed bin Zayed Species Conservation Fund (up to $25K,
+Ingenuity/Tech; Founder eligible as individual. **Mohamed bin Zayed Species Conservation Fund (up to $25K,
 deadline June 30, 2026)** — tie to a specific IUCN-listed threatened Oaxaca species; 3 deadlines per year.
 **Rufford Small Grants (£7K, rolling, ~2-month review)** — strong fit for MAIA student status; fieldwork costs
 only. **Bezos Earth Fund AI for Climate & Nature Grand Challenge Phase III** if US fiscal sponsor secured
 (Phase I $50K → Phase II up to $2M; NY Botanical Gardens plant ID and WCS MERMAID are the fit pattern).
 **Q3 2026:** **Conservation Leadership Programme (deadline November, $12.5K Future Conservationist for
-teams of 3+)**; **Future for Nature Award (September, €50K)** — strong individual fit for Artemio; **IDB Lab
+teams of 3+)**; **Future for Nature Award (September, €50K)** — strong individual fit for the founder; **IDB Lab
 Natural Capital Action Plan / Jaguar Impact Initiative** — LATAM's only dedicated multilateral biodiversityinnovation vehicle, $500K–$1M typical; **Google.org Accelerator: Generative AI** — 2026 cohort expected
 Q3, ~$1.5M equivalent + pro-bono engineering; **CZI EOSS Cycle 7** ($100K–$400K) if Tec de Monterrey or
 fiscal-sponsor affiliation in place.
@@ -1922,7 +1923,7 @@ fiscal-sponsor affiliation in place.
 
 (needs accredited nominator like Mills Fabrica or Commonwealth Secretariat); **Whitley Fund for Nature
 2028** (target after deployment maturity — 2026 and 2027 too early); **FAHHO (Fundación Alfredo Harp Helú
-Oaxaca)** direct partnership — **highest local-strategic fit given Artemio's Oaxaca roots + Indigenouslanguage angle**.
+Oaxaca)** direct partnership — **highest local-strategic fit given the founder's Oaxaca roots + Indigenouslanguage angle**.
 **What not to bother with:** USAID (frozen under current U.S. admin); YC/Techstars/for-profit VC accelerators
 (mission mismatch); Arcus/Leakey/Disney/Moore/Packard/NIH/ERC/UKRI/Wellcome/RWJF (poor fit or
 invitation-only); crypto/ReFi as anchor strategy (taint risk + low yield); Indigenous funds in wrong geography
@@ -2053,7 +2054,7 @@ strongest ejido/comunal forest institutions (Ixtlán de Juárez FSC-certified co
 Pueblos Mancomunados and Expediciones Sierra Norte operating since 1994–98; Capulálpam de Méndez
 
 Pueblo Mágico; active CONANP protected areas Tehuacán-Cuicatlán, Huatulco, Lagunas de Chacahua).
-Proximity to academic partners at Tec de Monterrey (Artemio's MAIA program), UNAM, IPN CIIDIR Oaxaca
+Proximity to academic partners at Tec de Monterrey (MAIA program), UNAM, IPN CIIDIR Oaxaca
 closes the loop.
 **Q1:** MoUs with CONABIO (NaturaLista interop API terms), INECOL, IPN CIIDIR Oaxaca. Field partnerships
 with Ecoturixtlán and Expediciones Sierra Norte. Zapoteco UI translation via UNAM linguistics + communitymember review. 3 community partnerships signed; Zapoteco MVP strings 100% translated. **Q2:** closed
@@ -2099,8 +2100,8 @@ The realistic financial outcome is a sustainable mission-led organization with $
 funded 40% by international grants, 35% by B2G/B2B SaaS to Mexican and LATAM institutions, 15% by
 training programs and sponsored events, and 10% by API licensing and consumer donations. This is smaller
 than Glority's PictureThis ($100M+) and larger than iNaturalist ($4M) — it is neither failure nor Silicon Valley
-outcome. It is the exact shape of a durable biodiversity commons built on Artemio's specific advantages:
-Mexico City residence, Oaxaca roots, AWS technical credibility, MAIA academic channel, and the unusual
+outcome. It is the exact shape of a durable biodiversity commons built on the founder's specific advantages:
+Mexico City residence, Oaxaca roots, MAIA academic channel, and the unusual
 quadrant of open-source + Indigenous + LATAM + offline-first that no other founder is positioned to occupy.
 **Act immediately on three things: apply for NVIDIA Inception and AWS Activate this week; email Fundación
 Alfredo Harp Helú Oaxaca for an introduction meeting; and file a Mexican trademark search on "Rastrum" via
