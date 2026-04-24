@@ -25,6 +25,7 @@
 13. [Module: Community & Gamification](#module-community--gamification)
 14. [Module: Institutional Partnerships & Data Exports](#module-institutional-partnerships--data-exports)
 15. [Module: Environmental Context Auto-Enrichment](#module-environmental-context-auto-enrichment)
+16. [Module: Media Metadata Extraction (EXIF/XMP/ID3)](#module-media-metadata-extraction-exifxmpid3)
 
 ---
 
@@ -301,6 +302,9 @@ Observations must be interoperable with the global biodiversity data ecosystem.
 - Observation detail page with identification candidates, map, and metadata.
 - Media preprocessing pipeline: EXIF extraction, auto-orientation, resolution
   normalization, thumbnail generation.
+- **Media Metadata Extraction module**: automatic EXIF/XMP/ID3 metadata extraction
+  from uploaded photos, videos, and audio files — auto-populates observation form
+  with GPS coordinates, timestamps, device info, and quality indicators.
 - User profile pages with observation history and statistics.
 - Basic search and filtering (by species, date, location).
 
@@ -1436,3 +1440,103 @@ New columns on the `observations` table:
 - **CONABIO FIRMS** fire hotspot API (Mexican government, open).
 - All enrichment runs **asynchronously** after observation is saved — does not block
   submission flow.
+
+---
+
+## Module: Media Metadata Extraction (EXIF/XMP/ID3)
+
+**Target release: v0.2** — automatically extracts embedded metadata from every uploaded file
+
+When a user uploads a photo, video, or audio file, Rastrum extracts all available
+embedded metadata before the user fills in any form fields. This auto-populates the
+observation form and reduces manual data entry to near zero for users with GPS-enabled
+devices.
+
+### Photo / Image (EXIF & XMP)
+
+Extracted automatically from JPEG, HEIC, PNG, RAW files:
+
+**Location:**
+- `GPSLatitude` + `GPSLongitude` → auto-fills observation coordinates
+- `GPSAltitude` → elevation in meters
+- `GPSSpeed` → movement speed at capture (useful for aerial/drone shots)
+- `GPSImgDirection` → compass bearing camera was pointing
+
+**Date & Time:**
+- `DateTimeOriginal` → exact capture timestamp (used for lunar/weather enrichment)
+- `OffsetTimeOriginal` → timezone offset (critical for accurate lunar phase)
+
+**Device:**
+- `Make` + `Model` → camera/phone model (stored for data quality tracking)
+- `LensModel` → lens used
+- `FocalLength`, `FNumber`, `ExposureTime`, `ISO` → exposure metadata
+
+**Image quality indicators:**
+- `PixelXDimension` + `PixelYDimension` → resolution check for ID quality
+- Sharpness and blur score computed client-side before upload
+
+**Embedded species hints (XMP/IPTC):**
+- `XMP:Subject` / `IPTC:Keywords` → if user previously tagged in Lightroom/Photos app
+- `XMP:Description` → pre-filled notes field
+
+### Video (MP4/MOV metadata + embedded GPS tracks)
+
+- `CreationDate` → capture timestamp
+- GPS track embedded in MOV (iPhone videos embed full GPS track) → extract start
+  coordinates
+- `LocationName` if present (Apple Photos embeds this)
+- Duration → stored for clip length context
+- Device model from `HandlerDescription` or `Make`
+- Audio channels → detect if mono/stereo (relevant for audio ID quality)
+
+### Audio (ID3 tags + EXIF in FLAC/WAV)
+
+- `TXXX:GPS` or `GEOB` ID3 tags → some field recorder apps embed GPS
+- `TDRC` → recording date
+- `TPE1` → recorder name (if observer pre-tagged in field recorder app)
+- Sample rate, bit depth, duration → audio quality indicators for BirdNET pipeline
+- iXML chunk (professional field recorders: Zoom, Sound Devices) → GPS, project name,
+  scene notes
+- BWF (Broadcast Wave Format) metadata → timestamp, originator, description
+
+### Implementation
+
+**Client-side extraction (no server round-trip):**
+- `exifr` (npm) — fast, browser-compatible EXIF/XMP/IPTC parser
+- `music-metadata-browser` — audio ID3/FLAC/WAV metadata in browser
+- All extraction happens before upload — metadata is sent alongside the file
+
+**Privacy:**
+- User is shown all extracted metadata before submission with ability to redact
+  (e.g. remove GPS for sensitive nesting locations)
+- Option: "Strip metadata from shared file" — serves clean file to public, stores
+  original with metadata internally
+- Sensitive location redaction: auto-detect endangered species flags and offer to blur
+  GPS to 10km radius
+
+**Auto-population flow:**
+1. User selects file(s)
+2. Client extracts all metadata in <100ms
+3. Observation form auto-fills: coordinates, date/time, device, notes
+4. Environmental enrichment triggered immediately using extracted GPS+timestamp
+5. User reviews pre-filled form, corrects if needed, submits
+6. Server validates and stores metadata in `media_files.exif_data JSONB`
+
+**Data model:**
+- `media_files` gains:
+  - `exif_data JSONB` — full raw EXIF dump
+  - `gps_lat FLOAT`, `gps_lng FLOAT`, `gps_alt FLOAT` — parsed coordinates
+  - `captured_at TIMESTAMPTZ` — from EXIF DateTimeOriginal
+  - `device_make VARCHAR`, `device_model VARCHAR`
+  - `media_duration_s FLOAT` — for audio/video
+  - `sample_rate_hz INT` — for audio
+  - `resolution_px INT` — megapixels
+  - `gps_direction_deg FLOAT` — compass bearing at capture
+  - `metadata_redacted BOOLEAN` — if user chose to strip sensitive data
+
+**Quality scoring from metadata:**
+- Low-res image (<2MP) → quality warning
+- No GPS in EXIF → prompt user to confirm location manually
+- Capture date > 7 days ago → flag as historic observation
+- Audio sample rate <22kHz → warn that BirdNET accuracy may be reduced
+- Video duration >5 min → suggest trimming before upload
