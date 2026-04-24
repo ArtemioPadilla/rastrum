@@ -1,0 +1,137 @@
+---
+import DocLayout from '../../../layouts/DocLayout.astro';
+import { t, getDocPath } from '../../../i18n/utils';
+
+const lang = 'en';
+const tr = t(lang);
+---
+
+<DocLayout title={tr.docs.sections.vision} lang={lang} section="vision" editPath="src/pages/en/docs/vision.astro">
+  <article class="space-y-8">
+    <div>
+      <h1 class="text-3xl font-bold tracking-tight mb-4">{tr.docs.sections.vision}</h1>
+      <p class="text-lg text-zinc-600 dark:text-zinc-400 max-w-3xl">{tr.docs.descriptions.vision}</p>
+    </div>
+
+    <!-- Mission Statement -->
+    <section>
+      <h2 id="mission" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+        <a href="#mission" class="text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Mission Statement
+      </h2>
+      <blockquote class="border-l-4 border-emerald-500 pl-4 py-2 text-zinc-700 dark:text-zinc-300 italic text-lg">
+        "Rastrum exists to make every living thing identifiable by anyone, anywhere — even without cell signal, even without formal training, even in the languages that field guides forgot."
+      </blockquote>
+      <p class="text-zinc-700 dark:text-zinc-300 mt-4">
+        Rastrum is a bridge between the naturalist's eye and the conservationist's database, built in the open so the data it generates belongs to the commons.
+      </p>
+    </section>
+
+    <!-- The Problem -->
+    <section>
+      <h2 id="problem" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+        <a href="#problem" class="text-zinc-400 hover:text-emerald-500 transition-colors">#</a> The Problem
+      </h2>
+      <div class="space-y-4 text-zinc-700 dark:text-zinc-300">
+        <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <p class="font-semibold text-zinc-900 dark:text-zinc-100 mb-1">Tool fragmentation</p>
+          <p>PlantNet handles plants, Merlin handles birds, iNaturalist handles community curation — but no single platform unifies photo, audio, video, and ecological evidence into one workflow. Field workers juggle 3-4 apps per outing.</p>
+        </div>
+        <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <p class="font-semibold text-zinc-900 dark:text-zinc-100 mb-1">Offline gap</p>
+          <p>INEGI ENDUTIH 2024 reports only 62.5% internet connectivity in Oaxaca — the most biodiverse state in Mexico. Cloud-dependent tools leave 37.5% of users behind in exactly the places that matter most.</p>
+        </div>
+        <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <p class="font-semibold text-zinc-900 dark:text-zinc-100 mb-1">Language barriers</p>
+          <p>Most identification tools default to English or European languages. Mexico has 68 recognized linguistic groups — Zapoteco, Mixteco, Nahuatl, Maya, Tsotsil-Tseltal — with no tool that speaks their languages.</p>
+        </div>
+        <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <p class="font-semibold text-zinc-900 dark:text-zinc-100 mb-1">Training data bias</p>
+          <p>Most AI models are trained on North American and European specimens. Megadiverse Neotropical regions are critically underrepresented, leading to poor accuracy where it matters most.</p>
+        </div>
+        <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <p class="font-semibold text-zinc-900 dark:text-zinc-100 mb-1">No ecological evidence support</p>
+          <p>iNaturalist accepts track photos as images, but has no structured fields for substrate, stride length, or morphometrics. The most common evidence of large mammals — their tracks and scat — is treated as a second-class observation.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Our Approach -->
+    <section>
+      <h2 id="approach" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+        <a href="#approach" class="text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Our Approach
+      </h2>
+      <div class="space-y-3 text-zinc-700 dark:text-zinc-300">
+        <div class="flex items-start gap-3">
+          <span class="mt-1 w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+          <p><span class="font-semibold text-zinc-900 dark:text-zinc-100">Multi-modal ID</span> — One UI for photo, audio, video, and ecological evidence (tracks, scat, burrows, nests)</p>
+        </div>
+        <div class="flex items-start gap-3">
+          <span class="mt-1 w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+          <p><span class="font-semibold text-zinc-900 dark:text-zinc-100">AI ensemble</span> — PlantNet + BirdNET + Claude Vision cascade for best-in-class accuracy across taxa</p>
+        </div>
+        <div class="flex items-start gap-3">
+          <span class="mt-1 w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+          <p><span class="font-semibold text-zinc-900 dark:text-zinc-100">Offline-first</span> — Full functionality via cached ONNX models and IndexedDB, sync when signal returns</p>
+        </div>
+        <div class="flex items-start gap-3">
+          <span class="mt-1 w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+          <p><span class="font-semibold text-zinc-900 dark:text-zinc-100">Expert curation</span> — Community validation with taxonomic badges, dispute resolution, and research-grade consensus</p>
+        </div>
+        <div class="flex items-start gap-3">
+          <span class="mt-1 w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+          <p><span class="font-semibold text-zinc-900 dark:text-zinc-100">Conservation pipeline</span> — Native Darwin Core export to GBIF, CONABIO SNIB, CONANP, and INAH</p>
+        </div>
+        <div class="flex items-start gap-3">
+          <span class="mt-1 w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+          <p><span class="font-semibold text-zinc-900 dark:text-zinc-100">Indigenous data sovereignty</span> — CARE principles, FPIC process, and community veto power over data sharing</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Why Oaxaca First -->
+    <section>
+      <h2 id="oaxaca" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+        <a href="#oaxaca" class="text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Why Oaxaca First
+      </h2>
+      <p class="text-zinc-700 dark:text-zinc-300 mb-4">
+        Oaxaca is the ideal proving ground — a megadiverse state where every challenge Rastrum solves is concentrated in one place.
+      </p>
+      <div class="not-prose overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-zinc-200 dark:border-zinc-800">
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Factor</th>
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Detail</th>
+            </tr>
+          </thead>
+          <tbody class="text-zinc-700 dark:text-zinc-300">
+            <tr class="border-b border-zinc-200 dark:border-zinc-800">
+              <td class="py-2 px-3 font-medium text-zinc-900 dark:text-zinc-100">Mega-diversity</td>
+              <td class="py-2 px-3">12,500+ plant species, 736 bird species — 4th most biodiverse state globally</td>
+            </tr>
+            <tr class="border-b border-zinc-200 dark:border-zinc-800">
+              <td class="py-2 px-3 font-medium text-zinc-900 dark:text-zinc-100">Indigenous languages</td>
+              <td class="py-2 px-3">16 linguistic families, 1M+ Zapotec and Mixtec speakers</td>
+            </tr>
+            <tr class="border-b border-zinc-200 dark:border-zinc-800">
+              <td class="py-2 px-3 font-medium text-zinc-900 dark:text-zinc-100">Community forestry</td>
+              <td class="py-2 px-3">Ixtlan de Juarez model — FSC-certified forests with 75 camera traps and dedicated monitors</td>
+            </tr>
+            <tr class="border-b border-zinc-200 dark:border-zinc-800">
+              <td class="py-2 px-3 font-medium text-zinc-900 dark:text-zinc-100">Anchor sites</td>
+              <td class="py-2 px-3">Monte Alban, Yagul, Sierra de Juarez, Tehuacan-Cuicatlan biosphere</td>
+            </tr>
+            <tr class="border-b border-zinc-200 dark:border-zinc-800">
+              <td class="py-2 px-3 font-medium text-zinc-900 dark:text-zinc-100">FAHHO partnership</td>
+              <td class="py-2 px-3">Fundacion Alfredo Harp Helu Oaxaca — highest strategic fit for launch partner</td>
+            </tr>
+            <tr>
+              <td class="py-2 px-3 font-medium text-zinc-900 dark:text-zinc-100">Research infrastructure</td>
+              <td class="py-2 px-3">UNAM FES Iztacala, IPN CIIDIR Oaxaca, INECOL nearby</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </article>
+</DocLayout>

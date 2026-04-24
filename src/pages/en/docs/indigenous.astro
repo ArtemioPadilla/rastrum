@@ -1,0 +1,83 @@
+---
+import DocLayout from '../../../layouts/DocLayout.astro';
+const lang = 'en';
+---
+<DocLayout title="Indigenous Data Sovereignty" lang={lang} section="indigenous">
+
+# 🦅 Indigenous Data Sovereignty
+
+**CARE principles are the strategic moat no competitor can replicate quickly.** iNaturalist, Wildlife Insights, eBird, and PlantNet have no operationalized FPIC framework. Building one takes years of relationship capital in LATAM that large platforms will not invest.
+
+## CARE Principles
+
+| Principle | Meaning | Rastrum implementation |
+|-----------|---------|----------------------|
+| **C**ollective benefit | Data should benefit Indigenous communities | Community owns their data; analytics shared back |
+| **A**uthority to control | Communities control access and use | INPI territory detection → BC Provenance Notice required |
+| **R**esponsibility | Ensure ethical relationships | CARI with veto power; honoraria from operating budget |
+| **E**thics | Minimize harm, maximize benefit | No publication without community approval in consulta-covered territories |
+
+## Four-Layer Operationalization
+
+### Layer 1 — Principles (v0.1)
+Adopt CARE principles + ISE Code of Ethics formally in v0.1. Principle statement + basic access controls.
+
+### Layer 2 — Local Contexts Labels (v0.5)
+Integrate [Local Contexts Hub API v2](https://localcontexts.org/) for:
+
+**TK Labels (Traditional Knowledge):**
+TK Attribution · TK Clan · TK Family · TK Non-Commercial · TK Culturally Sensitive · TK Secret/Sacred · TK Seasonal · TK Verified · and 8+ more
+
+**BC Labels (Biocultural):**
+BC Provenance · BC Consent-NonCommercial · BC Consent-Verified · BC Multiple Communities · BC Outreach · BC Research
+
+*GBIF was the first biodiversity database to pilot Local Contexts integration (2022, Manaaki Whenua New Zealand) — Rastrum follows that pattern.*
+
+### Layer 3 — Territory Detection (v0.5)
+When a user's GPS is inside an INPI-mapped Indigenous territory:
+- Show BC Provenance Notice by default
+- Require per-project community approval before public data release
+- Offer GPS obscuration before upload
+
+### Layer 4 — CARI (v1.0)
+Establish the **Rastrum Consejo Asesor Indígena (CARI)**:
+- 7–9 seats, minimum 5 Indigenous members
+- Representatives: Oaxaca (Zapoteco, Mixteco, Mixe), Yucatán (Maya), Chiapas (Tsotsil/Tseltal), Puebla/Veracruz (Nahua)
+- 3-year staggered terms, quarterly bilingual meetings
+- **Veto power** on TK features, dataset releases from consulta-covered territories, and commercial partnerships
+- Honoraria paid from operating budget (not project budget — avoids extraction optics)
+
+## Supported Languages
+
+| Language | Speakers (Mexico) | Region | v1 target |
+|----------|-------------------|--------|-----------|
+| Zapoteco | ~500K | Oaxaca Sierra Norte/Valles | ✓ Pilot |
+| Mixteco | ~500K | Oaxaca/Guerrero/Puebla | v1.0 |
+| Náhuatl | 1.65M | Central Mexico | v1.0 |
+| Maya Yucateco | 774K | Yucatán/Campeche/Q.Roo | v1.5 |
+| Tsotsil/Tseltal | ~1M | Chiapas | v1.5 |
+
+*Pre-recorded audio prompts for critical flows — no native TTS coverage exists for these languages. Partner with INALI, UNAM linguistics, and CIESAS.*
+
+## Nagoya Protocol
+
+Mexico ratified Nagoya on May 16, 2012 (5th country, first megadiverse).
+
+**Photographs, audio, and occurrence records are generally NOT genetic resources** in the strict Nagoya sense — a pure observation platform largely falls outside Nagoya's triggers.
+
+**Risk triggers when:** Rastrum collects or displays Indigenous names, medicinal/ritual uses, or associated traditional knowledge (aTK) → requires PIC + MAT + IRCC on the ABS Clearing-House.
+
+**Practical guidance:** Treat ethnobotany as a v2+ feature gated on a completed FPIC process with at least one community partner. Mexico's domestic ABS law is still stalled (Ley General de Biodiversidad, 2016–present).
+
+## Sensitive Species Obscuration
+
+| NOM-059 Category | Public visibility | Credentialed researchers |
+|-----------------|-------------------|--------------------------|
+| E (Extinct in wild) | 5km grid obscure | Signed data-use agreement |
+| P (Peligro) | 0.2° auto-obscure | With audit log |
+| A (Amenazada) | 0.2° auto-obscure | With audit log |
+| Pr (Protección especial) | 0.1° default | Observer opt-out allowed |
+| CITES Appendix I | Always obscure | Credentialed only |
+| Orchids + Cactaceae | Always obscure | High poach risk |
+
+</DocLayout>

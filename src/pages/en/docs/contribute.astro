@@ -1,0 +1,114 @@
+---
+import DocLayout from '../../../layouts/DocLayout.astro';
+const lang = 'en';
+---
+<DocLayout title="Contributing" lang={lang} section="contribute">
+
+# 🤝 Contributing
+
+Rastrum is open source and community-driven. There are many ways to contribute beyond code.
+
+## Ways to Contribute
+
+### 🌿 Code
+- **Frontend (SvelteKit 2):** UI components, offline sync, map interactions
+- **Backend (Supabase Edge Functions):** AI pipeline routing, export pipelines
+- **On-device ML (ONNX):** Model quantization, regional species packs
+- **PWA/Capacitor:** iOS/Android wrapper improvements
+
+### 📸 Data & Species Curation
+- Submit field observations from Mexico / LATAM
+- Validate AI identifications as an expert
+- Contribute regional species checklists (Darwin Core format)
+- Add morphometric fields for ecological evidence (tracks, scat)
+
+### 🌐 Translations
+- Spanish ↔ English (core UI)
+- Zapoteco, Mixteco, Náhuatl, Maya, Tsotsil/Tseltal (priority)
+- Partner with INALI, UNAM linguistics, or CIESAS for Indigenous languages
+
+### 🔬 Expert Validation
+- Apply for an expert badge in your taxonomic group (ornithology, botany, mycology, herpetology, entomology...)
+- Review the expert identification queue
+- Contribute regional species keys and disambiguation guides
+
+### 📍 PITs & Trails
+- Install QR anchors in your local trails or protected areas
+- Create biodiversity trail routes with waypoints
+- Document local species checklists per trail segment
+
+---
+
+## Development Setup
+
+```bash
+git clone https://github.com/ArtemioPadilla/rastrum.git
+cd rastrum
+npm install
+npm run dev        # Astro dev server (current content site)
+```
+
+Environment variables needed (copy `.env.example`):
+```
+PUBLIC_SUPABASE_URL=
+PUBLIC_SUPABASE_ANON_KEY=
+PLANTNET_API_KEY=
+```
+
+---
+
+## Contribution Process
+
+1. **Fork** the repo and create a feature branch
+2. **Sign** your commits with DCO (`git commit -s`)  
+   *We use DCO (Developer Certificate of Origin), not CLA — no paperwork, no anxiety*
+3. **Open a PR** with a clear description and linked issue
+4. **Tests** must pass: `npm run build`
+5. **Review** from a maintainer within 7 days
+
+---
+
+## DCO Sign-off
+
+Add to every commit:
+```
+Signed-off-by: Your Name &lt;your_email&gt;
+```
+
+Or use `git commit -s` to add automatically. By signing, you certify:
+
+> "I wrote this code, or have the right to submit it under the open source license applicable to this project."
+
+---
+
+## License
+
+| Component | License |
+|-----------|---------|
+| Server / backend | AGPL-3.0 |
+| Client SDKs | Apache 2.0 |
+| Documentation | CC BY 4.0 |
+| Taxonomic data | CC0 |
+| ML models (small) | Apache 2.0 |
+
+---
+
+## Community Channels
+
+- **GitHub Discussions:** Feature proposals, architectural decisions
+- **GitHub Issues:** Bug reports, feature requests
+- **Spec:** docs/specs/rastrum-v1.md (on GitHub)
+
+---
+
+## Priorities for Early Contributors
+
+The highest-impact contributions right now:
+
+1. **Zapoteco UI translation** — first Indigenous language pilot
+2. **SvelteKit migration** — the Astro site needs to move to SvelteKit for the app shell
+3. **Dexie offline queue** — IndexedDB observation outbox + Supabase sync
+4. **EfficientNet-Lite0 ONNX** — quantized model bundle for offline ID
+5. **Darwin Core export** — occurrence CSV + DwC Archive generator
+
+</DocLayout>

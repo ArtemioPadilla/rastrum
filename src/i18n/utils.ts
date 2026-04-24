@@ -27,7 +27,20 @@ export const routes: Record<string, Record<Locale, string>> = {
   identify: { en: '/identify', es: '/identificar' },
   explore: { en: '/explore', es: '/explorar' },
   about: { en: '/about', es: '/acerca' },
+  docs: { en: '/docs', es: '/docs' },
 };
+
+export const docPages = [
+  'vision', 'features', 'roadmap', 'market',
+  'architecture', 'indigenous', 'funding', 'contribute',
+] as const;
+
+export type DocPage = (typeof docPages)[number];
+
+export function getDocPath(lang: string, page?: string) {
+  const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+  return page ? `${base}/${lang}/docs/${page}/` : `${base}/${lang}/docs/`;
+}
 
 export function getAlternateLocale(lang: string): Locale {
   return lang === 'es' ? 'en' : 'es';

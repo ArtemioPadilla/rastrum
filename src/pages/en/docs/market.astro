@@ -1,0 +1,95 @@
+---
+import DocLayout from '../../../layouts/DocLayout.astro';
+const lang = 'en';
+const matrix = [
+  { feature: 'Photo ID',              rastrum: true,  inat: true,    merlin: true,  plantnet: true,  wi: false,  arbimon: false },
+  { feature: 'Audio ID',              rastrum: true,  inat: 'partial', merlin: true,plantnet: false, wi: false,  arbimon: true  },
+  { feature: 'Video',                 rastrum: true,  inat: false,   merlin: false, plantnet: false, wi: false,  arbimon: false },
+  { feature: 'Ecological evidence',   rastrum: true,  inat: 'partial',merlin: false,plantnet: false, wi: false,  arbimon: false },
+  { feature: 'Camera traps',          rastrum: true,  inat: false,   merlin: false, plantnet: false, wi: true,   arbimon: false },
+  { feature: 'Offline-first',         rastrum: true,  inat: 'partial',merlin:'partial',plantnet:'partial',wi:false,arbimon:false},
+  { feature: 'Indigenous languages',  rastrum: true,  inat: false,   merlin: false, plantnet: false, wi: false,  arbimon: false },
+  { feature: 'GBIF export',           rastrum: true,  inat: true,    merlin: false, plantnet: 'partial', wi: true, arbimon: false },
+  { feature: 'CONABIO/CONANP',        rastrum: true,  inat: false,   merlin: false, plantnet: false, wi: false,  arbimon: false },
+  { feature: 'PITs / QR anchors',     rastrum: true,  inat: false,   merlin: false, plantnet: false, wi: false,  arbimon: false },
+  { feature: 'Open source',           rastrum: true,  inat: true,    merlin: false, plantnet: true,  wi: 'partial', arbimon: false },
+  { feature: 'FPIC / CARE framework', rastrum: true,  inat: false,   merlin: false, plantnet: false, wi: false,  arbimon: false },
+];
+function cell(v: boolean | string) {
+  if (v === true)      return { text: '✓', cls: 'text-emerald-400 font-bold' };
+  if (v === 'partial') return { text: '~', cls: 'text-amber-400' };
+  return               { text: '✗', cls: 'text-zinc-600' };
+}
+---
+<DocLayout title="Market & Opportunity" lang={lang} section="market">
+
+# 📊 Market & Opportunity
+
+## The Gap Rastrum Fills
+
+**No product today unifies photo + audio + video + ecological evidence in a single UI with offline-first operation, Indigenous-language UX, and native export pipelines to GBIF, CONABIO SNIB, CONANP and INAH simultaneously.**
+
+## Competitive Matrix
+
+<div class="not-prose overflow-x-auto mt-6 mb-10">
+  <table class="w-full text-sm border-collapse">
+    <thead>
+      <tr class="border-b border-zinc-800">
+        <th class="text-left py-2 px-3 text-zinc-400 font-medium">Feature</th>
+        <th class="py-2 px-3 text-emerald-400 font-semibold">Rastrum</th>
+        <th class="py-2 px-3 text-zinc-400 font-medium">iNaturalist</th>
+        <th class="py-2 px-3 text-zinc-400 font-medium">Merlin</th>
+        <th class="py-2 px-3 text-zinc-400 font-medium">PlantNet</th>
+        <th class="py-2 px-3 text-zinc-400 font-medium">Wildlife Insights</th>
+        <th class="py-2 px-3 text-zinc-400 font-medium">Arbimon</th>
+      </tr>
+    </thead>
+    <tbody>
+      {matrix.map((row, i) => (
+        <tr class:list={["border-b border-zinc-900", i % 2 === 0 ? "bg-zinc-950/50" : ""]}>
+          <td class="py-2 px-3 text-zinc-300">{row.feature}</td>
+          {[row.rastrum, row.inat, row.merlin, row.plantnet, row.wi, row.arbimon].map((v, j) => {
+            const c = cell(v);
+            return <td class:list={["py-2 px-3 text-center", c.cls, j === 0 ? "bg-emerald-500/5" : ""]}>{c.text}</td>;
+          })}
+        </tr>
+      ))}
+    </tbody>
+  </table>
+  <p class="text-xs text-zinc-600 mt-2">✓ full support · ~ partial · ✗ not supported</p>
+</div>
+
+## Market Sizing
+
+| Segment | 2024 | 2033 | CAGR |
+|---------|------|------|------|
+| Global citizen science platforms | $1.23B | $3.84B | 13.7% |
+| Global ecotourism | $275B | $770B | — |
+| Mexico ecotourism | $3.3–3.8B | $8.7–10.6B | ~15% |
+| Mexico birdwatching tourism | $1.9B | $3.1B | 8.6% |
+
+*Figures from market research firms ±30% uncertainty. Birdwatching is the fastest-growing North American sub-segment.*
+
+## Why Mexico / LATAM
+
+- **NaturaLista MX:** 138K users, 5M observations, 45K species — growing at only 16%/year vs iNat's near-doubling globally. The slowdown + 2024 CONABIO autonomy reduction opens space for a private/NGO complement
+- **City Nature Challenge 2024:** Monterrey #2 globally by observations, La Paz Bolivia #1 — LATAM dominates citizen science per capita
+- **Connectivity gap:** INEGI ENDUTIH 2024 — 83.1% national but only **62.5% in Oaxaca**, 56.7% Chiapas. The least-connected states are the most biodiverse. **31.5% of target users can't use cloud-dependent tools.**
+
+## The PIT/QR Moat
+
+The QR/NFC "Punto de Información Territorial" anchors have **zero competition** — whoever installs the most physical nodes in Mexican parks creates the biological version of Foursquare: a network effect where every QR label installed makes the platform more valuable.
+
+First-mover advantage is physical (a QR sticker on a tree), not just digital.
+
+## Target Users (v1 Priority)
+
+| Persona | Budget | Network effect |
+|---------|--------|---------------|
+| CONANP guardaparques | Institutional | High — 232 ANPs |
+| Monitores comunitarios | Grant-funded | High — community networks |
+| Consultores MIA/EIA | Commercial | Medium — 200+ firms |
+| Ecotourism guides | Personal/cooperative | Medium — 50+ operators Oaxaca |
+| University biology students | Academic | High — Tec/UNAM/IPN/ECOSUR |
+
+</DocLayout>

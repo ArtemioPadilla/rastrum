@@ -1,0 +1,48 @@
+---
+import DocLayout from '../../../layouts/DocLayout.astro';
+import { t, getDocPath, docPages } from '../../../i18n/utils';
+const lang = 'en';
+const tr = t(lang);
+const sections = [
+  { key: 'vision',       icon: '🌿', desc: 'Mission, problem, and why Oaxaca first' },
+  { key: 'features',     icon: '⚡', desc: '16 modules from photo ID to AI assistant' },
+  { key: 'roadmap',      icon: '🗺️', desc: 'v0.1 MVP to v2.5 over 30 months' },
+  { key: 'market',       icon: '📊', desc: 'Competitive gap, market sizing, moats' },
+  { key: 'architecture', icon: '🏗️', desc: 'Stack decisions, AI pipeline, cost model' },
+  { key: 'indigenous',   icon: '🦅', desc: 'CARE, FPIC, Local Contexts, languages' },
+  { key: 'funding',      icon: '💰', desc: '$400K credits + grants + legal structure' },
+  { key: 'contribute',   icon: '🤝', desc: 'Code, data, translations, curation' },
+];
+const getSectionLabel = (key: string) => (tr.docs.sections as Record<string,string>)[key] || key;
+--- title="Docs" lang={lang} section="">
+  <h1 class="text-3xl font-bold text-zinc-100 mb-2">{tr.docs.index_title}</h1>
+  <p class="text-lg text-zinc-400 mb-10">{tr.docs.index_subtitle}</p>
+
+  <div class="grid sm:grid-cols-2 gap-4">
+    {sections.map(s => (
+      <a href={getDocPath(lang, s.key)}
+        class="group p-5 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-emerald-500/40 transition-all block">
+        <div class="flex items-center gap-3 mb-2">
+          <span class="text-2xl">{s.icon}</span>
+          <h2 class="text-base font-semibold text-zinc-100 group-hover:text-emerald-400 transition-colors">
+            {getSectionLabel(s.key)}
+          </h2>
+        </div>
+        <p class="text-sm text-zinc-500">{s.desc}</p>
+      </a>
+    ))}
+  </div>
+
+  <div class="mt-10 p-5 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
+    <div class="flex flex-wrap gap-4 items-center justify-between">
+      <div>
+        <p class="text-sm font-medium text-emerald-400">Current phase</p>
+        <p class="text-zinc-300 text-sm mt-0.5">v0.1 Alpha — Photo ID + Offline PWA + Zapoteco pilot</p>
+      </div>
+      <a href={getDocPath(lang, 'roadmap')}
+        class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition-colors">
+        View roadmap →
+      </a>
+    </div>
+  </div>
+</DocLayout>

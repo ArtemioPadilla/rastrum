@@ -1,10 +1,63 @@
 {
-  "site": { "title": "Rastrum", "description": "Species identification platform for biodiversity observation" },
-  "nav": { "home": "Home", "identify": "Identify", "explore": "Explore", "about": "About" },
+  "site": {
+    "title": "Rastrum",
+    "description": "Open-source biodiversity identification platform for Latin America"
+  },
+  "nav": {
+    "home": "Home",
+    "identify": "Identify",
+    "explore": "Explore",
+    "about": "About",
+    "docs": "Docs"
+  },
   "home": {
-    "hero_title": "Identify any species",
-    "hero_subtitle": "Plants, animals, fungi, and ecological evidence — powered by AI and expert curation.",
-    "cta": "Start Identifying"
+    "hero_title": "Identify any living thing — anywhere",
+    "hero_subtitle": "Rastrum exists to make every living thing identifiable by anyone, anywhere — even without cell signal, even without formal training, even in the languages that field guides forgot.",
+    "cta": "Start Identifying",
+    "how_title": "How It Works",
+    "how_steps": [
+      {
+        "title": "Observe",
+        "description": "Capture photos, audio, or video of any species in the field — online or offline."
+      },
+      {
+        "title": "Identify",
+        "description": "Our AI pipeline analyzes your evidence using PlantNet, BirdNET, and Claude Vision with regional accuracy."
+      },
+      {
+        "title": "Contribute",
+        "description": "Validated observations join a growing open dataset exported to GBIF and CONABIO for real conservation."
+      }
+    ],
+    "why_title": "Why Rastrum",
+    "why_items": [
+      {
+        "title": "Offline-First",
+        "description": "Works without cell signal. Regional ML models cached on-device via ONNX + WebAssembly."
+      },
+      {
+        "title": "Multi-Modal ID",
+        "description": "Photo, audio, video, and ecological evidence — tracks, scat, burrows — all in one platform."
+      },
+      {
+        "title": "Indigenous Languages",
+        "description": "Zapoteco, Mixteco, Náhuatl, Maya, Tsotsil/Tseltal. Built with CARE principles and community consent."
+      },
+      {
+        "title": "LATAM-Focused",
+        "description": "Trained on megadiverse Neotropical data, not just North American and European species."
+      },
+      {
+        "title": "Open Source",
+        "description": "AGPL-3.0 server, Apache 2.0 SDKs. Every observation strengthens the commons."
+      },
+      {
+        "title": "Conservation Pipeline",
+        "description": "Direct exports to GBIF, CONABIO, CONANP, and regional herbaria across Latin America."
+      }
+    ],
+    "docs_cta": "Read the Docs",
+    "github_cta": "View on GitHub"
   },
   "identify": {
     "title": "Identify a Species",
@@ -22,10 +75,23 @@
     "title": "About Rastrum",
     "description": "Rastrum is an open-source biodiversity observation platform that combines computer vision, audio analysis, and expert curation to identify species from photos, videos, audio, and indirect evidence.",
     "stack_title": "Tech Stack",
-    "stack": ["Astro + GitHub Pages", "Supabase (DB, Auth, Storage)", "PlantNet API + BirdNET + Claude Vision", "Tailwind CSS", "PWA-ready"]
+    "stack": [
+      "Astro + GitHub Pages",
+      "Supabase (DB, Auth, Storage)",
+      "PlantNet API + BirdNET + Claude Vision",
+      "Tailwind CSS",
+      "PWA-ready"
+    ]
   },
-  "footer": { "license": "MIT License", "source": "Source on GitHub" },
-  "common": { "confidence": "Confidence", "location": "Location", "date": "Date" },
+  "footer": {
+    "license": "AGPL-3.0 License",
+    "source": "Source on GitHub"
+  },
+  "common": {
+    "confidence": "Confidence",
+    "location": "Location",
+    "date": "Date"
+  },
   "vision": {
     "title": "Our Vision",
     "statement": "Making biodiversity knowledge accessible to everyone — from field researchers to curious hikers — so every observation can drive conservation.",
@@ -37,11 +103,46 @@
   "roadmap": {
     "title": "Roadmap",
     "phases": [
-      { "version": "v0.1 Alpha", "name": "Foundation", "items": ["Astro skeleton + Supabase schema", "Photo ID MVP with PlantNet"] },
-      { "version": "v0.2 Beta", "name": "Intelligence", "items": ["Claude Vision integration", "Observation log + GPS tagging"] },
-      { "version": "v0.3", "name": "Community", "items": ["Audio ID with BirdNET", "Expert validation system"] },
-      { "version": "v1.0", "name": "Full Platform", "items": ["Video analysis support", "Offline mode + Darwin Core export"] },
-      { "version": "v2.0", "name": "Next Frontier", "items": ["Regional ML models from community data", "AR species overlay"] }
+      {
+        "version": "v0.1 Alpha",
+        "name": "Foundation",
+        "items": [
+          "Astro skeleton + Supabase schema",
+          "Photo ID MVP with PlantNet"
+        ]
+      },
+      {
+        "version": "v0.2 Beta",
+        "name": "Intelligence",
+        "items": [
+          "Claude Vision integration",
+          "Observation log + GPS tagging"
+        ]
+      },
+      {
+        "version": "v0.3",
+        "name": "Community",
+        "items": [
+          "Audio ID with BirdNET",
+          "Expert validation system"
+        ]
+      },
+      {
+        "version": "v1.0",
+        "name": "Full Platform",
+        "items": [
+          "Video analysis support",
+          "Offline mode + Darwin Core export"
+        ]
+      },
+      {
+        "version": "v2.0",
+        "name": "Next Frontier",
+        "items": [
+          "Regional ML models from community data",
+          "AR species overlay"
+        ]
+      }
     ]
   },
   "impact": {
@@ -55,24 +156,80 @@
   },
   "team": {
     "title": "Open Source",
-    "description": "Rastrum is MIT-licensed and community-driven. Every observation, every validation, every line of code strengthens the global biodiversity knowledge commons."
+    "description": "Rastrum is AGPL-3.0-licensed and community-driven. Every observation, every validation, every line of code strengthens the global biodiversity knowledge commons."
   },
   "how_it_works": {
     "title": "How It Works",
     "steps": [
-      { "title": "Observe", "description": "Capture photos, audio, or video of any species in the field." },
-      { "title": "Identify", "description": "Our AI pipeline analyzes your evidence using PlantNet, BirdNET, and Claude Vision." },
-      { "title": "Contribute", "description": "Validated observations join a growing open dataset for conservation and science." }
+      {
+        "title": "Observe",
+        "description": "Capture photos, audio, or video of any species in the field."
+      },
+      {
+        "title": "Identify",
+        "description": "Our AI pipeline analyzes your evidence using PlantNet, BirdNET, and Claude Vision."
+      },
+      {
+        "title": "Contribute",
+        "description": "Validated observations join a growing open dataset for conservation and science."
+      }
     ]
   },
   "tech": {
     "title": "Built With",
     "items": [
-      { "name": "Astro", "description": "Fast, modern web framework for static-first delivery" },
-      { "name": "Supabase", "description": "Open-source backend for database, auth, and storage" },
-      { "name": "PlantNet", "description": "Specialized AI for plant and fungi identification" },
-      { "name": "BirdNET", "description": "Neural network for bird and wildlife audio recognition" },
-      { "name": "Claude Vision", "description": "Advanced multimodal AI for general species identification" }
+      {
+        "name": "Astro",
+        "description": "Fast, modern web framework for static-first delivery"
+      },
+      {
+        "name": "Supabase",
+        "description": "Open-source backend for database, auth, and storage"
+      },
+      {
+        "name": "PlantNet",
+        "description": "Specialized AI for plant and fungi identification"
+      },
+      {
+        "name": "BirdNET",
+        "description": "Neural network for bird and wildlife audio recognition"
+      },
+      {
+        "name": "Claude Vision",
+        "description": "Advanced multimodal AI for general species identification"
+      }
     ]
+  },
+  "docs": {
+    "nav_title": "Documentation",
+    "back_to_docs": "All docs",
+    "edit_on_github": "Edit on GitHub",
+    "index_title": "Rastrum Docs",
+    "index_subtitle": "Everything you need to understand and build with Rastrum",
+    "sections": {
+      "vision": "Vision & Mission",
+      "features": "Features",
+      "roadmap": "Roadmap",
+      "market": "Market",
+      "architecture": "Architecture",
+      "indigenous": "Indigenous Sovereignty",
+      "funding": "Funding & Legal",
+      "contribute": "Contributing"
+    },
+    "descriptions": {
+      "vision": "Mission, problem statement, and why Oaxaca is the right place to start.",
+      "features": "All 16 modules — from photo ID to AR species overlay — with version targets.",
+      "roadmap": "Six milestones from v0.1 MVP to v2.5 AI assistant over 30 months.",
+      "market": "Competitive analysis, market sizing, and the specific gap Rastrum fills.",
+      "architecture": "Stack decisions, AI pipeline routing, cost model, and iOS PWA constraints.",
+      "indigenous": "CARE principles, FPIC, Local Contexts Labels, and the CARI advisory council.",
+      "funding": "~$400K in credits available now, grant pipeline, legal structure, and revenue model.",
+      "contribute": "How to contribute code, data, translations, expert validation, and PITs."
+    },
+    "status": {
+      "current": "Active",
+      "planned": "Planned",
+      "deprioritized": "Deprioritized"
+    }
   }
 }

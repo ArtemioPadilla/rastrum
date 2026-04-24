@@ -1,0 +1,41 @@
+---
+import { t, getDocPath, docPages } from '../i18n/utils';
+
+interface Props {
+  lang: string;
+  currentPage?: string;
+}
+
+const { lang, currentPage } = Astro.props;
+const tr = t(lang);
+---
+
+<aside class="w-full lg:w-64 shrink-0">
+  <nav class="sticky top-8 space-y-1">
+    <a
+      href={getDocPath(lang)}
+      class:list={[
+        'block px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+        !currentPage
+          ? 'bg-emerald-600/10 text-emerald-500 dark:text-emerald-400'
+          : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800/50',
+      ]}
+    >
+      {tr.docs.back_to_docs}
+    </a>
+    <div class="border-t border-zinc-200 dark:border-zinc-800 my-2"></div>
+    {docPages.map((page) => (
+      <a
+        href={getDocPath(lang, page)}
+        class:list={[
+          'block px-3 py-2 rounded-lg text-sm transition-colors',
+          currentPage === page
+            ? 'bg-emerald-600/10 text-emerald-500 dark:text-emerald-400 font-medium'
+            : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800/50',
+        ]}
+      >
+        {(tr.docs.sections as Record<string, string>)[page]}
+      </a>
+    ))}
+  </nav>
+</aside>

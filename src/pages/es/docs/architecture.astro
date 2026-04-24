@@ -1,0 +1,13 @@
+---
+import DocLayout from '../../../layouts/DocLayout.astro';
+const lang = 'es';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const PAGE = 'architecture';
+const enUrl = `${base}/en/docs/${PAGE}/`;
+---
+<DocLayout title={PAGE} lang={lang} section={PAGE}>
+  <div class="not-prose p-4 rounded-lg bg-amber-500/10 border border-amber-500/20 mb-8">
+    <p class="text-sm text-amber-300">🌐 Esta sección está disponible en inglés. La traducción al español estará disponible pronto.</p>
+    <a href={enUrl} class="text-sm text-amber-400 underline mt-1 block">Ver en inglés →</a>
+  </div>
+</DocLayout>
