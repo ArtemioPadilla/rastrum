@@ -5,8 +5,8 @@ import sitemap from '@astrojs/sitemap';
 
 // https://astro.build/config
 export default defineConfig({
-  site: 'https://artemiopadilla.github.io',
-  base: '/rastrum',
+  site: 'https://rastrum.artemiop.com',
+  base: '/',
   output: 'static',
   integrations: [tailwind(), sitemap()],
   i18n: {
