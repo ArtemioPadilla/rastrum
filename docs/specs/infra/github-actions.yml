@@ -1,7 +1,9 @@
-name: Deploy to GitHub Pages
+name: CI — test, build, deploy
 
 on:
   push:
+    branches: [main]
+  pull_request:
     branches: [main]
   workflow_dispatch:
 
@@ -11,11 +13,40 @@ permissions:
   id-token: write
 
 concurrency:
-  group: "pages"
+  group: "pages-${{ github.ref }}"
   cancel-in-progress: false
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: supabase/postgres:15.1.0.147
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run test:unit -- --coverage
+      - run: npm run test:rls
+      - run: npx playwright install --with-deps chromium webkit
+      - run: npm run test:e2e
+
   build:
+    needs: test
+    # Run build on PRs too (preview) but only deploy from main
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -35,13 +66,22 @@ jobs:
         env:
           PUBLIC_SUPABASE_URL: ${{ secrets.PUBLIC_SUPABASE_URL }}
           PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.PUBLIC_SUPABASE_ANON_KEY }}
+          PUBLIC_R2_MEDIA_URL: ${{ secrets.PUBLIC_R2_MEDIA_URL }}
+          PUBLIC_R2_TILES_URL: ${{ secrets.PUBLIC_R2_TILES_URL }}
+
+      - name: Lighthouse CI
+        if: github.event_name == 'pull_request'
+        run: npx lhci autorun --upload.target=temporary-public-storage
+        continue-on-error: false
 
       - name: Upload artifact
+        if: github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./dist
 
   deploy:
+    if: github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
     environment:

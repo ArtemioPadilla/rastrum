@@ -32,10 +32,24 @@ await supabase.auth.mfa.enroll({ factorType: 'webauthn' });
 ```
 
 ### 3. Guest Mode
-- User can create up to 3 observations without signing in
-- Observations stored in Dexie with `observer_id: 'guest'`
-- On sign-up/in: transfer guest observations to real account
-- Show soft prompt after first observation: "Create free account to save your observations to the cloud"
+
+- User can create up to **3 observations** without signing in.
+- Guest observations live **exclusively in Dexie** — they are never written to
+  Supabase while `observer_id` is the sentinel `'guest'`. This matters because
+  `observations.observer_id` is `uuid NOT NULL REFERENCES public.users(id)` in
+  Postgres; writing the string `'guest'` would fail the constraint.
+- The TypeScript type uses a discriminated union so the compiler enforces this
+  invariant in the sync engine:
+  ```typescript
+  type ObserverRef =
+    | { kind: 'user';  id: string /* uuid */ }
+    | { kind: 'guest'; localId: string /* local-only */ };
+  ```
+- Soft prompt after the first observation:
+  "Create a free account to sync your observations to the cloud."
+- Hard prompt after the 3rd guest observation: the form refuses a 4th until
+  the user signs in or explicitly dismisses and acknowledges that further
+  observations are local-only.
 
 ---
 
@@ -150,19 +164,50 @@ ANTHROPIC_API_KEY=sk-ant-xxxxx
 
 ## Guest → Authenticated Migration
 
+When a guest signs in, all guest-scoped observations on *this device* are rewritten
+with the real `observer_id` and queued for sync. Cross-device guest observations
+are not merged — each device's guest store is independent.
+
 ```typescript
-async function migrateGuestObservations(userId: string): Promise<void> {
+async function migrateGuestObservations(userId: string): Promise<MigrationResult> {
   const guestObs = await db.observations
-    .where('data.observer_id').equals('guest')
+    .where('observer_kind').equals('guest')
     .toArray();
 
+  const migrated: string[] = [];
+  const skipped: Array<{ id: string; reason: string }> = [];
+
   for (const obs of guestObs) {
+    // Defensive: if somehow an observation already has a real user_id
+    // (e.g. the same device was used by two accounts), skip and log.
+    if (obs.data.observer_ref.kind === 'user') {
+      skipped.push({ id: obs.id, reason: 'already owned' });
+      continue;
+    }
+
     await db.observations.update(obs.id, {
-      data: { ...obs.data, observer_id: userId },
+      observer_kind: 'user',
+      data: {
+        ...obs.data,
+        observer_ref: { kind: 'user', id: userId },
+      },
+      sync_status: 'pending',  // re-queue for upload
     });
+    migrated.push(obs.id);
   }
 
-  // Re-trigger sync for migrated observations
+  // Re-trigger sync
   await syncOutbox();
+  return { migrated, skipped };
 }
 ```
+
+**Idempotency:** migration is safe to replay. Observations already marked
+`kind: 'user'` are skipped. The Supabase upsert uses `id` as the conflict
+key, so a replay of a previously-synced observation is a no-op.
+
+**Device-level conflict:** if the same user signs in on two devices that both
+hold guest observations, both devices migrate their own guest rows independently.
+Client-generated UUIDs make collisions statistically impossible. The rows
+appear on the server as two different observations — which is the correct
+behaviour (they really were two different field events).

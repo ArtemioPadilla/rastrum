@@ -14,10 +14,17 @@ Core data entry flow. User opens app, taps "New Observation", camera opens, phot
 ## Observation Data Model
 
 ```typescript
+// Discriminated union: guest observations live only in Dexie; authenticated
+// observations sync to Supabase. The sync engine refuses to upload anything
+// whose observer_ref.kind === 'guest' (see module 04).
+type ObserverRef =
+  | { kind: 'user';  id: string /* uuid */ }
+  | { kind: 'guest'; localId: string /* local-only, never synced as-is */ };
+
 interface Observation {
   // Identity
   id: string;                        // UUID v4, generated client-side
-  observer_id: string;               // UUID FK users.id
+  observer_ref: ObserverRef;         // see discriminated union above
   created_at: string;                // ISO 8601 UTC
 
   // Media

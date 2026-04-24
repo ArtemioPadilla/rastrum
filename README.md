@@ -63,9 +63,10 @@ Observations can be exported in standard formats (CSV, Darwin Core) for integrat
 | Framework | Astro 5.x | Static site generation, island architecture |
 | Styling | Tailwind CSS 3.x | Utility-first CSS |
 | Hosting | GitHub Pages | Static deployment at rastrum.artemiop.com |
-| Database | Supabase (PostgreSQL) | Observations, species, users, media metadata |
-| Storage | Supabase Storage | Photos, audio, video files |
-| Auth | Supabase Auth | User accounts and role-based access |
+| Database | Supabase (PostgreSQL + PostGIS) | Observations, taxa, users, media metadata |
+| Media storage | Cloudflare R2 | Photos, audio, video blobs (S3-compatible, zero egress) |
+| Map tiles | Cloudflare R2 + pmtiles | Offline-capable vector tiles |
+| Auth | Supabase Auth | Magic link + passkey, role-based access |
 | Edge Functions | Supabase Edge Functions | Server-side ID pipeline orchestration |
 | Photo ID | PlantNet API | Plant and fungus recognition |
 | Audio ID | BirdNET | Bird and animal vocalization classification |
@@ -108,12 +109,21 @@ npm run preview   # preview the build locally
 Create a `.env` file in the project root. The following variables are required for full functionality:
 
 ```
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_ANON_KEY=your-anon-key
+# Public (shipped to client)
+PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+PUBLIC_R2_MEDIA_URL=https://media.rastrum.app
+PUBLIC_R2_TILES_URL=https://tiles.rastrum.app
+
+# Server-side only (Supabase Edge Functions)
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 PLANTNET_API_KEY=your-plantnet-key
+ANTHROPIC_API_KEY=your-anthropic-key
+R2_ACCESS_KEY_ID=your-r2-access-key
+R2_SECRET_ACCESS_KEY=your-r2-secret
 ```
 
-The static landing pages work without these variables. The identification and observation features require a running Supabase project.
+The static landing pages work without these variables. The identification and observation features require a running Supabase project and an R2 bucket for media + tiles.
 
 ## Project Structure
 

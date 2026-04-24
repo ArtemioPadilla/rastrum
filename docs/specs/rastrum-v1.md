@@ -1,10 +1,25 @@
-# Rastrum v1 — Product Specification
+# Rastrum v1 — Product Specification (Vision Document)
 
-**Document**: Product Spec  
+**Document**: Product Spec — vision & narrative source  
 **Version**: 1.0  
 **Date**: 2026-04-24  
 **Status**: Draft  
 **License**: MIT  
+
+> **📌 Scope note — read this first.**
+>
+> This file is the **vision & feature-narrative** source for Rastrum. It
+> describes what the product is, who it is for, and what every feature should
+> eventually do.
+>
+> **It is not the implementation reference.** Implementation detail lives in
+> focused per-module specs at [`docs/specs/modules/`](./modules/), tracked by
+> the [module index](./modules/00-index.md). When this document and a module
+> spec disagree, the **module spec wins**.
+>
+> - Schema, RLS policies, and migrations: [`docs/specs/infra/`](./infra/)
+> - Testing & CI: [`infra/testing.md`](./infra/testing.md)
+> - Phase schedule and progress: [`docs/progress.json`](../progress.json)
 
 ---
 

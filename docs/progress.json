@@ -1,41 +1,52 @@
 {
   "updated": "2026-04-24",
+  "notes": "Phases v1.0 and v1.5 are parallel tracks — v1.5 work begins while v1.0 is still stabilising. See docs/specs/modules/00-index.md for the per-module status.",
   "phases": {
     "v0.1": {
-      "name": "Alpha MVP",
+      "name": "Alpha MVP (online-first)",
       "period": "Months 1–3",
       "status": "in_progress",
       "items": [
         { "id": "astro-skeleton",     "label": "Astro site skeleton + Tailwind + i18n", "done": true },
-        { "id": "supabase-schema",    "label": "Supabase schema (observations, taxa, media)", "done": false },
-        { "id": "pwa-manifest",       "label": "PWA manifest + offline service worker", "done": false },
+        { "id": "supabase-schema",    "label": "Supabase schema (observations, taxa, identifications, media) with PostGIS + RLS", "done": false },
+        { "id": "auth-magic-link",    "label": "Supabase magic-link auth + guest mode", "done": false },
+        { "id": "gps-observation",    "label": "GPS-tagged observation form with EXIF auto-fill", "done": false },
         { "id": "plantnet-id",        "label": "PlantNet photo ID integration", "done": false },
-        { "id": "claude-haiku-id",    "label": "Claude Haiku 4.5 vision cascade", "done": false },
-        { "id": "zapoteco-ui",        "label": "Zapoteco UI pilot (FPIC process)", "done": false },
-        { "id": "darwin-core-export", "label": "Darwin Core CSV/Archive export", "done": false },
-        { "id": "offline-queue",      "label": "Dexie IndexedDB observation outbox", "done": false },
-        { "id": "gps-observation",    "label": "GPS-tagged observation form", "done": false },
-        { "id": "map-view",           "label": "Leaflet map with observation pins", "done": false }
+        { "id": "claude-haiku-id",    "label": "Claude Haiku 4.5 vision cascade (threshold 0.7)", "done": false },
+        { "id": "map-view",           "label": "MapLibre + pmtiles map with clustered observation pins", "done": false },
+        { "id": "darwin-core-csv",    "label": "Darwin Core CSV export (v0.1 field subset)", "done": false },
+        { "id": "pwa-manifest",       "label": "PWA manifest + service worker shell cache", "done": false },
+        { "id": "offline-queue",      "label": "Dexie IndexedDB outbox + sync engine", "done": false }
+      ]
+    },
+    "v0.3": {
+      "name": "Offline intelligence",
+      "period": "Months 4–5",
+      "status": "planned",
+      "items": [
+        { "id": "onnx-base",          "label": "EfficientNet-Lite0 ONNX base fallback (~2.8MB)", "done": false },
+        { "id": "offline-maps",       "label": "pmtiles offline map download (Mexico zoom 0–10)", "done": false },
+        { "id": "exif-extraction",    "label": "EXIF/XMP/ID3 metadata auto-extraction", "done": false },
+        { "id": "sensitive-privacy",  "label": "NOM-059 / CITES obscuration grid enforcement", "done": false }
       ]
     },
     "v0.5": {
       "name": "Beta",
-      "period": "Months 4–6",
+      "period": "Months 6–8",
       "status": "planned",
       "items": [
         { "id": "birdnet-audio",      "label": "BirdNET audio ID (commercial license)", "done": false },
         { "id": "multi-image",        "label": "Multi-image observations", "done": false },
         { "id": "eco-evidence",       "label": "Ecological evidence fields (tracks, scat, substrate)", "done": false },
-        { "id": "scout-v0",           "label": "Rastrum Scout v0 (conversational ID)", "done": false },
+        { "id": "scout-v0",           "label": "Rastrum Scout v0 (conversational ID, pgvector RAG)", "done": false },
         { "id": "consensus-workflow", "label": "Research-grade 2/3 identifier consensus", "done": false },
-        { "id": "local-contexts",     "label": "Local Contexts BC Notice integration", "done": false },
-        { "id": "gbif-ipt",           "label": "GBIF IPT pilot publish", "done": false },
-        { "id": "exif-extraction",    "label": "EXIF/XMP/ID3 metadata auto-extraction", "done": false }
+        { "id": "onnx-regional",      "label": "Regional ONNX packs (Oaxaca, Yucatán)", "done": false },
+        { "id": "gbif-ipt",           "label": "GBIF IPT pilot publish (Darwin Core Archive ZIP)", "done": false }
       ]
     },
     "v1.0": {
       "name": "Public Launch",
-      "period": "Months 7–12",
+      "period": "Months 9–14",
       "status": "planned",
       "items": [
         { "id": "camera-trap-ingest", "label": "Camera trap ingestion (SpeciesNet + MegaDetector)", "done": false },
@@ -50,20 +61,19 @@
     },
     "v1.5": {
       "name": "Territory Layer",
-      "period": "Months 10–14",
+      "period": "Months 12–16 (parallel to v1.0)",
       "status": "planned",
       "items": [
         { "id": "biodiversity-trails","label": "Biodiversity Trails with GPS waypoints + diversity metrics", "done": false },
         { "id": "pits-qr",            "label": "PITs + QR/NFC anchors (Puntos de Información Territorial)", "done": false },
         { "id": "spatial-analysis",   "label": "Spatial analysis: ANP/INEGI/INAH GeoJSON layers", "done": false },
         { "id": "diversity-indices",  "label": "Diversity indices: S, H', D, Chao1, Pielou J", "done": false },
-        { "id": "offline-maps",       "label": "MapLibre + pmtiles offline maps (Mexico zoom 0–14)", "done": false },
         { "id": "trail-pdf-export",   "label": "Trail PDF export (field guide style)", "done": false }
       ]
     },
     "v2.0": {
       "name": "Institutional",
-      "period": "Months 15–20",
+      "period": "Months 17–22",
       "status": "planned",
       "items": [
         { "id": "camera-trap-advanced","label": "Camera trap: occupancy modeling, activity histograms", "done": false },
@@ -75,7 +85,7 @@
     },
     "v2.5": {
       "name": "AI + AR",
-      "period": "Months 21–30",
+      "period": "Months 23–32",
       "status": "planned",
       "items": [
         { "id": "scout-full",         "label": "Rastrum Scout — full conversational field AI (RAG + pgvector)", "done": false },
@@ -84,5 +94,15 @@
         { "id": "conabio-api",        "label": "Formal CONABIO/CONANP/INAH partnership APIs", "done": false }
       ]
     }
+  },
+  "governance_track": {
+    "name": "Governance & sovereignty (parallel to all product phases)",
+    "notes": "Governance work runs continuously alongside the product roadmap. Milestones have no shipping date — they complete when community consent + legal review land.",
+    "items": [
+      { "id": "zapoteco-fpic",      "label": "Zapoteco UI pilot — Free, Prior, Informed Consent process", "done": false },
+      { "id": "local-contexts",     "label": "Local Contexts BC/TK Notice integration", "done": false },
+      { "id": "data-sovereignty",   "label": "Indigenous Data Sovereignty (CARE principles) policy", "done": false },
+      { "id": "license-framework",  "label": "Observer license framework (CC BY / BY-NC / CC0) + ML training gates", "done": false }
+    ]
   }
 }

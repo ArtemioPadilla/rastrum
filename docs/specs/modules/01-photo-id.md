@@ -108,7 +108,13 @@ interface ClaudeIDResult {
 
 ---
 
-## Offline Fallback: EfficientNet-Lite0 ONNX
+## Offline Fallback
+
+> **Scope note:** v0.1 ships **online-only**. The ONNX fallback lands in v0.3,
+> regional packs in v0.5. When offline at v0.1, the app queues photos in Dexie
+> and identifies them when connectivity returns (see module 03).
+
+### EfficientNet-Lite0 ONNX (v0.3+)
 
 **Bundle:** `public/models/efficientnet-lite0-int8.onnx` (~2.8 MB)
 **Runtime:** ONNX Runtime Web (`ort`) with `executionProviders: ['webgpu', 'wasm']`
@@ -131,7 +137,8 @@ async function identifyOffline(imageData: ImageData): Promise<OfflineResult> {
 }
 ```
 
-**Regional packs (lazy-loaded into IndexedDB):**
+### Regional packs (v0.5+, lazy-loaded into IndexedDB)
+
 - `models/oaxaca-pack.onnx` (~18 MB) — Oaxaca endemic species
 - `models/yucatan-pack.onnx` (~15 MB) — Yucatán/Caribbean species
 
@@ -141,15 +148,21 @@ async function identifyOffline(imageData: ImageData): Promise<OfflineResult> {
 
 ```typescript
 async function identify(photo: File, context: ObservationContext): Promise<IDResult> {
-  // 1. Check connectivity + model availability
   const online = navigator.onLine;
   const isPlant = context.userHint === 'plant' || await quickPlantCheck(photo);
 
+  // v0.1: no offline ID. Queue in Dexie; the sync engine runs identify()
+  // when connectivity returns. See module 03.
   if (!online) {
-    return identifyOffline(await toImageData(photo));
+    throw new QueueForLaterError('offline: observation queued, ID deferred');
   }
 
-  // 2. PlantNet first (plants only, fast, cheap)
+  // v0.3+: attempt on-device ONNX when offline and model is cached
+  // if (!online && await hasOnnxModel()) {
+  //   return identifyOffline(await toImageData(photo));
+  // }
+
+  // 1. PlantNet first (plants only, fast, cheap)
   if (isPlant) {
     const pn = await plantNetIdentify(photo);
     if (pn.results[0]?.score >= 0.7) {
@@ -159,7 +172,7 @@ async function identify(photo: File, context: ObservationContext): Promise<IDRes
     return claudeIdentify(photo, context, pn.results.slice(0, 3));
   }
 
-  // 3. Claude Haiku for fauna/fungi/unknown
+  // 2. Claude Haiku for fauna/fungi/unknown
   return claudeIdentify(photo, context, null);
 }
 ```
@@ -184,11 +197,37 @@ function checkImageQuality(file: File): QualityWarning[] {
 
 ## Cost Model
 
-| Volume | Model | Monthly cost |
-|--------|-------|-------------|
-| 10K MAU × 3 IDs/day | Gemini Flash-Lite (50%) + Haiku 4.5 (50%) | ~$500 |
-| Camera trap batches | Haiku Batch API (-50%) | ~$200 |
-| Expert review | Sonnet (5% of IDs) | ~$300 |
+All figures assume Claude Haiku 4.5 list pricing (April 2026): **$1 / MTok input,
+$5 / MTok output**. Prompt caching on the system prompt shaves ~90% off system
+tokens; batch API saves 50% on non-realtime flows.
+
+**Per-image token budget (Haiku 4.5, vision):**
+
+| Component | Tokens |
+|---|---|
+| Image (1024×1024, `tokens ≈ width × height / 750`) | ~1,400 |
+| System prompt (cached) | ~220 amortised (90% cache hit) |
+| Context (location, habitat, PlantNet candidates) | ~200 |
+| **Input total** | **~1,820** |
+| JSON response (10 fields + 2 alternatives) | ~180 output |
+| **Per-image cost** | **~1,820 × $1e-6 + 180 × $5e-6 ≈ $0.00282** |
+
+**Monthly cost scenarios** (PlantNet handles ~50% of plant photos without
+Claude; Claude is invoked for the other 50% plus all fauna/fungi/evidence):
+
+| Volume | Claude calls | Monthly Claude cost | PlantNet (free tier) |
+|---|---|---|---|
+| 1K MAU × 2 IDs/day × 30d = 60K IDs | 30K | ~$85 | 30K (within free tier) |
+| 10K MAU × 2 IDs/day × 30d = 600K IDs | 300K | ~$850 | 300K (paid tier est. ~$150) |
+| Camera trap batches (async, Batch API –50%) | 100K | ~$140 | n/a |
+| Expert review escalations (Sonnet 4.6) | 5% of 600K = 30K | ~$600 | n/a |
+
+**Risk notes:**
+- Haiku vision pricing has moved twice since Jan 2026; re-verify before launch.
+- PlantNet free tier is 500 req/day per key; at 10K MAU we will need the paid
+  tier or a key-pool strategy.
+- Gemini Flash-Lite was considered as a cheap first-pass and **rejected** — it
+  underperforms on Neotropical taxa and adds a third vendor.
 
 ---
 

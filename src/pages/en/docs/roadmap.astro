@@ -29,6 +29,9 @@ function pct(items: any[]) {
       <h1 class="text-3xl font-bold tracking-tight mb-2">{tr.docs.sections.roadmap}</h1>
       <p class="text-zinc-600 dark:text-zinc-400 max-w-2xl">{tr.docs.descriptions.roadmap}</p>
       <p class="text-xs text-zinc-500 dark:text-zinc-500 mt-2">Progress synced from <code class="text-xs bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">docs/progress.json</code> — last updated {progressData.updated}</p>
+      {progressData.notes && (
+        <p class="text-xs text-zinc-500 dark:text-zinc-500 mt-1 italic">{progressData.notes}</p>
+      )}
     </div>
 
     {phases.map((phase, i) => {
@@ -117,6 +120,36 @@ function pct(items: any[]) {
         </div>
       );
     })}
+
+    {progressData.governance_track && (
+      <div class="mt-6 rounded-xl border border-amber-500/30 bg-amber-500/5 dark:bg-amber-500/5 p-5">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-amber-500" />
+          <h2 class="text-sm font-semibold text-zinc-800 dark:text-zinc-200">{progressData.governance_track.name}</h2>
+        </div>
+        <p class="text-xs text-zinc-600 dark:text-zinc-400 mb-3">{progressData.governance_track.notes}</p>
+        <div class="grid sm:grid-cols-2 gap-x-6 gap-y-1.5">
+          {progressData.governance_track.items.map(item => (
+            <div class="flex items-start gap-2.5">
+              <div class:list={[
+                "mt-0.5 w-4 h-4 rounded shrink-0 border-2 flex items-center justify-center",
+                item.done ? "bg-amber-500 border-amber-500" : "border-amber-400/50 dark:border-amber-500/40 bg-transparent"
+              ]}>
+                {item.done && (
+                  <svg class="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 12 12" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M2 6l3 3 5-5"/>
+                  </svg>
+                )}
+              </div>
+              <span class:list={[
+                "text-sm leading-relaxed",
+                item.done ? "text-zinc-500 dark:text-zinc-500 line-through" : "text-zinc-700 dark:text-zinc-300"
+              ]}>{item.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
 
     <div class="pt-4 px-1">
       <p class="text-xs text-zinc-500 dark:text-zinc-600">

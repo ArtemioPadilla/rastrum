@@ -1,14 +1,18 @@
 -- Rastrum v0.1 Supabase Schema
 -- Run in Supabase SQL Editor
 -- Region: sa-east-1 (São Paulo) or mx-central-1 (Mexico City) for LGPDPPSO compliance
+--
+-- Scope: v0.1 ships a plain (non-partitioned) observations table. Partitioning
+-- is deferred until the table exceeds ~1M rows — see docs/specs/infra/future-migrations.md
+-- pgvector is also deferred; enabled at v0.5 when Scout/RAG lands.
 
 -- ============================================================
 -- EXTENSIONS
 -- ============================================================
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "postgis";
-CREATE EXTENSION IF NOT EXISTS "pg_partman";
-CREATE EXTENSION IF NOT EXISTS "vector";         -- pgvector (v0.5+)
+-- Deferred: pg_partman (v0.8+, when observations table crosses ~1M rows)
+-- Deferred: pgvector (v0.5+, when Scout AI RAG lands)
 
 -- ============================================================
 -- USERS
@@ -94,10 +98,10 @@ CREATE TABLE public.taxon_usage_history (
 );
 
 -- ============================================================
--- OBSERVATIONS (partitioned monthly)
+-- OBSERVATIONS (plain table; partition later if >1M rows)
 -- ============================================================
 CREATE TABLE public.observations (
-  id                    uuid NOT NULL DEFAULT uuid_generate_v4(),
+  id                    uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   observer_id           uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   observed_at           timestamptz NOT NULL DEFAULT now(),
 
@@ -111,6 +115,12 @@ CREATE TABLE public.observations (
   state_province        text,
   municipality          text,
   locality              text,
+
+  -- Primary taxon denormalized from identifications (for RLS + fast read paths).
+  -- Updated by trigger when the primary identification changes.
+  primary_taxon_id      uuid REFERENCES public.taxa(id),
+  obscure_level         text NOT NULL DEFAULT 'none'
+                        CHECK (obscure_level IN ('none','0.1deg','0.2deg','5km','full')),
 
   -- Field context
   habitat               text,
@@ -151,18 +161,7 @@ CREATE TABLE public.observations (
   device_os             text,
 
   created_at            timestamptz NOT NULL DEFAULT now(),
-  updated_at            timestamptz NOT NULL DEFAULT now(),
-
-  PRIMARY KEY (id, observed_at)   -- partitioned PK requires partition key
-) PARTITION BY RANGE (observed_at);
-
--- Create monthly partitions (pg_partman manages future ones)
-SELECT partman.create_parent(
-  p_parent_table => 'public.observations',
-  p_control => 'observed_at',
-  p_type => 'native',
-  p_interval => 'monthly',
-  p_premake => 3
+  updated_at            timestamptz NOT NULL DEFAULT now()
 );
 
 -- Indexes
@@ -170,6 +169,9 @@ CREATE INDEX idx_obs_observer ON observations(observer_id, observed_at DESC);
 CREATE INDEX idx_obs_location ON observations USING GIST(location);
 CREATE INDEX idx_obs_location_obs ON observations USING GIST(location_obscured);
 CREATE INDEX idx_obs_sync ON observations(sync_status) WHERE sync_status = 'pending';
+CREATE INDEX idx_obs_primary_taxon ON observations(primary_taxon_id);
+CREATE INDEX idx_obs_public ON observations(sync_status, obscure_level)
+  WHERE sync_status = 'synced';
 
 -- ============================================================
 -- IDENTIFICATIONS
@@ -244,7 +246,9 @@ CREATE POLICY "users_self_update" ON public.users FOR UPDATE
 -- Taxa: public read
 CREATE POLICY "taxa_public_read" ON public.taxa FOR SELECT USING (true);
 
--- Observations: owner full access, public read for non-sensitive synced
+-- Observations: owner full access, public read for synced non-sensitive rows.
+-- obscure_level is denormalized onto observations (see trigger below) so the
+-- policy can stay single-table and inexpensive.
 CREATE POLICY "obs_owner" ON public.observations FOR ALL
   USING ((SELECT auth.uid()) = observer_id);
 
@@ -253,7 +257,7 @@ CREATE POLICY "obs_public_read" ON public.observations FOR SELECT
     sync_status = 'synced'
     AND (
       obscure_level = 'none'
-      OR location_obscured IS NOT NULL  -- obscured coords available
+      OR location_obscured IS NOT NULL   -- sensitive, but coarsened coords available
     )
   );
 
@@ -326,3 +330,49 @@ CREATE TRIGGER update_obs_count_trigger
   FOR EACH ROW
   WHEN (NEW.sync_status = 'synced')
   EXECUTE FUNCTION public.update_user_obs_count();
+
+-- Keep observations.primary_taxon_id / obscure_level / location_obscured
+-- in sync with the primary identification. Runs whenever an identification
+-- row is flagged is_primary = true.
+CREATE OR REPLACE FUNCTION public.sync_primary_identification()
+RETURNS trigger AS $$
+DECLARE
+  v_obscure_level text;
+  v_raw_loc       geography(Point, 4326);
+BEGIN
+  IF NOT NEW.is_primary THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT obscure_level INTO v_obscure_level
+  FROM public.taxa WHERE id = NEW.taxon_id;
+
+  SELECT location INTO v_raw_loc
+  FROM public.observations WHERE id = NEW.observation_id;
+
+  UPDATE public.observations
+  SET primary_taxon_id = NEW.taxon_id,
+      obscure_level    = COALESCE(v_obscure_level, 'none'),
+      location_obscured = CASE
+        WHEN v_obscure_level IS NULL OR v_obscure_level = 'none' THEN NULL
+        WHEN v_obscure_level = '0.1deg' THEN public.obscure_point(v_raw_loc::geometry, 0.1)::geography
+        WHEN v_obscure_level = '0.2deg' THEN public.obscure_point(v_raw_loc::geometry, 0.2)::geography
+        WHEN v_obscure_level = '5km'    THEN public.obscure_point(v_raw_loc::geometry, 5.0/111.0)::geography
+        WHEN v_obscure_level = 'full'   THEN NULL  -- withhold entirely from public
+      END,
+      updated_at = now()
+  WHERE id = NEW.observation_id;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER sync_primary_id_trigger
+  AFTER INSERT OR UPDATE OF is_primary, taxon_id ON public.identifications
+  FOR EACH ROW
+  EXECUTE FUNCTION public.sync_primary_identification();
+
+-- Only one primary identification per observation.
+CREATE UNIQUE INDEX uniq_primary_id_per_obs
+  ON public.identifications(observation_id)
+  WHERE is_primary = true;
