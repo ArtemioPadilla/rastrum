@@ -1,0 +1,328 @@
+-- Rastrum v0.1 Supabase Schema
+-- Run in Supabase SQL Editor
+-- Region: sa-east-1 (São Paulo) or mx-central-1 (Mexico City) for LGPDPPSO compliance
+
+-- ============================================================
+-- EXTENSIONS
+-- ============================================================
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "postgis";
+CREATE EXTENSION IF NOT EXISTS "pg_partman";
+CREATE EXTENSION IF NOT EXISTS "vector";         -- pgvector (v0.5+)
+
+-- ============================================================
+-- USERS
+-- ============================================================
+CREATE TABLE public.users (
+  id                uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  username          text UNIQUE CHECK (username ~ '^[a-zA-Z0-9_]{3,30}$'),
+  display_name      text CHECK (length(display_name) <= 80),
+  bio               text CHECK (length(bio) <= 500),
+  avatar_url        text,
+  preferred_lang    text NOT NULL DEFAULT 'es'
+                    CHECK (preferred_lang IN ('es','en','zap','mix','nah','myn','tzo','tze')),
+  is_expert         boolean NOT NULL DEFAULT false,
+  expert_taxa       text[],                       -- e.g. ARRAY['Aves','Plantae']
+  observer_license  text NOT NULL DEFAULT 'CC BY 4.0'
+                    CHECK (observer_license IN ('CC BY 4.0','CC BY-NC 4.0','CC0')),
+  observation_count integer NOT NULL DEFAULT 0,
+  created_at        timestamptz NOT NULL DEFAULT now(),
+  updated_at        timestamptz NOT NULL DEFAULT now()
+);
+
+-- Auto-create user profile on sign-up
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO public.users (id)
+  VALUES (NEW.id)
+  ON CONFLICT DO NOTHING;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- ============================================================
+-- TAXA
+-- ============================================================
+CREATE TABLE public.taxa (
+  id                    uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  gbif_taxon_key        integer UNIQUE,
+  scientific_name       text NOT NULL,
+  scientific_name_with_author text,
+  canonical_name        text,
+  taxon_rank            text NOT NULL DEFAULT 'species',  -- species|genus|family|order|class|phylum|kingdom
+  kingdom               text,
+  phylum                text,
+  class                 text,
+  "order"               text,
+  family                text,
+  genus                 text,
+  specific_epithet      text,
+  infraspecific_epithet text,
+  common_name_es        text,
+  common_name_en        text,
+  nom059_status         text CHECK (nom059_status IN ('E','P','A','Pr')),  -- NOM-059 categories
+  cites_appendix        text CHECK (cites_appendix IN ('I','II','III')),
+  iucn_category         text CHECK (iucn_category IN ('EX','EW','CR','EN','VU','NT','LC','DD','NE')),
+  is_endemic_mexico     boolean DEFAULT false,
+  description_es        text,
+  description_en        text,
+  -- Obscuration flags (derived from status)
+  obscure_level         text NOT NULL DEFAULT 'none'
+                        CHECK (obscure_level IN ('none','0.1deg','0.2deg','5km','full')),
+  created_at            timestamptz NOT NULL DEFAULT now(),
+  updated_at            timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_taxa_scientific_name ON taxa(scientific_name);
+CREATE INDEX idx_taxa_gbif ON taxa(gbif_taxon_key);
+CREATE INDEX idx_taxa_family ON taxa(family);
+
+-- Taxon usage history (never rewrite historical IDs)
+CREATE TABLE public.taxon_usage_history (
+  id                  uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  observation_id      uuid NOT NULL,
+  original_name       text NOT NULL,
+  original_taxon_id   uuid,
+  current_accepted_id uuid REFERENCES taxa(id),
+  synonym_since       date,
+  created_at          timestamptz NOT NULL DEFAULT now()
+);
+
+-- ============================================================
+-- OBSERVATIONS (partitioned monthly)
+-- ============================================================
+CREATE TABLE public.observations (
+  id                    uuid NOT NULL DEFAULT uuid_generate_v4(),
+  observer_id           uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  observed_at           timestamptz NOT NULL DEFAULT now(),
+
+  -- Location (PostGIS geography for spherical accuracy)
+  location              geography(Point, 4326),
+  location_obscured     geography(Point, 4326),   -- NULL if not sensitive
+  accuracy_m            numeric,
+  altitude_m            numeric,
+  location_source       text DEFAULT 'gps'
+                        CHECK (location_source IN ('gps','exif','manual')),
+  state_province        text,
+  municipality          text,
+  locality              text,
+
+  -- Field context
+  habitat               text,
+  weather               text,
+  notes                 text CHECK (length(notes) <= 2000),
+  individual_count      integer CHECK (individual_count > 0),
+
+  -- Evidence type (v0.5+)
+  evidence_type         text DEFAULT 'direct_sighting'
+                        CHECK (evidence_type IN
+                          ('direct_sighting','track','scat','burrow','nest','feather','bone','sound','camera_trap')),
+
+  -- Environmental enrichment (auto-filled)
+  moon_phase            text,
+  moon_illumination     numeric CHECK (moon_illumination BETWEEN 0 AND 1),
+  photoperiod_hours     numeric,
+  temp_celsius          numeric,
+  precipitation_24h_mm  numeric,
+  precipitation_7d_mm   numeric,
+  days_since_rain       integer,
+  post_rain_flag        boolean DEFAULT false,
+  weather_tag           text,
+  ndvi_value            numeric,
+  phenological_season   text,
+  fire_proximity_km     numeric,
+
+  -- EXIF metadata
+  captured_at           timestamptz,
+  device_make           text,
+  device_model          text,
+  gps_direction_deg     numeric,
+  media_quality_score   numeric,
+
+  -- Sync
+  sync_status           text NOT NULL DEFAULT 'pending'
+                        CHECK (sync_status IN ('pending','synced','error')),
+  app_version           text,
+  device_os             text,
+
+  created_at            timestamptz NOT NULL DEFAULT now(),
+  updated_at            timestamptz NOT NULL DEFAULT now(),
+
+  PRIMARY KEY (id, observed_at)   -- partitioned PK requires partition key
+) PARTITION BY RANGE (observed_at);
+
+-- Create monthly partitions (pg_partman manages future ones)
+SELECT partman.create_parent(
+  p_parent_table => 'public.observations',
+  p_control => 'observed_at',
+  p_type => 'native',
+  p_interval => 'monthly',
+  p_premake => 3
+);
+
+-- Indexes
+CREATE INDEX idx_obs_observer ON observations(observer_id, observed_at DESC);
+CREATE INDEX idx_obs_location ON observations USING GIST(location);
+CREATE INDEX idx_obs_location_obs ON observations USING GIST(location_obscured);
+CREATE INDEX idx_obs_sync ON observations(sync_status) WHERE sync_status = 'pending';
+
+-- ============================================================
+-- IDENTIFICATIONS
+-- ============================================================
+CREATE TABLE public.identifications (
+  id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  observation_id  uuid NOT NULL,
+  taxon_id        uuid REFERENCES taxa(id),
+  scientific_name text,                    -- denormalized, stored at ID time
+  confidence      numeric CHECK (confidence BETWEEN 0 AND 1),
+  source          text NOT NULL
+                  CHECK (source IN ('plantnet','claude_haiku','claude_sonnet','onnx_offline','human')),
+  raw_response    jsonb,                   -- full API response
+  is_primary      boolean NOT NULL DEFAULT true,
+  is_research_grade boolean DEFAULT false,
+  validated_by    uuid REFERENCES users(id),
+  validated_at    timestamptz,
+  created_at      timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_id_observation ON identifications(observation_id);
+CREATE INDEX idx_id_taxon ON identifications(taxon_id);
+
+-- ============================================================
+-- MEDIA FILES
+-- ============================================================
+CREATE TABLE public.media_files (
+  id                  uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  observation_id      uuid NOT NULL,
+  media_type          text NOT NULL CHECK (media_type IN ('photo','audio','video')),
+  url                 text NOT NULL,         -- Cloudflare R2 URL
+  thumbnail_url       text,
+  original_filename   text,
+  mime_type           text,
+  file_size_bytes     bigint,
+  duration_s          numeric,               -- audio/video
+  sample_rate_hz      integer,               -- audio
+  resolution_px       integer,               -- megapixels
+  -- EXIF
+  exif_data           jsonb,
+  gps_lat             numeric,
+  gps_lng             numeric,
+  gps_alt             numeric,
+  captured_at         timestamptz,
+  device_make         text,
+  device_model        text,
+  gps_direction_deg   numeric,
+  metadata_redacted   boolean DEFAULT false,
+  -- Order
+  sort_order          integer NOT NULL DEFAULT 0,
+  is_primary          boolean NOT NULL DEFAULT false,
+  created_at          timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_media_observation ON media_files(observation_id);
+
+-- ============================================================
+-- RLS POLICIES
+-- ============================================================
+
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.observations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.identifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.media_files ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.taxa ENABLE ROW LEVEL SECURITY;
+
+-- Users: public read, self-update
+CREATE POLICY "users_public_read" ON public.users FOR SELECT USING (true);
+CREATE POLICY "users_self_update" ON public.users FOR UPDATE
+  USING ((SELECT auth.uid()) = id);
+
+-- Taxa: public read
+CREATE POLICY "taxa_public_read" ON public.taxa FOR SELECT USING (true);
+
+-- Observations: owner full access, public read for non-sensitive synced
+CREATE POLICY "obs_owner" ON public.observations FOR ALL
+  USING ((SELECT auth.uid()) = observer_id);
+
+CREATE POLICY "obs_public_read" ON public.observations FOR SELECT
+  USING (
+    sync_status = 'synced'
+    AND (
+      obscure_level = 'none'
+      OR location_obscured IS NOT NULL  -- obscured coords available
+    )
+  );
+
+-- Identifications: tied to observation access
+CREATE POLICY "id_owner" ON public.identifications FOR ALL
+  USING (
+    observation_id IN (
+      SELECT id FROM observations WHERE (SELECT auth.uid()) = observer_id
+    )
+  );
+
+CREATE POLICY "id_public_read" ON public.identifications FOR SELECT
+  USING (
+    observation_id IN (SELECT id FROM observations WHERE sync_status = 'synced')
+  );
+
+-- Media: same as observations
+CREATE POLICY "media_owner" ON public.media_files FOR ALL
+  USING (
+    observation_id IN (
+      SELECT id FROM observations WHERE (SELECT auth.uid()) = observer_id
+    )
+  );
+
+CREATE POLICY "media_public_read" ON public.media_files FOR SELECT
+  USING (
+    observation_id IN (SELECT id FROM observations WHERE sync_status = 'synced')
+    AND metadata_redacted = false
+  );
+
+-- ============================================================
+-- HELPER FUNCTIONS
+-- ============================================================
+
+-- Obscure a point to a grid cell
+CREATE OR REPLACE FUNCTION public.obscure_point(
+  pt geometry,
+  cell_size_deg numeric DEFAULT 0.2
+)
+RETURNS geometry
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT ST_SetSRID(
+    ST_MakePoint(
+      round(ST_X(pt) / cell_size_deg) * cell_size_deg,
+      round(ST_Y(pt) / cell_size_deg) * cell_size_deg
+    ),
+    4326
+  );
+$$;
+
+-- Update observation count on user
+CREATE OR REPLACE FUNCTION public.update_user_obs_count()
+RETURNS trigger AS $$
+BEGIN
+  UPDATE public.users
+  SET observation_count = (
+    SELECT COUNT(*) FROM public.observations
+    WHERE observer_id = NEW.observer_id AND sync_status = 'synced'
+  ),
+  updated_at = now()
+  WHERE id = NEW.observer_id;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER update_obs_count_trigger
+  AFTER INSERT OR UPDATE OF sync_status ON public.observations
+  FOR EACH ROW
+  WHEN (NEW.sync_status = 'synced')
+  EXECUTE FUNCTION public.update_user_obs_count();
