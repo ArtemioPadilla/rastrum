@@ -28,6 +28,7 @@ export const routes: Record<string, Record<Locale, string>> = {
   explore: { en: '/explore', es: '/explorar' },
   about: { en: '/about', es: '/acerca' },
   docs: { en: '/docs', es: '/docs' },
+  signIn: { en: '/sign-in', es: '/ingresar' },
 };
 
 export const docPages = [

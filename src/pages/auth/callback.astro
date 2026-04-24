@@ -1,0 +1,101 @@
+---
+// Language-neutral callback page. Supabase redirects the magic link here with
+// `?code=...` in the URL. We exchange it client-side (static Astro, no SSR)
+// and bounce to the user's preferred language home.
+import BaseLayout from '../../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Signing you in…" lang="en">
+  <div class="max-w-md mx-auto mt-16 text-center">
+    <div id="state-working">
+      <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mb-4"></div>
+      <h1 class="text-xl font-semibold text-zinc-900 dark:text-zinc-100">Signing you in…</h1>
+      <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-400">Verifying your link. This takes a second.</p>
+    </div>
+
+    <div id="state-error" class="hidden">
+      <h1 class="text-xl font-semibold text-red-600 dark:text-red-400">Link didn't work</h1>
+      <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-400" id="error-detail">
+        That link didn't work. It may have expired. Request a new one.
+      </p>
+      <a href="/en/sign-in/" class="mt-4 inline-block text-sm font-medium text-emerald-700 dark:text-emerald-400 underline underline-offset-2">
+        Try again
+      </a>
+    </div>
+  </div>
+
+  <script>
+    import { exchangeCode } from '../../lib/auth';
+    import { getSupabase } from '../../lib/supabase';
+
+    const working = document.getElementById('state-working');
+    const errorBox = document.getElementById('state-error');
+    const errorDetail = document.getElementById('error-detail');
+
+    function showError(message: string) {
+      working?.classList.add('hidden');
+      errorBox?.classList.remove('hidden');
+      if (errorDetail && message) errorDetail.textContent = message;
+    }
+
+    async function run() {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('code');
+      const errorCode = params.get('error') || params.get('error_code');
+      const errorDescription = params.get('error_description');
+
+      if (errorCode) {
+        showError(errorDescription || errorCode);
+        return;
+      }
+
+      if (!code) {
+        // `detectSessionInUrl: true` on the client may have already consumed it
+        // from the hash fragment. Check if we're authenticated anyway.
+        const { data: { session } } = await getSupabase().auth.getSession();
+        if (session) {
+          redirectToHome();
+          return;
+        }
+        showError('No sign-in code in URL.');
+        return;
+      }
+
+      const { error } = await exchangeCode(code);
+      if (error) {
+        showError(error.message);
+        return;
+      }
+
+      redirectToHome();
+    }
+
+    async function redirectToHome() {
+      // Read the user's preferred_lang from their profile (public.users).
+      // Fall back to browser language, then en.
+      let lang: 'en' | 'es' = 'en';
+      try {
+        const supabase = getSupabase();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await supabase
+            .from('users')
+            .select('preferred_lang')
+            .eq('id', user.id)
+            .maybeSingle();
+          const pl = profile?.preferred_lang;
+          if (pl === 'es' || pl === 'en') {
+            lang = pl;
+          } else if (navigator.language?.toLowerCase().startsWith('es')) {
+            lang = 'es';
+          }
+        }
+      } catch {
+        // Profile fetch failures are non-fatal — just redirect to default.
+      }
+      window.location.replace(`/${lang}/`);
+    }
+
+    run();
+  </script>
+</BaseLayout>

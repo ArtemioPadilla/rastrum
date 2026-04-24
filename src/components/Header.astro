@@ -75,6 +75,19 @@ const isDocsPage = currentPath.includes('/docs');
     </nav>
     <div class="flex items-center gap-3">
       <a
+        href={getLocalizedPath(lang, routes.signIn[lang as 'en'|'es'] + '/')}
+        id="sign-in-link"
+        class="hidden text-xs font-medium px-2.5 py-1 rounded border border-emerald-600/60 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
+      >
+        {tr.auth.sign_in}
+      </a>
+      <button
+        id="sign-out-btn"
+        class="hidden text-xs font-medium px-2.5 py-1 rounded border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+      >
+        {tr.auth.sign_out}
+      </button>
+      <a
         href={altHref}
         class="text-xs font-medium px-2 py-1 rounded border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
       >
@@ -136,4 +149,33 @@ const isDocsPage = currentPath.includes('/docs');
       ddMenu.classList.add('hidden');
     });
   }
+</script>
+
+<!-- Auth status toggle: shows Sign in OR Sign out depending on session. -->
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { signOut } from '../lib/auth';
+
+  const signInLink = document.getElementById('sign-in-link');
+  const signOutBtn = document.getElementById('sign-out-btn');
+
+  function paint(hasSession: boolean) {
+    if (signInLink) signInLink.classList.toggle('hidden', hasSession);
+    if (signOutBtn) signOutBtn.classList.toggle('hidden', !hasSession);
+  }
+
+  (async () => {
+    try {
+      const { data: { session } } = await getSupabase().auth.getSession();
+      paint(!!session);
+      getSupabase().auth.onAuthStateChange((_evt, s) => paint(!!s));
+    } catch {
+      // No env vars / not configured — leave both hidden.
+    }
+  })();
+
+  signOutBtn?.addEventListener('click', async () => {
+    await signOut();
+    window.location.reload();
+  });
 </script>
