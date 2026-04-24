@@ -1,130 +1,173 @@
 ---
 import DocLayout from '../../../layouts/DocLayout.astro';
+import { t } from '../../../i18n/utils';
+
 const lang = 'en';
+const tr = t(lang);
+
+const stack = [
+  { layer: 'Frontend',       choice: 'SvelteKit',              rationale: 'Lightweight, SSR+SPA, good offline story for write-heavy PWA' },
+  { layer: 'Local DB',       choice: 'Dexie (IndexedDB)',      rationale: 'Offline-first, sync-ready, append-heavy single-author pattern' },
+  { layer: 'AI Runtime',     choice: 'ONNX Runtime Web',       rationale: 'On-device inference via WebAssembly, WebGPU fallback' },
+  { layer: 'Object Storage', choice: 'Cloudflare R2',          rationale: 'S3-compatible, zero egress fees ($150/mo vs $4,710/mo Supabase at 10K MAU)' },
+  { layer: 'Backend',        choice: 'Supabase',               rationale: 'Postgres + PostGIS + pgvector + Auth + Realtime + Storage' },
+  { layer: 'Maps',           choice: 'MapLibre GL JS',         rationale: 'Open-source, self-hostable, pmtiles on R2 for offline tiles' },
+];
+
+const costModel = [
+  { scale: '10K MAU',  monthly: '~$2,000', perUser: '$0.20', breakdown: 'AI inference $800, storage $400, compute $500, misc $300' },
+  { scale: '50K MAU',  monthly: '~$6,000', perUser: '$0.12', breakdown: '' },
+  { scale: '100K MAU', monthly: '~$11,500', perUser: '$0.12', breakdown: '' },
+];
 ---
-<DocLayout title="Architecture" lang={lang} section="architecture">
 
-# 🏗️ Technical Architecture
+<DocLayout title={tr.docs.sections.architecture} lang={lang} section="architecture" editPath="src/pages/en/docs/architecture.astro">
+  <article class="space-y-8">
+    <div>
+      <h1 class="text-3xl font-bold tracking-tight mb-4">{tr.docs.sections.architecture}</h1>
+      <p class="text-lg text-zinc-600 dark:text-zinc-400 max-w-3xl">{tr.docs.descriptions.architecture}</p>
+    </div>
 
-## Stack Decisions
+    <!-- Stack Decisions -->
+    <section>
+      <h2 id="stack" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+        <a href="#stack" class="text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Stack Decisions
+      </h2>
+      <div class="not-prose overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-zinc-200 dark:border-zinc-800">
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Layer</th>
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Choice</th>
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Rationale</th>
+            </tr>
+          </thead>
+          <tbody class="text-zinc-700 dark:text-zinc-300">
+            {stack.map((row, i) => (
+              <tr class:list={["border-b border-zinc-100 dark:border-zinc-900", i % 2 === 0 ? "bg-zinc-50/50 dark:bg-zinc-950/50" : ""]}>
+                <td class="py-2 px-3 font-medium text-zinc-900 dark:text-zinc-100 whitespace-nowrap">{row.layer}</td>
+                <td class="py-2 px-3 font-mono text-emerald-600 dark:text-emerald-400 whitespace-nowrap">{row.choice}</td>
+                <td class="py-2 px-3">{row.rationale}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
 
-| Component | Decision | Why |
-|-----------|----------|-----|
-| **App shell** | SvelteKit 2 | Write-heavy offline PWA; Astro's MPA routing fights offline UX |
-| **Content site** | Astro | Species guides, docs, blog — static content hydration is perfect |
-| **Mobile wrapper** | Capacitor (iOS v1.2) | Escape WebKit ITP eviction; reuse PWA codebase |
-| **Offline sync** | Dexie IndexedDB outbox + REST | Append-heavy, single-author; CRDTs overkill |
-| **Offline maps** | MapLibre GL JS + pmtiles on R2 | Mapbox GL JS has no offline web support |
-| **On-device ML** | EfficientNet-Lite0 INT8 ONNX | Sub-3MB bundle; WebGPU → WASM fallback |
-| **Vision API** | Gemini Flash-Lite → Haiku 4.5 | Cost-optimized routing; Sonnet only for expert review |
-| **Audio AI** | BirdNET (commercial license) | Best open acoustic model; ⚠️ weights are CC BY-NC-SA |
-| **Storage** | Cloudflare R2 | Zero egress fees — $150/mo vs $4,710/mo Supabase Storage at 10K MAU |
-| **Database** | PostGIS + pgvector + Supabase | Geography type, GIST, pg_partman monthly partitions |
-| **Data residency** | AWS mx-central-1 option | LGPDPPSO compliance for B2G Mexican clients |
-
-> ⚠️ **BirdNET critical:** Model weights are CC BY-NC-SA 4.0 — non-commercial. Source code is MIT but weights are not. Contact ccb-birdnet@cornell.edu for a commercial license before adding any paid tier.
-
-## AI Identification Pipeline
-
-<pre><code>
-User uploads media
-        |
-        v
-  Client-side EXIF extraction (exifr) --&gt; GPS, timestamp, device
-        |
-        v
-  Pre-ID quality check --&gt; blur/dark warning
-        |
-        |--- Plant detected? ---------------&gt; PlantNet Pro API
-        |                                      (78K species, confidence)
-        |
-        |--- Bird sound? ------------------&gt; BirdNET
-        |                                      (commercial license)
-        |
-        +--- General image/video ----------&gt; Gemini 2.5 Flash-Lite
-                                              |
-                                              +- conf &gt;= 0.8 --&gt; Result
-                                              |
-                                              +- conf &lt; 0.8 --&gt; Claude Haiku 4.5
-                                                                 |
-                                                                 +- conf &gt;= 0.7 --&gt; Result
-                                                                 |
-                                                                 +- Expert queue --&gt; Sonnet
+    <!-- AI Pipeline -->
+    <section>
+      <h2 id="ai-pipeline" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+        <a href="#ai-pipeline" class="text-zinc-400 hover:text-emerald-500 transition-colors">#</a> AI Identification Pipeline
+      </h2>
+      <div class="not-prose p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 font-mono text-sm text-zinc-700 dark:text-zinc-300 overflow-x-auto whitespace-pre leading-relaxed">User uploads media
+  |
+  v
+Client-side EXIF extraction (exifr) --&gt; GPS, timestamp, device
+  |
+  v
+Pre-ID quality check --&gt; blur / dark warning
+  |
+  |--- Plant detected? --------&gt; PlantNet Pro API (78K species)
+  |
+  |--- Bird sound? ------------&gt; BirdNET (commercial license)
+  |
+  +--- General image/video ---&gt; Gemini 2.5 Flash-Lite (~$0.001)
+                                  |
+                                  +-- conf &gt;= 0.8 --&gt; Result
+                                  |
+                                  +-- conf &lt; 0.8  --&gt; Claude Haiku 4.5 (~$0.01)
+                                                       |
+                                                       +-- conf &gt;= 0.7 --&gt; Result
+                                                       |
+                                                       +-- Low conf --&gt; Expert queue
 
 Offline fallback:
   EfficientNet-Lite0 INT8 ONNX (&lt;3MB, top 500 species)
-  + Regional packs (Oaxaca/Yucatan 10-30MB, lazy-loaded into IndexedDB)
-</code></pre>
+  + Regional packs (Oaxaca/Yucatan, 10-30MB, lazy-loaded into IndexedDB)</div>
+    </section>
 
-## Cost Model
+    <!-- Cost Model -->
+    <section>
+      <h2 id="cost-model" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+        <a href="#cost-model" class="text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Cost Model
+      </h2>
+      <div class="not-prose overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-zinc-200 dark:border-zinc-800">
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Scale</th>
+              <th class="text-right py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Monthly Cost</th>
+              <th class="text-right py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Per User</th>
+            </tr>
+          </thead>
+          <tbody class="text-zinc-700 dark:text-zinc-300">
+            {costModel.map((row, i) => (
+              <tr class:list={["border-b border-zinc-100 dark:border-zinc-900", i % 2 === 0 ? "bg-zinc-50/50 dark:bg-zinc-950/50" : ""]}>
+                <td class="py-2 px-3 font-medium text-zinc-900 dark:text-zinc-100">{row.scale}</td>
+                <td class="py-2 px-3 text-right font-mono">{row.monthly}</td>
+                <td class="py-2 px-3 text-right font-mono">{row.perUser}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p class="text-sm text-zinc-600 dark:text-zinc-500 mt-3">
+        10K MAU breakdown: AI inference $800, object storage $400, compute $500, monitoring and misc $300. Includes Supabase Pro, Cloudflare R2, ~500K Haiku calls, 600K PlantNet Pro calls, and Gemini Flash-Lite first-pass.
+      </p>
+    </section>
 
-| Scale | Monthly cost | Per-user |
-|-------|-------------|----------|
-| 10K MAU | ~$2,000 | $0.20 |
-| 50K MAU | ~$6,000 | $0.12 |
-| 100K MAU | ~$11,500 | $0.12 |
-
-*Includes: Supabase Pro + R2 + ~500K Claude Haiku calls + 600K PlantNet Pro + Gemini first-pass + monitoring*
-
-**Freemium model:** 10 IDs/day free · $5/mo unlimited + expert review · $200–2,000/mo institutional
-
-## Database Schema (core tables)
-
-```sql
--- Core observation
-observations (
-  id uuid PK,
-  observer_id uuid FK users,
-  observed_at timestamptz,
-  location geography(Point, 4326),    -- PostGIS geography
-  location_obscured geography(Point), -- public-readable, fuzzy
-  habitat_type varchar,
-  -- Environmental auto-enrichment
-  moon_phase varchar, moon_illumination float,
-  precipitation_24h_mm float, ndvi_value float,
-  -- EXIF extracted
-  captured_at timestamptz, device_make varchar,
-  -- Partitioned monthly via pg_partman
-)
-
--- AI identifications
-identifications (
-  id uuid PK,
-  observation_id uuid FK,
-  taxon_id uuid FK,
-  confidence float,
-  source varchar,  -- 'plantnet'|'birdnet'|'claude_haiku'|'human'
-  validated_by uuid FK users,
-  is_research_grade boolean
-)
-
--- Sensitive location RLS
--- location: auth.uid() = observer_id OR is_credentialed_researcher()
--- location_obscured: public readable (obscure_point() IMMUTABLE function)
-```
-
-## iOS PWA Constraints
-
-iOS Safari will kill your PWA if you ignore these:
-
-| Constraint | Mitigation |
-|-----------|-----------|
-| 7-day ITP storage eviction | `navigator.storage.persist()` on install |
-| ~50MB cache soft limit | Keep initial cache under 30MB; lazy-load regional packs |
-| No Background Sync API | Flush queue on every app open |
-| Web Push requires A2HS | Prompt aggressively for Add-to-Home-Screen |
-| WebGPU only Safari 26+ | WASM fallback in ONNX Runtime Web |
-| EU DMA breaks Web Push (iOS 17.4) | Capacitor wrapper by v1.2 |
-
-## Offline Maps
-
-```
-Zoom 0–10: ~250MB overview (Mexico, pre-bundled)
-Zoom 11–14: user downloads 50km radius chunks (~20–60MB each)
-           → stored in Dexie blob storage
-
-Stack: MapLibre GL JS + protomaps pmtiles format
-       Self-hosted on Cloudflare R2 (zero egress)
-```
-
+    <!-- Data Model -->
+    <section>
+      <h2 id="data-model" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+        <a href="#data-model" class="text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Data Model
+      </h2>
+      <p class="text-zinc-700 dark:text-zinc-300 mb-4">
+        Core tables in the Supabase Postgres schema, partitioned monthly via pg_partman. PostGIS geography types for spatial queries, pgvector for semantic species search.
+      </p>
+      <div class="not-prose overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-zinc-200 dark:border-zinc-800">
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Table</th>
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Purpose</th>
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Key Fields</th>
+            </tr>
+          </thead>
+          <tbody class="text-zinc-700 dark:text-zinc-300">
+            <tr class="border-b border-zinc-100 dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-950/50">
+              <td class="py-2 px-3 font-mono text-emerald-600 dark:text-emerald-400">users</td>
+              <td class="py-2 px-3">User accounts and profiles</td>
+              <td class="py-2 px-3 font-mono text-xs">id, display_name, role, language_pref</td>
+            </tr>
+            <tr class="border-b border-zinc-100 dark:border-zinc-900">
+              <td class="py-2 px-3 font-mono text-emerald-600 dark:text-emerald-400">observations</td>
+              <td class="py-2 px-3">Core observation records with location and environment</td>
+              <td class="py-2 px-3 font-mono text-xs">id, observer_id, observed_at, location (PostGIS), moon_phase, precipitation</td>
+            </tr>
+            <tr class="border-b border-zinc-100 dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-950/50">
+              <td class="py-2 px-3 font-mono text-emerald-600 dark:text-emerald-400">species</td>
+              <td class="py-2 px-3">Taxonomic reference with NOM-059 categories</td>
+              <td class="py-2 px-3 font-mono text-xs">id, scientific_name, common_names (jsonb), nom_059_category</td>
+            </tr>
+            <tr class="border-b border-zinc-100 dark:border-zinc-900">
+              <td class="py-2 px-3 font-mono text-emerald-600 dark:text-emerald-400">media_files</td>
+              <td class="py-2 px-3">Photos, audio, video with EXIF metadata</td>
+              <td class="py-2 px-3 font-mono text-xs">id, observation_id, media_type, r2_key, exif_data (jsonb)</td>
+            </tr>
+            <tr class="border-b border-zinc-100 dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-950/50">
+              <td class="py-2 px-3 font-mono text-emerald-600 dark:text-emerald-400">identifications</td>
+              <td class="py-2 px-3">AI and human ID results with confidence scores</td>
+              <td class="py-2 px-3 font-mono text-xs">id, observation_id, taxon_id, confidence, source, is_research_grade</td>
+            </tr>
+            <tr>
+              <td class="py-2 px-3 font-mono text-emerald-600 dark:text-emerald-400">expert_validations</td>
+              <td class="py-2 px-3">Expert review with taxonomic badge verification</td>
+              <td class="py-2 px-3 font-mono text-xs">id, identification_id, validator_id, verdict, notes</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </article>
 </DocLayout>

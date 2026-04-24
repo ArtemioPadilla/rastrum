@@ -1,13 +1,114 @@
 ---
 import DocLayout from '../../../layouts/DocLayout.astro';
 const lang = 'es';
-const base = import.meta.env.BASE_URL.replace(/\/$/, '');
-const PAGE = 'contribute';
-const enUrl = `${base}/en/docs/${PAGE}/`;
 ---
-<DocLayout title={PAGE} lang={lang} section={PAGE}>
-  <div class="not-prose p-4 rounded-lg bg-amber-500/10 border border-amber-500/20 mb-8">
-    <p class="text-sm text-amber-300">🌐 Esta sección está disponible en inglés. La traducción al español estará disponible pronto.</p>
-    <a href={enUrl} class="text-sm text-amber-400 underline mt-1 block">Ver en inglés →</a>
-  </div>
+<DocLayout title="Contribuir" lang={lang} section="contribute" editPath="src/pages/es/docs/contribute.astro">
+
+# 🤝 Contribuir
+
+Rastrum es de código abierto e impulsado por la comunidad. Hay muchas formas de contribuir más allá del código.
+
+## Formas de Contribuir
+
+### 🌿 Código
+- **Frontend (SvelteKit 2):** Componentes UI, sincronización offline, interacciones de mapa
+- **Backend (Supabase Edge Functions):** Enrutamiento del pipeline IA, pipelines de exportación
+- **ML en dispositivo (ONNX):** Cuantización de modelos, paquetes regionales de especies
+- **PWA/Capacitor:** Mejoras del wrapper iOS/Android
+
+### 📸 Datos y Curación de Especies
+- Enviar observaciones de campo desde México / LATAM
+- Validar identificaciones de IA como experto
+- Contribuir listas de verificación regionales de especies (formato Darwin Core)
+- Agregar campos morfométricos para evidencia ecológica (huellas, excrementos)
+
+### 🌐 Traducciones
+- Español ↔ Inglés (UI principal)
+- Zapoteco, Mixteco, Náhuatl, Maya, Tsotsil/Tseltal (prioridad)
+- Alianza con INALI, lingüística UNAM o CIESAS para lenguas indígenas
+
+### 🔬 Validación Experta
+- Solicitar una insignia de experto en tu grupo taxonómico (ornitología, botánica, micología, herpetología, entomología...)
+- Revisar la cola de identificación experta
+- Contribuir claves regionales de especies y guías de desambiguación
+
+### 📍 PITs y Senderos
+- Instalar anclajes QR en tus senderos locales o áreas protegidas
+- Crear rutas de senderos de biodiversidad con puntos de ruta
+- Documentar listas de verificación de especies locales por segmento de sendero
+
+---
+
+## Configuración de Desarrollo
+
+```bash
+git clone https://github.com/ArtemioPadilla/rastrum.git
+cd rastrum
+npm install
+npm run dev        # Servidor de desarrollo Astro (sitio de contenido actual)
+```
+
+Variables de entorno necesarias (copiar `.env.example`):
+```
+PUBLIC_SUPABASE_URL=
+PUBLIC_SUPABASE_ANON_KEY=
+PLANTNET_API_KEY=
+```
+
+---
+
+## Proceso de Contribución
+
+1. **Fork** del repositorio y crear una rama de funcionalidad
+2. **Firmar** tus commits con DCO (`git commit -s`)
+   *Usamos DCO (Developer Certificate of Origin), no CLA — sin papeleo, sin ansiedad*
+3. **Abrir un PR** con descripción clara e issue vinculado
+4. **Pruebas** deben pasar: `npm run build`
+5. **Revisión** de un maintainer en un máximo de 7 días
+
+---
+
+## Firma DCO
+
+Agregar a cada commit:
+```
+Signed-off-by: Tu Nombre &lt;tu_email&gt;
+```
+
+O usar `git commit -s` para agregar automáticamente. Al firmar, certificas:
+
+> "Yo escribí este código, o tengo el derecho de enviarlo bajo la licencia de código abierto aplicable a este proyecto."
+
+---
+
+## Licencia
+
+| Componente | Licencia |
+|------------|----------|
+| Servidor / backend | AGPL-3.0 |
+| SDKs cliente | Apache 2.0 |
+| Documentación | CC BY 4.0 |
+| Datos taxonómicos | CC0 |
+| Modelos ML (pequeños) | Apache 2.0 |
+
+---
+
+## Canales de Comunidad
+
+- **GitHub Discussions:** Propuestas de funcionalidades, decisiones arquitectónicas
+- **GitHub Issues:** Reportes de bugs, solicitudes de funcionalidades
+- **Especificación:** docs/specs/rastrum-v1.md (en GitHub)
+
+---
+
+## Prioridades para Contribuidores Iniciales
+
+Las contribuciones de mayor impacto ahora mismo:
+
+1. **Traducción UI Zapoteco** — primer piloto de lengua indígena
+2. **Migración a SvelteKit** — el sitio Astro necesita moverse a SvelteKit para el shell de app
+3. **Cola offline Dexie** — bandeja de salida IndexedDB de observaciones + sincronización Supabase
+4. **EfficientNet-Lite0 ONNX** — paquete de modelo cuantizado para ID offline
+5. **Exportación Darwin Core** — generador de CSV de ocurrencias + Darwin Core Archive
+
 </DocLayout>

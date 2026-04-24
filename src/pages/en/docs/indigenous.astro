@@ -1,83 +1,190 @@
 ---
 import DocLayout from '../../../layouts/DocLayout.astro';
+import { t } from '../../../i18n/utils';
+
 const lang = 'en';
+const tr = t(lang);
 ---
-<DocLayout title="Indigenous Data Sovereignty" lang={lang} section="indigenous">
 
-# 🦅 Indigenous Data Sovereignty
+<DocLayout title={tr.docs.sections.indigenous} lang={lang} section="indigenous" editPath="src/pages/en/docs/indigenous.astro">
+  <article class="space-y-8">
+    <div>
+      <h1 class="text-3xl font-bold tracking-tight mb-4">{tr.docs.sections.indigenous}</h1>
+      <p class="text-lg text-zinc-600 dark:text-zinc-400 max-w-3xl">{tr.docs.descriptions.indigenous}</p>
+    </div>
 
-**CARE principles are the strategic moat no competitor can replicate quickly.** iNaturalist, Wildlife Insights, eBird, and PlantNet have no operationalized FPIC framework. Building one takes years of relationship capital in LATAM that large platforms will not invest.
+    <!-- CARE Principles -->
+    <section>
+      <h2 id="care" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+        <a href="#care" class="text-zinc-400 hover:text-emerald-500 transition-colors">#</a> CARE Principles
+      </h2>
+      <p class="text-zinc-700 dark:text-zinc-300 mb-4">
+        CARE principles are the strategic moat no competitor can replicate quickly. iNaturalist, Wildlife Insights, eBird, and PlantNet have no operationalized FPIC framework. Building one takes years of relationship capital that large platforms will not invest.
+      </p>
+      <div class="not-prose overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-zinc-200 dark:border-zinc-800">
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Principle</th>
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Meaning</th>
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Rastrum Implementation</th>
+            </tr>
+          </thead>
+          <tbody class="text-zinc-700 dark:text-zinc-300">
+            <tr class="border-b border-zinc-100 dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-950/50">
+              <td class="py-2 px-3 font-semibold text-emerald-600 dark:text-emerald-400">C — Collective Benefit</td>
+              <td class="py-2 px-3">Data should benefit Indigenous communities</td>
+              <td class="py-2 px-3">Community owns their data; analytics shared back</td>
+            </tr>
+            <tr class="border-b border-zinc-100 dark:border-zinc-900">
+              <td class="py-2 px-3 font-semibold text-emerald-600 dark:text-emerald-400">A — Authority to Control</td>
+              <td class="py-2 px-3">Communities control access and use</td>
+              <td class="py-2 px-3">INPI territory detection triggers BC Provenance Notice automatically</td>
+            </tr>
+            <tr class="border-b border-zinc-100 dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-950/50">
+              <td class="py-2 px-3 font-semibold text-emerald-600 dark:text-emerald-400">R — Responsibility</td>
+              <td class="py-2 px-3">Ensure ethical relationships</td>
+              <td class="py-2 px-3">CARI advisory council with veto power; honoraria from operating budget</td>
+            </tr>
+            <tr>
+              <td class="py-2 px-3 font-semibold text-emerald-600 dark:text-emerald-400">E — Ethics</td>
+              <td class="py-2 px-3">Minimize harm, maximize benefit</td>
+              <td class="py-2 px-3">No publication without community approval in consulta-covered territories</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
 
-## CARE Principles
+    <!-- Local Contexts Labels -->
+    <section>
+      <h2 id="local-contexts" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+        <a href="#local-contexts" class="text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Local Contexts Labels
+      </h2>
+      <p class="text-zinc-700 dark:text-zinc-300 mb-4">
+        Rastrum integrates the <a href="https://localcontexts.org/" class="text-emerald-600 dark:text-emerald-400 underline" target="_blank" rel="noopener">Local Contexts Hub API v2</a> for culturally appropriate data labeling. GBIF was the first biodiversity database to pilot this integration (2022, Manaaki Whenua New Zealand) — Rastrum follows that pattern.
+      </p>
+      <div class="grid sm:grid-cols-2 gap-4 not-prose">
+        <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <p class="font-semibold text-zinc-900 dark:text-zinc-100 mb-2">TK Labels (Traditional Knowledge)</p>
+          <p class="text-sm text-zinc-600 dark:text-zinc-500">
+            TK Attribution, TK Clan, TK Family, TK Non-Commercial, TK Culturally Sensitive, TK Secret/Sacred, TK Seasonal, TK Verified, and 8+ additional labels for managing traditional knowledge provenance and access.
+          </p>
+        </div>
+        <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <p class="font-semibold text-zinc-900 dark:text-zinc-100 mb-2">BC Labels (Biocultural)</p>
+          <p class="text-sm text-zinc-600 dark:text-zinc-500">
+            BC Provenance, BC Consent-NonCommercial, BC Consent-Verified, BC Multiple Communities, BC Outreach, BC Research — for managing biocultural heritage and community consent.
+          </p>
+        </div>
+      </div>
+    </section>
 
-| Principle | Meaning | Rastrum implementation |
-|-----------|---------|----------------------|
-| **C**ollective benefit | Data should benefit Indigenous communities | Community owns their data; analytics shared back |
-| **A**uthority to control | Communities control access and use | INPI territory detection → BC Provenance Notice required |
-| **R**esponsibility | Ensure ethical relationships | CARI with veto power; honoraria from operating budget |
-| **E**thics | Minimize harm, maximize benefit | No publication without community approval in consulta-covered territories |
+    <!-- CARI -->
+    <section>
+      <h2 id="cari" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+        <a href="#cari" class="text-zinc-400 hover:text-emerald-500 transition-colors">#</a> CARI — Consejo Asesor de Recursos Indigenas
+      </h2>
+      <div class="p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5">
+        <p class="text-zinc-700 dark:text-zinc-300 mb-3">
+          The Rastrum Indigenous Advisory Council provides governance oversight for all features involving traditional knowledge and indigenous community data.
+        </p>
+        <div class="space-y-2 text-sm text-zinc-700 dark:text-zinc-300">
+          <div class="flex items-start gap-2">
+            <span class="mt-1 w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+            <p><span class="font-semibold">7-9 seats</span>, minimum 5 Indigenous members</p>
+          </div>
+          <div class="flex items-start gap-2">
+            <span class="mt-1 w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+            <p><span class="font-semibold">Representation:</span> Oaxaca (Zapoteco, Mixteco, Mixe), Yucatan (Maya), Chiapas (Tsotsil/Tseltal), Puebla/Veracruz (Nahua)</p>
+          </div>
+          <div class="flex items-start gap-2">
+            <span class="mt-1 w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+            <p><span class="font-semibold">3-year staggered terms</span>, quarterly bilingual meetings</p>
+          </div>
+          <div class="flex items-start gap-2">
+            <span class="mt-1 w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+            <p><span class="font-semibold">Veto power</span> on TK features, dataset releases from consulta-covered territories, and commercial partnerships</p>
+          </div>
+          <div class="flex items-start gap-2">
+            <span class="mt-1 w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+            <p><span class="font-semibold">Honoraria</span> paid from operating budget (not project budget — avoids extraction optics)</p>
+          </div>
+        </div>
+      </div>
+    </section>
 
-## Four-Layer Operationalization
+    <!-- Languages -->
+    <section>
+      <h2 id="languages" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+        <a href="#languages" class="text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Supported Languages
+      </h2>
+      <div class="not-prose overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-zinc-200 dark:border-zinc-800">
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Language</th>
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Speakers (Mexico)</th>
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Region</th>
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Target</th>
+            </tr>
+          </thead>
+          <tbody class="text-zinc-700 dark:text-zinc-300">
+            <tr class="border-b border-zinc-100 dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-950/50">
+              <td class="py-2 px-3 font-medium text-zinc-900 dark:text-zinc-100">Zapoteco</td>
+              <td class="py-2 px-3">~500K</td>
+              <td class="py-2 px-3">Oaxaca (Sierra Norte, Valles Centrales)</td>
+              <td class="py-2 px-3"><span class="text-emerald-600 dark:text-emerald-400 font-semibold">v0.1 Pilot</span></td>
+            </tr>
+            <tr class="border-b border-zinc-100 dark:border-zinc-900">
+              <td class="py-2 px-3 font-medium text-zinc-900 dark:text-zinc-100">Mixteco</td>
+              <td class="py-2 px-3">~500K</td>
+              <td class="py-2 px-3">Oaxaca, Guerrero, Puebla</td>
+              <td class="py-2 px-3">v1.0</td>
+            </tr>
+            <tr class="border-b border-zinc-100 dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-950/50">
+              <td class="py-2 px-3 font-medium text-zinc-900 dark:text-zinc-100">Nahuatl</td>
+              <td class="py-2 px-3">1.65M</td>
+              <td class="py-2 px-3">Central Mexico</td>
+              <td class="py-2 px-3">v1.0</td>
+            </tr>
+            <tr class="border-b border-zinc-100 dark:border-zinc-900">
+              <td class="py-2 px-3 font-medium text-zinc-900 dark:text-zinc-100">Maya Yucateco</td>
+              <td class="py-2 px-3">774K</td>
+              <td class="py-2 px-3">Yucatan, Campeche, Quintana Roo</td>
+              <td class="py-2 px-3">v1.5</td>
+            </tr>
+            <tr>
+              <td class="py-2 px-3 font-medium text-zinc-900 dark:text-zinc-100">Tsotsil / Tseltal</td>
+              <td class="py-2 px-3">~1M</td>
+              <td class="py-2 px-3">Chiapas</td>
+              <td class="py-2 px-3">v1.5</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="text-sm text-zinc-600 dark:text-zinc-500 mt-3">
+        Pre-recorded audio prompts for critical flows — no native TTS coverage exists for these languages. Partner with INALI, UNAM linguistics, and CIESAS for translation and audio production.
+      </p>
+    </section>
 
-### Layer 1 — Principles (v0.1)
-Adopt CARE principles + ISE Code of Ethics formally in v0.1. Principle statement + basic access controls.
-
-### Layer 2 — Local Contexts Labels (v0.5)
-Integrate [Local Contexts Hub API v2](https://localcontexts.org/) for:
-
-**TK Labels (Traditional Knowledge):**
-TK Attribution · TK Clan · TK Family · TK Non-Commercial · TK Culturally Sensitive · TK Secret/Sacred · TK Seasonal · TK Verified · and 8+ more
-
-**BC Labels (Biocultural):**
-BC Provenance · BC Consent-NonCommercial · BC Consent-Verified · BC Multiple Communities · BC Outreach · BC Research
-
-*GBIF was the first biodiversity database to pilot Local Contexts integration (2022, Manaaki Whenua New Zealand) — Rastrum follows that pattern.*
-
-### Layer 3 — Territory Detection (v0.5)
-When a user's GPS is inside an INPI-mapped Indigenous territory:
-- Show BC Provenance Notice by default
-- Require per-project community approval before public data release
-- Offer GPS obscuration before upload
-
-### Layer 4 — CARI (v1.0)
-Establish the **Rastrum Consejo Asesor Indígena (CARI)**:
-- 7–9 seats, minimum 5 Indigenous members
-- Representatives: Oaxaca (Zapoteco, Mixteco, Mixe), Yucatán (Maya), Chiapas (Tsotsil/Tseltal), Puebla/Veracruz (Nahua)
-- 3-year staggered terms, quarterly bilingual meetings
-- **Veto power** on TK features, dataset releases from consulta-covered territories, and commercial partnerships
-- Honoraria paid from operating budget (not project budget — avoids extraction optics)
-
-## Supported Languages
-
-| Language | Speakers (Mexico) | Region | v1 target |
-|----------|-------------------|--------|-----------|
-| Zapoteco | ~500K | Oaxaca Sierra Norte/Valles | ✓ Pilot |
-| Mixteco | ~500K | Oaxaca/Guerrero/Puebla | v1.0 |
-| Náhuatl | 1.65M | Central Mexico | v1.0 |
-| Maya Yucateco | 774K | Yucatán/Campeche/Q.Roo | v1.5 |
-| Tsotsil/Tseltal | ~1M | Chiapas | v1.5 |
-
-*Pre-recorded audio prompts for critical flows — no native TTS coverage exists for these languages. Partner with INALI, UNAM linguistics, and CIESAS.*
-
-## Nagoya Protocol
-
-Mexico ratified Nagoya on May 16, 2012 (5th country, first megadiverse).
-
-**Photographs, audio, and occurrence records are generally NOT genetic resources** in the strict Nagoya sense — a pure observation platform largely falls outside Nagoya's triggers.
-
-**Risk triggers when:** Rastrum collects or displays Indigenous names, medicinal/ritual uses, or associated traditional knowledge (aTK) → requires PIC + MAT + IRCC on the ABS Clearing-House.
-
-**Practical guidance:** Treat ethnobotany as a v2+ feature gated on a completed FPIC process with at least one community partner. Mexico's domestic ABS law is still stalled (Ley General de Biodiversidad, 2016–present).
-
-## Sensitive Species Obscuration
-
-| NOM-059 Category | Public visibility | Credentialed researchers |
-|-----------------|-------------------|--------------------------|
-| E (Extinct in wild) | 5km grid obscure | Signed data-use agreement |
-| P (Peligro) | 0.2° auto-obscure | With audit log |
-| A (Amenazada) | 0.2° auto-obscure | With audit log |
-| Pr (Protección especial) | 0.1° default | Observer opt-out allowed |
-| CITES Appendix I | Always obscure | Credentialed only |
-| Orchids + Cactaceae | Always obscure | High poach risk |
-
+    <!-- Nagoya Protocol -->
+    <section>
+      <h2 id="nagoya" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+        <a href="#nagoya" class="text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Nagoya Protocol Compliance
+      </h2>
+      <div class="space-y-3 text-zinc-700 dark:text-zinc-300">
+        <p>
+          Mexico ratified the Nagoya Protocol on May 16, 2012 (5th country, first megadiverse). Photographs, audio, and occurrence records are generally <span class="font-semibold">not</span> genetic resources in the strict Nagoya sense — a pure observation platform largely falls outside Nagoya's triggers.
+        </p>
+        <div class="p-4 rounded-xl border border-yellow-500/20 bg-yellow-500/5">
+          <p class="font-semibold text-zinc-900 dark:text-zinc-100 mb-1">Risk triggers</p>
+          <p>When Rastrum collects or displays Indigenous names, medicinal/ritual uses, or associated traditional knowledge (aTK), this requires Prior Informed Consent (PIC) + Mutually Agreed Terms (MAT) + IRCC on the ABS Clearing-House.</p>
+        </div>
+        <p>
+          <span class="font-semibold">Practical guidance:</span> Treat ethnobotany as a v2+ feature gated on a completed FPIC process with at least one community partner. Mexico's domestic ABS law is still stalled (Ley General de Biodiversidad, 2016-present).
+        </p>
+      </div>
+    </section>
+  </article>
 </DocLayout>

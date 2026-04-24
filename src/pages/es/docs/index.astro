@@ -1,13 +1,48 @@
 ---
 import DocLayout from '../../../layouts/DocLayout.astro';
-const lang = 'es';
+import { t } from '../../../i18n/utils';
+const lang = 'es'; const tr = t(lang);
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
-const PAGE = 'index';
-const enUrl = `${base}/en/docs/${PAGE}/`;
+const sections = [
+  { key: 'vision',       icon: '🌿', color: 'emerald', desc: 'Misión, problema y por qué Oaxaca primero' },
+  { key: 'features',     icon: '⚡', color: 'sky',     desc: '16 módulos desde ID fotográfica hasta asistente IA' },
+  { key: 'roadmap',      icon: '🗺️', color: 'violet',  desc: 'v0.1 MVP a v2.5 en 30 meses' },
+  { key: 'market',       icon: '📊', color: 'amber',   desc: 'Brecha competitiva, tamaño de mercado, fosos' },
+  { key: 'architecture', icon: '🏗️', color: 'rose',    desc: 'Decisiones de stack, pipeline IA, modelo de costos' },
+  { key: 'indigenous',   icon: '🦅', color: 'orange',  desc: 'CARE, FPIC, Local Contexts, lenguas' },
+  { key: 'funding',      icon: '💰', color: 'teal',    desc: '$400K en créditos + becas + estructura legal' },
+  { key: 'contribute',   icon: '🤝', color: 'emerald', desc: 'Código, datos, traducciones, curación' },
+];
 ---
-<DocLayout title={PAGE} lang={lang} section={PAGE}>
-  <div class="not-prose p-4 rounded-lg bg-amber-500/10 border border-amber-500/20 mb-8">
-    <p class="text-sm text-amber-300">🌐 Esta sección está disponible en inglés. La traducción al español estará disponible pronto.</p>
-    <a href={enUrl} class="text-sm text-amber-400 underline mt-1 block">Ver en inglés →</a>
+<DocLayout title="Docs" lang={lang} section="">
+  <h1>{(tr.docs as any).index_title}</h1>
+  <p class="text-lg text-zinc-400 mt-2 mb-10">{(tr.docs as any).index_subtitle}</p>
+
+  <div class="grid sm:grid-cols-2 gap-4 not-prose">
+    {sections.map(s => (
+      <a href={`${base}/${lang}/docs/${s.key}/`}
+        class="group p-5 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-emerald-500/40 transition-all">
+        <div class="flex items-center gap-3 mb-2">
+          <span class="text-2xl">{s.icon}</span>
+          <h2 class="text-base font-semibold text-zinc-100 group-hover:text-emerald-400 transition-colors">
+            {(tr.docs as any)[s.key + '_title'] || (tr.docs as any).sections[s.key]}
+          </h2>
+        </div>
+        <p class="text-sm text-zinc-500">{s.desc}</p>
+      </a>
+    ))}
+  </div>
+
+  <div class="mt-10 p-5 rounded-xl bg-emerald-500/5 border border-emerald-500/20 not-prose">
+    <div class="flex flex-wrap gap-4 items-center justify-between">
+      <div>
+        <p class="text-sm font-medium text-emerald-400">Fase actual</p>
+        <p class="text-zinc-300 text-sm mt-0.5">v0.1 Alpha — ID Fotográfica + PWA Sin Conexión + Piloto Zapoteco</p>
+      </div>
+      <a href={`${base}/${lang}/docs/roadmap/`}
+        class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition-colors">
+        Ver hoja de ruta →
+      </a>
+    </div>
   </div>
 </DocLayout>

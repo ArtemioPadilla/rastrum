@@ -1,13 +1,95 @@
 ---
 import DocLayout from '../../../layouts/DocLayout.astro';
 const lang = 'es';
-const base = import.meta.env.BASE_URL.replace(/\/$/, '');
-const PAGE = 'market';
-const enUrl = `${base}/en/docs/${PAGE}/`;
+const matrix = [
+  { feature: 'ID Fotográfica',           rastrum: true,  inat: true,    merlin: true,  plantnet: true,  wi: false,  arbimon: false },
+  { feature: 'ID de Audio',              rastrum: true,  inat: 'partial', merlin: true,plantnet: false, wi: false,  arbimon: true  },
+  { feature: 'Video',                    rastrum: true,  inat: false,   merlin: false, plantnet: false, wi: false,  arbimon: false },
+  { feature: 'Evidencia ecológica',      rastrum: true,  inat: 'partial',merlin: false,plantnet: false, wi: false,  arbimon: false },
+  { feature: 'Cámaras trampa',           rastrum: true,  inat: false,   merlin: false, plantnet: false, wi: true,   arbimon: false },
+  { feature: 'Sin conexión primero',     rastrum: true,  inat: 'partial',merlin:'partial',plantnet:'partial',wi:false,arbimon:false},
+  { feature: 'Lenguas indígenas',        rastrum: true,  inat: false,   merlin: false, plantnet: false, wi: false,  arbimon: false },
+  { feature: 'Exportación GBIF',         rastrum: true,  inat: true,    merlin: false, plantnet: 'partial', wi: true, arbimon: false },
+  { feature: 'CONABIO/CONANP',           rastrum: true,  inat: false,   merlin: false, plantnet: false, wi: false,  arbimon: false },
+  { feature: 'PITs / Anclajes QR',       rastrum: true,  inat: false,   merlin: false, plantnet: false, wi: false,  arbimon: false },
+  { feature: 'Código abierto',           rastrum: true,  inat: true,    merlin: false, plantnet: true,  wi: 'partial', arbimon: false },
+  { feature: 'Marco FPIC / CARE',        rastrum: true,  inat: false,   merlin: false, plantnet: false, wi: false,  arbimon: false },
+];
+function cell(v: boolean | string) {
+  if (v === true)      return { text: '✓', cls: 'text-emerald-400 font-bold' };
+  if (v === 'partial') return { text: '~', cls: 'text-amber-400' };
+  return               { text: '✗', cls: 'text-zinc-600' };
+}
 ---
-<DocLayout title={PAGE} lang={lang} section={PAGE}>
-  <div class="not-prose p-4 rounded-lg bg-amber-500/10 border border-amber-500/20 mb-8">
-    <p class="text-sm text-amber-300">🌐 Esta sección está disponible en inglés. La traducción al español estará disponible pronto.</p>
-    <a href={enUrl} class="text-sm text-amber-400 underline mt-1 block">Ver en inglés →</a>
-  </div>
+<DocLayout title="Mercado y Oportunidad" lang={lang} section="market" editPath="src/pages/es/docs/market.astro">
+
+# 📊 Mercado y Oportunidad
+
+## La Brecha que Rastrum Llena
+
+**Ningún producto hoy unifica foto + audio + video + evidencia ecológica en una sola UI con operación sin-conexión-primero, UX en lenguas indígenas y pipelines de exportación nativos a GBIF, CONABIO SNIB, CONANP e INAH simultáneamente.**
+
+## Matriz Competitiva
+
+<div class="not-prose overflow-x-auto mt-6 mb-10">
+  <table class="w-full text-sm border-collapse">
+    <thead>
+      <tr class="border-b border-zinc-800">
+        <th class="text-left py-2 px-3 text-zinc-400 font-medium">Característica</th>
+        <th class="py-2 px-3 text-emerald-400 font-semibold">Rastrum</th>
+        <th class="py-2 px-3 text-zinc-400 font-medium">iNaturalist</th>
+        <th class="py-2 px-3 text-zinc-400 font-medium">Merlin</th>
+        <th class="py-2 px-3 text-zinc-400 font-medium">PlantNet</th>
+        <th class="py-2 px-3 text-zinc-400 font-medium">Wildlife Insights</th>
+        <th class="py-2 px-3 text-zinc-400 font-medium">Arbimon</th>
+      </tr>
+    </thead>
+    <tbody>
+      {matrix.map((row, i) => (
+        <tr class:list={["border-b border-zinc-900", i % 2 === 0 ? "bg-zinc-950/50" : ""]}>
+          <td class="py-2 px-3 text-zinc-300">{row.feature}</td>
+          {[row.rastrum, row.inat, row.merlin, row.plantnet, row.wi, row.arbimon].map((v, j) => {
+            const c = cell(v);
+            return <td class:list={["py-2 px-3 text-center", c.cls, j === 0 ? "bg-emerald-500/5" : ""]}>{c.text}</td>;
+          })}
+        </tr>
+      ))}
+    </tbody>
+  </table>
+  <p class="text-xs text-zinc-600 mt-2">✓ soporte completo · ~ parcial · ✗ no soportado</p>
+</div>
+
+## Tamaño de Mercado
+
+| Segmento | 2024 | 2033 | CAGR |
+|----------|------|------|------|
+| Plataformas globales de ciencia ciudadana | $1.23B | $3.84B | 13.7% |
+| Ecoturismo global | $275B | $770B | — |
+| Ecoturismo México | $3.3–3.8B | $8.7–10.6B | ~15% |
+| Turismo de observación de aves México | $1.9B | $3.1B | 8.6% |
+
+*Cifras de firmas de investigación de mercado con ±30% de incertidumbre. La observación de aves es el sub-segmento de más rápido crecimiento en Norteamérica.*
+
+## ¿Por Qué México / LATAM?
+
+- **NaturaLista MX:** 138K usuarios, 5M observaciones, 45K especies — creciendo solo al 16%/año vs el casi-duplicado global de iNat. La desaceleración + la reducción de autonomía de CONABIO 2024 abren espacio para un complemento privado/ONG
+- **City Nature Challenge 2024:** Monterrey #2 global por observaciones, La Paz Bolivia #1 — LATAM domina la ciencia ciudadana per cápita
+- **Brecha de conectividad:** INEGI ENDUTIH 2024 — 83.1% nacional pero solo **62.5% en Oaxaca**, 56.7% Chiapas. Los estados menos conectados son los más biodiversos. **31.5% de los usuarios objetivo no pueden usar herramientas dependientes de la nube.**
+
+## El Foso PIT/QR
+
+Los anclajes QR/NFC "Punto de Información Territorial" tienen **cero competencia** — quien instale más nodos físicos en parques mexicanos crea la versión biológica de Foursquare: un efecto de red donde cada etiqueta QR instalada hace la plataforma más valiosa.
+
+La ventaja de primer movimiento es física (una calcomanía QR en un árbol), no solo digital.
+
+## Usuarios Objetivo (Prioridad v1)
+
+| Persona | Presupuesto | Efecto de red |
+|---------|-------------|---------------|
+| Guardaparques CONANP | Institucional | Alto — 232 ANPs |
+| Monitores comunitarios | Financiado por becas | Alto — redes comunitarias |
+| Consultores MIA/EIA | Comercial | Medio — 200+ firmas |
+| Guías de ecoturismo | Personal/cooperativa | Medio — 50+ operadores Oaxaca |
+| Estudiantes de biología universitarios | Académico | Alto — Tec/UNAM/IPN/ECOSUR |
+
 </DocLayout>

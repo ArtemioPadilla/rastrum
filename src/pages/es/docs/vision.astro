@@ -1,13 +1,65 @@
 ---
 import DocLayout from '../../../layouts/DocLayout.astro';
 const lang = 'es';
-const base = import.meta.env.BASE_URL.replace(/\/$/, '');
-const PAGE = 'vision';
-const enUrl = `${base}/en/docs/${PAGE}/`;
 ---
-<DocLayout title={PAGE} lang={lang} section={PAGE}>
-  <div class="not-prose p-4 rounded-lg bg-amber-500/10 border border-amber-500/20 mb-8">
-    <p class="text-sm text-amber-300">🌐 Esta sección está disponible en inglés. La traducción al español estará disponible pronto.</p>
-    <a href={enUrl} class="text-sm text-amber-400 underline mt-1 block">Ver en inglés →</a>
-  </div>
+<DocLayout title="Visión y Misión" lang={lang} section="vision" editPath="src/pages/es/docs/vision.astro">
+
+# 🌿 Visión y Misión
+
+## Misión
+
+> *"Rastrum existe para hacer que cada ser vivo sea identificable por cualquier persona, en cualquier lugar — incluso sin señal celular, sin formación académica, incluso en los idiomas que las guías de campo olvidaron."*
+
+Rastrum es un puente entre el ojo del naturalista y la base de datos del conservacionista, construido en abierto para que los datos que genera pertenezcan a los bienes comunes.
+
+---
+
+## El Problema
+
+La observación de biodiversidad hoy está fragmentada entre herramientas incompatibles:
+
+**Fragmentación de herramientas.** PlantNet maneja plantas, Merlin maneja aves, iNaturalist maneja curación comunitaria — pero ninguna plataforma unifica foto, audio, video y evidencia ecológica en un solo flujo de trabajo. Los trabajadores de campo malabarean 3-4 apps por salida.
+
+**Barreras lingüísticas.** La mayoría de las herramientas de identificación están en inglés o lenguas europeas. México tiene 68 grupos lingüísticos reconocidos. Un agricultor zapoteco que detecta un hongo raro después de la primera lluvia no tiene herramienta que hable su idioma.
+
+**Brecha de conectividad.** La ENDUTIH 2024 del INEGI reporta solo 62.5% de conectividad a internet en Oaxaca — el estado más biodiverso de México. Las herramientas dependientes de la nube dejan atrás al 37.5% de los usuarios exactamente en los lugares que más importan.
+
+**Fragmentación institucional.** Los biólogos de campo producen datos que deben reformatearse manualmente para GBIF, CONABIO SNIB, CONANP e INAH — cuatro formatos diferentes para cuatro agencias diferentes. La mayoría de los datos nunca se exportan.
+
+**Sin pipeline de evidencia ecológica.** iNaturalist acepta fotos de rastros como imágenes, pero no tiene campos estructurados para sustrato, longitud de zancada o morfometría. La evidencia más común de mamíferos grandes — sus huellas y excrementos — se trata como observación de segunda clase.
+
+---
+
+## Nuestro Enfoque
+
+Rastrum unifica el stack de identificación en una sola PWA sin-conexión-primero:
+
+- **Una UI** para foto, audio, video y evidencia ecológica (huellas, excrementos, madrigueras, nidos)
+- **Sin conexión primero** — funcionalidad completa sin conectividad, sincroniza cuando regresa la señal
+- **Lenguas indígenas** — UI completa en Zapoteco, Mixteco, Náhuatl, Maya, Tsotsil/Tseltal
+- **Gobernanza de datos CARE-first** — las comunidades son dueñas de sus datos, con poder de veto sobre cómo se comparten
+- **Exportaciones institucionales** — Darwin Core → formatos GBIF, SNIB, CONANP, INAH nativamente
+
+---
+
+## ¿Por Qué Oaxaca Primero?
+
+Oaxaca es el campo de pruebas ideal:
+
+- **Mega-diversidad:** 4to estado más biodiverso a nivel global, hogar de ~30% de las especies terrestres de México
+- **Lenguas indígenas:** 16 familias lingüísticas, 1M+ hablantes de Zapoteco + Mixteco
+- **Forestería comunitaria:** Modelo de Ixtlán de Juárez — bosques comunitarios certificados FSC con 75 cámaras trampa y monitores de conservación dedicados
+- **Sitios ancla:** Monte Albán, Yagul, Sierra de Juárez, Biosfera Tehuacán-Cuicatlán — cada uno un objetivo natural de despliegue PIT/QR
+- **Infraestructura de investigación:** UNAM FES Iztacala, IPN CIIDIR Oaxaca, INECOL cercano
+
+La estrategia Oaxaca-primero no es solo un plan de lanzamiento — es la historia de credibilidad que convierte cada solicitud de beca y cada conversación de alianza en una propuesta diferenciada.
+
+---
+
+## La Brecha que Llenamos
+
+**Ningún producto hoy unifica foto + audio + video + evidencia ecológica en una sola UI con operación sin-conexión-primero, UX en lenguas indígenas y pipelines de exportación nativos a GBIF, CONABIO SNIB, CONANP e INAH simultáneamente.**
+
+Ese es el cuadrante que Rastrum ocupa. La diferenciación de misión — sin-conexión-primero, español + lenguas indígenas, CARE/FPIC operacionalizado — es un foso de 3-5 años que ni iNaturalist, Google/Wildlife Insights, ni ninguna plataforma comercial de ID puede replicar sin perder sus ventajas de escala.
+
 </DocLayout>

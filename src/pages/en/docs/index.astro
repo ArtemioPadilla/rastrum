@@ -1,48 +1,79 @@
 ---
 import DocLayout from '../../../layouts/DocLayout.astro';
 import { t, getDocPath, docPages } from '../../../i18n/utils';
+
 const lang = 'en';
 const tr = t(lang);
-const sections = [
-  { key: 'vision',       icon: '🌿', desc: 'Mission, problem, and why Oaxaca first' },
-  { key: 'features',     icon: '⚡', desc: '16 modules from photo ID to AI assistant' },
-  { key: 'roadmap',      icon: '🗺️', desc: 'v0.1 MVP to v2.5 over 30 months' },
-  { key: 'market',       icon: '📊', desc: 'Competitive gap, market sizing, moats' },
-  { key: 'architecture', icon: '🏗️', desc: 'Stack decisions, AI pipeline, cost model' },
-  { key: 'indigenous',   icon: '🦅', desc: 'CARE, FPIC, Local Contexts, languages' },
-  { key: 'funding',      icon: '💰', desc: '$400K credits + grants + legal structure' },
-  { key: 'contribute',   icon: '🤝', desc: 'Code, data, translations, curation' },
-];
-const getSectionLabel = (key: string) => (tr.docs.sections as Record<string,string>)[key] || key;
---- title="Docs" lang={lang} section="">
-  <h1 class="text-3xl font-bold text-zinc-100 mb-2">{tr.docs.index_title}</h1>
-  <p class="text-lg text-zinc-400 mb-10">{tr.docs.index_subtitle}</p>
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const sections = tr.docs.sections as any;
+const descriptions = tr.docs.descriptions as any;
+---
 
-  <div class="grid sm:grid-cols-2 gap-4">
-    {sections.map(s => (
-      <a href={getDocPath(lang, s.key)}
-        class="group p-5 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-emerald-500/40 transition-all block">
-        <div class="flex items-center gap-3 mb-2">
-          <span class="text-2xl">{s.icon}</span>
-          <h2 class="text-base font-semibold text-zinc-100 group-hover:text-emerald-400 transition-colors">
-            {getSectionLabel(s.key)}
-          </h2>
-        </div>
-        <p class="text-sm text-zinc-500">{s.desc}</p>
+<DocLayout title="Docs" lang={lang} section="">
+  <article class="space-y-8">
+    <div>
+      <h1 class="text-3xl font-bold tracking-tight mb-4">{(tr.docs as any).index_title}</h1>
+      <p class="text-lg text-zinc-600 dark:text-zinc-400 max-w-3xl">{(tr.docs as any).index_subtitle}</p>
+    </div>
+
+    <!-- Quick links -->
+    <div class="not-prose flex flex-wrap gap-3">
+      <a
+        href="https://github.com/ArtemIOPadilla/rastrum"
+        target="_blank"
+        rel="noopener"
+        class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:border-emerald-500/40 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.205 11.387.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 17.07 3.633 16.7 3.633 16.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.694.825.576C20.565 21.795 24 17.295 24 12c0-6.63-5.37-12-12-12z"/></svg>
+        {(tr.docs as any).view_github}
       </a>
-    ))}
-  </div>
-
-  <div class="mt-10 p-5 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
-    <div class="flex flex-wrap gap-4 items-center justify-between">
-      <div>
-        <p class="text-sm font-medium text-emerald-400">Current phase</p>
-        <p class="text-zinc-300 text-sm mt-0.5">v0.1 Alpha — Photo ID + Offline PWA + Zapoteco pilot</p>
-      </div>
-      <a href={getDocPath(lang, 'roadmap')}
-        class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition-colors">
-        View roadmap →
+      <a
+        href={getDocPath(lang, 'roadmap')}
+        class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:border-emerald-500/40 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+      >
+        {(tr.docs as any).view_roadmap}
+      </a>
+      <a
+        href="https://github.com/ArtemIOPadilla/rastrum/blob/main/docs/specs/rastrum-v1.md"
+        target="_blank"
+        rel="noopener"
+        class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:border-emerald-500/40 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+      >
+        {(tr.docs as any).view_spec}
       </a>
     </div>
-  </div>
+
+    <!-- Section card grid -->
+    <div class="not-prose grid sm:grid-cols-2 gap-4">
+      {docPages.map(page => (
+        <a
+          href={getDocPath(lang, page)}
+          class="group p-5 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:border-emerald-500/40 transition-all"
+        >
+          <h2 class="text-base font-semibold text-zinc-900 dark:text-zinc-100 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors mb-1">
+            {sections[page]}
+          </h2>
+          <p class="text-sm text-zinc-600 dark:text-zinc-500">
+            {descriptions[page]}
+          </p>
+        </a>
+      ))}
+    </div>
+
+    <!-- Current phase banner -->
+    <div class="not-prose p-5 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
+      <div class="flex flex-wrap gap-4 items-center justify-between">
+        <div>
+          <p class="text-sm font-medium text-emerald-600 dark:text-emerald-400">{(tr.docs.status as any).in_progress}</p>
+          <p class="text-zinc-700 dark:text-zinc-300 text-sm mt-0.5">v0.1 Alpha — Astro PWA + i18n, Supabase schema, PlantNet MVP</p>
+        </div>
+        <a
+          href={getDocPath(lang, 'roadmap')}
+          class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition-colors"
+        >
+          {(tr.docs as any).view_roadmap} &rarr;
+        </a>
+      </div>
+    </div>
+  </article>
 </DocLayout>

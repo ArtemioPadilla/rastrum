@@ -1,13 +1,130 @@
 ---
 import DocLayout from '../../../layouts/DocLayout.astro';
 const lang = 'es';
-const base = import.meta.env.BASE_URL.replace(/\/$/, '');
-const PAGE = 'architecture';
-const enUrl = `${base}/en/docs/${PAGE}/`;
 ---
-<DocLayout title={PAGE} lang={lang} section={PAGE}>
-  <div class="not-prose p-4 rounded-lg bg-amber-500/10 border border-amber-500/20 mb-8">
-    <p class="text-sm text-amber-300">🌐 Esta sección está disponible en inglés. La traducción al español estará disponible pronto.</p>
-    <a href={enUrl} class="text-sm text-amber-400 underline mt-1 block">Ver en inglés →</a>
-  </div>
+<DocLayout title="Arquitectura Técnica" lang={lang} section="architecture" editPath="src/pages/es/docs/architecture.astro">
+
+# 🏗️ Arquitectura Técnica
+
+## Decisiones de Stack
+
+| Capa | Elección | Justificación |
+|------|----------|---------------|
+| **Shell de app** | SvelteKit 2 | PWA offline con escritura intensiva; el enrutamiento MPA de Astro dificulta la UX offline |
+| **Sitio de contenido** | Astro | Guías de especies, docs, blog — hidratación de contenido estático es perfecta |
+| **Wrapper móvil** | Capacitor (iOS v1.2) | Escapar la evicción ITP de WebKit; reutilizar codebase PWA |
+| **Sincronización offline** | Bandeja Dexie IndexedDB + REST | Escritura intensiva, autor único; CRDTs son excesivos |
+| **Mapas offline** | MapLibre GL JS + pmtiles en R2 | Mapbox GL JS no tiene soporte offline web |
+| **ML en dispositivo** | EfficientNet-Lite0 INT8 ONNX | Paquete de menos de 3MB; fallback WebGPU → WASM |
+| **API de visión** | Gemini Flash-Lite → Haiku 4.5 | Enrutamiento optimizado por costo; Sonnet solo para revisión experta |
+| **Audio IA** | BirdNET (licencia comercial) | Mejor modelo acústico abierto; los pesos son CC BY-NC-SA |
+| **Almacenamiento** | Cloudflare R2 | Cero tarifas de egreso — $150/mes vs $4,710/mes Supabase Storage a 10K MAU |
+| **Base de datos** | PostGIS + pgvector + Supabase | Tipo geography, GIST, particiones mensuales pg_partman |
+| **Residencia de datos** | Opción AWS mx-central-1 | Cumplimiento LGPDPPSO para clientes B2G mexicanos |
+
+> **BirdNET crítico:** Los pesos del modelo son CC BY-NC-SA 4.0 — no comercial. El código fuente es MIT pero los pesos no. Contactar ccb-birdnet@cornell.edu para licencia comercial antes de agregar cualquier nivel de pago.
+
+## Pipeline de Identificación IA
+
+<pre><code>
+El usuario sube medios
+        |
+        v
+  Extracción EXIF en cliente (exifr) --&gt; GPS, timestamp, dispositivo
+        |
+        v
+  Verificación de calidad pre-ID --&gt; advertencia de desenfoque/oscuridad
+        |
+        |--- Planta detectada? ---------------&gt; PlantNet Pro API
+        |                                        (78K especies, confianza)
+        |
+        |--- Sonido de ave? ------------------&gt; BirdNET
+        |                                        (licencia comercial)
+        |
+        +--- Imagen/video general ------------&gt; Gemini 2.5 Flash-Lite
+                                                  |
+                                                  +- conf &gt;= 0.8 --&gt; Resultado
+                                                  |
+                                                  +- conf &lt; 0.8 --&gt; Claude Haiku 4.5
+                                                                     |
+                                                                     +- conf &gt;= 0.7 --&gt; Resultado
+                                                                     |
+                                                                     +- Cola experta --&gt; Sonnet
+
+Respaldo offline:
+  EfficientNet-Lite0 INT8 ONNX (&lt;3MB, top 500 especies)
+  + Paquetes regionales (Oaxaca/Yucatán 10-30MB, carga diferida en IndexedDB)
+</code></pre>
+
+## Modelo de Costos
+
+| Escala | Costo mensual | Por usuario |
+|--------|--------------|-------------|
+| 10K MAU | ~$2,000 | $0.20 |
+| 50K MAU | ~$6,000 | $0.12 |
+| 100K MAU | ~$11,500 | $0.12 |
+
+*Incluye: Supabase Pro + R2 + ~500K llamadas Claude Haiku + 600K PlantNet Pro + primera pasada Gemini + monitoreo*
+
+**Modelo freemium:** 10 IDs/día gratis · $5/mes ilimitado + revisión experta · $200–2,000/mes institucional
+
+## Esquema de Base de Datos (tablas principales)
+
+```sql
+-- Observación principal
+observations (
+  id uuid PK,
+  observer_id uuid FK users,
+  observed_at timestamptz,
+  location geography(Point, 4326),    -- PostGIS geography
+  location_obscured geography(Point), -- legible públicamente, difuso
+  habitat_type varchar,
+  -- Auto-enriquecimiento ambiental
+  moon_phase varchar, moon_illumination float,
+  precipitation_24h_mm float, ndvi_value float,
+  -- Extraído de EXIF
+  captured_at timestamptz, device_make varchar,
+  -- Particionado mensualmente vía pg_partman
+)
+
+-- Identificaciones IA
+identifications (
+  id uuid PK,
+  observation_id uuid FK,
+  taxon_id uuid FK,
+  confidence float,
+  source varchar,  -- 'plantnet'|'birdnet'|'claude_haiku'|'human'
+  validated_by uuid FK users,
+  is_research_grade boolean
+)
+
+-- RLS de ubicación sensible
+-- location: auth.uid() = observer_id OR is_credentialed_researcher()
+-- location_obscured: lectura pública (función IMMUTABLE obscure_point())
+```
+
+## Restricciones PWA en iOS
+
+iOS Safari eliminará tu PWA si ignoras esto:
+
+| Restricción | Mitigación |
+|-------------|-----------|
+| Evicción de almacenamiento ITP 7 días | `navigator.storage.persist()` al instalar |
+| Límite suave de caché ~50MB | Mantener caché inicial bajo 30MB; cargar paquetes regionales de forma diferida |
+| Sin API de Background Sync | Vaciar cola en cada apertura de la app |
+| Web Push requiere A2HS | Solicitar agresivamente Agregar a Pantalla de Inicio |
+| WebGPU solo Safari 26+ | Fallback WASM en ONNX Runtime Web |
+| DMA de la UE rompe Web Push (iOS 17.4) | Wrapper Capacitor para v1.2 |
+
+## Mapas Offline
+
+```
+Zoom 0–10: ~250MB vista general (México, pre-incluido)
+Zoom 11–14: el usuario descarga chunks de 50km de radio (~20–60MB cada uno)
+           → almacenados en blob storage de Dexie
+
+Stack: MapLibre GL JS + formato pmtiles de protomaps
+       Autoalojado en Cloudflare R2 (cero egreso)
+```
+
 </DocLayout>
