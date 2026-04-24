@@ -20,6 +20,10 @@
 8. [Module: Territorial Information Points (PITs)](#module-territorial-information-points-pits--puntos-de-información-territorial)
 9. [Module: Camera Trap Analysis (Fototrampeo)](#module-camera-trap-analysis-fototrampeo)
 10. [Module: Spatial Analysis & Diversity Indices](#module-spatial-analysis--diversity-indices)
+11. [Module: Media Enhancement](#module-media-enhancement)
+12. [Module: Regional AI Assistant — Rastrum Scout](#module-regional-ai-assistant--rastrum-scout)
+13. [Module: Community & Gamification](#module-community--gamification)
+14. [Module: Institutional Partnerships & Data Exports](#module-institutional-partnerships--data-exports)
 
 ---
 
@@ -299,7 +303,7 @@ Observations must be interoperable with the global biodiversity data ecosystem.
 - User profile pages with observation history and statistics.
 - Basic search and filtering (by species, date, location).
 
-### v0.3 — Community (Month 5-6)
+### v0.3 — Audio & Community (Month 5-6)
 
 **Goal**: Audio identification and the beginning of the curation layer.
 
@@ -316,7 +320,7 @@ Observations must be interoperable with the global biodiversity data ecosystem.
 
 ### v1.0 — Field Ready (Month 7-9)
 
-**Goal**: A complete, offline-capable platform ready for real fieldwork.
+**Goal**: A complete, offline-capable platform with media tools and community mechanics.
 
 - Video identification: frame extraction, parallel audio pipeline, unified timeline.
 - Ecological evidence identification: track, scat, burrow, nest with scale reference
@@ -330,6 +334,10 @@ Observations must be interoperable with the global biodiversity data ecosystem.
 - Field trip grouping: named collections with date ranges and route maps.
 - Public read-only API (REST, JSON) for validated observations.
 - Performance hardening: image lazy loading, virtual scrolling, bundle optimization.
+- **Media Enhancement module**: in-app photo/audio/video editor with crop, denoise,
+  background removal, auto-enhance, and pre-ID quality check.
+- **Community & Gamification module**: observer profiles, badges, levels, streaks,
+  expert system, monthly BioBlitz, seasonal challenges, social features.
 
 ### v1.5 — Spatial Intelligence (Month 10-14)
 
@@ -351,13 +359,15 @@ Observations must be interoperable with the global biodiversity data ecosystem.
 
 ### v2.0 — Regional Intelligence (Month 15-20)
 
-**Goal**: Rastrum becomes a data source, not just a data consumer.
+**Goal**: Rastrum becomes a data source with institutional partnerships.
 
 - Camera trap module: bulk upload, motion detection, AI species ID (Claude Vision),
   confidence review queue, individual animal identification, activity pattern analysis,
   site occupancy modeling, multi-camera grid support.
-- Regional ML models trained on Rastrum's community-validated observation data,
-  purpose-built for Neotropical taxa.
+- **Institutional Partnerships & Data Exports module**: GBIF auto-publish, iNaturalist
+  bridge, CONABIO/CONANP/INAH data pipelines, auto-generated biodiversity reports.
+- Regional ML training pipeline: models trained on Rastrum's community-validated
+  observation data, purpose-built for Neotropical taxa.
 - AR species overlay: point your camera at a landscape and see species annotations
   in real time (experimental).
 - Acoustic monitoring integration: deploy BirdNET-Pi stations that feed observations
@@ -366,8 +376,17 @@ Observations must be interoperable with the global biodiversity data ecosystem.
   for conservation partners.
 - Multi-language expansion: Quechua, Nahuatl, Guarani common names and UI
   translations.
+
+### v2.5 — Rastrum Scout (Month 21-30)
+
+**Goal**: AI field assistant powered by regional community data.
+
+- **Rastrum Scout AI assistant**: conversational field assistant with natural language
+  queries answered by real Rastrum data, proactive contextual suggestions, species
+  co-occurrence insights, expert correction learning, and rarity alerts.
+- Full CONABIO/CONANP/INAH integration: automated SNIB exports, ANP monitoring
+  reports, and archaeological zone biodiversity management.
 - Formal GBIF data publisher registration and automated periodic dataset updates.
-- CONABIO/CONANP formal partnership for camera trap and PIT deployment in ANPs.
 
 ---
 
@@ -459,6 +478,10 @@ attached to them. All tables use UUID primary keys and include `created_at` and
 | organ_tag       | text        |                                | For plants: leaf, flower, fruit, bark, habit |
 | evidence_type   | text        |                                | For ecological evidence: track, scat, burrow, nest, feeding_sign |
 | has_scale_ref   | boolean     | DEFAULT false                  | Whether a scale reference is present     |
+| original_url      | text        |                                | URL of the original unmodified file      |
+| enhanced_url      | text        |                                | URL of the enhanced version              |
+| enhancement_params| jsonb       | DEFAULT '{}'                   | Parameters used for enhancement          |
+| quality_score     | numeric     |                                | AI-assessed quality score (0.00-1.00)    |
 | created_at      | timestamptz | DEFAULT now()                  | Upload timestamp                         |
 
 ### identifications
@@ -1022,3 +1045,283 @@ Computed per spatial unit — polygon, trail, or PIT radius:
 - **Darwin Core Archive** — for GBIF/iNaturalist sync
 - **R-compatible community matrix** — direct import into vegan, BiodiversityR, etc.
 - **PDF report** — maps, charts, and diversity index tables
+
+---
+
+## Module: Media Enhancement
+
+**Target release: v1.0**
+
+An in-app media editor that improves photo, audio, and video quality before
+submitting for AI identification. Enhanced media yields higher-confidence
+identifications, especially under difficult field conditions.
+
+### Image Tools
+
+- **Crop and straighten** — isolate the specimen within the frame.
+- **Brightness, contrast, exposure, saturation sliders** — compensate for harsh
+  midday sun, deep shade, or overcast conditions.
+- **Background removal / subject isolation** — helps AI focus on the specimen by
+  removing distracting foliage, hands, or other objects.
+- **Macro zoom simulation** — for small specimens (insects, fungi, lichens), digitally
+  enhance detail in the region of interest.
+- **Auto-enhance preset** — one-tap optimization for typical field photos: white
+  balance correction, contrast boost, sharpening.
+- **Pre-ID quality check** — warns if the image is too blurry, too dark, or too
+  overexposed before submission, with specific improvement suggestions.
+
+### Audio Tools
+
+- **Waveform and spectrogram visualization** — see the frequency structure of the
+  recording to identify call segments visually.
+- **Background noise reduction** — suppress wind, water, crowd, and road noise.
+- **Frequency band amplification** — boost bird call frequencies (1–8 kHz) or insect
+  frequencies (8–20 kHz) to make target vocalizations stand out.
+- **Trim start/end** — isolate the call segment, removing silence and irrelevant noise.
+- **Playback speed control** — slow down fast trills or speed up long sequences for
+  easier listening.
+- **Before/after comparison** — toggle between original and enhanced audio to verify
+  improvements.
+- **Auto-clean preset** — one-tap denoise + amplify optimized for field recordings.
+
+### Video Tools
+
+- **Frame scrubber** — extract the best still frame for photo ID submission.
+- **Clip trim** — select a 5–30 second segment from a longer recording.
+- **Audio track extraction** — pull the audio track for the audio ID pipeline.
+- **Motion detection highlight** — jump to frames with animal movement, skipping
+  empty footage.
+- **Export frame as image** — save any video frame as a standalone photo for the
+  photo ID pipeline.
+
+### Integration with AI Pipeline
+
+- Media enhancement runs as a preprocessing step before API calls.
+- Enhanced version stored alongside original — the original file is never deleted
+  or modified.
+- Quality score (0.00–1.00) displayed before submission with improvement suggestions
+  (e.g., "Crop tighter around the flower" or "Reduce background noise — current
+  SNR is low").
+
+### Data Model Additions
+
+The `media_files` table gains four columns:
+
+| Column              | Type    | Description                              |
+|---------------------|---------|------------------------------------------|
+| original_url        | text    | URL of the original unmodified file      |
+| enhanced_url        | text    | URL of the enhanced version              |
+| enhancement_params  | jsonb   | Parameters used for enhancement          |
+| quality_score       | numeric | AI-assessed quality score (0.00–1.00)    |
+
+---
+
+## Module: Regional AI Assistant — Rastrum Scout
+
+**Target release: v2.5**
+
+A conversational field assistant that learns from the accumulated Rastrum dataset to
+provide hyper-local species intelligence. Rastrum Scout answers natural language
+queries with real observation data, proactively suggests what to look for based on
+location and season, and improves over time as the community contributes more data.
+
+### Core Capabilities
+
+- **Conversational interface** — natural language queries answered with real Rastrum
+  data:
+  - "¿Qué aves migratorias puedo ver en San Pablo Etla en octubre?"
+  - "¿Qué hongos crecen en encinos de la Sierra de Juárez después de la lluvia?"
+  - "Esta huella tiene 8 cm de ancho, ¿qué felino puede ser en Yagul?"
+- **Proactive contextual suggestions** — based on current GPS location + date +
+  season + habitat type + recent nearby observations.
+- **Species co-occurrence insights** — "When you find species X in this habitat,
+  species Y is often nearby."
+- **Expert correction learning** — when verified experts correct an identification,
+  that correction improves the regional model's future responses.
+- **Rarity alerts** — "This species has only been recorded 3 times in Oaxaca —
+  please document carefully."
+
+### Regional Model Training Pipeline
+
+- Trained on Rastrum community data + expert validations.
+- Regional focus: Oaxaca → Mexico → Latin America (expanding concentrically).
+- Distinguishes between morphologically similar regional species that global models
+  confuse (e.g., Oaxacan endemic *Quercus* species, cloud forest fungi, Valley of
+  Oaxaca endemic herpetofauna).
+- Retraining cadence: quarterly once sufficient data volume reached (>10,000
+  validated observations).
+- First training case: San Pablo Etla + Valle de Oaxaca community observations.
+
+### Privacy and Data
+
+- All training data uses consented community observations only.
+- Observer attribution preserved in model metadata.
+- Local communities retain co-ownership of regional model improvements.
+- Models published open-source under CC BY-SA.
+
+### Architecture
+
+- **RAG layer** — Retrieval-Augmented Generation over the Rastrum database for
+  conversational queries.
+- **Fine-tuned classification heads** — for regional species groups where the global
+  model underperforms.
+- **Claude as reasoning backbone** — for complex multi-modal queries that combine
+  image, audio, location, and ecological context.
+- **Vector embeddings** — species descriptions, field notes, and habitat data stored
+  in pgvector (Supabase) for semantic search.
+
+### Data Model Additions
+
+#### species_embeddings
+
+| Column      | Type        | Constraints                    | Description                              |
+|-------------|-------------|--------------------------------|------------------------------------------|
+| id          | uuid        | PK, default gen_random_uuid() | Embedding identifier                     |
+| species_id  | uuid        | FK -> species.id, NOT NULL     | Source species                           |
+| embedding   | vector(1536)|                                | pgvector embedding                       |
+| source_text | text        |                                | Text that was embedded                   |
+| created_at  | timestamptz | DEFAULT now()                  | Embedding creation timestamp             |
+
+#### assistant_queries
+
+| Column      | Type        | Constraints                    | Description                              |
+|-------------|-------------|--------------------------------|------------------------------------------|
+| id          | uuid        | PK, default gen_random_uuid() | Query identifier                         |
+| user_id     | uuid        | FK -> users.id, NOT NULL       | Querying user                            |
+| query_text  | text        | NOT NULL                       | Natural language query                   |
+| response    | text        | NOT NULL                       | Assistant response                       |
+| context     | jsonb       | DEFAULT '{}'                   | GPS, date, season, habitat context       |
+| feedback    | text        |                                | User feedback: helpful, unhelpful, wrong |
+| created_at  | timestamptz | DEFAULT now()                  | Query timestamp                          |
+
+#### regional_models
+
+| Column          | Type        | Constraints                    | Description                              |
+|-----------------|-------------|--------------------------------|------------------------------------------|
+| id              | uuid        | PK, default gen_random_uuid() | Model identifier                         |
+| name            | text        | NOT NULL                       | Model name and version                   |
+| region          | text        | NOT NULL                       | Geographic scope (e.g., "oaxaca_valley") |
+| taxon_group     | text        |                                | Target taxon group (if specialized)      |
+| training_count  | integer     | NOT NULL                       | Number of observations in training set   |
+| accuracy        | numeric     |                                | Validation accuracy (0.00–1.00)          |
+| model_url       | text        |                                | URL to model artifact                    |
+| trained_at      | timestamptz | DEFAULT now()                  | Training completion timestamp            |
+| created_at      | timestamptz | DEFAULT now()                  | Record creation timestamp                |
+
+#### expert_corrections
+
+| Column              | Type        | Constraints                         | Description                              |
+|---------------------|-------------|-------------------------------------|------------------------------------------|
+| id                  | uuid        | PK, default gen_random_uuid()      | Correction identifier                    |
+| identification_id   | uuid        | FK -> identifications.id, NOT NULL  | Original identification                  |
+| expert_id           | uuid        | FK -> users.id, NOT NULL            | Correcting expert                        |
+| original_species_id | uuid        | FK -> species.id                    | Originally identified species            |
+| corrected_species_id| uuid        | FK -> species.id, NOT NULL          | Corrected species                        |
+| rationale           | text        | NOT NULL                            | Explanation of the correction            |
+| incorporated        | boolean     | DEFAULT false                       | Whether fed into model retraining        |
+| created_at          | timestamptz | DEFAULT now()                       | Correction timestamp                     |
+
+---
+
+## Module: Community & Gamification
+
+**Target release: v1.0**
+
+Mechanics to grow and retain the observer community through meaningful engagement,
+recognition, and collaborative goals aligned with conservation outcomes.
+
+### Observer Profiles
+
+- **Species count by taxon group** — birds, plants, fungi, reptiles, etc., displayed
+  as a visual breakdown.
+- **Personal observations map** — heatmap of the observer's geographic coverage.
+- **Badges:**
+  - First Bird, First Plant, First Fungus (taxonomic firsts)
+  - 100 Observations, 500 Observations, 1000 Observations (volume milestones)
+  - Night Observer (observations between 20:00–05:00)
+  - Rare Find (observation of a species with <10 regional records)
+  - Expert Validator (earned expert badge)
+  - Trail Creator (published a biodiversity trail)
+- **Observer level:** Novice → Field Naturalist → Specialist → Expert →
+  Master Naturalist — based on validated observation count, taxon breadth, and
+  community contributions.
+- **Streak tracking** — consecutive days with at least one observation.
+
+### Expert System
+
+- **Expert badge per taxonomic group** — ornithologist, botanist, mycologist,
+  herpetologist, entomologist, etc.
+- Experts can validate or correct identifications; expert validations carry 3×
+  weight in the consensus algorithm.
+- Expert nominations via community vote + admin review.
+- Expert leaderboard per taxon group.
+
+### Challenges
+
+- **Monthly BioBlitz** — most species documented in a defined area within 24 hours.
+- **Seasonal challenges** — document spring migrants, rainy season fungi, dry season
+  reptiles, etc.
+- **Community goals** — "Complete the bird list for Yagul" or "Map all orchid species
+  in the Sierra de Juárez."
+- **School/university group challenges** — structured challenges for educational
+  groups with progress tracking and group leaderboards.
+
+### Social Features
+
+- **Follow observers** — receive notifications of their rare finds and validated
+  observations.
+- **Comment and discussion** — threaded comments on observations for identification
+  discussion and ecological notes.
+- **Species watchlists** — get alerted when a species on your watchlist is observed
+  near you.
+
+---
+
+## Module: Institutional Partnerships & Data Exports
+
+**Target release: v2.0**
+
+Formal data pipelines to scientific institutions and conservation agencies, enabling
+Rastrum data to flow directly into national and international biodiversity databases
+and management planning processes.
+
+### GBIF Integration
+
+- **Automatic Darwin Core Archive generation** — validated observations are
+  continuously packaged as DwC-A.
+- **Scheduled push to GBIF dataset** — weekly automated publish to Rastrum's
+  registered GBIF dataset.
+- **DOI generation** — each Rastrum dataset version receives a DOI for academic
+  citation.
+- **Citation format** — auto-generated citation strings for scientific publications.
+
+### iNaturalist Bridge
+
+- **Import** — existing iNaturalist observations imported into Rastrum (with user
+  permission), preserving identifications and metadata.
+- **Export** — Rastrum observations exportable in iNaturalist-compatible format for
+  cross-platform sharing.
+
+### Mexican Institutions
+
+- **CONABIO** — SNIB (Sistema Nacional de Información sobre Biodiversidad) compatible
+  export format. Direct data pipeline for validated observations in priority regions.
+- **CONANP** — ANP monitoring reports auto-generated from observations within
+  protected area polygons. Formatted for management plan submissions.
+- **INAH** — Biodiversity reports for archaeological zone management plans,
+  correlating species data with cultural heritage sites (Monte Albán, Yagul,
+  Mitla, etc.).
+- **UNAM/IBUNAM** — Herbarium and collection data format compatibility for cross-
+  referencing field observations with voucher specimens.
+
+### Report Generation
+
+- **Auto-generated PDF: "Biodiversity Report — [Area] — [Period]"**
+  - Cover map with observation density
+  - Species list by taxon group with photo thumbnails
+  - Diversity indices (S, H', D, Chao1)
+  - Trend charts (monthly observation volume, species accumulation)
+  - Notable records (rare species, range extensions, first records)
+  - Suitable for CONANP management plan submissions
+  - Bilingual (ES/EN)
+- **Export formats:** PDF, Excel, CSV, Darwin Core Archive, R community matrix.
