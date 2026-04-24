@@ -1,5 +1,5 @@
 ---
-import { t, getLocalizedPath, routes, getAlternateLocale } from '../i18n/utils';
+import { t, getLocalizedPath, routes, getAlternateLocale, type Locale } from '../i18n/utils';
 
 interface Props {
   lang: string;
@@ -10,12 +10,23 @@ const { lang, currentPath = '/' } = Astro.props;
 const tr = t(lang);
 const alt = getAlternateLocale(lang);
 
-// Build alternate locale URL: swap /en/ → /es/ (or vice versa) keeping the rest of the path
+// Build alternate locale URL using route map
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const pathWithoutBase = currentPath.replace(base, '') || '/';
-// Replace leading locale segment: /en/about → /es/about
-const altPath = pathWithoutBase.replace(/^\/(?:en|es)(\/|$)/, `/${alt}$1`) || `/${alt}/`;
-const altHref = base + altPath;
+// pathWithoutBase looks like /es/acerca or /en/about
+const segments = pathWithoutBase.split('/').filter(Boolean); // ['es','acerca']
+const currentLang = segments[0] || lang;
+const currentSlug = '/' + (segments.slice(1).join('/') || ''); // '/acerca'
+
+// Find which route key matches the current slug in current lang
+const matchedKey = Object.keys(routes).find(key => {
+  const routeSlug = routes[key][currentLang as Locale] || '';
+  return routeSlug === currentSlug || (currentSlug === '/' && routeSlug === '');
+});
+
+// Get the slug in the alternate locale
+const altSlug = matchedKey ? (routes[matchedKey][alt] || '') : currentSlug;
+const altHref = base + '/' + alt + altSlug + '/';
 ---
 
 <header class="border-b border-zinc-200 dark:border-zinc-800">
