@@ -1540,3 +1540,571 @@ Extracted automatically from JPEG, HEIC, PNG, RAW files:
 - Capture date > 7 days ago → flag as historic observation
 - Audio sample rate <22kHz → warn that BirdNET accuracy may be reduced
 - Video duration >5 min → suggest trimming before upload
+
+
+---
+
+## Strategic & Technical Dossier (External Analysis)
+
+> This section integrates a comprehensive 17-page external strategic review of Rastrum.
+> Opinions are explicitly flagged **[OPINION]**; hard numbers include sources.
+> Source document: *Rastrum v1: A Strategic and Technical Dossier for a LATAM Biodiversity Platform* (April 2026)
+
+# Rastrum v1: A strategic and technical dossier
+**Rastrum fills a real, defensible gap — a multi-modal, offline-first, LATAM- and Indigenous-language-native
+biodiversity platform — but the v1.0 scope as written is too ambitious for a solo founder, the best license is
+not MIT, the best sync engine is not ElectricSQL, the best vision model is not Sonnet, and the best first
+customer is not CONANP.** The path to a durable product is to ship a radically narrower MVP in Oaxaca by
+Q3 2026, establish a Mexican A.C. plus a U.S. fiscal sponsor to unlock ~$400K in cloud credits this month
+and $1–2M in grants in Year 1, and monetize through B2G SaaS plus training programs funded by
+international donors rather than by CONANP directly. The mission differentiation — offline-first PWA, Spanish
++ Indigenous languages, ecological evidence as first-class data, CARE/FPIC operationalized with Local
+Contexts Labels — is a 3–5 year moat that neither iNaturalist, Google/Wildlife Insights, nor Glority can
+replicate without losing their scale advantages. The existential risks are real (Claude/PlantNet dependency,
+CONABIO political instability, founder burnout, potential iNaturalist LATAM pivot) but are all manageable with
+the architectural and governance decisions laid out below.
+This dossier integrates market research, product-market-fit analysis, technical architecture, feature
+prioritization, funding, monetization, and legal/governance into an actionable playbook. **Opinions are
+flagged; hard numbers are sourced.** It is designed to let Artemio decide whether to pursue Rastrum
+seriously, write grant applications, refine the architecture, build an MVP, attract a community, and monetize
+without compromising the mission.
+--## 1. Market position and the gap Rastrum fills
+The biodiversity identification space is fragmented across five silos that no single product unifies.
+iNaturalist/NaturaLista dominates community observation (**~3M observers, 240M+ verifiable observations,
+1M/week accretion**; [iNaturalist](https://www.inaturalist.org/blog/82010-spreading-our-wings-inaturalist-isnow-an-independent-nonprofit) Mexico is the #2 country globally); Cornell Lab's Merlin owns bird sound and
+photo ID (**10M+ users, Sound ID covers common Neotropical species since 2021**); [iNaturalist]
+(https://www.inaturalist.org/posts/25697-mexico-inaturalist-world-tour) Pl@ntNet leads plant ID (**78,000
+species, 1.4 billion identifications, 10M+ downloads**); [Wikipedia](https://en.wikipedia.org/wiki/Pl@ntNet)
+BirdNET is the de-facto open acoustic model but its trained weights are **CC BY-NC-SA 4.0 — noncommercial**; Wildlife Insights dominates camera traps (**34M+ images, 3,000+ species, [Vizzuality]
+(https://www.vizzuality.com/project/wildlife-insights) 600+ organizations, [Vizzuality]
+(https://www.vizzuality.com/project/wildlife-insights) SpeciesNet open-sourced March 2025**); [Google
+Research](https://research.google/blog/where-wild-things-roam-identifying-wildlife-with-speciesnet/) and
+SMART + CyberTracker handle ranger/Indigenous patrol workflows (**~1,200 protected areas, 120+
+countries; 500K+ CyberTracker downloads**). [CNN](https://www.cnn.com/2020/07/09/africa/louisliebenberg-c2e-spc-int)
+
+**No product today unifies photo + audio + video + ecological evidence (tracks, scat, nests) in a single UI with
+offline-first operation, Indigenous-language UX, and native export pipelines to GBIF, CONABIO SNIB, CONANP
+and INAH simultaneously.** That is the quadrant Rastrum occupies. The competitive matrix is stark: iNat has
+photo-only (audio upload but no AI-ID), no camera-trap ingestion, no tracks/scat taxonomy, no Indigenouslanguage UI, partial offline. Merlin is birds-only. Pl@ntNet is plants-only. Wildlife Insights is camera-trap-only
+and cloud-dependent. Arbimon is acoustic-only. CyberTracker has non-literate-friendly icon UX [CyberTracker]
+(https://cybertracker.org/the-new-cybertracker-online/) but is African-origin and not LATAM-taxonomy-tuned.
+**The QR/NFC "Punto de Información Territorial" anchors have zero competition** — a potential networkeffect moat where whoever plants the most physical anchors in Mexican parks creates the biological version
+of Foursquare.
+The market sizing numbers to anchor against (treat commercial-research-firm figures with ±30% uncertainty):
+global citizen-science platform market **~$1.23B in 2024, projected $3.84B by 2033 at 13.7% CAGR**;
+[Growthmarketreports](https://growthmarketreports.com/report/citizen-science-platform-market) global
+ecotourism **~$275B in 2024 trending to $770B by 2033**; [Custom Market Insights]
+(https://www.custommarketinsights.com/report/ecotourism-market/) Mexico ecotourism **~$3.3– [IMARC]
+(https://www.imarcgroup.com/mexico-ecotourism-market) 3.8B in 2024, [Grand View Research]
+(https://www.grandviewresearch.com/horizon/outlook/ecotourism-market/mexico) doubling to $8.7–
+[IMARC](https://www.imarcgroup.com/mexico-ecotourism-market) 10.6B by 2030– [Grand View Research]
+(https://www.grandviewresearch.com/horizon/outlook/ecotourism-market/mexico) 2033**; Mexico
+birdwatching tourism **~$1.9B in 2024 → $3.1B by 2030 at 8.6% CAGR [Grand View Research]
+(https://www.grandviewresearch.com/horizon/outlook/birdwatching-tourism-market/mexico) (fastestgrowing North American sub-segment)**; [Grand View Research]
+(https://www.grandviewresearch.com/horizon/outlook/birdwatching-tourism-market/united-states) City
+Nature Challenge 2024 showed **Monterrey #2 globally by observations** and La Paz, Bolivia #1 [Bnhc]
+(https://www.bnhc.org.uk/city-nature-challenge/results-from-city-nature-challenge-2024-west-of-england-anduk) — LATAM dominates citizen-science participation per capita. Meanwhile NaturaLista MX grew to **138K
+users, 5M observations, 45K species by its 2023 decade anniversary** [Fundación Carlos Slim]
+(https://fundacioncarlosslim.org/english/mexico-reaches-5-million-observations-of-plants-animals-and-fungiin-naturalista/) — roughly 16% annual observation growth, substantially slower than global iNat's neardoubling over the same period. **That slowdown, combined with the documented 2024 reduction of
+CONABIO's autonomy (Medellín & Soberón,** ***Science*** **384:9)**, [PubMed]
+(https://pubmed.ncbi.nlm.nih.gov/38574127/) is precisely the opening for a private-sector/NGO complement.
+Mexican rural connectivity is the other decisive anchor. **INEGI ENDUTIH 2024 reports 83.1% national
+internet penetration (100.2M users) but only 66.0% rural [INEGI]
+(https://www.inegi.org.mx/contenidos/saladeprensa/boletines/2024/ENDUTIH/ENDUTIH_23.pdf) — and the
+lowest-connected states (Oaxaca 62.5%, Chiapas 56.7%, [INEGI]
+(https://www.inegi.org.mx/contenidos/saladeprensa/boletines/2023/ENDUTIH/ENDUTIH_22.pdf) Guerrero)
+are precisely the country's most biodiverse and most Indigenous.** This single statistic validates offline-first
+
+architecture as a requirement, not a nice-to-have. It also tells you that **31.5% of your target users will not be
+reachable by cloud-dependent products** like Wildlife Insights or Arbimon, and that PWA delivery (no appstore friction, works on entry-level Android) is the right distribution channel.
+## 2. Product-market fit: where Rastrum wins and where to not fight
+Ten personas map onto this market, but only five matter for v1. **The commercial anchors are park rangers
+(CONANP guardaparques), community monitors (monitores comunitarios like the 75-camera-trap team that
+documented the 2026 jaguar record in Sierra Gorda Guanajuato), environmental consultants writing MIA/EIA
+baseline studies, ecotourism guides running community-forest enterprises (Ecoturixtlán, Expediciones Sierra
+Norte, Pueblos Mancomunados), [Visit Mexico](https://www.visit-mexico.mx/oaxaca/ecotourism-in-oaxaca/)
+and university biology students at UNAM/Tec/IPN/ECOSUR.** These are the users with either institutional
+budget, recurring revenue, or high-leverage network effects. Casual eco-tourists, amateur naturalists, and
+Indigenous community members are equally important to the mission but convert at lower rates and are best
+served through partnerships and free-tier generosity.
+The jobs-to-be-done analysis yields six differentiating unique value propositions: **(1) offline-first PWA
+grounded in rural-Mexico connectivity reality**; **(2) multi-modal unified in one UI** (no competitor bundles
+photo + audio + tracks + camera-trap + video); **(3) ecological evidence as structured first-class data** (iNat
+allows it but as photos only, with no substrate, stride-length, or morphometric fields); **(4) Rastrum Scout as
+a regional LLM assistant** fine-tuned on CONABIO EncicloVida + NOM-059 + SNIB, which beats generic CV
+models on Mexican endemic species where iNat's global CV model is weakest; **(5) Indigenous-language
+support beyond common-name labels** — full UI translation, voice I/O, and pre-recorded audio prompts for
+Zapoteco + Mixteco (Oaxaca, 1M speakers combined), Maya Yucateco (774K), [Statista]
+(https://www.statista.com/statistics/1323032/indigenous-language-speakers-by-language-mexico/) Náhuatl
+(1.65M), [International Work Group for Indigenous Affairs](https://iwgia.org/en/mexico/4232-iw-2021mexico.html) Tsotsil/Tseltal (Chiapas, 1M); [Statista]
+(https://www.statista.com/statistics/1323032/indigenous-language-speakers-by-language-mexico/) and **
+(6) four-way native export to GBIF + CONABIO SNIB + CONANP monitoring formats + INAH**, unique among
+current tools.
+**Where Rastrum should not compete: head-to-head against iNaturalist as a global observation social
+network, or against Merlin for North American bird sound ID.** iNat has 240M+ observations and a decadedeep ID-curator community — switching costs are prohibitive. The correct posture is interoperation: ingest
+iNat observations where relevant, contribute research-grade Rastrum observations back to iNat via API and
+GBIF, and position Rastrum as "the NaturaLista complement for offline + camera-trap + Indigenous-language
++ institutional workflows." Against Merlin, consume BirdNET (with a commercial license from Cornell) rather
+than retrain from scratch, and focus the custom audio effort on Mexican-endemic and rare species that
+Merlin's 3.8.4 release explicitly flags as gaps. [App Store](https://apps.apple.com/us/app/merlin-bird-id-bycornell-lab/id773457673)
+
+Four pivot options exist if consumer adoption disappoints. A **B2G-first pivot** doubles down on
+CONANP/CONABIO/state-government dashboards. A **community-forest-enterprise pivot** serves Ixtlán de
+Juárez-style FSC-certified communities [IPARD](https://www.fscindigenousfoundation.org/ixtlan-juarezcommunity-guardians-forests-biological-diversity/) that require biodiversity monitoring evidence for
+certification. A **guide-operator trip-report pivot** monetizes Persona 10 with branded trip outputs. An
+**education-vertical pivot** licenses to Tec de Monterrey, UNAM, and SEP state secretariats. Track consumer
+conversion at 90-day, 180-day, and 365-day milestones; if conversion lags forecasts by 50%+ at any
+milestone, trigger the pivot playbook.
+## 3. A realistic v1.0 scope — ship less, ship sooner
+**Opinion: the v1.0 spec as currently scoped (offline PWA + photo + audio + video + camera trap + ecological
+evidence + media enhancement + gamification + Rastrum Scout + institutional export, all at once) is not
+shippable by a solo or small team in 12 months, and ships with so many surface areas that none of them will
+be polished enough to win users from incumbents.** The correct sequencing is three releases over 12
+months.
+**v0.1 MVP (months 1–3):** installable PWA with offline observation queue; photo observation with Claude
+Haiku 4.5 + PlantNet cascade for AI ID; Spanish UI plus one Indigenous language (Zapoteco pilot, chosen via
+FPIC in Sierra Norte); core Darwin Core data model with NOM-059-backed taxon subset; CSV/Darwin Core
+Archive export; 50–200 beta users in Oaxaca. Explicitly **not** in MVP: video, audio AI, camera trap,
+gamification, Rastrum Scout chat, institutional-format export, ecological evidence. The MVP exists to prove
+the offline loop works, not to be feature-complete.
+**v0.5 Beta (months 4–6):** audio observation (BirdNET with commercial license or iNatSounds equivalent
+for birds + amphibians); multi-image observation; ecological evidence as structured fields (substrate, stride
+length, track morphology, scat dimensions — aligning with CONANP's published *Manual de fototrampeo*);
+Rastrum Scout v0 as a conversational ID disambiguator; research-grade consensus workflow (iNat-style 2/3
+identifier agreement); first real Local Contexts BC Notice integration; GBIF IPT pilot publish; 500–2,000 users
+across two states.
+**v1.0 (months 7–12):** camera-trap ingestion with SpeciesNet + MegaDetector compatibility; video support
+limited to short clips (≤30s, auto-transcoded to H.265 or AV1); opt-in gamification (no global leaderboards —
+see §7); institutional export packages (MIA biológica chapter format, UMA Plan de Manejo format, CONABIO
+SNIB format, INAH biocultural-site format); credentialed-researcher access tier for sensitive species true
+coordinates; 5+ states; 10K+ users.
+**Media enhancement should be killed from v1 entirely.** It is not a user-demand driver, it triples the ML
+surface area, and it has no demonstrated lift on identification accuracy in the academic literature. Add as a
+post-v1 plugin if at all.
+
+## 4. Technical architecture: the consequential decisions
+Seven architectural choices will determine whether Rastrum ships and scales. They are, in descending order
+of impact:
+**Frontend framework: Astro is the wrong primary choice for a write-heavy offline-first PWA.** Astro's
+strength is partial hydration for content — which fits species guides and educational material — but its MPAfirst routing reloads state between routes, fights offline SPA UX, and has no first-class pattern for offline
+queues + optimistic updates. **Recommended: SvelteKit 2 as the app shell (observation form, camera, map,
+feed); Astro for content** (species guides, conservation docs, blog) as a sibling site. Remix/React Router v7
+is a strong alternative with better loader/action semantics for sync. Next.js App Router is heavier than
+needed. Qwik City is too young. **Wrap with Capacitor for iOS App Store presence in v1.2**; Android
+TWA/Bubblewrap is sufficient.
+**Offline sync: drop ElectricSQL, skip CRDTs, start simple.** ElectricSQL pivoted to a read-path-only
+architecture in 2024 [ElectricSQL](https://electric-sql.com/blog/2024/07/17/electric-next) and is no longer
+the tool it advertised. [RxDB](https://rxdb.info/alternatives.html) CRDTs (Automerge, Yjs) are overkill because
+biodiversity observations are append-heavy and single-author-per-record. **Recommended: Dexie IndexedDB
+outbox table + REST POST to Supabase on reconnect, with last-write-wins per row by the observer.** Upgrade
+to PowerSync only if you hit multi-user collaborative editing needs (unlikely pre-$150/mo scale). Reserve
+CRDTs for later collaborative field-notebook editing features.
+**On-device ML: quantized EfficientNet-Lite0, WebGPU-first with WASM fallback.** Target sub-3 MB INT8
+ONNX starter model (top 500 species globally) bundled with the PWA; lazy-load regional packs (Oaxaca,
+Yucatán, CDMX at 10–30 MB each) into IndexedDB with `navigator.storage.persist()` requested. ONNX
+Runtime Web with `executionProviders: ['webgpu', 'wasm']` [ONNX Runtime]
+(https://onnxruntime.ai/docs/tutorials/web/) is the right runtime. [Emerging AI Hubs]
+(https://aicompetence.org/ai-in-browser-with-webgpu/) MobileViT-XS and EfficientFormer-L1 are viable
+alternatives but EfficientNet-Lite was specifically redesigned for post-training INT8 quantization and is the
+most accuracy-robust at small size.
+**Vision API: route Gemini 2.5 Flash-Lite → Claude Haiku 4.5 → PlantNet Pro, with Sonnet reserved for expert
+review.** At 10K MAU × 3 IDs/day × 30 days = 900K identifications/month, Haiku 4.5 alone with Batch API
+(−50%) and prompt caching [Finout](https://www.finout.io/blog/anthropic-api-pricing) on the system prompt
+(−90% on 400 of 500 tokens) lands at ~$700/month; adding Gemini Flash-Lite as the first-pass filter reduces
+Haiku calls ~50% and cuts the bill to ~$500/month. **Critical licensing warning: BirdNET trained model
+weights are [Birdnet-team](https://birdnet-team.github.io/BirdNET-Analyzer/faq.html) CC BY-NC-SA 4.0 —
+non-commercial.** The repo source is MIT but the weights are not. [Birdnet-team](https://birdnetteam.github.io/birdnetR/) If Rastrum has any paid tier, email ccb-birdnet@cornell.edu [GitHub]
+(https://github.com/birdnet-team/BirdNET-Analyzer) [BirdNET](https://birdnet.cornell.edu/app/) for a
+commercial license pre-emptively or position the project as nonprofit-educational throughout ToS.
+
+**Storage: Cloudflare R2, not Supabase Storage.** Zero egress fees are decisive for an image-heavy
+biodiversity workload. [BuildMVPFast](https://www.buildmvpfast.com/compare/supabase-vs-r2) At 10K MAU
+with typical 300 GB stored and 3 TB egress per month, Supabase Storage costs ~$4,710/month versus R2's
+~$150/month. Set WAF rate-limits on bucket GETs to prevent runaway bills from scrapers. [Transactional]
+(https://transactional.blog/blog/2023-cloud-storage-costs) Use Cloudflare Images for server-side resize at
+the edge (free within R2 Class B op tier).
+**Data layer: PostGIS + pgvector + pg_partman on Supabase, hosted in sa-east-1.** Geography type (not
+geometry) for observation points; GIST indexes; monthly partitions on `observation` table via pg_partman;
+HNSW index on pgvector embeddings [Neon](https://neon.com/docs/ai/ai-vector-search-optimization)
+(MiniLM-384 self-hosted in Edge Functions). Materialized views for Shannon/Simpson/Chao1 diversity
+indices, refreshed nightly. **Wrap all `auth.uid()` / `auth.jwt()` calls in `(SELECT ...)` inside RLS policies** —
+this enables Postgres initPlan caching [Supabase](https://supabase.com/docs/guides/troubleshooting/rlsperformance-and-best-practices-Z5Jjwv) [Supabase](https://supabase.com/docs/guides/getting-started/aiprompts/database-rls-policies) and produces dramatic query-performance gains per Supabase's official
+guidance. **Consider self-hosting Supabase (Apache 2.0) on AWS `mx-central-1`** (launched Jan 2025) to
+satisfy LGPDPPSO data-residency requirements for Mexican government clients — this alone is a significant
+B2G differentiator.
+**Combined monthly cost at 10K MAU is approximately $2,000** (Supabase Pro + small compute + R2 +
+~500K Claude Haiku + 600K PlantNet Pro calls + Gemini first-pass + monitoring). At 100K MAU, roughly
+$11,500/month. **Per-user-per-month cost of $0.10–$0.20 is inherent to biodiversity ID** — plan freemium
+limits accordingly (e.g., 10 IDs/day free, paid $5/mo for unlimited + expert review).
+## 5. Data, Darwin Core, and sensitive species obscuration
+Rastrum's credibility with CONABIO, GBIF, and research users depends on rigorous Darwin Core compliance
+from v0.1. **The minimum-viable DwC mapping requires `occurrenceID`, `basisOfRecord`, `eventDate`,
+`decimalLatitude`/`decimalLongitude`, `geodeticDatum`, `coordinateUncertaintyInMeters`,
+`identificationQualifier`, `identifiedBy`, `scientificName`, `taxonRank`, `occurrenceStatus`,
+`informationWithheld`, `dataGeneralizations`, `license`, and `rightsHolder`** — populate these from day one.
+basisOfRecord defaults to `HumanObservation` [GitHub](https://github.com/tdwg/dwcqa/blob/master/examples/terms.md) for app captures and `MachineObservation` for camera-trap/acoustic
+uploads. [Gbif](https://docs.gbif.org/camera-trap-guide/en/) [Obis]
+(https://manual.obis.org/darwin_core.html) Audubon Core mandatory fields (`ac:accessURI`,
+`ac:hashFunction`, `dc:license`, `ac:tag`, `ac:subjectOrientation`) belong on all media records [Tdwg]
+(https://ac.tdwg.org/guide/2013-10-15) — multi-modal without AC metadata is unpublishable.
+**Use the GBIF Backbone as the primary taxonomic authority** (it adopted Catalogue of Life [GBIF]
+(https://www.gbif.org/dataset/d7dddbf4-2cf0-4f39-9b2a-bb099caae36c) xrelease in late 2024). Cross-
+
+reference POWO/WCVP for plants — critical for LATAM where [Plants of the World Online]
+(https://powo.science.kew.org/about) MEXU is the largest herbarium. Use IOC World Bird List for birds.
+**Maintain your own `taxon_usage_history` table** that preserves the name as originally assigned at
+identification time; when backbone updates mark synonyms, update `taxon.accepted_id` but never rewrite the
+historical usage. This preserves DwC fidelity and enables defensible scientific citation.
+**Sensitive-species location obscuration is an ethical and legal requirement, not a feature.** Mirror
+iNaturalist's 0.2° × 0.2° grid-cell randomization [PubMed Central]
+(https://pmc.ncbi.nlm.nih.gov/articles/PMC12451486/) as the public floor. [iNaturalist]
+(https://www.inaturalist.org/posts/9649-understanding-your-privacy-settings-for-inaturalist-vermont) The
+obscuration matrix should be: NOM-059 category **E** (extinct in wild) [Gobierno de México]
+(https://www.gob.mx/semarnat/articulos/conoce-las-categorias-de-riesgo-de-la-nom-059-semarnat-2010para-especies-de-flora-y-fauna?state=published/) → full 5km grid obscure, admin + credentialed researchers
+only; **P** (peligro de extinción) → 0.2° auto-obscure, observer + trusted + credentialed; **A** (amenazada)
+
+→ 0.2° auto-obscure; **Pr** (sujeta a protección especial) → 0.1° default-obscure with observer opt-out;
+**CITES Appendix I** always obscure; **IUCN CR/EN/VU** default obscure; **orchids (Mammillaria,
+Ariocarpus) and Cactaceae** default obscure regardless of formal listing (high poach risk — Conophytum
+trafficking in South Africa post-2019 is the cautionary analog). Implement `obscure_point(pt, cell_size_deg)`
+as a PL/pgSQL IMMUTABLE function; store both `location` (RLS-locked) and `location_obscured` (publicreadable); Do et al. (2024, *Conservation Biology*) showed 0.2° obscuration biases species distribution
+models, [PubMed Central](https://pmc.ncbi.nlm.nih.gov/articles/PMC12451486/) so **build a credentialedresearcher access path with signed data-use agreements and audit logs from v1.0** — this is not optional.
+## 6. Offline-first on iOS is the hardest problem — solve it explicitly
+iOS Safari is where most PWAs die. The specific constraints that will bite Rastrum are: **7-day ITP eviction**
+(script-writable storage wiped after 7 days with no user interaction), **~50 MB soft cache limit [Tigren]
+(https://www.tigren.com/blog/progressive-web-app-limitations/) before prompts**, **no Background Sync
+API**, [MagicBell](https://www.magicbell.com/blog/pwa-ios-limitations-safari-support-complete-guide)
+**Web Push requires Add-to-Home-Screen (broken in EU under DMA since iOS 17.4)**, [MagicBell]
+(https://www.magicbell.com/blog/pwa-ios-limitations-safari-support-complete-guide) **WebGPU only in
+Safari 26 preview**. Mitigations compound: request `navigator.storage.persist()` on install (Chrome autogrants to bookmarked sites; Firefox prompts; Safari grants based on engagement); [MDN Web Docs]
+(https://developer.mozilla.org/en-US/docs/Web/API/Storage_API/Storage_quotas_and_eviction_criteria)
+budget the entire offline state under 30–50 MB initial cache and lazy-load into IndexedDB; implement **onevery-app-open queue flush** as the universal sync fallback instead of Background Sync; **prompt
+aggressively for A2HS** to unlock Web Push where available; and **wrap with Capacitor for the iOS App Store
+by v1.2** to escape WebKit eviction entirely while reusing the PWA codebase.
+Offline maps are the next hard problem. Mapbox GL JS does not support offline on web. **Recommended:
+MapLibre GL JS + protomaps pmtiles format, self-hosted on R2.** Full Mexico at zoom 0-14 is ~2-3 GB (too
+
+large per-device); ship zoom 0-10 as a ~250 MB overview, and let users "download my region" to fetch 50 km
+radius chunks at ~20–60 MB each into Dexie blob storage. For the offline GBIF backbone, ship the top 10K
+most-observed Mexican species (~3 MB) in the PWA bundle and fetch the long tail on demand via SQLite-inIndexedDB (absurd-sql or sqlite-wasm).
+## 7. Accessibility, field UX, and gamification without dark patterns
+WCAG 2.2 AA is the right bar, not AAA. The nine new criteria in 2.2 matter specifically for Rastrum: **2.4.11
+Focus Not Obscured** (sticky capture-bar must use `scroll-padding-top` so focus never hides behind the
+bottom action bar); **2.5.7 Dragging Movements** (map pins need tap-to-place alternatives; sliders need +/buttons); **2.5.8 Target Size** minimum 24×24 CSS px [arc42 Quality Model]
+(https://quality.arc42.org/standards/wcag-2-2) (baseline 48 dp Material Design); **3.2.6 Consistent Help**
+[Vispero](https://vispero.com/resources/new-success-criteria-in-wcag22/) (Rastrum Scout button fixed
+bottom-right across all pages); **3.3.8 Accessible Authentication** (support passkeys/Web [Xictron]
+(https://www.xictron.com/en/blog/wcag-2-2-new-success-criteria-online-shops/) Authn + email magic link,
+paste allowed — no cognitive tests). Color contrast should target **7:1 for body text, not just 4.5:1**, because
+outdoor sunlight legibility is a hard field-use requirement. **European Accessibility Act effective June 28,
+2025** makes WCAG 2.1 AA compliance a legal floor for any EU user/funder exposure — build for EAA from
+day one.
+For field use specifically: **48 dp minimum touch targets (not 24 px), with a "glove mode" toggle that enlarges
+to 56–64 dp**; dark mode default in field (OLED battery + sunlight); single-camera-init and throttled GPS (20second coarse polling vs continuous) for battery; haptic feedback on capture and sync confirmation; voicefirst hands-free via Web Speech API; wrap Latin binomials in `<span lang="la">` so screen readers pronounce
+`Panthera onca` correctly. Ship **pre-recorded prompt audio for critical flows in
+Zapoteco/Mixteco/Maya/Náhuatl** because those languages lack native TTS voice coverage — partner with
+INALI, UNAM linguistics, and CIESAS.
+**Gamification without "gamblification" is non-negotiable for mission alignment.** iNaturalist forum archives
+show community and staff actively resist leaderboards because they degrade identification quality ("too
+much focus on metrics or 'winners' is notorious for creating competition and toxicity rather than
+collaboration"). Apply Yu-kai Chou's Octalysis to emphasize Epic Meaning (conservation impact),
+Development/Accomplishment (mastery), and Ownership (life lists), while avoiding Scarcity and
+Unpredictability. **Rastrum's gamification should be: life lists and personal progress; region/species "blankspot" missions (fill undersampled areas); community recognition by name with elder-attribution option;
+badges tied to quality (verified rare species, careful track ID) — not quantity. No global leaderboards. No
+streaks or FOMO mechanics. No scarcity rewards. Optional opt-in "friendly event" mode for BioBlitzes only.**
+## 8. Indigenous data sovereignty is the moat — build it first, not last
+
+**CARE principles (Collective benefit, Authority to control, Responsibility, Ethics) are the strategic moat no
+competitor can replicate quickly.** iNaturalist, Wildlife Insights, eBird, and Pl@ntNet have no operationalized
+FPIC framework. Building one takes years of relationship capital in LATAM that large platforms will not invest.
+This is Rastrum's most durable differentiator.
+Operationalization has four layers. **Layer 1: Adopt CARE principles + ISE Code of Ethics formally in v0.1**
+(principle statement + basic access controls). **Layer 2: Integrate Local Contexts Hub API v2** (default since
+Feb 10, 2025) for TK Labels (16+ variants — TK Attribution, TK Clan, TK Family, TK Non-Commercial, TK
+Culturally Sensitive, TK Secret/Sacred, TK Seasonal, TK Verified) and BC Labels (Provenance, Consent-NonCommercial, Consent-Verified, Multiple Communities, Outreach, Research). GBIF is the first biodiversity
+database to pilot Labels integration (2022, Manaaki Whenua New Zealand) — follow that pattern.
+Institution/Researcher accounts require a Hub Subscriber Agreement as of Jan 13, 2025; Community
+Accounts are free; sandbox is free for integration testing. **Layer 3: When a user's GPS is inside an INPImapped Indigenous territory, show a BC Provenance Notice by default and require per-project community
+approval before public data release.** **Layer 4: Establish a Rastrum Consejo Asesor Indígena (CARI) with 7–
+9 seats, ≥5 Indigenous members, representatives from Oaxaca (Zapoteco, Mixteco, Mixe), Yucatán (Maya),
+Chiapas (Tsotsil/Tseltal), and Puebla/Veracruz (Nahua); 3-year staggered terms; quarterly bilingual meetings;
+veto power on TK features, dataset releases from consulta-covered territories, and commercial partnerships.
+Honoraria paid from operating budget, not project budget** (avoids extraction optics). Mexico's INPI
+Protocolo de Consulta Libre, Previa e Informada (DOF 2019) is the template for regional FPIC.
+**Nagoya Protocol nuances matter less than people think — but the parts that do matter are nonnegotiable.** Mexico ratified Nagoya May 16, 2012 (5th country, first megadiverse). **Photographs, audio,
+and occurrence records are generally NOT genetic resources in the strict Nagoya sense**, so a pure
+observation platform largely falls outside Nagoya's bright-line triggers. But the moment Rastrum collects or
+displays Indigenous names, medicinal/ritual uses, or associated traditional knowledge (aTK), you enter
+Nagoya scope and need PIC + MAT + IRCC on the ABS Clearing-House. Mexico's domestic implementation is
+incomplete — the Ley General de Biodiversidad has been stalled since 2016 (opposed by CEMDA, CeIBA,
+Greenpeace, Red Nacional Indígena over lack of consulta previa), a new initiative was filed Feb 12, 2025, and
+as of April 2026 no operational domestic ABS law exists. SEMARNAT collecta-científica permits under LGVS
+Arts. 85–87-bis and ad-hoc instruments fill the gap. **Practical implication: the Nagoya risk is low for core
+Rastrum features but high for any ethnobotany or TK module. Treat ethnobotany as a v2 feature gated on a
+completed FPIC process with at least one community partner.**
+## 9. Legal structure and Mexican context
+**Opinion: stand up a dual-entity structure within the first 6 months.** The "Rastrum A.C." (Asociación Civil,
+3–8 weeks to incorporate, MXN 15–40K in notario fees) holds the mission, trademark, grants, community,
+and data-governance rules. Pursue **donataria autorizada status with SAT** (12-month process) to enable
+tax-deductible donations and access Fondo Mexicano para la Conservación de la Naturaleza, FAHHO,
+Fomento Banamex, CONABIO-adjacent grants. The "Rastrum SAPI de C.V." (or initially a same-day **S.A.S.**
+
+via tuempresa.gob.mx for MXN ~0) handles commercial licensing, paid SaaS, government contracts, and
+eventual VC equity. The A.C. owns 100% of the SAPI initially, with a trademark license and services agreement
+between them to preserve daylight between mission and revenue. This mirrors Mozilla Foundation + Mozilla
+Corporation, WordPress.org Foundation + Automattic, and iNaturalist's 501(c)(3) spinoff with a $10M Moore
+Foundation startup grant in July 2023. **Pursue B Corp certification only via the SAPI (Sistema B does not
+certify nonprofits)**; Mexico has ~70 certified B Corps and offers Empresa B Pendiente for startups under 1
+year.
+A **U.S. 501(c)(3) fiscal sponsor** is also needed to unlock AWS Imagine, Bezos Earth Fund, CZI EOSS,
+Mulago, DRK, and most U.S.-origin philanthropy. **Multiplier (formerly Trust for Conservation Innovation) is
+conservation-specialized with a 9% fee**; Social Good Fund is faster (~5 business days if aligned) but has
+1000:100 applicant-to-slot ratio. Start with Multiplier; move to New Venture Fund once you have a $500K+
+commitment in hand.
+**Open source license: shift from MIT to a hybrid stack before attracting external contributors.** MIT
+maximizes adoption but leaves the SaaS loophole wide open — a well-funded competitor (Google, an iNatMexico operator, a commercial ID-as-a-Service) can fork Rastrum and close-source it. **Recommended:
+AGPL-3.0 for server code** (closes the SaaS loophole; Mastodon, Nextcloud, PeerTube precedent); **Apache
+2.0 for client SDKs** (adds patent grant); **CC BY 4.0 for documentation**; **CC0 for taxonomic lookup
+tables**; **TK Labels + negotiated community licenses for Indigenous-language glossaries** (CARE > FAIR
+here); **trained model weights tiered — small distilled models under Apache 2.0, frontier models under a
+source-available Rastrum Research License** (free for non-commercial research, commercial use requires
+agreement). Use **DCO (Developer Certificate of Origin, Linux-kernel style)** not CLA — lightweight, trustfriendly, no legal anxiety. Publish a separate **Rastrum Trademark Policy** (model on Mozilla's) preserving
+brand integrity independent of code license.
+**Trademark "Rastrum": file immediately in IMPI class 42 (SaaS), class 9 (downloadable software), and class
+41 (education).** IMPI tariff is MXN ~$3,126 per class plus ~MXN 5–15K per class in attorney fees, 6–18
+months to issuance. **Inventia Life Science (Sydney) has a RASTRUM™ 3D bioprinter that overlaps directly in
+class 42**; confirm via MARCANET search before filing (Inventia does not appear to be registered in Mexico
+based on public search). Park defensive names: "Rastrum Bio", "Rastrum MX", "Rastrum Nature"; consider
+Náhuatl-derived alternatives ("Xalli", "Tlapani") only after linguistic-consultant review. Register `rastrum.mx`,
+`rastrum.org.mx`, `rastrum.app`, `rastrum.ai`, `rastrum.eco` immediately. Include a **public disambiguation
+statement** on the website: "Rastrum® is a biodiversity platform by [A.C. name]. Not affiliated with Inventia
+Life Science's RASTRUM™ 3D bioprinter."
+**Mexican data privacy law went through seismic change in March 2025.** The LFPDPPP and LGPDPPSO
+were both replaced via decree March 20, 2025; **INAI was dissolved (Nov 2024 constitutional reform)** with
+enforcement now under the Secretaría Anticorrupción y Buen Gobierno through a decentralized body called
+"Transparencia para el Pueblo." Processors are now directly liable (not only controllers); ARCO rights
+preserved; **automated/agentic decision-making notice is now required — Rastrum's AI ID features trigger
+
+this**; sensitive data still requires express consent; cross-border transfer criteria are under-specified.
+**Secondary regulations are pending and could shift DPO, cross-border, and AI notice requirements
+significantly by late 2026** — design for GDPR (stricter by default), then Mexico compliance follows
+automatically. Faces in photos (biometric under LFPDPPP + GDPR Art. 9) and Indigenous self-identification
+(sensitive ethnicity data) are the two PII categories that need the most care — **implement client-side face
+blur via TensorFlow Lite before upload** and make Indigenous self-identification strictly opt-in with clear
+purpose explanation.
+## 10. Funding roadmap — the 18-month playbook
+**Before any paid grant dollar arrives, Artemio should close ~$400K+ in cloud and tech credits this month.**
+These are 30-minute-to-2-hour applications, almost all self-serve, no legal entity required. The immediate
+stack: **AWS Activate Founders ($1K, 7–10 days); NVIDIA Inception (up to $100K AWS Activate + $150K
+Nebius + GPU preferred pricing; free, no equity)**; Microsoft for Startups Founders Hub (up to $150K Azure +
+$2,500 OpenAI); **Anthropic AI for Science (up to $20K API credits with Tec de Monterrey MAIA affiliation —
+strongest single credit win)**; Anthropic Student Builder ($50 from Tec email); GitHub Student Developer
+Pack (Copilot Pro, GitHub Pro, DigitalOcean $200, and dozens more); Notion for Startups; Cloudflare for
+Startups ($2,500 credits); Supabase OSS request via email. **Combined value: ~$400K+ in in-kind credits**
+before a single grant cycle closes.
+The grant pipeline sequences by probability × size × fit × timing:
+**Q2 2026 flagship applications:** **MIT Solve 10th Anniversary Global Challenge (deadline May 21, 2026)**
+is the single highest-EV target — $10K Solver baseline + up to $150K AI for Humanity Prize via Patrick J.
+McGovern Foundation; Indigenous Communities + Climate tracks both fit. **National Geographic Society
+Level II Explorer grant (up to $100K, ~6-month LOI-to-decision)** — apply under Wildlife + Human
+Ingenuity/Tech; Artemio eligible as individual. **Mohamed bin Zayed Species Conservation Fund (up to $25K,
+deadline June 30, 2026)** — tie to a specific IUCN-listed threatened Oaxaca species; 3 deadlines per year.
+**Rufford Small Grants (£7K, rolling, ~2-month review)** — strong fit for MAIA student status; fieldwork costs
+only. **Bezos Earth Fund AI for Climate & Nature Grand Challenge Phase III** if US fiscal sponsor secured
+(Phase I $50K → Phase II up to $2M; NY Botanical Gardens plant ID and WCS MERMAID are the fit pattern).
+**Q3 2026:** **Conservation Leadership Programme (deadline November, $12.5K Future Conservationist for
+teams of 3+)**; **Future for Nature Award (September, €50K)** — strong individual fit for Artemio; **IDB Lab
+Natural Capital Action Plan / Jaguar Impact Initiative** — LATAM's only dedicated multilateral biodiversityinnovation vehicle, $500K–$1M typical; **Google.org Accelerator: Generative AI** — 2026 cohort expected
+Q3, ~$1.5M equivalent + pro-bono engineering; **CZI EOSS Cycle 7** ($100K–$400K) if Tec de Monterrey or
+fiscal-sponsor affiliation in place.
+**Q4 2026 and beyond:** **Mulago Henry Arnhold Fellowship** (referral-based, $100K unrestricted);
+**SECIHTI Convocatoria Nacional 2027** via Tec de Monterrey; **Earthshot Prize 2027 nominator outreach**
+
+(needs accredited nominator like Mills Fabrica or Commonwealth Secretariat); **Whitley Fund for Nature
+2028** (target after deployment maturity — 2026 and 2027 too early); **FAHHO (Fundación Alfredo Harp Helú
+Oaxaca)** direct partnership — **highest local-strategic fit given Artemio's Oaxaca roots + Indigenouslanguage angle**.
+**What not to bother with:** USAID (frozen under current U.S. admin); YC/Techstars/for-profit VC accelerators
+(mission mismatch); Arcus/Leakey/Disney/Moore/Packard/NIH/ERC/UKRI/Wellcome/RWJF (poor fit or
+invitation-only); crypto/ReFi as anchor strategy (taint risk + low yield); Indigenous funds in wrong geography
+(First Nations US, Indigenous Climate Hub Canada, Fondo Acción Colombia, WWF Brazil); Mozilla MOSS
+(program contracted).
+**Rare alignment funders to prioritize (open source + citizen science + Indigenous + LATAM quadrant):** IDB
+Lab, Bezos Earth Fund, FAHHO, National Geographic, MIT Solve, UNDP Equator, CZI EOSS, Conservation
+Leadership Programme. This combination of attributes is genuinely differentiating in grant applications —
+most biodiversity-AI projects pitched to U.S. funders are English-only and cloud-only.
+## 11. Monetization — the honest ceiling and how to earn it
+**Opinion: Rastrum's realistic 5-year ARR ceiling as a mission-led LATAM platform is $3–6M, not $30M.**
+That is a success case — roughly 2–4× iNaturalist's current revenue and sufficient for a sustainable 25–40
+person team — but it reframes the entire strategy. The failure mode is pricing and positioning for a Silicon
+Valley SaaS outcome that the market cannot deliver.
+Of the 20 monetization paths evaluated, four generate the bulk of realistic ARR. **B2B/B2G SaaS to
+institutions is the largest single stream** ($800K–$1.4M at scale): CONANP multi-reserve bundles, CONABIO
+data backend, state SEMARNAT counterparts (Yucatán, Oaxaca, Jalisco, CDMX, NL most active), universities,
+consultorías ambientales, ecolodges, botanical gardens. **Critical reality check: CONANP's entire 2025
+budget is ~USD $50M for 232 ANPs (MXN $10.2/hectare/year — the lowest in 21 years, with a further 12%
+cut proposed for 2026). Do not assume CONANP will buy direct.** Instead, **partner with international
+donors (BIOFIN, GEF, KfW, Moore, Packard, IDB Lab, Re:wild) to fund 3–5-ANP pilots**, using the pilots as
+reference datasets to pitch multi-reserve bundles later. This is how SMART, Wildlife Insights, and BIOFIN
+entered LATAM parks. **Camera trap SaaS ($360K at scale)** is the second-highest ROI with continuous
+billable events and clear unit economics — target the underserved UMA market (~12,000 registered Unidades
+de Manejo Ambiental, ~2,000 with camera-trap programs, and cashflow from hunting fees). Build on Wildlife
+Insights' Camtrap DP interoperability standard rather than competing. **White-label deployments ($480K at
+scale)** for ICMBio Brasil, SINAC Costa Rica, SERNANP Peru, MINAE, MiAmbiente Panamá, Instituto
+Humboldt Colombia — plus Mexican subnational states since CONABIO already runs NaturaLista nationally.
+**Training programs for community monitors ($500K at scale)**, funded by CONANP PROCODES (MXN
+~$600M annual budget — apply for PROCODES-eligibility via A.C.), FMCN, WWF-México, and university coaccreditation (ECOSUR, UADY, UAM-X).
+
+Secondary streams (~$100–$500K each): auto-generated biodiversity reports for MIA/EIA ($100–$500 per
+report, sleeper hit in Mexico's MIA market), educational licenses (free for public schools, paid for private;
+Oaxaca and Yucatán SEP-state pilots most promising), sponsored BioBlitzes ("Reto Naturalista México 2027
+powered by Rastrum" with Grupo Bimbo/FEMSA/Citibanamex sponsorship), commercial API tiered pricing
+(anchor on PlantNet Pro — €1000/year for 200K calls), ecotourism lodge partnerships ($50–$500/month per
+property).
+**Freemium consumer is a brand play, not a revenue engine.** At 100K MAU with 2–4% conversion at MXN
+$49/month (~USD $2.60), the yield is $44–$88K/year — because LATAM naturalist users skew
+student/researcher (low WTP) and because ethical freemium with a generous free tier converts at 2–4%, not
+Glority's ad-heavy trial-and-lock rates. **Donations yield ~$0.30–$0.80 per active user per year** based on
+iNaturalist, OpenStreetMap, and Wikipedia benchmarks — at 100K users, $30–$80K/year.
+**Red lines to publish as "Rastrum Monetization Principles" (doubles as FPIC credibility signal):** never
+paywall core ID; never sell raw user data to extractive industries (mining, oil & gas, industrial ag, logging —
+explicit industry-exclusion list in ToS); **never tokenize or blockchain Indigenous or community data (NFT on
+biodiversity is permanently off-limits)**; no dark-pattern subscriptions (one-click cancel, fully transparent
+pricing, no trial-and-auto-bill); no sale of precise location data for threatened species; no advertising; no data
+marketplace without community-level FPIC and revenue share; no biodiversity-credit MRV on
+Indigenous/ejido/comunidad lands without documented FPIC and benefit-sharing; no greenwashing
+partnerships (corporate sponsors pass a published screening for active environmental harm); full data
+portability (users export all their own observations in CSV/DwC/GPX, always).
+**The three-question test for any new monetization idea: Does it harm open science? Does it harm
+Indigenous data sovereignty? Does it distort incentives (reward disturbance, conflict of interest, attention
+drift)?** Green light requires three yesses.
+## 12. Existential risks and mitigations
+**Founder burnout is the single highest-probability, highest-impact risk (H/H).** Mitigations: sequence
+aggressively per the v0.1/v0.5/v1.0 plan above; hire a co-founder tech lead within 6 months or accept a
+slower roadmap; join a structured fellowship (MIT Solve, Ashoka, Acumen LatAm, Echoing Green); write a
+vacation/sabbatical calendar into bylaws; publicly commit to 40-hour weeks as a team norm.
+**Claude API dependency (M/H):** abstract Rastrum Scout behind a provider-agnostic service (Claude, GPT5, Gemini, Llama, local Mistral); fine-tune and distill a small local Spanish+Indigenous-language model for the
+offline/low-cost tier; negotiate startup credits; never store the only copy of prompts/responses; maintain
+semantic-cache-able design.
+**PlantNet single-point-of-failure (M/M):** multi-source ID fusion (PlantNet + iNat CV + on-device model +
+Claude Vision); contribute back to PlantNet's partner network; train own Mexico-region plant classifier on
+
+CONABIO SNIB + iNat MX as a hedge.
+**iNaturalist/CONABIO LATAM pivot (M/H):** differentiate on offline + Indigenous-language + ecologicalevidence + Local Contexts FPIC that iNat cannot quickly replicate; build MoUs with INPI, CONANP, and
+Oaxaca UMAs before iNat does; **federate rather than compete** — Rastrum as "iNat-compatible" via Darwin
+Core + GBIF IPT is friendlier and more defensible.
+**Google SpeciesNet + Wildlife Insights + Lens consolidation (M/H):** be MIT/Apache-compatible with
+SpeciesNet (ingest it); differentiate on offline + Indigenous languages + ecological evidence + data
+sovereignty — the parts Google cannot replicate without losing scale advantages.
+**Indigenous community pushback / extractive perception (M/Very H):** do FPIC before features, not after;
+CARI with real veto power; BC Notices applied by default on observations from INPI-mapped Indigenous
+territories until Labels negotiated; data-return workflow — communities get dashboards of their own data first,
+before public release; hire Indigenous staff (goal ≥30% of team, ≥50% of community-facing roles).
+**CONABIO political instability (H/H):** per Medellín & Soberón (*Science* 2024), the current administration
+reduced CONABIO's autonomy; Sheinbaum administration kept the trajectory but added Alicia Bárcena at
+SEMARNAT (more conservation-aligned). **Never make Rastrum financially dependent on CONABIO.**
+Diversify across international (GBIF, IDB, GEF), private (Moore, Packard, Bezos Earth, Bloomberg), and
+Mexican private (Fundación Coca-Cola, Televisa, Bancomer, FAHHO). Position Rastrum as the data
+infrastructure that survives political shifts.
+**LFPDPPP/LGPDPPSO 2025 reform aftermath (H/M):** design for GDPR (stricter by default); hire a
+fractional privacy counsel; maintain public compliance log.
+**Mexican B2G procurement cycles (H/M):** 12–18 months typical; go subnational first (Oaxaca, Yucatán,
+Jalisco, SEPI-CDMX); leverage universities and international NGOs as adoption bridges; CONACyTFrontera/FONDEC grants to bypass CompraNet.
+**Climate-driven data decay (H/M):** continual learning; monthly retraining pipeline; publish data-freshness
+indicator on each taxon page; partner with CONABIO monitoreo for climate-adjusted baselines.
+**Trademark dispute with Inventia RASTRUM (L-M/H):** file in MX class 42 within 30 days; disambiguation
+statement; 2–3 backup names pre-cleared; budget MXN 50–150K for potential nullity proceeding; preemptive coexistence-letter outreach to Inventia IP counsel (different field of use often accepted).
+## 13. Feature roadmap: v1 must-have, v2 should-have, v3 later, skip
+**v1 must-have (ship now or retroactive migration will be painful):** Darwin Core `basisOfRecord` /
+`occurrenceStatus` / `establishmentMeans` with structured enums; Audubon Core mandatory fields for all
+
+media (`ac:accessURI`, `ac:hashFunction`, `dc:license`); FPIC + CARE principles adoption as policy; basic
+Event structure with effort fields (retrofitting to Event Core later is costly); sensitive-taxa obscuration with
+credentialed-researcher access path; community-override on data sharing.
+**v2 should-have (6–12 months post-v1):** Event Core + MoF + Humboldt Extension exports (transforms
+Rastrum from observation logger to research platform); POWO/Tropicos/MEXU plant taxonomy resolver; full
+Audubon/Audiovisual Core 2023 terms; MAD-MEX + MapBiomas + Global Forest Watch overlays (strategic
+anchor for Mexico/LATAM positioning); CONAGUA/SMN weather integration; SMART-compatible export +
+Ranger/Patrol mode (opens CONANP institutional channel); **CyberTracker-style icon UI for low-literacy
+users** (signature differentiator aligning with Indigenous-language positioning); AudioMoth deployment
+registry + BirdNET-Analyzer pipeline; Wildbook integration for jaguar + whale shark (two flagship Mexican
+species with active Wildbooks — Whiskerbook, Sharkbook); crop detection + auto-focus guidance + multiangle composite ID; Local Contexts TK/BC Labels integration; ethnobotany/TEK module with consent; eBird +
+point-count + Pollard + NAAMP protocol library; phenology protocols for key Mexican species (magueys,
+oaks, cacti); BioBlitz mode; SEP-aligned education module pilot; camera trap upload with MegaDetector prefilter.
+**v3 nice-to-have (12–24 months):** scientific publication pipeline via Pensoft ARPHA for notable records;
+eDNA sample metadata using FAIRe checklist; BOLD/GenBank cross-reference fields; soundscape indices
+dashboard + OpenSoundscape training UI; Rainforest Connection Guardian alert ingestion; ARCore Geospatial
++ WebXR AR at signature PITs; herbarium digitization with LLM-powered OCR (2026 LLM OCR is a real leap;
+MEXU partnership possible); IoT sensors (LoRaWAN soil + weather); marine coral/debris/seagrass modules;
+LiDAR canopy overlays (GEDI); expanded Wildbook individual-ID for tapir, margay, manta; training/certification
+program; biodiversity credit data-model compatibility (Wallacea/Verra) — design for but don't depend on;
+CyberTracker webhook ingestion.
+**Skip or defer:** **blockchain for core data provenance** (GBIF datasetKey + DOI + DataCite + Preston
+content-addressed hashing solve the real problem without overhead; ECKOchain-style proposals are research
+curiosity, not production); **KlimaDAO/Regen Network integration** (speculative, reputationally risky, weak
+Indigenous-led support); ABCD standard (DwC dominates LATAM); MAPS banding (too specialized, requires
+permits); BBS protocol (Mexico has Monitoreo de Aves); DarwinCore-Germplasm (only if specific seed-bank
+partnership); local guide marketplace (scope-creep risk — potential v4 fork); full biodiversity credit registry (if
+market emerges, pick established registry not build).
+## 14. Community and growth: Oaxaca first, quarterly cadence
+**Oaxaca is the right seed ground** for four compounding reasons: highest Indigenous-language density
+(52.7% speak an Indigenous language; Zapoteco 490K, Mixteco 515K, Chinanteco, Mixe, Mazateco); highest
+endemism and biodiversity; lowest connectivity (62.5% internet penetration) which validates offline-first;
+strongest ejido/comunal forest institutions (Ixtlán de Juárez FSC-certified community forest enterprise;
+Pueblos Mancomunados and Expediciones Sierra Norte operating since 1994–98; Capulálpam de Méndez
+
+Pueblo Mágico; active CONANP protected areas Tehuacán-Cuicatlán, Huatulco, Lagunas de Chacahua).
+Proximity to academic partners at Tec de Monterrey (Artemio's MAIA program), UNAM, IPN CIIDIR Oaxaca
+closes the loop.
+**Q1:** MoUs with CONABIO (NaturaLista interop API terms), INECOL, IPN CIIDIR Oaxaca. Field partnerships
+with Ecoturixtlán and Expediciones Sierra Norte. Zapoteco UI translation via UNAM linguistics + communitymember review. 3 community partnerships signed; Zapoteco MVP strings 100% translated. **Q2:** closed
+beta with ~20 monitores comunitarios across 3 Ixtlán + Mancomunados sites; CONANP Tehuacán-Cuicatlán
+pilot with 10 rangers on camera-trap batch workflow; BioBlitz #1 "Reto Sierra Norte" for Día Internacional de la
+Biodiversidad (May 22); Tec and UNAM student ambassadors. 500 observations, 30 active users, <2% crash
+rate, sync success ≥95%. **Q3:** register Oaxaca for City Nature Challenge 2027; open beta with NaturaLista
+interop; onboard Huatulco and Lagunas de Chacahua CONANP rangers; content partnerships with Pronatura
+Sur, Terra Habitus, Endesu; first public Rastrum Scout (Oaxaca-trained RAG). 2,000 observations, 150 active
+users, 1 academic partnership course using Rastrum. **Q4:** add Mixteco language layer; Maya Yucateco
+scaffolding; expand to Sian Ka'an (Q. Roo) and Calakmul (Campeche) leveraging the Sierra Gorda jaguarcommunity-monitor pattern CONANP proved in 2026; Tec capstone partnership; Q4 BioBlitz aligned with
+CONABIO calendar; Tec/UNAM institutional license pilots. 10,000 observations, 500 active users, CNC 2027
+Oaxaca ready.
+**Priority academic partnerships:** Tec de Monterrey MAIA (internal hackathons, capstones, institutional
+license); UNAM Instituto de Biología and FES Iztacala/Zaragoza (taxonomy curation, model validation,
+student ambassadors); IPN CIIDIR Oaxaca (regional AI training data); UAM Iztapalapa (hydrobiology,
+freshwater module); ECOSUR (Chiapas/Q. Roo expansion lead); INECOL (Veracruz, central/Gulf partner);
+UABC, UAAAN, UADY, CINVESTAV for regional pilots. **Priority NGOs:** Pronatura (Noreste, Sur, Veracruz
+chapters as regional pilots); Naturalia (large mammals — jaguar, lobo mexicano); Terra Habitus (grassroots
+central MX); Endesu (insular endemics — Revillagigedo, Socorro); Reforestamos México (already partnered
+with Audubon on Izta-Popo bird tourism); Conselva (NW coastal/desert); WWF México as Wildlife Insights
+bridge.
+**Ride the existing event calendar, don't create competing events in year one.** CNC happens late April
+annually (2024 saw 83,528 participants globally, **Monterrey #2 globally by observations**). CONABIO's Reto
+Naturalista Urbano drives annual surges. CONANP runs smaller recurring bioblitzes in protected areas.
+Position Rastrum as participant first, event creator second.
+## Conclusion
+Rastrum is a real opportunity, but the founder's most dangerous temptation is to build the spec as written.
+**The four decisions that most determine outcome are: (1) scope discipline — v0.1 in 3 months with photoonly + offline + Zapoteco + Darwin Core, not the full multi-modal stack; (2) legal structure — Mexican A.C. +
+U.S. fiscal sponsor started this quarter, not next year; (3) license shift — AGPL/Apache/CC hybrid, not MIT,
+before external contributors arrive; (4) CARE-first Indigenous data sovereignty operationalized via Local
+
+Contexts Labels and an Indigenous advisory council with real veto power, as the core moat.** The technical
+stack almost chooses itself once these are clear: SvelteKit + Supabase (with option to self-host in `mxcentral-1`) + Dexie + ONNX Runtime Web + Cloudflare R2 + PostGIS + pgvector + Claude Haiku 4.5 routed
+through Gemini Flash-Lite first-pass + PlantNet Pro + Capacitor wrap.
+The Oaxaca-first playbook with Zapoteco Indigenous-language UI and Ixtlán de Juárez as anchor community
+partner is not just a launch strategy — **it is the credibility story that turns every grant application and every
+partnership conversation into a differentiated pitch**. No competitor can match this combination quickly.
+iNaturalist cannot replicate it without replacing its global posture. Google/Wildlife Insights cannot match it
+without losing scale advantages. Glority will not attempt it because there is no consumer subscription
+revenue in the strategy.
+The realistic financial outcome is a sustainable mission-led organization with $3–6M ARR within 5 years,
+funded 40% by international grants, 35% by B2G/B2B SaaS to Mexican and LATAM institutions, 15% by
+training programs and sponsored events, and 10% by API licensing and consumer donations. This is smaller
+than Glority's PictureThis ($100M+) and larger than iNaturalist ($4M) — it is neither failure nor Silicon Valley
+outcome. It is the exact shape of a durable biodiversity commons built on Artemio's specific advantages:
+Mexico City residence, Oaxaca roots, AWS technical credibility, MAIA academic channel, and the unusual
+quadrant of open-source + Indigenous + LATAM + offline-first that no other founder is positioned to occupy.
+**Act immediately on three things: apply for NVIDIA Inception and AWS Activate this week; email Fundación
+Alfredo Harp Helú Oaxaca for an introduction meeting; and file a Mexican trademark search on "Rastrum" via
+MARCANET to confirm the Inventia conflict is avoidable.** Everything else in this dossier can wait until those
+three are done.
+
+
