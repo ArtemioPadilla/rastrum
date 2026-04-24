@@ -83,13 +83,13 @@ const phases = [
   <article class="space-y-8">
     <div>
       <h1 class="text-3xl font-bold tracking-tight mb-4">{tr.docs.sections.roadmap}</h1>
-      <p class="text-lg text-zinc-600 dark:text-zinc-400 max-w-3xl">{tr.docs.descriptions.roadmap}</p>
+      <p class="text-lg text-zinc-600 dark:text-zinc-600 dark:text-zinc-400 max-w-3xl">{tr.docs.descriptions.roadmap}</p>
     </div>
 
     <!-- Visual timeline -->
     <section>
       <h2 id="timeline" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-6">
-        <a href="#timeline" class="text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Development Timeline
+        <a href="#timeline" class="text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Development Timeline
       </h2>
       <div class="not-prose space-y-0">
         {phases.map((p, i) => {
@@ -108,7 +108,7 @@ const phases = [
                 "absolute left-0 top-1.5 w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold",
                 isCurrent
                   ? "border-emerald-500 bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
-                  : "border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-500"
+                  : "border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-500 dark:text-zinc-500 dark:text-zinc-500"
               ]}>
                 {isCurrent ? '\u25B6' : i + 1}
               </div>
@@ -119,13 +119,13 @@ const phases = [
                     "text-xs font-mono px-2 py-0.5 rounded border",
                     isCurrent
                       ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
-                      : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 border-zinc-200 dark:border-zinc-700"
+                      : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-500 border-zinc-200 dark:border-zinc-700"
                   ]}>{p.ver}</span>
                   <span class:list={[
                     "font-semibold",
-                    isCurrent ? "text-zinc-900 dark:text-zinc-100" : "text-zinc-500 dark:text-zinc-400"
+                    isCurrent ? "text-zinc-900 dark:text-zinc-900 dark:text-zinc-100" : "text-zinc-500 dark:text-zinc-500 dark:text-zinc-600 dark:text-zinc-400"
                   ]}>{p.name}</span>
-                  <span class="text-xs text-zinc-500 dark:text-zinc-600">{p.period}</span>
+                  <span class="text-xs text-zinc-500 dark:text-zinc-500 dark:text-zinc-600">{p.period}</span>
                   {isCurrent && (
                     <span class="text-xs bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">
                       {(tr.docs.status as any).in_progress}
@@ -136,7 +136,7 @@ const phases = [
                   {p.items.map(item => (
                     <li class:list={[
                       "flex items-start gap-2 text-sm",
-                      isCurrent ? "text-zinc-700 dark:text-zinc-300" : "text-zinc-500 dark:text-zinc-500"
+                      isCurrent ? "text-zinc-700 dark:text-zinc-700 dark:text-zinc-300" : "text-zinc-500 dark:text-zinc-500 dark:text-zinc-500 dark:text-zinc-500 dark:text-zinc-500"
                     ]}>
                       <span class:list={[
                         "mt-1.5 w-1.5 h-1.5 rounded-full shrink-0",
@@ -156,9 +156,9 @@ const phases = [
     <!-- Design principles -->
     <section>
       <h2 id="principles" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
-        <a href="#principles" class="text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Design Principles
+        <a href="#principles" class="text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Design Principles
       </h2>
-      <div class="space-y-3 text-zinc-700 dark:text-zinc-300">
+      <div class="space-y-3 text-zinc-700 dark:text-zinc-700 dark:text-zinc-300">
         <div class="flex items-start gap-3">
           <span class="mt-1 w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
           <p>v0.1 proves offline works, nothing else</p>

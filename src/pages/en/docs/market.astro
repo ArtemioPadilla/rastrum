@@ -22,7 +22,7 @@ const matrix = [
 function cellDisplay(v: boolean | string) {
   if (v === true)      return { text: '\u2713', cls: 'text-emerald-600 dark:text-emerald-400 font-bold' };
   if (v === 'partial') return { text: '~',      cls: 'text-yellow-600 dark:text-yellow-400' };
-  return                       { text: '\u2717', cls: 'text-zinc-400 dark:text-zinc-600' };
+  return                       { text: '\u2717', cls: 'text-zinc-600 dark:text-zinc-400 dark:text-zinc-600' };
 }
 ---
 
@@ -30,31 +30,31 @@ function cellDisplay(v: boolean | string) {
   <article class="space-y-8">
     <div>
       <h1 class="text-3xl font-bold tracking-tight mb-4">{tr.docs.sections.market}</h1>
-      <p class="text-lg text-zinc-600 dark:text-zinc-400 max-w-3xl">{tr.docs.descriptions.market}</p>
+      <p class="text-lg text-zinc-600 dark:text-zinc-600 dark:text-zinc-400 max-w-3xl">{tr.docs.descriptions.market}</p>
     </div>
 
     <!-- Competitive Matrix -->
     <section>
       <h2 id="competitive-matrix" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
-        <a href="#competitive-matrix" class="text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Competitive Matrix
+        <a href="#competitive-matrix" class="text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Competitive Matrix
       </h2>
       <div class="not-prose overflow-x-auto">
         <table class="w-full text-sm border-collapse">
           <thead>
-            <tr class="border-b border-zinc-200 dark:border-zinc-800">
-              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Feature</th>
+            <tr class="border-b border-zinc-200 dark:border-zinc-200 dark:border-zinc-800">
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-500 dark:text-zinc-600 dark:text-zinc-400 font-medium">Feature</th>
               <th class="py-2 px-3 text-emerald-600 dark:text-emerald-400 font-semibold">Rastrum</th>
-              <th class="py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">iNaturalist</th>
-              <th class="py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Merlin</th>
-              <th class="py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">PlantNet</th>
-              <th class="py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Wildlife Insights</th>
-              <th class="py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Arbimon</th>
+              <th class="py-2 px-3 text-zinc-500 dark:text-zinc-500 dark:text-zinc-600 dark:text-zinc-400 font-medium">iNaturalist</th>
+              <th class="py-2 px-3 text-zinc-500 dark:text-zinc-500 dark:text-zinc-600 dark:text-zinc-400 font-medium">Merlin</th>
+              <th class="py-2 px-3 text-zinc-500 dark:text-zinc-500 dark:text-zinc-600 dark:text-zinc-400 font-medium">PlantNet</th>
+              <th class="py-2 px-3 text-zinc-500 dark:text-zinc-500 dark:text-zinc-600 dark:text-zinc-400 font-medium">Wildlife Insights</th>
+              <th class="py-2 px-3 text-zinc-500 dark:text-zinc-500 dark:text-zinc-600 dark:text-zinc-400 font-medium">Arbimon</th>
             </tr>
           </thead>
           <tbody>
             {matrix.map((row, i) => (
               <tr class:list={["border-b border-zinc-100 dark:border-zinc-900", i % 2 === 0 ? "bg-zinc-50/50 dark:bg-zinc-950/50" : ""]}>
-                <td class="py-2 px-3 text-zinc-700 dark:text-zinc-300">{row.feature}</td>
+                <td class="py-2 px-3 text-zinc-700 dark:text-zinc-700 dark:text-zinc-300">{row.feature}</td>
                 {[row.rastrum, row.inat, row.merlin, row.plantnet, row.wi, row.arbimon].map((v, j) => {
                   const c = cellDisplay(v);
                   return <td class:list={["py-2 px-3 text-center", c.cls, j === 0 ? "bg-emerald-500/5" : ""]}>{c.text}</td>;
@@ -63,12 +63,12 @@ function cellDisplay(v: boolean | string) {
             ))}
           </tbody>
         </table>
-        <p class="text-xs text-zinc-500 dark:text-zinc-600 mt-2">
+        <p class="text-xs text-zinc-500 dark:text-zinc-500 dark:text-zinc-600 mt-2">
           <span class="text-emerald-600 dark:text-emerald-400 font-bold">{'\u2713'}</span> full support
-          <span class="mx-2 text-zinc-300 dark:text-zinc-700">|</span>
+          <span class="mx-2 text-zinc-700 dark:text-zinc-300 dark:text-zinc-700">|</span>
           <span class="text-yellow-600 dark:text-yellow-400">~</span> partial
-          <span class="mx-2 text-zinc-300 dark:text-zinc-700">|</span>
-          <span class="text-zinc-400 dark:text-zinc-600">{'\u2717'}</span> not supported
+          <span class="mx-2 text-zinc-700 dark:text-zinc-300 dark:text-zinc-700">|</span>
+          <span class="text-zinc-600 dark:text-zinc-400 dark:text-zinc-600">{'\u2717'}</span> not supported
         </p>
       </div>
     </section>
@@ -76,19 +76,19 @@ function cellDisplay(v: boolean | string) {
     <!-- Market Sizing -->
     <section>
       <h2 id="market-sizing" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
-        <a href="#market-sizing" class="text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Market Sizing
+        <a href="#market-sizing" class="text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Market Sizing
       </h2>
       <div class="not-prose overflow-x-auto">
         <table class="w-full text-sm">
           <thead>
-            <tr class="border-b border-zinc-200 dark:border-zinc-800">
-              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Segment</th>
-              <th class="text-right py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">2024</th>
-              <th class="text-right py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">2033</th>
-              <th class="text-right py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">CAGR</th>
+            <tr class="border-b border-zinc-200 dark:border-zinc-200 dark:border-zinc-800">
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-500 dark:text-zinc-600 dark:text-zinc-400 font-medium">Segment</th>
+              <th class="text-right py-2 px-3 text-zinc-500 dark:text-zinc-500 dark:text-zinc-600 dark:text-zinc-400 font-medium">2024</th>
+              <th class="text-right py-2 px-3 text-zinc-500 dark:text-zinc-500 dark:text-zinc-600 dark:text-zinc-400 font-medium">2033</th>
+              <th class="text-right py-2 px-3 text-zinc-500 dark:text-zinc-500 dark:text-zinc-600 dark:text-zinc-400 font-medium">CAGR</th>
             </tr>
           </thead>
-          <tbody class="text-zinc-700 dark:text-zinc-300">
+          <tbody class="text-zinc-700 dark:text-zinc-700 dark:text-zinc-300">
             <tr class="border-b border-zinc-100 dark:border-zinc-900">
               <td class="py-2 px-3">Global citizen science platforms</td>
               <td class="py-2 px-3 text-right font-mono">$1.23B</td>
@@ -115,17 +115,17 @@ function cellDisplay(v: boolean | string) {
     <!-- Why LATAM -->
     <section>
       <h2 id="why-latam" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
-        <a href="#why-latam" class="text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Why LATAM, Why Offline-First
+        <a href="#why-latam" class="text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Why LATAM, Why Offline-First
       </h2>
-      <div class="space-y-3 text-zinc-700 dark:text-zinc-300">
+      <div class="space-y-3 text-zinc-700 dark:text-zinc-700 dark:text-zinc-300">
         <p>
-          <span class="font-semibold text-zinc-900 dark:text-zinc-100">Connectivity gap:</span> INEGI ENDUTIH 2024 reports 83.1% national internet connectivity but only 62.5% in Oaxaca and 56.7% in Chiapas. The least-connected states are the most biodiverse. 31.5% of target users cannot use cloud-dependent tools.
+          <span class="font-semibold text-zinc-900 dark:text-zinc-900 dark:text-zinc-100">Connectivity gap:</span> INEGI ENDUTIH 2024 reports 83.1% national internet connectivity but only 62.5% in Oaxaca and 56.7% in Chiapas. The least-connected states are the most biodiverse. 31.5% of target users cannot use cloud-dependent tools.
         </p>
         <p>
-          <span class="font-semibold text-zinc-900 dark:text-zinc-100">NaturaLista MX:</span> 138K users, 5M observations, 45K species — but growing at only 16%/year vs iNat's near-doubling globally. The 2024 CONABIO autonomy reduction opens space for a private/NGO complement.
+          <span class="font-semibold text-zinc-900 dark:text-zinc-900 dark:text-zinc-100">NaturaLista MX:</span> 138K users, 5M observations, 45K species — but growing at only 16%/year vs iNat's near-doubling globally. The 2024 CONABIO autonomy reduction opens space for a private/NGO complement.
         </p>
         <p>
-          <span class="font-semibold text-zinc-900 dark:text-zinc-100">City Nature Challenge 2024:</span> Monterrey ranked #2 globally by observations, La Paz Bolivia #1 — LATAM dominates citizen science per capita.
+          <span class="font-semibold text-zinc-900 dark:text-zinc-900 dark:text-zinc-100">City Nature Challenge 2024:</span> Monterrey ranked #2 globally by observations, La Paz Bolivia #1 — LATAM dominates citizen science per capita.
         </p>
       </div>
     </section>
@@ -133,9 +133,9 @@ function cellDisplay(v: boolean | string) {
     <!-- PITs as Moat -->
     <section>
       <h2 id="pits-moat" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
-        <a href="#pits-moat" class="text-zinc-400 hover:text-emerald-500 transition-colors">#</a> PITs as Foursquare Moat
+        <a href="#pits-moat" class="text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors">#</a> PITs as Foursquare Moat
       </h2>
-      <div class="p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 text-zinc-700 dark:text-zinc-300">
+      <div class="p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 text-zinc-700 dark:text-zinc-700 dark:text-zinc-300">
         <p class="mb-3">
           QR/NFC "Puntos de Informacion Territorial" (PITs) anchors have <span class="font-semibold text-emerald-600 dark:text-emerald-400">zero competition</span>. Whoever installs the most physical nodes in Mexican parks and trails creates the biological version of Foursquare: a network effect where every QR label installed makes the platform more valuable.
         </p>
