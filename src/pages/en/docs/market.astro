@@ -54,7 +54,7 @@ function cellDisplay(v: boolean | string) {
           <tbody>
             {matrix.map((row, i) => (
               <tr class:list={["border-b border-zinc-100 dark:border-zinc-900", i % 2 === 0 ? "bg-zinc-50/50 dark:bg-zinc-950/50" : ""]}>
-                <td class="py-2 px-3 text-zinc-700 dark:text-zinc-700 dark:text-zinc-300">{row.feature}</td>
+                <td class="py-2 px-3 text-zinc-700 dark:text-zinc-300">{row.feature}</td>
                 {[row.rastrum, row.inat, row.merlin, row.plantnet, row.wi, row.arbimon].map((v, j) => {
                   const c = cellDisplay(v);
                   return <td class:list={["py-2 px-3 text-center", c.cls, j === 0 ? "bg-emerald-500/5" : ""]}>{c.text}</td>;
@@ -88,7 +88,7 @@ function cellDisplay(v: boolean | string) {
               <th class="text-right py-2 px-3 text-zinc-500 dark:text-zinc-500 dark:text-zinc-600 dark:text-zinc-400 font-medium">CAGR</th>
             </tr>
           </thead>
-          <tbody class="text-zinc-700 dark:text-zinc-700 dark:text-zinc-300">
+          <tbody class="text-zinc-700 dark:text-zinc-300">
             <tr class="border-b border-zinc-100 dark:border-zinc-900">
               <td class="py-2 px-3">Global citizen science platforms</td>
               <td class="py-2 px-3 text-right font-mono">$1.23B</td>
@@ -117,7 +117,7 @@ function cellDisplay(v: boolean | string) {
       <h2 id="why-latam" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
         <a href="#why-latam" class="text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Why LATAM, Why Offline-First
       </h2>
-      <div class="space-y-3 text-zinc-700 dark:text-zinc-700 dark:text-zinc-300">
+      <div class="space-y-3 text-zinc-700 dark:text-zinc-300">
         <p>
           <span class="font-semibold text-zinc-900 dark:text-zinc-900 dark:text-zinc-100">Connectivity gap:</span> INEGI ENDUTIH 2024 reports 83.1% national internet connectivity but only 62.5% in Oaxaca and 56.7% in Chiapas. The least-connected states are the most biodiverse. 31.5% of target users cannot use cloud-dependent tools.
         </p>
@@ -135,7 +135,7 @@ function cellDisplay(v: boolean | string) {
       <h2 id="pits-moat" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
         <a href="#pits-moat" class="text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors">#</a> PITs as Foursquare Moat
       </h2>
-      <div class="p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 text-zinc-700 dark:text-zinc-700 dark:text-zinc-300">
+      <div class="p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 text-zinc-700 dark:text-zinc-300">
         <p class="mb-3">
           QR/NFC "Puntos de Informacion Territorial" (PITs) anchors have <span class="font-semibold text-emerald-600 dark:text-emerald-400">zero competition</span>. Whoever installs the most physical nodes in Mexican parks and trails creates the biological version of Foursquare: a network effect where every QR label installed makes the platform more valuable.
         </p>

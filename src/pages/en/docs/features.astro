@@ -81,7 +81,7 @@ function badgeClasses(status: string): string {
       <h2 id="ai-pipeline" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
         <a href="#ai-pipeline" class="text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Core AI Pipeline
       </h2>
-      <div class="not-prose p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 font-mono text-sm text-zinc-700 dark:text-zinc-700 dark:text-zinc-300 overflow-x-auto whitespace-pre leading-relaxed">Input (photo / audio / video / evidence)
+      <div class="not-prose p-4 rounded-xl bg-zinc-950 border border-zinc-800 font-mono text-xs text-emerald-300 overflow-x-auto whitespace-pre leading-relaxed">Input (photo / audio / video / evidence)
   |
   |-- Plant detected? --&gt; PlantNet Pro API (78K species)
   |-- Bird sound?     --&gt; BirdNET (commercial license)
@@ -101,7 +101,7 @@ Offline fallback:
       <h2 id="offline" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
         <a href="#offline" class="text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Offline-First Architecture
       </h2>
-      <p class="text-zinc-700 dark:text-zinc-700 dark:text-zinc-300">
+      <p class="text-zinc-700 dark:text-zinc-300">
         Every observation is written to a local Dexie IndexedDB outbox first. On reconnect, the queue flushes to Supabase via REST POST. No data is lost without connectivity. Regional ONNX model packs are cached in IndexedDB for on-device inference via WebAssembly.
       </p>
     </section>

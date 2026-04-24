@@ -42,7 +42,7 @@ const costModel = [
               <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-500 dark:text-zinc-600 dark:text-zinc-400 font-medium">Rationale</th>
             </tr>
           </thead>
-          <tbody class="text-zinc-700 dark:text-zinc-700 dark:text-zinc-300">
+          <tbody class="text-zinc-700 dark:text-zinc-300">
             {stack.map((row, i) => (
               <tr class:list={["border-b border-zinc-100 dark:border-zinc-900", i % 2 === 0 ? "bg-zinc-50/50 dark:bg-zinc-950/50" : ""]}>
                 <td class="py-2 px-3 font-medium text-zinc-900 dark:text-zinc-100 whitespace-nowrap">{row.layer}</td>
@@ -60,7 +60,7 @@ const costModel = [
       <h2 id="ai-pipeline" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
         <a href="#ai-pipeline" class="text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors">#</a> AI Identification Pipeline
       </h2>
-      <div class="not-prose p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 font-mono text-sm text-zinc-700 dark:text-zinc-700 dark:text-zinc-300 overflow-x-auto whitespace-pre leading-relaxed">User uploads media
+      <div class="not-prose p-4 rounded-xl bg-zinc-950 border border-zinc-800 font-mono text-xs text-emerald-300 overflow-x-auto whitespace-pre leading-relaxed">User uploads media
   |
   v
 Client-side EXIF extraction (exifr) --&gt; GPS, timestamp, device
@@ -101,7 +101,7 @@ Offline fallback:
               <th class="text-right py-2 px-3 text-zinc-500 dark:text-zinc-500 dark:text-zinc-600 dark:text-zinc-400 font-medium">Per User</th>
             </tr>
           </thead>
-          <tbody class="text-zinc-700 dark:text-zinc-700 dark:text-zinc-300">
+          <tbody class="text-zinc-700 dark:text-zinc-300">
             {costModel.map((row, i) => (
               <tr class:list={["border-b border-zinc-100 dark:border-zinc-900", i % 2 === 0 ? "bg-zinc-50/50 dark:bg-zinc-950/50" : ""]}>
                 <td class="py-2 px-3 font-medium text-zinc-900 dark:text-zinc-900 dark:text-zinc-100">{row.scale}</td>
@@ -122,7 +122,7 @@ Offline fallback:
       <h2 id="data-model" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
         <a href="#data-model" class="text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Data Model
       </h2>
-      <p class="text-zinc-700 dark:text-zinc-700 dark:text-zinc-300 mb-4">
+      <p class="text-zinc-700 dark:text-zinc-300 mb-4">
         Core tables in the Supabase Postgres schema, partitioned monthly via pg_partman. PostGIS geography types for spatial queries, pgvector for semantic species search.
       </p>
       <div class="not-prose overflow-x-auto">
@@ -134,7 +134,7 @@ Offline fallback:
               <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-500 dark:text-zinc-600 dark:text-zinc-400 font-medium">Key Fields</th>
             </tr>
           </thead>
-          <tbody class="text-zinc-700 dark:text-zinc-700 dark:text-zinc-300">
+          <tbody class="text-zinc-700 dark:text-zinc-300">
             <tr class="border-b border-zinc-100 dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-950/50">
               <td class="py-2 px-3 font-mono text-emerald-600 dark:text-emerald-400">users</td>
               <td class="py-2 px-3">User accounts and profiles</td>
