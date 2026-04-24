@@ -9,6 +9,7 @@ interface Props {
 }
 
 const { title, description = 'Species identification platform', lang = 'en' } = Astro.props;
+const currentPath = Astro.url.pathname;
 ---
 
 <!doctype html>
@@ -31,7 +32,7 @@ const { title, description = 'Species identification platform', lang = 'en' } = 
     </script>
   </head>
   <body class="min-h-screen bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 transition-colors">
-    <Header lang={lang} />
+    <Header lang={lang} currentPath={currentPath} />
     <main class="max-w-5xl mx-auto px-4 py-8">
       <slot />
     </main>
