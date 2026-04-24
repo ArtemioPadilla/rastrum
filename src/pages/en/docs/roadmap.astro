@@ -1,181 +1,128 @@
 ---
 import DocLayout from '../../../layouts/DocLayout.astro';
-import { t } from '../../../i18n/utils';
+import { t, getDocPath } from '../../../i18n/utils';
+import progressData from '../../../../docs/progress.json';
 
 const lang = 'en';
 const tr = t(lang);
 
-const phases = [
-  {
-    ver: 'v0.1', name: 'Foundation', period: 'Month 1-2', status: 'in_progress',
-    items: [
-      'Astro PWA shell with full i18n (EN/ES/Zapoteco pilot)',
-      'Supabase schema: observations, species, users, media',
-      'PlantNet MVP — single-photo plant identification',
-      'GitHub Pages deploy with CI/CD',
-      'Documentation site with 8-page spec',
-    ],
-  },
-  {
-    ver: 'v0.2', name: 'Intelligence', period: 'Month 3-4', status: 'planned',
-    items: [
-      'Claude Vision + Gemini Flash-Lite ensemble pipeline',
-      'Observation log with GPS geotagging',
-      'Media preprocessing: resize, quality check, blur detection',
-      'EXIF / XMP / ID3 metadata auto-extraction',
-      'GPS observation map with MapLibre GL',
-    ],
-  },
-  {
-    ver: 'v0.3', name: 'Community', period: 'Month 5-6', status: 'planned',
-    items: [
-      'BirdNET audio identification (commercial license)',
-      'Expert validation with taxonomic badges and 2/3 consensus',
-      'Dispute resolution queue for contested identifications',
-      'Species pages with range maps and regional data',
-      'Environmental context auto-enrichment (lunar, weather, phenology)',
-    ],
-  },
-  {
-    ver: 'v1.0', name: 'Field Ready', period: 'Month 7-9', status: 'planned',
-    items: [
-      'Video identification support (up to 30s clips)',
-      'Ecological evidence: tracks, scat, burrows, nests with structured fields',
-      'Full offline PWA with ONNX models cached in IndexedDB',
-      'Darwin Core Archive export to GBIF',
-      'Community and gamification: profiles, badges, levels, BioBlitz',
-    ],
-  },
-  {
-    ver: 'v1.5', name: 'Spatial Intelligence', period: 'Month 10-14', status: 'planned',
-    items: [
-      'Biodiversity Trails: transects, waypoints, diversity metrics',
-      'PITs + QR/NFC territorial information points',
-      'Spatial analysis: ANP, INEGI, INAH, hydrological layers',
-      'Diversity indices: Shannon-Wiener, Simpson, Chao1, rarefaction curves',
-      'Phenological calendar and community matrix export',
-    ],
-  },
-  {
-    ver: 'v2.0', name: 'Regional Intelligence', period: 'Month 15-20', status: 'planned',
-    items: [
-      'Camera trap analysis: bulk upload, SpeciesNet, occupancy modeling',
-      'Institutional exports: GBIF publisher, CONABIO SNIB, CONANP, INAH',
-      'Regional ML model training with federated learning',
-      'iNaturalist bridge for cross-platform observation sync',
-      'B2G SaaS dashboard for state agencies',
-    ],
-  },
-  {
-    ver: 'v2.5', name: 'Rastrum Scout', period: 'Month 21-30', status: 'planned',
-    items: [
-      'Scout AI conversational field assistant with regional RAG',
-      'AR species overlay in camera viewfinder',
-      'Advanced acoustic analysis beyond BirdNET',
-      'Full CONABIO / CONANP / INAH partnership APIs',
-      'Indigenous language voice I/O (Zapoteco, Mixteco, Nahuatl, Maya)',
-    ],
-  },
-];
+const phases = Object.entries(progressData.phases).map(([ver, phase]) => ({
+  ver,
+  ...phase,
+}));
+
+const statusConfig: Record<string, { label: string; badge: string; dot: string }> = {
+  in_progress: { label: 'In Progress', badge: 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30', dot: 'bg-emerald-500' },
+  planned:     { label: 'Planned',     badge: 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border-zinc-300 dark:border-zinc-700', dot: 'bg-zinc-400' },
+  done:        { label: 'Complete',    badge: 'bg-sky-500/20 text-sky-600 dark:text-sky-400 border-sky-500/30', dot: 'bg-sky-500' },
+};
+
+function pct(items: any[]) {
+  const done = items.filter(i => i.done).length;
+  return { done, total: items.length, pct: items.length ? Math.round((done / items.length) * 100) : 0 };
+}
 ---
 
 <DocLayout title={tr.docs.sections.roadmap} lang={lang} section="roadmap" editPath="src/pages/en/docs/roadmap.astro">
-  <article class="space-y-8">
-    <div>
-      <h1 class="text-3xl font-bold tracking-tight mb-4">{tr.docs.sections.roadmap}</h1>
-      <p class="text-lg text-zinc-600 dark:text-zinc-600 dark:text-zinc-400 max-w-3xl">{tr.docs.descriptions.roadmap}</p>
+  <article class="space-y-2">
+    <div class="mb-8">
+      <h1 class="text-3xl font-bold tracking-tight mb-2">{tr.docs.sections.roadmap}</h1>
+      <p class="text-zinc-600 dark:text-zinc-400 max-w-2xl">{tr.docs.descriptions.roadmap}</p>
+      <p class="text-xs text-zinc-500 dark:text-zinc-500 mt-2">Progress synced from <code class="text-xs bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">docs/progress.json</code> — last updated {progressData.updated}</p>
     </div>
 
-    <!-- Visual timeline -->
-    <section>
-      <h2 id="timeline" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-6">
-        <a href="#timeline" class="text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Development Timeline
-      </h2>
-      <div class="not-prose space-y-0">
-        {phases.map((p, i) => {
-          const isCurrent = p.status === 'in_progress';
-          return (
-            <div class="relative pl-10 pb-10 last:pb-0">
-              {/* Vertical line */}
-              {i < phases.length - 1 && (
-                <div class:list={[
-                  "absolute left-[15px] top-7 w-0.5 h-full",
-                  isCurrent ? "bg-emerald-500/40" : "bg-zinc-200 dark:bg-zinc-800"
+    {phases.map((phase, i) => {
+      const prog = pct(phase.items);
+      const cfg = statusConfig[phase.status] || statusConfig.planned;
+      const isActive = phase.status === 'in_progress';
+      return (
+        <div class:list={[
+          "relative rounded-xl border transition-all",
+          isActive
+            ? "border-emerald-500/40 bg-emerald-500/5 dark:bg-emerald-500/5"
+            : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50"
+        ]}>
+          {/* Phase header */}
+          <div class="p-5 pb-3">
+            <div class="flex flex-wrap items-start gap-3 justify-between mb-3">
+              <div class="flex items-center gap-3 flex-wrap">
+                <span class:list={[
+                  "w-2.5 h-2.5 rounded-full shrink-0 mt-0.5",
+                  cfg.dot,
+                  isActive ? "ring-4 ring-emerald-500/20" : ""
                 ]} />
-              )}
-              {/* Dot */}
-              <div class:list={[
-                "absolute left-0 top-1.5 w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold",
-                isCurrent
-                  ? "border-emerald-500 bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
-                  : "border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-500 dark:text-zinc-400 dark:text-zinc-500"
-              ]}>
-                {isCurrent ? '\u25B6' : i + 1}
-              </div>
-              {/* Content */}
-              <div class="pt-0.5">
-                <div class="flex flex-wrap items-center gap-2 mb-2">
-                  <span class:list={[
-                    "text-xs font-mono px-2 py-0.5 rounded border",
-                    isCurrent
-                      ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
-                      : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700"
-                  ]}>{p.ver}</span>
-                  <span class:list={[
-                    "font-semibold",
-                    isCurrent ? "text-zinc-900 dark:text-zinc-100" : "text-zinc-500 dark:text-zinc-400"
-                  ]}>{p.name}</span>
-                  <span class="text-xs text-zinc-500 dark:text-zinc-400 dark:text-zinc-600">{p.period}</span>
-                  {isCurrent && (
-                    <span class="text-xs bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">
-                      {(tr.docs.status as any).in_progress}
-                    </span>
-                  )}
+                <div>
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <code class="text-sm font-mono font-bold text-zinc-900 dark:text-zinc-100">{phase.ver}</code>
+                    <span class="text-sm font-semibold text-zinc-700 dark:text-zinc-300">{phase.name}</span>
+                    <span class:list={["text-xs px-2 py-0.5 rounded-full border font-medium", cfg.badge]}>{cfg.label}</span>
+                  </div>
+                  <p class="text-xs text-zinc-500 dark:text-zinc-500 mt-0.5">{phase.period}</p>
                 </div>
-                <ul class="space-y-1">
-                  {p.items.map(item => (
-                    <li class:list={[
-                      "flex items-start gap-2 text-sm",
-                      isCurrent ? "text-zinc-700 dark:text-zinc-300" : "text-zinc-500 dark:text-zinc-400 dark:text-zinc-500 dark:text-zinc-400 dark:text-zinc-500"
-                    ]}>
-                      <span class:list={[
-                        "mt-1.5 w-1.5 h-1.5 rounded-full shrink-0",
-                        isCurrent ? "bg-emerald-500" : "bg-zinc-300 dark:bg-zinc-700"
-                      ]} />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
+              </div>
+              {/* Progress counter */}
+              <div class="text-right shrink-0">
+                <span class:list={[
+                  "text-sm font-semibold",
+                  prog.pct === 100 ? "text-emerald-600 dark:text-emerald-400" :
+                  prog.pct > 0 ? "text-zinc-700 dark:text-zinc-300" : "text-zinc-400 dark:text-zinc-600"
+                ]}>
+                  {prog.done}/{prog.total}
+                </span>
+                <p class="text-xs text-zinc-400 dark:text-zinc-600">items</p>
               </div>
             </div>
-          );
-        })}
-      </div>
-    </section>
 
-    <!-- Design principles -->
-    <section>
-      <h2 id="principles" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
-        <a href="#principles" class="text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Design Principles
-      </h2>
-      <div class="space-y-3 text-zinc-700 dark:text-zinc-300">
-        <div class="flex items-start gap-3">
-          <span class="mt-1 w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
-          <p>v0.1 proves offline works, nothing else</p>
+            {/* Progress bar */}
+            <div class="w-full h-1.5 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
+              <div
+                class:list={[
+                  "h-full rounded-full transition-all",
+                  prog.pct === 100 ? "bg-sky-500" : isActive ? "bg-emerald-500" : "bg-zinc-400"
+                ]}
+                style={`width: ${prog.pct}%`}
+              />
+            </div>
+          </div>
+
+          {/* Items checklist */}
+          <div class="px-5 pb-5 grid sm:grid-cols-2 gap-x-6 gap-y-1.5 mt-1">
+            {phase.items.map(item => (
+              <div class="flex items-start gap-2.5">
+                <div class:list={[
+                  "mt-0.5 w-4 h-4 rounded shrink-0 border-2 flex items-center justify-center transition-colors",
+                  item.done
+                    ? "bg-emerald-500 border-emerald-500"
+                    : "border-zinc-300 dark:border-zinc-700 bg-transparent"
+                ]}>
+                  {item.done && (
+                    <svg class="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 12 12" stroke="currentColor" stroke-width="2.5">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M2 6l3 3 5-5"/>
+                    </svg>
+                  )}
+                </div>
+                <span class:list={[
+                  "text-sm leading-relaxed",
+                  item.done
+                    ? "text-zinc-500 dark:text-zinc-500 line-through"
+                    : isActive
+                      ? "text-zinc-800 dark:text-zinc-200"
+                      : "text-zinc-600 dark:text-zinc-400"
+                ]}>
+                  {item.label}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
-        <div class="flex items-start gap-3">
-          <span class="mt-1 w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
-          <p>Each release adds one new modality (audio, ecological evidence, camera traps, AI, AR)</p>
-        </div>
-        <div class="flex items-start gap-3">
-          <span class="mt-1 w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
-          <p>PITs and trails wait until the core observation loop is stable</p>
-        </div>
-        <div class="flex items-start gap-3">
-          <span class="mt-1 w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
-          <p>Institutional exports ship when there is data worth exporting</p>
-        </div>
-      </div>
-    </section>
+      );
+    })}
+
+    <div class="pt-4 px-1">
+      <p class="text-xs text-zinc-500 dark:text-zinc-600">
+        To update progress: edit <code class="bg-zinc-100 dark:bg-zinc-800 px-1 rounded">docs/progress.json</code> in the repo and set <code class="bg-zinc-100 dark:bg-zinc-800 px-1 rounded">"done": true</code> for completed items.
+        The page rebuilds automatically on each push.
+      </p>
+    </div>
   </article>
 </DocLayout>

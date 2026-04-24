@@ -1,0 +1,88 @@
+{
+  "updated": "2026-04-24",
+  "phases": {
+    "v0.1": {
+      "name": "Alpha MVP",
+      "period": "Months 1–3",
+      "status": "in_progress",
+      "items": [
+        { "id": "astro-skeleton",     "label": "Astro site skeleton + Tailwind + i18n", "done": true },
+        { "id": "supabase-schema",    "label": "Supabase schema (observations, taxa, media)", "done": false },
+        { "id": "pwa-manifest",       "label": "PWA manifest + offline service worker", "done": false },
+        { "id": "plantnet-id",        "label": "PlantNet photo ID integration", "done": false },
+        { "id": "claude-haiku-id",    "label": "Claude Haiku 4.5 vision cascade", "done": false },
+        { "id": "zapoteco-ui",        "label": "Zapoteco UI pilot (FPIC process)", "done": false },
+        { "id": "darwin-core-export", "label": "Darwin Core CSV/Archive export", "done": false },
+        { "id": "offline-queue",      "label": "Dexie IndexedDB observation outbox", "done": false },
+        { "id": "gps-observation",    "label": "GPS-tagged observation form", "done": false },
+        { "id": "map-view",           "label": "Leaflet map with observation pins", "done": false }
+      ]
+    },
+    "v0.5": {
+      "name": "Beta",
+      "period": "Months 4–6",
+      "status": "planned",
+      "items": [
+        { "id": "birdnet-audio",      "label": "BirdNET audio ID (commercial license)", "done": false },
+        { "id": "multi-image",        "label": "Multi-image observations", "done": false },
+        { "id": "eco-evidence",       "label": "Ecological evidence fields (tracks, scat, substrate)", "done": false },
+        { "id": "scout-v0",           "label": "Rastrum Scout v0 (conversational ID)", "done": false },
+        { "id": "consensus-workflow", "label": "Research-grade 2/3 identifier consensus", "done": false },
+        { "id": "local-contexts",     "label": "Local Contexts BC Notice integration", "done": false },
+        { "id": "gbif-ipt",           "label": "GBIF IPT pilot publish", "done": false },
+        { "id": "exif-extraction",    "label": "EXIF/XMP/ID3 metadata auto-extraction", "done": false }
+      ]
+    },
+    "v1.0": {
+      "name": "Public Launch",
+      "period": "Months 7–12",
+      "status": "planned",
+      "items": [
+        { "id": "camera-trap-ingest", "label": "Camera trap ingestion (SpeciesNet + MegaDetector)", "done": false },
+        { "id": "video-support",      "label": "Video support ≤30s (H.265/AV1)", "done": false },
+        { "id": "gamification",       "label": "Opt-in gamification (no leaderboards)", "done": false },
+        { "id": "institutional-export","label": "Institutional exports: MIA, SNIB, CONANP, INAH", "done": false },
+        { "id": "credentialed-access","label": "Credentialed researcher access tier", "done": false },
+        { "id": "env-enrichment",     "label": "Lunar/weather/NDVI environmental enrichment", "done": false },
+        { "id": "community-module",   "label": "Community profiles, badges, BioBlitz events", "done": false },
+        { "id": "capacitor-ios",      "label": "Capacitor iOS App Store wrapper (v1.2)", "done": false }
+      ]
+    },
+    "v1.5": {
+      "name": "Territory Layer",
+      "period": "Months 10–14",
+      "status": "planned",
+      "items": [
+        { "id": "biodiversity-trails","label": "Biodiversity Trails with GPS waypoints + diversity metrics", "done": false },
+        { "id": "pits-qr",            "label": "PITs + QR/NFC anchors (Puntos de Información Territorial)", "done": false },
+        { "id": "spatial-analysis",   "label": "Spatial analysis: ANP/INEGI/INAH GeoJSON layers", "done": false },
+        { "id": "diversity-indices",  "label": "Diversity indices: S, H', D, Chao1, Pielou J", "done": false },
+        { "id": "offline-maps",       "label": "MapLibre + pmtiles offline maps (Mexico zoom 0–14)", "done": false },
+        { "id": "trail-pdf-export",   "label": "Trail PDF export (field guide style)", "done": false }
+      ]
+    },
+    "v2.0": {
+      "name": "Institutional",
+      "period": "Months 15–20",
+      "status": "planned",
+      "items": [
+        { "id": "camera-trap-advanced","label": "Camera trap: occupancy modeling, activity histograms", "done": false },
+        { "id": "gbif-publisher",     "label": "GBIF dataset publisher + DOI generation", "done": false },
+        { "id": "regional-ml",        "label": "Regional ML training pipeline (Oaxaca-endemic focus)", "done": false },
+        { "id": "b2g-dashboard",      "label": "B2G SaaS dashboard for CONANP / state agencies", "done": false },
+        { "id": "inat-bridge",        "label": "iNaturalist import/export bridge", "done": false }
+      ]
+    },
+    "v2.5": {
+      "name": "AI + AR",
+      "period": "Months 21–30",
+      "status": "planned",
+      "items": [
+        { "id": "scout-full",         "label": "Rastrum Scout — full conversational field AI (RAG + pgvector)", "done": false },
+        { "id": "ar-overlay",         "label": "AR species overlay in camera viewfinder", "done": false },
+        { "id": "voice-indigenous",   "label": "Indigenous language voice I/O (Zapoteco, Mixteco, Maya, Náhuatl)", "done": false },
+        { "id": "conabio-api",        "label": "Formal CONABIO/CONANP/INAH partnership APIs", "done": false }
+      ]
+    }
+  }
+}
