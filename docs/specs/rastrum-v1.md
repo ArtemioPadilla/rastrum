@@ -1263,55 +1263,152 @@ location and season, and improves over time as the community contributes more da
 
 ## Module: Community & Gamification
 
-**Target release: v1.0**
+**Canonical implementation spec:** [`modules/08-profile-activity-gamification.md`](./modules/08-profile-activity-gamification.md).
+This section is the narrative/vision source; the module spec is the build reference.
 
-Mechanics to grow and retain the observer community through meaningful engagement,
-recognition, and collaborative goals aligned with conservation outcomes.
+**Staged rollout:**
 
-### Observer Profiles
+| Version | Scope |
+|---|---|
+| **v0.1** | Profile basics — page + edit + avatar dropdown in header |
+| **v0.3** | Activity feed — per-user event timeline driven by server-side triggers |
+| **v0.5** | Discovery & mastery badges — ~40 seed badges, nightly evaluator, quality gates |
+| **v1.0** | Streaks, BioBlitz events, shareable OG cards |
 
-- **Species count by taxon group** — birds, plants, fungi, reptiles, etc., displayed
-  as a visual breakdown.
-- **Personal observations map** — heatmap of the observer's geographic coverage.
-- **Badges:**
-  - First Bird, First Plant, First Fungus (taxonomic firsts)
-  - 100 Observations, 500 Observations, 1000 Observations (volume milestones)
-  - Night Observer (observations between 20:00–05:00)
-  - Rare Find (observation of a species with <10 regional records)
-  - Expert Validator (earned expert badge)
-  - Trail Creator (published a biodiversity trail)
-- **Observer level:** Novice → Field Naturalist → Specialist → Expert →
-  Master Naturalist — based on validated observation count, taxon breadth, and
-  community contributions.
-- **Streak tracking** — consecutive days with at least one observation.
+### Design philosophy (non-negotiable rules)
 
-### Expert System
+The platform adopts engagement mechanics but applies hard guardrails to prevent
+the abuses they usually bring with them:
+
+1. **Everything is opt-in.** Streaks, badges, points, activity: all off by
+   default. One gamification toggle enables them together; a separate toggle
+   controls public visibility.
+2. **No public leaderboards, ever.** Private self-comparison is fine; "you
+   rank #47 in Oaxaca" is not. Rationale: public ranks push volume over
+   quality and degrade dataset integrity.
+3. **Quality gates count everything.** An observation with
+   `identification.confidence < 0.4` or flagged `needs_review` does not count
+   toward streaks, badges, or activity. Research-grade observations (community
+   consensus) count double. This makes the cheapest way to farm badges also
+   the most scientifically valuable contribution.
+4. **No push-notification nagging.** Streak reminders are inbox-digest only,
+   opt-in on top of the gamification toggle, at most once per day.
+5. **No loot boxes, no scarcity mechanics, no chance rewards.** Badges are
+   deterministic: rule + history = earned. Complies with EU/MX digital
+   consumer protection norms and avoids slot-machine UX.
+
+### Profile
+
+- **Public identity:** avatar, display_name, username, bio, region_primary,
+  joined_at, preferred_lang, observer license (CC BY / BY-NC / CC0 — see
+  module 07).
+- **Top-line stats** (rolled up hourly into `users.stats_json`): total observations,
+  species count, research-grade count, first observation date.
+- **Kingdom mix** horizontal bar (Plantae / Animalia / Fungi / other).
+- **Top 5 families** by observation count.
+- **Regions** the observer has contributed from.
+- **Activity feed** (v0.3+) below the stats.
+- **Badges** (v0.5+) below activity, rendered only if the user opted into
+  public visibility.
+
+### Activity feed (v0.3+)
+
+Driven by server-side triggers writing to `public.activity_events`. Event kinds:
+`observation_created`, `observation_id_accepted`, `observation_id_changed`,
+`observation_research_grade`, `badge_earned`, `streak_milestone`,
+`first_of_species_in_region`, `first_observation_of_day`, `comment_received`,
+`validation_given`, `validation_received`. Each event has a `visibility`
+(`self` / `followers` / `public`) the user controls.
+
+### Badges (v0.5+)
+
+Five categories:
+
+- **Discovery** — first-of-species-in-region, rare NOM-059 finds, first
+  observation of a new family, cloud-forest explorer.
+- **Mastery** — depth badges per taxon group (10 / 50 / 100 / 500 / 1000
+  research-grade IDs), endemic-Oaxaca specialist, NOM-059 sensitivity training.
+- **Contribution** — N observations published to GBIF, N validations given to
+  other users.
+- **Community** — BioBlitz participant / top-contributor (per event, no
+  cross-event ranking).
+- **Governance** — completed FPIC workshop, Local Contexts training, NOM-059
+  sensitivity course.
+
+Badges are stored in a ledger table (`public.user_badges`) that is **append-only**
+except for policy-violation revocations. Retired badges stay visible on profiles
+that already earned them; no new user can earn retired badges.
+
+### Streaks (v1.0+)
+
+Consecutive-day counter with one key rule: a day counts only if it contains at
+least one synced observation whose primary identification has
+`confidence ≥ 0.4` and is not flagged `needs_review`. This definition is the
+core anti-abuse defence — a user cannot extend their streak with pocket-photos.
+
+**Grace window:** one "freeze" per rolling 30 days. Missing a day consumes the
+freeze rather than resetting the streak. Field biologists travel; hard-reset
+streaks punish real life and incentivise travel-day farming.
+
+**Hidden quality score:** an internal per-observation score (weighted by
+confidence, research-grade status, rarity, media quality) ranks the public
+"featured observations" widget. It is never shown to the user. Making it visible
+would turn it into a point-chase and break the design philosophy.
+
+### Events — BioBlitz (v1.0+)
+
+Time-boxed, location-boxed community observation pushes. Participation is
+implicit: an observation is "in the event" when its geometry falls inside the
+event boundary and its timestamp falls inside the event window. The event
+page shows aggregates only — total observations, distinct species, distinct
+participants, kingdom breakdown, most-observed species. No per-user
+leaderboard. Participants are listed alphabetically with their personal count,
+and only when they have opted into public visibility.
+
+Participation (≥ 3 synced observations inside the bounds / window) earns a
+`bioblitz_{slug}_participant` badge; top-10% by research-grade count earns a
+`top_contributor` badge, with deliberate fuzziness — only the earner knows
+they reached the top 10%.
+
+### Shareables (v1.0+)
+
+- **Observation card:** `share/obs/{id}.png` generated by an Edge Function —
+  thumbnail, scientific name, common name, region, Rastrum brand. Respects
+  every obscuration rule from module 02; `obscure_level = 'full'` observations
+  do not generate shareables at all.
+- **Badge card:** `share/badge/{user_id}/{badge_key}.png` — badge art + name
+  + earner's username. Only renders when `profile_public = true` and
+  `gamification_opt_in = true`.
+- **OpenGraph / Twitter card meta** on every shareable URL, never including
+  precise coordinates.
+
+### Expert system (complementary — retained from earlier spec)
 
 - **Expert badge per taxonomic group** — ornithologist, botanist, mycologist,
   herpetologist, entomologist, etc.
-- Experts can validate or correct identifications; expert validations carry 3×
-  weight in the consensus algorithm.
+- Expert validations carry 3× weight in the consensus algorithm.
 - Expert nominations via community vote + admin review.
-- Expert leaderboard per taxon group.
+- Expert work feeds a **contribution badge ledger**, never a public leaderboard.
 
-### Challenges
+### Social features
 
-- **Monthly BioBlitz** — most species documented in a defined area within 24 hours.
-- **Seasonal challenges** — document spring migrants, rainy season fungi, dry season
-  reptiles, etc.
-- **Community goals** — "Complete the bird list for Yagul" or "Map all orchid species
-  in the Sierra de Juárez."
-- **School/university group challenges** — structured challenges for educational
-  groups with progress tracking and group leaderboards.
+- **Follow observers** — inbox-digest notifications (not push) of their rare
+  finds and research-grade validations.
+- **Comment and discussion** — threaded comments on observations; comments
+  appear in the actor's activity feed under `comment_received`.
+- **Species watchlists** — alerts (inbox digest) when a watchlisted species is
+  observed within a user-set radius. Respects sensitive-species obscuration.
 
-### Social Features
+### Anti-abuse matrix
 
-- **Follow observers** — receive notifications of their rare finds and validated
-  observations.
-- **Comment and discussion** — threaded comments on observations for identification
-  discussion and ecological notes.
-- **Species watchlists** — get alerted when a species on your watchlist is observed
-  near you.
+| Abuse vector | Guardrail |
+|---|---|
+| Upload blurry photos to farm streaks | Streak requires confidence ≥ 0.4; blurry photos fail Laplacian check in module 01 |
+| Self-validate to reach research-grade | Trigger rejects `validated_by = observer_id` |
+| Farm first-of-species with "sp." IDs | Badge only fires after research-grade consensus |
+| Spam fake accounts to inflate validations | `is_research_grade` requires 2 distinct validators with minimum `observation_count` (anti-sybil) |
+| Compete for fastest-1000-observations | No view or rank shows this. The feature does not exist. |
+| Re-engage via push notifications | No push. Only inbox digest. Only opt-in on top of gamification opt-in. |
 
 ---
 

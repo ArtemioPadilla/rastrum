@@ -8,8 +8,10 @@
       "status": "in_progress",
       "items": [
         { "id": "astro-skeleton",     "label": "Astro site skeleton + Tailwind + i18n", "done": true },
-        { "id": "supabase-schema",    "label": "Supabase schema (observations, taxa, identifications, media) with PostGIS + RLS", "done": false },
-        { "id": "auth-magic-link",    "label": "Supabase magic-link auth + guest mode", "done": false },
+        { "id": "supabase-schema",    "label": "Supabase schema (observations, taxa, identifications, media) with PostGIS + RLS", "done": true },
+        { "id": "auth-magic-link",    "label": "Supabase magic-link auth + guest mode", "done": true },
+        { "id": "ci-cd",              "label": "CI/CD via GitHub Actions (typecheck, build, deploy)", "done": true },
+        { "id": "profile-basics",     "label": "Profile page + edit + avatar dropdown (module 08)", "done": false },
         { "id": "gps-observation",    "label": "GPS-tagged observation form with EXIF auto-fill", "done": false },
         { "id": "plantnet-id",        "label": "PlantNet photo ID integration", "done": false },
         { "id": "claude-haiku-id",    "label": "Claude Haiku 4.5 vision cascade (threshold 0.7)", "done": false },
@@ -27,7 +29,9 @@
         { "id": "onnx-base",          "label": "EfficientNet-Lite0 ONNX base fallback (~2.8MB)", "done": false },
         { "id": "offline-maps",       "label": "pmtiles offline map download (Mexico zoom 0–10)", "done": false },
         { "id": "exif-extraction",    "label": "EXIF/XMP/ID3 metadata auto-extraction", "done": false },
-        { "id": "sensitive-privacy",  "label": "NOM-059 / CITES obscuration grid enforcement", "done": false }
+        { "id": "sensitive-privacy",  "label": "NOM-059 / CITES obscuration grid enforcement", "done": false },
+        { "id": "activity-feed",      "label": "Activity feed + server-side triggers (module 08)", "done": false },
+        { "id": "unread-badge",       "label": "Unread-count badge on avatar dropdown", "done": false }
       ]
     },
     "v0.5": {
@@ -35,13 +39,15 @@
       "period": "Months 6–8",
       "status": "planned",
       "items": [
-        { "id": "birdnet-audio",      "label": "BirdNET audio ID (commercial license)", "done": false },
-        { "id": "multi-image",        "label": "Multi-image observations", "done": false },
-        { "id": "eco-evidence",       "label": "Ecological evidence fields (tracks, scat, substrate)", "done": false },
-        { "id": "scout-v0",           "label": "Rastrum Scout v0 (conversational ID, pgvector RAG)", "done": false },
-        { "id": "consensus-workflow", "label": "Research-grade 2/3 identifier consensus", "done": false },
-        { "id": "onnx-regional",      "label": "Regional ONNX packs (Oaxaca, Yucatán)", "done": false },
-        { "id": "gbif-ipt",           "label": "GBIF IPT pilot publish (Darwin Core Archive ZIP)", "done": false }
+        { "id": "birdnet-audio",       "label": "BirdNET audio ID (commercial license)", "done": false },
+        { "id": "multi-image",         "label": "Multi-image observations", "done": false },
+        { "id": "eco-evidence",        "label": "Ecological evidence fields (tracks, scat, substrate)", "done": false },
+        { "id": "scout-v0",            "label": "Rastrum Scout v0 (conversational ID, pgvector RAG)", "done": false },
+        { "id": "consensus-workflow",  "label": "Research-grade 2/3 identifier consensus + anti-sybil", "done": false },
+        { "id": "onnx-regional",       "label": "Regional ONNX packs (Oaxaca, Yucatán)", "done": false },
+        { "id": "gbif-ipt",            "label": "GBIF IPT pilot publish (Darwin Core Archive ZIP)", "done": false },
+        { "id": "discovery-badges",    "label": "Discovery + mastery badges (~40 seeds, nightly evaluator)", "done": false },
+        { "id": "quality-gates",       "label": "Gamification quality gates (confidence ≥ 0.4, research-grade 2×)", "done": false }
       ]
     },
     "v1.0": {
@@ -49,14 +55,17 @@
       "period": "Months 9–14",
       "status": "planned",
       "items": [
-        { "id": "camera-trap-ingest", "label": "Camera trap ingestion (SpeciesNet + MegaDetector)", "done": false },
-        { "id": "video-support",      "label": "Video support ≤30s (H.265/AV1)", "done": false },
-        { "id": "gamification",       "label": "Opt-in gamification (no leaderboards)", "done": false },
+        { "id": "camera-trap-ingest",  "label": "Camera trap ingestion (SpeciesNet + MegaDetector)", "done": false },
+        { "id": "video-support",       "label": "Video support ≤30s (H.265/AV1)", "done": false },
+        { "id": "streaks",             "label": "Opt-in streaks + grace window + inbox-digest (no push)", "done": false },
+        { "id": "bioblitz-events",     "label": "BioBlitz events table + aggregate-only event pages", "done": false },
+        { "id": "shareable-cards",     "label": "Observation + badge shareable OG cards (obscuration-safe)", "done": false },
+        { "id": "social-features",     "label": "Follow observers (digest), comments, species watchlists", "done": false },
+        { "id": "expert-system",       "label": "Expert taxonomic badges + 3× consensus weight", "done": false },
         { "id": "institutional-export","label": "Institutional exports: MIA, SNIB, CONANP, INAH", "done": false },
-        { "id": "credentialed-access","label": "Credentialed researcher access tier", "done": false },
-        { "id": "env-enrichment",     "label": "Lunar/weather/NDVI environmental enrichment", "done": false },
-        { "id": "community-module",   "label": "Community profiles, badges, BioBlitz events", "done": false },
-        { "id": "capacitor-ios",      "label": "Capacitor iOS App Store wrapper (v1.2)", "done": false }
+        { "id": "credentialed-access", "label": "Credentialed researcher access tier", "done": false },
+        { "id": "env-enrichment",      "label": "Lunar/weather/NDVI environmental enrichment", "done": false },
+        { "id": "capacitor-ios",       "label": "Capacitor iOS App Store wrapper (v1.2)", "done": false }
       ]
     },
     "v1.5": {
