@@ -108,7 +108,7 @@ const phases = [
                 "absolute left-0 top-1.5 w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold",
                 isCurrent
                   ? "border-emerald-500 bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
-                  : "border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-500 dark:text-zinc-500 dark:text-zinc-500"
+                  : "border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-500 dark:text-zinc-400 dark:text-zinc-500"
               ]}>
                 {isCurrent ? '\u25B6' : i + 1}
               </div>
@@ -119,13 +119,13 @@ const phases = [
                     "text-xs font-mono px-2 py-0.5 rounded border",
                     isCurrent
                       ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
-                      : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-500 border-zinc-200 dark:border-zinc-700"
+                      : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700"
                   ]}>{p.ver}</span>
                   <span class:list={[
                     "font-semibold",
-                    isCurrent ? "text-zinc-900 dark:text-zinc-900 dark:text-zinc-100" : "text-zinc-500 dark:text-zinc-500 dark:text-zinc-600 dark:text-zinc-400"
+                    isCurrent ? "text-zinc-900 dark:text-zinc-100" : "text-zinc-500 dark:text-zinc-400"
                   ]}>{p.name}</span>
-                  <span class="text-xs text-zinc-500 dark:text-zinc-500 dark:text-zinc-600">{p.period}</span>
+                  <span class="text-xs text-zinc-500 dark:text-zinc-400 dark:text-zinc-600">{p.period}</span>
                   {isCurrent && (
                     <span class="text-xs bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">
                       {(tr.docs.status as any).in_progress}
@@ -136,7 +136,7 @@ const phases = [
                   {p.items.map(item => (
                     <li class:list={[
                       "flex items-start gap-2 text-sm",
-                      isCurrent ? "text-zinc-700 dark:text-zinc-300" : "text-zinc-500 dark:text-zinc-500 dark:text-zinc-500 dark:text-zinc-500 dark:text-zinc-500"
+                      isCurrent ? "text-zinc-700 dark:text-zinc-300" : "text-zinc-500 dark:text-zinc-400 dark:text-zinc-500 dark:text-zinc-400 dark:text-zinc-500"
                     ]}>
                       <span class:list={[
                         "mt-1.5 w-1.5 h-1.5 rounded-full shrink-0",

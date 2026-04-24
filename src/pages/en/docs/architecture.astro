@@ -37,9 +37,9 @@ const costModel = [
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-zinc-200 dark:border-zinc-200 dark:border-zinc-800">
-              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-500 dark:text-zinc-600 dark:text-zinc-400 font-medium">Layer</th>
-              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-500 dark:text-zinc-600 dark:text-zinc-400 font-medium">Choice</th>
-              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-500 dark:text-zinc-600 dark:text-zinc-400 font-medium">Rationale</th>
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Layer</th>
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Choice</th>
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Rationale</th>
             </tr>
           </thead>
           <tbody class="text-zinc-700 dark:text-zinc-300">
@@ -96,15 +96,15 @@ Offline fallback:
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-zinc-200 dark:border-zinc-200 dark:border-zinc-800">
-              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-500 dark:text-zinc-600 dark:text-zinc-400 font-medium">Scale</th>
-              <th class="text-right py-2 px-3 text-zinc-500 dark:text-zinc-500 dark:text-zinc-600 dark:text-zinc-400 font-medium">Monthly Cost</th>
-              <th class="text-right py-2 px-3 text-zinc-500 dark:text-zinc-500 dark:text-zinc-600 dark:text-zinc-400 font-medium">Per User</th>
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Scale</th>
+              <th class="text-right py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Monthly Cost</th>
+              <th class="text-right py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Per User</th>
             </tr>
           </thead>
           <tbody class="text-zinc-700 dark:text-zinc-300">
             {costModel.map((row, i) => (
               <tr class:list={["border-b border-zinc-100 dark:border-zinc-900", i % 2 === 0 ? "bg-zinc-50/50 dark:bg-zinc-950/50" : ""]}>
-                <td class="py-2 px-3 font-medium text-zinc-900 dark:text-zinc-900 dark:text-zinc-100">{row.scale}</td>
+                <td class="py-2 px-3 font-medium text-zinc-900 dark:text-zinc-100">{row.scale}</td>
                 <td class="py-2 px-3 text-right font-mono">{row.monthly}</td>
                 <td class="py-2 px-3 text-right font-mono">{row.perUser}</td>
               </tr>
@@ -112,7 +112,7 @@ Offline fallback:
           </tbody>
         </table>
       </div>
-      <p class="text-sm text-zinc-600 dark:text-zinc-500 dark:text-zinc-500 mt-3">
+      <p class="text-sm text-zinc-600 dark:text-zinc-500 dark:text-zinc-400 mt-3">
         10K MAU breakdown: AI inference $800, object storage $400, compute $500, monitoring and misc $300. Includes Supabase Pro, Cloudflare R2, ~500K Haiku calls, 600K PlantNet Pro calls, and Gemini Flash-Lite first-pass.
       </p>
     </section>
@@ -129,9 +129,9 @@ Offline fallback:
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-zinc-200 dark:border-zinc-200 dark:border-zinc-800">
-              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-500 dark:text-zinc-600 dark:text-zinc-400 font-medium">Table</th>
-              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-500 dark:text-zinc-600 dark:text-zinc-400 font-medium">Purpose</th>
-              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-500 dark:text-zinc-600 dark:text-zinc-400 font-medium">Key Fields</th>
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Table</th>
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Purpose</th>
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Key Fields</th>
             </tr>
           </thead>
           <tbody class="text-zinc-700 dark:text-zinc-300">
