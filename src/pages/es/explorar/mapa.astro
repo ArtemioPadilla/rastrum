@@ -1,0 +1,12 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import ExploreMap from '../../../components/ExploreMap.astro';
+import { t } from '../../../i18n/utils';
+
+const lang = 'es';
+const tr = t(lang);
+---
+
+<BaseLayout title={`${tr.map.title} — Rastrum`} lang={lang}>
+  <ExploreMap lang={lang} />
+</BaseLayout>

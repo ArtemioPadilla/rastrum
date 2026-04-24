@@ -1,0 +1,324 @@
+---
+import { t } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+const { lang } = Astro.props;
+const tr = t(lang);
+
+const habitats = [
+  'forest_pine_oak','cloud_forest','tropical_dry_forest','riparian','wetland',
+  'grassland','agricultural','urban','coastal','reef','scrubland','cave',
+];
+const weathers = ['sunny','cloudy','overcast','light_rain','heavy_rain','fog','storm'];
+---
+
+<div class="max-w-xl mx-auto">
+  <h1 class="text-2xl font-bold tracking-tight mb-6">{tr.observe.title}</h1>
+
+  <form id="obs-form" class="space-y-5" novalidate>
+    <!-- Photo -->
+    <div>
+      <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">{tr.observe.photo_label}</label>
+      <div id="photo-preview-wrap" class="hidden mb-3">
+        <img id="photo-preview" src="" alt="" class="w-full max-h-80 object-contain rounded-lg border border-zinc-200 dark:border-zinc-800" />
+      </div>
+      <div class="flex gap-2">
+        <label class="flex-1 cursor-pointer rounded-lg border border-emerald-600/60 px-3 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-400 text-center hover:bg-emerald-50 dark:hover:bg-emerald-900/20">
+          <input id="camera-input" type="file" accept="image/*" capture="environment" class="hidden" />
+          {tr.observe.use_camera}
+        </label>
+        <label class="flex-1 cursor-pointer rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 text-center hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
+          <input id="gallery-input" type="file" accept="image/*" class="hidden" />
+          {tr.observe.choose_file}
+        </label>
+      </div>
+      <p class="mt-1 text-xs text-zinc-500">{tr.observe.photo_hint}</p>
+    </div>
+
+    <!-- Location -->
+    <div>
+      <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.observe.gps_label}</label>
+      <div id="gps-display" class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 px-3 py-2 text-sm">
+        <span id="gps-status" class="text-zinc-500">{tr.observe.gps_getting}</span>
+      </div>
+      <div id="gps-manual-wrap" class="hidden mt-2 grid grid-cols-2 gap-2">
+        <input id="manual-lat" name="lat" type="number" step="any" placeholder="Lat" class="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
+        <input id="manual-lng" name="lng" type="number" step="any" placeholder="Lng" class="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
+      </div>
+      <button type="button" id="gps-manual-btn" class="mt-1 text-xs text-emerald-700 dark:text-emerald-400 underline">{tr.observe.gps_manual}</button>
+    </div>
+
+    <!-- Habitat / weather -->
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.observe.habitat}</label>
+        <select name="habitat" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
+          <option value="">{tr.observe.habitat_placeholder}</option>
+          {habitats.map(h => <option value={h}>{h.replace(/_/g, ' ')}</option>)}
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.observe.weather}</label>
+        <select name="weather" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
+          <option value="">{tr.observe.weather_placeholder}</option>
+          {weathers.map(w => <option value={w}>{w.replace(/_/g, ' ')}</option>)}
+        </select>
+      </div>
+    </div>
+
+    <!-- Notes -->
+    <div>
+      <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.observe.notes}</label>
+      <textarea name="notes" maxlength="2000" rows="3" placeholder={tr.observe.notes_placeholder} class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm"></textarea>
+    </div>
+
+    <div class="flex items-center gap-3 pt-2">
+      <button type="submit" id="submit-btn" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+        <span data-label>{tr.observe.submit}</span>
+      </button>
+    </div>
+    <p id="err" class="hidden text-sm text-red-600 dark:text-red-400"></p>
+  </form>
+
+  <div id="success" class="hidden mt-6 rounded-lg border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-900/20 p-4">
+    <p id="success-msg" class="text-sm text-emerald-900 dark:text-emerald-200">—</p>
+    <button id="another-btn" class="mt-3 text-xs font-medium text-emerald-700 dark:text-emerald-400 underline">{tr.observe.another}</button>
+  </div>
+</div>
+
+<script>
+  import { parse as parseExif } from 'exifr';
+  import { getDB, requestPersistentStorage } from '../lib/db';
+  import { getSupabase } from '../lib/supabase';
+  import { syncOutbox, registerSyncTriggers } from '../lib/sync';
+  import type { Observation, ObserverRef } from '../lib/types';
+
+  const form         = document.getElementById('obs-form') as HTMLFormElement | null;
+  const cameraInput  = document.getElementById('camera-input') as HTMLInputElement | null;
+  const galleryInput = document.getElementById('gallery-input') as HTMLInputElement | null;
+  const photoPreview = document.getElementById('photo-preview') as HTMLImageElement | null;
+  const photoWrap    = document.getElementById('photo-preview-wrap');
+  const gpsStatus    = document.getElementById('gps-status');
+  const gpsManualBtn = document.getElementById('gps-manual-btn');
+  const gpsManualWrap= document.getElementById('gps-manual-wrap');
+  const manualLat    = document.getElementById('manual-lat') as HTMLInputElement | null;
+  const manualLng    = document.getElementById('manual-lng') as HTMLInputElement | null;
+  const submitBtn    = document.getElementById('submit-btn') as HTMLButtonElement | null;
+  const btnLabel     = submitBtn?.querySelector('[data-label]') as HTMLElement | null;
+  const errBox       = document.getElementById('err') as HTMLParagraphElement | null;
+  const successBox   = document.getElementById('success');
+  const successMsg   = document.getElementById('success-msg');
+  const anotherBtn   = document.getElementById('another-btn');
+
+  const ORIGINAL_LABEL = btnLabel?.textContent ?? 'Save';
+  const SUBMITTING = btnLabel?.textContent?.trim() === 'Guardar observación' ? 'Guardando…' : 'Saving…';
+
+  type LocState = {
+    lat: number; lng: number; accuracyM: number;
+    altitudeM: number | null;
+    capturedFrom: 'gps' | 'exif' | 'manual';
+  } | null;
+
+  type PhotoState = { file: File; blobId: string } | null;
+
+  let location: LocState = null;
+  let photo: PhotoState = null;
+
+  function paintLocation() {
+    if (!gpsStatus) return;
+    if (!location) {
+      gpsStatus.textContent = (document.documentElement.lang === 'es') ? 'Obteniendo tu ubicación…' : 'Getting your location…';
+      gpsStatus.className = 'text-zinc-500';
+      return;
+    }
+    const source = location.capturedFrom === 'exif'
+      ? (document.documentElement.lang === 'es' ? 'Foto' : 'Photo')
+      : location.capturedFrom.toUpperCase();
+    gpsStatus.textContent = `${location.lat.toFixed(5)}, ${location.lng.toFixed(5)}  ·  ${source}  ·  ±${Math.round(location.accuracyM)} m`;
+    gpsStatus.className = 'text-zinc-900 dark:text-zinc-100 font-mono text-xs';
+  }
+
+  function setPhoto(file: File) {
+    photo = { file, blobId: crypto.randomUUID() };
+    if (photoPreview) photoPreview.src = URL.createObjectURL(file);
+    photoWrap?.classList.remove('hidden');
+  }
+
+  async function fillFromExif(file: File) {
+    try {
+      const exif = await parseExif(file, { gps: true, tiff: true, exif: true });
+      if (exif?.latitude != null && exif?.longitude != null) {
+        // Only fall back to EXIF GPS if live GPS hasn't landed yet
+        if (!location || location.capturedFrom !== 'gps') {
+          location = {
+            lat: exif.latitude,
+            lng: exif.longitude,
+            accuracyM: 15,               // EXIF GPS is phone-derived; assume ~15m
+            altitudeM: exif.GPSAltitude ?? null,
+            capturedFrom: 'exif',
+          };
+          paintLocation();
+        }
+      }
+    } catch { /* non-fatal */ }
+  }
+
+  async function getLiveGPS(): Promise<void> {
+    if (!navigator.geolocation) return;
+    return new Promise<void>((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          location = {
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            accuracyM: pos.coords.accuracy,
+            altitudeM: pos.coords.altitude,
+            capturedFrom: 'gps',
+          };
+          paintLocation();
+          resolve();
+        },
+        () => resolve(),
+        { enableHighAccuracy: true, timeout: 10_000, maximumAge: 20_000 }
+      );
+    });
+  }
+
+  cameraInput?.addEventListener('change', async () => {
+    const f = cameraInput.files?.[0];
+    if (!f) return;
+    setPhoto(f);
+    await fillFromExif(f);
+  });
+  galleryInput?.addEventListener('change', async () => {
+    const f = galleryInput.files?.[0];
+    if (!f) return;
+    setPhoto(f);
+    await fillFromExif(f);
+  });
+
+  gpsManualBtn?.addEventListener('click', () => {
+    gpsManualWrap?.classList.toggle('hidden');
+  });
+  manualLat?.addEventListener('change', () => maybeManualUpdate());
+  manualLng?.addEventListener('change', () => maybeManualUpdate());
+  function maybeManualUpdate() {
+    const lat = parseFloat(manualLat?.value ?? '');
+    const lng = parseFloat(manualLng?.value ?? '');
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      location = { lat, lng, accuracyM: 1000, altitudeM: null, capturedFrom: 'manual' };
+      paintLocation();
+    }
+  }
+
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!form || !submitBtn || !btnLabel) return;
+    errBox?.classList.add('hidden');
+
+    if (!photo) {
+      if (errBox) { errBox.textContent = (document.documentElement.lang === 'es') ? 'Se requiere al menos una foto.' : 'At least one photo is required.'; errBox.classList.remove('hidden'); }
+      return;
+    }
+    if (!location) {
+      if (errBox) { errBox.textContent = (document.documentElement.lang === 'es') ? 'La ubicación es obligatoria.' : 'Location is required.'; errBox.classList.remove('hidden'); }
+      return;
+    }
+
+    submitBtn.disabled = true;
+    btnLabel.textContent = SUBMITTING;
+
+    // Resolve the ObserverRef from the Supabase session. If not signed in,
+    // fall back to a guest ref — observation stays Dexie-only per module 04.
+    let ref: ObserverRef = { kind: 'guest', localId: 'local-' + crypto.randomUUID() };
+    try {
+      const { data: { user } } = await getSupabase().auth.getUser();
+      if (user) ref = { kind: 'user', id: user.id };
+    } catch { /* ignore */ }
+
+    const obs: Observation = {
+      id: crypto.randomUUID(),
+      observerRef: ref,
+      createdAt: new Date().toISOString(),
+      photos: [{
+        id: photo.blobId,
+        mediaType: 'photo',
+        mimeType: photo.file.type,
+        sizeBytes: photo.file.size,
+      }],
+      primaryPhotoIndex: 0,
+      location,
+      identification: {
+        scientificName: '',
+        commonNameEs: null,
+        commonNameEn: null,
+        taxonId: null,
+        confidence: 0,
+        source: 'human',
+        status: 'pending',
+      },
+      habitat: ((form.elements.namedItem('habitat') as HTMLSelectElement).value || null) as Observation['habitat'],
+      weather: ((form.elements.namedItem('weather') as HTMLSelectElement).value || null) as Observation['weather'],
+      notes: ((form.elements.namedItem('notes') as HTMLTextAreaElement).value || null),
+      moonPhase: null,
+      moonIllumination: null,
+      precipitation24hMm: null,
+      ndviValue: null,
+      phenologicalSeason: null,
+      syncStatus: 'pending',
+      syncedAt: null,
+      appVersion: 'v0.1',
+      deviceOs: navigator.userAgent,
+    };
+
+    const db = getDB();
+    await requestPersistentStorage();
+    await db.mediaBlobs.put({
+      id: photo.blobId,
+      observation_id: obs.id,
+      blob: photo.file,
+      mime_type: photo.file.type,
+      size_bytes: photo.file.size,
+      uploaded: false,
+    });
+    await db.observations.put({
+      id: obs.id,
+      observer_kind: ref.kind,
+      data: obs,
+      sync_status: 'pending',
+      sync_attempts: 0,
+      created_at: obs.createdAt,
+      updated_at: obs.createdAt,
+    });
+
+    // Attempt immediate sync if online; otherwise it'll flush on next online event
+    let syncedNow = false;
+    if (ref.kind === 'user' && navigator.onLine) {
+      try {
+        const res = await syncOutbox();
+        syncedNow = res.synced > 0;
+      } catch { /* ignore — row stays pending */ }
+    }
+
+    submitBtn.disabled = false;
+    btnLabel.textContent = ORIGINAL_LABEL;
+    form.classList.add('hidden');
+    successBox?.classList.remove('hidden');
+    if (successMsg) {
+      const isEs = document.documentElement.lang === 'es';
+      successMsg.textContent = syncedNow
+        ? (isEs ? 'Guardada y sincronizada.' : 'Saved and synced.')
+        : (isEs ? 'Guardada en este dispositivo. Se sincronizará al conectarse.' : 'Saved on this device. Will sync when you’re online.');
+    }
+  });
+
+  anotherBtn?.addEventListener('click', () => {
+    window.location.reload();
+  });
+
+  // Kick off GPS + sync triggers on page load
+  registerSyncTriggers();
+  getLiveGPS();
+</script>

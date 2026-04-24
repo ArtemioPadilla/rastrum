@@ -1,0 +1,123 @@
+---
+import { t } from '../i18n/utils';
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+---
+
+<div class="max-w-2xl mx-auto">
+  <h1 class="text-2xl font-bold tracking-tight mb-2">{tr.export.title}</h1>
+  <p class="text-sm text-zinc-600 dark:text-zinc-400 mb-6">{tr.export.subtitle}</p>
+
+  <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-5">
+    <p class="text-sm text-zinc-700 dark:text-zinc-300 mb-4">
+      <span>{tr.export.count_prefix}</span>
+      <span id="count" class="font-semibold">—</span>
+      <span>{tr.export.count_suffix}</span>
+    </p>
+    <div id="empty" class="hidden text-sm text-zinc-500 italic">{tr.export.nothing_to_export}</div>
+    <button id="download-btn" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+      <span data-label>{tr.export.download_csv}</span>
+    </button>
+    <p id="err" class="hidden mt-3 text-sm text-red-600 dark:text-red-400"></p>
+  </div>
+</div>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { toDwCRecord, toCSV, downloadCSV, type DwCInput } from '../lib/darwin-core';
+  import type { UserProfile } from '../lib/types';
+
+  const btn      = document.getElementById('download-btn') as HTMLButtonElement | null;
+  const btnLabel = btn?.querySelector('[data-label]') as HTMLElement | null;
+  const countEl  = document.getElementById('count');
+  const empty    = document.getElementById('empty');
+  const err      = document.getElementById('err');
+
+  const ORIGINAL = btnLabel?.textContent ?? 'Download';
+  const GENERATING = btnLabel?.textContent?.trim() === 'Descargar CSV DwC' ? 'Generando…' : 'Generating…';
+
+  async function refreshCount() {
+    const supabase = getSupabase();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { if (countEl) countEl.textContent = '0'; btn && (btn.disabled = true); return; }
+    const { count } = await supabase
+      .from('observations')
+      .select('id', { count: 'exact', head: true })
+      .eq('observer_id', user.id)
+      .eq('sync_status', 'synced');
+    if (countEl) countEl.textContent = String(count ?? 0);
+    if ((count ?? 0) === 0) {
+      empty?.classList.remove('hidden');
+      if (btn) btn.disabled = true;
+    }
+  }
+
+  btn?.addEventListener('click', async () => {
+    if (!btn || !btnLabel) return;
+    err?.classList.add('hidden');
+    btn.disabled = true;
+    btnLabel.textContent = GENERATING;
+
+    try {
+      const supabase = getSupabase();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not signed in');
+
+      const { data: profile } = await supabase
+        .from('users')
+        .select('display_name,username,observer_license')
+        .eq('id', user.id)
+        .maybeSingle<Pick<UserProfile,'display_name'|'username'|'observer_license'>>();
+
+      const { data: obs, error: obsErr } = await supabase
+        .from('observations')
+        .select(`
+          id, observed_at, accuracy_m, obscure_level,
+          state_province, habitat, location,
+          identifications!inner(scientific_name, confidence, source, is_primary),
+          taxa:primary_taxon_id(kingdom)
+        `)
+        .eq('observer_id', user.id)
+        .eq('sync_status', 'synced')
+        .eq('identifications.is_primary', true);
+
+      if (obsErr) throw obsErr;
+
+      const rows: DwCInput[] = (obs ?? []).map(r => {
+        const loc = (r.location as unknown) as GeoJSON.Point | null;
+        const id0 = Array.isArray(r.identifications) ? r.identifications[0] : r.identifications;
+        return {
+          id: r.id as string,
+          observed_at: r.observed_at as string,
+          lat: loc?.coordinates?.[1] ?? 0,
+          lng: loc?.coordinates?.[0] ?? 0,
+          accuracy_m: r.accuracy_m as number | null,
+          obscure_level: (r.obscure_level as string) ?? 'none',
+          scientific_name: id0?.scientific_name ?? null,
+          confidence: id0?.confidence ?? null,
+          id_source: id0?.source ?? null,
+          kingdom: (r.taxa as { kingdom: string | null } | null)?.kingdom ?? null,
+          state_province: r.state_province as string | null,
+          habitat: r.habitat as string | null,
+          observer_display_name: profile?.display_name || profile?.username || null,
+          observer_license: profile?.observer_license ?? 'CC BY 4.0',
+        };
+      });
+
+      const csv = toCSV(rows.map(toDwCRecord));
+      const today = new Date().toISOString().slice(0, 10);
+      downloadCSV(csv, `rastrum-observations-${today}.csv`);
+    } catch (e) {
+      if (err) {
+        err.textContent = e instanceof Error ? e.message : String(e);
+        err.classList.remove('hidden');
+      }
+    } finally {
+      btn.disabled = false;
+      btnLabel.textContent = ORIGINAL;
+    }
+  });
+
+  refreshCount().catch(console.error);
+</script>

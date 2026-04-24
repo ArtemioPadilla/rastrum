@@ -37,6 +37,18 @@ CREATE TABLE IF NOT EXISTS public.users (
   updated_at        timestamptz NOT NULL DEFAULT now()
 );
 
+-- Profile / gamification additive columns (module 08 v0.1 slice).
+-- See docs/specs/modules/08-profile-activity-gamification.md.
+ALTER TABLE public.users
+  ADD COLUMN IF NOT EXISTS profile_public        boolean  NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS gamification_opt_in   boolean  NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS streak_digest_opt_in  boolean  NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS region_primary        text,
+  ADD COLUMN IF NOT EXISTS joined_at             timestamptz NOT NULL DEFAULT now(),
+  ADD COLUMN IF NOT EXISTS last_observation_at   timestamptz,
+  ADD COLUMN IF NOT EXISTS stats_cached_at       timestamptz,
+  ADD COLUMN IF NOT EXISTS stats_json            jsonb;
+
 -- Auto-create user profile on sign-up
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$
@@ -391,3 +403,28 @@ CREATE TRIGGER sync_primary_id_trigger
 CREATE UNIQUE INDEX IF NOT EXISTS uniq_primary_id_per_obs
   ON public.identifications(observation_id)
   WHERE is_primary = true;
+
+-- ============================================================
+-- STORAGE BUCKET + POLICIES (v0.1: Supabase Storage; v0.3 migrates to R2)
+-- ============================================================
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES ('media', 'media', true, 20 * 1024 * 1024,
+        ARRAY['image/jpeg','image/png','image/webp','audio/mpeg','audio/wav'])
+ON CONFLICT (id) DO NOTHING;
+
+-- Authenticated users can upload to their own folder: observations/<obs-id>/<blob-id>
+-- Object `name` starts with 'observations/<uuid>/...' — we let any authenticated
+-- user upload and rely on the observations FK + RLS to bound writes.
+DROP POLICY IF EXISTS "media_insert_authenticated" ON storage.objects;
+CREATE POLICY "media_insert_authenticated" ON storage.objects
+  FOR INSERT TO authenticated
+  WITH CHECK (bucket_id = 'media');
+
+DROP POLICY IF EXISTS "media_update_authenticated" ON storage.objects;
+CREATE POLICY "media_update_authenticated" ON storage.objects
+  FOR UPDATE TO authenticated
+  USING (bucket_id = 'media');
+
+DROP POLICY IF EXISTS "media_public_read" ON storage.objects;
+CREATE POLICY "media_public_read" ON storage.objects
+  FOR SELECT USING (bucket_id = 'media');

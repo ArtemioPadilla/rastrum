@@ -26,9 +26,13 @@ export const routes: Record<string, Record<Locale, string>> = {
   home: { en: '', es: '' },
   identify: { en: '/identify', es: '/identificar' },
   explore: { en: '/explore', es: '/explorar' },
+  observe: { en: '/observe', es: '/observar' },
   about: { en: '/about', es: '/acerca' },
   docs: { en: '/docs', es: '/docs' },
   signIn: { en: '/sign-in', es: '/ingresar' },
+  profile: { en: '/profile', es: '/perfil' },
+  profileEdit: { en: '/profile/edit', es: '/perfil/editar' },
+  profileExport: { en: '/profile/export', es: '/perfil/exportar' },
 };
 
 export const docPages = [

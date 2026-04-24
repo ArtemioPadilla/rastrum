@@ -1,0 +1,129 @@
+---
+import { t } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+const { lang } = Astro.props;
+const tr = t(lang);
+---
+
+<div>
+  <h1 class="text-2xl font-bold tracking-tight mb-2">{tr.map.title}</h1>
+  <p class="text-sm text-zinc-500 mb-4" id="map-status">{tr.map.loading}</p>
+  <div id="map" class="w-full h-[70vh] rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900"></div>
+</div>
+
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.css" />
+
+<script>
+  import maplibregl from 'maplibre-gl';
+  import { getSupabase } from '../lib/supabase';
+
+  const container = document.getElementById('map');
+  const status = document.getElementById('map-status');
+  if (!container) throw new Error('no map container');
+
+  const KINGDOM_COLORS: Record<string, string> = {
+    Plantae:  '#16a34a',
+    Animalia: '#dc2626',
+    Fungi:    '#9333ea',
+  };
+  const DEFAULT_COLOR = '#6b7280';
+
+  // Free OpenFreeMap style — OpenMapTiles-compatible, served by openfreemap.org.
+  // pmtiles + R2 migration happens in v0.3 (see module 05 § Tile Setup).
+  const map = new maplibregl.Map({
+    container,
+    style: 'https://tiles.openfreemap.org/styles/liberty',
+    center: [-96.72, 17.06],   // Oaxaca, MX
+    zoom: 6,
+    attributionControl: { compact: true },
+  });
+
+  map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+
+  map.on('load', async () => {
+    status?.classList.add('hidden');
+
+    // Query observations with a non-null raw location. RLS restricts this to
+    // synced public rows + any the current user owns (see supabase-schema.sql).
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('observations')
+      .select('id, location, primary_taxon_id, obscure_level, observed_at')
+      .eq('sync_status', 'synced')
+      .limit(500);
+
+    if (error) {
+      if (status) { status.textContent = error.message; status.classList.remove('hidden'); }
+      return;
+    }
+
+    const features: GeoJSON.Feature[] = [];
+    for (const row of data ?? []) {
+      // PostGIS geography returns WKB-hex or GeoJSON depending on server config.
+      // In supabase-js v2 it comes back as GeoJSON when the column is geography.
+      const geom = (row as { location: unknown }).location as GeoJSON.Point | null;
+      if (!geom?.coordinates) continue;
+      features.push({
+        type: 'Feature',
+        geometry: geom,
+        properties: { id: row.id, kingdom: 'Plantae' /* TODO: join taxa */ },
+      });
+    }
+
+    if (!features.length) {
+      if (status) { status.textContent = (document.documentElement.lang === 'es') ? 'Aún no hay observaciones que mostrar.' : 'No observations to show yet.'; status.classList.remove('hidden'); }
+    }
+
+    map.addSource('observations', {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features },
+      cluster: true,
+      clusterMaxZoom: 14,
+      clusterRadius: 50,
+    });
+
+    map.addLayer({
+      id: 'clusters',
+      type: 'circle',
+      source: 'observations',
+      filter: ['has', 'point_count'],
+      paint: {
+        'circle-color': ['step', ['get', 'point_count'], '#10b981', 10, '#059669', 50, '#047857'],
+        'circle-radius': ['step', ['get', 'point_count'], 18, 10, 26, 50, 34],
+      },
+    });
+    map.addLayer({
+      id: 'cluster-count',
+      type: 'symbol',
+      source: 'observations',
+      filter: ['has', 'point_count'],
+      layout: {
+        'text-field': ['get', 'point_count_abbreviated'],
+        'text-font': ['Noto Sans Regular'],
+        'text-size': 12,
+      },
+      paint: { 'text-color': '#ffffff' },
+    });
+    map.addLayer({
+      id: 'pin',
+      type: 'circle',
+      source: 'observations',
+      filter: ['!', ['has', 'point_count']],
+      paint: {
+        'circle-color': [
+          'match', ['get', 'kingdom'],
+          'Plantae',  KINGDOM_COLORS.Plantae,
+          'Animalia', KINGDOM_COLORS.Animalia,
+          'Fungi',    KINGDOM_COLORS.Fungi,
+          DEFAULT_COLOR,
+        ],
+        'circle-radius': 7,
+        'circle-stroke-width': 2,
+        'circle-stroke-color': '#ffffff',
+      },
+    });
+  });
+</script>

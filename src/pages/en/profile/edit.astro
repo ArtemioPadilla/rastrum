@@ -1,0 +1,12 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import ProfileEditForm from '../../../components/ProfileEditForm.astro';
+import { t } from '../../../i18n/utils';
+
+const lang = 'en';
+const tr = t(lang);
+---
+
+<BaseLayout title={`${tr.profile.edit} — Rastrum`} lang={lang}>
+  <ProfileEditForm lang={lang} />
+</BaseLayout>

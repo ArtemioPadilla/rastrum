@@ -1,0 +1,161 @@
+---
+import { t } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+
+const { lang } = Astro.props;
+const tr = t(lang);
+---
+
+<div class="max-w-3xl mx-auto">
+  <!-- Signed-out state -->
+  <div id="signed-out" class="hidden py-16 text-center">
+    <p class="text-zinc-600 dark:text-zinc-400">{tr.profile.not_signed_in}</p>
+    <a href={`/${lang}/${lang === 'es' ? 'ingresar' : 'sign-in'}/`} class="mt-4 inline-block rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white">
+      {tr.auth.sign_in}
+    </a>
+  </div>
+
+  <!-- Signed-in state -->
+  <div id="signed-in" class="hidden">
+    <header class="flex items-center gap-4 md:gap-6 mb-8">
+      <div class="shrink-0">
+        <img
+          id="avatar-img"
+          src=""
+          alt=""
+          class="w-20 h-20 md:w-24 md:h-24 rounded-full bg-zinc-200 dark:bg-zinc-800 object-cover"
+        />
+      </div>
+      <div class="min-w-0 flex-1">
+        <h1 id="display-name" class="text-2xl md:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 truncate">
+          —
+        </h1>
+        <p class="text-sm text-zinc-500 dark:text-zinc-500">
+          <span id="username-at">@—</span>
+          <span id="region-sep" class="hidden"> · </span>
+          <span id="region"></span>
+        </p>
+        <p id="bio" class="mt-2 text-sm text-zinc-700 dark:text-zinc-300 hidden"></p>
+      </div>
+      <div class="shrink-0 flex flex-col gap-2">
+        <a
+          href={`/${lang}/${lang === 'es' ? 'perfil/editar' : 'profile/edit'}/`}
+          class="rounded-lg border border-emerald-600/60 px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 text-center"
+        >
+          {tr.profile.edit}
+        </a>
+        <a
+          href={`/${lang}/${lang === 'es' ? 'perfil/exportar' : 'profile/export'}/`}
+          class="rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 text-center"
+        >
+          {tr.profile.export}
+        </a>
+      </div>
+    </header>
+
+    <!-- Stats strip -->
+    <section class="grid grid-cols-3 gap-3 mb-10">
+      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4">
+        <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100" id="stat-observations">0</p>
+        <p class="text-xs text-zinc-500 dark:text-zinc-400">{tr.profile.total_observations}</p>
+      </div>
+      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4">
+        <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100" id="stat-species">0</p>
+        <p class="text-xs text-zinc-500 dark:text-zinc-400">{tr.profile.species_count}</p>
+      </div>
+      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4">
+        <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100" id="stat-rg">0</p>
+        <p class="text-xs text-zinc-500 dark:text-zinc-400">{tr.profile.research_grade}</p>
+      </div>
+    </section>
+
+    <!-- Recent activity placeholder (v0.3 ships real one) -->
+    <section>
+      <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-3">
+        {tr.profile.section_activity}
+      </h2>
+      <div id="no-observations" class="rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-8 text-center">
+        <p class="text-sm text-zinc-500 dark:text-zinc-400">{tr.profile.no_observations_yet}</p>
+        <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-2 italic">{tr.profile.activity_coming_soon}</p>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import type { UserProfile } from '../lib/types';
+
+  const signedOut = document.getElementById('signed-out') as HTMLDivElement | null;
+  const signedIn = document.getElementById('signed-in') as HTMLDivElement | null;
+  const avatarImg = document.getElementById('avatar-img') as HTMLImageElement | null;
+  const displayName = document.getElementById('display-name');
+  const usernameAt = document.getElementById('username-at');
+  const region = document.getElementById('region');
+  const regionSep = document.getElementById('region-sep');
+  const bio = document.getElementById('bio');
+  const statObs = document.getElementById('stat-observations');
+  const statSpecies = document.getElementById('stat-species');
+  const statRG = document.getElementById('stat-rg');
+
+  function initialsAvatar(name: string): string {
+    const clean = name.trim().slice(0, 2).toUpperCase();
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'>
+      <rect width='96' height='96' fill='#10b981'/>
+      <text x='50%' y='58%' text-anchor='middle' fill='white' font-family='system-ui,sans-serif' font-size='40' font-weight='700'>${clean}</text>
+    </svg>`;
+    return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+  }
+
+  async function run() {
+    const supabase = getSupabase();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      signedOut?.classList.remove('hidden');
+      return;
+    }
+
+    const { data: profile } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', user.id)
+      .maybeSingle<UserProfile>();
+
+    if (!profile) {
+      signedOut?.classList.remove('hidden');
+      return;
+    }
+
+    signedIn?.classList.remove('hidden');
+
+    const name = profile.display_name || profile.username || user.email?.split('@')[0] || 'Observer';
+    if (displayName) displayName.textContent = name;
+    if (usernameAt) usernameAt.textContent = profile.username ? '@' + profile.username : (user.email ?? '');
+
+    if (avatarImg) {
+      avatarImg.src = profile.avatar_url || initialsAvatar(name);
+      avatarImg.alt = name;
+    }
+
+    if (profile.region_primary) {
+      if (region) region.textContent = profile.region_primary;
+      regionSep?.classList.remove('hidden');
+    }
+
+    if (profile.bio && bio) {
+      bio.textContent = profile.bio;
+      bio.classList.remove('hidden');
+    }
+
+    const stats = profile.stats_json;
+    if (statObs) statObs.textContent = String(stats?.total_observations ?? profile.observation_count ?? 0);
+    if (statSpecies) statSpecies.textContent = String(stats?.species_count ?? 0);
+    if (statRG) statRG.textContent = String(stats?.research_grade_count ?? 0);
+  }
+
+  run().catch(console.error);
+</script>

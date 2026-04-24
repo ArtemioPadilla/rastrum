@@ -1,0 +1,12 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ObservationForm from '../../components/ObservationForm.astro';
+import { t } from '../../i18n/utils';
+
+const lang = 'en';
+const tr = t(lang);
+---
+
+<BaseLayout title={`${tr.observe.title} — Rastrum`} lang={lang}>
+  <ObservationForm lang={lang} />
+</BaseLayout>

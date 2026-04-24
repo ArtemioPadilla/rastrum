@@ -101,18 +101,40 @@ export interface Observation {
   deviceOs: string | null;
 }
 
-/** Profile row as stored in public.users. */
+/** Profile row as stored in public.users. Snake-cased to match Postgres. */
 export interface UserProfile {
   id: string;
   username: string | null;
-  displayName: string | null;
+  display_name: string | null;
   bio: string | null;
-  avatarUrl: string | null;
-  preferredLang: 'es' | 'en' | 'zap' | 'mix' | 'nah' | 'myn' | 'tzo' | 'tze';
-  isExpert: boolean;
-  expertTaxa: string[] | null;
-  observerLicense: 'CC BY 4.0' | 'CC BY-NC 4.0' | 'CC0';
-  observationCount: number;
-  createdAt: string;
-  updatedAt: string;
+  avatar_url: string | null;
+  preferred_lang: 'es' | 'en' | 'zap' | 'mix' | 'nah' | 'myn' | 'tzo' | 'tze';
+  is_expert: boolean;
+  expert_taxa: string[] | null;
+  observer_license: 'CC BY 4.0' | 'CC BY-NC 4.0' | 'CC0';
+  observation_count: number;
+  profile_public: boolean;
+  gamification_opt_in: boolean;
+  streak_digest_opt_in: boolean;
+  region_primary: string | null;
+  joined_at: string;
+  last_observation_at: string | null;
+  stats_cached_at: string | null;
+  stats_json: UserStats | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Stats roll-up stored in public.users.stats_json. Refreshed by Edge Function. */
+export interface UserStats {
+  total_observations: number;
+  research_grade_count: number;
+  species_count: number;
+  kingdom_breakdown: { Plantae: number; Animalia: number; Fungi: number };
+  first_observation_at: string | null;
+  last_observation_at: string | null;
+  top_families: Array<{ family: string; count: number }>;
+  regions: Array<{ state_province: string; count: number }>;
+  streak_days: number;
+  streak_best: number;
 }

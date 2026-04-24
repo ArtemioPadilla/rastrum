@@ -1,0 +1,193 @@
+---
+import { t } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+const { lang } = Astro.props;
+const tr = t(lang);
+---
+
+<div class="max-w-2xl mx-auto">
+  <h1 class="text-2xl font-bold tracking-tight mb-6">{tr.profile.edit}</h1>
+
+  <form id="edit-form" class="space-y-5" novalidate>
+    <div>
+      <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.profile.username}</label>
+      <input name="username" type="text" pattern="[a-zA-Z0-9_]{3,30}" maxlength="30" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
+      <p class="mt-1 text-xs text-zinc-500">{tr.profile.username_hint}</p>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.profile.display_name}</label>
+      <input name="display_name" type="text" maxlength="80" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.profile.bio}</label>
+      <textarea name="bio" maxlength="500" rows="3" placeholder={tr.profile.bio_placeholder} class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm"></textarea>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.profile.region_primary}</label>
+      <input name="region_primary" type="text" placeholder={tr.profile.region_placeholder} class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.profile.avatar_url}</label>
+      <input name="avatar_url" type="url" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
+    </div>
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.profile.preferred_lang}</label>
+        <select name="preferred_lang" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
+          <option value="es">Español</option>
+          <option value="en">English</option>
+          <option value="zap">Zapoteco</option>
+          <option value="mix">Mixteco</option>
+          <option value="nah">Náhuatl</option>
+          <option value="myn">Maya</option>
+          <option value="tzo">Tsotsil</option>
+          <option value="tze">Tseltal</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.profile.license}</label>
+        <select name="observer_license" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
+          <option value="CC BY 4.0">CC BY 4.0</option>
+          <option value="CC BY-NC 4.0">CC BY-NC 4.0</option>
+          <option value="CC0">CC0</option>
+        </select>
+        <p class="mt-1 text-xs text-zinc-500">{tr.profile.license_hint}</p>
+      </div>
+    </div>
+
+    <fieldset class="space-y-3 border-t border-zinc-200 dark:border-zinc-800 pt-5">
+      <label class="flex items-start gap-3 cursor-pointer">
+        <input type="checkbox" name="profile_public" class="mt-1" />
+        <div>
+          <p class="text-sm font-medium text-zinc-700 dark:text-zinc-300">{tr.profile.public_profile}</p>
+          <p class="text-xs text-zinc-500">{tr.profile.public_profile_hint}</p>
+        </div>
+      </label>
+      <label class="flex items-start gap-3 cursor-pointer">
+        <input type="checkbox" name="gamification_opt_in" class="mt-1" />
+        <div>
+          <p class="text-sm font-medium text-zinc-700 dark:text-zinc-300">{tr.profile.gamification}</p>
+          <p class="text-xs text-zinc-500">{tr.profile.gamification_hint}</p>
+        </div>
+      </label>
+      <label class="flex items-start gap-3 cursor-pointer">
+        <input type="checkbox" name="streak_digest_opt_in" class="mt-1" />
+        <div>
+          <p class="text-sm font-medium text-zinc-700 dark:text-zinc-300">{tr.profile.streak_digest}</p>
+          <p class="text-xs text-zinc-500">{tr.profile.streak_digest_hint}</p>
+        </div>
+      </label>
+    </fieldset>
+
+    <div class="flex items-center gap-3 pt-2">
+      <button type="submit" id="save-btn" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+        <span data-label>{tr.profile.save}</span>
+      </button>
+      <a href={`/${lang}/${lang === 'es' ? 'perfil' : 'profile'}/`} class="text-sm text-zinc-600 dark:text-zinc-400 hover:underline">
+        ← {tr.profile.view_profile}
+      </a>
+      <span id="save-status" class="hidden text-sm text-emerald-600 dark:text-emerald-400">✓ {tr.profile.saved}</span>
+    </div>
+    <p id="form-error" class="hidden text-sm text-red-600 dark:text-red-400"></p>
+  </form>
+</div>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import type { UserProfile } from '../lib/types';
+
+  const form = document.getElementById('edit-form') as HTMLFormElement | null;
+  const saveBtn = document.getElementById('save-btn') as HTMLButtonElement | null;
+  const btnLabel = saveBtn?.querySelector('[data-label]') as HTMLElement | null;
+  const status = document.getElementById('save-status');
+  const err = document.getElementById('form-error') as HTMLParagraphElement | null;
+
+  const ORIGINAL = btnLabel?.textContent ?? 'Save';
+  const SAVING = btnLabel?.textContent?.trim() === 'Guardar' ? 'Guardando…' : 'Saving…';
+
+  type EditableKey =
+    | 'username' | 'display_name' | 'bio' | 'region_primary' | 'avatar_url'
+    | 'preferred_lang' | 'observer_license'
+    | 'profile_public' | 'gamification_opt_in' | 'streak_digest_opt_in';
+
+  async function load() {
+    if (!form) return;
+    const supabase = getSupabase();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      window.location.replace(`${window.location.pathname.startsWith('/es/') ? '/es/ingresar/' : '/en/sign-in/'}`);
+      return;
+    }
+    const { data: profile } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', user.id)
+      .maybeSingle<UserProfile>();
+
+    if (!profile) return;
+
+    (form.elements.namedItem('username') as HTMLInputElement).value = profile.username ?? '';
+    (form.elements.namedItem('display_name') as HTMLInputElement).value = profile.display_name ?? '';
+    (form.elements.namedItem('bio') as HTMLTextAreaElement).value = profile.bio ?? '';
+    (form.elements.namedItem('region_primary') as HTMLInputElement).value = profile.region_primary ?? '';
+    (form.elements.namedItem('avatar_url') as HTMLInputElement).value = profile.avatar_url ?? '';
+    (form.elements.namedItem('preferred_lang') as HTMLSelectElement).value = profile.preferred_lang ?? 'es';
+    (form.elements.namedItem('observer_license') as HTMLSelectElement).value = profile.observer_license ?? 'CC BY 4.0';
+    (form.elements.namedItem('profile_public') as HTMLInputElement).checked = profile.profile_public;
+    (form.elements.namedItem('gamification_opt_in') as HTMLInputElement).checked = profile.gamification_opt_in;
+    (form.elements.namedItem('streak_digest_opt_in') as HTMLInputElement).checked = profile.streak_digest_opt_in;
+  }
+
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!form || !saveBtn || !btnLabel) return;
+
+    err?.classList.add('hidden');
+    status?.classList.add('hidden');
+    saveBtn.disabled = true;
+    btnLabel.textContent = SAVING;
+
+    const data = new FormData(form);
+    const nullableText = (k: EditableKey) => {
+      const v = (data.get(k) ?? '').toString().trim();
+      return v === '' ? null : v;
+    };
+    const payload: Record<string, unknown> = {
+      username:             nullableText('username'),
+      display_name:         nullableText('display_name'),
+      bio:                  nullableText('bio'),
+      region_primary:       nullableText('region_primary'),
+      avatar_url:           nullableText('avatar_url'),
+      preferred_lang:       (data.get('preferred_lang') ?? 'es').toString(),
+      observer_license:     (data.get('observer_license') ?? 'CC BY 4.0').toString(),
+      profile_public:       data.get('profile_public') === 'on',
+      gamification_opt_in:  data.get('gamification_opt_in') === 'on',
+      streak_digest_opt_in: data.get('streak_digest_opt_in') === 'on',
+      updated_at:           new Date().toISOString(),
+    };
+
+    const supabase = getSupabase();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { error } = await supabase.from('users').update(payload).eq('id', user.id);
+
+    saveBtn.disabled = false;
+    btnLabel.textContent = ORIGINAL;
+
+    if (error) {
+      if (err) {
+        err.textContent = error.message;
+        err.classList.remove('hidden');
+      }
+      return;
+    }
+    status?.classList.remove('hidden');
+    setTimeout(() => status?.classList.add('hidden'), 3000);
+  });
+
+  load().catch(console.error);
+</script>

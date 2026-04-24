@@ -37,8 +37,8 @@ const isDocsPage = currentPath.includes('/docs');
     </a>
     <nav class="hidden sm:flex items-center gap-6 text-sm">
       <a href={getLocalizedPath(lang, routes.home[lang as 'en'|'es'] + '/')} class="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">{tr.nav.home}</a>
-      <a href={getLocalizedPath(lang, routes.identify[lang as 'en'|'es'] + '/')} class="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">{tr.nav.identify}</a>
-      <a href={getLocalizedPath(lang, routes.explore[lang as 'en'|'es'] + '/')} class="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">{tr.nav.explore}</a>
+      <a href={getLocalizedPath(lang, routes.observe[lang as 'en'|'es'] + '/')} class="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">{tr.nav.observe}</a>
+      <a href={getLocalizedPath(lang, (lang === 'es' ? '/explorar/mapa' : '/explore/map') + '/')} class="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">{tr.nav.map}</a>
       <a href={getLocalizedPath(lang, routes.about[lang as 'en'|'es'] + '/')} class="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">{tr.nav.about}</a>
 
       <!-- Docs dropdown -->
@@ -81,12 +81,18 @@ const isDocsPage = currentPath.includes('/docs');
       >
         {tr.auth.sign_in}
       </a>
-      <button
-        id="sign-out-btn"
-        class="hidden text-xs font-medium px-2.5 py-1 rounded border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-      >
-        {tr.auth.sign_out}
-      </button>
+      <!-- Avatar dropdown (hidden until authenticated) -->
+      <div id="avatar-wrap" class="hidden relative">
+        <button id="avatar-btn" aria-label="Account menu" class="block rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500">
+          <img id="header-avatar" src="" alt="" class="w-8 h-8 rounded-full bg-emerald-600 object-cover" />
+        </button>
+        <div id="avatar-menu" class="hidden absolute right-0 top-full mt-2 w-48 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-lg py-1 z-50">
+          <a id="menu-profile" href={getLocalizedPath(lang, routes.profile[lang as 'en'|'es'] + '/')} class="block px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800">{tr.profile.view_profile}</a>
+          <a id="menu-edit" href={getLocalizedPath(lang, routes.profileEdit[lang as 'en'|'es'] + '/')} class="block px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800">{tr.profile.edit}</a>
+          <div class="border-t border-zinc-200 dark:border-zinc-800 my-1"></div>
+          <button id="sign-out-btn" class="block w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800">{tr.auth.sign_out}</button>
+        </div>
+      </div>
       <a
         href={altHref}
         class="text-xs font-medium px-2 py-1 rounded border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
@@ -114,8 +120,8 @@ const isDocsPage = currentPath.includes('/docs');
   </div>
   <nav id="mobile-menu" class="sm:hidden hidden border-t border-zinc-200 dark:border-zinc-800 px-4 py-3 space-y-2 text-sm">
     <a href={getLocalizedPath(lang, routes.home[lang as 'en'|'es'] + '/')} class="block hover:text-emerald-600 dark:hover:text-emerald-400">{tr.nav.home}</a>
-    <a href={getLocalizedPath(lang, routes.identify[lang as 'en'|'es'] + '/')} class="block hover:text-emerald-600 dark:hover:text-emerald-400">{tr.nav.identify}</a>
-    <a href={getLocalizedPath(lang, routes.explore[lang as 'en'|'es'] + '/')} class="block hover:text-emerald-600 dark:hover:text-emerald-400">{tr.nav.explore}</a>
+    <a href={getLocalizedPath(lang, routes.observe[lang as 'en'|'es'] + '/')} class="block hover:text-emerald-600 dark:hover:text-emerald-400">{tr.nav.observe}</a>
+    <a href={getLocalizedPath(lang, (lang === 'es' ? '/explorar/mapa' : '/explore/map') + '/')} class="block hover:text-emerald-600 dark:hover:text-emerald-400">{tr.nav.map}</a>
     <a href={getLocalizedPath(lang, routes.about[lang as 'en'|'es'] + '/')} class="block hover:text-emerald-600 dark:hover:text-emerald-400">{tr.nav.about}</a>
     <div class="border-t border-zinc-200 dark:border-zinc-800 pt-2 mt-2">
       <p class="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">{tr.nav.docs}</p>
@@ -151,28 +157,61 @@ const isDocsPage = currentPath.includes('/docs');
   }
 </script>
 
-<!-- Auth status toggle: shows Sign in OR Sign out depending on session. -->
+<!-- Auth status: swaps sign-in link for avatar dropdown when authenticated. -->
 <script>
   import { getSupabase } from '../lib/supabase';
   import { signOut } from '../lib/auth';
+  import type { UserProfile } from '../lib/types';
 
-  const signInLink = document.getElementById('sign-in-link');
-  const signOutBtn = document.getElementById('sign-out-btn');
+  const signInLink  = document.getElementById('sign-in-link');
+  const avatarWrap  = document.getElementById('avatar-wrap');
+  const avatarBtn   = document.getElementById('avatar-btn');
+  const avatarMenu  = document.getElementById('avatar-menu');
+  const avatarImg   = document.getElementById('header-avatar') as HTMLImageElement | null;
+  const signOutBtn  = document.getElementById('sign-out-btn');
 
-  function paint(hasSession: boolean) {
+  function initialsAvatar(name: string): string {
+    const clean = (name || '?').trim().slice(0, 2).toUpperCase();
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'>
+      <rect width='32' height='32' fill='#10b981'/>
+      <text x='50%' y='58%' text-anchor='middle' fill='white' font-family='system-ui,sans-serif' font-size='14' font-weight='700'>${clean}</text>
+    </svg>`;
+    return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+  }
+
+  async function paint(hasSession: boolean) {
     if (signInLink) signInLink.classList.toggle('hidden', hasSession);
-    if (signOutBtn) signOutBtn.classList.toggle('hidden', !hasSession);
+    if (avatarWrap) avatarWrap.classList.toggle('hidden', !hasSession);
+    if (hasSession && avatarImg) {
+      try {
+        const supabase = getSupabase();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data: profile } = await supabase
+          .from('users')
+          .select('username,display_name,avatar_url')
+          .eq('id', user.id)
+          .maybeSingle<Pick<UserProfile,'username'|'display_name'|'avatar_url'>>();
+        const name = profile?.display_name || profile?.username || user.email?.split('@')[0] || '?';
+        avatarImg.src = profile?.avatar_url || initialsAvatar(name);
+        avatarImg.alt = name;
+      } catch { /* env not set */ }
+    }
   }
 
   (async () => {
     try {
       const { data: { session } } = await getSupabase().auth.getSession();
-      paint(!!session);
+      await paint(!!session);
       getSupabase().auth.onAuthStateChange((_evt, s) => paint(!!s));
-    } catch {
-      // No env vars / not configured — leave both hidden.
-    }
+    } catch { /* env not set */ }
   })();
+
+  avatarBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    avatarMenu?.classList.toggle('hidden');
+  });
+  document.addEventListener('click', () => avatarMenu?.classList.add('hidden'));
 
   signOutBtn?.addEventListener('click', async () => {
     await signOut();
