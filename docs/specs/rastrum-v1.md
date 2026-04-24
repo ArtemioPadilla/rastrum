@@ -24,6 +24,7 @@
 12. [Module: Regional AI Assistant — Rastrum Scout](#module-regional-ai-assistant--rastrum-scout)
 13. [Module: Community & Gamification](#module-community--gamification)
 14. [Module: Institutional Partnerships & Data Exports](#module-institutional-partnerships--data-exports)
+15. [Module: Environmental Context Auto-Enrichment](#module-environmental-context-auto-enrichment)
 
 ---
 
@@ -317,6 +318,8 @@ Observations must be interoperable with the global biodiversity data ecosystem.
   common names in Spanish/Portuguese/English.
 - Notification system: alerts for identifications on your observations, validation
   requests, dispute outcomes.
+- **Environmental Context Auto-Enrichment module**: automatic lunar cycle, solar/seasonal,
+  precipitation, weather, and phenological tagging of every observation using GPS + timestamp.
 
 ### v1.0 — Field Ready (Month 7-9)
 
@@ -1039,6 +1042,22 @@ Computed per spatial unit — polygon, trail, or PIT radius:
 | Species accumulation curves | Rarefaction                                       |
 | Pielou evenness (J)         | H' / ln(S)                                        |
 
+### Temporal and Phenological Analysis
+
+- **Time series of species richness** per trail/polygon — track how biodiversity
+  changes over weeks, months, and years at each spatial unit.
+- **Seasonal species composition comparison** — dry vs. wet season community
+  composition using beta diversity metrics (Sørensen, Jaccard).
+- **Lunar phase activity charts per species** — bar/line charts showing observation
+  frequency by moon phase, revealing nocturnal activity patterns.
+- **Precipitation-emergence correlation charts** — scatter plots of species detection
+  rates vs. precipitation lag (days since rain), identifying rain-triggered emergence.
+- **Year-over-year biodiversity trend** — are species appearing earlier/later than
+  previous years? Phenological shift detection with statistical significance testing.
+- **"Phenological calendar" per site** — visual grid (months × species) showing which
+  species appear in which month, color-coded by observation density. Exportable as
+  PDF field reference.
+
 ### Export Formats
 
 - **CSV matrix** — species × sites for spreadsheet analysis
@@ -1325,3 +1344,95 @@ and management planning processes.
   - Suitable for CONANP management plan submissions
   - Bilingual (ES/EN)
 - **Export formats:** PDF, Excel, CSV, Darwin Core Archive, R community matrix.
+
+---
+
+## Module: Environmental Context Auto-Enrichment
+
+**Target release: v0.3** — enriches every observation automatically with environmental metadata
+
+Every observation in Rastrum is automatically tagged with environmental context at the
+moment of submission, using the GPS coordinates and timestamp. This transforms raw
+sightings into ecologically rich records without any extra effort from the observer.
+
+### Lunar Cycle
+
+- **Moon phase** at time of observation: new moon, waxing crescent, first quarter,
+  waxing gibbous, full moon, waning gibbous, last quarter, waning crescent.
+- **Lunar illumination percentage** (0–100%).
+- **Moon rise/set times** for the observation location.
+- Computed locally (no API needed) using astronomical algorithms (e.g. SunCalc.js).
+- **Use cases:**
+  - Nocturnal mammal activity peaks near full moon
+  - Sea turtle nesting triggered by lunar cycles
+  - Insect emergence (mayflies, moths) correlated with lunar phases
+  - Fishing community traditional knowledge validation
+  - Analysis: "Do jaguar camera trap detections peak on dark moon nights?"
+
+### Solar and Seasonal Context
+
+- **Day length (photoperiod)** at observation location and date.
+- **Solar angle and UV index** (from open APIs).
+- **Season** (astronomical + phenological): dry season, early rains, peak rains,
+  post-rains (for tropical Mexico).
+- **Days since/until seasonal milestones**: first frost, solstice, equinox.
+- **Phenological stage auto-tag**: leaf-out, flowering, fruiting, senescence
+  (inferred from regional plant data).
+
+### Precipitation and Weather
+
+- **Precipitation** in last 24h, 7 days, 30 days (Open-Meteo API, free, no key needed).
+- **Temperature** at time of observation (min/max/current).
+- **Cloud cover** percentage.
+- **Days since last significant rain event** (>5mm).
+- **Automatic "post-rain emergence" flag** when >10mm fell in previous 48h — highly
+  relevant for fungi, amphibians, termites.
+- **Weather auto-tag options**: sunny, cloudy, overcast, light rain, heavy rain, fog,
+  storm.
+
+### Derived Phenological Indicators
+
+- **"First rain of season" flag** — observation made within 7 days of the season's
+  first significant rainfall.
+- **Fire risk index** from CONABIO FIRMS satellite data (relevant for monitoring
+  post-fire regeneration).
+- **NDVI (vegetation greenness)** from Copernicus/Sentinel data for the observation
+  location — shows vegetation state.
+
+### Data Model Additions
+
+New columns on the `observations` table:
+
+| Column              | Type    | Constraints   | Description                                      |
+|---------------------|---------|---------------|--------------------------------------------------|
+| moon_phase          | varchar |               | Phase name (new_moon, waxing_crescent, etc.)     |
+| moon_illumination   | float   |               | Lunar illumination 0.0–1.0                       |
+| photoperiod_hours   | float   |               | Day length at observation location               |
+| temp_celsius        | float   |               | Air temperature at time of observation           |
+| precipitation_24h_mm| float   |               | Precipitation in last 24 hours (mm)              |
+| precipitation_7d_mm | float   |               | Precipitation in last 7 days (mm)                |
+| days_since_rain     | integer |               | Days since last significant rain (>5mm)          |
+| post_rain_flag      | boolean | DEFAULT false | True if >10mm fell in previous 48h               |
+| weather_tag         | varchar |               | sunny, cloudy, overcast, light_rain, heavy_rain, fog, storm |
+| ndvi_value          | float   |               | NDVI vegetation greenness at observation location|
+| phenological_season | varchar |               | dry, early_rains, peak_rains, post_rains         |
+| fire_proximity_km   | float   |               | Distance to nearest active fire hotspot (km)     |
+
+### Analysis Capabilities Unlocked
+
+- Correlate species emergence with lunar phase.
+- Map observation density vs. precipitation lag.
+- Identify "phenological trigger events" — what environmental conditions reliably
+  predict species appearance.
+- Compare seasonal biodiversity indices year over year.
+- "First of season" detection alerts: first jaguar track after dry season, first
+  monarch butterfly sighting.
+
+### Implementation
+
+- **SunCalc.js** (client-side, no API) for moon + solar calculations.
+- **Open-Meteo API** (free, no key) for historical weather at GPS + date.
+- **Copernicus NDVI tiles** (free) served via GeoTIFF endpoint.
+- **CONABIO FIRMS** fire hotspot API (Mexican government, open).
+- All enrichment runs **asynchronously** after observation is saved — does not block
+  submission flow.
