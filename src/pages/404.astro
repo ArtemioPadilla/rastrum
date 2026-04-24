@@ -1,0 +1,179 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getLangFromUrl, t, getLocalizedPath, routes } from '../i18n/utils';
+
+const lang = getLangFromUrl(Astro.url);
+const tr = t(lang);
+
+const i18n: Record<string, Record<string, string>> = {
+  en: {
+    title: 'Species Not Found',
+    heading: '404',
+    tagline: 'Species not found in this habitat',
+    description: 'The specimen you were tracking has moved beyond our survey area. The page you requested does not exist or has been relocated.',
+    home: 'Return to Base Camp',
+    explore: 'Explore Observations',
+    field_label: 'Field Note',
+    catalog: 'Catalog No.',
+    catalogVal: 'RST-000-000',
+    coords: 'Coordinates',
+    coordsVal: '0\u00B000\'00.0"N 0\u00B000\'00.0"W',
+    status: 'Status',
+    statusVal: 'No match in database',
+    confidence: 'Confidence',
+    confidenceVal: '0.00%',
+    observer: 'Observer',
+    observerVal: 'Unknown',
+    date: 'Date',
+    dateVal: new Date().toISOString().split('T')[0],
+    tracks_alt: 'Animal tracks leading away',
+  },
+  es: {
+    title: 'Especie No Encontrada',
+    heading: '404',
+    tagline: 'Especie no encontrada en este h\u00E1bitat',
+    description: 'El esp\u00E9cimen que rastreabas se movi\u00F3 fuera de nuestra zona de estudio. La p\u00E1gina solicitada no existe o fue reubicada.',
+    home: 'Volver al Campamento Base',
+    explore: 'Explorar Observaciones',
+    field_label: 'Nota de Campo',
+    catalog: 'N\u00BA de Cat\u00E1logo',
+    catalogVal: 'RST-000-000',
+    coords: 'Coordenadas',
+    coordsVal: '0\u00B000\'00.0"N 0\u00B000\'00.0"O',
+    status: 'Estado',
+    statusVal: 'Sin coincidencia en la base de datos',
+    confidence: 'Confianza',
+    confidenceVal: '0.00%',
+    observer: 'Observador',
+    observerVal: 'Desconocido',
+    date: 'Fecha',
+    dateVal: new Date().toISOString().split('T')[0],
+    tracks_alt: 'Huellas de animal alejándose',
+  },
+};
+
+const txt = i18n[lang] || i18n['en'];
+const homePath = getLocalizedPath(lang, routes.home[lang as 'en' | 'es'] + '/');
+const explorePath = getLocalizedPath(lang, routes.explore[lang as 'en' | 'es'] + '/');
+---
+
+<BaseLayout title={`${tr.site.title} — ${txt.title}`} description={txt.description} lang={lang}>
+
+  <section class="flex flex-col items-center justify-center py-12 sm:py-20 text-center space-y-10">
+
+    {/* --- Tracks SVG --- */}
+    <div class="relative w-full max-w-md mx-auto h-24 opacity-30 dark:opacity-20" aria-label={txt.tracks_alt} role="img">
+      <svg viewBox="0 0 400 80" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-full h-full">
+        {/* Paw print 1 — far left, rotated as if walking */}
+        <g transform="translate(30,50) rotate(-15)">
+          <ellipse cx="0" cy="0" rx="5" ry="7" class="fill-emerald-700 dark:fill-emerald-400" />
+          <circle cx="-5" cy="-9" r="2.5" class="fill-emerald-700 dark:fill-emerald-400" />
+          <circle cx="0" cy="-11" r="2.5" class="fill-emerald-700 dark:fill-emerald-400" />
+          <circle cx="5" cy="-9" r="2.5" class="fill-emerald-700 dark:fill-emerald-400" />
+        </g>
+        {/* Paw print 2 */}
+        <g transform="translate(95,28) rotate(10)">
+          <ellipse cx="0" cy="0" rx="5" ry="7" class="fill-emerald-700 dark:fill-emerald-400" />
+          <circle cx="-5" cy="-9" r="2.5" class="fill-emerald-700 dark:fill-emerald-400" />
+          <circle cx="0" cy="-11" r="2.5" class="fill-emerald-700 dark:fill-emerald-400" />
+          <circle cx="5" cy="-9" r="2.5" class="fill-emerald-700 dark:fill-emerald-400" />
+        </g>
+        {/* Paw print 3 */}
+        <g transform="translate(170,52) rotate(-12)">
+          <ellipse cx="0" cy="0" rx="5" ry="7" class="fill-emerald-700 dark:fill-emerald-400" />
+          <circle cx="-5" cy="-9" r="2.5" class="fill-emerald-700 dark:fill-emerald-400" />
+          <circle cx="0" cy="-11" r="2.5" class="fill-emerald-700 dark:fill-emerald-400" />
+          <circle cx="5" cy="-9" r="2.5" class="fill-emerald-700 dark:fill-emerald-400" />
+        </g>
+        {/* Paw print 4 */}
+        <g transform="translate(250,25) rotate(8)">
+          <ellipse cx="0" cy="0" rx="5" ry="7" class="fill-emerald-700 dark:fill-emerald-400" />
+          <circle cx="-5" cy="-9" r="2.5" class="fill-emerald-700 dark:fill-emerald-400" />
+          <circle cx="0" cy="-11" r="2.5" class="fill-emerald-700 dark:fill-emerald-400" />
+          <circle cx="5" cy="-9" r="2.5" class="fill-emerald-700 dark:fill-emerald-400" />
+        </g>
+        {/* Paw print 5 — fading out to the right */}
+        <g transform="translate(330,48) rotate(-5)" opacity="0.6">
+          <ellipse cx="0" cy="0" rx="5" ry="7" class="fill-emerald-700 dark:fill-emerald-400" />
+          <circle cx="-5" cy="-9" r="2.5" class="fill-emerald-700 dark:fill-emerald-400" />
+          <circle cx="0" cy="-11" r="2.5" class="fill-emerald-700 dark:fill-emerald-400" />
+          <circle cx="5" cy="-9" r="2.5" class="fill-emerald-700 dark:fill-emerald-400" />
+        </g>
+        {/* Paw print 6 — almost gone */}
+        <g transform="translate(385,30) rotate(3)" opacity="0.25">
+          <ellipse cx="0" cy="0" rx="4" ry="6" class="fill-emerald-700 dark:fill-emerald-400" />
+          <circle cx="-4" cy="-8" r="2" class="fill-emerald-700 dark:fill-emerald-400" />
+          <circle cx="0" cy="-10" r="2" class="fill-emerald-700 dark:fill-emerald-400" />
+          <circle cx="4" cy="-8" r="2" class="fill-emerald-700 dark:fill-emerald-400" />
+        </g>
+      </svg>
+    </div>
+
+    {/* --- Specimen Label / 404 Heading --- */}
+    <div class="space-y-4">
+      <div class="inline-block border-2 border-dashed border-zinc-300 dark:border-zinc-700 px-8 py-4 rounded">
+        <p class="text-xs uppercase tracking-[0.3em] text-zinc-500 dark:text-zinc-500 font-mono mb-1">
+          {txt.field_label}
+        </p>
+        <h1 class="text-8xl sm:text-9xl font-black tracking-tighter text-zinc-900 dark:text-zinc-100 font-mono leading-none">
+          {txt.heading}
+        </h1>
+      </div>
+
+      <h2 class="text-xl sm:text-2xl font-semibold text-emerald-700 dark:text-emerald-400 italic">
+        {txt.tagline}
+      </h2>
+
+      <p class="text-zinc-600 dark:text-zinc-400 max-w-lg mx-auto text-sm sm:text-base leading-relaxed">
+        {txt.description}
+      </p>
+    </div>
+
+    {/* --- Action Buttons --- */}
+    <div class="flex flex-col sm:flex-row gap-3">
+      <a
+        href={homePath}
+        class="inline-flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg transition-colors"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+        </svg>
+        {txt.home}
+      </a>
+      <a
+        href={explorePath}
+        class="inline-flex items-center justify-center gap-2 px-6 py-3 border border-zinc-300 dark:border-zinc-700 hover:border-emerald-600 dark:hover:border-emerald-500 text-zinc-700 dark:text-zinc-300 hover:text-emerald-700 dark:hover:text-emerald-400 font-medium rounded-lg transition-colors"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+        </svg>
+        {txt.explore}
+      </a>
+    </div>
+
+    {/* --- Field Notes Metadata --- */}
+    <div class="w-full max-w-sm mx-auto mt-4">
+      <div class="border border-zinc-200 dark:border-zinc-800 rounded-lg bg-zinc-50 dark:bg-zinc-900/50 p-4 font-mono text-xs text-left space-y-1.5">
+        <p class="text-zinc-500 dark:text-zinc-600 uppercase tracking-widest text-[10px] mb-2 border-b border-zinc-200 dark:border-zinc-800 pb-1.5">
+          {txt.field_label} #RST-404
+        </p>
+        <div class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+          <span class="text-zinc-400 dark:text-zinc-600">{txt.catalog}</span>
+          <span class="text-zinc-600 dark:text-zinc-400">{txt.catalogVal}</span>
+          <span class="text-zinc-400 dark:text-zinc-600">{txt.coords}</span>
+          <span class="text-zinc-600 dark:text-zinc-400">{txt.coordsVal}</span>
+          <span class="text-zinc-400 dark:text-zinc-600">{txt.status}</span>
+          <span class="text-red-500 dark:text-red-400">{txt.statusVal}</span>
+          <span class="text-zinc-400 dark:text-zinc-600">{txt.confidence}</span>
+          <span class="text-zinc-600 dark:text-zinc-400">{txt.confidenceVal}</span>
+          <span class="text-zinc-400 dark:text-zinc-600">{txt.observer}</span>
+          <span class="text-zinc-600 dark:text-zinc-400">{txt.observerVal}</span>
+          <span class="text-zinc-400 dark:text-zinc-600">{txt.date}</span>
+          <span class="text-zinc-600 dark:text-zinc-400">{txt.dateVal}</span>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+</BaseLayout>
