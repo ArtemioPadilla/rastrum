@@ -1,0 +1,20 @@
+---
+const preferredLang = 'en';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Rastrum — Redirecting</title>
+    <script is:inline define:vars={{ base }}>
+      const langs = ['es', 'en'];
+      const browserLang = navigator.language?.slice(0, 2);
+      const lang = langs.includes(browserLang) ? browserLang : 'en';
+      window.location.replace(base + '/' + lang + '/');
+    </script>
+    <meta http-equiv="refresh" content={`0;url=${base}/en/`} />
+  </head>
+  <body></body>
+</html>

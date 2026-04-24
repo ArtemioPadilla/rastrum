@@ -1,0 +1,19 @@
+---
+import { t } from '../i18n/utils';
+
+interface Props {
+  lang: string;
+}
+
+const { lang } = Astro.props;
+const tr = t(lang);
+---
+
+<footer class="border-t border-zinc-200 dark:border-zinc-800 mt-16">
+  <div class="max-w-5xl mx-auto px-4 py-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+    <p>&copy; {new Date().getFullYear()} Rastrum &middot; {tr.footer.license}</p>
+    <a href="https://github.com/ArtemIOPadilla/rastrum" class="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors" target="_blank" rel="noopener">
+      {tr.footer.source}
+    </a>
+  </div>
+</footer>

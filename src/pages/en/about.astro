@@ -1,0 +1,25 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { t } from '../../i18n/utils';
+
+const lang = 'en';
+const tr = t(lang);
+---
+
+<BaseLayout title={`${tr.about.title} — Rastrum`} lang={lang}>
+  <div class="space-y-8 max-w-3xl">
+    <h1 class="text-3xl font-bold">{tr.about.title}</h1>
+    <p class="text-zinc-600 dark:text-zinc-400 leading-relaxed">{tr.about.description}</p>
+    <div>
+      <h2 class="text-xl font-semibold mb-3">{tr.about.stack_title}</h2>
+      <ul class="space-y-2">
+        {tr.about.stack.map((item: string) => (
+          <li class="flex items-center gap-2 text-sm">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+            {item}
+          </li>
+        ))}
+      </ul>
+    </div>
+  </div>
+</BaseLayout>

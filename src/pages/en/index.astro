@@ -1,0 +1,24 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { t, getLocalizedPath, routes } from '../../i18n/utils';
+
+const lang = 'en';
+const tr = t(lang);
+---
+
+<BaseLayout title={`${tr.site.title} — ${tr.home.hero_title}`} description={tr.site.description} lang={lang}>
+  <section class="text-center py-20 space-y-6">
+    <h1 class="text-4xl sm:text-5xl font-bold tracking-tight">
+      {tr.home.hero_title}
+    </h1>
+    <p class="text-lg text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto">
+      {tr.home.hero_subtitle}
+    </p>
+    <a
+      href={getLocalizedPath(lang, routes.identify[lang] + '/')}
+      class="inline-block px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg transition-colors"
+    >
+      {tr.home.cta}
+    </a>
+  </section>
+</BaseLayout>
