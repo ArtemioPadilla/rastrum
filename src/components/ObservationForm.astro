@@ -35,6 +35,20 @@ const weathers = ['sunny','cloudy','overcast','light_rain','heavy_rain','fog','s
       <p class="mt-1 text-xs text-zinc-500">{tr.observe.photo_hint}</p>
     </div>
 
+    <!-- Audio -->
+    <div>
+      <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">{tr.observe.audio_label}</label>
+      <div id="audio-grid" class="hidden mb-3 space-y-2"></div>
+      <div class="flex items-center gap-2">
+        <button id="audio-record-btn" type="button" class="rounded-lg border border-emerald-600/60 px-3 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 disabled:opacity-50">
+          <span data-audio-label>{tr.observe.audio_record}</span>
+        </button>
+        <span id="audio-elapsed" class="hidden text-xs text-zinc-500 font-mono"></span>
+        <span id="audio-error" class="hidden text-xs text-red-600 dark:text-red-400"></span>
+      </div>
+      <p class="mt-1 text-xs text-zinc-500">{tr.observe.audio_max_duration} · {tr.observe.audio_pending_id}</p>
+    </div>
+
     <!-- Evidence type -->
     <div>
       <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.observe.evidence_type}</label>
@@ -142,9 +156,11 @@ const weathers = ['sunny','cloudy','overcast','light_rain','heavy_rain','fog','s
   } | null;
 
   type PhotoEntry = { file: File; blobId: string };
+  type AudioEntry = { blob: Blob; blobId: string; mimeType: string; durationSec: number };
 
   let location: LocState = null;
   const photos: PhotoEntry[] = [];
+  const audios: AudioEntry[] = [];
 
   function paintLocation() {
     if (!gpsStatus) return;
@@ -185,6 +201,124 @@ const weathers = ['sunny','cloudy','overcast','light_rain','heavy_rain','fog','s
     }
     repaintGrid();
   }
+
+  // ── Audio recording (MediaRecorder, ≤30 s) ──
+  const audioGrid     = document.getElementById('audio-grid');
+  const audioRecBtn   = document.getElementById('audio-record-btn') as HTMLButtonElement | null;
+  const audioRecLabel = audioRecBtn?.querySelector('[data-audio-label]') as HTMLElement | null;
+  const audioElapsed  = document.getElementById('audio-elapsed');
+  const audioErrEl    = document.getElementById('audio-error');
+
+  let mediaRecorder: MediaRecorder | null = null;
+  let audioChunks: Blob[] = [];
+  let recordStartedAt = 0;
+  let elapsedTimer: number | null = null;
+  let durationCutoffTimer: number | null = null;
+
+  const AUDIO_MAX_SECS = 30;
+  const isEs2 = (typeof document !== 'undefined') && document.documentElement.lang === 'es';
+
+  function repaintAudioGrid() {
+    if (!audioGrid) return;
+    audioGrid.classList.toggle('hidden', audios.length === 0);
+    audioGrid.innerHTML = audios.map((a, i) => `
+      <div class="flex items-center gap-2 rounded-lg border border-zinc-200 dark:border-zinc-800 p-2">
+        <audio controls src="${URL.createObjectURL(a.blob)}" class="flex-1 h-8"></audio>
+        <span class="text-[10px] text-zinc-500 font-mono">${a.durationSec.toFixed(1)}s</span>
+        <button data-rm-audio="${i}" type="button" class="w-6 h-6 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs flex items-center justify-center" aria-label="remove">×</button>
+      </div>
+    `).join('');
+    audioGrid.querySelectorAll<HTMLButtonElement>('button[data-rm-audio]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = Number(btn.dataset.rmAudio);
+        audios.splice(idx, 1);
+        repaintAudioGrid();
+      });
+    });
+  }
+
+  function setAudioBtnLabel(text: string) {
+    if (audioRecLabel) audioRecLabel.textContent = text;
+  }
+
+  function audioSupported(): boolean {
+    return typeof navigator !== 'undefined'
+      && !!navigator.mediaDevices
+      && typeof navigator.mediaDevices.getUserMedia === 'function'
+      && typeof MediaRecorder !== 'undefined';
+  }
+
+  if (!audioSupported()) {
+    if (audioRecBtn) audioRecBtn.disabled = true;
+    if (audioErrEl) {
+      audioErrEl.textContent = isEs2 ? 'La grabación de audio no está disponible en este navegador.' : "Audio recording isn't supported on this browser.";
+      audioErrEl.classList.remove('hidden');
+    }
+  }
+
+  function pickAudioMime(): string {
+    const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'];
+    for (const m of candidates) {
+      if (MediaRecorder.isTypeSupported(m)) return m;
+    }
+    return 'audio/webm';
+  }
+
+  async function startRecording() {
+    if (!audioRecBtn) return;
+    audioErrEl?.classList.add('hidden');
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      if (audioErrEl) {
+        audioErrEl.textContent = isEs2
+          ? 'Acceso al micrófono denegado. Habilítalo en la configuración del navegador para grabar.'
+          : 'Microphone access denied. Allow it in your browser settings to record.';
+        audioErrEl.classList.remove('hidden');
+      }
+      return;
+    }
+    audioChunks = [];
+    const mime = pickAudioMime();
+    mediaRecorder = new MediaRecorder(stream, { mimeType: mime });
+    mediaRecorder.addEventListener('dataavailable', e => {
+      if (e.data && e.data.size > 0) audioChunks.push(e.data);
+    });
+    mediaRecorder.addEventListener('stop', () => {
+      stream.getTracks().forEach(t => t.stop());
+      const blob = new Blob(audioChunks, { type: mime });
+      const durationSec = Math.min((Date.now() - recordStartedAt) / 1000, AUDIO_MAX_SECS);
+      audios.push({ blob, blobId: crypto.randomUUID(), mimeType: mime, durationSec });
+      repaintAudioGrid();
+      setAudioBtnLabel(isEs2 ? 'Grabar audio' : 'Record audio');
+      audioElapsed?.classList.add('hidden');
+      if (elapsedTimer != null) { clearInterval(elapsedTimer); elapsedTimer = null; }
+      if (durationCutoffTimer != null) { clearTimeout(durationCutoffTimer); durationCutoffTimer = null; }
+    });
+
+    recordStartedAt = Date.now();
+    mediaRecorder.start();
+    setAudioBtnLabel(isEs2 ? 'Detener' : 'Stop');
+    audioElapsed?.classList.remove('hidden');
+    if (audioElapsed) audioElapsed.textContent = '0.0s / ' + AUDIO_MAX_SECS + 's';
+    elapsedTimer = window.setInterval(() => {
+      const e = (Date.now() - recordStartedAt) / 1000;
+      if (audioElapsed) audioElapsed.textContent = e.toFixed(1) + 's / ' + AUDIO_MAX_SECS + 's';
+    }, 100);
+    durationCutoffTimer = window.setTimeout(() => {
+      try { mediaRecorder?.stop(); } catch { /* already stopped */ }
+    }, AUDIO_MAX_SECS * 1000);
+  }
+
+  function stopRecording() {
+    try { mediaRecorder?.stop(); } catch { /* already stopped */ }
+  }
+
+  audioRecBtn?.addEventListener('click', () => {
+    if (mediaRecorder && mediaRecorder.state === 'recording') stopRecording();
+    else                                                       startRecording();
+  });
 
   async function fillFromExif(file: File) {
     try {
@@ -256,8 +390,11 @@ const weathers = ['sunny','cloudy','overcast','light_rain','heavy_rain','fog','s
     if (!form || !submitBtn || !btnLabel) return;
     errBox?.classList.add('hidden');
 
-    if (photos.length === 0) {
-      if (errBox) { errBox.textContent = (document.documentElement.lang === 'es') ? 'Se requiere al menos una foto.' : 'At least one photo is required.'; errBox.classList.remove('hidden'); }
+    if (photos.length === 0 && audios.length === 0) {
+      if (errBox) { errBox.textContent = (document.documentElement.lang === 'es')
+        ? 'Se requiere al menos una foto o un audio.'
+        : 'At least one photo or audio is required.';
+        errBox.classList.remove('hidden'); }
       return;
     }
     if (!location) {
@@ -280,12 +417,20 @@ const weathers = ['sunny','cloudy','overcast','light_rain','heavy_rain','fog','s
       id: crypto.randomUUID(),
       observerRef: ref,
       createdAt: new Date().toISOString(),
-      photos: photos.map(p => ({
-        id: p.blobId,
-        mediaType: 'photo',
-        mimeType: p.file.type,
-        sizeBytes: p.file.size,
-      })),
+      photos: [
+        ...photos.map(p => ({
+          id: p.blobId,
+          mediaType: 'photo' as const,
+          mimeType: p.file.type,
+          sizeBytes: p.file.size,
+        })),
+        ...audios.map(a => ({
+          id: a.blobId,
+          mediaType: 'audio' as const,
+          mimeType: a.mimeType,
+          sizeBytes: a.blob.size,
+        })),
+      ],
       primaryPhotoIndex: 0,
       location,
       identification: {
@@ -321,6 +466,16 @@ const weathers = ['sunny','cloudy','overcast','light_rain','heavy_rain','fog','s
         blob: p.file,
         mime_type: p.file.type,
         size_bytes: p.file.size,
+        uploaded: false,
+      });
+    }
+    for (const a of audios) {
+      await db.mediaBlobs.put({
+        id: a.blobId,
+        observation_id: obs.id,
+        blob: a.blob,
+        mime_type: a.mimeType,
+        size_bytes: a.blob.size,
         uploaded: false,
       });
     }

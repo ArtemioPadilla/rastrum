@@ -80,7 +80,11 @@ async function syncOne(record: ObservationRecord): Promise<void> {
       .map((b, idx) => ({
         id: b.id,
         observation_id: record.id,
-        media_type: 'photo' as const,
+        media_type: (
+          b.mime_type.startsWith('image/') ? 'photo' :
+          b.mime_type.startsWith('audio/') ? 'audio' :
+          b.mime_type.startsWith('video/') ? 'video' : 'photo'
+        ) as 'photo' | 'audio' | 'video',
         url: b.upload_url!,
         mime_type: b.mime_type,
         file_size_bytes: b.size_bytes,
@@ -142,10 +146,21 @@ async function triggerIdentify(observationId: string): Promise<void> {
   const supabase = getSupabase();
   const db = getDB();
 
-  // Find the primary photo URL we just uploaded
+  // Find the primary uploaded blob — prefer image when both photos and audio
+  // exist, since the photo cascade has more registered providers today.
+  // BirdNET-Lite (audio) is wired but not yet bundled; it'll auto-route once
+  // the model lands. See docs/specs/modules/12-birdnet-audio.md.
   const blobs = await db.mediaBlobs.where('observation_id').equals(observationId).toArray();
-  const primary = blobs.find(b => b.upload_url) ?? blobs[0];
-  if (!primary?.upload_url) return;
+  const uploadedBlobs = blobs.filter(b => b.upload_url);
+  if (uploadedBlobs.length === 0) return;
+
+  const photoBlob = uploadedBlobs.find(b => b.mime_type.startsWith('image/'));
+  const audioBlob = uploadedBlobs.find(b => b.mime_type.startsWith('audio/'));
+  const primary = photoBlob ?? audioBlob ?? uploadedBlobs[0];
+  const mediaKind: 'photo' | 'audio' | 'video' =
+    primary.mime_type.startsWith('image/') ? 'photo' :
+    primary.mime_type.startsWith('audio/') ? 'audio' :
+    primary.mime_type.startsWith('video/') ? 'video' : 'photo';
 
   const obsRecord = await db.observations.get(observationId);
   const loc = obsRecord?.data.location;
@@ -156,21 +171,23 @@ async function triggerIdentify(observationId: string): Promise<void> {
 
   // Exclude on-device plugins unless the user opted in. They still appear
   // in the registry (UI lists them) but the cascade engine skips them.
+  // Note: birdnet_lite is on-device and gated by both opt-in AND the model
+  // bundle landing — its isAvailable() returns model_not_bundled until then.
   const excluded = isLocalAIOptedIn() ? [] : ['webllm_phi35_vision', 'onnx_efficientnet_lite0', 'birdnet_lite'];
 
   // Plugins read their own keys from byo-keys.ts at identify-time, so we
   // don't pre-collect them here. Pass an empty byo_keys object as a default.
   const cascadeResult = await runCascade(
     {
-      media: { kind: 'url', url: primary.upload_url },
-      mediaKind: 'photo',
+      media: { kind: 'url', url: primary.upload_url! },
+      mediaKind,
       location: loc ? { lat: loc.lat, lng: loc.lng } : undefined,
       habitat,
       byo_keys: {},
     },
     {
-      media: 'photo',
-      taxa: undefined,    // we don't yet know what kingdom — the cascade probes generalists too
+      media: mediaKind,
+      taxa: mediaKind === 'audio' ? 'Animalia.Aves' : undefined,
       excluded,
     },
   );
