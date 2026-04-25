@@ -112,6 +112,44 @@ async function syncOne(record: ObservationRecord): Promise<void> {
       attempts: 0,
     });
   }
+
+  // 5. Trigger the identify Edge Function async (fire-and-forget; the queue
+  //    catches retries). The function does its own DB writes.
+  triggerIdentify(record.id).catch(err => console.warn('[rastrum] identify failed', err));
+}
+
+/** Invoke the identify Edge Function for an observation that's freshly synced. */
+async function triggerIdentify(observationId: string): Promise<void> {
+  const supabase = getSupabase();
+  const db = getDB();
+
+  // Find the primary photo URL we just uploaded
+  const blobs = await db.mediaBlobs.where('observation_id').equals(observationId).toArray();
+  const primary = blobs.find(b => b.upload_url) ?? blobs[0];
+  if (!primary?.upload_url) return;  // shouldn't happen, but be defensive
+
+  // Pull the GPS for context (improves Claude's ID)
+  const obsRecord = await db.observations.get(observationId);
+  const loc = obsRecord?.data.location;
+
+  const { error } = await supabase.functions.invoke('identify', {
+    body: {
+      observation_id: observationId,
+      image_url: primary.upload_url,
+      location: loc ? { lat: loc.lat, lng: loc.lng } : undefined,
+    },
+  });
+  if (error) {
+    // Don't fail sync — keep the row in idQueue for nightly retry
+    await db.idQueue.update(observationId, {
+      attempts: ((await db.idQueue.get(observationId))?.attempts ?? 0) + 1,
+      last_error: error.message,
+    });
+    return;
+  }
+
+  // Success — drop the queue entry
+  await db.idQueue.delete(observationId);
 }
 
 /** Flush all pending observations. Safe to call on every `online` event. */

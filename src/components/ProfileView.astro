@@ -72,14 +72,14 @@ const tr = t(lang);
       </div>
     </section>
 
-    <!-- Recent activity placeholder (v0.3 ships real one) -->
+    <!-- Recent activity feed (module 08) -->
     <section>
       <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-3">
         {tr.profile.section_activity}
       </h2>
-      <div id="no-observations" class="rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-8 text-center">
+      <ul id="activity-list" class="space-y-2"></ul>
+      <div id="no-observations" class="hidden rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-8 text-center">
         <p class="text-sm text-zinc-500 dark:text-zinc-400">{tr.profile.no_observations_yet}</p>
-        <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-2 italic">{tr.profile.activity_coming_soon}</p>
       </div>
     </section>
   </div>
@@ -155,6 +155,65 @@ const tr = t(lang);
     if (statObs) statObs.textContent = String(stats?.total_observations ?? profile.observation_count ?? 0);
     if (statSpecies) statSpecies.textContent = String(stats?.species_count ?? 0);
     if (statRG) statRG.textContent = String(stats?.research_grade_count ?? 0);
+
+    // Load activity events (last 20)
+    const { data: events } = await supabase
+      .from('activity_events')
+      .select('id, kind, payload, created_at, read_at')
+      .eq('actor_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    const list = document.getElementById('activity-list') as HTMLUListElement | null;
+    const empty = document.getElementById('no-observations');
+    if (!events?.length) {
+      empty?.classList.remove('hidden');
+      return;
+    }
+    const isEs = document.documentElement.lang === 'es';
+    const labels: Record<string,(p: Record<string, unknown> | null) => string> = {
+      observation_created: (p) => isEs
+        ? `Observación nueva${p?.state_province ? ' en ' + p.state_province : ''}`
+        : `New observation${p?.state_province ? ' in ' + p.state_province : ''}`,
+      observation_research_grade: (p) => isEs
+        ? `Grado-investigación: ${p?.scientific_name ?? ''}`
+        : `Reached research-grade: ${p?.scientific_name ?? ''}`,
+      observation_id_accepted: () => isEs ? 'Identificación aceptada' : 'Identification accepted',
+      observation_id_changed:  () => isEs ? 'Identificación cambió'   : 'Identification changed',
+      badge_earned: (p) => isEs ? `Insignia obtenida: ${p?.badge_key ?? ''}` : `Badge earned: ${p?.badge_key ?? ''}`,
+      streak_milestone: (p) => isEs ? `Racha de ${p?.days ?? ''} días` : `${p?.days ?? ''}-day streak`,
+      first_of_species_in_region: (p) => isEs
+        ? `Primera ${p?.scientific_name ?? ''} en la región`
+        : `First ${p?.scientific_name ?? ''} in region`,
+      first_observation_of_day: () => isEs ? 'Primera observación del día' : 'First observation of the day',
+      comment_received: () => isEs ? 'Comentario recibido' : 'Comment received',
+      validation_given: () => isEs ? 'Validación dada' : 'Validation given',
+      validation_received: () => isEs ? 'Validación recibida' : 'Validation received',
+      follow_received: () => isEs ? 'Nuevo seguidor' : 'New follower',
+    };
+    if (list) {
+      list.innerHTML = events.map(ev => {
+        const fn = labels[ev.kind as string] ?? ((p: Record<string, unknown> | null) => `${ev.kind}${p ? ' — ' + JSON.stringify(p) : ''}`);
+        const text = fn(ev.payload as Record<string, unknown> | null);
+        const date = new Date(ev.created_at as string).toLocaleDateString();
+        return `<li class="flex items-start gap-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-3">
+          <span class="mt-1 w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm text-zinc-800 dark:text-zinc-200">${text}</p>
+            <p class="text-xs text-zinc-500">${date}</p>
+          </div>
+        </li>`;
+      }).join('');
+    }
+
+    // Mark all as read in the background
+    const unreadIds = events.filter(e => !e.read_at).map(e => e.id);
+    if (unreadIds.length) {
+      supabase.from('activity_events')
+        .update({ read_at: new Date().toISOString() })
+        .in('id', unreadIds)
+        .then(() => { /* fire and forget */ });
+    }
   }
 
   run().catch(console.error);

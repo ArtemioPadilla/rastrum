@@ -442,6 +442,97 @@ CREATE UNIQUE INDEX IF NOT EXISTS uniq_primary_id_per_obs
   WHERE is_primary = true;
 
 -- ============================================================
+-- ACTIVITY FEED (v0.3 — module 08)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.activity_events (
+  id         uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  actor_id   uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  subject_id uuid,
+  kind       text NOT NULL CHECK (kind IN (
+    'observation_created','observation_id_accepted','observation_id_changed',
+    'observation_research_grade','badge_earned','streak_milestone',
+    'first_of_species_in_region','first_observation_of_day',
+    'comment_received','validation_given','validation_received',
+    'follow_received'
+  )),
+  payload    jsonb,
+  read_at    timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  visibility text NOT NULL DEFAULT 'self'
+             CHECK (visibility IN ('self','followers','public'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_activity_actor       ON activity_events(actor_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_activity_unread      ON activity_events(actor_id) WHERE read_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_activity_public_feed ON activity_events(created_at DESC) WHERE visibility = 'public';
+
+ALTER TABLE public.activity_events ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS activity_self_read ON public.activity_events;
+CREATE POLICY activity_self_read ON public.activity_events FOR SELECT
+  USING ((SELECT auth.uid()) = actor_id);
+
+DROP POLICY IF EXISTS activity_self_update ON public.activity_events;
+CREATE POLICY activity_self_update ON public.activity_events FOR UPDATE
+  USING ((SELECT auth.uid()) = actor_id);
+
+DROP POLICY IF EXISTS activity_public_read ON public.activity_events;
+CREATE POLICY activity_public_read ON public.activity_events FOR SELECT
+  USING (
+    visibility = 'public'
+    AND actor_id IN (SELECT id FROM public.users WHERE profile_public = true)
+  );
+
+-- Auto-fire activity_events from observation insert.
+CREATE OR REPLACE FUNCTION public.fire_observation_created()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO public.activity_events (actor_id, subject_id, kind, payload, visibility)
+  VALUES (
+    NEW.observer_id,
+    NEW.id,
+    'observation_created',
+    jsonb_build_object(
+      'state_province', NEW.state_province,
+      'habitat', NEW.habitat
+    ),
+    'self'
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS fire_observation_created_trigger ON public.observations;
+CREATE TRIGGER fire_observation_created_trigger
+  AFTER INSERT ON public.observations
+  FOR EACH ROW
+  EXECUTE FUNCTION public.fire_observation_created();
+
+-- Promote to public visibility once the observation reaches research-grade.
+CREATE OR REPLACE FUNCTION public.fire_research_grade()
+RETURNS trigger AS $$
+BEGIN
+  IF NEW.is_research_grade IS DISTINCT FROM OLD.is_research_grade
+     AND NEW.is_research_grade = true THEN
+    INSERT INTO public.activity_events (actor_id, subject_id, kind, payload, visibility)
+    SELECT o.observer_id,
+           o.id,
+           'observation_research_grade',
+           jsonb_build_object('scientific_name', NEW.scientific_name),
+           'public'
+    FROM public.observations o WHERE o.id = NEW.observation_id;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS fire_research_grade_trigger ON public.identifications;
+CREATE TRIGGER fire_research_grade_trigger
+  AFTER UPDATE OF is_research_grade ON public.identifications
+  FOR EACH ROW
+  EXECUTE FUNCTION public.fire_research_grade();
+
+-- ============================================================
 -- STORAGE BUCKET + POLICIES (v0.1: Supabase Storage; v0.3 migrates to R2)
 -- ============================================================
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)

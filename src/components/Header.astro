@@ -83,8 +83,9 @@ const isDocsPage = currentPath.includes('/docs');
       </a>
       <!-- Avatar dropdown (hidden until authenticated) -->
       <div id="avatar-wrap" class="hidden relative">
-        <button id="avatar-btn" aria-label="Account menu" class="block rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500">
+        <button id="avatar-btn" aria-label="Account menu" class="block rounded-full relative focus:outline-none focus:ring-2 focus:ring-emerald-500">
           <img id="header-avatar" src="" alt="" class="w-8 h-8 rounded-full bg-emerald-600 object-cover" />
+          <span id="unread-dot" class="hidden absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-red-500 border-2 border-white dark:border-zinc-950 text-[10px] font-bold text-white flex items-center justify-center">0</span>
         </button>
         <div id="avatar-menu" class="hidden absolute right-0 top-full mt-2 w-48 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-lg py-1 z-50">
           <a id="menu-profile" href={getLocalizedPath(lang, routes.profile[lang as 'en'|'es'] + '/')} class="block px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800">{tr.profile.view_profile}</a>
@@ -179,6 +180,8 @@ const isDocsPage = currentPath.includes('/docs');
     return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
   }
 
+  const unreadDot = document.getElementById('unread-dot');
+
   async function paint(hasSession: boolean) {
     if (signInLink) signInLink.classList.toggle('hidden', hasSession);
     if (avatarWrap) avatarWrap.classList.toggle('hidden', !hasSession);
@@ -195,6 +198,21 @@ const isDocsPage = currentPath.includes('/docs');
         const name = profile?.display_name || profile?.username || user.email?.split('@')[0] || '?';
         avatarImg.src = profile?.avatar_url || initialsAvatar(name);
         avatarImg.alt = name;
+
+        // Unread activity count
+        const { count } = await supabase
+          .from('activity_events')
+          .select('id', { count: 'exact', head: true })
+          .eq('actor_id', user.id)
+          .is('read_at', null);
+        if (unreadDot) {
+          if (count && count > 0) {
+            unreadDot.textContent = count > 99 ? '99+' : String(count);
+            unreadDot.classList.remove('hidden');
+          } else {
+            unreadDot.classList.add('hidden');
+          }
+        }
       } catch { /* env not set */ }
     }
   }

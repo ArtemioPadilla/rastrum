@@ -74,6 +74,13 @@ const weathers = ['sunny','cloudy','overcast','light_rain','heavy_rain','fog','s
       <textarea name="notes" maxlength="2000" rows="3" placeholder={tr.observe.notes_placeholder} class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm"></textarea>
     </div>
 
+    <!-- Privacy notice — always visible. Becomes louder once an ID resolves to a NOM-059 species -->
+    <div class="rounded-lg border border-amber-300 dark:border-amber-700/40 bg-amber-50 dark:bg-amber-900/10 p-3 text-xs text-amber-800 dark:text-amber-200">
+      {lang === 'es'
+        ? 'Las coordenadas exactas se guardan privadamente. Si la especie identificada está en NOM-059 o CITES, mostraremos sólo una zona aproximada en el mapa público.'
+        : 'Exact coordinates are stored privately. If the identified species is on NOM-059 or CITES, the public map will only show a coarsened area.'}
+    </div>
+
     <div class="flex items-center gap-3 pt-2">
       <button type="submit" id="submit-btn" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
         <span data-label>{tr.observe.submit}</span>
