@@ -64,6 +64,8 @@ async function ensureCreator() {
 export async function loadVisionEngine(onProgress: (p: LoadProgress) => void): Promise<MLCEngineInterface> {
   if (visionEngine) return visionEngine;
   if (!localAISupported()) throw new Error('WebGPU not available — local AI unavailable on this browser.');
+  // Lock OPFS storage against eviction before downloading multi-GB weights
+  await requestPersistentStorage().catch(() => {});
   const create = await ensureCreator();
   visionEngine = await create(VISION_MODEL_ID, {
     initProgressCallback: (p) => onProgress({
@@ -79,6 +81,7 @@ export async function loadVisionEngine(onProgress: (p: LoadProgress) => void): P
 export async function loadTextEngine(onProgress: (p: LoadProgress) => void): Promise<MLCEngineInterface> {
   if (textEngine) return textEngine;
   if (!localAISupported()) throw new Error('WebGPU not available — local AI unavailable on this browser.');
+  await requestPersistentStorage().catch(() => {});
   const create = await ensureCreator();
   textEngine = await create(TEXT_MODEL_ID, {
     initProgressCallback: (p) => onProgress({
@@ -98,6 +101,133 @@ export async function unloadAll(): Promise<void> {
   ]);
   visionEngine = null;
   textEngine = null;
+}
+
+// ───────────────────── Persistent storage + cache management ─────────────────────
+
+/**
+ * Ask the browser to mark our origin's storage as "persistent" so the OS
+ * won't evict the multi-GB model under storage pressure. Without this,
+ * iOS may delete OPFS data after 7 days of non-use.
+ *
+ * Calling this multiple times is harmless — `navigator.storage.persist()` is
+ * idempotent and returns the current state.
+ */
+export async function requestPersistentStorage(): Promise<boolean> {
+  if (typeof navigator === 'undefined' || !navigator.storage?.persist) return false;
+  return navigator.storage.persist();
+}
+
+/** Total bytes used by all origin storage (rough estimate). */
+export async function getStorageEstimate(): Promise<{ usage: number; quota: number }> {
+  if (typeof navigator === 'undefined' || !navigator.storage?.estimate) {
+    return { usage: 0, quota: 0 };
+  }
+  const e = await navigator.storage.estimate();
+  return { usage: e.usage ?? 0, quota: e.quota ?? 0 };
+}
+
+/**
+ * The cache names WebLLM uses for OPFS-backed model and wasm storage.
+ * These string values are part of the `@mlc-ai/web-llm` runtime contract;
+ * if WebLLM ever renames them, we'll see deletes silently no-op and need
+ * to update.
+ */
+const WEBLLM_CACHE_NAMES = ['webllm/model', 'webllm/wasm', 'webllm/config'] as const;
+
+export type ModelCacheStatus = {
+  modelId: string;
+  cached: boolean;
+  approxBytes: number;        // 0 if not cached or browser doesn't expose Content-Length
+  entries: number;
+};
+
+/**
+ * Probe the Cache API to see if a given WebLLM model has weights cached
+ * locally. Sums Content-Length where available — exact values aren't
+ * always reliable since WebLLM streams shards, but the number is a useful
+ * progress/diagnostic indicator.
+ */
+export async function getModelCacheStatus(modelId: string): Promise<ModelCacheStatus> {
+  if (typeof caches === 'undefined') {
+    return { modelId, cached: false, approxBytes: 0, entries: 0 };
+  }
+  let cached = false;
+  let approxBytes = 0;
+  let entries = 0;
+  for (const name of WEBLLM_CACHE_NAMES) {
+    const c = await caches.open(name).catch(() => null);
+    if (!c) continue;
+    const keys = await c.keys();
+    for (const req of keys) {
+      // WebLLM keys URLs by model id — match conservatively on substring
+      if (req.url.includes(modelId)) {
+        cached = true;
+        entries++;
+        try {
+          const res = await c.match(req);
+          const len = res?.headers.get('content-length');
+          if (len) approxBytes += parseInt(len, 10);
+        } catch { /* ignore */ }
+      }
+    }
+  }
+  return { modelId, cached, approxBytes, entries };
+}
+
+/**
+ * Delete every cache entry whose URL contains the given model id. Frees
+ * the OPFS-backed disk space. The model can be re-downloaded later by
+ * calling loadVisionEngine/loadTextEngine again.
+ *
+ * Returns the number of entries deleted, summed across all WebLLM caches.
+ */
+export async function clearModelCache(modelId: string): Promise<{ deleted: number }> {
+  if (typeof caches === 'undefined') return { deleted: 0 };
+  // If the model is currently loaded into GPU memory, unload it first so
+  // we don't hand back stale memory references after the disk wipe.
+  if (modelId === VISION_MODEL_ID && visionEngine) {
+    await visionEngine.unload();
+    visionEngine = null;
+  }
+  if (modelId === TEXT_MODEL_ID && textEngine) {
+    await textEngine.unload();
+    textEngine = null;
+  }
+
+  let deleted = 0;
+  for (const name of WEBLLM_CACHE_NAMES) {
+    const c = await caches.open(name).catch(() => null);
+    if (!c) continue;
+    const keys = await c.keys();
+    for (const req of keys) {
+      if (req.url.includes(modelId)) {
+        const ok = await c.delete(req);
+        if (ok) deleted++;
+      }
+    }
+  }
+  return { deleted };
+}
+
+/**
+ * Clear EVERY WebLLM cache — both models, all WASM, all config. Free
+ * memory first. Use as the "remove all on-device AI data" nuclear option.
+ */
+export async function clearAllModelCaches(): Promise<{ deleted: number; cachesRemoved: number }> {
+  await unloadAll();
+  if (typeof caches === 'undefined') return { deleted: 0, cachesRemoved: 0 };
+  let deleted = 0;
+  let cachesRemoved = 0;
+  for (const name of WEBLLM_CACHE_NAMES) {
+    const removed = await caches.delete(name);
+    if (removed) {
+      cachesRemoved++;
+      // We don't know how many entries were inside — just report the buckets
+      deleted = -1;
+    }
+  }
+  return { deleted, cachesRemoved };
 }
 
 // ───────────────────── Vision: image identification fallback ─────────────────────

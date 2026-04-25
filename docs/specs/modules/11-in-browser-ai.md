@@ -101,16 +101,49 @@ Detected via `navigator.gpu` — `localAISupported()` in `src/lib/local-ai.ts`.
 
 ## UX rules
 
-1. **Never auto-download.** Models load only on explicit button click. The
-   button labels include the size in the user's locale (`~4 GB`, `~880 MB`).
-2. **Opt-in cascade.** Three independent toggles in profile/edit:
-   - Bring-your-own Anthropic key (text input)
-   - Allow on-device AI as fallback (checkbox)
-   - Download the vision model / Download the text model (action buttons)
-3. **Disclaimer always visible** when opting in:
-   "Phi-3.5-vision is a general AI without taxonomic training. Results
-    are capped at low confidence and never count toward research-grade."
-4. **Free GPU memory** button to unload both models when done.
+1. **Never auto-download.** Models load only on explicit button click.
+2. **Modal confirmation before every download.** The button click opens a
+   dialog explaining: exact size, that the model runs entirely on-device
+   after download, that the download is one-time + persistent, and that
+   the user should prefer Wi-Fi. The user must click **Download** to
+   proceed; **Not now** cancels with no side effect.
+3. **Opt-in cascade.** Three independent levels in profile/edit:
+   - Bring-your-own Anthropic key (text input, server-side fallback)
+   - "Allow on-device AI as fallback" toggle (governs whether sync.ts
+     ever calls into WebLLM)
+   - Per-model download (vision / text), each requiring its own
+     confirmation dialog
+4. **Persistent storage.** `loadVisionEngine` / `loadTextEngine` call
+   `navigator.storage.persist()` before any network fetch, so iOS Safari
+   doesn't evict OPFS data after 7 days of non-use.
+5. **Disclaimer always visible** when opting in: "Phi-3.5-vision is a
+   general AI without taxonomic training. Results are capped at low
+   confidence and never count toward research-grade."
+6. **Cache lifecycle is transparent and reversible.** Each model card in
+   profile/edit shows live state pulled from the Cache API:
+   - **Not downloaded · ~size** — initial state, single Download button.
+   - **Cached on this device · X GB · N files** — after first download.
+     Buttons swap to Re-download + Delete from device.
+   - **Loaded in GPU** — when `unload()` hasn't been called.
+7. **Three eviction paths**:
+   - **Unload (free GPU memory).** Keeps disk cache, drops VRAM.
+   - **Delete from device.** Per-model. Removes Cache API entries
+     matching the model id. User can re-download anytime.
+   - **Delete all on-device AI data.** Nuclear; drops both models and
+     all WebLLM-related cache buckets.
+8. **Storage usage indicator.** A small line under the model cards
+   displays `navigator.storage.estimate()` so the user knows how much
+   of the origin's quota they're using.
+
+## Cache implementation notes
+
+WebLLM caches model shards via the standard `caches.open()` API under
+three named buckets: `webllm/model`, `webllm/wasm`, `webllm/config`. The
+bucket names are part of WebLLM's runtime contract — if a future version
+renames them, our cache management functions (`getModelCacheStatus`,
+`clearModelCache`, `clearAllModelCaches` in `src/lib/local-ai.ts`) must
+be updated. Cache API entries are URL-keyed; we match the model id via
+substring against `req.url`.
 
 ---
 
