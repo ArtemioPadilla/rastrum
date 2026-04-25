@@ -4,34 +4,47 @@
   "location": "San Pablo Etla, Oaxaca, México",
   "coords_approx": { "lat": 17.11, "lng": -96.74 },
   "habitat": "bosque_encino_hojarasca",
-  "photo_angle": "lateral_flor_tallo",
-  "photo_file": "3b20913d-7155-451e-8eb0-ff88987259e7.jpg",
+  "photo_files": [
+    "tc-003-hypoxis-hirsuta.jpg",
+    "tc-003b-hypoxis-hojas.jpg"
+  ],
   "pipeline": {
-    "plantnet": {
-      "top_result": null,
-      "confidence": null,
-      "note": "Not tested — PLANTNET_API_KEY not available in server env"
-    },
-    "claude_haiku": {
+    "round_1_flower_only": {
       "model": "anthropic.claude-haiku-4-5-20251001-v1:0",
       "result": "Oxalis stricta",
+      "family_guessed": "Oxalidaceae",
       "confidence": 0.75,
-      "alternatives": ["Oxalis latifolia", "Oxalis pubescens"],
-      "reasoning": "Small herbaceous plant with yellow flower and hairy green stems in oak forest"
+      "above_threshold": true,
+      "would_accept": true,
+      "verdict": "FALSE POSITIVE — cascade habría aceptado sin review"
+    },
+    "round_2_flower_plus_leaves": {
+      "model": "anthropic.claude-haiku-4-5-20251001-v1:0",
+      "result": "Schaffneria nigrescens (hallucination)",
+      "family_guessed": "Asteraceae",
+      "confidence": 0.45,
+      "above_threshold": false,
+      "would_accept": false,
+      "verdict": "CLOSER — modelo detectó que hojas lineares no encajan con Oxalidaceae, pero no alcanza Hypoxidaceae; activaría needs_review con threshold=0.5"
     }
   },
   "ground_truth": {
     "scientific_name": "Hypoxis hirsuta",
     "alternate_candidate": "Hypoxis mexicana",
     "expert_preference": "H. hirsuta (primary), H. mexicana (possible)",
-    "authority": null,
     "family": "Hypoxidaceae",
     "identified_by": "Eugenio Padilla (field expert)",
-    "nom059_status": null,
-    "notes": "Planta herbácea pequeña, flor amarilla de 6 pétalos, tallo y hojas pilosas, bosque de encino. Hypoxidaceae — familia distinta a Oxalidaceae aunque superficialmente similar en flor amarilla."
+    "diagnostic_features": [
+      "Roseta basal de hojas lineares hirsuta emergiendo desde corm/bulbo",
+      "6 tépalos libres amarillos",
+      "Tallo escapo densamente peloso",
+      "Habitat: bosque de encino, suelo con algo de humedad"
+    ],
+    "nom059_status": null
   },
-  "failure_mode": "confusion_familias_flor_amarilla",
-  "lesson": "Oxalis (Oxalidaceae) vs Hypoxis (Hypoxidaceae): flor amarilla + tallo peloso en encinar = confusión frecuente. Diferencia clave: Hypoxis tiene 6 tépalos libres, hojas lineares basales. Oxalis tiene hojas trifoliadas típicas. Foto de hojas en roseta basal resolvería ambigüedad.",
-  "cascade_behavior": "Claude Haiku retornó confidence=0.75 — supera ACCEPT_THRESHOLD=0.7 → el cascade habría aceptado el resultado incorrecto sin fallback. Bug confirmado: threshold demasiado permisivo para Hypoxidaceae subrepresentada en datasets.",
-  "priority": "high — Hypoxis es género subrepresentado en iNat/PlantNet para México; Oxalis es trampa frecuente por flor amarilla similar"
+  "key_finding": "Multi-foto mejora el comportamiento del cascade: con 1 foto confidence=0.75 (false positive aceptado); con 2 fotos confidence=0.45 (activaría needs_review). La segunda foto fue determinante para revelar hojas lineares basales vs hojas trifoliadas de Oxalis.",
+  "failure_mode": "hypoxidaceae_blind_spot_dataset",
+  "lesson": "Hypoxidaceae subrepresentada en datasets globales. Rasgo diagnóstico clave: roseta basal desde corm + hojas lineares hirsuta. Con solo la flor, modelo confunde con Oxalis (flor amarilla similar). Pedir siempre foto de hojas basales para plantas herbáceas con flor amarilla en encinar.",
+  "cascade_fix": "Bajar ACCEPT_THRESHOLD de 0.7 a 0.5. Agregar prompt hint: 'If linear strap-shaped basal leaves visible, consider Hypoxidaceae (Hypoxis) before Oxalidaceae'",
+  "priority": "high — Hypoxis frecuente en bosques de encino Oaxaca, sistemáticamente mal identificada"
 }
