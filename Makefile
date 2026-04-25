@@ -61,6 +61,11 @@ db-apply: ## Apply the canonical schema to Supabase
 	@psql "$$SUPABASE_DB" -v ON_ERROR_STOP=1 -f $(SCHEMA)
 	@echo "✓ Schema applied"
 
+db-seed-badges: ## Seed the badges catalogue (idempotent)
+	$(call require_env,SUPABASE_DB)
+	@psql "$$SUPABASE_DB" -v ON_ERROR_STOP=1 -f $(MIGRATIONS_DIR)/seed-badges.sql
+	@echo "✓ Badges seeded"
+
 db-verify: ## Verify tables, RLS, triggers, extensions are in place
 	$(call require_env,SUPABASE_DB)
 	@echo "── Tables ──"

@@ -442,6 +442,99 @@ CREATE UNIQUE INDEX IF NOT EXISTS uniq_primary_id_per_obs
   WHERE is_primary = true;
 
 -- ============================================================
+-- BADGES + USER_BADGES (v0.5 — module 08)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.badges (
+  key            text PRIMARY KEY,
+  name_es        text NOT NULL,
+  name_en        text NOT NULL,
+  description_es text NOT NULL,
+  description_en text NOT NULL,
+  category       text NOT NULL CHECK (category IN
+                 ('discovery','mastery','contribution','community','governance')),
+  tier           text NOT NULL DEFAULT 'bronze'
+                 CHECK (tier IN ('bronze','silver','gold','platinum')),
+  art_url        text,
+  rule_json      jsonb NOT NULL,
+  retired_at     timestamptz,
+  created_at     timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.user_badges (
+  id             uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id        uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  badge_key      text NOT NULL REFERENCES public.badges(key),
+  awarded_at     timestamptz NOT NULL DEFAULT now(),
+  trigger_obs_id uuid REFERENCES public.observations(id) ON DELETE SET NULL,
+  revoked_at     timestamptz,
+  revoke_reason  text,
+  CONSTRAINT uniq_user_badge UNIQUE (user_id, badge_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_badges_user ON user_badges(user_id, awarded_at DESC);
+
+ALTER TABLE public.badges      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_badges ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS badges_public_read ON public.badges;
+CREATE POLICY badges_public_read ON public.badges FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS user_badges_self_read ON public.user_badges;
+CREATE POLICY user_badges_self_read ON public.user_badges FOR SELECT
+  USING ((SELECT auth.uid()) = user_id);
+
+DROP POLICY IF EXISTS user_badges_public_read ON public.user_badges;
+CREATE POLICY user_badges_public_read ON public.user_badges FOR SELECT
+  USING (
+    revoked_at IS NULL
+    AND user_id IN (
+      SELECT id FROM public.users
+      WHERE profile_public = true AND gamification_opt_in = true
+    )
+  );
+
+-- Anti-sybil: a user cannot validate their own observation's identification.
+-- Implemented as a BEFORE INSERT/UPDATE trigger because CHECK constraints
+-- can't reference other tables.
+CREATE OR REPLACE FUNCTION public.prevent_self_validation()
+RETURNS trigger AS $$
+DECLARE
+  observer_id uuid;
+BEGIN
+  IF NEW.validated_by IS NULL THEN RETURN NEW; END IF;
+  SELECT o.observer_id INTO observer_id FROM public.observations o WHERE o.id = NEW.observation_id;
+  IF observer_id = NEW.validated_by THEN
+    RAISE EXCEPTION 'A user cannot validate their own observation (anti-sybil rule)';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS prevent_self_validation_trigger ON public.identifications;
+CREATE TRIGGER prevent_self_validation_trigger
+  BEFORE INSERT OR UPDATE OF validated_by ON public.identifications
+  FOR EACH ROW
+  EXECUTE FUNCTION public.prevent_self_validation();
+
+-- Quality gate: observations with confidence < 0.4 cannot be marked
+-- research-grade. Enforced at the identification level.
+CREATE OR REPLACE FUNCTION public.enforce_research_grade_quality()
+RETURNS trigger AS $$
+BEGIN
+  IF NEW.is_research_grade = true AND COALESCE(NEW.confidence, 0) < 0.4 THEN
+    RAISE EXCEPTION 'Cannot mark research-grade with confidence < 0.4';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS enforce_rg_quality_trigger ON public.identifications;
+CREATE TRIGGER enforce_rg_quality_trigger
+  BEFORE INSERT OR UPDATE OF is_research_grade ON public.identifications
+  FOR EACH ROW
+  EXECUTE FUNCTION public.enforce_research_grade_quality();
+
+-- ============================================================
 -- ACTIVITY FEED (v0.3 — module 08)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS public.activity_events (

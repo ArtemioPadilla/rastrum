@@ -68,6 +68,7 @@ async function syncOne(record: ObservationRecord): Promise<void> {
     location_source: obs.location.capturedFrom,
     habitat:         obs.habitat,
     weather:         obs.weather,
+    evidence_type:   obs.evidenceType ?? 'direct_sighting',
     notes:           obs.notes,
     sync_status:     'synced' as const,
     app_version:     obs.appVersion,

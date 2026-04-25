@@ -38,6 +38,10 @@ export type WeatherTag =
   | 'fog'
   | 'storm';
 
+export type EvidenceType =
+  | 'direct_sighting' | 'track' | 'scat' | 'burrow' | 'nest'
+  | 'feather' | 'bone' | 'sound' | 'camera_trap';
+
 export type IDSource =
   | 'plantnet'
   | 'claude_haiku'
@@ -86,6 +90,7 @@ export interface Observation {
 
   habitat: HabitatType | null;
   weather: WeatherTag | null;
+  evidenceType: EvidenceType;
   notes: string | null;
 
   // Env enrichment, filled post-submission (v1.0+)

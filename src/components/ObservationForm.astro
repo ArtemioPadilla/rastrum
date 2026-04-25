@@ -18,23 +18,37 @@ const weathers = ['sunny','cloudy','overcast','light_rain','heavy_rain','fog','s
   <h1 class="text-2xl font-bold tracking-tight mb-6">{tr.observe.title}</h1>
 
   <form id="obs-form" class="space-y-5" novalidate>
-    <!-- Photo -->
+    <!-- Photos (multi) -->
     <div>
       <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">{tr.observe.photo_label}</label>
-      <div id="photo-preview-wrap" class="hidden mb-3">
-        <img id="photo-preview" src="" alt="" class="w-full max-h-80 object-contain rounded-lg border border-zinc-200 dark:border-zinc-800" />
-      </div>
+      <div id="photo-grid" class="hidden mb-3 grid grid-cols-3 gap-2"></div>
       <div class="flex gap-2">
         <label class="flex-1 cursor-pointer rounded-lg border border-emerald-600/60 px-3 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-400 text-center hover:bg-emerald-50 dark:hover:bg-emerald-900/20">
           <input id="camera-input" type="file" accept="image/*" capture="environment" class="hidden" />
           {tr.observe.use_camera}
         </label>
         <label class="flex-1 cursor-pointer rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 text-center hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
-          <input id="gallery-input" type="file" accept="image/*" class="hidden" />
+          <input id="gallery-input" type="file" accept="image/*" multiple class="hidden" />
           {tr.observe.choose_file}
         </label>
       </div>
       <p class="mt-1 text-xs text-zinc-500">{tr.observe.photo_hint}</p>
+    </div>
+
+    <!-- Evidence type -->
+    <div>
+      <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.observe.evidence_type}</label>
+      <select name="evidence_type" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
+        <option value="direct_sighting">{lang === 'es' ? 'Avistamiento directo' : 'Direct sighting'}</option>
+        <option value="track">{lang === 'es' ? 'Huella' : 'Track / footprint'}</option>
+        <option value="scat">{lang === 'es' ? 'Excremento' : 'Scat'}</option>
+        <option value="burrow">{lang === 'es' ? 'Madriguera' : 'Burrow / den'}</option>
+        <option value="nest">{lang === 'es' ? 'Nido' : 'Nest'}</option>
+        <option value="feather">{lang === 'es' ? 'Pluma' : 'Feather'}</option>
+        <option value="bone">{lang === 'es' ? 'Hueso' : 'Bone'}</option>
+        <option value="sound">{lang === 'es' ? 'Sonido' : 'Sound'}</option>
+        <option value="camera_trap">{lang === 'es' ? 'Cámara trampa' : 'Camera trap'}</option>
+      </select>
     </div>
 
     <!-- Location -->
@@ -105,8 +119,7 @@ const weathers = ['sunny','cloudy','overcast','light_rain','heavy_rain','fog','s
   const form         = document.getElementById('obs-form') as HTMLFormElement | null;
   const cameraInput  = document.getElementById('camera-input') as HTMLInputElement | null;
   const galleryInput = document.getElementById('gallery-input') as HTMLInputElement | null;
-  const photoPreview = document.getElementById('photo-preview') as HTMLImageElement | null;
-  const photoWrap    = document.getElementById('photo-preview-wrap');
+  const photoGrid    = document.getElementById('photo-grid');
   const gpsStatus    = document.getElementById('gps-status');
   const gpsManualBtn = document.getElementById('gps-manual-btn');
   const gpsManualWrap= document.getElementById('gps-manual-wrap');
@@ -128,10 +141,10 @@ const weathers = ['sunny','cloudy','overcast','light_rain','heavy_rain','fog','s
     capturedFrom: 'gps' | 'exif' | 'manual';
   } | null;
 
-  type PhotoState = { file: File; blobId: string } | null;
+  type PhotoEntry = { file: File; blobId: string };
 
   let location: LocState = null;
-  let photo: PhotoState = null;
+  const photos: PhotoEntry[] = [];
 
   function paintLocation() {
     if (!gpsStatus) return;
@@ -147,10 +160,30 @@ const weathers = ['sunny','cloudy','overcast','light_rain','heavy_rain','fog','s
     gpsStatus.className = 'text-zinc-900 dark:text-zinc-100 font-mono text-xs';
   }
 
-  function setPhoto(file: File) {
-    photo = { file, blobId: crypto.randomUUID() };
-    if (photoPreview) photoPreview.src = URL.createObjectURL(file);
-    photoWrap?.classList.remove('hidden');
+  function repaintGrid() {
+    if (!photoGrid) return;
+    photoGrid.classList.toggle('hidden', photos.length === 0);
+    photoGrid.innerHTML = photos.map((p, i) => `
+      <div class="relative aspect-square rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800">
+        <img src="${URL.createObjectURL(p.file)}" alt="" class="w-full h-full object-cover" />
+        ${i === 0 ? '<span class="absolute top-1 left-1 text-[10px] px-1.5 py-0.5 rounded bg-emerald-600 text-white">primary</span>' : ''}
+        <button data-rm="${i}" type="button" class="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white text-xs flex items-center justify-center" aria-label="remove">×</button>
+      </div>
+    `).join('');
+    photoGrid.querySelectorAll<HTMLButtonElement>('button[data-rm]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = Number(btn.dataset.rm);
+        photos.splice(idx, 1);
+        repaintGrid();
+      });
+    });
+  }
+
+  function addPhotos(fileList: FileList) {
+    for (const file of Array.from(fileList)) {
+      photos.push({ file, blobId: crypto.randomUUID() });
+    }
+    repaintGrid();
   }
 
   async function fillFromExif(file: File) {
@@ -194,16 +227,14 @@ const weathers = ['sunny','cloudy','overcast','light_rain','heavy_rain','fog','s
   }
 
   cameraInput?.addEventListener('change', async () => {
-    const f = cameraInput.files?.[0];
-    if (!f) return;
-    setPhoto(f);
-    await fillFromExif(f);
+    if (!cameraInput.files?.length) return;
+    addPhotos(cameraInput.files);
+    await fillFromExif(cameraInput.files[0]);
   });
   galleryInput?.addEventListener('change', async () => {
-    const f = galleryInput.files?.[0];
-    if (!f) return;
-    setPhoto(f);
-    await fillFromExif(f);
+    if (!galleryInput.files?.length) return;
+    addPhotos(galleryInput.files);
+    await fillFromExif(galleryInput.files[0]);
   });
 
   gpsManualBtn?.addEventListener('click', () => {
@@ -225,7 +256,7 @@ const weathers = ['sunny','cloudy','overcast','light_rain','heavy_rain','fog','s
     if (!form || !submitBtn || !btnLabel) return;
     errBox?.classList.add('hidden');
 
-    if (!photo) {
+    if (photos.length === 0) {
       if (errBox) { errBox.textContent = (document.documentElement.lang === 'es') ? 'Se requiere al menos una foto.' : 'At least one photo is required.'; errBox.classList.remove('hidden'); }
       return;
     }
@@ -249,12 +280,12 @@ const weathers = ['sunny','cloudy','overcast','light_rain','heavy_rain','fog','s
       id: crypto.randomUUID(),
       observerRef: ref,
       createdAt: new Date().toISOString(),
-      photos: [{
-        id: photo.blobId,
+      photos: photos.map(p => ({
+        id: p.blobId,
         mediaType: 'photo',
-        mimeType: photo.file.type,
-        sizeBytes: photo.file.size,
-      }],
+        mimeType: p.file.type,
+        sizeBytes: p.file.size,
+      })),
       primaryPhotoIndex: 0,
       location,
       identification: {
@@ -268,6 +299,7 @@ const weathers = ['sunny','cloudy','overcast','light_rain','heavy_rain','fog','s
       },
       habitat: ((form.elements.namedItem('habitat') as HTMLSelectElement).value || null) as Observation['habitat'],
       weather: ((form.elements.namedItem('weather') as HTMLSelectElement).value || null) as Observation['weather'],
+      evidenceType: ((form.elements.namedItem('evidence_type') as HTMLSelectElement).value || 'direct_sighting') as Observation['evidenceType'],
       notes: ((form.elements.namedItem('notes') as HTMLTextAreaElement).value || null),
       moonPhase: null,
       moonIllumination: null,
@@ -282,14 +314,16 @@ const weathers = ['sunny','cloudy','overcast','light_rain','heavy_rain','fog','s
 
     const db = getDB();
     await requestPersistentStorage();
-    await db.mediaBlobs.put({
-      id: photo.blobId,
-      observation_id: obs.id,
-      blob: photo.file,
-      mime_type: photo.file.type,
-      size_bytes: photo.file.size,
-      uploaded: false,
-    });
+    for (const p of photos) {
+      await db.mediaBlobs.put({
+        id: p.blobId,
+        observation_id: obs.id,
+        blob: p.file,
+        mime_type: p.file.type,
+        size_bytes: p.file.size,
+        uploaded: false,
+      });
+    }
     await db.observations.put({
       id: obs.id,
       observer_kind: ref.kind,

@@ -72,6 +72,14 @@ const tr = t(lang);
       </div>
     </section>
 
+    <!-- Badges (module 08) -->
+    <section id="badges-section" class="hidden mb-8">
+      <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-3">
+        {lang === 'es' ? 'Insignias' : 'Badges'}
+      </h2>
+      <ul id="badges-list" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2"></ul>
+    </section>
+
     <!-- Recent activity feed (module 08) -->
     <section>
       <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-3">
@@ -155,6 +163,38 @@ const tr = t(lang);
     if (statObs) statObs.textContent = String(stats?.total_observations ?? profile.observation_count ?? 0);
     if (statSpecies) statSpecies.textContent = String(stats?.species_count ?? 0);
     if (statRG) statRG.textContent = String(stats?.research_grade_count ?? 0);
+
+    // Badges (only show if the user opted into gamification)
+    if (profile.gamification_opt_in) {
+      const { data: rows } = await supabase
+        .from('user_badges')
+        .select('awarded_at, badges:badge_key(key,name_es,name_en,tier,category)')
+        .eq('user_id', user.id)
+        .is('revoked_at', null)
+        .order('awarded_at', { ascending: false })
+        .limit(40);
+      const earned = (rows ?? []).map(r => r.badges as unknown as { key: string; name_es: string; name_en: string; tier: string; category: string });
+      if (earned.length) {
+        const sec = document.getElementById('badges-section');
+        const list = document.getElementById('badges-list');
+        const isEs2 = document.documentElement.lang === 'es';
+        sec?.classList.remove('hidden');
+        if (list) {
+          const tierColor = (t: string) =>
+            t === 'platinum' ? 'bg-zinc-200 text-zinc-800 dark:bg-zinc-300 dark:text-zinc-900' :
+            t === 'gold'     ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300' :
+            t === 'silver'   ? 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200' :
+                               'bg-orange-50 text-orange-800 dark:bg-orange-900/20 dark:text-orange-300';
+          list.innerHTML = earned.map(b => `
+            <li class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+              <div class="text-xs uppercase tracking-wider mb-1 ${tierColor(b.tier)} inline-block px-1.5 py-0.5 rounded">${b.tier}</div>
+              <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">${isEs2 ? b.name_es : b.name_en}</p>
+              <p class="text-xs text-zinc-500 capitalize">${b.category}</p>
+            </li>
+          `).join('');
+        }
+      }
+    }
 
     // Load activity events (last 20)
     const { data: events } = await supabase
