@@ -13,25 +13,89 @@ Magic link email auth (primary) + optional passkey/WebAuthn. No passwords. Auth 
 
 ## Auth Methods
 
-### 1. Magic Link (primary)
+The sign-in page surfaces all of these in a single component
+(`src/components/SignInForm.astro`), so every method shares one UX:
+
+### 1. Email — magic link **and** numeric OTP code
+
+`signInWithOtp` emails the user both a magic link AND a 6-digit code. The
+UI prompts for the code, with the magic link as a fallback (some inboxes
+strip codes from the body but preserve links).
+
 ```typescript
-// Send magic link
-const { error } = await supabase.auth.signInWithOtp({
-  email: userEmail,
+// Step 1 — request
+await supabase.auth.signInWithOtp({
+  email,
   options: {
-    emailRedirectTo: `${window.location.origin}/auth/callback`,
+    emailRedirectTo: `${window.location.origin}/auth/callback/`,
     shouldCreateUser: true,
-  }
+  },
+});
+// Step 2 — verify the pasted code (no email round-trip)
+await supabase.auth.verifyOtp({ email, token: '123456', type: 'email' });
+```
+
+**Why both?** Magic-link clicks fail on iOS Mail → Safari handoff and
+sometimes get pre-fetched by spam scanners (consuming the token). Code paste
+sidesteps both failures.
+
+### 2. Google OAuth
+
+```typescript
+await supabase.auth.signInWithOAuth({
+  provider: 'google',
+  options: { redirectTo: `${window.location.origin}/auth/callback/` },
 });
 ```
 
-### 2. Passkey / WebAuthn (v0.3+)
+**Dashboard setup:**
+1. Google Cloud Console → APIs & Services → Credentials → Create OAuth 2.0
+   Client ID, type "Web application".
+2. Authorised redirect URI: `https://reppvlqejgoqvitturxp.supabase.co/auth/v1/callback`
+   (Supabase's callback, not ours — Supabase exchanges the Google token and
+   then redirects to *our* callback per `redirectTo`).
+3. Copy the Client ID + Secret.
+4. Supabase dashboard → Authentication → Providers → Google → enable, paste
+   both, save.
+
+### 3. GitHub OAuth
+
 ```typescript
-// Register passkey after first sign-in
-await supabase.auth.mfa.enroll({ factorType: 'webauthn' });
+await supabase.auth.signInWithOAuth({
+  provider: 'github',
+  options: { redirectTo: `${window.location.origin}/auth/callback/` },
+});
 ```
 
-### 3. Guest Mode
+**Dashboard setup:**
+1. GitHub → Settings → Developer Settings → OAuth Apps → New OAuth App.
+2. Authorisation callback URL: `https://reppvlqejgoqvitturxp.supabase.co/auth/v1/callback`
+3. Copy the Client ID + generate a Client Secret.
+4. Supabase dashboard → Authentication → Providers → GitHub → enable, paste,
+   save.
+
+### 4. Passkey / WebAuthn (step-up MFA on this device)
+
+Supabase MFA-style WebAuthn enrolment. Flow:
+- User signs in with email/OAuth (aal1 session).
+- Profile → Security → "Register a passkey on this device" → calls
+  `mfa.enroll({ factorType: 'webauthn' })`, browser prompts for biometric.
+- Subsequent visits: sign-in page shows "Sign in with passkey" button when
+  WebAuthn is supported. Clicking it re-elevates aal1 → aal2 (effectively a
+  passwordless sign-in on this device).
+
+The helpers in `src/lib/auth.ts` handle the b64url ↔ ArrayBuffer dance the
+browser API needs.
+
+**Notes:**
+- This is **not** primary-auth passkey (which would skip email entirely from
+  cold start). Supabase JS doesn't expose that yet — when it lands, we'll add
+  a "primary passkey" mode without needing email.
+- WebAuthn is supported everywhere except Safari < 16.4 and very old Android
+  WebViews. We feature-detect via `passkeySupported()` and hide the button
+  on unsupported browsers.
+
+### 6. Guest Mode
 
 - User can create up to **3 observations** without signing in.
 - Guest observations live **exclusively in Dexie** — they are never written to
@@ -146,6 +210,29 @@ CREATE POLICY "Public read" ON observations
 ```
 
 ---
+
+## Session lifetime ("keep me signed in")
+
+Supabase JWT defaults: 1 h access token, 1 week refresh token. For a
+PWA that's offline-capable and used in the field, this is too short — every
+week-long field trip would force a re-auth. Bump:
+
+**Dashboard → Authentication → Sessions:**
+| Setting | Default | Recommended |
+|---|---|---|
+| JWT expiry (access token) | 3600 s (1 h) | 86400 s (24 h) |
+| Refresh token reuse interval | 10 s | 10 s (leave) |
+| Refresh token expiry | 1 week | 90 days (`7776000` s) |
+| Inactivity timeout | none | none (leave) |
+
+The `auth.refreshToken: true` flag we already pass to `createClient` keeps
+the session alive transparently — users almost never see a sign-in screen
+again on a device they've authed on, until they explicitly sign out or the
+90-day window elapses.
+
+**Sign out from all devices:** the profile/edit page exposes
+`signOut({ scope: 'global' })` which revokes every refresh token for the
+user across all sessions. Use this if a user reports a lost phone.
 
 ## Custom SMTP
 

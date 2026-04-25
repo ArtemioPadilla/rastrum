@@ -93,6 +93,26 @@ const tr = t(lang);
     </div>
     <p id="form-error" class="hidden text-sm text-red-600 dark:text-red-400"></p>
   </form>
+
+  <!-- ── Security ── -->
+  <section class="mt-10 border-t border-zinc-200 dark:border-zinc-800 pt-8">
+    <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-4">
+      {tr.auth.security}
+    </h2>
+    <div class="space-y-3">
+      <button id="passkey-btn" type="button" class="w-full sm:w-auto rounded-lg border border-emerald-600/60 bg-emerald-50 dark:bg-emerald-900/20 px-4 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 disabled:opacity-50">
+        <span data-pk-label>{tr.auth.register_passkey}</span>
+      </button>
+      <p id="passkey-msg" class="hidden text-sm"></p>
+      <p id="passkey-unsupported" class="hidden text-xs text-zinc-500 italic">{tr.auth.passkey_unavailable}</p>
+
+      <div class="pt-2">
+        <button id="signout-all-btn" type="button" class="text-sm text-red-600 dark:text-red-400 hover:underline disabled:opacity-50">
+          <span data-so-label>{tr.auth.sign_out_everywhere}</span>
+        </button>
+      </div>
+    </div>
+  </section>
 </div>
 
 <script>
@@ -190,4 +210,63 @@ const tr = t(lang);
   });
 
   load().catch(console.error);
+
+  // ── Security: passkey + sign-out-everywhere ──
+  const passkeyBtn  = document.getElementById('passkey-btn') as HTMLButtonElement | null;
+  const pkLabel     = passkeyBtn?.querySelector('[data-pk-label]') as HTMLElement | null;
+  const pkMsg       = document.getElementById('passkey-msg');
+  const pkUnsup     = document.getElementById('passkey-unsupported');
+  const soBtn       = document.getElementById('signout-all-btn') as HTMLButtonElement | null;
+  const soLabel     = soBtn?.querySelector('[data-so-label]') as HTMLElement | null;
+
+  const isEsLang = document.documentElement.lang === 'es';
+  const PK_DEFAULT = pkLabel?.textContent ?? 'Register a passkey';
+  const PK_BUSY    = isEsLang ? 'Esperando tu autenticador…' : 'Waiting for your authenticator…';
+  const SO_DEFAULT = soLabel?.textContent ?? 'Sign out everywhere';
+  const SO_BUSY    = isEsLang ? 'Cerrando sesión…' : 'Signing out…';
+
+  // Hide button when WebAuthn isn't supported
+  import('../lib/auth').then(({ passkeySupported }) => {
+    if (!passkeySupported()) {
+      passkeyBtn?.classList.add('hidden');
+      pkUnsup?.classList.remove('hidden');
+    }
+  });
+
+  passkeyBtn?.addEventListener('click', async () => {
+    if (!passkeyBtn || !pkLabel) return;
+    pkMsg?.classList.add('hidden');
+    passkeyBtn.disabled = true;
+    pkLabel.textContent = PK_BUSY;
+    try {
+      const { enrollPasskey } = await import('../lib/auth');
+      const { error } = await enrollPasskey();
+      if (error) throw error;
+      if (pkMsg) {
+        pkMsg.textContent = isEsLang ? '✓ Passkey registrada.' : '✓ Passkey registered.';
+        pkMsg.className = 'text-sm text-emerald-600 dark:text-emerald-400';
+        pkMsg.classList.remove('hidden');
+      }
+    } catch (err) {
+      if (pkMsg) {
+        const m = err instanceof Error ? err.message : String(err);
+        pkMsg.textContent = (isEsLang ? 'No se pudo registrar la passkey: ' : 'Couldn’t register passkey: ') + m;
+        pkMsg.className = 'text-sm text-red-600 dark:text-red-400';
+        pkMsg.classList.remove('hidden');
+      }
+    } finally {
+      passkeyBtn.disabled = false;
+      pkLabel.textContent = PK_DEFAULT;
+    }
+  });
+
+  soBtn?.addEventListener('click', async () => {
+    if (!soBtn || !soLabel) return;
+    if (!confirm(isEsLang ? '¿Cerrar sesión en todos los dispositivos?' : 'Sign out from all devices?')) return;
+    soBtn.disabled = true;
+    soLabel.textContent = SO_BUSY;
+    const { signOutEverywhere } = await import('../lib/auth');
+    await signOutEverywhere();
+    window.location.replace(isEsLang ? '/es/' : '/en/');
+  });
 </script>
