@@ -1,0 +1,184 @@
+---
+/**
+ * Token management UI — list, create and revoke personal API tokens.
+ * See docs/specs/modules/14-user-api-tokens.md
+ */
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import { t as getT } from '../../../i18n/utils';
+
+const lang = 'es';
+const t = getT(lang);
+---
+
+<BaseLayout title={t('tokens.title')} description={t('tokens.desc')}>
+  <main class="mx-auto max-w-2xl px-4 py-10">
+    <h1 class="text-2xl font-bold mb-1">{t('tokens.title')}</h1>
+    <p class="text-sm text-gray-500 mb-8">{t('tokens.desc')}</p>
+
+    <!-- New token banner (shown after creation) -->
+    <div id="new-token-banner" class="hidden mb-6 rounded-lg border border-green-300 bg-green-50 p-4">
+      <p class="text-sm font-semibold text-green-800 mb-2">
+        {t('tokens.copy_now')}
+      </p>
+      <div class="flex items-center gap-2">
+        <code id="new-token-value" class="flex-1 rounded bg-white border px-3 py-2 text-sm font-mono break-all"></code>
+        <button id="copy-btn" class="shrink-0 rounded bg-green-600 px-3 py-2 text-sm text-white hover:bg-green-700">
+          {t('tokens.copy')}
+        </button>
+      </div>
+    </div>
+
+    <!-- Token list -->
+    <section id="token-list" class="mb-8 space-y-3">
+      <div class="animate-pulse text-sm text-gray-400">{t('tokens.loading')}</div>
+    </section>
+
+    <!-- Create form -->
+    <form id="create-form" class="rounded-xl border p-5 space-y-4">
+      <h2 class="font-semibold">{t('tokens.new')}</h2>
+
+      <div>
+        <label class="block text-sm font-medium mb-1" for="token-name">
+          {t('tokens.name_label')}
+        </label>
+        <input
+          id="token-name"
+          type="text"
+          placeholder={t('tokens.name_placeholder')}
+          class="w-full rounded border px-3 py-2 text-sm"
+          maxlength="64"
+          required
+        />
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium mb-1">{t('tokens.scopes_label')}</label>
+        <div class="flex flex-wrap gap-3">
+          {['observe', 'identify', 'export', 'read_all'].map(scope => (
+            <label class="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                name="scope"
+                value={scope}
+                checked={['observe', 'identify', 'export'].includes(scope)}
+              />
+              <code class="text-xs bg-gray-100 px-1 rounded">{scope}</code>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium mb-1" for="token-expires">
+          {t('tokens.expires_label')}
+        </label>
+        <select id="token-expires" class="rounded border px-3 py-2 text-sm">
+          <option value="">{t('tokens.no_expiry')}</option>
+          <option value="30">30 {t('tokens.days')}</option>
+          <option value="90">90 {t('tokens.days')}</option>
+          <option value="365">1 {t('tokens.year')}</option>
+        </select>
+      </div>
+
+      <button
+        type="submit"
+        class="rounded-lg bg-green-700 px-5 py-2 text-sm font-semibold text-white hover:bg-green-800"
+      >
+        {t('tokens.create')}
+      </button>
+    </form>
+  </main>
+</BaseLayout>
+
+<script>
+  import { supabase } from '../../../lib/supabase';
+
+  const TOKENS_URL = `${import.meta.env.PUBLIC_SUPABASE_URL}/functions/v1/tokens`;
+
+  async function getAuthHeader() {
+    const { data } = await supabase.auth.getSession();
+    return `Bearer ${data.session?.access_token ?? ''}`;
+  }
+
+  async function loadTokens() {
+    const res = await fetch(TOKENS_URL, {
+      headers: { Authorization: await getAuthHeader() },
+    });
+    const tokens = await res.json();
+    const list = document.getElementById('token-list')!;
+
+    if (!Array.isArray(tokens) || tokens.length === 0) {
+      list.innerHTML = `<p class="text-sm text-gray-400">No hay tokens todavía.</p>`;
+      return;
+    }
+
+    list.innerHTML = tokens.map((t: Record<string, string>) => `
+      <div class="flex items-center justify-between rounded-lg border px-4 py-3 gap-4">
+        <div class="min-w-0">
+          <p class="font-medium text-sm truncate">${t.name}</p>
+          <p class="text-xs text-gray-400 font-mono">${t.prefix}…</p>
+          <p class="text-xs text-gray-400 mt-0.5">
+            ${t.scopes?.join(', ')} ·
+            ${t.last_used_at ? `Último uso: ${new Date(t.last_used_at).toLocaleDateString()}` : 'Sin usar'}
+            ${t.expires_at ? ` · Expira: ${new Date(t.expires_at).toLocaleDateString()}` : ''}
+          </p>
+        </div>
+        <button
+          data-id="${t.id}"
+          class="revoke-btn shrink-0 rounded border px-3 py-1.5 text-xs text-red-600 border-red-200 hover:bg-red-50"
+        >
+          Revocar
+        </button>
+      </div>
+    `).join('');
+
+    document.querySelectorAll('.revoke-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const id = (e.currentTarget as HTMLElement).dataset.id!;
+        if (!confirm('¿Revocar este token? Esta acción no se puede deshacer.')) return;
+        await fetch(`${TOKENS_URL}/${id}`, {
+          method: 'DELETE',
+          headers: { Authorization: await getAuthHeader() },
+        });
+        loadTokens();
+      });
+    });
+  }
+
+  document.getElementById('create-form')!.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = (document.getElementById('token-name') as HTMLInputElement).value.trim();
+    const scopes = Array.from(document.querySelectorAll<HTMLInputElement>('input[name="scope"]:checked'))
+      .map(el => el.value);
+    const expiresEl = document.getElementById('token-expires') as HTMLSelectElement;
+    const expires_in_days = expiresEl.value ? parseInt(expiresEl.value) : undefined;
+
+    const res = await fetch(TOKENS_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: await getAuthHeader(),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ name, scopes, expires_in_days }),
+    });
+
+    const data = await res.json();
+    if (data.token) {
+      const banner = document.getElementById('new-token-banner')!;
+      const val = document.getElementById('new-token-value')!;
+      val.textContent = data.token;
+      banner.classList.remove('hidden');
+      banner.scrollIntoView({ behavior: 'smooth' });
+
+      document.getElementById('copy-btn')!.onclick = () => {
+        navigator.clipboard.writeText(data.token);
+        (document.getElementById('copy-btn') as HTMLButtonElement).textContent = '✓';
+      };
+
+      (document.getElementById('token-name') as HTMLInputElement).value = '';
+      loadTokens();
+    }
+  });
+
+  loadTokens();
+</script>
