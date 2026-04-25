@@ -284,3 +284,34 @@ Functions: deploy via `gh workflow run deploy-functions.yml -f function=<name>`.
 | R2 bucket settings | https://dash.cloudflare.com/?to=/:account/r2/default/buckets/rastrum-media |
 | Roadmap | https://rastrum.artemiop.com/en/docs/roadmap/ |
 | Tasks | https://rastrum.artemiop.com/en/docs/tasks/ |
+
+---
+
+## Audit / E2E
+
+End-to-end browser tests run via Playwright; performance and a11y budgets
+via Lighthouse CI. Both are wired into GitHub Actions
+(`.github/workflows/e2e.yml`, `.github/workflows/lhci.yml`).
+
+```bash
+npm run test:e2e            # Playwright on chromium + mobile-chrome
+npm run test:e2e:ui         # Playwright UI mode (debug locally)
+npm run test:e2e:mobile     # mobile-chrome project only
+npm run test:lhci           # Lighthouse CI against ./dist
+npm run test:audit          # build + e2e + lhci end-to-end
+```
+
+Reports land in:
+- `playwright-report/` — HTML report, opened with `npx playwright show-report`
+- `test-results/` — failure traces, screenshots, videos
+- `.lighthouseci/` — JSON + HTML for each URL audited
+
+The suite is **intentionally minimal** — smoke + nav + docs + observe form +
+PWA + a11y + mobile + offline. Total runtime under a minute locally on
+chromium. Add tests sparingly; if you need a complex flow, ask whether
+mocking is cheaper than a real test, and skip it if it depends on a real
+Supabase session. See the per-spec comments for what's deliberately out of
+scope (auth flows, identifier cascade, real SW caching).
+
+The Playwright preview server uses port `4329` to avoid colliding with a
+stray `astro dev` on `4321`. Override with `E2E_PORT=…` if needed.

@@ -1,0 +1,55 @@
+name: Lighthouse CI
+
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    # Nightly trend run — uses 3 runs per URL for stable medians.
+    - cron: '13 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lhci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (static site)
+        run: npm run build
+        env:
+          PUBLIC_SUPABASE_URL:       ${{ secrets.PUBLIC_SUPABASE_URL }}
+          PUBLIC_SUPABASE_ANON_KEY:  ${{ secrets.PUBLIC_SUPABASE_ANON_KEY }}
+          PUBLIC_R2_MEDIA_URL:       ${{ secrets.PUBLIC_R2_MEDIA_URL }}
+          PUBLIC_R2_TILES_URL:       ${{ secrets.PUBLIC_R2_TILES_URL }}
+
+      - name: Run Lighthouse CI
+        run: npm run test:lhci
+        env:
+          # 3 runs per URL on nightly, 1 on PRs.
+          LHCI_RUNS: ${{ github.event_name == 'schedule' && '3' || '1' }}
+
+      - name: Upload LHCI artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouseci
+          path: .lighthouseci/
+          retention-days: 14
