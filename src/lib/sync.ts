@@ -117,6 +117,16 @@ async function syncOne(record: ObservationRecord): Promise<void> {
   // 5. Trigger the identify Edge Function async (fire-and-forget; the queue
   //    catches retries). The function does its own DB writes.
   triggerIdentify(record.id).catch(err => console.warn('[rastrum] identify failed', err));
+
+  // 6. Trigger environmental enrichment (lunar / weather). Also fire-and-forget.
+  triggerEnvEnrichment(record.id).catch(err => console.warn('[rastrum] enrich failed', err));
+}
+
+async function triggerEnvEnrichment(observationId: string): Promise<void> {
+  const supabase = getSupabase();
+  await supabase.functions.invoke('enrich-environment', {
+    body: { observation_id: observationId },
+  });
 }
 
 /** Invoke the identify Edge Function for an observation that's freshly synced. */

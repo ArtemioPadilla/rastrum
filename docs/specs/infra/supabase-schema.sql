@@ -535,6 +535,299 @@ CREATE TRIGGER enforce_rg_quality_trigger
   EXECUTE FUNCTION public.enforce_research_grade_quality();
 
 -- ============================================================
+-- STREAKS (v1.0 — module 08)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.user_streaks (
+  user_id             uuid PRIMARY KEY REFERENCES public.users(id) ON DELETE CASCADE,
+  current_days        integer NOT NULL DEFAULT 0,
+  longest_days        integer NOT NULL DEFAULT 0,
+  last_qualifying_day date,
+  grace_used_at       timestamptz,
+  updated_at          timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.user_streaks ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS streaks_self_read ON public.user_streaks;
+CREATE POLICY streaks_self_read ON public.user_streaks FOR SELECT
+  USING ((SELECT auth.uid()) = user_id);
+
+DROP POLICY IF EXISTS streaks_public_read ON public.user_streaks;
+CREATE POLICY streaks_public_read ON public.user_streaks FOR SELECT
+  USING (
+    user_id IN (
+      SELECT id FROM public.users
+      WHERE profile_public = true AND gamification_opt_in = true
+    )
+  );
+
+-- Recompute streak for one user. Called by the nightly Edge Function.
+-- A "qualifying day" = at least one synced observation whose primary
+-- identification has confidence >= 0.4 and is not flagged needs_review.
+CREATE OR REPLACE FUNCTION public.recompute_streak(p_user_id uuid)
+RETURNS void AS $$
+DECLARE
+  qualifying_days date[];
+  cur integer := 0;
+  longest integer := 0;
+  prev date;
+  d date;
+  last_q date;
+  uses_grace boolean := false;
+BEGIN
+  SELECT array_agg(DISTINCT (observed_at AT TIME ZONE 'UTC')::date ORDER BY (observed_at AT TIME ZONE 'UTC')::date DESC)
+  INTO qualifying_days
+  FROM public.observations o
+  JOIN public.identifications i ON i.observation_id = o.id AND i.is_primary
+  WHERE o.observer_id = p_user_id
+    AND o.sync_status = 'synced'
+    AND COALESCE(i.confidence, 0) >= 0.4;
+
+  IF qualifying_days IS NULL THEN
+    INSERT INTO public.user_streaks (user_id, current_days, longest_days, updated_at)
+    VALUES (p_user_id, 0, 0, now())
+    ON CONFLICT (user_id) DO UPDATE SET current_days = 0, updated_at = now();
+    RETURN;
+  END IF;
+
+  last_q := qualifying_days[1];
+  prev := last_q;
+  cur := 1;
+  longest := 1;
+  -- iterate desc-sorted days, allowing one grace miss in any 30-day window
+  FOR i IN 2..array_length(qualifying_days, 1) LOOP
+    d := qualifying_days[i];
+    IF prev - d = 1 THEN
+      cur := cur + 1;
+    ELSIF prev - d = 2 AND NOT uses_grace AND (CURRENT_DATE - prev) <= 30 THEN
+      cur := cur + 1;
+      uses_grace := true;
+    ELSE
+      EXIT;
+    END IF;
+    IF cur > longest THEN longest := cur; END IF;
+    prev := d;
+  END LOOP;
+
+  -- If today's not in the list and yesterday was the most recent, streak is still alive
+  IF (CURRENT_DATE - last_q) > 1 THEN
+    cur := 0;
+  END IF;
+
+  INSERT INTO public.user_streaks (user_id, current_days, longest_days, last_qualifying_day, grace_used_at, updated_at)
+  VALUES (p_user_id, cur, GREATEST(longest, cur), last_q, CASE WHEN uses_grace THEN now() END, now())
+  ON CONFLICT (user_id) DO UPDATE
+    SET current_days = EXCLUDED.current_days,
+        longest_days = GREATEST(public.user_streaks.longest_days, EXCLUDED.current_days, EXCLUDED.longest_days),
+        last_qualifying_day = EXCLUDED.last_qualifying_day,
+        grace_used_at = EXCLUDED.grace_used_at,
+        updated_at = now();
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================================
+-- BIOBLITZ EVENTS (v1.0 — module 08)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.events (
+  id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  slug            text UNIQUE NOT NULL,
+  name            text NOT NULL,
+  description_md  text,
+  organiser_id    uuid REFERENCES public.users(id) ON DELETE SET NULL,
+  starts_at       timestamptz NOT NULL,
+  ends_at         timestamptz NOT NULL,
+  region_geojson  geography(Polygon, 4326) NOT NULL,
+  kind            text NOT NULL DEFAULT 'bioblitz'
+                  CHECK (kind IN ('bioblitz','survey','challenge')),
+  created_at      timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_events_time   ON events(starts_at, ends_at);
+CREATE INDEX IF NOT EXISTS idx_events_region ON events USING GIST(region_geojson);
+
+ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS events_public_read ON public.events;
+CREATE POLICY events_public_read ON public.events FOR SELECT USING (true);
+
+-- ============================================================
+-- SOCIAL: follows + comments + watchlists (v1.0 — module 08)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.follows (
+  follower_id  uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  followee_id  uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (follower_id, followee_id),
+  CHECK (follower_id <> followee_id)
+);
+
+ALTER TABLE public.follows ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS follows_self_manage ON public.follows;
+CREATE POLICY follows_self_manage ON public.follows FOR ALL
+  USING ((SELECT auth.uid()) = follower_id);
+
+DROP POLICY IF EXISTS follows_public_read ON public.follows;
+CREATE POLICY follows_public_read ON public.follows FOR SELECT
+  USING (
+    follower_id IN (SELECT id FROM public.users WHERE profile_public = true)
+    OR followee_id IN (SELECT id FROM public.users WHERE profile_public = true)
+  );
+
+CREATE TABLE IF NOT EXISTS public.observation_comments (
+  id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  observation_id  uuid NOT NULL REFERENCES public.observations(id) ON DELETE CASCADE,
+  author_id       uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  body            text NOT NULL CHECK (length(body) BETWEEN 1 AND 2000),
+  helpful_count   integer NOT NULL DEFAULT 0,
+  parent_id       uuid REFERENCES public.observation_comments(id) ON DELETE CASCADE,
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  edited_at       timestamptz,
+  deleted_at      timestamptz
+);
+CREATE INDEX IF NOT EXISTS idx_comments_obs ON observation_comments(observation_id, created_at);
+
+ALTER TABLE public.observation_comments ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS comments_authenticated_insert ON public.observation_comments;
+CREATE POLICY comments_authenticated_insert ON public.observation_comments FOR INSERT
+  TO authenticated
+  WITH CHECK ((SELECT auth.uid()) = author_id);
+
+DROP POLICY IF EXISTS comments_self_update ON public.observation_comments;
+CREATE POLICY comments_self_update ON public.observation_comments FOR UPDATE
+  USING ((SELECT auth.uid()) = author_id);
+
+DROP POLICY IF EXISTS comments_public_read ON public.observation_comments;
+CREATE POLICY comments_public_read ON public.observation_comments FOR SELECT
+  USING (
+    deleted_at IS NULL
+    AND observation_id IN (SELECT id FROM public.observations WHERE sync_status = 'synced')
+  );
+
+CREATE TABLE IF NOT EXISTS public.watchlists (
+  id            uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id       uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  taxon_id      uuid REFERENCES public.taxa(id) ON DELETE CASCADE,
+  scientific_name text,                       -- denorm fallback when taxon not linked
+  radius_km     integer DEFAULT 50 CHECK (radius_km BETWEEN 1 AND 500),
+  digest_only   boolean NOT NULL DEFAULT true,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  CHECK (taxon_id IS NOT NULL OR scientific_name IS NOT NULL)
+);
+CREATE INDEX IF NOT EXISTS idx_watchlists_user ON watchlists(user_id);
+
+ALTER TABLE public.watchlists ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS watchlists_self ON public.watchlists;
+CREATE POLICY watchlists_self ON public.watchlists FOR ALL
+  USING ((SELECT auth.uid()) = user_id);
+
+-- ============================================================
+-- BADGE PREDICATES (v0.5 — called from award-badges Edge Function)
+-- ============================================================
+CREATE OR REPLACE FUNCTION public.badge_eligible_kingdom_first(p_kingdom text)
+RETURNS SETOF uuid AS $$
+  SELECT DISTINCT o.observer_id
+  FROM public.observations o
+  JOIN public.identifications i ON i.observation_id = o.id AND i.is_primary
+  JOIN public.taxa t ON t.id = i.taxon_id
+  WHERE o.sync_status = 'synced' AND t.kingdom = p_kingdom;
+$$ LANGUAGE sql STABLE SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION public.badge_eligible_rg_count(
+  p_kingdom text DEFAULT NULL, p_class text DEFAULT NULL, p_threshold integer DEFAULT 10
+)
+RETURNS SETOF uuid AS $$
+  SELECT o.observer_id
+  FROM public.observations o
+  JOIN public.identifications i ON i.observation_id = o.id AND i.is_primary AND i.is_research_grade
+  JOIN public.taxa t ON t.id = i.taxon_id
+  WHERE o.sync_status = 'synced'
+    AND (p_kingdom IS NULL OR t.kingdom = p_kingdom)
+    AND (p_class   IS NULL OR t.class   = p_class)
+  GROUP BY o.observer_id
+  HAVING count(*) >= p_threshold;
+$$ LANGUAGE sql STABLE SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION public.badge_eligible_species_count(p_threshold integer)
+RETURNS SETOF uuid AS $$
+  SELECT o.observer_id
+  FROM public.observations o
+  JOIN public.identifications i ON i.observation_id = o.id AND i.is_primary
+  WHERE o.sync_status = 'synced' AND i.taxon_id IS NOT NULL
+  GROUP BY o.observer_id
+  HAVING count(DISTINCT i.taxon_id) >= p_threshold;
+$$ LANGUAGE sql STABLE SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION public.badge_eligible_kingdom_diversity(p_min integer)
+RETURNS SETOF uuid AS $$
+  WITH per_kingdom AS (
+    SELECT o.observer_id, t.kingdom, count(*) AS n
+    FROM public.observations o
+    JOIN public.identifications i ON i.observation_id = o.id AND i.is_primary
+    JOIN public.taxa t ON t.id = i.taxon_id
+    WHERE o.sync_status = 'synced' AND t.kingdom IN ('Plantae','Animalia','Fungi')
+    GROUP BY o.observer_id, t.kingdom
+  )
+  SELECT observer_id
+  FROM per_kingdom
+  WHERE n >= p_min
+  GROUP BY observer_id
+  HAVING count(DISTINCT kingdom) >= 3;
+$$ LANGUAGE sql STABLE SECURITY DEFINER;
+
+-- Permission for the service role to invoke
+GRANT EXECUTE ON FUNCTION public.badge_eligible_kingdom_first(text)            TO service_role;
+GRANT EXECUTE ON FUNCTION public.badge_eligible_rg_count(text,text,integer)    TO service_role;
+GRANT EXECUTE ON FUNCTION public.badge_eligible_species_count(integer)         TO service_role;
+GRANT EXECUTE ON FUNCTION public.badge_eligible_kingdom_diversity(integer)     TO service_role;
+GRANT EXECUTE ON FUNCTION public.recompute_streak(uuid)                        TO service_role;
+
+-- ============================================================
+-- EXPERT-WEIGHTED CONSENSUS (v0.5/v1.0 — module 08)
+-- ============================================================
+-- A community validation contributes 1.0; an expert validation in the
+-- relevant kingdom contributes 3.0. Research-grade fires when the
+-- weighted score for the leading taxon ≥ 2.0 AND ≥ 2 distinct validators.
+CREATE OR REPLACE FUNCTION public.recompute_consensus(p_observation_id uuid)
+RETURNS void AS $$
+DECLARE
+  winning_taxon uuid;
+  winning_score numeric;
+  validator_count integer;
+BEGIN
+  WITH weighted AS (
+    SELECT i.taxon_id,
+           SUM(CASE WHEN u.is_expert AND t.kingdom = ANY(u.expert_taxa) THEN 3.0 ELSE 1.0 END) AS score,
+           count(DISTINCT i.validated_by) AS validators
+    FROM public.identifications i
+    JOIN public.taxa t ON t.id = i.taxon_id
+    LEFT JOIN public.users u ON u.id = i.validated_by
+    WHERE i.observation_id = p_observation_id
+      AND i.taxon_id IS NOT NULL
+      AND i.validated_by IS NOT NULL
+    GROUP BY i.taxon_id
+  )
+  SELECT taxon_id, score, validators
+  INTO winning_taxon, winning_score, validator_count
+  FROM weighted
+  ORDER BY score DESC
+  LIMIT 1;
+
+  IF winning_taxon IS NULL THEN RETURN; END IF;
+
+  IF winning_score >= 2.0 AND validator_count >= 2 THEN
+    UPDATE public.identifications
+       SET is_research_grade = true
+     WHERE observation_id = p_observation_id AND taxon_id = winning_taxon AND is_primary;
+  END IF;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION public.recompute_consensus(uuid) TO service_role;
+
+-- ============================================================
 -- ACTIVITY FEED (v0.3 — module 08)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS public.activity_events (
