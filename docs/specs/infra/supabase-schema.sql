@@ -977,8 +977,7 @@ CREATE TABLE IF NOT EXISTS public.user_api_tokens (
 
 CREATE INDEX IF NOT EXISTS idx_tokens_user ON public.user_api_tokens(user_id)
   WHERE revoked_at IS NULL;
-CREATE INDEX IF NOT EXISTS idx_tokens_hash ON public.user_api_tokens(token_hash)
-  WHERE revoked_at IS NULL;
+-- Note: idx_tokens_hash not needed — token_hash UNIQUE constraint creates its own index.
 
 ALTER TABLE public.user_api_tokens ENABLE ROW LEVEL SECURITY;
 

@@ -1,10 +1,10 @@
 /**
- * /functions/v1/api/observe — Submit observation via personal API token.
- * /functions/v1/api/identify — Identify species via personal API token.
- * /functions/v1/api/observations — List own observations.
- * /functions/v1/api/export — Export Darwin Core CSV.
+ * /functions/v1/api/* — REST API authenticated via personal API tokens (rst_xxxx).
  *
- * Auth: Authorization: Bearer rst_xxxx  (personal API token)
+ * POST /api/observe       → submit observation (scope: observe)
+ * POST /api/identify      → photo ID cascade (scope: identify)
+ * GET  /api/observations  → list own observations (scope: observe)
+ * GET  /api/export        → export Darwin Core CSV (scope: export)
  *
  * See docs/specs/modules/14-user-api-tokens.md
  */
@@ -17,16 +17,10 @@ const corsHeaders = {
 };
 
 async function sha256(text: string): Promise<string> {
-  const buf = await crypto.subtle.digest(
-    'SHA-256',
-    new TextEncoder().encode(text)
-  );
-  return Array.from(new Uint8Array(buf))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-/** Verify a personal API token. Returns { user_id, scopes } or null. */
 async function verifyToken(
   token: string,
   requiredScope: string,
@@ -39,15 +33,14 @@ async function verifyToken(
     .select('id, user_id, scopes, expires_at')
     .eq('token_hash', hash)
     .is('revoked_at', null)
-    .single();
+    .maybeSingle();
 
   if (error || !data) return null;
   if (data.expires_at && new Date(data.expires_at) < new Date()) return null;
-  if (!data.scopes.includes(requiredScope)) return null;
+  if (!Array.isArray(data.scopes) || !data.scopes.includes(requiredScope)) return null;
 
-  // Update last_used_at (fire and forget — don't await)
-  supabase
-    .from('user_api_tokens')
+  // Update last_used_at — fire and forget
+  supabase.from('user_api_tokens')
     .update({ last_used_at: new Date().toISOString() })
     .eq('id', data.id);
 
@@ -55,9 +48,7 @@ async function verifyToken(
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
-  }
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
@@ -66,13 +57,13 @@ Deno.serve(async (req: Request) => {
 
   const token = req.headers.get('Authorization')?.replace('Bearer ', '');
   if (!token?.startsWith('rst_')) {
-    return json({ error: 'Missing or invalid API token. Use Authorization: Bearer rst_...' }, 401);
+    return json({ error: 'Missing or invalid API token. Use: Authorization: Bearer rst_...' }, 401);
   }
 
   const url = new URL(req.url);
-  const path = url.pathname.split('/api/')[1] ?? ''; // 'observe' | 'identify' | 'observations' | 'export'
+  const path = url.pathname.split('/api/')[1] ?? '';
 
-  // ── POST /api/observe ──────────────────────────────────────────────────────
+  // ── POST /api/observe ────────────────────────────────────────────────────
   if (req.method === 'POST' && path === 'observe') {
     const auth = await verifyToken(token, 'observe', supabase);
     if (!auth) return json({ error: 'Unauthorized or insufficient scope' }, 401);
@@ -80,27 +71,17 @@ Deno.serve(async (req: Request) => {
     const body = await req.json().catch(() => null);
     if (!body) return json({ error: 'Invalid JSON body' }, 400);
 
-    const {
-      scientific_name,
-      lat,
-      lng,
-      observed_at,
-      notes,
-      photo_url,
-      habitat,
-      evidence_type = 'direct_sighting',
-    } = body;
+    const { lat, lng, observed_at, notes, photo_url, habitat, evidence_type = 'direct_sighting' } = body;
+    if (lat == null || lng == null) return json({ error: 'lat and lng are required' }, 400);
 
-    if (!scientific_name || lat == null || lng == null) {
-      return json({ error: 'scientific_name, lat, and lng are required' }, 400);
-    }
-
-    const { data, error } = await supabase
+    // observations table has no scientific_name — insert bare observation,
+    // then create an identification row if a name was supplied.
+    const { data: obs, error: obsErr } = await supabase
       .from('observations')
       .insert({
         observer_id: auth.user_id,
-        scientific_name,
-        location: `POINT(${lng} ${lat})`,
+        // PostGIS geography: SRID=4326;POINT(lng lat)
+        location: `SRID=4326;POINT(${lng} ${lat})`,
         observed_at: observed_at ?? new Date().toISOString(),
         notes,
         habitat,
@@ -108,25 +89,36 @@ Deno.serve(async (req: Request) => {
         app_version: 'api/v1',
         sync_status: 'synced',
       })
-      .select('id, scientific_name, observed_at, created_at')
+      .select('id, observed_at, created_at')
       .single();
 
-    if (error) return json({ error: error.message }, 500);
+    if (obsErr) return json({ error: obsErr.message }, 500);
+
+    // Attach identification if scientific_name provided
+    if (body.scientific_name && obs?.id) {
+      await supabase.from('identifications').insert({
+        observation_id: obs.id,
+        identifier_id: auth.user_id,
+        scientific_name: body.scientific_name,
+        id_source: 'human',
+        confidence: 1.0,
+      });
+    }
 
     // Attach photo if provided
-    if (photo_url && data?.id) {
+    if (photo_url && obs?.id) {
       await supabase.from('media_files').insert({
-        observation_id: data.id,
+        observation_id: obs.id,
         url: photo_url,
         media_type: 'photo',
         is_primary: true,
       });
     }
 
-    return json(data, 201);
+    return json(obs, 201);
   }
 
-  // ── POST /api/identify ─────────────────────────────────────────────────────
+  // ── POST /api/identify ───────────────────────────────────────────────────
   if (req.method === 'POST' && path === 'identify') {
     const auth = await verifyToken(token, 'identify', supabase);
     if (!auth) return json({ error: 'Unauthorized or insufficient scope' }, 401);
@@ -134,7 +126,6 @@ Deno.serve(async (req: Request) => {
     const body = await req.json().catch(() => null);
     if (!body?.image_url) return json({ error: 'image_url is required' }, 400);
 
-    // Delegate to existing identify Edge Function
     const identifyRes = await fetch(
       `${Deno.env.get('SUPABASE_URL')}/functions/v1/identify`,
       {
@@ -145,9 +136,7 @@ Deno.serve(async (req: Request) => {
         },
         body: JSON.stringify({
           image_url: body.image_url,
-          location: body.lat != null
-            ? { lat: body.lat, lng: body.lng }
-            : undefined,
+          location: body.lat != null ? { lat: body.lat, lng: body.lng } : undefined,
           user_hint: body.user_hint,
         }),
       }
@@ -157,7 +146,7 @@ Deno.serve(async (req: Request) => {
     return json(result, identifyRes.status);
   }
 
-  // ── GET /api/observations ──────────────────────────────────────────────────
+  // ── GET /api/observations ────────────────────────────────────────────────
   if (req.method === 'GET' && path === 'observations') {
     const auth = await verifyToken(token, 'observe', supabase);
     if (!auth) return json({ error: 'Unauthorized or insufficient scope' }, 401);
@@ -169,9 +158,9 @@ Deno.serve(async (req: Request) => {
     let q = supabase
       .from('observations')
       .select(`
-        id, scientific_name, observed_at, notes, habitat, evidence_type,
-        location, created_at,
-        media_files(url, is_primary)
+        id, observed_at, notes, habitat, evidence_type, created_at,
+        media_files(url, is_primary),
+        identifications(scientific_name, confidence, id_source)
       `)
       .eq('observer_id', auth.user_id)
       .order('observed_at', { ascending: false })
@@ -181,10 +170,10 @@ Deno.serve(async (req: Request) => {
 
     const { data, error } = await q;
     if (error) return json({ error: error.message }, 500);
-    return json(data);
+    return json(data ?? []);
   }
 
-  // ── GET /api/export ────────────────────────────────────────────────────────
+  // ── GET /api/export ──────────────────────────────────────────────────────
   if (req.method === 'GET' && path === 'export') {
     const auth = await verifyToken(token, 'export', supabase);
     if (!auth) return json({ error: 'Unauthorized or insufficient scope' }, 401);
@@ -194,8 +183,8 @@ Deno.serve(async (req: Request) => {
     const { data, error } = await supabase
       .from('observations')
       .select(`
-        id, scientific_name, observed_at, notes, habitat,
-        location, created_at, app_version
+        id, observed_at, notes, habitat, location,
+        identifications(scientific_name, confidence, id_source)
       `)
       .eq('observer_id', auth.user_id)
       .order('observed_at', { ascending: false });
@@ -206,23 +195,29 @@ Deno.serve(async (req: Request) => {
       const header = [
         'occurrenceID', 'scientificName', 'eventDate',
         'decimalLatitude', 'decimalLongitude',
-        'habitat', 'occurrenceRemarks', 'basisOfRecord',
+        'habitat', 'occurrenceRemarks', 'basisOfRecord', 'identificationSource',
       ].join(',');
 
       const rows = (data ?? []).map(row => {
-        // PostGIS point → lat/lng
-        const match = (row.location as string)?.match(/POINT\(([^ ]+) ([^)]+)\)/);
+        // PostGIS geography → lat/lng
+        const match = (row.location as string)
+          ?.match(/POINT\(([^ ]+)\s+([^)]+)\)/);
         const lng = match ? match[1] : '';
         const lat = match ? match[2] : '';
+        // Primary identification (highest confidence)
+        const ids = Array.isArray(row.identifications) ? row.identifications : [];
+        const primary = ids.sort((a: {confidence: number}, b: {confidence: number}) =>
+          (b.confidence ?? 0) - (a.confidence ?? 0))[0];
         return [
           row.id,
-          `"${row.scientific_name}"`,
+          `"${(primary?.scientific_name ?? '').replace(/"/g, '""')}"`,
           row.observed_at,
           lat,
           lng,
           row.habitat ?? '',
           `"${(row.notes ?? '').replace(/"/g, '""')}"`,
           'HumanObservation',
+          primary?.id_source ?? '',
         ].join(',');
       });
 

@@ -74,39 +74,59 @@ const t = getT(lang);
     return `Bearer ${data.session?.access_token ?? ''}`;
   }
 
+  function buildTokenRow(t: Record<string, any>): HTMLElement {
+    const row = document.createElement('div');
+    row.className = 'flex items-center justify-between rounded-lg border px-4 py-3 gap-4';
+    const content = document.createElement('div');
+    content.className = 'min-w-0';
+    const name = document.createElement('p');
+    name.className = 'font-medium text-sm truncate';
+    name.textContent = t.name ?? '';
+    const prefix = document.createElement('p');
+    prefix.className = 'text-xs text-gray-400 font-mono';
+    prefix.textContent = `${t.prefix ?? ''}…`;
+    const meta = document.createElement('p');
+    meta.className = 'text-xs text-gray-400 mt-0.5';
+    const scopes = Array.isArray(t.scopes) ? t.scopes.join(', ') : '';
+    const lastUsed = t.last_used_at
+      ? `Last used: ${new Date(t.last_used_at).toLocaleDateString()}`
+      : 'Never used';
+    const expires = t.expires_at ? ` · Expires: ${new Date(t.expires_at).toLocaleDateString()}` : '';
+    meta.textContent = `${scopes} · ${lastUsed}${expires}`;
+    content.append(name, prefix, meta);
+    const btn = document.createElement('button');
+    btn.dataset.id = t.id ?? '';
+    btn.className = 'revoke-btn shrink-0 rounded border px-3 py-1.5 text-xs text-red-600 border-red-200 hover:bg-red-50';
+    btn.textContent = 'Revoke';
+    btn.addEventListener('click', async () => {
+      if (!confirm('Revoke this token? This cannot be undone.')) return;
+      const r = await fetch(`${TOKENS_URL}/${t.id}`, { method: 'DELETE', headers: { Authorization: await getAuthHeader() } });
+      if (!r.ok) { alert('Failed to revoke token.'); return; }
+      loadTokens();
+    });
+    row.append(content, btn);
+    return row;
+  }
+
   async function loadTokens() {
-    const res = await fetch(TOKENS_URL, { headers: { Authorization: await getAuthHeader() } });
-    const tokens = await res.json();
     const list = document.getElementById('token-list')!;
-    if (!Array.isArray(tokens) || tokens.length === 0) {
-      list.innerHTML = `<p class="text-sm text-gray-400">No tokens yet.</p>`;
+    const res = await fetch(TOKENS_URL, { headers: { Authorization: await getAuthHeader() } });
+    if (!res.ok) {
+      const p = document.createElement('p');
+      p.className = 'text-sm text-red-500';
+      p.textContent = `Error loading tokens (${res.status}). Make sure you are signed in.`;
+      list.replaceChildren(p);
       return;
     }
-    list.innerHTML = tokens.map((t: Record<string, string>) => `
-      <div class="flex items-center justify-between rounded-lg border px-4 py-3 gap-4">
-        <div class="min-w-0">
-          <p class="font-medium text-sm truncate">${t.name}</p>
-          <p class="text-xs text-gray-400 font-mono">${t.prefix}…</p>
-          <p class="text-xs text-gray-400 mt-0.5">
-            ${t.scopes?.join(', ')} ·
-            ${t.last_used_at ? `Last used: ${new Date(t.last_used_at).toLocaleDateString()}` : 'Never used'}
-            ${t.expires_at ? ` · Expires: ${new Date(t.expires_at).toLocaleDateString()}` : ''}
-          </p>
-        </div>
-        <button data-id="${t.id}"
-          class="revoke-btn shrink-0 rounded border px-3 py-1.5 text-xs text-red-600 border-red-200 hover:bg-red-50">
-          Revoke
-        </button>
-      </div>
-    `).join('');
-    document.querySelectorAll('.revoke-btn').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        const id = (e.currentTarget as HTMLElement).dataset.id!;
-        if (!confirm('Revoke this token? This cannot be undone.')) return;
-        await fetch(`${TOKENS_URL}/${id}`, { method: 'DELETE', headers: { Authorization: await getAuthHeader() } });
-        loadTokens();
-      });
-    });
+    const tokens = await res.json();
+    if (!Array.isArray(tokens) || tokens.length === 0) {
+      const p = document.createElement('p');
+      p.className = 'text-sm text-gray-400';
+      p.textContent = 'No tokens yet.';
+      list.replaceChildren(p);
+      return;
+    }
+    list.replaceChildren(...tokens.map(buildTokenRow));
   }
 
   document.getElementById('create-form')!.addEventListener('submit', async (e) => {

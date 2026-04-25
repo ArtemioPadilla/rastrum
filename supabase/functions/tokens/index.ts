@@ -41,17 +41,15 @@ Deno.serve(async (req: Request) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   );
 
-  // Authenticate caller via session JWT
   const jwt = req.headers.get('Authorization')?.replace('Bearer ', '');
   if (!jwt) return json({ error: 'Missing Authorization header' }, 401);
 
-  const { data: { user }, error: authErr } =
-    await supabase.auth.getUser(jwt);
+  const { data: { user }, error: authErr } = await supabase.auth.getUser(jwt);
   if (authErr || !user) return json({ error: 'Unauthorized' }, 401);
 
   const url = new URL(req.url);
-  const segments = url.pathname.split('/').filter(Boolean); // ['tokens', ':id']
-  const tokenId = segments[1]; // optional
+  const segments = url.pathname.split('/').filter(Boolean);
+  const tokenId = segments[segments.length - 1] !== 'tokens' ? segments[segments.length - 1] : undefined;
 
   // ── GET /tokens ── list own tokens
   if (req.method === 'GET') {
@@ -63,7 +61,7 @@ Deno.serve(async (req: Request) => {
       .order('created_at', { ascending: false });
 
     if (error) return json({ error: error.message }, 500);
-    return json(data);
+    return json(data ?? []);
   }
 
   // ── POST /tokens ── create new token
@@ -75,7 +73,10 @@ Deno.serve(async (req: Request) => {
       expires_in_days,
     } = body;
 
-    // Validate scopes
+    // Validate scopes — must be array of strings
+    if (!Array.isArray(scopes) || !scopes.every((s): s is string => typeof s === 'string')) {
+      return json({ error: 'scopes must be an array of strings' }, 400);
+    }
     const ALLOWED_SCOPES = ['observe', 'identify', 'export', 'read_all'];
     const invalidScopes = scopes.filter((s: string) => !ALLOWED_SCOPES.includes(s));
     if (invalidScopes.length > 0) {
@@ -84,7 +85,7 @@ Deno.serve(async (req: Request) => {
 
     const raw = generateToken();
     const token_hash = await sha256(raw);
-    const prefix = raw.slice(0, 12); // "rst_a1b2c3d4"
+    const prefix = raw.slice(0, 12);
 
     const expires_at = expires_in_days
       ? new Date(Date.now() + expires_in_days * 86_400_000).toISOString()
@@ -92,32 +93,28 @@ Deno.serve(async (req: Request) => {
 
     const { data, error } = await supabase
       .from('user_api_tokens')
-      .insert({
-        user_id: user.id,
-        name,
-        token_hash,
-        prefix,
-        scopes,
-        expires_at,
-      })
+      .insert({ user_id: user.id, name, token_hash, prefix, scopes, expires_at })
       .select('id, name, prefix, scopes, expires_at, created_at')
       .single();
 
     if (error) return json({ error: error.message }, 500);
-
     // Return raw token ONCE — never stored, never logged
     return json({ ...data, token: raw }, 201);
   }
 
   // ── DELETE /tokens/:id ── revoke
   if (req.method === 'DELETE' && tokenId) {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('user_api_tokens')
       .update({ revoked_at: new Date().toISOString() })
       .eq('id', tokenId)
-      .eq('user_id', user.id); // ensure ownership
+      .eq('user_id', user.id)   // ownership check
+      .is('revoked_at', null)   // already-revoked guard
+      .select('id')
+      .maybeSingle();
 
     if (error) return json({ error: error.message }, 500);
+    if (!data) return json({ error: 'Token not found or already revoked' }, 404);
     return json({ revoked: true });
   }
 
