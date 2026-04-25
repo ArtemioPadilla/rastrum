@@ -517,6 +517,7 @@ const weatherLabels = (tr.observe as any).weather_options as Record<string,strin
   async function getLiveGPS(): Promise<void> {
     if (!navigator.geolocation) return;
     return new Promise<void>((resolve) => {
+      // First pass: quick low-accuracy fix (coarse network location)
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           location = {
@@ -527,10 +528,27 @@ const weatherLabels = (tr.observe as any).weather_options as Record<string,strin
             capturedFrom: 'gps',
           };
           paintLocation();
-          resolve();
+          // Second pass: refine with high-accuracy GPS (up to 30s)
+          navigator.geolocation.getCurrentPosition(
+            (pos2) => {
+              if (pos2.coords.accuracy < (location?.accuracyM ?? 9999)) {
+                location = {
+                  lat: pos2.coords.latitude,
+                  lng: pos2.coords.longitude,
+                  accuracyM: pos2.coords.accuracy,
+                  altitudeM: pos2.coords.altitude,
+                  capturedFrom: 'gps',
+                };
+                paintLocation();
+              }
+              resolve();
+            },
+            () => resolve(),
+            { enableHighAccuracy: true, timeout: 30_000, maximumAge: 0 }
+          );
         },
         () => resolve(),
-        { enableHighAccuracy: true, timeout: 10_000, maximumAge: 20_000 }
+        { enableHighAccuracy: false, timeout: 8_000, maximumAge: 60_000 }
       );
     });
   }
