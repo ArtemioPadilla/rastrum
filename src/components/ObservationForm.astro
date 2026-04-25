@@ -19,6 +19,24 @@ const weatherLabels = (tr.observe as any).weather_options as Record<string,strin
   <h1 class="text-2xl font-bold tracking-tight mb-6">{tr.observe.title}</h1>
 
   <form id="obs-form" class="space-y-5" novalidate>
+
+    <!-- WebLLM download warning — shown once before first local AI use -->
+    <div id="webllm-warning" class="hidden rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 p-3">
+      <p class="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-1">🧠 {isEs ? 'IA local — primera descarga' : 'Local AI — first download'}</p>
+      <p class="text-sm text-amber-700 dark:text-amber-400">
+        {isEs
+          ? 'Rastrum usa IA en tu dispositivo para identificar especies. La primera vez descarga ~2.4 GB. Tu foto nunca sale de tu celular.'
+          : 'Rastrum uses on-device AI to identify species. First use downloads ~2.4 GB. Your photo never leaves your device.'}
+      </p>
+      <div class="flex gap-2 mt-2">
+        <button id="webllm-ok" class="rounded bg-amber-700 px-3 py-1.5 text-xs text-white hover:bg-amber-800">
+          {isEs ? 'Entendido, continuar' : 'Got it, continue'}
+        </button>
+        <button id="webllm-skip" class="rounded border px-3 py-1.5 text-xs text-amber-700 border-amber-300 hover:bg-amber-100">
+          {isEs ? 'Solo usar PlantNet' : 'Use PlantNet only'}
+        </button>
+      </div>
+    </div>
     <!-- Photos (multi) -->
     <div>
       <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">{tr.observe.photo_label}</label>
@@ -160,6 +178,26 @@ const weatherLabels = (tr.observe as any).weather_options as Record<string,strin
   import type { Observation, ObserverRef } from '../lib/types';
 
   const form         = document.getElementById('obs-form') as HTMLFormElement | null;
+
+  // WebLLM download warning — show once before first local AI use
+  const webllmWarning = document.getElementById('webllm-warning');
+  const webllmOk      = document.getElementById('webllm-ok');
+  const webllmSkip    = document.getElementById('webllm-skip');
+  const { hasShownLocalAIDownloadWarning, markLocalAIDownloadWarningShown } = await import('../lib/sync');
+  const LOCAL_AI_OPTIN = 'rastrum.localAiOptIn';
+
+  if (!hasShownLocalAIDownloadWarning() && localStorage.getItem(LOCAL_AI_OPTIN) !== 'false') {
+    webllmWarning?.classList.remove('hidden');
+  }
+  webllmOk?.addEventListener('click', () => {
+    markLocalAIDownloadWarningShown();
+    webllmWarning?.classList.add('hidden');
+  });
+  webllmSkip?.addEventListener('click', () => {
+    localStorage.setItem(LOCAL_AI_OPTIN, 'false');
+    markLocalAIDownloadWarningShown();
+    webllmWarning?.classList.add('hidden');
+  });
   const cameraInput  = document.getElementById('camera-input') as HTMLInputElement | null;
   const galleryInput = document.getElementById('gallery-input') as HTMLInputElement | null;
   const photoGrid    = document.getElementById('photo-grid');
@@ -518,13 +556,21 @@ const weatherLabels = (tr.observe as any).weather_options as Record<string,strin
       updated_at: obs.createdAt,
     });
 
-    // Attempt immediate sync if online; otherwise it'll flush on next online event
+    // Attempt immediate sync if online; otherwise it'll flush on next online event.
+    // Use a timeout to prevent hanging indefinitely if Edge Functions are unavailable.
     let syncedNow = false;
     if (ref.kind === 'user' && navigator.onLine) {
       try {
-        const res = await syncOutbox();
+        const syncPromise = syncOutbox();
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('sync timeout')), 15_000)
+        );
+        const res = await Promise.race([syncPromise, timeoutPromise]);
         syncedNow = res.synced > 0;
-      } catch { /* ignore — row stays pending */ }
+      } catch (err) {
+        console.warn('[rastrum] sync failed or timed out:', err);
+        /* ignore — row stays pending, will retry on next online event */
+      }
     }
 
     submitBtn.disabled = false;
