@@ -54,6 +54,40 @@ const weatherLabels = (tr.observe as any).weather_options as Record<string,strin
       <p class="mt-1 text-xs text-zinc-500">{tr.observe.photo_hint}</p>
     </div>
 
+    <!-- Identification block -->
+    <div id="id-block">
+      <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">{tr.observe.id_label ?? (isEs ? 'Identificación' : 'Identification')}</label>
+
+      <!-- Spinner shown while PlantNet is running -->
+      <div id="id-spinner" class="hidden flex items-center gap-2 text-sm text-zinc-500 mb-2">
+        <svg class="animate-spin h-4 w-4 text-emerald-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+        </svg>
+        <span id="id-spinner-label">{isEs ? 'Identificando con PlantNet…' : 'Identifying with PlantNet…'}</span>
+      </div>
+
+      <!-- Result chip -->
+      <div id="id-result" class="hidden mb-2 flex items-center gap-2 flex-wrap">
+        <span id="id-name" class="font-medium text-sm italic text-emerald-800 dark:text-emerald-300"></span>
+        <span id="id-confidence" class="text-xs text-zinc-500"></span>
+        <span id="id-source" class="text-xs bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded"></span>
+        <button id="id-clear" type="button" class="text-xs text-zinc-400 hover:text-red-500 ml-auto">{isEs ? 'Cambiar' : 'Change'}</button>
+      </div>
+
+      <!-- Manual input (always available, pre-filled by cascade) -->
+      <input
+        id="id-scientific-name"
+        name="scientific_name"
+        type="text"
+        placeholder={isEs ? 'Nombre científico (opcional)' : 'Scientific name (optional)'}
+        class="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm"
+        autocomplete="off"
+        spellcheck={false}
+      />
+      <p class="mt-1 text-xs text-zinc-500">{isEs ? 'PlantNet identifica automáticamente al subir la foto. Puedes corregirlo aquí.' : 'PlantNet identifies automatically on photo upload. Correct it here if needed.'}</p>
+    </div>
+
     <!-- Audio -->
     <div>
       <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">{tr.observe.audio_label}</label>
@@ -262,9 +296,83 @@ const weatherLabels = (tr.observe as any).weather_options as Record<string,strin
     });
   }
 
+  // ── Identification block ──────────────────────────────────────────────
+  const idSpinner     = document.getElementById('id-spinner');
+  const idSpinnerLbl  = document.getElementById('id-spinner-label');
+  const idResult      = document.getElementById('id-result');
+  const idName        = document.getElementById('id-name');
+  const idConfidence  = document.getElementById('id-confidence');
+  const idSource      = document.getElementById('id-source');
+  const idClear       = document.getElementById('id-clear');
+  const idInput       = document.getElementById('id-scientific-name') as HTMLInputElement | null;
+  const isEs          = document.documentElement.lang === 'es';
+
+  let currentIdentification: { scientific_name: string; confidence: number; source: string } | null = null;
+
+  function showIdResult(name: string, confidence: number, source: string) {
+    currentIdentification = { scientific_name: name, confidence, source };
+    if (idInput) idInput.value = name;
+    if (idName) idName.textContent = name;
+    if (idConfidence) idConfidence.textContent = `${Math.round(confidence * 100)}%`;
+    if (idSource) idSource.textContent = source;
+    idResult?.classList.remove('hidden');
+    idSpinner?.classList.add('hidden');
+  }
+
+  function clearIdResult() {
+    currentIdentification = null;
+    if (idInput) idInput.value = '';
+    idResult?.classList.add('hidden');
+    idSpinner?.classList.add('hidden');
+  }
+
+  idClear?.addEventListener('click', clearIdResult);
+
+  async function triggerClientIdentify(file: File) {
+    idSpinner?.classList.remove('hidden');
+    idResult?.classList.add('hidden');
+    if (idSpinnerLbl) idSpinnerLbl.textContent = isEs ? 'Identificando con PlantNet…' : 'Identifying with PlantNet…';
+
+    try {
+      const PLANTNET_KEY = (window as any).__RASTRUM_PLANTNET_KEY__ ?? '';
+      if (!PLANTNET_KEY) {
+        idSpinner?.classList.add('hidden');
+        return; // No key available client-side — server will identify post-sync
+      }
+
+      const form = new FormData();
+      form.append('images', file);
+      form.append('organs', 'auto');
+
+      const res = await fetch(
+        `https://my-api.plantnet.org/v2/identify/all?api-key=${PLANTNET_KEY}&lang=${isEs ? 'es' : 'en'}&nb-results=3`,
+        { method: 'POST', body: form }
+      );
+
+      if (!res.ok) throw new Error(`PlantNet ${res.status}`);
+      const data = await res.json();
+      const top = data?.results?.[0];
+      if (top && top.score >= 0.1) {
+        showIdResult(
+          top.species?.scientificNameWithoutAuthor ?? top.species?.scientificName ?? '',
+          top.score,
+          'PlantNet'
+        );
+      } else {
+        idSpinner?.classList.add('hidden');
+      }
+    } catch (err) {
+      console.warn('[rastrum] client identify failed:', err);
+      idSpinner?.classList.add('hidden');
+      // Server-side identify will run after sync
+    }
+  }
+
   function addPhotos(fileList: FileList) {
     for (const file of Array.from(fileList)) {
       photos.push({ file, blobId: crypto.randomUUID() });
+      // Trigger identification on first photo
+      if (photos.length === 1) triggerClientIdentify(file);
     }
     repaintGrid();
   }
@@ -501,13 +609,13 @@ const weatherLabels = (tr.observe as any).weather_options as Record<string,strin
       primaryPhotoIndex: 0,
       location,
       identification: {
-        scientificName: '',
+        scientificName: idInput?.value.trim() || currentIdentification?.scientific_name || '',
         commonNameEs: null,
         commonNameEn: null,
         taxonId: null,
-        confidence: 0,
-        source: 'human',
-        status: 'pending',
+        confidence: currentIdentification?.confidence ?? 0,
+        source: (currentIdentification?.source === 'PlantNet' ? 'plantnet' : 'human') as Observation['identification']['source'],
+        status: (idInput?.value.trim() ? 'accepted' : 'pending') as Observation['identification']['status'],
       },
       habitat: ((form.elements.namedItem('habitat') as HTMLSelectElement).value || null) as Observation['habitat'],
       weather: ((form.elements.namedItem('weather') as HTMLSelectElement).value || null) as Observation['weather'],
