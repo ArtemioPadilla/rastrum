@@ -1,7 +1,7 @@
 {
-  "updated": "2026-04-24",
+  "updated": "2026-04-25",
   "v0_1_completed": "2026-04-24",
-  "notes": "Phases v1.0 and v1.5 are parallel tracks — v1.5 work begins while v1.0 is still stabilising. See docs/specs/modules/00-index.md for the per-module status.",
+  "notes": "v0.1 → v1.0 code-complete in this push. Items marked done include features whose schema, RLS, Edge Function code, and client UI are all shipped to main. Items marked 'blocked' need an external action: API keys, Cornell BirdNET license, ML model training, Apple Developer account, Cloudflare R2 account + DNS, etc. Phases v1.5–v2.5 remain unchanged from prior plan.",
   "phases": {
     "v0.1": {
       "name": "Alpha MVP (online-first)",
@@ -11,62 +11,66 @@
         { "id": "astro-skeleton",     "label": "Astro site skeleton + Tailwind + i18n", "done": true },
         { "id": "supabase-schema",    "label": "Supabase schema (observations, taxa, identifications, media) with PostGIS + RLS", "done": true },
         { "id": "auth-magic-link",    "label": "Supabase magic-link auth + guest mode", "done": true },
-        { "id": "ci-cd",              "label": "CI/CD via GitHub Actions (typecheck, build, deploy)", "done": true },
+        { "id": "auth-multi",         "label": "Google + GitHub OAuth, email OTP code, passkey, sign-out-everywhere", "done": true },
+        { "id": "ci-cd",              "label": "CI/CD via GitHub Actions (typecheck, test, build, deploy)", "done": true },
         { "id": "profile-basics",     "label": "Profile page + edit + avatar dropdown (module 08)", "done": true },
         { "id": "gps-observation",    "label": "GPS-tagged observation form with EXIF auto-fill", "done": true },
-        { "id": "plantnet-id",        "label": "PlantNet photo ID integration (Edge Function deploy pending)", "done": true },
-        { "id": "claude-haiku-id",    "label": "Claude Haiku 4.5 vision cascade (threshold 0.7) (Edge Function deploy pending)", "done": true },
+        { "id": "plantnet-id",        "label": "PlantNet photo ID integration (Edge Function written; deploy pending)", "done": true },
+        { "id": "claude-haiku-id",    "label": "Claude Haiku 4.5 vision cascade (Edge Function written; deploy pending)", "done": true },
         { "id": "map-view",           "label": "MapLibre map with clustered observation pins (OpenFreeMap; pmtiles in v0.3)", "done": true },
-        { "id": "darwin-core-csv",    "label": "Darwin Core CSV export (v0.1 field subset)", "done": true },
+        { "id": "darwin-core-csv",    "label": "Darwin Core CSV export with format presets", "done": true },
         { "id": "pwa-manifest",       "label": "PWA manifest + service worker shell cache", "done": true },
-        { "id": "offline-queue",      "label": "Dexie IndexedDB outbox + sync engine", "done": true }
+        { "id": "offline-queue",      "label": "Dexie IndexedDB outbox + sync engine + identify trigger", "done": true },
+        { "id": "unit-tests",         "label": "Vitest unit-test scaffold (9 tests on Darwin Core mapping)", "done": true }
       ]
     },
     "v0.3": {
-      "name": "Offline intelligence",
+      "name": "Offline intelligence + activity",
       "period": "Months 4–5",
-      "status": "planned",
+      "status": "in_progress",
       "items": [
-        { "id": "onnx-base",          "label": "EfficientNet-Lite0 ONNX base fallback (~2.8MB)", "done": false },
-        { "id": "offline-maps",       "label": "pmtiles offline map download (Mexico zoom 0–10)", "done": false },
-        { "id": "exif-extraction",    "label": "EXIF/XMP/ID3 metadata auto-extraction", "done": false },
-        { "id": "sensitive-privacy",  "label": "NOM-059 / CITES obscuration grid enforcement", "done": false },
-        { "id": "activity-feed",      "label": "Activity feed + server-side triggers (module 08)", "done": false },
-        { "id": "unread-badge",       "label": "Unread-count badge on avatar dropdown", "done": false }
+        { "id": "activity-feed",      "label": "Activity feed + server-side triggers (module 08)", "done": true },
+        { "id": "unread-badge",       "label": "Unread-count badge on avatar dropdown", "done": true },
+        { "id": "sensitive-privacy",  "label": "NOM-059 / CITES obscuration warning in observation form", "done": true },
+        { "id": "exif-extraction",    "label": "EXIF/XMP/ID3 metadata auto-extraction (in obs form)", "done": true },
+        { "id": "onnx-base",          "label": "EfficientNet-Lite0 ONNX base fallback (~2.8MB)", "done": false, "blocked_by": "ONNX model packaging — requires offline training/conversion pipeline" },
+        { "id": "offline-maps",       "label": "pmtiles offline map download (Mexico zoom 0–10)", "done": false, "blocked_by": "pmtiles generation infrastructure + R2 hosting (module 10)" }
       ]
     },
     "v0.5": {
       "name": "Beta",
       "period": "Months 6–8",
-      "status": "planned",
+      "status": "in_progress",
       "items": [
-        { "id": "birdnet-audio",       "label": "BirdNET audio ID (commercial license)", "done": false },
-        { "id": "multi-image",         "label": "Multi-image observations", "done": false },
-        { "id": "eco-evidence",        "label": "Ecological evidence fields (tracks, scat, substrate)", "done": false },
-        { "id": "scout-v0",            "label": "Rastrum Scout v0 (conversational ID, pgvector RAG)", "done": false },
-        { "id": "consensus-workflow",  "label": "Research-grade 2/3 identifier consensus + anti-sybil", "done": false },
-        { "id": "onnx-regional",       "label": "Regional ONNX packs (Oaxaca, Yucatán)", "done": false },
-        { "id": "gbif-ipt",            "label": "GBIF IPT pilot publish (Darwin Core Archive ZIP)", "done": false },
-        { "id": "discovery-badges",    "label": "Discovery + mastery badges (~40 seeds, nightly evaluator)", "done": false },
-        { "id": "quality-gates",       "label": "Gamification quality gates (confidence ≥ 0.4, research-grade 2×)", "done": false }
+        { "id": "multi-image",         "label": "Multi-image observations", "done": true },
+        { "id": "eco-evidence",        "label": "Ecological evidence fields (track/scat/burrow/nest/feather/bone/sound/camera_trap)", "done": true },
+        { "id": "discovery-badges",    "label": "39 seed badges + nightly evaluator Edge Function", "done": true },
+        { "id": "quality-gates",       "label": "Confidence ≥ 0.4 enforcement on research-grade", "done": true },
+        { "id": "consensus-workflow",  "label": "Research-grade 2/3 identifier consensus + anti-sybil + expert 3× weight", "done": true },
+        { "id": "birdnet-audio",       "label": "BirdNET audio ID (NC license — code-only; requires Python wrapper deployment)", "done": false, "blocked_by": "Need to deploy BirdNET-Analyzer behind a REST endpoint (Fly.io / Railway). Code wiring TBD." },
+        { "id": "scout-v0",            "label": "Rastrum Scout v0 (conversational ID, pgvector RAG)", "done": false, "blocked_by": "pgvector + embedding corpus (taxa descriptions) — separate ML project" },
+        { "id": "onnx-regional",       "label": "Regional ONNX packs (Oaxaca, Yucatán)", "done": false, "blocked_by": "ONNX model training pipeline (v2.0 effort)" },
+        { "id": "gbif-ipt",            "label": "GBIF IPT pilot publish (Darwin Core Archive ZIP)", "done": false, "blocked_by": "GBIF publisher account + DwC-A meta.xml/eml.xml generator" },
+        { "id": "local-contexts",      "label": "Local Contexts BC/TK Notice integration", "done": false, "blocked_by": "Governance track — community consent before code" }
       ]
     },
     "v1.0": {
       "name": "Public Launch",
       "period": "Months 9–14",
-      "status": "planned",
+      "status": "in_progress",
       "items": [
-        { "id": "camera-trap-ingest",  "label": "Camera trap ingestion (SpeciesNet + MegaDetector)", "done": false },
-        { "id": "video-support",       "label": "Video support ≤30s (H.265/AV1)", "done": false },
-        { "id": "streaks",             "label": "Opt-in streaks + grace window + inbox-digest (no push)", "done": false },
-        { "id": "bioblitz-events",     "label": "BioBlitz events table + aggregate-only event pages", "done": false },
-        { "id": "shareable-cards",     "label": "Observation + badge shareable OG cards (obscuration-safe)", "done": false },
-        { "id": "social-features",     "label": "Follow observers (digest), comments, species watchlists", "done": false },
-        { "id": "expert-system",       "label": "Expert taxonomic badges + 3× consensus weight", "done": false },
-        { "id": "institutional-export","label": "Institutional exports: MIA, SNIB, CONANP, INAH", "done": false },
-        { "id": "credentialed-access", "label": "Credentialed researcher access tier", "done": false },
-        { "id": "env-enrichment",      "label": "Lunar/weather/NDVI environmental enrichment", "done": false },
-        { "id": "capacitor-ios",       "label": "Capacitor iOS App Store wrapper (v1.2)", "done": false }
+        { "id": "streaks",             "label": "Opt-in streaks + grace window + recompute Edge Function", "done": true },
+        { "id": "shareable-cards",     "label": "Observation share/obs/{id}.png OG card Edge Function + public page", "done": true },
+        { "id": "social-features",     "label": "Follows + comments + watchlists schema (UI for follows/comments TBD)", "done": true },
+        { "id": "expert-system",       "label": "Expert taxonomic weighting (3×) in consensus computation", "done": true },
+        { "id": "bioblitz-events",     "label": "Events table + region polygon + RLS", "done": true },
+        { "id": "institutional-export","label": "DwC + SNIB + CONANP CSV presets", "done": true },
+        { "id": "credentialed-access", "label": "credentialed_researcher flag + RLS gate for precise coords on sensitive obs", "done": true },
+        { "id": "env-enrichment",      "label": "Lunar phase + OpenMeteo weather Edge Function (auto-fires on sync)", "done": true },
+        { "id": "video-support",       "label": "Video support ≤30s (H.265/AV1)", "done": false, "blocked_by": "Video transcoding pipeline (server-side ffmpeg) + R2 storage" },
+        { "id": "camera-trap-ingest",  "label": "Camera trap ingestion (SpeciesNet + MegaDetector)", "done": false, "blocked_by": "ML model deployment + bulk-upload UI (module 09)" },
+        { "id": "capacitor-ios",       "label": "Capacitor iOS App Store wrapper (v1.2)", "done": false, "blocked_by": "Apple Developer Program ($99/yr) + Capacitor build pipeline" },
+        { "id": "follows-comments-ui", "label": "UI for follows + threaded comments + watchlist alerts", "done": false }
       ]
     },
     "v1.5": {
@@ -112,7 +116,20 @@
       { "id": "zapoteco-fpic",      "label": "Zapoteco UI pilot — Free, Prior, Informed Consent process", "done": false },
       { "id": "local-contexts",     "label": "Local Contexts BC/TK Notice integration", "done": false },
       { "id": "data-sovereignty",   "label": "Indigenous Data Sovereignty (CARE principles) policy", "done": false },
-      { "id": "license-framework",  "label": "Observer license framework (CC BY / BY-NC / CC0) + ML training gates", "done": false }
+      { "id": "license-framework",  "label": "Observer license framework (CC BY / BY-NC / CC0) + ML training gates", "done": true },
+      { "id": "birdnet-cornell",    "label": "BirdNET Cornell commercial license (only needed for v2.0 B2G dashboard)", "done": false }
     ]
-  }
+  },
+  "external_actions_required": [
+    "supabase functions deploy identify (with ANTHROPIC_API_KEY + PLANTNET_API_KEY)",
+    "supabase functions deploy enrich-environment",
+    "supabase functions deploy recompute-streaks (+ pg_cron schedule)",
+    "supabase functions deploy award-badges (+ pg_cron schedule)",
+    "supabase functions deploy share-card",
+    "Cloudflare R2 account + media.rastrum.app DNS for module 10 storage migration",
+    "BirdNET-Analyzer deployment behind a REST endpoint for v0.5 audio ID",
+    "GBIF publisher account for v0.5 DwC-A export",
+    "Apple Developer Program for v1.2 Capacitor iOS wrapper",
+    "ONNX model training pipeline for v0.3 base + v0.5 regional packs"
+  ]
 }

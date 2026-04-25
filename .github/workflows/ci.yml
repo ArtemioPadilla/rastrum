@@ -29,6 +29,9 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
 
+      - name: Unit tests (Vitest)
+        run: npm test
+
       - name: Build (static site)
         run: npm run build
         env:

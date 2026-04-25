@@ -31,9 +31,10 @@ narrative source.
 | 03 | Offline-first / PWA / sync (outbox; ID deferred to v0.3) | v0.1 | spec | [`03-offline.md`](03-offline.md) |
 | 04 | Authentication (magic link + guest mode) | v0.1 | spec | [`04-auth.md`](04-auth.md) |
 | 05 | Map view (MapLibre + pmtiles) | v0.1 | spec | [`05-map.md`](05-map.md) |
-| 06 | Darwin Core export (CSV) | v0.1 | spec | [`06-darwin-core.md`](06-darwin-core.md) |
+| 06 | Darwin Core export (CSV + SNIB + CONANP presets) | v0.1 | **shipped** | [`06-darwin-core.md`](06-darwin-core.md) |
 | 07 | Licensing, ML training gates, governance | v0.1 policy → v2.0 enforcement | spec | [`07-licensing.md`](07-licensing.md) |
-| 08 | Profile, activity feed, badges, streaks, events | v0.1 → v1.0 (staged) | spec | [`08-profile-activity-gamification.md`](08-profile-activity-gamification.md) |
+| 08 | Profile, activity feed, badges, streaks, events | v0.1 → v1.0 (staged) | **shipped (v0.1, v0.3, v0.5, v1.0 slices)** | [`08-profile-activity-gamification.md`](08-profile-activity-gamification.md) |
+| 10 | Media storage (R2 + presigned URLs + CDN) | v0.1 → v0.3 migration | spec | [`10-media-storage.md`](10-media-storage.md) |
 
 ## v0.3 — Offline intelligence
 

@@ -123,8 +123,11 @@ lint: ## (Placeholder — wire up eslint once code lands)
 typecheck: ## Typecheck via tsc
 	@npx tsc --noEmit
 
-test: ## (Placeholder — wire up vitest/playwright per docs/specs/infra/testing.md)
-	@echo "TODO: vitest + playwright in v0.1."
+test: ## Run unit tests (vitest)
+	npm test
+
+test-coverage: ## Run unit tests with coverage report
+	npm run test:coverage
 
 docs-check: ## Verify module index lists every module spec present on disk
 	@echo "Specs on disk:"
