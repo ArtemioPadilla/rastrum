@@ -122,6 +122,19 @@ async function triggerEnvEnrichment(observationId: string): Promise<void> {
   });
 }
 
+const BYO_KEY_STORAGE = 'rastrum.byoAnthropicKey';
+const LOCAL_AI_OPTIN  = 'rastrum.localAiOptIn';
+
+function readByoAnthropicKey(): string | undefined {
+  if (typeof localStorage === 'undefined') return undefined;
+  return localStorage.getItem(BYO_KEY_STORAGE) ?? undefined;
+}
+
+function isLocalAIOptedIn(): boolean {
+  if (typeof localStorage === 'undefined') return false;
+  return localStorage.getItem(LOCAL_AI_OPTIN) === 'true';
+}
+
 /** Invoke the identify Edge Function for an observation that's freshly synced. */
 async function triggerIdentify(observationId: string): Promise<void> {
   const supabase = getSupabase();
@@ -130,30 +143,87 @@ async function triggerIdentify(observationId: string): Promise<void> {
   // Find the primary photo URL we just uploaded
   const blobs = await db.mediaBlobs.where('observation_id').equals(observationId).toArray();
   const primary = blobs.find(b => b.upload_url) ?? blobs[0];
-  if (!primary?.upload_url) return;  // shouldn't happen, but be defensive
+  if (!primary?.upload_url) return;
 
-  // Pull the GPS for context (improves Claude's ID)
   const obsRecord = await db.observations.get(observationId);
   const loc = obsRecord?.data.location;
 
-  const { error } = await supabase.functions.invoke('identify', {
+  const { data, error } = await supabase.functions.invoke('identify', {
     body: {
       observation_id: observationId,
       image_url: primary.upload_url,
       location: loc ? { lat: loc.lat, lng: loc.lng } : undefined,
+      client_anthropic_key: readByoAnthropicKey(),
     },
   });
-  if (error) {
-    // Don't fail sync — keep the row in idQueue for nightly retry
-    await db.idQueue.update(observationId, {
-      attempts: ((await db.idQueue.get(observationId))?.attempts ?? 0) + 1,
-      last_error: error.message,
-    });
-    return;
+
+  // The function returns 200 even when no engine is available, so check the
+  // body shape rather than `error`.
+  const noEngine = (data as { error?: string } | null)?.error === 'no_id_engine_available';
+  if (error || noEngine) {
+    // Try the local-AI fallback if the user opted in. Otherwise leave it
+    // in the queue for a future retry (or manual ID).
+    if (noEngine && isLocalAIOptedIn() && obsRecord) {
+      try {
+        await runLocalFallback(observationId, primary.upload_url, obsRecord.data.habitat ?? undefined, loc);
+      } catch (e) {
+        await db.idQueue.update(observationId, {
+          attempts: ((await db.idQueue.get(observationId))?.attempts ?? 0) + 1,
+          last_error: 'local fallback failed: ' + (e instanceof Error ? e.message : String(e)),
+        });
+        return;
+      }
+    } else {
+      await db.idQueue.update(observationId, {
+        attempts: ((await db.idQueue.get(observationId))?.attempts ?? 0) + 1,
+        last_error: error?.message ?? 'no_id_engine_available',
+      });
+      return;
+    }
   }
 
-  // Success — drop the queue entry
   await db.idQueue.delete(observationId);
+}
+
+/**
+ * Last-resort on-device identification using Phi-3.5-vision via WebLLM.
+ * Writes the result directly to public.identifications via supabase-js
+ * (RLS gates the write to the observation owner).
+ *
+ * Always marked confidence ≤ 0.4 — see lib/local-ai.ts for why.
+ */
+async function runLocalFallback(
+  observationId: string,
+  imageUrl: string,
+  habitat?: string,
+  loc?: { lat: number; lng: number },
+): Promise<void> {
+  // Fetch the image as base64 so the WebLLM model can read it
+  const res = await fetch(imageUrl);
+  const blob = await res.blob();
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result as string);
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(blob);
+  });
+
+  const { identifyImageLocal } = await import('./local-ai');
+  const result = await identifyImageLocal(
+    dataUrl,
+    () => { /* progress is shown in the profile UI; sync runs background */ },
+    { lat: loc?.lat, lng: loc?.lng, habitat },
+  );
+
+  const supabase = getSupabase();
+  await supabase.from('identifications').insert({
+    observation_id: observationId,
+    scientific_name: result.scientific_name,
+    confidence: result.confidence,
+    source: 'onnx_offline',     // closest enum value; webllm flavour noted in raw_response
+    raw_response: result,
+    is_primary: true,
+  });
 }
 
 /** Flush all pending observations. Safe to call on every `online` event. */

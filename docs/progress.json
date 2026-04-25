@@ -33,6 +33,8 @@
         { "id": "unread-badge",       "label": "Unread-count badge on avatar dropdown", "done": true },
         { "id": "sensitive-privacy",  "label": "NOM-059 / CITES obscuration warning in observation form", "done": true },
         { "id": "exif-extraction",    "label": "EXIF/XMP/ID3 metadata auto-extraction (in obs form)", "done": true },
+        { "id": "byo-anthropic-key",  "label": "BYO Anthropic key (client-set, never persisted)", "done": true },
+        { "id": "webllm-text",        "label": "WebLLM Llama-3.2-1B for translation + field notes (module 11)", "done": true },
         { "id": "onnx-base",          "label": "EfficientNet-Lite0 ONNX base fallback (~2.8MB)", "done": false, "blocked_by": "ONNX model packaging — requires offline training/conversion pipeline" },
         { "id": "offline-maps",       "label": "pmtiles offline map download (Mexico zoom 0–10)", "done": false, "blocked_by": "pmtiles generation infrastructure + R2 hosting (module 10)" }
       ]
@@ -45,6 +47,7 @@
         { "id": "multi-image",         "label": "Multi-image observations", "done": true },
         { "id": "eco-evidence",        "label": "Ecological evidence fields (track/scat/burrow/nest/feather/bone/sound/camera_trap)", "done": true },
         { "id": "discovery-badges",    "label": "39 seed badges + nightly evaluator Edge Function", "done": true },
+        { "id": "webllm-vision",       "label": "WebLLM Phi-3.5-vision fallback ID (opt-in, confidence ≤ 0.4)", "done": true },
         { "id": "quality-gates",       "label": "Confidence ≥ 0.4 enforcement on research-grade", "done": true },
         { "id": "consensus-workflow",  "label": "Research-grade 2/3 identifier consensus + anti-sybil + expert 3× weight", "done": true },
         { "id": "birdnet-audio",       "label": "BirdNET audio ID (NC license — code-only; requires Python wrapper deployment)", "done": false, "blocked_by": "Need to deploy BirdNET-Analyzer behind a REST endpoint (Fly.io / Railway). Code wiring TBD." },

@@ -35,6 +35,7 @@ narrative source.
 | 07 | Licensing, ML training gates, governance | v0.1 policy → v2.0 enforcement | spec | [`07-licensing.md`](07-licensing.md) |
 | 08 | Profile, activity feed, badges, streaks, events | v0.1 → v1.0 (staged) | **shipped (v0.1, v0.3, v0.5, v1.0 slices)** | [`08-profile-activity-gamification.md`](08-profile-activity-gamification.md) |
 | 10 | Media storage (R2 + presigned URLs + CDN) | v0.1 → v0.3 migration | spec | [`10-media-storage.md`](10-media-storage.md) |
+| 11 | In-browser AI (WebLLM: Phi-3.5-vision + Llama-3.2-1B) | v0.3 → v0.5 | **shipped (opt-in)** | [`11-in-browser-ai.md`](11-in-browser-ai.md) |
 
 ## v0.3 — Offline intelligence
 

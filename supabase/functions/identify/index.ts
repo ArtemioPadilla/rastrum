@@ -19,6 +19,12 @@ type IdentifyRequest = {
   image_url: string;           // signed/public URL of the uploaded photo
   user_hint?: 'plant' | 'animal' | 'fungi' | 'unknown';
   location?: { lat: number; lng: number };
+  /**
+   * Optional bring-your-own Anthropic key supplied by the signed-in user.
+   * Used only for this single call; never logged or persisted server-side.
+   * Falls back to ANTHROPIC_API_KEY env var when not provided.
+   */
+  client_anthropic_key?: string;
 };
 
 type IDResult = {
@@ -82,9 +88,12 @@ async function callPlantNet(imageBytes: Uint8Array): Promise<IDResult | null> {
 async function callClaudeHaiku(
   imageBytes: Uint8Array,
   mimeType: string,
-  context: { lat?: number; lng?: number; plantnet_candidates?: string[] },
+  context: { lat?: number; lng?: number; plantnet_candidates?: string[]; client_key?: string },
 ): Promise<IDResult | null> {
-  const key = Deno.env.get('ANTHROPIC_API_KEY');
+  // Prefer the user-supplied key; fall back to server env var. Either path
+  // routes through the same Anthropic SDK call, but server-set keys absorb
+  // the cost while client-set keys are billed to the user's own account.
+  const key = context.client_key || Deno.env.get('ANTHROPIC_API_KEY');
   if (!key) return null;
 
   // base64-encode the image
@@ -190,18 +199,32 @@ serve(async (req) => {
         lat: body.location?.lat,
         lng: body.location?.lng,
         plantnet_candidates: pn ? [pn.scientific_name] : undefined,
+        client_key: body.client_anthropic_key,
       });
+      // If no Claude key available but PlantNet returned *something*, return
+      // that even at low confidence — better than nothing, the UI will mark
+      // it as cf. (see Darwin Core export's identificationQualifier).
+      if (!result && pn) result = pn;
     }
   } else {
     result = await callClaudeHaiku(imageBytes, mimeType, {
       lat: body.location?.lat,
       lng: body.location?.lng,
+      client_key: body.client_anthropic_key,
     });
   }
 
   if (!result) {
-    return new Response(JSON.stringify({ error: 'No identification possible' }), {
-      status: 502,
+    // Distinguish "no engine available" from "engine ran but failed" so the
+    // client can route fallback paths (e.g. WebLLM Phi-3.5-vision opt-in).
+    const hasAnyClaudeKey = !!(body.client_anthropic_key || Deno.env.get('ANTHROPIC_API_KEY'));
+    return new Response(JSON.stringify({
+      error: hasAnyClaudeKey ? 'identification_failed' : 'no_id_engine_available',
+      hint: hasAnyClaudeKey
+        ? 'PlantNet returned nothing and Claude failed to parse the response.'
+        : 'Configure ANTHROPIC_API_KEY (server) or supply client_anthropic_key, or enable on-device fallback.',
+    }), {
+      status: 200,   // not a server error — the call completed, just no ID landed
       headers: { 'content-type': 'application/json' },
     });
   }

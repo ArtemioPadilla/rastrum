@@ -94,6 +94,58 @@ const tr = t(lang);
     <p id="form-error" class="hidden text-sm text-red-600 dark:text-red-400"></p>
   </form>
 
+  <!-- ── AI settings ── -->
+  <section class="mt-10 border-t border-zinc-200 dark:border-zinc-800 pt-8">
+    <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-4">
+      {tr.auth.ai_settings}
+    </h2>
+
+    <!-- BYO Anthropic key -->
+    <div class="space-y-3">
+      <div>
+        <label for="anthropic-key" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+          {tr.auth.anthropic_key_label}
+        </label>
+        <input id="anthropic-key" type="password" autocomplete="off" placeholder="sk-ant-…"
+          class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm font-mono" />
+        <p class="mt-1 text-xs text-zinc-500">{tr.auth.anthropic_key_hint}</p>
+        <div class="mt-2 flex items-center gap-2">
+          <button id="ak-save"  type="button" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 text-xs font-semibold text-white">{tr.auth.anthropic_key_save}</button>
+          <button id="ak-clear" type="button" class="rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40">{tr.auth.anthropic_key_clear}</button>
+          <span id="ak-saved" class="hidden text-xs text-emerald-600 dark:text-emerald-400">✓ {tr.auth.anthropic_key_saved}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- On-device AI -->
+    <div class="mt-6 pt-5 border-t border-zinc-100 dark:border-zinc-800/60">
+      <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">{tr.auth.local_ai_section}</h3>
+      <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">{tr.auth.local_ai_hint}</p>
+      <p id="local-ai-unsup" class="hidden text-xs text-amber-700 dark:text-amber-400">{tr.auth.local_ai_unsupported}</p>
+
+      <label class="flex items-start gap-3 cursor-pointer mt-2">
+        <input type="checkbox" id="local-ai-optin" class="mt-1" />
+        <div>
+          <p class="text-sm text-zinc-700 dark:text-zinc-300">{tr.auth.local_ai_opt_in}</p>
+          <p class="text-xs text-amber-700 dark:text-amber-400 mt-1">{tr.auth.local_ai_warning}</p>
+        </div>
+      </label>
+
+      <div class="mt-3 flex flex-wrap gap-2">
+        <button id="dl-vision" type="button" class="rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 disabled:opacity-50">
+          <span data-vlabel>{tr.auth.local_ai_download_vision}</span>
+        </button>
+        <button id="dl-text"   type="button" class="rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 disabled:opacity-50">
+          <span data-tlabel>{tr.auth.local_ai_download_text}</span>
+        </button>
+        <button id="ai-unload" type="button" class="rounded-lg text-xs text-zinc-500 hover:underline">
+          {tr.auth.local_ai_unload}
+        </button>
+      </div>
+      <p id="ai-progress" class="hidden mt-2 text-xs text-zinc-600 dark:text-zinc-400 font-mono"></p>
+    </div>
+  </section>
+
   <!-- ── Security ── -->
   <section class="mt-10 border-t border-zinc-200 dark:border-zinc-800 pt-8">
     <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-4">
@@ -268,5 +320,109 @@ const tr = t(lang);
     const { signOutEverywhere } = await import('../lib/auth');
     await signOutEverywhere();
     window.location.replace(isEsLang ? '/es/' : '/en/');
+  });
+
+  // ── AI settings: BYO Anthropic key (localStorage) ──
+  const AK_STORAGE = 'rastrum.byoAnthropicKey';
+  const akInput = document.getElementById('anthropic-key') as HTMLInputElement | null;
+  const akSave  = document.getElementById('ak-save');
+  const akClear = document.getElementById('ak-clear');
+  const akSaved = document.getElementById('ak-saved');
+
+  function akShow() {
+    akSaved?.classList.remove('hidden');
+    setTimeout(() => akSaved?.classList.add('hidden'), 2500);
+  }
+  if (akInput) {
+    akInput.value = localStorage.getItem(AK_STORAGE) ?? '';
+  }
+  akSave?.addEventListener('click', () => {
+    if (!akInput) return;
+    const v = akInput.value.trim();
+    if (v) localStorage.setItem(AK_STORAGE, v);
+    else   localStorage.removeItem(AK_STORAGE);
+    akShow();
+  });
+  akClear?.addEventListener('click', () => {
+    if (akInput) akInput.value = '';
+    localStorage.removeItem(AK_STORAGE);
+    akShow();
+  });
+
+  // ── AI settings: WebLLM opt-in + manual model download ──
+  const LAI_OPTIN = 'rastrum.localAiOptIn';
+  const optinBox = document.getElementById('local-ai-optin') as HTMLInputElement | null;
+  const dlVision = document.getElementById('dl-vision') as HTMLButtonElement | null;
+  const dlText   = document.getElementById('dl-text') as HTMLButtonElement | null;
+  const aiUnload = document.getElementById('ai-unload');
+  const aiProgress = document.getElementById('ai-progress');
+  const unsupNote = document.getElementById('local-ai-unsup');
+  const vLabel = dlVision?.querySelector('[data-vlabel]') as HTMLElement | null;
+  const tLabel = dlText?.querySelector('[data-tlabel]') as HTMLElement | null;
+  const V_DEFAULT = vLabel?.textContent ?? '';
+  const T_DEFAULT = tLabel?.textContent ?? '';
+  const READY = isEsLang ? 'Listo' : 'Ready';
+  const DLING = isEsLang ? 'Descargando…' : 'Downloading…';
+
+  // Lazy-load WebGPU support detection from local-ai (avoids importing the
+  // entire @mlc-ai bundle until the user clicks).
+  import('../lib/local-ai').then(({ localAISupported }) => {
+    if (!localAISupported()) {
+      unsupNote?.classList.remove('hidden');
+      if (dlVision) dlVision.disabled = true;
+      if (dlText)   dlText.disabled = true;
+    }
+  }).catch(() => {});
+
+  if (optinBox) {
+    optinBox.checked = localStorage.getItem(LAI_OPTIN) === 'true';
+    optinBox.addEventListener('change', () => {
+      if (optinBox.checked) localStorage.setItem(LAI_OPTIN, 'true');
+      else                  localStorage.removeItem(LAI_OPTIN);
+    });
+  }
+
+  function paintProgress(p: { progress: number; text: string }) {
+    if (!aiProgress) return;
+    aiProgress.classList.remove('hidden');
+    aiProgress.textContent = `${Math.round((p.progress ?? 0) * 100)}%  ${p.text}`;
+  }
+
+  dlVision?.addEventListener('click', async () => {
+    if (!vLabel || !dlVision) return;
+    dlVision.disabled = true;
+    vLabel.textContent = DLING;
+    try {
+      const { loadVisionEngine } = await import('../lib/local-ai');
+      await loadVisionEngine(paintProgress);
+      vLabel.textContent = READY;
+    } catch (e) {
+      vLabel.textContent = (e instanceof Error ? e.message : 'Failed');
+    } finally {
+      dlVision.disabled = false;
+    }
+  });
+
+  dlText?.addEventListener('click', async () => {
+    if (!tLabel || !dlText) return;
+    dlText.disabled = true;
+    tLabel.textContent = DLING;
+    try {
+      const { loadTextEngine } = await import('../lib/local-ai');
+      await loadTextEngine(paintProgress);
+      tLabel.textContent = READY;
+    } catch (e) {
+      tLabel.textContent = (e instanceof Error ? e.message : 'Failed');
+    } finally {
+      dlText.disabled = false;
+    }
+  });
+
+  aiUnload?.addEventListener('click', async () => {
+    const { unloadAll } = await import('../lib/local-ai');
+    await unloadAll();
+    if (vLabel) vLabel.textContent = V_DEFAULT;
+    if (tLabel) tLabel.textContent = T_DEFAULT;
+    aiProgress?.classList.add('hidden');
   });
 </script>
