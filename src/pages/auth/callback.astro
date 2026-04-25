@@ -39,35 +39,55 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
     }
 
     async function run() {
-      const params = new URLSearchParams(window.location.search);
-      const code = params.get('code');
-      const errorCode = params.get('error') || params.get('error_code');
-      const errorDescription = params.get('error_description');
+      // Supabase may return the session in either format:
+      //   PKCE flow         → ?code=xxx              (query string)
+      //   Implicit flow     → #access_token=…&refresh_token=…  (hash fragment)
+      // We detect which and handle both.
+
+      const query = new URLSearchParams(window.location.search);
+      const hash  = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+      const errorCode        = query.get('error')        || hash.get('error');
+      const errorDescription = query.get('error_description') || hash.get('error_description');
+      const code             = query.get('code');
+      const accessToken      = hash.get('access_token');
+      const refreshToken     = hash.get('refresh_token');
+      const supabase         = getSupabase();
 
       if (errorCode) {
         showError(errorDescription || errorCode);
         return;
       }
 
-      if (!code) {
-        // `detectSessionInUrl: true` on the client may have already consumed it
-        // from the hash fragment. Check if we're authenticated anyway.
-        const { data: { session } } = await getSupabase().auth.getSession();
-        if (session) {
-          redirectToHome();
-          return;
-        }
-        showError('No sign-in code in URL.');
+      // PKCE flow
+      if (code) {
+        const { error } = await exchangeCode(code);
+        if (error) { showError(error.message); return; }
+        redirectToHome();
         return;
       }
 
-      const { error } = await exchangeCode(code);
-      if (error) {
-        showError(error.message);
+      // Implicit flow — manually call setSession if `detectSessionInUrl`
+      // hasn't already consumed it (Astro static pages sometimes race this).
+      if (accessToken && refreshToken) {
+        const { error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+        if (error) { showError(error.message); return; }
+        // Clean the hash out of the URL so a refresh doesn't re-trigger.
+        history.replaceState(null, '', window.location.pathname);
+        redirectToHome();
         return;
       }
 
-      redirectToHome();
+      // No code, no tokens — maybe detectSessionInUrl already ran
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        redirectToHome();
+        return;
+      }
+
+      showError('No sign-in token in URL.');
     }
 
     async function redirectToHome() {
