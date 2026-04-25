@@ -122,13 +122,7 @@ async function triggerEnvEnrichment(observationId: string): Promise<void> {
   });
 }
 
-const BYO_KEY_STORAGE = 'rastrum.byoAnthropicKey';
-const LOCAL_AI_OPTIN  = 'rastrum.localAiOptIn';
-
-function readByoAnthropicKey(): string | undefined {
-  if (typeof localStorage === 'undefined') return undefined;
-  return localStorage.getItem(BYO_KEY_STORAGE) ?? undefined;
-}
+const LOCAL_AI_OPTIN = 'rastrum.localAiOptIn';
 
 function isLocalAIOptedIn(): boolean {
   if (typeof localStorage === 'undefined') return false;
@@ -164,13 +158,15 @@ async function triggerIdentify(observationId: string): Promise<void> {
   // in the registry (UI lists them) but the cascade engine skips them.
   const excluded = isLocalAIOptedIn() ? [] : ['webllm_phi35_vision', 'onnx_efficientnet_lite0', 'birdnet_lite'];
 
+  // Plugins read their own keys from byo-keys.ts at identify-time, so we
+  // don't pre-collect them here. Pass an empty byo_keys object as a default.
   const cascadeResult = await runCascade(
     {
       media: { kind: 'url', url: primary.upload_url },
       mediaKind: 'photo',
       location: loc ? { lat: loc.lat, lng: loc.lng } : undefined,
       habitat,
-      byo_keys: { anthropic: readByoAnthropicKey() },
+      byo_keys: {},
     },
     {
       media: 'photo',

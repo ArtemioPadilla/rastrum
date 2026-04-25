@@ -38,6 +38,42 @@ export type LicenseKind =
   | 'byo-key'           // user supplies their own API key (e.g. Claude BYO)
   | 'paid';             // operator pays per-call
 
+/**
+ * Declares an API key the user can supply for this plugin. A plugin can
+ * declare zero or more KeySpecs; the UI auto-renders inputs for each.
+ *
+ * Keys are stored in localStorage by the byo-keys module and forwarded
+ * per-call when the plugin needs them. They never touch our server-side
+ * persistence — only the Edge Function for that single identify call.
+ */
+export interface KeySpec {
+  /** Stable name used by the plugin internally (e.g. 'anthropic', 'plantnet'). */
+  name: string;
+  /** Human-readable label for the input. */
+  label: string;
+  /** Format hint shown as placeholder (e.g. 'sk-ant-…'). */
+  placeholder?: string;
+  /** Short usage hint shown next to the input. */
+  hint?: string;
+  /** When true, the plugin still works without it (e.g. operator-set fallback). */
+  optional?: boolean;
+  /** Regex for client-side format validation before save. */
+  pattern?: RegExp;
+}
+
+/**
+ * One step in the user's onboarding flow for a plugin. Rendered as a
+ * numbered list when the user clicks "Configure" — clickable link if
+ * `link` is set, otherwise plain text.
+ */
+export interface SetupStep {
+  text: string;
+  /** Optional URL the step opens in a new tab. */
+  link?: string;
+  /** Small print rendered under the step. */
+  details?: string;
+}
+
 /** Filter set telling the cascade engine when a plugin is a viable choice. */
 export interface IdentifierCapabilities {
   /** Which media kinds the plugin can ingest. */
@@ -70,8 +106,11 @@ export interface IdentifyInput {
   habitat?: string | null;
   /** Identifiers may chain — pass earlier results forward for context. */
   prior_candidates?: Array<Pick<IDResult, 'scientific_name' | 'confidence'>>;
-  /** User's BYO Anthropic key (only applicable to plugins that need one). */
-  byo_keys?: { anthropic?: string };
+  /**
+   * BYO API keys keyed by KeySpec.name. Plugins read what they need.
+   * Empty when no plugin needs keys (Phi-3.5-vision, BirdNET-Lite, ...)
+   */
+  byo_keys?: Record<string, string>;
   /** Progress callback for slow / large operations (model load, etc.). */
   onProgress?: (p: { progress: number; text: string }) => void;
 }
@@ -85,6 +124,14 @@ export interface Identifier {
   description: string;
   /** Static metadata for cascade decisions. */
   capabilities: IdentifierCapabilities;
+  /** Optional list of API keys the user can supply for this plugin. */
+  keySpec?: KeySpec[];
+  /** Ordered onboarding steps to walk the user through setup. */
+  setupSteps?: SetupStep[];
+  /** Logo URL or emoji shown next to the name in the UI. */
+  brand?: string;
+  /** Optional cheap "is this key valid?" probe for the Configure UI. */
+  testConnection?(): Promise<{ ok: boolean; message?: string }>;
   /** True when the plugin can run right now (env vars set, model downloaded). */
   isAvailable(): Promise<IdentifierAvailability>;
   /** Run the identification. May throw — caller catches and falls through. */

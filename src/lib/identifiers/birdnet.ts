@@ -15,7 +15,12 @@ import type { Identifier, IDResult, IdentifyInput } from './types';
 export const birdnetIdentifier: Identifier = {
   id: 'birdnet_lite',
   name: 'BirdNET-Lite (audio)',
-  description: 'Cornell BirdNET (lite) for bird-call identification. Runs on-device. Free for non-commercial use; attribution required.',
+  brand: '🐦',
+  description: 'Cornell Lab\'s bird-call identifier, compiled to TFLite. Runs entirely on-device. Free for non-commercial use; attribution required.',
+  setupSteps: [
+    { text: 'Coming in v0.5 — Rastrum will host the ~50 MB model on its own CDN so you don\'t need an account.' },
+    { text: 'Once shipped: Profile → Edit → AI settings → BirdNET-Lite → Download.' },
+  ],
   capabilities: {
     media: ['audio', 'video'],
     taxa: ['Animalia.Aves'],

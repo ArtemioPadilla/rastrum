@@ -20,9 +20,17 @@ type IdentifyRequest = {
   user_hint?: 'plant' | 'animal' | 'fungi' | 'unknown';
   location?: { lat: number; lng: number };
   /**
-   * Optional bring-your-own Anthropic key supplied by the signed-in user.
-   * Used only for this single call; never logged or persisted server-side.
-   * Falls back to ANTHROPIC_API_KEY env var when not provided.
+   * Bring-your-own keys keyed by provider name. The function uses each
+   * key only for this single call; nothing is logged or persisted
+   * server-side. Server env vars (ANTHROPIC_API_KEY, PLANTNET_API_KEY)
+   * are the fallback when a client key isn't provided.
+   *
+   * Supported names today: 'anthropic', 'plantnet'.
+   */
+  client_keys?: Record<string, string>;
+  /**
+   * Legacy field — same effect as client_keys.anthropic. Kept for
+   * backwards compat with older clients that haven't migrated yet.
    */
   client_anthropic_key?: string;
   /**
@@ -52,8 +60,8 @@ async function fetchImageAsBytes(url: string): Promise<Uint8Array> {
   return new Uint8Array(await res.arrayBuffer());
 }
 
-async function callPlantNet(imageBytes: Uint8Array): Promise<IDResult | null> {
-  const key = Deno.env.get('PLANTNET_API_KEY');
+async function callPlantNet(imageBytes: Uint8Array, clientKey?: string): Promise<IDResult | null> {
+  const key = clientKey || Deno.env.get('PLANTNET_API_KEY');
   if (!key) return null;
 
   const form = new FormData();
@@ -192,21 +200,25 @@ serve(async (req) => {
   const imageBytes = await fetchImageAsBytes(body.image_url);
   const mimeType = 'image/jpeg';
 
+  // Resolve BYO keys (new field wins; legacy field is the fallback)
+  const byoPlantnet = body.client_keys?.plantnet;
+  const byoAnthropic = body.client_keys?.anthropic ?? body.client_anthropic_key;
+
   let result: IDResult | null = null;
 
   if (body.force_provider === 'plantnet') {
-    result = await callPlantNet(imageBytes);
+    result = await callPlantNet(imageBytes, byoPlantnet);
   } else if (body.force_provider === 'claude_haiku') {
     result = await callClaudeHaiku(imageBytes, mimeType, {
       lat: body.location?.lat,
       lng: body.location?.lng,
-      client_key: body.client_anthropic_key,
+      client_key: byoAnthropic,
     });
   } else {
     // Default cascade: PlantNet first if it's likely a plant, Claude otherwise
     const isPlant = body.user_hint === 'plant' || body.user_hint === 'fungi' || !body.user_hint;
     if (isPlant) {
-      const pn = await callPlantNet(imageBytes);
+      const pn = await callPlantNet(imageBytes, byoPlantnet);
       if (pn && pn.confidence >= PLANTNET_THRESHOLD) {
         result = pn;
       } else {
@@ -214,7 +226,7 @@ serve(async (req) => {
           lat: body.location?.lat,
           lng: body.location?.lng,
           plantnet_candidates: pn ? [pn.scientific_name] : undefined,
-          client_key: body.client_anthropic_key,
+          client_key: byoAnthropic,
         });
         if (!result && pn) result = pn;
       }
@@ -222,7 +234,7 @@ serve(async (req) => {
       result = await callClaudeHaiku(imageBytes, mimeType, {
         lat: body.location?.lat,
         lng: body.location?.lng,
-        client_key: body.client_anthropic_key,
+        client_key: byoAnthropic,
       });
     }
   }
@@ -230,7 +242,7 @@ serve(async (req) => {
   if (!result) {
     // Distinguish "no engine available" from "engine ran but failed" so the
     // client can route fallback paths (e.g. WebLLM Phi-3.5-vision opt-in).
-    const hasAnyClaudeKey = !!(body.client_anthropic_key || Deno.env.get('ANTHROPIC_API_KEY'));
+    const hasAnyClaudeKey = !!(byoAnthropic || Deno.env.get('ANTHROPIC_API_KEY'));
     return new Response(JSON.stringify({
       error: hasAnyClaudeKey ? 'identification_failed' : 'no_id_engine_available',
       hint: hasAnyClaudeKey

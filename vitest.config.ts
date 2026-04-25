@@ -2,7 +2,9 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    environment: 'node',
+    // happy-dom: smaller, faster than jsdom, and avoids vitest 4's
+    // node-localstorage conflict that breaks localStorage.clear().
+    environment: 'happy-dom',
     include: ['src/**/*.test.ts'],
     coverage: {
       reporter: ['text', 'json'],

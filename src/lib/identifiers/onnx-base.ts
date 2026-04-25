@@ -10,7 +10,11 @@ import type { Identifier, IDResult, IdentifyInput } from './types';
 export const onnxBaseIdentifier: Identifier = {
   id: 'onnx_efficientnet_lite0',
   name: 'EfficientNet-Lite0 (on-device, regional)',
-  description: 'Compact species classifier fine-tuned on iNaturalist + GBIF. Runs offline with onnxruntime-web. ~3 MB.',
+  brand: '🌎',
+  description: 'Compact species classifier fine-tuned on iNaturalist + GBIF data. Runs offline via onnxruntime-web. ~3 MB.',
+  setupSteps: [
+    { text: 'Coming in v0.3 — Rastrum will bundle the model with the app.' },
+  ],
   capabilities: {
     media: ['photo'],
     taxa: ['*'],

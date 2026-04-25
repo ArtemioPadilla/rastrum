@@ -142,6 +142,69 @@ the appropriate `force_provider`.
 
 ---
 
+## BYO API keys (per-plugin)
+
+Plugins that talk to paid or quota-limited services declare a `keySpec[]`
+listing the API keys they accept, plus a `setupSteps[]` array of guided
+onboarding steps for the user. Optional `testConnection()` runs a cheap
+probe (e.g. a 1-token Anthropic call) so the user can verify the key
+works before saving.
+
+### Storage contract — `src/lib/byo-keys.ts`
+
+- All BYO keys live in `localStorage['rastrum.byoKeys']` as a flat JSON
+  map keyed by `pluginId.keyName`. Migration from the legacy
+  `rastrum.byoAnthropicKey` slot is automatic on first read.
+- Keys never sync to Supabase. They're forwarded per-call to the Edge
+  Function as `client_keys: { plantnet?, anthropic?, ... }` and used
+  for that single request only.
+- `clearAllKeys()` is the nuclear option — wipes both the new and
+  legacy slots.
+
+### Edge Function contract
+
+`POST /functions/v1/identify`
+
+```jsonc
+{
+  "observation_id": "…",
+  "image_url": "…",
+  "force_provider": "plantnet" | "claude_haiku",
+  "client_keys": {
+    "plantnet":  "2b10…",     // optional
+    "anthropic": "sk-ant-…"   // optional
+  },
+  "client_anthropic_key": "sk-ant-…"   // legacy alias for client_keys.anthropic
+}
+```
+
+Server env vars (`PLANTNET_API_KEY`, `ANTHROPIC_API_KEY`) act as the
+fallback when a `client_keys.<provider>` entry is missing. The function
+never logs the key value.
+
+### Guided setup UX
+
+Each plugin's profile/edit card has a "Configure" disclosure that opens:
+
+1. The plugin's `setupSteps` rendered as a numbered list with clickable
+   links to the provider's dashboard.
+2. One password input per `keySpec` entry, with `placeholder`, `hint`,
+   and optional pattern validation.
+3. **Save** + **Test** + **Clear** buttons. Test calls `testConnection()`
+   and shows ✓ / ✗ inline.
+
+### Privacy invariants
+
+- **Local only by default.** Keys are stored in localStorage on the
+  user's device. Browser private mode = ephemeral keys.
+- **No server-side persistence.** The Edge Function uses the key for one
+  call and forgets it.
+- **No logs.** The function explicitly does not log the key value.
+- **Origin-scoped.** Browsers prevent localStorage cross-origin reads, so
+  `rastrum.artemiop.com` is the only origin that can read the keys.
+
+---
+
 ## Why this is also a community story
 
 The plugin contract is intentionally narrow (one interface, one register

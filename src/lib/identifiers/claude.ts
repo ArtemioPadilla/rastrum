@@ -6,37 +6,73 @@
  *  - The user's BYO key (passed via byo_keys.anthropic).
  */
 import { getSupabase } from '../supabase';
+import { getKey } from '../byo-keys';
 import type { Identifier, IDResult, IdentifyInput } from './types';
 
-const BYO_KEY_STORAGE = 'rastrum.byoAnthropicKey';
-
-function readByoKey(): string | undefined {
-  if (typeof localStorage === 'undefined') return undefined;
-  return localStorage.getItem(BYO_KEY_STORAGE) ?? undefined;
-}
+const PLUGIN_ID = 'claude_haiku';
 
 export const claudeIdentifier: Identifier = {
-  id: 'claude_haiku',
+  id: PLUGIN_ID,
   name: 'Claude Haiku 4.5 (Vision)',
-  description: 'Anthropic Claude Haiku 4.5 with image input. Generalist; good for animals, fungi, indirect evidence. Uses your BYO key if set.',
+  brand: '✨',
+  description: 'Anthropic Claude Haiku 4.5 with vision input. Generalist — strong on animals, fungi, indirect evidence (tracks/scat/burrows). Bring your own API key to bill the cost to your account.',
   capabilities: {
     media: ['photo'],
     taxa: ['*'],
     runtime: 'server',
-    license: 'byo-key',                  // operator may also configure ANTHROPIC_API_KEY
+    license: 'byo-key',
     cost_per_id_usd: 0.0028,
   },
+  keySpec: [{
+    name: 'anthropic',
+    label: 'Anthropic API key',
+    placeholder: 'sk-ant-…',
+    hint: 'Used per-call; never stored on our server. Each call costs ≈ $0.003.',
+    pattern: /^sk-ant-[A-Za-z0-9_-]+$/,
+    optional: true,
+  }],
+  setupSteps: [
+    { text: 'Sign in to console.anthropic.com', link: 'https://console.anthropic.com' },
+    { text: 'Click API Keys (left sidebar) → Create Key', link: 'https://console.anthropic.com/settings/keys' },
+    { text: 'Name the key something like "rastrum-personal", scope it to "Default", click Create.' },
+    { text: 'Copy the key (starts with sk-ant-…) — you can\'t see it again.', details: 'Free $5 credit at signup. After that, ~3,500 identifications per dollar.' },
+    { text: 'Paste the key below and click Save.' },
+  ],
   async isAvailable() {
-    if (readByoKey()) return { ready: true };
-    // We don't know about the server's env var; assume ready and let the
-    // Edge Function tell us via the no_id_engine_available marker.
-    return { ready: true };
+    if (getKey(PLUGIN_ID, 'anthropic')) return { ready: true };
+    return { ready: true };  // server fallback may exist
+  },
+  async testConnection() {
+    const key = getKey(PLUGIN_ID, 'anthropic');
+    if (!key) return { ok: false, message: 'No key set.' };
+    // Cheapest possible probe: list models endpoint, 1-token response
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': key,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5',
+          max_tokens: 1,
+          messages: [{ role: 'user', content: 'ping' }],
+        }),
+      });
+      if (res.ok) return { ok: true, message: 'Key reaches Anthropic.' };
+      if (res.status === 401) return { ok: false, message: 'Key rejected (401).' };
+      if (res.status === 429) return { ok: true, message: 'Key valid but rate-limited.' };
+      return { ok: false, message: `HTTP ${res.status}` };
+    } catch (e) {
+      return { ok: false, message: e instanceof Error ? e.message : 'Network error.' };
+    }
   },
   async identify(input: IdentifyInput): Promise<IDResult> {
     if (input.media.kind !== 'url') {
       throw new Error('claude_haiku: requires media.kind=url');
     }
-    const byo = input.byo_keys?.anthropic ?? readByoKey();
+    const userKey = input.byo_keys?.anthropic ?? getKey(PLUGIN_ID, 'anthropic');
     const supabase = getSupabase();
     const { data, error } = await supabase.functions.invoke('identify', {
       body: {
@@ -44,7 +80,7 @@ export const claudeIdentifier: Identifier = {
         image_url: input.media.url,
         force_provider: 'claude_haiku',
         location: input.location,
-        client_anthropic_key: byo,
+        client_keys: userKey ? { anthropic: userKey } : undefined,
       },
     });
     if (error) throw error;

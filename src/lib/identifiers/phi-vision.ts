@@ -10,7 +10,12 @@ import type { Identifier, IDResult, IdentifyInput } from './types';
 export const phiVisionIdentifier: Identifier = {
   id: 'webllm_phi35_vision',
   name: 'Phi-3.5-vision (on-device)',
-  description: 'General vision-language model, runs entirely in your browser. ~4 GB download. Hard-capped at low confidence — never reaches research-grade.',
+  brand: '🧠',
+  description: 'Microsoft Phi-3.5 vision-language model running entirely in your browser via WebLLM. ~4 GB one-time download. Generalist — confidence is hard-capped because it has no taxonomic training.',
+  setupSteps: [
+    { text: 'Profile → Edit → AI settings → "On-device AI" → "Download vision model".' },
+    { text: 'You only download once. The model stays cached for next time.', details: 'Requires WebGPU. ~4 GB download + ~5 GB free disk space.' },
+  ],
   capabilities: {
     media: ['photo'],
     taxa: ['*'],
