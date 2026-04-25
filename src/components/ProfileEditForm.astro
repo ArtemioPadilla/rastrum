@@ -185,6 +185,33 @@ const tr = t(lang);
         </div>
       </div>
     </div>
+
+    <!-- BirdNET-Lite (on-device audio) -->
+    <div class="mt-6 pt-5 border-t border-zinc-100 dark:border-zinc-800/60">
+      <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">{tr.auth.birdnet_section}</h3>
+      <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">{tr.auth.birdnet_hint}</p>
+      <p id="birdnet-url-missing" class="hidden text-xs text-amber-700 dark:text-amber-400 mb-2">{tr.auth.birdnet_weights_url_missing}</p>
+
+      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+        <div class="flex items-start justify-between gap-3 flex-wrap">
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">BirdNET-Lite v2.4</p>
+            <p class="text-xs text-zinc-500" id="birdnet-status">—</p>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button id="birdnet-download" type="button" class="rounded-lg border border-emerald-600/60 px-3 py-1.5 text-xs sm:text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 disabled:opacity-50">
+              <span data-bnlabel>{tr.auth.birdnet_download}</span>
+            </button>
+            <button id="birdnet-delete" type="button" class="hidden rounded-lg border border-red-300 dark:border-red-900/50 px-3 py-1.5 text-xs sm:text-sm font-medium text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">
+              {tr.auth.birdnet_delete}
+            </button>
+          </div>
+        </div>
+        <p id="birdnet-progress" class="hidden mt-2 text-xs text-zinc-600 dark:text-zinc-400 font-mono"></p>
+        <p class="mt-3 text-[11px] text-zinc-500 dark:text-zinc-400">{tr.auth.birdnet_attribution}</p>
+        <p class="mt-1 text-[11px] text-amber-700 dark:text-amber-400">{tr.auth.birdnet_nc_warning}</p>
+      </div>
+    </div>
   </section>
 
   <!-- ── Confirmation modals (single dialog reused via data attrs) ── -->
@@ -573,6 +600,89 @@ const tr = t(lang);
   });
 
   refreshAll().catch(() => {});
+
+  // ── BirdNET-Lite (on-device audio) — independent of WebLLM cache ──
+  const bnDownloadBtn = document.getElementById('birdnet-download') as HTMLButtonElement | null;
+  const bnDeleteBtn   = document.getElementById('birdnet-delete')   as HTMLButtonElement | null;
+  const bnStatus      = document.getElementById('birdnet-status');
+  const bnProgress    = document.getElementById('birdnet-progress');
+  const bnUrlMissing  = document.getElementById('birdnet-url-missing');
+  const bnLabel       = bnDownloadBtn?.querySelector('[data-bnlabel]') as HTMLElement | null;
+  const BN_DEFAULT_LABEL = bnLabel?.textContent ?? '';
+  const BN_REDOWNLOAD_LABEL = isEsLang ? 'Volver a descargar' : 'Re-download';
+
+  let bnLib: typeof import('../lib/identifiers/birdnet-cache') | null = null;
+  async function getBnLib() {
+    if (!bnLib) bnLib = await import('../lib/identifiers/birdnet-cache');
+    return bnLib;
+  }
+
+  async function refreshBirdNET() {
+    if (!bnDownloadBtn || !bnDeleteBtn || !bnStatus || !bnLabel) return;
+    const lib = await getBnLib().catch(() => null);
+    if (!lib) return;
+    const baseUrl = lib.getBirdNETWeightsBaseUrl();
+    if (!baseUrl) {
+      bnUrlMissing?.classList.remove('hidden');
+      bnDownloadBtn.disabled = true;
+    } else {
+      bnUrlMissing?.classList.add('hidden');
+      bnDownloadBtn.disabled = false;
+    }
+    const status = await lib.getBirdNETCacheStatus();
+    if (status.modelCached && status.labelsCached) {
+      bnStatus.textContent = `${tr('Cached on this device','Guardado en este dispositivo')} · ${bytesHuman(status.approxBytes)}`;
+      bnLabel.textContent = BN_REDOWNLOAD_LABEL;
+      bnDeleteBtn.classList.remove('hidden');
+    } else {
+      bnStatus.textContent = `${tr('Not downloaded','No descargado')} · ~50 MB`;
+      bnLabel.textContent = BN_DEFAULT_LABEL;
+      bnDeleteBtn.classList.add('hidden');
+    }
+  }
+
+  bnDownloadBtn?.addEventListener('click', async () => {
+    if (!bnDownloadBtn) return;
+    const ok = await confirmDialog({
+      title: tr('Download BirdNET-Lite?','¿Descargar BirdNET-Lite?'),
+      bodyHtml: `
+        <p><strong>${tr('Size','Tamaño')}:</strong> ~50 MB</p>
+        <ul class="list-disc pl-4 space-y-1 text-zinc-600 dark:text-zinc-400">
+          <li>${tr('After download, the model runs entirely on this device — recordings never leave the browser.','Tras la descarga el modelo se ejecuta totalmente en este dispositivo — las grabaciones nunca salen del navegador.')}</li>
+          <li>${tr('License: CC BY-NC-SA 4.0 (non-commercial). Cite Kahl et al. 2021.','Licencia: CC BY-NC-SA 4.0 (no comercial). Cita a Kahl et al. 2021.')}</li>
+        </ul>
+      `,
+      okLabel: tr('Download','Descargar'),
+    });
+    if (!ok) return;
+    bnDownloadBtn.disabled = true;
+    bnProgress?.classList.remove('hidden');
+    try {
+      const lib = await getBnLib();
+      await lib.downloadBirdNETWeights((p) => {
+        if (bnProgress) bnProgress.textContent = `${Math.round((p.progress ?? 0) * 100)}%  ${p.text ?? ''}`;
+      });
+    } catch (e) {
+      if (bnStatus) bnStatus.textContent = e instanceof Error ? e.message : 'Failed';
+    } finally {
+      bnDownloadBtn.disabled = false;
+      await refreshBirdNET();
+    }
+  });
+
+  bnDeleteBtn?.addEventListener('click', async () => {
+    const ok = await confirmDialog({
+      title: tr('Delete BirdNET-Lite from this device?','¿Borrar BirdNET-Lite de este dispositivo?'),
+      bodyHtml: `<p>${tr("This frees disk space. You can re-download anytime — your account isn't affected.","Libera espacio en disco. Puedes volver a descargarlo en cualquier momento — tu cuenta no se ve afectada.")}</p>`,
+      okLabel: tr('Delete','Borrar'),
+    });
+    if (!ok) return;
+    const lib = await getBnLib();
+    await lib.clearBirdNETCache();
+    await refreshBirdNET();
+  });
+
+  refreshBirdNET().catch(() => {});
 
   // ── Identifier registry list (modular platform) with guided setup ──
   async function paintRegistry() {
