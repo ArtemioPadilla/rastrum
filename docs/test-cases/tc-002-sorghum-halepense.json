@@ -1,0 +1,32 @@
+{
+  "id": "tc-002",
+  "date": "2026-04-24",
+  "location": "San Pablo Etla, Oaxaca, México",
+  "coords_approx": { "lat": 17.11, "lng": -96.74 },
+  "habitat": "baldio_urbano_orilla_camino",
+  "photo_angle": "lateral_inflorescencia",
+  "pipeline": {
+    "claude_vision_round1": {
+      "result": "Cenchrus setaceus (syn. Pennisetum setaceum) — Zacate plumero africano",
+      "confidence": 0.65,
+      "reasoning": "Hojas largas lineares glaucas, tallos erectos, panícula plumosa terminal"
+    },
+    "claude_vision_round2_with_inflorescencia": {
+      "result": "Cenchrus setaceus confirmado",
+      "confidence": 0.72
+    }
+  },
+  "ground_truth": {
+    "scientific_name": "Sorghum halepense",
+    "authority": "(L.) Pers.",
+    "family": "Poaceae",
+    "common_name_es": "Zacate Johnson / Sorgo de Alepo",
+    "identified_by": "Eugenio Padilla (field expert)",
+    "nom059_status": null,
+    "origin": "Africana — invasora naturalizada en México",
+    "notes": "Panícula más abierta y ramificada que Cenchrus. Hojas más anchas con nervadura central blanca prominente. Rizomatosa. Una de las peores malezas agrícolas del mundo."
+  },
+  "failure_mode": "confusion_gramineas_invasoras_africanas",
+  "lesson": "Cenchrus vs Sorghum: panícula plumosa vs panícula abierta ramificada. Nervadura central y ancho de hoja son rasgos clave. Ambas invasoras en Valle de Oaxaca.",
+  "priority": "medium — especies invasoras importantes para mapeo de distribución"
+}

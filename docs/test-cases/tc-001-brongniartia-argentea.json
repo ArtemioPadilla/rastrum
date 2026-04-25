@@ -1,0 +1,32 @@
+{
+  "id": "tc-001",
+  "date": "2026-04-24",
+  "location": "San Pablo Etla, Oaxaca, México",
+  "coords_approx": { "lat": 17.11, "lng": -96.74 },
+  "habitat": "bosque_encino_hojarasca",
+  "photo_angle": "cenital",
+  "pipeline": {
+    "plantnet": {
+      "top_result": null,
+      "confidence": null,
+      "note": "No tested yet — manual ID session via WhatsApp"
+    },
+    "claude_vision": {
+      "result": "Krameria sp. (posiblemente K. cytisoides o K. erecta)",
+      "confidence": 0.40,
+      "reasoning": "Hojas pinnadas pequeñas grisáceas, frutos/flores rojizas, porte rastrero sobre hojarasca"
+    }
+  },
+  "ground_truth": {
+    "scientific_name": "Brongniartia argentea",
+    "authority": "Rydb.",
+    "family": "Fabaceae",
+    "identified_by": "Eugenio Padilla (field expert)",
+    "nom059_status": null,
+    "endemic": "México (centro y sur: Oaxaca, Puebla, Guerrero)",
+    "notes": "Hojas pinnadas plateadas/glaucas con lustre metálico. Arbustiva baja. Común bosque encino Oaxaca."
+  },
+  "failure_mode": "foto_cenital_hojarasca_especie_endemica",
+  "lesson": "Ángulo cenital + fondo hojarasca + especie endémica subrepresentada en datasets globales = error de género. Pedir foto lateral de rama con flor para confirmar.",
+  "priority": "high — Brongniartia género endémico México, pocas fotos en iNat/PlantNet"
+}
