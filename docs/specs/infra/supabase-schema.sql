@@ -314,6 +314,43 @@ CREATE POLICY "media_public_read" ON public.media_files FOR SELECT
   );
 
 -- ============================================================
+-- ROLE-LEVEL GRANTS
+-- ============================================================
+-- Required because we deliberately turned OFF "Automatically expose new
+-- tables and functions" when we created the project. PostgREST won't grant
+-- anything by default, so anon/authenticated requests get 403 even though
+-- RLS is configured correctly. RLS still does the row-level gating; these
+-- GRANTs only expose the tables to the API.
+
+-- Schema usage
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+
+-- Anonymous: read-only — RLS will gate which rows are actually returned.
+GRANT SELECT ON ALL TABLES    IN SCHEMA public TO anon;
+GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO anon;
+
+-- Authenticated: full CRUD — RLS gates rows. Functions need EXECUTE.
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES    IN SCHEMA public TO authenticated;
+GRANT USAGE,  SELECT                  ON ALL SEQUENCES IN SCHEMA public TO authenticated;
+GRANT EXECUTE                         ON ALL FUNCTIONS IN SCHEMA public TO authenticated;
+
+-- Future tables/sequences/functions inherit the same grants automatically.
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT SELECT ON TABLES TO anon;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT EXECUTE ON FUNCTIONS TO authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT USAGE, SELECT ON SEQUENCES TO authenticated;
+
+-- Defensive: revoke privileges that Supabase's legacy project init may have
+-- granted to anon. None are reachable via PostgREST today, but minimal
+-- privilege is a basic hygiene principle.
+REVOKE TRUNCATE, REFERENCES, TRIGGER ON ALL TABLES IN SCHEMA public FROM anon;
+REVOKE INSERT, UPDATE, DELETE          ON ALL TABLES IN SCHEMA public FROM anon;
+
+-- ============================================================
 -- HELPER FUNCTIONS
 -- ============================================================
 
