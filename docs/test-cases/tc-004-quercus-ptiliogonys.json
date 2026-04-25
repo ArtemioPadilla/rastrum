@@ -1,0 +1,45 @@
+{
+  "id": "tc-004",
+  "date": "2026-04-25",
+  "location": "San Pablo Etla, Valle de Etla, Oaxaca, México",
+  "coords_approx": { "lat": 17.11, "lng": -96.74 },
+  "habitat": "bosque_encino_encinar_valle_etla",
+  "photo_files": ["tc-004-quercus-ptiliogonys.jpg"],
+  "pipeline": {
+    "tree": {
+      "model": "anthropic.claude-haiku-4-5-20251001-v1:0",
+      "result": "Quercus crassifolia",
+      "family_guessed": "Fagaceae",
+      "confidence": 0.85,
+      "above_threshold": true,
+      "verdict": "PENDIENTE validación por Eugenio — plausible para Valle de Etla"
+    },
+    "bird": {
+      "model": "anthropic.claude-haiku-4-5-20251001-v1:0",
+      "result": "Psarocolius montezuma",
+      "family_guessed": "Icteridae",
+      "confidence": 0.85,
+      "above_threshold": true,
+      "would_accept": true,
+      "verdict": "FALSE POSITIVE — silueta en contraluz, modelo guessó especie de bosque húmedo incorrecta para habitat seco"
+    }
+  },
+  "ground_truth": {
+    "tree": {
+      "scientific_name": "Quercus sp.",
+      "notes": "Pendiente confirmación de especie por Eugenio — encino dominante Valle de Etla"
+    },
+    "bird": {
+      "scientific_name": "Ptiliogonys sp.",
+      "family": "Ptiliogonatidae",
+      "common_name_es": "Capulinero / Fandanguero",
+      "identified_by": "Eugenio Padilla (field expert)",
+      "nom_059_status": null,
+      "notes": "Ptiliogonys cinereus (capulinero gris) o P. caudatus. Familia Ptiliogonatidae — endémica Mesoamérica. Habitat correcto: encinar montano Oaxaca. Claude confundió con Psarocolius (bosque húmedo tropical) basándose solo en silueta oscura en contraluz."
+    }
+  },
+  "failure_mode": "silueta_contraluz_ave_familia_endemica_mesoamerica",
+  "lesson": "Silueta en contraluz = confianza inflada sin base morfológica real. Ptiliogonatidae es familia endémica Mesoamérica casi ausente en datasets globales. Para aves: sin plumaje visible la confianza debe ser forzosamente baja (<0.3). Necesitamos hard-cap de confianza para fotos de aves en contraluz.",
+  "cascade_fix": "Para kingdom=Animalia + imagen en contraluz (alta luminosidad de fondo): cap confidence a 0.3 automáticamente. Agregar detección de contraluz como flag en preprocessing.",
+  "priority": "high — Ptiliogonatidae es familia endémica oaxaqueña frecuente, sistemáticamente ignorada por modelos globales"
+}
