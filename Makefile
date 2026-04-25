@@ -66,6 +66,13 @@ db-seed-badges: ## Seed the badges catalogue (idempotent)
 	@psql "$$SUPABASE_DB" -v ON_ERROR_STOP=1 -f $(MIGRATIONS_DIR)/seed-badges.sql
 	@echo "✓ Badges seeded"
 
+db-cron-schedule: ## Schedule the nightly cron jobs (edit the SQL first to insert your anon key)
+	$(call require_env,SUPABASE_DB)
+	@grep -q '<YOUR_PUBLISHABLE_KEY>' $(MIGRATIONS_DIR)/cron-schedules.sql && { \
+	  echo "✗ Edit $(MIGRATIONS_DIR)/cron-schedules.sql first — replace <YOUR_PUBLISHABLE_KEY> with your sb_publishable_… key."; exit 1; } || true
+	@psql "$$SUPABASE_DB" -v ON_ERROR_STOP=1 -f $(MIGRATIONS_DIR)/cron-schedules.sql
+	@echo "✓ Cron jobs scheduled"
+
 db-verify: ## Verify tables, RLS, triggers, extensions are in place
 	$(call require_env,SUPABASE_DB)
 	@echo "── Tables ──"
