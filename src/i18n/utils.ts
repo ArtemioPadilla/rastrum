@@ -36,7 +36,7 @@ export const routes: Record<string, Record<Locale, string>> = {
 };
 
 export const docPages = [
-  'vision', 'features', 'roadmap', 'market',
+  'vision', 'features', 'roadmap', 'tasks', 'market',
   'architecture', 'indigenous', 'funding', 'contribute',
 ] as const;
 

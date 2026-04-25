@@ -1,0 +1,222 @@
+---
+import { t } from '../i18n/utils';
+import progressData from '../../docs/progress.json';
+import tasksData from '../../docs/tasks.json';
+
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+const isEs = lang === 'es';
+
+function loc<T extends Record<string, unknown>>(obj: T, base: string): string {
+  if (isEs) {
+    const v = obj[base + '_es'];
+    if (typeof v === 'string' && v.length) return v;
+  }
+  const v = obj[base];
+  return typeof v === 'string' ? v : '';
+}
+
+type SubtaskStatus = 'done' | 'in_progress' | 'planned' | 'blocked';
+type Subtask = {
+  label_en: string;
+  label_es?: string;
+  status: SubtaskStatus;
+  blocker_en?: string;
+  blocker_es?: string;
+  ref_en?: string;
+  ref_es?: string;
+};
+type TaskItem = {
+  phase: string;
+  title_en: string;
+  title_es?: string;
+  modules: string[];
+  subtasks: Subtask[];
+};
+
+// Group items by phase. Precompute every localised string here so the JSX
+// stays free of `Record<…>` casts (which Astro's parser misreads as tags).
+const phaseOrder = ['v0.1','v0.3','v0.5','v1.0','v1.5','v2.0','v2.5'];
+const items = tasksData.items as Record<string, TaskItem>;
+
+interface DisplaySubtask {
+  label: string;
+  blocker: string;
+  ref: string;
+  status: SubtaskStatus;
+}
+interface DisplayItem {
+  id: string;
+  title: string;
+  modules: string[];
+  subtasks: DisplaySubtask[];
+}
+
+const byPhase: Record<string, DisplayItem[]> = {};
+for (const [id, item] of Object.entries(items)) {
+  const p = item.phase;
+  if (!byPhase[p]) byPhase[p] = [];
+  byPhase[p].push({
+    id,
+    title:   loc(item as unknown as Record<string, unknown>, 'title'),
+    modules: item.modules ?? [],
+    subtasks: (item.subtasks ?? []).map(s => ({
+      label:   loc(s as unknown as Record<string, unknown>, 'label'),
+      blocker: loc(s as unknown as Record<string, unknown>, 'blocker'),
+      ref:     loc(s as unknown as Record<string, unknown>, 'ref'),
+      status:  s.status,
+    })),
+  });
+}
+
+function pct(subs: { status: SubtaskStatus }[]) {
+  const done = subs.filter(s => s.status === 'done').length;
+  return { done, total: subs.length, pct: subs.length ? Math.round((done / subs.length) * 100) : 0 };
+}
+
+const tStatus = {
+  done:        isEs ? 'Hecho'    : 'Done',
+  in_progress: isEs ? 'En curso' : 'In progress',
+  planned:     isEs ? 'Pendiente': 'Planned',
+  blocked:     isEs ? 'Bloqueado': 'Blocked',
+};
+
+type PhaseShape = { status: string; name?: string; name_es?: string };
+const phasesMap = progressData.phases as unknown as Record<string, PhaseShape>;
+
+const phaseStatusOf = (phaseId: string): string => {
+  return phasesMap[phaseId]?.status ?? 'planned';
+};
+
+const phaseLabelOf = (phaseId: string): string => {
+  const p = phasesMap[phaseId];
+  if (!p) return phaseId;
+  return loc(p as unknown as Record<string, unknown>, 'name');
+};
+
+const titleText = isEs ? 'Tareas detalladas' : 'Detailed tasks';
+const subtitle = isEs
+  ? 'Desglose por ítem del roadmap. Sub-tareas con estado y referencias a specs.'
+  : 'Per-item roadmap breakdown. Subtasks with status and spec references.';
+const updated = isEs ? 'Actualizado' : 'Updated';
+---
+
+<article class="space-y-2">
+  <header class="mb-8">
+    <h1 class="text-3xl font-bold tracking-tight mb-2">{titleText}</h1>
+    <p class="text-zinc-600 dark:text-zinc-400 max-w-2xl">{subtitle}</p>
+    <p class="text-xs text-zinc-500 dark:text-zinc-500 mt-2">
+      {updated}: {tasksData.updated}
+      {' · '}
+      <a href={`/${lang}/docs/roadmap/`} class="underline">{isEs ? 'Ver roadmap' : 'View roadmap'}</a>
+    </p>
+  </header>
+
+  {/* Legend */}
+  <div class="not-prose flex flex-wrap gap-2 text-xs mb-6">
+    <span class="px-2 py-1 rounded border bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30">✓ {tStatus.done}</span>
+    <span class="px-2 py-1 rounded border bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30">~ {tStatus.in_progress}</span>
+    <span class="px-2 py-1 rounded border bg-zinc-200/50 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border-zinc-300 dark:border-zinc-700">○ {tStatus.planned}</span>
+    <span class="px-2 py-1 rounded border bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30">! {tStatus.blocked}</span>
+  </div>
+
+  {phaseOrder.filter(p => byPhase[p]).map(phaseId => {
+    const phaseItems = byPhase[phaseId];
+    const phaseStatus = phaseStatusOf(phaseId);
+    const phaseLabel = phaseLabelOf(phaseId);
+    return (
+      <section class="mb-8">
+        <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-3 flex items-center gap-2 flex-wrap">
+          <code class="font-mono text-sm">{phaseId}</code>
+          <span>{phaseLabel}</span>
+          {phaseStatus === 'done' && <span class="text-xs px-2 py-0.5 rounded-full border bg-sky-500/20 text-sky-600 dark:text-sky-400 border-sky-500/30">{isEs ? 'Lanzado' : 'Shipped'}</span>}
+          {phaseStatus === 'in_progress' && <span class="text-xs px-2 py-0.5 rounded-full border bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30">{isEs ? 'En progreso' : 'In Progress'}</span>}
+          {phaseStatus === 'planned' && <span class="text-xs px-2 py-0.5 rounded-full border bg-zinc-200 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border-zinc-300 dark:border-zinc-700">{isEs ? 'Planeado' : 'Planned'}</span>}
+        </h2>
+
+        <div class="space-y-2">
+          {phaseItems.map((item) => {
+            const prog = pct(item.subtasks);
+            const isDoneAll = prog.pct === 100;
+            const isAnyBlocked = item.subtasks.some(s => s.status === 'blocked');
+            return (
+              <details class:list={[
+                "rounded-xl border transition-colors",
+                isDoneAll
+                  ? "border-sky-500/30 bg-sky-500/5"
+                  : isAnyBlocked
+                    ? "border-amber-500/30 bg-amber-500/5"
+                    : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50"
+              ]}>
+                <summary class="cursor-pointer select-none p-4 flex items-start justify-between gap-3 flex-wrap">
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <code class="text-xs font-mono text-zinc-500 dark:text-zinc-500">{item.id}</code>
+                      <span class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{item.title}</span>
+                    </div>
+                    {item.modules.length > 0 && (
+                      <p class="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono mt-1">
+                        {item.modules.map((m, i) => (
+                          <Fragment>
+                            {i > 0 && ' · '}
+                            <a href={`https://github.com/ArtemioPadilla/rastrum/blob/main/docs/specs/${m.startsWith('infra/') ? m : 'modules/' + m}`} target="_blank" rel="noopener" class="hover:underline">{m}</a>
+                          </Fragment>
+                        ))}
+                      </p>
+                    )}
+                  </div>
+                  <div class="text-right shrink-0">
+                    <span class:list={[
+                      "text-sm font-semibold",
+                      prog.pct === 100 ? "text-sky-600 dark:text-sky-400" :
+                      prog.pct > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-400 dark:text-zinc-600"
+                    ]}>
+                      {prog.done}/{prog.total}
+                    </span>
+                    <p class="text-xs text-zinc-400 dark:text-zinc-600">{isEs ? 'subtareas' : 'subtasks'}</p>
+                  </div>
+                </summary>
+
+                <div class="px-4 pb-4 space-y-1">
+                  {item.subtasks.map(sub => {
+                    const icon = sub.status === 'done' ? '✓' : sub.status === 'in_progress' ? '~' : sub.status === 'blocked' ? '!' : '○';
+                    const cls =
+                      sub.status === 'done'        ? 'text-emerald-600 dark:text-emerald-400'
+                    : sub.status === 'in_progress' ? 'text-amber-600 dark:text-amber-400'
+                    : sub.status === 'blocked'     ? 'text-red-600 dark:text-red-400'
+                                                   : 'text-zinc-400 dark:text-zinc-500';
+                    return (
+                      <div class="flex items-start gap-2 text-sm">
+                        <span class:list={["mt-0.5 font-mono w-4 shrink-0", cls]}>{icon}</span>
+                        <div class="flex-1 min-w-0">
+                          <span class:list={[
+                            "leading-relaxed",
+                            sub.status === 'done' ? 'text-zinc-500 dark:text-zinc-500 line-through' : 'text-zinc-700 dark:text-zinc-300'
+                          ]}>
+                            {sub.label}
+                          </span>
+                          {sub.blocker && (
+                            <p class="text-[10px] text-red-600 dark:text-red-400 italic mt-0.5">{isEs ? 'Bloqueado por: ' : 'Blocked by: '}{sub.blocker}</p>
+                          )}
+                          {sub.ref && (
+                            <p class="text-[10px] text-zinc-500 italic mt-0.5">→ {sub.ref}</p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </details>
+            );
+          })}
+        </div>
+      </section>
+    );
+  })}
+
+  <p class="text-xs text-zinc-500 dark:text-zinc-600 mt-8">
+    {isEs ? 'Edita ' : 'Edit '}<code class="bg-zinc-100 dark:bg-zinc-800 px-1 rounded">docs/tasks.json</code>
+    {isEs ? ' para actualizar. La página se reconstruye en cada push.' : ' to update. The page rebuilds on every push.'}
+  </p>
+</article>

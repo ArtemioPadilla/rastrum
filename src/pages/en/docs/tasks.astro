@@ -1,0 +1,12 @@
+---
+import DocLayout from '../../../layouts/DocLayout.astro';
+import TasksView from '../../../components/TasksView.astro';
+import { t } from '../../../i18n/utils';
+
+const lang = 'en';
+const tr = t(lang);
+---
+
+<DocLayout title={tr.docs.sections.tasks} lang={lang} section="tasks" editPath="src/pages/en/docs/tasks.astro">
+  <TasksView lang={lang} />
+</DocLayout>

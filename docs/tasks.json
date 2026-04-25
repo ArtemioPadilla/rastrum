@@ -1,0 +1,474 @@
+{
+  "updated": "2026-04-25",
+  "schema_version": 1,
+  "notes_en": "Per-item task breakdown. Each entry mirrors docs/tasks.md. Subtasks: 'done'|'in_progress'|'blocked'|'planned'. The page at /{lang}/docs/tasks/ renders this with progress bars + commit/spec links.",
+  "notes_es": "Desglose por ítem. Cada entrada refleja docs/tasks.md. Subtareas: 'done'|'in_progress'|'blocked'|'planned'. La página /{lang}/docs/tasks/ la renderiza con barras de progreso y enlaces a commits y specs.",
+  "items": {
+    "astro-skeleton": {
+      "phase": "v0.1",
+      "title_en": "Astro site skeleton + Tailwind + i18n",
+      "title_es": "Esqueleto Astro + Tailwind + i18n",
+      "modules": [],
+      "subtasks": [
+        { "label_en": "Astro 5 project with output: 'static'",                         "label_es": "Proyecto Astro 5 con output: 'static'",                                          "status": "done" },
+        { "label_en": "Tailwind 3 + @astrojs/tailwind integration",                    "label_es": "Tailwind 3 + integración @astrojs/tailwind",                                     "status": "done" },
+        { "label_en": "EN/ES locales via astro/i18n + prefixDefaultLocale",            "label_es": "Locales EN/ES vía astro/i18n + prefixDefaultLocale",                             "status": "done" },
+        { "label_en": "BaseLayout + DocLayout shared shells",                          "label_es": "Shells compartidos BaseLayout + DocLayout",                                      "status": "done" },
+        { "label_en": "Header + Footer with theme toggle, lang switcher, mobile menu", "label_es": "Header + Footer con toggle de tema, switcher de idioma y menú móvil",            "status": "done" },
+        { "label_en": "Sitemap (@astrojs/sitemap)",                                    "label_es": "Sitemap (@astrojs/sitemap)",                                                     "status": "done" }
+      ]
+    },
+    "supabase-schema": {
+      "phase": "v0.1",
+      "title_en": "Supabase schema with PostGIS + RLS",
+      "title_es": "Esquema Supabase con PostGIS + RLS",
+      "modules": ["02-observation.md","05-map.md","06-darwin-core.md","07-licensing.md"],
+      "subtasks": [
+        { "label_en": "6 core tables (users, taxa, taxon_usage_history, observations, identifications, media_files)", "label_es": "6 tablas principales", "status": "done" },
+        { "label_en": "PostGIS geography columns + GIST indexes",        "label_es": "Columnas geography PostGIS + índices GIST",   "status": "done" },
+        { "label_en": "RLS owner + public-read + credentialed-read",     "label_es": "RLS dueño + lectura pública + credentialed",  "status": "done" },
+        { "label_en": "3 triggers (auth-user-created, obs-count, sync-primary-id)", "label_es": "3 triggers", "status": "done" },
+        { "label_en": "obscure_point() helper + obscure_level enum",     "label_es": "helper obscure_point() + enum obscure_level", "status": "done" },
+        { "label_en": "Idempotent — replayable via make db-apply",       "label_es": "Idempotente — reaplicable con make db-apply", "status": "done" },
+        { "label_en": "Storage bucket 'media' + policies",                "label_es": "Bucket de storage 'media' + políticas",       "status": "done" },
+        { "label_en": "Role-level grants (anon SELECT, authenticated CRUD)", "label_es": "Permisos de rol (anon SELECT, authenticated CRUD)", "status": "done" }
+      ]
+    },
+    "auth-magic-link": {
+      "phase": "v0.1",
+      "title_en": "Magic-link auth + guest mode",
+      "title_es": "Auth con enlace mágico + modo invitado",
+      "modules": ["04-auth.md"],
+      "subtasks": [
+        { "label_en": "supabase.ts singleton client",                "label_es": "Cliente singleton supabase.ts",                "status": "done" },
+        { "label_en": "auth.ts helpers (sendMagicLink, exchangeCode, signOut)", "label_es": "Helpers en auth.ts",                  "status": "done" },
+        { "label_en": "Sign-in pages in EN + ES",                    "label_es": "Páginas de sign-in en EN y ES",                "status": "done" },
+        { "label_en": "Callback handles PKCE and implicit flows",    "label_es": "Callback maneja flujos PKCE e implicit",       "status": "done" },
+        { "label_en": "Header avatar dropdown via onAuthStateChange","label_es": "Dropdown de avatar en Header con onAuthStateChange", "status": "done" },
+        { "label_en": "ObserverRef discriminated union",             "label_es": "Unión discriminada ObserverRef",               "status": "done" },
+        { "label_en": "Hard-cap UI nudge after 3rd guest observation","label_es": "Nudge tras la 3ra observación de invitado",   "status": "planned" }
+      ]
+    },
+    "auth-multi": {
+      "phase": "v0.1",
+      "title_en": "Google + GitHub OAuth, OTP code, passkey, sign-out-everywhere",
+      "title_es": "OAuth Google + GitHub, código OTP, passkey, cerrar sesión en todos los dispositivos",
+      "modules": ["04-auth.md"],
+      "subtasks": [
+        { "label_en": "signInWithGoogle / signInWithGitHub (with user:email scope)",     "label_es": "signInWithGoogle / signInWithGitHub", "status": "done" },
+        { "label_en": "Email OTP code path (verifyOtp)",                                  "label_es": "Flujo de código OTP (verifyOtp)",     "status": "done" },
+        { "label_en": "Passkey enrol + verify (b64url ↔ ArrayBuffer)",                    "label_es": "Passkey enrol + verify",              "status": "done" },
+        { "label_en": "WebAuthn feature detection",                                       "label_es": "Detección WebAuthn",                  "status": "done" },
+        { "label_en": "signOutEverywhere() global revocation",                             "label_es": "signOutEverywhere() revocación global","status": "done" },
+        { "label_en": "SignInForm shared component used by both locales",                "label_es": "Componente SignInForm compartido",    "status": "done" },
+        { "label_en": "Operator: enable WebAuthn MFA toggle in dashboard",               "label_es": "Operador: habilitar toggle MFA WebAuthn", "status": "blocked", "blocker_en": "Manual dashboard step", "blocker_es": "Paso manual en dashboard" }
+      ]
+    },
+    "ci-cd": {
+      "phase": "v0.1",
+      "title_en": "CI/CD via GitHub Actions",
+      "title_es": "CI/CD con GitHub Actions",
+      "modules": ["infra/testing.md","infra/github-actions.yml"],
+      "subtasks": [
+        { "label_en": "ci.yml — typecheck + test + build on PRs",            "label_es": "ci.yml — typecheck + test + build en PRs",      "status": "done" },
+        { "label_en": "deploy.yml — typecheck + test + build + deploy",      "label_es": "deploy.yml — typecheck + test + build + deploy","status": "done" },
+        { "label_en": "deploy-functions.yml — manual Edge Function deploys", "label_es": "deploy-functions.yml — deploys manuales",       "status": "done" },
+        { "label_en": "PUBLIC_* secrets pushed via gh secret set",            "label_es": "Secrets PUBLIC_* vía gh secret set",             "status": "done" },
+        { "label_en": "Vitest job runs in CI",                                "label_es": "Job de Vitest corre en CI",                      "status": "done" }
+      ]
+    },
+    "profile-basics": {
+      "phase": "v0.1",
+      "title_en": "Profile page + edit + avatar dropdown",
+      "title_es": "Página de perfil + edición + dropdown de avatar",
+      "modules": ["08-profile-activity-gamification.md"],
+      "subtasks": [
+        { "label_en": "ALTER TABLE users with 11 profile/credential columns", "label_es": "ALTER TABLE users con 11 columnas",            "status": "done" },
+        { "label_en": "ProfileView + ProfileEditForm shared components",     "label_es": "Componentes compartidos ProfileView + ProfileEditForm","status": "done" },
+        { "label_en": "Pages in EN /profile/* and ES /perfil/*",              "label_es": "Páginas en EN /profile/* y ES /perfil/*",       "status": "done" },
+        { "label_en": "Initials-SVG avatar fallback",                          "label_es": "Avatar de respaldo con iniciales SVG",          "status": "done" },
+        { "label_en": "Header avatar dropdown (View / Edit / Sign out)",      "label_es": "Dropdown de avatar (Ver / Editar / Cerrar)",   "status": "done" },
+        { "label_en": "Activity feed section (renders v0.3+ events)",          "label_es": "Sección feed de actividad",                     "status": "done" },
+        { "label_en": "Badges section (renders when gamification opted in)", "label_es": "Sección de insignias",                          "status": "done" }
+      ]
+    },
+    "gps-observation": {
+      "phase": "v0.1",
+      "title_en": "GPS observation form with EXIF auto-fill",
+      "title_es": "Formulario de observación GPS con auto-relleno EXIF",
+      "modules": ["02-observation.md"],
+      "subtasks": [
+        { "label_en": "Multi-image capture/upload",                       "label_es": "Captura/carga de múltiples imágenes",       "status": "done" },
+        { "label_en": "Live GPS via getCurrentPosition",                  "label_es": "GPS en vivo con getCurrentPosition",        "status": "done" },
+        { "label_en": "EXIF GPS fallback via exifr",                       "label_es": "Fallback GPS EXIF con exifr",               "status": "done" },
+        { "label_en": "Manual coords input",                               "label_es": "Entrada manual de coordenadas",             "status": "done" },
+        { "label_en": "Habitat / weather / evidence_type dropdowns",       "label_es": "Dropdowns hábitat / clima / tipo evidencia","status": "done" },
+        { "label_en": "Notes textarea (≤2000 chars)",                      "label_es": "Textarea de notas (≤2000)",                 "status": "done" },
+        { "label_en": "NOM-059 / CITES privacy notice",                    "label_es": "Aviso de privacidad NOM-059/CITES",         "status": "done" },
+        { "label_en": "Audio capture (MediaRecorder ≤30s)",                "label_es": "Captura de audio (MediaRecorder ≤30s)",     "status": "done" },
+        { "label_en": "Saves to Dexie outbox + immediate sync attempt",    "label_es": "Guarda en outbox Dexie + intento de sync",  "status": "done" }
+      ]
+    },
+    "plantnet-id": {
+      "phase": "v0.1",
+      "title_en": "PlantNet photo ID integration",
+      "title_es": "Integración con PlantNet",
+      "modules": ["01-photo-id.md","13-identifier-registry.md"],
+      "subtasks": [
+        { "label_en": "Edge Function with PlantNet → Claude waterfall", "label_es": "Edge Function con cascada PlantNet → Claude", "status": "done" },
+        { "label_en": "force_provider field for cascade routing",       "label_es": "Campo force_provider para enrutamiento",     "status": "done" },
+        { "label_en": "client_keys.plantnet BYO key support",            "label_es": "Soporte de BYO key client_keys.plantnet",    "status": "done" },
+        { "label_en": "0.7 confidence threshold",                        "label_es": "Umbral de confianza 0.7",                    "status": "done" },
+        { "label_en": "Plugin wrapper in identifiers/plantnet.ts",       "label_es": "Wrapper en identifiers/plantnet.ts",         "status": "done" },
+        { "label_en": "testConnection() probe",                          "label_es": "Probe testConnection()",                     "status": "done" },
+        { "label_en": "Operator: deploy + set secret",                   "label_es": "Operador: deploy + secret",                  "status": "done" }
+      ]
+    },
+    "claude-haiku-id": {
+      "phase": "v0.1",
+      "title_en": "Claude Haiku 4.5 vision cascade",
+      "title_es": "Cascada con Claude Haiku 4.5",
+      "modules": ["01-photo-id.md"],
+      "subtasks": [
+        { "label_en": "Cached system prompt (90% token savings)",       "label_es": "Prompt de sistema cacheado",        "status": "done" },
+        { "label_en": "JSON response parsing with code-fence stripping","label_es": "Parseo JSON con remoción de fences","status": "done" },
+        { "label_en": "client_anthropic_key BYO support",                "label_es": "Soporte BYO client_anthropic_key",  "status": "done" },
+        { "label_en": "Cost-tracking probe in testConnection",           "label_es": "Probe de costo en testConnection",  "status": "done" },
+        { "label_en": "Operator: optional ANTHROPIC_API_KEY secret",     "label_es": "Operador: secret opcional",         "status": "planned" }
+      ]
+    },
+    "map-view": {
+      "phase": "v0.1",
+      "title_en": "MapLibre map with clustered observation pins",
+      "title_es": "Mapa MapLibre con pines agrupados",
+      "modules": ["05-map.md"],
+      "subtasks": [
+        { "label_en": "OpenFreeMap Liberty style (free, IPv4)",        "label_es": "Estilo OpenFreeMap Liberty",                   "status": "done" },
+        { "label_en": "GeoJSON source from observations table",        "label_es": "Fuente GeoJSON desde la tabla observations",   "status": "done" },
+        { "label_en": "Clustering at low zoom + pins at high zoom",    "label_es": "Clustering en zoom bajo + pines en zoom alto", "status": "done" },
+        { "label_en": "Kingdom-coloured pins",                          "label_es": "Pines coloreados por reino",                   "status": "done" },
+        { "label_en": "Click pin → popup with thumbnail + link",        "label_es": "Click en pin → popup con miniatura",           "status": "done" },
+        { "label_en": "pmtiles offline layer (deferred to v0.3)",       "label_es": "Capa pmtiles offline (diferido a v0.3)",       "status": "planned" }
+      ]
+    },
+    "darwin-core-csv": {
+      "phase": "v0.1",
+      "title_en": "Darwin Core CSV export",
+      "title_es": "Exportación CSV Darwin Core",
+      "modules": ["06-darwin-core.md"],
+      "subtasks": [
+        { "label_en": "darwin-core.ts mapping + CSV generation",        "label_es": "Mapeo + generación CSV en darwin-core.ts",  "status": "done" },
+        { "label_en": "Three column presets: DwC / SNIB / CONANP",       "label_es": "Tres presets: DwC / SNIB / CONANP",         "status": "done" },
+        { "label_en": "Obscuration tier handling",                       "label_es": "Manejo del tier de oscurecimiento",         "status": "done" },
+        { "label_en": "ExportView component with format selector",       "label_es": "Componente ExportView con selector",        "status": "done" },
+        { "label_en": "9 Vitest unit tests",                              "label_es": "9 tests unitarios Vitest",                  "status": "done" }
+      ]
+    },
+    "pwa-manifest": {
+      "phase": "v0.1",
+      "title_en": "PWA manifest + service worker shell cache",
+      "title_es": "Manifest PWA + service worker con caché de shell",
+      "modules": ["03-offline.md"],
+      "subtasks": [
+        { "label_en": "manifest.webmanifest with display:standalone", "label_es": "manifest.webmanifest con display:standalone", "status": "done" },
+        { "label_en": "sw.js cache-first for same-origin GETs",       "label_es": "sw.js cache-first para GETs same-origin",     "status": "done" },
+        { "label_en": "Production-only registration (skip localhost)","label_es": "Registro solo en producción",                 "status": "done" },
+        { "label_en": "Apple-mobile-web-app meta tags",               "label_es": "Meta tags Apple mobile",                       "status": "done" }
+      ]
+    },
+    "offline-queue": {
+      "phase": "v0.1",
+      "title_en": "Dexie IndexedDB outbox + sync engine + identify trigger",
+      "title_es": "Outbox Dexie + motor de sync + trigger de identificación",
+      "modules": ["03-offline.md","10-media-storage.md"],
+      "subtasks": [
+        { "label_en": "RastrumDB with observations / mediaBlobs / idQueue",  "label_es": "RastrumDB con tres tablas",          "status": "done" },
+        { "label_en": "syncOutbox + registerSyncTriggers",                    "label_es": "syncOutbox + registerSyncTriggers",  "status": "done" },
+        { "label_en": "R2 + Supabase Storage dual upload paths",              "label_es": "Doble path R2 + Supabase Storage",  "status": "done" },
+        { "label_en": "Client-side image resize before upload",               "label_es": "Resize de imagen en cliente",        "status": "done" },
+        { "label_en": "Cascade engine integration",                           "label_es": "Integración con cascade engine",     "status": "done" },
+        { "label_en": "Audio blob support",                                   "label_es": "Soporte para blobs de audio",        "status": "done" }
+      ]
+    },
+    "unit-tests": {
+      "phase": "v0.1",
+      "title_en": "Vitest unit-test scaffold",
+      "title_es": "Andamiaje de tests unitarios Vitest",
+      "modules": ["infra/testing.md"],
+      "subtasks": [
+        { "label_en": "Vitest 4.1 + happy-dom env",       "label_es": "Vitest 4.1 + entorno happy-dom",      "status": "done" },
+        { "label_en": "darwin-core.test.ts (9 tests)",      "label_es": "darwin-core.test.ts (9 tests)",       "status": "done" },
+        { "label_en": "byo-keys.test.ts (10 tests)",        "label_es": "byo-keys.test.ts (10 tests)",         "status": "done" },
+        { "label_en": "Make targets + CI integration",      "label_es": "Targets de Make + integración CI",    "status": "done" },
+        { "label_en": "pgTAP RLS test suite",                "label_es": "Suite pgTAP de RLS",                  "status": "planned" },
+        { "label_en": "Playwright E2E suite",                "label_es": "Suite Playwright E2E",                "status": "planned" }
+      ]
+    },
+    "activity-feed": {
+      "phase": "v0.3",
+      "title_en": "Activity feed + server-side triggers",
+      "title_es": "Feed de actividad + triggers del servidor",
+      "modules": ["08-profile-activity-gamification.md"],
+      "subtasks": [
+        { "label_en": "activity_events table with kind enum (12 values)",  "label_es": "Tabla activity_events con enum (12 kinds)", "status": "done" },
+        { "label_en": "RLS self/public + visibility tiers",                 "label_es": "RLS self/público + tiers de visibilidad",  "status": "done" },
+        { "label_en": "fire_observation_created trigger",                   "label_es": "Trigger fire_observation_created",          "status": "done" },
+        { "label_en": "fire_research_grade trigger (auto-public)",          "label_es": "Trigger fire_research_grade",               "status": "done" },
+        { "label_en": "Profile-page rendering with i18n labels",             "label_es": "Renderizado en perfil con labels i18n",     "status": "done" },
+        { "label_en": "Auto-mark-as-read on view",                           "label_es": "Auto-marca como leído al ver",              "status": "done" }
+      ]
+    },
+    "unread-badge": {
+      "phase": "v0.3",
+      "title_en": "Unread-count badge on avatar dropdown",
+      "title_es": "Contador de no leídos en avatar",
+      "modules": ["08-profile-activity-gamification.md"],
+      "subtasks": [
+        { "label_en": "Red dot with count when unread > 0",        "label_es": "Punto rojo con contador",         "status": "done" },
+        { "label_en": "Refresh on every onAuthStateChange",        "label_es": "Refresca con onAuthStateChange",  "status": "done" },
+        { "label_en": "99+ overflow text",                          "label_es": "Texto 99+",                       "status": "done" }
+      ]
+    },
+    "sensitive-privacy": {
+      "phase": "v0.3",
+      "title_en": "NOM-059 / CITES obscuration warning",
+      "title_es": "Aviso de oscurecimiento NOM-059 / CITES",
+      "modules": ["02-observation.md"],
+      "subtasks": [
+        { "label_en": "Amber notice always visible in form",                       "label_es": "Aviso ámbar siempre visible",          "status": "done" },
+        { "label_en": "Schema obscure_level enum",                                 "label_es": "Enum obscure_level en el schema",      "status": "done" },
+        { "label_en": "sync_primary_identification trigger applies obscuration",   "label_es": "Trigger aplica oscurecimiento",        "status": "done" },
+        { "label_en": "location_obscured separate column for public reads",         "label_es": "Columna location_obscured separada",   "status": "done" },
+        { "label_en": "Per-species look-up at form-submit time",                    "label_es": "Look-up por especie al enviar",        "status": "planned" }
+      ]
+    },
+    "exif-extraction": {
+      "phase": "v0.3",
+      "title_en": "EXIF/XMP/ID3 metadata auto-extraction",
+      "title_es": "Auto-extracción de metadatos EXIF/XMP/ID3",
+      "modules": ["02-observation.md"],
+      "subtasks": [
+        { "label_en": "exifr library wired in observation form",  "label_es": "exifr integrado en formulario",   "status": "done" },
+        { "label_en": "GPS extracted with EXIF source flag",      "label_es": "GPS extraído con flag EXIF",       "status": "done" },
+        { "label_en": "DateTimeOriginal → observation timestamp", "label_es": "DateTimeOriginal → timestamp",    "status": "done" }
+      ]
+    },
+    "byo-keys-platform": {
+      "phase": "v0.5",
+      "title_en": "Per-plugin BYO API keys with guided setup",
+      "title_es": "API keys propias por plugin con guía de configuración",
+      "modules": ["13-identifier-registry.md"],
+      "subtasks": [
+        { "label_en": "KeySpec + SetupStep + testConnection contract",   "label_es": "Contrato KeySpec + SetupStep + testConnection", "status": "done" },
+        { "label_en": "byo-keys.ts central store",                       "label_es": "Store central byo-keys.ts",                      "status": "done" },
+        { "label_en": "One-time legacy migration",                       "label_es": "Migración one-time del legacy",                  "status": "done" },
+        { "label_en": "Per-plugin Configure disclosure UI",               "label_es": "UI Configure por plugin",                        "status": "done" },
+        { "label_en": "Live save + Test + Clear buttons",                "label_es": "Botones Save + Test + Clear",                    "status": "done" },
+        { "label_en": "10 unit tests",                                    "label_es": "10 tests unitarios",                              "status": "done" }
+      ]
+    },
+    "webllm-text": {
+      "phase": "v0.3",
+      "title_en": "WebLLM Llama-3.2-1B for translation + field notes",
+      "title_es": "WebLLM Llama-3.2-1B para traducción + notas",
+      "modules": ["11-in-browser-ai.md"],
+      "subtasks": [
+        { "label_en": "@mlc-ai/web-llm installed",                                    "label_es": "@mlc-ai/web-llm instalado",                  "status": "done" },
+        { "label_en": "loadTextEngine + translateNote + generateFieldNote",          "label_es": "loadTextEngine + translateNote + generateFieldNote", "status": "done" },
+        { "label_en": "Profile/edit AI download card with consent modal",            "label_es": "Card de descarga con modal de consentimiento", "status": "done" },
+        { "label_en": "Cache management (probe / delete / re-download)",             "label_es": "Gestión de caché (probe / delete / re-download)", "status": "done" },
+        { "label_en": "requestPersistentStorage() to prevent iOS eviction",          "label_es": "requestPersistentStorage() contra evicción iOS","status": "done" },
+        { "label_en": "Translate + Auto-narrative buttons in observation form",     "label_es": "Botones Translate + Auto-narrativa en form",   "status": "planned" }
+      ]
+    },
+    "webllm-vision": {
+      "phase": "v0.5",
+      "title_en": "WebLLM Phi-3.5-vision fallback ID",
+      "title_es": "ID de respaldo con WebLLM Phi-3.5-vision",
+      "modules": ["11-in-browser-ai.md"],
+      "subtasks": [
+        { "label_en": "Phi-3.5-vision plugin in identifiers/phi-vision.ts",   "label_es": "Plugin Phi-3.5-vision",              "status": "done" },
+        { "label_en": "Confidence hard-cap 0.35 (DB trigger blocks <0.4)",   "label_es": "Cap duro de 0.35",                    "status": "done" },
+        { "label_en": "Disclaimer in profile/edit + plugin description",     "label_es": "Disclaimer en perfil",                "status": "done" },
+        { "label_en": "Same consent + cache + delete flow as Llama",         "label_es": "Mismo flujo consent + caché",         "status": "done" },
+        { "label_en": "Cascade integration as last-resort opt-in",           "label_es": "Integración como respaldo opt-in",    "status": "done" }
+      ]
+    },
+    "discovery-badges": {
+      "phase": "v0.5",
+      "title_en": "39 seed badges + nightly evaluator",
+      "title_es": "39 insignias semilla + evaluador nocturno",
+      "modules": ["08-profile-activity-gamification.md"],
+      "subtasks": [
+        { "label_en": "badges + user_badges tables with RLS",                "label_es": "Tablas badges + user_badges con RLS",          "status": "done" },
+        { "label_en": "39 badge seed (5 categories × 4 tiers)",               "label_es": "39 insignias (5 categorías × 4 tiers)",        "status": "done" },
+        { "label_en": "Badge eligibility SQL functions",                       "label_es": "Funciones SQL de elegibilidad",                "status": "done" },
+        { "label_en": "award-badges nightly Edge Function",                    "label_es": "Edge Function award-badges nocturna",          "status": "done" },
+        { "label_en": "Profile-page tier-coloured pills",                       "label_es": "Pills por tier en el perfil",                  "status": "done" },
+        { "label_en": "Cron schedule 30 7 * * *",                              "label_es": "Cron 30 7 * * *",                              "status": "done" },
+        { "label_en": "Activity-feed badge_earned event integration",            "label_es": "Integración con feed de actividad",            "status": "planned" }
+      ]
+    },
+    "quality-gates": {
+      "phase": "v0.5",
+      "title_en": "Confidence ≥ 0.4 enforcement on research-grade",
+      "title_es": "Compuerta de calidad: research-grade requiere confianza ≥ 0.4",
+      "modules": ["08-profile-activity-gamification.md"],
+      "subtasks": [
+        { "label_en": "enforce_research_grade_quality trigger",  "label_es": "Trigger enforce_research_grade_quality", "status": "done" },
+        { "label_en": "Plugin-level confidence_ceiling cap",      "label_es": "Cap confidence_ceiling por plugin",      "status": "done" }
+      ]
+    },
+    "consensus-workflow": {
+      "phase": "v0.5",
+      "title_en": "Research-grade 2/3 consensus + anti-sybil + expert weight",
+      "title_es": "Consenso 2/3 + anti-sybil + peso experto",
+      "modules": ["08-profile-activity-gamification.md"],
+      "subtasks": [
+        { "label_en": "prevent_self_validation trigger",                  "label_es": "Trigger prevent_self_validation",            "status": "done" },
+        { "label_en": "recompute_consensus with 3× expert weight",         "label_es": "recompute_consensus con peso 3× experto",    "status": "done" },
+        { "label_en": "Validator UI for community input",                  "label_es": "UI de validador para la comunidad",          "status": "planned" },
+        { "label_en": "AFTER INSERT/UPDATE auto-recompute trigger",        "label_es": "Trigger auto-recompute",                     "status": "planned" }
+      ]
+    },
+    "multi-image": {
+      "phase": "v0.5",
+      "title_en": "Multi-image observations",
+      "title_es": "Observaciones multi-imagen",
+      "modules": ["02-observation.md"],
+      "subtasks": [
+        { "label_en": "Gallery <input multiple>",                       "label_es": "Galería <input multiple>",            "status": "done" },
+        { "label_en": "Photo grid with primary indicator + remove",     "label_es": "Grid con primary + remove",            "status": "done" },
+        { "label_en": "All blobs saved to Dexie + uploaded to R2",       "label_es": "Blobs guardados + subidos a R2",       "status": "done" },
+        { "label_en": "media_files inserted with sort_order + is_primary","label_es": "media_files con sort_order + is_primary","status": "done" }
+      ]
+    },
+    "eco-evidence": {
+      "phase": "v0.5",
+      "title_en": "Ecological evidence fields",
+      "title_es": "Campos de evidencia ecológica",
+      "modules": ["02-observation.md"],
+      "subtasks": [
+        { "label_en": "evidence_type enum on observations",  "label_es": "Enum evidence_type en observations", "status": "done" },
+        { "label_en": "Form dropdown with 9 values",          "label_es": "Dropdown con 9 valores",              "status": "done" }
+      ]
+    },
+    "birdnet-audio": {
+      "phase": "v0.5",
+      "title_en": "BirdNET-Lite audio ID",
+      "title_es": "ID de audio con BirdNET-Lite",
+      "modules": ["12-birdnet-audio.md"],
+      "subtasks": [
+        { "label_en": "Audio capture in observation form (≤30s)",          "label_es": "Captura de audio en formulario (≤30s)",    "status": "done" },
+        { "label_en": "Sync engine routes audio to R2 + cascade",          "label_es": "Sync routes audio → R2 + cascade",          "status": "done" },
+        { "label_en": "BirdNET plugin stub (model_not_bundled)",            "label_es": "Stub plugin BirdNET",                        "status": "done" },
+        { "label_en": "Module 12 spec written",                              "label_es": "Spec módulo 12",                             "status": "done" },
+        { "label_en": "Re-host TFLite/ONNX on R2",                          "label_es": "Re-hospedar TFLite/ONNX en R2",              "status": "blocked", "blocker_en": "Need to fetch model from Cornell + convert", "blocker_es": "Falta obtener el modelo y convertir" },
+        { "label_en": "Mel-spectrogram preprocessing (Meyda)",              "label_es": "Preprocesamiento mel-spectrogram",          "status": "planned" },
+        { "label_en": "onnxruntime-web inference in plugin",                "label_es": "Inferencia con onnxruntime-web",            "status": "planned" },
+        { "label_en": "Bundle species labels JSON",                          "label_es": "Bundle labels JSON",                         "status": "planned" },
+        { "label_en": "Profile/edit download card",                          "label_es": "Card de descarga en perfil",                 "status": "planned" },
+        { "label_en": "Cornell Lab attribution in UI + DwC export",          "label_es": "Atribución Cornell Lab",                     "status": "planned" }
+      ]
+    },
+    "streaks": {
+      "phase": "v1.0",
+      "title_en": "Opt-in streaks + grace window",
+      "title_es": "Rachas opt-in + ventana de gracia",
+      "modules": ["08-profile-activity-gamification.md"],
+      "subtasks": [
+        { "label_en": "user_streaks table",                                  "label_es": "Tabla user_streaks",                          "status": "done" },
+        { "label_en": "recompute_streak() with single-grace-per-30-days",     "label_es": "recompute_streak() con gracia mensual",       "status": "done" },
+        { "label_en": "recompute-streaks Edge Function (nightly)",           "label_es": "Edge Function recompute-streaks",             "status": "done" },
+        { "label_en": "Quality gate: confidence ≥ 0.4",                       "label_es": "Compuerta de calidad",                        "status": "done" },
+        { "label_en": "Streak display on profile page",                       "label_es": "Display de racha en perfil",                  "status": "planned" },
+        { "label_en": "Inbox-digest email for milestones",                    "label_es": "Email de hito por correo",                    "status": "planned" }
+      ]
+    },
+    "shareable-cards": {
+      "phase": "v1.0",
+      "title_en": "Observation share OG cards",
+      "title_es": "Tarjetas OG para compartir observaciones",
+      "modules": [],
+      "subtasks": [
+        { "label_en": "share-card Edge Function (SVG + HTML)",  "label_es": "Edge Function share-card (SVG + HTML)",   "status": "done" },
+        { "label_en": "Branded design with species + region",    "label_es": "Diseño con marca + especie + región",    "status": "done" },
+        { "label_en": "OG / Twitter card meta",                   "label_es": "Meta OG / Twitter",                       "status": "done" },
+        { "label_en": "Sensitive-species badge when obscured",    "label_es": "Badge especie sensible cuando oscurecida","status": "done" },
+        { "label_en": "Public Astro page renders observation",    "label_es": "Página pública renderiza observación",   "status": "done" }
+      ]
+    },
+    "social-features": {
+      "phase": "v1.0",
+      "title_en": "Follows + comments + watchlists schema",
+      "title_es": "Esquema seguidores + comentarios + listas",
+      "modules": ["08-profile-activity-gamification.md"],
+      "subtasks": [
+        { "label_en": "follows table (anti-self-follow + RLS)",  "label_es": "Tabla follows (anti-self + RLS)",   "status": "done" },
+        { "label_en": "observation_comments (threading + soft-delete)", "label_es": "observation_comments (threading + soft-delete)", "status": "done" },
+        { "label_en": "watchlists with radius_km",                "label_es": "watchlists con radius_km",          "status": "done" },
+        { "label_en": "UI implementation",                         "label_es": "Implementación UI",                  "status": "planned", "ref_en": "tracked as follows-comments-ui", "ref_es": "rastreado como follows-comments-ui" }
+      ]
+    },
+    "expert-system": {
+      "phase": "v1.0",
+      "title_en": "Expert taxonomic 3× weight",
+      "title_es": "Peso 3× experto taxonómico",
+      "modules": ["08-profile-activity-gamification.md"],
+      "subtasks": [
+        { "label_en": "users.is_expert + users.expert_taxa[] columns",       "label_es": "Columnas is_expert + expert_taxa[]",       "status": "done" },
+        { "label_en": "recompute_consensus() applies 3× weight",              "label_es": "recompute_consensus aplica peso 3×",       "status": "done" },
+        { "label_en": "Expert-application UI",                                 "label_es": "UI de solicitud de experto",                 "status": "planned" },
+        { "label_en": "Expert badges in profile",                              "label_es": "Insignias de experto en perfil",            "status": "planned" }
+      ]
+    },
+    "bioblitz-events": {
+      "phase": "v1.0",
+      "title_en": "Events table + RLS",
+      "title_es": "Tabla de eventos + RLS",
+      "modules": ["08-profile-activity-gamification.md"],
+      "subtasks": [
+        { "label_en": "events table with region_geojson",        "label_es": "Tabla events con region_geojson",     "status": "done" },
+        { "label_en": "Public-read RLS",                           "label_es": "RLS de lectura pública",               "status": "done" },
+        { "label_en": "Three event kinds (bioblitz/survey/challenge)","label_es": "Tres tipos de evento",            "status": "done" },
+        { "label_en": "Event detail page",                         "label_es": "Página de detalle de evento",          "status": "planned" },
+        { "label_en": "Event aggregates (obs within polygon × window)","label_es": "Agregados del evento",         "status": "planned" },
+        { "label_en": "Participation badges",                      "label_es": "Insignias de participación",           "status": "planned" },
+        { "label_en": "Top-decile detection",                      "label_es": "Detección top decil",                  "status": "planned" }
+      ]
+    },
+    "institutional-export": {
+      "phase": "v1.0",
+      "title_en": "DwC + SNIB + CONANP CSV presets",
+      "title_es": "Plantillas CSV DwC + SNIB + CONANP",
+      "modules": ["06-darwin-core.md"],
+      "subtasks": [
+        { "label_en": "Three column subsets in darwin-core.ts",   "label_es": "Tres subconjuntos de columnas",   "status": "done" },
+        { "label_en": "Format selector in Export view",            "label_es": "Selector de formato",              "status": "done" },
+        { "label_en": "Filename suffixes per format",              "label_es": "Sufijos de archivo por formato",    "status": "done" }
+      ]
+    },
+    "credentialed-access": {
+      "phase": "v1.0",
+      "title_en": "credentialed_researcher RLS gate",
+      "title_es": "Compuerta RLS credentialed_researcher",
+      "modules": ["07-licensing.md"],
+      "subtasks": [
+        { "label_en": "Three columns on users table",             "label_es": "Tres columnas en users",          "status": "done" },
+        { "label_en": "obs_credentialed_read RLS policy",          "label_es": "Política RLS obs_credentialed_read", "status": "done" },
+        { "label_en": "Application flow page",                     "label_es": "Página de solicitud",               "status": "planned" }
+      ]
+    },
+    "env-enrichment": {
+      "phase": "v1.0",
+      "title_en": "Lunar phase + OpenMeteo weather Edge Function",
+      "title_es": "Edge Function fase lunar + OpenMeteo",
+      "modules": [],
+      "subtasks": [
+        { "label_en": "enrich-environment Edge Function",           "label_es": "Edge Function enrich-environment",      "status": "done" },
+        { "label_en": "Auto-fires on observation sync",               "label_es": "Se dispara al sincronizar",              "status": "done" },
+        { "label_en": "Updates 5 environmental columns",              "label_es": "Actualiza 5 columnas ambientales",       "status": "done" }
+      ]
+    }
+  }
+}
