@@ -1,0 +1,202 @@
+---
+import { t } from '../i18n/utils';
+import progressData from '../../docs/progress.json';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+const { lang } = Astro.props;
+const tr = t(lang);
+const isEs = lang === 'es';
+
+// Pick the locale-appropriate field. The JSON carries optional `_es`
+// variants alongside the default English value; we fall back to the
+// default whenever a translation is missing so the page never renders
+// `undefined`.
+function loc<T extends Record<string, unknown>>(obj: T, field: string): string {
+  if (isEs) {
+    const v = obj[field + '_es'];
+    if (typeof v === 'string' && v.length) return v;
+  }
+  const v = obj[field];
+  return typeof v === 'string' ? v : '';
+}
+
+const phases = Object.entries(progressData.phases).map(([ver, phase]) => ({
+  ver,
+  raw: phase,
+  name:   loc(phase as Record<string, unknown>, 'name'),
+  period: loc(phase as Record<string, unknown>, 'period'),
+  status: phase.status,
+  items: (phase.items as Array<Record<string, unknown>>).map(item => ({
+    id:    item.id as string,
+    label: loc(item, 'label'),
+    done:  item.done as boolean,
+  })),
+}));
+
+const notesLoc      = loc(progressData as unknown as Record<string, unknown>, 'notes');
+const govName       = progressData.governance_track ? loc(progressData.governance_track as unknown as Record<string, unknown>, 'name')  : '';
+const govNotes      = progressData.governance_track ? loc(progressData.governance_track as unknown as Record<string, unknown>, 'notes') : '';
+const govItems      = progressData.governance_track
+  ? (progressData.governance_track.items as Array<Record<string, unknown>>).map(item => ({
+      id:    item.id as string,
+      label: loc(item, 'label'),
+      done:  item.done as boolean,
+    }))
+  : [];
+
+type StatusKey = 'in_progress' | 'planned' | 'done' | 'current';
+const statusConfig: Record<StatusKey, { label: string; badge: string; dot: string }> = {
+  in_progress: { label: isEs ? 'En progreso' : 'In Progress', badge: 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30', dot: 'bg-emerald-500' },
+  planned:     { label: isEs ? 'Planeado'    : 'Planned',     badge: 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border-zinc-300 dark:border-zinc-700', dot: 'bg-zinc-400' },
+  done:        { label: isEs ? 'Lanzado'     : 'Shipped',     badge: 'bg-sky-500/20 text-sky-600 dark:text-sky-400 border-sky-500/30', dot: 'bg-sky-500' },
+  current:     { label: isEs ? 'Activo'      : 'Active',      badge: 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30', dot: 'bg-emerald-500' },
+};
+
+const lastUpdated = isEs ? 'última actualización' : 'last updated';
+const itemsLabel = isEs ? 'ítems' : 'items';
+
+const helpText = isEs
+  ? 'Para actualizar el progreso: edita docs/progress.json en el repositorio y marca "done": true en los ítems completados. La página se reconstruye automáticamente con cada push.'
+  : 'To update progress: edit docs/progress.json in the repo and set "done": true for completed items. The page rebuilds automatically on each push.';
+
+const syncedFromText = isEs
+  ? `Progreso sincronizado desde docs/progress.json — ${lastUpdated} ${progressData.updated}`
+  : `Progress synced from docs/progress.json — ${lastUpdated} ${progressData.updated}`;
+
+function pct(items: { done: boolean }[]) {
+  const done = items.filter(i => i.done).length;
+  return { done, total: items.length, pct: items.length ? Math.round((done / items.length) * 100) : 0 };
+}
+---
+
+<article class="space-y-2">
+  <div class="mb-8">
+    <h1 class="text-3xl font-bold tracking-tight mb-2">{tr.docs.sections.roadmap}</h1>
+    <p class="text-zinc-600 dark:text-zinc-400 max-w-2xl">{tr.docs.descriptions.roadmap}</p>
+    <p class="text-xs text-zinc-500 dark:text-zinc-500 mt-2">
+      {syncedFromText}
+    </p>
+    {notesLoc && (
+      <p class="text-xs text-zinc-500 dark:text-zinc-500 mt-1 italic">{notesLoc}</p>
+    )}
+  </div>
+
+  {phases.map((phase) => {
+    const prog = pct(phase.items);
+    const cfg = statusConfig[phase.status as StatusKey] ?? statusConfig.planned;
+    const isActive = phase.status === 'in_progress' || phase.status === 'current';
+    return (
+      <div class:list={[
+        "relative rounded-xl border transition-all",
+        isActive
+          ? "border-emerald-500/40 bg-emerald-500/5 dark:bg-emerald-500/5"
+          : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50"
+      ]}>
+        <div class="p-5 pb-3">
+          <div class="flex flex-wrap items-start gap-3 justify-between mb-3">
+            <div class="flex items-center gap-3 flex-wrap">
+              <span class:list={[
+                "w-2.5 h-2.5 rounded-full shrink-0 mt-0.5",
+                cfg.dot,
+                isActive ? "ring-4 ring-emerald-500/20" : ""
+              ]} />
+              <div>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <code class="text-sm font-mono font-bold text-zinc-900 dark:text-zinc-100">{phase.ver}</code>
+                  <span class="text-sm font-semibold text-zinc-700 dark:text-zinc-300">{phase.name}</span>
+                  <span class:list={["text-xs px-2 py-0.5 rounded-full border font-medium", cfg.badge]}>{cfg.label}</span>
+                </div>
+                <p class="text-xs text-zinc-500 dark:text-zinc-500 mt-0.5">{phase.period}</p>
+              </div>
+            </div>
+            <div class="text-right shrink-0">
+              <span class:list={[
+                "text-sm font-semibold",
+                prog.pct === 100 ? "text-emerald-600 dark:text-emerald-400" :
+                prog.pct > 0 ? "text-zinc-700 dark:text-zinc-300" : "text-zinc-400 dark:text-zinc-600"
+              ]}>
+                {prog.done}/{prog.total}
+              </span>
+              <p class="text-xs text-zinc-400 dark:text-zinc-600">{itemsLabel}</p>
+            </div>
+          </div>
+
+          <div class="w-full h-1.5 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
+            <div
+              class:list={[
+                "h-full rounded-full transition-all",
+                prog.pct === 100 ? "bg-sky-500" : isActive ? "bg-emerald-500" : "bg-zinc-400"
+              ]}
+              style={`width: ${prog.pct}%`}
+            />
+          </div>
+        </div>
+
+        <div class="px-5 pb-5 grid sm:grid-cols-2 gap-x-6 gap-y-1.5 mt-1">
+          {phase.items.map(item => (
+            <div class="flex items-start gap-2.5">
+              <div class:list={[
+                "mt-0.5 w-4 h-4 rounded shrink-0 border-2 flex items-center justify-center transition-colors",
+                item.done
+                  ? "bg-emerald-500 border-emerald-500"
+                  : "border-zinc-300 dark:border-zinc-700 bg-transparent"
+              ]}>
+                {item.done && (
+                  <svg class="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 12 12" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M2 6l3 3 5-5"/>
+                  </svg>
+                )}
+              </div>
+              <span class:list={[
+                "text-sm leading-relaxed",
+                item.done
+                  ? "text-zinc-500 dark:text-zinc-500 line-through"
+                  : isActive
+                    ? "text-zinc-800 dark:text-zinc-200"
+                    : "text-zinc-600 dark:text-zinc-400"
+              ]}>
+                {item.label}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  })}
+
+  {progressData.governance_track && (
+    <div class="mt-6 rounded-xl border border-amber-500/30 bg-amber-500/5 dark:bg-amber-500/5 p-5">
+      <div class="flex items-center gap-2 mb-2">
+        <span class="w-2.5 h-2.5 rounded-full bg-amber-500" />
+        <h2 class="text-sm font-semibold text-zinc-800 dark:text-zinc-200">{govName}</h2>
+      </div>
+      <p class="text-xs text-zinc-600 dark:text-zinc-400 mb-3">{govNotes}</p>
+      <div class="grid sm:grid-cols-2 gap-x-6 gap-y-1.5">
+        {govItems.map(item => (
+          <div class="flex items-start gap-2.5">
+            <div class:list={[
+              "mt-0.5 w-4 h-4 rounded shrink-0 border-2 flex items-center justify-center",
+              item.done ? "bg-amber-500 border-amber-500" : "border-amber-400/50 dark:border-amber-500/40 bg-transparent"
+            ]}>
+              {item.done && (
+                <svg class="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 12 12" stroke="currentColor" stroke-width="2.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M2 6l3 3 5-5"/>
+                </svg>
+              )}
+            </div>
+            <span class:list={[
+              "text-sm leading-relaxed",
+              item.done ? "text-zinc-500 dark:text-zinc-500 line-through" : "text-zinc-700 dark:text-zinc-300"
+            ]}>{item.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )}
+
+  <div class="pt-4 px-1">
+    <p class="text-xs text-zinc-500 dark:text-zinc-600">{helpText}</p>
+  </div>
+</article>

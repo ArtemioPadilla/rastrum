@@ -1,95 +1,148 @@
 ---
 import DocLayout from '../../../layouts/DocLayout.astro';
+import { t } from '../../../i18n/utils';
+
 const lang = 'es';
+const tr = t(lang);
+
 const matrix = [
-  { feature: 'ID Fotográfica',           rastrum: true,  inat: true,    merlin: true,  plantnet: true,  wi: false,  arbimon: false },
-  { feature: 'ID de Audio',              rastrum: true,  inat: 'partial', merlin: true,plantnet: false, wi: false,  arbimon: true  },
-  { feature: 'Video',                    rastrum: true,  inat: false,   merlin: false, plantnet: false, wi: false,  arbimon: false },
-  { feature: 'Evidencia ecológica',      rastrum: true,  inat: 'partial',merlin: false,plantnet: false, wi: false,  arbimon: false },
-  { feature: 'Cámaras trampa',           rastrum: true,  inat: false,   merlin: false, plantnet: false, wi: true,   arbimon: false },
-  { feature: 'Sin conexión primero',     rastrum: true,  inat: 'partial',merlin:'partial',plantnet:'partial',wi:false,arbimon:false},
-  { feature: 'Lenguas indígenas',        rastrum: true,  inat: false,   merlin: false, plantnet: false, wi: false,  arbimon: false },
-  { feature: 'Exportación GBIF',         rastrum: true,  inat: true,    merlin: false, plantnet: 'partial', wi: true, arbimon: false },
-  { feature: 'CONABIO/CONANP',           rastrum: true,  inat: false,   merlin: false, plantnet: false, wi: false,  arbimon: false },
-  { feature: 'PITs / Anclajes QR',       rastrum: true,  inat: false,   merlin: false, plantnet: false, wi: false,  arbimon: false },
-  { feature: 'Código abierto',           rastrum: true,  inat: true,    merlin: false, plantnet: true,  wi: 'partial', arbimon: false },
-  { feature: 'Marco FPIC / CARE',        rastrum: true,  inat: false,   merlin: false, plantnet: false, wi: false,  arbimon: false },
+  { feature: 'ID por foto',                  rastrum: true,  inat: true,      merlin: true,      plantnet: true,      wi: false,     arbimon: false },
+  { feature: 'ID por audio',                 rastrum: true,  inat: 'partial', merlin: true,      plantnet: false,     wi: false,     arbimon: true  },
+  { feature: 'Video',                        rastrum: true,  inat: false,     merlin: false,     plantnet: false,     wi: false,     arbimon: false },
+  { feature: 'Evidencia ecológica',          rastrum: true,  inat: 'partial', merlin: false,     plantnet: false,     wi: false,     arbimon: false },
+  { feature: 'Cámaras trampa',               rastrum: true,  inat: false,     merlin: false,     plantnet: false,     wi: true,      arbimon: false },
+  { feature: 'Sin conexión primero',         rastrum: true,  inat: 'partial', merlin: 'partial', plantnet: 'partial', wi: false,     arbimon: false },
+  { feature: 'Lenguas indígenas',            rastrum: true,  inat: false,     merlin: false,     plantnet: false,     wi: false,     arbimon: false },
+  { feature: 'Exportación a GBIF',           rastrum: true,  inat: true,      merlin: false,     plantnet: 'partial', wi: true,      arbimon: false },
+  { feature: 'CONABIO / CONANP',             rastrum: true,  inat: false,     merlin: false,     plantnet: false,     wi: false,     arbimon: false },
+  { feature: 'PITs / anclas QR',             rastrum: true,  inat: false,     merlin: false,     plantnet: false,     wi: false,     arbimon: false },
+  { feature: 'Gratis / código abierto',      rastrum: true,  inat: true,      merlin: false,     plantnet: true,      wi: 'partial', arbimon: false },
 ];
-function cell(v: boolean | string) {
-  if (v === true)      return { text: '✓', cls: 'text-emerald-400 font-bold' };
-  if (v === 'partial') return { text: '~', cls: 'text-amber-400' };
-  return               { text: '✗', cls: 'text-zinc-600' };
+
+function cellDisplay(v: boolean | string) {
+  if (v === true)      return { text: '✓', cls: 'text-emerald-600 dark:text-emerald-400 font-bold' };
+  if (v === 'partial') return { text: '~', cls: 'text-yellow-600 dark:text-yellow-400' };
+  return                       { text: '✗', cls: 'text-zinc-600 dark:text-zinc-400' };
 }
 ---
-<DocLayout title="Mercado y Oportunidad" lang={lang} section="market" editPath="src/pages/es/docs/market.astro">
 
-# 📊 Mercado y Oportunidad
+<DocLayout title={tr.docs.sections.market} lang={lang} section="market" editPath="src/pages/es/docs/market.astro">
+  <article class="space-y-8">
+    <div>
+      <h1 class="text-3xl font-bold tracking-tight mb-4">{tr.docs.sections.market}</h1>
+      <p class="text-lg text-zinc-600 dark:text-zinc-400 max-w-3xl">{tr.docs.descriptions.market}</p>
+    </div>
 
-## La Brecha que Rastrum Llena
+    <!-- Matriz competitiva -->
+    <section>
+      <h2 id="matriz-competitiva" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+        <a href="#matriz-competitiva" class="text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Matriz competitiva
+      </h2>
+      <div class="not-prose overflow-x-auto">
+        <table class="w-full text-sm border-collapse">
+          <thead>
+            <tr class="border-b border-zinc-200 dark:border-zinc-800">
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Funcionalidad</th>
+              <th class="py-2 px-3 text-emerald-600 dark:text-emerald-400 font-semibold">Rastrum</th>
+              <th class="py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">iNaturalist</th>
+              <th class="py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Merlin</th>
+              <th class="py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">PlantNet</th>
+              <th class="py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Wildlife Insights</th>
+              <th class="py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Arbimon</th>
+            </tr>
+          </thead>
+          <tbody>
+            {matrix.map((row, i) => (
+              <tr class:list={["border-b border-zinc-100 dark:border-zinc-900", i % 2 === 0 ? "bg-zinc-50/50 dark:bg-zinc-950/50" : ""]}>
+                <td class="py-2 px-3 text-zinc-700 dark:text-zinc-300">{row.feature}</td>
+                {[row.rastrum, row.inat, row.merlin, row.plantnet, row.wi, row.arbimon].map((v, j) => {
+                  const c = cellDisplay(v);
+                  return <td class:list={["py-2 px-3 text-center", c.cls, j === 0 ? "bg-emerald-500/5" : ""]}>{c.text}</td>;
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-2">
+          <span class="text-emerald-600 dark:text-emerald-400 font-bold">{'✓'}</span> soporte completo
+          <span class="mx-2 text-zinc-400">|</span>
+          <span class="text-yellow-600 dark:text-yellow-400">~</span> parcial
+          <span class="mx-2 text-zinc-400">|</span>
+          <span class="text-zinc-500">{'✗'}</span> no soportado
+        </p>
+      </div>
+    </section>
 
-**Ningún producto hoy unifica foto + audio + video + evidencia ecológica en una sola UI con operación sin-conexión-primero, UX en lenguas indígenas y pipelines de exportación nativos a GBIF, CONABIO SNIB, CONANP e INAH simultáneamente.**
+    <!-- Tamaño de mercado -->
+    <section>
+      <h2 id="tamano-mercado" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+        <a href="#tamano-mercado" class="text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Tamaño del mercado
+      </h2>
+      <div class="not-prose overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-zinc-200 dark:border-zinc-800">
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Segmento</th>
+              <th class="text-right py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">2024</th>
+              <th class="text-right py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">2033</th>
+              <th class="text-right py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">CAGR</th>
+            </tr>
+          </thead>
+          <tbody class="text-zinc-700 dark:text-zinc-300">
+            <tr class="border-b border-zinc-100 dark:border-zinc-900">
+              <td class="py-2 px-3">Plataformas globales de ciencia ciudadana</td>
+              <td class="py-2 px-3 text-right font-mono">$1.23B</td>
+              <td class="py-2 px-3 text-right font-mono">$3.84B</td>
+              <td class="py-2 px-3 text-right font-mono">13.7%</td>
+            </tr>
+            <tr class="border-b border-zinc-100 dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-950/50">
+              <td class="py-2 px-3">Ecoturismo en México</td>
+              <td class="py-2 px-3 text-right font-mono">$3.8B</td>
+              <td class="py-2 px-3 text-right font-mono">$10B</td>
+              <td class="py-2 px-3 text-right font-mono">~15%</td>
+            </tr>
+            <tr class="border-b border-zinc-100 dark:border-zinc-900">
+              <td class="py-2 px-3">Turismo de observación de aves en México</td>
+              <td class="py-2 px-3 text-right font-mono">$1.9B</td>
+              <td class="py-2 px-3 text-right font-mono">$3.1B</td>
+              <td class="py-2 px-3 text-right font-mono">8.6%</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
 
-## Matriz Competitiva
+    <!-- Por qué LATAM -->
+    <section>
+      <h2 id="por-que-latam" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+        <a href="#por-que-latam" class="text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Por qué LATAM, por qué sin conexión primero
+      </h2>
+      <div class="space-y-3 text-zinc-700 dark:text-zinc-300">
+        <p>
+          <span class="font-semibold text-zinc-900 dark:text-zinc-100">Brecha de conectividad:</span> la ENDUTIH 2024 del INEGI reporta 83.1% de conectividad nacional pero sólo 62.5% en Oaxaca y 56.7% en Chiapas. Los estados menos conectados son los más biodiversos. El 31.5% de los usuarios objetivo no puede usar herramientas dependientes de la nube.
+        </p>
+        <p>
+          <span class="font-semibold text-zinc-900 dark:text-zinc-100">NaturaLista MX:</span> 138 mil usuarios, 5M de observaciones, 45 mil especies — pero crece sólo 16% al año contra el casi-duplicarse global de iNat. La reducción de autonomía de CONABIO en 2024 abre espacio para un complemento privado/ONG.
+        </p>
+        <p>
+          <span class="font-semibold text-zinc-900 dark:text-zinc-100">City Nature Challenge 2024:</span> Monterrey ocupó el #2 global por observaciones, La Paz Bolivia el #1 — LATAM domina la ciencia ciudadana per cápita.
+        </p>
+      </div>
+    </section>
 
-<div class="not-prose overflow-x-auto mt-6 mb-10">
-  <table class="w-full text-sm border-collapse">
-    <thead>
-      <tr class="border-b border-zinc-800">
-        <th class="text-left py-2 px-3 text-zinc-400 font-medium">Característica</th>
-        <th class="py-2 px-3 text-emerald-400 font-semibold">Rastrum</th>
-        <th class="py-2 px-3 text-zinc-400 font-medium">iNaturalist</th>
-        <th class="py-2 px-3 text-zinc-400 font-medium">Merlin</th>
-        <th class="py-2 px-3 text-zinc-400 font-medium">PlantNet</th>
-        <th class="py-2 px-3 text-zinc-400 font-medium">Wildlife Insights</th>
-        <th class="py-2 px-3 text-zinc-400 font-medium">Arbimon</th>
-      </tr>
-    </thead>
-    <tbody>
-      {matrix.map((row, i) => (
-        <tr class:list={["border-b border-zinc-900", i % 2 === 0 ? "bg-zinc-950/50" : ""]}>
-          <td class="py-2 px-3 text-zinc-300">{row.feature}</td>
-          {[row.rastrum, row.inat, row.merlin, row.plantnet, row.wi, row.arbimon].map((v, j) => {
-            const c = cell(v);
-            return <td class:list={["py-2 px-3 text-center", c.cls, j === 0 ? "bg-emerald-500/5" : ""]}>{c.text}</td>;
-          })}
-        </tr>
-      ))}
-    </tbody>
-  </table>
-  <p class="text-xs text-zinc-600 mt-2">✓ soporte completo · ~ parcial · ✗ no soportado</p>
-</div>
-
-## Tamaño de Mercado
-
-| Segmento | 2024 | 2033 | CAGR |
-|----------|------|------|------|
-| Plataformas globales de ciencia ciudadana | $1.23B | $3.84B | 13.7% |
-| Ecoturismo global | $275B | $770B | — |
-| Ecoturismo México | $3.3–3.8B | $8.7–10.6B | ~15% |
-| Turismo de observación de aves México | $1.9B | $3.1B | 8.6% |
-
-*Cifras de firmas de investigación de mercado con ±30% de incertidumbre. La observación de aves es el sub-segmento de más rápido crecimiento en Norteamérica.*
-
-## ¿Por Qué México / LATAM?
-
-- **NaturaLista MX:** 138K usuarios, 5M observaciones, 45K especies — creciendo solo al 16%/año vs el casi-duplicado global de iNat. La desaceleración + la reducción de autonomía de CONABIO 2024 abren espacio para un complemento privado/ONG
-- **City Nature Challenge 2024:** Monterrey #2 global por observaciones, La Paz Bolivia #1 — LATAM domina la ciencia ciudadana per cápita
-- **Brecha de conectividad:** INEGI ENDUTIH 2024 — 83.1% nacional pero solo **62.5% en Oaxaca**, 56.7% Chiapas. Los estados menos conectados son los más biodiversos. **31.5% de los usuarios objetivo no pueden usar herramientas dependientes de la nube.**
-
-## El Foso PIT/QR
-
-Los anclajes QR/NFC "Punto de Información Territorial" tienen **cero competencia** — quien instale más nodos físicos en parques mexicanos crea la versión biológica de Foursquare: un efecto de red donde cada etiqueta QR instalada hace la plataforma más valiosa.
-
-La ventaja de primer movimiento es física (una calcomanía QR en un árbol), no solo digital.
-
-## Usuarios Objetivo (Prioridad v1)
-
-| Persona | Presupuesto | Efecto de red |
-|---------|-------------|---------------|
-| Guardaparques CONANP | Institucional | Alto — 232 ANPs |
-| Monitores comunitarios | Financiado por becas | Alto — redes comunitarias |
-| Consultores MIA/EIA | Comercial | Medio — 200+ firmas |
-| Guías de ecoturismo | Personal/cooperativa | Medio — 50+ operadores Oaxaca |
-| Estudiantes de biología universitarios | Académico | Alto — Tec/UNAM/IPN/ECOSUR |
-
+    <!-- PITs como foso -->
+    <section>
+      <h2 id="pits-foso" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+        <a href="#pits-foso" class="text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors">#</a> PITs como foso estilo Foursquare
+      </h2>
+      <div class="p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 text-zinc-700 dark:text-zinc-300">
+        <p class="mb-3">
+          Las anclas QR/NFC de "Puntos de Información Territorial" (PITs) tienen <span class="font-semibold text-emerald-600 dark:text-emerald-400">cero competencia</span>. Quien instale más nodos físicos en parques y senderos mexicanos crea la versión biológica de Foursquare: un efecto de red en el que cada etiqueta QR instalada hace que la plataforma sea más valiosa.
+        </p>
+        <p>
+          La ventaja de primer movimiento es física (un sticker QR en un árbol), no sólo digital. Cada PIT instalado vincula una ubicación geográfica a una página viva y creciente de observaciones de especies — infraestructura permanente que los competidores no pueden replicar sólo con código.
+        </p>
+      </div>
+    </section>
+  </article>
 </DocLayout>

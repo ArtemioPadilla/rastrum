@@ -1,119 +1,177 @@
 ---
 import DocLayout from '../../../layouts/DocLayout.astro';
+import { t } from '../../../i18n/utils';
+
 const lang = 'es';
----
-<DocLayout title="Financiamiento y Legal" lang={lang} section="funding" editPath="src/pages/es/docs/funding.astro">
-
-# 💰 Financiamiento y Legal
-
-## Estructura Legal (Recomendada)
-
-Dos entidades, una misión:
-
-### Rastrum A.C. (Asociación Civil)
-- Resguarda misión, marca, becas, comunidad, reglas de gobernanza de datos
-- 3–8 semanas para constituirse · MXN 15–40K honorarios notariales
-- Buscar **donataria autorizada** (SAT, 12 meses) → habilita becas FMCN, FAHHO, Fomento Banamex
-- Modelo: Fundación Mozilla, Fundación WordPress.org, iNaturalist 501(c)(3)
-
-### Rastrum S.A.S. (mismo día vía tuempresa.gob.mx, ~MXN 0)
-- Licenciamiento comercial, contratos SaaS, gobierno B2G, eventual equity de VC
-- La A.C. posee el 100% inicialmente; acuerdo de marca + servicios entre entidades
-- Certificación B Corp vía SAPI (Sistema B no certifica sin fines de lucro)
-
-### Patrocinador Fiscal 501(c)(3) en EE.UU.
-Necesario para desbloquear AWS Imagine, Bezos Earth Fund, CZI EOSS, Mulago, DRK y la mayoría de filantropía de origen estadounidense:
-- **Multiplier** (especializado en conservación, 9% de comisión) — recomendado
-- Social Good Fund (más rápido, ~5 días, pero ratio 1000:100)
-
+const tr = t(lang);
 ---
 
-## ~$400K en Créditos Disponibles Ahora
+<DocLayout title={tr.docs.sections.funding} lang={lang} section="funding" editPath="src/pages/es/docs/funding.astro">
+  <article class="space-y-8">
+    <div>
+      <h1 class="text-3xl font-bold tracking-tight mb-4">{tr.docs.sections.funding}</h1>
+      <p class="text-lg text-zinc-600 dark:text-zinc-400 max-w-3xl">{tr.docs.descriptions.funding}</p>
+    </div>
 
-Sin necesidad de entidad legal. Aplicaciones de 30 minutos:
+    <!-- Estructura legal -->
+    <section>
+      <h2 id="estructura-legal" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+        <a href="#estructura-legal" class="text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Estructura legal dual
+      </h2>
+      <p class="text-zinc-700 dark:text-zinc-300 mb-4">Dos entidades, una sola misión:</p>
+      <div class="grid sm:grid-cols-2 gap-4 not-prose">
+        <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <p class="font-semibold text-zinc-900 dark:text-zinc-100 text-lg mb-2">Rastrum A.C.</p>
+          <p class="text-xs font-mono text-emerald-600 dark:text-emerald-400 mb-3">Asociación Civil (sin fines de lucro)</p>
+          <div class="space-y-2 text-sm text-zinc-600 dark:text-zinc-400">
+            <p>Custodia la misión, marca, donativos, comunidad y reglas de gobernanza de datos</p>
+            <p>3-8 semanas para constituir, MXN 15-40K en honorarios notariales</p>
+            <p>Buscar el estatus de <span class="font-medium text-zinc-700 dark:text-zinc-300">donataria autorizada</span> (SAT, 12 meses) para desbloquear apoyos de FMCN, FAHHO y Fomento Banamex</p>
+            <p class="text-xs text-zinc-500">Modelo: Mozilla Foundation, WordPress.org, iNaturalist 501(c)(3)</p>
+          </div>
+        </div>
+        <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <p class="font-semibold text-zinc-900 dark:text-zinc-100 text-lg mb-2">Rastrum S.A.S.</p>
+          <p class="text-xs font-mono text-emerald-600 dark:text-emerald-400 mb-3">Sociedad por Acciones Simplificada (con fines de lucro)</p>
+          <div class="space-y-2 text-sm text-zinc-600 dark:text-zinc-400">
+            <p>Licenciamiento comercial, contratos SaaS, B2G de gobierno, eventual capital VC</p>
+            <p>Constitución el mismo día vía tuempresa.gob.mx, ~MXN 0</p>
+            <p>La A.C. posee 100% inicialmente; convenio de marca + servicios entre las dos entidades</p>
+            <p class="text-xs text-zinc-500">Certificación B Corp vía SAPI (Sistema B)</p>
+          </div>
+        </div>
+      </div>
+    </section>
 
-| Programa | Valor | Tiempo |
-|----------|-------|--------|
-| NVIDIA Inception | $100K AWS + $150K Nebius + precios GPU | Gratis, sin equity |
-| Microsoft for Startups | $150K Azure + $2,500 OpenAI | 1–2 días |
-| Anthropic AI for Science | $20K créditos API (afiliación MAIA más fuerte) | 1 semana |
-| Cloudflare for Startups | $2,500 créditos | Mismo día |
-| AWS Activate Founders | $1K | 7–10 días |
-| GitHub Student Developer Pack | Copilot + DigitalOcean $200 + más | 1 día |
-| Supabase OSS | Créditos Pro | Solicitud por email |
-| Anthropic Student Builder | $50 | Email estudiantil |
+    <!-- Créditos -->
+    <section>
+      <h2 id="creditos" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+        <a href="#creditos" class="text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors">#</a> ~$400K en créditos disponibles ahora
+      </h2>
+      <p class="text-zinc-700 dark:text-zinc-300 mb-4">No requiere entidad legal. La mayoría de las solicitudes toma menos de 30 minutos.</p>
+      <div class="not-prose overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-zinc-200 dark:border-zinc-800">
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Programa</th>
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Valor</th>
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Tiempo de activación</th>
+            </tr>
+          </thead>
+          <tbody class="text-zinc-700 dark:text-zinc-300">
+            <tr class="border-b border-zinc-100 dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-950/50">
+              <td class="py-2 px-3 font-medium text-zinc-900 dark:text-zinc-100">NVIDIA Inception</td>
+              <td class="py-2 px-3">$100K AWS + $150K Nebius + precios de GPU</td>
+              <td class="py-2 px-3">Gratis, sin equity</td>
+            </tr>
+            <tr class="border-b border-zinc-100 dark:border-zinc-900">
+              <td class="py-2 px-3 font-medium text-zinc-900 dark:text-zinc-100">Microsoft for Startups</td>
+              <td class="py-2 px-3">$150K Azure + $2,500 OpenAI</td>
+              <td class="py-2 px-3">1-2 días</td>
+            </tr>
+            <tr class="border-b border-zinc-100 dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-950/50">
+              <td class="py-2 px-3 font-medium text-zinc-900 dark:text-zinc-100">Anthropic AI for Science</td>
+              <td class="py-2 px-3">$20K en créditos de API</td>
+              <td class="py-2 px-3">~1 semana</td>
+            </tr>
+            <tr class="border-b border-zinc-100 dark:border-zinc-900">
+              <td class="py-2 px-3 font-medium text-zinc-900 dark:text-zinc-100">Cloudflare for Startups</td>
+              <td class="py-2 px-3">$2,500 en créditos</td>
+              <td class="py-2 px-3">El mismo día</td>
+            </tr>
+            <tr class="border-b border-zinc-100 dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-950/50">
+              <td class="py-2 px-3 font-medium text-zinc-900 dark:text-zinc-100">AWS Activate Founders</td>
+              <td class="py-2 px-3">$1K</td>
+              <td class="py-2 px-3">7-10 días</td>
+            </tr>
+            <tr>
+              <td class="py-2 px-3 font-medium text-zinc-900 dark:text-zinc-100">Supabase OSS</td>
+              <td class="py-2 px-3">Créditos Pro</td>
+              <td class="py-2 px-3">Solicitud por correo</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
 
----
+    <!-- Pipeline de fondos -->
+    <section>
+      <h2 id="fondos" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+        <a href="#fondos" class="text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Pipeline de fondos
+      </h2>
+      <p class="text-zinc-700 dark:text-zinc-300 mb-4">Meta del año 1: $1-2M entre fondos y alianzas.</p>
+      <div class="space-y-4 not-prose">
+        <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <p class="font-semibold text-zinc-900 dark:text-zinc-100 mb-3">Oportunidades inmediatas</p>
+          <div class="space-y-2 text-sm text-zinc-700 dark:text-zinc-300">
+            <div class="flex items-start gap-2">
+              <span class="mt-1 w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+              <p><span class="font-medium">MIT Solve</span> (tracks de IA para la Humanidad + Indígenas) — hasta $150K</p>
+            </div>
+            <div class="flex items-start gap-2">
+              <span class="mt-1 w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+              <p><span class="font-medium">National Geographic Society Nivel II</span> — hasta $100K, abierto</p>
+            </div>
+            <div class="flex items-start gap-2">
+              <span class="mt-1 w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+              <p><span class="font-medium">Mohamed bin Zayed Species Conservation Fund</span> — hasta $25K</p>
+            </div>
+            <div class="flex items-start gap-2">
+              <span class="mt-1 w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+              <p><span class="font-medium">Bezos Earth Fund AI for Climate & Nature</span> — $50K-$2M (requiere patrocinador fiscal en EE.UU.)</p>
+            </div>
+          </div>
+        </div>
+        <div class="p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5">
+          <p class="font-semibold text-zinc-900 dark:text-zinc-100 mb-2">Alto encaje local</p>
+          <p class="text-sm text-zinc-700 dark:text-zinc-300">
+            <span class="font-medium">Fundación Alfredo Harp Helú Oaxaca (FAHHO)</span> — $50-200K. El mejor encaje estratégico dada la raíz oaxaqueña y el ángulo de lenguas indígenas. Alianza directa, no concurso de fondos.
+          </p>
+        </div>
+      </div>
+    </section>
 
-## Pipeline de Becas (Año 1 · Objetivo $1–2M)
-
-### Inmediatas (Q2 2026)
-| Beca | Monto | Fecha límite | Ajuste |
-|------|-------|-------------|--------|
-| **MIT Solve** (IA para la Humanidad + pistas Indígenas) | Hasta $150K | **21 mayo 2026** | Excelente |
-| National Geographic Society Explorador Nivel II | Hasta $100K | Continua, ~6 meses | Excelente |
-| Mohamed bin Zayed Species Conservation Fund | Hasta $25K | **30 junio 2026** | Muy bueno |
-| Rufford Small Grants | £7K | Continua, ~2 meses | Muy bueno |
-
-### Q3 2026
-| Beca | Monto | Notas |
-|------|-------|-------|
-| Bezos Earth Fund AI para Clima y Naturaleza | $50K–$2M | Requiere patrocinador fiscal en EE.UU. |
-| BID Lab (Iniciativa Jaguar de Impacto) | $500K–$1M | Solo LATAM, multilateral |
-| Google.org Acelerador: IA Generativa | ~$1.5M equiv. | Cohorte 2026 esperada Q3 |
-| CZI EOSS Ciclo 7 | $100K–$400K | Con afiliación institucional |
-| Conservation Leadership Programme | $12.5K | Equipos de 3+, fecha límite noviembre |
-| Future for Nature Award | €50K | Fecha límite septiembre |
-
-### Alto Ajuste Local
-**Fundación Alfredo Harp Helú Oaxaca (FAHHO)** — el mayor ajuste estratégico dadas las raíces oaxaqueñas + el ángulo de lenguas indígenas. Alianza directa, no competencia de becas.
-
----
-
-## Modelo de Ingresos (Perspectiva a 5 Años)
-
-Techo realista de ARR a 5 años: **$3–6M** (equipo sostenible de 25–40 personas)
-
-| Fuente | % del ARR | Ejemplos |
-|--------|----------|----------|
-| Becas internacionales | 40% | FAHHO, NatGeo, Bezos, CZI |
-| SaaS B2G / B2B | 35% | Pilotos CONANP, agencias estatales, consultoras |
-| Programas de capacitación | 15% | MXN 15–30K por taller de 3 días |
-| API + donaciones | 10% | $0.05–0.10/llamada ID; consumidor |
-
-### Niveles SaaS
-| Nivel | Precio | Incluye |
-|-------|--------|---------|
-| Gratis | $0 | 10 IDs/día, mapa básico, comunidad |
-| Pro | $5/mes | IDs ilimitadas, revisión experta, paquetes regionales offline, cámara trampa ≤500 img/mes |
-| Institucional | $200–2,000/mes | API, exportación SNIB/CONANP, multi-usuario, SLA, registros de auditoría |
-| B2G Personalizado | MXN 500K–3M/año | Por agencia (CONANP, CONABIO, SEMARNAT estatal, INAH) |
-
----
-
-## Stack de Licencias
-
-| Código | Licencia | Justificación |
-|--------|----------|---------------|
-| Código servidor | **AGPL-3.0** | Cierra el vacío SaaS (precedente Mastodon/Nextcloud) |
-| SDKs cliente | **Apache 2.0** | Agrega concesión de patentes |
-| Documentación | **CC BY 4.0** | Compartir abierto |
-| Tablas taxonómicas | **CC0** | Dominio público |
-| Glosarios indígenas | **Etiquetas TK + licencia comunitaria** | CARE > FAIR |
-| Modelos ML pequeños | **Apache 2.0** | |
-| Modelos de frontera | **Licencia de Investigación Rastrum** | Gratis no-comercial, comercial requiere acuerdo |
-
-**DCO (Developer Certificate of Origin)** no CLA — ligero y genera confianza.
-
----
-
-## Marca Registrada
-
-Registrar inmediatamente en IMPI en clase 42 (SaaS) + clase 9 (software) + clase 41 (educación).
-~MXN 3,126/clase + MXN 5–15K honorarios de abogado · 6–18 meses hasta emisión.
-
-**Inventia Life Science (Sydney) tiene una marca RASTRUM para bioimpresora 3D** — confirmar vía [MARCANET](https://marcanet.impi.gob.mx/) antes de presentar.
-
-Registrar dominios: `rastrum.mx` · `rastrum.org.mx` · `rastrum.app` · `rastrum.ai` · `rastrum.eco`
-
+    <!-- Modelo de ingresos -->
+    <section>
+      <h2 id="ingresos" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+        <a href="#ingresos" class="text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Modelo de ingresos
+      </h2>
+      <p class="text-zinc-700 dark:text-zinc-300 mb-4">
+        Tope realista de ARR a 5 años: <span class="font-semibold text-emerald-600 dark:text-emerald-400">$3-6M</span> (equipo sostenible de 25-40 personas). Mezcla de fondos, SaaS, capacitación y APIs.
+      </p>
+      <div class="not-prose overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-zinc-200 dark:border-zinc-800">
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Plan</th>
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Precio</th>
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Incluye</th>
+            </tr>
+          </thead>
+          <tbody class="text-zinc-700 dark:text-zinc-300">
+            <tr class="border-b border-zinc-100 dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-950/50">
+              <td class="py-2 px-3 font-medium text-zinc-900 dark:text-zinc-100">Gratis</td>
+              <td class="py-2 px-3 font-mono">$0</td>
+              <td class="py-2 px-3">10 IDs/día, mapa básico, funcionalidades comunitarias</td>
+            </tr>
+            <tr class="border-b border-zinc-100 dark:border-zinc-900">
+              <td class="py-2 px-3 font-medium text-zinc-900 dark:text-zinc-100">Pro</td>
+              <td class="py-2 px-3 font-mono">$5/mes</td>
+              <td class="py-2 px-3">IDs ilimitadas, revisión experta, paquetes regionales offline, cámaras trampa (500 imágenes/mes)</td>
+            </tr>
+            <tr class="border-b border-zinc-100 dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-950/50">
+              <td class="py-2 px-3 font-medium text-zinc-900 dark:text-zinc-100">Institucional</td>
+              <td class="py-2 px-3 font-mono">$200-2,000/mes</td>
+              <td class="py-2 px-3">Acceso a API, exportación SNIB/CONANP, multi-usuario, SLA, registros de auditoría</td>
+            </tr>
+            <tr>
+              <td class="py-2 px-3 font-medium text-zinc-900 dark:text-zinc-100">B2G a la medida</td>
+              <td class="py-2 px-3 font-mono">MXN 500K-3M/año</td>
+              <td class="py-2 px-3">Por agencia (CONANP, CONABIO, SEMARNAT estatales, INAH)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </article>
 </DocLayout>

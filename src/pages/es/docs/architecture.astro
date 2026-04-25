@@ -1,130 +1,173 @@
 ---
 import DocLayout from '../../../layouts/DocLayout.astro';
+import { t } from '../../../i18n/utils';
+
 const lang = 'es';
+const tr = t(lang);
+
+const stack = [
+  { layer: 'Frontend',         choice: 'SvelteKit',          rationale: 'Ligero, SSR+SPA, buena historia offline para una PWA con escritura intensa' },
+  { layer: 'BD local',         choice: 'Dexie (IndexedDB)',  rationale: 'Sin conexión primero, lista para sincronizar, patrón append-heavy con autor único' },
+  { layer: 'Runtime de IA',    choice: 'ONNX Runtime Web',   rationale: 'Inferencia en dispositivo vía WebAssembly, fallback a WebGPU' },
+  { layer: 'Almacenamiento',   choice: 'Cloudflare R2',      rationale: 'Compatible con S3, cero tarifas de egreso ($150/mes vs $4,710/mes en Supabase a 10K MAU)' },
+  { layer: 'Backend',          choice: 'Supabase',           rationale: 'Postgres + PostGIS + pgvector + Auth + Realtime + Storage' },
+  { layer: 'Mapas',            choice: 'MapLibre GL JS',     rationale: 'Open-source, autoalojable, pmtiles en R2 para mosaicos sin conexión' },
+];
+
+const costModel = [
+  { scale: '10K MAU',  monthly: '~$2,000',  perUser: '$0.20', breakdown: 'Inferencia IA $800, almacenamiento $400, cómputo $500, varios $300' },
+  { scale: '50K MAU',  monthly: '~$6,000',  perUser: '$0.12', breakdown: '' },
+  { scale: '100K MAU', monthly: '~$11,500', perUser: '$0.12', breakdown: '' },
+];
 ---
-<DocLayout title="Arquitectura Técnica" lang={lang} section="architecture" editPath="src/pages/es/docs/architecture.astro">
 
-# 🏗️ Arquitectura Técnica
+<DocLayout title={tr.docs.sections.architecture} lang={lang} section="architecture" editPath="src/pages/es/docs/architecture.astro">
+  <article class="space-y-8">
+    <div>
+      <h1 class="text-3xl font-bold tracking-tight mb-4">{tr.docs.sections.architecture}</h1>
+      <p class="text-lg text-zinc-600 dark:text-zinc-400 max-w-3xl">{tr.docs.descriptions.architecture}</p>
+    </div>
 
-## Decisiones de Stack
+    <!-- Decisiones de stack -->
+    <section>
+      <h2 id="stack" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+        <a href="#stack" class="text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Decisiones de stack
+      </h2>
+      <div class="not-prose overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-zinc-200 dark:border-zinc-800">
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Capa</th>
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Elección</th>
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Justificación</th>
+            </tr>
+          </thead>
+          <tbody class="text-zinc-700 dark:text-zinc-300">
+            {stack.map((row, i) => (
+              <tr class:list={["border-b border-zinc-100 dark:border-zinc-900", i % 2 === 0 ? "bg-zinc-50/50 dark:bg-zinc-950/50" : ""]}>
+                <td class="py-2 px-3 font-medium text-zinc-900 dark:text-zinc-100 whitespace-nowrap">{row.layer}</td>
+                <td class="py-2 px-3 font-mono text-emerald-600 dark:text-emerald-400 whitespace-nowrap">{row.choice}</td>
+                <td class="py-2 px-3">{row.rationale}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
 
-| Capa | Elección | Justificación |
-|------|----------|---------------|
-| **Shell de app** | SvelteKit 2 | PWA offline con escritura intensiva; el enrutamiento MPA de Astro dificulta la UX offline |
-| **Sitio de contenido** | Astro | Guías de especies, docs, blog — hidratación de contenido estático es perfecta |
-| **Wrapper móvil** | Capacitor (iOS v1.2) | Escapar la evicción ITP de WebKit; reutilizar codebase PWA |
-| **Sincronización offline** | Bandeja Dexie IndexedDB + REST | Escritura intensiva, autor único; CRDTs son excesivos |
-| **Mapas offline** | MapLibre GL JS + pmtiles en R2 | Mapbox GL JS no tiene soporte offline web |
-| **ML en dispositivo** | EfficientNet-Lite0 INT8 ONNX | Paquete de menos de 3MB; fallback WebGPU → WASM |
-| **API de visión** | Gemini Flash-Lite → Haiku 4.5 | Enrutamiento optimizado por costo; Sonnet solo para revisión experta |
-| **Audio IA** | BirdNET (licencia comercial) | Mejor modelo acústico abierto; los pesos son CC BY-NC-SA |
-| **Almacenamiento** | Cloudflare R2 | Cero tarifas de egreso — $150/mes vs $4,710/mes Supabase Storage a 10K MAU |
-| **Base de datos** | PostGIS + pgvector + Supabase | Tipo geography, GIST, particiones mensuales pg_partman |
-| **Residencia de datos** | Opción AWS mx-central-1 | Cumplimiento LGPDPPSO para clientes B2G mexicanos |
-
-> **BirdNET crítico:** Los pesos del modelo son CC BY-NC-SA 4.0 — no comercial. El código fuente es MIT pero los pesos no. Contactar ccb-birdnet@cornell.edu para licencia comercial antes de agregar cualquier nivel de pago.
-
-## Pipeline de Identificación IA
-
-<pre><code>
-El usuario sube medios
-        |
-        v
-  Extracción EXIF en cliente (exifr) --&gt; GPS, timestamp, dispositivo
-        |
-        v
-  Verificación de calidad pre-ID --&gt; advertencia de desenfoque/oscuridad
-        |
-        |--- Planta detectada? ---------------&gt; PlantNet Pro API
-        |                                        (78K especies, confianza)
-        |
-        |--- Sonido de ave? ------------------&gt; BirdNET
-        |                                        (licencia comercial)
-        |
-        +--- Imagen/video general ------------&gt; Gemini 2.5 Flash-Lite
-                                                  |
-                                                  +- conf &gt;= 0.8 --&gt; Resultado
-                                                  |
-                                                  +- conf &lt; 0.8 --&gt; Claude Haiku 4.5
-                                                                     |
-                                                                     +- conf &gt;= 0.7 --&gt; Resultado
-                                                                     |
-                                                                     +- Cola experta --&gt; Sonnet
+    <!-- Pipeline de identificación IA -->
+    <section>
+      <h2 id="pipeline" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+        <a href="#pipeline" class="text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Pipeline de identificación con IA
+      </h2>
+      <div class="not-prose p-4 rounded-xl bg-zinc-950 border border-zinc-800 font-mono text-xs text-emerald-300 overflow-x-auto whitespace-pre leading-relaxed">El usuario sube medios
+  |
+  v
+Extracción EXIF en el cliente (exifr) --&gt; GPS, timestamp, dispositivo
+  |
+  v
+Comprobación de calidad pre-ID --&gt; aviso de desenfoque / poca luz
+  |
+  |--- ¿Planta detectada? ----&gt; PlantNet Pro API (78K especies)
+  |
+  |--- ¿Sonido de ave? -------&gt; BirdNET (licencia comercial)
+  |
+  +--- Imagen / video general &gt; Gemini 2.5 Flash-Lite (~$0.001)
+                                  |
+                                  +-- conf &gt;= 0.8 --&gt; Resultado
+                                  |
+                                  +-- conf &lt; 0.8  --&gt; Claude Haiku 4.5 (~$0.01)
+                                                       |
+                                                       +-- conf &gt;= 0.7 --&gt; Resultado
+                                                       |
+                                                       +-- Conf baja  --&gt; Cola de expertos
 
 Respaldo offline:
-  EfficientNet-Lite0 INT8 ONNX (&lt;3MB, top 500 especies)
-  + Paquetes regionales (Oaxaca/Yucatán 10-30MB, carga diferida en IndexedDB)
-</code></pre>
+  EfficientNet-Lite0 INT8 ONNX (&lt;3 MB, top 500 especies)
+  + Paquetes regionales (Oaxaca/Yucatán, 10-30 MB, carga diferida en IndexedDB)</div>
+    </section>
 
-## Modelo de Costos
+    <!-- Modelo de costos -->
+    <section>
+      <h2 id="costos" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+        <a href="#costos" class="text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Modelo de costos
+      </h2>
+      <div class="not-prose overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-zinc-200 dark:border-zinc-800">
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Escala</th>
+              <th class="text-right py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Costo mensual</th>
+              <th class="text-right py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Por usuario</th>
+            </tr>
+          </thead>
+          <tbody class="text-zinc-700 dark:text-zinc-300">
+            {costModel.map((row, i) => (
+              <tr class:list={["border-b border-zinc-100 dark:border-zinc-900", i % 2 === 0 ? "bg-zinc-50/50 dark:bg-zinc-950/50" : ""]}>
+                <td class="py-2 px-3 font-medium text-zinc-900 dark:text-zinc-100">{row.scale}</td>
+                <td class="py-2 px-3 text-right font-mono">{row.monthly}</td>
+                <td class="py-2 px-3 text-right font-mono">{row.perUser}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-3">
+        Desglose 10K MAU: inferencia IA $800, almacenamiento de objetos $400, cómputo $500, monitoreo y otros $300. Incluye Supabase Pro, Cloudflare R2, ~500K llamadas a Haiku, 600K llamadas a PlantNet Pro y la primera pasada con Gemini Flash-Lite.
+      </p>
+    </section>
 
-| Escala | Costo mensual | Por usuario |
-|--------|--------------|-------------|
-| 10K MAU | ~$2,000 | $0.20 |
-| 50K MAU | ~$6,000 | $0.12 |
-| 100K MAU | ~$11,500 | $0.12 |
-
-*Incluye: Supabase Pro + R2 + ~500K llamadas Claude Haiku + 600K PlantNet Pro + primera pasada Gemini + monitoreo*
-
-**Modelo freemium:** 10 IDs/día gratis · $5/mes ilimitado + revisión experta · $200–2,000/mes institucional
-
-## Esquema de Base de Datos (tablas principales)
-
-```sql
--- Observación principal
-observations (
-  id uuid PK,
-  observer_id uuid FK users,
-  observed_at timestamptz,
-  location geography(Point, 4326),    -- PostGIS geography
-  location_obscured geography(Point), -- legible públicamente, difuso
-  habitat_type varchar,
-  -- Auto-enriquecimiento ambiental
-  moon_phase varchar, moon_illumination float,
-  precipitation_24h_mm float, ndvi_value float,
-  -- Extraído de EXIF
-  captured_at timestamptz, device_make varchar,
-  -- Particionado mensualmente vía pg_partman
-)
-
--- Identificaciones IA
-identifications (
-  id uuid PK,
-  observation_id uuid FK,
-  taxon_id uuid FK,
-  confidence float,
-  source varchar,  -- 'plantnet'|'birdnet'|'claude_haiku'|'human'
-  validated_by uuid FK users,
-  is_research_grade boolean
-)
-
--- RLS de ubicación sensible
--- location: auth.uid() = observer_id OR is_credentialed_researcher()
--- location_obscured: lectura pública (función IMMUTABLE obscure_point())
-```
-
-## Restricciones PWA en iOS
-
-iOS Safari eliminará tu PWA si ignoras esto:
-
-| Restricción | Mitigación |
-|-------------|-----------|
-| Evicción de almacenamiento ITP 7 días | `navigator.storage.persist()` al instalar |
-| Límite suave de caché ~50MB | Mantener caché inicial bajo 30MB; cargar paquetes regionales de forma diferida |
-| Sin API de Background Sync | Vaciar cola en cada apertura de la app |
-| Web Push requiere A2HS | Solicitar agresivamente Agregar a Pantalla de Inicio |
-| WebGPU solo Safari 26+ | Fallback WASM en ONNX Runtime Web |
-| DMA de la UE rompe Web Push (iOS 17.4) | Wrapper Capacitor para v1.2 |
-
-## Mapas Offline
-
-```
-Zoom 0–10: ~250MB vista general (México, pre-incluido)
-Zoom 11–14: el usuario descarga chunks de 50km de radio (~20–60MB cada uno)
-           → almacenados en blob storage de Dexie
-
-Stack: MapLibre GL JS + formato pmtiles de protomaps
-       Autoalojado en Cloudflare R2 (cero egreso)
-```
-
+    <!-- Modelo de datos -->
+    <section>
+      <h2 id="datos" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+        <a href="#datos" class="text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Modelo de datos
+      </h2>
+      <p class="text-zinc-700 dark:text-zinc-300 mb-4">
+        Tablas centrales del esquema Postgres en Supabase, particionadas mensualmente con pg_partman. Tipos geography de PostGIS para consultas espaciales y pgvector para búsqueda semántica de especies.
+      </p>
+      <div class="not-prose overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-zinc-200 dark:border-zinc-800">
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Tabla</th>
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Propósito</th>
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Campos clave</th>
+            </tr>
+          </thead>
+          <tbody class="text-zinc-700 dark:text-zinc-300">
+            <tr class="border-b border-zinc-100 dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-950/50">
+              <td class="py-2 px-3 font-mono text-emerald-600 dark:text-emerald-400">users</td>
+              <td class="py-2 px-3">Cuentas y perfiles de usuario</td>
+              <td class="py-2 px-3 font-mono text-xs">id, display_name, role, language_pref</td>
+            </tr>
+            <tr class="border-b border-zinc-100 dark:border-zinc-900">
+              <td class="py-2 px-3 font-mono text-emerald-600 dark:text-emerald-400">observations</td>
+              <td class="py-2 px-3">Registros de observación con ubicación y entorno</td>
+              <td class="py-2 px-3 font-mono text-xs">id, observer_id, observed_at, location (PostGIS), moon_phase, precipitation</td>
+            </tr>
+            <tr class="border-b border-zinc-100 dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-950/50">
+              <td class="py-2 px-3 font-mono text-emerald-600 dark:text-emerald-400">species</td>
+              <td class="py-2 px-3">Referencia taxonómica con categorías NOM-059</td>
+              <td class="py-2 px-3 font-mono text-xs">id, scientific_name, common_names (jsonb), nom_059_category</td>
+            </tr>
+            <tr class="border-b border-zinc-100 dark:border-zinc-900">
+              <td class="py-2 px-3 font-mono text-emerald-600 dark:text-emerald-400">media_files</td>
+              <td class="py-2 px-3">Fotos, audio, video con metadatos EXIF</td>
+              <td class="py-2 px-3 font-mono text-xs">id, observation_id, media_type, r2_key, exif_data (jsonb)</td>
+            </tr>
+            <tr class="border-b border-zinc-100 dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-950/50">
+              <td class="py-2 px-3 font-mono text-emerald-600 dark:text-emerald-400">identifications</td>
+              <td class="py-2 px-3">Resultados de IA y de humanos con puntajes de confianza</td>
+              <td class="py-2 px-3 font-mono text-xs">id, observation_id, taxon_id, confidence, source, is_research_grade</td>
+            </tr>
+            <tr>
+              <td class="py-2 px-3 font-mono text-emerald-600 dark:text-emerald-400">expert_validations</td>
+              <td class="py-2 px-3">Revisión experta con verificación de insignias taxonómicas</td>
+              <td class="py-2 px-3 font-mono text-xs">id, identification_id, validator_id, verdict, notes</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </article>
 </DocLayout>

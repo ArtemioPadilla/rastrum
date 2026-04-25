@@ -1,126 +1,144 @@
 {
   "updated": "2026-04-25",
   "v0_1_completed": "2026-04-24",
-  "notes": "v0.1 → v1.0 code-complete in this push. Items marked done include features whose schema, RLS, Edge Function code, and client UI are all shipped to main. Items marked 'blocked' need an external action: API keys, Cornell BirdNET license, ML model training, Apple Developer account, Cloudflare R2 account + DNS, etc. Phases v1.5–v2.5 remain unchanged from prior plan.",
+  "notes":    "v0.1 → v1.0 code-complete in this push. Items marked done include features whose schema, RLS, Edge Function code, and client UI are all shipped to main. Items marked 'blocked' need an external action: API keys, Cornell BirdNET license, ML model training, Apple Developer account, Cloudflare R2 account + DNS, etc. Phases v1.5–v2.5 remain unchanged from prior plan.",
+  "notes_es": "v0.1 → v1.0 código completo en este push. Los ítems marcados como done incluyen funcionalidades cuyo schema, RLS, Edge Function y UI ya están desplegados en main. Los ítems marcados como 'blocked' requieren una acción externa: API keys, licencia comercial de BirdNET, entrenamiento ML, cuenta Apple Developer, DNS de Cloudflare R2, etc. Las fases v1.5–v2.5 no cambian respecto al plan anterior.",
   "phases": {
     "v0.1": {
-      "name": "Alpha MVP (online-first)",
-      "period": "Months 1–3",
+      "name":    "Alpha MVP (online-first)",
+      "name_es": "Alpha MVP (online-first)",
+      "period":    "Months 1–3",
+      "period_es": "Meses 1–3",
       "status": "done",
       "items": [
-        { "id": "astro-skeleton",     "label": "Astro site skeleton + Tailwind + i18n", "done": true },
-        { "id": "supabase-schema",    "label": "Supabase schema (observations, taxa, identifications, media) with PostGIS + RLS", "done": true },
-        { "id": "auth-magic-link",    "label": "Supabase magic-link auth + guest mode", "done": true },
-        { "id": "auth-multi",         "label": "Google + GitHub OAuth, email OTP code, passkey, sign-out-everywhere", "done": true },
-        { "id": "ci-cd",              "label": "CI/CD via GitHub Actions (typecheck, test, build, deploy)", "done": true },
-        { "id": "profile-basics",     "label": "Profile page + edit + avatar dropdown (module 08)", "done": true },
-        { "id": "gps-observation",    "label": "GPS-tagged observation form with EXIF auto-fill", "done": true },
-        { "id": "plantnet-id",        "label": "PlantNet photo ID integration (Edge Function written; deploy pending)", "done": true },
-        { "id": "claude-haiku-id",    "label": "Claude Haiku 4.5 vision cascade (Edge Function written; deploy pending)", "done": true },
-        { "id": "map-view",           "label": "MapLibre map with clustered observation pins (OpenFreeMap; pmtiles in v0.3)", "done": true },
-        { "id": "darwin-core-csv",    "label": "Darwin Core CSV export with format presets", "done": true },
-        { "id": "pwa-manifest",       "label": "PWA manifest + service worker shell cache", "done": true },
-        { "id": "offline-queue",      "label": "Dexie IndexedDB outbox + sync engine + identify trigger", "done": true },
-        { "id": "unit-tests",         "label": "Vitest unit-test scaffold (9 tests on Darwin Core mapping)", "done": true }
+        { "id": "astro-skeleton",     "label": "Astro site skeleton + Tailwind + i18n", "label_es": "Esqueleto Astro + Tailwind + i18n", "done": true },
+        { "id": "supabase-schema",    "label": "Supabase schema (observations, taxa, identifications, media) with PostGIS + RLS", "label_es": "Esquema Supabase (observaciones, taxa, identificaciones, media) con PostGIS + RLS", "done": true },
+        { "id": "auth-magic-link",    "label": "Supabase magic-link auth + guest mode", "label_es": "Auth con enlace mágico Supabase + modo invitado", "done": true },
+        { "id": "auth-multi",         "label": "Google + GitHub OAuth, email OTP code, passkey, sign-out-everywhere", "label_es": "OAuth con Google + GitHub, OTP por correo, passkey, cerrar sesión en todos los dispositivos", "done": true },
+        { "id": "ci-cd",              "label": "CI/CD via GitHub Actions (typecheck, test, build, deploy)", "label_es": "CI/CD con GitHub Actions (typecheck, test, build, deploy)", "done": true },
+        { "id": "profile-basics",     "label": "Profile page + edit + avatar dropdown (module 08)", "label_es": "Página de perfil + edición + dropdown de avatar (módulo 08)", "done": true },
+        { "id": "gps-observation",    "label": "GPS-tagged observation form with EXIF auto-fill", "label_es": "Formulario de observación con GPS y auto-relleno EXIF", "done": true },
+        { "id": "plantnet-id",        "label": "PlantNet photo ID integration",                    "label_es": "Integración con PlantNet para ID fotográfica", "done": true },
+        { "id": "claude-haiku-id",    "label": "Claude Haiku 4.5 vision cascade",                  "label_es": "Cascada con Claude Haiku 4.5 (visión)", "done": true },
+        { "id": "map-view",           "label": "MapLibre map with clustered observation pins (OpenFreeMap; pmtiles in v0.3)", "label_es": "Mapa MapLibre con pines agrupados (OpenFreeMap; pmtiles en v0.3)", "done": true },
+        { "id": "darwin-core-csv",    "label": "Darwin Core CSV export with format presets",      "label_es": "Exportación CSV Darwin Core con plantillas (SNIB, CONANP)", "done": true },
+        { "id": "pwa-manifest",       "label": "PWA manifest + service worker shell cache",       "label_es": "Manifiesto PWA + service worker con caché de shell", "done": true },
+        { "id": "offline-queue",      "label": "Dexie IndexedDB outbox + sync engine + identify trigger", "label_es": "Outbox Dexie IndexedDB + motor de sincronización + disparador de identificación", "done": true },
+        { "id": "unit-tests",         "label": "Vitest unit-test scaffold (9 tests on Darwin Core mapping)", "label_es": "Andamiaje de pruebas unitarias Vitest (9 tests sobre el mapeo Darwin Core)", "done": true }
       ]
     },
     "v0.3": {
-      "name": "Offline intelligence + activity",
-      "period": "Months 4–5",
+      "name":    "Offline intelligence + activity",
+      "name_es": "Inteligencia offline + actividad",
+      "period":    "Months 4–5",
+      "period_es": "Meses 4–5",
       "status": "in_progress",
       "items": [
-        { "id": "activity-feed",      "label": "Activity feed + server-side triggers (module 08)", "done": true },
-        { "id": "unread-badge",       "label": "Unread-count badge on avatar dropdown", "done": true },
-        { "id": "sensitive-privacy",  "label": "NOM-059 / CITES obscuration warning in observation form", "done": true },
-        { "id": "exif-extraction",    "label": "EXIF/XMP/ID3 metadata auto-extraction (in obs form)", "done": true },
-        { "id": "byo-anthropic-key",  "label": "BYO Anthropic key (client-set, never persisted)", "done": true },
-        { "id": "webllm-text",        "label": "WebLLM Llama-3.2-1B for translation + field notes (module 11)", "done": true },
-        { "id": "onnx-base",          "label": "EfficientNet-Lite0 ONNX base fallback (~2.8MB)", "done": false, "blocked_by": "ONNX model packaging — requires offline training/conversion pipeline" },
-        { "id": "offline-maps",       "label": "pmtiles offline map download (Mexico zoom 0–10)", "done": false, "blocked_by": "pmtiles generation infrastructure + R2 hosting (module 10)" }
+        { "id": "activity-feed",      "label": "Activity feed + server-side triggers (module 08)", "label_es": "Feed de actividad + triggers del servidor (módulo 08)", "done": true },
+        { "id": "unread-badge",       "label": "Unread-count badge on avatar dropdown",            "label_es": "Contador de no leídos en el dropdown del avatar", "done": true },
+        { "id": "sensitive-privacy",  "label": "NOM-059 / CITES obscuration warning in observation form", "label_es": "Aviso de oscurecimiento NOM-059 / CITES en el formulario de observación", "done": true },
+        { "id": "exif-extraction",    "label": "EXIF/XMP/ID3 metadata auto-extraction (in obs form)", "label_es": "Extracción automática de metadatos EXIF/XMP/ID3 en el formulario", "done": true },
+        { "id": "byo-anthropic-key",  "label": "BYO Anthropic key (client-set, never persisted)",  "label_es": "API key de Anthropic propia (en el cliente, nunca persistida)", "done": true },
+        { "id": "webllm-text",        "label": "WebLLM Llama-3.2-1B for translation + field notes (module 11)", "label_es": "WebLLM Llama-3.2-1B para traducción + notas de campo (módulo 11)", "done": true },
+        { "id": "onnx-base",          "label": "EfficientNet-Lite0 ONNX base fallback (~2.8MB)",  "label_es": "Fallback ONNX base con EfficientNet-Lite0 (~2.8 MB)", "done": false, "blocked_by": "ONNX model packaging — requires offline training/conversion pipeline" },
+        { "id": "offline-maps",       "label": "pmtiles offline map download (Mexico zoom 0–10)",  "label_es": "Descarga de mapas offline pmtiles (México zoom 0–10)", "done": false, "blocked_by": "pmtiles generation infrastructure + R2 hosting (module 10)" }
       ]
     },
     "v0.5": {
-      "name": "Beta",
-      "period": "Months 6–8",
+      "name":    "Beta",
+      "name_es": "Beta",
+      "period":    "Months 6–8",
+      "period_es": "Meses 6–8",
       "status": "in_progress",
       "items": [
-        { "id": "multi-image",         "label": "Multi-image observations", "done": true },
-        { "id": "eco-evidence",        "label": "Ecological evidence fields (track/scat/burrow/nest/feather/bone/sound/camera_trap)", "done": true },
-        { "id": "discovery-badges",    "label": "39 seed badges + nightly evaluator Edge Function", "done": true },
-        { "id": "webllm-vision",       "label": "WebLLM Phi-3.5-vision fallback ID (opt-in, confidence ≤ 0.4)", "done": true },
-        { "id": "quality-gates",       "label": "Confidence ≥ 0.4 enforcement on research-grade", "done": true },
-        { "id": "consensus-workflow",  "label": "Research-grade 2/3 identifier consensus + anti-sybil + expert 3× weight", "done": true },
-        { "id": "birdnet-audio",       "label": "BirdNET audio ID (NC license — code-only; requires Python wrapper deployment)", "done": false, "blocked_by": "Need to deploy BirdNET-Analyzer behind a REST endpoint (Fly.io / Railway). Code wiring TBD." },
-        { "id": "scout-v0",            "label": "Rastrum Scout v0 (conversational ID, pgvector RAG)", "done": false, "blocked_by": "pgvector + embedding corpus (taxa descriptions) — separate ML project" },
-        { "id": "onnx-regional",       "label": "Regional ONNX packs (Oaxaca, Yucatán)", "done": false, "blocked_by": "ONNX model training pipeline (v2.0 effort)" },
-        { "id": "gbif-ipt",            "label": "GBIF IPT pilot publish (Darwin Core Archive ZIP)", "done": false, "blocked_by": "GBIF publisher account + DwC-A meta.xml/eml.xml generator" },
-        { "id": "local-contexts",      "label": "Local Contexts BC/TK Notice integration", "done": false, "blocked_by": "Governance track — community consent before code" }
+        { "id": "multi-image",         "label": "Multi-image observations",                         "label_es": "Observaciones con múltiples imágenes", "done": true },
+        { "id": "eco-evidence",        "label": "Ecological evidence fields (track/scat/burrow/nest/feather/bone/sound/camera_trap)", "label_es": "Campos de evidencia ecológica (huella, excremento, madriguera, nido, pluma, hueso, sonido, cámara trampa)", "done": true },
+        { "id": "discovery-badges",    "label": "39 seed badges + nightly evaluator Edge Function", "label_es": "39 insignias semilla + Edge Function de evaluación nocturna", "done": true },
+        { "id": "webllm-vision",       "label": "WebLLM Phi-3.5-vision fallback ID (opt-in, confidence ≤ 0.4)", "label_es": "ID de respaldo con WebLLM Phi-3.5-vision (opt-in, confianza ≤ 0.4)", "done": true },
+        { "id": "quality-gates",       "label": "Confidence ≥ 0.4 enforcement on research-grade",  "label_es": "Compuerta de calidad: research-grade requiere confianza ≥ 0.4", "done": true },
+        { "id": "consensus-workflow",  "label": "Research-grade 2/3 identifier consensus + anti-sybil + expert 3× weight", "label_es": "Consenso research-grade 2/3 identificadores + anti-sybil + peso experto 3×", "done": true },
+        { "id": "byo-keys-platform",   "label": "Per-plugin BYO API keys with guided setup (module 13)", "label_es": "API keys propias por plugin con guía de configuración (módulo 13)", "done": true },
+        { "id": "birdnet-audio",       "label": "BirdNET-Lite audio ID (module 12, NC license)",   "label_es": "ID de audio con BirdNET-Lite (módulo 12, licencia NC)", "done": false, "blocked_by": "Bundle TFLite/ONNX model + audio capture in observation form" },
+        { "id": "scout-v0",            "label": "Rastrum Scout v0 (conversational ID, pgvector RAG)", "label_es": "Rastrum Scout v0 (ID conversacional, RAG con pgvector)", "done": false, "blocked_by": "pgvector + embedding corpus (taxa descriptions) — separate ML project" },
+        { "id": "onnx-regional",       "label": "Regional ONNX packs (Oaxaca, Yucatán)",            "label_es": "Paquetes ONNX regionales (Oaxaca, Yucatán)", "done": false, "blocked_by": "ONNX model training pipeline (v2.0 effort)" },
+        { "id": "gbif-ipt",            "label": "GBIF IPT pilot publish (Darwin Core Archive ZIP)", "label_es": "Publicación piloto en GBIF IPT (Darwin Core Archive ZIP)", "done": false, "blocked_by": "GBIF publisher account + DwC-A meta.xml/eml.xml generator" },
+        { "id": "local-contexts",      "label": "Local Contexts BC/TK Notice integration",         "label_es": "Integración con Avisos BC/TK de Local Contexts", "done": false, "blocked_by": "Governance track — community consent before code" }
       ]
     },
     "v1.0": {
-      "name": "Public Launch",
-      "period": "Months 9–14",
+      "name":    "Public Launch",
+      "name_es": "Lanzamiento Público",
+      "period":    "Months 9–14",
+      "period_es": "Meses 9–14",
       "status": "in_progress",
       "items": [
-        { "id": "streaks",             "label": "Opt-in streaks + grace window + recompute Edge Function", "done": true },
-        { "id": "shareable-cards",     "label": "Observation share/obs/{id}.png OG card Edge Function + public page", "done": true },
-        { "id": "social-features",     "label": "Follows + comments + watchlists schema (UI for follows/comments TBD)", "done": true },
-        { "id": "expert-system",       "label": "Expert taxonomic weighting (3×) in consensus computation", "done": true },
-        { "id": "bioblitz-events",     "label": "Events table + region polygon + RLS", "done": true },
-        { "id": "institutional-export","label": "DwC + SNIB + CONANP CSV presets", "done": true },
-        { "id": "credentialed-access", "label": "credentialed_researcher flag + RLS gate for precise coords on sensitive obs", "done": true },
-        { "id": "env-enrichment",      "label": "Lunar phase + OpenMeteo weather Edge Function (auto-fires on sync)", "done": true },
-        { "id": "video-support",       "label": "Video support ≤30s (H.265/AV1)", "done": false, "blocked_by": "Video transcoding pipeline (server-side ffmpeg) + R2 storage" },
-        { "id": "camera-trap-ingest",  "label": "Camera trap ingestion (SpeciesNet + MegaDetector)", "done": false, "blocked_by": "ML model deployment + bulk-upload UI (module 09)" },
-        { "id": "capacitor-ios",       "label": "Capacitor iOS App Store wrapper (v1.2)", "done": false, "blocked_by": "Apple Developer Program ($99/yr) + Capacitor build pipeline" },
-        { "id": "follows-comments-ui", "label": "UI for follows + threaded comments + watchlist alerts", "done": false }
+        { "id": "streaks",             "label": "Opt-in streaks + grace window + recompute Edge Function", "label_es": "Rachas opt-in + ventana de gracia + Edge Function de recomputo", "done": true },
+        { "id": "shareable-cards",     "label": "Observation share/obs/{id}.png OG card Edge Function + public page", "label_es": "Edge Function para tarjetas OG share/obs/{id}.png + página pública", "done": true },
+        { "id": "social-features",     "label": "Follows + comments + watchlists schema (UI for follows/comments TBD)", "label_es": "Esquema de seguidores + comentarios + listas de seguimiento (UI pendiente)", "done": true },
+        { "id": "expert-system",       "label": "Expert taxonomic weighting (3×) in consensus computation", "label_es": "Ponderación experta (3×) en el cálculo del consenso", "done": true },
+        { "id": "bioblitz-events",     "label": "Events table + region polygon + RLS",             "label_es": "Tabla de eventos + polígono de región + RLS", "done": true },
+        { "id": "institutional-export","label": "DwC + SNIB + CONANP CSV presets",                 "label_es": "Plantillas CSV DwC + SNIB + CONANP", "done": true },
+        { "id": "credentialed-access", "label": "credentialed_researcher flag + RLS gate for precise coords on sensitive obs", "label_es": "Flag credentialed_researcher + RLS para coordenadas precisas en observaciones sensibles", "done": true },
+        { "id": "env-enrichment",      "label": "Lunar phase + OpenMeteo weather Edge Function (auto-fires on sync)", "label_es": "Edge Function de fase lunar + clima OpenMeteo (se ejecuta al sincronizar)", "done": true },
+        { "id": "video-support",       "label": "Video support ≤30s (H.265/AV1)",                  "label_es": "Soporte de video ≤30s (H.265/AV1)", "done": false, "blocked_by": "Video transcoding pipeline (server-side ffmpeg) + R2 storage" },
+        { "id": "camera-trap-ingest",  "label": "Camera trap ingestion (SpeciesNet + MegaDetector)", "label_es": "Ingesta de cámara trampa (SpeciesNet + MegaDetector)", "done": false, "blocked_by": "ML model deployment + bulk-upload UI (module 09)" },
+        { "id": "capacitor-ios",       "label": "Capacitor iOS App Store wrapper (v1.2)",          "label_es": "Wrapper iOS Capacitor para App Store (v1.2)", "done": false, "blocked_by": "Apple Developer Program ($99/yr) + Capacitor build pipeline" },
+        { "id": "follows-comments-ui", "label": "UI for follows + threaded comments + watchlist alerts", "label_es": "UI de seguidores + comentarios anidados + alertas de seguimiento", "done": false }
       ]
     },
     "v1.5": {
-      "name": "Territory Layer",
-      "period": "Months 12–16 (parallel to v1.0)",
+      "name":    "Territory Layer",
+      "name_es": "Capa Territorial",
+      "period":    "Months 12–16 (parallel to v1.0)",
+      "period_es": "Meses 12–16 (paralelo a v1.0)",
       "status": "planned",
       "items": [
-        { "id": "biodiversity-trails","label": "Biodiversity Trails with GPS waypoints + diversity metrics", "done": false },
-        { "id": "pits-qr",            "label": "PITs + QR/NFC anchors (Puntos de Información Territorial)", "done": false },
-        { "id": "spatial-analysis",   "label": "Spatial analysis: ANP/INEGI/INAH GeoJSON layers", "done": false },
-        { "id": "diversity-indices",  "label": "Diversity indices: S, H', D, Chao1, Pielou J", "done": false },
-        { "id": "trail-pdf-export",   "label": "Trail PDF export (field guide style)", "done": false }
+        { "id": "biodiversity-trails","label": "Biodiversity Trails with GPS waypoints + diversity metrics", "label_es": "Senderos de Biodiversidad con waypoints GPS + métricas de diversidad", "done": false },
+        { "id": "pits-qr",            "label": "PITs + QR/NFC anchors (Puntos de Información Territorial)", "label_es": "PITs + anclas QR/NFC (Puntos de Información Territorial)", "done": false },
+        { "id": "spatial-analysis",   "label": "Spatial analysis: ANP/INEGI/INAH GeoJSON layers",  "label_es": "Análisis espacial: capas GeoJSON ANP/INEGI/INAH", "done": false },
+        { "id": "diversity-indices",  "label": "Diversity indices: S, H', D, Chao1, Pielou J",     "label_es": "Índices de diversidad: S, H', D, Chao1, Pielou J", "done": false },
+        { "id": "trail-pdf-export",   "label": "Trail PDF export (field guide style)",             "label_es": "Exportación PDF de senderos (estilo guía de campo)", "done": false }
       ]
     },
     "v2.0": {
-      "name": "Institutional",
-      "period": "Months 17–22",
+      "name":    "Institutional",
+      "name_es": "Institucional",
+      "period":    "Months 17–22",
+      "period_es": "Meses 17–22",
       "status": "planned",
       "items": [
-        { "id": "camera-trap-advanced","label": "Camera trap: occupancy modeling, activity histograms", "done": false },
-        { "id": "gbif-publisher",     "label": "GBIF dataset publisher + DOI generation", "done": false },
-        { "id": "regional-ml",        "label": "Regional ML training pipeline (Oaxaca-endemic focus)", "done": false },
-        { "id": "b2g-dashboard",      "label": "B2G SaaS dashboard for CONANP / state agencies", "done": false },
-        { "id": "inat-bridge",        "label": "iNaturalist import/export bridge", "done": false }
+        { "id": "camera-trap-advanced","label": "Camera trap: occupancy modeling, activity histograms", "label_es": "Cámara trampa: modelado de ocupación, histogramas de actividad", "done": false },
+        { "id": "gbif-publisher",     "label": "GBIF dataset publisher + DOI generation",          "label_es": "Publicador de datasets GBIF + generación de DOI", "done": false },
+        { "id": "regional-ml",        "label": "Regional ML training pipeline (Oaxaca-endemic focus)", "label_es": "Pipeline de entrenamiento ML regional (enfoque endémicas de Oaxaca)", "done": false },
+        { "id": "b2g-dashboard",      "label": "B2G SaaS dashboard for CONANP / state agencies",   "label_es": "Dashboard B2G SaaS para CONANP / agencias estatales", "done": false },
+        { "id": "inat-bridge",        "label": "iNaturalist import/export bridge",                 "label_es": "Puente de importación/exportación con iNaturalist", "done": false }
       ]
     },
     "v2.5": {
-      "name": "AI + AR",
-      "period": "Months 23–32",
+      "name":    "AI + AR",
+      "name_es": "IA + RA",
+      "period":    "Months 23–32",
+      "period_es": "Meses 23–32",
       "status": "planned",
       "items": [
-        { "id": "scout-full",         "label": "Rastrum Scout — full conversational field AI (RAG + pgvector)", "done": false },
-        { "id": "ar-overlay",         "label": "AR species overlay in camera viewfinder", "done": false },
-        { "id": "voice-indigenous",   "label": "Indigenous language voice I/O (Zapoteco, Mixteco, Maya, Náhuatl)", "done": false },
-        { "id": "conabio-api",        "label": "Formal CONABIO/CONANP/INAH partnership APIs", "done": false }
+        { "id": "scout-full",         "label": "Rastrum Scout — full conversational field AI (RAG + pgvector)", "label_es": "Rastrum Scout — IA conversacional de campo completa (RAG + pgvector)", "done": false },
+        { "id": "ar-overlay",         "label": "AR species overlay in camera viewfinder",          "label_es": "Superposición AR de especies en el visor de la cámara", "done": false },
+        { "id": "voice-indigenous",   "label": "Indigenous language voice I/O (Zapoteco, Mixteco, Maya, Náhuatl)", "label_es": "Entrada/salida de voz en lenguas indígenas (Zapoteco, Mixteco, Maya, Náhuatl)", "done": false },
+        { "id": "conabio-api",        "label": "Formal CONABIO/CONANP/INAH partnership APIs",       "label_es": "APIs formales de alianza CONABIO/CONANP/INAH", "done": false }
       ]
     }
   },
   "governance_track": {
-    "name": "Governance & sovereignty (parallel to all product phases)",
-    "notes": "Governance work runs continuously alongside the product roadmap. Milestones have no shipping date — they complete when community consent + legal review land.",
+    "name":    "Governance & sovereignty (parallel to all product phases)",
+    "name_es": "Gobernanza y soberanía (paralelo a todas las fases del producto)",
+    "notes":    "Governance work runs continuously alongside the product roadmap. Milestones have no shipping date — they complete when community consent + legal review land.",
+    "notes_es": "El trabajo de gobernanza corre en paralelo a todo el roadmap. Los hitos no tienen fecha de lanzamiento — se completan cuando aterrizan el consentimiento comunitario y la revisión legal.",
     "items": [
-      { "id": "zapoteco-fpic",      "label": "Zapoteco UI pilot — Free, Prior, Informed Consent process", "done": false },
-      { "id": "local-contexts",     "label": "Local Contexts BC/TK Notice integration", "done": false },
-      { "id": "data-sovereignty",   "label": "Indigenous Data Sovereignty (CARE principles) policy", "done": false },
-      { "id": "license-framework",  "label": "Observer license framework (CC BY / BY-NC / CC0) + ML training gates", "done": true },
-      { "id": "birdnet-cornell",    "label": "BirdNET Cornell commercial license (only needed for v2.0 B2G dashboard)", "done": false }
+      { "id": "zapoteco-fpic",      "label": "Zapoteco UI pilot — Free, Prior, Informed Consent process", "label_es": "Piloto de UI en Zapoteco — proceso de Consentimiento Libre, Previo e Informado", "done": false },
+      { "id": "local-contexts",     "label": "Local Contexts BC/TK Notice integration",           "label_es": "Integración con Avisos BC/TK de Local Contexts", "done": false },
+      { "id": "data-sovereignty",   "label": "Indigenous Data Sovereignty (CARE principles) policy", "label_es": "Política de Soberanía de Datos Indígenas (principios CARE)", "done": false },
+      { "id": "license-framework",  "label": "Observer license framework (CC BY / BY-NC / CC0) + ML training gates", "label_es": "Marco de licencias del observador (CC BY / BY-NC / CC0) + compuertas de entrenamiento ML", "done": true },
+      { "id": "birdnet-cornell",    "label": "BirdNET Cornell commercial license (only needed for v2.0 B2G dashboard)", "label_es": "Licencia comercial de BirdNET de Cornell (sólo para el dashboard B2G v2.0)", "done": false }
     ]
   },
   "external_actions_required": [

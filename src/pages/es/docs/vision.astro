@@ -1,65 +1,119 @@
 ---
 import DocLayout from '../../../layouts/DocLayout.astro';
+import { t } from '../../../i18n/utils';
+
 const lang = 'es';
----
-<DocLayout title="Visión y Misión" lang={lang} section="vision" editPath="src/pages/es/docs/vision.astro">
-
-# 🌿 Visión y Misión
-
-## Misión
-
-> *"Rastrum existe para hacer que cada ser vivo sea identificable por cualquier persona, en cualquier lugar — incluso sin señal celular, sin formación académica, incluso en los idiomas que las guías de campo olvidaron."*
-
-Rastrum es un puente entre el ojo del naturalista y la base de datos del conservacionista, construido en abierto para que los datos que genera pertenezcan a los bienes comunes.
-
+const tr = t(lang);
 ---
 
-## El Problema
+<DocLayout title={tr.docs.sections.vision} lang={lang} section="vision" editPath="src/pages/es/docs/vision.astro">
+  <article class="space-y-8">
+    <div>
+      <h1 class="text-3xl font-bold tracking-tight mb-4">{tr.docs.sections.vision}</h1>
+      <p class="text-lg text-zinc-600 dark:text-zinc-400 max-w-3xl">{tr.docs.descriptions.vision}</p>
+    </div>
 
-La observación de biodiversidad hoy está fragmentada entre herramientas incompatibles:
+    <!-- Misión -->
+    <section>
+      <h2 id="mision" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+        <a href="#mision" class="text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Misión
+      </h2>
+      <blockquote class="border-l-4 border-emerald-500 pl-4 py-2 text-zinc-700 dark:text-zinc-300 italic text-lg">
+        "Rastrum existe para hacer que cada ser vivo sea identificable por cualquier persona, en cualquier lugar — incluso sin señal celular, sin formación académica, incluso en los idiomas que las guías de campo olvidaron."
+      </blockquote>
+      <p class="text-zinc-700 dark:text-zinc-300 mt-4">
+        Rastrum es un puente entre el ojo del naturalista y la base de datos del conservacionista, construido en abierto para que los datos que genera pertenezcan a los bienes comunes.
+      </p>
+    </section>
 
-**Fragmentación de herramientas.** PlantNet maneja plantas, Merlin maneja aves, iNaturalist maneja curación comunitaria — pero ninguna plataforma unifica foto, audio, video y evidencia ecológica en un solo flujo de trabajo. Los trabajadores de campo malabarean 3-4 apps por salida.
+    <!-- El Problema -->
+    <section>
+      <h2 id="problema" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+        <a href="#problema" class="text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors">#</a> El Problema
+      </h2>
+      <div class="space-y-4 text-zinc-700 dark:text-zinc-300">
+        <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <p class="font-semibold text-zinc-900 dark:text-zinc-100 mb-1">Fragmentación de herramientas</p>
+          <p>PlantNet maneja plantas, Merlin maneja aves, iNaturalist se encarga de la curación comunitaria — pero ninguna plataforma unifica foto, audio, video y evidencia ecológica en un solo flujo. Los trabajadores de campo malabarean 3-4 apps por salida.</p>
+        </div>
+        <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <p class="font-semibold text-zinc-900 dark:text-zinc-100 mb-1">Brecha de conectividad</p>
+          <p>La ENDUTIH 2024 del INEGI reporta sólo 62.5% de conectividad a internet en Oaxaca — el estado más biodiverso de México. Las herramientas dependientes de la nube dejan atrás al 37.5% de los usuarios exactamente en los lugares que más importan.</p>
+        </div>
+        <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <p class="font-semibold text-zinc-900 dark:text-zinc-100 mb-1">Barreras lingüísticas</p>
+          <p>La mayoría de las herramientas de identificación están en inglés o en lenguas europeas. México tiene 68 grupos lingüísticos reconocidos — Zapoteco, Mixteco, Náhuatl, Maya, Tsotsil-Tseltal — sin ninguna herramienta que hable sus idiomas.</p>
+        </div>
+        <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <p class="font-semibold text-zinc-900 dark:text-zinc-100 mb-1">Sesgo en los datos de entrenamiento</p>
+          <p>La mayoría de los modelos de IA están entrenados con especímenes de Norteamérica y Europa. Las regiones megadiversas neotropicales están críticamente subrepresentadas, lo que reduce la precisión justo donde más importa.</p>
+        </div>
+        <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <p class="font-semibold text-zinc-900 dark:text-zinc-100 mb-1">Sin soporte para evidencia ecológica</p>
+          <p>iNaturalist acepta fotos de huellas como imágenes, pero no tiene campos estructurados para sustrato, longitud de zancada ni morfometría. La evidencia más común de mamíferos grandes — sus huellas y excrementos — se trata como una observación de segunda clase.</p>
+        </div>
+      </div>
+    </section>
 
-**Barreras lingüísticas.** La mayoría de las herramientas de identificación están en inglés o lenguas europeas. México tiene 68 grupos lingüísticos reconocidos. Un agricultor zapoteco que detecta un hongo raro después de la primera lluvia no tiene herramienta que hable su idioma.
+    <!-- Nuestro Enfoque -->
+    <section>
+      <h2 id="enfoque" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+        <a href="#enfoque" class="text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Nuestro Enfoque
+      </h2>
+      <div class="space-y-3 text-zinc-700 dark:text-zinc-300">
+        <div class="flex items-start gap-3">
+          <span class="mt-1 w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+          <p><span class="font-semibold text-zinc-900 dark:text-zinc-100">ID multi-modal</span> — Una sola UI para foto, audio, video y evidencia ecológica (huellas, excrementos, madrigueras, nidos)</p>
+        </div>
+        <div class="flex items-start gap-3">
+          <span class="mt-1 w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+          <p><span class="font-semibold text-zinc-900 dark:text-zinc-100">Ensamble de IA</span> — Cascada PlantNet + BirdNET + Claude Vision para precisión de primer nivel en todos los taxones</p>
+        </div>
+        <div class="flex items-start gap-3">
+          <span class="mt-1 w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+          <p><span class="font-semibold text-zinc-900 dark:text-zinc-100">Sin conexión primero</span> — Funcionalidad completa con modelos ONNX en caché y IndexedDB, sincroniza cuando regresa la señal</p>
+        </div>
+        <div class="flex items-start gap-3">
+          <span class="mt-1 w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+          <p><span class="font-semibold text-zinc-900 dark:text-zinc-100">Curación experta</span> — Validación comunitaria con insignias taxonómicas, resolución de disputas y consenso research-grade</p>
+        </div>
+        <div class="flex items-start gap-3">
+          <span class="mt-1 w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+          <p><span class="font-semibold text-zinc-900 dark:text-zinc-100">Pipeline de conservación</span> — Exportación nativa Darwin Core a GBIF, CONABIO SNIB, CONANP e INAH</p>
+        </div>
+        <div class="flex items-start gap-3">
+          <span class="mt-1 w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+          <p><span class="font-semibold text-zinc-900 dark:text-zinc-100">Soberanía de datos indígena</span> — Principios CARE, proceso FPIC y poder de veto comunitario sobre el intercambio de datos</p>
+        </div>
+      </div>
+    </section>
 
-**Brecha de conectividad.** La ENDUTIH 2024 del INEGI reporta solo 62.5% de conectividad a internet en Oaxaca — el estado más biodiverso de México. Las herramientas dependientes de la nube dejan atrás al 37.5% de los usuarios exactamente en los lugares que más importan.
-
-**Fragmentación institucional.** Los biólogos de campo producen datos que deben reformatearse manualmente para GBIF, CONABIO SNIB, CONANP e INAH — cuatro formatos diferentes para cuatro agencias diferentes. La mayoría de los datos nunca se exportan.
-
-**Sin pipeline de evidencia ecológica.** iNaturalist acepta fotos de rastros como imágenes, pero no tiene campos estructurados para sustrato, longitud de zancada o morfometría. La evidencia más común de mamíferos grandes — sus huellas y excrementos — se trata como observación de segunda clase.
-
----
-
-## Nuestro Enfoque
-
-Rastrum unifica el stack de identificación en una sola PWA sin-conexión-primero:
-
-- **Una UI** para foto, audio, video y evidencia ecológica (huellas, excrementos, madrigueras, nidos)
-- **Sin conexión primero** — funcionalidad completa sin conectividad, sincroniza cuando regresa la señal
-- **Lenguas indígenas** — UI completa en Zapoteco, Mixteco, Náhuatl, Maya, Tsotsil/Tseltal
-- **Gobernanza de datos CARE-first** — las comunidades son dueñas de sus datos, con poder de veto sobre cómo se comparten
-- **Exportaciones institucionales** — Darwin Core → formatos GBIF, SNIB, CONANP, INAH nativamente
-
----
-
-## ¿Por Qué Oaxaca Primero?
-
-Oaxaca es el campo de pruebas ideal:
-
-- **Mega-diversidad:** 4to estado más biodiverso a nivel global, hogar de ~30% de las especies terrestres de México
-- **Lenguas indígenas:** 16 familias lingüísticas, 1M+ hablantes de Zapoteco + Mixteco
-- **Forestería comunitaria:** Modelo de Ixtlán de Juárez — bosques comunitarios certificados FSC con 75 cámaras trampa y monitores de conservación dedicados
-- **Sitios ancla:** Monte Albán, Yagul, Sierra de Juárez, Biosfera Tehuacán-Cuicatlán — cada uno un objetivo natural de despliegue PIT/QR
-- **Infraestructura de investigación:** UNAM FES Iztacala, IPN CIIDIR Oaxaca, INECOL cercano
-
-La estrategia Oaxaca-primero no es solo un plan de lanzamiento — es la historia de credibilidad que convierte cada solicitud de beca y cada conversación de alianza en una propuesta diferenciada.
-
----
-
-## La Brecha que Llenamos
-
-**Ningún producto hoy unifica foto + audio + video + evidencia ecológica en una sola UI con operación sin-conexión-primero, UX en lenguas indígenas y pipelines de exportación nativos a GBIF, CONABIO SNIB, CONANP e INAH simultáneamente.**
-
-Ese es el cuadrante que Rastrum ocupa. La diferenciación de misión — sin-conexión-primero, español + lenguas indígenas, CARE/FPIC operacionalizado — es un foso de 3-5 años que ni iNaturalist, Google/Wildlife Insights, ni ninguna plataforma comercial de ID puede replicar sin perder sus ventajas de escala.
-
+    <!-- ¿Por Qué Oaxaca Primero? -->
+    <section>
+      <h2 id="oaxaca" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+        <a href="#oaxaca" class="text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors">#</a> ¿Por qué Oaxaca primero?
+      </h2>
+      <p class="text-zinc-700 dark:text-zinc-300 mb-4">
+        Oaxaca es el campo de pruebas ideal — un estado megadiverso donde cada problema que Rastrum resuelve está concentrado en un solo lugar.
+      </p>
+      <div class="not-prose grid gap-3">
+        {[
+          { icon: '🌿', factor: 'Mega-diversidad',          detail: '12,500+ especies de plantas, 736 especies de aves — 4to estado más biodiverso a nivel global' },
+          { icon: '🗣️', factor: 'Lenguas indígenas',        detail: '16 familias lingüísticas, más de 1M de hablantes de zapoteco y mixteco' },
+          { icon: '🌲', factor: 'Forestería comunitaria',   detail: 'Modelo Ixtlán de Juárez — bosques certificados FSC con 75 cámaras trampa y monitores dedicados' },
+          { icon: '🏛️', factor: 'Sitios ancla',             detail: 'Monte Albán, Yagul, Sierra de Juárez, Reserva de la Biosfera Tehuacán-Cuicatlán' },
+          { icon: '🤝', factor: 'Alianza FAHHO',            detail: 'Fundación Alfredo Harp Helú Oaxaca — el mejor encaje estratégico para socio de lanzamiento' },
+          { icon: '🔬', factor: 'Infraestructura de investigación', detail: 'UNAM FES Iztacala, IPN CIIDIR Oaxaca, INECOL cercano' },
+        ].map(row => (
+          <div class="flex gap-3 p-4 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+            <span class="text-xl shrink-0 mt-0.5">{row.icon}</span>
+            <div>
+              <p class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-0.5">{row.factor}</p>
+              <p class="text-sm text-zinc-600 dark:text-zinc-400">{row.detail}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  </article>
 </DocLayout>
