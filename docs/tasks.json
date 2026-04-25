@@ -469,6 +469,300 @@
         { "label_en": "Auto-fires on observation sync",               "label_es": "Se dispara al sincronizar",              "status": "done" },
         { "label_en": "Updates 5 environmental columns",              "label_es": "Actualiza 5 columnas ambientales",       "status": "done" }
       ]
+    },
+    "scout-v0": {
+      "phase": "v0.5",
+      "title_en": "Rastrum Scout v0 (conversational ID, pgvector RAG)",
+      "title_es": "Rastrum Scout v0 (ID conversacional, RAG con pgvector)",
+      "modules": [],
+      "subtasks": [
+        { "label_en": "Enable pgvector extension",                            "label_es": "Habilitar extensión pgvector",                  "status": "blocked", "blocker_en": "Deferred per future-migrations.md", "blocker_es": "Diferido en future-migrations.md" },
+        { "label_en": "Embedding pipeline (Voyage-3 over ~50K Mexican taxa)", "label_es": "Pipeline de embeddings (Voyage-3 ~50K taxa)",   "status": "blocked", "blocker_en": "Embedding budget (~$50)",          "blocker_es": "Presupuesto de embeddings" },
+        { "label_en": "taxon_embeddings table + HNSW index",                  "label_es": "Tabla taxon_embeddings + índice HNSW",          "status": "planned" },
+        { "label_en": "scout Edge Function (retrieval + Claude composition)", "label_es": "Edge Function scout",                           "status": "planned" },
+        { "label_en": "Chat UI in app",                                        "label_es": "UI de chat en la app",                          "status": "planned" },
+        { "label_en": "chat_sessions table + history",                         "label_es": "Tabla chat_sessions + historial",               "status": "planned" }
+      ]
+    },
+    "onnx-base": {
+      "phase": "v0.3",
+      "title_en": "EfficientNet-Lite0 ONNX base fallback (~3 MB)",
+      "title_es": "Fallback ONNX base EfficientNet-Lite0 (~3 MB)",
+      "modules": ["13-identifier-registry.md"],
+      "subtasks": [
+        { "label_en": "Train or convert model to int8 ONNX",  "label_es": "Entrenar / convertir modelo a ONNX int8", "status": "blocked", "blocker_en": "ONNX training/conversion pipeline", "blocker_es": "Pipeline de entrenamiento/conversión" },
+        { "label_en": "Bundle species labels JSON",            "label_es": "Bundle de labels JSON",                    "status": "planned" },
+        { "label_en": "src/lib/identifiers/onnx-base.ts impl", "label_es": "Implementación onnx-base.ts",             "status": "planned" },
+        { "label_en": "Image preprocessing (resize, normalise)", "label_es": "Preprocesamiento de imagen",            "status": "planned" },
+        { "label_en": "Plugin isAvailable() flips to ready",   "label_es": "isAvailable() pasa a ready",               "status": "planned" }
+      ]
+    },
+    "offline-maps": {
+      "phase": "v0.3",
+      "title_en": "pmtiles offline map download (Mexico zoom 0–10)",
+      "title_es": "Descarga de mapas offline pmtiles (México zoom 0–10)",
+      "modules": ["05-map.md"],
+      "subtasks": [
+        { "label_en": "Generate Mexico zoom 0–10 pmtiles (~250 MB)",  "label_es": "Generar pmtiles México zoom 0–10",       "status": "blocked", "blocker_en": "pmtiles tooling (Tippecanoe + clipping)", "blocker_es": "Tooling pmtiles" },
+        { "label_en": "Upload to R2 at tiles.rastrum.app",             "label_es": "Subir a R2 en tiles.rastrum.app",         "status": "planned" },
+        { "label_en": "Download trigger in profile (cell-conn warn)",  "label_es": "Disparador de descarga con aviso",        "status": "planned" },
+        { "label_en": "Cache via OPFS + pmtiles:// MapLibre protocol", "label_es": "Cache OPFS + protocolo pmtiles://",      "status": "planned" },
+        { "label_en": "Per-region zoom 11–14 chunks on-demand",        "label_es": "Chunks zoom 11–14 por región",            "status": "planned" }
+      ]
+    },
+    "onnx-regional": {
+      "phase": "v0.5",
+      "title_en": "Regional ONNX packs (Oaxaca, Yucatán)",
+      "title_es": "Paquetes ONNX regionales (Oaxaca, Yucatán)",
+      "modules": [],
+      "subtasks": [
+        { "label_en": "Training pipeline (TFLite Model Maker / PyTorch+Optimum)", "label_es": "Pipeline de entrenamiento", "status": "blocked", "blocker_en": "ML training infra", "blocker_es": "Infraestructura ML" },
+        { "label_en": "Curated training set per region (~1K species each)",       "label_es": "Set de entrenamiento por región", "status": "planned" },
+        { "label_en": "Convert to ONNX int8",                                      "label_es": "Convertir a ONNX int8",            "status": "planned" },
+        { "label_en": "Download cards in profile/edit",                            "label_es": "Cards de descarga en perfil",      "status": "planned" },
+        { "label_en": "Region-aware cascade routing (lat/lng → pack)",             "label_es": "Routing del cascade por región",   "status": "planned" }
+      ]
+    },
+    "gbif-ipt": {
+      "phase": "v0.5",
+      "title_en": "GBIF IPT pilot publish (DwC-A ZIP)",
+      "title_es": "Publicación piloto GBIF IPT (DwC-A ZIP)",
+      "modules": ["06-darwin-core.md"],
+      "subtasks": [
+        { "label_en": "GBIF publisher account application",                "label_es": "Solicitud de cuenta de publicador GBIF",     "status": "blocked", "blocker_en": "~2-week ed-org review", "blocker_es": "~2 semanas de revisión" },
+        { "label_en": "DwC-A ZIP generator (meta.xml + eml.xml + csvs)",   "label_es": "Generador de DwC-A ZIP",                     "status": "planned" },
+        { "label_en": "gbif-publish Edge Function (monthly cron)",          "label_es": "Edge Function gbif-publish",                  "status": "planned" },
+        { "label_en": "DOI tracking in dataset_versions table",             "label_es": "Tracking de DOIs",                            "status": "planned" }
+      ]
+    },
+    "local-contexts": {
+      "phase": "v0.5",
+      "title_en": "Local Contexts BC/TK Notice integration",
+      "title_es": "Integración con Avisos BC/TK de Local Contexts",
+      "modules": [],
+      "subtasks": [
+        { "label_en": "Community consent (Zapoteco partnership)",     "label_es": "Consentimiento comunitario",                 "status": "blocked", "blocker_en": "Multi-month governance work", "blocker_es": "Trabajo de gobernanza multi-mes" },
+        { "label_en": "Local Contexts Hub API v2 integration",        "label_es": "Integración con Local Contexts Hub API v2",  "status": "planned" },
+        { "label_en": "observation_bc_notices link table",             "label_es": "Tabla de enlace observation_bc_notices",      "status": "planned" },
+        { "label_en": "BC/TK label rendering on observations + DwC",  "label_es": "Renderizado de etiquetas BC/TK",              "status": "planned" }
+      ]
+    },
+    "video-support": {
+      "phase": "v1.0",
+      "title_en": "Video support ≤30s (H.265/AV1)",
+      "title_es": "Soporte de video ≤30s (H.265/AV1)",
+      "modules": [],
+      "subtasks": [
+        { "label_en": "Server-side ffmpeg transcoding pipeline",        "label_es": "Pipeline de transcodificación con ffmpeg",       "status": "blocked", "blocker_en": "Cloud Run + ffmpeg layer", "blocker_es": "Cloud Run + capa ffmpeg" },
+        { "label_en": "Video capture in observation form",                "label_es": "Captura de video en formulario",                  "status": "planned" },
+        { "label_en": "Frame extraction for ID + audio for BirdNET",      "label_es": "Extracción de frames + audio",                    "status": "planned" },
+        { "label_en": "Video player on observation page",                  "label_es": "Reproductor en la página de observación",         "status": "planned" }
+      ]
+    },
+    "camera-trap-ingest": {
+      "phase": "v1.0",
+      "title_en": "Camera trap ingestion (SpeciesNet + MegaDetector)",
+      "title_es": "Ingesta de cámara trampa",
+      "modules": ["09-camera-trap.md"],
+      "subtasks": [
+        { "label_en": "MegaDetector + SpeciesNet model deployment",     "label_es": "Despliegue de MegaDetector + SpeciesNet",     "status": "blocked", "blocker_en": "ML infra (~5 GB models)", "blocker_es": "Infra ML" },
+        { "label_en": "Bulk-upload UI (drag-drop + per-file progress)",  "label_es": "UI de carga masiva",                          "status": "planned" },
+        { "label_en": "camera_trap_deployments table",                    "label_es": "Tabla camera_trap_deployments",               "status": "planned" },
+        { "label_en": "camera_trap_processing_queue table",                "label_es": "Tabla camera_trap_processing_queue",           "status": "planned" },
+        { "label_en": "Edge Function: motion → ID → research-grade",       "label_es": "Edge Function: motion → ID → research-grade",  "status": "planned" }
+      ]
+    },
+    "capacitor-ios": {
+      "phase": "v1.0",
+      "title_en": "Capacitor iOS App Store wrapper (v1.2)",
+      "title_es": "Wrapper iOS Capacitor para App Store (v1.2)",
+      "modules": [],
+      "subtasks": [
+        { "label_en": "Apple Developer Program ($99/yr)",        "label_es": "Apple Developer Program ($99/año)",        "status": "blocked", "blocker_en": "Subscription required", "blocker_es": "Suscripción requerida" },
+        { "label_en": "Capacitor scaffolding + platform/ios",     "label_es": "Andamiaje Capacitor + platform/ios",        "status": "planned" },
+        { "label_en": "Native plugins (Camera, Geo, FS, Network)","label_es": "Plugins nativos",                            "status": "planned" },
+        { "label_en": "App Store metadata + screenshots",         "label_es": "Metadatos + screenshots para App Store",   "status": "planned" },
+        { "label_en": "First TestFlight build",                    "label_es": "Primer build de TestFlight",                "status": "planned" }
+      ]
+    },
+    "follows-comments-ui": {
+      "phase": "v1.0",
+      "title_en": "UI for follows + threaded comments + watchlist alerts",
+      "title_es": "UI de seguidores + comentarios + alertas",
+      "modules": ["08-profile-activity-gamification.md"],
+      "subtasks": [
+        { "label_en": "Follow button on public profile pages",                "label_es": "Botón Seguir en perfiles públicos",          "status": "planned" },
+        { "label_en": "Threaded comments component on share/obs page",         "label_es": "Componente de comentarios anidados",          "status": "planned" },
+        { "label_en": "Followers' research-grade events in activity feed",     "label_es": "Eventos de seguidos en feed",                  "status": "planned" },
+        { "label_en": "Watchlist add/edit form in profile",                     "label_es": "Formulario de listas en perfil",               "status": "planned" },
+        { "label_en": "Watchlist alerts (inbox digest, daily cron)",            "label_es": "Alertas de lista (digest, cron diario)",       "status": "planned" }
+      ]
+    },
+    "biodiversity-trails": {
+      "phase": "v1.5",
+      "title_en": "Biodiversity Trails with GPS waypoints + diversity metrics",
+      "title_es": "Senderos de Biodiversidad con waypoints GPS + métricas de diversidad",
+      "modules": [],
+      "subtasks": [
+        { "label_en": "trails table (start/end, route LineString, observer)", "label_es": "Tabla trails",                              "status": "planned" },
+        { "label_en": "Trail recording UI (start/stop, waypoints)",           "label_es": "UI de grabación de sendero",                "status": "planned" },
+        { "label_en": "Per-trail observation linking (FK trail_id)",          "label_es": "Vinculación observaciones-sendero",          "status": "planned" },
+        { "label_en": "Diversity metrics per trail (S, H', D)",                "label_es": "Métricas de diversidad por sendero",         "status": "planned" },
+        { "label_en": "Trail detail page + map render",                         "label_es": "Página de detalle + render en mapa",         "status": "planned" }
+      ]
+    },
+    "pits-qr": {
+      "phase": "v1.5",
+      "title_en": "PITs + QR/NFC anchors",
+      "title_es": "PITs + anclas QR/NFC",
+      "modules": [],
+      "subtasks": [
+        { "label_en": "pits table (slug, polygon, install_location)", "label_es": "Tabla pits",                              "status": "planned" },
+        { "label_en": "/{lang}/pit/<slug>/ page (obs in polygon)",     "label_es": "Página por PIT con observaciones",         "status": "planned" },
+        { "label_en": "QR generator for printing",                       "label_es": "Generador QR para impresión",              "status": "planned" },
+        { "label_en": "NFC tag write protocol docs",                     "label_es": "Documentación de protocolo NFC",            "status": "planned" },
+        { "label_en": "Stats: visitors + species recorded at PIT",       "label_es": "Estadísticas por PIT",                      "status": "planned" }
+      ]
+    },
+    "spatial-analysis": {
+      "phase": "v1.5",
+      "title_en": "Spatial analysis: ANP/INEGI/INAH GeoJSON layers",
+      "title_es": "Análisis espacial: capas GeoJSON ANP/INEGI/INAH",
+      "modules": [],
+      "subtasks": [
+        { "label_en": "Static GeoJSON for ANP boundaries (CONANP)",  "label_es": "GeoJSON ANP (CONANP)",                "status": "planned" },
+        { "label_en": "INEGI municipal boundaries",                    "label_es": "Límites municipales INEGI",            "status": "planned" },
+        { "label_en": "INAH archaeological-zone polygons",              "label_es": "Polígonos INAH",                       "status": "planned" },
+        { "label_en": "Layer toggle in MapLibre",                       "label_es": "Toggle de capas en MapLibre",          "status": "planned" },
+        { "label_en": "PostGIS ST_Within queries (obs within ANP X)", "label_es": "Consultas PostGIS ST_Within",          "status": "planned" }
+      ]
+    },
+    "diversity-indices": {
+      "phase": "v1.5",
+      "title_en": "Diversity indices: S, H', D, Chao1, Pielou J",
+      "title_es": "Índices de diversidad: S, H', D, Chao1, Pielou J",
+      "modules": [],
+      "subtasks": [
+        { "label_en": "diversity-stats Edge Function (bbox + window → JSON)", "label_es": "Edge Function diversity-stats",        "status": "planned" },
+        { "label_en": "Math: Shannon-Wiener, Simpson, Chao1, Pielou",          "label_es": "Cálculos matemáticos",                  "status": "planned" },
+        { "label_en": "Rarefaction curves",                                     "label_es": "Curvas de rarefacción",                  "status": "planned" },
+        { "label_en": "Render in trail / event / region pages",                  "label_es": "Render en páginas de sendero / evento", "status": "planned" }
+      ]
+    },
+    "trail-pdf-export": {
+      "phase": "v1.5",
+      "title_en": "Trail PDF export (field guide style)",
+      "title_es": "Exportación PDF de senderos (estilo guía de campo)",
+      "modules": [],
+      "subtasks": [
+        { "label_en": "Server-side PDF rendering (Puppeteer or react-pdf)", "label_es": "Render PDF server-side",            "status": "planned" },
+        { "label_en": "Cover map, species list, diversity stats",            "label_es": "Mapa, lista de especies, stats",   "status": "planned" },
+        { "label_en": "Bilingual templates",                                  "label_es": "Plantillas bilingües",              "status": "planned" }
+      ]
+    },
+    "camera-trap-advanced": {
+      "phase": "v2.0",
+      "title_en": "Camera trap: occupancy modelling, activity histograms",
+      "title_es": "Cámara trampa: modelado de ocupación, histogramas",
+      "modules": [],
+      "subtasks": [
+        { "label_en": "R or Python statistical pipeline",         "label_es": "Pipeline estadístico R/Python",      "status": "planned" },
+        { "label_en": "Activity histograms by species + time-of-day", "label_es": "Histogramas por especie y hora",  "status": "planned" },
+        { "label_en": "Multi-camera grid analysis",                "label_es": "Análisis de grid multi-cámara",      "status": "planned" }
+      ]
+    },
+    "gbif-publisher": {
+      "phase": "v2.0",
+      "title_en": "GBIF dataset publisher + DOI generation",
+      "title_es": "Publicador de datasets GBIF + DOI",
+      "modules": [],
+      "subtasks": [
+        { "label_en": "Continuous DwC-A export",                              "label_es": "Exportación DwC-A continua",       "status": "planned" },
+        { "label_en": "Versioned dataset releases with DOIs (Zenodo/DataCite)","label_es": "Releases versionados con DOIs",   "status": "planned" },
+        { "label_en": "Citation generator",                                    "label_es": "Generador de citas",                "status": "planned" }
+      ]
+    },
+    "regional-ml": {
+      "phase": "v2.0",
+      "title_en": "Regional ML training pipeline",
+      "title_es": "Pipeline de entrenamiento ML regional",
+      "modules": ["07-licensing.md"],
+      "subtasks": [
+        { "label_en": "Continuous fine-tuning on validated observations", "label_es": "Fine-tuning continuo",               "status": "planned" },
+        { "label_en": "Federated learning across institutional partners",  "label_es": "Aprendizaje federado",                "status": "planned" },
+        { "label_en": "Model card publication per release",                  "label_es": "Model cards por release",             "status": "planned" },
+        { "label_en": "License gate: only CC BY / CC0 enter training",       "label_es": "Compuerta de licencia",               "status": "planned" }
+      ]
+    },
+    "b2g-dashboard": {
+      "phase": "v2.0",
+      "title_en": "B2G SaaS dashboard for CONANP / state agencies",
+      "title_es": "Dashboard B2G SaaS para CONANP / agencias",
+      "modules": [],
+      "subtasks": [
+        { "label_en": "Separate Astro+React app at b2g.rastrum.app",  "label_es": "App separada en b2g.rastrum.app",   "status": "planned" },
+        { "label_en": "Per-agency report templates",                    "label_es": "Plantillas por agencia",             "status": "planned" },
+        { "label_en": "Stripe subscriptions",                            "label_es": "Suscripciones Stripe",                "status": "planned" },
+        { "label_en": "Audit logs + SLA monitoring",                     "label_es": "Logs de auditoría + SLA",             "status": "planned" },
+        { "label_en": "Cornell BirdNET commercial license signed",       "label_es": "Licencia comercial BirdNET firmada",  "status": "blocked", "blocker_en": "Cornell licensing process", "blocker_es": "Proceso con Cornell" }
+      ]
+    },
+    "inat-bridge": {
+      "phase": "v2.0",
+      "title_en": "iNaturalist import/export bridge",
+      "title_es": "Puente iNaturalist import/export",
+      "modules": [],
+      "subtasks": [
+        { "label_en": "iNat OAuth flow",                                "label_es": "Flujo OAuth con iNat",                "status": "planned" },
+        { "label_en": "Import: pull user's iNat observations",          "label_es": "Importar observaciones de iNat",       "status": "planned" },
+        { "label_en": "Export: push verified data back with attribution","label_es": "Exportar datos verificados",          "status": "planned" },
+        { "label_en": "Rate-limit compatibility",                        "label_es": "Compatibilidad con rate limits",       "status": "planned" }
+      ]
+    },
+    "scout-full": {
+      "phase": "v2.5",
+      "title_en": "Rastrum Scout — full conversational field AI",
+      "title_es": "Rastrum Scout — IA conversacional de campo completa",
+      "modules": [],
+      "subtasks": [
+        { "label_en": "Multi-turn conversation refinement",          "label_es": "Refinamiento multi-turno",             "status": "planned" },
+        { "label_en": "Region-aware retrieval (lat/lng filtering)", "label_es": "Retrieval por región",                  "status": "planned" },
+        { "label_en": "Citation rendering for sources",              "label_es": "Render de citas con fuentes",            "status": "planned" },
+        { "label_en": "Builds on scout-v0",                           "label_es": "Sobre scout-v0",                          "status": "planned" }
+      ]
+    },
+    "ar-overlay": {
+      "phase": "v2.5",
+      "title_en": "AR species overlay in camera viewfinder",
+      "title_es": "Superposición AR de especies en visor",
+      "modules": [],
+      "subtasks": [
+        { "label_en": "WebXR or Capacitor ARKit/ARCore",         "label_es": "WebXR o Capacitor ARKit/ARCore",    "status": "planned" },
+        { "label_en": "Real-time camera frame → ID → 3D label",   "label_es": "Frame en vivo → ID → label 3D",      "status": "planned" },
+        { "label_en": "Performance budget: 30fps mobile",         "label_es": "Presupuesto de performance: 30 fps",  "status": "planned" }
+      ]
+    },
+    "voice-indigenous": {
+      "phase": "v2.5",
+      "title_en": "Indigenous language voice I/O",
+      "title_es": "Entrada/salida de voz en lenguas indígenas",
+      "modules": [],
+      "subtasks": [
+        { "label_en": "Whisper-tiny via transformers.js for STT", "label_es": "Whisper-tiny para STT",            "status": "planned" },
+        { "label_en": "Custom-trained TTS for Zapoteco/Mixteco", "label_es": "TTS custom para Zapoteco/Mixteco",  "status": "blocked", "blocker_en": "No off-the-shelf TTS exists", "blocker_es": "No existe TTS comercial" },
+        { "label_en": "Conversation flow in Zapoteco for Sierra Norte pilot", "label_es": "Flujo en Zapoteco para piloto Sierra Norte", "status": "planned" }
+      ]
+    },
+    "conabio-api": {
+      "phase": "v2.5",
+      "title_en": "Formal CONABIO/CONANP/INAH partnership APIs",
+      "title_es": "APIs formales de alianza CONABIO/CONANP/INAH",
+      "modules": [],
+      "subtasks": [
+        { "label_en": "MOUs with each agency",                        "label_es": "MOUs con cada agencia",             "status": "planned" },
+        { "label_en": "Whitelisted API endpoints with audit logs",     "label_es": "Endpoints API con audit logs",        "status": "planned" },
+        { "label_en": "Bidirectional sync agreements",                  "label_es": "Acuerdos de sincronización bidireccional", "status": "planned" }
+      ]
     }
   }
 }
