@@ -127,10 +127,30 @@ async function triggerEnvEnrichment(observationId: string): Promise<void> {
 }
 
 const LOCAL_AI_OPTIN = 'rastrum.localAiOptIn';
+const LOCAL_AI_DOWNLOAD_WARNED = 'rastrum.localAiDownloadWarned';
 
-function isLocalAIOptedIn(): boolean {
+/**
+ * WebLLM is ON by default (issue #12 — privacy-first, offline-capable).
+ * Users can opt OUT in profile settings if bandwidth is a concern.
+ * On first use, a download warning is shown (see ObservationForm).
+ */
+function isLocalAIEnabled(): boolean {
+  if (typeof localStorage === 'undefined') return true; // SSR: default on
+  // Legacy opt-in key still respected for users who explicitly enabled it
+  if (localStorage.getItem(LOCAL_AI_OPTIN) === 'true') return true;
+  // New default: on unless user explicitly opted out
+  return localStorage.getItem(LOCAL_AI_OPTIN) !== 'false';
+}
+
+export function hasShownLocalAIDownloadWarning(): boolean {
   if (typeof localStorage === 'undefined') return false;
-  return localStorage.getItem(LOCAL_AI_OPTIN) === 'true';
+  return localStorage.getItem(LOCAL_AI_DOWNLOAD_WARNED) === 'true';
+}
+
+export function markLocalAIDownloadWarningShown(): void {
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(LOCAL_AI_DOWNLOAD_WARNED, 'true');
+  }
 }
 
 /**
@@ -169,11 +189,16 @@ async function triggerIdentify(observationId: string): Promise<void> {
   const { bootstrapIdentifiers, runCascade } = await import('./identifiers');
   bootstrapIdentifiers();
 
-  // Exclude on-device plugins unless the user opted in. They still appear
-  // in the registry (UI lists them) but the cascade engine skips them.
-  // Note: birdnet_lite is on-device and gated by both opt-in AND the model
-  // bundle landing — its isAvailable() returns model_not_bundled until then.
-  const excluded = isLocalAIOptedIn() ? [] : ['webllm_phi35_vision', 'onnx_efficientnet_lite0', 'birdnet_lite'];
+  // WebLLM (Phi-3.5-vision) is ON by default — local, private, no key needed.
+  // Exclude it only if user explicitly opted out (bandwidth concern).
+  // Claude is excluded when no BYO key is set — avoids silent crashes.
+  const { getKey } = await import('./byo-keys');
+  const hasAnthropicKey = !!getKey('claude_haiku', 'anthropic');
+  const localAIEnabled = isLocalAIEnabled();
+
+  const excluded: string[] = [];
+  if (!localAIEnabled) excluded.push('webllm_phi35_vision', 'onnx_efficientnet_lite0', 'birdnet_lite');
+  if (!hasAnthropicKey) excluded.push('claude_haiku');
 
   // Plugins read their own keys from byo-keys.ts at identify-time, so we
   // don't pre-collect them here. Pass an empty byo_keys object as a default.
