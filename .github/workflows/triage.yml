@@ -1,0 +1,144 @@
+# Triage workflow — runs on every newly opened issue.
+#
+# What it does:
+#   1. Asks GitHub Models (`gh models run`) to classify the issue as JSON
+#      with suggested labels, priority, suspected component, and a next step.
+#   2. Applies the suggested labels (intersected with the repo's label
+#      catalog defined in .github/labels.yml — unknown labels are ignored).
+#   3. Posts a triage summary comment on the issue.
+#
+# Requirements / setup:
+#   - GitHub Models access must be enabled for the repo / org.
+#     Settings -> Code & automation -> Actions -> "Allow GitHub Actions to
+#     use GitHub Models" (or the org-level toggle).
+#   - The default GITHUB_TOKEN with `issues: write` is enough; no PAT.
+#
+# Failure mode:
+#   - If gh models is unavailable or returns malformed JSON, the workflow
+#     posts a minimal "needs human triage" comment instead of failing.
+name: Triage issue
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+  contents: read
+  models: read
+
+concurrency:
+  group: triage-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run GitHub Models classifier
+        id: classify
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: |
+          set +e
+          PROMPT=$(cat <<'EOF'
+          You are an issue triager for the Rastrum repo (Astro 5 + Tailwind +
+          Supabase, bilingual EN/ES biodiversity PWA). Classify the issue and
+          reply with a SINGLE JSON object on one line, no prose, no fences:
+          {
+            "labels": [string],
+            "priority": "low" | "medium" | "high",
+            "component": string,
+            "next_step": string
+          }
+          Allowed labels: bug, enhancement, question, i18n, triage,
+          good-first-issue, auto-fix-candidate, help-wanted.
+          The "component" should be a short codepath hint like
+          "src/components/ReportIssueButton.astro" or "supabase/functions/identify".
+          The "next_step" should be one short imperative sentence.
+          EOF
+          )
+          INPUT=$(printf 'Title: %s\n\nBody:\n%s\n' "$ISSUE_TITLE" "$ISSUE_BODY")
+          RAW=$(printf '%s\n---\n%s\n' "$PROMPT" "$INPUT" \
+            | gh models run openai/gpt-4o-mini 2>/dev/null)
+          if [ -z "$RAW" ]; then
+            echo "raw=" >> "$GITHUB_OUTPUT"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Persist raw output for the next step (multi-line safe).
+          {
+            echo 'raw<<RAW_EOF'
+            echo "$RAW"
+            echo 'RAW_EOF'
+          } >> "$GITHUB_OUTPUT"
+          echo "ok=true" >> "$GITHUB_OUTPUT"
+
+      - name: Apply labels and comment
+        uses: actions/github-script@v7
+        env:
+          MODEL_OK: ${{ steps.classify.outputs.ok }}
+          MODEL_RAW: ${{ steps.classify.outputs.raw }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const allowed = new Set([
+              'bug','enhancement','question','i18n','triage',
+              'good-first-issue','auto-fix-candidate','help-wanted',
+            ]);
+            const issue_number = context.payload.issue.number;
+            const owner = context.repo.owner;
+            const repo  = context.repo.repo;
+
+            let parsed = null;
+            const ok = process.env.MODEL_OK === 'true';
+            const raw = process.env.MODEL_RAW || '';
+            if (ok && raw) {
+              const match = raw.match(/\{[\s\S]*\}/);
+              if (match) {
+                try { parsed = JSON.parse(match[0]); } catch (_) { parsed = null; }
+              }
+            }
+
+            let body;
+            if (parsed) {
+              const labels = Array.isArray(parsed.labels)
+                ? parsed.labels.filter(l => typeof l === 'string' && allowed.has(l))
+                : [];
+              if (labels.length) {
+                await github.rest.issues.addLabels({
+                  owner, repo, issue_number, labels,
+                });
+              }
+              const priority = String(parsed.priority || 'unknown');
+              const component = String(parsed.component || 'unknown');
+              const nextStep = String(parsed.next_step || 'Awaiting human triage.');
+              body = [
+                '### Auto-triage',
+                '',
+                '- **Suggested labels:** ' + (labels.length ? labels.map(l => '`' + l + '`').join(', ') : '_none applied_'),
+                '- **Suggested priority:** ' + priority,
+                '- **Suspected component:** `' + component + '`',
+                '- **Suggested next step:** ' + nextStep,
+                '',
+                '_This is an automated suggestion — a maintainer will confirm._',
+              ].join('\n');
+            } else {
+              await github.rest.issues.addLabels({
+                owner, repo, issue_number, labels: ['triage'],
+              });
+              body = [
+                '### Auto-triage',
+                '',
+                'Could not auto-classify this issue. Marked `triage` for human review.',
+              ].join('\n');
+            }
+
+            await github.rest.issues.createComment({
+              owner, repo, issue_number, body,
+            });

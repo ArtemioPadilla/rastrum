@@ -1,0 +1,44 @@
+name: Translation issue
+description: Report a missing, incorrect, or awkward translation.
+title: "[i18n]: "
+labels: ["i18n", "triage"]
+body:
+  - type: dropdown
+    id: locale
+    attributes:
+      label: Locale
+      description: Which locale is affected?
+      options:
+        - en
+        - es
+    validations:
+      required: true
+  - type: input
+    id: key_path
+    attributes:
+      label: Key path
+      description: e.g. `report.button_label` or `nav.home`.
+      placeholder: namespace.key
+    validations:
+      required: true
+  - type: textarea
+    id: current
+    attributes:
+      label: Current text
+      description: What does it say today?
+    validations:
+      required: true
+  - type: textarea
+    id: suggested
+    attributes:
+      label: Suggested text
+      description: What should it say instead?
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Context, regional considerations, references.
+    validations:
+      required: false
