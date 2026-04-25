@@ -958,3 +958,33 @@ CREATE POLICY "media_update_authenticated" ON storage.objects
 DROP POLICY IF EXISTS "media_public_read" ON storage.objects;
 CREATE POLICY "media_public_read" ON storage.objects
   FOR SELECT USING (bucket_id = 'media');
+
+-- ============================================================
+-- MODULE 14 — USER API TOKENS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.user_api_tokens (
+  id           uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id      uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  name         text NOT NULL DEFAULT 'API Token',
+  token_hash   text NOT NULL UNIQUE,
+  prefix       text NOT NULL,
+  scopes       text[] NOT NULL DEFAULT '{observe,identify,export}',
+  last_used_at timestamptz,
+  expires_at   timestamptz,
+  created_at   timestamptz DEFAULT now(),
+  revoked_at   timestamptz
+);
+
+CREATE INDEX IF NOT EXISTS idx_tokens_user ON public.user_api_tokens(user_id)
+  WHERE revoked_at IS NULL;
+-- Note: idx_tokens_hash not needed — token_hash UNIQUE constraint creates its own index.
+
+ALTER TABLE public.user_api_tokens ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "tokens_select_own" ON public.user_api_tokens;
+CREATE POLICY "tokens_select_own" ON public.user_api_tokens
+  FOR SELECT TO authenticated USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "tokens_delete_own" ON public.user_api_tokens;
+CREATE POLICY "tokens_delete_own" ON public.user_api_tokens
+  FOR UPDATE TO authenticated USING (auth.uid() = user_id);
