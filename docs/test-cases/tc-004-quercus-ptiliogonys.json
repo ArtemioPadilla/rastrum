@@ -2,9 +2,14 @@
   "id": "tc-004",
   "date": "2026-04-25",
   "location": "San Pablo Etla, Valle de Etla, Oaxaca, México",
-  "coords_approx": { "lat": 17.11, "lng": -96.74 },
+  "coords_approx": {
+    "lat": 17.11,
+    "lng": -96.74
+  },
   "habitat": "bosque_encino_encinar_valle_etla",
-  "photo_files": ["tc-004-quercus-ptiliogonys.jpg"],
+  "photo_files": [
+    "tc-004-quercus-ptiliogonys.jpg"
+  ],
   "pipeline": {
     "tree": {
       "model": "anthropic.claude-haiku-4-5-20251001-v1:0",
@@ -12,7 +17,7 @@
       "family_guessed": "Fagaceae",
       "confidence": 0.85,
       "above_threshold": true,
-      "verdict": "PENDIENTE validación por Eugenio — plausible para Valle de Etla"
+      "verdict": "FALSE POSITIVE — Q. crassifolia descartado por experto. >15 spp. de Quercus en San Pablo Etla, dataset global no puede distinguirlas con foto de copa."
     },
     "bird": {
       "model": "anthropic.claude-haiku-4-5-20251001-v1:0",
@@ -26,8 +31,10 @@
   },
   "ground_truth": {
     "tree": {
-      "scientific_name": "Quercus sp.",
-      "notes": "Pendiente confirmación de especie por Eugenio — encino dominante Valle de Etla"
+      "scientific_name": "Quercus sp. (pendiente)",
+      "family": "Fagaceae",
+      "identified_by": "Pendiente — Eugenio Padilla",
+      "notes": "Q. crassifolia descartado por Eugenio. San Pablo Etla tiene >15 especies de Quercus. Fotos adicionales pendientes para determinación de especie."
     },
     "bird": {
       "scientific_name": "Ptiliogonys sp.",
@@ -39,7 +46,7 @@
     }
   },
   "failure_mode": "silueta_contraluz_ave_familia_endemica_mesoamerica",
-  "lesson": "Silueta en contraluz = confianza inflada sin base morfológica real. Ptiliogonatidae es familia endémica Mesoamérica casi ausente en datasets globales. Para aves: sin plumaje visible la confianza debe ser forzosamente baja (<0.3). Necesitamos hard-cap de confianza para fotos de aves en contraluz.",
+  "lesson": "Silueta en contraluz = confianza inflada sin base morfológica real. Ptiliogonatidae es familia endémica Mesoamérica casi ausente en datasets globales. Para aves: sin plumaje visible la confianza debe ser forzosamente baja (<0.3). Necesitamos hard-cap de confianza para fotos de aves en contraluz. Para Quercus en Oaxaca: foto de copa no es suficiente — se necesitan hojas, bellotas, escamas de cúpula. Hay >15 spp. en Valle de Etla, varios con fenología y porte similares.",
   "cascade_fix": "Para kingdom=Animalia + imagen en contraluz (alta luminosidad de fondo): cap confidence a 0.3 automáticamente. Agregar detección de contraluz como flag en preprocessing.",
   "priority": "high — Ptiliogonatidae es familia endémica oaxaqueña frecuente, sistemáticamente ignorada por modelos globales"
 }
