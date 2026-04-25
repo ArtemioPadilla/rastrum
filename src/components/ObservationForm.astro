@@ -12,6 +12,7 @@ const habitats = [
   'grassland','agricultural','urban','coastal','reef','scrubland','cave',
 ];
 const weathers = ['sunny','cloudy','overcast','light_rain','heavy_rain','fog','storm'];
+const weatherLabels = (tr.observe as any).weather_options as Record<string,string> | undefined;
 ---
 
 <div class="max-w-xl mx-auto">
@@ -91,7 +92,7 @@ const weathers = ['sunny','cloudy','overcast','light_rain','heavy_rain','fog','s
         <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.observe.weather}</label>
         <select name="weather" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
           <option value="">{tr.observe.weather_placeholder}</option>
-          {weathers.map(w => <option value={w}>{w.replace(/_/g, ' ')}</option>)}
+          {weathers.map(w => <option value={w}>{weatherLabels?.[w] ?? w.replace(/_/g, ' ')}</option>)}
         </select>
       </div>
     </div>
