@@ -1,14 +1,27 @@
 ---
 import BaseLayout from '../../../layouts/BaseLayout.astro';
+import Comments from '../../../components/Comments.astro';
+import FollowButton from '../../../components/FollowButton.astro';
+
+// SSG: query string is unknown at build time. Comments component reads
+// observation_id from data attribute, which we set at runtime in the
+// load() script below.
+const lang: 'en' | 'es' = 'en';
+const obsIdPlaceholder = '';
 ---
 
-<BaseLayout title="Observation — Rastrum" lang="en">
+<BaseLayout title="Observation — Rastrum" lang={lang}>
   <div class="max-w-3xl mx-auto">
     <div id="loading" class="py-16 text-center text-zinc-500">Loading observation…</div>
     <article id="obs" class="hidden space-y-6">
-      <header class="space-y-1">
-        <h1 id="species" class="text-3xl md:text-4xl font-bold italic text-zinc-900 dark:text-zinc-100"></h1>
-        <p id="meta" class="text-sm text-zinc-500 dark:text-zinc-400"></p>
+      <header class="space-y-1 flex flex-wrap items-start justify-between gap-3">
+        <div class="min-w-0">
+          <h1 id="species" class="text-3xl md:text-4xl font-bold italic text-zinc-900 dark:text-zinc-100"></h1>
+          <p id="meta" class="text-sm text-zinc-500 dark:text-zinc-400"></p>
+        </div>
+        <div id="follow-mount">
+          <FollowButton lang={lang} />
+        </div>
       </header>
 
       <img id="img" src="" alt="" class="w-full max-h-[500px] object-contain rounded-xl border border-zinc-200 dark:border-zinc-800 hidden" />
@@ -38,6 +51,10 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
     </article>
 
     <div id="err" class="hidden py-16 text-center text-red-600 dark:text-red-400"></div>
+
+    <div id="social-mount" class="hidden">
+      <Comments lang={lang} observationId={obsIdPlaceholder} />
+    </div>
   </div>
 
   <script>
@@ -61,7 +78,7 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
       const { data: obs, error } = await supabase
         .from('observations')
         .select(`
-          id, observed_at, obscure_level, state_province, habitat,
+          id, observed_at, obscure_level, state_province, habitat, observer_id,
           identifications!inner(scientific_name, is_primary),
           users!observer_id(display_name, username, profile_public)
         `)
@@ -102,6 +119,23 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
 
       if (obs.obscure_level && obs.obscure_level !== 'none') {
         document.getElementById('sensitive')?.classList.remove('hidden');
+      }
+
+      // Wire follow button + reveal comments now that we know who posted.
+      const observerId = (obs as { observer_id?: string }).observer_id;
+      if (observerId) {
+        const followRoot = document.querySelector<HTMLElement>('#follow-mount .rastrum-follow-btn');
+        if (followRoot) {
+          followRoot.dataset.targetId = observerId;
+          document.dispatchEvent(new CustomEvent('rastrum:follow-ready'));
+        }
+      }
+      const social = document.getElementById('social-mount');
+      social?.classList.remove('hidden');
+      const commentsRoot = social?.querySelector<HTMLElement>('.rastrum-comments');
+      if (commentsRoot) {
+        commentsRoot.dataset.observationId = id;
+        document.dispatchEvent(new CustomEvent('rastrum:comments-ready'));
       }
     }
   </script>

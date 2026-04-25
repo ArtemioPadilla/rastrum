@@ -1,5 +1,6 @@
 ---
 import { t } from '../i18n/utils';
+import WatchlistView from './WatchlistView.astro';
 
 interface Props {
   lang: 'en' | 'es';
@@ -90,6 +91,9 @@ const tr = t(lang);
         <p class="text-sm text-zinc-500 dark:text-zinc-400">{tr.profile.no_observations_yet}</p>
       </div>
     </section>
+
+    <!-- Watchlist (followed users + species) — module 08 -->
+    <WatchlistView lang={lang} />
   </div>
 </div>
 

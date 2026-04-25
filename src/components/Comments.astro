@@ -1,0 +1,423 @@
+---
+/**
+ * Comments — single-level threaded comments on an observation.
+ *
+ * RLS: comments_public_read returns only undeleted rows on synced
+ * observations. comments_authenticated_insert/update gate writes.
+ * We never filter on the client.
+ *
+ * If the parent observation has obscure_level > 'none', the surrounding
+ * page hides location info — comments themselves are unaffected.
+ *
+ * Mobile: composer textarea uses text-base (16px) to prevent iOS zoom.
+ */
+import { t, getLocalizedPath, routes } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+  observationId: string;
+}
+
+const { lang, observationId } = Astro.props;
+const tr = t(lang);
+const signInPath = getLocalizedPath(lang, routes.signIn[lang] + '/');
+---
+
+<section
+  class="rastrum-comments mt-10"
+  data-observation-id={observationId}
+  data-lang={lang}
+  data-signin-path={signInPath}
+  data-label-edit={tr.social.edit}
+  data-label-delete={tr.social.delete}
+  data-label-reply={tr.social.reply}
+  data-label-cancel={tr.social.cancel}
+  data-label-save={tr.social.save}
+  data-label-empty={tr.social.empty_comments}
+  data-label-edited={tr.social.edited}
+  data-label-deleted={tr.social.comment_deleted}
+  data-label-confirm-delete={tr.social.delete_confirm}
+>
+  <h2 class="text-lg md:text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+    {tr.social.comments_title}
+  </h2>
+
+  <div class="comments-loading text-sm text-zinc-500 dark:text-zinc-400 py-3">
+    {tr.social.loading}
+  </div>
+
+  <ul class="comments-list space-y-4 hidden"></ul>
+
+  <p class="comments-empty hidden rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
+    {tr.social.empty_comments}
+  </p>
+
+  <button
+    type="button"
+    class="comments-load-more hidden mt-4 inline-flex items-center justify-center min-h-[44px] rounded-lg border border-zinc-300 dark:border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
+  >
+    {tr.social.load_more}
+  </button>
+
+  <!-- Composer (auth) -->
+  <form class="comments-composer hidden mt-6 space-y-2">
+    <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+      {tr.social.compose_label}
+    </label>
+    <textarea
+      class="composer-input w-full min-h-[96px] rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-3 text-base text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+      placeholder={tr.social.compose_placeholder}
+      maxlength="2000"
+    ></textarea>
+    <div class="flex items-center justify-between flex-wrap gap-2">
+      <p class="text-xs text-zinc-500">{tr.social.markdown_hint}</p>
+      <button
+        type="submit"
+        class="composer-submit inline-flex min-h-[44px] items-center justify-center rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+      >
+        {tr.social.submit}
+      </button>
+    </div>
+    <p class="composer-error hidden text-sm text-red-600 dark:text-red-400"></p>
+  </form>
+
+  <!-- Sign-in CTA (anon) -->
+  <div class="comments-signin hidden mt-6 rounded-lg border border-zinc-300 dark:border-zinc-700 p-4 text-sm text-zinc-700 dark:text-zinc-300 flex flex-wrap items-center justify-between gap-3">
+    <span>{tr.social.signin_to_comment}</span>
+    <a
+      href={signInPath}
+      class="inline-flex min-h-[44px] items-center rounded-lg border border-emerald-600/60 px-3 py-2 text-sm font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+    >
+      {tr.auth.sign_in}
+    </a>
+  </div>
+</section>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { buildCommentTree, formatTimeAgo, sanitizeCommentBody, type CommentRow, type CommentNode } from '../lib/social';
+
+  const PAGE_SIZE = 20;
+
+  type AuthorMap = Record<string, { username: string | null; display_name: string | null; avatar_url: string | null }>;
+
+  function initials(name: string) {
+    return (name || '?').trim().slice(0, 2).toUpperCase();
+  }
+
+  function avatarSvg(name: string) {
+    const c = initials(name);
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><rect width='32' height='32' fill='#10b981'/><text x='50%' y='58%' text-anchor='middle' fill='white' font-family='system-ui,sans-serif' font-size='14' font-weight='700'>${c}</text></svg>`;
+    return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+  }
+
+  function nodeMarkup(
+    node: CommentNode,
+    authors: AuthorMap,
+    currentUserId: string | null,
+    lang: 'en' | 'es',
+    labels: Record<string, string>,
+    isReply = false,
+  ): string {
+    const author = authors[node.author_id];
+    const name = author?.display_name || author?.username || (lang === 'es' ? 'Observador' : 'Observer');
+    const avatar = author?.avatar_url || avatarSvg(name);
+    const ago = formatTimeAgo(node.created_at, lang);
+    const editedBadge = node.edited_at ? `<span class="text-xs text-zinc-400 ml-1">(${labels.edited})</span>` : '';
+    const isOwner = currentUserId && currentUserId === node.author_id;
+    const indent = isReply ? 'ml-4 sm:ml-6' : '';
+    const ownerActions = isOwner
+      ? `<div class="comment-actions mt-1 flex flex-wrap gap-3 text-xs text-zinc-500"><button type="button" class="action-edit underline-offset-2 hover:underline" data-id="${node.id}">${labels.edit}</button><button type="button" class="action-delete underline-offset-2 hover:underline text-red-600 dark:text-red-400" data-id="${node.id}">${labels.delete}</button></div>`
+      : '';
+    const replyAction = !isReply && currentUserId
+      ? `<button type="button" class="action-reply text-xs text-emerald-700 dark:text-emerald-400 underline-offset-2 hover:underline mt-1" data-id="${node.id}">${labels.reply}</button>`
+      : '';
+    const repliesMarkup = (node.replies || [])
+      .map(r => nodeMarkup(r, authors, currentUserId, lang, labels, true))
+      .join('');
+    return `
+      <li class="comment-item ${indent}" data-comment-id="${node.id}">
+        <article class="flex gap-3">
+          <img src="${avatar}" alt="" class="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 shrink-0" />
+          <div class="flex-1 min-w-0">
+            <header class="text-sm">
+              <span class="font-semibold text-zinc-900 dark:text-zinc-100">${escapeText(name)}</span>
+              <span class="text-zinc-500 ml-1">${ago}</span>
+              ${editedBadge}
+            </header>
+            <div class="comment-body mt-1 text-sm text-zinc-800 dark:text-zinc-200 break-words"></div>
+            ${replyAction}
+            ${ownerActions}
+            <div class="comment-edit-area hidden mt-2"></div>
+            <div class="comment-reply-area hidden mt-2"></div>
+          </div>
+        </article>
+        ${repliesMarkup ? `<ul class="mt-3 space-y-3">${repliesMarkup}</ul>` : ''}
+      </li>
+    `;
+  }
+
+  function escapeText(s: string): string {
+    return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as Record<string, string>)[c]);
+  }
+
+  async function wireOne(root: HTMLElement) {
+    const obsId = root.dataset.observationId;
+    const lang = (root.dataset.lang === 'es' ? 'es' : 'en') as 'en' | 'es';
+    if (!obsId) return;
+
+    const labels: Record<string, string> = {
+      edit: root.dataset.labelEdit ?? 'Edit',
+      delete: root.dataset.labelDelete ?? 'Delete',
+      reply: root.dataset.labelReply ?? 'Reply',
+      cancel: root.dataset.labelCancel ?? 'Cancel',
+      save: root.dataset.labelSave ?? 'Save',
+      edited: root.dataset.labelEdited ?? 'edited',
+      deleted: root.dataset.labelDeleted ?? 'deleted',
+      confirmDelete: root.dataset.labelConfirmDelete ?? 'Delete this comment?',
+      empty: root.dataset.labelEmpty ?? 'No comments yet.',
+    };
+
+    const listEl = root.querySelector('.comments-list') as HTMLUListElement | null;
+    const loadingEl = root.querySelector('.comments-loading') as HTMLElement | null;
+    const emptyEl = root.querySelector('.comments-empty') as HTMLElement | null;
+    const loadMoreBtn = root.querySelector('.comments-load-more') as HTMLButtonElement | null;
+    const composer = root.querySelector('.comments-composer') as HTMLFormElement | null;
+    const composerInput = composer?.querySelector('.composer-input') as HTMLTextAreaElement | null;
+    const composerSubmit = composer?.querySelector('.composer-submit') as HTMLButtonElement | null;
+    const composerError = composer?.querySelector('.composer-error') as HTMLElement | null;
+    const signInBlock = root.querySelector('.comments-signin') as HTMLElement | null;
+
+    let supabase;
+    try {
+      supabase = getSupabase();
+    } catch {
+      if (loadingEl) loadingEl.textContent = '';
+      return;
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    const currentUserId: string | null = user?.id ?? null;
+
+    if (currentUserId) composer?.classList.remove('hidden');
+    else signInBlock?.classList.remove('hidden');
+
+    let offset = 0;
+    let allRows: CommentRow[] = [];
+    const authors: AuthorMap = {};
+
+    async function fetchAuthors(ids: string[]) {
+      const missing = ids.filter(id => !(id in authors));
+      if (!missing.length) return;
+      const { data } = await supabase
+        .from('users')
+        .select('id, username, display_name, avatar_url')
+        .in('id', missing);
+      for (const u of data ?? []) {
+        authors[u.id as string] = {
+          username: u.username as string | null,
+          display_name: u.display_name as string | null,
+          avatar_url: u.avatar_url as string | null,
+        };
+      }
+    }
+
+    function paintBodies() {
+      const items = listEl?.querySelectorAll<HTMLElement>('.comment-item') ?? [];
+      const byId = new Map(allRows.map(r => [r.id, r] as const));
+      items.forEach(li => {
+        const id = li.dataset.commentId;
+        if (!id) return;
+        const row = byId.get(id);
+        if (!row) return;
+        const bodyEl = li.querySelector(':scope > article > div > .comment-body') as HTMLElement | null;
+        if (bodyEl) bodyEl.innerHTML = sanitizeCommentBody(row.body);
+      });
+    }
+
+    function render() {
+      if (!listEl) return;
+      const tree = buildCommentTree(allRows);
+      if (!tree.length) {
+        listEl.classList.add('hidden');
+        emptyEl?.classList.remove('hidden');
+        return;
+      }
+      emptyEl?.classList.add('hidden');
+      listEl.classList.remove('hidden');
+      listEl.innerHTML = tree
+        .map(n => nodeMarkup(n, authors, currentUserId, lang, labels, false))
+        .join('');
+      paintBodies();
+      wireRowActions();
+    }
+
+    function wireRowActions() {
+      listEl?.querySelectorAll<HTMLButtonElement>('.action-edit').forEach(btn => {
+        btn.addEventListener('click', () => beginEdit(btn.dataset.id ?? ''));
+      });
+      listEl?.querySelectorAll<HTMLButtonElement>('.action-delete').forEach(btn => {
+        btn.addEventListener('click', () => doDelete(btn.dataset.id ?? ''));
+      });
+      listEl?.querySelectorAll<HTMLButtonElement>('.action-reply').forEach(btn => {
+        btn.addEventListener('click', () => beginReply(btn.dataset.id ?? ''));
+      });
+    }
+
+    function beginEdit(id: string) {
+      const row = allRows.find(r => r.id === id);
+      const li = listEl?.querySelector<HTMLElement>(`[data-comment-id="${id}"]`);
+      if (!row || !li) return;
+      const area = li.querySelector(':scope > article > div > .comment-edit-area') as HTMLElement | null;
+      if (!area) return;
+      area.classList.remove('hidden');
+      area.innerHTML = `
+        <textarea class="edit-input w-full min-h-[80px] rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-2 text-base text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500" maxlength="2000">${escapeText(row.body)}</textarea>
+        <div class="mt-2 flex flex-wrap gap-2">
+          <button type="button" class="edit-save min-h-[44px] rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-2 text-sm font-semibold text-white">${labels.save}</button>
+          <button type="button" class="edit-cancel min-h-[44px] rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300">${labels.cancel}</button>
+        </div>
+      `;
+      const save = area.querySelector('.edit-save') as HTMLButtonElement | null;
+      const cancel = area.querySelector('.edit-cancel') as HTMLButtonElement | null;
+      const input = area.querySelector('.edit-input') as HTMLTextAreaElement | null;
+      cancel?.addEventListener('click', () => { area.innerHTML = ''; area.classList.add('hidden'); });
+      save?.addEventListener('click', async () => {
+        if (!input) return;
+        const next = input.value.trim();
+        if (!next) return;
+        save.disabled = true;
+        const { error } = await supabase
+          .from('observation_comments')
+          .update({ body: next, edited_at: new Date().toISOString() })
+          .eq('id', id);
+        save.disabled = false;
+        if (error) return;
+        row.body = next;
+        row.edited_at = new Date().toISOString();
+        area.innerHTML = '';
+        area.classList.add('hidden');
+        render();
+      });
+    }
+
+    async function doDelete(id: string) {
+      if (!confirm(labels.confirmDelete)) return;
+      const { error } = await supabase
+        .from('observation_comments')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) return;
+      allRows = allRows.filter(r => r.id !== id);
+      render();
+    }
+
+    function beginReply(parentId: string) {
+      const li = listEl?.querySelector<HTMLElement>(`[data-comment-id="${parentId}"]`);
+      if (!li) return;
+      const area = li.querySelector(':scope > article > div > .comment-reply-area') as HTMLElement | null;
+      if (!area) return;
+      area.classList.remove('hidden');
+      area.innerHTML = `
+        <textarea class="reply-input w-full min-h-[72px] rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-2 text-base text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500" maxlength="2000"></textarea>
+        <div class="mt-2 flex flex-wrap gap-2">
+          <button type="button" class="reply-submit min-h-[44px] rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-2 text-sm font-semibold text-white">${labels.save}</button>
+          <button type="button" class="reply-cancel min-h-[44px] rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300">${labels.cancel}</button>
+        </div>
+      `;
+      const submit = area.querySelector('.reply-submit') as HTMLButtonElement | null;
+      const cancel = area.querySelector('.reply-cancel') as HTMLButtonElement | null;
+      const input = area.querySelector('.reply-input') as HTMLTextAreaElement | null;
+      cancel?.addEventListener('click', () => { area.innerHTML = ''; area.classList.add('hidden'); });
+      submit?.addEventListener('click', async () => {
+        if (!currentUserId || !input) return;
+        const body = input.value.trim();
+        if (!body) return;
+        submit.disabled = true;
+        const { data, error } = await supabase
+          .from('observation_comments')
+          .insert({ observation_id: obsId, author_id: currentUserId, body, parent_id: parentId })
+          .select('id, observation_id, author_id, body, parent_id, created_at, edited_at, deleted_at')
+          .single();
+        submit.disabled = false;
+        if (error || !data) return;
+        const row = data as unknown as CommentRow;
+        allRows.push(row);
+        await fetchAuthors([row.author_id]);
+        area.innerHTML = '';
+        area.classList.add('hidden');
+        render();
+      });
+    }
+
+    async function loadPage() {
+      loadingEl?.classList.remove('hidden');
+      const { data, error } = await supabase
+        .from('observation_comments')
+        .select('id, observation_id, author_id, body, parent_id, created_at, edited_at, deleted_at')
+        .eq('observation_id', obsId)
+        .order('created_at', { ascending: false })
+        .range(offset, offset + PAGE_SIZE - 1);
+      loadingEl?.classList.add('hidden');
+      if (error || !data) {
+        if (loadMoreBtn) loadMoreBtn.classList.add('hidden');
+        if (allRows.length === 0) emptyEl?.classList.remove('hidden');
+        return;
+      }
+      const rows = data as unknown as CommentRow[];
+      allRows = allRows.concat(rows);
+      offset += rows.length;
+      const ids = Array.from(new Set(rows.map(r => r.author_id)));
+      await fetchAuthors(ids);
+      if (loadMoreBtn) loadMoreBtn.classList.toggle('hidden', rows.length < PAGE_SIZE);
+      render();
+    }
+
+    loadMoreBtn?.addEventListener('click', () => { loadPage().catch(() => {}); });
+
+    composer?.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      if (!currentUserId || !composerInput || !composerSubmit) return;
+      const body = composerInput.value.trim();
+      if (!body) return;
+      composerSubmit.disabled = true;
+      composerError?.classList.add('hidden');
+      try {
+        const { data, error } = await supabase
+          .from('observation_comments')
+          .insert({ observation_id: obsId, author_id: currentUserId, body })
+          .select('id, observation_id, author_id, body, parent_id, created_at, edited_at, deleted_at')
+          .single();
+        if (error || !data) {
+          if (composerError) {
+            composerError.textContent = error?.message ?? 'Error';
+            composerError.classList.remove('hidden');
+          }
+          return;
+        }
+        const row = data as unknown as CommentRow;
+        allRows.unshift(row);
+        await fetchAuthors([row.author_id]);
+        composerInput.value = '';
+        render();
+      } finally {
+        composerSubmit.disabled = false;
+      }
+    });
+
+    await loadPage();
+  }
+
+  type WiredEl = HTMLElement & { __wired?: boolean };
+  function wireAll() {
+    document.querySelectorAll<HTMLElement>('.rastrum-comments').forEach(el => {
+      const w = el as WiredEl;
+      if (w.__wired) return;
+      if (!el.dataset.observationId) return;
+      w.__wired = true;
+      wireOne(el).catch(() => { /* env not configured */ });
+    });
+  }
+  wireAll();
+  document.addEventListener('rastrum:comments-ready', () => wireAll());
+</script>

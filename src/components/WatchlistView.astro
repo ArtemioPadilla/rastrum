@@ -1,0 +1,201 @@
+---
+/**
+ * WatchlistView — list of followed species/users with recent activity
+ * (last 30 days). Uses the existing public.activity_events feed; activity
+ * for users you follow shows up via visibility=followers/public RLS.
+ *
+ * Renders nothing (an empty state) when there's no activity. We never
+ * filter on the client — RLS does the gating.
+ */
+import { t } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+
+const { lang } = Astro.props;
+const tr = t(lang);
+---
+
+<section
+  class="rastrum-watchlist mt-10"
+  data-lang={lang}
+  data-label-empty={tr.social.no_activity}
+  data-label-mark-read={tr.social.mark_all_read}
+>
+  <div class="flex items-center justify-between flex-wrap gap-3 mb-3">
+    <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
+      {tr.social.watchlist_title}
+    </h2>
+    <button
+      type="button"
+      class="watchlist-mark-read hidden inline-flex min-h-[36px] items-center rounded-lg border border-zinc-300 dark:border-zinc-700 px-2.5 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
+    >
+      {tr.social.mark_all_read}
+    </button>
+  </div>
+
+  <ul class="watchlist-list space-y-2"></ul>
+
+  <p class="watchlist-empty hidden rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
+    {tr.social.no_activity}
+  </p>
+</section>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { formatTimeAgo } from '../lib/social';
+
+  type ActivityRow = {
+    id: string;
+    actor_id: string;
+    subject_id: string | null;
+    kind: string;
+    payload: Record<string, unknown> | null;
+    created_at: string;
+    read_at: string | null;
+  };
+
+  type Author = { id: string; username: string | null; display_name: string | null; avatar_url: string | null };
+
+  function escapeText(s: string): string {
+    return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as Record<string, string>)[c]);
+  }
+
+  function avatarSvg(name: string) {
+    const c = (name || '?').trim().slice(0, 2).toUpperCase();
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><rect width='32' height='32' fill='#10b981'/><text x='50%' y='58%' text-anchor='middle' fill='white' font-family='system-ui,sans-serif' font-size='14' font-weight='700'>${c}</text></svg>`;
+    return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+  }
+
+  function summarize(row: ActivityRow, author: Author | undefined, lang: 'en' | 'es'): string {
+    const who = author?.display_name || author?.username || (lang === 'es' ? 'alguien' : 'someone');
+    const p = row.payload || {};
+    const sci = (p as { scientific_name?: string }).scientific_name ?? '';
+    const region = (p as { state_province?: string }).state_province ?? '';
+    const isEs = lang === 'es';
+    switch (row.kind) {
+      case 'observation_created':
+        return isEs
+          ? `${who} registró una observación${region ? ' en ' + region : ''}`
+          : `${who} logged an observation${region ? ' in ' + region : ''}`;
+      case 'observation_research_grade':
+        return isEs
+          ? `${who} alcanzó grado-investigación: ${sci}`
+          : `${who} reached research-grade: ${sci}`;
+      case 'follow_received':
+        return isEs ? `${who} te empezó a seguir` : `${who} started following you`;
+      case 'comment_received':
+        return isEs ? `${who} comentó en tu observación` : `${who} commented on your observation`;
+      case 'badge_earned': {
+        const key = (p as { badge_key?: string }).badge_key ?? '';
+        return isEs ? `${who} obtuvo la insignia ${key}` : `${who} earned badge ${key}`;
+      }
+      default:
+        return isEs ? `${who} — ${row.kind}` : `${who} — ${row.kind}`;
+    }
+  }
+
+  async function wire(root: HTMLElement) {
+    const lang = (root.dataset.lang === 'es' ? 'es' : 'en') as 'en' | 'es';
+    const listEl = root.querySelector('.watchlist-list') as HTMLUListElement | null;
+    const emptyEl = root.querySelector('.watchlist-empty') as HTMLElement | null;
+    const markBtn = root.querySelector('.watchlist-mark-read') as HTMLButtonElement | null;
+
+    let supabase;
+    try { supabase = getSupabase(); } catch { return; }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const since = new Date();
+    since.setDate(since.getDate() - 30);
+
+    const { data: follows } = await supabase
+      .from('follows')
+      .select('followee_id')
+      .eq('follower_id', user.id);
+    const followeeIds = (follows ?? []).map(f => f.followee_id as string);
+
+    const actorPool = Array.from(new Set([user.id, ...followeeIds]));
+    if (actorPool.length === 0) {
+      emptyEl?.classList.remove('hidden');
+      return;
+    }
+
+    const { data: events } = await supabase
+      .from('activity_events')
+      .select('id, actor_id, subject_id, kind, payload, created_at, read_at')
+      .in('actor_id', actorPool)
+      .gte('created_at', since.toISOString())
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    const rows = (events ?? []) as ActivityRow[];
+    if (!rows.length) {
+      emptyEl?.classList.remove('hidden');
+      return;
+    }
+
+    const authorIds = Array.from(new Set(rows.map(r => r.actor_id)));
+    const { data: usersData } = await supabase
+      .from('users')
+      .select('id, username, display_name, avatar_url')
+      .in('id', authorIds);
+    const authors: Record<string, Author> = {};
+    for (const u of usersData ?? []) {
+      authors[u.id as string] = {
+        id: u.id as string,
+        username: u.username as string | null,
+        display_name: u.display_name as string | null,
+        avatar_url: u.avatar_url as string | null,
+      };
+    }
+
+    const sharePath = `/share/obs/?id=`;
+    if (listEl) {
+      listEl.innerHTML = rows.map(r => {
+        const author = authors[r.actor_id];
+        const name = author?.display_name || author?.username || (lang === 'es' ? 'Observador' : 'Observer');
+        const avatar = author?.avatar_url || avatarSvg(name);
+        const summary = summarize(r, author, lang);
+        const ago = formatTimeAgo(r.created_at, lang);
+        const href = r.subject_id ? `${sharePath}${encodeURIComponent(r.subject_id)}` : '#';
+        const unread = !r.read_at ? 'border-emerald-300 dark:border-emerald-700/60 bg-emerald-50/40 dark:bg-emerald-900/10' : '';
+        return `
+          <li>
+            <a href="${href}" class="flex items-start gap-3 rounded-lg border border-zinc-200 dark:border-zinc-800 ${unread} p-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors">
+              <img src="${avatar}" alt="" class="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 shrink-0" />
+              <div class="flex-1 min-w-0">
+                <p class="text-sm text-zinc-800 dark:text-zinc-200 line-clamp-2">${escapeText(summary)}</p>
+                <p class="text-xs text-zinc-500 mt-0.5">${ago}</p>
+              </div>
+            </a>
+          </li>`;
+      }).join('');
+    }
+
+    const unreadIds = rows.filter(r => !r.read_at && r.actor_id === user.id).map(r => r.id);
+    if (unreadIds.length && markBtn) markBtn.classList.remove('hidden');
+    markBtn?.addEventListener('click', async () => {
+      markBtn.disabled = true;
+      const ids = rows.filter(r => !r.read_at && r.actor_id === user.id).map(r => r.id);
+      if (!ids.length) { markBtn.classList.add('hidden'); markBtn.disabled = false; return; }
+      const { error } = await supabase
+        .from('activity_events')
+        .update({ read_at: new Date().toISOString() })
+        .in('id', ids);
+      markBtn.disabled = false;
+      if (!error) {
+        markBtn.classList.add('hidden');
+        listEl?.querySelectorAll<HTMLElement>('a').forEach(a => {
+          a.classList.remove('border-emerald-300', 'dark:border-emerald-700/60', 'bg-emerald-50/40', 'dark:bg-emerald-900/10');
+        });
+      }
+    });
+  }
+
+  document.querySelectorAll<HTMLElement>('.rastrum-watchlist').forEach(el => {
+    wire(el).catch(() => { /* env not configured */ });
+  });
+</script>

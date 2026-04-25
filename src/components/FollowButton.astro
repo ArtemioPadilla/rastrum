@@ -1,0 +1,152 @@
+---
+/**
+ * FollowButton — toggles a follow on `public.follows`.
+ *
+ * Usage: <FollowButton lang="en" targetUserId={observerId} />
+ *
+ * Hidden when:
+ *   - target is the current user
+ *   - target is empty
+ *
+ * Optimistic UI: flip state immediately, roll back on error. RLS rejects
+ * unauthenticated writes so we surface a sign-in CTA in that case.
+ *
+ * Mobile: ≥44px tap target (py-2.5 + min-h-[44px]).
+ */
+import { t, getLocalizedPath, routes } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+  /** Optional — if not known at build time, set element's data-target-id from JS later. */
+  targetUserId?: string;
+}
+
+const { lang, targetUserId = '' } = Astro.props;
+const tr = t(lang);
+const signInPath = getLocalizedPath(lang, routes.signIn[lang] + '/');
+---
+
+<div
+  class="rastrum-follow-btn inline-flex"
+  data-target-id={targetUserId}
+  data-sign-in-path={signInPath}
+  data-label-follow={tr.social.follow}
+  data-label-following={tr.social.following}
+  data-label-signin={tr.social.signin_to_follow}
+  data-label-loading={tr.social.loading}
+>
+  <button
+    type="button"
+    data-state="hidden"
+    class="follow-btn hidden min-h-[44px] inline-flex items-center justify-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold border transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+  >
+    <span class="follow-label">{tr.social.follow}</span>
+  </button>
+</div>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+
+  type FollowEl = HTMLElement & { __wired?: boolean };
+
+  function paint(btn: HTMLButtonElement, state: 'follow' | 'following' | 'signin', root: HTMLElement) {
+    btn.dataset.state = state;
+    btn.classList.remove('hidden');
+    btn.classList.remove(
+      'border-emerald-600/60', 'text-emerald-700', 'dark:text-emerald-400', 'hover:bg-emerald-50', 'dark:hover:bg-emerald-900/20',
+      'bg-emerald-700', 'text-white', 'hover:bg-emerald-800', 'border-emerald-700',
+      'border-zinc-300', 'dark:border-zinc-700', 'text-zinc-700', 'dark:text-zinc-300', 'hover:bg-zinc-50', 'dark:hover:bg-zinc-800/40',
+    );
+    const labelEl = btn.querySelector('.follow-label') as HTMLSpanElement | null;
+    if (state === 'following') {
+      btn.classList.add('bg-emerald-700', 'text-white', 'hover:bg-emerald-800', 'border-emerald-700');
+      if (labelEl) labelEl.textContent = root.dataset.labelFollowing ?? '';
+    } else if (state === 'follow') {
+      btn.classList.add('border-emerald-600/60', 'text-emerald-700', 'dark:text-emerald-400', 'hover:bg-emerald-50', 'dark:hover:bg-emerald-900/20');
+      if (labelEl) labelEl.textContent = root.dataset.labelFollow ?? '';
+    } else {
+      btn.classList.add('border-zinc-300', 'dark:border-zinc-700', 'text-zinc-700', 'dark:text-zinc-300', 'hover:bg-zinc-50', 'dark:hover:bg-zinc-800/40');
+      if (labelEl) labelEl.textContent = root.dataset.labelSignin ?? '';
+    }
+  }
+
+  async function wire(root: FollowEl) {
+    if (root.__wired) return;
+    root.__wired = true;
+    const targetId = root.dataset.targetId;
+    if (!targetId) return;
+    const btn = root.querySelector('.follow-btn') as HTMLButtonElement | null;
+    if (!btn) return;
+
+    let supabase;
+    try {
+      supabase = getSupabase();
+    } catch {
+      return;
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      paint(btn, 'signin', root);
+      btn.addEventListener('click', () => {
+        const path = root.dataset.signInPath ?? '/';
+        window.location.href = path;
+      });
+      return;
+    }
+
+    if (user.id === targetId) {
+      btn.classList.add('hidden');
+      return;
+    }
+
+    const { data: existing } = await supabase
+      .from('follows')
+      .select('follower_id')
+      .eq('follower_id', user.id)
+      .eq('followee_id', targetId)
+      .maybeSingle();
+
+    let following = !!existing;
+    paint(btn, following ? 'following' : 'follow', root);
+
+    btn.addEventListener('click', async () => {
+      const prev = following;
+      following = !following;
+      paint(btn, following ? 'following' : 'follow', root);
+      btn.disabled = true;
+      try {
+        if (following) {
+          const { error } = await supabase
+            .from('follows')
+            .insert({ follower_id: user.id, followee_id: targetId });
+          if (error && !/duplicate/i.test(error.message)) throw error;
+        } else {
+          const { error } = await supabase
+            .from('follows')
+            .delete()
+            .eq('follower_id', user.id)
+            .eq('followee_id', targetId);
+          if (error) throw error;
+        }
+      } catch {
+        following = prev;
+        paint(btn, following ? 'following' : 'follow', root);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  }
+
+  function wireAll() {
+    document.querySelectorAll<HTMLElement>('.rastrum-follow-btn').forEach((el) => {
+      const target = el.dataset.targetId;
+      if (!target) return;
+      wire(el as FollowEl).catch(() => { /* no-op: env not configured */ });
+    });
+  }
+
+  wireAll();
+  document.addEventListener('rastrum:follow-ready', () => wireAll());
+</script>
