@@ -39,6 +39,7 @@ const isDocsPage = currentPath.includes('/docs');
       <a href={getLocalizedPath(lang, routes.home[lang as 'en'|'es'] + '/')} class="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">{tr.nav.home}</a>
       <a href={getLocalizedPath(lang, routes.observe[lang as 'en'|'es'] + '/')} class="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">{tr.nav.observe}</a>
       <a href={getLocalizedPath(lang, (lang === 'es' ? '/explorar/mapa' : '/explore/map') + '/')} class="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">{tr.nav.map}</a>
+      <a href={getLocalizedPath(lang, routes.chat[lang as 'en'|'es'] + '/')} class="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">{tr.nav.chat}</a>
       <a href={getLocalizedPath(lang, routes.about[lang as 'en'|'es'] + '/')} class="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">{tr.nav.about}</a>
 
       <!-- Docs dropdown -->
@@ -123,6 +124,7 @@ const isDocsPage = currentPath.includes('/docs');
     <a href={getLocalizedPath(lang, routes.home[lang as 'en'|'es'] + '/')} class="block hover:text-emerald-600 dark:hover:text-emerald-400">{tr.nav.home}</a>
     <a href={getLocalizedPath(lang, routes.observe[lang as 'en'|'es'] + '/')} class="block hover:text-emerald-600 dark:hover:text-emerald-400">{tr.nav.observe}</a>
     <a href={getLocalizedPath(lang, (lang === 'es' ? '/explorar/mapa' : '/explore/map') + '/')} class="block hover:text-emerald-600 dark:hover:text-emerald-400">{tr.nav.map}</a>
+    <a href={getLocalizedPath(lang, routes.chat[lang as 'en'|'es'] + '/')} class="block hover:text-emerald-600 dark:hover:text-emerald-400">{tr.nav.chat}</a>
     <a href={getLocalizedPath(lang, routes.about[lang as 'en'|'es'] + '/')} class="block hover:text-emerald-600 dark:hover:text-emerald-400">{tr.nav.about}</a>
     <div class="border-t border-zinc-200 dark:border-zinc-800 pt-2 mt-2">
       <p class="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">{tr.nav.docs}</p>

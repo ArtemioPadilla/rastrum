@@ -33,6 +33,7 @@ export const routes: Record<string, Record<Locale, string>> = {
   profile: { en: '/profile', es: '/perfil' },
   profileEdit: { en: '/profile/edit', es: '/perfil/editar' },
   profileExport: { en: '/profile/export', es: '/perfil/exportar' },
+  chat: { en: '/chat', es: '/chat' },
 };
 
 export const docPages = [
