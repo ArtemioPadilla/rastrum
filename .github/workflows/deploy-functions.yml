@@ -1,0 +1,54 @@
+name: Deploy Supabase Edge Functions
+
+on:
+  workflow_dispatch:
+    inputs:
+      function:
+        description: 'Function name to deploy (or "all")'
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - get-upload-url
+          - identify
+          - enrich-environment
+          - recompute-streaks
+          - award-badges
+          - share-card
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_REF: reppvlqejgoqvitturxp
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy
+        run: |
+          set -e
+          if [ "${{ inputs.function }}" = "all" ]; then
+            for fn in get-upload-url identify enrich-environment recompute-streaks award-badges share-card; do
+              echo "→ deploying $fn"
+              # share-card is public (OG scrapers need it without a JWT)
+              if [ "$fn" = "share-card" ]; then
+                supabase functions deploy "$fn" --project-ref "$PROJECT_REF" --no-verify-jwt
+              else
+                supabase functions deploy "$fn" --project-ref "$PROJECT_REF"
+              fi
+            done
+          else
+            fn="${{ inputs.function }}"
+            if [ "$fn" = "share-card" ]; then
+              supabase functions deploy "$fn" --project-ref "$PROJECT_REF" --no-verify-jwt
+            else
+              supabase functions deploy "$fn" --project-ref "$PROJECT_REF"
+            fi
+          fi
