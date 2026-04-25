@@ -49,19 +49,23 @@ export async function exchangeCode(code: string) {
 }
 
 // ───────────────────── OAuth ─────────────────────
-async function signInWithProvider(provider: Provider) {
+async function signInWithProvider(provider: Provider, scopes?: string) {
   return getSupabase().auth.signInWithOAuth({
     provider,
     options: {
       redirectTo: callbackUrl(),
       // Force Supabase to land us on /auth/callback/ instead of the dashboard
       // default. The Site URL allow-list already covers this origin.
+      ...(scopes ? { scopes } : {}),
     },
   });
 }
 
 export const signInWithGoogle = () => signInWithProvider('google');
-export const signInWithGitHub = () => signInWithProvider('github');
+// `user:email` forces GitHub to return private emails too, so we never need
+// the "Allow users without an email" toggle. Keeping that toggle OFF means
+// magic-link recovery + Darwin Core attribution always have a contact email.
+export const signInWithGitHub = () => signInWithProvider('github', 'read:user user:email');
 
 // ───────────────────── Passkey / WebAuthn ─────────────────────
 /**

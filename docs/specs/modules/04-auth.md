@@ -74,6 +74,12 @@ await supabase.auth.signInWithOAuth({
 4. Supabase dashboard → Authentication → Providers → GitHub → enable, paste,
    save.
 
+**Provider toggles** (apply to both Google and GitHub):
+| Toggle | Setting | Why |
+|---|---|---|
+| Skip nonce checks | **OFF** | Nonce binds an ID token to its issuing session and prevents replay attacks. Only turn on for native iOS Apple Sign-In flows where the nonce can't be surfaced back. Web `signInWithOAuth` doesn't need it. |
+| Allow users without an email | **OFF** | Email is required for magic-link recovery and Darwin Core attribution. We pass `scopes: 'read:user user:email'` to GitHub so private-email users still return their email. |
+
 ### 4. Passkey / WebAuthn (step-up MFA on this device)
 
 Supabase MFA-style WebAuthn enrolment. Flow:
