@@ -1,38 +1,22 @@
 /**
  * Sync engine — flushes the Dexie outbox to Supabase.
  *
- * Order matters: media blobs upload to Supabase Storage first, observation
- * upsert second. If the upload succeeds but the upsert fails, a replay will
- * see uploaded=true and skip re-uploading.
+ * Order matters: media blobs upload first, observation upsert second. If
+ * the upload succeeds but the upsert fails, a replay sees uploaded=true and
+ * skips re-uploading.
  *
- * Storage: we use Supabase Storage bucket `media` for v0.1 — not R2 yet.
- * R2 migration happens at v0.3 when we also ship offline pmtiles.
+ * Storage backend: src/lib/upload.ts auto-selects R2 (when
+ * PUBLIC_R2_MEDIA_URL is set) or Supabase Storage (fallback). See module 10.
  */
 import { getDB, type ObservationRecord } from './db';
 import { getSupabase } from './supabase';
+import { uploadMedia, resizeImage, r2Enabled } from './upload';
 import type { Observation } from './types';
-
-const MEDIA_BUCKET = 'media';
 
 export interface SyncResult {
   synced: number;
   failed: number;
   skipped_guest: number;
-}
-
-/** Upload one blob to Supabase Storage. Returns the public URL. */
-async function uploadBlob(
-  blob: Blob,
-  path: string,
-  mimeType: string
-): Promise<string> {
-  const supabase = getSupabase();
-  const { error } = await supabase.storage
-    .from(MEDIA_BUCKET)
-    .upload(path, blob, { contentType: mimeType, upsert: true });
-  if (error) throw error;
-  const { data } = supabase.storage.from(MEDIA_BUCKET).getPublicUrl(path);
-  return data.publicUrl;
 }
 
 async function syncOne(record: ObservationRecord): Promise<void> {
@@ -42,15 +26,24 @@ async function syncOne(record: ObservationRecord): Promise<void> {
   // Guest observations don't sync — they have no server-side owner.
   if (record.observer_kind === 'guest') return;
 
-  // 1. Upload every media blob that hasn't been uploaded yet
+  // 1. Upload every media blob that hasn't been uploaded yet. We resize
+  //    images client-side first (saves storage + bandwidth, see module 10).
   const blobs = await db.mediaBlobs.where('observation_id').equals(record.id).toArray();
   for (const b of blobs) {
     if (b.uploaded) continue;
-    const url = await uploadBlob(
-      b.blob,
-      `observations/${record.id}/${b.id}`,
-      b.mime_type
-    );
+    let payload: Blob = b.blob;
+    let mime = b.mime_type;
+    if (b.mime_type.startsWith('image/')) {
+      try {
+        payload = await resizeImage(new File([b.blob], b.id, { type: b.mime_type }));
+        mime = 'image/jpeg';
+      } catch {
+        // Resize failed (older browser?) — fall back to the original blob
+      }
+    }
+    const ext = mime === 'image/jpeg' ? '.jpg' : '';
+    const key = `observations/${record.id}/${b.id}${ext}`;
+    const url = await uploadMedia(payload, key, mime);
     await db.mediaBlobs.update(b.id, { uploaded: true, upload_url: url });
   }
 

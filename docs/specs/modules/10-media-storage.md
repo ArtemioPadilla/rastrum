@@ -1,7 +1,21 @@
 # Module 10 — Media Storage (Cloudflare R2 + CDN)
 
 **Version target:** v0.1
-**Status:** Not started
+**Status:** Code shipped — operator must provision R2 + DNS to activate.
+
+**Code shipped (commit 1b7ba04 onwards):**
+- `supabase/functions/get-upload-url/` — presigned PUT URL service with
+  per-user prefix scoping + JWT validation. README documents the
+  Cloudflare account / bucket / DNS / token / Transform-Rules setup.
+- `src/lib/upload.ts` — client helper: `resizeImage()` (≤1200px JPEG q=0.85
+  via OffscreenCanvas) + `uploadMedia()` (auto-routes to R2 or Supabase
+  Storage based on `PUBLIC_R2_MEDIA_URL` presence).
+- `src/lib/sync.ts` — observation sync resizes images then calls
+  `uploadMedia()` instead of writing directly to Supabase Storage.
+
+**Activation switch:** set `PUBLIC_R2_MEDIA_URL` in `.env.local` (and as a
+GitHub secret for CI). With it absent, the build keeps using Supabase
+Storage. With it present, every new upload goes to R2.
 
 ---
 
