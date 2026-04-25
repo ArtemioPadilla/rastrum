@@ -36,6 +36,8 @@ narrative source.
 | 08 | Profile, activity feed, badges, streaks, events | v0.1 → v1.0 (staged) | **shipped (v0.1, v0.3, v0.5, v1.0 slices)** | [`08-profile-activity-gamification.md`](08-profile-activity-gamification.md) |
 | 10 | Media storage (R2 + presigned URLs + CDN) | v0.1 → v0.3 migration | spec | [`10-media-storage.md`](10-media-storage.md) |
 | 11 | In-browser AI (WebLLM: Phi-3.5-vision + Llama-3.2-1B) | v0.3 → v0.5 | **shipped (opt-in)** | [`11-in-browser-ai.md`](11-in-browser-ai.md) |
+| 12 | BirdNET audio ID (Cornell Lab, CC BY-NC-SA model) | v0.5 | spec | [`12-birdnet-audio.md`](12-birdnet-audio.md) |
+| 13 | Identifier registry (plugin platform) | v0.5 | **shipped (scaffold)** | [`13-identifier-registry.md`](13-identifier-registry.md) |
 
 ## v0.3 — Offline intelligence
 

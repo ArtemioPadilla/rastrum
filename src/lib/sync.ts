@@ -135,7 +135,15 @@ function isLocalAIOptedIn(): boolean {
   return localStorage.getItem(LOCAL_AI_OPTIN) === 'true';
 }
 
-/** Invoke the identify Edge Function for an observation that's freshly synced. */
+/**
+ * Run the identifier cascade against the freshly-synced observation.
+ *
+ * The cascade is the *plugin* layer (src/lib/identifiers/) rather than the
+ * Edge Function's hardcoded waterfall. It walks every registered plugin
+ * whose capabilities match (media + taxa + runtime), in cost order, and
+ * stops at the first result above the accept threshold. Falls back to
+ * Phi-3.5-vision on-device when the user opted in and cloud paths fail.
+ */
 async function triggerIdentify(observationId: string): Promise<void> {
   const supabase = getSupabase();
   const db = getDB();
@@ -147,84 +155,64 @@ async function triggerIdentify(observationId: string): Promise<void> {
 
   const obsRecord = await db.observations.get(observationId);
   const loc = obsRecord?.data.location;
+  const habitat = obsRecord?.data.habitat ?? undefined;
 
-  const { data, error } = await supabase.functions.invoke('identify', {
-    body: {
-      observation_id: observationId,
-      image_url: primary.upload_url,
+  const { bootstrapIdentifiers, runCascade } = await import('./identifiers');
+  bootstrapIdentifiers();
+
+  // Exclude on-device plugins unless the user opted in. They still appear
+  // in the registry (UI lists them) but the cascade engine skips them.
+  const excluded = isLocalAIOptedIn() ? [] : ['webllm_phi35_vision', 'onnx_efficientnet_lite0', 'birdnet_lite'];
+
+  const cascadeResult = await runCascade(
+    {
+      media: { kind: 'url', url: primary.upload_url },
+      mediaKind: 'photo',
       location: loc ? { lat: loc.lat, lng: loc.lng } : undefined,
-      client_anthropic_key: readByoAnthropicKey(),
+      habitat,
+      byo_keys: { anthropic: readByoAnthropicKey() },
     },
+    {
+      media: 'photo',
+      taxa: undefined,    // we don't yet know what kingdom — the cascade probes generalists too
+      excluded,
+    },
+  );
+
+  if (!cascadeResult.best) {
+    await db.idQueue.update(observationId, {
+      attempts: ((await db.idQueue.get(observationId))?.attempts ?? 0) + 1,
+      last_error: 'cascade exhausted: ' + cascadeResult.attempts.map(a => a.id + (a.ok ? '✓' : '✗')).join(','),
+    });
+    return;
+  }
+
+  // Write the chosen identification to public.identifications. The
+  // sync_primary_id_trigger then materialises denormalised columns on
+  // the observation row (primary_taxon_id, obscure_level, location_obscured).
+  const r = cascadeResult.best;
+  const { error: insertErr } = await supabase.from('identifications').insert({
+    observation_id: observationId,
+    scientific_name: r.scientific_name,
+    confidence: r.confidence,
+    source: r.source,
+    raw_response: r.raw as object,
+    is_primary: true,
   });
 
-  // The function returns 200 even when no engine is available, so check the
-  // body shape rather than `error`.
-  const noEngine = (data as { error?: string } | null)?.error === 'no_id_engine_available';
-  if (error || noEngine) {
-    // Try the local-AI fallback if the user opted in. Otherwise leave it
-    // in the queue for a future retry (or manual ID).
-    if (noEngine && isLocalAIOptedIn() && obsRecord) {
-      try {
-        await runLocalFallback(observationId, primary.upload_url, obsRecord.data.habitat ?? undefined, loc);
-      } catch (e) {
-        await db.idQueue.update(observationId, {
-          attempts: ((await db.idQueue.get(observationId))?.attempts ?? 0) + 1,
-          last_error: 'local fallback failed: ' + (e instanceof Error ? e.message : String(e)),
-        });
-        return;
-      }
-    } else {
-      await db.idQueue.update(observationId, {
-        attempts: ((await db.idQueue.get(observationId))?.attempts ?? 0) + 1,
-        last_error: error?.message ?? 'no_id_engine_available',
-      });
-      return;
-    }
+  if (insertErr) {
+    await db.idQueue.update(observationId, {
+      attempts: ((await db.idQueue.get(observationId))?.attempts ?? 0) + 1,
+      last_error: 'identification insert failed: ' + insertErr.message,
+    });
+    return;
   }
 
   await db.idQueue.delete(observationId);
 }
 
-/**
- * Last-resort on-device identification using Phi-3.5-vision via WebLLM.
- * Writes the result directly to public.identifications via supabase-js
- * (RLS gates the write to the observation owner).
- *
- * Always marked confidence ≤ 0.4 — see lib/local-ai.ts for why.
- */
-async function runLocalFallback(
-  observationId: string,
-  imageUrl: string,
-  habitat?: string,
-  loc?: { lat: number; lng: number },
-): Promise<void> {
-  // Fetch the image as base64 so the WebLLM model can read it
-  const res = await fetch(imageUrl);
-  const blob = await res.blob();
-  const dataUrl = await new Promise<string>((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(r.result as string);
-    r.onerror = () => reject(r.error);
-    r.readAsDataURL(blob);
-  });
-
-  const { identifyImageLocal } = await import('./local-ai');
-  const result = await identifyImageLocal(
-    dataUrl,
-    () => { /* progress is shown in the profile UI; sync runs background */ },
-    { lat: loc?.lat, lng: loc?.lng, habitat },
-  );
-
-  const supabase = getSupabase();
-  await supabase.from('identifications').insert({
-    observation_id: observationId,
-    scientific_name: result.scientific_name,
-    confidence: result.confidence,
-    source: 'onnx_offline',     // closest enum value; webllm flavour noted in raw_response
-    raw_response: result,
-    is_primary: true,
-  });
-}
+// Legacy runLocalFallback was replaced by the cascade engine above; the
+// Phi-3.5-vision fallback is now a registered plugin (phi-vision.ts).
 
 /** Flush all pending observations. Safe to call on every `online` event. */
 export async function syncOutbox(): Promise<SyncResult> {

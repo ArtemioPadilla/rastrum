@@ -25,6 +25,12 @@ type IdentifyRequest = {
    * Falls back to ANTHROPIC_API_KEY env var when not provided.
    */
   client_anthropic_key?: string;
+  /**
+   * Force a specific provider — used by the client cascade engine when it
+   * wants to call exactly one server-side identifier (skip the default
+   * PlantNet → Claude waterfall). Values: 'plantnet' | 'claude_haiku'.
+   */
+  force_provider?: 'plantnet' | 'claude_haiku';
 };
 
 type IDResult = {
@@ -186,32 +192,39 @@ serve(async (req) => {
   const imageBytes = await fetchImageAsBytes(body.image_url);
   const mimeType = 'image/jpeg';
 
-  // Cascade: PlantNet first when we think it's a plant, Claude otherwise
   let result: IDResult | null = null;
-  const isPlant = body.user_hint === 'plant' || body.user_hint === 'fungi' || !body.user_hint;
 
-  if (isPlant) {
-    const pn = await callPlantNet(imageBytes);
-    if (pn && pn.confidence >= PLANTNET_THRESHOLD) {
-      result = pn;
-    } else {
-      result = await callClaudeHaiku(imageBytes, mimeType, {
-        lat: body.location?.lat,
-        lng: body.location?.lng,
-        plantnet_candidates: pn ? [pn.scientific_name] : undefined,
-        client_key: body.client_anthropic_key,
-      });
-      // If no Claude key available but PlantNet returned *something*, return
-      // that even at low confidence — better than nothing, the UI will mark
-      // it as cf. (see Darwin Core export's identificationQualifier).
-      if (!result && pn) result = pn;
-    }
-  } else {
+  if (body.force_provider === 'plantnet') {
+    result = await callPlantNet(imageBytes);
+  } else if (body.force_provider === 'claude_haiku') {
     result = await callClaudeHaiku(imageBytes, mimeType, {
       lat: body.location?.lat,
       lng: body.location?.lng,
       client_key: body.client_anthropic_key,
     });
+  } else {
+    // Default cascade: PlantNet first if it's likely a plant, Claude otherwise
+    const isPlant = body.user_hint === 'plant' || body.user_hint === 'fungi' || !body.user_hint;
+    if (isPlant) {
+      const pn = await callPlantNet(imageBytes);
+      if (pn && pn.confidence >= PLANTNET_THRESHOLD) {
+        result = pn;
+      } else {
+        result = await callClaudeHaiku(imageBytes, mimeType, {
+          lat: body.location?.lat,
+          lng: body.location?.lng,
+          plantnet_candidates: pn ? [pn.scientific_name] : undefined,
+          client_key: body.client_anthropic_key,
+        });
+        if (!result && pn) result = pn;
+      }
+    } else {
+      result = await callClaudeHaiku(imageBytes, mimeType, {
+        lat: body.location?.lat,
+        lng: body.location?.lng,
+        client_key: body.client_anthropic_key,
+      });
+    }
   }
 
   if (!result) {
@@ -229,19 +242,23 @@ serve(async (req) => {
     });
   }
 
-  // Write identification back to the DB with service role
-  const serviceRole = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  if (serviceRole && supabaseUrl) {
-    const db = createClient(supabaseUrl, serviceRole);
-    await db.from('identifications').insert({
-      observation_id: body.observation_id,
-      scientific_name: result.scientific_name,
-      confidence: result.confidence,
-      source: result.source,
-      raw_response: result.raw as object,
-      is_primary: true,
-    });
+  // Write identification back to the DB with service role.
+  // Skip when the call was cascade-only (the client cascade engine handles
+  // the DB write on its own after picking the best result across plugins).
+  if (body.observation_id !== 'cascade-only') {
+    const serviceRole = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    if (serviceRole && supabaseUrl) {
+      const db = createClient(supabaseUrl, serviceRole);
+      await db.from('identifications').insert({
+        observation_id: body.observation_id,
+        scientific_name: result.scientific_name,
+        confidence: result.confidence,
+        source: result.source,
+        raw_response: result.raw as object,
+        is_primary: true,
+      });
+    }
   }
 
   return new Response(JSON.stringify(result), {
