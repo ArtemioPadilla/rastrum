@@ -1,0 +1,206 @@
+---
+import { t } from '../i18n/utils';
+
+interface Props {
+  lang: string;
+}
+
+const { lang } = Astro.props;
+const tr = t(lang);
+const buildSha = import.meta.env.PUBLIC_BUILD_SHA || 'dev';
+const repoSlug = 'ArtemioPadilla/rastrum';
+---
+
+<button
+  id="report-issue-btn"
+  type="button"
+  aria-label={tr.report.button_label}
+  title={tr.report.button_label}
+  class="fixed bottom-4 right-4 z-40 w-12 h-12 rounded-full flex items-center justify-center shadow-lg bg-zinc-200/90 hover:bg-zinc-300 text-zinc-800 dark:bg-zinc-800/80 dark:hover:bg-zinc-700 dark:text-zinc-100 transition-all hover:scale-105 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
+>
+  <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m0 3.25h.008v.008H12v-.008zm-9 0a9 9 0 1118 0 9 9 0 01-18 0z" />
+  </svg>
+  <span class="sr-only">{tr.report.button_label}</span>
+</button>
+
+<dialog
+  id="report-issue-modal"
+  data-repo={repoSlug}
+  data-lang={lang}
+  data-build-sha={buildSha}
+  class="rounded-lg backdrop:bg-black/60 p-0 w-[min(92vw,560px)] max-h-[88vh] overflow-hidden bg-white text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100 shadow-2xl border border-zinc-200 dark:border-zinc-800"
+>
+  <form method="dialog" class="flex flex-col max-h-[88vh]">
+    <header class="flex items-center justify-between px-5 py-3 border-b border-zinc-200 dark:border-zinc-800 sticky top-0 bg-white dark:bg-zinc-900">
+      <h2 class="text-base font-semibold">{tr.report.modal_title}</h2>
+      <button
+        type="button"
+        id="report-close-btn"
+        aria-label={tr.report.cancel}
+        class="p-1.5 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 min-w-[44px] min-h-[44px] flex items-center justify-center"
+      >
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+      </button>
+    </header>
+    <div class="px-5 py-4 space-y-4 overflow-y-auto flex-1">
+      <div>
+        <label for="report-type" class="block text-sm font-medium mb-1">{tr.report.type_label}</label>
+        <select
+          id="report-type"
+          class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        >
+          <option value="bug">{tr.report.type_bug}</option>
+          <option value="feature">{tr.report.type_feature}</option>
+          <option value="question">{tr.report.type_question}</option>
+          <option value="translation">{tr.report.type_translation}</option>
+        </select>
+      </div>
+      <div>
+        <label for="report-title" class="block text-sm font-medium mb-1">{tr.report.title_label}</label>
+        <input
+          type="text"
+          id="report-title"
+          maxlength="120"
+          placeholder={tr.report.title_placeholder}
+          class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        />
+      </div>
+      <div>
+        <label for="report-description" class="block text-sm font-medium mb-1">{tr.report.description_label}</label>
+        <textarea
+          id="report-description"
+          rows="5"
+          placeholder={tr.report.description_placeholder}
+          class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        ></textarea>
+      </div>
+      <div>
+        <p class="text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">{tr.report.metadata_label}</p>
+        <pre
+          id="report-metadata"
+          class="text-xs bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded p-2 whitespace-pre-wrap break-all max-h-32 overflow-auto select-all"
+        ></pre>
+      </div>
+    </div>
+    <footer class="sticky bottom-0 flex items-center justify-end gap-2 px-5 py-3 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+      <button
+        type="button"
+        id="report-cancel-btn"
+        class="min-h-[44px] px-4 py-2 rounded text-sm font-medium border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+      >
+        {tr.report.cancel}
+      </button>
+      <button
+        type="button"
+        id="report-submit-btn"
+        class="min-h-[44px] px-4 py-2 rounded text-sm font-semibold bg-emerald-700 hover:bg-emerald-800 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+      >
+        {tr.report.open_on_github}
+      </button>
+    </footer>
+  </form>
+</dialog>
+
+<script is:inline>
+  (function () {
+    const btn = document.getElementById('report-issue-btn');
+    const modal = document.getElementById('report-issue-modal');
+    if (!btn || !modal) return;
+
+    const dlg = modal;
+    const repo = dlg.dataset.repo || '';
+    const lang = dlg.dataset.lang || 'en';
+    const buildSha = dlg.dataset.buildSha || 'dev';
+
+    const typeEl = document.getElementById('report-type');
+    const titleEl = document.getElementById('report-title');
+    const descEl = document.getElementById('report-description');
+    const metaEl = document.getElementById('report-metadata');
+    const closeBtn = document.getElementById('report-close-btn');
+    const cancelBtn = document.getElementById('report-cancel-btn');
+    const submitBtn = document.getElementById('report-submit-btn');
+
+    function buildMetadata() {
+      return {
+        url: window.location.href,
+        userAgent: navigator.userAgent,
+        locale: lang,
+        buildSha: buildSha,
+        online: navigator.onLine,
+        viewport: window.innerWidth + 'x' + window.innerHeight,
+        timestamp: new Date().toISOString(),
+      };
+    }
+
+    function refreshMetadata() {
+      if (!metaEl) return;
+      const m = buildMetadata();
+      metaEl.textContent =
+        'URL: ' + m.url + '\n' +
+        'User Agent: ' + m.userAgent + '\n' +
+        'Locale: ' + m.locale + '\n' +
+        'Build: ' + m.buildSha + '\n' +
+        'Online: ' + (m.online ? 'yes' : 'no') + '\n' +
+        'Viewport: ' + m.viewport + '\n' +
+        'Time: ' + m.timestamp;
+    }
+
+    function templateFor(type) {
+      switch (type) {
+        case 'feature': return 'feature.yml';
+        case 'question': return 'question.yml';
+        case 'translation': return 'translation.yml';
+        case 'bug':
+        default: return 'bug.yml';
+      }
+    }
+
+    function buildBody() {
+      const m = buildMetadata();
+      const desc = (descEl && descEl.value ? descEl.value : '').trim();
+      const env =
+        '### Environment\n' +
+        '- URL: ' + m.url + '\n' +
+        '- User Agent: ' + m.userAgent + '\n' +
+        '- Locale: ' + m.locale + '\n' +
+        '- Build: ' + m.buildSha + '\n' +
+        '- Online: ' + (m.online ? 'yes' : 'no') + '\n' +
+        '- Viewport: ' + m.viewport + '\n' +
+        '- Time: ' + m.timestamp;
+      return desc ? (desc + '\n\n' + env) : env;
+    }
+
+    function openOnGithub() {
+      const type = (typeEl && typeEl.value) || 'bug';
+      const tpl = templateFor(type);
+      const title = (titleEl && titleEl.value ? titleEl.value : '').trim();
+      const body = buildBody();
+      const url =
+        'https://github.com/' + repo + '/issues/new' +
+        '?template=' + encodeURIComponent(tpl) +
+        '&title=' + encodeURIComponent(title) +
+        '&body=' + encodeURIComponent(body);
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+
+    function open() {
+      refreshMetadata();
+      if (typeof dlg.showModal === 'function') dlg.showModal();
+      else dlg.setAttribute('open', '');
+    }
+
+    function close() {
+      if (typeof dlg.close === 'function') dlg.close();
+      else dlg.removeAttribute('open');
+    }
+
+    btn.addEventListener('click', open);
+    closeBtn && closeBtn.addEventListener('click', close);
+    cancelBtn && cancelBtn.addEventListener('click', close);
+    submitBtn && submitBtn.addEventListener('click', function () {
+      openOnGithub();
+      close();
+    });
+  })();
+</script>

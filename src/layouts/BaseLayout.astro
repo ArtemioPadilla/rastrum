@@ -1,6 +1,7 @@
 ---
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
+import ReportIssueButton from '../components/ReportIssueButton.astro';
 
 interface Props {
   title: string;
@@ -50,5 +51,6 @@ const currentPath = Astro.url.pathname;
       <slot />
     </main>
     <Footer lang={lang} />
+    <ReportIssueButton lang={lang} />
   </body>
 </html>

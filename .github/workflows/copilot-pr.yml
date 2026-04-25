@@ -1,0 +1,57 @@
+# Copilot auto-PR workflow.
+#
+# Pings @copilot in a comment when an issue is labeled
+# `good-first-issue` or `auto-fix-candidate`, asking it to open a PR.
+#
+# REPO SETUP REQUIRED for this to actually trigger Copilot:
+#   1. The repository (or its org) must have GitHub Copilot enabled with
+#      Copilot Workspace / Copilot coding agent access.
+#      Settings -> Copilot -> "Coding agent" / "Copilot in pull requests".
+#   2. @copilot must be a recognized actor in this repo. If your org has
+#      Copilot Workspace, mentioning @copilot in an issue comment is the
+#      documented trigger.
+#   3. The default GITHUB_TOKEN's `issues: write` permission is enough to
+#      post the comment. Copilot's own actions use its own credentials.
+#
+# If Copilot is not enabled the comment is harmless — it's just a ping.
+name: Copilot auto-PR
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  issues: write
+  pull-requests: write
+  contents: read
+
+concurrency:
+  group: copilot-pr-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  ping-copilot:
+    if: ${{ github.event.label.name == 'good-first-issue' || github.event.label.name == 'auto-fix-candidate' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Comment to ping Copilot
+        uses: actions/github-script@v7
+        env:
+          LABEL_NAME: ${{ github.event.label.name }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issue_number = context.payload.issue.number;
+            const owner = context.repo.owner;
+            const repo  = context.repo.repo;
+            const label = process.env.LABEL_NAME;
+            const body = [
+              '@copilot please open a pull request for this issue.',
+              '',
+              'Triggered by label **`' + label + '`**. See AGENTS.md at the repo root for project conventions, EN/ES parity rules, and known pitfalls before generating changes.',
+              '',
+              'Include tests where applicable and keep diffs minimal.',
+            ].join('\n');
+            await github.rest.issues.createComment({
+              owner, repo, issue_number, body,
+            });
