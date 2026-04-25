@@ -98,8 +98,36 @@ const weathers = ['sunny','cloudy','overcast','light_rain','heavy_rain','fog','s
 
     <!-- Notes -->
     <div>
-      <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.observe.notes}</label>
-      <textarea name="notes" maxlength="2000" rows="3" placeholder={tr.observe.notes_placeholder} class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm"></textarea>
+      <div class="flex items-end justify-between gap-2 flex-wrap mb-1">
+        <label for="obs-notes" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300">{tr.observe.notes}</label>
+        <div class="flex flex-wrap gap-2 ml-auto">
+          <button
+            id="auto-narrative-btn"
+            type="button"
+            class="hidden inline-flex items-center gap-1.5 min-h-11 sm:min-h-0 rounded-lg border border-emerald-600/60 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 disabled:opacity-50"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
+            <span data-narrative-label>{tr.observe.auto_narrative}</span>
+          </button>
+          <button
+            id="translate-btn"
+            type="button"
+            disabled
+            class="hidden inline-flex items-center gap-1.5 min-h-11 sm:min-h-0 rounded-lg border border-emerald-600/60 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 disabled:opacity-50"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5h12M9 3v2m1.05 6.95L7 17l-3-3m11.95 5L20 13l-3 3" /></svg>
+            <span data-translate-label>{tr.observe.translate}</span>
+          </button>
+        </div>
+      </div>
+      <textarea id="obs-notes" name="notes" maxlength="2000" rows="3" placeholder={tr.observe.notes_placeholder} class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-base"></textarea>
+      <div class="mt-1 flex items-center gap-3 flex-wrap">
+        <button id="translate-undo-btn" type="button" class="hidden text-xs font-medium text-emerald-700 dark:text-emerald-400 underline">
+          {tr.observe.translated_undo}
+        </button>
+        <span id="ai-helpers-progress" class="hidden text-xs text-zinc-500 font-mono"></span>
+        <span id="ai-helpers-error" class="hidden text-xs text-red-600 dark:text-red-400"></span>
+      </div>
     </div>
 
     <!-- Privacy notice — always visible. Becomes louder once an ID resolves to a NOM-059 species -->
@@ -517,4 +545,171 @@ const weathers = ['sunny','cloudy','overcast','light_rain','heavy_rain','fog','s
   // Kick off GPS + sync triggers on page load
   registerSyncTriggers();
   getLiveGPS();
+
+  // ── On-device AI helpers: Translate + Auto-narrative ──
+  type LocaleEnEs = 'en' | 'es';
+  const docLangEnEs: LocaleEnEs = (document.documentElement.lang === 'es') ? 'es' : 'en';
+  const isEsAi = docLangEnEs === 'es';
+
+  const notesEl       = document.getElementById('obs-notes') as HTMLTextAreaElement | null;
+  const translateBtn  = document.getElementById('translate-btn') as HTMLButtonElement | null;
+  const trLabel       = translateBtn?.querySelector('[data-translate-label]') as HTMLElement | null;
+  const undoBtn       = document.getElementById('translate-undo-btn') as HTMLButtonElement | null;
+  const narrativeBtn  = document.getElementById('auto-narrative-btn') as HTMLButtonElement | null;
+  const narrLabel     = narrativeBtn?.querySelector('[data-narrative-label]') as HTMLElement | null;
+  const aiProgress    = document.getElementById('ai-helpers-progress');
+  const aiError       = document.getElementById('ai-helpers-error');
+
+  const TRANSLATE_DEFAULT = trLabel?.textContent ?? 'Translate';
+  const TRANSLATE_BUSY    = isEsAi ? 'Traduciendo…' : 'Translating…';
+  const NARRATIVE_DEFAULT = narrLabel?.textContent ?? 'Auto-narrative';
+  const NARRATIVE_BUSY    = isEsAi ? 'Escribiendo…' : 'Writing…';
+
+  function setAiError(text: string | null) {
+    if (!aiError) return;
+    if (!text) { aiError.classList.add('hidden'); aiError.textContent = ''; return; }
+    aiError.textContent = text;
+    aiError.classList.remove('hidden');
+  }
+  function setAiProgress(text: string | null) {
+    if (!aiProgress) return;
+    if (!text) { aiProgress.classList.add('hidden'); aiProgress.textContent = ''; return; }
+    aiProgress.textContent = text;
+    aiProgress.classList.remove('hidden');
+  }
+
+  let undoTimer: number | null = null;
+  let originalBeforeTranslate: string | null = null;
+
+  // Show buttons only when the text model is cached on this device. The
+  // download flow lives on the profile page — we don't want the obs form
+  // triggering a 880 MB download.
+  async function maybeShowAiButtons() {
+    try {
+      const lib = await import('../lib/local-ai');
+      if (!lib.localAISupported()) return;
+      const status = await lib.getModelCacheStatus(lib.TEXT_MODEL_ID);
+      if (status.cached) {
+        translateBtn?.classList.remove('hidden');
+        narrativeBtn?.classList.remove('hidden');
+      }
+    } catch { /* env not set */ }
+  }
+  maybeShowAiButtons();
+
+  function refreshTranslateDisabled() {
+    if (!translateBtn || !notesEl) return;
+    translateBtn.disabled = notesEl.value.trim().length === 0;
+  }
+  notesEl?.addEventListener('input', refreshTranslateDisabled);
+  refreshTranslateDisabled();
+
+  translateBtn?.addEventListener('click', async () => {
+    if (!translateBtn || !trLabel || !notesEl) return;
+    const text = notesEl.value.trim();
+    if (!text) return;
+    setAiError(null);
+
+    const helpers = await import('../lib/local-ai-helpers');
+    const source = helpers.detectLocaleFromDoc();
+    const target = helpers.flipLocale(source);
+
+    translateBtn.disabled = true;
+    trLabel.textContent = TRANSLATE_BUSY;
+    setAiProgress(isEsAi ? 'Cargando modelo local…' : 'Loading on-device model…');
+
+    try {
+      const lib = await import('../lib/local-ai');
+      const engine = await lib.loadTextEngine((p) => {
+        setAiProgress(`${Math.round((p.progress ?? 0) * 100)}%  ${p.text ?? ''}`);
+      });
+      const reply = await engine.chat.completions.create({
+        messages: [
+          { role: 'system', content: helpers.buildTranslatePrompt(source, target) },
+          { role: 'user', content: text },
+        ],
+        max_tokens: 400,
+      });
+      const raw = reply.choices?.[0]?.message?.content ?? '';
+      const out = (typeof raw === 'string' ? raw : '').trim();
+      if (!out) throw new Error(isEsAi ? 'Sin respuesta del modelo.' : 'Empty response from model.');
+      originalBeforeTranslate = notesEl.value;
+      notesEl.value = out;
+      undoBtn?.classList.remove('hidden');
+      if (undoTimer != null) window.clearTimeout(undoTimer);
+      undoTimer = window.setTimeout(() => {
+        undoBtn?.classList.add('hidden');
+        originalBeforeTranslate = null;
+      }, 10_000);
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAiProgress(null);
+      trLabel.textContent = TRANSLATE_DEFAULT;
+      refreshTranslateDisabled();
+    }
+  });
+
+  undoBtn?.addEventListener('click', () => {
+    if (originalBeforeTranslate == null || !notesEl) return;
+    notesEl.value = originalBeforeTranslate;
+    originalBeforeTranslate = null;
+    undoBtn.classList.add('hidden');
+    if (undoTimer != null) { window.clearTimeout(undoTimer); undoTimer = null; }
+    refreshTranslateDisabled();
+  });
+
+  narrativeBtn?.addEventListener('click', async () => {
+    if (!narrativeBtn || !narrLabel || !notesEl || !form) return;
+    setAiError(null);
+
+    const helpers = await import('../lib/local-ai-helpers');
+    const fields: import('../lib/local-ai-helpers').NarrativeFields = {
+      species_guess: null,
+      location_obscured: location ? `${location.lat.toFixed(2)}, ${location.lng.toFixed(2)}` : null,
+      location_raw: location ? { lat: location.lat, lng: location.lng } : null,
+      time: new Date().toISOString(),
+      habitat: (form.elements.namedItem('habitat') as HTMLSelectElement | null)?.value || null,
+      weather: (form.elements.namedItem('weather') as HTMLSelectElement | null)?.value || null,
+      evidence_type: (form.elements.namedItem('evidence_type') as HTMLSelectElement | null)?.value || null,
+      behavior_tags: null,
+      count: null,
+    };
+
+    let mode: 'replace' | 'append' = 'replace';
+    if (notesEl.value.trim()) {
+      const ok = window.confirm(isEsAi
+        ? 'Ya hay una nota. ¿Reemplazarla por la generada?\nAceptar = Reemplazar · Cancelar = Añadir'
+        : 'There is already a note. Replace it with the generated one?\nOK = Replace · Cancel = Append');
+      mode = ok ? 'replace' : 'append';
+    }
+
+    narrativeBtn.disabled = true;
+    narrLabel.textContent = NARRATIVE_BUSY;
+    setAiProgress(isEsAi ? 'Cargando modelo local…' : 'Loading on-device model…');
+
+    try {
+      const lib = await import('../lib/local-ai');
+      const engine = await lib.loadTextEngine((p) => {
+        setAiProgress(`${Math.round((p.progress ?? 0) * 100)}%  ${p.text ?? ''}`);
+      });
+      const prompt = helpers.buildNarrativePrompt(docLangEnEs, fields);
+      const reply = await engine.chat.completions.create({
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 220,
+      });
+      const raw = reply.choices?.[0]?.message?.content ?? '';
+      const out = (typeof raw === 'string' ? raw : '').trim();
+      if (!out) throw new Error(isEsAi ? 'Sin respuesta del modelo.' : 'Empty response from model.');
+      if (mode === 'replace') notesEl.value = out;
+      else notesEl.value = (notesEl.value.trim() + '\n\n' + out).trim();
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAiProgress(null);
+      narrativeBtn.disabled = false;
+      narrLabel.textContent = NARRATIVE_DEFAULT;
+      refreshTranslateDisabled();
+    }
+  });
 </script>

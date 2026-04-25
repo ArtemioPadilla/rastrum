@@ -355,3 +355,40 @@ export async function generateFieldNote(
   const raw = reply.choices?.[0]?.message?.content ?? '';
   return typeof raw === 'string' ? raw.trim() : '';
 }
+
+// ───────────────────── Generic chat (text-engine, streaming) ─────────────────────
+
+export type ChatRole = 'system' | 'user' | 'assistant';
+export interface ChatTurn { role: ChatRole; content: string; }
+
+/**
+ * Stream a chat completion using the loaded Llama-3.2-1B text engine.
+ *
+ * Calls `onToken(delta)` for each newly arrived chunk and resolves once the
+ * model finishes. Returns the full assembled assistant message.
+ *
+ * Used by the in-browser chat page (`/en/chat`, `/es/chat`). Loading the
+ * engine is the caller's responsibility — pass an already-loaded engine
+ * from `loadTextEngine()` so the consent dialog stays in the UI layer.
+ */
+export async function streamChat(
+  engine: MLCEngineInterface,
+  messages: ChatTurn[],
+  onToken: (delta: string, full: string) => void,
+  opts?: { signal?: AbortSignal; maxTokens?: number },
+): Promise<string> {
+  const stream = await engine.chat.completions.create({
+    messages,
+    max_tokens: opts?.maxTokens ?? 512,
+    stream: true,
+  });
+  let full = '';
+  for await (const chunk of stream as AsyncIterable<{ choices?: Array<{ delta?: { content?: string } }> }>) {
+    if (opts?.signal?.aborted) break;
+    const delta = chunk.choices?.[0]?.delta?.content ?? '';
+    if (!delta) continue;
+    full += delta;
+    onToken(delta, full);
+  }
+  return full;
+}
