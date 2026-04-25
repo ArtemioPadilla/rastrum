@@ -136,6 +136,11 @@ const isDocsPage = currentPath.includes('/docs');
         </a>
       ))}
     </div>
+    <div id="mobile-auth-links" class="hidden border-t border-zinc-200 dark:border-zinc-800 pt-2 mt-2 space-y-1">
+      <a id="mobile-menu-profile" href={getLocalizedPath(lang, routes.profile[lang as 'en'|'es'] + '/')} class="block py-1 hover:text-emerald-600 dark:hover:text-emerald-400">{tr.profile.view_profile}</a>
+      <a id="mobile-menu-edit" href={getLocalizedPath(lang, routes.profileEdit[lang as 'en'|'es'] + '/')} class="block py-1 hover:text-emerald-600 dark:hover:text-emerald-400">{tr.profile.edit}</a>
+      <button id="mobile-sign-out-btn" class="block w-full text-left py-1 text-red-600 dark:text-red-400 hover:text-red-700">{tr.auth.sign_out}</button>
+    </div>
   </nav>
 </header>
 
@@ -167,12 +172,14 @@ const isDocsPage = currentPath.includes('/docs');
   import { signOut } from '../lib/auth';
   import type { UserProfile } from '../lib/types';
 
-  const signInLink  = document.getElementById('sign-in-link');
-  const avatarWrap  = document.getElementById('avatar-wrap');
-  const avatarBtn   = document.getElementById('avatar-btn');
-  const avatarMenu  = document.getElementById('avatar-menu');
-  const avatarImg   = document.getElementById('header-avatar') as HTMLImageElement | null;
-  const signOutBtn  = document.getElementById('sign-out-btn');
+  const signInLink       = document.getElementById('sign-in-link');
+  const avatarWrap       = document.getElementById('avatar-wrap');
+  const avatarBtn        = document.getElementById('avatar-btn');
+  const avatarMenu       = document.getElementById('avatar-menu');
+  const avatarImg        = document.getElementById('header-avatar') as HTMLImageElement | null;
+  const signOutBtn       = document.getElementById('sign-out-btn');
+  const mobileAuthLinks  = document.getElementById('mobile-auth-links');
+  const mobileSignOutBtn = document.getElementById('mobile-sign-out-btn');
 
   function initialsAvatar(name: string): string {
     const clean = (name || '?').trim().slice(0, 2).toUpperCase();
@@ -187,6 +194,7 @@ const isDocsPage = currentPath.includes('/docs');
   async function paint(hasSession: boolean) {
     if (signInLink) signInLink.classList.toggle('hidden', hasSession);
     if (avatarWrap) avatarWrap.classList.toggle('hidden', !hasSession);
+    if (mobileAuthLinks) mobileAuthLinks.classList.toggle('hidden', !hasSession);
     if (hasSession && avatarImg) {
       try {
         const supabase = getSupabase();
@@ -219,6 +227,10 @@ const isDocsPage = currentPath.includes('/docs');
   document.addEventListener('click', () => avatarMenu?.classList.add('hidden'));
 
   signOutBtn?.addEventListener('click', async () => {
+    await signOut();
+    window.location.reload();
+  });
+  mobileSignOutBtn?.addEventListener('click', async () => {
     await signOut();
     window.location.reload();
   });

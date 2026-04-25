@@ -336,7 +336,17 @@ const tr = t(lang);
 
     if (error) {
       if (err) {
-        err.textContent = error.message;
+        // Translate constraint violation to friendly message
+        const isEs = document.documentElement.lang === 'es';
+        if (error.message.includes('username_check') || error.message.includes('users_username_check')) {
+          err.textContent = isEs
+            ? 'El nombre de usuario solo puede tener letras, números y guion bajo (_), entre 3 y 30 caracteres. Ej: eugenio_bio'
+            : 'Username can only contain letters, numbers, and underscores (_), 3–30 characters. E.g. eugenio_bio';
+        } else if (error.message.includes('username') && error.message.includes('unique')) {
+          err.textContent = isEs ? 'Ese nombre de usuario ya está en uso.' : 'That username is already taken.';
+        } else {
+          err.textContent = error.message;
+        }
         err.classList.remove('hidden');
       }
       return;
