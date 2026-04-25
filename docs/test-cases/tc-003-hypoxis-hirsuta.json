@@ -1,0 +1,37 @@
+{
+  "id": "tc-003",
+  "date": "2026-04-25",
+  "location": "San Pablo Etla, Oaxaca, México",
+  "coords_approx": { "lat": 17.11, "lng": -96.74 },
+  "habitat": "bosque_encino_hojarasca",
+  "photo_angle": "lateral_flor_tallo",
+  "photo_file": "3b20913d-7155-451e-8eb0-ff88987259e7.jpg",
+  "pipeline": {
+    "plantnet": {
+      "top_result": null,
+      "confidence": null,
+      "note": "Not tested — PLANTNET_API_KEY not available in server env"
+    },
+    "claude_haiku": {
+      "model": "anthropic.claude-haiku-4-5-20251001-v1:0",
+      "result": "Oxalis stricta",
+      "confidence": 0.75,
+      "alternatives": ["Oxalis latifolia", "Oxalis pubescens"],
+      "reasoning": "Small herbaceous plant with yellow flower and hairy green stems in oak forest"
+    }
+  },
+  "ground_truth": {
+    "scientific_name": "Hypoxis hirsuta",
+    "alternate_candidate": "Hypoxis mexicana",
+    "expert_preference": "H. hirsuta (primary), H. mexicana (possible)",
+    "authority": null,
+    "family": "Hypoxidaceae",
+    "identified_by": "Eugenio Padilla (field expert)",
+    "nom059_status": null,
+    "notes": "Planta herbácea pequeña, flor amarilla de 6 pétalos, tallo y hojas pilosas, bosque de encino. Hypoxidaceae — familia distinta a Oxalidaceae aunque superficialmente similar en flor amarilla."
+  },
+  "failure_mode": "confusion_familias_flor_amarilla",
+  "lesson": "Oxalis (Oxalidaceae) vs Hypoxis (Hypoxidaceae): flor amarilla + tallo peloso en encinar = confusión frecuente. Diferencia clave: Hypoxis tiene 6 tépalos libres, hojas lineares basales. Oxalis tiene hojas trifoliadas típicas. Foto de hojas en roseta basal resolvería ambigüedad.",
+  "cascade_behavior": "Claude Haiku retornó confidence=0.75 — supera ACCEPT_THRESHOLD=0.7 → el cascade habría aceptado el resultado incorrecto sin fallback. Bug confirmado: threshold demasiado permisivo para Hypoxidaceae subrepresentada en datasets.",
+  "priority": "high — Hypoxis es género subrepresentado en iNat/PlantNet para México; Oxalis es trampa frecuente por flor amarilla similar"
+}
