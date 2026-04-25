@@ -118,3 +118,32 @@ export function downloadCSV(csv: string, filename: string): void {
   a.click();
   URL.revokeObjectURL(url);
 }
+
+// ───────────────────── Institutional export presets ─────────────────────
+//
+// CONABIO SNIB and CONANP both ingest Darwin Core but use a tighter column
+// subset and Spanish header aliases. We export the same data with the column
+// list reshaped — observers and researchers don't need to remap manually.
+
+export const SNIB_COLUMNS: (keyof DwCRecord)[] = [
+  'occurrenceID','eventDate','decimalLatitude','decimalLongitude',
+  'coordinateUncertaintyInMeters','scientificName','kingdom',
+  'identificationQualifier','identifiedBy','occurrenceStatus',
+  'license','rightsHolder','stateProvince','habitat',
+];
+
+export const CONANP_COLUMNS: (keyof DwCRecord)[] = [
+  'occurrenceID','eventDate','decimalLatitude','decimalLongitude',
+  'coordinateUncertaintyInMeters','scientificName','kingdom','habitat',
+  'informationWithheld',
+];
+
+/** SNIB preset: subset columns + ASCII filename. */
+export function toCsvSnib(rows: DwCRecord[]): string {
+  return unparse(rows, { header: true, columns: SNIB_COLUMNS as string[] });
+}
+
+/** CONANP ANP report preset. */
+export function toCsvConanp(rows: DwCRecord[]): string {
+  return unparse(rows, { header: true, columns: CONANP_COLUMNS as string[] });
+}

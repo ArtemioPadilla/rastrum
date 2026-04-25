@@ -1,0 +1,108 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Observation — Rastrum" lang="en">
+  <div class="max-w-3xl mx-auto">
+    <div id="loading" class="py-16 text-center text-zinc-500">Loading observation…</div>
+    <article id="obs" class="hidden space-y-6">
+      <header class="space-y-1">
+        <h1 id="species" class="text-3xl md:text-4xl font-bold italic text-zinc-900 dark:text-zinc-100"></h1>
+        <p id="meta" class="text-sm text-zinc-500 dark:text-zinc-400"></p>
+      </header>
+
+      <img id="img" src="" alt="" class="w-full max-h-[500px] object-contain rounded-xl border border-zinc-200 dark:border-zinc-800 hidden" />
+
+      <dl class="grid grid-cols-2 gap-4 text-sm">
+        <div>
+          <dt class="text-zinc-500 dark:text-zinc-400">Date</dt>
+          <dd id="date" class="font-medium"></dd>
+        </div>
+        <div>
+          <dt class="text-zinc-500 dark:text-zinc-400">Region</dt>
+          <dd id="region" class="font-medium">—</dd>
+        </div>
+        <div>
+          <dt class="text-zinc-500 dark:text-zinc-400">Habitat</dt>
+          <dd id="habitat" class="font-medium">—</dd>
+        </div>
+        <div>
+          <dt class="text-zinc-500 dark:text-zinc-400">Observed by</dt>
+          <dd id="observer" class="font-medium">—</dd>
+        </div>
+      </dl>
+
+      <p id="sensitive" class="hidden text-sm text-amber-700 dark:text-amber-400 border-l-4 border-amber-500 pl-3">
+        This observation is of a sensitive species. Precise coordinates are obscured to protect it.
+      </p>
+    </article>
+
+    <div id="err" class="hidden py-16 text-center text-red-600 dark:text-red-400"></div>
+  </div>
+
+  <script>
+    import { getSupabase } from '../../../lib/supabase';
+
+    const id = new URLSearchParams(window.location.search).get('id');
+    if (!id) {
+      document.getElementById('loading')?.classList.add('hidden');
+      const err = document.getElementById('err');
+      if (err) { err.textContent = 'No observation id in URL.'; err.classList.remove('hidden'); }
+    } else {
+      load(id).catch(e => {
+        document.getElementById('loading')?.classList.add('hidden');
+        const err = document.getElementById('err');
+        if (err) { err.textContent = e.message; err.classList.remove('hidden'); }
+      });
+    }
+
+    async function load(id: string) {
+      const supabase = getSupabase();
+      const { data: obs, error } = await supabase
+        .from('observations')
+        .select(`
+          id, observed_at, obscure_level, state_province, habitat,
+          identifications!inner(scientific_name, is_primary),
+          users!observer_id(display_name, username, profile_public)
+        `)
+        .eq('id', id)
+        .eq('identifications.is_primary', true)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!obs) throw new Error('Observation not found.');
+
+      const ident = Array.isArray(obs.identifications) ? obs.identifications[0] : obs.identifications;
+      const user  = Array.isArray(obs.users) ? obs.users[0] : obs.users;
+
+      document.getElementById('loading')?.classList.add('hidden');
+      document.getElementById('obs')?.classList.remove('hidden');
+      document.getElementById('species')!.textContent = ident?.scientific_name ?? 'Unknown species';
+      const date = new Date(obs.observed_at as string);
+      document.getElementById('date')!.textContent = date.toLocaleDateString();
+      document.getElementById('meta')!.textContent = `${date.toLocaleDateString()}${obs.state_province ? '  ·  ' + obs.state_province : ''}`;
+      if (obs.state_province)  document.getElementById('region')!.textContent  = obs.state_province as string;
+      if (obs.habitat)         document.getElementById('habitat')!.textContent = (obs.habitat as string).replace(/_/g, ' ');
+      const isPublic = user?.profile_public;
+      document.getElementById('observer')!.textContent = isPublic ? (user?.display_name || user?.username || '—') : 'Anonymous';
+
+      // Pull the primary photo if we can read media_files (RLS gates this)
+      const { data: media } = await supabase
+        .from('media_files')
+        .select('url, is_primary')
+        .eq('observation_id', id)
+        .order('is_primary', { ascending: false })
+        .limit(1);
+      const photo = media?.[0]?.url;
+      const img = document.getElementById('img') as HTMLImageElement | null;
+      if (photo && img) {
+        img.src = photo;
+        img.classList.remove('hidden');
+      }
+
+      if (obs.obscure_level && obs.obscure_level !== 'none') {
+        document.getElementById('sensitive')?.classList.remove('hidden');
+      }
+    }
+  </script>
+</BaseLayout>

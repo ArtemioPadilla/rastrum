@@ -47,7 +47,13 @@ ALTER TABLE public.users
   ADD COLUMN IF NOT EXISTS joined_at             timestamptz NOT NULL DEFAULT now(),
   ADD COLUMN IF NOT EXISTS last_observation_at   timestamptz,
   ADD COLUMN IF NOT EXISTS stats_cached_at       timestamptz,
-  ADD COLUMN IF NOT EXISTS stats_json            jsonb;
+  ADD COLUMN IF NOT EXISTS stats_json            jsonb,
+  -- v1.0: credentialed researcher tier — when true, RLS gates open up to
+  -- precise coordinates of NOM-059/CITES species (still subject to BC/TK
+  -- notices). Set by an admin after ID verification (no self-serve).
+  ADD COLUMN IF NOT EXISTS credentialed_researcher boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS credentialed_at       timestamptz,
+  ADD COLUMN IF NOT EXISTS credentialed_by       uuid REFERENCES public.users(id);
 
 -- Auto-create user profile on sign-up
 CREATE OR REPLACE FUNCTION public.handle_new_user()
@@ -280,6 +286,16 @@ CREATE POLICY "obs_public_read" ON public.observations FOR SELECT
       obscure_level = 'none'
       OR location_obscured IS NOT NULL   -- sensitive, but coarsened coords available
     )
+  );
+
+-- Credentialed researchers get precise coords on sensitive observations.
+-- Same dataset shape, just no obscuration. Admin sets credentialed_researcher
+-- after ID verification (no self-serve toggle).
+DROP POLICY IF EXISTS "obs_credentialed_read" ON public.observations;
+CREATE POLICY "obs_credentialed_read" ON public.observations FOR SELECT
+  USING (
+    sync_status = 'synced'
+    AND (SELECT credentialed_researcher FROM public.users WHERE id = auth.uid()) = true
   );
 
 -- Identifications: tied to observation access

@@ -16,7 +16,15 @@ const tr = t(lang);
       <span>{tr.export.count_suffix}</span>
     </p>
     <div id="empty" class="hidden text-sm text-zinc-500 italic">{tr.export.nothing_to_export}</div>
-    <button id="download-btn" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+
+    <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{lang === 'es' ? 'Formato' : 'Format'}</label>
+    <select id="format" class="block w-full sm:w-auto mb-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
+      <option value="dwc">Darwin Core (full)</option>
+      <option value="snib">CONABIO SNIB</option>
+      <option value="conanp">CONANP ANP report</option>
+    </select>
+
+    <button id="download-btn" class="block rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
       <span data-label>{tr.export.download_csv}</span>
     </button>
     <p id="err" class="hidden mt-3 text-sm text-red-600 dark:text-red-400"></p>
@@ -25,7 +33,7 @@ const tr = t(lang);
 
 <script>
   import { getSupabase } from '../lib/supabase';
-  import { toDwCRecord, toCSV, downloadCSV, type DwCInput } from '../lib/darwin-core';
+  import { toDwCRecord, toCSV, toCsvSnib, toCsvConanp, downloadCSV, type DwCInput } from '../lib/darwin-core';
   import type { UserProfile } from '../lib/types';
 
   const btn      = document.getElementById('download-btn') as HTMLButtonElement | null;
@@ -105,9 +113,17 @@ const tr = t(lang);
         };
       });
 
-      const csv = toCSV(rows.map(toDwCRecord));
+      const dwcRows = rows.map(toDwCRecord);
+      const fmt = (document.getElementById('format') as HTMLSelectElement | null)?.value ?? 'dwc';
+      let csv = '';
+      let suffix = '';
+      switch (fmt) {
+        case 'snib':   csv = toCsvSnib(dwcRows);   suffix = 'snib';   break;
+        case 'conanp': csv = toCsvConanp(dwcRows); suffix = 'conanp'; break;
+        default:       csv = toCSV(dwcRows);        suffix = 'dwc';   break;
+      }
       const today = new Date().toISOString().slice(0, 10);
-      downloadCSV(csv, `rastrum-observations-${today}.csv`);
+      downloadCSV(csv, `rastrum-${suffix}-${today}.csv`);
     } catch (e) {
       if (err) {
         err.textContent = e instanceof Error ? e.message : String(e);
