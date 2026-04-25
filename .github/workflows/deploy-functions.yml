@@ -34,21 +34,22 @@ jobs:
       - name: Deploy
         run: |
           set -e
+          # Functions that don't require a user JWT at the Edge layer:
+          #   share-card        — OG scrapers fetch anonymously
+          #   recompute-streaks — cron-only; gates internally on service-role
+          #   award-badges      — cron-only; gates internally on service-role
+          NO_JWT="share-card recompute-streaks award-badges"
+          deploy_one() {
+            local fn="$1"
+            local flag=""
+            for nj in $NO_JWT; do [ "$fn" = "$nj" ] && flag="--no-verify-jwt"; done
+            echo "→ deploying $fn $flag"
+            supabase functions deploy "$fn" --project-ref "$PROJECT_REF" $flag
+          }
           if [ "${{ inputs.function }}" = "all" ]; then
             for fn in get-upload-url identify enrich-environment recompute-streaks award-badges share-card; do
-              echo "→ deploying $fn"
-              # share-card is public (OG scrapers need it without a JWT)
-              if [ "$fn" = "share-card" ]; then
-                supabase functions deploy "$fn" --project-ref "$PROJECT_REF" --no-verify-jwt
-              else
-                supabase functions deploy "$fn" --project-ref "$PROJECT_REF"
-              fi
+              deploy_one "$fn"
             done
           else
-            fn="${{ inputs.function }}"
-            if [ "$fn" = "share-card" ]; then
-              supabase functions deploy "$fn" --project-ref "$PROJECT_REF" --no-verify-jwt
-            else
-              supabase functions deploy "$fn" --project-ref "$PROJECT_REF"
-            fi
+            deploy_one "${{ inputs.function }}"
           fi

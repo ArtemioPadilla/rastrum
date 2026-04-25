@@ -66,12 +66,22 @@ db-seed-badges: ## Seed the badges catalogue (idempotent)
 	@psql "$$SUPABASE_DB" -v ON_ERROR_STOP=1 -f $(MIGRATIONS_DIR)/seed-badges.sql
 	@echo "✓ Badges seeded"
 
-db-cron-schedule: ## Schedule the nightly cron jobs (edit the SQL first to insert your anon key)
+db-cron-schedule: ## Schedule nightly cron jobs (idempotent)
 	$(call require_env,SUPABASE_DB)
-	@grep -q '<YOUR_PUBLISHABLE_KEY>' $(MIGRATIONS_DIR)/cron-schedules.sql && { \
-	  echo "✗ Edit $(MIGRATIONS_DIR)/cron-schedules.sql first — replace <YOUR_PUBLISHABLE_KEY> with your sb_publishable_… key."; exit 1; } || true
 	@psql "$$SUPABASE_DB" -v ON_ERROR_STOP=1 -f $(MIGRATIONS_DIR)/cron-schedules.sql
 	@echo "✓ Cron jobs scheduled"
+
+db-cron-test: ## Manually fire both cron jobs once and tail the responses
+	$(call require_env,SUPABASE_DB)
+	@psql "$$SUPABASE_DB" -v ON_ERROR_STOP=1 -f $(MIGRATIONS_DIR)/cron-test.sql
+
+db-cron-list: ## List currently-scheduled cron jobs
+	$(call require_env,SUPABASE_DB)
+	@psql "$$SUPABASE_DB" -c "SELECT jobid, jobname, schedule, active FROM cron.job ORDER BY jobname;"
+
+db-cron-runs: ## Show recent cron job run history (last 10)
+	$(call require_env,SUPABASE_DB)
+	@psql "$$SUPABASE_DB" -c "SELECT jobid, runid, status, start_time, end_time FROM cron.job_run_details ORDER BY start_time DESC LIMIT 10;"
 
 db-verify: ## Verify tables, RLS, triggers, extensions are in place
 	$(call require_env,SUPABASE_DB)
