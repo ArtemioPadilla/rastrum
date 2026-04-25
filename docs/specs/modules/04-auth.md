@@ -147,6 +147,46 @@ CREATE POLICY "Public read" ON observations
 
 ---
 
+## Custom SMTP
+
+Supabase's built-in SMTP caps **3 magic-link emails per hour per project** on
+the free tier and is explicitly not recommended for production. Rastrum
+wires a custom SMTP provider from day one.
+
+**Dev path — Gmail + App Password (fastest, free, 500/day):**
+
+1. Go to <https://myaccount.google.com/apppasswords> (requires 2-step
+   verification enabled on the Google account).
+2. Create app password: name `Rastrum Supabase`. Copy the 16-char password.
+3. Supabase dashboard → Authentication → SMTP Settings → enable custom SMTP:
+   - Sender email: your Gmail address
+   - Sender name: `Rastrum`
+   - Host: `smtp.gmail.com`
+   - Port: `465`
+   - Username: your Gmail address (full `you@gmail.com`)
+   - Password: the 16-char app password
+   - Minimum interval between emails: `60` seconds
+4. Save. Test by requesting a magic link from `/en/sign-in/`.
+
+**Prod path — Resend (recommended, 100/day free, custom domain):**
+
+1. Sign up at <https://resend.com>. Verify the domain `rastrum.artemiop.com`
+   by adding the SPF, DKIM, and DMARC records Resend shows you.
+2. Create API key scoped to "Sending access" — `re_xxxxx`.
+3. Supabase dashboard → Authentication → SMTP Settings:
+   - Sender email: `no-reply@rastrum.artemiop.com`
+   - Sender name: `Rastrum`
+   - Host: `smtp.resend.com`
+   - Port: `465`
+   - Username: `resend`
+   - Password: the `re_xxxxx` API key
+   - Minimum interval between emails: `0`
+4. Save. Request a magic link to verify delivery.
+
+**Why not AWS SES?** Cheaper at scale (~$0.10 per 1K emails) but requires
+provisioning out of sandbox mode, which takes 24–48 h. Revisit at v1.0 when
+volume justifies it.
+
 ## Environment Variables
 
 ```env
