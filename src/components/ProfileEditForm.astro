@@ -212,6 +212,32 @@ const tr = t(lang);
         <p class="mt-1 text-[11px] text-amber-700 dark:text-amber-400">{tr.auth.birdnet_nc_warning}</p>
       </div>
     </div>
+
+    <!-- EfficientNet-Lite0 (on-device photo) -->
+    <div class="mt-6 pt-5 border-t border-zinc-100 dark:border-zinc-800/60">
+      <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">{tr.auth.onnx_base_section}</h3>
+      <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">{tr.auth.onnx_base_hint}</p>
+      <p id="onnx-base-url-missing" class="hidden text-xs text-amber-700 dark:text-amber-400 mb-2">{tr.auth.onnx_base_weights_url_missing}</p>
+
+      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+        <div class="flex items-start justify-between gap-3 flex-wrap">
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">EfficientNet-Lite0</p>
+            <p class="text-xs text-zinc-500" id="onnx-base-status">—</p>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button id="onnx-base-download" type="button" class="rounded-lg border border-emerald-600/60 px-3 py-1.5 text-xs sm:text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 disabled:opacity-50">
+              <span data-onnxlabel>{tr.auth.onnx_base_download}</span>
+            </button>
+            <button id="onnx-base-delete" type="button" class="hidden rounded-lg border border-red-300 dark:border-red-900/50 px-3 py-1.5 text-xs sm:text-sm font-medium text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">
+              {tr.auth.onnx_base_delete}
+            </button>
+          </div>
+        </div>
+        <p id="onnx-base-progress" class="hidden mt-2 text-xs text-zinc-600 dark:text-zinc-400 font-mono"></p>
+        <p class="mt-3 text-[11px] text-zinc-500 dark:text-zinc-400">{tr.auth.onnx_base_attribution}</p>
+      </div>
+    </div>
   </section>
 
   <!-- ── Confirmation modals (single dialog reused via data attrs) ── -->
@@ -693,6 +719,89 @@ const tr = t(lang);
   });
 
   refreshBirdNET().catch(() => {});
+
+  // ── EfficientNet-Lite0 (on-device photo) — same shape as BirdNET ──
+  const enDownloadBtn = document.getElementById('onnx-base-download') as HTMLButtonElement | null;
+  const enDeleteBtn   = document.getElementById('onnx-base-delete')   as HTMLButtonElement | null;
+  const enStatus      = document.getElementById('onnx-base-status');
+  const enProgress    = document.getElementById('onnx-base-progress');
+  const enUrlMissing  = document.getElementById('onnx-base-url-missing');
+  const enLabel       = enDownloadBtn?.querySelector('[data-onnxlabel]') as HTMLElement | null;
+  const EN_DEFAULT_LABEL = enLabel?.textContent ?? '';
+  const EN_REDOWNLOAD_LABEL = isEsLang ? 'Volver a descargar' : 'Re-download';
+
+  let enLib: typeof import('../lib/identifiers/onnx-base-cache') | null = null;
+  async function getEnLib() {
+    if (!enLib) enLib = await import('../lib/identifiers/onnx-base-cache');
+    return enLib;
+  }
+
+  async function refreshOnnxBase() {
+    if (!enDownloadBtn || !enDeleteBtn || !enStatus || !enLabel) return;
+    const lib = await getEnLib().catch(() => null);
+    if (!lib) return;
+    const baseUrl = lib.getOnnxBaseWeightsBaseUrl();
+    if (!baseUrl) {
+      enUrlMissing?.classList.remove('hidden');
+      enDownloadBtn.disabled = true;
+    } else {
+      enUrlMissing?.classList.add('hidden');
+      enDownloadBtn.disabled = false;
+    }
+    const status = await lib.getOnnxBaseCacheStatus();
+    if (status.modelCached && status.labelsCached) {
+      enStatus.textContent = `${tr('Cached on this device','Guardado en este dispositivo')} · ${bytesHuman(status.approxBytes)}`;
+      enLabel.textContent = EN_REDOWNLOAD_LABEL;
+      enDeleteBtn.classList.remove('hidden');
+    } else {
+      enStatus.textContent = `${tr('Not downloaded','No descargado')} · ~2.8 MB`;
+      enLabel.textContent = EN_DEFAULT_LABEL;
+      enDeleteBtn.classList.add('hidden');
+    }
+  }
+
+  enDownloadBtn?.addEventListener('click', async () => {
+    if (!enDownloadBtn) return;
+    const ok = await confirmDialog({
+      title: tr('Download EfficientNet-Lite0?','¿Descargar EfficientNet-Lite0?'),
+      bodyHtml: `
+        <p><strong>${tr('Size','Tamaño')}:</strong> ~2.8 MB</p>
+        <ul class="list-disc pl-4 space-y-1 text-zinc-600 dark:text-zinc-400">
+          <li>${tr('After download, the model runs entirely on this device — photos never leave the browser.','Tras la descarga el modelo se ejecuta totalmente en este dispositivo — las fotos nunca salen del navegador.')}</li>
+          <li>${tr('Model: TensorFlow Model Garden (Apache-2.0). ImageNet labels are English common names — treat results as hints.','Modelo: TensorFlow Model Garden (Apache-2.0). Las etiquetas de ImageNet son nombres comunes en inglés — trata los resultados como pistas.')}</li>
+        </ul>
+      `,
+      okLabel: tr('Download','Descargar'),
+    });
+    if (!ok) return;
+    enDownloadBtn.disabled = true;
+    enProgress?.classList.remove('hidden');
+    try {
+      const lib = await getEnLib();
+      await lib.downloadOnnxBaseWeights((p) => {
+        if (enProgress) enProgress.textContent = `${Math.round((p.progress ?? 0) * 100)}%  ${p.text ?? ''}`;
+      });
+    } catch (e) {
+      if (enStatus) enStatus.textContent = e instanceof Error ? e.message : 'Failed';
+    } finally {
+      enDownloadBtn.disabled = false;
+      await refreshOnnxBase();
+    }
+  });
+
+  enDeleteBtn?.addEventListener('click', async () => {
+    const ok = await confirmDialog({
+      title: tr('Delete EfficientNet-Lite0 from this device?','¿Borrar EfficientNet-Lite0 de este dispositivo?'),
+      bodyHtml: `<p>${tr("This frees disk space. You can re-download anytime — your account isn't affected.","Libera espacio en disco. Puedes volver a descargarlo en cualquier momento — tu cuenta no se ve afectada.")}</p>`,
+      okLabel: tr('Delete','Borrar'),
+    });
+    if (!ok) return;
+    const lib = await getEnLib();
+    await lib.clearOnnxBaseCache();
+    await refreshOnnxBase();
+  });
+
+  refreshOnnxBase().catch(() => {});
 
   // ── Identifier registry list (modular platform) with guided setup ──
   async function paintRegistry() {
