@@ -1,0 +1,611 @@
+---
+import { t } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+  /**
+   * 'generic' = stock batch importer (per-row GPS from EXIF).
+   * 'camera_trap' = single trap location applied to all rows; evidence_type
+   *   defaults to camera_trap; the cascade preference is the camera-trap
+   *   pipeline (stub today).
+   */
+  mode?: 'generic' | 'camera_trap';
+}
+
+const { lang, mode = 'generic' } = Astro.props;
+const tr = t(lang);
+const isEs = lang === 'es';
+const isCameraTrap = mode === 'camera_trap';
+
+const habitats = [
+  'forest_pine_oak','cloud_forest','tropical_dry_forest','riparian','wetland',
+  'grassland','agricultural','urban','coastal','reef','scrubland','cave',
+];
+const weathers = ['sunny','cloudy','overcast','light_rain','heavy_rain','fog','storm'];
+const evidences = isCameraTrap
+  ? ['camera_trap']
+  : ['direct_sighting','track','scat','burrow','nest','feather','bone','sound','camera_trap'];
+const weatherLabels = (tr.observe as unknown as { weather_options?: Record<string,string> }).weather_options;
+const evidenceLabel = (key: string): string => {
+  const map: Record<string, { en: string; es: string }> = {
+    direct_sighting: { en: 'Direct sighting', es: 'Avistamiento directo' },
+    track:           { en: 'Track / footprint', es: 'Huella' },
+    scat:            { en: 'Scat', es: 'Excremento' },
+    burrow:          { en: 'Burrow / den', es: 'Madriguera' },
+    nest:            { en: 'Nest', es: 'Nido' },
+    feather:         { en: 'Feather', es: 'Pluma' },
+    bone:            { en: 'Bone', es: 'Hueso' },
+    sound:           { en: 'Sound', es: 'Sonido' },
+    camera_trap:     { en: 'Camera trap', es: 'Cámara trampa' },
+  };
+  return map[key]?.[lang] ?? key;
+};
+
+const importTr = tr.import as unknown as Record<string, string> | undefined;
+const trapTr = (tr as unknown as { camera_trap?: Record<string, string> }).camera_trap;
+const trText = (key: string, fallback: string): string => importTr?.[key] ?? fallback;
+const ctText = (key: string, fallback: string): string => trapTr?.[key] ?? fallback;
+---
+
+<div class="max-w-5xl mx-auto" data-mode={mode}>
+  <header class="mb-6">
+    <h1 class="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+      {isCameraTrap ? ctText('title', 'Camera trap import') : trText('title', 'Batch import photos')}
+    </h1>
+    <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+      {isCameraTrap ? ctText('subtitle', 'All photos in one deployment share a single GPS.') : trText('subtitle', 'Drop in many photos at once.')}
+    </p>
+    {!isCameraTrap && (
+      <p class="mt-2 text-xs">
+        <a href={`/${lang}/${isEs ? 'perfil/importar/camara-trampa' : 'profile/import/camera-trap'}/`} class="text-emerald-700 dark:text-emerald-400 underline">
+          {trText('tip_camera_trap_link', 'Open camera-trap importer')}
+        </a>
+      </p>
+    )}
+  </header>
+
+  {isCameraTrap && (
+    <section class="mb-6 rounded-lg border border-emerald-200 dark:border-emerald-900 bg-emerald-50/60 dark:bg-emerald-900/10 p-4">
+      <p class="text-sm font-semibold text-emerald-900 dark:text-emerald-200 mb-2">{ctText('trap_location_label', 'Trap location (applied to all photos)')}</p>
+      <p class="text-xs text-emerald-800 dark:text-emerald-300/80 mb-3">{ctText('trap_location_hint', 'Lat/Lng in decimal degrees.')}</p>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <input id="trap-lat" type="number" step="any" placeholder={ctText('trap_lat', 'Latitude')} class="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
+        <input id="trap-lng" type="number" step="any" placeholder={ctText('trap_lng', 'Longitude')} class="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
+        <input id="trap-alt" type="number" step="any" placeholder={ctText('trap_altitude', 'Altitude (m, optional)')} class="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
+      </div>
+      <div class="mt-2 flex items-center gap-2 flex-wrap">
+        <button id="trap-use-gps" type="button" class="rounded-lg border border-emerald-600/60 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20">
+          {ctText('use_my_location', 'Use my current GPS')}
+        </button>
+        <span id="trap-gps-msg" class="hidden text-xs text-amber-700 dark:text-amber-400"></span>
+      </div>
+      <p class="mt-3 text-xs text-zinc-600 dark:text-zinc-400">
+        <span class="font-medium">{ctText('id_pipeline', 'Identification will use MegaDetector + SpeciesNet when available.')}</span>
+        {' '}
+        <span>{ctText('id_pipeline_pending', 'Inference is pending model deployment — observations save now and re-identify on sync once the pipeline is wired.')}</span>
+      </p>
+    </section>
+  )}
+
+  <!-- Drop zone / file picker -->
+  <section
+    id="dropzone"
+    class="rounded-xl border-2 border-dashed border-emerald-400/60 dark:border-emerald-700/60 bg-emerald-50/40 dark:bg-emerald-900/10 px-6 py-10 text-center cursor-pointer transition hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+    tabindex="0"
+    aria-label={trText('drop_label', 'Drop photos here')}
+  >
+    <p class="text-base font-semibold text-emerald-900 dark:text-emerald-200">{trText('drop_label', 'Drop photos here')}</p>
+    <p class="mt-1 text-xs text-emerald-800 dark:text-emerald-300/80">{trText('drop_hint', 'or tap to choose files. JPEG/HEIC with embedded GPS work best.')}</p>
+    <label class="inline-block mt-4 rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white cursor-pointer">
+      <input id="batch-file-input" type="file" accept="image/*" multiple class="hidden" />
+      {trText('choose_files', 'Choose photos')}
+    </label>
+  </section>
+
+  <!-- Reading metadata progress -->
+  <p id="reading-progress" class="hidden mt-4 text-sm text-zinc-600 dark:text-zinc-400 font-mono"></p>
+
+  <!-- Bulk-set panel — shown after first file added -->
+  <section id="bulk-set" class="hidden mt-6 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/40 p-4">
+    <p class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-1">{trText('bulk_set_title', 'Bulk-set fields')}</p>
+    <p class="text-xs text-zinc-600 dark:text-zinc-400 mb-3">{trText('bulk_set_hint', 'Apply to every included row.')}</p>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+      <select id="bulk-habitat" class="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
+        <option value="">{tr.observe.habitat_placeholder}</option>
+        {habitats.map(h => <option value={h}>{h.replace(/_/g, ' ')}</option>)}
+      </select>
+      <select id="bulk-weather" class="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
+        <option value="">{tr.observe.weather_placeholder}</option>
+        {weathers.map(w => <option value={w}>{weatherLabels?.[w] ?? w.replace(/_/g, ' ')}</option>)}
+      </select>
+      <select id="bulk-evidence" class="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
+        {!isCameraTrap && <option value="">—</option>}
+        {evidences.map(e => <option value={e} selected={isCameraTrap && e === 'camera_trap'}>{evidenceLabel(e)}</option>)}
+      </select>
+    </div>
+    <div class="mt-3 flex items-center gap-2 flex-wrap">
+      <button id="bulk-apply" type="button" class="rounded-lg bg-zinc-700 hover:bg-zinc-800 dark:bg-zinc-200 dark:text-zinc-900 dark:hover:bg-white px-3 py-1.5 text-xs font-semibold text-white">
+        {trText('bulk_apply', 'Apply to all rows')}
+      </button>
+      <span id="bulk-msg" class="hidden text-xs text-emerald-700 dark:text-emerald-400"></span>
+    </div>
+  </section>
+
+  <!-- Summary + actions -->
+  <section id="summary-bar" class="hidden mt-6 flex items-center justify-between flex-wrap gap-3">
+    <p id="summary-text" class="text-sm text-zinc-700 dark:text-zinc-300"></p>
+    <div class="flex items-center gap-2 flex-wrap">
+      <button id="remove-all" type="button" class="rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
+        {trText('remove_all', 'Remove all')}
+      </button>
+      <button id="import-all" type="button" disabled class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+        {trText('import_all', 'Import all')}
+      </button>
+    </div>
+  </section>
+
+  <!-- Importing progress -->
+  <p id="importing-progress" class="hidden mt-3 text-sm text-emerald-800 dark:text-emerald-300 font-mono"></p>
+  <p id="import-result" class="hidden mt-3 text-sm font-semibold"></p>
+  <p id="warn-no-ready" class="hidden mt-3 text-sm text-amber-700 dark:text-amber-400"></p>
+
+  <!-- Rows table (sm+) / cards (<sm) -->
+  <section id="rows-host" class="mt-6"></section>
+</div>
+
+<script>
+  import { parse as parseExif } from 'exifr';
+  import {
+    buildBatchRow, applyBulkSet, isRowReady, summariseRows,
+    type BatchRow, type BulkSetPatch,
+  } from '../lib/batch-import';
+  import { saveObservationToOutbox, resolveObserverRef } from '../lib/observe';
+  import { syncOutbox, registerSyncTriggers } from '../lib/sync';
+  import type { EvidenceType, HabitatType, WeatherTag } from '../lib/types';
+
+  // The component's mode is encoded as a data attribute on the root.
+  const root = document.querySelector<HTMLElement>('[data-mode]');
+  const mode = (root?.dataset.mode as 'generic' | 'camera_trap') ?? 'generic';
+  const isCameraTrap = mode === 'camera_trap';
+  const isEs = document.documentElement.lang === 'es';
+
+  const fileInput      = document.getElementById('batch-file-input') as HTMLInputElement | null;
+  const dropzone       = document.getElementById('dropzone');
+  const readingP       = document.getElementById('reading-progress');
+  const bulkPanel      = document.getElementById('bulk-set');
+  const bulkHabitat    = document.getElementById('bulk-habitat') as HTMLSelectElement | null;
+  const bulkWeather    = document.getElementById('bulk-weather') as HTMLSelectElement | null;
+  const bulkEvidence   = document.getElementById('bulk-evidence') as HTMLSelectElement | null;
+  const bulkApplyBtn   = document.getElementById('bulk-apply');
+  const bulkMsg        = document.getElementById('bulk-msg');
+  const summaryBar     = document.getElementById('summary-bar');
+  const summaryText    = document.getElementById('summary-text');
+  const importBtn      = document.getElementById('import-all') as HTMLButtonElement | null;
+  const removeAllBtn   = document.getElementById('remove-all');
+  const importingP     = document.getElementById('importing-progress');
+  const importResult   = document.getElementById('import-result');
+  const warnNoReady    = document.getElementById('warn-no-ready');
+  const rowsHost       = document.getElementById('rows-host');
+
+  // Camera-trap specific
+  const trapLat        = document.getElementById('trap-lat') as HTMLInputElement | null;
+  const trapLng        = document.getElementById('trap-lng') as HTMLInputElement | null;
+  const trapAlt        = document.getElementById('trap-alt') as HTMLInputElement | null;
+  const trapUseGpsBtn  = document.getElementById('trap-use-gps');
+  const trapGpsMsg     = document.getElementById('trap-gps-msg');
+
+  type RowState = BatchRow & { file: File; thumbUrl: string };
+  const rows: RowState[] = [];
+
+  // Strings rendered from script context are inline EN/ES — the Astro
+  // frontmatter handles the static-rendered i18n above. The dynamic
+  // strings below are short and predictable, so a switch on isEs is
+  // simpler than wiring a runtime i18n bundle into every page.
+
+  // ── Rendering ─────────────────────────────────────────────────
+  function render() {
+    if (!rowsHost) return;
+    if (!rows.length) {
+      rowsHost.innerHTML = `<p class="text-sm text-zinc-500">${isEs ? 'Aún no has elegido fotos.' : 'No photos selected yet.'}</p>`;
+      summaryBar?.classList.add('hidden');
+      bulkPanel?.classList.add('hidden');
+      if (importBtn) importBtn.disabled = true;
+      return;
+    }
+
+    const sm = summariseRows(rows);
+    if (summaryText) {
+      summaryText.textContent = (isEs
+        ? `${sm.ready} listas · ${sm.withGps} con GPS · ${sm.withoutGps} sin GPS`
+        : `${sm.ready} ready · ${sm.withGps} with GPS · ${sm.withoutGps} without GPS`);
+    }
+    summaryBar?.classList.remove('hidden');
+    bulkPanel?.classList.remove('hidden');
+    if (importBtn) importBtn.disabled = sm.ready === 0;
+    warnNoReady?.classList.toggle('hidden', sm.ready > 0);
+    if (warnNoReady) warnNoReady.textContent = isEs
+      ? 'Ninguna fila está lista — cada fila necesita una ubicación.'
+      : 'No rows are ready — every row needs a location.';
+
+    // ─── Desktop / sm+: real table ───
+    // ─── Mobile: stacked cards (replicating the same fields) ───
+    const tableHeader = `
+      <thead class="bg-zinc-50 dark:bg-zinc-900/40">
+        <tr>
+          <th scope="col" class="px-3 py-2 text-left text-xs font-semibold text-zinc-700 dark:text-zinc-300">${isEs ? 'Foto' : 'Photo'}</th>
+          <th scope="col" class="px-3 py-2 text-left text-xs font-semibold text-zinc-700 dark:text-zinc-300">${isEs ? 'Archivo' : 'File'}</th>
+          <th scope="col" class="px-3 py-2 text-left text-xs font-semibold text-zinc-700 dark:text-zinc-300">${isEs ? 'Ubicación' : 'Location'}</th>
+          <th scope="col" class="px-3 py-2 text-left text-xs font-semibold text-zinc-700 dark:text-zinc-300">${isEs ? 'Fecha' : 'Date'}</th>
+          <th scope="col" class="px-3 py-2 text-left text-xs font-semibold text-zinc-700 dark:text-zinc-300">${isEs ? 'Evidencia' : 'Evidence'}</th>
+          <th scope="col" class="px-3 py-2 text-right text-xs font-semibold text-zinc-700 dark:text-zinc-300">${isEs ? 'Acciones' : 'Actions'}</th>
+        </tr>
+      </thead>`;
+
+    const rowHtml = rows.map((r, i) => {
+      const ready = isRowReady(r);
+      const noGps = r.lat == null || r.lng == null;
+      const dt = r.datetime ? new Date(r.datetime).toLocaleString(isEs ? 'es-MX' : 'en-US') : '—';
+      const loc = r.lat != null && r.lng != null
+        ? `<span class="font-mono text-xs">${r.lat.toFixed(4)}, ${r.lng.toFixed(4)}</span>`
+        : `<span class="rounded bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 text-[10px] text-amber-800 dark:text-amber-300">${isEs ? 'Sin GPS' : 'No GPS'}</span>`;
+      const evLabel = (() => {
+        const map: Record<string,{en:string;es:string}> = {
+          direct_sighting: { en: 'Direct sighting', es: 'Avistamiento directo' },
+          track: { en: 'Track', es: 'Huella' },
+          scat:  { en: 'Scat',  es: 'Excremento' },
+          burrow:{ en: 'Burrow',es: 'Madriguera' },
+          nest:  { en: 'Nest',  es: 'Nido' },
+          feather:{en: 'Feather',es: 'Pluma' },
+          bone:  { en: 'Bone',  es: 'Hueso' },
+          sound: { en: 'Sound', es: 'Sonido' },
+          camera_trap: { en: 'Camera trap', es: 'Cámara trampa' },
+        };
+        return map[r.evidenceType]?.[isEs ? 'es' : 'en'] ?? r.evidenceType;
+      })();
+      const excludedClass = r.excluded ? 'opacity-50' : '';
+      const readyDot = ready
+        ? `<span class="inline-block w-2 h-2 rounded-full bg-emerald-500" aria-label="ready"></span>`
+        : `<span class="inline-block w-2 h-2 rounded-full bg-amber-500" aria-label="not-ready"></span>`;
+
+      return `
+        <tr class="border-t border-zinc-200 dark:border-zinc-800 ${excludedClass}" data-row-id="${r.id}">
+          <td class="px-3 py-2">
+            <img src="${r.thumbUrl}" alt="" class="w-12 h-12 sm:w-14 sm:h-14 object-cover rounded border border-zinc-200 dark:border-zinc-800" loading="lazy" />
+          </td>
+          <td class="px-3 py-2 max-w-[12rem] truncate text-xs text-zinc-700 dark:text-zinc-300">${r.fileName}</td>
+          <td class="px-3 py-2">${loc} ${noGps ? '' : readyDot}</td>
+          <td class="px-3 py-2 text-xs text-zinc-700 dark:text-zinc-300">${dt}</td>
+          <td class="px-3 py-2 text-xs text-zinc-700 dark:text-zinc-300">${evLabel}</td>
+          <td class="px-3 py-2 text-right">
+            <button data-edit="${r.id}" type="button" class="text-xs text-emerald-700 dark:text-emerald-400 underline mr-2">${isEs ? 'Editar' : 'Edit'}</button>
+            <button data-toggle="${r.id}" type="button" class="text-xs ${r.excluded ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'} underline">
+              ${r.excluded ? (isEs ? 'Incluir' : 'Include') : (isEs ? 'Excluir' : 'Exclude')}
+            </button>
+          </td>
+        </tr>
+        <tr class="hidden" data-edit-row="${r.id}">
+          <td colspan="6" class="px-3 py-3 bg-zinc-50 dark:bg-zinc-900/40">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <input data-field="lat"  type="number" step="any" value="${r.lat ?? ''}"  placeholder="Lat" class="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
+              <input data-field="lng"  type="number" step="any" value="${r.lng ?? ''}"  placeholder="Lng" class="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
+              <input data-field="datetime" type="datetime-local" value="${r.datetime ? r.datetime.slice(0,16) : ''}" class="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
+            </div>
+            <div class="mt-2 flex items-center gap-2">
+              <button data-save="${r.id}"   type="button" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 text-xs font-semibold text-white">${isEs ? 'Guardar' : 'Save'}</button>
+              <button data-cancel="${r.id}" type="button" class="rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300">${isEs ? 'Cancelar' : 'Cancel'}</button>
+            </div>
+          </td>
+        </tr>`;
+    }).join('');
+
+    const cardHtml = rows.map(r => {
+      const noGps = r.lat == null || r.lng == null;
+      const dt = r.datetime ? new Date(r.datetime).toLocaleString(isEs ? 'es-MX' : 'en-US') : '—';
+      const loc = noGps
+        ? `<span class="rounded bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 text-[10px] text-amber-800 dark:text-amber-300">${isEs ? 'Sin GPS' : 'No GPS'}</span>`
+        : `<span class="font-mono text-[10px]">${r.lat!.toFixed(4)}, ${r.lng!.toFixed(4)}</span>`;
+      const excludedClass = r.excluded ? 'opacity-50' : '';
+      return `
+        <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3 flex gap-3 ${excludedClass}" data-card-id="${r.id}">
+          <img src="${r.thumbUrl}" alt="" class="w-16 h-16 object-cover rounded shrink-0" loading="lazy" />
+          <div class="min-w-0 flex-1">
+            <p class="text-xs text-zinc-700 dark:text-zinc-300 truncate">${r.fileName}</p>
+            <p class="mt-1 text-[11px] text-zinc-500">${loc} · ${dt}</p>
+            <div class="mt-2 flex items-center gap-3">
+              <button data-edit="${r.id}" type="button" class="text-xs text-emerald-700 dark:text-emerald-400 underline">${isEs ? 'Editar' : 'Edit'}</button>
+              <button data-toggle="${r.id}" type="button" class="text-xs ${r.excluded ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'} underline">
+                ${r.excluded ? (isEs ? 'Incluir' : 'Include') : (isEs ? 'Excluir' : 'Exclude')}
+              </button>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+
+    rowsHost.innerHTML = `
+      <div class="hidden sm:block overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
+        <table class="min-w-full text-sm">${tableHeader}<tbody>${rowHtml}</tbody></table>
+      </div>
+      <div class="sm:hidden space-y-3">${cardHtml}</div>`;
+
+    rowsHost.querySelectorAll<HTMLButtonElement>('button[data-edit]').forEach(btn => {
+      btn.addEventListener('click', () => openEdit(btn.dataset.edit!));
+    });
+    rowsHost.querySelectorAll<HTMLButtonElement>('button[data-toggle]').forEach(btn => {
+      btn.addEventListener('click', () => toggleExclude(btn.dataset.toggle!));
+    });
+    rowsHost.querySelectorAll<HTMLButtonElement>('button[data-save]').forEach(btn => {
+      btn.addEventListener('click', () => saveEdit(btn.dataset.save!));
+    });
+    rowsHost.querySelectorAll<HTMLButtonElement>('button[data-cancel]').forEach(btn => {
+      btn.addEventListener('click', () => cancelEdit(btn.dataset.cancel!));
+    });
+  }
+
+  function openEdit(id: string) {
+    const editRow = rowsHost?.querySelector(`tr[data-edit-row="${id}"]`) as HTMLElement | null;
+    editRow?.classList.remove('hidden');
+    // For mobile cards we open a simple prompt-style modal — but to keep
+    // the bundle small, we reuse the same edit row by switching layouts on
+    // mobile. The card-mode "Edit" button shows the desktop edit row by
+    // appending a clone below the card.
+    const card = rowsHost?.querySelector(`[data-card-id="${id}"]`) as HTMLElement | null;
+    if (card && !card.querySelector('[data-mobile-edit]')) {
+      const r = rows.find(x => x.id === id)!;
+      const wrap = document.createElement('div');
+      wrap.dataset.mobileEdit = '1';
+      wrap.className = 'mt-3 grid grid-cols-1 gap-2';
+      wrap.innerHTML = `
+        <input data-mfield="lat"  type="number" step="any" value="${r.lat ?? ''}"  placeholder="Lat" class="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
+        <input data-mfield="lng"  type="number" step="any" value="${r.lng ?? ''}"  placeholder="Lng" class="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
+        <input data-mfield="datetime" type="datetime-local" value="${r.datetime ? r.datetime.slice(0,16) : ''}" class="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
+        <div class="flex items-center gap-2">
+          <button data-msave="${id}" type="button" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 text-xs font-semibold text-white">${isEs ? 'Guardar' : 'Save'}</button>
+          <button data-mcancel="${id}" type="button" class="rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300">${isEs ? 'Cancelar' : 'Cancel'}</button>
+        </div>`;
+      card.appendChild(wrap);
+      wrap.querySelector<HTMLButtonElement>('[data-msave]')?.addEventListener('click', () => saveEditMobile(id, wrap));
+      wrap.querySelector<HTMLButtonElement>('[data-mcancel]')?.addEventListener('click', () => wrap.remove());
+    }
+  }
+
+  function cancelEdit(id: string) {
+    const editRow = rowsHost?.querySelector(`tr[data-edit-row="${id}"]`) as HTMLElement | null;
+    editRow?.classList.add('hidden');
+  }
+
+  function saveEdit(id: string) {
+    const editRow = rowsHost?.querySelector(`tr[data-edit-row="${id}"]`) as HTMLElement | null;
+    if (!editRow) return;
+    const lat = parseFloat((editRow.querySelector('[data-field="lat"]') as HTMLInputElement).value);
+    const lng = parseFloat((editRow.querySelector('[data-field="lng"]') as HTMLInputElement).value);
+    const dt = (editRow.querySelector('[data-field="datetime"]') as HTMLInputElement).value;
+    applyRowEdit(id, lat, lng, dt);
+  }
+
+  function saveEditMobile(id: string, wrap: HTMLElement) {
+    const lat = parseFloat((wrap.querySelector('[data-mfield="lat"]') as HTMLInputElement).value);
+    const lng = parseFloat((wrap.querySelector('[data-mfield="lng"]') as HTMLInputElement).value);
+    const dt = (wrap.querySelector('[data-mfield="datetime"]') as HTMLInputElement).value;
+    applyRowEdit(id, lat, lng, dt);
+  }
+
+  function applyRowEdit(id: string, lat: number, lng: number, dt: string) {
+    const i = rows.findIndex(r => r.id === id);
+    if (i < 0) return;
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      rows[i].lat = lat;
+      rows[i].lng = lng;
+      rows[i].locationSource = 'manual';
+    }
+    if (dt) {
+      const t = Date.parse(dt);
+      if (Number.isFinite(t)) rows[i].datetime = new Date(t).toISOString();
+    }
+    render();
+  }
+
+  function toggleExclude(id: string) {
+    const r = rows.find(x => x.id === id);
+    if (!r) return;
+    r.excluded = !r.excluded;
+    render();
+  }
+
+  // ── File ingestion ─────────────────────────────────────────────
+  async function ingestFiles(files: FileList | File[]) {
+    const list = Array.from(files).filter(f => f.type.startsWith('image/'));
+    if (!list.length) return;
+    let done = 0;
+    if (readingP) {
+      readingP.classList.remove('hidden');
+      readingP.textContent = (isEs ? `Leyendo metadatos… ${done} / ${list.length}` : `Reading metadata… ${done} / ${list.length}`);
+    }
+    for (const file of list) {
+      let exif: unknown = null;
+      try {
+        exif = await parseExif(file, { gps: true, tiff: true, exif: true });
+      } catch { /* non-fatal */ }
+      const row = buildBatchRow(
+        { name: file.name, size: file.size, type: file.type },
+        exif as Parameters<typeof buildBatchRow>[1],
+        { defaultEvidenceType: isCameraTrap ? 'camera_trap' : 'direct_sighting' },
+      );
+      const thumbUrl = URL.createObjectURL(file);
+      rows.push({ ...row, file, thumbUrl });
+      done++;
+      if (readingP) readingP.textContent = (isEs ? `Leyendo metadatos… ${done} / ${list.length}` : `Reading metadata… ${done} / ${list.length}`);
+    }
+    if (readingP) readingP.classList.add('hidden');
+
+    // Camera trap: if a trap location is already set, push it to all rows.
+    if (isCameraTrap) syncTrapLocationIntoRows();
+    render();
+  }
+
+  fileInput?.addEventListener('change', () => {
+    if (fileInput.files?.length) ingestFiles(fileInput.files);
+    fileInput.value = '';
+  });
+  dropzone?.addEventListener('click', () => fileInput?.click());
+  dropzone?.addEventListener('keydown', (e) => {
+    if ((e as KeyboardEvent).key === 'Enter' || (e as KeyboardEvent).key === ' ') {
+      e.preventDefault();
+      fileInput?.click();
+    }
+  });
+  ['dragenter','dragover'].forEach(ev => {
+    dropzone?.addEventListener(ev, (e) => {
+      e.preventDefault();
+      dropzone.classList.add('ring-2','ring-emerald-500');
+    });
+  });
+  ['dragleave','drop'].forEach(ev => {
+    dropzone?.addEventListener(ev, (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('ring-2','ring-emerald-500');
+    });
+  });
+  dropzone?.addEventListener('drop', (e) => {
+    const files = (e as DragEvent).dataTransfer?.files;
+    if (files?.length) ingestFiles(files);
+  });
+
+  // ── Bulk-set ───────────────────────────────────────────────────
+  bulkApplyBtn?.addEventListener('click', () => {
+    const patch: BulkSetPatch = {};
+    if (bulkHabitat?.value)  patch.habitat = bulkHabitat.value as HabitatType;
+    if (bulkWeather?.value)  patch.weather = bulkWeather.value as WeatherTag;
+    if (bulkEvidence?.value) patch.evidenceType = bulkEvidence.value as EvidenceType;
+    const next = applyBulkSet(rows, patch);
+    let count = 0;
+    for (let i = 0; i < rows.length; i++) {
+      if (rows[i].excluded) continue;
+      // Preserve File / thumbUrl which aren't part of the BatchRow shape.
+      Object.assign(rows[i], next[i]);
+      count++;
+    }
+    if (bulkMsg) {
+      bulkMsg.textContent = (isEs ? `Aplicado a ${count} fila(s).` : `Applied to ${count} row(s).`);
+      bulkMsg.classList.remove('hidden');
+      setTimeout(() => bulkMsg.classList.add('hidden'), 2_000);
+    }
+    render();
+  });
+
+  removeAllBtn?.addEventListener('click', () => {
+    rows.forEach(r => URL.revokeObjectURL(r.thumbUrl));
+    rows.length = 0;
+    render();
+  });
+
+  // ── Camera-trap location ──────────────────────────────────────
+  function syncTrapLocationIntoRows() {
+    const lat = parseFloat(trapLat?.value ?? '');
+    const lng = parseFloat(trapLng?.value ?? '');
+    const alt = parseFloat(trapAlt?.value ?? '');
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    const next = applyBulkSet(rows, { location: { lat, lng, altitudeM: Number.isFinite(alt) ? alt : null } });
+    for (let i = 0; i < rows.length; i++) {
+      if (rows[i].excluded) continue;
+      Object.assign(rows[i], next[i]);
+    }
+  }
+  [trapLat, trapLng, trapAlt].forEach(el => el?.addEventListener('change', () => {
+    syncTrapLocationIntoRows();
+    render();
+  }));
+  trapUseGpsBtn?.addEventListener('click', () => {
+    if (!navigator.geolocation) {
+      if (trapGpsMsg) {
+        trapGpsMsg.textContent = isEs ? 'Geolocalización no disponible.' : 'Geolocation unavailable.';
+        trapGpsMsg.classList.remove('hidden');
+      }
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        if (trapLat) trapLat.value = String(pos.coords.latitude);
+        if (trapLng) trapLng.value = String(pos.coords.longitude);
+        if (trapAlt && pos.coords.altitude != null) trapAlt.value = String(pos.coords.altitude);
+        syncTrapLocationIntoRows();
+        render();
+        trapGpsMsg?.classList.add('hidden');
+      },
+      () => {
+        if (trapGpsMsg) {
+          trapGpsMsg.textContent = isEs
+            ? "No se pudo leer tu GPS. Escribe las coordenadas manualmente."
+            : "Couldn't read your GPS. Type the coordinates manually.";
+          trapGpsMsg.classList.remove('hidden');
+        }
+      },
+      { enableHighAccuracy: true, timeout: 15_000, maximumAge: 0 },
+    );
+  });
+
+  // ── Import ────────────────────────────────────────────────────
+  importBtn?.addEventListener('click', async () => {
+    if (!importBtn) return;
+    const ready = rows.filter(r => isRowReady(r));
+    if (!ready.length) return;
+    importBtn.disabled = true;
+    if (importingP) importingP.classList.remove('hidden');
+    let done = 0, failed = 0;
+    const ref = await resolveObserverRef();
+    for (const r of ready) {
+      try {
+        await saveObservationToOutbox({
+          observerRef: ref,
+          createdAt: r.datetime ?? new Date().toISOString(),
+          media: [{
+            blobId: crypto.randomUUID(),
+            blob: r.file,
+            mimeType: r.mimeType,
+            sizeBytes: r.fileSize,
+            mediaType: 'photo',
+          }],
+          primaryPhotoIndex: 0,
+          location: {
+            lat: r.lat!,
+            lng: r.lng!,
+            accuracyM: r.locationSource === 'exif' ? 15 : (r.locationSource === 'bulk' ? 25 : 50),
+            altitudeM: r.altitudeM ?? null,
+            capturedFrom: r.locationSource === 'bulk' ? 'manual' : (r.locationSource === 'manual' ? 'manual' : 'exif'),
+          },
+          habitat: r.habitat,
+          weather: r.weather,
+          evidenceType: r.evidenceType,
+          notes: r.notes,
+        });
+        done++;
+      } catch (err) {
+        console.error('[rastrum] batch import row failed:', err);
+        failed++;
+      }
+      if (importingP) importingP.textContent = (isEs ? `Importando… ${done} / ${ready.length}` : `Importing… ${done} / ${ready.length}`);
+    }
+    if (importingP) importingP.classList.add('hidden');
+    if (importResult) {
+      importResult.classList.remove('hidden');
+      if (failed === 0) {
+        importResult.className = 'mt-3 text-sm font-semibold text-emerald-700 dark:text-emerald-400';
+        importResult.textContent = (isEs
+          ? `Se importaron ${done} observación(es). Se sincronizarán al conectarse.`
+          : `Imported ${done} observation(s). They'll sync when you're online.`);
+      } else {
+        importResult.className = 'mt-3 text-sm font-semibold text-amber-700 dark:text-amber-400';
+        importResult.textContent = (isEs
+          ? `Se importaron ${done} de ${ready.length}. ${failed} fallaron — revisa la consola.`
+          : `Imported ${done} of ${ready.length}. ${failed} failed — see console for details.`);
+      }
+    }
+    // Fire-and-forget sync attempt — only meaningful for signed-in users.
+    if (ref.kind === 'user' && navigator.onLine) {
+      syncOutbox().catch(err => console.warn('[rastrum] sync after batch import failed:', err));
+    }
+    importBtn.disabled = false;
+  });
+
+  registerSyncTriggers();
+  render();
+</script>

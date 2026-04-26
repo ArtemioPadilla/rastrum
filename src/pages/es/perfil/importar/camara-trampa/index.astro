@@ -1,0 +1,13 @@
+---
+import BaseLayout from '../../../../../layouts/BaseLayout.astro';
+import BatchImporter from '../../../../../components/BatchImporter.astro';
+import { t } from '../../../../../i18n/utils';
+
+const lang = 'es';
+const tr = t(lang);
+const ctTitle = (tr as unknown as { camera_trap?: { title?: string } }).camera_trap?.title ?? 'Importación de cámara trampa';
+---
+
+<BaseLayout title={`${ctTitle} — Rastrum`} lang={lang}>
+  <BatchImporter lang={lang} mode="camera_trap" />
+</BaseLayout>
