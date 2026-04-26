@@ -88,7 +88,7 @@ serve(async (req) => {
   <!-- Footer -->
   <g transform="translate(60, ${H - 80})">
     <text font-family="system-ui, sans-serif" font-size="22" fill="#d1fae5">Observed by ${escapeXml(observer)}</text>
-    <text y="32" font-family="system-ui, sans-serif" font-size="16" fill="#6ee7b7">rastrum.artemiop.com</text>
+    <text y="32" font-family="system-ui, sans-serif" font-size="16" fill="#6ee7b7">rastrum.org</text>
   </g>
 
   ${obs.obscure_level && obs.obscure_level !== 'none' ? `
@@ -113,7 +113,7 @@ serve(async (req) => {
   // function with format=svg.
   const baseUrl = `${url.origin}${url.pathname}`;
   const imgUrl  = `${baseUrl}?obs_id=${encodeURIComponent(obsId)}&format=svg`;
-  const pageUrl = `https://rastrum.artemiop.com/share/obs/?id=${encodeURIComponent(obsId)}`;
+  const pageUrl = `https://rastrum.org/share/obs/?id=${encodeURIComponent(obsId)}`;
   const title = `${speciesName} — Rastrum`;
   const desc  = `Observed ${date}${region ? ' in ' + region : ''}${habitat ? ' (' + habitat + ')' : ''} — Rastrum biodiversity observation.`;
 

@@ -12,7 +12,7 @@ America. Astro + Tailwind frontend, Supabase backend (Postgres + PostGIS +
 RLS), Cloudflare R2 for media, Edge Functions (Deno) for AI identification.
 Bilingual EN/ES from day one.
 
-- **Public site:** https://rastrum.artemiop.com
+- **Public site:** https://rastrum.org
 - **Repo:** https://github.com/ArtemioPadilla/rastrum
 - **License:** MIT (code), AGPL-3.0 (server per README), per-observation CC
   (BY / BY-NC / CC0)
@@ -278,12 +278,12 @@ Functions: deploy via `gh workflow run deploy-functions.yml -f function=<name>`.
 
 | What | URL |
 |---|---|
-| Production | https://rastrum.artemiop.com |
+| Production | https://rastrum.org |
 | Supabase project | https://supabase.com/dashboard/project/reppvlqejgoqvitturxp |
 | GitHub Actions | https://github.com/ArtemioPadilla/rastrum/actions |
 | R2 bucket settings | https://dash.cloudflare.com/?to=/:account/r2/default/buckets/rastrum-media |
-| Roadmap | https://rastrum.artemiop.com/en/docs/roadmap/ |
-| Tasks | https://rastrum.artemiop.com/en/docs/tasks/ |
+| Roadmap | https://rastrum.org/en/docs/roadmap/ |
+| Tasks | https://rastrum.org/en/docs/tasks/ |
 
 ---
 

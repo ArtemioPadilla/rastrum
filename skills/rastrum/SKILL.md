@@ -1,6 +1,6 @@
 ---
 name: rastrum
-description: Use when working with the Rastrum biodiversity platform — testing the photo ID pipeline (PlantNet + Claude Haiku cascade), submitting observations via API, processing camera trap batches, documenting field test cases, or interacting with the Supabase backend. Triggers on: species identification testing, camera trap analysis, observation upload, Darwin Core export, or any rastrum.artemiop.com interaction.
+description: Use when working with the Rastrum biodiversity platform — testing the photo ID pipeline (PlantNet + Claude Haiku cascade), submitting observations via API, processing camera trap batches, documenting field test cases, or interacting with the Supabase backend. Triggers on: species identification testing, camera trap analysis, observation upload, Darwin Core export, or any rastrum.org interaction.
 ---
 
 # Rastrum Skill

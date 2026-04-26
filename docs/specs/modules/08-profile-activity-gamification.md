@@ -404,7 +404,7 @@ the user themselves did.
 ### Observation cards
 
 Each observation has a canonical shareable card at
-`https://rastrum.artemiop.com/share/obs/{id}.png` generated on-demand by an
+`https://rastrum.org/share/obs/{id}.png` generated on-demand by an
 Edge Function. Layout: species thumbnail + scientific name + common name +
 region + Rastrum logo + observer's display name (if profile_public).
 
@@ -414,7 +414,7 @@ all.
 
 ### Badge cards
 
-`https://rastrum.artemiop.com/share/badge/{user_id}/{badge_key}.png`
+`https://rastrum.org/share/badge/{user_id}/{badge_key}.png`
 Renders the badge art + name + "earned by @{username} on Rastrum".
 
 Only available when the user's profile is public and `gamification_opt_in = true`.

@@ -10,7 +10,7 @@ records using your personal API token.
 
 ## Setup (one time)
 
-1. Go to **rastrum.artemiop.com/es/perfil/tokens**
+1. Go to **rastrum.org/es/perfil/tokens**
 2. Click **Nuevo token** → copy the token shown (only visible once)
 3. Save it: `export RASTRUM_TOKEN=rst_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`
 
@@ -19,7 +19,7 @@ records using your personal API token.
 ### Identify a Species from Photo
 
 ```bash
-curl -s -X POST "https://rastrum.artemiop.com/functions/v1/api/identify" \
+curl -s -X POST "https://rastrum.org/functions/v1/api/identify" \
   -H "Authorization: Bearer $RASTRUM_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -32,7 +32,7 @@ curl -s -X POST "https://rastrum.artemiop.com/functions/v1/api/identify" \
 ### Submit an Observation
 
 ```bash
-curl -s -X POST "https://rastrum.artemiop.com/functions/v1/api/observe" \
+curl -s -X POST "https://rastrum.org/functions/v1/api/observe" \
   -H "Authorization: Bearer $RASTRUM_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -48,14 +48,14 @@ curl -s -X POST "https://rastrum.artemiop.com/functions/v1/api/observe" \
 ### List Your Observations
 
 ```bash
-curl -s "https://rastrum.artemiop.com/functions/v1/api/observations?limit=20" \
+curl -s "https://rastrum.org/functions/v1/api/observations?limit=20" \
   -H "Authorization: Bearer $RASTRUM_TOKEN" | jq '.[]'
 ```
 
 ### Export Darwin Core CSV
 
 ```bash
-curl -s "https://rastrum.artemiop.com/functions/v1/api/export?format=darwin_core" \
+curl -s "https://rastrum.org/functions/v1/api/export?format=darwin_core" \
   -H "Authorization: Bearer $RASTRUM_TOKEN" -o my-observations.csv
 ```
 
@@ -71,6 +71,6 @@ curl -s "https://rastrum.artemiop.com/functions/v1/api/export?format=darwin_core
 
 - Token format: `rst_` followed by 32 hex characters
 - Tokens are scoped — create separate tokens per tool
-- Revoke tokens anytime at rastrum.artemiop.com/perfil/tokens
+- Revoke tokens anytime at rastrum.org/perfil/tokens
 - Photo ID uses PlantNet + Claude Haiku cascade
 - All observations are geolocated and exportable as Darwin Core

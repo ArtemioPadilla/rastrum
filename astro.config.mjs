@@ -5,7 +5,7 @@ import sitemap from '@astrojs/sitemap';
 
 // https://astro.build/config
 export default defineConfig({
-  site: 'https://rastrum.artemiop.com',
+  site: 'https://rastrum.org',
   base: '/',
   output: 'static',
   integrations: [tailwind(), sitemap()],

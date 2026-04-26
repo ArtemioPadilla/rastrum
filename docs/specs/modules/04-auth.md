@@ -263,11 +263,11 @@ wires a custom SMTP provider from day one.
 
 **Prod path — Resend (recommended, 100/day free, custom domain):**
 
-1. Sign up at <https://resend.com>. Verify the domain `rastrum.artemiop.com`
+1. Sign up at <https://resend.com>. Verify the domain `rastrum.org`
    by adding the SPF, DKIM, and DMARC records Resend shows you.
 2. Create API key scoped to "Sending access" — `re_xxxxx`.
 3. Supabase dashboard → Authentication → SMTP Settings:
-   - Sender email: `no-reply@rastrum.artemiop.com`
+   - Sender email: `no-reply@rastrum.org`
    - Sender name: `Rastrum`
    - Host: `smtp.resend.com`
    - Port: `465`

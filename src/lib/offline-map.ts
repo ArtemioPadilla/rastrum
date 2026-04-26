@@ -17,7 +17,7 @@
  * https://maps.protomaps.com/builds, or `tippecanoe` from a Mexico OSM
  * extract). Upload the resulting `mexico-z0-10.pmtiles` to Cloudflare R2
  * with public read access and CORS allowing the production origin
- * (https://rastrum.artemiop.com). Then set `PUBLIC_PMTILES_MX_URL` in
+ * (https://rastrum.org). Then set `PUBLIC_PMTILES_MX_URL` in
  * the deployment environment to the absolute URL of the archive
  * (including the filename). When unset, the offline-map UI surfaces
  * a clear "not configured" message instead of a broken download.

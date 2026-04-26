@@ -201,7 +201,7 @@ Each plugin's profile/edit card has a "Configure" disclosure that opens:
   call and forgets it.
 - **No logs.** The function explicitly does not log the key value.
 - **Origin-scoped.** Browsers prevent localStorage cross-origin reads, so
-  `rastrum.artemiop.com` is the only origin that can read the keys.
+  `rastrum.org` is the only origin that can read the keys.
 
 ---
 

@@ -111,8 +111,8 @@ describe('renderMarkdown', () => {
   });
 
   it('renders explicit links with safe rels', () => {
-    const html = renderMarkdown('[Rastrum](https://rastrum.artemiop.com)');
-    expect(html).toContain('href="https://rastrum.artemiop.com"');
+    const html = renderMarkdown('[Rastrum](https://rastrum.org)');
+    expect(html).toContain('href="https://rastrum.org"');
     expect(html).toContain('rel="nofollow noopener noreferrer"');
     expect(html).toContain('target="_blank"');
   });

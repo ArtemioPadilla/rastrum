@@ -62,7 +62,7 @@ Observations can be exported in standard formats (CSV, Darwin Core) for integrat
 | --- | --- | --- |
 | Framework | Astro 5.x | Static site generation, island architecture |
 | Styling | Tailwind CSS 3.x | Utility-first CSS |
-| Hosting | GitHub Pages | Static deployment at rastrum.artemiop.com |
+| Hosting | GitHub Pages | Static deployment at rastrum.org |
 | Database | Supabase (PostgreSQL + PostGIS) | Observations, taxa, users, media metadata |
 | Media storage | Cloudflare R2 | Photos, audio, video blobs (S3-compatible, zero egress) |
 | Map tiles | Cloudflare R2 + pmtiles | Offline-capable vector tiles |

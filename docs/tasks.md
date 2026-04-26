@@ -562,7 +562,7 @@
 
 These don't have subtasks because they're not engineering work — they're configurations or accounts the human operator must arrange:
 
-- [x] Cloudflare R2 account + DNS for `rastrum-media.artemiop.com`
+- [x] Cloudflare R2 account + DNS for `media.rastrum.org`
 - [x] R2 bucket + API token + CORS policy
 - [x] Supabase project provisioned + secrets set (PLANTNET_API_KEY, R2_*)
 - [x] Edge Functions deployed (identify, enrich-environment, recompute-streaks, award-badges, share-card, get-upload-url)

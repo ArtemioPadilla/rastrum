@@ -225,7 +225,7 @@ function buildEmlXml(opts: {
     <creator>
       <organizationName>Rastrum</organizationName>
       <individualName><surName>Rastrum Operator</surName></individualName>
-      <electronicMailAddress>data@rastrum.artemiop.com</electronicMailAddress>
+      <electronicMailAddress>data@rastrum.org</electronicMailAddress>
     </creator>
     <pubDate>${pubDate}</pubDate>
     <language>en</language>
@@ -236,7 +236,7 @@ function buildEmlXml(opts: {
     <contact>
       <organizationName>Rastrum</organizationName>
       <individualName><surName>Rastrum Operator</surName></individualName>
-      <electronicMailAddress>data@rastrum.artemiop.com</electronicMailAddress>
+      <electronicMailAddress>data@rastrum.org</electronicMailAddress>
     </contact>
   </dataset>
 </eml:eml>
