@@ -16,6 +16,7 @@ on:
           - recompute-streaks
           - award-badges
           - share-card
+          - export-dwca
 
 jobs:
   deploy:
@@ -47,7 +48,7 @@ jobs:
             supabase functions deploy "$fn" --project-ref "$PROJECT_REF" $flag
           }
           if [ "${{ inputs.function }}" = "all" ]; then
-            for fn in get-upload-url identify enrich-environment recompute-streaks award-badges share-card; do
+            for fn in get-upload-url identify enrich-environment recompute-streaks award-badges share-card export-dwca; do
               deploy_one "$fn"
             done
           else

@@ -530,9 +530,11 @@
       "modules": ["06-darwin-core.md"],
       "subtasks": [
         { "label_en": "GBIF publisher account application",                "label_es": "Solicitud de cuenta de publicador GBIF",     "status": "blocked", "blocker_en": "~2-week ed-org review", "blocker_es": "~2 semanas de revisión" },
-        { "label_en": "DwC-A ZIP generator (meta.xml + eml.xml + csvs)",   "label_es": "Generador de DwC-A ZIP",                     "status": "planned" },
-        { "label_en": "gbif-publish Edge Function (monthly cron)",          "label_es": "Edge Function gbif-publish",                  "status": "planned" },
-        { "label_en": "DOI tracking in dataset_versions table",             "label_es": "Tracking de DOIs",                            "status": "planned" }
+        { "label_en": "DwC-A ZIP generator (meta.xml + eml.xml + csvs)",   "label_es": "Generador de DwC-A ZIP",                     "status": "done" },
+        { "label_en": "export-dwca Edge Function (on-demand export)",       "label_es": "Edge Function export-dwca",                   "status": "done" },
+        { "label_en": "publish-to-ipt.sh operator script",                  "label_es": "Script publish-to-ipt.sh para operadores",   "status": "done" },
+        { "label_en": "gbif-publish Edge Function (monthly cron)",          "label_es": "Edge Function gbif-publish (cron mensual)",   "status": "planned" },
+        { "label_en": "DOI tracking in dataset_versions table",             "label_es": "Tracking de DOIs en dataset_versions",        "status": "planned" }
       ]
     },
     "local-contexts": {
