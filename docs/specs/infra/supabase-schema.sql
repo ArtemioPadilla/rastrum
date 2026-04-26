@@ -988,3 +988,46 @@ CREATE POLICY "tokens_select_own" ON public.user_api_tokens
 DROP POLICY IF EXISTS "tokens_delete_own" ON public.user_api_tokens;
 CREATE POLICY "tokens_delete_own" ON public.user_api_tokens
   FOR UPDATE TO authenticated USING (auth.uid() = user_id);
+
+-- ─────────────────────────────────────────────────────────────────────
+-- Expert applications (module 08 — credentialed-tier review queue)
+-- Users submit one application per request. Admins review out-of-band
+-- (no admin UI yet) and on approval flip users.is_expert + expert_taxa.
+-- ─────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.expert_applications (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id       uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  taxa          text[] NOT NULL,                    -- ['Aves','Mammalia',…]
+  credentials   text   NOT NULL,                    -- free-text bio / cv blurb
+  institution   text,
+  orcid         text,                               -- 0000-0000-0000-0000
+  status        text NOT NULL DEFAULT 'pending'
+                  CHECK (status IN ('pending','approved','rejected','withdrawn')),
+  reviewer_note text,                               -- admin-set on transition
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  reviewed_at   timestamptz
+);
+
+CREATE INDEX IF NOT EXISTS idx_expert_apps_user
+  ON public.expert_applications(user_id, status);
+CREATE INDEX IF NOT EXISTS idx_expert_apps_pending
+  ON public.expert_applications(created_at)
+  WHERE status = 'pending';
+
+ALTER TABLE public.expert_applications ENABLE ROW LEVEL SECURITY;
+
+-- A user reads & inserts their own applications. UPDATE is admin-only
+-- (we let the user 'withdraw' by inserting a fresh row with status set,
+-- which keeps the audit trail intact).
+DROP POLICY IF EXISTS "expert_apps_read_own" ON public.expert_applications;
+CREATE POLICY "expert_apps_read_own" ON public.expert_applications
+  FOR SELECT TO authenticated USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "expert_apps_insert_own" ON public.expert_applications;
+CREATE POLICY "expert_apps_insert_own" ON public.expert_applications
+  FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+
+-- Service-role bypasses RLS for admin ops; no UPDATE/DELETE policy for
+-- regular users by design.
+
+GRANT SELECT, INSERT ON public.expert_applications TO authenticated;

@@ -203,20 +203,31 @@ const roadmapPath = getLocalizedPath(lang, '/docs/roadmap/');
       return;
     }
 
-    // SCHEMA GAP: public.expert_applications doesn't exist yet. We surface
-    // the form (so the UI is reviewable) but on submit show the unavailable
-    // notice instead of attempting an insert.
+    // Check for an existing pending application — show "already submitted"
+    // state instead of a fresh form so users can't double-submit.
+    const { data: existing } = await supabase
+      .from('expert_applications')
+      .select('id, status')
+      .eq('user_id', user.id)
+      .eq('status', 'pending')
+      .maybeSingle();
+    if (existing) {
+      show('expert-pending');
+      return;
+    }
+
     show('expert-form');
 
     const orcidRe = /^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/;
 
-    form.addEventListener('submit', (ev) => {
+    form.addEventListener('submit', async (ev) => {
       ev.preventDefault();
       const errEl = document.getElementById('expert-error');
       if (errEl) errEl.classList.add('hidden');
 
       const taxaInputs = Array.from(form.querySelectorAll<HTMLInputElement>('.taxa-checkbox:checked')).map(i => i.value);
       const credentials = (form.elements.namedItem('credentials') as HTMLTextAreaElement | null)?.value.trim() ?? '';
+      const institution = (form.elements.namedItem('institution') as HTMLInputElement | null)?.value.trim() ?? '';
       const orcid = (form.elements.namedItem('orcid') as HTMLInputElement | null)?.value.trim() ?? '';
 
       const reportError = (msg: string) => {
@@ -238,10 +249,29 @@ const roadmapPath = getLocalizedPath(lang, '/docs/roadmap/');
         return;
       }
 
-      // No expert_applications table yet — surface the schema-gap notice.
       const submitBtn = document.getElementById('expert-submit') as HTMLButtonElement | null;
       if (submitBtn) submitBtn.disabled = true;
-      show('expert-unavailable');
+
+      const { error } = await supabase.from('expert_applications').insert({
+        user_id: user.id,
+        taxa: taxaInputs,
+        credentials,
+        institution: institution || null,
+        orcid: orcid || null,
+      });
+
+      if (error) {
+        if (submitBtn) submitBtn.disabled = false;
+        // 42P01 = relation does not exist → schema not applied yet
+        if (error.code === '42P01') {
+          show('expert-unavailable');
+        } else {
+          reportError(error.message);
+        }
+        return;
+      }
+
+      show('expert-pending');
     });
   }
 
