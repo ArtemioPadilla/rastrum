@@ -1,0 +1,203 @@
+# Bundle ML model weights / offline-map archives into the Rastrum R2 bucket.
+#
+# Each input choice fetches its assets from upstream, uploads them to a
+# stable R2 path, and prints the public URL you should paste into the
+# matching GitHub repo secret (see "Required secrets" below).
+#
+# This workflow is the source of truth for model hosting — manual `aws s3
+# cp` or `rclone` commands should not be used. Re-run this workflow when
+# upstream releases a new model version, then bump the relevant
+# PUBLIC_*_URL secret to repoint the build.
+#
+# ── Required secrets (one-time setup, repo Settings → Secrets) ────────
+#   R2_ACCESS_KEY_ID        Cloudflare R2 access key with write to the bucket
+#   R2_SECRET_ACCESS_KEY    Matching secret
+#   R2_ENDPOINT_URL         e.g. https://<account-id>.r2.cloudflarestorage.com
+#   R2_BUCKET               e.g. rastrum-media
+#   R2_PUBLIC_BASE_URL      e.g. https://rastrum-media.artemiop.com
+#
+# ── After upload ──────────────────────────────────────────────────────
+# The job summary tells you exactly which PUBLIC_*_URL secret to set
+# (or update) for the build to start serving the asset.
+
+name: Bundle ML models to R2
+
+on:
+  workflow_dispatch:
+    inputs:
+      asset:
+        description: Which asset to bundle
+        required: true
+        type: choice
+        options:
+          - birdnet
+          - efficientnet-lite0
+          - pmtiles-mx
+          - megadetector
+          - all
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bundle-models-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      AWS_ACCESS_KEY_ID:     ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION:    auto
+      R2_ENDPOINT:           ${{ secrets.R2_ENDPOINT_URL }}
+      R2_BUCKET:             ${{ secrets.R2_BUCKET }}
+      R2_PUBLIC_BASE:        ${{ secrets.R2_PUBLIC_BASE_URL }}
+    steps:
+      - name: Validate secrets
+        run: |
+          set -e
+          for v in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY R2_ENDPOINT R2_BUCKET R2_PUBLIC_BASE; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Missing secret: $v" && exit 1
+            fi
+          done
+
+      - name: Install AWS CLI
+        run: |
+          if ! command -v aws >/dev/null; then
+            sudo apt-get update -qq && sudo apt-get install -qq -y awscli
+          fi
+          aws --version
+
+      - name: Bundle BirdNET-Lite (audio)
+        if: inputs.asset == 'birdnet' || inputs.asset == 'all'
+        run: |
+          set -euo pipefail
+          mkdir -p _staging/birdnet && cd _staging/birdnet
+
+          # Pre-converted ONNX from HuggingFace (Cornell Lab CC BY-NC-SA 4.0,
+          # ONNX conversion Apache-2.0). Mirror: justinchuby/BirdNET-onnx.
+          curl -fL --retry 3 -o birdnet_v2.4.onnx \
+            "https://huggingface.co/justinchuby/BirdNET-onnx/resolve/main/model.onnx"
+          curl -fL --retry 3 -o BirdNET_GLOBAL_6K_V2.4_Labels.txt \
+            "https://huggingface.co/justinchuby/BirdNET-onnx/resolve/main/BirdNET_GLOBAL_6K_V2.4_Labels.txt"
+          ls -lh
+
+          # Verify ONNX magic bytes (protobuf marker)
+          file birdnet_v2.4.onnx | grep -qiE 'data|onnx|protobuf' \
+            || { echo "::error::Downloaded ONNX failed sanity check"; exit 1; }
+
+          # Upload (Cache-Control hints aggressive caching since URLs are versioned)
+          for f in birdnet_v2.4.onnx BirdNET_GLOBAL_6K_V2.4_Labels.txt; do
+            CT=$([ "${f##*.}" = "txt" ] && echo "text/plain" || echo "application/octet-stream")
+            aws s3 cp "$f" "s3://$R2_BUCKET/models/birdnet/$f" \
+              --endpoint-url "$R2_ENDPOINT" \
+              --content-type "$CT" \
+              --cache-control "public, max-age=31536000, immutable"
+          done
+
+          echo "### BirdNET-Lite uploaded" >> "$GITHUB_STEP_SUMMARY"
+          echo "Set repo secret \`PUBLIC_BIRDNET_WEIGHTS_URL\` to:" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`$R2_PUBLIC_BASE/models/birdnet\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Bundle EfficientNet-Lite0 (photo base)
+        if: inputs.asset == 'efficientnet-lite0' || inputs.asset == 'all'
+        run: |
+          set -euo pipefail
+          mkdir -p _staging/efficientnet && cd _staging/efficientnet
+
+          # ONNX-Models zoo — Apache-2.0, official conversion of the TensorFlow
+          # Model Garden EfficientNet-Lite0. ImageNet-1k labels.
+          curl -fL --retry 3 -o efficientnet_lite0.onnx \
+            "https://github.com/onnx/models/raw/main/Computer_Vision/efficientnet_lite0_Opset17_timm/efficientnet_lite0_Opset17.onnx" \
+            || curl -fL --retry 3 -o efficientnet_lite0.onnx \
+              "https://huggingface.co/onnx-community/efficientnet-lite0-Opset17/resolve/main/onnx/model.onnx"
+
+          # Standard ImageNet-1k label list
+          curl -fL --retry 3 -o imagenet_labels.txt \
+            "https://raw.githubusercontent.com/onnx/models/main/validated/vision/classification/synset.txt" \
+            || curl -fL --retry 3 -o imagenet_labels.txt \
+              "https://raw.githubusercontent.com/anishathalye/imagenet-simple-labels/master/imagenet-simple-labels.json"
+
+          ls -lh
+
+          for f in efficientnet_lite0.onnx imagenet_labels.txt; do
+            CT=$([ "${f##*.}" = "txt" ] && echo "text/plain" || echo "application/octet-stream")
+            aws s3 cp "$f" "s3://$R2_BUCKET/models/efficientnet-lite0/$f" \
+              --endpoint-url "$R2_ENDPOINT" \
+              --content-type "$CT" \
+              --cache-control "public, max-age=31536000, immutable"
+          done
+
+          echo "### EfficientNet-Lite0 uploaded" >> "$GITHUB_STEP_SUMMARY"
+          echo "Set repo secret \`PUBLIC_ONNX_BASE_URL\` to:" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`$R2_PUBLIC_BASE/models/efficientnet-lite0\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Bundle pmtiles for Mexico (offline maps)
+        if: inputs.asset == 'pmtiles-mx' || inputs.asset == 'all'
+        run: |
+          set -euo pipefail
+          mkdir -p _staging/pmtiles && cd _staging/pmtiles
+
+          # Protomaps daily builds: full planet pmtiles. We extract only Mexico
+          # (zoom 0–10) using the pmtiles CLI's `extract` subcommand to keep
+          # the download manageable (~150 MB).
+          PMTILES_VERSION=v1.27.4
+          curl -fL --retry 3 -o pmtiles.tar.gz \
+            "https://github.com/protomaps/go-pmtiles/releases/download/${PMTILES_VERSION}/go-pmtiles_${PMTILES_VERSION#v}_Linux_x86_64.tar.gz"
+          tar -xzf pmtiles.tar.gz pmtiles
+          chmod +x pmtiles
+
+          # Extract Mexico bbox (lng_min lat_min lng_max lat_max), zoom 0..10
+          # bbox: -118.6,14.3,-86.5,33.0 (ish — covers continental MX + Yucatán)
+          ./pmtiles extract \
+            "https://build.protomaps.com/$(date -u +%Y%m%d).pmtiles" \
+            mexico_z0_10.pmtiles \
+            --bbox=-118.6,14.3,-86.5,33.0 \
+            --maxzoom=10 \
+            || { echo "::error::pmtiles extract failed (build may not be ready for today's date)"; exit 1; }
+
+          ls -lh mexico_z0_10.pmtiles
+
+          aws s3 cp mexico_z0_10.pmtiles "s3://$R2_BUCKET/maps/mexico_z0_10.pmtiles" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --content-type application/octet-stream \
+            --cache-control "public, max-age=2592000"
+
+          echo "### Mexico pmtiles uploaded" >> "$GITHUB_STEP_SUMMARY"
+          echo "Set repo secret \`PUBLIC_PMTILES_MX_URL\` to:" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`$R2_PUBLIC_BASE/maps/mexico_z0_10.pmtiles\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Bundle MegaDetector (camera-trap)
+        if: inputs.asset == 'megadetector' || inputs.asset == 'all'
+        run: |
+          set -euo pipefail
+          mkdir -p _staging/megadetector && cd _staging/megadetector
+
+          # MegaDetector v5a, ONNX-converted (community mirror; verify license
+          # — original is MIT). Source: agentmorris/MegaDetector + the
+          # ONNX export documented in their docs.
+          # NOTE: The exact stable URL changes; pinning a known-good HF mirror.
+          curl -fL --retry 3 -o megadetector_v5a.onnx \
+            "https://huggingface.co/microsoft/MegaDetector-v5a-ONNX/resolve/main/megadetector_v5a.0.0.onnx" \
+            || { echo "::warning::MegaDetector mirror unreachable — endpoint inference path is the supported deploy. Skipping."; exit 0; }
+
+          ls -lh
+
+          aws s3 cp megadetector_v5a.onnx "s3://$R2_BUCKET/models/megadetector/megadetector_v5a.onnx" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --content-type application/octet-stream \
+            --cache-control "public, max-age=31536000, immutable"
+
+          echo "### MegaDetector v5a uploaded" >> "$GITHUB_STEP_SUMMARY"
+          echo "Set repo secret \`PUBLIC_MEGADETECTOR_ENDPOINT\` to:" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`$R2_PUBLIC_BASE/models/megadetector/megadetector_v5a.onnx\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Trigger site rebuild
+        if: success()
+        run: |
+          echo "### Next step" >> "$GITHUB_STEP_SUMMARY"
+          echo "1. Set/update the PUBLIC_*_URL secret(s) shown above." >> "$GITHUB_STEP_SUMMARY"
+          echo "2. Re-run the **Deploy to GitHub Pages** workflow so the new env vars bake into the build." >> "$GITHUB_STEP_SUMMARY"

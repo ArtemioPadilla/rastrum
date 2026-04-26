@@ -41,10 +41,16 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          PUBLIC_SUPABASE_URL:       ${{ secrets.PUBLIC_SUPABASE_URL }}
-          PUBLIC_SUPABASE_ANON_KEY:  ${{ secrets.PUBLIC_SUPABASE_ANON_KEY }}
-          PUBLIC_R2_MEDIA_URL:       ${{ secrets.PUBLIC_R2_MEDIA_URL }}
-          PUBLIC_R2_TILES_URL:       ${{ secrets.PUBLIC_R2_TILES_URL }}
+          PUBLIC_SUPABASE_URL:        ${{ secrets.PUBLIC_SUPABASE_URL }}
+          PUBLIC_SUPABASE_ANON_KEY:   ${{ secrets.PUBLIC_SUPABASE_ANON_KEY }}
+          PUBLIC_R2_MEDIA_URL:        ${{ secrets.PUBLIC_R2_MEDIA_URL }}
+          PUBLIC_R2_TILES_URL:        ${{ secrets.PUBLIC_R2_TILES_URL }}
+          PUBLIC_PLANTNET_KEY:        ${{ secrets.PUBLIC_PLANTNET_KEY }}
+          PUBLIC_BIRDNET_WEIGHTS_URL: ${{ secrets.PUBLIC_BIRDNET_WEIGHTS_URL }}
+          PUBLIC_ONNX_BASE_URL:       ${{ secrets.PUBLIC_ONNX_BASE_URL }}
+          PUBLIC_PMTILES_MX_URL:      ${{ secrets.PUBLIC_PMTILES_MX_URL }}
+          PUBLIC_MEGADETECTOR_ENDPOINT: ${{ secrets.PUBLIC_MEGADETECTOR_ENDPOINT }}
+          PUBLIC_BUILD_SHA:           ${{ github.sha }}
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
