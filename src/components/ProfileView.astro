@@ -1,6 +1,7 @@
 ---
-import { t } from '../i18n/utils';
+import { t, getLocalizedPath, routes } from '../i18n/utils';
 import WatchlistView from './WatchlistView.astro';
+import StreakCard from './StreakCard.astro';
 
 interface Props {
   lang: 'en' | 'es';
@@ -8,6 +9,8 @@ interface Props {
 
 const { lang } = Astro.props;
 const tr = t(lang);
+const myObservationsPath = getLocalizedPath(lang, routes.profileObservations[lang] + '/');
+const expertApplyPath = getLocalizedPath(lang, routes.profileExpertApply[lang] + '/');
 ---
 
 <div class="max-w-3xl mx-auto">
@@ -56,6 +59,25 @@ const tr = t(lang);
         </a>
       </div>
     </header>
+
+    <!-- Quick links (self only) -->
+    <nav class="flex flex-wrap gap-2 mb-6 text-xs">
+      <a
+        href={myObservationsPath}
+        class="inline-flex items-center rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
+      >
+        {tr.profile.my_observations_link}
+      </a>
+      <a
+        href={expertApplyPath}
+        class="inline-flex items-center rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
+      >
+        {tr.expert.apply_title}
+      </a>
+    </nav>
+
+    <!-- Streak card (module 08) -->
+    <StreakCard lang={lang} />
 
     <!-- Stats strip -->
     <section class="grid grid-cols-3 gap-3 mb-10">

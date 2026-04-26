@@ -1,0 +1,261 @@
+---
+/**
+ * MyObservationsView — paginated list of the signed-in user's own
+ * observations with sync-status tabs.
+ *
+ * RLS: the obs_owner policy returns the user's own rows regardless of
+ * sync_status, so we can read pending/error rows here. We never filter on
+ * the client beyond the chosen tab.
+ *
+ * Each row links to /share/obs/?id=<id> (the existing detail page). The
+ * empty state pushes the user to the observe form.
+ */
+import { t, getLocalizedPath, routes } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+
+const { lang } = Astro.props;
+const tr = t(lang);
+const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
+const profilePath = getLocalizedPath(lang, routes.profile[lang] + '/');
+const shareObsBase = `/${lang}/share/obs/`;
+
+const tabs = [
+  { id: 'all', label: tr.profile.my_observations_filter_all },
+  { id: 'synced', label: tr.profile.my_observations_filter_synced },
+  { id: 'pending', label: tr.profile.my_observations_filter_pending },
+  { id: 'error', label: tr.profile.my_observations_filter_error },
+] as const;
+---
+
+<div
+  class="rastrum-my-observations max-w-3xl mx-auto"
+  data-lang={lang}
+  data-share-obs-base={shareObsBase}
+  data-label-loading={tr.profile.my_observations_loading}
+  data-label-empty={tr.profile.my_observations_empty}
+  data-label-cta={tr.profile.my_observations_cta}
+  data-label-load-more={tr.profile.my_observations_load_more}
+  data-label-status-synced={tr.profile.my_observations_status_synced}
+  data-label-status-pending={tr.profile.my_observations_status_pending}
+  data-label-status-error={tr.profile.my_observations_status_error}
+  data-label-unknown-species={tr.profile.my_observations_unknown_species}
+  data-observe-path={observePath}
+>
+  <header class="flex items-start justify-between gap-3 mb-6 flex-wrap">
+    <div>
+      <h1 class="text-2xl md:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+        {tr.profile.my_observations_title}
+      </h1>
+      <a href={profilePath} class="text-sm text-zinc-600 dark:text-zinc-400 hover:underline">
+        ← {tr.profile.view_profile}
+      </a>
+    </div>
+  </header>
+
+  <div id="mo-signin" class="hidden rounded-lg border border-zinc-300 dark:border-zinc-700 p-4 text-sm">
+    <p>{tr.profile.not_signed_in}</p>
+  </div>
+
+  <div id="mo-content" class="hidden">
+    <nav class="flex gap-1 mb-5 overflow-x-auto" role="tablist" aria-label={tr.profile.my_observations_title}>
+      {tabs.map(tab => (
+        <button
+          type="button"
+          role="tab"
+          data-tab={tab.id}
+          class="mo-tab inline-flex min-h-[40px] items-center px-3 py-1.5 rounded-lg text-sm font-medium border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 data-[active=true]:bg-emerald-700 data-[active=true]:text-white data-[active=true]:border-emerald-700"
+          aria-selected="false"
+        >
+          {tab.label}
+        </button>
+      ))}
+    </nav>
+
+    <ul id="mo-list" class="space-y-3"></ul>
+
+    <div id="mo-loading" class="hidden py-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
+      {tr.profile.my_observations_loading}
+    </div>
+
+    <div id="mo-empty" class="hidden rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-8 text-center">
+      <p class="text-sm text-zinc-500 dark:text-zinc-400">{tr.profile.my_observations_empty}</p>
+      <a
+        href={observePath}
+        class="mt-4 inline-flex min-h-[44px] items-center rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white"
+      >
+        {tr.profile.my_observations_cta}
+      </a>
+    </div>
+
+    <div id="mo-load-more-wrap" class="hidden mt-4 text-center">
+      <button
+        type="button"
+        id="mo-load-more"
+        class="inline-flex min-h-[44px] items-center rounded-lg border border-zinc-300 dark:border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
+      >
+        {tr.profile.my_observations_load_more}
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { isSyncFilter, type SyncFilter } from '../lib/social';
+
+  type Lang = 'en' | 'es';
+
+  type Ident = { scientific_name: string; is_primary: boolean };
+  type Media = { url: string; is_primary: boolean };
+  type Row = {
+    id: string;
+    observed_at: string;
+    sync_status: 'synced' | 'pending' | 'error';
+    state_province: string | null;
+    identifications: Ident[] | Ident | null;
+    media_files: Media[];
+  };
+
+  const PAGE_SIZE = 20;
+
+  const root = document.querySelector<HTMLElement>('.rastrum-my-observations');
+  const lang: Lang = root?.dataset.lang === 'es' ? 'es' : 'en';
+  const shareBase = root?.dataset.shareObsBase ?? '/en/share/obs/';
+
+  let currentTab: SyncFilter = 'all';
+  let offset = 0;
+  let exhausted = false;
+  let busy = false;
+  let userId: string | null = null;
+
+  function statusBadge(status: Row['sync_status']): string {
+    if (!root) return '';
+    if (status === 'synced')  return `<span class="inline-flex items-center rounded-full bg-emerald-100 dark:bg-emerald-900/30 px-2 py-0.5 text-[11px] font-semibold text-emerald-800 dark:text-emerald-300">${root.dataset.labelStatusSynced ?? ''}</span>`;
+    if (status === 'pending') return `<span class="inline-flex items-center rounded-full bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:text-amber-300">${root.dataset.labelStatusPending ?? ''}</span>`;
+    return `<span class="inline-flex items-center rounded-full bg-red-100 dark:bg-red-900/30 px-2 py-0.5 text-[11px] font-semibold text-red-800 dark:text-red-300">${root.dataset.labelStatusError ?? ''}</span>`;
+  }
+
+  function escapeText(s: string): string {
+    return s.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function rowMarkup(r: Row): string {
+    const ident = Array.isArray(r.identifications) ? r.identifications[0] : r.identifications;
+    const unknown = root?.dataset.labelUnknownSpecies ?? 'Unidentified';
+    const name = ident?.scientific_name ?? unknown;
+    const photo = (r.media_files ?? []).find(m => m.is_primary)?.url ?? (r.media_files ?? [])[0]?.url ?? '';
+    const date = new Date(r.observed_at).toLocaleDateString(lang === 'es' ? 'es' : 'en');
+    const region = r.state_province ? ' · ' + r.state_province : '';
+    const isSynced = r.sync_status === 'synced';
+    const wrapTag = isSynced ? 'a' : 'div';
+    const wrapAttr = isSynced ? `href="${shareBase}?id=${r.id}"` : '';
+    return `<li class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 overflow-hidden">
+      <${wrapTag} ${wrapAttr} class="flex items-center gap-3 p-3 ${isSynced ? 'hover:bg-zinc-50 dark:hover:bg-zinc-800/40' : 'opacity-90'}">
+        <div class="w-16 h-16 shrink-0 rounded-lg overflow-hidden bg-zinc-100 dark:bg-zinc-800">
+          ${photo ? `<img src="${escapeText(photo)}" alt="${escapeText(name)}" class="w-full h-full object-cover" loading="lazy" />` : ''}
+        </div>
+        <div class="min-w-0 flex-1">
+          <p class="text-sm italic font-medium text-zinc-900 dark:text-zinc-100 truncate">${escapeText(name)}</p>
+          <p class="text-xs text-zinc-500 truncate">${date}${escapeText(region)}</p>
+          <div class="mt-1">${statusBadge(r.sync_status)}</div>
+        </div>
+      </${wrapTag}>
+    </li>`;
+  }
+
+  async function fetchPage(): Promise<Row[]> {
+    if (!userId) return [];
+    const supabase = getSupabase();
+    let q = supabase
+      .from('observations')
+      .select('id, observed_at, sync_status, state_province, identifications(scientific_name, is_primary), media_files(url, is_primary)')
+      .eq('observer_id', userId)
+      .order('observed_at', { ascending: false })
+      .range(offset, offset + PAGE_SIZE - 1);
+    if (currentTab !== 'all') q = q.eq('sync_status', currentTab);
+    const { data } = await q;
+    return ((data ?? []) as unknown) as Row[];
+  }
+
+  function setEmptyState(visible: boolean) {
+    document.getElementById('mo-empty')?.classList.toggle('hidden', !visible);
+  }
+
+  async function loadMore() {
+    if (busy || exhausted) return;
+    busy = true;
+    document.getElementById('mo-loading')?.classList.remove('hidden');
+    try {
+      const page = await fetchPage();
+      const list = document.getElementById('mo-list');
+      if (list) list.insertAdjacentHTML('beforeend', page.map(rowMarkup).join(''));
+      offset += page.length;
+      if (page.length < PAGE_SIZE) exhausted = true;
+      const wrap = document.getElementById('mo-load-more-wrap');
+      wrap?.classList.toggle('hidden', exhausted);
+      const list2 = document.getElementById('mo-list');
+      const empty = list2 ? list2.children.length === 0 : true;
+      setEmptyState(empty);
+    } finally {
+      document.getElementById('mo-loading')?.classList.add('hidden');
+      busy = false;
+    }
+  }
+
+  function resetAndLoad() {
+    offset = 0;
+    exhausted = false;
+    const list = document.getElementById('mo-list');
+    if (list) list.innerHTML = '';
+    setEmptyState(false);
+    return loadMore();
+  }
+
+  function wireTabs() {
+    const tabs = document.querySelectorAll<HTMLButtonElement>('.mo-tab');
+    const setActive = (id: string) => {
+      tabs.forEach(t => t.dataset.active = String(t.dataset.tab === id));
+      tabs.forEach(t => t.setAttribute('aria-selected', String(t.dataset.tab === id)));
+    };
+    setActive(currentTab);
+    tabs.forEach(t => {
+      t.addEventListener('click', () => {
+        const v = t.dataset.tab ?? 'all';
+        if (!isSyncFilter(v) || v === currentTab) return;
+        currentTab = v;
+        setActive(currentTab);
+        resetAndLoad().catch(() => { /* surface no-op; RLS may reject when offline */ });
+      });
+    });
+  }
+
+  async function init() {
+    if (!root) return;
+    let supabase;
+    try {
+      supabase = getSupabase();
+    } catch {
+      document.getElementById('mo-signin')?.classList.remove('hidden');
+      return;
+    }
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      document.getElementById('mo-signin')?.classList.remove('hidden');
+      return;
+    }
+    userId = user.id;
+    document.getElementById('mo-content')?.classList.remove('hidden');
+    wireTabs();
+    document.getElementById('mo-load-more')?.addEventListener('click', () => {
+      loadMore().catch(() => { /* no-op */ });
+    });
+    await resetAndLoad();
+  }
+
+  init().catch(() => {
+    document.getElementById('mo-signin')?.classList.remove('hidden');
+  });
+</script>

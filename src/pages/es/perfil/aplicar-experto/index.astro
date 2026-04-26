@@ -1,0 +1,12 @@
+---
+import BaseLayout from '../../../../layouts/BaseLayout.astro';
+import ExpertApplyView from '../../../../components/ExpertApplyView.astro';
+import { t } from '../../../../i18n/utils';
+
+const lang = 'es';
+const tr = t(lang);
+---
+
+<BaseLayout title={`${tr.expert.apply_title} — Rastrum`} lang={lang}>
+  <ExpertApplyView lang={lang} />
+</BaseLayout>

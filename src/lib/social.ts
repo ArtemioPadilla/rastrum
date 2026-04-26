@@ -163,3 +163,105 @@ export function sanitizeCommentBody(input: string): string {
   const trimmed = (input ?? '').trim().slice(0, 2000);
   return renderMarkdown(trimmed);
 }
+
+/**
+ * Streak state derived from the public.user_streaks row plus today's date.
+ *
+ * 'active'  — streak is alive and the user observed today or yesterday
+ * 'at_risk' — last qualifying day was 2 days ago (one grace miss left)
+ * 'broken'  — current_days is 0 because the streak lapsed
+ * 'none'    — user has never qualified
+ */
+export type StreakState = 'active' | 'at_risk' | 'broken' | 'none';
+
+export interface StreakRow {
+  current_days: number;
+  longest_days: number;
+  last_qualifying_day: string | null;
+  updated_at?: string | null;
+}
+
+export interface StreakSummary {
+  state: StreakState;
+  current: number;
+  longest: number;
+  /** Human-friendly local-date string for last_qualifying_day (or null). */
+  lastDayIso: string | null;
+  /** Days elapsed since last_qualifying_day; null when no day on record. */
+  daysSinceLast: number | null;
+}
+
+const MS_PER_DAY = 86_400_000;
+
+function parseUtcDate(iso: string): Date | null {
+  if (!iso) return null;
+  const d = new Date(iso.length === 10 ? `${iso}T00:00:00Z` : iso);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function utcStartOfDay(d: Date): number {
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+}
+
+/**
+ * Summarise a streak row for display. Pure — no DB calls.
+ *
+ * The recompute job sets current_days = 0 when last_qualifying_day is older
+ * than yesterday, but the day in between (today, with no obs yet) is still
+ * "active" if last day was yesterday. We surface 'at_risk' when last day was
+ * 2 days ago — the SQL allows a single 30-day grace miss, so the streak may
+ * still be alive on the server.
+ */
+export function summarizeStreak(row: StreakRow | null | undefined, now: Date = new Date()): StreakSummary {
+  if (!row || (row.current_days === 0 && row.longest_days === 0 && !row.last_qualifying_day)) {
+    return { state: 'none', current: 0, longest: 0, lastDayIso: null, daysSinceLast: null };
+  }
+  const lastDate = row.last_qualifying_day ? parseUtcDate(row.last_qualifying_day) : null;
+  const daysSinceLast = lastDate
+    ? Math.floor((utcStartOfDay(now) - utcStartOfDay(lastDate)) / MS_PER_DAY)
+    : null;
+
+  let state: StreakState;
+  if (row.current_days === 0) {
+    state = row.longest_days > 0 ? 'broken' : 'none';
+  } else if (daysSinceLast !== null && daysSinceLast >= 2) {
+    state = 'at_risk';
+  } else {
+    state = 'active';
+  }
+
+  return {
+    state,
+    current: row.current_days,
+    longest: row.longest_days,
+    lastDayIso: row.last_qualifying_day ?? null,
+    daysSinceLast,
+  };
+}
+
+/**
+ * Locale-aware label for a streak count.
+ *
+ * Examples:
+ *   formatStreakDays(0, 'en') => '0 days'
+ *   formatStreakDays(1, 'en') => '1 day'
+ *   formatStreakDays(7, 'es') => '7 días'
+ *   formatStreakDays(1, 'es') => '1 día'
+ */
+export function formatStreakDays(n: number, lang: 'en' | 'es'): string {
+  const safe = Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
+  if (lang === 'es') return `${safe} día${safe === 1 ? '' : 's'}`;
+  return `${safe} day${safe === 1 ? '' : 's'}`;
+}
+
+/**
+ * Sync-status filter used by the My Observations list. Pure helper so the
+ * page can be tested without a DOM.
+ */
+export type SyncFilter = 'all' | 'synced' | 'pending' | 'error';
+
+export const SYNC_FILTERS: ReadonlyArray<SyncFilter> = ['all', 'synced', 'pending', 'error'];
+
+export function isSyncFilter(value: string | null | undefined): value is SyncFilter {
+  return !!value && (SYNC_FILTERS as ReadonlyArray<string>).includes(value);
+}

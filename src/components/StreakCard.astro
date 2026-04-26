@@ -1,0 +1,213 @@
+---
+/**
+ * StreakCard — surface the current/longest/last-active streak from
+ * public.user_streaks for the signed-in user, or a CTA to opt in.
+ *
+ * Reads gamification_opt_in from public.users; if false, shows the enable
+ * card. Toggling the flag flips the column and triggers a one-shot recompute
+ * (the nightly cron handles ongoing updates).
+ *
+ * RLS: streaks_self_read covers the signed-in user. We never filter on the
+ * client — empty results just render the "none" state.
+ */
+import { t } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+
+const { lang } = Astro.props;
+const tr = t(lang);
+---
+
+<section
+  class="rastrum-streak-card mb-8"
+  data-lang={lang}
+  data-label-loading={tr.social.streak_loading}
+  data-label-active={tr.social.streak_state_active}
+  data-label-at-risk={tr.social.streak_state_at_risk}
+  data-label-broken={tr.social.streak_state_broken}
+  data-label-none={tr.social.streak_state_none}
+  data-label-current={tr.social.streak_current}
+  data-label-longest={tr.social.streak_longest}
+  data-label-last={tr.social.streak_last_active}
+  data-label-never={tr.social.streak_never}
+  data-label-enabling={tr.social.streak_enabling}
+  data-label-recompute-failed={tr.social.streak_recompute_failed}
+>
+  <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-3">
+    {tr.social.streak_title}
+  </h2>
+
+  <div class="streak-loading rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4 text-sm text-zinc-500 dark:text-zinc-400">
+    {tr.social.streak_loading}
+  </div>
+
+  <div class="streak-enable hidden rounded-lg border border-emerald-300 dark:border-emerald-700/60 bg-emerald-50 dark:bg-emerald-900/20 p-4">
+    <p class="text-sm font-semibold text-emerald-900 dark:text-emerald-100">{tr.social.streak_enable_title}</p>
+    <p class="mt-1 text-xs text-emerald-800 dark:text-emerald-200">{tr.social.streak_enable_body}</p>
+    <button
+      type="button"
+      class="streak-enable-btn mt-3 inline-flex min-h-[44px] items-center rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+    >
+      <span class="streak-enable-label">{tr.social.streak_enable_cta}</span>
+    </button>
+    <p class="streak-enable-error hidden mt-2 text-xs text-red-600 dark:text-red-400"></p>
+  </div>
+
+  <div class="streak-display hidden rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4">
+    <div class="flex items-center justify-between flex-wrap gap-3">
+      <div class="flex items-center gap-3">
+        <span aria-hidden="true" class="streak-flame text-2xl leading-none">🔥</span>
+        <div>
+          <p class="streak-state-label text-sm font-semibold text-zinc-900 dark:text-zinc-100">—</p>
+          <p class="streak-last text-xs text-zinc-500 dark:text-zinc-400">—</p>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3 text-right">
+        <div>
+          <p class="streak-current text-2xl font-bold text-zinc-900 dark:text-zinc-100">0</p>
+          <p class="text-xs text-zinc-500 dark:text-zinc-400">{tr.social.streak_current}</p>
+        </div>
+        <div>
+          <p class="streak-longest text-2xl font-bold text-zinc-900 dark:text-zinc-100">0</p>
+          <p class="text-xs text-zinc-500 dark:text-zinc-400">{tr.social.streak_longest}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { summarizeStreak, formatStreakDays, type StreakRow, type StreakState } from '../lib/social';
+
+  type Lang = 'en' | 'es';
+
+  function setText(root: HTMLElement, sel: string, text: string) {
+    const el = root.querySelector<HTMLElement>(sel);
+    if (el) el.textContent = text;
+  }
+
+  function show(root: HTMLElement, sel: string) {
+    root.querySelector<HTMLElement>(sel)?.classList.remove('hidden');
+  }
+
+  function hide(root: HTMLElement, sel: string) {
+    root.querySelector<HTMLElement>(sel)?.classList.add('hidden');
+  }
+
+  function stateLabel(state: StreakState, root: HTMLElement): string {
+    const map: Record<StreakState, string> = {
+      active: root.dataset.labelActive ?? '',
+      at_risk: root.dataset.labelAtRisk ?? '',
+      broken: root.dataset.labelBroken ?? '',
+      none: root.dataset.labelNone ?? '',
+    };
+    return map[state] ?? '';
+  }
+
+  function flameForState(state: StreakState): string {
+    if (state === 'active') return '🔥';
+    if (state === 'at_risk') return '⚠️';
+    if (state === 'broken') return '💤';
+    return '🌱';
+  }
+
+  function paintRow(root: HTMLElement, lang: Lang, row: StreakRow | null) {
+    const sum = summarizeStreak(row);
+    setText(root, '.streak-state-label', stateLabel(sum.state, root));
+    setText(root, '.streak-current', formatStreakDays(sum.current, lang));
+    setText(root, '.streak-longest', formatStreakDays(sum.longest, lang));
+
+    const lastLabel = root.dataset.labelLast ?? '';
+    const neverLabel = root.dataset.labelNever ?? '';
+    const lastText = sum.lastDayIso
+      ? `${lastLabel}: ${new Date(sum.lastDayIso + (sum.lastDayIso.length === 10 ? 'T00:00:00Z' : '')).toLocaleDateString(lang === 'es' ? 'es' : 'en')}`
+      : `${lastLabel}: ${neverLabel}`;
+    setText(root, '.streak-last', lastText);
+
+    const flame = root.querySelector<HTMLElement>('.streak-flame');
+    if (flame) flame.textContent = flameForState(sum.state);
+  }
+
+  async function init() {
+    const root = document.querySelector<HTMLElement>('.rastrum-streak-card');
+    if (!root) return;
+    const lang = (root.dataset.lang === 'es' ? 'es' : 'en') as Lang;
+
+    let supabase;
+    try {
+      supabase = getSupabase();
+    } catch {
+      hide(root, '.streak-loading');
+      return;
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      // Not signed in — ProfileView handles signed-out state; hide the card.
+      root.classList.add('hidden');
+      return;
+    }
+
+    const { data: profile } = await supabase
+      .from('users')
+      .select('gamification_opt_in')
+      .eq('id', user.id)
+      .maybeSingle<{ gamification_opt_in: boolean }>();
+
+    hide(root, '.streak-loading');
+
+    if (!profile?.gamification_opt_in) {
+      show(root, '.streak-enable');
+      const btn = root.querySelector<HTMLButtonElement>('.streak-enable-btn');
+      const label = root.querySelector<HTMLElement>('.streak-enable-label');
+      const err = root.querySelector<HTMLElement>('.streak-enable-error');
+      btn?.addEventListener('click', async () => {
+        if (!btn || !label) return;
+        btn.disabled = true;
+        const original = label.textContent ?? '';
+        label.textContent = root.dataset.labelEnabling ?? original;
+        err?.classList.add('hidden');
+        try {
+          const { error: upErr } = await supabase
+            .from('users')
+            .update({ gamification_opt_in: true, profile_public: true })
+            .eq('id', user.id);
+          if (upErr) throw upErr;
+          // Fire one recompute now; the nightly cron handles future runs.
+          await supabase.rpc('recompute_streak', { p_user_id: user.id });
+          const { data: row } = await supabase
+            .from('user_streaks')
+            .select('current_days, longest_days, last_qualifying_day, updated_at')
+            .eq('user_id', user.id)
+            .maybeSingle<StreakRow>();
+          hide(root, '.streak-enable');
+          show(root, '.streak-display');
+          paintRow(root, lang, row ?? null);
+        } catch {
+          if (err) {
+            err.textContent = root.dataset.labelRecomputeFailed ?? '';
+            err.classList.remove('hidden');
+          }
+          label.textContent = original;
+          btn.disabled = false;
+        }
+      });
+      return;
+    }
+
+    const { data: row } = await supabase
+      .from('user_streaks')
+      .select('current_days, longest_days, last_qualifying_day, updated_at')
+      .eq('user_id', user.id)
+      .maybeSingle<StreakRow>();
+    show(root, '.streak-display');
+    paintRow(root, lang, row ?? null);
+  }
+
+  init().catch(() => {
+    document.querySelector<HTMLElement>('.rastrum-streak-card .streak-loading')?.classList.add('hidden');
+  });
+</script>

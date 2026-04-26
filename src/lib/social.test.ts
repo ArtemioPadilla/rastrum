@@ -4,6 +4,9 @@ import {
   formatTimeAgo,
   renderMarkdown,
   sanitizeCommentBody,
+  summarizeStreak,
+  formatStreakDays,
+  isSyncFilter,
   type CommentRow,
 } from './social';
 
@@ -151,5 +154,89 @@ describe('sanitizeCommentBody', () => {
 
   it('handles empty input', () => {
     expect(sanitizeCommentBody('')).toBe('');
+  });
+});
+
+describe('summarizeStreak', () => {
+  const today = new Date('2026-04-25T15:00:00Z');
+
+  it('returns "none" when row is null', () => {
+    const s = summarizeStreak(null, today);
+    expect(s.state).toBe('none');
+    expect(s.current).toBe(0);
+    expect(s.longest).toBe(0);
+  });
+
+  it('returns "none" when never qualified', () => {
+    const s = summarizeStreak({ current_days: 0, longest_days: 0, last_qualifying_day: null }, today);
+    expect(s.state).toBe('none');
+  });
+
+  it('returns "active" when last day was today', () => {
+    const s = summarizeStreak(
+      { current_days: 5, longest_days: 9, last_qualifying_day: '2026-04-25' },
+      today
+    );
+    expect(s.state).toBe('active');
+    expect(s.daysSinceLast).toBe(0);
+  });
+
+  it('returns "active" when last day was yesterday', () => {
+    const s = summarizeStreak(
+      { current_days: 5, longest_days: 9, last_qualifying_day: '2026-04-24' },
+      today
+    );
+    expect(s.state).toBe('active');
+    expect(s.daysSinceLast).toBe(1);
+  });
+
+  it('returns "at_risk" when last day was 2 days ago but server still says active', () => {
+    const s = summarizeStreak(
+      { current_days: 5, longest_days: 9, last_qualifying_day: '2026-04-23' },
+      today
+    );
+    expect(s.state).toBe('at_risk');
+    expect(s.daysSinceLast).toBe(2);
+  });
+
+  it('returns "broken" when current is 0 but longest is positive', () => {
+    const s = summarizeStreak(
+      { current_days: 0, longest_days: 12, last_qualifying_day: '2026-04-01' },
+      today
+    );
+    expect(s.state).toBe('broken');
+  });
+});
+
+describe('formatStreakDays', () => {
+  it('singular en', () => {
+    expect(formatStreakDays(1, 'en')).toBe('1 day');
+  });
+  it('plural en', () => {
+    expect(formatStreakDays(7, 'en')).toBe('7 days');
+  });
+  it('singular es', () => {
+    expect(formatStreakDays(1, 'es')).toBe('1 día');
+  });
+  it('plural es', () => {
+    expect(formatStreakDays(0, 'es')).toBe('0 días');
+  });
+  it('clamps NaN to 0', () => {
+    expect(formatStreakDays(Number.NaN, 'en')).toBe('0 days');
+  });
+});
+
+describe('isSyncFilter', () => {
+  it('accepts known values', () => {
+    expect(isSyncFilter('all')).toBe(true);
+    expect(isSyncFilter('synced')).toBe(true);
+    expect(isSyncFilter('pending')).toBe(true);
+    expect(isSyncFilter('error')).toBe(true);
+  });
+  it('rejects unknown values', () => {
+    expect(isSyncFilter(null)).toBe(false);
+    expect(isSyncFilter('')).toBe(false);
+    expect(isSyncFilter('SYNCED')).toBe(false);
+    expect(isSyncFilter('foo')).toBe(false);
   });
 });

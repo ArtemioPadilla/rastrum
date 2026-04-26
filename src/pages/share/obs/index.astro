@@ -48,6 +48,12 @@ const obsIdPlaceholder = '';
       <p id="sensitive" class="hidden text-sm text-amber-700 dark:text-amber-400 border-l-4 border-amber-500 pl-3">
         This observation is of a sensitive species. Precise coordinates are obscured to protect it.
       </p>
+
+      {/* TODO(local-contexts): when public.observations gains a
+          `local_contexts_notice_url` column (schema gap as of 2026-04-25 —
+          see docs/specs/modules/07-licensing.md and the local-contexts
+          roadmap item), render the BC/TK notice badge + link here.
+          Schema must NOT be modified from this UI; wait for the migration. */}
     </article>
 
     <div id="err" class="hidden py-16 text-center text-red-600 dark:text-red-400"></div>
