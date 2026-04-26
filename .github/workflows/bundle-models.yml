@@ -40,7 +40,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: bundle-models-${{ github.ref }}
+  # Scope per asset so independent bundles can run in parallel.
+  group: bundle-models-${{ github.ref }}-${{ inputs.asset }}
   cancel-in-progress: false
 
 jobs:
