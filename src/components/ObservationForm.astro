@@ -14,6 +14,25 @@ const habitats = [
 ];
 const weathers = ['sunny','cloudy','overcast','light_rain','heavy_rain','fog','storm'];
 const weatherLabels = (tr.observe as any).weather_options as Record<string,string> | undefined;
+
+// Pull strings into typed local consts so JSX never needs an inline
+// `Record<…>` cast (Astro/esbuild parses the angle brackets as a tag).
+const observeStrings = tr.observe as unknown as Record<string, string>;
+const mapPickerOpen     = observeStrings.map_picker_open     ?? (isEs ? 'Elegir en el mapa' : 'Pick on map');
+const mapPickerTitle    = observeStrings.map_picker_title    ?? (isEs ? 'Elige una ubicación' : 'Pick a location');
+const mapPickerHint     = observeStrings.map_picker_hint     ?? '';
+const mapPickerUse      = observeStrings.map_picker_use      ?? (isEs ? 'Usar esta ubicación' : 'Use this location');
+const mapPickerCancel   = observeStrings.map_picker_cancel   ?? (isEs ? 'Cancelar' : 'Cancel');
+const mapPickerLoading  = observeStrings.map_picker_loading  ?? (isEs ? 'Cargando mapa…' : 'Loading map…');
+const cameraOpen        = observeStrings.camera_open         ?? (isEs ? 'Abrir cámara' : 'Open camera');
+const cameraTitle       = observeStrings.camera_title        ?? (isEs ? 'Tomar foto' : 'Take a photo');
+const cameraCapture     = observeStrings.camera_capture      ?? (isEs ? 'Capturar' : 'Capture');
+const cameraCancel      = observeStrings.camera_cancel       ?? (isEs ? 'Cancelar' : 'Cancel');
+const cameraFlip        = observeStrings.camera_flip         ?? (isEs ? 'Cambiar cámara' : 'Flip camera');
+const cameraStarting    = observeStrings.camera_starting     ?? (isEs ? 'Iniciando cámara…' : 'Starting camera…');
+const videoRecord       = observeStrings.video_record        ?? (isEs ? 'Grabar video' : 'Record video');
+const videoLabel        = observeStrings.video_label         ?? 'Video';
+const videoMaxDuration  = observeStrings.video_max_duration  ?? (isEs ? 'Máximo 30 segundos' : 'Maximum 30 seconds');
 ---
 
 <div class="max-w-xl mx-auto">
@@ -42,17 +61,34 @@ const weatherLabels = (tr.observe as any).weather_options as Record<string,strin
     <div>
       <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">{tr.observe.photo_label}</label>
       <div id="photo-grid" class="hidden mb-3 grid grid-cols-3 gap-2"></div>
-      <div class="flex gap-2">
-        <label class="flex-1 cursor-pointer rounded-lg border border-emerald-600/60 px-3 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-400 text-center hover:bg-emerald-50 dark:hover:bg-emerald-900/20">
+      <div class="flex gap-2 flex-wrap">
+        <button id="camera-open-btn" type="button" class="flex-1 min-h-11 rounded-lg border border-emerald-600/60 px-3 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-400 text-center hover:bg-emerald-50 dark:hover:bg-emerald-900/20">
+          {cameraOpen}
+        </button>
+        <label class="flex-1 cursor-pointer min-h-11 rounded-lg border border-emerald-600/60 px-3 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-400 text-center hover:bg-emerald-50 dark:hover:bg-emerald-900/20 flex items-center justify-center">
           <input id="camera-input" type="file" accept="image/*" capture="environment" class="hidden" />
           {tr.observe.use_camera}
         </label>
-        <label class="flex-1 cursor-pointer rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 text-center hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
+        <label class="flex-1 cursor-pointer min-h-11 rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 text-center hover:bg-zinc-50 dark:hover:bg-zinc-800/40 flex items-center justify-center">
           <input id="gallery-input" type="file" accept="image/*" multiple class="hidden" />
           {tr.observe.choose_file}
         </label>
       </div>
       <p class="mt-1 text-xs text-zinc-500">{tr.observe.photo_hint}</p>
+    </div>
+
+    <!-- Video (multi) -->
+    <div>
+      <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">{videoLabel}</label>
+      <div id="video-grid" class="hidden mb-3 space-y-2"></div>
+      <div class="flex items-center gap-2">
+        <button id="video-record-btn" type="button" class="min-h-11 rounded-lg border border-emerald-600/60 px-3 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 disabled:opacity-50">
+          <span data-video-label>{videoRecord}</span>
+        </button>
+        <span id="video-elapsed" class="hidden text-xs text-zinc-500 font-mono"></span>
+        <span id="video-error" class="hidden text-xs text-red-600 dark:text-red-400"></span>
+      </div>
+      <p class="mt-1 text-xs text-zinc-500">{videoMaxDuration}</p>
     </div>
 
     <!-- Identification block -->
@@ -126,10 +162,13 @@ const weatherLabels = (tr.observe as any).weather_options as Record<string,strin
         <span id="gps-status" class="text-zinc-500">{tr.observe.gps_getting}</span>
       </div>
       <div id="gps-manual-wrap" class="hidden mt-2 grid grid-cols-2 gap-2">
-        <input id="manual-lat" name="lat" type="number" step="any" placeholder="Lat" class="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
-        <input id="manual-lng" name="lng" type="number" step="any" placeholder="Lng" class="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
+        <input id="manual-lat" name="lat" type="number" step="any" placeholder="Lat" class="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-base" />
+        <input id="manual-lng" name="lng" type="number" step="any" placeholder="Lng" class="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-base" />
       </div>
-      <button type="button" id="gps-manual-btn" class="mt-1 text-xs text-emerald-700 dark:text-emerald-400 underline">{tr.observe.gps_manual}</button>
+      <div class="mt-1 flex gap-3 flex-wrap">
+        <button type="button" id="gps-manual-btn" class="text-xs text-emerald-700 dark:text-emerald-400 underline">{tr.observe.gps_manual}</button>
+        <button type="button" id="map-picker-open-btn" class="text-xs text-emerald-700 dark:text-emerald-400 underline">{mapPickerOpen}</button>
+      </div>
     </div>
 
     <!-- Habitat / weather -->
@@ -205,12 +244,72 @@ const weatherLabels = (tr.observe as any).weather_options as Record<string,strin
   </div>
 </div>
 
+<!-- Camera modal (getUserMedia) — full-screen on small viewports -->
+<div id="camera-modal" class="hidden fixed inset-0 z-50 flex items-stretch sm:items-center justify-center bg-black/80 p-0 sm:p-4" role="dialog" aria-modal="true" aria-labelledby="camera-modal-title">
+  <div class="relative w-full sm:max-w-lg bg-black sm:rounded-lg overflow-hidden flex flex-col">
+    <div class="flex items-center justify-between px-3 py-2 bg-black/60 text-white">
+      <h2 id="camera-modal-title" class="text-sm font-semibold">{cameraTitle}</h2>
+      <button id="camera-close-btn" type="button" class="min-h-11 min-w-11 rounded text-white/90 hover:text-white" aria-label={cameraCancel}>
+        <svg class="w-5 h-5 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="relative flex-1 min-h-[60vh] sm:min-h-[60vh] bg-black flex items-center justify-center">
+      <video id="camera-video" class="w-full h-full max-h-[80vh] object-contain bg-black" autoplay playsinline muted></video>
+      <p id="camera-status" class="hidden absolute inset-0 flex items-center justify-center text-white text-sm px-4 text-center">{cameraStarting}</p>
+    </div>
+    <div class="flex items-center justify-between gap-2 px-3 py-3 bg-black/70">
+      <button id="camera-flip-btn" type="button" class="min-h-11 px-3 rounded-lg text-sm font-medium text-white border border-white/30 hover:bg-white/10">
+        {cameraFlip}
+      </button>
+      <button id="camera-capture-btn" type="button" class="min-h-11 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">
+        {cameraCapture}
+      </button>
+      <button id="camera-cancel-btn" type="button" class="min-h-11 px-3 rounded-lg text-sm font-medium text-white/90 hover:text-white">
+        {cameraCancel}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Map picker modal — full-screen on small viewports -->
+<div id="map-modal" class="hidden fixed inset-0 z-50 flex items-stretch sm:items-center justify-center bg-black/80 p-0 sm:p-4" role="dialog" aria-modal="true" aria-labelledby="map-modal-title">
+  <div class="relative w-full sm:max-w-2xl h-full sm:h-[80vh] bg-white dark:bg-zinc-900 sm:rounded-lg overflow-hidden flex flex-col">
+    <div class="flex items-center justify-between px-3 py-2 border-b border-zinc-200 dark:border-zinc-800">
+      <h2 id="map-modal-title" class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{mapPickerTitle}</h2>
+      <button id="map-close-btn" type="button" class="min-h-11 min-w-11 rounded text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300" aria-label={mapPickerCancel}>
+        <svg class="w-5 h-5 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <p class="px-3 py-2 text-xs text-zinc-500">{mapPickerHint}</p>
+    <div id="map-picker" class="flex-1 bg-zinc-100 dark:bg-zinc-900"></div>
+    <p id="map-picker-status" class="px-3 py-1 text-xs text-zinc-500">{mapPickerLoading}</p>
+    <div class="flex items-center justify-end gap-2 px-3 py-3 border-t border-zinc-200 dark:border-zinc-800">
+      <button id="map-cancel-btn" type="button" class="min-h-11 px-3 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800">
+        {mapPickerCancel}
+      </button>
+      <button id="map-use-btn" type="button" class="min-h-11 rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" disabled>
+        {mapPickerUse}
+      </button>
+    </div>
+  </div>
+</div>
+
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.css" />
+
 <script>
   import { parse as parseExif } from 'exifr';
   import { getDB, requestPersistentStorage } from '../lib/db';
   import { getSupabase } from '../lib/supabase';
   import { syncOutbox, registerSyncTriggers } from '../lib/sync';
   import type { Observation, ObserverRef } from '../lib/types';
+  import {
+    pickVideoMime,
+    VIDEO_MAX_SECS,
+    VIDEO_THUMB_PARAMS,
+    computeThumbDims,
+    MEXICO_DEFAULT_CENTER,
+    isValidLatLng,
+  } from '../lib/media-helpers';
 
   const form         = document.getElementById('obs-form') as HTMLFormElement | null;
 
@@ -259,10 +358,18 @@ const weatherLabels = (tr.observe as any).weather_options as Record<string,strin
 
   type PhotoEntry = { file: File; blobId: string };
   type AudioEntry = { blob: Blob; blobId: string; mimeType: string; durationSec: number };
+  type VideoEntry = {
+    blob: Blob;
+    blobId: string;
+    mimeType: string;
+    durationSec: number;
+    thumbnailUrl: string | null;
+  };
 
   let location: LocState = null;
   const photos: PhotoEntry[] = [];
   const audios: AudioEntry[] = [];
+  const videos: VideoEntry[] = [];
 
   function paintLocation() {
     if (!gpsStatus) return;
@@ -406,8 +513,11 @@ const weatherLabels = (tr.observe as any).weather_options as Record<string,strin
     }
   }
 
-  function addPhotos(fileList: FileList) {
-    for (const file of Array.from(fileList)) {
+  function addPhotos(fileList: FileList | File[]) {
+    const files = (fileList instanceof Array)
+      ? fileList
+      : Array.from(fileList as FileList);
+    for (const file of files) {
       photos.push({ file, blobId: crypto.randomUUID() });
       // Trigger identification on first photo
       if (photos.length === 1) triggerClientIdentify(file);
@@ -533,6 +643,380 @@ const weatherLabels = (tr.observe as any).weather_options as Record<string,strin
     else                                                       startRecording();
   });
 
+  // ── In-app camera (getUserMedia) ──────────────────────────────────────
+  const cameraOpenBtn   = document.getElementById('camera-open-btn') as HTMLButtonElement | null;
+  const cameraModal     = document.getElementById('camera-modal');
+  const cameraVideo     = document.getElementById('camera-video') as HTMLVideoElement | null;
+  const cameraStatusEl  = document.getElementById('camera-status');
+  const cameraCloseBtn  = document.getElementById('camera-close-btn');
+  const cameraCancelBtn = document.getElementById('camera-cancel-btn');
+  const cameraCaptureBtn= document.getElementById('camera-capture-btn') as HTMLButtonElement | null;
+  const cameraFlipBtn   = document.getElementById('camera-flip-btn');
+  const cameraInputEl   = document.getElementById('camera-input') as HTMLInputElement | null;
+
+  let cameraStream: MediaStream | null = null;
+  let cameraFacing: 'environment' | 'user' = 'environment';
+
+  function cameraSupported(): boolean {
+    return typeof navigator !== 'undefined'
+      && !!navigator.mediaDevices
+      && typeof navigator.mediaDevices.getUserMedia === 'function';
+  }
+
+  // If getUserMedia is unavailable, fall back to the file input with capture
+  // attribute (legacy behaviour). The button below the camera-input label
+  // still works on its own.
+  if (!cameraSupported()) {
+    cameraOpenBtn?.classList.add('hidden');
+  }
+
+  function showCameraStatus(text: string | null) {
+    if (!cameraStatusEl) return;
+    if (!text) { cameraStatusEl.classList.add('hidden'); return; }
+    cameraStatusEl.textContent = text;
+    cameraStatusEl.classList.remove('hidden');
+  }
+
+  async function startCameraStream() {
+    if (!cameraVideo) return;
+    showCameraStatus(isEs ? 'Iniciando cámara…' : 'Starting camera…');
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(t => t.stop());
+      cameraStream = null;
+    }
+    try {
+      cameraStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: cameraFacing } },
+        audio: false,
+      });
+    } catch {
+      // Permission denied or device error — fall back to legacy file input
+      // with capture=environment.
+      showCameraStatus(isEs
+        ? 'Acceso a la cámara denegado. Usa el selector de archivos.'
+        : 'Camera access denied. Use the file picker instead.');
+      cameraInputEl?.click();
+      closeCameraModal();
+      return;
+    }
+    cameraVideo.srcObject = cameraStream;
+    try { await cameraVideo.play(); } catch { /* autoplay blocked? user can tap */ }
+    showCameraStatus(null);
+  }
+
+  function closeCameraModal() {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(t => t.stop());
+      cameraStream = null;
+    }
+    if (cameraVideo) cameraVideo.srcObject = null;
+    cameraModal?.classList.add('hidden');
+  }
+
+  async function openCameraModal() {
+    if (!cameraSupported()) {
+      // Fall back to the legacy capture=environment input.
+      cameraInputEl?.click();
+      return;
+    }
+    cameraModal?.classList.remove('hidden');
+    await startCameraStream();
+  }
+
+  cameraOpenBtn?.addEventListener('click', () => { openCameraModal(); });
+  cameraCloseBtn?.addEventListener('click', closeCameraModal);
+  cameraCancelBtn?.addEventListener('click', closeCameraModal);
+  cameraFlipBtn?.addEventListener('click', async () => {
+    cameraFacing = cameraFacing === 'environment' ? 'user' : 'environment';
+    await startCameraStream();
+  });
+  cameraCaptureBtn?.addEventListener('click', async () => {
+    if (!cameraVideo || !cameraStream) return;
+    const w = cameraVideo.videoWidth;
+    const h = cameraVideo.videoHeight;
+    if (!Number.isFinite(w) || !Number.isFinite(h) || w === 0 || h === 0) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(cameraVideo, 0, 0, w, h);
+    const blob: Blob | null = await new Promise(resolve => {
+      canvas.toBlob(b => resolve(b), 'image/jpeg', 0.9);
+    });
+    if (!blob) return;
+    const file = new File([blob], `camera-${Date.now()}.jpg`, { type: 'image/jpeg' });
+    addPhotos([file]);
+    await fillFromExif(file);
+    closeCameraModal();
+  });
+
+  // ── Video recording (MediaRecorder, ≤30 s) ───────────────────────────
+  const videoGridEl    = document.getElementById('video-grid');
+  const videoRecBtn    = document.getElementById('video-record-btn') as HTMLButtonElement | null;
+  const videoRecLabel  = videoRecBtn?.querySelector('[data-video-label]') as HTMLElement | null;
+  const videoElapsedEl = document.getElementById('video-elapsed');
+  const videoErrEl     = document.getElementById('video-error');
+
+  let videoRecorder: MediaRecorder | null = null;
+  let videoStream: MediaStream | null = null;
+  let videoChunks: Blob[] = [];
+  let videoStartedAt = 0;
+  let videoElapsedTimer: number | null = null;
+  let videoCutoffTimer: number | null = null;
+
+  function videoSupported(): boolean {
+    return typeof navigator !== 'undefined'
+      && !!navigator.mediaDevices
+      && typeof navigator.mediaDevices.getUserMedia === 'function'
+      && typeof MediaRecorder !== 'undefined';
+  }
+
+  if (!videoSupported()) {
+    if (videoRecBtn) videoRecBtn.disabled = true;
+    if (videoErrEl) {
+      videoErrEl.textContent = isEs
+        ? 'La grabación de video no está disponible en este navegador.'
+        : "Video recording isn't supported on this browser.";
+      videoErrEl.classList.remove('hidden');
+    }
+  }
+
+  function setVideoBtnLabel(text: string) {
+    if (videoRecLabel) videoRecLabel.textContent = text;
+  }
+
+  function repaintVideoGrid() {
+    if (!videoGridEl) return;
+    videoGridEl.classList.toggle('hidden', videos.length === 0);
+    videoGridEl.innerHTML = videos.map((v, i) => `
+      <div class="flex items-center gap-2 rounded-lg border border-zinc-200 dark:border-zinc-800 p-2">
+        ${v.thumbnailUrl
+          ? `<img src="${v.thumbnailUrl}" alt="" class="w-16 h-16 rounded object-cover bg-black flex-none" />`
+          : '<div class="w-16 h-16 rounded bg-zinc-200 dark:bg-zinc-800 flex-none"></div>'}
+        <video controls src="${URL.createObjectURL(v.blob)}" class="flex-1 max-h-28 rounded"></video>
+        <span class="text-[10px] text-zinc-500 font-mono">${v.durationSec.toFixed(1)}s</span>
+        <button data-rm-video="${i}" type="button" class="w-6 h-6 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs flex items-center justify-center" aria-label="remove">×</button>
+      </div>
+    `).join('');
+    videoGridEl.querySelectorAll<HTMLButtonElement>('button[data-rm-video]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = Number(btn.dataset.rmVideo);
+        const removed = videos.splice(idx, 1)[0];
+        if (removed?.thumbnailUrl) {
+          try { URL.revokeObjectURL(removed.thumbnailUrl); } catch { /* noop */ }
+        }
+        repaintVideoGrid();
+      });
+    });
+  }
+
+  async function extractVideoThumbnail(blob: Blob): Promise<string | null> {
+    return new Promise<string | null>((resolve) => {
+      const url = URL.createObjectURL(blob);
+      const tmp = document.createElement('video');
+      tmp.preload = 'auto';
+      tmp.muted = true;
+      tmp.playsInline = true;
+      tmp.src = url;
+      let settled = false;
+      const finish = (out: string | null) => {
+        if (settled) return;
+        settled = true;
+        try { URL.revokeObjectURL(url); } catch { /* noop */ }
+        resolve(out);
+      };
+      tmp.addEventListener('loadedmetadata', () => {
+        try { tmp.currentTime = Math.min(VIDEO_THUMB_PARAMS.seekToSec, Math.max(0, (tmp.duration || 0) / 4)); }
+        catch { finish(null); }
+      });
+      tmp.addEventListener('seeked', () => {
+        try {
+          const { w, h } = computeThumbDims(tmp.videoWidth, tmp.videoHeight, 320);
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return finish(null);
+          ctx.drawImage(tmp, 0, 0, w, h);
+          canvas.toBlob(b => finish(b ? URL.createObjectURL(b) : null), VIDEO_THUMB_PARAMS.mime, VIDEO_THUMB_PARAMS.quality);
+        } catch { finish(null); }
+      });
+      tmp.addEventListener('error', () => finish(null));
+      // safety net
+      setTimeout(() => finish(null), 6_000);
+    });
+  }
+
+  async function startVideoRecording() {
+    if (!videoRecBtn) return;
+    videoErrEl?.classList.add('hidden');
+    try {
+      videoStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+        audio: true,
+      });
+    } catch {
+      if (videoErrEl) {
+        videoErrEl.textContent = isEs
+          ? 'Acceso a la cámara/micrófono denegado. Habilítalo en la configuración del navegador para grabar.'
+          : 'Camera/microphone access denied. Allow it in your browser settings to record.';
+        videoErrEl.classList.remove('hidden');
+      }
+      return;
+    }
+    videoChunks = [];
+    const mime = pickVideoMime((m) => MediaRecorder.isTypeSupported(m));
+    try {
+      videoRecorder = new MediaRecorder(videoStream, { mimeType: mime });
+    } catch {
+      // MIME couldn't be applied — fall back to default.
+      videoRecorder = new MediaRecorder(videoStream);
+    }
+    const recorder = videoRecorder;
+    recorder.addEventListener('dataavailable', e => {
+      if (e.data && e.data.size > 0) videoChunks.push(e.data);
+    });
+    recorder.addEventListener('stop', async () => {
+      videoStream?.getTracks().forEach(t => t.stop());
+      videoStream = null;
+      const blob = new Blob(videoChunks, { type: recorder.mimeType || mime });
+      const durationSec = Math.min((Date.now() - videoStartedAt) / 1000, VIDEO_MAX_SECS);
+      const thumbnailUrl = await extractVideoThumbnail(blob).catch(() => null);
+      videos.push({
+        blob,
+        blobId: crypto.randomUUID(),
+        mimeType: blob.type || mime,
+        durationSec,
+        thumbnailUrl,
+      });
+      repaintVideoGrid();
+      setVideoBtnLabel(isEs ? 'Grabar video' : 'Record video');
+      videoElapsedEl?.classList.add('hidden');
+      if (videoElapsedTimer != null) { clearInterval(videoElapsedTimer); videoElapsedTimer = null; }
+      if (videoCutoffTimer != null) { clearTimeout(videoCutoffTimer); videoCutoffTimer = null; }
+    });
+    videoStartedAt = Date.now();
+    recorder.start();
+    setVideoBtnLabel(isEs ? 'Detener' : 'Stop');
+    videoElapsedEl?.classList.remove('hidden');
+    if (videoElapsedEl) videoElapsedEl.textContent = '0.0s / ' + VIDEO_MAX_SECS + 's';
+    videoElapsedTimer = window.setInterval(() => {
+      const e = (Date.now() - videoStartedAt) / 1000;
+      if (videoElapsedEl) videoElapsedEl.textContent = e.toFixed(1) + 's / ' + VIDEO_MAX_SECS + 's';
+    }, 100);
+    videoCutoffTimer = window.setTimeout(() => {
+      try { videoRecorder?.stop(); } catch { /* already stopped */ }
+    }, VIDEO_MAX_SECS * 1000);
+  }
+
+  function stopVideoRecording() {
+    try { videoRecorder?.stop(); } catch { /* already stopped */ }
+  }
+
+  videoRecBtn?.addEventListener('click', () => {
+    if (videoRecorder && videoRecorder.state === 'recording') stopVideoRecording();
+    else                                                      startVideoRecording();
+  });
+
+  // ── Map picker (MapLibre) ─────────────────────────────────────────────
+  const mapModal       = document.getElementById('map-modal');
+  const mapPickerEl    = document.getElementById('map-picker');
+  const mapStatusEl    = document.getElementById('map-picker-status');
+  const mapOpenBtn     = document.getElementById('map-picker-open-btn');
+  const mapCloseBtn    = document.getElementById('map-close-btn');
+  const mapCancelBtn   = document.getElementById('map-cancel-btn');
+  const mapUseBtn      = document.getElementById('map-use-btn') as HTMLButtonElement | null;
+
+  // Loaded lazily on first open — saves ~150 KB JS for users who never tap it.
+  let mapPickerInstance: import('maplibre-gl').Map | null = null;
+  let mapPickerMarker: import('maplibre-gl').Marker | null = null;
+  let mapPickerSelected: { lat: number; lng: number } | null = null;
+
+  function setMapStatus(text: string | null) {
+    if (!mapStatusEl) return;
+    if (!text) { mapStatusEl.classList.add('hidden'); return; }
+    mapStatusEl.textContent = text;
+    mapStatusEl.classList.remove('hidden');
+  }
+
+  function setMapSelected(lat: number, lng: number) {
+    if (!isValidLatLng(lat, lng)) return;
+    mapPickerSelected = { lat, lng };
+    if (mapUseBtn) mapUseBtn.disabled = false;
+  }
+
+  async function openMapPicker() {
+    if (!mapPickerEl) return;
+    mapModal?.classList.remove('hidden');
+    setMapStatus(isEs ? 'Cargando mapa…' : 'Loading map…');
+
+    const initialLat = location?.lat ?? MEXICO_DEFAULT_CENTER.lat;
+    const initialLng = location?.lng ?? MEXICO_DEFAULT_CENTER.lng;
+    const initialZoom = location ? 13 : MEXICO_DEFAULT_CENTER.zoom;
+
+    if (!mapPickerInstance) {
+      try {
+        const maplibre = (await import('maplibre-gl')).default;
+        mapPickerInstance = new maplibre.Map({
+          container: mapPickerEl,
+          style: 'https://tiles.openfreemap.org/styles/liberty',
+          center: [initialLng, initialLat],
+          zoom: initialZoom,
+          attributionControl: { compact: true },
+        });
+        mapPickerInstance.addControl(new maplibre.NavigationControl({ showCompass: false }), 'top-right');
+        mapPickerMarker = new maplibre.Marker({ draggable: true, color: '#047857' })
+          .setLngLat([initialLng, initialLat])
+          .addTo(mapPickerInstance);
+        if (location) setMapSelected(initialLat, initialLng);
+        mapPickerMarker.on('dragend', () => {
+          const ll = mapPickerMarker?.getLngLat();
+          if (ll) setMapSelected(ll.lat, ll.lng);
+        });
+        mapPickerInstance.on('click', (e) => {
+          mapPickerMarker?.setLngLat(e.lngLat);
+          setMapSelected(e.lngLat.lat, e.lngLat.lng);
+        });
+        mapPickerInstance.on('load', () => setMapStatus(null));
+      } catch {
+        setMapStatus(isEs
+          ? 'No se pudo cargar el mapa. Usa la entrada manual.'
+          : "Couldn't load the map. Use manual entry instead.");
+        return;
+      }
+    } else {
+      // Re-center on subsequent opens (user may have refined GPS by now).
+      mapPickerInstance.setCenter([initialLng, initialLat]);
+      mapPickerInstance.setZoom(initialZoom);
+      mapPickerMarker?.setLngLat([initialLng, initialLat]);
+      if (location) setMapSelected(initialLat, initialLng);
+      setMapStatus(null);
+      // MapLibre needs a resize after the modal becomes visible.
+      setTimeout(() => mapPickerInstance?.resize(), 50);
+    }
+    setTimeout(() => mapPickerInstance?.resize(), 50);
+  }
+
+  function closeMapPicker() {
+    mapModal?.classList.add('hidden');
+  }
+
+  mapOpenBtn?.addEventListener('click', () => { openMapPicker(); });
+  mapCloseBtn?.addEventListener('click', closeMapPicker);
+  mapCancelBtn?.addEventListener('click', closeMapPicker);
+  mapUseBtn?.addEventListener('click', () => {
+    if (!mapPickerSelected) return;
+    location = {
+      lat: mapPickerSelected.lat,
+      lng: mapPickerSelected.lng,
+      accuracyM: 50,
+      altitudeM: null,
+      capturedFrom: 'manual',
+    };
+    paintLocation();
+    closeMapPicker();
+  });
+
   async function fillFromExif(file: File) {
     try {
       const exif = await parseExif(file, { gps: true, tiff: true, exif: true });
@@ -622,10 +1106,10 @@ const weatherLabels = (tr.observe as any).weather_options as Record<string,strin
     const isEsSubmit = document.documentElement.lang === 'es';
     errBox?.classList.add('hidden');
 
-    if (photos.length === 0 && audios.length === 0) {
+    if (photos.length === 0 && audios.length === 0 && videos.length === 0) {
       if (errBox) { errBox.textContent = isEsSubmit
-        ? 'Se requiere al menos una foto o un audio.'
-        : 'At least one photo or audio is required.';
+        ? 'Se requiere al menos una foto, un audio o un video.'
+        : 'At least one photo, audio, or video is required.';
         errBox.classList.remove('hidden'); }
       return;
     }
@@ -671,6 +1155,12 @@ const weatherLabels = (tr.observe as any).weather_options as Record<string,strin
           mediaType: 'audio' as const,
           mimeType: a.mimeType,
           sizeBytes: a.blob.size,
+        })),
+        ...videos.map(v => ({
+          id: v.blobId,
+          mediaType: 'video' as const,
+          mimeType: v.mimeType,
+          sizeBytes: v.blob.size,
         })),
       ],
       primaryPhotoIndex: 0,
@@ -718,6 +1208,16 @@ const weatherLabels = (tr.observe as any).weather_options as Record<string,strin
         blob: a.blob,
         mime_type: a.mimeType,
         size_bytes: a.blob.size,
+        uploaded: false,
+      });
+    }
+    for (const v of videos) {
+      await db.mediaBlobs.put({
+        id: v.blobId,
+        observation_id: obs.id,
+        blob: v.blob,
+        mime_type: v.mimeType,
+        size_bytes: v.blob.size,
         uploaded: false,
       });
     }
