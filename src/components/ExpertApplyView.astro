@@ -1,0 +1,251 @@
+---
+/**
+ * ExpertApplyView — form for users to apply for expert validator status.
+ *
+ * SCHEMA GAP (2026-04-25): public.expert_applications does not yet exist
+ * in docs/specs/infra/supabase-schema.sql. Per the implementation brief we
+ * MUST NOT migrate from this UI. The form is rendered, validated, and
+ * surfaces a friendly notice instead of attempting an insert. When the
+ * schema lands, swap the simulated submit in the script block for a real
+ * insert into public.expert_applications, and read the pending status by
+ * selecting the most recent row for auth.uid().
+ *
+ * Today we still surface the user.is_expert flag — already-recognised
+ * experts see a thank-you instead of the form.
+ */
+import { t, getLocalizedPath, routes } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+
+const { lang } = Astro.props;
+const tr = t(lang);
+
+const taxaKeys = [
+  'Aves', 'Mammalia', 'Reptilia', 'Amphibia', 'Actinopterygii',
+  'Insecta', 'Arachnida', 'Mollusca', 'Plantae', 'Fungi', 'Algae',
+] as const;
+
+const taxaLabels = tr.expert.apply_taxa as Record<string, string>;
+const taxa = taxaKeys.map((key) => ({ key, label: taxaLabels[key] ?? key }));
+
+const signInPath = getLocalizedPath(lang, routes.signIn[lang] + '/');
+const profilePath = getLocalizedPath(lang, routes.profile[lang] + '/');
+
+// "expert-system" is a roadmap item slug — link to the roadmap page.
+const roadmapPath = getLocalizedPath(lang, '/docs/roadmap/');
+---
+
+<div class="max-w-2xl mx-auto">
+  <header class="mb-6">
+    <h1 class="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+      {tr.expert.apply_title}
+    </h1>
+    <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{tr.expert.apply_subtitle}</p>
+  </header>
+
+  <div
+    id="expert-signin"
+    class="hidden rounded-lg border border-zinc-300 dark:border-zinc-700 p-4 text-sm"
+  >
+    <p class="text-zinc-700 dark:text-zinc-300">{tr.expert.apply_signin_required}</p>
+    <a
+      href={signInPath}
+      class="mt-3 inline-block rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white"
+    >
+      {tr.auth.sign_in}
+    </a>
+  </div>
+
+  <div
+    id="expert-already"
+    class="hidden rounded-lg border border-emerald-300 dark:border-emerald-700/60 bg-emerald-50 dark:bg-emerald-900/20 p-4 text-sm text-emerald-900 dark:text-emerald-100"
+  >
+    <p class="font-semibold">{tr.expert.apply_already_expert}</p>
+    <a href={profilePath} class="mt-3 inline-block text-sm text-emerald-700 dark:text-emerald-300 hover:underline">
+      ← {tr.profile.view_profile}
+    </a>
+  </div>
+
+  <div
+    id="expert-pending"
+    class="hidden rounded-lg border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-4 text-sm text-amber-900 dark:text-amber-100"
+  >
+    <p class="font-semibold">{tr.expert.apply_pending}</p>
+    <p class="mt-1 text-xs text-amber-800 dark:text-amber-200">{tr.expert.apply_pending_body}</p>
+  </div>
+
+  <form
+    id="expert-form"
+    class="hidden space-y-5"
+    novalidate
+    data-label-submitting={tr.expert.apply_submitting}
+    data-label-taxa-required={tr.expert.apply_taxa_required}
+    data-label-credentials-required={tr.expert.apply_credentials_required}
+    data-label-orcid-invalid={tr.expert.apply_orcid_invalid}
+  >
+    <fieldset>
+      <legend class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+        {tr.expert.apply_taxa_label}
+      </legend>
+      <p class="text-xs text-zinc-500 mb-2">{tr.expert.apply_taxa_hint}</p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {taxa.map(item => (
+          <label class="flex items-center gap-2 rounded-lg border border-zinc-200 dark:border-zinc-800 px-3 py-2 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
+            <input type="checkbox" name="taxa" value={item.key} class="taxa-checkbox" />
+            <span class="text-sm text-zinc-800 dark:text-zinc-200">{item.label}</span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+
+    <div>
+      <label for="credentials" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+        {tr.expert.apply_credentials_label}
+      </label>
+      <textarea
+        id="credentials"
+        name="credentials"
+        rows="4"
+        maxlength="2000"
+        placeholder={tr.expert.apply_credentials_placeholder}
+        class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm"
+      ></textarea>
+    </div>
+
+    <div>
+      <label for="institution" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+        {tr.expert.apply_institution_label}
+      </label>
+      <input
+        id="institution"
+        name="institution"
+        type="text"
+        maxlength="200"
+        placeholder={tr.expert.apply_institution_placeholder}
+        class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm"
+      />
+    </div>
+
+    <div>
+      <label for="orcid" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+        {tr.expert.apply_orcid_label}
+      </label>
+      <input
+        id="orcid"
+        name="orcid"
+        type="text"
+        maxlength="19"
+        placeholder={tr.expert.apply_orcid_placeholder}
+        pattern="\d{4}-\d{4}-\d{4}-\d{3}[\dX]"
+        class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm"
+      />
+    </div>
+
+    <p
+      id="expert-unavailable"
+      class="hidden rounded-lg border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-3 text-xs text-amber-900 dark:text-amber-100"
+    >
+      <span set:html={tr.expert.apply_unavailable.replace('{0}', `<a class='underline font-semibold' href='${roadmapPath}#${tr.expert.apply_roadmap_link}'>${tr.expert.apply_roadmap_link}</a>`)}></span>
+    </p>
+
+    <div class="flex items-center gap-3 pt-2">
+      <button
+        type="submit"
+        id="expert-submit"
+        class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 min-h-[44px]"
+      >
+        <span class="expert-submit-label">{tr.expert.apply_submit}</span>
+      </button>
+      <a href={profilePath} class="text-sm text-zinc-600 dark:text-zinc-400 hover:underline">
+        ← {tr.profile.view_profile}
+      </a>
+    </div>
+    <p id="expert-error" class="hidden text-sm text-red-600 dark:text-red-400"></p>
+  </form>
+</div>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+
+  type ProfileRow = { is_expert: boolean | null };
+
+  function show(id: string) { document.getElementById(id)?.classList.remove('hidden'); }
+  function hide(id: string) { document.getElementById(id)?.classList.add('hidden'); }
+
+  async function init() {
+    const form = document.getElementById('expert-form') as HTMLFormElement | null;
+    if (!form) return;
+
+    let supabase;
+    try {
+      supabase = getSupabase();
+    } catch {
+      show('expert-signin');
+      return;
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      show('expert-signin');
+      return;
+    }
+
+    const { data: profile } = await supabase
+      .from('users')
+      .select('is_expert')
+      .eq('id', user.id)
+      .maybeSingle<ProfileRow>();
+
+    if (profile?.is_expert) {
+      show('expert-already');
+      return;
+    }
+
+    // SCHEMA GAP: public.expert_applications doesn't exist yet. We surface
+    // the form (so the UI is reviewable) but on submit show the unavailable
+    // notice instead of attempting an insert.
+    show('expert-form');
+
+    const orcidRe = /^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/;
+
+    form.addEventListener('submit', (ev) => {
+      ev.preventDefault();
+      const errEl = document.getElementById('expert-error');
+      if (errEl) errEl.classList.add('hidden');
+
+      const taxaInputs = Array.from(form.querySelectorAll<HTMLInputElement>('.taxa-checkbox:checked')).map(i => i.value);
+      const credentials = (form.elements.namedItem('credentials') as HTMLTextAreaElement | null)?.value.trim() ?? '';
+      const orcid = (form.elements.namedItem('orcid') as HTMLInputElement | null)?.value.trim() ?? '';
+
+      const reportError = (msg: string) => {
+        if (!errEl) return;
+        errEl.textContent = msg;
+        errEl.classList.remove('hidden');
+      };
+
+      if (taxaInputs.length === 0) {
+        reportError(form.dataset.labelTaxaRequired ?? '');
+        return;
+      }
+      if (credentials.length < 5) {
+        reportError(form.dataset.labelCredentialsRequired ?? '');
+        return;
+      }
+      if (orcid && !orcidRe.test(orcid)) {
+        reportError(form.dataset.labelOrcidInvalid ?? '');
+        return;
+      }
+
+      // No expert_applications table yet — surface the schema-gap notice.
+      const submitBtn = document.getElementById('expert-submit') as HTMLButtonElement | null;
+      if (submitBtn) submitBtn.disabled = true;
+      show('expert-unavailable');
+    });
+  }
+
+  init().catch(() => {
+    show('expert-signin');
+  });
+</script>
