@@ -185,6 +185,7 @@ async function triggerIdentify(observationId: string): Promise<void> {
   const obsRecord = await db.observations.get(observationId);
   const loc = obsRecord?.data.location;
   const habitat = obsRecord?.data.habitat ?? undefined;
+  const evidenceType = obsRecord?.data.evidenceType;
 
   const { bootstrapIdentifiers, runCascade } = await import('./identifiers');
   bootstrapIdentifiers();
@@ -200,6 +201,15 @@ async function triggerIdentify(observationId: string): Promise<void> {
   if (!localAIEnabled) excluded.push('webllm_phi35_vision', 'onnx_efficientnet_lite0', 'birdnet_lite');
   if (!hasAnthropicKey) excluded.push('claude_haiku');
 
+  // Camera-trap photos prefer the MegaDetector + SpeciesNet pipeline when
+  // available — see docs/specs/modules/09-camera-trap.md. The plugin is a
+  // stub today (returns ready:false), but registering it as preferred now
+  // means the cascade auto-picks it up the moment weights are hosted.
+  const preferred: string[] = [];
+  if (mediaKind === 'photo' && evidenceType === 'camera_trap') {
+    preferred.push('camera_trap_megadetector');
+  }
+
   // Plugins read their own keys from byo-keys.ts at identify-time, so we
   // don't pre-collect them here. Pass an empty byo_keys object as a default.
   const cascadeResult = await runCascade(
@@ -214,6 +224,7 @@ async function triggerIdentify(observationId: string): Promise<void> {
       media: mediaKind,
       taxa: mediaKind === 'audio' ? 'Animalia.Aves' : undefined,
       excluded,
+      preferred,
     },
   );
 

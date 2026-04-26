@@ -1,0 +1,13 @@
+---
+import BaseLayout from '../../../../layouts/BaseLayout.astro';
+import BatchImporter from '../../../../components/BatchImporter.astro';
+import { t } from '../../../../i18n/utils';
+
+const lang = 'en';
+const tr = t(lang);
+const importTitle = (tr as unknown as { import?: { title?: string } }).import?.title ?? 'Batch import photos';
+---
+
+<BaseLayout title={`${importTitle} — Rastrum`} lang={lang}>
+  <BatchImporter lang={lang} mode="generic" />
+</BaseLayout>

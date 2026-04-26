@@ -36,6 +36,11 @@ export const routes: Record<string, Record<Locale, string>> = {
   profileObservations: { en: '/profile/observations', es: '/perfil/observaciones' },
   profileExpertApply: { en: '/profile/expert-apply', es: '/perfil/aplicar-experto' },
   profileUser: { en: '/profile/u', es: '/perfil/u' },
+  profileImport: { en: '/profile/import', es: '/perfil/importar' },
+  profileImportCameraTrap: {
+    en: '/profile/import/camera-trap',
+    es: '/perfil/importar/camara-trampa',
+  },
   chat: { en: '/chat', es: '/chat' },
 };
 

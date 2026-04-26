@@ -298,10 +298,9 @@ const videoMaxDuration  = observeStrings.video_max_duration  ?? (isEs ? 'Máximo
 
 <script>
   import { parse as parseExif } from 'exifr';
-  import { getDB, requestPersistentStorage } from '../lib/db';
-  import { getSupabase } from '../lib/supabase';
   import { syncOutbox, registerSyncTriggers } from '../lib/sync';
-  import type { Observation, ObserverRef } from '../lib/types';
+  import { resolveObserverRef, saveObservationToOutbox } from '../lib/observe';
+  import type { Observation } from '../lib/types';
   import {
     pickVideoMime,
     VIDEO_MAX_SECS,
@@ -1129,47 +1128,37 @@ const videoMaxDuration  = observeStrings.video_max_duration  ?? (isEs ? 'Máximo
     try {
     // Resolve the ObserverRef from the Supabase session. If not signed in,
     // fall back to a guest ref — observation stays Dexie-only per module 04.
-    let ref: ObserverRef = { kind: 'guest', localId: 'local-' + crypto.randomUUID() };
-    try {
-      const authPromise = getSupabase().auth.getUser();
-      const authTimeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('auth timeout')), 5_000)
-      );
-      const { data: { user } } = await Promise.race([authPromise, authTimeout]);
-      if (user) ref = { kind: 'user', id: user.id };
-    } catch { /* offline or no session — proceed as guest */ }
+    const ref = await resolveObserverRef();
 
-    const obs: Observation = {
-      id: crypto.randomUUID(),
+    await saveObservationToOutbox({
       observerRef: ref,
-      createdAt: new Date().toISOString(),
-      photos: [
+      media: [
         ...photos.map(p => ({
-          id: p.blobId,
-          mediaType: 'photo' as const,
+          blobId: p.blobId,
+          blob: p.file,
           mimeType: p.file.type,
           sizeBytes: p.file.size,
+          mediaType: 'photo' as const,
         })),
         ...audios.map(a => ({
-          id: a.blobId,
-          mediaType: 'audio' as const,
+          blobId: a.blobId,
+          blob: a.blob,
           mimeType: a.mimeType,
           sizeBytes: a.blob.size,
+          mediaType: 'audio' as const,
         })),
         ...videos.map(v => ({
-          id: v.blobId,
-          mediaType: 'video' as const,
+          blobId: v.blobId,
+          blob: v.blob,
           mimeType: v.mimeType,
           sizeBytes: v.blob.size,
+          mediaType: 'video' as const,
         })),
       ],
       primaryPhotoIndex: 0,
       location,
       identification: {
         scientificName: idInput?.value.trim() || currentIdentification?.scientific_name || '',
-        commonNameEs: null,
-        commonNameEn: null,
-        taxonId: null,
         confidence: currentIdentification?.confidence ?? 0,
         source: (currentIdentification?.source === 'PlantNet' ? 'plantnet' : 'human') as Observation['identification']['source'],
         status: (idInput?.value.trim() ? 'accepted' : 'pending') as Observation['identification']['status'],
@@ -1178,57 +1167,6 @@ const videoMaxDuration  = observeStrings.video_max_duration  ?? (isEs ? 'Máximo
       weather: ((form.elements.namedItem('weather') as HTMLSelectElement).value || null) as Observation['weather'],
       evidenceType: ((form.elements.namedItem('evidence_type') as HTMLSelectElement).value || 'direct_sighting') as Observation['evidenceType'],
       notes: ((form.elements.namedItem('notes') as HTMLTextAreaElement).value || null),
-      moonPhase: null,
-      moonIllumination: null,
-      precipitation24hMm: null,
-      ndviValue: null,
-      phenologicalSeason: null,
-      syncStatus: 'pending',
-      syncedAt: null,
-      appVersion: 'v0.1',
-      deviceOs: navigator.userAgent,
-    };
-
-    const db = getDB();
-    await requestPersistentStorage();
-    for (const p of photos) {
-      await db.mediaBlobs.put({
-        id: p.blobId,
-        observation_id: obs.id,
-        blob: p.file,
-        mime_type: p.file.type,
-        size_bytes: p.file.size,
-        uploaded: false,
-      });
-    }
-    for (const a of audios) {
-      await db.mediaBlobs.put({
-        id: a.blobId,
-        observation_id: obs.id,
-        blob: a.blob,
-        mime_type: a.mimeType,
-        size_bytes: a.blob.size,
-        uploaded: false,
-      });
-    }
-    for (const v of videos) {
-      await db.mediaBlobs.put({
-        id: v.blobId,
-        observation_id: obs.id,
-        blob: v.blob,
-        mime_type: v.mimeType,
-        size_bytes: v.blob.size,
-        uploaded: false,
-      });
-    }
-    await db.observations.put({
-      id: obs.id,
-      observer_kind: ref.kind,
-      data: obs,
-      sync_status: 'pending',
-      sync_attempts: 0,
-      created_at: obs.createdAt,
-      updated_at: obs.createdAt,
     });
 
     // Attempt immediate sync if online; otherwise it'll flush on next online event.
