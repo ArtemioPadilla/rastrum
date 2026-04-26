@@ -12,16 +12,29 @@ const tr = t(lang);
   <h1 class="text-2xl font-bold tracking-tight mb-2">{tr.map.title}</h1>
   <p class="text-sm text-zinc-500 mb-4" id="map-status">{tr.map.loading}</p>
   <div id="map" class="w-full h-[70vh] rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900"></div>
+  <p id="map-source-note" class="hidden mt-2 text-[11px] text-zinc-500 dark:text-zinc-400"></p>
+  <p id="map-offline-hint" class="hidden mt-2 text-xs text-amber-700 dark:text-amber-400"></p>
 </div>
 
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.css" />
 
 <script>
   import maplibregl from 'maplibre-gl';
+  import { Protocol } from 'pmtiles';
   import { getSupabase } from '../lib/supabase';
+  import {
+    decideTileSource,
+    getPmtilesCacheStatus,
+    getPmtilesMxUrl,
+  } from '../lib/offline-map';
+
+  const isEs = document.documentElement.lang === 'es';
+  const tr = (en: string, es: string): string => (isEs ? es : en);
 
   const container = document.getElementById('map');
   const status = document.getElementById('map-status');
+  const sourceNote = document.getElementById('map-source-note');
+  const offlineHint = document.getElementById('map-offline-hint');
   if (!container) throw new Error('no map container');
 
   const KINGDOM_COLORS: Record<string, string> = {
@@ -31,23 +44,141 @@ const tr = t(lang);
   };
   const DEFAULT_COLOR = '#6b7280';
 
-  // Free OpenFreeMap style — OpenMapTiles-compatible, served by openfreemap.org.
-  // pmtiles + R2 migration happens in v0.3 (see module 05 § Tile Setup).
+  // Register MapLibre's pmtiles protocol up-front so a `pmtiles://…`
+  // style URL resolves correctly regardless of whether we end up using
+  // the cached archive on this load. The protocol delegates to fetch(),
+  // which the browser satisfies from the Cache API entry we wrote in
+  // src/lib/offline-map.ts.
+  const pmProtocol = new Protocol();
+  maplibregl.addProtocol('pmtiles', pmProtocol.tile);
+
+  const REMOTE_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
+
+  /**
+   * Inline minimal pmtiles style spec. We don't pull in
+   * `protomaps-themes-base` to keep the bundle small — a flat-fill +
+   * water + roads/labels rendering is enough for a fallback offline
+   * basemap on top of which we paint observations.
+   */
+  function buildPmtilesStyle(pmtilesUrl: string): maplibregl.StyleSpecification {
+    return {
+      version: 8,
+      glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+      sources: {
+        'protomaps': {
+          type: 'vector',
+          url: `pmtiles://${pmtilesUrl}`,
+          attribution: '© OpenStreetMap contributors',
+        },
+      },
+      layers: [
+        { id: 'background', type: 'background', paint: { 'background-color': '#f4f4f5' } },
+        {
+          id: 'water',
+          type: 'fill',
+          source: 'protomaps',
+          'source-layer': 'water',
+          paint: { 'fill-color': '#bfdbfe' },
+        },
+        {
+          id: 'landuse',
+          type: 'fill',
+          source: 'protomaps',
+          'source-layer': 'landuse',
+          paint: { 'fill-color': '#e7e5e4', 'fill-opacity': 0.5 },
+        },
+        {
+          id: 'roads',
+          type: 'line',
+          source: 'protomaps',
+          'source-layer': 'roads',
+          paint: { 'line-color': '#a1a1aa', 'line-width': 0.6 },
+        },
+        {
+          id: 'boundaries',
+          type: 'line',
+          source: 'protomaps',
+          'source-layer': 'boundaries',
+          paint: { 'line-color': '#71717a', 'line-width': 0.4, 'line-dasharray': [2, 2] },
+        },
+      ],
+    };
+  }
+
+  function emptyOfflineState(message: string): void {
+    if (status) {
+      status.textContent = message;
+      status.classList.remove('hidden');
+    }
+    if (offlineHint) {
+      offlineHint.textContent = message;
+      offlineHint.classList.remove('hidden');
+    }
+  }
+
+  async function chooseStyle(): Promise<{
+    style: string | maplibregl.StyleSpecification;
+    note: string;
+  } | null> {
+    const url = getPmtilesMxUrl();
+    const cacheStatus = await getPmtilesCacheStatus().catch(() => ({ cached: false, approxBytes: 0 }));
+    const decision = decideTileSource({
+      configured: !!url,
+      hasCache: cacheStatus.cached,
+      online: navigator.onLine,
+    });
+
+    switch (decision) {
+      case 'cached': {
+        // Configured + cached: render entirely from the local archive
+        // even when online (fastest path, also works offline).
+        if (!url) return { style: REMOTE_STYLE, note: tr('Using online tiles', 'Usando tiles en línea') };
+        return {
+          style: buildPmtilesStyle(url),
+          note: tr('Using offline map · cached on this device', 'Usando mapa sin conexión · guardado en este dispositivo'),
+        };
+      }
+      case 'remote':
+      case 'unconfigured':
+        // Either no env var set, or set but archive not yet cached and
+        // we're online: fall back to the existing OpenFreeMap style.
+        return { style: REMOTE_STYLE, note: tr('Using online tiles', 'Usando tiles en línea') };
+      case 'offline-no-cache':
+        // Offline + no cache: don't try to construct a map at all,
+        // surface a clear empty state with a path to recover.
+        return null;
+    }
+  }
+
+  const choice = await chooseStyle();
+  if (!choice) {
+    emptyOfflineState(
+      tr(
+        "You are offline and the Mexico map isn't downloaded yet. Open Profile → Edit → Offline maps to download it next time you have Wi-Fi.",
+        'Estás sin conexión y el mapa de México aún no está descargado. Abre Perfil → Editar → Mapas sin conexión para descargarlo la próxima vez que tengas Wi-Fi.',
+      ),
+    );
+    throw new Error('offline-no-cache');
+  }
+
   const map = new maplibregl.Map({
     container,
-    style: 'https://tiles.openfreemap.org/styles/liberty',
-    center: [-96.72, 17.06],   // Oaxaca, MX
+    style: choice.style,
+    center: [-96.72, 17.06],
     zoom: 6,
     attributionControl: { compact: true },
   });
 
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
 
+  if (sourceNote) {
+    sourceNote.textContent = choice.note;
+    sourceNote.classList.remove('hidden');
+  }
+
   map.on('load', async () => {
     status?.classList.add('hidden');
 
-    // Query observations with a non-null raw location. RLS restricts this to
-    // synced public rows + any the current user owns (see supabase-schema.sql).
     const supabase = getSupabase();
     const { data, error } = await supabase
       .from('observations')
@@ -62,8 +193,6 @@ const tr = t(lang);
 
     const features: GeoJSON.Feature[] = [];
     for (const row of data ?? []) {
-      // PostGIS geography returns WKB-hex or GeoJSON depending on server config.
-      // In supabase-js v2 it comes back as GeoJSON when the column is geography.
       const geom = (row as { location: unknown }).location as GeoJSON.Point | null;
       if (!geom?.coordinates) continue;
       features.push({
@@ -74,7 +203,10 @@ const tr = t(lang);
     }
 
     if (!features.length) {
-      if (status) { status.textContent = (document.documentElement.lang === 'es') ? 'Aún no hay observaciones que mostrar.' : 'No observations to show yet.'; status.classList.remove('hidden'); }
+      if (status) {
+        status.textContent = isEs ? 'Aún no hay observaciones que mostrar.' : 'No observations to show yet.';
+        status.classList.remove('hidden');
+      }
     }
 
     map.addSource('observations', {
