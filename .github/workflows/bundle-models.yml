@@ -147,7 +147,10 @@ jobs:
           # Protomaps daily builds: full planet pmtiles. We extract only Mexico
           # (zoom 0–10) using the pmtiles CLI's `extract` subcommand to keep
           # the download manageable (~150 MB).
-          PMTILES_VERSION=v1.27.4
+          # Resolve latest go-pmtiles release at runtime so this workflow
+          # doesn't rot when upstream cuts a new version.
+          PMTILES_VERSION=$(curl -fsSL https://api.github.com/repos/protomaps/go-pmtiles/releases/latest | python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'])")
+          echo "Using pmtiles CLI ${PMTILES_VERSION}"
           curl -fL --retry 3 -o pmtiles.tar.gz \
             "https://github.com/protomaps/go-pmtiles/releases/download/${PMTILES_VERSION}/go-pmtiles_${PMTILES_VERSION#v}_Linux_x86_64.tar.gz"
           tar -xzf pmtiles.tar.gz pmtiles
