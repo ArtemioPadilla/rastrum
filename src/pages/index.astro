@@ -1,5 +1,4 @@
 ---
-const preferredLang = 'en';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
@@ -10,11 +9,18 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     <title>Rastrum — Redirecting</title>
     <script is:inline define:vars={{ base }}>
       const langs = ['es', 'en'];
-      const browserLang = navigator.language?.slice(0, 2);
-      const lang = langs.includes(browserLang) ? browserLang : 'en';
-      window.location.replace(base + '/' + lang + '/');
+      // 1. Prefer a previously saved choice
+      const saved = localStorage.getItem('rastrum.lang');
+      if (saved && langs.includes(saved)) {
+        window.location.replace(base + '/' + saved + '/');
+      } else {
+        // 2. Use browser language, defaulting to 'es' (primary audience)
+        const browserLang = navigator.language?.slice(0, 2);
+        const lang = langs.includes(browserLang) ? browserLang : 'es';
+        window.location.replace(base + '/' + lang + '/');
+      }
     </script>
-    <meta http-equiv="refresh" content={`0;url=${base}/en/`} />
+    <meta http-equiv="refresh" content={`0;url=${base}/es/`} />
   </head>
   <body></body>
 </html>

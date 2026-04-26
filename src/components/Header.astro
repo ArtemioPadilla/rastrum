@@ -98,6 +98,8 @@ const isDocsPage = currentPath.includes('/docs');
       </div>
       <a
         href={altHref}
+        id="lang-toggle"
+        data-target-lang={alt}
         class="text-xs font-medium px-2 py-1 rounded border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
       >
         {alt.toUpperCase()}
@@ -164,6 +166,11 @@ const isDocsPage = currentPath.includes('/docs');
       ddMenu.classList.add('hidden');
     });
   }
+  // Save language preference when toggling
+  document.getElementById('lang-toggle')?.addEventListener('click', function() {
+    const targetLang = this.dataset.targetLang;
+    if (targetLang) localStorage.setItem('rastrum.lang', targetLang);
+  });
 </script>
 
 <!-- Auth status: swaps sign-in link for avatar dropdown when authenticated. -->
