@@ -92,7 +92,9 @@ src/
 └── env.d.ts                Typed import.meta.env
 
 supabase/
-├── functions/<name>/index.ts    Deno Edge Functions (6 deployed today)
+├── functions/<name>/index.ts    Deno Edge Functions (identify, enrich-environment,
+│                                 recompute-streaks, award-badges, share-card,
+│                                 get-upload-url, export-dwca, api, mcp)
 └── config.toml             Local CLI config (deploy via CI, not local)
 
 docs/
@@ -284,6 +286,8 @@ Functions: deploy via `gh workflow run deploy-functions.yml -f function=<name>`.
 | R2 bucket settings | https://dash.cloudflare.com/?to=/:account/r2/default/buckets/rastrum-media |
 | Roadmap | https://rastrum.org/en/docs/roadmap/ |
 | Tasks | https://rastrum.org/en/docs/tasks/ |
+| MCP server | https://reppvlqejgoqvitturxp.supabase.co/functions/v1/mcp |
+| API tokens | https://rastrum.org/en/profile/tokens |
 
 ---
 

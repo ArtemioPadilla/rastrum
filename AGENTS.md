@@ -92,7 +92,16 @@ src/
 └── env.d.ts                Typed import.meta.env
 
 supabase/
-├── functions/<name>/index.ts    Deno Edge Functions (6 deployed today)
+├── functions/<name>/index.ts    Deno Edge Functions (deploy via CI)
+│   ├── identify              Photo cascade entry point
+│   ├── enrich-environment    Lunar phase + OpenMeteo backfill
+│   ├── recompute-streaks     Nightly cron
+│   ├── award-badges          Nightly cron
+│   ├── share-card            Public OG card renderer
+│   ├── get-upload-url        R2 presigned upload URLs
+│   ├── export-dwca           Darwin Core Archive ZIP
+│   ├── api                   REST API (rst_* token auth)
+│   └── mcp                   MCP server for AI agents (rst_* token auth, JSON-RPC over HTTP)
 └── config.toml             Local CLI config (deploy via CI, not local)
 
 docs/
@@ -284,6 +293,8 @@ Functions: deploy via `gh workflow run deploy-functions.yml -f function=<name>`.
 | R2 bucket settings | https://dash.cloudflare.com/?to=/:account/r2/default/buckets/rastrum-media |
 | Roadmap | https://rastrum.org/en/docs/roadmap/ |
 | Tasks | https://rastrum.org/en/docs/tasks/ |
+| MCP server | https://reppvlqejgoqvitturxp.supabase.co/functions/v1/mcp |
+| API tokens | https://rastrum.org/en/profile/tokens |
 
 ---
 

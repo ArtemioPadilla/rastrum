@@ -17,6 +17,8 @@ on:
           - award-badges
           - share-card
           - export-dwca
+          - mcp
+          - api
 
 jobs:
   deploy:
@@ -39,7 +41,8 @@ jobs:
           #   share-card        — OG scrapers fetch anonymously
           #   recompute-streaks — cron-only; gates internally on service-role
           #   award-badges      — cron-only; gates internally on service-role
-          NO_JWT="share-card recompute-streaks award-badges"
+          #   mcp / api         — gate internally on rst_ tokens (not JWTs)
+          NO_JWT="share-card recompute-streaks award-badges mcp api"
           deploy_one() {
             local fn="$1"
             local flag=""
@@ -48,7 +51,7 @@ jobs:
             supabase functions deploy "$fn" --project-ref "$PROJECT_REF" $flag
           }
           if [ "${{ inputs.function }}" = "all" ]; then
-            for fn in get-upload-url identify enrich-environment recompute-streaks award-badges share-card export-dwca; do
+            for fn in get-upload-url identify enrich-environment recompute-streaks award-badges share-card export-dwca mcp api; do
               deploy_one "$fn"
             done
           else

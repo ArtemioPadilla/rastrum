@@ -19,7 +19,7 @@ records using your personal API token.
 ### Identify a Species from Photo
 
 ```bash
-curl -s -X POST "https://rastrum.org/functions/v1/api/identify" \
+curl -s -X POST "https://reppvlqejgoqvitturxp.supabase.co/functions/v1/api/identify" \
   -H "Authorization: Bearer $RASTRUM_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -32,7 +32,7 @@ curl -s -X POST "https://rastrum.org/functions/v1/api/identify" \
 ### Submit an Observation
 
 ```bash
-curl -s -X POST "https://rastrum.org/functions/v1/api/observe" \
+curl -s -X POST "https://reppvlqejgoqvitturxp.supabase.co/functions/v1/api/observe" \
   -H "Authorization: Bearer $RASTRUM_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -48,16 +48,41 @@ curl -s -X POST "https://rastrum.org/functions/v1/api/observe" \
 ### List Your Observations
 
 ```bash
-curl -s "https://rastrum.org/functions/v1/api/observations?limit=20" \
+curl -s "https://reppvlqejgoqvitturxp.supabase.co/functions/v1/api/observations?limit=20" \
   -H "Authorization: Bearer $RASTRUM_TOKEN" | jq '.[]'
 ```
 
 ### Export Darwin Core CSV
 
 ```bash
-curl -s "https://rastrum.org/functions/v1/api/export?format=darwin_core" \
+curl -s "https://reppvlqejgoqvitturxp.supabase.co/functions/v1/api/export?format=darwin_core" \
   -H "Authorization: Bearer $RASTRUM_TOKEN" -o my-observations.csv
 ```
+
+## Use from an AI agent (MCP server)
+
+The same `rst_*` token also works against the Rastrum MCP server, which
+exposes the same operations as JSON-RPC tools that Claude Desktop /
+Cursor / Copilot Coding Agent can call.
+
+In your agent's MCP config:
+
+```json
+{
+  "mcpServers": {
+    "rastrum": {
+      "type": "http",
+      "url": "https://reppvlqejgoqvitturxp.supabase.co/functions/v1/mcp",
+      "headers": { "Authorization": "Bearer rst_..." }
+    }
+  }
+}
+```
+
+Tools: `identify_species`, `submit_observation`, `list_observations`,
+`get_observation`, `export_darwin_core`. Each tool checks the token's
+scope, so you can issue a narrow token (e.g. `observe` only) for an
+agent and a broader one for shell scripts.
 
 ## Token Scopes
 

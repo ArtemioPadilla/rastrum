@@ -180,6 +180,20 @@ Rastrum expects the following tables in your Supabase project. Create them throu
 
 Row-Level Security policies should restrict writes to authenticated users and limit expert actions to users with the `expert` role. See the Supabase docs on [RLS](https://supabase.com/docs/guides/auth/row-level-security) for guidance.
 
+## REST API & MCP server
+
+Personal API tokens (`rst_*`, scoped, SHA-256 hashed) authenticate two
+parallel surfaces:
+
+- **REST API** at `/functions/v1/api/*` — request/response endpoints for
+  shell scripts and curl. See [`docs/specs/modules/14-user-api-tokens.md`](docs/specs/modules/14-user-api-tokens.md).
+- **MCP server** at `/functions/v1/mcp` — JSON-RPC 2.0 over HTTP for AI
+  agents (Claude Desktop, Cursor, Copilot Coding Agent). See
+  [`docs/specs/modules/15-mcp-server.md`](docs/specs/modules/15-mcp-server.md).
+
+Issue tokens at https://rastrum.org/en/profile/tokens. Both surfaces
+gate on the same scope strings (`observe`, `identify`, `export`).
+
 ## Roadmap
 
 | Version | Milestone |

@@ -111,6 +111,18 @@ are now wholly covered by module 08 and are removed from this phase.
 
 ---
 
+## Shipped modules (post-v0.5)
+
+| # | Module | Target | Status | Spec |
+|---|---|---|---|---|
+| 14 | User API tokens (`rst_*`, scoped, SHA-256 hashed) | v0.5 | shipped | [`14-user-api-tokens.md`](14-user-api-tokens.md) |
+| 15 | MCP server (JSON-RPC over HTTP for AI agents) | v1.0 | shipped | [`15-mcp-server.md`](15-mcp-server.md) |
+
+> **Note:** the planned-module table above (rows 13–20) was authored
+> early in v0.3 with provisional numbers and is stale relative to actual
+> shipped numbering. Trust the file names and statuses in this section
+> over the planned table for anything past 12.
+
 ## Infra & cross-cutting
 
 | Doc | Purpose |
