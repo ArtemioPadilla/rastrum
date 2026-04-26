@@ -6,6 +6,7 @@ interface Props {
 }
 const { lang } = Astro.props;
 const tr = t(lang);
+const isEs = lang === 'es';
 
 const habitats = [
   'forest_pine_oak','cloud_forest','tropical_dry_forest','riparian','wetland',
@@ -334,20 +335,46 @@ const weatherLabels = (tr.observe as any).weather_options as Record<string,strin
     if (idSpinnerLbl) idSpinnerLbl.textContent = isEs ? 'Identificando con PlantNet…' : 'Identifying with PlantNet…';
 
     try {
-      const PLANTNET_KEY = (window as any).__RASTRUM_PLANTNET_KEY__ ?? '';
-      if (!PLANTNET_KEY) {
+      // Resolve key from (in order): runtime injection, build-time env,
+      // user-supplied BYO key in localStorage. If none, show a hint instead
+      // of silently doing nothing — server-side cascade will still run on
+      // sync, but the user expects to see why the spinner disappeared.
+      let plantnetKey: string = (window as any).__RASTRUM_PLANTNET_KEY__ ?? '';
+      if (!plantnetKey) {
+        plantnetKey = (import.meta.env.PUBLIC_PLANTNET_KEY as string | undefined) ?? '';
+      }
+      if (!plantnetKey) {
+        try {
+          const { getKey } = await import('../lib/byo-keys');
+          plantnetKey = getKey('plantnet', 'plantnet') ?? '';
+        } catch { /* byo-keys unavailable */ }
+      }
+
+      if (!plantnetKey) {
         idSpinner?.classList.add('hidden');
-        return; // No key available client-side — server will identify post-sync
+        if (idSpinnerLbl) {
+          idSpinnerLbl.textContent = isEs
+            ? 'Configura una clave PlantNet en Perfil → Editar para identificar al instante.'
+            : 'Add a PlantNet key in Profile → Edit for instant ID.';
+        }
+        // Reveal the hint by showing the spinner row WITHOUT the spinning icon.
+        // Cheaper alternative: a dedicated hint element. Reuse spinner row with the label-only state.
+        const spinnerSvg = idSpinner?.querySelector('svg');
+        spinnerSvg?.classList.add('hidden');
+        idSpinner?.classList.remove('hidden');
+        return; // Server-side cascade will still run after sync.
       }
 
       const form = new FormData();
       form.append('images', file);
       form.append('organs', 'auto');
 
+      const ac = new AbortController();
+      const timeoutId = setTimeout(() => ac.abort(), 15_000);
       const res = await fetch(
-        `https://my-api.plantnet.org/v2/identify/all?api-key=${PLANTNET_KEY}&lang=${isEs ? 'es' : 'en'}&nb-results=3`,
-        { method: 'POST', body: form }
-      );
+        `https://my-api.plantnet.org/v2/identify/all?api-key=${plantnetKey}&lang=${isEs ? 'es' : 'en'}&nb-results=3`,
+        { method: 'POST', body: form, signal: ac.signal }
+      ).finally(() => clearTimeout(timeoutId));
 
       if (!res.ok) throw new Error(`PlantNet ${res.status}`);
       const data = await res.json();
@@ -360,11 +387,22 @@ const weatherLabels = (tr.observe as any).weather_options as Record<string,strin
         );
       } else {
         idSpinner?.classList.add('hidden');
+        if (idSpinnerLbl) {
+          idSpinnerLbl.textContent = isEs
+            ? 'Sin coincidencia clara. Sincronizaremos para usar la cascada de IA.'
+            : 'No confident match. Will use AI cascade on sync.';
+        }
+        idSpinner?.classList.remove('hidden');
       }
     } catch (err) {
       console.warn('[rastrum] client identify failed:', err);
       idSpinner?.classList.add('hidden');
-      // Server-side identify will run after sync
+      if (idSpinnerLbl) {
+        idSpinnerLbl.textContent = isEs
+          ? 'Identificación local falló. Reintentaremos al sincronizar.'
+          : 'Client-side identify failed. Will retry on sync.';
+      }
+      idSpinner?.classList.remove('hidden');
     }
   }
 
@@ -581,30 +619,41 @@ const weatherLabels = (tr.observe as any).weather_options as Record<string,strin
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
     if (!form || !submitBtn || !btnLabel) return;
+    const isEsSubmit = document.documentElement.lang === 'es';
     errBox?.classList.add('hidden');
 
     if (photos.length === 0 && audios.length === 0) {
-      if (errBox) { errBox.textContent = (document.documentElement.lang === 'es')
+      if (errBox) { errBox.textContent = isEsSubmit
         ? 'Se requiere al menos una foto o un audio.'
         : 'At least one photo or audio is required.';
         errBox.classList.remove('hidden'); }
       return;
     }
-    if (!location) {
-      if (errBox) { errBox.textContent = (document.documentElement.lang === 'es') ? 'La ubicación es obligatoria.' : 'Location is required.'; errBox.classList.remove('hidden'); }
+    if (!location || !Number.isFinite(location.lat) || !Number.isFinite(location.lng)) {
+      if (errBox) {
+        errBox.textContent = isEsSubmit
+          ? 'Ubicación inválida. Activa el GPS o ingresa coordenadas válidas.'
+          : 'Invalid location. Enable GPS or enter valid coordinates.';
+        errBox.classList.remove('hidden');
+      }
       return;
     }
 
     submitBtn.disabled = true;
     btnLabel.textContent = SUBMITTING;
 
+    try {
     // Resolve the ObserverRef from the Supabase session. If not signed in,
     // fall back to a guest ref — observation stays Dexie-only per module 04.
     let ref: ObserverRef = { kind: 'guest', localId: 'local-' + crypto.randomUUID() };
     try {
-      const { data: { user } } = await getSupabase().auth.getUser();
+      const authPromise = getSupabase().auth.getUser();
+      const authTimeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('auth timeout')), 5_000)
+      );
+      const { data: { user } } = await Promise.race([authPromise, authTimeout]);
       if (user) ref = { kind: 'user', id: user.id };
-    } catch { /* ignore */ }
+    } catch { /* offline or no session — proceed as guest */ }
 
     const obs: Observation = {
       id: crypto.randomUUID(),
@@ -685,6 +734,7 @@ const weatherLabels = (tr.observe as any).weather_options as Record<string,strin
     // Attempt immediate sync if online; otherwise it'll flush on next online event.
     // Use a timeout to prevent hanging indefinitely if Edge Functions are unavailable.
     let syncedNow = false;
+    let syncErrMsg: string | null = null;
     if (ref.kind === 'user' && navigator.onLine) {
       try {
         const syncPromise = syncOutbox();
@@ -694,20 +744,38 @@ const weatherLabels = (tr.observe as any).weather_options as Record<string,strin
         const res = await Promise.race([syncPromise, timeoutPromise]);
         syncedNow = res.synced > 0;
       } catch (err) {
+        syncErrMsg = err instanceof Error ? err.message : String(err);
         console.warn('[rastrum] sync failed or timed out:', err);
-        /* ignore — row stays pending, will retry on next online event */
+        /* row stays pending — will retry on next online event */
       }
     }
 
-    submitBtn.disabled = false;
-    btnLabel.textContent = ORIGINAL_LABEL;
     form.classList.add('hidden');
     successBox?.classList.remove('hidden');
     if (successMsg) {
-      const isEs = document.documentElement.lang === 'es';
-      successMsg.textContent = syncedNow
-        ? (isEs ? 'Guardada y sincronizada.' : 'Saved and synced.')
-        : (isEs ? 'Guardada en este dispositivo. Se sincronizará al conectarse.' : 'Saved on this device. Will sync when you’re online.');
+      if (syncErrMsg) {
+        successMsg.textContent = isEsSubmit
+          ? `Guardada en este dispositivo. La sincronización falló (${syncErrMsg}); reintentaremos automáticamente.`
+          : `Saved on this device. Sync failed (${syncErrMsg}); we'll retry automatically.`;
+      } else {
+        successMsg.textContent = syncedNow
+          ? (isEsSubmit ? 'Guardada y sincronizada.' : 'Saved and synced.')
+          : (isEsSubmit ? 'Guardada en este dispositivo. Se sincronizará al conectarse.' : 'Saved on this device. Will sync when you’re online.');
+      }
+    }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[rastrum] submit failed:', err);
+      if (errBox) {
+        errBox.textContent = isEsSubmit
+          ? `No se pudo guardar la observación: ${msg}`
+          : `Could not save observation: ${msg}`;
+        errBox.classList.remove('hidden');
+      }
+      // Leave the form visible so the user can retry without losing input.
+    } finally {
+      submitBtn.disabled = false;
+      btnLabel.textContent = ORIGINAL_LABEL;
     }
   });
 

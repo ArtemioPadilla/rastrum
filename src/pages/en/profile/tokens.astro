@@ -4,40 +4,40 @@
  * See docs/specs/modules/14-user-api-tokens.md
  */
 import BaseLayout from '../../../layouts/BaseLayout.astro';
-import { t as getT } from '../../../i18n/utils';
+import { t } from '../../../i18n/utils';
 
 const lang = 'en';
-const t = getT(lang);
+const tr = t(lang) as any;
 ---
 
-<BaseLayout title={t('tokens.title')} description={t('tokens.desc')}>
+<BaseLayout title={tr.tokens.title} description={tr.tokens.desc}>
   <main class="mx-auto max-w-2xl px-4 py-10">
-    <h1 class="text-2xl font-bold mb-1">{t('tokens.title')}</h1>
-    <p class="text-sm text-gray-500 mb-8">{t('tokens.desc')}</p>
+    <h1 class="text-2xl font-bold mb-1">{tr.tokens.title}</h1>
+    <p class="text-sm text-gray-500 mb-8">{tr.tokens.desc}</p>
 
     <div id="new-token-banner" class="hidden mb-6 rounded-lg border border-green-300 bg-green-50 p-4">
-      <p class="text-sm font-semibold text-green-800 mb-2">{t('tokens.copy_now')}</p>
+      <p class="text-sm font-semibold text-green-800 mb-2">{tr.tokens.copy_now}</p>
       <div class="flex items-center gap-2">
         <code id="new-token-value" class="flex-1 rounded bg-white border px-3 py-2 text-sm font-mono break-all"></code>
         <button id="copy-btn" class="shrink-0 rounded bg-green-600 px-3 py-2 text-sm text-white hover:bg-green-700">
-          {t('tokens.copy')}
+          {tr.tokens.copy}
         </button>
       </div>
     </div>
 
     <section id="token-list" class="mb-8 space-y-3">
-      <div class="animate-pulse text-sm text-gray-400">{t('tokens.loading')}</div>
+      <div class="animate-pulse text-sm text-gray-400">{tr.tokens.loading}</div>
     </section>
 
     <form id="create-form" class="rounded-xl border p-5 space-y-4">
-      <h2 class="font-semibold">{t('tokens.new')}</h2>
+      <h2 class="font-semibold">{tr.tokens.new}</h2>
       <div>
-        <label class="block text-sm font-medium mb-1" for="token-name">{t('tokens.name_label')}</label>
-        <input id="token-name" type="text" placeholder={t('tokens.name_placeholder')}
+        <label class="block text-sm font-medium mb-1" for="token-name">{tr.tokens.name_label}</label>
+        <input id="token-name" type="text" placeholder={tr.tokens.name_placeholder}
           class="w-full rounded border px-3 py-2 text-sm" maxlength="64" required />
       </div>
       <div>
-        <label class="block text-sm font-medium mb-1">{t('tokens.scopes_label')}</label>
+        <label class="block text-sm font-medium mb-1">{tr.tokens.scopes_label}</label>
         <div class="flex flex-wrap gap-3">
           {['observe', 'identify', 'export', 'read_all'].map(scope => (
             <label class="flex items-center gap-2 text-sm cursor-pointer">
@@ -49,17 +49,17 @@ const t = getT(lang);
         </div>
       </div>
       <div>
-        <label class="block text-sm font-medium mb-1" for="token-expires">{t('tokens.expires_label')}</label>
+        <label class="block text-sm font-medium mb-1" for="token-expires">{tr.tokens.expires_label}</label>
         <select id="token-expires" class="rounded border px-3 py-2 text-sm">
-          <option value="">{t('tokens.no_expiry')}</option>
-          <option value="30">30 {t('tokens.days')}</option>
-          <option value="90">90 {t('tokens.days')}</option>
-          <option value="365">1 {t('tokens.year')}</option>
+          <option value="">{tr.tokens.no_expiry}</option>
+          <option value="30">30 {tr.tokens.days}</option>
+          <option value="90">90 {tr.tokens.days}</option>
+          <option value="365">1 {tr.tokens.year}</option>
         </select>
       </div>
       <button type="submit"
         class="rounded-lg bg-green-700 px-5 py-2 text-sm font-semibold text-white hover:bg-green-800">
-        {t('tokens.create')}
+        {tr.tokens.create}
       </button>
     </form>
   </main>
