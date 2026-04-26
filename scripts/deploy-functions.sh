@@ -28,6 +28,7 @@ declare -A VERIFY_JWT=(
   [recompute-streaks]=true
   [award-badges]=true
   [share-card]=false   # OG scrapers need anonymous access
+  [export-dwca]=true   # accepts user JWT or service-role bearer (cron / IPT cli)
 )
 
 deploy_one() {
