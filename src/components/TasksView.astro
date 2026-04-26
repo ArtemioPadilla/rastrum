@@ -13,8 +13,10 @@ function loc<T extends Record<string, unknown>>(obj: T, base: string): string {
     const v = obj[base + '_es'];
     if (typeof v === 'string' && v.length) return v;
   }
-  const v = obj[base];
-  return typeof v === 'string' ? v : '';
+  const en = obj[base + '_en'];
+  if (typeof en === 'string' && en.length) return en;
+  const bare = obj[base];
+  return typeof bare === 'string' ? bare : '';
 }
 
 type SubtaskStatus = 'done' | 'in_progress' | 'planned' | 'blocked';
