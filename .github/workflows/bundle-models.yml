@@ -14,7 +14,7 @@
 #   R2_SECRET_ACCESS_KEY    Matching secret
 #   R2_ENDPOINT_URL         e.g. https://<account-id>.r2.cloudflarestorage.com
 #   R2_BUCKET               e.g. rastrum-media
-#   R2_PUBLIC_BASE_URL      e.g. https://rastrum-media.artemiop.com
+#   PUBLIC_R2_MEDIA_URL      e.g. https://rastrum-media.artemiop.com
 #
 # ── After upload ──────────────────────────────────────────────────────
 # The job summary tells you exactly which PUBLIC_*_URL secret to set
@@ -53,7 +53,9 @@ jobs:
       AWS_DEFAULT_REGION:    auto
       R2_ENDPOINT:           ${{ secrets.R2_ENDPOINT_URL }}
       R2_BUCKET:             ${{ secrets.R2_BUCKET }}
-      R2_PUBLIC_BASE:        ${{ secrets.R2_PUBLIC_BASE_URL }}
+      R2_PUBLIC_BASE:        ${{ secrets.PUBLIC_R2_MEDIA_URL }}
+      # Note: PUBLIC_R2_MEDIA_URL is the same secret used by deploy.yml — reuse,
+      # don't duplicate. We just rebind it to R2_PUBLIC_BASE for readability.
     steps:
       - name: Validate secrets
         run: |
