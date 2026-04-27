@@ -333,8 +333,8 @@
         },
         {
           "id": "camera-trap-ingest",
-          "label": "Camera trap ingestion (MegaDetector v5a INT8 ONNX hosted on R2, batch importer at /profile/import/camera-trap, plugin in cascade for evidence_type='camera_trap')",
-          "label_es": "Ingesta de cámara trampa (MegaDetector v5a INT8 ONNX en R2, importador batch en /perfil/importar/camara-trampa, plugin en cascada para evidence_type='camera_trap')",
+          "label": "Camera trap ingestion (batch importer at /profile/import/camera-trap, MegaDetector v5a YOLOv5 ONNX runs on-device via onnxruntime-web; FilteredFrameError short-circuits the cascade for empty/human/vehicle frames; operator hosts weights at PUBLIC_MEGADETECTOR_WEIGHTS_URL)",
+          "label_es": "Ingesta de cámara trampa (importador batch en /perfil/importar/camara-trampa, MegaDetector v5a YOLOv5 ONNX corre en el dispositivo vía onnxruntime-web; FilteredFrameError corta el cascade para cuadros vacíos/humano/vehículo; el operador aloja los pesos en PUBLIC_MEGADETECTOR_WEIGHTS_URL)",
           "done": true
         },
         {
@@ -432,6 +432,24 @@
           "id": "expert-app-admin-ui",
           "label": "Admin review UI for expert_applications (schema shipped v1.0; admin approve/reject UX missing)",
           "label_es": "UI admin para revisar expert_applications (schema en v1.0; falta UX para aprobar/rechazar)",
+          "done": false
+        },
+        {
+          "id": "megadetector-bbox-cascade",
+          "label": "Bbox-aware species cascade — when MegaDetector finds an animal, crop the photo to the bbox before passing to PlantNet/Claude/Phi (×3-5 accuracy bump on small subjects in distant traps)",
+          "label_es": "Cascade de especies consciente del bbox — cuando MegaDetector encuentra un animal, recortar la foto al bbox antes de pasarla a PlantNet/Claude/Phi (×3-5 mejora de precisión en sujetos pequeños/lejanos)",
+          "done": false
+        },
+        {
+          "id": "megadetector-hosting-recipe",
+          "label": "Hosting recipe under infra/megadetector/ for one-shot conversion of MegaDetector v5a checkpoint to ONNX + R2 upload (Modal/Lambda/Replicate variants)",
+          "label_es": "Receta de hosting en infra/megadetector/ para conversión one-shot del checkpoint MegaDetector v5a a ONNX + subida a R2 (variantes Modal/Lambda/Replicate)",
+          "done": false
+        },
+        {
+          "id": "speciesnet-distilled",
+          "label": "Distilled SpeciesNet for on-device animal classification (~100 MB ONNX, iWildCam categories) so common camera-trap species don't need cloud LLMs",
+          "label_es": "SpeciesNet destilado para clasificación animal en el dispositivo (~100 MB ONNX, categorías iWildCam) para que las especies comunes de cámara trampa no requieran LLMs en la nube",
           "done": false
         },
         {

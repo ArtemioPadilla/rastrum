@@ -497,7 +497,39 @@ const altHref = `${base}/${alt}${altSlug}/`;
       } catch { /* ignore */ }
       idStates.push({ id: 'birdnet', name: 'BirdNET', desc: isEs ? 'En el dispositivo — aves por sonido (~50 MB).' : 'On-device — birds by sound (~50 MB).', emoji: '🎵', type: 'device', status: birdnetCached ? 'cached' : 'not_downloaded' });
 
-      // 5. EfficientNet — check cache
+      // 5b. MegaDetector v5a — on-device camera-trap filter (operator-hosted weights).
+      let mdCached = false;
+      let mdHasUrl = false;
+      try {
+        const { getMegadetectorWeightsBaseUrl, getMegadetectorCacheStatus } = await import('../lib/identifiers/megadetector-cache');
+        mdHasUrl = !!getMegadetectorWeightsBaseUrl();
+        if (mdHasUrl) {
+          const s = await getMegadetectorCacheStatus();
+          mdCached = s.modelCached;
+        }
+      } catch { /* ignore */ }
+      if (mdHasUrl) {
+        idStates.push({
+          id: 'megadetector',
+          name: 'MegaDetector v5a',
+          desc: isEs ? 'En el dispositivo — pre-filtro de cámara trampa (~85 MB).' : 'On-device — camera-trap pre-filter (~85 MB).',
+          emoji: '🎥',
+          type: 'device',
+          status: mdCached ? 'cached' : 'not_downloaded',
+        });
+      } else {
+        idStates.push({
+          id: 'megadetector',
+          name: 'MegaDetector v5a',
+          desc: isEs ? "El operador aún no publicó los pesos ONNX." : "Operator hasn't published the ONNX weights yet.",
+          emoji: '🎥',
+          type: 'device',
+          status: 'unavailable',
+          unavailableReason: 'no_url',
+        });
+      }
+
+      // 5c. EfficientNet — check cache
       let onnxCached = false;
       try {
         const { getOnnxBaseCacheStatus } = await import('../lib/identifiers/onnx-base-cache');
@@ -605,7 +637,7 @@ const altHref = `${base}/${alt}${altSlug}/`;
 
         if (
           (s.id === 'phi_vision' || s.id === 'birdnet' || s.id === 'onnx_base' ||
-           s.id === 'llama_text' || s.id === 'pmtiles_mx') && s.status === 'not_downloaded'
+           s.id === 'llama_text' || s.id === 'pmtiles_mx' || s.id === 'megadetector') && s.status === 'not_downloaded'
         ) {
           const sizes: Record<string, string> = {
             phi_vision: '~4 GB',
@@ -613,9 +645,11 @@ const altHref = `${base}/${alt}${altSlug}/`;
             onnx_base: '~2.8 MB',
             llama_text: '~700 MB',
             pmtiles_mx: '~48 MB',
+            megadetector: '~85 MB',
           };
           // Heavy = anything large enough to warrant a Wi-Fi confirmation.
-          const isHeavy = s.id === 'phi_vision' || s.id === 'birdnet' || s.id === 'llama_text' || s.id === 'pmtiles_mx';
+          const isHeavy = s.id === 'phi_vision' || s.id === 'birdnet' || s.id === 'llama_text'
+            || s.id === 'pmtiles_mx' || s.id === 'megadetector';
           actionHtml = `
             <div class="mt-2" data-onb-dl-row="${escape(s.id)}">
               <button type="button" data-onb-download="${escape(s.id)}" data-onb-size="${escape(sizes[s.id] ?? '')}" data-onb-heavy="${isHeavy ? '1' : '0'}" class="rounded-lg border border-emerald-600/60 px-3 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 disabled:opacity-50">
@@ -802,6 +836,13 @@ const altHref = `${base}/${alt}${altSlug}/`;
             if (statusEl) statusEl.textContent = `${Math.round(p.progress * 100)}%`;
           });
           const state = idStates.find(s => s.id === 'pmtiles_mx');
+          if (state) state.status = 'cached';
+        } else if (modelId === 'megadetector') {
+          const { downloadMegadetectorWeights } = await import('../lib/identifiers/megadetector-cache');
+          await downloadMegadetectorWeights((p) => {
+            if (statusEl) statusEl.textContent = `${Math.round(p.progress * 100)}%`;
+          });
+          const state = idStates.find(s => s.id === 'megadetector');
           if (state) state.status = 'cached';
         }
         renderIdCards();

@@ -588,15 +588,52 @@
     },
     "camera-trap-ingest": {
       "phase": "v1.0",
-      "title_en": "Camera trap ingestion (MegaDetector v5a INT8 ONNX)",
-      "title_es": "Ingesta de cámara trampa (MegaDetector v5a INT8 ONNX)",
+      "title_en": "Camera trap ingestion (on-device MegaDetector v5a YOLOv5 ONNX)",
+      "title_es": "Ingesta de cámara trampa (MegaDetector v5a YOLOv5 ONNX en el dispositivo)",
       "modules": ["09-camera-trap.md","19-batch-photo-importer.md"],
       "subtasks": [
         { "label_en": "Bulk-upload UI at /profile/import/camera-trap (drag-drop)", "label_es": "UI de carga masiva en /perfil/importar/camara-trampa (drag-drop)", "status": "done" },
         { "label_en": "Shared trap location (single GPS) + per-photo EXIF timestamp", "label_es": "Ubicación compartida del trap (GPS único) + timestamp EXIF",   "status": "done" },
-        { "label_en": "MegaDetector v5a INT8 ONNX hosted on R2 (model_not_bundled stub)", "label_es": "MegaDetector v5a INT8 ONNX en R2 (stub model_not_bundled)",    "status": "done" },
+        { "label_en": "Plugin runtime:'client' running MegaDetector v5a via onnxruntime-web (megadetector-yolo.ts letterbox+NMS, megadetector-cache.ts download/cache)", "label_es": "Plugin runtime:'client' que corre MegaDetector v5a vía onnxruntime-web (megadetector-yolo.ts letterbox+NMS, megadetector-cache.ts descarga/cache)", "status": "done" },
+        { "label_en": "FilteredFrameError short-circuits the cascade for empty/human/vehicle frames (cascade.ts + errors.ts)", "label_es": "FilteredFrameError corta el cascade para cuadros vacíos/humano/vehículo (cascade.ts + errors.ts)", "status": "done" },
+        { "label_en": "Operator hosts the ~85 MB ONNX behind PUBLIC_MEGADETECTOR_WEIGHTS_URL", "label_es": "El operador aloja el ONNX de ~85 MB en PUBLIC_MEGADETECTOR_WEIGHTS_URL", "status": "blocked", "blocker_en": "Operator action: convert v5a checkpoint and upload to R2", "blocker_es": "Acción del operador: convertir el checkpoint v5a y subirlo a R2" },
         { "label_en": "camera_trap_deployments + processing_queue tables (deferred)",  "label_es": "Tablas camera_trap_deployments + processing_queue (diferidas)", "status": "planned" },
         { "label_en": "Edge Function: motion → ID → research-grade pipeline",          "label_es": "Edge Function: motion → ID → research-grade",                   "status": "planned" }
+      ]
+    },
+    "megadetector-bbox-cascade": {
+      "phase": "v1.0.x",
+      "title_en": "Bbox-aware species cascade",
+      "title_es": "Cascade de especies consciente del bbox",
+      "modules": ["09-camera-trap.md","13-identifier-registry.md"],
+      "subtasks": [
+        { "label_en": "Extend IdentifyInput with optional `mediaCrop?: bbox` field", "label_es": "Extender IdentifyInput con campo opcional `mediaCrop?: bbox`", "status": "planned" },
+        { "label_en": "MegaDetector throws fall-through error with bbox attached (already done)", "label_es": "MegaDetector lanza fall-through con bbox adjunto (ya hecho)", "status": "done" },
+        { "label_en": "Cascade reads bbox from previous error and passes to next plugin", "label_es": "Cascade lee bbox del error previo y lo pasa al siguiente plugin", "status": "planned" },
+        { "label_en": "PlantNet/Claude/Phi pre-crop image to bbox in their decode step", "label_es": "PlantNet/Claude/Phi pre-recortan al bbox en su decode", "status": "planned" }
+      ]
+    },
+    "megadetector-hosting-recipe": {
+      "phase": "v1.0.x",
+      "title_en": "MegaDetector ONNX hosting recipe",
+      "title_es": "Receta de hosting del ONNX de MegaDetector",
+      "modules": ["09-camera-trap.md"],
+      "subtasks": [
+        { "label_en": "infra/megadetector/convert.sh: one-shot v5a.pt → ONNX via ultralytics export.py", "label_es": "infra/megadetector/convert.sh: conversión one-shot v5a.pt → ONNX vía ultralytics export.py", "status": "planned" },
+        { "label_en": "infra/megadetector/upload-r2.sh: upload to media.rastrum.org/models/megadetector_v5a.onnx", "label_es": "infra/megadetector/upload-r2.sh: subida a media.rastrum.org/models/megadetector_v5a.onnx", "status": "planned" },
+        { "label_en": "Optional Modal/Lambda/Replicate variants for server-side fallback", "label_es": "Variantes Modal/Lambda/Replicate opcionales para fallback server-side", "status": "planned" }
+      ]
+    },
+    "speciesnet-distilled": {
+      "phase": "v1.0.x",
+      "title_en": "Distilled SpeciesNet on-device classifier",
+      "title_es": "Clasificador SpeciesNet destilado en el dispositivo",
+      "modules": ["09-camera-trap.md","13-identifier-registry.md"],
+      "subtasks": [
+        { "label_en": "Train MobileNetV3-Small (or equivalent) on iWildCam 2022 categories (~250 species)", "label_es": "Entrenar MobileNetV3-Small (o equivalente) en categorías de iWildCam 2022 (~250 especies)", "status": "planned" },
+        { "label_en": "Quantise to INT8 ONNX, target ~100 MB", "label_es": "Cuantizar a INT8 ONNX, objetivo ~100 MB", "status": "planned" },
+        { "label_en": "Sibling plugin in src/lib/identifiers/ following birdnet-cache pattern", "label_es": "Plugin hermano en src/lib/identifiers/ siguiendo el patrón birdnet-cache", "status": "planned" },
+        { "label_en": "Cascade ordering: prefer for evidence_type=camera_trap when MegaDetector found an animal", "label_es": "Orden del cascade: preferir para evidence_type=camera_trap cuando MegaDetector encontró un animal", "status": "planned" }
       ]
     },
     "capacitor-ios": {

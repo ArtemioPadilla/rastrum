@@ -76,7 +76,13 @@ serve(async (req) => {
   if (req.method !== 'POST') return textResponse('Method not allowed', 405);
 
   const env = (k: string) => Deno.env.get(k);
-  const required = ['CF_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET_NAME', 'R2_PUBLIC_URL', 'SUPABASE_URL', 'SUPABASE_ANON_KEY'];
+  // Endpoint can be supplied directly via R2_ENDPOINT_URL or derived
+  // from CF_ACCOUNT_ID. Accept either — the deploy workflow now syncs
+  // both from GitHub Actions secrets.
+  const r2Endpoint = env('R2_ENDPOINT_URL')
+    ?? (env('CF_ACCOUNT_ID') ? `https://${env('CF_ACCOUNT_ID')}.r2.cloudflarestorage.com` : null);
+  if (!r2Endpoint) return textResponse('Function not configured: R2_ENDPOINT_URL or CF_ACCOUNT_ID', 500);
+  const required = ['R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET_NAME', 'R2_PUBLIC_URL', 'SUPABASE_URL', 'SUPABASE_ANON_KEY'];
   for (const k of required) {
     if (!env(k)) return textResponse(`Function not configured: ${k}`, 500);
   }
@@ -124,7 +130,7 @@ serve(async (req) => {
   // Construct the R2 client. R2 emulates S3; region is always 'auto'.
   const r2 = new S3Client({
     region: 'auto',
-    endpoint: `https://${env('CF_ACCOUNT_ID')}.r2.cloudflarestorage.com`,
+    endpoint: r2Endpoint,
     credentials: {
       accessKeyId: env('R2_ACCESS_KEY_ID')!,
       secretAccessKey: env('R2_SECRET_ACCESS_KEY')!,

@@ -1,9 +1,23 @@
 # Module 09 — Camera Trap Analysis (Fototrampeo)
 
 **Version target:** v1.0 (months 7–12)
-**Status:** client implemented. Plugin (`src/lib/identifiers/camera-trap-megadetector.ts`) POSTs the image URL to `PUBLIC_MEGADETECTOR_ENDPOINT` and parses the standardised response (see file header for wire format). Bulk-upload UI shipped at `/profile/import/camera-trap`. The cascade prefers this plugin for `evidence_type=camera_trap` photos and falls through transparently when the env var is unset. Operator action remaining: host MegaDetector v5a + SpeciesNet behind that URL.
+**Status:** on-device pre-filter implemented. Plugin (`src/lib/identifiers/camera-trap-megadetector.ts`) runs MegaDetector v5a as YOLOv5 ONNX in the browser via `onnxruntime-web` (helpers in `megadetector-yolo.ts`, cache in `megadetector-cache.ts`). Empty / human / vehicle frames throw `FilteredFrameError`, which the cascade catches and short-circuits — no cloud quota burned on non-animal frames. Animal frames throw a fall-through, so the species cascade (PlantNet → Claude → Phi → EfficientNet) runs against the full frame. Bulk-upload UI shipped at `/profile/import/camera-trap`. The cascade prefers this plugin for `evidence_type=camera_trap` photos.
+**Operator action remaining:** convert MegaDetector v5a to ONNX (one-shot via the upstream `export.py`) and host `megadetector_v5a.onnx` behind a CORS-open `PUBLIC_MEGADETECTOR_WEIGHTS_URL`. Until that's done the plugin reports `model_not_bundled` and the cascade transparently falls through.
 **Spec author:** Eugenio Padilla + Claude (2026-04-24)
 **Last verified:** 2026-04-27.
+
+---
+
+## Next steps
+
+In priority order, what would deepen this pipeline beyond the v1.0 cut:
+
+1. **Bbox-aware species cascade** — when MegaDetector finds an animal, pass the bbox forward in `IdentifyInput.prior_candidates` (or extend the input shape) so PlantNet/Claude/Phi run on a tight crop, not the full frame. Crops are a ×3-×5 accuracy bump on small subjects in distant traps. Effort: ~1 day in `cascade.ts` + each plugin's preprocess. Blocker: shape extension to `IdentifyInput` (mediaCrop?: bbox).
+2. **Distilled SpeciesNet for on-device animal classification** — a small (~100 MB) ONNX-quantised animal classifier trained on iWildCam categories slots in as a sibling on-device model. Frees us from depending on cloud LLMs for species ID on common camera-trap species (deer, peccary, jaguarundi, ocelot, etc). Effort: training pipeline + hosting + plugin (~1 week).
+3. **Server-side fallback (already-wired alternate path)** — keep `PUBLIC_MEGADETECTOR_ENDPOINT` as a switchable server route for low-end devices that can't run the ONNX. Need a small "use server-side detector" toggle in Profile → Edit → AI settings, defaults off. The server path is already implemented at git history ref `9174d32` and can be re-enabled by reverting one commit.
+4. **Hosting recipe** — a Modal.com app (or Lambda / Replicate variant) packaged under `infra/megadetector/` for one-shot deploy to fill `PUBLIC_MEGADETECTOR_WEIGHTS_URL` (and optionally the server endpoint). Effort: ~1 day.
+5. **CONANP fototrampeo export profile** — the existing DwC-A export module already supports `evidence_type=camera_trap`; a CONANP-specific column profile (camera ID, trap-night counts, detection-event grouping) would make the bulk-upload artefact directly publishable.
+6. **Audio camera-trap** — many modern traps record audio alongside photo. BirdNET-Lite already lives on-device; wiring evidence_type=camera_trap photos with attached audio into the same review queue is mostly UI work.
 
 ---
 

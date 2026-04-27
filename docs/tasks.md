@@ -16,7 +16,7 @@
 | v0.3 | Offline intelligence + activity | done | 11 / 11 |
 | v0.5 | Beta | shipped (partial) | 11 / 13 |
 | v1.0 | Public Launch | shipped (partial) | 18 / 21 |
-| v1.0.x | Post-launch polish | in_progress | 2 / 16 |
+| v1.0.x | Post-launch polish | in_progress | 2 / 19 |
 | v1.1 | UX polish (post-launch brainstorm) | planned | 13 / 15 |
 | **v0.1 → v1.0** | **Public launch** | **shipped 2026-04-26** | **54 / 59** |
 
@@ -59,10 +59,13 @@ Remaining:
 
 ## v1.0.x — Post-launch polish — in_progress
 
-**2 of 16 items done.**
+**2 of 19 items done.**
 
 Remaining:
 
+- `megadetector-bbox-cascade` — Bbox-aware species cascade — when MegaDetector finds an animal, crop the photo to the bbox before passing to PlantNet/Claude/Phi (×3-5 accuracy bump on small subjects in distant traps)  _(· planned)_
+- `megadetector-hosting-recipe` — Hosting recipe under `infra/megadetector/` for one-shot conversion of MegaDetector v5a checkpoint to ONNX + R2 upload (Modal/Lambda/Replicate variants)  _(· planned)_
+- `speciesnet-distilled` — Distilled SpeciesNet for on-device animal classification (~100 MB ONNX, iWildCam categories) so common camera-trap species don't need cloud LLMs  _(· planned)_
 - `arch-diagram-parallel` — Update architecture page cascade SVG to show parallel race (currently shows serial waterfall)  _(· planned)_
 - `identify-server-cascade` — Move runParallelIdentify to identify Edge Function for server-side parity (currently client-only)  _(· planned)_
 - `inapp-camera-secondary` — Re-introduce in-app getUserMedia camera as secondary 'preview' path with system camera staying primary  _(! blocked: Awaits feedback from real users — deferred from v1.0 because system camera is more reliable on test devices. GitHub issue #18)_

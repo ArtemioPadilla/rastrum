@@ -47,48 +47,83 @@ jobs:
         # only pushed if non-empty in CI (no clobbering existing Supabase
         # values with empty strings). Skip with `sync_secrets=false` when
         # you need to deploy code without touching credentials.
+        #
+        # Some GitHub secret names differ from the Edge-Function-expected
+        # names (e.g. R2_BUCKET vs R2_BUCKET_NAME). The mapping table
+        # below normalises both directions: we read the GH secret under
+        # the name you have, then write to Supabase under the canonical
+        # name the function code expects.
         if: ${{ inputs.sync_secrets != false }}
         env:
-          # R2 / Cloudflare
-          CF_ACCOUNT_ID:        ${{ secrets.CF_ACCOUNT_ID }}
+          # R2 / Cloudflare — GitHub names on the right, Supabase names
+          # established in the env-key columns below.
           R2_ACCESS_KEY_ID:     ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          R2_BUCKET_NAME:       ${{ secrets.R2_BUCKET_NAME }}
-          R2_PUBLIC_URL:        ${{ secrets.R2_PUBLIC_URL }}
-          # Identifier providers (operator-shared keys)
+          R2_BUCKET:            ${{ secrets.R2_BUCKET }}
+          R2_ENDPOINT_URL:      ${{ secrets.R2_ENDPOINT_URL }}
+          PUBLIC_R2_MEDIA_URL:  ${{ secrets.PUBLIC_R2_MEDIA_URL }}
+          # Optional CF_ACCOUNT_ID — derived from R2_ENDPOINT_URL when
+          # absent (`https://<acct>.r2.cloudflarestorage.com`).
+          CF_ACCOUNT_ID:        ${{ secrets.CF_ACCOUNT_ID }}
+          # Identifier providers
+          PUBLIC_PLANTNET_KEY:  ${{ secrets.PUBLIC_PLANTNET_KEY }}
           PLANTNET_API_KEY:     ${{ secrets.PLANTNET_API_KEY }}
           ANTHROPIC_API_KEY:    ${{ secrets.ANTHROPIC_API_KEY }}
-          # Web Push (VAPID private; the public half is built into the bundle)
+          # Web Push
           VAPID_PRIVATE_KEY:    ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_PUBLIC_KEY:     ${{ secrets.VAPID_PUBLIC_KEY }}
           VAPID_SUBJECT:        ${{ secrets.VAPID_SUBJECT }}
-          # Stripe (subscription tier — see runbook stripe-pro-tier.md)
+          # Stripe (scaffolded; see runbook stripe-pro-tier.md)
           STRIPE_SECRET_KEY:    ${{ secrets.STRIPE_SECRET_KEY }}
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
         run: |
           set -e
+
           push_secret() {
-            local name="$1"
-            # Read the env var via indirect expansion so `set -u` and
-            # logs don't leak the value.
-            local val="${!name:-}"
+            local supabase_name="$1"   # name as the Edge Function reads it
+            local val="$2"             # already-resolved value
             if [ -n "$val" ]; then
-              echo "→ syncing $name"
-              # supabase CLI accepts repeated KEY=VALUE pairs; we set one
-              # at a time so a single bad value doesn't silently fail
-              # the rest. The CLI never echoes values.
-              supabase secrets set "$name=$val" --project-ref "$PROJECT_REF" >/dev/null
+              echo "→ syncing $supabase_name"
+              supabase secrets set "$supabase_name=$val" --project-ref "$PROJECT_REF" >/dev/null
             else
-              echo "→ skipping $name (not set in GitHub Actions)"
+              echo "→ skipping $supabase_name (no value in GitHub)"
             fi
           }
-          for k in \
-            CF_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_BUCKET_NAME R2_PUBLIC_URL \
-            PLANTNET_API_KEY ANTHROPIC_API_KEY \
-            VAPID_PRIVATE_KEY VAPID_SUBJECT \
-            STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET
-          do
-            push_secret "$k"
-          done
+
+          # Derive CF_ACCOUNT_ID from R2_ENDPOINT_URL when not set
+          # explicitly. R2 endpoint format:
+          #   https://<accountid>.r2.cloudflarestorage.com
+          if [ -z "${CF_ACCOUNT_ID:-}" ] && [ -n "${R2_ENDPOINT_URL:-}" ]; then
+            CF_ACCOUNT_ID=$(echo "$R2_ENDPOINT_URL" \
+              | sed -E 's#^https?://([0-9a-f]+)\.r2\.cloudflarestorage\.com/?$#\1#')
+            if [ "$CF_ACCOUNT_ID" = "$R2_ENDPOINT_URL" ]; then
+              echo "warn: could not parse CF_ACCOUNT_ID from R2_ENDPOINT_URL=$R2_ENDPOINT_URL"
+              CF_ACCOUNT_ID=""
+            fi
+          fi
+
+          # R2 family — translate GitHub names → Supabase names
+          push_secret R2_ACCESS_KEY_ID      "${R2_ACCESS_KEY_ID:-}"
+          push_secret R2_SECRET_ACCESS_KEY  "${R2_SECRET_ACCESS_KEY:-}"
+          push_secret R2_BUCKET_NAME        "${R2_BUCKET:-}"
+          push_secret R2_ENDPOINT_URL       "${R2_ENDPOINT_URL:-}"
+          push_secret R2_PUBLIC_URL         "${PUBLIC_R2_MEDIA_URL:-}"
+          push_secret CF_ACCOUNT_ID         "${CF_ACCOUNT_ID:-}"
+
+          # Identifier providers — PLANTNET key has two GH names; Supabase
+          # uses PLANTNET_API_KEY. Prefer the explicit one if both are set.
+          PLANTNET="${PLANTNET_API_KEY:-${PUBLIC_PLANTNET_KEY:-}}"
+          push_secret PLANTNET_API_KEY      "$PLANTNET"
+          push_secret ANTHROPIC_API_KEY     "${ANTHROPIC_API_KEY:-}"
+
+          # Web Push
+          push_secret VAPID_PRIVATE_KEY     "${VAPID_PRIVATE_KEY:-}"
+          push_secret VAPID_PUBLIC_KEY      "${VAPID_PUBLIC_KEY:-}"
+          push_secret VAPID_SUBJECT         "${VAPID_SUBJECT:-mailto:hello@rastrum.org}"
+
+          # Stripe
+          push_secret STRIPE_SECRET_KEY     "${STRIPE_SECRET_KEY:-}"
+          push_secret STRIPE_WEBHOOK_SECRET "${STRIPE_WEBHOOK_SECRET:-}"
 
       - name: Deploy
         run: |

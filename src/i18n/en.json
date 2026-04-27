@@ -1040,8 +1040,8 @@
     "trap_altitude": "Altitude (m, optional)",
     "use_my_location": "Use my current GPS",
     "use_my_location_failed": "Couldn't read your GPS. Type the coordinates manually.",
-    "id_pipeline": "MegaDetector filters animal vs. empty/human/vehicle frames; SpeciesNet classifies each animal crop to species.",
-    "id_pipeline_pending": "When the operator hasn't configured PUBLIC_MEGADETECTOR_ENDPOINT, photos fall through to the standard cascade (PlantNet → Claude → on-device).",
+    "id_pipeline": "MegaDetector v5a runs on-device to pre-filter empty / human / vehicle frames. Animal frames continue through the standard species cascade (PlantNet → Claude → Phi → EfficientNet).",
+    "id_pipeline_pending": "Until the operator hosts the ONNX model behind PUBLIC_MEGADETECTOR_WEIGHTS_URL, the filter is unavailable and every photo runs through the species cascade.",
     "tag_camera_trap": "Camera trap"
   },
   "tokens": {

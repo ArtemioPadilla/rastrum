@@ -22,6 +22,12 @@ class Registry implements IdentifierRegistry {
     return Array.from(this.plugins.values());
   }
 
+  /** Test helper — drop every registered plugin. Not part of the
+   *  IdentifierRegistry interface; cast to `Registry` to access. */
+  _resetForTests(): void {
+    this.plugins.clear();
+  }
+
   findFor(opts: { media: MediaKind; taxa?: string; runtime?: Runtime }): Identifier[] {
     const wantedKingdom = opts.taxa?.split('.')?.[0];
     return this.list().filter(p => {
