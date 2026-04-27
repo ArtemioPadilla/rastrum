@@ -40,6 +40,11 @@ const videoMaxDuration  = observeStrings.video_max_duration  ?? (isEs ? 'Máximo
 
   <form id="obs-form" class="space-y-5" novalidate>
 
+    <!-- Pre-filled from chat banner (revealed by consumeChatPrefillIfAny) -->
+    <div id="chat-prefill-banner" class="hidden rounded-lg border border-emerald-300 dark:border-emerald-800/40 bg-emerald-50 dark:bg-emerald-900/10 px-3 py-2 text-sm text-emerald-900 dark:text-emerald-200">
+      {tr.chat.prefilled_from_chat_banner}
+    </div>
+
     <!-- WebLLM download warning — shown once before first local AI use -->
     <div id="webllm-warning" class="hidden rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 p-3">
       <p class="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-1">🧠 {isEs ? 'IA local — primera descarga' : 'Local AI — first download'}</p>
@@ -522,6 +527,58 @@ const videoMaxDuration  = observeStrings.video_max_duration  ?? (isEs ? 'Máximo
     }
     repaintGrid();
   }
+
+  /**
+   * If the user landed here from the chat page after attaching a photo or
+   * audio, preload that media + cascade ID into the form so they only need
+   * to add location and notes. The contract is `PendingObservation` from
+   * `src/lib/chat-attachment-helpers.ts` — see that file for shape.
+   */
+  async function consumeChatPrefillIfAny(): Promise<void> {
+    const { parsePendingObservation, PENDING_OBSERVATION_KEY } = await import('../lib/chat-attachment-helpers');
+    const raw = (() => { try { return sessionStorage.getItem(PENDING_OBSERVATION_KEY); } catch { return null; } })();
+    const pending = parsePendingObservation(raw);
+    if (!pending) return;
+    try { sessionStorage.removeItem(PENDING_OBSERVATION_KEY); } catch { /* private mode */ }
+
+    const banner = document.getElementById('chat-prefill-banner');
+    banner?.classList.remove('hidden');
+
+    try {
+      const res = await fetch(pending.blob_url);
+      const blob = await res.blob();
+      const ext = pending.kind === 'photo'
+        ? (pending.mime_type.includes('png') ? 'png' : 'jpg')
+        : (pending.mime_type.includes('mp4') ? 'm4a' : 'webm');
+      const filename = `chat-attachment.${ext}`;
+
+      if (pending.kind === 'photo') {
+        const file = new File([blob], filename, { type: pending.mime_type });
+        photos.push({ file, blobId: crypto.randomUUID() });
+        repaintGrid();
+        await fillFromExif(file).catch(() => {});
+      } else {
+        audios.push({
+          blob,
+          blobId: crypto.randomUUID(),
+          mimeType: pending.mime_type,
+          durationSec: 0,
+        });
+        repaintAudioGrid();
+      }
+
+      if (pending.scientific_name) {
+        showIdResult(
+          pending.scientific_name,
+          pending.confidence,
+          pending.source,
+        );
+      }
+    } catch (err) {
+      console.warn('[rastrum] chat prefill failed:', err);
+    }
+  }
+  void consumeChatPrefillIfAny();
 
   // ── Audio recording (MediaRecorder, ≤30 s) ──
   const audioGrid     = document.getElementById('audio-grid');
