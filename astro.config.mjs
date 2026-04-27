@@ -20,9 +20,7 @@ export default defineConfig({
   // not personal admin, so it lives under /explore now. Old URL keeps
   // working via 301 so existing bookmarks survive.
   redirects: {
-    '/en/profile/watchlist':    { status: 301, destination: '/en/explore/watchlist/' },
-    '/en/profile/watchlist/':   { status: 301, destination: '/en/explore/watchlist/' },
-    '/es/perfil/seguimiento':   { status: 301, destination: '/es/explorar/seguimiento/' },
-    '/es/perfil/seguimiento/':  { status: 301, destination: '/es/explorar/seguimiento/' },
+    '/en/profile/watchlist':  { status: 301, destination: '/en/explore/watchlist/' },
+    '/es/perfil/seguimiento': { status: 301, destination: '/es/explorar/seguimiento/' },
   },
 });
