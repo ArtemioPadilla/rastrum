@@ -453,6 +453,13 @@
           "done": false
         },
         {
+          "id": "ci-smoke-model-assets",
+          "label": "CI smoke check for on-device model asset URLs (infra/smoke-model-assets.sh wired into deploy.yml + nightly-smoke.yml — curls each PUBLIC_*_URL and asserts 200 + CORS + sane content-length)",
+          "label_es": "Check de smoke en CI para URLs de modelos en el dispositivo (infra/smoke-model-assets.sh cableado en deploy.yml + nightly-smoke.yml — hace curl a cada PUBLIC_*_URL y asegura 200 + CORS + content-length razonable)",
+          "done": true,
+          "done_at": "2026-04-27"
+        },
+        {
           "id": "bioblitz-events-ui-poll",
           "label": "Bioblitz event detail UI — build when first community organizer requests one",
           "label_es": "UI de detalle de evento bioblitz — construir cuando un organizador comunitario lo solicite",
@@ -604,6 +611,13 @@
           "label_es": "Onboarding al primer registro — 3 tarjetas descartables (instala la PWA → toma una foto → mira tu perfil); saltable; sin repeticiones",
           "done": true,
           "done_at": "2026-04-25"
+        },
+        {
+          "id": "ux-onboarding-v2",
+          "label": "Onboarding overhaul — 4-step pipeline setup (explain → configure → summary → install) with WCAG focus trap, step-aware aria-labelledby, sessionStorage resume, top-right theme/lang toolbar, vertical pipeline diagram on mobile, Anthropic key live verify (validateAnthropicKey + shape regex), 'How do I get a key?' help collapsible, heavy-download Wi-Fi confirmation (Phi/BirdNET/Llama/MegaDetector/pmtiles), Skip-to-summary fall-through, replay event (rastrum:replay-onboarding) wired to Profile → Edit, telemetry events (rastrum:onboarding-event) at every step transition. See docs/runbooks/onboarding-events.md.",
+          "label_es": "Renovación del onboarding — flujo de 4 pasos para configurar el pipeline (explicar → configurar → resumen → instalar) con focus trap WCAG, aria-labelledby por paso, reanudación con sessionStorage, barra de tema/idioma en la esquina superior derecha, diagrama del pipeline vertical en móvil, verificación en vivo de la API key de Anthropic (validateAnthropicKey + regex de forma), 'Cómo obtengo una key?' como collapsible, confirmación Wi-Fi para descargas pesadas (Phi/BirdNET/Llama/MegaDetector/pmtiles), Skip-to-summary, evento de replay (rastrum:replay-onboarding) cableado en Perfil → Editar, telemetría (rastrum:onboarding-event) en cada transición. Ver docs/runbooks/onboarding-events.md.",
+          "done": true,
+          "done_at": "2026-04-27"
         },
         {
           "id": "ux-chat-suggestions",

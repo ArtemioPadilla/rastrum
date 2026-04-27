@@ -221,6 +221,29 @@ production builds.
 
 Full design rationale: `docs/superpowers/specs/2026-04-26-ux-revamp-design.md`.
 
+### Onboarding events + CI smoke
+
+The onboarding tour exposes two public DOM events:
+- **`rastrum:replay-onboarding`** (consumer → tour) re-opens the modal
+  and resets the `localStorage.rastrum.onboardingV2` flag. Wired from
+  Profile → Edit's "Replay tour" button.
+- **`rastrum:onboarding-event`** (tour → consumer) fires at every state
+  change with `{type, step, …}`. No analytics provider is wired by
+  default — operators attach a listener in `BaseLayout.astro` to send
+  to whatever backend they want.
+
+`src/lib/anthropic-key.ts` exports `validateAnthropicKey()` for any UI
+that takes an Anthropic key — it's a `max_tokens:1` probe that costs
+≈ nothing per call. Reuse it before persisting any BYO key.
+
+Full notes: [`docs/runbooks/onboarding-events.md`](docs/runbooks/onboarding-events.md).
+
+CI runs **`infra/smoke-model-assets.sh`** after every deploy and during
+the nightly smoke run. It curls every operator-configured `PUBLIC_*_URL`
+(BirdNET, EfficientNet, pmtiles MX, MegaDetector) and asserts HTTP 200
++ `access-control-allow-origin` + a sane minimum content-length.
+Failure modes + fixes in [`docs/runbooks/ci-smoke-checks.md`](docs/runbooks/ci-smoke-checks.md).
+
 ---
 
 ## Known pitfalls (things that bit me)

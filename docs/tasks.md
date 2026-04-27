@@ -16,7 +16,7 @@
 | v0.3 | Offline intelligence + activity | done | 11 / 11 |
 | v0.5 | Beta | shipped (partial) | 11 / 13 |
 | v1.0 | Public Launch | shipped (partial) | 18 / 21 |
-| v1.0.x | Post-launch polish | in_progress | 3 / 19 |
+| v1.0.x | Post-launch polish | in_progress | 5 / 21 |
 | v1.1 | UX polish (post-launch brainstorm) | planned | 13 / 15 |
 | **v0.1 → v1.0** | **Public launch** | **shipped 2026-04-26** | **54 / 59** |
 
@@ -59,7 +59,7 @@ Remaining:
 
 ## v1.0.x — Post-launch polish — in_progress
 
-**3 of 19 items done.**
+**5 of 21 items done.**
 
 Remaining:
 

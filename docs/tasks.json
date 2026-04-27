@@ -638,6 +638,39 @@
         { "label_en": "Cascade ordering: prefer for evidence_type=camera_trap when MegaDetector found an animal", "label_es": "Orden del cascade: preferir para evidence_type=camera_trap cuando MegaDetector encontró un animal", "status": "planned" }
       ]
     },
+    "ux-onboarding-v2": {
+      "phase": "v1.0.x",
+      "title_en": "Onboarding overhaul — pipeline setup + a11y + replay + telemetry",
+      "title_es": "Renovación del onboarding — configuración del pipeline + a11y + replay + telemetría",
+      "modules": [],
+      "subtasks": [
+        { "label_en": "4-step flow (explain → configure → summary → install) replacing the v1.1 3-card tour; localStorage key bumped to rastrum.onboardingV2", "label_es": "Flujo de 4 pasos (explicar → configurar → resumen → instalar) reemplazando el tour de 3 tarjetas v1.1; clave de localStorage migrada a rastrum.onboardingV2", "status": "done" },
+        { "label_en": "WCAG dialog correctness: focus trap, focus restore on close, step-aware aria-labelledby, role=img + aria-label on step dots", "label_es": "Conformidad WCAG: focus trap, restauración de foco al cerrar, aria-labelledby por paso, role=img + aria-label en los dots", "status": "done" },
+        { "label_en": "Step state persists in sessionStorage so reloads resume mid-flow", "label_es": "Estado del paso persiste en sessionStorage; las recargas reanudan el flujo", "status": "done" },
+        { "label_en": "Top-right theme + lang toolbar (mirrors Header / MobileDrawer pattern)", "label_es": "Barra de tema + idioma en la esquina superior derecha (replica el patrón Header / MobileDrawer)", "status": "done" },
+        { "label_en": "Vertical pipeline diagram on mobile (flex-col → flex-row at sm+, chevrons rotate)", "label_es": "Diagrama del pipeline vertical en móvil (flex-col → flex-row en sm+, chevrons rotan)", "status": "done" },
+        { "label_en": "Anthropic key live verify — shape regex + validateAnthropicKey() against api.anthropic.com (auth/network/other reasons surfaced)", "label_es": "Verificación en vivo de la key de Anthropic — regex de forma + validateAnthropicKey() contra api.anthropic.com (razones auth/network/other expuestas)", "status": "done" },
+        { "label_en": "'How do I get a key?' details collapsible with numbered Anthropic console steps + privacy note", "label_es": "'¿Cómo obtengo una key?' como details collapsible con pasos numerados de console.anthropic.com + nota de privacidad", "status": "done" },
+        { "label_en": "Heavy-download Wi-Fi confirmation row for Phi (4 GB), BirdNET (50 MB), Llama (700 MB), MegaDetector (134 MB), pmtiles (48 MB)", "label_es": "Confirmación Wi-Fi para descargas pesadas: Phi (4 GB), BirdNET (50 MB), Llama (700 MB), MegaDetector (134 MB), pmtiles (48 MB)", "status": "done" },
+        { "label_en": "Skip-to-summary fall-through (PlantNet stays as default), with window.confirm guard", "label_es": "Skip-to-summary (PlantNet queda como predeterminado) con guard de window.confirm", "status": "done" },
+        { "label_en": "Replay event 'rastrum:replay-onboarding' wired to Profile → Edit 'Replay tour' button", "label_es": "Evento de replay 'rastrum:replay-onboarding' cableado al botón 'Reproducir tour' en Perfil → Editar", "status": "done" },
+        { "label_en": "Telemetry — 'rastrum:onboarding-event' fires on opened/resumed/step_change/skip_to_summary/key_saved/key_verify_failed/download_started/dismissed_before_done/completed", "label_es": "Telemetría — 'rastrum:onboarding-event' se dispara en opened/resumed/step_change/skip_to_summary/key_saved/key_verify_failed/download_started/dismissed_before_done/completed", "status": "done" },
+        { "label_en": "Llama-3.2-1B (text), MegaDetector v5a, and pmtiles-mx rows added to the on-device download list (operator-config gated)", "label_es": "Filas para Llama-3.2-1B (texto), MegaDetector v5a y pmtiles-mx agregadas a la lista de descargas en el dispositivo (gateadas por config del operador)", "status": "done" },
+        { "label_en": "Playwright e2e (tests/e2e/onboarding.spec.ts): replay opens, focus trap, Escape closes, skip-to-summary, key validation gating, telemetry events", "label_es": "Playwright e2e (tests/e2e/onboarding.spec.ts): replay abre, focus trap, Escape cierra, skip-to-summary, validación de key, eventos de telemetría", "status": "done" }
+      ]
+    },
+    "ci-smoke-model-assets": {
+      "phase": "v1.0.x",
+      "title_en": "CI smoke check for on-device model asset URLs",
+      "title_es": "Check de smoke en CI para URLs de modelos en el dispositivo",
+      "modules": [],
+      "subtasks": [
+        { "label_en": "infra/smoke-model-assets.sh — curls each PUBLIC_*_URL, asserts HTTP 200 + access-control-allow-origin + min content-length per asset", "label_es": "infra/smoke-model-assets.sh — hace curl a cada PUBLIC_*_URL, asegura HTTP 200 + access-control-allow-origin + content-length mínimo por asset", "status": "done" },
+        { "label_en": "Wired into deploy.yml as a third job after deploy (fails the workflow on R2 drift but doesn't block the deploy)", "label_es": "Cableado en deploy.yml como tercer job después del deploy (falla el workflow ante drift de R2 sin bloquear el deploy)", "status": "done" },
+        { "label_en": "Wired into nightly-smoke.yml after the Playwright run (catches post-deploy CORS revocation, file deletion, bucket lifecycle expiry)", "label_es": "Cableado en nightly-smoke.yml después del Playwright (captura revocación de CORS, eliminación accidental, expiración de lifecycle del bucket post-deploy)", "status": "done" },
+        { "label_en": "Documented in docs/runbooks/ci-smoke-checks.md", "label_es": "Documentado en docs/runbooks/ci-smoke-checks.md", "status": "done" }
+      ]
+    },
     "capacitor-ios": {
       "phase": "v1.0",
       "title_en": "Capacitor iOS App Store wrapper (v1.2)",
