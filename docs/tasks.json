@@ -619,8 +619,10 @@
       "title_es": "Receta de hosting del ONNX de MegaDetector",
       "modules": ["09-camera-trap.md"],
       "subtasks": [
-        { "label_en": "infra/megadetector/convert.sh: one-shot v5a.pt → ONNX via ultralytics export.py", "label_es": "infra/megadetector/convert.sh: conversión one-shot v5a.pt → ONNX vía ultralytics export.py", "status": "planned" },
-        { "label_en": "infra/megadetector/upload-r2.sh: upload to media.rastrum.org/models/megadetector_v5a.onnx", "label_es": "infra/megadetector/upload-r2.sh: subida a media.rastrum.org/models/megadetector_v5a.onnx", "status": "planned" },
+        { "label_en": "infra/megadetector/convert.sh: one-shot v5a.pt → ONNX via ultralytics export.py", "label_es": "infra/megadetector/convert.sh: conversión one-shot v5a.pt → ONNX vía ultralytics export.py", "status": "done" },
+        { "label_en": "infra/megadetector/quantize_int8.py: dynamic INT8 quantisation (~140 MB → ~85 MB)", "label_es": "infra/megadetector/quantize_int8.py: cuantización dinámica INT8 (~140 MB → ~85 MB)", "status": "done" },
+        { "label_en": "infra/megadetector/README.md: R2 upload + CI env var instructions", "label_es": "infra/megadetector/README.md: instrucciones de subida a R2 + variable de entorno CI", "status": "done" },
+        { "label_en": "Operator runs convert.sh and uploads to media.rastrum.org/models/megadetector_v5a.onnx", "label_es": "El operador corre convert.sh y sube a media.rastrum.org/models/megadetector_v5a.onnx", "status": "blocked", "blocker_en": "Operator action — see infra/megadetector/README.md", "blocker_es": "Acción del operador — ver infra/megadetector/README.md" },
         { "label_en": "Optional Modal/Lambda/Replicate variants for server-side fallback", "label_es": "Variantes Modal/Lambda/Replicate opcionales para fallback server-side", "status": "planned" }
       ]
     },

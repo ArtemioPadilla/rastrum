@@ -8,16 +8,18 @@
  * Until the operator hosts the file the plugin reports `model_not_bundled`
  * and the cascade transparently falls through.
  *
- * Operator action:
- *   1. Convert the upstream MegaDetector v5a checkpoint to ONNX:
- *        git clone https://github.com/agentmorris/MegaDetector
- *        python detection/run_detector_batch.py --export-onnx \
- *          --weights md_v5a.0.0.pt --output megadetector_v5a.onnx
- *      (or any equivalent ultralytics/yolov5 `export.py --include onnx` run).
- *   2. Upload `megadetector_v5a.onnx` to a CORS-open public URL (e.g.
- *      Cloudflare R2 under media.rastrum.org).
- *   3. Set `PUBLIC_MEGADETECTOR_WEIGHTS_URL` to the directory URL (no
- *      trailing slash). The file path appended is `${base}/${MODEL_FILE}`.
+ * Operator action: run the recipe at `infra/megadetector/convert.sh` —
+ * it clones ultralytics/yolov5, runs `export.py --weights md_v5a.0.0.pt
+ * --include onnx --imgsz 640 --opset 12 --simplify`, and INT8-quantises
+ * the result via onnxruntime so the client downloads ~85 MB instead of
+ * ~140 MB. Upload the resulting `megadetector_v5a.onnx` to a CORS-open
+ * public URL (e.g. Cloudflare R2 under media.rastrum.org/models/) and
+ * set `PUBLIC_MEGADETECTOR_WEIGHTS_URL` to the directory URL (no
+ * trailing slash). See infra/megadetector/README.md for full notes.
+ *
+ * NOTE: do not try `python detection/run_detector_batch.py --export-onnx`
+ * — that's the inference batch runner and has no export flag. The
+ * megadetector PyPI package ships inference utilities, not export.
  *
  * License: code MIT (this file). Model: MIT (Microsoft AI for Earth) —
  * safe for commercial use.
