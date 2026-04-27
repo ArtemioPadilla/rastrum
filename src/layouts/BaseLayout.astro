@@ -7,6 +7,7 @@ import OnboardingTour from '../components/OnboardingTour.astro';
 import ReportIssueButton from '../components/ReportIssueButton.astro';
 import SwUpdateToast from '../components/SwUpdateToast.astro';
 import OfflineBanner from '../components/OfflineBanner.astro';
+import { getAlternateUrl } from '../i18n/utils';
 
 interface Props {
   title: string;
@@ -20,14 +21,24 @@ interface Props {
    * client-side rendered at observation-save time.
    */
   ogImage?: string;
+  /** Open Graph type override; defaults to 'website'. Use 'article' for doc pages. */
+  ogType?: 'website' | 'article';
 }
 
-const { title, description = 'Species identification platform', lang = 'en', ogImage } = Astro.props;
+const { title, description = 'Species identification platform', lang = 'en', ogImage, ogType } = Astro.props;
 const currentPath = Astro.url.pathname;
 const installLang: 'en' | 'es' = lang === 'es' ? 'es' : 'en';
 
 const SITE_URL = 'https://rastrum.org';
 const canonical = `${SITE_URL}${currentPath}${currentPath.endsWith('/') ? '' : '/'}`;
+const altLang: 'en' | 'es' = lang === 'es' ? 'en' : 'es';
+const sameLang: 'en' | 'es' = lang === 'es' ? 'es' : 'en';
+const altUrl = `${SITE_URL}${getAlternateUrl(currentPath, altLang)}`;
+const sameUrl = `${SITE_URL}${getAlternateUrl(currentPath, sameLang)}`;
+const xDefaultUrl = `${SITE_URL}${getAlternateUrl(currentPath, 'en')}`;
+const ogTypeFinal = ogType ?? 'website';
+const ogLocale = lang === 'es' ? 'es_MX' : 'en_US';
+const ogLocaleAlt = lang === 'es' ? 'en_US' : 'es_MX';
 
 // Map the current path to the OG card slug emitted by scripts/generate-og.ts.
 // The slug system mirrors the route names but flattens locale prefixes,
@@ -55,30 +66,33 @@ const resolvedOgImage = ogImage ?? `${SITE_URL}/og/${ogSlugForPath(currentPath)}
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="alternate" hreflang={sameLang} href={sameUrl} />
+    <link rel="alternate" hreflang={altLang} href={altUrl} />
+    <link rel="alternate" hreflang="x-default" href={xDefaultUrl} />
     <link rel="icon" type="image/svg+xml" href={`${import.meta.env.BASE_URL}favicon.svg`} />
     <link rel="apple-touch-icon" sizes="180x180" href={`${import.meta.env.BASE_URL}rastrum-logo-240.png`} />
     <link rel="manifest" href={`${import.meta.env.BASE_URL}manifest.webmanifest`} />
     <meta name="theme-color" content="#10b981" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <link rel="canonical" href={canonical} />
     <title>{title}</title>
     <!-- Open Graph -->
-    <meta property="og:type"        content="website" />
-    <meta property="og:site_name"   content="Rastrum" />
-    <meta property="og:title"       content={title} />
+    <meta property="og:type" content={ogTypeFinal} />
+    <meta property="og:site_name" content="Rastrum" />
+    <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
-    <meta property="og:url"         content={canonical} />
-    <meta property="og:image"       content={resolvedOgImage} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={resolvedOgImage} />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:locale"      content={lang === 'es' ? 'es_MX' : 'en_US'} />
-    <meta property="og:locale:alternate" content={lang === 'es' ? 'en_US' : 'es_MX'} />
+    <meta property="og:locale" content={ogLocale} />
+    <meta property="og:locale:alternate" content={ogLocaleAlt} />
     <!-- Twitter -->
-    <meta name="twitter:card"        content="summary_large_image" />
-    <meta name="twitter:title"       content={title} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
-    <meta name="twitter:image"       content={resolvedOgImage} />
+    <meta name="twitter:image" content={resolvedOgImage} />
     <script is:inline>
       (function() {
         const theme = localStorage.getItem('theme');
