@@ -11,6 +11,7 @@ interface ImportMetaEnv {
   readonly PUBLIC_PMTILES_MX_URL?: string;
   readonly PUBLIC_MEGADETECTOR_ENDPOINT?: string;
   readonly PUBLIC_PLANTNET_KEY?: string;
+  readonly PUBLIC_ANTHROPIC_KEY?: string;
   readonly PUBLIC_BUILD_SHA?: string;
 }
 

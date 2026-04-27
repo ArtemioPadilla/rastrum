@@ -42,16 +42,34 @@ End users on cached HTML keep using the old key for up to one
 service-worker cycle. If the leak is severe (key hit the wild), tell
 users to hard-refresh (`Cmd+Shift+R` or close + reopen the tab).
 
-### Anthropic API key (`ANTHROPIC_API_KEY`)
+### Anthropic API key (`ANTHROPIC_API_KEY` / `PUBLIC_ANTHROPIC_KEY`)
 
-Two flavours:
+Three flavours:
 
-- **Operator key** (set as a Supabase secret on the `identify` Edge
-  Function — used for free-tier cascade fallback when the user has no
-  BYO key).
+- **Operator key** (`ANTHROPIC_API_KEY`, set as a Supabase secret on
+  the `identify` Edge Function — used for server-side cascade fallback
+  when the user has no BYO key).
+- **Project-wide client key** (`PUBLIC_ANTHROPIC_KEY`, **OPTIONAL** and
+  unset by default for the zero-cost target). When set as a GitHub
+  Actions secret it ships in the static bundle so first-time visitors
+  on `/identify` get an instant Claude vision identification without
+  setting up their own BYO key. Treat any operator who configures this
+  the same as the operator key — it's a public, single-shared bucket.
+  Use only with a spending cap.
 - **User BYO key** (lives in the user's `localStorage[rastrum.byoKeys]`,
   forwarded per-call as `client_keys.anthropic` and never persisted
   server-side).
+
+If you want to enable the project-wide client key for instant ID:
+
+```bash
+gh secret set PUBLIC_ANTHROPIC_KEY  # paste a key with a $10/mo spending cap
+                                    # configured at console.anthropic.com
+gh workflow run deploy.yml
+```
+
+To disable, just delete the secret and re-deploy — the build is a
+no-op without it (clients fall through to BYO + Phi-vision).
 
 ```bash
 # Operator key:
