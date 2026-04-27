@@ -116,10 +116,11 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
         { method: 'POST', body: form, signal: ac.signal }
       ).finally(() => clearTimeout(timeout));
       if (res.status === 403 || res.status === 404) {
-        // PlantNet returns 403/404 when no plant organ is detected — usually
-        // an animal, mushroom, scenery, or unclear photo. Point users to
-        // /chat (vision LLM) and /observe (full cascade) instead.
-        renderNotPlant();
+        // PlantNet returns 403/404 when no plant organ is detected (animal,
+        // mushroom, scenery, etc.). Don't bounce the user to another page —
+        // silently try Claude vision next and surface the result inline.
+        if (spinnerLbl) spinnerLbl.textContent = isEs ? 'Mirando con más detalle…' : 'Looking more carefully…';
+        await tryVisionFallback(file);
         return;
       }
       if (res.status === 401) {
@@ -142,35 +143,150 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
     }
   }
 
-  function renderNotPlant() {
+  /**
+   * When PlantNet doesn't recognize a plant, transparently fall back to
+   * Claude Haiku vision via the user's BYO key — no navigation, no extra
+   * clicks. If the user has no key, surface a single inline upgrade card
+   * pointing at /profile/edit (and a link to /chat which has Phi-vision
+   * + on-device fallback for the no-Claude-key case).
+   */
+  async function tryVisionFallback(file: File) {
+    let key = '';
+    try {
+      const { getKey } = await import('../lib/byo-keys');
+      key = getKey('claude_haiku', 'anthropic') ?? '';
+    } catch { /* localStorage unavailable */ }
+
+    if (!key) {
+      renderNoVisionAi();
+      spinner?.classList.add('hidden');
+      return;
+    }
+
+    try {
+      const dataUrl: string = await new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(String(r.result ?? ''));
+        r.onerror = () => reject(new Error('read failed'));
+        r.readAsDataURL(file);
+      });
+      const m = /^data:([^;]+);base64,(.+)$/.exec(dataUrl);
+      if (!m) throw new Error('decode failed');
+      const [, mediaType, base64] = m;
+
+      const prompt = isEs
+        ? 'Identifica la especie en esta foto y responde ÚNICAMENTE con JSON válido (sin texto antes ni después, sin bloques de código). Formato exacto:\n{"top":"Nombre científico","common":"Nombre común en español","confidence":0.85,"alternates":[{"sci":"...","common":"...","score":0.10}],"note":"Una frase con un dato interesante o detalle específico"}\nSi no estás seguro, baja la confianza pero responde. Si genuinamente no puedes identificar, devuelve {"top":null,"note":"explicación breve"}.'
+        : 'Identify the species in this photo and reply ONLY with valid JSON (no preamble, no code fences). Exact format:\n{"top":"Scientific name","common":"Common name in English","confidence":0.85,"alternates":[{"sci":"...","common":"...","score":0.10}],"note":"One short sentence with an interesting detail"}\nIf unsure lower the confidence but answer. If you genuinely cannot identify, return {"top":null,"note":"brief explanation"}.';
+
+      const ac = new AbortController();
+      const tId = setTimeout(() => ac.abort(), 25_000);
+      const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        signal: ac.signal,
+        headers: {
+          'x-api-key': key,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5',
+          max_tokens: 600,
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
+              { type: 'text', text: prompt },
+            ],
+          }],
+        }),
+      }).finally(() => clearTimeout(tId));
+
+      if (!aiRes.ok) {
+        renderVisionError(`Claude HTTP ${aiRes.status}`);
+        return;
+      }
+      const aiData = await aiRes.json() as { content?: Array<{ type: string; text?: string }> };
+      const piece = aiData.content?.find(p => p.type === 'text');
+      const raw = piece?.text?.trim() ?? '';
+      const jsonMatch = raw.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) { renderVisionError(isEs ? 'Respuesta no estructurada' : 'Unstructured response'); return; }
+      const parsed = JSON.parse(jsonMatch[0]) as {
+        top: string | null;
+        common?: string;
+        confidence?: number;
+        alternates?: Array<{ sci: string; common?: string; score: number }>;
+        note?: string;
+      };
+      renderClaudeResult(parsed);
+    } catch (err) {
+      renderVisionError(err instanceof Error ? err.message : String(err));
+    } finally {
+      spinner?.classList.add('hidden');
+    }
+  }
+
+  function renderClaudeResult(r: { top: string | null; common?: string; confidence?: number; alternates?: Array<{ sci: string; common?: string; score: number }>; note?: string }) {
     if (!resultsBox) return;
-    const chatPath = isEs ? '/es/chat/'     : '/en/chat/';
-    const obsPath  = isEs ? '/es/observar/' : '/en/observe/';
+    if (!r.top) {
+      resultsBox.innerHTML = `<p class="text-zinc-700 dark:text-zinc-300">${
+        isEs ? 'No pude identificar esta foto con confianza. ' : 'I could not identify this confidently. '
+      }${escapeHtml(r.note ?? '')}</p>`;
+      return;
+    }
+    const score = Math.round((r.confidence ?? 0.5) * 100);
+    const others = (r.alternates ?? []).slice(0, 4).map((a) => {
+      const s = Math.round((a.score ?? 0) * 100);
+      return `<li class="flex items-baseline justify-between gap-2"><span class="italic">${escapeHtml(a.sci)}</span><span class="text-xs text-zinc-500">${a.common ? escapeHtml(a.common) + ' · ' : ''}${s}%</span></li>`;
+    }).join('');
     resultsBox.innerHTML = `
       <div class="space-y-3">
-        <p class="text-amber-700 dark:text-amber-400">${
-          isEs
-            ? 'PlantNet no reconoció una planta en esta foto. Esta página identifica solo plantas.'
-            : 'PlantNet did not recognize a plant in this photo. This page identifies plants only.'
-        }</p>
-        <p class="text-sm text-zinc-700 dark:text-zinc-300">${
-          isEs ? 'Para animales, hongos o cualquier otra cosa, prueba:' : 'For animals, mushrooms, or anything else, try:'
-        }</p>
-        <div class="flex flex-wrap gap-2">
-          <a href="${chatPath}" class="inline-flex items-center gap-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-2 text-sm font-semibold text-white">
-            ${isEs ? 'Chat con foto' : 'Chat with photo'}
-          </a>
-          <a href="${obsPath}" class="inline-flex items-center gap-2 rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
-            ${isEs ? 'Formulario de observación' : 'Observation form'}
-          </a>
+        <div>
+          <p class="text-xs uppercase tracking-wider text-zinc-500">${isEs ? 'Mejor coincidencia' : 'Top match'}</p>
+          <p class="text-lg italic font-semibold text-emerald-700 dark:text-emerald-400">${escapeHtml(r.top)}</p>
+          ${r.common ? `<p class="text-sm text-zinc-600 dark:text-zinc-300">${escapeHtml(r.common)}</p>` : ''}
+          <p class="text-xs text-zinc-500 mt-1">${score}% · Claude Haiku</p>
         </div>
-        <p class="text-xs text-zinc-500">${
-          isEs
-            ? 'El chat usa una IA de visión general (en tu dispositivo o vía Claude) que reconoce animales y otras cosas. El formulario de observación corre toda la cascada y guarda con ubicación.'
-            : 'Chat uses a general vision AI (on-device or via Claude) that recognizes animals and other subjects. The observation form runs the full cascade and saves with location.'
-        }</p>
+        ${r.note ? `<p class="text-sm text-zinc-700 dark:text-zinc-300">${escapeHtml(r.note)}</p>` : ''}
+        ${others ? `<div>
+          <p class="text-xs uppercase tracking-wider text-zinc-500 mb-1">${isEs ? 'Otras opciones' : 'Other matches'}</p>
+          <ul class="space-y-1 text-sm">${others}</ul>
+        </div>` : ''}
       </div>
     `;
+  }
+
+  function renderNoVisionAi() {
+    if (!resultsBox) return;
+    const editPath = isEs ? '/es/perfil/editar/' : '/en/profile/edit/';
+    const chatPath = isEs ? '/es/chat/'         : '/en/chat/';
+    resultsBox.innerHTML = `
+      <div class="rounded-lg border border-emerald-300/40 dark:border-emerald-700/40 bg-emerald-50/40 dark:bg-emerald-900/10 p-4 space-y-3">
+        <p class="text-sm text-zinc-800 dark:text-zinc-200 font-medium">${
+          isEs ? 'Esta foto no parece una planta.' : "This photo doesn't look like a plant."
+        }</p>
+        <p class="text-sm text-zinc-700 dark:text-zinc-300">${
+          isEs
+            ? 'Para identificar animales, hongos y cualquier otra cosa, agrega una clave de Claude (gratis para empezar — la clave se guarda solo en este dispositivo) o usa el chat que tiene IA en tu propio dispositivo.'
+            : 'To identify animals, mushrooms, and anything else, add a Claude key (free to start — stored only on this device) or use chat which has on-device AI.'
+        }</p>
+        <div class="flex flex-wrap gap-2">
+          <a href="${editPath}" class="inline-flex items-center gap-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-2 text-sm font-semibold text-white">
+            ${isEs ? 'Activar Claude' : 'Set up Claude'}
+          </a>
+          <a href="${chatPath}" class="inline-flex items-center gap-2 rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
+            ${isEs ? 'Probar en chat' : 'Try in chat'}
+          </a>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderVisionError(detail: string) {
+    if (!resultsBox) return;
+    resultsBox.innerHTML = `<p class="text-amber-700 dark:text-amber-400 text-sm">${
+      isEs ? `No pude analizarla con la IA de visión (${escapeHtml(detail)}). Verifica tu clave de Claude en Perfil → Editar.` : `Vision AI couldn't analyze it (${escapeHtml(detail)}). Check your Claude key in Profile → Edit.`
+    }</p>`;
   }
 
   function renderKeyInvalid() {

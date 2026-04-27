@@ -127,10 +127,29 @@ const recentActive = isActiveSection(currentPath, 'exploreRecent', lang);
 </nav>
 
 <!--
-  Auth-state swap. Mirrors the existing pattern in Header.astro: read the
-  Supabase session, toggle visibility for the signed-in vs signed-out
-  layout. The `mbb-anon` block is shown by default so the layout never
-  flashes empty.
+  First-paint cache. Header.astro writes `rastrum.headerAvatar` to localStorage
+  every time it resolves a session; we read it synchronously here so the
+  authed variant (with FAB) shows on first paint instead of flashing the
+  4-tab anon layout while Supabase resolves the session asynchronously.
+-->
+<script is:inline>
+  (function () {
+    try {
+      if (!localStorage.getItem('rastrum.headerAvatar')) return;
+      const authed = document.getElementById('mbb-authed');
+      const anon = document.getElementById('mbb-anon');
+      if (authed && anon) {
+        authed.classList.remove('hidden');
+        anon.classList.add('hidden');
+      }
+    } catch { /* localStorage unavailable */ }
+  })();
+</script>
+
+<!--
+  Auth-state reconciliation. The synchronous script above handles first
+  paint; this module subscribes to live auth changes (sign-in/out in
+  another tab, etc.) so the bar stays in sync.
 -->
 <script>
   import { getSupabase } from '../lib/supabase';
