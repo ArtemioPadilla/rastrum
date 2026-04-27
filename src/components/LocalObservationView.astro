@@ -1,0 +1,206 @@
+---
+/**
+ * LocalObservationView — detail page for an unsynced (Dexie) observation.
+ *
+ * Mirror of /share/obs/<id> but for rows that haven't reached Supabase
+ * yet. Reads everything from the local IndexedDB outbox: the photo blob
+ * (via createObjectURL), the identification, the location, the sync
+ * error, and any media metadata. Lets the user retry, edit, or discard
+ * before deciding whether the row is recoverable.
+ */
+import { t, getLocalizedPath, routes } from '../i18n/utils';
+
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+const profileStrings = tr.profile as unknown as Record<string, string>;
+const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
+const obsListPath  = getLocalizedPath(lang, (lang === 'es' ? '/perfil/observaciones' : '/profile/observations') + '/');
+const retryLabel   = profileStrings.my_observations_retry ?? (lang === 'es' ? 'Reintentar' : 'Retry');
+---
+
+<div
+  class="rastrum-local-obs max-w-3xl mx-auto"
+  data-lang={lang}
+  data-obs-list={obsListPath}
+  data-retry-label={retryLabel}
+>
+  <a href={obsListPath} class="text-sm text-zinc-600 dark:text-zinc-400 hover:underline">← {tr.profile.my_observations_title}</a>
+
+  <div id="local-obs-loading" class="mt-6 text-sm text-zinc-500">{lang === 'es' ? 'Cargando…' : 'Loading…'}</div>
+  <div id="local-obs-not-found" class="hidden mt-6 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-6 text-sm text-zinc-500 text-center">
+    {lang === 'es' ? 'No encontramos esa observación en este dispositivo.' : "We couldn't find that observation on this device."}
+  </div>
+
+  <article id="local-obs-card" class="hidden mt-6 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/40 overflow-hidden">
+    <img id="local-obs-photo" src="" alt="" class="w-full max-h-[60vh] object-contain bg-zinc-100 dark:bg-zinc-800" />
+
+    <div class="p-4 space-y-3">
+      <div class="flex items-baseline justify-between gap-2 flex-wrap">
+        <h1 id="local-obs-name" class="text-xl italic font-semibold text-emerald-700 dark:text-emerald-400 break-words">—</h1>
+        <span id="local-obs-status-pill" class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold"></span>
+      </div>
+
+      <p id="local-obs-meta" class="text-sm text-zinc-600 dark:text-zinc-400">—</p>
+      <p id="local-obs-notes" class="hidden text-sm text-zinc-700 dark:text-zinc-200 whitespace-pre-wrap"></p>
+
+      <div id="local-obs-error-wrap" class="hidden rounded-lg border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-3 text-xs">
+        <p class="font-semibold text-red-900 dark:text-red-200 mb-1">{lang === 'es' ? 'Error de sincronización' : 'Sync error'}</p>
+        <p id="local-obs-error" class="text-red-800 dark:text-red-300 break-words"></p>
+      </div>
+
+      <div class="flex flex-wrap gap-2 pt-2">
+        <button id="local-obs-retry" type="button" class="min-h-11 rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white">{retryLabel}</button>
+        <a id="local-obs-edit" href={observePath} class="min-h-11 inline-flex items-center rounded-lg border border-zinc-300 dark:border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40">{lang === 'es' ? 'Nueva observación' : 'New observation'}</a>
+        <button id="local-obs-discard" type="button" class="min-h-11 rounded-lg border border-red-300 dark:border-red-800 px-4 py-2 text-sm font-medium text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">{lang === 'es' ? 'Descartar' : 'Discard'}</button>
+      </div>
+    </div>
+  </article>
+
+  <div id="local-obs-toast" class="hidden fixed bottom-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg text-sm shadow-lg" role="status" aria-live="polite"></div>
+</div>
+
+<script>
+  type Lang = 'en' | 'es';
+  const root = document.querySelector<HTMLElement>('.rastrum-local-obs');
+  if (!root) throw new Error('Local observation root missing');
+  const lang: Lang = (root.dataset.lang === 'es') ? 'es' : 'en';
+  const isEs = lang === 'es';
+
+  const params = new URLSearchParams(location.search);
+  const id = params.get('id');
+
+  function showToast(msg: string, kind: 'ok' | 'err' = 'ok') {
+    const el = document.getElementById('local-obs-toast');
+    if (!el) return;
+    el.textContent = msg;
+    el.className = `fixed bottom-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg text-sm shadow-lg ${kind === 'ok' ? 'bg-emerald-700' : 'bg-red-700'} text-white`;
+    el.classList.remove('hidden');
+    setTimeout(() => el.classList.add('hidden'), 4000);
+  }
+
+  function statusPill(status: string): { html: string; classes: string } {
+    if (status === 'pending') return { html: isEs ? 'Pendiente' : 'Pending', classes: 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300' };
+    if (status === 'error')   return { html: isEs ? 'Error de sync' : 'Sync failed', classes: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300' };
+    if (status === 'draft')   return { html: isEs ? 'Borrador' : 'Draft', classes: 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300' };
+    return { html: isEs ? 'Sincronizada' : 'Synced', classes: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300' };
+  }
+
+  async function load() {
+    if (!id) {
+      document.getElementById('local-obs-loading')?.classList.add('hidden');
+      document.getElementById('local-obs-not-found')?.classList.remove('hidden');
+      return;
+    }
+    const { getDB } = await import('../lib/db');
+    const db = getDB();
+    const rec = await db.observations.get(id);
+    if (!rec) {
+      document.getElementById('local-obs-loading')?.classList.add('hidden');
+      document.getElementById('local-obs-not-found')?.classList.remove('hidden');
+      return;
+    }
+
+    document.getElementById('local-obs-loading')?.classList.add('hidden');
+    document.getElementById('local-obs-card')?.classList.remove('hidden');
+
+    // Photo
+    const blobs = await db.mediaBlobs.where('observation_id').equals(id).toArray();
+    const photo = blobs.find(b => b.mime_type.startsWith('image/')) ?? blobs[0];
+    const photoEl = document.getElementById('local-obs-photo') as HTMLImageElement | null;
+    if (photoEl && photo?.blob) {
+      photoEl.src = URL.createObjectURL(photo.blob);
+      photoEl.alt = rec.data?.identification?.scientificName ?? '';
+    } else if (photoEl) {
+      photoEl.classList.add('hidden');
+    }
+
+    // Name
+    const nameEl = document.getElementById('local-obs-name');
+    if (nameEl) {
+      nameEl.textContent = rec.data?.identification?.scientificName
+        || (isEs ? 'Sin identificar' : 'Unidentified');
+    }
+
+    // Status pill
+    const pill = document.getElementById('local-obs-status-pill');
+    if (pill) {
+      const s = statusPill(rec.sync_status);
+      pill.textContent = s.html;
+      pill.className = `inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${s.classes}`;
+    }
+
+    // Meta line: date · location · habitat
+    const metaEl = document.getElementById('local-obs-meta');
+    if (metaEl) {
+      const date = new Date(rec.created_at).toLocaleString(lang === 'es' ? 'es' : 'en');
+      const loc = rec.data?.location;
+      const locStr = loc && Number.isFinite(loc.lat) && Number.isFinite(loc.lng) && !(loc.lat === 0 && loc.lng === 0)
+        ? `${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)}` : (isEs ? 'sin ubicación' : 'no location');
+      metaEl.textContent = `${date} · ${locStr}`;
+    }
+
+    // Notes
+    const notesEl = document.getElementById('local-obs-notes');
+    if (notesEl && rec.data?.notes) {
+      notesEl.textContent = rec.data.notes;
+      notesEl.classList.remove('hidden');
+    }
+
+    // Sync error (if any)
+    const errWrap = document.getElementById('local-obs-error-wrap');
+    const errEl = document.getElementById('local-obs-error');
+    const recAny = rec as unknown as { sync_error?: string | null };
+    if (errWrap && errEl && recAny.sync_error) {
+      errEl.textContent = recAny.sync_error;
+      errWrap.classList.remove('hidden');
+    }
+
+    // Retry → flush outbox; if it succeeds the row gets removed from
+    // Dexie's pending set, syncOutbox dispatches rastrum:sync-row-done,
+    // we redirect back to the list.
+    const retryBtn = document.getElementById('local-obs-retry') as HTMLButtonElement | null;
+    retryBtn?.addEventListener('click', async () => {
+      retryBtn.disabled = true;
+      retryBtn.textContent = isEs ? 'Sincronizando…' : 'Syncing…';
+      try {
+        const { syncOutbox } = await import('../lib/sync');
+        const res = await syncOutbox();
+        if (res.synced > 0) {
+          showToast(isEs ? '¡Listo! Sincronizada.' : 'Synced.', 'ok');
+          setTimeout(() => location.href = root!.dataset.obsList!, 1200);
+        } else if (res.last_error) {
+          showToast((isEs ? 'No se pudo: ' : 'Sync failed: ') + res.last_error, 'err');
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        showToast((isEs ? 'No se pudo: ' : 'Sync failed: ') + msg, 'err');
+      } finally {
+        retryBtn.disabled = false;
+        retryBtn.textContent = root!.dataset.retryLabel ?? 'Retry';
+      }
+    });
+
+    // Discard → confirm, then delete the Dexie row + its blobs.
+    const discardBtn = document.getElementById('local-obs-discard') as HTMLButtonElement | null;
+    discardBtn?.addEventListener('click', async () => {
+      const ok = window.confirm(isEs
+        ? '¿Eliminar esta observación de tu dispositivo? Esta acción no se puede deshacer.'
+        : 'Delete this observation from your device? This cannot be undone.');
+      if (!ok) return;
+      try {
+        await db.mediaBlobs.where('observation_id').equals(id).delete();
+        await db.observations.delete(id);
+        location.href = root!.dataset.obsList!;
+      } catch (err) {
+        showToast((isEs ? 'Error al eliminar: ' : 'Delete failed: ') + (err instanceof Error ? err.message : String(err)), 'err');
+      }
+    });
+  }
+
+  load().catch(err => {
+    console.error('[rastrum] local obs load failed', err);
+    document.getElementById('local-obs-loading')?.classList.add('hidden');
+    document.getElementById('local-obs-not-found')?.classList.remove('hidden');
+  });
+</script>

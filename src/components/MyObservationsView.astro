@@ -193,8 +193,13 @@ const tabs = [
     const date = new Date(r.observed_at).toLocaleDateString(lang === 'es' ? 'es' : 'en');
     const region = r.state_province ? ' · ' + r.state_province : '';
     const isSynced = r.sync_status === 'synced';
-    const wrapTag = isSynced ? 'a' : 'div';
-    const wrapAttr = isSynced ? `href="${shareBase}?id=${r.id}"` : '';
+    // Unsynced rows now link to /local/?id=<id> (this view's own
+    // detail page) which reads from Dexie. The user can see the
+    // photo, notes, and the actual sync error before deciding
+    // whether to retry, edit, or discard.
+    const localDetailHref = `/${lang}/${lang === 'es' ? 'perfil/observaciones' : 'profile/observations'}/local/?id=${encodeURIComponent(r.id)}`;
+    const wrapTag = 'a';
+    const wrapAttr = `href="${isSynced ? shareBase + '?id=' + r.id : localDetailHref}"`;
     const shareLabelText = root?.dataset.labelShare ?? 'Share';
     const retryLabelText = root?.dataset.labelRetry ?? 'Retry';
     const retryable = r.sync_status === 'pending' || r.sync_status === 'error';
@@ -303,6 +308,16 @@ const tabs = [
             .reverse()
             .sortBy('created_at');
           for (const rec of recs) {
+            // Hydrate the primary photo from the local mediaBlobs store.
+            // Without this, pending rows render with no thumbnail — looks
+            // like the app lost the photo. URL.createObjectURL is cheap;
+            // the URL stays valid until the page navigates away.
+            let primaryPhotoUrl = '';
+            try {
+              const blobs = await db.mediaBlobs.where('observation_id').equals(rec.id).toArray();
+              const photo = blobs.find(b => b.mime_type.startsWith('image/')) ?? blobs[0];
+              if (photo?.blob) primaryPhotoUrl = URL.createObjectURL(photo.blob);
+            } catch { /* mediaBlobs missing — render without thumbnail */ }
             all.push({
               id: rec.id,
               observed_at: rec.created_at,
@@ -311,7 +326,9 @@ const tabs = [
               identifications: rec.data.identification?.scientificName
                 ? { scientific_name: rec.data.identification.scientificName, is_primary: true }
                 : null,
-              media_files: [],
+              media_files: primaryPhotoUrl
+                ? [{ url: primaryPhotoUrl, is_primary: true }]
+                : [],
             });
           }
         }

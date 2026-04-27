@@ -19,6 +19,7 @@
  */
 import { registry } from './registry';
 import type { IDResult, IdentifyInput, MediaKind } from './types';
+import { isFilteredFrameError } from './errors';
 
 export const ACCEPT_THRESHOLD = 0.7;
 
@@ -43,6 +44,13 @@ export interface CascadeOptions {
 export interface CascadeResult {
   best: IDResult | null;
   attempts: Array<{ id: string; ok: boolean; result?: IDResult; error?: string }>;
+  /**
+   * Set when a plugin threw `FilteredFrameError` — the cascade stopped
+   * because the frame doesn't contain anything to identify (empty / human
+   * / vehicle). Callers should mark the row `status='needs_review'` and
+   * preserve the source + label in raw_response.
+   */
+  filtered?: { source: string; label: 'empty' | 'human' | 'vehicle'; raw?: unknown };
 }
 
 export async function runCascade(input: IdentifyInput, opts: CascadeOptions): Promise<CascadeResult> {
@@ -89,6 +97,15 @@ export async function runCascade(input: IdentifyInput, opts: CascadeOptions): Pr
       if (result.confidence >= ACCEPT_THRESHOLD) break;   // good enough
     } catch (e) {
       attempts.push({ id: plugin.id, ok: false, error: e instanceof Error ? e.message : String(e) });
+      // Hard-stop signal: empty/human/vehicle frame from MegaDetector.
+      // Don't burn cloud quota on plugins that have nothing to identify.
+      if (isFilteredFrameError(e)) {
+        return {
+          best: null,
+          attempts,
+          filtered: { source: e.source, label: e.filtered_label, raw: e.raw },
+        };
+      }
     }
   }
 

@@ -138,10 +138,22 @@ function xhrPut(
         if (onProgress) onProgress(blob.size, blob.size);
         resolve();
       } else {
-        reject(new Error(`R2 upload failed: ${xhr.status} ${xhr.statusText}`));
+        // R2 returns 403 when the access key lacks Object Write on the
+        // bucket, or when the signed URL doesn't match the request shape.
+        // Either way, surface the status — "R2 upload failed" alone hid
+        // a 403 behind a CORS-shaped error for hours during the launch.
+        reject(new Error(`R2 upload failed: HTTP ${xhr.status}${xhr.statusText ? ' ' + xhr.statusText : ''} — likely access key lacks Object Write permission on the bucket`));
       }
     });
-    xhr.addEventListener('error', () => reject(new Error('R2 upload network error')));
+    xhr.addEventListener('error', () => {
+      // The browser fires `error` for both network failures AND CORS
+      // rejections on the actual PUT response. When R2 returns a non-2xx
+      // (e.g. 403), CORS headers are absent → the browser blocks the
+      // response, the readyState fires error, and xhr.status is 0. Same
+      // symptom as "DNS unreachable", different cause. The DevTools
+      // Network tab is the only place that shows the real status.
+      reject(new Error('R2 upload network error or CORS rejection — open DevTools → Network → click the failed PUT → Status shows the real code (403 = bad access key, 0 = network)'));
+    });
     xhr.addEventListener('abort', () => reject(new Error('R2 upload aborted')));
     xhr.send(blob);
   });
