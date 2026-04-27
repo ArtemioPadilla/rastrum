@@ -197,33 +197,82 @@ const isDocsPage = currentPath.includes('/docs');
     return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
   }
 
+  // Cached avatar src so reloads don't flash the placeholder while we
+  // wait for getSession() + the public.users round-trip. Updated below
+  // every time paint() resolves a fresh URL.
+  const AVATAR_CACHE_KEY = 'rastrum.headerAvatar';
+  const AVATAR_NAME_KEY  = 'rastrum.headerName';
+  function paintCachedAvatar() {
+    if (!avatarImg) return;
+    try {
+      const cachedSrc = localStorage.getItem(AVATAR_CACHE_KEY);
+      const cachedAlt = localStorage.getItem(AVATAR_NAME_KEY);
+      if (cachedSrc) {
+        avatarImg.src = cachedSrc;
+        if (cachedAlt) avatarImg.alt = cachedAlt;
+        avatarWrap?.classList.remove('hidden');
+        signInLink?.classList.add('hidden');
+        mobileAuthLinks?.classList.remove('hidden');
+      }
+    } catch { /* localStorage unavailable */ }
+  }
+  paintCachedAvatar();
+
   // Unread badge handled by <BellIcon> — see BellIcon.astro.
-  async function paint(hasSession: boolean) {
+  async function paint(hasSession: boolean, sessionUser?: { id: string; email?: string; user_metadata?: Record<string, unknown> }) {
     if (signInLink) signInLink.classList.toggle('hidden', hasSession);
     if (avatarWrap) avatarWrap.classList.toggle('hidden', !hasSession);
     if (mobileAuthLinks) mobileAuthLinks.classList.toggle('hidden', !hasSession);
-    if (hasSession && avatarImg) {
-      try {
-        const supabase = getSupabase();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-        const { data: profile } = await supabase
-          .from('users')
-          .select('username,display_name,avatar_url')
-          .eq('id', user.id)
-          .maybeSingle<Pick<UserProfile,'username'|'display_name'|'avatar_url'>>();
-        const name = profile?.display_name || profile?.username || user.email?.split('@')[0] || '?';
-        avatarImg.src = profile?.avatar_url || initialsAvatar(name);
-        avatarImg.alt = name;
-      } catch { /* env not set */ }
+
+    if (!hasSession) {
+      // Signed out — clear the cache so the next render starts clean.
+      try { localStorage.removeItem(AVATAR_CACHE_KEY); localStorage.removeItem(AVATAR_NAME_KEY); } catch { /* ignore */ }
+      return;
     }
+    if (!avatarImg) return;
+
+    // Fast path: read avatar straight from the session's user_metadata
+    // (already in localStorage from Supabase auth — no DB round-trip).
+    if (sessionUser) {
+      const meta = (sessionUser.user_metadata ?? {}) as Record<string, string | undefined>;
+      const fastSrc = meta.picture || meta.avatar_url;
+      const fastName = meta.full_name || meta.name || meta.user_name || sessionUser.email?.split('@')[0] || '?';
+      if (fastSrc) {
+        avatarImg.src = fastSrc;
+        avatarImg.alt = fastName;
+      } else if (!avatarImg.src) {
+        avatarImg.src = initialsAvatar(fastName);
+        avatarImg.alt = fastName;
+      }
+    }
+
+    // Slow path: refine from public.users (in case the operator-controlled
+    // record has a different avatar — e.g. user uploaded a custom one).
+    try {
+      const supabase = getSupabase();
+      const userId = sessionUser?.id;
+      if (!userId) return;
+      const { data: profile } = await supabase
+        .from('users')
+        .select('username,display_name,avatar_url')
+        .eq('id', userId)
+        .maybeSingle<Pick<UserProfile,'username'|'display_name'|'avatar_url'>>();
+      const name = profile?.display_name || profile?.username || sessionUser?.email?.split('@')[0] || '?';
+      const finalSrc = profile?.avatar_url || avatarImg.src || initialsAvatar(name);
+      avatarImg.src = finalSrc;
+      avatarImg.alt = name;
+      try {
+        localStorage.setItem(AVATAR_CACHE_KEY, finalSrc);
+        localStorage.setItem(AVATAR_NAME_KEY, name);
+      } catch { /* ignore */ }
+    } catch { /* env not set */ }
   }
 
   (async () => {
     try {
       const { data: { session } } = await getSupabase().auth.getSession();
-      await paint(!!session);
-      getSupabase().auth.onAuthStateChange((_evt, s) => paint(!!s));
+      await paint(!!session, session?.user as Parameters<typeof paint>[1]);
+      getSupabase().auth.onAuthStateChange((_evt, s) => paint(!!s, s?.user as Parameters<typeof paint>[1]));
     } catch { /* env not set */ }
   })();
 
