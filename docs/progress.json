@@ -401,6 +401,112 @@
         }
       ]
     },
+    "v1.0.x": {
+      "name": "Post-launch polish",
+      "name_es": "Pulido post-lanzamiento",
+      "period": "Weeks following 2026-04-26 launch",
+      "period_es": "Semanas posteriores al lanzamiento 2026-04-26",
+      "status": "in_progress",
+      "status_es": "en progreso",
+      "items": [
+        {
+          "id": "arch-diagram-parallel",
+          "label": "Update architecture page cascade SVG to show parallel race (currently shows serial waterfall)",
+          "label_es": "Actualizar el SVG de cascada en arquitectura para mostrar la carrera paralela (actualmente muestra cascada serial)",
+          "done": false
+        },
+        {
+          "id": "identify-server-cascade",
+          "label": "Move runParallelIdentify to identify Edge Function for server-side parity (currently client-only)",
+          "label_es": "Mover runParallelIdentify a la Edge Function identify para paridad server-side (actualmente solo cliente)",
+          "done": false
+        },
+        {
+          "id": "inapp-camera-secondary",
+          "label": "Re-introduce in-app getUserMedia camera as secondary 'preview' path with system camera staying primary",
+          "label_es": "Reintroducir cámara getUserMedia in-app como ruta secundaria 'preview' con la cámara del sistema como primaria",
+          "done": false,
+          "blocked_by": "Awaits feedback from real users — deferred from v1.0 because system camera is more reliable on test devices. GitHub issue #18"
+        },
+        {
+          "id": "expert-app-admin-ui",
+          "label": "Admin review UI for expert_applications (schema shipped v1.0; admin approve/reject UX missing)",
+          "label_es": "UI admin para revisar expert_applications (schema en v1.0; falta UX para aprobar/rechazar)",
+          "done": false
+        },
+        {
+          "id": "bioblitz-events-ui-poll",
+          "label": "Bioblitz event detail UI — build when first community organizer requests one",
+          "label_es": "UI de detalle de evento bioblitz — construir cuando un organizador comunitario lo solicite",
+          "done": false,
+          "blocked_by": "Speculative without a pilot event. Reshelved here from v1.0 alongside its schema sibling."
+        },
+        {
+          "id": "chat-phi-autoload",
+          "label": "Chat: auto-load cached Phi-3.5-vision instead of re-prompting consent on returning users",
+          "label_es": "Chat: cargar automáticamente el Phi-3.5-vision en caché en lugar de pedir consentimiento de nuevo a usuarios que vuelven",
+          "done": false
+        },
+        {
+          "id": "install-discoverability",
+          "label": "Earlier PWA install prompt + iOS Add-to-Home-Screen walkthrough (animated GIF or guided overlay)",
+          "label_es": "Aviso de instalación PWA más temprano + tutorial de 'Agregar a inicio' en iOS (GIF animado o tour guiado)",
+          "done": false
+        },
+        {
+          "id": "plantnet-quota-monitor",
+          "label": "Alerting / dashboard for PlantNet daily-quota usage (500/day shared); fall through gracefully when exhausted",
+          "label_es": "Alertas / dashboard para uso de cuota diaria de PlantNet (500/día compartido); manejar agotamiento sin romper UX",
+          "done": false
+        },
+        {
+          "id": "oauth-logo-google",
+          "label": "Upload Rastrum logo + privacy/terms URLs at Google Cloud Console OAuth consent screen",
+          "label_es": "Subir logo Rastrum + URLs de privacidad/términos en la pantalla de consentimiento OAuth de Google Cloud Console",
+          "done": false,
+          "blocked_by": "Manual operator action — see GitHub issue #3"
+        },
+        {
+          "id": "oauth-logo-github",
+          "label": "Upload Rastrum logo at GitHub Developer Settings OAuth app",
+          "label_es": "Subir logo Rastrum en la app OAuth en GitHub Developer Settings",
+          "done": false,
+          "blocked_by": "Manual operator action — see GitHub issue #3"
+        },
+        {
+          "id": "tasks-json-deepfill",
+          "label": "Deepen tasks.json subtask granularity where 3-subtask backfill is thin (esp. v1.0 social + tokens items)",
+          "label_es": "Profundizar la granularidad de subtareas en tasks.json donde el relleno actual es escaso (especialmente social + tokens en v1.0)",
+          "done": false
+        },
+        {
+          "id": "issue-5-gps-retest",
+          "label": "GPS auto-fill retest on Eugenio's Android device — fix shipped, awaiting confirmation",
+          "label_es": "Retest del GPS en el Android de Eugenio — fix enviado, esperando confirmación",
+          "done": false,
+          "blocked_by": "Awaits real-device retest — see GitHub issue #5"
+        },
+        {
+          "id": "issue-18-camera-retest",
+          "label": "'Tomar foto' retest on Eugenio's Android — Android-specific hint shipped, awaiting confirmation",
+          "label_es": "Retest de 'Tomar foto' en el Android de Eugenio — hint específico para Android enviado, esperando confirmación",
+          "done": false,
+          "blocked_by": "Awaits real-device retest — see GitHub issue #18"
+        },
+        {
+          "id": "smoke-test-nightly",
+          "label": "Nightly cron-fired Playwright smoke test against production rastrum.org (currently only PR-triggered)",
+          "label_es": "Prueba humo Playwright contra rastrum.org disparada por cron nocturno (actualmente solo en PRs)",
+          "done": false
+        },
+        {
+          "id": "license-per-record-ui",
+          "label": "UI for per-observation license selection (CC-BY default; CC0, CC-BY-NC, all-rights-reserved options)",
+          "label_es": "UI para selección de licencia por observación (CC-BY por defecto; opciones CC0, CC-BY-NC, derechos reservados)",
+          "done": false
+        }
+      ]
+    },
     "v1.5": {
       "name": "Territory Layer",
       "name_es": "Capa Territorial",
