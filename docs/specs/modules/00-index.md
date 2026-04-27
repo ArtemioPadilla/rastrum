@@ -28,7 +28,7 @@ narrative source.
 > numbers reflect the actual filename on disk; gaps and the duplicated
 > `15-*.md` are historical (`15-map-location-picker.md` was claimed first,
 > then `15-mcp-server.md` shipped under the same number — see the note
-> below the table).
+> below the table). 22 module specs are tracked here today.
 
 ---
 
@@ -71,6 +71,8 @@ narrative source.
 | 17 | In-App Camera (`getUserMedia`) | v1.0 | shipped | [`17-in-app-camera.md`](17-in-app-camera.md) |
 | 18 | Onboarding Flow | v1.0 | shipped | [`18-onboarding.md`](18-onboarding.md) |
 | 19 | Batch Photo Importer (Google Photos / Drive / file upload) | v1.0 | shipped | [`19-batch-photo-importer.md`](19-batch-photo-importer.md) |
+| 20 | Conversational Chat (cascade interpreter + vision fallback) | v1.0 | shipped | [`20-chat.md`](20-chat.md) |
+| 21 | Identify (no-save quick PlantNet probe) | v1.0 | shipped | [`21-identify.md`](21-identify.md) |
 
 > **Numbering note.** Two specs share the `15-` prefix:
 > [`15-map-location-picker.md`](15-map-location-picker.md) was claimed first
@@ -120,7 +122,7 @@ ML training pipeline) rather than waiting on engineering capacity.
 
 ## How to add a new module spec
 
-1. Claim the next free `NN-*.md` slot (currently `20-`).
+1. Claim the next free `NN-*.md` slot (currently `22-`).
 2. Copy the structure of an existing spec
    (`01-photo-id.md` is a good template).
 3. Include: **Overview → Data model → APIs / logic → Edge cases → Cost / risk
