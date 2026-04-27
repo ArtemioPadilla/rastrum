@@ -272,6 +272,42 @@ const onb = (tr as unknown as { onboarding: Record<string, string> }).onboarding
       </div>
     </div>
 
+    <!-- MegaDetector v5a (on-device camera trap) -->
+    <div class="mt-6 pt-5 border-t border-zinc-100 dark:border-zinc-800/60">
+      <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
+        {lang === 'es' ? '🎥 MegaDetector v5a (cámara trampa)' : '🎥 MegaDetector v5a (camera trap)'}
+      </h3>
+      <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">
+        {lang === 'es'
+          ? 'Detecta animales en fotos de cámara trampa directamente en tu dispositivo. ~134 MB, una sola descarga.'
+          : 'Detects animals in camera trap photos entirely on your device. ~134 MB, one-time download.'}
+      </p>
+      <p id="megadetector-url-missing" class="hidden text-xs text-amber-700 dark:text-amber-400 mb-2">
+        {lang === 'es' ? 'URL del modelo no configurada. Contacta al administrador.' : 'Model URL not configured. Contact the administrator.'}
+      </p>
+
+      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+        <div class="flex items-start justify-between gap-3 flex-wrap">
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">MegaDetector v5a (INT8 ONNX)</p>
+            <p class="text-xs text-zinc-500" id="megadetector-status">&mdash;</p>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button id="megadetector-download" type="button" class="rounded-lg border border-emerald-600/60 px-3 py-1.5 text-xs sm:text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 disabled:opacity-50">
+              <span data-mdlabel>{lang === 'es' ? 'Descargar (~134 MB)' : 'Download (~134 MB)'}</span>
+            </button>
+            <button id="megadetector-delete" type="button" class="hidden rounded-lg border border-red-300 dark:border-red-900/50 px-3 py-1.5 text-xs sm:text-sm font-medium text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">
+              {lang === 'es' ? 'Eliminar' : 'Delete'}
+            </button>
+          </div>
+        </div>
+        <p id="megadetector-progress" class="hidden mt-2 text-xs text-zinc-600 dark:text-zinc-400 font-mono"></p>
+        <p class="mt-3 text-[11px] text-zinc-500 dark:text-zinc-400">
+          {lang === 'es' ? 'Microsoft AI for Good · Licencia MIT · Solo detección (sin clasificación de especie)' : 'Microsoft AI for Good · MIT License · Detection only (no species classification)'}
+        </p>
+      </div>
+    </div>
+
     <!-- EfficientNet-Lite0 (on-device photo) -->
     <div class="mt-6 pt-5 border-t border-zinc-100 dark:border-zinc-800/60">
       <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">{tr.auth.onnx_base_section}</h3>
@@ -840,6 +876,90 @@ const onb = (tr as unknown as { onboarding: Record<string, string> }).onboarding
   });
 
   refreshBirdNET().catch(() => {});
+
+  // ── MegaDetector v5a (on-device camera trap) ──
+  const mdDownloadBtn = document.getElementById('megadetector-download') as HTMLButtonElement | null;
+  const mdDeleteBtn   = document.getElementById('megadetector-delete')   as HTMLButtonElement | null;
+  const mdStatus      = document.getElementById('megadetector-status');
+  const mdProgress    = document.getElementById('megadetector-progress');
+  const mdUrlMissing  = document.getElementById('megadetector-url-missing');
+  const mdLabel       = mdDownloadBtn?.querySelector('[data-mdlabel]') as HTMLElement | null;
+  const MD_DEFAULT_LABEL = mdLabel?.textContent ?? '';
+  const MD_REDOWNLOAD_LABEL = isEsLang ? 'Volver a descargar' : 'Re-download';
+
+  let mdLib: typeof import('../lib/identifiers/megadetector-cache') | null = null;
+  async function getMdLib() {
+    if (!mdLib) mdLib = await import('../lib/identifiers/megadetector-cache');
+    return mdLib;
+  }
+
+  async function refreshMegadetector() {
+    if (!mdDownloadBtn || !mdDeleteBtn || !mdStatus || !mdLabel) return;
+    const lib = await getMdLib().catch(() => null);
+    if (!lib) return;
+    const weightsUrl = lib.getMegadetectorWeightsBaseUrl();
+    if (!weightsUrl) {
+      mdUrlMissing?.classList.remove('hidden');
+      mdDownloadBtn.disabled = true;
+    } else {
+      mdUrlMissing?.classList.add('hidden');
+      mdDownloadBtn.disabled = false;
+    }
+    const status = await lib.getMegadetectorCacheStatus();
+    if (status.modelCached) {
+      mdStatus!.textContent = `${isEsLang ? 'Guardado en este dispositivo' : 'Cached on this device'} · ${bytesHuman(status.approxBytes ?? 0)}`;
+      if (mdLabel) mdLabel.textContent = MD_REDOWNLOAD_LABEL;
+      mdDeleteBtn.classList.remove('hidden');
+    } else {
+      mdStatus!.textContent = `${isEsLang ? 'No descargado' : 'Not downloaded'} · ~134 MB`;
+      if (mdLabel) mdLabel.textContent = MD_DEFAULT_LABEL;
+      mdDeleteBtn.classList.add('hidden');
+    }
+  }
+
+  mdDownloadBtn?.addEventListener('click', async () => {
+    if (!mdDownloadBtn) return;
+    const ok = await confirmDialog({
+      title: isEsLang ? '¿Descargar MegaDetector v5a?' : 'Download MegaDetector v5a?',
+      bodyHtml: `
+        <p><strong>${isEsLang ? 'Tamaño' : 'Size'}:</strong> ~134 MB</p>
+        <ul class="list-disc pl-4 space-y-1 text-zinc-600 dark:text-zinc-400">
+          <li>${isEsLang ? 'Detecta animales, personas y vehículos en fotos de cámara trampa — no clasifica especies.' : 'Detects animals, people and vehicles in camera trap photos — does not classify species.'}</li>
+          <li>${isEsLang ? 'El modelo se ejecuta totalmente en este dispositivo — las fotos nunca salen del navegador.' : 'Runs entirely on this device — photos never leave the browser.'}</li>
+          <li>${isEsLang ? 'Licencia MIT · Microsoft AI for Good.' : 'MIT License · Microsoft AI for Good.'}</li>
+        </ul>
+      `,
+      okLabel: isEsLang ? 'Descargar' : 'Download',
+    });
+    if (!ok) return;
+    mdDownloadBtn.disabled = true;
+    mdProgress?.classList.remove('hidden');
+    try {
+      const lib = await getMdLib();
+      await lib.downloadMegadetectorWeights((p: { progress?: number; text?: string }) => {
+        if (mdProgress) mdProgress.textContent = `${Math.round((p.progress ?? 0) * 100)}%  ${p.text ?? ''}`;
+      });
+    } catch (e) {
+      if (mdStatus) mdStatus.textContent = e instanceof Error ? e.message : 'Failed';
+    } finally {
+      mdDownloadBtn.disabled = false;
+      await refreshMegadetector();
+    }
+  });
+
+  mdDeleteBtn?.addEventListener('click', async () => {
+    const ok = await confirmDialog({
+      title: isEsLang ? '¿Borrar MegaDetector de este dispositivo?' : 'Delete MegaDetector from this device?',
+      bodyHtml: `<p>${isEsLang ? 'Libera ~134 MB. Puedes volver a descargarlo en cualquier momento.' : 'Frees ~134 MB. You can re-download anytime.'}</p>`,
+      okLabel: isEsLang ? 'Borrar' : 'Delete',
+    });
+    if (!ok) return;
+    const lib = await getMdLib();
+    await lib.clearMegadetectorCache();
+    await refreshMegadetector();
+  });
+
+  refreshMegadetector().catch(() => {});
 
   // ── EfficientNet-Lite0 (on-device photo) — same shape as BirdNET ──
   const enDownloadBtn = document.getElementById('onnx-base-download') as HTMLButtonElement | null;
