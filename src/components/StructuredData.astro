@@ -1,0 +1,56 @@
+---
+interface OrganizationProps { type: 'organization' }
+interface WebSiteProps { type: 'website'; lang: 'en' | 'es' }
+interface BreadcrumbItem { name: string; url?: string }
+interface BreadcrumbProps { type: 'breadcrumb'; items: BreadcrumbItem[] }
+
+type Props = OrganizationProps | WebSiteProps | BreadcrumbProps;
+const props = Astro.props;
+
+const SITE = 'https://rastrum.org';
+
+let json: Record<string, unknown> = {};
+
+if (props.type === 'organization') {
+  json = {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: 'Rastrum',
+    url: SITE,
+    logo: `${SITE}/rastrum-logo-512.png`,
+    sameAs: ['https://github.com/ArtemioPadilla/rastrum'],
+    description: 'Open-source biodiversity observation platform for Latin America. Multi-modal AI species identification, offline-first, indigenous-language ready.',
+  };
+} else if (props.type === 'website') {
+  const localeRoot = `${SITE}/${props.lang}/`;
+  const isEn = props.lang === 'en';
+  json = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: 'Rastrum',
+    url: localeRoot,
+    inLanguage: isEn ? 'en' : 'es',
+    description: isEn
+      ? 'Open-source biodiversity observation platform built for Latin America. Multi-modal AI species ID, offline-first, indigenous-language ready, GBIF-aligned.'
+      : 'Plataforma open-source de observación de biodiversidad construida para América Latina. ID multi-modal con IA, offline-first, lenguas indígenas, alineada con GBIF.',
+    publisher: {
+      '@type': 'Organization',
+      name: 'Rastrum',
+      url: SITE,
+    },
+  };
+} else if (props.type === 'breadcrumb') {
+  json = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: props.items.map((item, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      name: item.name,
+      ...(item.url ? { item: item.url } : {}),
+    })),
+  };
+}
+---
+
+<script type="application/ld+json" set:html={JSON.stringify(json)}></script>

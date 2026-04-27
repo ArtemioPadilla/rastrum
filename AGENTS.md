@@ -137,6 +137,7 @@ docs/
   intentional (icons, brand marks).
 - **No `console.log` in shipped code.** `console.warn` for genuinely
   exceptional ignored errors only.
+- **Below-fold images use `loading="lazy"`.** The hero / first-paint image stays default-loaded for LCP; everything below the fold (doc screenshots, observation thumbnails, profile avatars in lists) gets `loading="lazy"`.
 
 ### Astro JSX gotcha — `Record<…>` is parsed as a tag
 Inline TypeScript casts like `(foo as Record<string, unknown>).bar` inside

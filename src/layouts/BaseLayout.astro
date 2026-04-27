@@ -8,6 +8,7 @@ import ReportIssueButton from '../components/ReportIssueButton.astro';
 import SwUpdateToast from '../components/SwUpdateToast.astro';
 import OfflineBanner from '../components/OfflineBanner.astro';
 import { getAlternateUrl } from '../i18n/utils';
+import StructuredData from '../components/StructuredData.astro';
 
 interface Props {
   title: string;
@@ -76,7 +77,11 @@ const resolvedOgImage = ogImage ?? `${SITE_URL}/og/${ogSlugForPath(currentPath)}
     <meta name="theme-color" content="#10b981" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="application-name" content="Rastrum" />
+    <meta name="apple-mobile-web-app-title" content="Rastrum" />
     <title>{title}</title>
+    <StructuredData type="organization" />
+    {currentPath === `/${lang}/` && <StructuredData type="website" lang={lang === 'es' ? 'es' : 'en'} />}
     <!-- Open Graph -->
     <meta property="og:type" content={ogTypeFinal} />
     <meta property="og:site_name" content="Rastrum" />
