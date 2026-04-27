@@ -1,0 +1,72 @@
+---
+/**
+ * ExploreWatchlistView — public-facing host for the existing WatchlistView.
+ *
+ * For signed-in users: same activity feed as on /profile, simply at a
+ * dedicated URL inside the Explore section.
+ * For anonymous visitors: a sign-in CTA pointing at /sign-in (the WatchlistView
+ * itself is mounted but renders nothing without an authenticated user).
+ */
+import { t, getLocalizedPath, routes } from '../i18n/utils';
+import WatchlistView from './WatchlistView.astro';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+
+const { lang } = Astro.props;
+const tr = t(lang);
+const page = tr.explore_pages.watchlist;
+const signInPath = getLocalizedPath(lang, routes.signIn[lang] + '/');
+---
+
+<section class="rastrum-explore-watchlist" data-lang={lang}>
+  <header class="space-y-3 py-6">
+    <h1 class="text-3xl font-bold tracking-tight">{page.title}</h1>
+    <p class="text-zinc-600 dark:text-zinc-400">{page.subtitle}</p>
+  </header>
+
+  <div
+    id="ew-anon-cta"
+    class="hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-6 text-center"
+  >
+    <p class="text-sm text-zinc-700 dark:text-zinc-300 mb-4">{page.signin_cta}</p>
+    <a
+      href={signInPath}
+      class="inline-flex min-h-[44px] items-center rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white"
+    >
+      {tr.auth.sign_in}
+    </a>
+  </div>
+
+  <div id="ew-signed-in" class="hidden">
+    <WatchlistView lang={lang} />
+  </div>
+</section>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+
+  const anonCta = document.getElementById('ew-anon-cta');
+  const signedInBlock = document.getElementById('ew-signed-in');
+
+  async function init() {
+    let supabase;
+    try {
+      supabase = getSupabase();
+    } catch {
+      anonCta?.classList.remove('hidden');
+      return;
+    }
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      signedInBlock?.classList.remove('hidden');
+    } else {
+      anonCta?.classList.remove('hidden');
+    }
+  }
+
+  init().catch(() => {
+    anonCta?.classList.remove('hidden');
+  });
+</script>

@@ -1,0 +1,584 @@
+---
+/**
+ * ExploreSpeciesView — two-tier surface for browsing the species corpus.
+ *
+ * Index mode (default):  search box + grid of taxa with at least one public
+ *                        observation, sorted by observation count.
+ * Detail mode (?slug=…): header + conservation badges + description + tiny
+ *                        MapLibre instance with all public observations of
+ *                        the species (clustered) + a strip of recent photos.
+ *
+ * The page hydrates client-side based on `?slug=…`, mirroring the existing
+ * /share/obs/?id=<id> pattern (no getStaticPaths — Astro `output: 'static'`).
+ */
+import { t } from '../i18n/utils';
+import Skeleton from './Skeleton.astro';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+
+const { lang } = Astro.props;
+const tr = t(lang);
+const page = tr.explore_pages.species;
+const shareBase = `/${lang}/share/obs/`;
+const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/species'}/`;
+---
+
+<section
+  class="rastrum-explore-species"
+  data-lang={lang}
+  data-share-base={shareBase}
+  data-index-base={indexBase}
+  data-label-search-placeholder={page.search_placeholder}
+  data-label-back={page.back_to_index}
+  data-label-empty={page.empty}
+  data-label-detail-empty={page.detail_empty}
+  data-label-error={page.error}
+  data-label-obs-count-one={page.obs_count_one}
+  data-label-obs-count-other={page.obs_count_other}
+  data-label-loading={page.loading}
+  data-label-endemic={page.endemic_mexico}
+  data-label-nom059={page.nom059_label}
+  data-label-cites={page.cites_label}
+  data-label-iucn={page.iucn_label}
+  data-label-taxonomy={page.taxonomy}
+  data-label-distribution={page.distribution}
+  data-label-recent-photos={page.recent_photos}
+  data-label-no-coords={page.no_coordinates}
+>
+  <header class="space-y-3 py-6">
+    <h1 class="es-title text-3xl font-bold tracking-tight">{page.title}</h1>
+    <p class="es-subtitle text-zinc-600 dark:text-zinc-400">{page.subtitle}</p>
+  </header>
+
+  <!-- Index mode -->
+  <div class="es-index">
+    <label class="block mb-4">
+      <span class="sr-only">{page.search_placeholder}</span>
+      <input
+        type="search"
+        class="es-search w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        placeholder={page.search_placeholder}
+        autocomplete="off"
+      />
+    </label>
+
+    <div class="es-skeleton">
+      <Skeleton variant="card" count={6} ariaLabel={page.loading} />
+    </div>
+
+    <ul class="es-list grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></ul>
+
+    <p class="es-empty hidden mt-4 rounded-xl border border-zinc-200 dark:border-zinc-800 p-8 text-center text-zinc-500 dark:text-zinc-400">
+      {page.empty}
+    </p>
+
+    <p class="es-error hidden mt-4 rounded-lg border border-red-300 dark:border-red-800 p-4 text-center text-sm text-red-700 dark:text-red-400"></p>
+  </div>
+
+  <!-- Detail mode -->
+  <div class="es-detail hidden">
+    <a href={indexBase} class="es-back inline-flex items-center text-sm text-emerald-700 dark:text-emerald-400 hover:underline mb-4">
+      ← {page.back_to_index}
+    </a>
+
+    <article class="space-y-6">
+      <header class="space-y-2">
+        <h2 class="es-d-sci text-3xl font-bold italic text-zinc-900 dark:text-zinc-100"></h2>
+        <p class="es-d-common text-lg text-zinc-700 dark:text-zinc-300"></p>
+        <ul class="es-d-badges flex flex-wrap gap-2"></ul>
+      </header>
+
+      <p class="es-d-description text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed"></p>
+
+      <section>
+        <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2">
+          {page.taxonomy}
+        </h3>
+        <ul class="es-d-taxonomy flex flex-wrap gap-2 text-xs"></ul>
+      </section>
+
+      <section>
+        <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2">
+          {page.distribution}
+        </h3>
+        <div class="relative">
+          <div
+            class="es-d-map w-full h-[40vh] sm:h-[50vh] rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900"
+          ></div>
+          <p class="es-d-no-coords hidden absolute inset-0 flex items-center justify-center text-sm text-zinc-500 text-center px-4"></p>
+        </div>
+      </section>
+
+      <section>
+        <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2">
+          {page.recent_photos}
+        </h3>
+        <ul class="es-d-photos grid grid-cols-3 sm:grid-cols-6 gap-2"></ul>
+      </section>
+    </article>
+
+    <p class="es-d-error hidden mt-4 rounded-lg border border-red-300 dark:border-red-800 p-4 text-center text-sm text-red-700 dark:text-red-400"></p>
+  </div>
+</section>
+
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.css" />
+
+<script>
+  import maplibregl from 'maplibre-gl';
+  import { getSupabase } from '../lib/supabase';
+
+  type Lang = 'en' | 'es';
+
+  type Taxon = {
+    id: string;
+    scientific_name: string;
+    common_name_es: string | null;
+    common_name_en: string | null;
+    kingdom: string | null;
+    phylum: string | null;
+    class: string | null;
+    order: string | null;
+    family: string | null;
+    genus: string | null;
+    nom059_status: string | null;
+    cites_appendix: string | null;
+    iucn_category: string | null;
+    is_endemic_mexico: boolean | null;
+    description_es: string | null;
+    description_en: string | null;
+  };
+
+  type ObsRow = {
+    id: string;
+    location: GeoJSON.Point | null;
+    observed_at: string;
+    media_files: { url: string | null; is_primary: boolean | null }[];
+  };
+
+  function escapeText(s: string): string {
+    return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as Record<string, string>)[c]);
+  }
+
+  function commonName(t: Pick<Taxon, 'common_name_es' | 'common_name_en'>, lang: Lang): string {
+    if (lang === 'es') return t.common_name_es ?? t.common_name_en ?? '';
+    return t.common_name_en ?? t.common_name_es ?? '';
+  }
+
+  function pluralise(n: number, one: string, other: string): string {
+    return (n === 1 ? one : other).replace('{count}', String(n));
+  }
+
+  async function wire(root: HTMLElement) {
+    const lang = (root.dataset.lang === 'es' ? 'es' : 'en') as Lang;
+    const shareBase = root.dataset.shareBase ?? `/${lang}/share/obs/`;
+    const indexBase = root.dataset.indexBase ?? `/${lang}/explore/species/`;
+
+    const indexPane = root.querySelector('.es-index') as HTMLElement | null;
+    const detailPane = root.querySelector('.es-detail') as HTMLElement | null;
+    const titleEl = root.querySelector('.es-title') as HTMLElement | null;
+    const subtitleEl = root.querySelector('.es-subtitle') as HTMLElement | null;
+
+    const params = new URLSearchParams(window.location.search);
+    const slug = params.get('slug');
+
+    if (slug) {
+      indexPane?.classList.add('hidden');
+      detailPane?.classList.remove('hidden');
+      // Hide redundant intro on detail.
+      titleEl?.classList.add('hidden');
+      subtitleEl?.classList.add('hidden');
+      await renderDetail(root, lang, decodeURIComponent(slug), shareBase);
+    } else {
+      detailPane?.classList.add('hidden');
+      indexPane?.classList.remove('hidden');
+      await renderIndex(root, lang, indexBase);
+    }
+  }
+
+  // ---------------------- INDEX ----------------------
+
+  async function renderIndex(root: HTMLElement, lang: Lang, indexBase: string) {
+    const listEl = root.querySelector('.es-list') as HTMLUListElement | null;
+    const skeletonEl = root.querySelector('.es-skeleton') as HTMLElement | null;
+    const emptyEl = root.querySelector('.es-empty') as HTMLElement | null;
+    const errEl = root.querySelector('.es-error') as HTMLElement | null;
+    const searchEl = root.querySelector('.es-search') as HTMLInputElement | null;
+
+    const oneTpl = root.dataset.labelObsCountOne ?? '{count} obs';
+    const otherTpl = root.dataset.labelObsCountOther ?? '{count} obs';
+    const errLabel = root.dataset.labelError ?? 'Failed to load';
+
+    const hideSkeleton = () => skeletonEl?.classList.add('hidden');
+
+    let supabase;
+    try {
+      supabase = getSupabase();
+    } catch {
+      hideSkeleton();
+      if (errEl) {
+        errEl.textContent = errLabel;
+        errEl.classList.remove('hidden');
+      }
+      return;
+    }
+
+    type ObsBucketRow = { primary_taxon_id: string | null };
+    let obsRows: ObsBucketRow[] = [];
+    try {
+      const { data, error } = await supabase
+        .from('observations')
+        .select('primary_taxon_id')
+        .eq('sync_status', 'synced')
+        .not('primary_taxon_id', 'is', null)
+        .limit(2000);
+      if (error) throw error;
+      obsRows = (data ?? []) as unknown as ObsBucketRow[];
+    } catch (e) {
+      hideSkeleton();
+      if (errEl) {
+        errEl.textContent = (e as { message?: string })?.message ?? errLabel;
+        errEl.classList.remove('hidden');
+      }
+      return;
+    }
+
+    const counts = new Map<string, number>();
+    for (const r of obsRows) {
+      if (!r.primary_taxon_id) continue;
+      counts.set(r.primary_taxon_id, (counts.get(r.primary_taxon_id) ?? 0) + 1);
+    }
+    const taxonIds = Array.from(counts.keys());
+
+    if (taxonIds.length === 0) {
+      hideSkeleton();
+      emptyEl?.classList.remove('hidden');
+      return;
+    }
+
+    type TaxaRow = Pick<
+      Taxon,
+      'id' | 'scientific_name' | 'common_name_es' | 'common_name_en'
+      | 'nom059_status' | 'cites_appendix' | 'iucn_category' | 'is_endemic_mexico'
+    >;
+
+    let taxaRows: TaxaRow[] = [];
+    try {
+      const { data, error } = await supabase
+        .from('taxa')
+        .select('id, scientific_name, common_name_es, common_name_en, nom059_status, cites_appendix, iucn_category, is_endemic_mexico')
+        .in('id', taxonIds);
+      if (error) throw error;
+      taxaRows = (data ?? []) as unknown as TaxaRow[];
+    } catch (e) {
+      hideSkeleton();
+      if (errEl) {
+        errEl.textContent = (e as { message?: string })?.message ?? errLabel;
+        errEl.classList.remove('hidden');
+      }
+      return;
+    }
+
+    const enriched = taxaRows
+      .map(t => ({
+        ...t,
+        count: counts.get(t.id) ?? 0,
+      }))
+      .sort((a, b) => b.count - a.count || a.scientific_name.localeCompare(b.scientific_name));
+
+    hideSkeleton();
+    if (enriched.length === 0) {
+      emptyEl?.classList.remove('hidden');
+      return;
+    }
+
+    function badgePillsForCard(t: TaxaRow): string {
+      const pills: string[] = [];
+      if (t.nom059_status) {
+        pills.push(`<span class="inline-flex items-center rounded-full bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:text-amber-300">NOM-059 · ${escapeText(t.nom059_status)}</span>`);
+      }
+      if (t.cites_appendix) {
+        pills.push(`<span class="inline-flex items-center rounded-full bg-rose-100 dark:bg-rose-900/30 px-2 py-0.5 text-[10px] font-semibold text-rose-800 dark:text-rose-300">CITES · ${escapeText(t.cites_appendix)}</span>`);
+      }
+      if (t.iucn_category) {
+        pills.push(`<span class="inline-flex items-center rounded-full bg-sky-100 dark:bg-sky-900/30 px-2 py-0.5 text-[10px] font-semibold text-sky-800 dark:text-sky-300">IUCN · ${escapeText(t.iucn_category)}</span>`);
+      }
+      return pills.join(' ');
+    }
+
+    function cardMarkup(t: TaxaRow & { count: number }): string {
+      const common = commonName(t, lang);
+      const countLabel = pluralise(t.count, oneTpl, otherTpl);
+      const href = `${indexBase}?slug=${encodeURIComponent(t.scientific_name)}`;
+      return `<li>
+        <a
+          href="${href}"
+          class="es-card block rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-3 hover:border-emerald-400 dark:hover:border-emerald-700 transition-colors"
+          data-search="${escapeText((t.scientific_name + ' ' + (t.common_name_es ?? '') + ' ' + (t.common_name_en ?? '')).toLowerCase())}"
+        >
+          <p class="text-sm italic font-semibold text-zinc-900 dark:text-zinc-100 truncate">${escapeText(t.scientific_name)}</p>
+          ${common ? `<p class="text-xs text-zinc-600 dark:text-zinc-300 truncate">${escapeText(common)}</p>` : ''}
+          <div class="mt-2 flex items-center gap-2 flex-wrap">
+            <span class="inline-flex items-center rounded-full bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-[11px] font-medium text-zinc-700 dark:text-zinc-300">${escapeText(countLabel)}</span>
+            ${badgePillsForCard(t)}
+          </div>
+        </a>
+      </li>`;
+    }
+
+    if (listEl) {
+      listEl.innerHTML = enriched.map(cardMarkup).join('');
+    }
+
+    if (searchEl) {
+      let timer: number | null = null;
+      searchEl.addEventListener('input', () => {
+        if (timer) window.clearTimeout(timer);
+        timer = window.setTimeout(() => {
+          const q = (searchEl.value ?? '').trim().toLowerCase();
+          const cards = listEl?.querySelectorAll<HTMLElement>('li > a.es-card');
+          let visible = 0;
+          cards?.forEach(card => {
+            const haystack = card.dataset.search ?? '';
+            const li = card.parentElement as HTMLElement | null;
+            const match = !q || haystack.includes(q);
+            if (li) li.style.display = match ? '' : 'none';
+            if (match) visible++;
+          });
+          if (visible === 0 && q) {
+            emptyEl?.classList.remove('hidden');
+          } else {
+            emptyEl?.classList.add('hidden');
+          }
+        }, 200);
+      });
+    }
+  }
+
+  // ---------------------- DETAIL ----------------------
+
+  async function renderDetail(root: HTMLElement, lang: Lang, slug: string, shareBase: string) {
+    const errEl = root.querySelector('.es-d-error') as HTMLElement | null;
+    const errLabel = root.dataset.labelError ?? 'Failed to load';
+
+    let supabase;
+    try {
+      supabase = getSupabase();
+    } catch {
+      if (errEl) {
+        errEl.textContent = errLabel;
+        errEl.classList.remove('hidden');
+      }
+      return;
+    }
+
+    let taxon: Taxon | null = null;
+    try {
+      const { data, error } = await supabase
+        .from('taxa')
+        .select('id, scientific_name, common_name_es, common_name_en, kingdom, phylum, class, "order", family, genus, nom059_status, cites_appendix, iucn_category, is_endemic_mexico, description_es, description_en')
+        .eq('scientific_name', slug)
+        .maybeSingle();
+      if (error) throw error;
+      taxon = (data ?? null) as unknown as Taxon | null;
+    } catch (e) {
+      if (errEl) {
+        errEl.textContent = (e as { message?: string })?.message ?? errLabel;
+        errEl.classList.remove('hidden');
+      }
+      return;
+    }
+
+    if (!taxon) {
+      const detailEmpty = root.dataset.labelDetailEmpty ?? 'Species not found.';
+      if (errEl) {
+        errEl.textContent = detailEmpty;
+        errEl.classList.remove('hidden');
+      }
+      return;
+    }
+
+    const sciEl = root.querySelector('.es-d-sci') as HTMLElement | null;
+    const commonEl = root.querySelector('.es-d-common') as HTMLElement | null;
+    const badgesEl = root.querySelector('.es-d-badges') as HTMLUListElement | null;
+    const descEl = root.querySelector('.es-d-description') as HTMLElement | null;
+    const taxonomyEl = root.querySelector('.es-d-taxonomy') as HTMLUListElement | null;
+    const photosEl = root.querySelector('.es-d-photos') as HTMLUListElement | null;
+    const mapEl = root.querySelector('.es-d-map') as HTMLElement | null;
+    const noCoordsEl = root.querySelector('.es-d-no-coords') as HTMLElement | null;
+
+    if (sciEl) sciEl.textContent = taxon.scientific_name;
+    const common = commonName(taxon, lang);
+    if (commonEl) {
+      if (common) commonEl.textContent = common;
+      else commonEl.classList.add('hidden');
+    }
+
+    document.title = `${taxon.scientific_name} — Rastrum`;
+
+    if (badgesEl) {
+      const pills: string[] = [];
+      if (taxon.is_endemic_mexico) {
+        const lbl = root.dataset.labelEndemic ?? 'Endemic to Mexico';
+        pills.push(`<li><span class="inline-flex items-center rounded-full bg-emerald-100 dark:bg-emerald-900/30 px-3 py-1 text-xs font-semibold text-emerald-800 dark:text-emerald-300">${escapeText(lbl)}</span></li>`);
+      }
+      if (taxon.nom059_status) {
+        const lbl = root.dataset.labelNom059 ?? 'NOM-059';
+        pills.push(`<li><span class="inline-flex items-center rounded-full bg-amber-100 dark:bg-amber-900/30 px-3 py-1 text-xs font-semibold text-amber-800 dark:text-amber-300">${escapeText(lbl)} · ${escapeText(taxon.nom059_status)}</span></li>`);
+      }
+      if (taxon.cites_appendix) {
+        const lbl = root.dataset.labelCites ?? 'CITES';
+        pills.push(`<li><span class="inline-flex items-center rounded-full bg-rose-100 dark:bg-rose-900/30 px-3 py-1 text-xs font-semibold text-rose-800 dark:text-rose-300">${escapeText(lbl)} · ${escapeText(taxon.cites_appendix)}</span></li>`);
+      }
+      if (taxon.iucn_category) {
+        const lbl = root.dataset.labelIucn ?? 'IUCN';
+        pills.push(`<li><span class="inline-flex items-center rounded-full bg-sky-100 dark:bg-sky-900/30 px-3 py-1 text-xs font-semibold text-sky-800 dark:text-sky-300">${escapeText(lbl)} · ${escapeText(taxon.iucn_category)}</span></li>`);
+      }
+      badgesEl.innerHTML = pills.join('');
+    }
+
+    const description = lang === 'es'
+      ? (taxon.description_es ?? taxon.description_en ?? '')
+      : (taxon.description_en ?? taxon.description_es ?? '');
+    if (descEl) {
+      if (description) descEl.textContent = description;
+      else descEl.classList.add('hidden');
+    }
+
+    if (taxonomyEl) {
+      const chain: { rank: string; name: string }[] = [];
+      const ranks: { key: keyof Taxon; label: string }[] = [
+        { key: 'kingdom', label: 'Kingdom' },
+        { key: 'phylum',  label: 'Phylum' },
+        { key: 'class',   label: 'Class' },
+        { key: 'order',   label: 'Order' },
+        { key: 'family',  label: 'Family' },
+        { key: 'genus',   label: 'Genus' },
+      ];
+      for (const r of ranks) {
+        const v = taxon[r.key];
+        if (typeof v === 'string' && v) chain.push({ rank: r.label, name: v });
+      }
+      taxonomyEl.innerHTML = chain
+        .map(c => `<li><span class="inline-flex items-center rounded-full bg-zinc-100 dark:bg-zinc-800 px-2 py-1 text-[11px] font-medium text-zinc-700 dark:text-zinc-300"><span class="text-zinc-500 mr-1">${escapeText(c.rank)}</span>${escapeText(c.name)}</span></li>`)
+        .join('');
+    }
+
+    let obsRows: ObsRow[] = [];
+    try {
+      const { data, error } = await supabase
+        .from('observations')
+        .select('id, location, observed_at, media_files(url, is_primary)')
+        .eq('sync_status', 'synced')
+        .eq('primary_taxon_id', taxon.id)
+        .order('observed_at', { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      obsRows = (data ?? []) as unknown as ObsRow[];
+    } catch {
+      // Non-fatal — show the page without points.
+    }
+
+    if (photosEl) {
+      const top = obsRows
+        .filter(o => (o.media_files ?? []).some(m => m?.url))
+        .slice(0, 6)
+        .map(o => {
+          const media = (o.media_files ?? []).find(m => m?.is_primary && m?.url) ?? (o.media_files ?? []).find(m => m?.url);
+          const url = media?.url ?? '';
+          return `<li><a href="${shareBase}?id=${encodeURIComponent(o.id)}" class="block aspect-square overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-800"><img src="${escapeText(url)}" alt="${escapeText(taxon!.scientific_name)}" loading="lazy" class="w-full h-full object-cover" /></a></li>`;
+        });
+      photosEl.innerHTML = top.join('');
+    }
+
+    if (mapEl) {
+      const features: GeoJSON.Feature[] = [];
+      for (const r of obsRows) {
+        const geom = r.location;
+        if (!geom?.coordinates) continue;
+        features.push({ type: 'Feature', geometry: geom, properties: { id: r.id } });
+      }
+
+      if (features.length === 0) {
+        mapEl.classList.add('hidden');
+        if (noCoordsEl) {
+          noCoordsEl.textContent = root.dataset.labelNoCoords ?? '';
+          noCoordsEl.classList.remove('hidden');
+          noCoordsEl.classList.remove('absolute');
+          noCoordsEl.classList.add('rounded-lg', 'border', 'border-zinc-200', 'dark:border-zinc-800', 'p-8');
+        }
+      } else {
+        const REMOTE_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
+        const map = new maplibregl.Map({
+          container: mapEl,
+          style: REMOTE_STYLE,
+          center: features[0].geometry.type === 'Point'
+            ? (features[0].geometry as GeoJSON.Point).coordinates as [number, number]
+            : [-96.72, 17.06],
+          zoom: 4,
+          attributionControl: { compact: true },
+        });
+        map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+        map.on('load', () => {
+          map.addSource('species-obs', {
+            type: 'geojson',
+            data: { type: 'FeatureCollection', features },
+            cluster: true,
+            clusterMaxZoom: 14,
+            clusterRadius: 50,
+          });
+          map.addLayer({
+            id: 'species-clusters',
+            type: 'circle',
+            source: 'species-obs',
+            filter: ['has', 'point_count'],
+            paint: {
+              'circle-color': ['step', ['get', 'point_count'], '#10b981', 10, '#059669', 50, '#047857'],
+              'circle-radius': ['step', ['get', 'point_count'], 16, 10, 22, 50, 28],
+            },
+          });
+          map.addLayer({
+            id: 'species-cluster-count',
+            type: 'symbol',
+            source: 'species-obs',
+            filter: ['has', 'point_count'],
+            layout: {
+              'text-field': ['get', 'point_count_abbreviated'],
+              'text-font': ['Noto Sans Regular'],
+              'text-size': 11,
+            },
+            paint: { 'text-color': '#ffffff' },
+          });
+          map.addLayer({
+            id: 'species-pin',
+            type: 'circle',
+            source: 'species-obs',
+            filter: ['!', ['has', 'point_count']],
+            paint: {
+              'circle-color': '#10b981',
+              'circle-radius': 6,
+              'circle-stroke-width': 2,
+              'circle-stroke-color': '#ffffff',
+            },
+          });
+
+          // Fit to all points (with sane padding) when more than one.
+          if (features.length > 1) {
+            const bounds = new maplibregl.LngLatBounds();
+            for (const f of features) {
+              if (f.geometry.type === 'Point') {
+                bounds.extend((f.geometry.coordinates as [number, number]));
+              }
+            }
+            map.fitBounds(bounds, { padding: 40, maxZoom: 11, duration: 0 });
+          }
+        });
+      }
+    }
+  }
+
+  document.querySelectorAll<HTMLElement>('.rastrum-explore-species').forEach(el => {
+    wire(el).catch(() => { /* env not configured */ });
+  });
+</script>

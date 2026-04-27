@@ -1,0 +1,269 @@
+---
+/**
+ * ExploreRecentView — public-facing grid of the latest 20 synced observations.
+ *
+ * RLS does the gating (`obs_public_read` requires `sync_status = 'synced'`),
+ * so we never filter on the client beyond the visible page-size paging.
+ *
+ * Each card links to /share/obs/?id=<id>. The observer username is rendered
+ * only when `users.profile_public` is true; otherwise we render "Anonymous".
+ */
+import { t } from '../i18n/utils';
+import Skeleton from './Skeleton.astro';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+
+const { lang } = Astro.props;
+const tr = t(lang);
+const page = tr.explore_pages.recent;
+const profileBase = `/${lang}/${lang === 'es' ? 'perfil/u' : 'profile/u'}/`;
+const shareBase = `/${lang}/share/obs/`;
+---
+
+<section
+  class="rastrum-explore-recent"
+  data-lang={lang}
+  data-share-base={shareBase}
+  data-profile-base={profileBase}
+  data-label-anon={page.anonymous}
+  data-label-unknown-species={page.unknown_species}
+  data-label-load-more={page.load_more}
+  data-label-loading={page.loading}
+>
+  <header class="space-y-3 py-6">
+    <h1 class="text-3xl font-bold tracking-tight">{page.title}</h1>
+    <p class="text-zinc-600 dark:text-zinc-400">{page.subtitle}</p>
+  </header>
+
+  <div class="er-skeleton">
+    <Skeleton variant="card" count={6} ariaLabel={page.loading} />
+  </div>
+
+  <ul
+    class="er-list grid grid-cols-1 sm:grid-cols-2 gap-4"
+    aria-label={page.title}
+  ></ul>
+
+  <p class="er-empty hidden mt-4 rounded-xl border border-zinc-200 dark:border-zinc-800 p-8 text-center text-zinc-500 dark:text-zinc-400">
+    {page.empty}
+  </p>
+
+  <p class="er-error hidden mt-4 rounded-lg border border-red-300 dark:border-red-800 p-4 text-center text-sm text-red-700 dark:text-red-400"></p>
+
+  <div class="er-load-more-wrap hidden mt-6 text-center">
+    <button
+      type="button"
+      class="er-load-more inline-flex min-h-[44px] items-center rounded-lg border border-zinc-300 dark:border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
+    >
+      {page.load_more}
+    </button>
+  </div>
+</section>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { formatTimeAgo } from '../lib/social';
+
+  type Lang = 'en' | 'es';
+
+  type Ident = {
+    scientific_name: string | null;
+    is_primary: boolean | null;
+    confidence: number | null;
+    taxa: { common_name_es: string | null; common_name_en: string | null } | null;
+  };
+
+  type Media = { url: string | null; is_primary: boolean | null };
+
+  type Observer = {
+    id: string;
+    username: string | null;
+    display_name: string | null;
+    profile_public: boolean | null;
+  };
+
+  type Row = {
+    id: string;
+    observed_at: string;
+    state_province: string | null;
+    observer_id: string;
+    identifications: Ident[] | Ident | null;
+    media_files: Media[];
+    users: Observer | Observer[] | null;
+  };
+
+  const PAGE_SIZE = 20;
+
+  function escapeText(s: string): string {
+    return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as Record<string, string>)[c]);
+  }
+
+  function colorForConfidence(c: number): string {
+    if (c >= 0.85) return 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 border-emerald-300/60 dark:border-emerald-700/60';
+    if (c >= 0.5)  return 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 border-amber-300/60 dark:border-amber-700/60';
+    return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-300/60 dark:border-red-700/60';
+  }
+
+  function pickIdent(r: Row): Ident | null {
+    if (!r.identifications) return null;
+    if (Array.isArray(r.identifications)) {
+      if (r.identifications.length === 0) return null;
+      const primary = r.identifications.find(i => i?.is_primary);
+      if (primary) return primary;
+      return [...r.identifications].sort((a, b) => (b?.confidence ?? 0) - (a?.confidence ?? 0))[0] ?? null;
+    }
+    return r.identifications;
+  }
+
+  function pickObserver(r: Row): Observer | null {
+    if (!r.users) return null;
+    if (Array.isArray(r.users)) return r.users[0] ?? null;
+    return r.users;
+  }
+
+  function rowMarkup(r: Row, lang: Lang, anonLabel: string, unknownLabel: string, shareBase: string, profileBase: string): string {
+    const ident = pickIdent(r);
+    const observer = pickObserver(r);
+    const sci = ident?.scientific_name ?? unknownLabel;
+    const common = lang === 'es'
+      ? (ident?.taxa?.common_name_es ?? ident?.taxa?.common_name_en ?? '')
+      : (ident?.taxa?.common_name_en ?? ident?.taxa?.common_name_es ?? '');
+    const confidence = typeof ident?.confidence === 'number' ? Math.max(0, Math.min(1, ident.confidence)) : null;
+    const photo = (r.media_files ?? []).find(m => m?.is_primary)?.url ?? (r.media_files ?? []).find(m => !!m?.url)?.url ?? '';
+    const ago = formatTimeAgo(r.observed_at, lang);
+    const isPublic = !!observer?.profile_public;
+    const observerName = isPublic ? (observer?.display_name || observer?.username || '') : '';
+    const observerUsername = isPublic ? observer?.username ?? '' : '';
+
+    const observerHtml = isPublic && observerUsername
+      ? `<a href="${profileBase}?username=${encodeURIComponent(observerUsername)}" class="text-emerald-700 dark:text-emerald-400 hover:underline" data-stop>${escapeText(observerName || observerUsername)}</a>`
+      : `<span class="text-zinc-500">${escapeText(anonLabel)}</span>`;
+
+    const confidencePill = confidence !== null
+      ? `<span class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${colorForConfidence(confidence)}">${Math.round(confidence * 100)}%</span>`
+      : '';
+
+    const commonHtml = common ? `<p class="text-sm text-zinc-600 dark:text-zinc-300 truncate">${escapeText(common)}</p>` : '';
+
+    return `<li>
+      <a
+        href="${shareBase}?id=${encodeURIComponent(r.id)}"
+        class="er-card block overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 hover:border-emerald-400 dark:hover:border-emerald-700 transition-colors"
+      >
+        <div class="aspect-square w-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+          ${photo
+            ? `<img src="${escapeText(photo)}" alt="${escapeText(sci)}" loading="lazy" class="w-full h-full object-cover" />`
+            : ''}
+        </div>
+        <div class="p-3 space-y-1">
+          <p class="text-sm italic font-semibold text-zinc-900 dark:text-zinc-100 truncate">${escapeText(sci)}</p>
+          ${commonHtml}
+          <div class="flex items-center gap-2 flex-wrap text-xs text-zinc-500 dark:text-zinc-400">
+            ${confidencePill}
+            <span>${escapeText(ago)}</span>
+          </div>
+          <p class="text-xs text-zinc-500 dark:text-zinc-400 truncate">${observerHtml}</p>
+        </div>
+      </a>
+    </li>`;
+  }
+
+  async function wire(root: HTMLElement) {
+    const lang = (root.dataset.lang === 'es' ? 'es' : 'en') as Lang;
+    const shareBase = root.dataset.shareBase ?? `/${lang}/share/obs/`;
+    const profileBase = root.dataset.profileBase ?? `/${lang}/profile/u/`;
+    const anonLabel = root.dataset.labelAnon ?? 'Anonymous';
+    const unknownLabel = root.dataset.labelUnknownSpecies ?? 'Unknown species';
+
+    const listEl = root.querySelector('.er-list') as HTMLUListElement | null;
+    const skeletonEl = root.querySelector('.er-skeleton') as HTMLElement | null;
+    const emptyEl = root.querySelector('.er-empty') as HTMLElement | null;
+    const errEl = root.querySelector('.er-error') as HTMLElement | null;
+    const loadMoreWrap = root.querySelector('.er-load-more-wrap') as HTMLElement | null;
+    const loadMoreBtn = root.querySelector('.er-load-more') as HTMLButtonElement | null;
+
+    let offset = 0;
+    let exhausted = false;
+    let busy = false;
+
+    const hideSkeleton = () => skeletonEl?.classList.add('hidden');
+
+    let supabase;
+    try {
+      supabase = getSupabase();
+    } catch {
+      hideSkeleton();
+      if (errEl) {
+        errEl.textContent = lang === 'es' ? 'Servicio no disponible.' : 'Service unavailable.';
+        errEl.classList.remove('hidden');
+      }
+      return;
+    }
+
+    async function fetchPage(): Promise<Row[]> {
+      const { data, error } = await supabase
+        .from('observations')
+        .select(`
+          id, observed_at, state_province, observer_id,
+          identifications(scientific_name, is_primary, confidence, taxa(common_name_es, common_name_en)),
+          media_files(url, is_primary),
+          users!observer_id(id, username, display_name, profile_public)
+        `)
+        .eq('sync_status', 'synced')
+        .order('observed_at', { ascending: false })
+        .range(offset, offset + PAGE_SIZE - 1);
+      if (error) throw error;
+      return ((data ?? []) as unknown) as Row[];
+    }
+
+    async function loadMore() {
+      if (busy || exhausted) return;
+      busy = true;
+      loadMoreBtn?.setAttribute('disabled', '1');
+      try {
+        const page = await fetchPage();
+        hideSkeleton();
+        if (listEl) {
+          listEl.insertAdjacentHTML(
+            'beforeend',
+            page.map(r => rowMarkup(r, lang, anonLabel, unknownLabel, shareBase, profileBase)).join(''),
+          );
+        }
+        offset += page.length;
+        if (page.length < PAGE_SIZE) exhausted = true;
+        const total = listEl?.children.length ?? 0;
+        if (total === 0) {
+          emptyEl?.classList.remove('hidden');
+        } else {
+          emptyEl?.classList.add('hidden');
+        }
+        if (exhausted) {
+          loadMoreWrap?.classList.add('hidden');
+        } else {
+          loadMoreWrap?.classList.remove('hidden');
+        }
+      } catch (e) {
+        hideSkeleton();
+        if (errEl) {
+          errEl.textContent = (e as { message?: string })?.message ?? (lang === 'es' ? 'Error al cargar' : 'Failed to load');
+          errEl.classList.remove('hidden');
+        }
+      } finally {
+        loadMoreBtn?.removeAttribute('disabled');
+        busy = false;
+      }
+    }
+
+    loadMoreBtn?.addEventListener('click', () => {
+      loadMore().catch(() => { /* surfaced via errEl */ });
+    });
+
+    await loadMore();
+  }
+
+  document.querySelectorAll<HTMLElement>('.rastrum-explore-recent').forEach(el => {
+    wire(el).catch(() => { /* env not configured */ });
+  });
+</script>

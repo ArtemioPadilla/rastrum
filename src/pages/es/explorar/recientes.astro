@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../../../layouts/BaseLayout.astro';
+import ExploreRecentView from '../../../components/ExploreRecentView.astro';
 import { t } from '../../../i18n/utils';
 
 const lang = 'es';
@@ -8,12 +9,5 @@ const page = tr.explore_pages.recent;
 ---
 
 <BaseLayout title={`${page.title} — Rastrum`} description={page.subtitle} lang={lang}>
-  <section class="space-y-3 py-6">
-    <h1 class="text-3xl font-bold tracking-tight">{page.title}</h1>
-    <p class="text-zinc-600 dark:text-zinc-400">{page.subtitle}</p>
-  </section>
-
-  <section class="rounded-xl border border-zinc-200 dark:border-zinc-800 p-8 text-center text-zinc-500 dark:text-zinc-400">
-    {page.empty}
-  </section>
+  <ExploreRecentView lang={lang} />
 </BaseLayout>
