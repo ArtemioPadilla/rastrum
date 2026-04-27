@@ -8,7 +8,16 @@ export default defineConfig({
   site: 'https://rastrum.org',
   base: '/',
   output: 'static',
-  integrations: [tailwind(), sitemap()],
+  integrations: [
+    tailwind(),
+    sitemap({
+      i18n: {
+        defaultLocale: 'en',
+        locales: { en: 'en-US', es: 'es-MX' },
+      },
+      filter: (page) => !page.includes('/auth/callback'),
+    }),
+  ],
   i18n: {
     defaultLocale: 'en',
     locales: ['en', 'es'],
