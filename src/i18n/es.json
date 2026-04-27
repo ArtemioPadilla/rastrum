@@ -1039,7 +1039,8 @@
     "trap_altitude": "Altitud (m, opcional)",
     "use_my_location": "Usar mi GPS actual",
     "use_my_location_failed": "No se pudo leer tu GPS. Escribe las coordenadas manualmente.",
-    "id_pipeline_generic": "Cada foto pasa por la misma cascada de identificación que una observación normal (PlantNet, Claude, modelos en dispositivo). Los cuadros vacíos / humanos / vehículos quedan en cola para revisión manual.",
+    "id_pipeline": "MegaDetector filtra animal vs. cuadros vacíos / humano / vehículo; SpeciesNet clasifica cada recorte animal a nivel especie.",
+    "id_pipeline_pending": "Si el operador no configuró PUBLIC_MEGADETECTOR_ENDPOINT, las fotos caen al cascade estándar (PlantNet → Claude → en dispositivo).",
     "tag_camera_trap": "Cámara trampa"
   },
   "tokens": {

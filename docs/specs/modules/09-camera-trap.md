@@ -1,9 +1,9 @@
 # Module 09 — Camera Trap Analysis (Fototrampeo)
 
 **Version target:** v1.0 (months 7–12)
-**Status:** partial — UI shipped at `/profile/import/camera-trap`; `camera_trap_megadetector` plugin stub registered (`src/lib/identifiers/camera-trap-megadetector.ts`); inference pending operator-hosted weights at `PUBLIC_MEGADETECTOR_ENDPOINT`.
+**Status:** client implemented. Plugin (`src/lib/identifiers/camera-trap-megadetector.ts`) POSTs the image URL to `PUBLIC_MEGADETECTOR_ENDPOINT` and parses the standardised response (see file header for wire format). Bulk-upload UI shipped at `/profile/import/camera-trap`. The cascade prefers this plugin for `evidence_type=camera_trap` photos and falls through transparently when the env var is unset. Operator action remaining: host MegaDetector v5a + SpeciesNet behind that URL.
 **Spec author:** Eugenio Padilla + Claude (2026-04-24)
-**Last verified:** 2026-04-26.
+**Last verified:** 2026-04-27.
 
 ---
 

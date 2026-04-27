@@ -6,9 +6,10 @@ interface Props {
   /**
    * 'generic' = stock batch importer (per-row GPS from EXIF).
    * 'camera_trap' = single trap location applied to all rows; evidence_type
-   *   defaults to `camera_trap`. Identification still uses the standard
-   *   cascade — a dedicated MegaDetector/SpeciesNet pipeline is specified
-   *   in docs/specs/modules/09-camera-trap.md but not yet implemented.
+   *   defaults to `camera_trap`. The cascade prefers the MegaDetector +
+   *   SpeciesNet plugin (`camera_trap_megadetector`) — when the operator
+   *   has set `PUBLIC_MEGADETECTOR_ENDPOINT` it runs first; when unset
+   *   the cascade falls through to the standard waterfall.
    */
   mode?: 'generic' | 'camera_trap';
 }
@@ -81,7 +82,9 @@ const ctText = (key: string, fallback: string): string => trapTr?.[key] ?? fallb
         <span id="trap-gps-msg" class="hidden text-xs text-amber-700 dark:text-amber-400"></span>
       </div>
       <p class="mt-3 text-xs text-zinc-600 dark:text-zinc-400">
-        {ctText('id_pipeline_generic', 'Each photo runs through the same identification cascade as a regular observation (PlantNet, Claude, on-device models). Empty / human / vehicle frames stay in the queue for manual review.')}
+        <span class="font-medium">{ctText('id_pipeline', 'MegaDetector filters animal vs. empty/human/vehicle frames; SpeciesNet classifies each animal crop to species.')}</span>
+        {' '}
+        <span>{ctText('id_pipeline_pending', "When the operator hasn't configured PUBLIC_MEGADETECTOR_ENDPOINT, photos fall through to the standard cascade (PlantNet → Claude → on-device).")}</span>
       </p>
     </section>
   )}
