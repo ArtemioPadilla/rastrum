@@ -1,5 +1,5 @@
 ---
-import { t, getLocalizedPath, getDocPath, getAlternateLocale, routes, docPages, type Locale } from '../i18n/utils';
+import { t, getLocalizedPath, getDocPath, getAlternateLocale, getAlternateUrl, routes, docPages, type Locale } from '../i18n/utils';
 
 interface Props {
   lang: 'en' | 'es';
@@ -10,18 +10,7 @@ const tr = t(lang);
 const alt = getAlternateLocale(lang);
 const locale = lang as Locale;
 
-// alt-language href for the segmented switch
-const base = import.meta.env.BASE_URL.replace(/\/$/, '');
-const pathWithoutBase = currentPath.replace(base, '') || '/';
-const segments = pathWithoutBase.split('/').filter(Boolean);
-const currentLang = segments[0] || lang;
-const currentSlug = '/' + (segments.slice(1).join('/') || '');
-const matchedKey = Object.keys(routes).find(key => {
-  const slug = routes[key][currentLang as Locale] || '';
-  return slug === currentSlug || (currentSlug === '/' && slug === '');
-});
-const altSlug = matchedKey ? (routes[matchedKey][alt] || '') : currentSlug;
-const altHref = `${base}/${alt}${altSlug}/`;
+const altHref = getAlternateUrl(currentPath, alt);
 
 const aboutPath = getLocalizedPath(lang, routes.about[locale] + '/');
 const signInPath = getLocalizedPath(lang, routes.signIn[locale] + '/');
