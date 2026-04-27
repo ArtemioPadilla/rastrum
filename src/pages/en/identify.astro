@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import IdentifyView from '../../components/IdentifyView.astro';
 import { t } from '../../i18n/utils';
 
 const lang = 'en';
@@ -7,27 +8,5 @@ const tr = t(lang);
 ---
 
 <BaseLayout title={`${tr.identify.title} — Rastrum`} lang={lang}>
-  <div class="space-y-8">
-    <h1 class="text-3xl font-bold">{tr.identify.title}</h1>
-    <div class="border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-xl p-12 text-center space-y-4">
-      <svg class="w-16 h-16 mx-auto text-zinc-400 dark:text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-      </svg>
-      <p class="text-sm text-zinc-500 dark:text-zinc-400">{tr.identify.upload_desc}</p>
-      <div class="flex justify-center gap-3">
-        <button class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors">
-          {tr.identify.upload_label}
-        </button>
-        <button class="px-4 py-2 border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-sm font-medium rounded-lg transition-colors">
-          {tr.identify.camera}
-        </button>
-      </div>
-    </div>
-    <div class="space-y-3">
-      <h2 class="text-xl font-semibold">{tr.identify.result_title}</h2>
-      <div class="rounded-xl border border-zinc-200 dark:border-zinc-800 p-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
-        {tr.identify.result_placeholder}
-      </div>
-    </div>
-  </div>
+  <IdentifyView lang={lang} />
 </BaseLayout>

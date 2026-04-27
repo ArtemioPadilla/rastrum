@@ -1,0 +1,183 @@
+---
+import { t, getLocalizedPath, routes } from '../i18n/utils';
+
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+const isEs = lang === 'es';
+const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
+---
+
+<div class="space-y-8 max-w-xl mx-auto">
+  <h1 class="text-3xl font-bold">{tr.identify.title}</h1>
+  <p class="text-sm text-zinc-600 dark:text-zinc-400 -mt-4">{tr.identify.upload_desc}</p>
+
+  <!-- Upload card -->
+  <div class="border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-xl p-8 text-center space-y-4">
+    <div id="identify-preview-wrap" class="hidden">
+      <img id="identify-preview" alt="" class="max-h-64 mx-auto rounded-lg" />
+    </div>
+    <div id="identify-empty" class="space-y-3">
+      <svg class="w-16 h-16 mx-auto text-zinc-400 dark:text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 0 1 2-2h2l1.5-2h7L17 7h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+        <circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+      </svg>
+    </div>
+    <div class="flex flex-wrap justify-center gap-2">
+      <button id="identify-camera-btn" type="button" class="min-h-11 rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 0 1 2-2h2l1.5-2h7L17 7h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+        {tr.observe.use_camera}
+      </button>
+      <input id="identify-camera-input" type="file" accept="image/*" capture="environment" class="sr-only" />
+      <button id="identify-gallery-btn" type="button" class="min-h-11 rounded-lg border border-zinc-300 dark:border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 5h16v14H4z"/><path stroke-linecap="round" stroke-linejoin="round" d="m4 16 4-4 4 4 3-3 5 5"/><circle cx="9" cy="9" r="1.5" fill="currentColor"/></svg>
+        {tr.observe.choose_file}
+      </button>
+      <input id="identify-gallery-input" type="file" accept="image/*" class="sr-only" />
+    </div>
+    <p class="text-xs text-zinc-500 dark:text-zinc-500">
+      {isEs
+        ? 'Identificación rápida sin guardar. ¿Quieres registrar una observación con ubicación? '
+        : 'Quick identify, no save. Want to log a full observation with location? '}
+      <a href={observePath} class="text-emerald-600 dark:text-emerald-400 underline">
+        {isEs ? 'Ir al formulario de observación' : 'Go to the observation form'}
+      </a>.
+    </p>
+  </div>
+
+  <!-- Spinner -->
+  <div id="identify-spinner" class="hidden flex items-center justify-center gap-2 text-sm text-zinc-500">
+    <svg class="animate-spin h-4 w-4 text-emerald-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+    </svg>
+    <span id="identify-spinner-label">{isEs ? 'Identificando…' : 'Identifying…'}</span>
+  </div>
+
+  <!-- Results -->
+  <div class="space-y-3">
+    <h2 class="text-xl font-semibold">{tr.identify.result_title}</h2>
+    <div id="identify-results" class="rounded-xl border border-zinc-200 dark:border-zinc-800 p-6 text-sm text-zinc-500 dark:text-zinc-400">
+      {tr.identify.result_placeholder}
+    </div>
+  </div>
+</div>
+
+<script>
+  const isEs = document.documentElement.lang === 'es';
+  const cameraBtn  = document.getElementById('identify-camera-btn');
+  const galleryBtn = document.getElementById('identify-gallery-btn');
+  const cameraInput  = document.getElementById('identify-camera-input') as HTMLInputElement | null;
+  const galleryInput = document.getElementById('identify-gallery-input') as HTMLInputElement | null;
+  const previewWrap = document.getElementById('identify-preview-wrap');
+  const previewImg  = document.getElementById('identify-preview') as HTMLImageElement | null;
+  const emptyState  = document.getElementById('identify-empty');
+  const spinner     = document.getElementById('identify-spinner');
+  const spinnerLbl  = document.getElementById('identify-spinner-label');
+  const resultsBox  = document.getElementById('identify-results');
+
+  cameraBtn?.addEventListener('click',  () => cameraInput?.click());
+  galleryBtn?.addEventListener('click', () => galleryInput?.click());
+  cameraInput?.addEventListener('change',  () => cameraInput.files?.[0]  && handleFile(cameraInput.files[0]));
+  galleryInput?.addEventListener('change', () => galleryInput.files?.[0] && handleFile(galleryInput.files[0]));
+
+  async function handleFile(file: File) {
+    if (previewImg && previewWrap) {
+      previewImg.src = URL.createObjectURL(file);
+      previewWrap.classList.remove('hidden');
+      emptyState?.classList.add('hidden');
+    }
+    if (resultsBox) resultsBox.innerHTML = `<p class="text-zinc-500">${
+      isEs ? 'Esperando…' : 'Waiting…'
+    }</p>`;
+    spinner?.classList.remove('hidden');
+
+    const key = await resolvePlantNetKey();
+    if (!key) {
+      spinner?.classList.add('hidden');
+      if (resultsBox) {
+        resultsBox.innerHTML = `<p class="text-amber-700 dark:text-amber-400">${
+          isEs
+            ? 'No hay clave de PlantNet configurada. Agrega una en <a class="underline" href="/es/perfil/editar/">Perfil → Editar</a> para identificar al instante.'
+            : 'No PlantNet key configured. Add one in <a class="underline" href="/en/profile/edit/">Profile → Edit</a> for instant ID.'
+        }</p>`;
+      }
+      return;
+    }
+
+    try {
+      const form = new FormData();
+      form.append('images', file);
+      form.append('organs', 'auto');
+      const ac = new AbortController();
+      const timeout = setTimeout(() => ac.abort(), 20_000);
+      const res = await fetch(
+        `https://my-api.plantnet.org/v2/identify/all?api-key=${encodeURIComponent(key)}&lang=${isEs ? 'es' : 'en'}&nb-results=5`,
+        { method: 'POST', body: form, signal: ac.signal }
+      ).finally(() => clearTimeout(timeout));
+      if (!res.ok) throw new Error(`PlantNet HTTP ${res.status}`);
+      const data = await res.json();
+      const results = Array.isArray(data?.results) ? data.results : [];
+      renderResults(results);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (resultsBox) {
+        resultsBox.innerHTML = `<p class="text-red-600 dark:text-red-400">${
+          isEs ? `Error: ${msg}` : `Error: ${msg}`
+        }</p>`;
+      }
+    } finally {
+      spinner?.classList.add('hidden');
+    }
+  }
+
+  function renderResults(results: Array<Record<string, any>>) {
+    if (!resultsBox) return;
+    if (results.length === 0) {
+      resultsBox.innerHTML = `<p>${
+        isEs ? 'Sin coincidencias. Prueba con otra foto, más cerca o con mejor luz.' : 'No matches. Try another photo, closer or with better light.'
+      }</p>`;
+      return;
+    }
+    const top = results[0];
+    const score = Math.round((top.score ?? 0) * 100);
+    const sci = top.species?.scientificNameWithoutAuthor ?? top.species?.scientificName ?? '?';
+    const common = (top.species?.commonNames?.[0]) ?? '';
+    const others = results.slice(1, 5).map((r) => {
+      const s = Math.round((r.score ?? 0) * 100);
+      const n = r.species?.scientificNameWithoutAuthor ?? r.species?.scientificName ?? '?';
+      const c = r.species?.commonNames?.[0] ?? '';
+      return `<li class="flex items-baseline justify-between gap-2"><span class="italic">${escapeHtml(n)}</span><span class="text-xs text-zinc-500">${c ? escapeHtml(c) + ' · ' : ''}${s}%</span></li>`;
+    }).join('');
+    resultsBox.innerHTML = `
+      <div class="space-y-3">
+        <div>
+          <p class="text-xs uppercase tracking-wider text-zinc-500">${isEs ? 'Mejor coincidencia' : 'Top match'}</p>
+          <p class="text-lg italic font-semibold text-emerald-700 dark:text-emerald-400">${escapeHtml(sci)}</p>
+          ${common ? `<p class="text-sm text-zinc-600 dark:text-zinc-300">${escapeHtml(common)}</p>` : ''}
+          <p class="text-xs text-zinc-500 mt-1">${score}% · PlantNet</p>
+        </div>
+        ${others ? `<div>
+          <p class="text-xs uppercase tracking-wider text-zinc-500 mb-1">${isEs ? 'Otras opciones' : 'Other matches'}</p>
+          <ul class="space-y-1 text-sm">${others}</ul>
+        </div>` : ''}
+      </div>
+    `;
+  }
+
+  function escapeHtml(s: string): string {
+    return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
+  }
+
+  async function resolvePlantNetKey(): Promise<string> {
+    let key: string = (window as any).__RASTRUM_PLANTNET_KEY__ ?? '';
+    if (!key) key = (import.meta.env.PUBLIC_PLANTNET_KEY as string | undefined) ?? '';
+    if (!key) {
+      try {
+        const { getKey } = await import('../lib/byo-keys');
+        key = getKey('plantnet', 'plantnet') ?? '';
+      } catch { /* unavailable */ }
+    }
+    return key;
+  }
+</script>
