@@ -376,12 +376,14 @@
       "title_es": "Rachas opt-in + ventana de gracia",
       "modules": ["08-profile-activity-gamification.md"],
       "subtasks": [
-        { "label_en": "user_streaks table",                                  "label_es": "Tabla user_streaks",                          "status": "done" },
-        { "label_en": "recompute_streak() with single-grace-per-30-days",     "label_es": "recompute_streak() con gracia mensual",       "status": "done" },
-        { "label_en": "recompute-streaks Edge Function (nightly)",           "label_es": "Edge Function recompute-streaks",             "status": "done" },
-        { "label_en": "Quality gate: confidence ≥ 0.4",                       "label_es": "Compuerta de calidad",                        "status": "done" },
-        { "label_en": "Streak display on profile page (StreakCard)",          "label_es": "Display de racha en perfil (StreakCard)",      "status": "done" },
-        { "label_en": "Inbox-digest email for milestones",                    "label_es": "Email de hito por correo",                    "status": "planned" }
+        { "label_en": "user_streaks table (current_days, longest_days, last_qualifying_day, grace_used_at) + RLS self-read + public-when-opted-in",  "label_es": "Tabla user_streaks (current_days, longest_days, last_qualifying_day, grace_used_at) + RLS self-read + pública si opt-in", "status": "done" },
+        { "label_en": "recompute_streak(p_user_id) PL/pgSQL function with single-grace-per-30-days window logic",                                    "label_es": "Función PL/pgSQL recompute_streak(p_user_id) con ventana de gracia única por 30 días",                                  "status": "done" },
+        { "label_en": "Quality gate: only identifications with confidence ≥ 0.4 count toward a qualifying day",                                       "label_es": "Compuerta de calidad: solo identificaciones con confianza ≥ 0.4 cuentan como día válido",                               "status": "done" },
+        { "label_en": "supabase/functions/recompute-streaks Edge Function — iterates gamification_opt_in users, RPCs recompute_streak per user",      "label_es": "Edge Function recompute-streaks — itera usuarios con gamification_opt_in y llama recompute_streak vía RPC",             "status": "done" },
+        { "label_en": "pg_cron schedule (nightly 07:05 UTC) firing the Edge Function via net.http_post",                                              "label_es": "Schedule pg_cron (nocturno 07:05 UTC) dispara la Edge Function vía net.http_post",                                       "status": "done" },
+        { "label_en": "StreakCard.astro on profile page — opt-in CTA, current/longest/last-active display, flame state (active/at_risk/broken/none)", "label_es": "StreakCard.astro en perfil — CTA de opt-in, current/longest/last-active, estado flama (active/at_risk/broken/none)",    "status": "done" },
+        { "label_en": "summarizeStreak() helper in src/lib/social.ts derives state from row + today's date",                                          "label_es": "Helper summarizeStreak() en src/lib/social.ts deriva estado desde la fila + fecha de hoy",                              "status": "done" },
+        { "label_en": "Inbox-digest email for milestone streaks (7/30/100 days)",                                                                     "label_es": "Email de hito de racha (7/30/100 días)",                                                                                "status": "planned" }
       ]
     },
     "shareable-cards": {
@@ -390,11 +392,13 @@
       "title_es": "Tarjetas OG para compartir observaciones",
       "modules": [],
       "subtasks": [
-        { "label_en": "share-card Edge Function (SVG + HTML)",  "label_es": "Edge Function share-card (SVG + HTML)",   "status": "done" },
-        { "label_en": "Branded design with species + region",    "label_es": "Diseño con marca + especie + región",    "status": "done" },
-        { "label_en": "OG / Twitter card meta",                   "label_es": "Meta OG / Twitter",                       "status": "done" },
-        { "label_en": "Sensitive-species badge when obscured",    "label_es": "Badge especie sensible cuando oscurecida","status": "done" },
-        { "label_en": "Public Astro page renders observation",    "label_es": "Página pública renderiza observación",   "status": "done" }
+        { "label_en": "supabase/functions/share-card Edge Function — accepts ?obs_id=, format=html|svg, joins observations + identifications + users", "label_es": "Edge Function share-card — acepta ?obs_id=, format=html|svg, hace join observations + identifications + users", "status": "done" },
+        { "label_en": "1200×630 SVG renderer with brand stripe, gradient bg, italic species name, date + region + habitat meta",                       "label_es": "Renderer SVG 1200×630 con franja de marca, fondo degradado, nombre de especie en cursiva, meta fecha + región + hábitat", "status": "done" },
+        { "label_en": "obscure_level='full' returns 404 — fully-withheld species cannot be share-card scraped",                                          "label_es": "obscure_level='full' devuelve 404 — especies totalmente ocultas no se pueden raspar via share-card",                  "status": "done" },
+        { "label_en": "Sensitive-species visual badge when obscure_level > 'none' (still surfaces region, hides precise locale)",                       "label_es": "Badge visual de especie sensible cuando obscure_level > 'none' (muestra región, oculta locación precisa)",            "status": "done" },
+        { "label_en": "Public Astro page src/pages/share/obs/[id].astro renders observation with OG/Twitter meta tags pointing to share-card endpoint", "label_es": "Página pública src/pages/share/obs/[id].astro con meta OG/Twitter que apuntan al endpoint share-card",                "status": "done" },
+        { "label_en": "Anonymous fallback when profile_public is false — observer rendered as 'Anonymous observer'",                                    "label_es": "Fallback anónimo cuando profile_public=false — observer mostrado como 'Anonymous observer'",                          "status": "done" },
+        { "label_en": "XML-escape all user-provided strings to prevent SVG injection",                                                                   "label_es": "Escape XML de todas las cadenas del usuario para evitar inyección en SVG",                                            "status": "done" }
       ]
     },
     "social-features": {
@@ -403,10 +407,14 @@
       "title_es": "Esquema seguidores + comentarios + listas",
       "modules": ["08-profile-activity-gamification.md"],
       "subtasks": [
-        { "label_en": "follows table (anti-self-follow + RLS)",  "label_es": "Tabla follows (anti-self + RLS)",   "status": "done" },
-        { "label_en": "observation_comments (threading + soft-delete)", "label_es": "observation_comments (threading + soft-delete)", "status": "done" },
-        { "label_en": "watchlists with radius_km",                "label_es": "watchlists con radius_km",          "status": "done" },
-        { "label_en": "UI implementation (Comments, FollowButton, WatchlistView)", "label_es": "Implementación UI (Comments, FollowButton, WatchlistView)", "status": "done", "ref_en": "tracked under follows-comments-ui", "ref_es": "rastreado en follows-comments-ui" }
+        { "label_en": "public.follows (follower_id, followee_id) PRIMARY KEY composite + RLS follows_self_manage + follows_public_read",      "label_es": "public.follows (follower_id, followee_id) PK compuesta + RLS follows_self_manage + follows_public_read",     "status": "done" },
+        { "label_en": "Anti-self-follow CHECK constraint (follower_id ≠ followee_id) on follows",                                              "label_es": "CHECK anti-auto-seguimiento (follower_id ≠ followee_id) en follows",                                          "status": "done" },
+        { "label_en": "public.observation_comments with parent_id self-FK (single-level threading) + soft-delete via deleted_at + idx_comments_obs", "label_es": "public.observation_comments con parent_id auto-FK (threading de un nivel) + soft-delete vía deleted_at + idx_comments_obs", "status": "done" },
+        { "label_en": "comments RLS triplet: comments_authenticated_insert + comments_self_update + comments_public_read",                     "label_es": "RLS comentarios: comments_authenticated_insert + comments_self_update + comments_public_read",                "status": "done" },
+        { "label_en": "public.watchlists (user_id, taxon_id, radius_km, region_geojson) + watchlists_self RLS",                                "label_es": "public.watchlists (user_id, taxon_id, radius_km, region_geojson) + RLS watchlists_self",                      "status": "done" },
+        { "label_en": "Comments.astro component — list + composer + reply (one-level) + edit/delete owned, 2000-char limit",                   "label_es": "Comments.astro — lista + composer + reply (un nivel) + editar/borrar propios, límite 2000 caracteres",        "status": "done" },
+        { "label_en": "FollowButton.astro — optimistic toggle, hidden when self-target, sign-in CTA on RLS-rejected writes",                   "label_es": "FollowButton.astro — toggle optimista, oculto cuando target=self, CTA de sign-in cuando RLS rechaza",        "status": "done" },
+        { "label_en": "WatchlistView.astro — surfaces activity_events feed via RLS visibility=followers/public, mark-all-read",                "label_es": "WatchlistView.astro — feed de activity_events vía RLS visibility=followers/public, marcar-todo-leído",       "status": "done" }
       ]
     },
     "expert-system": {
@@ -415,25 +423,28 @@
       "title_es": "Peso 3× experto taxonómico",
       "modules": ["08-profile-activity-gamification.md"],
       "subtasks": [
-        { "label_en": "users.is_expert + users.expert_taxa[] columns",       "label_es": "Columnas is_expert + expert_taxa[]",       "status": "done" },
-        { "label_en": "recompute_consensus() applies 3× weight",              "label_es": "recompute_consensus aplica peso 3×",       "status": "done" },
-        { "label_en": "Expert-application UI (ExpertApplyView)",              "label_es": "UI de solicitud de experto (ExpertApplyView)", "status": "done" },
-        { "label_en": "Expert badges in profile",                              "label_es": "Insignias de experto en perfil",            "status": "planned" }
+        { "label_en": "users.is_expert (boolean) + users.expert_taxa (text[] e.g. ARRAY['Aves','Plantae']) columns on the users table",                       "label_es": "Columnas users.is_expert (boolean) + users.expert_taxa (text[] p.ej. ARRAY['Aves','Plantae']) en la tabla users",                  "status": "done" },
+        { "label_en": "recompute_consensus(p_observation_id) PL/pgSQL — SUM weight 3.0 when u.is_expert AND t.kingdom = ANY(u.expert_taxa) else 1.0",         "label_es": "recompute_consensus(p_observation_id) PL/pgSQL — SUM peso 3.0 cuando u.is_expert AND t.kingdom = ANY(u.expert_taxa) si no 1.0",   "status": "done" },
+        { "label_en": "public.expert_applications table (user_id, taxa[], credentials, institution, orcid, status enum) + indices for pending queue",        "label_es": "Tabla public.expert_applications (user_id, taxa[], credentials, institution, orcid, status enum) + índices para cola pendiente", "status": "done" },
+        { "label_en": "expert_applications RLS — user reads/inserts own, UPDATE admin-only (withdraw via fresh row keeps audit trail)",                       "label_es": "RLS expert_applications — usuario lee/inserta propias, UPDATE solo admin (withdraw vía fila nueva mantiene auditoría)",            "status": "done" },
+        { "label_en": "ExpertApplyView.astro — taxa multi-select (11 kingdoms), credentials textarea, ORCID validation, pending/approved state UI",          "label_es": "ExpertApplyView.astro — multi-select de taxa (11 reinos), textarea credentials, validación ORCID, UI estado pending/approved",   "status": "done" },
+        { "label_en": "Already-expert short-circuit: ExpertApplyView reads users.is_expert and shows thank-you instead of form",                              "label_es": "Atajo experto-ya: ExpertApplyView lee users.is_expert y muestra agradecimiento en vez del formulario",                            "status": "done" },
+        { "label_en": "Expert badges surfaced on profile page (insignia visual when is_expert + per-kingdom chips)",                                          "label_es": "Insignias de experto visibles en página de perfil (badge visual cuando is_expert + chips por reino)",                              "status": "planned" }
       ]
     },
     "bioblitz-events": {
       "phase": "v1.0",
-      "title_en": "Events table + RLS",
-      "title_es": "Tabla de eventos + RLS",
+      "title_en": "Events table + RLS (schema)",
+      "title_es": "Tabla de eventos + RLS (esquema)",
       "modules": ["08-profile-activity-gamification.md"],
       "subtasks": [
-        { "label_en": "events table with region_geojson",        "label_es": "Tabla events con region_geojson",     "status": "done" },
-        { "label_en": "Public-read RLS",                           "label_es": "RLS de lectura pública",               "status": "done" },
-        { "label_en": "Three event kinds (bioblitz/survey/challenge)","label_es": "Tres tipos de evento",            "status": "done" },
-        { "label_en": "Event detail page",                         "label_es": "Página de detalle de evento",          "status": "planned" },
-        { "label_en": "Event aggregates (obs within polygon × window)","label_es": "Agregados del evento",         "status": "planned" },
-        { "label_en": "Participation badges",                      "label_es": "Insignias de participación",           "status": "planned" },
-        { "label_en": "Top-decile detection",                      "label_es": "Detección top decil",                  "status": "planned" }
+        { "label_en": "public.events table — id, slug UNIQUE, name, description_md, organiser_id FK→users, starts_at, ends_at, kind",       "label_es": "Tabla public.events — id, slug UNIQUE, name, description_md, organiser_id FK→users, starts_at, ends_at, kind", "status": "done" },
+        { "label_en": "region_geojson geography(Polygon, 4326) NOT NULL — defines the spatial bounds for in-event observations",            "label_es": "region_geojson geography(Polygon, 4326) NOT NULL — define los límites espaciales de las observaciones",         "status": "done" },
+        { "label_en": "Three event kinds via CHECK (kind IN ('bioblitz','survey','challenge'))",                                            "label_es": "Tres tipos de evento vía CHECK (kind IN ('bioblitz','survey','challenge'))",                                     "status": "done" },
+        { "label_en": "Composite/temporal index idx_events_time on (starts_at, ends_at)",                                                   "label_es": "Índice temporal idx_events_time sobre (starts_at, ends_at)",                                                     "status": "done" },
+        { "label_en": "Spatial GIST index idx_events_region on region_geojson for fast obs-within-region queries",                          "label_es": "Índice espacial GIST idx_events_region sobre region_geojson para queries obs-dentro-de-región",                  "status": "done" },
+        { "label_en": "RLS enabled + events_public_read policy (anyone can SELECT — events are publicly browsable)",                        "label_es": "RLS habilitada + política events_public_read (cualquiera puede SELECT — eventos públicamente navegables)",       "status": "done" },
+        { "label_en": "Idempotent schema (CREATE TABLE IF NOT EXISTS, DROP POLICY IF EXISTS … ; CREATE POLICY) — replayable via make db-apply", "label_es": "Esquema idempotente (CREATE TABLE IF NOT EXISTS, DROP POLICY IF EXISTS … ; CREATE POLICY) — reaplicable con make db-apply", "status": "done" }
       ]
     },
     "institutional-export": {
@@ -442,9 +453,13 @@
       "title_es": "Plantillas CSV DwC + SNIB + CONANP",
       "modules": ["06-darwin-core.md"],
       "subtasks": [
-        { "label_en": "Three column subsets in darwin-core.ts",   "label_es": "Tres subconjuntos de columnas",   "status": "done" },
-        { "label_en": "Format selector in Export view",            "label_es": "Selector de formato",              "status": "done" },
-        { "label_en": "Filename suffixes per format",              "label_es": "Sufijos de archivo por formato",    "status": "done" }
+        { "label_en": "DWC_COLUMNS — full Darwin Core column set in src/lib/darwin-core.ts (toCSV() default)",                          "label_es": "DWC_COLUMNS — set completo de Darwin Core en src/lib/darwin-core.ts (default toCSV())",                              "status": "done" },
+        { "label_en": "SNIB_COLUMNS subset — 14 columns aligned with CONABIO SNIB ingest schema (toCsvSnib())",                         "label_es": "Subset SNIB_COLUMNS — 14 columnas alineadas al esquema de ingesta CONABIO SNIB (toCsvSnib())",                       "status": "done" },
+        { "label_en": "CONANP_COLUMNS subset — 9 columns for ANP report format including informationWithheld (toCsvConanp())",          "label_es": "Subset CONANP_COLUMNS — 9 columnas para formato reporte ANP incluyendo informationWithheld (toCsvConanp())",        "status": "done" },
+        { "label_en": "ExportView.astro <select id=\"format\"> with options dwc / snib / conanp",                                       "label_es": "<select id=\"format\"> en ExportView.astro con opciones dwc / snib / conanp",                                       "status": "done" },
+        { "label_en": "Switch in download handler picks the right serializer per fmt value",                                            "label_es": "Switch en handler de descarga elige el serializer correcto según fmt",                                              "status": "done" },
+        { "label_en": "Filename suffixes per format — rastrum-{dwc|snib|conanp}-YYYY-MM-DD.csv via downloadCSV()",                       "label_es": "Sufijos de archivo por formato — rastrum-{dwc|snib|conanp}-YYYY-MM-DD.csv vía downloadCSV()",                        "status": "done" },
+        { "label_en": "Unit tests for column subsets and CSV header order in src/lib/darwin-core.test.ts",                              "label_es": "Tests unitarios para subsets de columnas y orden de cabecera CSV en src/lib/darwin-core.test.ts",                   "status": "done" }
       ]
     },
     "credentialed-access": {
@@ -453,9 +468,12 @@
       "title_es": "Compuerta RLS credentialed_researcher",
       "modules": ["07-licensing.md"],
       "subtasks": [
-        { "label_en": "Three columns on users table",             "label_es": "Tres columnas en users",          "status": "done" },
-        { "label_en": "obs_credentialed_read RLS policy",          "label_es": "Política RLS obs_credentialed_read", "status": "done" },
-        { "label_en": "Application flow page",                     "label_es": "Página de solicitud",               "status": "planned" }
+        { "label_en": "users.credentialed_researcher (boolean DEFAULT false) — admin-set after ID verification, no self-serve",                          "label_es": "users.credentialed_researcher (boolean DEFAULT false) — set por admin tras verificación, no auto-servicio",                "status": "done" },
+        { "label_en": "users.credentialed_at (timestamptz) + users.credentialed_by (uuid FK→users) for audit trail",                                    "label_es": "users.credentialed_at (timestamptz) + users.credentialed_by (uuid FK→users) para auditoría",                              "status": "done" },
+        { "label_en": "obs_credentialed_read RLS policy — SELECT bypasses obscure_level when caller's credentialed_researcher=true",                    "label_es": "Política RLS obs_credentialed_read — SELECT evita obscure_level cuando credentialed_researcher del caller=true",          "status": "done" },
+        { "label_en": "Policy still respects BC/TK Notice withholding (community-level overrides remain in effect)",                                    "label_es": "La política respeta retención por avisos BC/TK (overrides comunitarios siguen vigentes)",                                  "status": "done" },
+        { "label_en": "Idempotent ALTER TABLE … ADD COLUMN IF NOT EXISTS for the three columns",                                                        "label_es": "ALTER TABLE … ADD COLUMN IF NOT EXISTS idempotente para las tres columnas",                                                "status": "done" },
+        { "label_en": "Application flow page (UI for self-serve credential request — admin reviews via dashboard)",                                     "label_es": "Página de solicitud (UI auto-servicio — admin revisa por dashboard)",                                                      "status": "planned" }
       ]
     },
     "env-enrichment": {
@@ -464,9 +482,13 @@
       "title_es": "Edge Function fase lunar + OpenMeteo",
       "modules": [],
       "subtasks": [
-        { "label_en": "enrich-environment Edge Function",           "label_es": "Edge Function enrich-environment",      "status": "done" },
-        { "label_en": "Auto-fires on observation sync",               "label_es": "Se dispara al sincronizar",              "status": "done" },
-        { "label_en": "Updates 5 environmental columns",              "label_es": "Actualiza 5 columnas ambientales",       "status": "done" }
+        { "label_en": "supabase/functions/enrich-environment Edge Function (Deno) — POST { observation_id }, service-role client",                              "label_es": "Edge Function supabase/functions/enrich-environment (Deno) — POST { observation_id }, cliente service-role",                            "status": "done" },
+        { "label_en": "Conway lunar-phase algorithm — computes phase ('new'..'waning_crescent') + illumination 0..1 from observed_at UTC",                     "label_es": "Algoritmo lunar de Conway — calcula phase ('new'..'waning_crescent') + illumination 0..1 desde observed_at UTC",                       "status": "done" },
+        { "label_en": "OpenMeteo historical archive fetch (CC BY 4.0) — daily precipitation_sum + temperature_2m_mean for the obs lat/lng/date",                "label_es": "Fetch histórico OpenMeteo (CC BY 4.0) — precipitation_sum + temperature_2m_mean diarios para lat/lng/date",                            "status": "done" },
+        { "label_en": "UPDATE observations SET moon_phase, moon_illumination, precipitation_24h_mm, temp_celsius, post_rain_flag (>5mm) — 5 columns",          "label_es": "UPDATE observations SET moon_phase, moon_illumination, precipitation_24h_mm, temp_celsius, post_rain_flag (>5mm) — 5 columnas",         "status": "done" },
+        { "label_en": "Auto-fires from src/lib/sync.ts after observation sync — fire-and-forget (failures don't block the sync flow)",                          "label_es": "Auto-disparo desde src/lib/sync.ts tras sincronizar observación — fire-and-forget (fallos no bloquean el sync)",                        "status": "done" },
+        { "label_en": "Idempotent — safe to invoke repeatedly on the same observation_id (UPSERT semantics via update + observation PK)",                       "label_es": "Idempotente — seguro invocarlo varias veces con el mismo observation_id (semántica UPSERT vía update + PK de observación)",            "status": "done" },
+        { "label_en": "Partial-enrichment tolerance — OpenMeteo failure still writes lunar phase; lunar failure leaves columns NULL but doesn't 500",            "label_es": "Tolerancia a enriquecimiento parcial — fallo OpenMeteo igual escribe fase lunar; fallo lunar deja columnas NULL pero no devuelve 500", "status": "done" }
       ]
     },
     "scout-v0": {

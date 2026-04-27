@@ -89,6 +89,14 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
     <div>
       <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">{tr.observe.photo_label}</label>
       <div id="photo-grid" class="hidden mb-3 grid grid-cols-3 gap-2"></div>
+      {/*
+        TODO(v1.1): re-introduce in-app getUserMedia camera as a SECONDARY
+        path alongside this primary "Take photo" button. New button label:
+        "Cámara con vista previa" ("Camera with preview" in EN), gated on a
+        settings toggle (rastrum.prefs.useInAppCamera, default false).
+        Falls back to clicking #camera-input on getUserMedia denial.
+        Plan: docs/specs/modules/17-in-app-camera.md → "Re-introduction path".
+      */}
       <div class="flex gap-2 flex-wrap">
         <button id="camera-legacy-btn" type="button" class="flex-1 cursor-pointer min-h-11 rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-2 text-sm font-semibold text-white text-center flex items-center justify-center gap-2">
           <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 0 1 2-2h2l1.5-2h7L17 7h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>

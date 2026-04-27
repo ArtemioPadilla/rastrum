@@ -197,7 +197,7 @@ const intro = isEs
   </section>
 
   <!-- ========================================================== -->
-  <!-- DIAGRAM 2 — Identification cascade                         -->
+  <!-- DIAGRAM 2 — Identification cascade (parallel race)         -->
   <!-- ========================================================== -->
   <section>
     <h2 id="cascade" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-2 flex items-center gap-2">
@@ -206,117 +206,131 @@ const intro = isEs
     </h2>
     <p class="text-sm text-zinc-600 dark:text-zinc-400 max-w-3xl mb-4">
       {isEs
-        ? 'Los plugins se ordenan por costo de licencia (Free → Free-NC → Free-cuota → BYO → Pago) y luego por tope de confianza descendente. El motor llama a cada uno en orden hasta que uno devuelve confianza ≥ 0.7. El mejor resultado siempre se guarda, incluso cuando ninguno cruza el umbral.'
-        : 'Plugins are sorted by license cost (Free → Free-NC → Free-quota → BYO → Paid) then by confidence ceiling descending. The engine calls each in order until one returns confidence ≥ 0.7. The best seen result is always written, even when nothing crosses the threshold.'}
+        ? 'En /identify, el blob de la foto se reparte a tres ejecutores en paralelo. El primero que devuelve confianza ≥ 0.5 gana; los demás se cancelan vía AbortController. Esto reemplaza la cascada serial original (PlantNet → Claude → Phi en orden) que hacía esperar ~10 s a fotos de no-plantas.'
+        : 'On /identify, the photo blob fans out to three runners in parallel. First responder with confidence ≥ 0.5 wins; the others are cancelled via AbortController. This replaces the original serial cascade (PlantNet → Claude → Phi in order) which made non-plant photos wait ~10 s.'}
     </p>
     <div class="not-prose rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-3 sm:p-4 overflow-x-auto">
-      <svg viewBox="0 0 900 380" xmlns="http://www.w3.org/2000/svg" class="w-full h-auto min-w-[720px] max-w-full text-zinc-800 dark:text-zinc-200" aria-label={isEs ? 'Diagrama de cascada de identificación' : 'Identification cascade diagram'}>
+      <svg viewBox="0 0 900 400" xmlns="http://www.w3.org/2000/svg" class="w-full h-auto min-w-[720px] max-w-full text-zinc-800 dark:text-zinc-200" aria-label={isEs ? 'Diagrama de cascada de identificación paralela' : 'Parallel identification cascade diagram'}>
         <defs>
           <marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
             <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+          </marker>
+          <marker id="arr2-abort" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#9ca3af"/>
+          </marker>
+          <marker id="arr2-win" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#10b981"/>
           </marker>
           <filter id="sh2" x="-10%" y="-10%" width="120%" height="120%">
             <feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.10"/>
           </filter>
         </defs>
 
-        {/* Source */}
+        {/* Source — photo blob */}
         <g filter="url(#sh2)">
-          <rect x="30" y="160" width="150" height="60" rx="10" fill="#f4f4f5" stroke="#52525b" stroke-width="1.5"/>
+          <rect x="20" y="170" width="140" height="60" rx="10" fill="#f4f4f5" stroke="#52525b" stroke-width="1.5"/>
         </g>
-        <text x="105" y="185" text-anchor="middle" font-size="12" font-weight="700" fill="#27272a">{isEs ? 'Foto / audio / video' : 'Photo / audio / video'}</text>
-        <text x="105" y="203" text-anchor="middle" font-size="10" fill="#3f3f46">Blob</text>
+        <text x="90" y="195" text-anchor="middle" font-size="12" font-weight="700" fill="#27272a">{isEs ? 'Foto' : 'Photo'}</text>
+        <text x="90" y="213" text-anchor="middle" font-size="10" fill="#3f3f46">Blob</text>
 
-        {/* Registry */}
+        {/* Fan-out hub */}
         <g filter="url(#sh2)">
-          <rect x="220" y="160" width="150" height="60" rx="10" fill="#e0e7ff" stroke="#6366f1" stroke-width="1.5"/>
+          <rect x="200" y="170" width="160" height="60" rx="10" fill="#dbeafe" stroke="#3b82f6" stroke-width="1.5"/>
         </g>
-        <text x="295" y="185" text-anchor="middle" font-size="12" font-weight="700" fill="#3730a3">registry.findFor</text>
-        <text x="295" y="203" text-anchor="middle" font-size="10" fill="#312e81">media · taxa</text>
+        <text x="280" y="195" text-anchor="middle" font-size="12" font-weight="700" fill="#1e3a8a">runParallelIdentify</text>
+        <text x="280" y="213" text-anchor="middle" font-size="10" fill="#1e40af">{isEs ? 'fan-out · race' : 'fan-out · race'}</text>
 
-        {/* Cascade engine */}
-        <g filter="url(#sh2)">
-          <rect x="410" y="140" width="160" height="100" rx="10" fill="#dbeafe" stroke="#3b82f6" stroke-width="1.5"/>
-        </g>
-        <text x="490" y="165" text-anchor="middle" font-size="12" font-weight="700" fill="#1e3a8a">{isEs ? 'Motor cascade' : 'Cascade engine'}</text>
-        <text x="490" y="183" text-anchor="middle" font-size="10" fill="#1e40af">{isEs ? 'sort · costo licencia ↑' : 'sort · license cost ↑'}</text>
-        <text x="490" y="198" text-anchor="middle" font-size="10" fill="#1e40af">{isEs ? 'luego confianza ↓' : 'then confidence ↓'}</text>
-        <text x="490" y="220" text-anchor="middle" font-size="10" fill="#1e40af" font-style="italic">accept ≥ 0.7</text>
-
-        {/* Plugin column */}
+        {/* Three parallel runners */}
         <g font-size="11">
+          {/* PlantNet — emerald (free-quota / cloud) */}
           <g filter="url(#sh2)">
-            <rect x="610" y="20" width="170" height="50" rx="8" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+            <rect x="420" y="40" width="200" height="70" rx="10" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
           </g>
-          <text x="695" y="40" text-anchor="middle" font-weight="700" fill="#166534">PlantNet</text>
-          <text x="695" y="55" text-anchor="middle" fill="#166534" font-size="9">{isEs ? 'free-quota · cloud' : 'free-quota · cloud'}</text>
+          <text x="520" y="64" text-anchor="middle" font-weight="700" fill="#166534">PlantNet</text>
+          <text x="520" y="80" text-anchor="middle" fill="#166534" font-size="9">{isEs ? 'free-quota · cloud' : 'free-quota · cloud'}</text>
+          <text x="520" y="96" text-anchor="middle" fill="#166534" font-size="9" font-style="italic">{isEs ? 'siempre se ejecuta' : 'always runs'}</text>
 
+          {/* Claude — red (BYO key) */}
           <g filter="url(#sh2)">
-            <rect x="610" y="80" width="170" height="50" rx="8" fill="#fef9c3" stroke="#ca8a04" stroke-width="1.5"/>
+            <rect x="420" y="165" width="200" height="70" rx="10" fill="#fee2e2" stroke="#dc2626" stroke-width="1.5"/>
           </g>
-          <text x="695" y="100" text-anchor="middle" font-weight="700" fill="#854d0e">BirdNET-Lite</text>
-          <text x="695" y="115" text-anchor="middle" fill="#854d0e" font-size="9">free-nc · on-device</text>
+          <text x="520" y="189" text-anchor="middle" font-weight="700" fill="#991b1b">Claude Haiku 4.5</text>
+          <text x="520" y="205" text-anchor="middle" fill="#991b1b" font-size="9">byo-key · cloud</text>
+          <text x="520" y="221" text-anchor="middle" fill="#991b1b" font-size="9" font-style="italic">{isEs ? 'si hay BYO key' : 'when BYO key set'}</text>
 
+          {/* Phi — amber (free-NC, on-device when cached) */}
           <g filter="url(#sh2)">
-            <rect x="610" y="140" width="170" height="50" rx="8" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+            <rect x="420" y="290" width="200" height="70" rx="10" fill="#fef9c3" stroke="#ca8a04" stroke-width="1.5"/>
           </g>
-          <text x="695" y="160" text-anchor="middle" font-weight="700" fill="#166534">EfficientNet-Lite0</text>
-          <text x="695" y="175" text-anchor="middle" fill="#166534" font-size="9">free · on-device</text>
-
-          <g filter="url(#sh2)">
-            <rect x="610" y="200" width="170" height="50" rx="8" fill="#fee2e2" stroke="#dc2626" stroke-width="1.5"/>
-          </g>
-          <text x="695" y="220" text-anchor="middle" font-weight="700" fill="#991b1b">Claude Haiku 4.5</text>
-          <text x="695" y="235" text-anchor="middle" fill="#991b1b" font-size="9">byo-key · cloud</text>
-
-          <g filter="url(#sh2)">
-            <rect x="610" y="260" width="170" height="50" rx="8" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
-          </g>
-          <text x="695" y="280" text-anchor="middle" font-weight="700" fill="#166534">Phi-3.5-vision</text>
-          <text x="695" y="295" text-anchor="middle" fill="#166534" font-size="9">{isEs ? 'free · respaldo on-device' : 'free · on-device fallback'}</text>
-
-          <g filter="url(#sh2)">
-            <rect x="610" y="320" width="170" height="50" rx="8" fill="#fef9c3" stroke="#ca8a04" stroke-width="1.5"/>
-          </g>
-          <text x="695" y="340" text-anchor="middle" font-weight="700" fill="#854d0e">MegaDetector v5a</text>
-          <text x="695" y="355" text-anchor="middle" fill="#854d0e" font-size="9">{isEs ? 'free-nc · cámara trampa' : 'free-nc · camera trap'}</text>
+          <text x="520" y="314" text-anchor="middle" font-weight="700" fill="#854d0e">Phi-3.5-vision</text>
+          <text x="520" y="330" text-anchor="middle" fill="#854d0e" font-size="9">{isEs ? 'free-nc · on-device' : 'free-nc · on-device'}</text>
+          <text x="520" y="346" text-anchor="middle" fill="#854d0e" font-size="9" font-style="italic">{isEs ? 'si modelo cacheado' : 'when model cached'}</text>
         </g>
 
-        {/* Result box */}
+        {/* Race judge — accept ≥ 0.5 */}
         <g filter="url(#sh2)">
-          <rect x="820" y="160" width="60" height="60" rx="10" fill="#10b981" stroke="#047857" stroke-width="1.5"/>
+          <rect x="660" y="170" width="140" height="60" rx="10" fill="#e0e7ff" stroke="#6366f1" stroke-width="1.5"/>
         </g>
-        <text x="850" y="185" text-anchor="middle" font-size="11" font-weight="700" fill="#ffffff">IDResult</text>
-        <text x="850" y="200" text-anchor="middle" font-size="9" fill="#ecfdf5">{isEs ? 'primero gana' : 'first wins'}</text>
+        <text x="730" y="192" text-anchor="middle" font-size="12" font-weight="700" fill="#3730a3">{isEs ? 'Primero gana' : 'First wins'}</text>
+        <text x="730" y="208" text-anchor="middle" font-size="10" fill="#312e81">accept ≥ 0.5</text>
+        <text x="730" y="222" text-anchor="middle" font-size="9" fill="#312e81" font-style="italic">{isEs ? 'AbortController →' : 'AbortController →'}</text>
 
-        {/* Arrows */}
-        <g stroke="currentColor" stroke-width="1.5" fill="none" marker-end="url(#arr2)">
-          <path d="M180,190 L220,190"/>
-          <path d="M370,190 L410,190"/>
-          <path d="M570,190 L610,45" stroke-dasharray="3 2"/>
-          <path d="M570,190 L610,105" stroke-dasharray="3 2"/>
-          <path d="M570,190 L610,165" stroke-dasharray="3 2"/>
-          <path d="M570,190 L610,225" stroke-dasharray="3 2"/>
-          <path d="M570,190 L610,285" stroke-dasharray="3 2"/>
-          <path d="M570,190 L610,345" stroke-dasharray="3 2"/>
-          <path d="M780,190 L820,190" stroke="#10b981" stroke-width="2"/>
+        {/* IDResult */}
+        <g filter="url(#sh2)">
+          <rect x="830" y="170" width="60" height="60" rx="10" fill="#10b981" stroke="#047857" stroke-width="1.5"/>
         </g>
+        <text x="860" y="195" text-anchor="middle" font-size="11" font-weight="700" fill="#ffffff">IDResult</text>
+        <text x="860" y="210" text-anchor="middle" font-size="9" fill="#ecfdf5">{isEs ? 'ganador' : 'winner'}</text>
+
+        {/* Fan-out arrows: hub → 3 runners (solid) */}
+        <g stroke="currentColor" stroke-width="1.5" fill="none" marker-end="url(#arr2)">
+          <path d="M160,200 L200,200"/>
+          <path d="M360,190 C390,190 390,75 420,75"/>
+          <path d="M360,200 L420,200"/>
+          <path d="M360,210 C390,210 390,325 420,325"/>
+        </g>
+
+        {/* Winner arrow (PlantNet → judge, emerald) — illustrative */}
+        <g stroke="#10b981" stroke-width="2" fill="none" marker-end="url(#arr2-win)">
+          <path d="M620,75 C645,75 645,190 660,190"/>
+        </g>
+
+        {/* Loser arrows (dashed gray = cancelled) */}
+        <g stroke="#9ca3af" stroke-width="1.25" fill="none" stroke-dasharray="4 3" marker-end="url(#arr2-abort)">
+          {/* Claude → judge (cancelled) */}
+          <path d="M620,200 L660,200"/>
+          {/* Phi → judge (cancelled) */}
+          <path d="M620,325 C645,325 645,210 660,210"/>
+        </g>
+
+        {/* Judge → Result */}
+        <g stroke="#10b981" stroke-width="2" fill="none" marker-end="url(#arr2-win)">
+          <path d="M800,200 L830,200"/>
+        </g>
+
+        {/* Cancellation labels along the dashed paths */}
+        <text x="640" y="195" text-anchor="middle" font-size="9" fill="#6b7280" font-style="italic">abort</text>
+        <text x="635" y="280" text-anchor="middle" font-size="9" fill="#6b7280" font-style="italic">abort</text>
 
         {/* Legend */}
         <g font-size="9" fill="currentColor">
-          <rect x="30" y="320" width="12" height="12" rx="2" fill="#dcfce7" stroke="#16a34a"/>
-          <text x="48" y="330">free</text>
-          <rect x="80" y="320" width="12" height="12" rx="2" fill="#fef9c3" stroke="#ca8a04"/>
-          <text x="98" y="330">free-nc · free-quota</text>
-          <rect x="220" y="320" width="12" height="12" rx="2" fill="#fee2e2" stroke="#dc2626"/>
-          <text x="238" y="330">byo-key</text>
+          <rect x="20" y="375" width="12" height="12" rx="2" fill="#dcfce7" stroke="#16a34a"/>
+          <text x="38" y="385">PlantNet · free</text>
+          <rect x="140" y="375" width="12" height="12" rx="2" fill="#fee2e2" stroke="#dc2626"/>
+          <text x="158" y="385">Claude · BYO</text>
+          <rect x="260" y="375" width="12" height="12" rx="2" fill="#fef9c3" stroke="#ca8a04"/>
+          <text x="278" y="385">Phi · free-NC</text>
+          <line x1="390" y1="381" x2="430" y2="381" stroke="#9ca3af" stroke-width="1.25" stroke-dasharray="4 3"/>
+          <text x="438" y="385" fill="#6b7280">{isEs ? 'cancelados (AbortController)' : 'cancelled (AbortController)'}</text>
         </g>
       </svg>
     </div>
     <p class="text-xs text-zinc-500 dark:text-zinc-500 mt-3 italic max-w-3xl">
       {isEs
-        ? 'El motor (src/lib/identifiers/cascade.ts) usa la misma firma del lado del cliente y dentro de la Edge Function identify. Esa simetría es lo que mantiene la cascada offline coherente con la online.'
-        : 'The engine (src/lib/identifiers/cascade.ts) uses the same signature on the client and inside the identify Edge Function. That symmetry is what keeps the offline cascade coherent with the online one.'}
+        ? 'Primer respondedor con confianza ≥ 0.5 gana; los demás se cancelan. Ver '
+        : 'First responder with confidence ≥ 0.5 wins; others abort. See '}
+      <a href="https://github.com/ArtemioPadilla/rastrum/blob/main/docs/specs/modules/21-identify.md" class="underline hover:text-emerald-600 dark:hover:text-emerald-400">{isEs ? 'Módulo 21 — Identify' : 'Module 21 — Identify'}</a>
+      {isEs ? ' para detalles.' : ' for details.'}
     </p>
   </section>
 
