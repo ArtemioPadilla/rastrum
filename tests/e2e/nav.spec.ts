@@ -31,9 +31,9 @@ const ROUTES: Record<'en' | 'es', string[]> = {
   ],
 };
 
-// Suppress the unused-variable lint warning — ROUTES is exported for reference
-// by other tooling (e.g. smoke.spec.ts mirrors it). The constant documents the
-// canonical IA and is intentionally kept here even if tests don't iterate it.
+// ROUTES is the canonical IA reference for this spec — not exported, but kept
+// so the list of expected paths is visible alongside the navigation tests. If
+// routes change, sync this list AND the smoke spec's equivalent.
 void ROUTES;
 
 test.describe('navigation', () => {
