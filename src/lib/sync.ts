@@ -69,11 +69,30 @@ async function syncOne(record: ObservationRecord): Promise<void> {
 
   // 2. Upsert the observation row
   const obs: Observation = record.data;
-  if (obs.observerRef.kind !== 'user') return;
+
+  // If the observation was saved while the user was not yet authenticated (guest),
+  // try to re-resolve the observer now. If there's an active session, upgrade
+  // the record in Dexie so future syncs also pick it up.
+  let observerRef = obs.observerRef;
+  if (observerRef.kind !== 'user') {
+    try {
+      const { data: { session } } = await getSupabase().auth.getSession();
+      if (session?.user?.id) {
+        observerRef = { kind: 'user', id: session.user.id };
+        const db = await getDB();
+        await db.observations.update(record.id, {
+          data: { ...obs, observerRef },
+          observer_kind: 'user',
+        });
+      }
+    } catch { /* leave as guest, will retry next sync */ }
+  }
+
+  if (observerRef.kind !== 'user') return;
 
   const serverRow = {
     id:              obs.id,
-    observer_id:     obs.observerRef.id,
+    observer_id:     observerRef.id,
     observed_at:     obs.createdAt,
     location:        `SRID=4326;POINT(${obs.location.lng} ${obs.location.lat})`,
     accuracy_m:      obs.location.accuracyM,
