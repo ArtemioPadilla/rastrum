@@ -1076,11 +1076,53 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
           }
         }
       } catch { /* fall through to error banner */ }
+      // Tailor the failure message to what the cascade actually had to
+      // work with. The generic "todos fallaron" message is misleading
+      // when the real cause is "PlantNet only handles plants and no
+      // other key was configured" — sending a mammal/bird photo through
+      // a plant-only cascade always fails. See feedback report 2026-04-27.
       if (idAllFailed) {
-        idAllFailed.textContent = idStringsRT.all_failed;
+        idAllFailed.textContent = describeAllFailed({
+          hint: activeTaxonHint,
+          hadPlantNet: !!runners.plantnet,
+          hadClaude: !!runners.claude_haiku,
+          hadPhi: !!runners.webllm_phi35_vision,
+        });
         idAllFailed.classList.remove('hidden');
       }
     }
+  }
+
+  /**
+   * Build a specific call-to-action when the cascade returns nothing.
+   * Branches on (a) what the user told us (taxon chip), (b) which
+   * runners were actually available. The goal is to point at the next
+   * concrete step the user can take, not just say "try again".
+   */
+  function describeAllFailed(ctx: {
+    hint: TaxonHint | null;
+    hadPlantNet: boolean;
+    hadClaude: boolean;
+    hadPhi: boolean;
+  }): string {
+    const isAnimal = ctx.hint && ctx.hint !== 'Plantae' && ctx.hint !== 'Fungi';
+    const onlyPlantNet = ctx.hadPlantNet && !ctx.hadClaude && !ctx.hadPhi;
+    if (isAnimal && onlyPlantNet) {
+      return isEs
+        ? 'Para identificar animales necesitamos un modelo más allá de PlantNet. Configura tu llave de Claude Haiku (Perfil → Editar) o activa el modelo en el dispositivo (~2.4 GB) para que funcione sin conexión.'
+        : "We need a non-plant identifier for animals. Add your Claude Haiku key (Profile → Edit) or enable the on-device model (~2.4 GB) for offline use.";
+    }
+    if (!ctx.hadClaude && !ctx.hadPhi && !ctx.hadPlantNet) {
+      return isEs
+        ? 'No hay ningún identificador disponible. Configura una llave en Perfil → Editar, o activa el modelo en el dispositivo.'
+        : 'No identifier is available. Configure a key in Profile → Edit, or enable the on-device model.';
+    }
+    if (ctx.hint === 'Animalia.Aves' && !ctx.hadClaude) {
+      return isEs
+        ? 'Para aves recomendamos audio (BirdNET) o agregar tu llave de Claude Haiku.'
+        : 'Birds work best with audio (BirdNET) or with your Claude Haiku key.';
+    }
+    return idStringsRT.all_failed;
   }
 
   function offerPhiVision() {

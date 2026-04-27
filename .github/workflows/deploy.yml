@@ -69,3 +69,23 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  smoke-model-assets:
+    # Verifies that every operator-configured PUBLIC_*_URL points at a
+    # reachable, CORS-open file with the expected content-length range.
+    # Catches the case where the deploy went out fine but R2 is
+    # misconfigured / file got renamed / CORS got revoked, so the
+    # on-device cascade silently falls back. Runs after deploy so it
+    # doesn't block a working deploy on an asset hiccup, but goes red
+    # in CI so the operator sees it.
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Smoke-test model asset URLs
+        run: bash infra/smoke-model-assets.sh
+        env:
+          PUBLIC_BIRDNET_WEIGHTS_URL:      ${{ secrets.PUBLIC_BIRDNET_WEIGHTS_URL }}
+          PUBLIC_ONNX_BASE_URL:            ${{ secrets.PUBLIC_ONNX_BASE_URL }}
+          PUBLIC_PMTILES_MX_URL:           ${{ secrets.PUBLIC_PMTILES_MX_URL }}
+          PUBLIC_MEGADETECTOR_WEIGHTS_URL: ${{ secrets.PUBLIC_MEGADETECTOR_WEIGHTS_URL }}

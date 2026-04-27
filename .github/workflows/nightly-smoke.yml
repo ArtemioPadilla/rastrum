@@ -43,6 +43,18 @@ jobs:
       - name: Run smoke spec against production
         run: npx playwright test tests/e2e/smoke.spec.ts --project=chromium
 
+      - name: Smoke-test on-device model asset URLs
+        # Catches post-deploy R2 drift — bucket renamed, CORS revoked,
+        # file deleted by accident. Runs even if the Playwright spec
+        # passed; an unreachable model asset still fails the workflow.
+        if: always()
+        run: bash infra/smoke-model-assets.sh
+        env:
+          PUBLIC_BIRDNET_WEIGHTS_URL:      ${{ secrets.PUBLIC_BIRDNET_WEIGHTS_URL }}
+          PUBLIC_ONNX_BASE_URL:            ${{ secrets.PUBLIC_ONNX_BASE_URL }}
+          PUBLIC_PMTILES_MX_URL:           ${{ secrets.PUBLIC_PMTILES_MX_URL }}
+          PUBLIC_MEGADETECTOR_WEIGHTS_URL: ${{ secrets.PUBLIC_MEGADETECTOR_WEIGHTS_URL }}
+
       - name: Upload Playwright report
         if: always() && failure()
         uses: actions/upload-artifact@v4
