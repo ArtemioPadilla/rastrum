@@ -102,7 +102,7 @@
       "name_es": "Inteligencia offline + actividad",
       "period": "Months 4–5",
       "period_es": "Meses 4–5",
-      "status": "in_progress",
+      "status": "done",
       "items": [
         {
           "id": "activity-feed",
@@ -142,17 +142,15 @@
         },
         {
           "id": "onnx-base",
-          "label": "EfficientNet-Lite0 ONNX base fallback (~2.8MB)",
-          "label_es": "Fallback ONNX base con EfficientNet-Lite0 (~2.8 MB)",
-          "done": false,
-          "blocked_by": "ONNX model packaging — requires offline training/conversion pipeline"
+          "label": "EfficientNet-Lite0 ONNX base fallback (~18 MB INT8 hosted on R2)",
+          "label_es": "Fallback ONNX base con EfficientNet-Lite0 (~18 MB INT8 alojado en R2)",
+          "done": true
         },
         {
           "id": "offline-maps",
-          "label": "pmtiles offline map download (Mexico zoom 0–10)",
-          "label_es": "Descarga de mapas offline pmtiles (México zoom 0–10)",
-          "done": false,
-          "blocked_by": "pmtiles generation infrastructure + R2 hosting (module 10)"
+          "label": "pmtiles offline map download (Mexico zoom 0–10, ~48 MB)",
+          "label_es": "Descarga de mapa offline pmtiles (México zoom 0–10, ~48 MB)",
+          "done": true
         },
         {
           "id": "webllm-default",
@@ -179,7 +177,8 @@
       "name_es": "Beta",
       "period": "Months 6–8",
       "period_es": "Meses 6–8",
-      "status": "in_progress",
+      "status": "shipped (engineering); 2 items deferred to operator action — see gbif-ipt and local-contexts blockers",
+      "status_es": "lanzado (ingeniería); 2 ítems diferidos a acción del operador — ver bloqueadores de gbif-ipt y local-contexts",
       "items": [
         {
           "id": "multi-image",
@@ -225,24 +224,9 @@
         },
         {
           "id": "birdnet-audio",
-          "label": "BirdNET-Lite audio ID (module 12, NC license)",
-          "label_es": "ID de audio con BirdNET-Lite (módulo 12, licencia NC)",
-          "done": false,
-          "blocked_by": "Bundle TFLite/ONNX model + audio capture in observation form"
-        },
-        {
-          "id": "scout-v0",
-          "label": "Rastrum Scout v0 (conversational ID, pgvector RAG)",
-          "label_es": "Rastrum Scout v0 (ID conversacional, RAG con pgvector)",
-          "done": false,
-          "blocked_by": "pgvector + embedding corpus (taxa descriptions) — separate ML project"
-        },
-        {
-          "id": "onnx-regional",
-          "label": "Regional ONNX packs (Oaxaca, Yucatán)",
-          "label_es": "Paquetes ONNX regionales (Oaxaca, Yucatán)",
-          "done": false,
-          "blocked_by": "ONNX model training pipeline (v2.0 effort)"
+          "label": "BirdNET-Lite audio ID (Cornell Lab CC BY-NC-SA 4.0, ONNX hosted on R2, on-device inference via onnxruntime-web)",
+          "label_es": "ID de audio con BirdNET-Lite (Cornell Lab CC BY-NC-SA 4.0, ONNX en R2, inferencia en dispositivo vía onnxruntime-web)",
+          "done": true
         },
         {
           "id": "gbif-ipt",
@@ -283,7 +267,8 @@
       "name_es": "Lanzamiento Público",
       "period": "Months 9–14",
       "period_es": "Meses 9–14",
-      "status": "in_progress",
+      "status": "shipped (2026-04-26); 2 items deferred — capacitor-ios is v1.2, oauth-custom-domain requires Supabase Pro ($25/mo, deferred for zero-cost target)",
+      "status_es": "lanzado (2026-04-26); 2 ítems diferidos — capacitor-ios es v1.2, oauth-custom-domain requiere Supabase Pro ($25/mes, diferido para meta de costo cero)",
       "items": [
         {
           "id": "streaks",
@@ -341,10 +326,9 @@
         },
         {
           "id": "camera-trap-ingest",
-          "label": "Camera trap ingestion (SpeciesNet + MegaDetector)",
-          "label_es": "Ingesta de cámara trampa (SpeciesNet + MegaDetector)",
-          "done": false,
-          "blocked_by": "ML model deployment — UI shipped at /profile/import/camera-trap; identifier plugin stub registered (camera_trap_megadetector). Inference pending weights hosting per module 09."
+          "label": "Camera trap ingestion (MegaDetector v5a INT8 ONNX hosted on R2, batch importer at /profile/import/camera-trap, plugin in cascade for evidence_type='camera_trap')",
+          "label_es": "Ingesta de cámara trampa (MegaDetector v5a INT8 ONNX en R2, importador batch en /perfil/importar/camara-trampa, plugin en cascada para evidence_type='camera_trap')",
+          "done": true
         },
         {
           "id": "capacitor-ios",
@@ -412,6 +396,13 @@
       "status": "planned",
       "items": [
         {
+          "id": "scout-v0",
+          "label": "Rastrum Scout v0 (conversational ID, pgvector RAG)",
+          "label_es": "Rastrum Scout v0 (ID conversacional, RAG con pgvector)",
+          "done": false,
+          "blocked_by": "pgvector extension on Supabase + embedding corpus (taxa descriptions) — separate ML project; reshelved from v0.5 to v1.5 since core photo/audio cascade is sufficient for v1.0"
+        },
+        {
           "id": "biodiversity-trails",
           "label": "Biodiversity Trails with GPS waypoints + diversity metrics",
           "label_es": "Senderos de Biodiversidad con waypoints GPS + métricas de diversidad",
@@ -467,6 +458,13 @@
           "label": "Regional ML training pipeline (Oaxaca-endemic focus)",
           "label_es": "Pipeline de entrenamiento ML regional (enfoque endémicas de Oaxaca)",
           "done": false
+        },
+        {
+          "id": "onnx-regional",
+          "label": "Regional ONNX packs (Oaxaca, Yucatán) — output of regional-ml pipeline",
+          "label_es": "Paquetes ONNX regionales (Oaxaca, Yucatán) — salida del pipeline regional-ml",
+          "done": false,
+          "blocked_by": "Depends on regional-ml training pipeline; reshelved from v0.5 to v2.0 since the generic onnx-base (EfficientNet-Lite0) covers v1.0"
         },
         {
           "id": "b2g-dashboard",
