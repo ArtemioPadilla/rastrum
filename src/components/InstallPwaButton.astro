@@ -63,6 +63,20 @@ const tr = t(lang);
     btn?.classList.remove('inline-flex');
   }
 
+  // Check if already installed via getInstalledRelatedApps (Chrome Android)
+  async function isAlreadyInstalled(): Promise<boolean> {
+    try {
+      const nav = window.navigator as Navigator & { getInstalledRelatedApps?: () => Promise<unknown[]> };
+      if (nav.getInstalledRelatedApps) {
+        const apps = await nav.getInstalledRelatedApps();
+        if (apps.length > 0) return true;
+      }
+    } catch { /* not supported */ }
+    // Fallback: check localStorage flag set on appinstalled event
+    try { if (localStorage.getItem('rastrum.pwaInstalled') === 'true') return true; } catch { /* ignore */ }
+    return false;
+  }
+
   if (!isStandaloneDisplayMode()) {
     if (isIOS()) {
       // Show the iOS Add-to-Home-Screen tooltip once per install (until dismissed).
@@ -72,8 +86,10 @@ const tr = t(lang);
         setTimeout(() => iosHint?.classList.remove('hidden'), 1500);
       }
     } else {
-      window.addEventListener('beforeinstallprompt', (ev) => {
+      window.addEventListener('beforeinstallprompt', async (ev) => {
         ev.preventDefault();
+        // Don't show if already installed
+        if (await isAlreadyInstalled()) return;
         saved = ev as InstallPromptEvent;
         showAndroidBtn();
       });
@@ -104,5 +120,7 @@ const tr = t(lang);
     saved = null;
     hideAndroidBtn();
     iosHint?.classList.add('hidden');
+    // Persist flag so next browser visit also hides the button
+    try { localStorage.setItem('rastrum.pwaInstalled', 'true'); } catch { /* ignore */ }
   });
 </script>
