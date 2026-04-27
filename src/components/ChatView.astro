@@ -840,7 +840,10 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
       }
     }
     onUpdate(i18nGet('looking-more-carefully'));
-    const dataUrl = await blobToDataUrl(att.blob);
+    const rawDataUrl = await blobToDataUrl(att.blob);
+    // Phi-3.5-vision MLC needs a 336×336 single-crop input. See
+    // src/lib/local-ai.ts → prepareImageForPhi.
+    const dataUrl = await lib.prepareImageForPhi(rawDataUrl, 336);
     const engine = await lib.loadVisionEngine(() => {});
     const prompt = buildVisionFallbackPrompt({ userText, locale: docLocale });
     const reply = await engine.chat.completions.create({

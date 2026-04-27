@@ -160,7 +160,7 @@ export function makePhiRunner(
   onProgress?: (text: string, fraction: number) => void,
 ): IdentifierRunner {
   return async (file, signal) => {
-    const { loadVisionEngine, VISION_MODEL_ID, getModelCacheStatus } = await import('./local-ai');
+    const { loadVisionEngine, VISION_MODEL_ID, getModelCacheStatus, prepareImageForPhi } = await import('./local-ai');
     const status = await getModelCacheStatus(VISION_MODEL_ID);
     if (!status.cached) throw new Error('phi-vision not cached');
     if (signal.aborted) throw new Error('aborted');
@@ -168,7 +168,11 @@ export function makePhiRunner(
       onProgress?.(p.text, p.progress);
     });
     if (signal.aborted) throw new Error('aborted');
-    const dataUrl = await fileToDataUrl(file);
+    // Phi-3.5-vision MLC has a fixed image-embed shape (1921 tokens =
+    // single 336×336 crop). Non-square inputs crash with
+    // `expect embed.shape[0] to be 1921, but got <N>`.
+    const rawDataUrl = await fileToDataUrl(file);
+    const dataUrl = await prepareImageForPhi(rawDataUrl, 336);
     const prompt = buildClaudePrompt(locale);  // reuse JSON-locked prompt
     const reply = await engine.chat.completions.create({
       messages: [{

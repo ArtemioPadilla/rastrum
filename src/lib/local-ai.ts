@@ -262,12 +262,53 @@ export interface LocalIDResult {
  *   - Authoritative ID for citizen science → use PlantNet + Claude
  *   - Sensitive species detection → use Claude only
  */
+
+/**
+ * Center-crop and resize a data URL image to a fixed square. The
+ * MLC-compiled Phi-3.5-vision-q4f16_1 model has a hard-coded image-embed
+ * sequence length (1921 tokens = single 336×336 crop). Non-square inputs
+ * make the vision processor emit a different patch count and the model
+ * crashes with `expect embed.shape[0] to be 1921, but got <N>`.
+ * Pre-cropping here is the supported workaround.
+ */
+export async function prepareImageForPhi(dataUrl: string, size: number = 336): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { resolve(dataUrl); return; }
+        // Center-crop the source to its largest centred square, then scale.
+        const side = Math.min(img.naturalWidth, img.naturalHeight);
+        const sx = (img.naturalWidth  - side) / 2;
+        const sy = (img.naturalHeight - side) / 2;
+        ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size);
+        resolve(canvas.toDataURL('image/jpeg', 0.92));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    img.onerror = () => reject(new Error('Image load failed'));
+    img.src = dataUrl;
+  });
+}
+
 export async function identifyImageLocal(
   imageDataUrl: string,
   onProgress: (p: LoadProgress) => void,
   context?: { lat?: number; lng?: number; habitat?: string },
 ): Promise<LocalIDResult> {
   const engine = await loadVisionEngine(onProgress);
+
+  // Phi-3.5-vision MLC-compiled q4f16_1 has a fixed image-embedding shape
+  // (1921 tokens = single 336×336 crop). Non-square photos make the vision
+  // processor emit extra tokens and the model throws
+  // `expect embed.shape[0] to be 1921, but got <N>`. Center-crop to a
+  // 336×336 square before passing.
+  const normalised = await prepareImageForPhi(imageDataUrl, 336);
 
   const prompt = [
     'You see a photo from a biodiversity observation in Latin America.',
@@ -282,7 +323,7 @@ export async function identifyImageLocal(
     messages: [{
       role: 'user',
       content: [
-        { type: 'image_url', image_url: { url: imageDataUrl } },
+        { type: 'image_url', image_url: { url: normalised } },
         { type: 'text', text: prompt },
       ],
     }],
