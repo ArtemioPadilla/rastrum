@@ -1251,25 +1251,36 @@ CREATE POLICY "sync_failures_read_admin" ON public.sync_failures
 GRANT SELECT ON public.sync_failures TO authenticated;
 -- No INSERT/UPDATE grant for anon/authenticated.
 
+
 -- ─────────────────────────────────────────────────────────────────────
 -- Module 22 — Community validation (expert ID queue)
 -- See docs/specs/modules/22-community-validation.md
 --
--- Adds:
---   • validation_queue VIEW       — server-side eligibility rule
---   • id_validator_insert/update/delete POLICIES — community vote path
---   • tg_check_validator_not_observer TRIGGER  — anti-self-vote
---   • tg_research_grade_min_confidence TRIGGER — refuse < 0.4
---   • tg_research_grade_activity_event TRIGGER — fire activity feed
---   • partial UNIQUE index on (observation_id, validated_by)
---   • tie-handling guard inside recompute_consensus()
+-- This migration is INTENTIONALLY MINIMAL. It reuses these existing
+-- pieces (do NOT redefine them):
+--   • prevent_self_validation() / prevent_self_validation_trigger     (line ~599)
+--   • enforce_research_grade_quality() / enforce_rg_quality_trigger   (line ~621)
+--   • fire_research_grade() / fire_research_grade_trigger             (line ~998)
+--   • recompute_consensus(uuid)                                       (line ~893)
 --
--- All idempotent. No new tables.
+-- Adds (all idempotent):
+--   • validation_queue VIEW              — server-side eligibility
+--   • id_validator_insert/update/delete  — RLS policies for the
+--                                          community-vote write path
+--   • partial UNIQUE index on (observation_id, validated_by)
+--   • tie-handling guard inside recompute_consensus() (in-place
+--     CREATE OR REPLACE — single source of truth)
+--
 -- ─────────────────────────────────────────────────────────────────────
 
--- Eligibility view: observations that need community help.
--- Used by ValidationQueueView. RLS on the underlying observations table
--- (obs_public_read) gates visibility — private obs never appear.
+-- Eligibility view used by ValidationQueueView. RLS on the underlying
+-- observations table (obs_public_read) gates visibility — private obs
+-- never appear. Predicate: an observation is in the queue when it's
+-- synced + not fully redacted AND
+--   (no primary identification) OR
+--   (primary ID is not research-grade AND its confidence is < 0.5)
+-- The two-clause "needs help" test avoids re-queueing already-promoted
+-- rows whose confidence happens to sit between 0.4 and 0.5.
 CREATE OR REPLACE VIEW public.validation_queue AS
 SELECT
   o.id                               AS observation_id,
@@ -1281,7 +1292,7 @@ SELECT
   i.id                               AS primary_id_id,
   i.scientific_name                  AS current_scientific_name,
   i.confidence                       AS current_confidence,
-  i.is_research_grade,
+  COALESCE(i.is_research_grade, false) AS is_research_grade,
   (SELECT count(*)
      FROM public.identifications x
     WHERE x.observation_id = o.id
@@ -1295,29 +1306,37 @@ LEFT JOIN public.identifications i
        ON i.observation_id = o.id AND i.is_primary = true
 WHERE o.sync_status = 'synced'
   AND o.obscure_level IN ('none','0.1deg','0.2deg','5km')
+  AND COALESCE(i.is_research_grade, false) = false
   AND (
        i.id IS NULL
     OR COALESCE(i.confidence, 0) < 0.5
-    OR i.is_research_grade = false
   );
 
 GRANT SELECT ON public.validation_queue TO authenticated, anon;
 
--- Validator INSERT path: signed-in users can suggest a non-primary
--- identification on observations they don't own.
+-- Validator INSERT path. Signed-in users can suggest a non-primary
+-- identification on observations that
+--   (a) they don't own,
+--   (b) are publicly readable (synced + not fully redacted) — without
+--       this clause, a UUID-guessing attacker could vote on any
+--       observation, including drafts, outside the queue.
 DROP POLICY IF EXISTS "id_validator_insert" ON public.identifications;
 CREATE POLICY "id_validator_insert" ON public.identifications
   FOR INSERT TO authenticated
   WITH CHECK (
     (SELECT auth.uid()) = validated_by
     AND validated_by IS NOT NULL
-    AND validated_by <> (
-      SELECT observer_id FROM public.observations WHERE id = observation_id
-    )
     AND is_primary = false
+    AND EXISTS (
+      SELECT 1 FROM public.observations o
+      WHERE o.id = observation_id
+        AND o.observer_id <> validated_by
+        AND o.sync_status = 'synced'
+        AND o.obscure_level IN ('none','0.1deg','0.2deg','5km')
+    )
   );
 
--- Validator UPDATE: own row only (e.g. change taxon, edit confidence).
+-- Validator UPDATE: own-row only.
 DROP POLICY IF EXISTS "id_validator_update" ON public.identifications;
 CREATE POLICY "id_validator_update" ON public.identifications
   FOR UPDATE TO authenticated
@@ -1338,82 +1357,16 @@ CREATE POLICY "id_validator_delete" ON public.identifications
     AND (SELECT auth.uid()) = validated_by
   );
 
--- Anti-self-vote at the row layer (defence in depth in case the policy
--- is ever loosened or bypassed via a future path).
-CREATE OR REPLACE FUNCTION public.tg_check_validator_not_observer()
-RETURNS trigger LANGUAGE plpgsql AS $$
-DECLARE obs_owner uuid;
-BEGIN
-  IF NEW.validated_by IS NULL THEN RETURN NEW; END IF;
-  SELECT observer_id INTO obs_owner
-    FROM public.observations
-    WHERE id = NEW.observation_id;
-  IF obs_owner = NEW.validated_by THEN
-    RAISE EXCEPTION 'A user cannot validate their own observation';
-  END IF;
-  RETURN NEW;
-END;
-$$;
-DROP TRIGGER IF EXISTS check_validator_not_observer ON public.identifications;
-CREATE TRIGGER check_validator_not_observer
-  BEFORE INSERT OR UPDATE OF validated_by ON public.identifications
-  FOR EACH ROW EXECUTE FUNCTION public.tg_check_validator_not_observer();
-
--- Research-grade promotion can't bypass the min-confidence floor even
--- if recompute_consensus() is called with bad data.
-CREATE OR REPLACE FUNCTION public.tg_research_grade_min_confidence()
-RETURNS trigger LANGUAGE plpgsql AS $$
-BEGIN
-  IF NEW.is_research_grade = true AND COALESCE(NEW.confidence, 0) < 0.4 THEN
-    RAISE EXCEPTION 'Cannot promote to research grade with confidence < 0.4';
-  END IF;
-  RETURN NEW;
-END;
-$$;
-DROP TRIGGER IF EXISTS research_grade_min_confidence ON public.identifications;
-CREATE TRIGGER research_grade_min_confidence
-  BEFORE INSERT OR UPDATE OF is_research_grade ON public.identifications
-  FOR EACH ROW EXECUTE FUNCTION public.tg_research_grade_min_confidence();
-
--- Activity event on the research-grade transition; powers push notifs.
-CREATE OR REPLACE FUNCTION public.tg_research_grade_activity_event()
-RETURNS trigger LANGUAGE plpgsql AS $$
-DECLARE obs_owner uuid;
-BEGIN
-  IF NEW.is_research_grade = true
-     AND (OLD.is_research_grade IS DISTINCT FROM NEW.is_research_grade) THEN
-    SELECT observer_id INTO obs_owner
-      FROM public.observations WHERE id = NEW.observation_id;
-    INSERT INTO public.activity_events
-      (actor_id, subject_id, kind, payload, visibility)
-    VALUES (
-      obs_owner,
-      NEW.observation_id,
-      'observation_research_grade',
-      jsonb_build_object(
-        'scientific_name',   NEW.scientific_name,
-        'taxon_id',          NEW.taxon_id,
-        'identification_id', NEW.id
-      ),
-      'self'
-    );
-  END IF;
-  RETURN NEW;
-END;
-$$;
-DROP TRIGGER IF EXISTS research_grade_activity_event ON public.identifications;
-CREATE TRIGGER research_grade_activity_event
-  AFTER UPDATE OF is_research_grade ON public.identifications
-  FOR EACH ROW EXECUTE FUNCTION public.tg_research_grade_activity_event();
-
 -- One suggestion per (user, observation). UPDATE the existing row to
 -- change a vote.
 CREATE UNIQUE INDEX IF NOT EXISTS uniq_id_obs_validator
   ON public.identifications(observation_id, validated_by)
   WHERE validated_by IS NOT NULL;
 
--- Tie-handling: if multiple rows share the winning weighted score,
--- recompute_consensus() refuses to promote. Block ARBITRARY pick.
+-- recompute_consensus() — IN-PLACE CREATE OR REPLACE. Adds a tie-
+-- handling guard: if multiple taxa share the winning weighted score,
+-- promotion is skipped and the queue waits for a tiebreaker. The rest
+-- of the function body is identical to the earlier definition.
 CREATE OR REPLACE FUNCTION public.recompute_consensus(p_observation_id uuid)
 RETURNS void AS $$
 DECLARE
@@ -1442,7 +1395,9 @@ BEGIN
 
   IF winning_taxon IS NULL THEN RETURN; END IF;
 
-  -- Tie guard: if multiple rows share the winning score, do not promote.
+  -- Tie guard: refuse promotion when multiple taxa share the winning
+  -- score. Without this, the LIMIT 1 above would promote one row
+  -- non-deterministically.
   SELECT count(*) INTO tied_count
   FROM (
     SELECT i.taxon_id,
@@ -1467,6 +1422,6 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Allow signed-in users to call recompute_consensus from PostgREST RPC
--- after submitting a suggestion. Function is SECURITY DEFINER so it
--- doesn't need elevated caller permissions.
+-- after submitting a suggestion. SECURITY DEFINER means the caller
+-- doesn't need elevated permissions on identifications/taxa.
 GRANT EXECUTE ON FUNCTION public.recompute_consensus(uuid) TO authenticated;

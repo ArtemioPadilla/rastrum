@@ -41,6 +41,9 @@ const lastSyncNow       = profileStrings.my_observations_last_sync_now  ?? (lang
 const lastSyncMin       = profileStrings.my_observations_last_sync_minutes ?? '{n} min';
 const lastSyncHr        = profileStrings.my_observations_last_sync_hours   ?? '{n} h';
 const lastSyncDay       = profileStrings.my_observations_last_sync_days    ?? '{n} d';
+const validation        = (tr as unknown as { validation?: Record<string, string> }).validation ?? {};
+const rgLabel           = validation.research_grade        ?? (lang === 'es' ? 'Grado investigación' : 'Research grade');
+const rgTitle           = validation.research_grade_title  ?? rgLabel;
 
 const tabs = [
   { id: 'all', label: tr.profile.my_observations_filter_all },
@@ -75,6 +78,8 @@ const tabs = [
   data-label-last-sync-hr={lastSyncHr}
   data-label-last-sync-day={lastSyncDay}
   data-label-unknown-species={tr.profile.my_observations_unknown_species}
+  data-label-research-grade={rgLabel}
+  data-label-research-grade-title={rgTitle}
   data-observe-path={observePath}
 >
   <header class="flex items-start justify-between gap-3 mb-6 flex-wrap">
@@ -234,7 +239,7 @@ const tabs = [
             <p class="text-xs text-zinc-500 truncate">${date}${escapeText(region)}</p>
             <div class="mt-1 flex items-center gap-1.5 flex-wrap">
               ${statusBadge(r.sync_status)}
-              ${ident?.is_research_grade ? `<span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 px-2 py-0.5 text-[11px] font-semibold text-emerald-800 dark:text-emerald-300" title="${lang === 'es' ? 'Grado investigación' : 'Research grade'}"><svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>${lang === 'es' ? 'Grado investigación' : 'Research grade'}</span>` : ''}
+              ${ident?.is_research_grade ? `<span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 px-2 py-0.5 text-[11px] font-semibold text-emerald-800 dark:text-emerald-300" title="${escapeText(root?.dataset.labelResearchGradeTitle ?? '')}"><svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>${escapeText(root?.dataset.labelResearchGrade ?? '')}</span>` : ''}
             </div>
           </div>
         </${wrapTag}>

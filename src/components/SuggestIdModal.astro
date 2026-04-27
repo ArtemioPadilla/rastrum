@@ -25,6 +25,10 @@ const v = (tr as unknown as { validation: Record<string, string> }).validation;
   role="dialog"
   aria-modal="true"
   aria-labelledby="suggest-id-modal-title"
+  data-label-submitting={v.submitting}
+  data-label-failed={v.submit_failed}
+  data-label-no-taxon-match={v.no_taxon_match}
+  data-label-target-tpl={v.submit_target_tpl}
   class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
 >
   <div class="w-full max-w-md rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 shadow-xl">
@@ -114,23 +118,18 @@ const v = (tr as unknown as { validation: Record<string, string> }).validation;
   if (modal && form && submitBtn && submitLabel) {
     let observationId: string | null = null;
     let observerName: string | null = null;
-    const isEs = document.documentElement.lang === 'es';
-    const original = submitLabel.textContent ?? 'Submit';
-    const submitting = isEs ? 'Enviando…' : 'Submitting…';
-    const failedTpl = isEs
-      ? 'No se pudo enviar la sugerencia: {error}'
-      : 'Could not submit suggestion: {error}';
-    const noTaxonMatch = isEs
-      ? 'No se encontró ninguna especie con ese nombre. Asegúrate de escribir el nombre científico completo.'
-      : "No species found with that name. Make sure you're typing the full scientific name.";
+    const original   = submitLabel.textContent ?? 'Submit';
+    const submitting = modal.dataset.labelSubmitting ?? 'Submitting…';
+    const failedTpl  = modal.dataset.labelFailed     ?? 'Could not submit: {error}';
+    const noTaxonMatch = modal.dataset.labelNoTaxonMatch ?? 'No taxon match.';
+    const targetTpl  = modal.dataset.labelTargetTpl  ?? 'Suggestion for {name}';
 
     function open(obsId: string, observer: string | null) {
       observationId = obsId;
       observerName  = observer;
       modal!.hidden = false;
       if (target && observerName) {
-        const tpl = isEs ? 'Sugerencia para la observación de {name}' : "Suggestion for {name}'s observation";
-        target.textContent = tpl.replace('{name}', observerName);
+        target.textContent = targetTpl.replace('{name}', observerName);
       } else if (target) {
         target.textContent = '';
       }
@@ -179,7 +178,15 @@ const v = (tr as unknown as { validation: Record<string, string> }).validation;
       }, 200);
     });
     function renderDatalist(rows: Array<{ id: string; scientific_name: string }>) {
-      datalist!.innerHTML = rows.map(r => `<option value="${r.scientific_name.replace(/"/g, '&quot;')}" data-id="${r.id}"></option>`).join('');
+      // DOM-API set instead of innerHTML so the browser does the
+      // escaping. The scientific_name comes from the DB and could
+      // theoretically contain HTML metacharacters in malformed rows.
+      datalist!.replaceChildren(...rows.map(r => {
+        const opt = document.createElement('option');
+        opt.value = r.scientific_name;
+        opt.dataset.id = r.id;
+        return opt;
+      }));
     }
 
     form.addEventListener('submit', async (e) => {
@@ -216,9 +223,14 @@ const v = (tr as unknown as { validation: Record<string, string> }).validation;
           return;
         }
 
+        // Upsert against the partial UNIQUE index on
+        // (observation_id, validated_by) — repeating a vote (e.g.
+        // user picked Confirm twice or changed their mind via
+        // Suggest another) is a legitimate flow and must not throw a
+        // 23505. The unique index is the conflict target.
         const { error: insertErr } = await supabase
           .from('identifications')
-          .insert({
+          .upsert({
             observation_id: observationId,
             taxon_id: taxon.id,
             scientific_name: sci,
@@ -228,16 +240,30 @@ const v = (tr as unknown as { validation: Record<string, string> }).validation;
             validated_by: user.id,
             validated_at: new Date().toISOString(),
             raw_response: note ? { note } : null,
-          });
+          }, { onConflict: 'observation_id,validated_by' });
         if (insertErr) throw insertErr;
 
         // Trigger consensus check; the DB handles the promotion.
+        // Re-fetch the now-current primary identification to learn
+        // whether THIS suggestion pushed the row into research grade.
         const { error: rpcErr } = await supabase.rpc('recompute_consensus', { p_observation_id: observationId });
         if (rpcErr) console.warn('[rastrum] recompute_consensus RPC failed', rpcErr);
 
-        // Notify the embedding page so it can re-fetch the row + show toast.
+        let promoted = false;
+        try {
+          const { data: primary } = await supabase
+            .from('identifications')
+            .select('is_research_grade')
+            .eq('observation_id', observationId)
+            .eq('is_primary', true)
+            .maybeSingle();
+          promoted = !!(primary as { is_research_grade?: boolean } | null)?.is_research_grade;
+        } catch { /* leave promoted=false */ }
+
+        // Parent decides which toast to show. Pass the actual outcome
+        // so the queue view doesn't lie about promotion.
         window.dispatchEvent(new CustomEvent('rastrum:suggestion-submitted', {
-          detail: { observation_id: observationId },
+          detail: { observation_id: observationId, promoted },
         }));
         close();
       } catch (err) {

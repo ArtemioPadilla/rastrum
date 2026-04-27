@@ -40,7 +40,10 @@ const sharePathBase = '/share/obs/';
   data-label-votes-one={v.votes_count_one}
   data-label-votes-other={v.votes_count_other}
   data-label-cant-vote-own={v.cannot_vote_own}
-  data-label-signin={v.validate_signin_prompt}
+  data-label-signin={v.validate_signin_btn}
+  data-label-signin-prompt={v.validate_signin_prompt}
+  data-label-subtitle-tpl={v.queue_subtitle}
+  data-label-submission-received={v.submission_received}
   data-signin-href={signInPath}
   data-share-base={sharePathBase}
 >
@@ -54,7 +57,7 @@ const sharePathBase = '/share/obs/';
   <div id="vq-signin" class="hidden mb-4 rounded-lg border border-emerald-300 dark:border-emerald-800/40 bg-emerald-50 dark:bg-emerald-900/20 p-3 text-sm flex items-center justify-between gap-3 flex-wrap">
     <span>{v.validate_signin_prompt}</span>
     <a href={signInPath} class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 text-xs font-semibold text-white">
-      {isEs ? 'Iniciar sesión' : 'Sign in'}
+      {v.validate_signin_btn}
     </a>
   </div>
 
@@ -82,7 +85,16 @@ const sharePathBase = '/share/obs/';
     let rows: ValidationQueueRow[] = [];
 
     function escapeText(s: string): string {
-      return s.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      // Escape `&` first to avoid double-escaping the entities below.
+      // Used for both element-content interpolation AND attribute values
+      // (so `'` and `"` matter too — never trust DB strings to be safe
+      // for innerHTML attribute slots).
+      return s
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
     }
 
     function rowMarkup(r: ValidationQueueRow, mediaUrl: string | null, observerName: string | null): string {
@@ -162,12 +174,10 @@ const sharePathBase = '/share/obs/';
         if (error) throw error;
         rows = (data ?? []) as ValidationQueueRow[];
 
-        // Subtitle count
+        // Subtitle count via i18n template ("{n} observations need help").
         const countEl = document.getElementById('vq-count');
-        const tplCount = (root.dataset.labelEmpty && rows.length === 0)
-          ? ''
-          : (isEs ? `${rows.length} observaciones necesitan ayuda` : `${rows.length} observations need help`);
-        if (countEl) countEl.textContent = tplCount;
+        const subtitleTpl = root.dataset.labelSubtitleTpl ?? '{n}';
+        if (countEl) countEl.textContent = rows.length === 0 ? '' : subtitleTpl.replace('{n}', String(rows.length));
 
         if (rows.length === 0) {
           document.getElementById('vq-empty')?.classList.remove('hidden');
@@ -229,11 +239,18 @@ const sharePathBase = '/share/obs/';
       }
     }
 
-    // Re-fetch when a suggestion lands.
-    window.addEventListener('rastrum:suggestion-submitted', () => {
-      showToast(root.dataset.labelPromoted ?? '✓');
+    // Re-fetch when a suggestion lands. Only show the "promoted to
+    // research grade" toast when consensus actually flipped the row;
+    // otherwise show a neutral "suggestion received" toast.
+    window.addEventListener('rastrum:suggestion-submitted', ((ev: Event) => {
+      const promoted = !!(ev as CustomEvent<{ promoted?: boolean }>).detail?.promoted;
+      showToast(
+        promoted
+          ? (root.dataset.labelPromoted ?? '✓')
+          : (root.dataset.labelSubmissionReceived ?? '✓'),
+      );
       load();
-    });
+    }) as EventListener);
 
     load();
   }

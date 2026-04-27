@@ -13,7 +13,7 @@ const { lang } = Astro.props;
 const tr = t(lang);
 const v = (tr as unknown as { validation: Record<string, string> }).validation;
 const profilePath = getLocalizedPath(lang, routes.profile[lang] + '/');
-const queuePath = lang === 'es' ? '/es/explorar/validar/' : '/en/explore/validate/';
+const queuePath = getLocalizedPath(lang, routes.exploreValidate[lang] + '/');
 ---
 
 <div class="rastrum-validation-dashboard max-w-3xl mx-auto" data-lang={lang}>
@@ -73,11 +73,37 @@ const queuePath = lang === 'es' ? '/es/explorar/validar/' : '/en/explore/validat
       // Total suggestions = identifications rows where validated_by = me
       const { data: rows, count } = await supabase
         .from('identifications')
-        .select('id, scientific_name, is_research_grade, is_primary, taxon_id', { count: 'exact' })
+        .select('id, scientific_name, is_primary, taxon_id, observation_id', { count: 'exact' })
         .eq('validated_by', user.id);
 
       const total = count ?? (rows?.length ?? 0);
-      const reachedRG = (rows ?? []).filter(r => (r as { is_research_grade?: boolean }).is_research_grade && (r as { is_primary?: boolean }).is_primary).length;
+
+      // Reached research grade — count distinct observations the user
+      // suggested on whose PRIMARY identification matches the user's
+      // taxon AND is now research-grade. Community suggestions are
+      // is_primary=false, but consensus promotes the is_primary=true
+      // row (typically with validated_by NULL); we have to join.
+      let reachedRG = 0;
+      const obsIds = Array.from(new Set((rows ?? []).map(r => (r as { observation_id?: string }).observation_id).filter(Boolean) as string[]));
+      if (obsIds.length > 0) {
+        const { data: primaries } = await supabase
+          .from('identifications')
+          .select('observation_id, taxon_id, is_research_grade')
+          .in('observation_id', obsIds)
+          .eq('is_primary', true)
+          .eq('is_research_grade', true);
+        const userTaxonByObs = new Map<string, string>();
+        for (const r of (rows ?? [])) {
+          const oid = (r as { observation_id?: string }).observation_id;
+          const tid = (r as { taxon_id?: string }).taxon_id;
+          if (oid && tid) userTaxonByObs.set(oid, tid);
+        }
+        for (const p of (primaries ?? [])) {
+          const oid = (p as { observation_id: string }).observation_id;
+          const tid = (p as { taxon_id?: string }).taxon_id;
+          if (userTaxonByObs.get(oid) === tid) reachedRG += 1;
+        }
+      }
 
       document.getElementById('vd-stat-suggestions')!.textContent = String(total);
       document.getElementById('vd-stat-research')!.textContent    = String(reachedRG);

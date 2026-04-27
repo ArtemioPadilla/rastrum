@@ -117,7 +117,7 @@ const docColumns = [
           <a href={exploreRecentPath}     class="block px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800">{tr.nav.explore_dropdown.recent}</a>
           <a href={exploreWatchlistPath}  class="block px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800">{tr.nav.explore_dropdown.watchlist}</a>
           <a href={exploreSpeciesPath}    class="block px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800">{tr.nav.explore_dropdown.species}</a>
-          <a href={exploreValidatePath}   class="block px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800">{lang === 'es' ? 'Validar' : 'Validate'}</a>
+          <a href={exploreValidatePath}   class="block px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800">{((tr as unknown as { validation?: { nav_validate_label?: string } }).validation?.nav_validate_label) ?? 'Validate'}</a>
         </div>
       </div>
 

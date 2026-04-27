@@ -8,6 +8,6 @@ const tr = t(lang);
 const v = (tr as unknown as { validation: Record<string, string> }).validation;
 ---
 
-<BaseLayout title={`${v.queue_title} — Rastrum`} description={v.dashboard_subtitle ?? 'Validation queue'} lang={lang}>
+<BaseLayout title={`${v.queue_title} — Rastrum`} description="Suggest identifications for observations that need community help. Expert suggestions carry more weight in consensus." lang={lang}>
   <ValidationQueueView lang={lang} />
 </BaseLayout>
