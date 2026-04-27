@@ -17,6 +17,8 @@
 --   v1 (2026-04-25): initial 'streaks-nightly' (07:00 UTC) and
 --                    'badges-nightly' (07:30 UTC). Bearer header.
 --   v2 (2026-04-25): functions redeployed --no-verify-jwt; header dropped.
+--   v3 (2026-04-27): added 'plantnet-quota-daily' (23:55 UTC) and
+--                    'streak-push-nightly' (01:55 UTC ≈ 19:55 America/Mexico_City).
 -- ════════════════════════════════════════════════════════════════════════
 
 CREATE EXTENSION IF NOT EXISTS pg_cron;
@@ -46,11 +48,36 @@ BEGIN
     );
   $body$, v_base || '/award-badges'));
 
+  -- 3. plantnet-quota-daily — 23:55 UTC
+  --    Probes PlantNet's /v2/usage endpoint and upserts api_usage. Optional
+  --    Slack/Discord webhook fires inside the function when usage > 80%.
+  PERFORM cron.unschedule('plantnet-quota-daily') FROM cron.job WHERE jobname = 'plantnet-quota-daily';
+  PERFORM cron.schedule('plantnet-quota-daily', '55 23 * * *', format($body$
+    SELECT net.http_post(
+      url     := %L,
+      headers := '{"Content-Type":"application/json"}'::jsonb,
+      body    := '{}'::jsonb
+    );
+  $body$, v_base || '/plantnet-monitor'));
+
+  -- 4. streak-push-nightly — 01:55 UTC (≈ 19:55 America/Mexico_City UTC-6)
+  --    v1.0.x scope: single timezone fixed to America/Mexico_City. When
+  --    we add a per-user `tz` column the EF will branch off it instead;
+  --    keep the cron at 01:55 UTC so it fires once before the 8 PM bell.
+  PERFORM cron.unschedule('streak-push-nightly') FROM cron.job WHERE jobname = 'streak-push-nightly';
+  PERFORM cron.schedule('streak-push-nightly', '55 1 * * *', format($body$
+    SELECT net.http_post(
+      url     := %L,
+      headers := '{"Content-Type":"application/json"}'::jsonb,
+      body    := '{}'::jsonb
+    );
+  $body$, v_base || '/streak-push'));
+
   RAISE NOTICE '✓ Cron schedules applied';
 END
 $migration$;
 
 SELECT jobid, jobname, schedule, active
 FROM cron.job
-WHERE jobname IN ('streaks-nightly', 'badges-nightly')
+WHERE jobname IN ('streaks-nightly', 'badges-nightly', 'plantnet-quota-daily', 'streak-push-nightly')
 ORDER BY jobname;

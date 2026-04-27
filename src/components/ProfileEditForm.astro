@@ -94,6 +94,26 @@ const tr = t(lang);
     <p id="form-error" class="hidden text-sm text-red-600 dark:text-red-400"></p>
   </form>
 
+  <!-- ── Streak push reminders (ux-streak-push) ── -->
+  <section class="mt-10 border-t border-zinc-200 dark:border-zinc-800 pt-8">
+    <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2">
+      {tr.profile_streak_push.section_title}
+    </h2>
+    <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">{tr.profile_streak_push.section_hint}</p>
+
+    <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3 flex items-start gap-3 flex-wrap">
+      <button
+        id="streak-push-toggle"
+        type="button"
+        class="rounded-lg border border-emerald-600/60 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 text-sm font-medium text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 disabled:opacity-50"
+      >
+        <span data-spp-label>{tr.profile_streak_push.enable}</span>
+      </button>
+      <p id="streak-push-status" class="text-xs text-zinc-500"></p>
+    </div>
+    <p id="streak-push-warning" class="hidden mt-2 text-xs text-amber-700 dark:text-amber-400"></p>
+  </section>
+
   <!-- ── AI settings ── -->
   <section class="mt-10 border-t border-zinc-200 dark:border-zinc-800 pt-8">
     <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-4">
@@ -1078,4 +1098,78 @@ const tr = t(lang);
     });
   }
   paintRegistry().catch(() => {});
+
+  // ── Streak push reminder toggle (ux-streak-push) ──
+  const sppBtn = document.getElementById('streak-push-toggle') as HTMLButtonElement | null;
+  const sppLabel = sppBtn?.querySelector('[data-spp-label]') as HTMLElement | null;
+  const sppStatus = document.getElementById('streak-push-status');
+  const sppWarn = document.getElementById('streak-push-warning');
+
+  const SPP_TXT = isEsLang
+    ? {
+        enable: 'Activar recordatorios push de racha',
+        enabling: 'Suscribiendo…',
+        enabled: 'Recordatorios push activados.',
+        disable: 'Desactivar',
+        disabling: 'Desactivando…',
+        permission_blocked: 'Las notificaciones del navegador están bloqueadas. Actívalas en la configuración del sitio y vuelve a intentar.',
+        unsupported: 'Este navegador no soporta web push (prueba Chrome en Android o Safari 16.4+ en iOS).',
+        vapid_missing: 'El push aún no está configurado — el operador debe publicar primero una llave VAPID.',
+      }
+    : {
+        enable: 'Enable streak push reminders',
+        enabling: 'Subscribing…',
+        enabled: 'Push reminders enabled.',
+        disable: 'Disable',
+        disabling: 'Disabling…',
+        permission_blocked: 'Browser notifications are blocked. Enable them in your browser site settings, then try again.',
+        unsupported: "This browser doesn't support web push (try Chrome on Android or Safari 16.4+ on iOS).",
+        vapid_missing: "Push isn't configured yet — the operator must publish a VAPID key first.",
+      };
+
+  function setSppLabel(txt: string) { if (sppLabel) sppLabel.textContent = txt; }
+  function setSppStatus(txt: string) { if (sppStatus) sppStatus.textContent = txt; }
+  function setSppWarn(txt: string | null) {
+    if (!sppWarn) return;
+    if (!txt) { sppWarn.classList.add('hidden'); sppWarn.textContent = ''; return; }
+    sppWarn.textContent = txt;
+    sppWarn.classList.remove('hidden');
+  }
+
+  async function refreshSpp() {
+    if (!sppBtn) return;
+    const { isStreakPushEnabled } = await import('../lib/push');
+    const on = await isStreakPushEnabled();
+    if (on) {
+      setSppLabel(SPP_TXT.disable);
+      setSppStatus('✓ ' + SPP_TXT.enabled);
+      sppBtn.dataset.state = 'on';
+    } else {
+      setSppLabel(SPP_TXT.enable);
+      setSppStatus('');
+      sppBtn.dataset.state = 'off';
+    }
+    setSppWarn(null);
+  }
+
+  sppBtn?.addEventListener('click', async () => {
+    if (!sppBtn) return;
+    sppBtn.disabled = true;
+    const state = sppBtn.dataset.state;
+    setSppLabel(state === 'on' ? SPP_TXT.disabling : SPP_TXT.enabling);
+    const lib = await import('../lib/push');
+    const r = state === 'on' ? await lib.disableStreakPush() : await lib.enableStreakPush();
+    sppBtn.disabled = false;
+    if (!r.ok) {
+      const reasonMap: Record<string, string> = {
+        unsupported: SPP_TXT.unsupported,
+        permission_blocked: SPP_TXT.permission_blocked,
+        vapid_missing: SPP_TXT.vapid_missing,
+      };
+      setSppWarn(reasonMap[r.reason ?? 'unknown'] ?? r.message ?? '');
+    }
+    await refreshSpp();
+  });
+
+  refreshSpp().catch(() => {});
 </script>

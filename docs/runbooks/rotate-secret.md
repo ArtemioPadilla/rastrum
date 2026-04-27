@@ -142,6 +142,73 @@ No further server action is needed. Revocation is immediate (the
 `api` and `mcp` Edge Functions read `user_api_tokens` per request and
 will reject the next call).
 
+### VAPID keys (`VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `PUBLIC_VAPID_PUBLIC_KEY`)
+
+Used by the `streak-push` Edge Function to send Web Push notifications
+(see `ux-streak-push` in the v1.1 backlog). Three env vars work together:
+
+- **`VAPID_PUBLIC_KEY`** (Supabase secret) — uncompressed P-256 public key,
+  base64url-encoded (65 bytes raw, starts with `0x04`).
+- **`VAPID_PRIVATE_KEY`** (Supabase secret) — 32-byte EC scalar,
+  base64url-encoded.
+- **`PUBLIC_VAPID_PUBLIC_KEY`** (GitHub Actions secret) — the *same*
+  public key as above. Mirrored into the static bundle so the PWA's
+  `pushManager.subscribe()` can pin to it.
+- **`VAPID_SUBJECT`** (Supabase secret) — `mailto:owner@rastrum.org` or
+  `https://rastrum.org`. Used as the JWT `sub` claim per RFC 8292.
+
+#### First-time setup
+
+VAPID keys aren't auto-generated — the operator runs this once. Use any
+ECDSA P-256 generator that emits base64url. The cleanest path is the
+`web-push` npm CLI (Node-only; not added to repo deps because it's
+operator-only):
+
+```bash
+# 1. Generate a fresh keypair (no extra deps in this repo).
+npx web-push generate-vapid-keys --json
+# → { "publicKey": "B…", "privateKey": "Y…" }
+
+# 2. Push to Supabase Edge Functions:
+gh secret set VAPID_PUBLIC_KEY      # paste the publicKey
+gh secret set VAPID_PRIVATE_KEY     # paste the privateKey
+gh secret set VAPID_SUBJECT         # paste mailto:owner@rastrum.org
+
+# 3. Push the public half into the static bundle so the PWA can subscribe:
+gh secret set PUBLIC_VAPID_PUBLIC_KEY  # same publicKey
+
+# 4. Re-deploy:
+gh workflow run deploy-functions.yml -f function=streak-push
+gh workflow run deploy.yml --ref main
+```
+
+Verify by visiting `/profile/edit`, scrolling to "Streak reminders",
+clicking the toggle, and confirming a row lands in
+`public.push_subscriptions`. Trigger a fan-out manually from
+`make db-cron-test` after editing a streak's `last_qualifying_day` to
+yesterday.
+
+#### Rotation
+
+If the private key leaks:
+
+```bash
+# 1. Generate a new keypair:
+npx web-push generate-vapid-keys --json
+
+# 2. Push the new pair as above (Supabase secrets + GitHub Actions secret).
+
+# 3. Invalidate every existing subscription — the old public key is now
+#    "wrong" from each browser's perspective, so the next push attempt
+#    will 410 and the EF will reap them automatically. To force-clear
+#    instead, run:
+make db-psql
+DELETE FROM public.push_subscriptions;
+```
+
+Users will need to re-toggle "Streak reminders" on `/profile/edit` to
+re-subscribe with the new key.
+
 ### Other secrets you might encounter
 
 - **`PUBLIC_SUPABASE_URL` / `PUBLIC_SUPABASE_ANON_KEY`** — these are

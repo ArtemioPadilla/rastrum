@@ -9,7 +9,7 @@
 //   - Manifest, favicon, sw.js itself: network-first so updates land fast.
 //
 // Bump VERSION to invalidate every cached entry on the next visit.
-const VERSION = 'rastrum-shell-v3-2026-04-26';
+const VERSION = 'rastrum-shell-v4-2026-04-27';
 const SHELL = [
   '/',
   '/en/',
@@ -36,6 +36,53 @@ self.addEventListener('activate', (event) => {
 // Allow the page to ping us if it ever wants to force-update.
 self.addEventListener('message', (event) => {
   if (event.data === 'SKIP_WAITING') self.skipWaiting();
+});
+
+// ── Web Push ── (ux-streak-push)
+//
+// The streak-push EF sends payload-less notifications (just VAPID auth +
+// TTL). We render a fixed bilingual reminder body — picking ES vs EN by
+// the language of the most recently focused/visible client, falling back
+// to the document `lang`. Tapping the notification opens /profile/.
+self.addEventListener('push', (event) => {
+  event.waitUntil((async () => {
+    let lang = 'es';
+    try {
+      const clients = await self.clients.matchAll({ includeUncontrolled: true, type: 'window' });
+      const last = clients[0];
+      if (last) {
+        const url = new URL(last.url);
+        if (url.pathname.startsWith('/en/')) lang = 'en';
+      }
+    } catch { /* fall through to default */ }
+
+    const title = lang === 'en' ? 'Your streak is 1 day from breaking' : 'Tu racha está a 1 día de romperse';
+    const body = lang === 'en'
+      ? 'Log one observation today (with confidence ≥ 40%) to keep it alive.'
+      : 'Registra una observación hoy (con confianza ≥ 40 %) para mantenerla viva.';
+    const tag = 'rastrum-streak-reminder';
+
+    await self.registration.showNotification(title, {
+      body,
+      tag,
+      icon: '/rastrum-logo.svg',
+      badge: '/favicon.svg',
+      renotify: false,
+      data: { lang, target: lang === 'en' ? '/en/profile/' : '/es/perfil/' },
+    });
+  })());
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const target = event.notification.data?.target || '/';
+  event.waitUntil((async () => {
+    const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const c of clients) {
+      if (c.url.includes(target) && 'focus' in c) return c.focus();
+    }
+    if (self.clients.openWindow) return self.clients.openWindow(target);
+  })());
 });
 
 function isImmutableAsset(url) {

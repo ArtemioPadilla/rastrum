@@ -3,7 +3,13 @@ import { defineConfig, devices } from '@playwright/test';
 // Use a non-default port to avoid colliding with an `astro dev` someone left
 // running locally. CI is clean either way.
 const PORT = Number(process.env.E2E_PORT ?? 4329);
-const BASE_URL = `http://127.0.0.1:${PORT}`;
+const LOCAL_BASE_URL = `http://127.0.0.1:${PORT}`;
+
+// When PLAYWRIGHT_BASE_URL is set we hit a real deployment instead of
+// spinning up `astro preview` locally. The nightly smoke workflow uses
+// this against https://rastrum.org/.
+const REMOTE_BASE_URL = process.env.PLAYWRIGHT_BASE_URL?.replace(/\/$/, '');
+const BASE_URL = REMOTE_BASE_URL || LOCAL_BASE_URL;
 
 export default defineConfig({
   testDir: 'tests/e2e',
@@ -35,12 +41,17 @@ export default defineConfig({
       testMatch: /(mobile|smoke)\.spec\.ts/,
     },
   ],
-  webServer: {
-    command: `npm run preview -- --port ${PORT} --host 127.0.0.1`,
-    port: PORT,
-    reuseExistingServer: !process.env.CI,
-    timeout: 60_000,
-    stdout: 'ignore',
-    stderr: 'pipe',
-  },
+  // Skip the local preview server when targeting a remote base URL — the
+  // nightly smoke workflow runs against production and shouldn't waste
+  // a minute booting Astro on the runner.
+  webServer: REMOTE_BASE_URL
+    ? undefined
+    : {
+        command: `npm run preview -- --port ${PORT} --host 127.0.0.1`,
+        port: PORT,
+        reuseExistingServer: !process.env.CI,
+        timeout: 60_000,
+        stdout: 'ignore',
+        stderr: 'pipe',
+      },
 });

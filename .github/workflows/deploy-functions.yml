@@ -19,6 +19,8 @@ on:
           - export-dwca
           - mcp
           - api
+          - plantnet-monitor
+          - streak-push
 
 jobs:
   deploy:
@@ -41,8 +43,10 @@ jobs:
           #   share-card        — OG scrapers fetch anonymously
           #   recompute-streaks — cron-only; gates internally on service-role
           #   award-badges      — cron-only; gates internally on service-role
+          #   plantnet-monitor  — cron-only; gates internally on service-role
+          #   streak-push       — cron-only; gates internally on service-role
           #   mcp / api         — gate internally on rst_ tokens (not JWTs)
-          NO_JWT="share-card recompute-streaks award-badges mcp api"
+          NO_JWT="share-card recompute-streaks award-badges plantnet-monitor streak-push mcp api"
           deploy_one() {
             local fn="$1"
             local flag=""
@@ -51,7 +55,7 @@ jobs:
             supabase functions deploy "$fn" --project-ref "$PROJECT_REF" $flag
           }
           if [ "${{ inputs.function }}" = "all" ]; then
-            for fn in get-upload-url identify enrich-environment recompute-streaks award-badges share-card export-dwca mcp api; do
+            for fn in get-upload-url identify enrich-environment recompute-streaks award-badges share-card export-dwca mcp api plantnet-monitor streak-push; do
               deploy_one "$fn"
             done
           else
