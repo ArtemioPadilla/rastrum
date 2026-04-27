@@ -306,8 +306,8 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
 
     <!-- Evidence type -->
     <div data-identify-hide>
-      <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.observe.evidence_type}</label>
-      <select name="evidence_type" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
+      <label for="obs-evidence-type" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.observe.evidence_type}</label>
+      <select id="obs-evidence-type" name="evidence_type" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
         <option value="direct_sighting">{lang === 'es' ? 'Avistamiento directo' : 'Direct sighting'}</option>
         <option value="track">{lang === 'es' ? 'Huella' : 'Track / footprint'}</option>
         <option value="scat">{lang === 'es' ? 'Excremento' : 'Scat'}</option>
@@ -351,15 +351,15 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
     <!-- Habitat / weather -->
     <div class="grid grid-cols-2 gap-3" data-identify-hide>
       <div>
-        <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.observe.habitat}</label>
-        <select name="habitat" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
+        <label for="obs-habitat" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.observe.habitat}</label>
+        <select id="obs-habitat" name="habitat" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
           <option value="">{tr.observe.habitat_placeholder}</option>
           {habitats.map(h => <option value={h}>{habitatLabels?.[h] ?? h.replace(/_/g, ' ')}</option>)}
         </select>
       </div>
       <div>
-        <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.observe.weather}</label>
-        <select name="weather" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
+        <label for="obs-weather" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.observe.weather}</label>
+        <select id="obs-weather" name="weather" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
           <option value="">{tr.observe.weather_placeholder}</option>
           {weathers.map(w => <option value={w}>{weatherLabels?.[w] ?? w.replace(/_/g, ' ')}</option>)}
         </select>
