@@ -62,8 +62,8 @@ const recentActive = isActiveSection(currentPath, 'exploreRecent', lang);
       <span>{tr.nav.bottom.chat}</span>
     </a>
 
-    <!-- FAB slot -->
-    <div class="relative">
+    <!-- FAB slot — h-full so absolute children measure from the bar's top edge (not from items-end's collapsed bottom strip) -->
+    <div class="relative h-full">
       <a
         href={fab.href}
         data-tour="fab"
@@ -75,7 +75,7 @@ const recentActive = isActiveSection(currentPath, 'exploreRecent', lang);
           <span aria-hidden="true" class="absolute -top-1 -right-1 w-5 h-5 bg-yellow-400 text-zinc-900 rounded-full flex items-center justify-center text-[10px] font-bold border-2 border-white dark:border-zinc-950">⚡</span>
         )}
       </a>
-      <span class="absolute left-1/2 -translate-x-1/2 top-9 text-[9px] text-zinc-500 dark:text-zinc-400 whitespace-nowrap">
+      <span class="absolute left-1/2 -translate-x-1/2 bottom-1 text-[9px] text-zinc-500 dark:text-zinc-400 whitespace-nowrap">
         {fab.mode === 'quick-id' ? tr.nav.bottom.quick_id : tr.nav.bottom.observe}
       </span>
     </div>
