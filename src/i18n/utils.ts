@@ -119,3 +119,23 @@ export function getRouteLabel(key: string, lang: string): string {
 export function getRouteParent(key: string): string | undefined {
   return routeTree[key]?.parent;
 }
+
+/**
+ * Given a pathname like '/en/observe/' and a target locale like 'es',
+ * returns the equivalent path in that locale: '/es/observar/'.
+ * Falls back to a locale-prefix swap when no route key matches.
+ */
+export function getAlternateUrl(currentPath: string, targetLang: 'en' | 'es'): string {
+  const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+  const pathWithoutBase = currentPath.replace(base, '') || '/';
+  const segments = pathWithoutBase.split('/').filter(Boolean);
+  const currentLang = segments[0];
+  const currentSlug = '/' + (segments.slice(1).join('/') || '');
+
+  const matchedKey = Object.keys(routes).find(key => {
+    const slug = routes[key][currentLang as Locale] || '';
+    return slug === currentSlug || (currentSlug === '/' && slug === '');
+  });
+  const altSlug = matchedKey ? (routes[matchedKey][targetLang] || '') : currentSlug;
+  return `${base}/${targetLang}${altSlug}/`;
+}
