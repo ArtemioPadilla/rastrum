@@ -112,7 +112,7 @@ const pwa = (tr as unknown as { pwa: Record<string, string> }).pwa;
 </aside>
 
 <script>
-  import { isIOS, isFirefox, isAndroid, isStandaloneDisplayMode } from '../lib/local-ai-helpers';
+  import { isIOS, isFirefox, isAndroid, isPwaInstalled, markPwaInstalled, markInstalledIfRelatedAppsKnown } from '../lib/local-ai-helpers';
 
   type InstallPromptEvent = Event & {
     prompt: () => Promise<void>;
@@ -205,12 +205,21 @@ const pwa = (tr as unknown as { pwa: Record<string, string> }).pwa;
 
     window.addEventListener('appinstalled', () => {
       savedPrompt = null;
+      markPwaInstalled();   // remember across browser-tab visits, not just standalone session
       markDismissed();
       hide();
     });
 
     function init(): void {
-      if (isStandaloneDisplayMode() || isDismissed()) return;
+      // isPwaInstalled() includes display-mode standalone, the
+      // localStorage memo from a previous appinstalled event, and
+      // (after the async probe below) Chrome's getInstalledRelatedApps.
+      if (isPwaInstalled() || isDismissed()) return;
+      // Async probe: ask Chrome if the app is already installed even
+      // when this is a regular browser-tab visit. If so, persist + hide.
+      void markInstalledIfRelatedAppsKnown().then(() => {
+        if (isPwaInstalled()) hide();
+      });
       const count = readCount() + 1;
       writeCount(count);
       if (count < 2) return;

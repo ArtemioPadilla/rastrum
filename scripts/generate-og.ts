@@ -64,6 +64,61 @@ async function renderOne(spec: PageSpec, fontBold: ArrayBuffer, fontRegular: Arr
   console.log(`  ✓ ${spec.slug}.png  (${(png.length / 1024).toFixed(1)} KB)`);
 }
 
+// PWA screenshot specs — required by Chrome's "Richer PWA Install UI"
+// (one wide for desktop, one narrow for mobile). Stored under
+// public/screenshots/<slug>.png and referenced from manifest.webmanifest.
+const SCREENSHOTS_DIR = path.join(ROOT, 'public', 'screenshots');
+interface ScreenshotSpec {
+  slug: string;
+  width: number;
+  height: number;
+  card: StaticCardInput;
+}
+const SCREENSHOTS: ScreenshotSpec[] = [
+  {
+    slug: 'desktop-home',
+    width: 1280,
+    height: 720,
+    card: {
+      kind: 'static',
+      title: 'Rastrum',
+      subtitle: 'Identifica plantas, animales y hongos. Sin conexión. En tu idioma.',
+      accent: 'emerald',
+    },
+  },
+  {
+    slug: 'mobile-home',
+    width: 750,
+    height: 1334,
+    card: {
+      kind: 'static',
+      title: 'Rastrum',
+      subtitle: 'Captura una foto. Identifícala al instante. Sin conexión.',
+      accent: 'emerald',
+    },
+  },
+];
+
+async function renderScreenshot(spec: ScreenshotSpec, fontBold: ArrayBuffer, fontRegular: ArrayBuffer): Promise<void> {
+  // The OG-card layout was designed for 1200×630; reuse the same satori
+  // tree but tell satori the canvas is the screenshot's dimensions.
+  // satori scales children proportionally; if the layout doesn't fit, it
+  // re-flows. Acceptable for the install-UI screenshots (informational).
+  const tree = buildOgTree(spec.card);
+  const svg = await satori(tree as unknown as Parameters<typeof satori>[0], {
+    width: spec.width,
+    height: spec.height,
+    fonts: [
+      { name: 'DM Sans', data: fontBold,    weight: 700, style: 'normal' },
+      { name: 'DM Sans', data: fontRegular, weight: 400, style: 'normal' },
+    ],
+  });
+  const png = new Resvg(svg, { fitTo: { mode: 'width', value: spec.width } }).render().asPng();
+  const outPath = path.join(SCREENSHOTS_DIR, `${spec.slug}.png`);
+  fs.writeFileSync(outPath, png);
+  console.log(`  ✓ screenshots/${spec.slug}.png  (${spec.width}×${spec.height}, ${(png.length / 1024).toFixed(1)} KB)`);
+}
+
 async function main() {
   for (const fp of [FONT_BOLD_PATH, FONT_REGULAR_PATH]) {
     if (!fs.existsSync(fp)) {
@@ -71,6 +126,7 @@ async function main() {
     }
   }
   fs.mkdirSync(OUT_DIR, { recursive: true });
+  fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
   // Convert Buffer → ArrayBuffer (satori's Font['data'] type expects
   // ArrayBuffer | Buffer, not Uint8Array). The slice() copies.
   const toAb = (b: Buffer): ArrayBuffer => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
@@ -79,6 +135,10 @@ async function main() {
   console.log(`Generating ${PAGES.length} OG cards into public/og/…`);
   for (const spec of PAGES) {
     await renderOne(spec, fontBold, fontRegular);
+  }
+  console.log(`Generating ${SCREENSHOTS.length} PWA screenshots into public/screenshots/…`);
+  for (const spec of SCREENSHOTS) {
+    await renderScreenshot(spec, fontBold, fontRegular);
   }
   console.log(`Done.`);
 }

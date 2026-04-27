@@ -105,3 +105,50 @@ export function isStandaloneDisplayMode(): boolean {
   const navStandalone = (window.navigator as Navigator & { standalone?: boolean }).standalone;
   return navStandalone === true;
 }
+
+const PWA_INSTALLED_KEY = 'rastrum.pwaInstalled';
+
+/**
+ * True when we have any signal that the PWA has been installed on this
+ * device — combines:
+ *   1. display-mode: standalone (we're running INSIDE the installed app)
+ *   2. localStorage memo (set on the `appinstalled` event last time)
+ *   3. navigator.getInstalledRelatedApps() (Chrome only; needs
+ *      manifest related_applications) — async, so not used here; the
+ *      `markInstalledIfRelatedAppsKnown()` helper polls it on first
+ *      load and writes the localStorage memo for subsequent visits.
+ *
+ * This catches the "user installed yesterday, today opens
+ * rastrum.org in a regular Chrome tab" case where display-mode is
+ * 'browser' but the app IS installed — without this, the banner
+ * re-appears in browser-tab context.
+ */
+export function isPwaInstalled(): boolean {
+  if (typeof window === 'undefined') return false;
+  if (isStandaloneDisplayMode()) return true;
+  try { return localStorage.getItem(PWA_INSTALLED_KEY) === 'true'; }
+  catch { return false; }
+}
+
+/** Persist the "installed on this device" memo. Idempotent. */
+export function markPwaInstalled(): void {
+  try { localStorage.setItem(PWA_INSTALLED_KEY, 'true'); } catch { /* full storage */ }
+}
+
+/**
+ * Async probe via Chrome's `getInstalledRelatedApps()`. When it
+ * confirms our PWA is installed, write the localStorage memo so
+ * subsequent loads short-circuit synchronously via `isPwaInstalled()`.
+ * Safe no-op on browsers that don't support the API.
+ */
+export async function markInstalledIfRelatedAppsKnown(): Promise<void> {
+  if (typeof navigator === 'undefined') return;
+  const nav = navigator as Navigator & {
+    getInstalledRelatedApps?: () => Promise<Array<{ platform: string; url?: string; id?: string }>>;
+  };
+  if (typeof nav.getInstalledRelatedApps !== 'function') return;
+  try {
+    const apps = await nav.getInstalledRelatedApps();
+    if (apps.length > 0) markPwaInstalled();
+  } catch { /* permissions or feature gated — ignore */ }
+}
