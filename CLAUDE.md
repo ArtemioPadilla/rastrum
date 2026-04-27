@@ -3,7 +3,7 @@
 > Briefing for AI coding agents (Claude Code, Copilot, Cursor, Codex, …)
 > working in this repo. Read this before making changes.
 >
-> **Last full doc sync:** 2026-04-26 (v1.0 shipped).
+> **Last full doc sync:** 2026-04-26 (v1.0 + chrome revamp).
 
 ---
 
@@ -69,11 +69,17 @@ src/
 ├── components/             Astro components — both pages + shared widgets
 │   ├── *View.astro         Shared per-feature views (RoadmapView, TasksView,
 │   │                       ProfileView, ExploreMap, ExportView, …)
-│   └── *Form.astro         Forms (ObservationForm, ProfileEditForm, SignInForm)
+│   ├── *Form.astro         Forms (ObservationForm, ProfileEditForm, SignInForm)
+│   ├── Header.astro        Verb-first chrome (Observe/Explore ▾/Chat | About/Docs ▾)
+│   ├── MegaMenu.astro      3-col dropdown shell, used by Docs ▾
+│   ├── MobileBottomBar.astro 5-slot bottom bar with center camera FAB (signed-in)
+│   └── MobileDrawer.astro  Right-side hamburger overlay (mobile only)
 ├── i18n/{en,es}.json       Translations. ANY new UI string lives here.
-├── i18n/utils.ts           t(lang) helper, route map, docPages list.
+├── i18n/utils.ts           t(lang) helper, routes + routeTree, docPages list.
 ├── layouts/                BaseLayout (PWA, theme, SW reg) + DocLayout (sidebar)
 ├── lib/
+│   ├── chrome-mode.ts      resolveChromeMode(path) → 'app' | 'read'
+│   ├── chrome-helpers.ts   getFabTarget, isActiveSection
 │   ├── supabase.ts         Singleton supabase-js client
 │   ├── auth.ts             Magic link, OAuth, OTP, passkey, signOut
 │   ├── byo-keys.ts         Per-plugin user-supplied API keys (localStorage)
@@ -89,7 +95,8 @@ src/
 │   │   ├── index.ts        bootstrapIdentifiers() registers built-ins
 │   │   └── *.ts            One file per plugin
 │   └── types.ts            ObserverRef, Observation, MediaFile, …
-├── pages/{en,es}/          Locale-paired routes. /en/observe ↔ /es/observar
+├── pages/{en,es}/          Locale-paired routes. /en/observe ↔ /es/observar;
+│                           explore subroutes: /explore/{recent,watchlist,species}
 ├── pages/auth/callback.astro  Language-neutral OAuth/PKCE landing page
 ├── pages/share/obs/        Public OG-card observation viewer
 └── env.d.ts                Typed import.meta.env
@@ -191,6 +198,27 @@ Adding a new model/service for species ID is a 3-step recipe:
 3. (Server-side only) extend the Edge Function's `force_provider` switch.
 The registry has runtime collision detection on `id`. See
 `docs/specs/modules/13-identifier-registry.md` for the full contract.
+
+### Chrome / IA conventions
+
+The app chrome is verb-first. Three action items on the left of the header
+— **Observe**, **Explore ▾** (dropdown), **Chat** — and a reference cluster
+on the right — **About**, **Docs ▾**. Identify is hub-spoke off the home
+hero and is intentionally absent from persistent nav.
+
+Mobile uses a bottom bar (`MobileBottomBar.astro`) with a center camera FAB;
+when the user is on `/observe`, the FAB shifts to `/identify` with a
+"⚡ Quick ID" badge. A right-side drawer (`MobileDrawer.astro`) handles
+reference links, account, and preferences.
+
+Per-section accent rail: Observe = emerald (brand), Explore = teal, Chat =
+sky, About/Docs = stone. The dynamic `railClass()` helper in `Header.astro`
+builds these class names at runtime, so they must be **SAFELISTED** in
+`tailwind.config.mjs`. Adding a new top-level section with its own accent
+colour requires extending that safelist or the classes will be purged in
+production builds.
+
+Full design rationale: `docs/superpowers/specs/2026-04-26-ux-revamp-design.md`.
 
 ---
 
