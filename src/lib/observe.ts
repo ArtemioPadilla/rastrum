@@ -10,6 +10,7 @@
  */
 import { getDB, requestPersistentStorage } from './db';
 import { getSupabase } from './supabase';
+import { announcePendingCount } from './sync-events';
 import type {
   EvidenceType, HabitatType, MediaFile, Observation, ObserverRef, WeatherTag,
 } from './types';
@@ -127,6 +128,10 @@ export async function saveObservationToOutbox(draft: ObservationDraft): Promise<
     created_at: obs.createdAt,
     updated_at: obs.createdAt,
   });
+
+  // Header sync pill listens for this — without it the pill stays at its
+  // last known count until a sync event fires.
+  if (!draft.asDraft) announcePendingCount().catch(() => { /* SSR */ });
 
   return obs;
 }

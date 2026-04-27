@@ -5,6 +5,7 @@ import BellIcon from './BellIcon.astro';
 import MegaMenu from './MegaMenu.astro';
 import MobileBottomBar from './MobileBottomBar.astro';
 import MobileDrawer from './MobileDrawer.astro';
+import SyncPill from './SyncPill.astro';
 
 interface Props {
   lang: string;
@@ -159,6 +160,7 @@ const docColumns = [
       >
         {tr.auth.sign_in}
       </a>
+      <SyncPill lang={locale} />
       <BellIcon lang={locale} />
       <div id="avatar-wrap" class="hidden relative">
         <button id="avatar-btn" aria-label="Account menu" class="block rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500">

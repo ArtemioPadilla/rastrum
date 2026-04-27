@@ -57,6 +57,18 @@ interface PresignedResponse {
   expiresIn: number;
 }
 
+export type UploadProgress = (loaded: number, total: number) => void;
+
+export interface UploadOptions {
+  /**
+   * Fires repeatedly during the PUT — `loaded` and `total` are bytes.
+   * Only the R2 path supports this today; the Supabase Storage SDK
+   * doesn't expose a progress event, so it's a single 100% pulse on
+   * completion.
+   */
+  onProgress?: UploadProgress;
+}
+
 /**
  * Upload a single media blob using the active backend (R2 if configured,
  * else Supabase Storage). Returns the resulting public URL.
@@ -65,14 +77,20 @@ export async function uploadMedia(
   blob: Blob,
   key: string,
   contentType = 'image/jpeg',
+  opts: UploadOptions = {},
 ): Promise<string> {
   if (r2Enabled()) {
-    return uploadToR2(blob, key, contentType);
+    return uploadToR2(blob, key, contentType, opts);
   }
-  return uploadToSupabaseStorage(blob, key, contentType);
+  return uploadToSupabaseStorage(blob, key, contentType, opts);
 }
 
-async function uploadToR2(blob: Blob, key: string, contentType: string): Promise<string> {
+async function uploadToR2(
+  blob: Blob,
+  key: string,
+  contentType: string,
+  opts: UploadOptions,
+): Promise<string> {
   const supabase = getSupabase();
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Not signed in — cannot upload to R2');
@@ -82,21 +100,55 @@ async function uploadToR2(blob: Blob, key: string, contentType: string): Promise
   });
   if (error || !data) throw error ?? new Error('Failed to get presigned URL');
 
-  const res = await fetch(data.uploadUrl, {
-    method: 'PUT',
-    body: blob,
-    headers: { 'Content-Type': contentType },
-  });
-  if (!res.ok) throw new Error(`R2 upload failed: ${res.status} ${res.statusText}`);
+  // XHR over fetch so we can emit upload progress events. fetch() in browsers
+  // gives no insight into PUT-body progress (the streams API workaround is
+  // not yet broadly supported), and a frozen spinner on a 12 MP photo over
+  // a slow Telcel connection looks identical to a hung app.
+  await xhrPut(data.uploadUrl, blob, contentType, opts.onProgress);
   return data.publicUrl;
 }
 
-async function uploadToSupabaseStorage(blob: Blob, key: string, contentType: string): Promise<string> {
+function xhrPut(
+  url: string,
+  blob: Blob,
+  contentType: string,
+  onProgress?: UploadProgress,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', url, true);
+    xhr.setRequestHeader('Content-Type', contentType);
+    if (onProgress) {
+      xhr.upload.addEventListener('progress', (ev) => {
+        if (ev.lengthComputable) onProgress(ev.loaded, ev.total);
+      });
+    }
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        if (onProgress) onProgress(blob.size, blob.size);
+        resolve();
+      } else {
+        reject(new Error(`R2 upload failed: ${xhr.status} ${xhr.statusText}`));
+      }
+    });
+    xhr.addEventListener('error', () => reject(new Error('R2 upload network error')));
+    xhr.addEventListener('abort', () => reject(new Error('R2 upload aborted')));
+    xhr.send(blob);
+  });
+}
+
+async function uploadToSupabaseStorage(
+  blob: Blob,
+  key: string,
+  contentType: string,
+  opts: UploadOptions,
+): Promise<string> {
   const supabase = getSupabase();
   const { error } = await supabase.storage
     .from('media')
     .upload(key, blob, { contentType, upsert: true });
   if (error) throw error;
+  if (opts.onProgress) opts.onProgress(blob.size, blob.size);
   const { data } = supabase.storage.from('media').getPublicUrl(key);
   return data.publicUrl;
 }

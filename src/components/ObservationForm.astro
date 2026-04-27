@@ -67,6 +67,16 @@ const videoMaxDuration  = observeStrings.video_max_duration  ?? (isEs ? 'Máximo
 const gpsErrPermission  = observeStrings.gps_error_permission_denied ?? (isEs ? 'Permiso de ubicación denegado. Actívalo en ajustes.' : 'Location permission denied. Enable it in settings.');
 const gpsErrUnavailable = observeStrings.gps_error_unavailable       ?? (isEs ? 'Ubicación no disponible.' : 'Location unavailable.');
 const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 'Tiempo de espera agotado.' : 'Location timed out.');
+const gpsDeniedTitle    = observeStrings.gps_denied_card_title       ?? (isEs ? 'Necesitamos tu ubicación' : 'We need your location');
+const gpsDeniedBody     = observeStrings.gps_denied_card_body        ?? (isEs ? 'Tu dispositivo bloqueó el permiso. Vuelve a pedirlo o ingresa las coordenadas a mano.' : 'Your device blocked permission. Ask again or enter coordinates manually.');
+const gpsDeniedRetry    = observeStrings.gps_denied_retry            ?? (isEs ? 'Volver a pedir permiso' : 'Ask again');
+const gpsDeniedManual   = observeStrings.gps_denied_manual           ?? (isEs ? 'Ingresar manualmente' : 'Enter manually');
+const formRestoredBanner   = observeStrings.form_restored_banner    ?? (isEs ? 'Restauramos tu observación en progreso.' : 'We restored your in-progress observation.');
+const formRestoredDismiss  = observeStrings.form_restored_dismiss   ?? (isEs ? 'Descartar' : 'Discard');
+const uploadProgressTpl    = observeStrings.upload_progress_label   ?? (isEs ? 'Subiendo foto: {pct}%' : 'Uploading photo: {pct}%');
+const idAgainLabel         = observeStrings.id_again                ?? (isEs ? 'Identificar de otra forma' : 'Identify another way');
+const idAgainRunningLabel  = observeStrings.id_again_running        ?? (isEs ? 'Reintentando identificación…' : 'Re-running identification…');
+const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? 'No se obtuvo otro resultado.' : 'No new result.');
 ---
 
 <div class="max-w-xl mx-auto">
@@ -77,7 +87,11 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
     data-label-identify={submitIdentifyLabel}
     data-label-save-cta={saveObservationCtaLabel}
     data-label-save-as={saveAsObservationLabel}
-    data-label-back-identify={backToIdentifyLabel}>
+    data-label-back-identify={backToIdentifyLabel}
+    data-upload-progress-tpl={uploadProgressTpl}
+    data-id-again-label={idAgainLabel}
+    data-id-again-running={idAgainRunningLabel}
+    data-id-again-failed={idAgainFailedLabel}>
 
     <!-- Pre-filled from chat banner (revealed by consumeChatPrefillIfAny) -->
     <div id="chat-prefill-banner" class="hidden rounded-lg border border-emerald-300 dark:border-emerald-800/40 bg-emerald-50 dark:bg-emerald-900/10 px-3 py-2 text-sm text-emerald-900 dark:text-emerald-200">
@@ -251,6 +265,12 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
         <div id="id-save-inline" class="hidden mt-3 pt-3 border-t border-zinc-200 dark:border-zinc-800">
           <button type="button" id="save-inline-btn" class="text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:underline">{saveInlineLinkLabel} →</button>
         </div>
+
+        <!-- Try-again — re-runs cascade with the next-best taxon hint -->
+        <div class="mt-3 pt-3 border-t border-zinc-200 dark:border-zinc-800 flex items-center gap-3 flex-wrap">
+          <button type="button" id="id-again-btn" class="text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:underline">↺ {idAgainLabel}</button>
+          <span id="id-again-status" class="hidden text-xs text-zinc-500"></span>
+        </div>
       </div>
 
       <!-- All-failed banner -->
@@ -308,6 +328,14 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
           data-err-unavailable={gpsErrUnavailable}
           data-err-timeout={gpsErrTimeout}
         >{tr.observe.gps_getting}</span>
+      </div>
+      <div id="gps-denied-card" class="hidden mt-2 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 p-3">
+        <p class="text-sm font-semibold text-amber-900 dark:text-amber-200">{gpsDeniedTitle}</p>
+        <p class="text-xs text-amber-800 dark:text-amber-300 mt-0.5">{gpsDeniedBody}</p>
+        <div class="mt-2 flex gap-2 flex-wrap">
+          <button type="button" id="gps-denied-retry" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 text-xs font-semibold text-white">{gpsDeniedRetry}</button>
+          <button type="button" id="gps-denied-manual" class="rounded-lg border border-amber-500 px-3 py-1.5 text-xs font-medium text-amber-900 dark:text-amber-200">{gpsDeniedManual}</button>
+        </div>
       </div>
       <div id="gps-manual-wrap" class="hidden mt-2 grid grid-cols-2 gap-2">
         <input id="manual-lat" name="lat" type="number" step="any" placeholder="Lat" class="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-base" />
@@ -398,7 +426,21 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
         : "✓ Your observation is saved even if AI can't identify it right now — identification will retry when you're online or after the models finish downloading."}
     </p>
     <p id="err" class="hidden text-sm text-red-600 dark:text-red-400"></p>
+
+    <!-- Upload progress strip (rendered while syncOutbox is pushing blobs) -->
+    <div id="upload-progress" class="hidden mt-2" aria-live="polite">
+      <p id="upload-progress-label" class="text-xs text-zinc-600 dark:text-zinc-400 mb-1">—</p>
+      <div class="h-1.5 w-full rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
+        <div id="upload-progress-bar" class="h-full bg-emerald-600 transition-[width] duration-150" style="width:0%"></div>
+      </div>
+    </div>
   </form>
+
+  <!-- Form-restored banner (appears when we re-hydrate a saved draft) -->
+  <div id="form-restored" class="hidden mt-3 rounded-lg border border-sky-300 dark:border-sky-800 bg-sky-50 dark:bg-sky-900/20 p-3 flex items-center justify-between gap-2">
+    <p class="text-xs text-sky-900 dark:text-sky-200" data-restored-tpl={formRestoredBanner}>{formRestoredBanner}</p>
+    <button id="form-restored-dismiss" type="button" class="text-xs font-medium text-sky-700 dark:text-sky-300 underline">{formRestoredDismiss}</button>
+  </div>
 
   <div id="success" class="hidden mt-6 rounded-lg border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-900/20 p-4">
     <p id="success-msg" class="text-sm text-emerald-900 dark:text-emerald-200">—</p>
@@ -911,7 +953,39 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
     if (lastFile) triggerClientIdentify(lastFile);
   });
 
-  async function triggerClientIdentify(file: File) {
+  // ── "Identify another way" ──────────────────────────────────────────
+  // Re-runs the cascade, excluding the runner that produced the current
+  // result. Used when Phi or PlantNet returns the wrong taxon and the
+  // user would rather have the alternate provider's answer than re-type
+  // the scientific name.
+  document.getElementById('id-again-btn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('id-again-btn') as HTMLButtonElement | null;
+    const status = document.getElementById('id-again-status');
+    if (!lastFile || !btn) return;
+    const runningLabel = form?.dataset.idAgainRunning ?? 'Re-running…';
+    const failedLabel  = form?.dataset.idAgainFailed  ?? 'No new result.';
+    btn.disabled = true;
+    if (status) {
+      status.textContent = runningLabel;
+      status.classList.remove('hidden');
+    }
+    const prevSource = currentIdentification?.source ?? null;
+    const before = currentIdentification?.scientific_name ?? null;
+    try {
+      await triggerClientIdentify(lastFile, prevSource);
+      if (status && currentIdentification?.scientific_name === before) {
+        status.textContent = failedLabel;
+      } else if (status) {
+        status.classList.add('hidden');
+      }
+    } catch (err) {
+      if (status) status.textContent = err instanceof Error ? err.message : String(err);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  async function triggerClientIdentify(file: File, excludeSource: string | null = null) {
     lastFile = file;
     hideAllIdStates();
     idSpinner?.classList.remove('hidden');
@@ -952,6 +1026,19 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
         }
       }
     } catch { /* WebLLM unavailable in this environment */ }
+
+    // "Identify another way" — exclude the previous winner's runner so the
+    // cascade resolves to the next-best provider. The map below covers
+    // the result.source values used in paintCard.
+    if (excludeSource) {
+      const sourceToRunnerId: Record<string, string> = {
+        plantnet: 'plantnet',
+        claude_haiku: 'claude_haiku',
+        webllm_phi35_vision: 'webllm_phi35_vision',
+      };
+      const runnerId = sourceToRunnerId[excludeSource] ?? excludeSource;
+      if (runners[runnerId]) delete runners[runnerId];
+    }
 
     if (Object.keys(runners).length === 0) {
       // No identifier available — show offer for Phi-vision (always free).
@@ -1799,10 +1886,31 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
     else                 msg = d.errTimeout ?? '';
     gpsStatus.textContent = msg;
     gpsStatus.className = 'text-amber-700 dark:text-amber-400 text-xs';
-    // Auto-reveal manual entry — that's the recovery path the message
-    // points users at.
-    gpsManualWrap?.classList.remove('hidden');
+    // Permission-denied gets the bigger recovery card (with explicit
+    // "Ask again" + "Enter manually" buttons). Other errors fall back to
+    // just revealing the manual-entry inputs as before.
+    if (code === 1) {
+      document.getElementById('gps-denied-card')?.classList.remove('hidden');
+    } else {
+      gpsManualWrap?.classList.remove('hidden');
+    }
   }
+
+  document.getElementById('gps-denied-retry')?.addEventListener('click', () => {
+    document.getElementById('gps-denied-card')?.classList.add('hidden');
+    if (gpsStatus) {
+      gpsStatus.textContent = (document.documentElement.lang === 'es')
+        ? 'Obteniendo tu ubicación…'
+        : 'Getting your location…';
+      gpsStatus.className = 'text-zinc-500';
+    }
+    void getLiveGPS();
+  });
+  document.getElementById('gps-denied-manual')?.addEventListener('click', () => {
+    document.getElementById('gps-denied-card')?.classList.add('hidden');
+    gpsManualWrap?.classList.remove('hidden');
+    document.getElementById('manual-lat')?.focus();
+  });
 
   async function getLiveGPS(): Promise<void> {
     if (!navigator.geolocation) {
@@ -2009,6 +2117,7 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
     if (!obsDraft) return;
     const savedObs = await saveObservationToOutbox(obsDraft);
     lastSavedObservationId = savedObs.id;
+    form.dispatchEvent(new CustomEvent('rastrum:form-saved'));
 
     // Attempt immediate sync if online; otherwise it'll flush on next online event.
     // Use a timeout to prevent hanging indefinitely if Edge Functions are unavailable.
@@ -2086,6 +2195,114 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
   anotherBtn?.addEventListener('click', () => {
     window.location.reload();
   });
+
+  // ── Upload progress strip ────────────────────────────────────────────
+  // Wired against the rastrum:sync-progress event emitted by the upload
+  // helper for every PUT chunk to R2. Hidden when no syncing is in flight.
+  (function wireUploadProgress() {
+    const wrap  = document.getElementById('upload-progress');
+    const label = document.getElementById('upload-progress-label');
+    const bar   = document.getElementById('upload-progress-bar');
+    if (!wrap || !label || !bar) return;
+    const tpl = form?.dataset.uploadProgressTpl ?? 'Uploading photo: {pct}%';
+    let lastPct = 0;
+    window.addEventListener('rastrum:sync-progress', ((ev: Event) => {
+      const detail = (ev as CustomEvent<{ loaded: number; total: number }>).detail;
+      if (!detail || !detail.total) return;
+      const pct = Math.min(100, Math.round((detail.loaded / detail.total) * 100));
+      lastPct = pct;
+      wrap.classList.remove('hidden');
+      label.textContent = tpl.replace('{pct}', String(pct));
+      (bar as HTMLElement).style.width = `${pct}%`;
+    }) as EventListener);
+    window.addEventListener('rastrum:sync-done', () => {
+      // Brief delay so the user sees the bar hit 100% before it disappears.
+      setTimeout(() => wrap.classList.add('hidden'), 600);
+    });
+    window.addEventListener('rastrum:sync-start', () => {
+      lastPct = 0;
+      (bar as HTMLElement).style.width = '0%';
+    });
+  })();
+
+  // ── Form auto-save / restore ─────────────────────────────────────────
+  // Persist text-only fields to localStorage on every input. On remount,
+  // restore them so a phone interruption (call, low battery, swipe-away)
+  // doesn't lose typed notes / picked dropdowns. Photos/audio/video are
+  // intentionally NOT persisted — they're already in the Dexie outbox if
+  // the user explicitly saved a draft, and serialising blobs to LS would
+  // blow the 5 MB quota immediately.
+  (function wireFormAutoSave() {
+    if (!form || form.dataset.mode === 'identify-only') return;
+    const KEY = 'rastrum.formAutoSave.v1';
+    const fields = ['notes', 'habitat', 'weather', 'evidence_type'];
+
+    type Saved = { ts: number; values: Record<string, string> };
+
+    function readFields(): Record<string, string> {
+      const out: Record<string, string> = {};
+      for (const name of fields) {
+        const el = form?.elements.namedItem(name) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
+        if (el && 'value' in el && el.value) out[name] = String(el.value);
+      }
+      return out;
+    }
+    function writeFields(values: Record<string, string>) {
+      for (const [name, v] of Object.entries(values)) {
+        const el = form?.elements.namedItem(name) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
+        if (el && 'value' in el) el.value = v;
+      }
+    }
+    function snapshot() {
+      try {
+        const values = readFields();
+        if (Object.keys(values).length === 0) {
+          localStorage.removeItem(KEY);
+          return;
+        }
+        const payload: Saved = { ts: Date.now(), values };
+        localStorage.setItem(KEY, JSON.stringify(payload));
+      } catch { /* full storage */ }
+    }
+
+    let debounce: number | undefined;
+    form.addEventListener('input',  () => { window.clearTimeout(debounce); debounce = window.setTimeout(snapshot, 400); });
+    form.addEventListener('change', () => { window.clearTimeout(debounce); debounce = window.setTimeout(snapshot, 400); });
+
+    // Restore on mount. We only restore if the snapshot is < 24 h old —
+    // older drafts are stale enough to be confusing.
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Saved;
+      const ageMs = Date.now() - (parsed?.ts ?? 0);
+      if (!parsed?.values || ageMs > 24 * 60 * 60 * 1000) {
+        localStorage.removeItem(KEY);
+        return;
+      }
+      const hasContent = Object.values(parsed.values).some(v => v && v.length > 0);
+      if (!hasContent) return;
+      writeFields(parsed.values);
+      document.getElementById('form-restored')?.classList.remove('hidden');
+    } catch { /* malformed JSON or LS off */ }
+
+    document.getElementById('form-restored-dismiss')?.addEventListener('click', () => {
+      try { localStorage.removeItem(KEY); } catch { /* noop */ }
+      const banner = document.getElementById('form-restored');
+      banner?.classList.add('hidden');
+      // Clear restored values back to defaults.
+      for (const name of fields) {
+        const el = form?.elements.namedItem(name) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
+        if (el && 'value' in el) el.value = '';
+      }
+    });
+
+    // Clear after a successful save (the form re-renders, so the next mount
+    // shouldn't re-restore the just-saved data).
+    form.addEventListener('rastrum:form-saved', () => {
+      try { localStorage.removeItem(KEY); } catch { /* noop */ }
+    });
+  })();
 
   // Kick off GPS + sync triggers on page load.
   // In identify-only mode, defer GPS until the user reveals the location

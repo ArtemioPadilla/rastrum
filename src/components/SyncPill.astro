@@ -1,0 +1,133 @@
+---
+/**
+ * SyncPill — header indicator for unsynced Dexie rows.
+ *
+ * Hidden by default; shown when there's at least one observation in
+ * sync_status='pending' or 'error'. Tapping flushes the outbox via
+ * syncOutbox() and announces the result. Listens to sync-events to keep
+ * the badge live.
+ *
+ * Renders nothing visible on first paint — the script flips it on once
+ * we know there's work queued. This avoids a flash of the pill on every
+ * page load when the queue is empty.
+ */
+import type { Locale } from '../i18n/utils';
+import { t } from '../i18n/utils';
+
+interface Props { lang: Locale }
+const { lang } = Astro.props;
+const tr = t(lang);
+const profile = tr.profile as unknown as Record<string, string>;
+const pillSingular = profile.sync_pill_pending ?? '{n} pending';
+const pillPlural   = profile.sync_pill_pending_plural ?? '{n} pending';
+const pillSyncing  = profile.sync_pill_syncing ?? 'Syncing…';
+const pillOffline  = profile.sync_pill_offline ?? 'Offline';
+const pillAria     = profile.sync_pill_aria ?? 'Sync pending observations';
+---
+
+<button
+  id="rastrum-sync-pill"
+  type="button"
+  data-singular={pillSingular}
+  data-plural={pillPlural}
+  data-syncing={pillSyncing}
+  data-offline={pillOffline}
+  aria-label={pillAria}
+  class="hidden inline-flex items-center gap-1.5 rounded-full border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-2.5 py-1 text-[11px] font-medium text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors"
+>
+  <svg id="sp-icon" aria-hidden="true" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M20 20v-5h-5M4 9a8 8 0 0114-3M20 15a8 8 0 01-14 3"/>
+  </svg>
+  <span id="sp-label">—</span>
+</button>
+
+<script>
+  import { SYNC_EVENTS, getPendingCount } from '../lib/sync-events';
+
+  const pill = document.getElementById('rastrum-sync-pill');
+  const label = document.getElementById('sp-label');
+  const icon  = document.getElementById('sp-icon');
+  if (pill && label) {
+    let busy = false;
+
+    const tplSingular = pill.dataset.singular ?? '{n} pending';
+    const tplPlural   = pill.dataset.plural ?? '{n} pending';
+    const tplSyncing  = pill.dataset.syncing ?? 'Syncing…';
+    const tplOffline  = pill.dataset.offline ?? 'Offline';
+
+    function spinIcon(spin: boolean) {
+      if (!icon) return;
+      icon.classList.toggle('animate-spin', spin);
+    }
+
+    function paint(count: number) {
+      if (busy) return;
+      if (count <= 0) {
+        pill?.classList.add('hidden');
+        return;
+      }
+      const tpl = count === 1 ? tplSingular : tplPlural;
+      label!.textContent = tpl.replace('{n}', String(count));
+      pill?.classList.remove('hidden');
+      spinIcon(false);
+    }
+
+    function paintSyncing() {
+      label!.textContent = tplSyncing;
+      pill?.classList.remove('hidden');
+      spinIcon(true);
+    }
+
+    function paintOffline() {
+      label!.textContent = tplOffline;
+      pill?.classList.remove('hidden');
+      spinIcon(false);
+    }
+
+    async function refresh() {
+      const c = await getPendingCount();
+      paint(c);
+    }
+
+    // Subscribe to sync events.
+    window.addEventListener(SYNC_EVENTS.start, () => {
+      busy = true;
+      paintSyncing();
+    });
+    window.addEventListener(SYNC_EVENTS.done, async () => {
+      busy = false;
+      await refresh();
+    });
+    window.addEventListener(SYNC_EVENTS.pendingChanged, ((ev: Event) => {
+      const detail = (ev as CustomEvent<{ count: number }>).detail;
+      paint(detail?.count ?? 0);
+    }) as EventListener);
+
+    // Reflect online/offline state passively (a queued row + offline =
+    // "Offline" badge so the user sees we're not just stalling).
+    window.addEventListener('online',  () => { void refresh(); });
+    window.addEventListener('offline', () => {
+      // Only flip to offline if there's something pending; an empty queue
+      // shouldn't flash a badge just because Wi-Fi died.
+      getPendingCount().then(c => { if (c > 0) paintOffline(); });
+    });
+
+    // Click flushes the outbox.
+    pill.addEventListener('click', async () => {
+      if (busy) return;
+      if (!navigator.onLine) {
+        paintOffline();
+        return;
+      }
+      try {
+        const { syncOutbox } = await import('../lib/sync');
+        await syncOutbox();
+      } catch (err) {
+        console.warn('[rastrum] manual sync failed', err);
+      }
+    });
+
+    // Initial paint (after a tick — Dexie open is async).
+    refresh();
+  }
+</script>

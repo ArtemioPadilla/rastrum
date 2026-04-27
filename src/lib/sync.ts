@@ -12,6 +12,10 @@ import { getDB, type ObservationRecord } from './db';
 import { getSupabase } from './supabase';
 import { uploadMedia, resizeImage, r2Enabled } from './upload';
 import type { Observation } from './types';
+import {
+  SYNC_EVENTS, emit, setLastSyncAt, announcePendingCount,
+  type SyncDoneDetail, type SyncProgressDetail, type SyncRowDetail,
+} from './sync-events';
 
 export interface SyncResult {
   synced: number;
@@ -50,7 +54,16 @@ async function syncOne(record: ObservationRecord): Promise<void> {
     }
     const ext = mime === 'image/jpeg' ? '.jpg' : '';
     const key = `observations/${record.id}/${b.id}${ext}`;
-    const url = await uploadMedia(payload, key, mime);
+    const url = await uploadMedia(payload, key, mime, {
+      onProgress: (loaded, total) => {
+        emit<SyncProgressDetail>(SYNC_EVENTS.progress, {
+          observation_id: record.id,
+          blob_id: b.id,
+          loaded,
+          total,
+        });
+      },
+    });
     await db.mediaBlobs.update(b.id, { uploaded: true, upload_url: url });
   }
 
@@ -279,30 +292,50 @@ async function triggerIdentify(observationId: string): Promise<void> {
  */
 export async function syncOutbox(): Promise<SyncResult> {
   const db = getDB();
-  const pending = await db.observations.where('sync_status').equals('pending').toArray();
-  if (!pending.length) return { synced: 0, failed: 0, skipped_guest: 0, last_error: null };
+  // Pending AND error rows both belong in the queue. An 'error' row is one
+  // that previously failed (e.g. CORS, network blip); we want manual retry
+  // and the auto-retry-on-mount to re-attempt them, not just the never-tried
+  // 'pending' rows.
+  const queued = await db.observations
+    .where('sync_status').anyOf('pending', 'error')
+    .toArray();
+  if (!queued.length) {
+    const empty: SyncResult = { synced: 0, failed: 0, skipped_guest: 0, last_error: null };
+    emit<SyncDoneDetail>(SYNC_EVENTS.done, empty);
+    await announcePendingCount();
+    return empty;
+  }
+
+  emit(SYNC_EVENTS.start, { total: queued.length });
 
   let synced = 0, failed = 0, skipped_guest = 0;
   let last_error: string | null = null;
 
-  for (const rec of pending) {
+  for (const rec of queued) {
     if (rec.observer_kind === 'guest') { skipped_guest++; continue; }
     try {
       await syncOne(rec);
       synced++;
+      emit<SyncRowDetail>(SYNC_EVENTS.rowDone, { observation_id: rec.id });
     } catch (err) {
       failed++;
       const msg = err instanceof Error ? err.message : String(err);
       last_error = msg;
       console.warn('[rastrum] syncOne failed', rec.id, msg);
       await db.observations.update(rec.id, {
+        sync_status: 'error',
         sync_error: msg,
         sync_attempts: (rec.sync_attempts ?? 0) + 1,
         updated_at: new Date().toISOString(),
       });
+      emit<SyncRowDetail>(SYNC_EVENTS.rowFail, { observation_id: rec.id, error: msg });
     }
   }
-  return { synced, failed, skipped_guest, last_error };
+  if (synced > 0) setLastSyncAt();
+  const result: SyncResult = { synced, failed, skipped_guest, last_error };
+  emit<SyncDoneDetail>(SYNC_EVENTS.done, result);
+  await announcePendingCount();
+  return result;
 }
 
 /** Register listeners that auto-flush the outbox when the app is visible/online. */

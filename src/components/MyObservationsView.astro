@@ -28,6 +28,16 @@ const profileStrings = tr.profile as unknown as Record<string, string>;
 const draftsFilterLabel = profileStrings.my_observations_filter_drafts ?? (lang === 'es' ? 'Borradores' : 'Drafts');
 const draftStatusLabel  = profileStrings.my_observations_status_draft  ?? (lang === 'es' ? 'Borrador' : 'Draft');
 const shareLabel        = profileStrings.my_observations_share         ?? (lang === 'es' ? 'Compartir' : 'Share');
+const retryLabel        = profileStrings.my_observations_retry         ?? (lang === 'es' ? 'Reintentar' : 'Retry');
+const retryingLabel     = profileStrings.my_observations_retrying      ?? (lang === 'es' ? 'Sincronizando…' : 'Syncing…');
+const retryFailedTpl    = profileStrings.my_observations_retry_failed  ?? (lang === 'es' ? 'No se pudo: {error}' : 'Sync failed: {error}');
+const retryOkLabel      = profileStrings.my_observations_retry_ok      ?? (lang === 'es' ? 'Sincronizada.' : 'Synced.');
+const lastSyncTpl       = profileStrings.my_observations_last_sync     ?? (lang === 'es' ? 'Última sincronización: {when}' : 'Last sync: {when}');
+const lastSyncNever     = profileStrings.my_observations_last_sync_never ?? (lang === 'es' ? 'Aún no se ha sincronizado nada.' : 'Nothing has synced yet.');
+const lastSyncNow       = profileStrings.my_observations_last_sync_now  ?? (lang === 'es' ? 'ahora mismo' : 'just now');
+const lastSyncMin       = profileStrings.my_observations_last_sync_minutes ?? '{n} min';
+const lastSyncHr        = profileStrings.my_observations_last_sync_hours   ?? '{n} h';
+const lastSyncDay       = profileStrings.my_observations_last_sync_days    ?? '{n} d';
 
 const tabs = [
   { id: 'all', label: tr.profile.my_observations_filter_all },
@@ -51,6 +61,16 @@ const tabs = [
   data-label-status-error={tr.profile.my_observations_status_error}
   data-label-status-draft={draftStatusLabel}
   data-label-share={shareLabel}
+  data-label-retry={retryLabel}
+  data-label-retrying={retryingLabel}
+  data-label-retry-failed={retryFailedTpl}
+  data-label-retry-ok={retryOkLabel}
+  data-label-last-sync={lastSyncTpl}
+  data-label-last-sync-never={lastSyncNever}
+  data-label-last-sync-now={lastSyncNow}
+  data-label-last-sync-min={lastSyncMin}
+  data-label-last-sync-hr={lastSyncHr}
+  data-label-last-sync-day={lastSyncDay}
   data-label-unknown-species={tr.profile.my_observations_unknown_species}
   data-observe-path={observePath}
 >
@@ -62,8 +82,10 @@ const tabs = [
       <a href={profilePath} class="text-sm text-zinc-600 dark:text-zinc-400 hover:underline">
         ← {tr.profile.view_profile}
       </a>
+      <p id="mo-last-sync" class="mt-1 text-xs text-zinc-500 dark:text-zinc-500" aria-live="polite"></p>
     </div>
   </header>
+  <div id="mo-toast" class="hidden fixed bottom-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg text-sm shadow-lg" role="status" aria-live="polite"></div>
 
   <div id="mo-signin" class="hidden rounded-lg border border-zinc-300 dark:border-zinc-700 p-4 text-sm">
     <p>{tr.profile.not_signed_in}</p>
@@ -166,12 +188,21 @@ const tabs = [
     const wrapTag = isSynced ? 'a' : 'div';
     const wrapAttr = isSynced ? `href="${shareBase}?id=${r.id}"` : '';
     const shareLabelText = root?.dataset.labelShare ?? 'Share';
-    const shareBtn = isSynced
-      ? `<button type="button" data-share-id="${r.id}" data-share-name="${escapeText(name)}" class="mo-share-btn shrink-0 inline-flex items-center gap-1 rounded-lg border border-emerald-600/60 px-2 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20" aria-label="${shareLabelText}">
+    const retryLabelText = root?.dataset.labelRetry ?? 'Retry';
+    const retryable = r.sync_status === 'pending' || r.sync_status === 'error';
+    let actionBtn = '';
+    if (isSynced) {
+      actionBtn = `<button type="button" data-share-id="${r.id}" data-share-name="${escapeText(name)}" class="mo-share-btn shrink-0 inline-flex items-center gap-1 rounded-lg border border-emerald-600/60 px-2 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20" aria-label="${shareLabelText}">
           <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v14"/></svg>
           ${shareLabelText}
-        </button>`
-      : '';
+        </button>`;
+    } else if (retryable) {
+      actionBtn = `<button type="button" data-retry-id="${r.id}" class="mo-retry-btn shrink-0 inline-flex items-center gap-1 rounded-lg border border-amber-500/60 px-2 py-1 text-xs font-medium text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20" aria-label="${retryLabelText}">
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M20 20v-5h-5M4 9a8 8 0 0114-3M20 15a8 8 0 01-14 3"/></svg>
+          ${retryLabelText}
+        </button>`;
+    }
+    const shareBtn = actionBtn;
     return `<li class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 overflow-hidden">
       <div class="flex items-center gap-3 p-3 ${isSynced ? 'hover:bg-zinc-50 dark:hover:bg-zinc-800/40' : 'opacity-90'}">
         <${wrapTag} ${wrapAttr} class="flex items-center gap-3 min-w-0 flex-1">
@@ -271,6 +302,70 @@ const tabs = [
     document.getElementById('mo-empty')?.classList.toggle('hidden', !visible);
   }
 
+  function showToast(msg: string, kind: 'ok' | 'err' = 'ok') {
+    const el = document.getElementById('mo-toast');
+    if (!el) return;
+    el.textContent = msg;
+    el.className = `fixed bottom-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg text-sm shadow-lg ${
+      kind === 'ok'
+        ? 'bg-emerald-700 text-white'
+        : 'bg-red-700 text-white'
+    }`;
+    el.classList.remove('hidden');
+    setTimeout(() => el.classList.add('hidden'), 4_000);
+  }
+
+  function paintLastSync() {
+    if (typeof localStorage === 'undefined') return;
+    const stampEl = document.getElementById('mo-last-sync');
+    if (!stampEl || !root) return;
+    let raw: string | null = null;
+    try { raw = localStorage.getItem('rastrum.lastSyncAt'); } catch { /* noop */ }
+    if (!raw) {
+      stampEl.textContent = root.dataset.labelLastSyncNever ?? '';
+      return;
+    }
+    const ts = Date.parse(raw);
+    if (!Number.isFinite(ts)) return;
+    const diffMs = Date.now() - ts;
+    const min = Math.floor(diffMs / 60_000);
+    const hr = Math.floor(min / 60);
+    const day = Math.floor(hr / 24);
+    let when: string;
+    if (min < 1) when = root.dataset.labelLastSyncNow ?? 'just now';
+    else if (min < 60) when = (root.dataset.labelLastSyncMin ?? '{n} min').replace('{n}', String(min));
+    else if (hr < 24)  when = (root.dataset.labelLastSyncHr  ?? '{n} h').replace('{n}', String(hr));
+    else               when = (root.dataset.labelLastSyncDay ?? '{n} d').replace('{n}', String(day));
+    const tpl = root.dataset.labelLastSync ?? 'Last sync: {when}';
+    stampEl.textContent = tpl.replace('{when}', when);
+  }
+
+  async function retryRow(observationId: string, btn: HTMLButtonElement) {
+    if (!root) return;
+    const origLabel = btn.innerHTML;
+    btn.disabled = true;
+    btn.textContent = root.dataset.labelRetrying ?? 'Syncing…';
+    try {
+      const { syncOutbox } = await import('../lib/sync');
+      const res = await syncOutbox();
+      if (res.synced > 0) {
+        showToast(root.dataset.labelRetryOk ?? 'Synced.', 'ok');
+        await resetAndLoad();
+      } else if (res.last_error) {
+        const tpl = root.dataset.labelRetryFailed ?? 'Sync failed: {error}';
+        showToast(tpl.replace('{error}', res.last_error), 'err');
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const tpl = root.dataset.labelRetryFailed ?? 'Sync failed: {error}';
+      showToast(tpl.replace('{error}', msg), 'err');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = origLabel;
+      paintLastSync();
+    }
+  }
+
   async function loadMore() {
     if (busy || exhausted) return;
     busy = true;
@@ -288,6 +383,15 @@ const tabs = [
             const id = btn.dataset.shareId ?? '';
             const name = btn.dataset.shareName ?? 'Rastrum';
             if (id) shareObservation(id, name);
+          });
+        });
+        // Wire freshly-rendered retry buttons.
+        list.querySelectorAll<HTMLButtonElement>('button.mo-retry-btn:not([data-bound])').forEach((btn) => {
+          btn.dataset.bound = '1';
+          btn.addEventListener('click', (ev) => {
+            ev.preventDefault();
+            const id = btn.dataset.retryId ?? '';
+            if (id) retryRow(id, btn);
           });
         });
       }
@@ -351,6 +455,8 @@ const tabs = [
     document.getElementById('mo-load-more')?.addEventListener('click', () => {
       loadMore().catch(() => { /* no-op */ });
     });
+    paintLastSync();
+    setInterval(paintLastSync, 60_000); // refresh "hace 3 min" once a minute
     await resetAndLoad();
 
     // Auto-retry the outbox in the background. If the user is here looking
@@ -361,6 +467,7 @@ const tabs = [
       const { syncOutbox } = await import('../lib/sync');
       const result = await syncOutbox();
       if (result.synced > 0) await resetAndLoad();
+      paintLastSync();
     } catch { /* silent — user already sees the list */ }
   }
 
