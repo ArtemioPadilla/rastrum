@@ -301,9 +301,25 @@ async function runServerCascade(
 
 // ─────────────── HTTP handler ───────────────
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info, x-rastrum-build',
+  'Access-Control-Max-Age': '86400',
+};
+
+function corsResponse(body: BodyInit | null, init: ResponseInit = {}): Response {
+  const headers = new Headers(init.headers);
+  for (const [k, v] of Object.entries(CORS_HEADERS)) headers.set(k, v);
+  return new Response(body, { ...init, headers });
+}
+
 serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
+  }
   if (req.method !== 'POST') {
-    return new Response('Method not allowed', { status: 405 });
+    return corsResponse('Method not allowed', { status: 405 });
   }
 
   // Per-IP rate limit for unauthenticated callers — guests on the
@@ -326,7 +342,7 @@ serve(async (req) => {
     const now = Date.now();
     const recent = (ipMap.get(key) ?? []).filter(t => now - t < WINDOW_MS);
     if (recent.length >= ANON_LIMIT) {
-      return new Response(
+      return corsResponse(
         JSON.stringify({ error: 'rate_limited', retry_after_seconds: 3600 }),
         { status: 429, headers: { 'content-type': 'application/json' } },
       );
@@ -339,11 +355,11 @@ serve(async (req) => {
   try {
     body = await req.json();
   } catch {
-    return new Response('Invalid JSON', { status: 400 });
+    return corsResponse('Invalid JSON', { status: 400 });
   }
 
   if (!body.observation_id || !body.image_url) {
-    return new Response('Missing observation_id or image_url', { status: 400 });
+    return corsResponse('Missing observation_id or image_url', { status: 400 });
   }
 
   const imageBytes = await fetchImageAsBytes(body.image_url);
@@ -386,7 +402,7 @@ serve(async (req) => {
 
   if (!result) {
     const hasAnyClaudeKey = !!(byoAnthropic || Deno.env.get('ANTHROPIC_API_KEY'));
-    return new Response(JSON.stringify({
+    return corsResponse(JSON.stringify({
       error: hasAnyClaudeKey ? 'identification_failed' : 'no_id_engine_available',
       hint: hasAnyClaudeKey
         ? 'PlantNet returned nothing and Claude failed to parse the response.'
@@ -413,7 +429,7 @@ serve(async (req) => {
     }
   }
 
-  return new Response(JSON.stringify(result), {
+  return corsResponse(JSON.stringify(result), {
     headers: { 'content-type': 'application/json' },
   });
 });

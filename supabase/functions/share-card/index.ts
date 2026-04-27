@@ -18,15 +18,31 @@ function escapeXml(s: string): string {
     ({ '<':'&lt;','>':'&gt;','&':'&amp;',"'":'&apos;','"':'&quot;' }[c]!));
 }
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info, x-rastrum-build',
+  'Access-Control-Max-Age': '86400',
+};
+
+function withCors(headers: HeadersInit = {}): HeadersInit {
+  const out = new Headers(headers);
+  for (const [k, v] of Object.entries(CORS_HEADERS)) out.set(k, v);
+  return out;
+}
+
 serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
+  }
   const url = new URL(req.url);
   const obsId = url.searchParams.get('obs_id') ?? url.searchParams.get('id');
   const format = url.searchParams.get('format') ?? 'html';   // html | svg
-  if (!obsId) return new Response('Missing obs_id', { status: 400 });
+  if (!obsId) return new Response('Missing obs_id', { status: 400, headers: CORS_HEADERS });
 
   const sUrl = Deno.env.get('SUPABASE_URL');
   const role = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  if (!sUrl || !role) return new Response('Function not configured', { status: 500 });
+  if (!sUrl || !role) return new Response('Function not configured', { status: 500, headers: CORS_HEADERS });
   const db = createClient(sUrl, role);
 
   const { data: obs } = await db
@@ -40,8 +56,8 @@ serve(async (req) => {
     .eq('identifications.is_primary', true)
     .maybeSingle();
 
-  if (!obs) return new Response('Not found', { status: 404 });
-  if (obs.obscure_level === 'full') return new Response('Not found', { status: 404 });
+  if (!obs) return new Response('Not found', { status: 404, headers: CORS_HEADERS });
+  if (obs.obscure_level === 'full') return new Response('Not found', { status: 404, headers: CORS_HEADERS });
 
   const ident = Array.isArray(obs.identifications) ? obs.identifications[0] : obs.identifications;
   const user  = Array.isArray(obs.users) ? obs.users[0] : obs.users;
@@ -102,10 +118,10 @@ serve(async (req) => {
 
   if (format === 'svg') {
     return new Response(svg, {
-      headers: {
+      headers: withCors({
         'content-type': 'image/svg+xml; charset=utf-8',
         'cache-control': 'public, max-age=86400',
-      },
+      }),
     });
   }
 
@@ -152,9 +168,9 @@ serve(async (req) => {
 </html>`;
 
   return new Response(html, {
-    headers: {
+    headers: withCors({
       'content-type': 'text/html; charset=utf-8',
       'cache-control': 'public, max-age=300',
-    },
+    }),
   });
 });

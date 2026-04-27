@@ -36,14 +36,30 @@ function lunarIllumination(d: Date): { phase: string; illumination: number } {
   return { phase, illumination: Math.round(illum * 100) / 100 };
 }
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info, x-rastrum-build',
+  'Access-Control-Max-Age': '86400',
+};
+
+function corsResponse(body: BodyInit | null, init: ResponseInit = {}): Response {
+  const headers = new Headers(init.headers);
+  for (const [k, v] of Object.entries(CORS_HEADERS)) headers.set(k, v);
+  return new Response(body, { ...init, headers });
+}
+
 serve(async (req) => {
-  if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
+  }
+  if (req.method !== 'POST') return corsResponse('Method not allowed', { status: 405 });
   const body = await req.json() as Req;
-  if (!body?.observation_id) return new Response('Missing observation_id', { status: 400 });
+  if (!body?.observation_id) return corsResponse('Missing observation_id', { status: 400 });
 
   const url = Deno.env.get('SUPABASE_URL');
   const role = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  if (!url || !role) return new Response('Function not configured', { status: 500 });
+  if (!url || !role) return corsResponse('Function not configured', { status: 500 });
 
   const db = createClient(url, role);
 
@@ -52,11 +68,11 @@ serve(async (req) => {
     .select('id, observed_at, location')
     .eq('id', body.observation_id)
     .maybeSingle();
-  if (!obs) return new Response('Observation not found', { status: 404 });
+  if (!obs) return corsResponse('Observation not found', { status: 404 });
 
   const geom = obs.location as { coordinates?: [number, number] } | null;
   const coords = geom?.coordinates;
-  if (!coords) return new Response('No location', { status: 422 });
+  if (!coords) return corsResponse('No location', { status: 422 });
 
   const [lng, lat] = coords;
   const observedAt = new Date(obs.observed_at);
@@ -92,8 +108,8 @@ serve(async (req) => {
     updated_at: new Date().toISOString(),
   }).eq('id', body.observation_id);
 
-  if (error) return new Response(error.message, { status: 500 });
-  return new Response(JSON.stringify({ ok: true, lunar, precip24, tempMean }), {
+  if (error) return corsResponse(error.message, { status: 500 });
+  return corsResponse(JSON.stringify({ ok: true, lunar, precip24, tempMean }), {
     headers: { 'content-type': 'application/json' },
   });
 });
