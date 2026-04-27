@@ -17,6 +17,13 @@ export interface SyncResult {
   synced: number;
   failed: number;
   skipped_guest: number;
+  /**
+   * The most recent failure's error message + the offending stage. Lets
+   * the form surface the real reason ("R2 upload 401", "PostgREST 403",
+   * "Edge Function not configured: CF_ACCOUNT_ID", etc.) instead of
+   * staying silent on the silent-fail path. Null when no failure.
+   */
+  last_error: string | null;
 }
 
 async function syncOne(record: ObservationRecord): Promise<void> {
@@ -273,9 +280,10 @@ async function triggerIdentify(observationId: string): Promise<void> {
 export async function syncOutbox(): Promise<SyncResult> {
   const db = getDB();
   const pending = await db.observations.where('sync_status').equals('pending').toArray();
-  if (!pending.length) return { synced: 0, failed: 0, skipped_guest: 0 };
+  if (!pending.length) return { synced: 0, failed: 0, skipped_guest: 0, last_error: null };
 
   let synced = 0, failed = 0, skipped_guest = 0;
+  let last_error: string | null = null;
 
   for (const rec of pending) {
     if (rec.observer_kind === 'guest') { skipped_guest++; continue; }
@@ -284,14 +292,17 @@ export async function syncOutbox(): Promise<SyncResult> {
       synced++;
     } catch (err) {
       failed++;
+      const msg = err instanceof Error ? err.message : String(err);
+      last_error = msg;
+      console.warn('[rastrum] syncOne failed', rec.id, msg);
       await db.observations.update(rec.id, {
-        sync_error: err instanceof Error ? err.message : String(err),
+        sync_error: msg,
         sync_attempts: (rec.sync_attempts ?? 0) + 1,
         updated_at: new Date().toISOString(),
       });
     }
   }
-  return { synced, failed, skipped_guest };
+  return { synced, failed, skipped_guest, last_error };
 }
 
 /** Register listeners that auto-flush the outbox when the app is visible/online. */

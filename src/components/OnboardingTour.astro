@@ -443,8 +443,9 @@ const altHref = `${base}/${alt}${altSlug}/`;
       name: string;
       desc: string;
       emoji: string;
-      type: 'cloud' | 'device';
+      type: 'cloud' | 'device' | 'map';
       status: 'ready' | 'needs_key' | 'not_downloaded' | 'cached' | 'unavailable';
+      unavailableReason?: string;
       hasKey?: boolean;
     };
 
@@ -505,6 +506,51 @@ const altHref = `${base}/${alt}${altSlug}/`;
       } catch { /* ignore */ }
       idStates.push({ id: 'onnx_base', name: 'EfficientNet-Lite0', desc: isEs ? 'En el dispositivo — respaldo offline (~2.8 MB).' : 'On-device — offline fallback (~2.8 MB).', emoji: '🔍', type: 'device', status: onnxCached ? 'cached' : 'not_downloaded' });
 
+      // 6. Llama-3.2-1B (text engine) — used by /chat and as the offline LLM
+      // interpreter when no Anthropic key is available. Same WebLLM path as Phi.
+      let llamaCached = false;
+      try {
+        const { getModelCacheStatus, TEXT_MODEL_ID } = await import('../lib/local-ai');
+        const s = await getModelCacheStatus(TEXT_MODEL_ID);
+        llamaCached = s.cached;
+      } catch { /* ignore */ }
+      idStates.push({
+        id: 'llama_text',
+        name: 'Llama-3.2-1B',
+        desc: isEs ? 'En el dispositivo — LLM offline para chat (~700 MB).' : 'On-device — offline LLM for chat (~700 MB).',
+        emoji: '💬',
+        type: 'device',
+        status: llamaCached ? 'cached' : 'not_downloaded',
+      });
+
+      // 7. Offline map (pmtiles, Mexico). Only listed if the operator has
+      // published an archive — otherwise mark unavailable so users see why.
+      try {
+        const { getPmtilesMxUrl, getPmtilesCacheStatus } = await import('../lib/offline-map');
+        const url = getPmtilesMxUrl();
+        if (url) {
+          const s = await getPmtilesCacheStatus();
+          idStates.push({
+            id: 'pmtiles_mx',
+            name: isEs ? 'Mapa offline — México' : 'Offline map — Mexico',
+            desc: isEs ? 'Zoom 0–10 (~48 MB) para /explore/map sin conexión.' : 'Zoom 0–10 (~48 MB) for offline /explore/map.',
+            emoji: '🗺️',
+            type: 'map',
+            status: s.cached ? 'cached' : 'not_downloaded',
+          });
+        } else {
+          idStates.push({
+            id: 'pmtiles_mx',
+            name: isEs ? 'Mapa offline — México' : 'Offline map — Mexico',
+            desc: isEs ? 'El operador aún no publicó un archivo de mapa offline.' : "Operator hasn't published an offline map archive yet.",
+            emoji: '🗺️',
+            type: 'map',
+            status: 'unavailable',
+            unavailableReason: 'no_url',
+          });
+        }
+      } catch { /* lib unavailable */ }
+
       renderIdCards();
     }
 
@@ -518,7 +564,9 @@ const altHref = `${base}/${alt}${altSlug}/`;
         const badge = `<span class="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded ${statusColor(s.status)}">${statusLabel(s.status)}</span>`;
         const typeBadge = s.type === 'cloud'
           ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-700 dark:text-sky-400">${isEs ? 'Nube' : 'Cloud'}</span>`
-          : `<span class="text-[10px] px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">${isEs ? 'Local' : 'Device'}</span>`;
+          : s.type === 'map'
+            ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-700 dark:text-teal-400">${isEs ? 'Mapa' : 'Map'}</span>`
+            : `<span class="text-[10px] px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">${isEs ? 'Local' : 'Device'}</span>`;
 
         let actionHtml = '';
         if (s.id === 'claude_haiku') {
@@ -555,9 +603,19 @@ const altHref = `${base}/${alt}${altSlug}/`;
             </div>`;
         }
 
-        if ((s.id === 'phi_vision' || s.id === 'birdnet' || s.id === 'onnx_base') && s.status === 'not_downloaded') {
-          const sizes: Record<string, string> = { phi_vision: '~4 GB', birdnet: '~50 MB', onnx_base: '~2.8 MB' };
-          const isHeavy = s.id === 'phi_vision' || s.id === 'birdnet';
+        if (
+          (s.id === 'phi_vision' || s.id === 'birdnet' || s.id === 'onnx_base' ||
+           s.id === 'llama_text' || s.id === 'pmtiles_mx') && s.status === 'not_downloaded'
+        ) {
+          const sizes: Record<string, string> = {
+            phi_vision: '~4 GB',
+            birdnet: '~50 MB',
+            onnx_base: '~2.8 MB',
+            llama_text: '~700 MB',
+            pmtiles_mx: '~48 MB',
+          };
+          // Heavy = anything large enough to warrant a Wi-Fi confirmation.
+          const isHeavy = s.id === 'phi_vision' || s.id === 'birdnet' || s.id === 'llama_text' || s.id === 'pmtiles_mx';
           actionHtml = `
             <div class="mt-2" data-onb-dl-row="${escape(s.id)}">
               <button type="button" data-onb-download="${escape(s.id)}" data-onb-size="${escape(sizes[s.id] ?? '')}" data-onb-heavy="${isHeavy ? '1' : '0'}" class="rounded-lg border border-emerald-600/60 px-3 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 disabled:opacity-50">
@@ -730,6 +788,20 @@ const altHref = `${base}/${alt}${altSlug}/`;
             if (statusEl) statusEl.textContent = `${Math.round(p.progress * 100)}%`;
           });
           const state = idStates.find(s => s.id === 'onnx_base');
+          if (state) state.status = 'cached';
+        } else if (modelId === 'llama_text') {
+          const { loadTextEngine } = await import('../lib/local-ai');
+          await loadTextEngine((p) => {
+            if (statusEl) statusEl.textContent = `${Math.round(p.progress * 100)}%`;
+          });
+          const state = idStates.find(s => s.id === 'llama_text');
+          if (state) state.status = 'cached';
+        } else if (modelId === 'pmtiles_mx') {
+          const { downloadPmtilesMx } = await import('../lib/offline-map');
+          await downloadPmtilesMx((p) => {
+            if (statusEl) statusEl.textContent = `${Math.round(p.progress * 100)}%`;
+          });
+          const state = idStates.find(s => s.id === 'pmtiles_mx');
           if (state) state.status = 'cached';
         }
         renderIdCards();

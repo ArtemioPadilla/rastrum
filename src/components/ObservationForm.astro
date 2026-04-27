@@ -2014,6 +2014,7 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
     // Use a timeout to prevent hanging indefinitely if Edge Functions are unavailable.
     let syncedNow = false;
     let syncErrMsg: string | null = null;
+    let syncFailedReason: string | null = null;
     if (ref.kind === 'user' && navigator.onLine) {
       try {
         const syncPromise = syncOutbox();
@@ -2022,6 +2023,9 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
         );
         const res = await Promise.race([syncPromise, timeoutPromise]);
         syncedNow = res.synced > 0;
+        if (res.failed > 0 && res.last_error) {
+          syncFailedReason = res.last_error;
+        }
       } catch (err) {
         syncErrMsg = err instanceof Error ? err.message : String(err);
         console.warn('[rastrum] sync failed or timed out:', err);
@@ -2036,14 +2040,28 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
       idShareBtn.removeAttribute('title');
     }
     if (successMsg) {
+      // Surface the real failure reason, not a generic "will sync later".
+      // Three states: hard exception (timeout, etc.), per-row failure
+      // (sync attempted but a runner threw; last_error is set), and clean
+      // success (synced > 0).
       if (syncErrMsg) {
         successMsg.textContent = isEsSubmit
-          ? `Guardada en este dispositivo. La sincronización falló (${syncErrMsg}); reintentaremos automáticamente.`
-          : `Saved on this device. Sync failed (${syncErrMsg}); we'll retry automatically.`;
+          ? `Guardada en este dispositivo. La sincronización falló: ${syncErrMsg}. Reintentaremos automáticamente.`
+          : `Saved on this device. Sync failed: ${syncErrMsg}. We'll retry automatically.`;
+      } else if (syncFailedReason) {
+        successMsg.textContent = isEsSubmit
+          ? `Guardada en este dispositivo. La subida no se completó: ${syncFailedReason}. Reintentaremos al recargar.`
+          : `Saved on this device. Upload didn't complete: ${syncFailedReason}. We'll retry on reload.`;
+      } else if (syncedNow) {
+        successMsg.textContent = isEsSubmit ? 'Guardada y sincronizada.' : 'Saved and synced.';
+      } else if (ref.kind === 'guest') {
+        successMsg.textContent = isEsSubmit
+          ? 'Guardada en este dispositivo. Inicia sesión para sincronizar.'
+          : "Saved on this device. Sign in to sync.";
       } else {
-        successMsg.textContent = syncedNow
-          ? (isEsSubmit ? 'Guardada y sincronizada.' : 'Saved and synced.')
-          : (isEsSubmit ? 'Guardada en este dispositivo. Se sincronizará al conectarse.' : 'Saved on this device. Will sync when you’re online.');
+        successMsg.textContent = isEsSubmit
+          ? 'Guardada en este dispositivo. Se sincronizará al conectarse.'
+          : "Saved on this device. Will sync when you're online.";
       }
     }
     } catch (err) {
