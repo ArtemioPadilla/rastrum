@@ -49,7 +49,7 @@ export type IDSource =
   | 'onnx_offline'
   | 'human';
 
-export type SyncStatus = 'pending' | 'synced' | 'error';
+export type SyncStatus = 'pending' | 'synced' | 'error' | 'draft';
 
 export type ObscureLevel = 'none' | '0.1deg' | '0.2deg' | '5km' | 'full';
 

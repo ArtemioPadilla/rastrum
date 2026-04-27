@@ -13,7 +13,12 @@ export interface ObservationRecord {
   id: string;                            // UUID v4, primary key
   observer_kind: 'user' | 'guest';       // mirrors observer_ref discriminator
   data: Observation;                     // the full observation payload
-  sync_status: 'pending' | 'synced' | 'error';
+  /**
+   * 'draft' = local-only, missing required GPS; sync engine SKIPS these
+   * until the user opens the row and adds a location, which flips them to
+   * 'pending' so they enter the normal upload path.
+   */
+  sync_status: 'pending' | 'synced' | 'error' | 'draft';
   sync_error?: string;
   sync_attempts: number;
   created_at: string;

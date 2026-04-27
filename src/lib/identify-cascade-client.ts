@@ -35,6 +35,18 @@ export type IdentifierRunner = (
   signal: AbortSignal,
 ) => Promise<UnifiedIdResult | null>;
 
+/**
+ * Optional taxon hint primed from the quick-taxon chips under the photo
+ * upload. Tapping 🐦 routes the cascade away from PlantNet (which only
+ * does plants and 403s on birds) and toward the vision LLMs.
+ */
+export type TaxonHint =
+  | 'Plantae'
+  | 'Animalia.Aves'
+  | 'Animalia.Mammalia'
+  | 'Animalia.Insecta'
+  | 'Fungi';
+
 export interface RunParallelIdentifyOptions {
   /** Plugin-id → runner. Pass only the runners that should compete. */
   runners: Record<string, IdentifierRunner>;
@@ -42,6 +54,36 @@ export interface RunParallelIdentifyOptions {
   threshold?: number;
   /** Wall-clock cap (ms) before we give up on slow runners. Default 30s. */
   timeoutMs?: number;
+  /** When set, runners are filtered/ordered by `filterRunnersByHint`. */
+  taxonHint?: TaxonHint | null;
+}
+
+/**
+ * Filter the runner set by a taxonomic hint. Pure helper extracted so the
+ * mapping is unit-testable without a real cascade.
+ *
+ * Rules:
+ *   - Plantae:        keep PlantNet primary, keep all others.
+ *   - Animalia.*:     drop PlantNet (it's plant-only and 403s on non-plants).
+ *   - Fungi:          drop PlantNet (tree of life is wrong).
+ *   - null / unset:   no-op, return the input unchanged.
+ *
+ * The "primary"/"prefer" intent is encoded just by *which runners are kept*
+ * — the cascade then races the survivors and the first to cross the
+ * confidence threshold wins.
+ */
+export function filterRunnersByHint(
+  runners: Record<string, IdentifierRunner>,
+  hint: TaxonHint | null | undefined,
+): Record<string, IdentifierRunner> {
+  if (!hint) return runners;
+  const out: Record<string, IdentifierRunner> = {};
+  const keepPlantNet = hint === 'Plantae';
+  for (const [id, runner] of Object.entries(runners)) {
+    if (id === 'plantnet' && !keepPlantNet) continue;
+    out[id] = runner;
+  }
+  return out;
 }
 
 export type ParallelIdentifyOutcome =
@@ -70,7 +112,8 @@ export async function runParallelIdentify(
 ): Promise<ParallelIdentifyOutcome> {
   const threshold = opts.threshold ?? 0.5;
   const timeoutMs = opts.timeoutMs ?? 30_000;
-  const entries = Object.entries(opts.runners);
+  const filteredRunners = filterRunnersByHint(opts.runners, opts.taxonHint ?? null);
+  const entries = Object.entries(filteredRunners);
   if (entries.length === 0) {
     return { kind: 'all_failed', errors: { _: 'no runners' } };
   }

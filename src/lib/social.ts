@@ -258,9 +258,9 @@ export function formatStreakDays(n: number, lang: 'en' | 'es'): string {
  * Sync-status filter used by the My Observations list. Pure helper so the
  * page can be tested without a DOM.
  */
-export type SyncFilter = 'all' | 'synced' | 'pending' | 'error';
+export type SyncFilter = 'all' | 'synced' | 'pending' | 'error' | 'draft';
 
-export const SYNC_FILTERS: ReadonlyArray<SyncFilter> = ['all', 'synced', 'pending', 'error'];
+export const SYNC_FILTERS: ReadonlyArray<SyncFilter> = ['all', 'synced', 'pending', 'error', 'draft'];
 
 export function isSyncFilter(value: string | null | undefined): value is SyncFilter {
   return !!value && (SYNC_FILTERS as ReadonlyArray<string>).includes(value);

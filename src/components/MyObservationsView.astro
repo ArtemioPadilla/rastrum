@@ -24,11 +24,17 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
 const profilePath = getLocalizedPath(lang, routes.profile[lang] + '/');
 const shareObsBase = `/${lang}/share/obs/`;
 
+const profileStrings = tr.profile as unknown as Record<string, string>;
+const draftsFilterLabel = profileStrings.my_observations_filter_drafts ?? (lang === 'es' ? 'Borradores' : 'Drafts');
+const draftStatusLabel  = profileStrings.my_observations_status_draft  ?? (lang === 'es' ? 'Borrador' : 'Draft');
+const shareLabel        = profileStrings.my_observations_share         ?? (lang === 'es' ? 'Compartir' : 'Share');
+
 const tabs = [
   { id: 'all', label: tr.profile.my_observations_filter_all },
   { id: 'synced', label: tr.profile.my_observations_filter_synced },
   { id: 'pending', label: tr.profile.my_observations_filter_pending },
   { id: 'error', label: tr.profile.my_observations_filter_error },
+  { id: 'draft', label: draftsFilterLabel },
 ] as const;
 ---
 
@@ -43,6 +49,8 @@ const tabs = [
   data-label-status-synced={tr.profile.my_observations_status_synced}
   data-label-status-pending={tr.profile.my_observations_status_pending}
   data-label-status-error={tr.profile.my_observations_status_error}
+  data-label-status-draft={draftStatusLabel}
+  data-label-share={shareLabel}
   data-label-unknown-species={tr.profile.my_observations_unknown_species}
   data-observe-path={observePath}
 >
@@ -117,7 +125,7 @@ const tabs = [
   type Row = {
     id: string;
     observed_at: string;
-    sync_status: 'synced' | 'pending' | 'error';
+    sync_status: 'synced' | 'pending' | 'error' | 'draft';
     state_province: string | null;
     identifications: Ident[] | Ident | null;
     media_files: Media[];
@@ -139,6 +147,7 @@ const tabs = [
     if (!root) return '';
     if (status === 'synced')  return `<span class="inline-flex items-center rounded-full bg-emerald-100 dark:bg-emerald-900/30 px-2 py-0.5 text-[11px] font-semibold text-emerald-800 dark:text-emerald-300">${root.dataset.labelStatusSynced ?? ''}</span>`;
     if (status === 'pending') return `<span class="inline-flex items-center rounded-full bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:text-amber-300">${root.dataset.labelStatusPending ?? ''}</span>`;
+    if (status === 'draft')   return `<span class="inline-flex items-center rounded-full bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">${root.dataset.labelStatusDraft ?? ''}</span>`;
     return `<span class="inline-flex items-center rounded-full bg-red-100 dark:bg-red-900/30 px-2 py-0.5 text-[11px] font-semibold text-red-800 dark:text-red-300">${root.dataset.labelStatusError ?? ''}</span>`;
   }
 
@@ -156,22 +165,71 @@ const tabs = [
     const isSynced = r.sync_status === 'synced';
     const wrapTag = isSynced ? 'a' : 'div';
     const wrapAttr = isSynced ? `href="${shareBase}?id=${r.id}"` : '';
+    const shareLabelText = root?.dataset.labelShare ?? 'Share';
+    const shareBtn = isSynced
+      ? `<button type="button" data-share-id="${r.id}" data-share-name="${escapeText(name)}" class="mo-share-btn shrink-0 inline-flex items-center gap-1 rounded-lg border border-emerald-600/60 px-2 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20" aria-label="${shareLabelText}">
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v14"/></svg>
+          ${shareLabelText}
+        </button>`
+      : '';
     return `<li class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 overflow-hidden">
-      <${wrapTag} ${wrapAttr} class="flex items-center gap-3 p-3 ${isSynced ? 'hover:bg-zinc-50 dark:hover:bg-zinc-800/40' : 'opacity-90'}">
-        <div class="w-16 h-16 shrink-0 rounded-lg overflow-hidden bg-zinc-100 dark:bg-zinc-800">
-          ${photo ? `<img src="${escapeText(photo)}" alt="${escapeText(name)}" class="w-full h-full object-cover" loading="lazy" />` : ''}
-        </div>
-        <div class="min-w-0 flex-1">
-          <p class="text-sm italic font-medium text-zinc-900 dark:text-zinc-100 truncate">${escapeText(name)}</p>
-          <p class="text-xs text-zinc-500 truncate">${date}${escapeText(region)}</p>
-          <div class="mt-1">${statusBadge(r.sync_status)}</div>
-        </div>
-      </${wrapTag}>
+      <div class="flex items-center gap-3 p-3 ${isSynced ? 'hover:bg-zinc-50 dark:hover:bg-zinc-800/40' : 'opacity-90'}">
+        <${wrapTag} ${wrapAttr} class="flex items-center gap-3 min-w-0 flex-1">
+          <div class="w-16 h-16 shrink-0 rounded-lg overflow-hidden bg-zinc-100 dark:bg-zinc-800">
+            ${photo ? `<img src="${escapeText(photo)}" alt="${escapeText(name)}" class="w-full h-full object-cover" loading="lazy" />` : ''}
+          </div>
+          <div class="min-w-0 flex-1">
+            <p class="text-sm italic font-medium text-zinc-900 dark:text-zinc-100 truncate">${escapeText(name)}</p>
+            <p class="text-xs text-zinc-500 truncate">${date}${escapeText(region)}</p>
+            <div class="mt-1">${statusBadge(r.sync_status)}</div>
+          </div>
+        </${wrapTag}>
+        ${shareBtn}
+      </div>
     </li>`;
+  }
+
+  async function shareObservation(id: string, name: string): Promise<void> {
+    const url = `https://rastrum.org/share/obs/?id=${encodeURIComponent(id)}`;
+    const text = lang === 'es' ? '¡Mira esta observación!' : 'Look at this observation!';
+    type NavShare = Navigator & { share?: (data: ShareData) => Promise<void> };
+    const nav = navigator as NavShare;
+    try {
+      if (typeof nav.share === 'function') {
+        await nav.share({ url, title: name, text });
+      } else if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+      }
+    } catch { /* user cancelled */ }
   }
 
   async function fetchPage(): Promise<Row[]> {
     if (!userId) return [];
+    if (currentTab === 'draft') {
+      // Drafts live only in Dexie — they're missing required GPS so the
+      // server never sees them until the user re-opens and adds location.
+      try {
+        const { getDB } = await import('../lib/db');
+        const db = getDB();
+        const all = await db.observations
+          .where('sync_status').equals('draft')
+          .reverse()
+          .sortBy('created_at');
+        const slice = all.slice(offset, offset + PAGE_SIZE);
+        return slice.map(rec => ({
+          id: rec.id,
+          observed_at: rec.created_at,
+          sync_status: 'draft' as const,
+          state_province: null,
+          identifications: rec.data.identification?.scientificName
+            ? { scientific_name: rec.data.identification.scientificName, is_primary: true }
+            : null,
+          media_files: [],
+        }));
+      } catch {
+        return [];
+      }
+    }
     const supabase = getSupabase();
     let q = supabase
       .from('observations')
@@ -195,7 +253,19 @@ const tabs = [
     try {
       const page = await fetchPage();
       const list = document.getElementById('mo-list');
-      if (list) list.insertAdjacentHTML('beforeend', page.map(rowMarkup).join(''));
+      if (list) {
+        list.insertAdjacentHTML('beforeend', page.map(rowMarkup).join(''));
+        // Wire freshly-rendered share buttons.
+        list.querySelectorAll<HTMLButtonElement>('button.mo-share-btn:not([data-bound])').forEach((btn) => {
+          btn.dataset.bound = '1';
+          btn.addEventListener('click', (ev) => {
+            ev.preventDefault();
+            const id = btn.dataset.shareId ?? '';
+            const name = btn.dataset.shareName ?? 'Rastrum';
+            if (id) shareObservation(id, name);
+          });
+        });
+      }
       offset += page.length;
       if (page.length < PAGE_SIZE) exhausted = true;
       const wrap = document.getElementById('mo-load-more-wrap');

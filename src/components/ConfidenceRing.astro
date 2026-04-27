@@ -1,0 +1,73 @@
+---
+/**
+ * Confidence ring — SVG arc graded emerald → amber → red, with the % rendered
+ * inside. Replaces the old `87%` text pill on the identification result card.
+ *
+ * Pre-attentive: a half-filled emerald ring vs a quarter-filled amber ring
+ * is recognised in <250 ms with no math. The numeric % stays inside for users
+ * who care, and the "i" info popover (on the parent) keeps source attribution.
+ *
+ * Static defaults; the form's runtime renderer (in ObservationForm.astro)
+ * builds the same arc imperatively and shares the same color thresholds via
+ * the `colorForConfidence` export below for parity.
+ */
+
+interface Props {
+  /** 0–1 confidence value. Out-of-range values are clamped. */
+  confidence: number;
+  /** Diameter in px. Defaults to 32. */
+  size?: number;
+  /** Stroke width. Defaults to 3. */
+  stroke?: number;
+}
+
+const { confidence, size = 32, stroke = 3 } = Astro.props;
+const c = Math.max(0, Math.min(1, confidence ?? 0));
+const radius = (size - stroke) / 2;
+const circumference = 2 * Math.PI * radius;
+const dash = circumference * c;
+const gap = circumference - dash;
+const colorClass =
+  c >= 0.85 ? 'text-emerald-500'
+  : c >= 0.5 ? 'text-amber-500'
+  : 'text-red-500';
+const pct = Math.round(c * 100);
+---
+
+<span
+  class={`relative inline-flex items-center justify-center ${colorClass}`}
+  style={`width:${size}px;height:${size}px;`}
+  role="img"
+  aria-label={`${pct}% confidence`}
+>
+  <svg
+    width={size}
+    height={size}
+    viewBox={`0 0 ${size} ${size}`}
+    class="absolute inset-0 -rotate-90"
+    aria-hidden="true"
+  >
+    <circle
+      cx={size / 2}
+      cy={size / 2}
+      r={radius}
+      fill="none"
+      stroke="currentColor"
+      stroke-opacity="0.15"
+      stroke-width={stroke}
+    />
+    <circle
+      cx={size / 2}
+      cy={size / 2}
+      r={radius}
+      fill="none"
+      stroke="currentColor"
+      stroke-width={stroke}
+      stroke-linecap="round"
+      stroke-dasharray={`${dash} ${gap}`}
+    />
+  </svg>
+  <span class="relative text-[9px] font-semibold tabular-nums leading-none">
+    {pct}
+  </span>
+</span>

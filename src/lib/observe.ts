@@ -45,6 +45,12 @@ export interface ObservationDraft {
   notes?: string | null;
   appVersion?: string;
   deviceOs?: string | null;
+  /**
+   * When true, the row is saved with `sync_status: 'draft'` and the sync
+   * engine skips it. Drafts are typically created when the user submits
+   * without a finite GPS fix (cell-dead zones).
+   */
+  asDraft?: boolean;
 }
 
 /** Build a fully-formed Observation from a draft, filling defaults. */
@@ -84,7 +90,7 @@ export function buildObservation(draft: ObservationDraft): Observation {
     precipitation24hMm: null,
     ndviValue: null,
     phenologicalSeason: null,
-    syncStatus: 'pending',
+    syncStatus: draft.asDraft ? 'draft' : 'pending',
     syncedAt: null,
     appVersion: draft.appVersion ?? 'v0.1',
     deviceOs:   draft.deviceOs   ?? (typeof navigator !== 'undefined' ? navigator.userAgent : null),
@@ -116,7 +122,7 @@ export async function saveObservationToOutbox(draft: ObservationDraft): Promise<
     id: obs.id,
     observer_kind: draft.observerRef.kind,
     data: obs,
-    sync_status: 'pending',
+    sync_status: draft.asDraft ? 'draft' : 'pending',
     sync_attempts: 0,
     created_at: obs.createdAt,
     updated_at: obs.createdAt,
