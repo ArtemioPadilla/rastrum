@@ -108,8 +108,8 @@ fi
 echo
 echo "Next:"
 echo "  1) Upload $OUT/megadetector_v5a.onnx to a CORS-open public URL."
-echo "     Example (Cloudflare R2):"
+echo "     Example (Cloudflare R2 — note --remote, otherwise it goes to the local Miniflare emulator):"
 echo "       wrangler r2 object put rastrum-media/models/megadetector_v5a.onnx \\"
-echo "         --file=$OUT/megadetector_v5a.onnx --content-type=application/octet-stream"
+echo "         --file=$OUT/megadetector_v5a.onnx --content-type=application/octet-stream --remote"
 echo "  2) Set in CI: PUBLIC_MEGADETECTOR_WEIGHTS_URL=https://media.rastrum.org/models"
 echo "  3) Rebuild + deploy. The client picks it up on the next page load."

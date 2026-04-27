@@ -47,11 +47,14 @@ trailing slash).
 
 ```bash
 # Once: bind the rastrum-media bucket if you haven't.
-# wrangler r2 bucket create rastrum-media
+# wrangler r2 bucket create rastrum-media --remote
 
+# Upload to the REMOTE bucket (without --remote, wrangler 4.x writes to
+# its local Miniflare emulator instead — easy gotcha):
 wrangler r2 object put rastrum-media/models/megadetector_v5a.onnx \
   --file=out/megadetector_v5a.onnx \
-  --content-type=application/octet-stream
+  --content-type=application/octet-stream \
+  --remote
 
 # Then make sure the bucket has CORS open for media.rastrum.org. The
 # project already serves BirdNET, EfficientNet, and pmtiles from the
@@ -121,6 +124,12 @@ then tries to downgrade for compatibility. The downgrade fails on the
 Resize op but the exported file is still valid at opset 18+, which
 onnxruntime-web 1.20+ runs without issue. (We dropped the explicit
 `--opset 12` flag from convert.sh — the exporter ignored it anyway.)
+
+**`wrangler r2 object put` says "Resource location: local"**: that means
+it wrote to the local Miniflare emulator at `~/Library/Preferences/.wrangler`,
+NOT Cloudflare. Add `--remote` to the command. Verified by `curl -I
+https://media.rastrum.org/models/megadetector_v5a.onnx` returning 200
+with the right content-length.
 
 ## See also
 
