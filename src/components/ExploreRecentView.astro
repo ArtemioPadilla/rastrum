@@ -209,7 +209,7 @@ const shareBase = `/${lang}/share/obs/`;
           id, observed_at, state_province, observer_id,
           identifications(scientific_name, is_primary, confidence, taxa(common_name_es, common_name_en)),
           media_files(url, is_primary),
-          users!observer_id(id, username, display_name, profile_public)
+          users(id, username, display_name, profile_public)
         `)
         .eq('sync_status', 'synced')
         .order('observed_at', { ascending: false })

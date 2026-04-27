@@ -86,7 +86,7 @@ const obsIdPlaceholder = '';
         .select(`
           id, observed_at, obscure_level, state_province, habitat, observer_id,
           identifications!inner(scientific_name, is_primary),
-          users!observer_id(display_name, username, profile_public)
+          users(display_name, username, profile_public)
         `)
         .eq('id', id)
         .eq('identifications.is_primary', true)
