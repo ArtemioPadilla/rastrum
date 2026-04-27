@@ -140,13 +140,13 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
         </button>
         <input id="gallery-input" type="file" accept="image/*" multiple class="sr-only" aria-label={tr.observe.choose_file} />
       </div>
-      <p class="mt-1 text-xs text-zinc-500">{tr.observe.photo_hint}</p>
+      <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{tr.observe.photo_hint}</p>
       <p id="photo-hint-android" class="hidden mt-1 text-xs text-amber-700 dark:text-amber-400">{observeStrings.photo_hint_android}</p>
 
       <!-- Quick-taxon chips (ux-quick-taxon-chips). Pure routing hint —
            selecting one filters the cascade runners; default = no hint. -->
       <fieldset id="taxon-hint-chips" class="mt-3" aria-label={taxonHintLabel}>
-        <legend class="text-xs uppercase tracking-wider text-zinc-500 mb-1">{taxonHintLabel}</legend>
+        <legend class="text-xs uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1">{taxonHintLabel}</legend>
         <div class="flex flex-wrap gap-1.5">
           <button type="button" data-hint="Plantae" class="taxon-chip min-h-9 px-2.5 py-1 rounded-full text-xs font-medium border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 data-[active=true]:bg-emerald-700 data-[active=true]:text-white data-[active=true]:border-emerald-700"><span aria-hidden="true">🌿</span> {taxonHintPlant}</button>
           <button type="button" data-hint="Animalia.Aves" class="taxon-chip min-h-9 px-2.5 py-1 rounded-full text-xs font-medium border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 data-[active=true]:bg-emerald-700 data-[active=true]:text-white data-[active=true]:border-emerald-700"><span aria-hidden="true">🐦</span> {taxonHintBird}</button>
@@ -180,7 +180,7 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
         <span id="video-elapsed" class="hidden text-xs text-zinc-500 font-mono"></span>
         <span id="video-error" class="hidden text-xs text-red-600 dark:text-red-400"></span>
       </div>
-      <p class="mt-1 text-xs text-zinc-500">{videoMaxDuration}</p>
+      <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{videoMaxDuration}</p>
     </div>
 
     <!-- Identification block (overhauled: parallel cascade + progressive disclosure + tooltip) -->
@@ -188,7 +188,7 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
       <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">{tr.observe.id_label ?? (isEs ? 'Identificación' : 'Identification')}</label>
 
       <!-- Single, non-morphing spinner -->
-      <div id="id-spinner" class="hidden flex items-center gap-2 text-sm text-zinc-500 mb-2">
+      <div id="id-spinner" class="hidden flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400 mb-2">
         <svg class="animate-spin h-4 w-4 text-emerald-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
@@ -218,7 +218,7 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
       <div id="id-result-card" class="hidden rounded-xl border border-zinc-200 dark:border-zinc-800 p-4 mb-2 bg-white dark:bg-zinc-900/40">
         <div class="flex items-baseline justify-between gap-2 flex-wrap">
           <div class="space-y-0.5 min-w-0">
-            <p class="text-xs uppercase tracking-wider text-zinc-500">{isEs ? 'Mejor coincidencia' : 'Top match'}</p>
+            <p class="text-xs uppercase tracking-wider text-zinc-500 dark:text-zinc-400">{isEs ? 'Mejor coincidencia' : 'Top match'}</p>
             <p id="id-name" class="text-lg italic font-semibold text-emerald-700 dark:text-emerald-400 break-words"></p>
             <p id="id-common" class="hidden text-sm text-zinc-600 dark:text-zinc-300"></p>
           </div>
@@ -257,7 +257,7 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
         <div id="id-alternates-wrap" class="hidden mt-3">
           <button id="id-alternates-toggle" type="button" class="text-xs text-emerald-700 dark:text-emerald-400 hover:underline" aria-expanded="false"></button>
           <div id="id-alternates" class="hidden mt-2">
-            <p class="text-xs uppercase tracking-wider text-zinc-500 mb-1">{idStrings.alternates_title}</p>
+            <p class="text-xs uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1">{idStrings.alternates_title}</p>
             <ul id="id-alternates-list" class="space-y-1 text-sm"></ul>
           </div>
         </div>
@@ -287,7 +287,7 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
         autocomplete="off"
         spellcheck={false}
       />
-      <p class="mt-1 text-xs text-zinc-500">{isEs ? 'Identificación automática al subir la foto. Puedes corregirla aquí.' : 'Auto-identifies on photo upload. Correct it here if needed.'}</p>
+      <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{isEs ? 'Identificación automática al subir la foto. Puedes corregirla aquí.' : 'Auto-identifies on photo upload. Correct it here if needed.'}</p>
     </div>
 
     <!-- Audio -->
@@ -301,7 +301,7 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
         <span id="audio-elapsed" class="hidden text-xs text-zinc-500 font-mono"></span>
         <span id="audio-error" class="hidden text-xs text-red-600 dark:text-red-400"></span>
       </div>
-      <p class="mt-1 text-xs text-zinc-500">{tr.observe.audio_max_duration} · {tr.observe.audio_pending_id}</p>
+      <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{tr.observe.audio_max_duration} · {tr.observe.audio_pending_id}</p>
     </div>
 
     <!-- Evidence type -->
@@ -324,7 +324,7 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
     <div data-identify-hide>
       <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.observe.gps_label}</label>
       <div id="gps-display" class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 px-3 py-2 text-sm">
-        <span id="gps-status" class="text-zinc-500"
+        <span id="gps-status" class="text-zinc-500 dark:text-zinc-400"
           data-err-permission={gpsErrPermission}
           data-err-unavailable={gpsErrUnavailable}
           data-err-timeout={gpsErrTimeout}
@@ -395,7 +395,7 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
         <button id="translate-undo-btn" type="button" class="hidden text-xs font-medium text-emerald-700 dark:text-emerald-400 underline">
           {tr.observe.translated_undo}
         </button>
-        <span id="ai-helpers-progress" class="hidden text-xs text-zinc-500 font-mono"></span>
+        <span id="ai-helpers-progress" class="hidden text-xs text-zinc-500 dark:text-zinc-400 font-mono"></span>
         <span id="ai-helpers-error" class="hidden text-xs text-red-600 dark:text-red-400"></span>
       </div>
     </div>
@@ -487,13 +487,13 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
   <div class="relative w-full sm:max-w-2xl h-full sm:h-[80vh] bg-white dark:bg-zinc-900 sm:rounded-lg overflow-hidden flex flex-col">
     <div class="flex items-center justify-between px-3 py-2 border-b border-zinc-200 dark:border-zinc-800">
       <h2 id="map-modal-title" class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{mapPickerTitle}</h2>
-      <button id="map-close-btn" type="button" class="min-h-11 min-w-11 rounded text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300" aria-label={mapPickerCancel}>
+      <button id="map-close-btn" type="button" class="min-h-11 min-w-11 rounded text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300" aria-label={mapPickerCancel}>
         <svg class="w-5 h-5 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
       </button>
     </div>
-    <p class="px-3 py-2 text-xs text-zinc-500">{mapPickerHint}</p>
+    <p class="px-3 py-2 text-xs text-zinc-500 dark:text-zinc-400">{mapPickerHint}</p>
     <div id="map-picker" class="flex-1 bg-zinc-100 dark:bg-zinc-900"></div>
-    <p id="map-picker-status" class="px-3 py-1 text-xs text-zinc-500">{mapPickerLoading}</p>
+    <p id="map-picker-status" class="px-3 py-1 text-xs text-zinc-500 dark:text-zinc-400">{mapPickerLoading}</p>
     <div class="flex items-center justify-end gap-2 px-3 py-3 border-t border-zinc-200 dark:border-zinc-800">
       <button id="map-cancel-btn" type="button" class="min-h-11 px-3 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800">
         {mapPickerCancel}
