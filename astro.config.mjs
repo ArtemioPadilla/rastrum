@@ -14,6 +14,10 @@ export default defineConfig({
     locales: ['en', 'es'],
     routing: {
       prefixDefaultLocale: true,
+      // Don't auto-redirect / to /en/ — we serve our own SEO-friendly
+      // root index.astro with hreflang + locale picker so crawlers and
+      // social-card scrapers get real metadata, not a thin redirect stub.
+      redirectToDefaultLocale: false,
     },
   },
   // PR-1 (UX revamp) IA reshuffle: watchlist is public-data exploration,
