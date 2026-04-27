@@ -1,9 +1,10 @@
 """INT8 dynamic quantisation for the MegaDetector v5a ONNX export.
 
 Dynamic quantisation is calibration-free — it folds activation ranges
-into the model at inference time. Output size shrinks ~40% vs FP32
-(~140 MB → ~85 MB) with negligible accuracy loss for detection at the
-default IoU/conf thresholds we use in the client.
+into the model at inference time. On the modern Ultralytics export of
+MegaDetector v5a we observe ~535 MB FP32 → ~134 MB INT8 (a ~75%
+reduction) with negligible accuracy loss for detection at the default
+IoU/conf thresholds we use in the client.
 
 Usage (called from convert.sh):
     python quantize_int8.py --in fp32.onnx --out int8.onnx

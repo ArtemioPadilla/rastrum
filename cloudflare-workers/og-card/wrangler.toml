@@ -1,0 +1,44 @@
+# Cloudflare Worker for dynamic Open Graph images.
+#
+# Routes:
+#   GET https://og.rastrum.org/obs/<id>.svg          → observation OG card
+#   GET https://og.rastrum.org/obs/<id>.svg?w=800    → constrained width variant
+#   GET https://og.rastrum.org/u/<username>.svg      → profile OG card
+#   GET https://og.rastrum.org/health                → liveness
+#
+# Why a separate subdomain instead of /og/* on rastrum.org:
+#   The rastrum.org apex is served straight from GitHub Pages today
+#   (no Cloudflare proxy). Routing /og/* through Cloudflare would
+#   require flipping the apex DNS to "proxied" and regression-testing
+#   the whole site. og.rastrum.org is purely Cloudflare-orange-cloud,
+#   isolated, and can be deployed independently.
+#
+# Deploy:
+#   cd cloudflare-workers/og-card
+#   npx wrangler deploy
+#
+# Bindings: SUPABASE_URL + SUPABASE_ANON_KEY are set as Worker secrets
+# (NOT plain vars — they sit on the public RLS surface but treating
+# them as secrets keeps them out of `wrangler.toml` and out of git).
+#
+#   npx wrangler secret put SUPABASE_URL
+#   npx wrangler secret put SUPABASE_ANON_KEY
+
+name = "rastrum-og-card"
+main = "src/index.ts"
+compatibility_date = "2026-04-27"
+compatibility_flags = ["nodejs_compat"]
+
+# Custom domain. Add a CNAME `og.rastrum.org → workers.dev` once the
+# Worker is deployed; Cloudflare auto-sets up the route.
+[[routes]]
+pattern = "og.rastrum.org/*"
+custom_domain = true
+
+# Public R2 host — used to embed observation photos directly in the OG
+# card without re-fetching them through the Worker.
+[vars]
+PUBLIC_R2_MEDIA_URL = "https://media.rastrum.org"
+
+# Static assets are not needed for this Worker — everything is generated
+# inline from the request URL.

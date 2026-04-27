@@ -5,16 +5,17 @@
 # MegaDetector v5a is a YOLOv5 model from Microsoft AI for Earth (MIT).
 # The export uses Ultralytics' YOLOv5 export.py (not the megadetector PyPI
 # package — that one ships inference utilities, not export). After export
-# we INT8-quantise via onnxruntime so the client downloads ~85 MB instead
-# of ~140 MB FP32.
+# we INT8-quantise via onnxruntime so the client downloads ~134 MB INT8
+# instead of ~535 MB FP32 (modern YOLOv5 export is fatter than the
+# 2021-era v5a checkpoint; quantisation still wins ~75% off).
 #
 # Usage:
 #   ./convert.sh                          # full pipeline, leaves output in ./out/
-#   ./convert.sh --skip-quantise          # FP32 only (~140 MB)
+#   ./convert.sh --skip-quantise          # FP32 only (~535 MB; usually you want INT8)
 #   ./convert.sh --weights /path/v5a.pt   # custom checkpoint path
 #
-# Output: out/megadetector_v5a.onnx (the file the client expects, INT8 by default)
-#         out/megadetector_v5a.fp32.onnx (kept around for debugging)
+# Output: out/megadetector_v5a.onnx (the file the client expects, INT8 ~134 MB)
+#         out/megadetector_v5a.fp32.onnx (kept around for debugging, ~535 MB)
 #
 # Then upload `out/megadetector_v5a.onnx` to a CORS-open public URL and set
 # `PUBLIC_MEGADETECTOR_WEIGHTS_URL` to the directory holding it (no trailing
@@ -69,15 +70,18 @@ if [[ -z "$WEIGHTS_PATH" ]]; then
   fi
 fi
 
-# 4. Run YOLOv5's export.py — produces md_v5a.0.0.onnx beside the checkpoint
-echo "▶ Exporting to ONNX (640×640, opset 12, CPU)"
+# 4. Run YOLOv5's export.py — produces md_v5a.0.0.onnx beside the checkpoint.
+# Note: we don't pass --opset; the modern Ultralytics exporter ignores low
+# opset requests anyway (uses opset 18 internally) and the downgrade
+# attempt fails on Resize ops with a noisy traceback. onnxruntime-web 1.20+
+# supports through opset 21, so the default is fine.
+echo "▶ Exporting to ONNX (640×640, default opset, CPU)"
 ( cd "$HERE/yolov5" \
   && python export.py \
        --weights "$WEIGHTS_PATH" \
        --include onnx \
        --imgsz 640 \
        --device cpu \
-       --opset 12 \
        --simplify )
 
 # YOLOv5 writes to ${weights%.pt}.onnx — locate and stage it.

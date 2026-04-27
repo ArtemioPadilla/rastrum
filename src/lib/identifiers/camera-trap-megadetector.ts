@@ -34,7 +34,7 @@ import {
 
 export const CAMERA_TRAP_PLUGIN_ID = 'camera_trap_megadetector';
 
-// Module-level ONNX session — keep across calls so the ~85 MB parse
+// Module-level ONNX session — keep across calls so the ~134 MB parse
 // happens once per page lifetime. Cleared on `clearMegadetectorCache()`
 // elsewhere if the model is removed.
 type OrtSession = {
@@ -140,7 +140,7 @@ export const cameraTrapMegadetectorIdentifier: Identifier = {
     'On-device YOLOv5 detector. Filters camera-trap photos as animal / human / vehicle / empty before any cloud round-trip. Runs entirely in this browser; photos never leave your device for this filtering step.',
   setupSteps: [
     {
-      text: 'Profile → Edit → AI settings → MegaDetector → Download (~85 MB).',
+      text: 'Profile → Edit → AI settings → MegaDetector → Download (~134 MB).',
     },
     {
       text: 'After download, the filter runs offline. Empty / human / vehicle frames short-circuit the cascade and land in needs_review.',
@@ -173,7 +173,7 @@ export const cameraTrapMegadetectorIdentifier: Identifier = {
     }
     const status = await getMegadetectorCacheStatus();
     if (!status.modelCached) {
-      return { ready: false, reason: 'needs_download', message: '~85 MB download (model only).' };
+      return { ready: false, reason: 'needs_download', message: '~134 MB download (model only).' };
     }
     return { ready: true };
   },

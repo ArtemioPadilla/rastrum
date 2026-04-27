@@ -2,7 +2,7 @@
  * MegaDetector v5a weight cache — mirrors `birdnet-cache.ts`.
  *
  * Files we cache (Cache API, key = absolute URL):
- *   - megadetector_v5a.onnx        (~85 MB; YOLOv5 ONNX export)
+ *   - megadetector_v5a.onnx        (~134 MB; INT8 YOLOv5 ONNX export)
  *
  * The weights base URL comes from `import.meta.env.PUBLIC_MEGADETECTOR_WEIGHTS_URL`.
  * Until the operator hosts the file the plugin reports `model_not_bundled`
@@ -10,11 +10,11 @@
  *
  * Operator action: run the recipe at `infra/megadetector/convert.sh` —
  * it clones ultralytics/yolov5, runs `export.py --weights md_v5a.0.0.pt
- * --include onnx --imgsz 640 --opset 12 --simplify`, and INT8-quantises
- * the result via onnxruntime so the client downloads ~85 MB instead of
- * ~140 MB. Upload the resulting `megadetector_v5a.onnx` to a CORS-open
- * public URL (e.g. Cloudflare R2 under media.rastrum.org/models/) and
- * set `PUBLIC_MEGADETECTOR_WEIGHTS_URL` to the directory URL (no
+ * --include onnx --imgsz 640 --simplify`, and INT8-quantises the
+ * result via onnxruntime so the client downloads ~134 MB instead of
+ * ~535 MB FP32. Upload the resulting `megadetector_v5a.onnx` to a
+ * CORS-open public URL (e.g. Cloudflare R2 under media.rastrum.org/models/)
+ * and set `PUBLIC_MEGADETECTOR_WEIGHTS_URL` to the directory URL (no
  * trailing slash). See infra/megadetector/README.md for full notes.
  *
  * NOTE: do not try `python detection/run_detector_batch.py --export-onnx`

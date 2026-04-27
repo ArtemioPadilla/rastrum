@@ -17,3 +17,13 @@ test-results/
 
 # Git worktrees (superpowers skill)
 .worktrees/
+
+# Megadetector hosting recipe artefacts — large model weights belong in
+# cloud storage (R2), not git. The recipe scripts (convert.sh,
+# quantize_int8.py, README.md) ARE tracked; their outputs are not.
+infra/megadetector/venv/
+infra/megadetector/yolov5/
+infra/megadetector/out/
+infra/megadetector/*.pt
+infra/megadetector/*.onnx
+infra/megadetector/*.onnx.data

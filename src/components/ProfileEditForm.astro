@@ -451,6 +451,31 @@ const onb = (tr as unknown as { onboarding: Record<string, string> }).onboarding
     }
     status?.classList.remove('hidden');
     setTimeout(() => status?.classList.add('hidden'), 3000);
+
+    // Re-render the user's OG card so /perfil/u/<username>/ embeds the
+    // latest display name + stats. Best-effort: a render or upload
+    // failure does not undo the profile save.
+    try {
+      const username = (payload.username as string | null) ?? null;
+      if (username) {
+        // Pull stats so the card reflects current numbers.
+        const { count: obsCount } = await supabase
+          .from('observations')
+          .select('id', { count: 'exact', head: true })
+          .eq('observer_id', user.id);
+        const { renderProfileOgPng } = await import('../lib/og-card');
+        const { uploadMedia } = await import('../lib/upload');
+        const png = await renderProfileOgPng({
+          displayName:        (payload.display_name as string) || username,
+          username,
+          observationsCount:  obsCount ?? undefined,
+          region:             (payload.region_primary as string) || null,
+        });
+        await uploadMedia(png, `og/u/${username}.png`, 'image/png');
+      }
+    } catch (e) {
+      console.warn('[rastrum] profile OG render failed (non-fatal)', e);
+    }
   });
 
   load().catch(console.error);

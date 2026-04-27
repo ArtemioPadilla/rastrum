@@ -12,11 +12,41 @@ interface Props {
   title: string;
   description?: string;
   lang?: string;
+  /**
+   * Override the OG image. Defaults to a path-derived static PNG built
+   * by `npm run build:og` and shipped to public/og/<slug>.png. User-
+   * generated pages (share/obs, public profiles) pass their own URL
+   * (typically `https://media.rastrum.org/og/<id>.png`) which is
+   * client-side rendered at observation-save time.
+   */
+  ogImage?: string;
 }
 
-const { title, description = 'Species identification platform', lang = 'en' } = Astro.props;
+const { title, description = 'Species identification platform', lang = 'en', ogImage } = Astro.props;
 const currentPath = Astro.url.pathname;
 const installLang: 'en' | 'es' = lang === 'es' ? 'es' : 'en';
+
+const SITE_URL = 'https://rastrum.org';
+const canonical = `${SITE_URL}${currentPath}${currentPath.endsWith('/') ? '' : '/'}`;
+
+// Map the current path to the OG card slug emitted by scripts/generate-og.ts.
+// The slug system mirrors the route names but flattens locale prefixes,
+// since we render a single PNG per surface (the title/subtitle are
+// language-neutral enough at OG sizes — fine to revisit per-locale later).
+function ogSlugForPath(path: string): string {
+  const p = path.replace(/\/(en|es)\//, '/').replace(/\/+$/, '') || '/';
+  if (p === '/' || p === '/en' || p === '/es')                  return 'home';
+  if (p.startsWith('/observe') || p.startsWith('/observar'))    return 'observe';
+  if (p.startsWith('/identify') || p.startsWith('/identificar'))return 'identify';
+  if (p.startsWith('/explore')  || p.startsWith('/explorar'))   return 'explore';
+  if (p.startsWith('/chat'))                                    return 'chat';
+  if (p.startsWith('/about')  || p.startsWith('/acerca'))       return 'about';
+  if (p.includes('/roadmap')  || p.includes('/hoja-de-ruta'))   return 'docs-roadmap';
+  if (p.includes('/architecture') || p.includes('/arquitectura')) return 'docs-architecture';
+  if (p.includes('/contribute')   || p.includes('/contribuir'))   return 'docs-contribute';
+  return 'default';
+}
+const resolvedOgImage = ogImage ?? `${SITE_URL}/og/${ogSlugForPath(currentPath)}.png`;
 ---
 
 <!doctype html>
@@ -31,7 +61,24 @@ const installLang: 'en' | 'es' = lang === 'es' ? 'es' : 'en';
     <meta name="theme-color" content="#10b981" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="canonical" href={canonical} />
     <title>{title}</title>
+    <!-- Open Graph -->
+    <meta property="og:type"        content="website" />
+    <meta property="og:site_name"   content="Rastrum" />
+    <meta property="og:title"       content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url"         content={canonical} />
+    <meta property="og:image"       content={resolvedOgImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale"      content={lang === 'es' ? 'es_MX' : 'en_US'} />
+    <meta property="og:locale:alternate" content={lang === 'es' ? 'en_US' : 'es_MX'} />
+    <!-- Twitter -->
+    <meta name="twitter:card"        content="summary_large_image" />
+    <meta name="twitter:title"       content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image"       content={resolvedOgImage} />
     <script is:inline>
       (function() {
         const theme = localStorage.getItem('theme');

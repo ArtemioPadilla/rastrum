@@ -208,8 +208,8 @@ Regular thrown errors fall through to the next plugin as usual.
 **Camera-trap pipeline:** MegaDetector v5a runs as YOLOv5 ONNX in the
 browser via `onnxruntime-web` — see `megadetector-yolo.ts` (preprocess +
 NMS), `megadetector-cache.ts` (download/cache), and
-`camera-trap-megadetector.ts` (plugin glue). Operator hosts the ~85 MB
-ONNX behind `PUBLIC_MEGADETECTOR_WEIGHTS_URL`; the plugin reports
+`camera-trap-megadetector.ts` (plugin glue). Operator hosts the ~134 MB
+INT8 ONNX behind `PUBLIC_MEGADETECTOR_WEIGHTS_URL`; the plugin reports
 `model_not_bundled` when unset. For `evidence_type=camera_trap` photos
 sync.ts pushes the plugin into the cascade's `preferred` array so the
 filter runs first.

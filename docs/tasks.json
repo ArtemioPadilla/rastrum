@@ -596,7 +596,7 @@
         { "label_en": "Shared trap location (single GPS) + per-photo EXIF timestamp", "label_es": "Ubicación compartida del trap (GPS único) + timestamp EXIF",   "status": "done" },
         { "label_en": "Plugin runtime:'client' running MegaDetector v5a via onnxruntime-web (megadetector-yolo.ts letterbox+NMS, megadetector-cache.ts download/cache)", "label_es": "Plugin runtime:'client' que corre MegaDetector v5a vía onnxruntime-web (megadetector-yolo.ts letterbox+NMS, megadetector-cache.ts descarga/cache)", "status": "done" },
         { "label_en": "FilteredFrameError short-circuits the cascade for empty/human/vehicle frames (cascade.ts + errors.ts)", "label_es": "FilteredFrameError corta el cascade para cuadros vacíos/humano/vehículo (cascade.ts + errors.ts)", "status": "done" },
-        { "label_en": "Operator hosts the ~85 MB ONNX behind PUBLIC_MEGADETECTOR_WEIGHTS_URL", "label_es": "El operador aloja el ONNX de ~85 MB en PUBLIC_MEGADETECTOR_WEIGHTS_URL", "status": "blocked", "blocker_en": "Operator action: convert v5a checkpoint and upload to R2", "blocker_es": "Acción del operador: convertir el checkpoint v5a y subirlo a R2" },
+        { "label_en": "Operator hosts the ~134 MB ONNX behind PUBLIC_MEGADETECTOR_WEIGHTS_URL", "label_es": "El operador aloja el ONNX de ~134 MB en PUBLIC_MEGADETECTOR_WEIGHTS_URL", "status": "blocked", "blocker_en": "Operator action: convert v5a checkpoint and upload to R2", "blocker_es": "Acción del operador: convertir el checkpoint v5a y subirlo a R2" },
         { "label_en": "camera_trap_deployments + processing_queue tables (deferred)",  "label_es": "Tablas camera_trap_deployments + processing_queue (diferidas)", "status": "planned" },
         { "label_en": "Edge Function: motion → ID → research-grade pipeline",          "label_es": "Edge Function: motion → ID → research-grade",                   "status": "planned" }
       ]
@@ -620,7 +620,7 @@
       "modules": ["09-camera-trap.md"],
       "subtasks": [
         { "label_en": "infra/megadetector/convert.sh: one-shot v5a.pt → ONNX via ultralytics export.py", "label_es": "infra/megadetector/convert.sh: conversión one-shot v5a.pt → ONNX vía ultralytics export.py", "status": "done" },
-        { "label_en": "infra/megadetector/quantize_int8.py: dynamic INT8 quantisation (~140 MB → ~85 MB)", "label_es": "infra/megadetector/quantize_int8.py: cuantización dinámica INT8 (~140 MB → ~85 MB)", "status": "done" },
+        { "label_en": "infra/megadetector/quantize_int8.py: dynamic INT8 quantisation (~535 MB FP32 → ~134 MB INT8)", "label_es": "infra/megadetector/quantize_int8.py: cuantización dinámica INT8 (~535 MB FP32 → ~134 MB INT8)", "status": "done" },
         { "label_en": "infra/megadetector/README.md: R2 upload + CI env var instructions", "label_es": "infra/megadetector/README.md: instrucciones de subida a R2 + variable de entorno CI", "status": "done" },
         { "label_en": "Operator runs convert.sh and uploads to media.rastrum.org/models/megadetector_v5a.onnx", "label_es": "El operador corre convert.sh y sube a media.rastrum.org/models/megadetector_v5a.onnx", "status": "blocked", "blocker_en": "Operator action — see infra/megadetector/README.md", "blocker_es": "Acción del operador — ver infra/megadetector/README.md" },
         { "label_en": "Optional Modal/Lambda/Replicate variants for server-side fallback", "label_es": "Variantes Modal/Lambda/Replicate opcionales para fallback server-side", "status": "planned" }

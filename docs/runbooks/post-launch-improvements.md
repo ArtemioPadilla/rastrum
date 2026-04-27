@@ -102,6 +102,39 @@ These don't fit v1.0.x but are tracked here so they don't get lost.
 
 ---
 
+## OG cards — current architecture (2026-04-27)
+
+> The Open Graph image system was rebuilt to remove all per-request
+> server-side compute. The pattern is borrowed from watchboard.
+
+**Rendering pipeline:**
+
+| Surface | When rendered | Where stored | Render path |
+|---|---|---|---|
+| Static pages (home, observe, identify, explore, chat, about, docs/*) | Build time, via `npm run build:og` | `public/og/<slug>.png` → shipped to GitHub Pages | satori → resvg-js → PNG |
+| User observations | Client-side, at observation save | R2: `og/<obs-id>.png` (served by `media.rastrum.org`) | satori → SVG → OffscreenCanvas → PNG |
+| User profiles | Client-side, on Profile → Edit save | R2: `og/u/<username>.png` (served by `media.rastrum.org`) | satori → SVG → OffscreenCanvas → PNG |
+
+**Per-request compute: zero.** All cards are static files served by CDN
+(GitHub Pages or Cloudflare R2). The renderer runs once per piece of
+content (build time for static pages, client-side at save for user
+content) and never again.
+
+**Shared layout:** `src/lib/og-layout.ts` exports a single satori
+React-element tree builder used by both renderers. Edit there once;
+both paths produce identical cards.
+
+**Known limitation:** the static `/share/obs/?id=…` page can't insert a
+per-observation `og:image` meta tag at HTML build time (the obs ID
+isn't known then), so it falls back to the generic `/og/default.png`
+when scraped. The per-observation PNG still exists at
+`media.rastrum.org/og/<obs-id>.png` and can be embedded directly in
+shares (the Share button → Web Share API does this), but the static
+share page cannot reference it without server templating. Closing
+this last gap requires either a thin Cloudflare Worker on the share
+URL OR pre-rendering one HTML file per observation; both are
+explicitly out of scope for the "no per-request server" target.
+
 ## Done log (this PR)
 
 | # | Item | Commit |

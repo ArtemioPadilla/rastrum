@@ -117,6 +117,31 @@ async function syncOne(record: ObservationRecord): Promise<void> {
     if (mediaErr) throw mediaErr;
   }
 
+  // 3.5. Render the OG card client-side and PUT it to R2 alongside
+  //      the photo. The card lives at og/<obs-id>.png and is referenced
+  //      by share/obs/<id> via the og:image meta tag — a static file
+  //      served by the Cloudflare CDN, no per-request server compute.
+  //      Best-effort: a render failure does NOT fail the whole sync.
+  try {
+    const primaryBlob = blobs.find(b => b.mime_type.startsWith('image/')) ?? blobs[0];
+    if (primaryBlob?.upload_url) {
+      const { renderObservationOgPng } = await import('./og-card');
+      const png = await renderObservationOgPng({
+        scientificName: obs.identification.scientificName || '',
+        commonName:     obs.identification.commonNameEs || obs.identification.commonNameEn,
+        observedAt:     obs.createdAt,
+        photoUrl:       primaryBlob.upload_url,
+        meta:           [obs.habitat, obs.weather].filter(Boolean).join(' · '),
+      });
+      const ogKey = `og/${record.id}.png`;
+      await uploadMedia(png, ogKey, 'image/png').catch(err => {
+        console.warn('[rastrum] OG card upload failed (non-fatal)', err);
+      });
+    }
+  } catch (err) {
+    console.warn('[rastrum] OG card render failed (non-fatal)', err);
+  }
+
   // 4. Mark synced in Dexie + enqueue ID request if not already
   await db.observations.update(record.id, {
     sync_status: 'synced',

@@ -11,7 +11,9 @@ Conversion to ONNX goes through Ultralytics' YOLOv5 `export.py`, which is
 why this recipe clones `ultralytics/yolov5` rather than relying on the
 megadetector package directly. After export we INT8-quantise dynamically
 via `onnxruntime.quantization` so the on-device download shrinks from
-~140 MB FP32 to ~85 MB.
+~535 MB FP32 to ~134 MB INT8. (The 2021-era v5a paper cited ~85 MB; the
+modern Ultralytics export is fatter than the original because it embeds
+the inference graph + detection head explicitly.)
 
 ## Usage
 
@@ -32,7 +34,7 @@ That's it. The script:
 
 Flags:
 - `--weights /path/v5a.pt` — use a custom checkpoint
-- `--skip-quantise`        — keep FP32 (~140 MB), useful for accuracy diffing
+- `--skip-quantise`        — keep FP32 (~535 MB), useful for accuracy diffing
 
 ## After conversion: hosting
 
@@ -78,7 +80,7 @@ automatically.
 ```bash
 # Smoke-test the file exists and is correctly served:
 curl -I "${PUBLIC_MEGADETECTOR_WEIGHTS_URL}/megadetector_v5a.onnx"
-# Should return 200 + content-length ≈ 85_000_000 + access-control-allow-origin
+# Should return 200 + content-length ≈ 134_000_000 + access-control-allow-origin
 ```
 
 In the browser, open DevTools → Application → Cache Storage → look for the
@@ -108,9 +110,17 @@ directly), or `python -m megadetector.detection.run_detector_batch` from
 `torch>=2.0` is installed; `convert.sh` pins compatible versions via
 `yolov5/requirements.txt`.
 
-**85 MB target not hit (still ~140 MB)**: you ran with `--skip-quantise`.
-Re-run without that flag, or run `python quantize_int8.py --in
-out/megadetector_v5a.fp32.onnx --out out/megadetector_v5a.onnx`.
+**Output is still ~535 MB**: you ran with `--skip-quantise`. Re-run
+without that flag, or run `python quantize_int8.py --in
+out/megadetector_v5a.fp32.onnx --out out/megadetector_v5a.onnx` to
+INT8-quantise the existing FP32 export.
+
+**Noisy traceback during export about "No Adapter To Version 17 for
+Resize"**: harmless. The Ultralytics exporter emits opset 18 internally,
+then tries to downgrade for compatibility. The downgrade fails on the
+Resize op but the exported file is still valid at opset 18+, which
+onnxruntime-web 1.20+ runs without issue. (We dropped the explicit
+`--opset 12` flag from convert.sh — the exporter ignored it anyway.)
 
 ## See also
 

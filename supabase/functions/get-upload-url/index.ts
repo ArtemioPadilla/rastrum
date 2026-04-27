@@ -33,6 +33,9 @@ type Body = {
 const ALLOWED_PREFIXES = (userId: string) => [
   `observations/`,                           // refined check below uses obs ownership
   `avatars/${userId}/`,
+  `og/`,                                     // pre-rendered OG cards (1200×630 PNG)
+                                             //   og/<obs-id>.png (observation cards)
+                                             //   og/u/<username>.png (profile cards)
 ];
 
 function safeKey(userId: string, key: string): string | null {

@@ -2,7 +2,7 @@
 
 **Version target:** v1.0 (months 7–12)
 **Status:** on-device pre-filter implemented. Plugin (`src/lib/identifiers/camera-trap-megadetector.ts`) runs MegaDetector v5a as YOLOv5 ONNX in the browser via `onnxruntime-web` (helpers in `megadetector-yolo.ts`, cache in `megadetector-cache.ts`). Empty / human / vehicle frames throw `FilteredFrameError`, which the cascade catches and short-circuits — no cloud quota burned on non-animal frames. Animal frames throw a fall-through, so the species cascade (PlantNet → Claude → Phi → EfficientNet) runs against the full frame. Bulk-upload UI shipped at `/profile/import/camera-trap`. The cascade prefers this plugin for `evidence_type=camera_trap` photos.
-**Operator action remaining:** run [`infra/megadetector/convert.sh`](../../../infra/megadetector/) to convert MegaDetector v5a → INT8 ONNX (~85 MB), upload `out/megadetector_v5a.onnx` to a CORS-open public URL (R2 recommended, mirrors BirdNET / pmtiles), and set `PUBLIC_MEGADETECTOR_WEIGHTS_URL` to the directory URL. Until that's done the plugin reports `model_not_bundled` and the cascade transparently falls through.
+**Operator action remaining:** run [`infra/megadetector/convert.sh`](../../../infra/megadetector/) to convert MegaDetector v5a → INT8 ONNX (~134 MB; FP32 export is ~535 MB and dynamic quantisation hits the MatMul/Conv/Gemm subset for a ~75% reduction), upload `out/megadetector_v5a.onnx` to a CORS-open public URL (R2 recommended, mirrors BirdNET / pmtiles), and set `PUBLIC_MEGADETECTOR_WEIGHTS_URL` to the directory URL. Until that's done the plugin reports `model_not_bundled` and the cascade transparently falls through.
 **Spec author:** Eugenio Padilla + Claude (2026-04-24)
 **Last verified:** 2026-04-27.
 
