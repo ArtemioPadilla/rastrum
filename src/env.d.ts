@@ -9,6 +9,8 @@ interface ImportMetaEnv {
   readonly PUBLIC_BIRDNET_WEIGHTS_URL?: string;
   readonly PUBLIC_ONNX_BASE_URL?: string;
   readonly PUBLIC_PMTILES_MX_URL?: string;
+  readonly PUBLIC_MEGADETECTOR_ENDPOINT?: string;
+  readonly PUBLIC_PLANTNET_KEY?: string;
   readonly PUBLIC_BUILD_SHA?: string;
 }
 
