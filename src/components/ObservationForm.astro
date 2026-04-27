@@ -79,6 +79,7 @@ const videoMaxDuration  = observeStrings.video_max_duration  ?? (isEs ? 'Máximo
         <input id="gallery-input" type="file" accept="image/*" multiple class="sr-only" />
       </div>
       <p class="mt-1 text-xs text-zinc-500">{tr.observe.photo_hint}</p>
+      <p id="photo-hint-android" class="hidden mt-1 text-xs text-amber-700 dark:text-amber-400">{observeStrings.photo_hint_android}</p>
     </div>
 
     <!-- Video (multi) -->
@@ -1091,8 +1092,25 @@ const videoMaxDuration  = observeStrings.video_max_duration  ?? (isEs ? 'Máximo
     } catch { /* non-fatal */ }
   }
 
+  function showGpsError(code: number) {
+    if (!gpsStatus) return;
+    const obs = tr.observe as Record<string, string>;
+    let msg: string;
+    if (code === 1)      msg = obs.gps_error_permission_denied;
+    else if (code === 2) msg = obs.gps_error_unavailable;
+    else                 msg = obs.gps_error_timeout;
+    gpsStatus.textContent = msg;
+    gpsStatus.className = 'text-amber-700 dark:text-amber-400 text-xs';
+    // Auto-reveal manual entry — that's the recovery path the message
+    // points users at.
+    gpsManualWrap?.classList.remove('hidden');
+  }
+
   async function getLiveGPS(): Promise<void> {
-    if (!navigator.geolocation) return;
+    if (!navigator.geolocation) {
+      showGpsError(2);
+      return;
+    }
     return new Promise<void>((resolve) => {
       // First pass: quick low-accuracy fix (coarse network location)
       navigator.geolocation.getCurrentPosition(
@@ -1105,7 +1123,9 @@ const videoMaxDuration  = observeStrings.video_max_duration  ?? (isEs ? 'Máximo
             capturedFrom: 'gps',
           };
           paintLocation();
-          // Second pass: refine with high-accuracy GPS (up to 30s)
+          // Second pass: refine with high-accuracy GPS (up to 30s).
+          // If the refine fails we silently keep the coarse fix — only
+          // show an error if BOTH passes failed (handled below).
           navigator.geolocation.getCurrentPosition(
             (pos2) => {
               if (pos2.coords.accuracy < (location?.accuracyM ?? 9999)) {
@@ -1124,7 +1144,12 @@ const videoMaxDuration  = observeStrings.video_max_duration  ?? (isEs ? 'Máximo
             { enableHighAccuracy: true, timeout: 30_000, maximumAge: 0 }
           );
         },
-        () => resolve(),
+        (err) => {
+          // First-pass failed — surface the specific reason so the user
+          // knows whether to grant permission, wait, or use manual entry.
+          showGpsError(err.code);
+          resolve();
+        },
         { enableHighAccuracy: false, timeout: 8_000, maximumAge: 60_000 }
       );
     });
@@ -1289,6 +1314,13 @@ const videoMaxDuration  = observeStrings.video_max_duration  ?? (isEs ? 'Máximo
   // Kick off GPS + sync triggers on page load
   registerSyncTriggers();
   getLiveGPS();
+
+  // Show the Android-specific camera hint only on Android user agents —
+  // covers the 'capture=environment opens an empty file picker folder'
+  // failure mode reported in issue #18.
+  if (/Android/i.test(navigator.userAgent)) {
+    document.getElementById('photo-hint-android')?.classList.remove('hidden');
+  }
 
   // ── On-device AI helpers: Translate + Auto-narrative ──
   type LocaleEnEs = 'en' | 'es';
