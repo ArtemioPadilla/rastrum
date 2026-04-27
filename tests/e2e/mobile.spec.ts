@@ -40,12 +40,27 @@ test('mobile menu toggle is reachable', async ({ page }) => {
   expect(Math.min(box!.width, box!.height)).toBeGreaterThanOrEqual(32);
 });
 
-test('opening mobile menu shows nav items', async ({ page }) => {
+test('hamburger opens the mobile drawer', async ({ page }) => {
   await page.goto('/en/');
   await page.locator('#mobile-menu-toggle').click();
-  const menu = page.locator('#mobile-menu');
-  // Note: the menu retains the `sm:hidden` utility class even when open
-  // (it should hide on >=sm). We assert visibility instead of class state.
-  await expect(menu).toBeVisible();
-  await expect(menu.getByRole('link', { name: /Observe/i }).first()).toBeVisible();
+  await expect(page.locator('#mobile-drawer')).toBeVisible();
+  await page.locator('#mobile-drawer-close').click();
+  await expect(page.locator('#mobile-drawer')).toBeHidden();
+});
+
+test('mobile bottom bar — FAB target defaults to /observe', async ({ page }) => {
+  await page.goto('/en/explore/map/');
+  // FAB is rendered server-side inside #mbb-authed (which starts hidden until
+  // auth resolves). The anchor still exists in the DOM and its href is the
+  // computed observe path; that's the target we care about for this test.
+  const fab = page.locator('#mobile-bottom-bar a[data-tour="fab"]');
+  await expect(fab).toHaveAttribute('href', '/en/observe/');
+});
+
+test('FAB on /observe targets /identify (quick id) with ⚡ badge', async ({ page }) => {
+  await page.goto('/en/observe/');
+  const fab = page.locator('#mobile-bottom-bar a[data-tour="fab"]');
+  await expect(fab).toHaveAttribute('href', '/en/identify/');
+  // The ⚡ badge is inside the FAB; assert it's present in the markup.
+  await expect(fab.locator('span:has-text("⚡")')).toHaveCount(1);
 });

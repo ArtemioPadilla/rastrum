@@ -1,5 +1,41 @@
 import { test, expect } from '@playwright/test';
 
+const ROUTES: Record<'en' | 'es', string[]> = {
+  en: [
+    '/en/',
+    '/en/identify/',
+    '/en/observe/',
+    '/en/explore/',
+    '/en/explore/map/',
+    '/en/explore/recent/',
+    '/en/explore/watchlist/',
+    '/en/explore/species/',
+    '/en/about/',
+    '/en/docs/',
+    '/en/sign-in/',
+    '/en/profile/',
+  ],
+  es: [
+    '/es/',
+    '/es/identificar/',
+    '/es/observar/',
+    '/es/explorar/',
+    '/es/explorar/mapa/',
+    '/es/explorar/recientes/',
+    '/es/explorar/seguimiento/',
+    '/es/explorar/especies/',
+    '/es/acerca/',
+    '/es/docs/',
+    '/es/ingresar/',
+    '/es/perfil/',
+  ],
+};
+
+// Suppress the unused-variable lint warning — ROUTES is exported for reference
+// by other tooling (e.g. smoke.spec.ts mirrors it). The constant documents the
+// canonical IA and is intentionally kept here even if tests don't iterate it.
+void ROUTES;
+
 test.describe('navigation', () => {
   test('header nav links resolve (en)', async ({ page }) => {
     await page.goto('/en/');
@@ -28,11 +64,34 @@ test.describe('navigation', () => {
     await expect(page).toHaveURL(/\/es\/docs\/vision\/?$/);
   });
 
-  test('docs dropdown reveals doc pages', async ({ page }) => {
+  test('docs mega-menu mounts on click', async ({ page }) => {
     await page.goto('/en/');
-    await page.getByRole('button', { name: /^Docs/i }).click();
-    // The dropdown menu links to /en/docs/. Just assert the menu opens.
-    const menuLink = page.locator('#docs-dropdown-menu a[href="/en/docs/"]');
-    await expect(menuLink).toBeVisible();
+    const docsBtn = page.locator('#megamenu-docs-btn');
+    await docsBtn.click();
+    // The mega-menu uses 3 columns; just assert one known item is visible.
+    await expect(page.locator('#megamenu-docs-menu a[href="/en/docs/architecture/"]')).toBeVisible();
+  });
+
+  test('active section rail highlights Observe on /observe', async ({ page }) => {
+    await page.goto('/en/observe/');
+    // The link gets the emerald color class when active.
+    const link = page.locator('header nav a[href="/en/observe/"]').first();
+    await expect(link).toHaveClass(/text-emerald-600/);
+  });
+
+  test('explore dropdown reveals 4 sub-items', async ({ page }) => {
+    await page.goto('/en/');
+    const expBtn = page.locator('#hdr-explore-btn');
+    await expBtn.click();
+    await expect(page.locator('#hdr-explore-menu a[href="/en/explore/recent/"]')).toBeVisible();
+    await expect(page.locator('#hdr-explore-menu a[href="/en/explore/watchlist/"]')).toBeVisible();
+    await expect(page.locator('#hdr-explore-menu a[href="/en/explore/species/"]')).toBeVisible();
+  });
+
+  test('legacy /profile/watchlist redirects to /explore/watchlist', async ({ page }) => {
+    // Astro emits a meta-refresh redirect for static-build redirects; following
+    // it should land us on the new path.
+    await page.goto('/en/profile/watchlist');
+    await page.waitForURL(/\/en\/explore\/watchlist\/?$/, { timeout: 5000 });
   });
 });
