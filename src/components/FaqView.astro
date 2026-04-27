@@ -1,0 +1,206 @@
+---
+import { getDocPath } from '../i18n/utils';
+
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const isEs = lang === 'es';
+const docsHome = getDocPath(lang);
+---
+
+<article class="prose prose-zinc dark:prose-invert max-w-3xl">
+  <h1>{isEs ? 'Preguntas frecuentes' : 'Frequently Asked Questions'}</h1>
+  <p>
+    {isEs
+      ? 'Todo lo que nos han preguntado suficientes veces como para escribirlo. Si tu pregunta no está aquí, '
+      : 'Everything we have been asked enough times to write down. If your question is not here, '}
+    <a href="https://github.com/ArtemioPadilla/rastrum/issues" target="_blank" rel="noopener">{isEs ? 'abre un issue' : 'open an issue'}</a>
+    {isEs ? ' y la agregamos.' : ' and we\'ll add it.'}
+  </p>
+  <p class="text-sm text-zinc-500">{isEs ? 'Última actualización: 2026-04-25.' : 'Last updated: 2026-04-25.'}</p>
+
+  <h2>{isEs ? 'Para empezar' : 'Getting started'}</h2>
+
+  <h3>{isEs ? '¿Cómo instalo la app en mi teléfono?' : 'How do I install the app on my phone?'}</h3>
+  <p>{isEs ? 'Rastrum es una Progressive Web App (PWA), no una app nativa — no hay nada que instalar desde una tienda.' : 'Rastrum is a Progressive Web App (PWA), not a native app — there\'s nothing to install from an app store.'}</p>
+  <ul>
+    <li><strong>{isEs ? 'Android (Chrome / Edge / Brave):' : 'Android (Chrome / Edge / Brave):'}</strong>{isEs ? ' abre rastrum.org; un botón "Instalar" aparece en la esquina inferior derecha. Tócalo. El icono aterriza en tu pantalla de inicio y se comporta como cualquier otra app.' : ' open rastrum.org; an "Install" button appears in the bottom-right corner. Tap it. The icon lands on your home screen and behaves like any other app.'}</li>
+    <li><strong>{isEs ? 'iOS (Safari):' : 'iOS (Safari):'}</strong>{isEs ? ' Apple no muestra un prompt automático. Abre rastrum.org, toca el icono ' : ' Apple does not show an automatic install prompt. Open rastrum.org, tap the '}<strong>{isEs ? 'Compartir' : 'Share'}</strong>{isEs ? ', luego ' : ' icon, then '}<strong>{isEs ? 'Agregar a pantalla de inicio' : 'Add to Home Screen'}</strong>{isEs ? '. El icono aparece junto a las otras apps.' : '. The icon shows up alongside other apps.'}</li>
+    <li><strong>{isEs ? 'Escritorio:' : 'Desktop:'}</strong>{isEs ? ' el mismo botón de instalar aparece en Chrome/Edge/Brave a la derecha de la barra de direcciones.' : ' the same install button shows in Chrome/Edge/Brave on the right of the address bar.'}</li>
+  </ul>
+  <p>{isEs ? 'Un wrapper iOS nativo en App Store está en el roadmap v1.2 (requiere cuenta de Apple Developer); la PWA cubre la mayoría de los casos de uso por ahora.' : 'A native iOS App Store wrapper is on the v1.2 roadmap (it requires an Apple Developer account); the PWA covers most use cases for now.'}</p>
+
+  <h3>{isEs ? '¿Necesito una cuenta?' : 'Do I need an account?'}</h3>
+  <p>{isEs ? 'No. Rastrum tiene modo invitado: abre el sitio, toca el botón de cámara, registra una observación. Se queda en tu dispositivo hasta que inicies sesión.' : 'No. Rastrum has a guest mode: open the site, hit the camera button, log an observation. It stays on your device until you sign in.'}</p>
+  <p>{isEs ? 'Iniciar sesión (enlace mágico, Google, GitHub, passkey, o código OTP de 6 dígitos) te da:' : 'Signing in (magic link, Google, GitHub, passkey, or 6-digit OTP code) gives you:'}</p>
+  <ul>
+    <li>{isEs ? 'Sincronización a la nube — las observaciones viven en tu cuenta y sobreviven a un reinicio del teléfono.' : 'Cloud sync — observations live in your account and survive a phone reset.'}</li>
+    <li>{isEs ? 'Compartir — otros pueden ver y comentar tus observaciones.' : 'Sharing — others can see and comment on your observations.'}</li>
+    <li>{isEs ? 'Feed de actividad e insignias.' : 'Activity feed and badges.'}</li>
+    <li>{isEs ? 'Tokens API para acceso programático.' : 'API tokens for programmatic access.'}</li>
+  </ul>
+  <p>{isEs ? 'Un flujo "convertir invitado a cuenta" corre la primera vez que inicias sesión: cualquier observación local se asocia a tu nueva cuenta.' : 'A "convert guest to account" flow runs the first time you sign in: any local observations get attached to your new account.'}</p>
+
+  <h3>{isEs ? '¿Es gratis?' : 'Is it free?'}</h3>
+  <p>{isEs ? 'Sí. No hay cuotas de suscripción, no hay anuncios, no hay upsells. Los datos que aportas se publican bajo la licencia Creative Commons por registro que tú elijas (BY 4.0 por defecto).' : 'Yes. There are no subscription fees, no ads, no upsells. The data you contribute is published under a per-record Creative Commons license you choose (BY 4.0 by default).'}</p>
+
+  <h2>{isEs ? 'Identificación' : 'Identification'}</h2>
+
+  <h3>{isEs ? '¿Por qué no veo sugerencias de identificación?' : 'Why don\'t I see identification suggestions?'}</h3>
+  <p>{isEs ? 'Las razones más comunes:' : 'The most common reasons:'}</p>
+  <ul>
+    <li><strong>{isEs ? 'No hay clave de PlantNet configurada.' : 'No PlantNet key configured.'}</strong>{isEs ? ' Inicia sesión, ve a Perfil → Editar y agrega una clave gratis de PlantNet (my.plantnet.org/account). Sin una clave, la cascada salta PlantNet y cae a plugins más lentos / opt-in.' : ' Sign in, go to Profile → Edit, and add a free PlantNet key (my.plantnet.org/account). Without a key, the cascade skips PlantNet and falls through to slower / opt-in plugins.'}</li>
+    <li><strong>{isEs ? 'Cascada solo offline.' : 'Offline-only cascade.'}</strong>{isEs ? ' Si estás offline y no tienes modelos on-device descargados, la cascada no tiene nada que correr. Aún puedes registrar la observación sin ID; la cascada vuelve a correr al sincronizar.' : ' If you\'re offline and don\'t have any on-device models downloaded, the cascade has nothing to run. You can still log the observation without an ID; the cascade re-runs when you sync.'}</li>
+    <li><strong>{isEs ? 'Foto muy oscura / borrosa / recortada.' : 'Photo too dark / blurry / cropped.'}</strong>{isEs ? ' Identificadores como PlantNet fallan en silencio en fotos sin sujeto reconocible. Toma de nuevo más cerca o con mejor luz.' : ' Identifiers like PlantNet fail silently on photos with no recognisable subject. Retake closer or with better light.'}</li>
+  </ul>
+
+  <h3>{isEs ? '¿Qué tan precisa es la identificación?' : 'How accurate is identification?'}</h3>
+  <p>{isEs ? 'Depende del taxón y la foto:' : 'It depends on the taxon and the photo:'}</p>
+  <ul>
+    <li><strong>{isEs ? 'Plantas' : 'Plants'}</strong>{isEs ? ' — la top-1 de PlantNet en la cascada acierta ~70-90% del tiempo en una foto clara de una flor o hoja, menos para fotos de hábito o frutos fuera de temporada.' : ' — PlantNet\'s top-1 in the cascade is correct ~70-90% of the time on a clear photo of a flower or leaf, less for habit shots or fruits out of season.'}</li>
+    <li><strong>{isEs ? 'Aves' : 'Birds'}</strong>{isEs ? ' — BirdNET-Lite (audio) es fuerte en las ~6,000 especies de su modelo global cuando el canto es limpio y la especie está en rango. Las fotos de aves son más difíciles; las enrutamos por Phi-3.5-vision o Claude (clave BYO).' : ' — BirdNET-Lite (audio) is strong on the ~6,000 species in its global model when the call is clean and the species is in range. Photos of birds are harder; we route through Phi-3.5-vision or Claude (BYO key).'}</li>
+    <li><strong>{isEs ? 'Insectos, hongos, líquenes, vida marina' : 'Insects, fungi, lichens, marine life'}</strong>{isEs ? ' — significativamente menos confiable. Trata cualquier ID por IA como una *sugerencia*, no una determinación.' : ' — significantly less reliable. Treat any AI ID as a *suggestion*, not a determination.'}</li>
+  </ul>
+  <p>{isEs ? 'La cascada reporta un puntaje de confianza con cada ID. Por debajo de 0.4 lo marcamos como "baja confianza" y no promovemos la observación a research-grade. Por arriba de 0.4 sigue siendo tu trabajo mirar la foto y decidir si la sugerencia coincide con lo que viste.' : 'The cascade reports a confidence score with every ID. Below 0.4 we flag it as "low confidence" and don\'t promote the observation to research-grade. Above 0.4 it\'s still your job to look at the photo and decide whether the guess matches what you saw.'}</p>
+
+  <h3>{isEs ? '¿Puedo corregir una identificación?' : 'Can I correct an identification?'}</h3>
+  <p>
+    {isEs
+      ? 'Sí. En el formulario de observación (o después, en la página de detalle de la observación), edita el campo de '
+      : 'Yes. On the observation form (or after the fact, on the observation detail page), edit the '}
+    <strong>{isEs ? 'nombre científico' : 'scientific name'}</strong>
+    {isEs
+      ? ' y guarda. Tu entrada manual sobreescribe la sugerencia de la IA; la sugerencia original de la IA se mantiene en el historial de identificación para transparencia.'
+      : ' field and save. Your manual entry overrides the AI\'s guess; the original AI suggestion is kept in the identification history for transparency.'}
+  </p>
+  <p>
+    {isEs
+      ? 'Si eres investigador credenciado, tus ediciones a observaciones de otros llevan un peso 3× en el algoritmo de consenso — ver la sección de docs sobre '
+      : 'If you\'re a credentialed researcher, your edits to other people\'s observations carry a 3× weight in the consensus algorithm — see the docs section on '}
+    <a href={getDocPath(lang, 'contribute')}>{isEs ? 'validación experta' : 'expert validation'}</a>
+    {isEs ? ' para cómo aplicar.' : ' for how to apply.'}
+  </p>
+
+  <h2>{isEs ? 'Audio' : 'Audio'}</h2>
+
+  <h3>{isEs ? '¿Por qué BirdNET me pide descargar algo?' : 'Why does BirdNET ask me to download something?'}</h3>
+  <p>{isEs ? 'BirdNET-Lite es el identificador de audio on-device (Cornell Lab of Ornithology; CC BY-NC-SA 4.0). El archivo del modelo es ~50 MB. Lo descargamos una vez, la primera vez que grabes audio, y lo cacheamos localmente. Después de eso:' : 'BirdNET-Lite is the on-device audio identifier (Cornell Lab of Ornithology; CC BY-NC-SA 4.0). The model file is ~50 MB. We download it once, the first time you record audio, and cache it locally. After that:'}</p>
+  <ul>
+    <li>{isEs ? 'La identificación corre completamente en tu teléfono.' : 'Identification runs entirely on your phone.'}</li>
+    <li>{isEs ? 'El audio nunca sale de tu dispositivo.' : 'No audio leaves your device.'}</li>
+    <li>{isEs ? 'Funciona offline.' : 'It works offline.'}</li>
+  </ul>
+  <p>{isEs ? 'Puedes limpiar el modelo cacheado desde Perfil → Editar → BirdNET-Lite → Limpiar caché si alguna vez necesitas re-descargarlo.' : 'You can clear the cached model from Profile → Edit → BirdNET-Lite → Clear cache if you ever need to re-download.'}</p>
+
+  <h3>{isEs ? '¿Por qué mi grabación no se identifica?' : 'Why doesn\'t my recording identify?'}</h3>
+  <p>{isEs ? 'Causas probables:' : 'Likely causes:'}</p>
+  <ul>
+    <li><strong>{isEs ? 'Modelo no descargado aún' : 'Model not downloaded yet'}</strong>{isEs ? ' — la primera grabación descarga el modelo; las grabaciones siguientes usan la copia cacheada.' : ' — the first recording downloads the model; subsequent recordings use the cached copy.'}</li>
+    <li><strong>{isEs ? 'La especie no está en el modelo global de 6,000 especies' : 'Species isn\'t in the global 6,000-species model'}</strong>{isEs ? ' — BirdNET-Lite prioriza las especies más grabadas a nivel mundial. Endémicas y rarezas regionales pueden estar ausentes.' : ' — BirdNET-Lite prioritises the most-recorded species worldwide. Endemics and regional rarities can be absent.'}</li>
+    <li><strong>{isEs ? 'Grabación demasiado corta o ruidosa' : 'Recording too short or too noisy'}</strong>{isEs ? ' — el modelo necesita al menos ~2-3 segundos de señal relativamente limpia. Mucho viento, tráfico o voces traslapadas destruyen el espectrograma.' : ' — the model needs at least ~2-3 seconds of relatively clean signal. Heavy wind, traffic, or overlapping voices destroy the spectrogram.'}</li>
+    <li><strong>{isEs ? 'Taxón equivocado' : 'Wrong taxon'}</strong>{isEs ? ' — BirdNET solo maneja aves. Cantos de insectos, mamíferos y ranas están fuera de alcance hoy.' : ' — BirdNET only handles birds. Insect, mammal, and frog calls are out of scope today.'}</li>
+  </ul>
+
+  <h2>{isEs ? 'Privacidad y datos' : 'Privacy and data'}</h2>
+
+  <h3>{isEs ? '¿A dónde van mis fotos?' : 'Where do my photos go?'}</h3>
+  <p>{isEs ? 'Depende de si iniciaste sesión y si disparaste una identificación:' : 'It depends on whether you\'re signed in and whether you\'ve triggered an identification:'}</p>
+  <ul>
+    <li><strong>{isEs ? 'Sesión iniciada:' : 'Signed in:'}</strong>{isEs ? ' las fotos se suben a Cloudflare R2 (media.rastrum.org) y se vinculan a la fila de tu observación en Supabase. La visibilidad por defecto es pública; puedes marcar una observación como oscurecida para especies sensibles.' : ' photos upload to Cloudflare R2 (media.rastrum.org) and are linked to your observation row in Supabase. Default visibility is public; you can mark an observation as obscured for sensitive species.'}</li>
+    <li><strong>{isEs ? 'Invitado / offline:' : 'Guest / offline:'}</strong>{isEs ? ' las fotos se quedan en el outbox de IndexedDB de tu teléfono hasta que estés en línea y con sesión iniciada.' : ' photos stay in your phone\'s IndexedDB outbox until you\'re online and signed in.'}</li>
+    <li><strong>{isEs ? 'Identificación:' : 'Identification:'}</strong>{isEs ? ' las fotos se envían a PlantNet (cuando hay clave configurada) y a Anthropic (solo cuando provees tu propia clave). Nunca se envían a Anthropic por defecto.' : ' photos are sent to PlantNet (when a key is set) and to Anthropic (only when you supply your own key). They are never sent to Anthropic by default.'}</li>
+    <li><strong>{isEs ? 'Modelos on-device' : 'On-device models'}</strong>{isEs ? ' (BirdNET, EfficientNet-Lite0, Phi-3.5-vision, Llama-3.2-1B) nunca ven la red para los datos — solo la descarga única del modelo en sí.' : ' (BirdNET, EfficientNet-Lite0, Phi-3.5-vision, Llama-3.2-1B) never see the network for the data — only the one-time download of the model itself.'}</li>
+  </ul>
+  <p>
+    {isEs ? 'Ver la ' : 'See the '}
+    <a href={`/${lang}/${isEs ? 'privacidad' : 'privacy'}/`}>{isEs ? 'página de privacidad' : 'privacy page'}</a>
+    {isEs ? ' para el desglose completo.' : ' for the full breakdown.'}
+  </p>
+
+  <h3>{isEs ? '¿Puedo eliminar mi cuenta?' : 'Can I delete my account?'}</h3>
+  <p>
+    {isEs ? 'Sí. Inicia sesión → ' : 'Yes. Sign in → '}
+    <code>/{isEs ? 'perfil/editar' : 'profile/edit'}/</code>
+    {isEs ? ' → ' : ' → '}<strong>{isEs ? 'Eliminar cuenta' : 'Delete account'}</strong>{isEs ? '. Después de la confirmación:' : '. After confirmation:'}
+  </p>
+  <ul>
+    <li>{isEs ? 'Tu identidad de auth se elimina.' : 'Your auth identity is removed.'}</li>
+    <li>{isEs ? 'Tus observaciones se anonimizan (el vínculo a tu user id se rompe).' : 'Your observations are anonymised (the link to your user id is severed).'}</li>
+    <li>{isEs ? 'Las fotos en R2 se ponen en cola para purga en 30 días.' : 'Photos in R2 are queued for purge within 30 days.'}</li>
+    <li>{isEs ? 'El audio se elimina inmediatamente.' : 'Audio is deleted immediately.'}</li>
+    <li>{isEs ? 'Las identificaciones y comentarios se conservan pero se anonimizan.' : 'Identifications and comments are retained but anonymised.'}</li>
+  </ul>
+  <p>{isEs ? 'Si quieres una exportación completa primero, usa ' : 'If you want a full export first, use '}<code>/{isEs ? 'perfil/exportar' : 'profile/export'}/</code>{isEs ? '. Si necesitas observaciones eliminadas completamente (en lugar de anonimizadas), abre un issue y lo resolvemos.' : '. If you need observations removed entirely (rather than anonymised), open an issue and we\'ll work it out.'}</p>
+
+  <h3>{isEs ? '¿Y si quiero que mi observación sea privada?' : 'What if I want my observation to be private?'}</h3>
+  <p>{isEs ? 'Dos caminos:' : 'Two paths:'}</p>
+  <ul>
+    <li><strong>{isEs ? 'Las especies sensibles se oscurecen automáticamente.' : 'Sensitive species are obscured automatically.'}</strong>{isEs ? ' Si tu observación coincide con NOM-059-SEMARNAT-2010 o apéndices CITES, las coordenadas públicas legibles se recortan a ~10×10 km. Solo tú e investigadores credenciados ven la ubicación precisa.' : ' If your observation matches NOM-059-SEMARNAT-2010 or CITES appendices, the public-readable coordinates are coarsened to ~10×10 km. Only you and credentialed researchers see the precise location.'}</li>
+    <li><strong>{isEs ? 'Oscurecimiento voluntario.' : 'Voluntary obscuration.'}</strong>{isEs ? ' En el formulario de observación, activa el toggle "Oscurecer coordenadas". Aplica el mismo recorte.' : ' On the observation form, set the "Obscure coordinates" toggle. The same coarsening applies.'}</li>
+  </ul>
+  <p>{isEs ? 'No tenemos un modo "observación privada" (donde la observación es invisible para todos excepto tú) en v1.0. Si tienes un caso de uso, abre un issue.' : 'We don\'t have a "private observation" mode (where the observation is invisible to everyone but you) at v1.0. If you have a use case for it, file an issue.'}</p>
+
+  <h2>{isEs ? 'Offline y sincronización' : 'Offline and sync'}</h2>
+
+  <h3>{isEs ? '¿Qué pasa si observo sin señal?' : 'What happens if I observe without signal?'}</h3>
+  <ul>
+    <li>{isEs ? 'La observación, fotos y audio se guardan inmediatamente en el outbox de IndexedDB.' : 'The observation, photos, and audio are saved to your phone\'s IndexedDB outbox immediately.'}</li>
+    <li>{isEs ? 'Aparece un indicador "pendiente de sincronizar" en el dropdown del avatar.' : 'A small "pending sync" indicator appears in the avatar dropdown.'}</li>
+    <li>{isEs ? 'Cuando la siguiente solicitud de red tenga éxito, el outbox se vacía: los medios van a R2, la fila de la observación va a Supabase, las identificaciones corren en el servidor.' : 'When the next network request succeeds, the outbox flushes: media goes to R2, the observation row goes to Supabase, identifications run on the server.'}</li>
+    <li>{isEs ? 'Si la sincronización falla, reintentamos en el siguiente evento online. No tienes que hacer nada.' : 'If sync fails, we retry on the next online event. You don\'t have to do anything.'}</li>
+  </ul>
+  <p>{isEs ? 'Puedes seguir observando mientras la sincronización corre en segundo plano.' : 'You can keep observing while sync runs in the background.'}</p>
+
+  <h3>{isEs ? '¿Qué pasa si pierdo mi teléfono?' : 'What happens if I lose my phone?'}</h3>
+  <ul>
+    <li><strong>{isEs ? 'Las observaciones sincronizadas están seguras' : 'Synced observations are safe'}</strong>{isEs ? ' en tu cuenta de Rastrum. Inicia sesión en otro dispositivo y aparecen inmediatamente.' : ' in your Rastrum account. Sign in on a new device and they show up immediately.'}</li>
+    <li><strong>{isEs ? 'Las observaciones de invitado sin sincronizar se pierden' : 'Unsynced guest observations are lost'}</strong>{isEs ? ' — solo vivieron en el IndexedDB del teléfono perdido. Esta es la única razón buena para iniciar sesión.' : ' — they only ever lived in the IndexedDB on the lost phone. This is the one good reason to sign in.'}</li>
+  </ul>
+  <p>{isEs ? 'Si inicias sesión *antes* de perder el teléfono, todo lo que se sincronizó es durable. Si inicias sesión *después* de perderlo, los registros sin sincronizar se fueron.' : 'If you sign in *before* losing the phone, anything that synced is durable. If you sign in *after* losing it, the unsynced records are gone.'}</p>
+
+  <h2>{isEs ? 'Técnico' : 'Technical'}</h2>
+
+  <h3>{isEs ? '¿Dónde puedo reportar bugs?' : 'Where can I report bugs?'}</h3>
+  <p>{isEs ? 'Dos lugares:' : 'Two places:'}</p>
+  <ul>
+    <li>{isEs ? 'El botón ' : 'The '}<strong>{isEs ? 'Reportar problema' : 'Report issue'}</strong>{isEs ? ' al pie derecho de cada página (rellena un issue de GitHub con tu locale, página e info básica del dispositivo).' : ' button at the bottom-right of every page (it pre-populates a GitHub issue with your locale, page, and basic device info).'}</li>
+    <li>{isEs ? 'Directo en ' : 'Directly at '}<a href="https://github.com/ArtemioPadilla/rastrum/issues" target="_blank" rel="noopener">github.com/ArtemioPadilla/rastrum/issues</a>.</li>
+  </ul>
+  <p>{isEs ? 'Para una pregunta más conversacional (peticiones de feature, "cómo hago…"), prefiere ' : 'For a more discussion-shaped question (feature requests, "how do I…"), prefer '}<a href="https://github.com/ArtemioPadilla/rastrum/discussions" target="_blank" rel="noopener">{isEs ? 'Discussions' : 'Discussions'}</a>.</p>
+
+  <h3>{isEs ? '¿Puedo usar la API?' : 'Can I use the API?'}</h3>
+  <p>
+    {isEs
+      ? 'Sí. Rastrum expone una API REST en /functions/v1/api/... y un servidor '
+      : 'Yes. Rastrum exposes a REST API at /functions/v1/api/... and a '}
+    <a href="https://modelcontextprotocol.io" target="_blank" rel="noopener">Model Context Protocol</a>
+    {isEs ? ' en /functions/v1/mcp para agentes de IA.' : ' server at /functions/v1/mcp for AI agents.'}
+  </p>
+  <ul>
+    <li>{isEs ? 'Crea un token personal en ' : 'Create a personal token at '}<code>/{isEs ? 'perfil/tokens' : 'profile/tokens'}</code>{isEs ? ' (formato: ' : ' (token format: '}<code>rst_*</code>).</li>
+    <li>{isEs ? 'Los tokens tienen scopes (' : 'Tokens are scoped ('}<code>observe</code>, <code>identify</code>, <code>export</code>).</li>
+    <li>
+      {isEs ? 'Ver el ' : 'See the '}
+      <a href={docsHome}>{isEs ? 'índice de docs' : 'docs index'}</a>
+      {isEs ? ' para el módulo 14 (REST) y el módulo 15 (MCP). Hay ejemplos para Claude Desktop, Cursor, VS Code y GitHub Copilot Coding Agent en esos specs.' : ' for Module 14 (REST) and Module 15 (MCP). Worked examples for Claude Desktop, Cursor, VS Code, and GitHub Copilot Coding Agent configurations are in those module specs.'}
+    </li>
+  </ul>
+
+  <h3>{isEs ? '¿Por qué veo la versión vieja después de un deploy?' : 'Why am I seeing the old version after a deploy?'}</h3>
+  <p>
+    {isEs
+      ? 'Normalmente un service worker viejo. Haz hard-refresh ('
+      : 'Usually a stale service worker. Hard-refresh your tab ('}
+    <code>Ctrl+Shift+R</code>{isEs ? ' en Win/Linux, ' : ' on Win/Linux, '}
+    <code>Cmd+Shift+R</code>{isEs ? ' en Mac) o cierra y vuelve a abrir la pestaña. Si aún ves la versión vieja, ver el ' : ' on Mac) or close and reopen the tab. If you\'re still seeing the old version, see the '}
+    <a href="https://github.com/ArtemioPadilla/rastrum/blob/main/docs/runbooks/sw-cache.md" target="_blank" rel="noopener">{isEs ? 'runbook del service worker' : 'service worker cache runbook'}</a>
+    {isEs ? ' para pasos de diagnóstico.' : ' for diagnosis steps.'}
+  </p>
+
+  <h2>{isEs ? '¿Algo más?' : 'Anything else?'}</h2>
+  <p>
+    {isEs ? 'Abre un issue en ' : 'Open an issue at '}
+    <a href="https://github.com/ArtemioPadilla/rastrum/issues" target="_blank" rel="noopener">github.com/ArtemioPadilla/rastrum/issues</a>
+    {isEs ? ' y te respondemos (y agregamos la respuesta aquí si es una pregunta recurrente).' : ' and we will reply (and add the answer here if it\'s a recurring question).'}
+  </p>
+  <p class="text-sm text-zinc-500 mt-8">{isEs ? 'Última actualización: 2026-04-25.' : 'Last updated: 2026-04-25.'}</p>
+</article>

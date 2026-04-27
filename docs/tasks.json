@@ -765,6 +765,194 @@
         { "label_en": "Whitelisted API endpoints with audit logs",     "label_es": "Endpoints API con audit logs",        "status": "planned" },
         { "label_en": "Bidirectional sync agreements",                  "label_es": "Acuerdos de sincronización bidireccional", "status": "planned" }
       ]
+    },
+    "byo-anthropic-key": {
+      "phase": "v0.3",
+      "title_en": "BYO Anthropic key (client-set, never persisted)",
+      "title_es": "API key de Anthropic propia (en el cliente, nunca persistida)",
+      "modules": ["01-photo-id.md","13-identifier-registry.md"],
+      "subtasks": [
+        { "label_en": "byo-keys.ts central store backed by localStorage", "label_es": "Store central byo-keys.ts respaldado en localStorage", "status": "done" },
+        { "label_en": "client_keys.anthropic forwarded per call to Edge Function", "label_es": "client_keys.anthropic se reenvía por llamada a la Edge Function", "status": "done" },
+        { "label_en": "Edge Function never logs or persists the key",     "label_es": "La Edge Function nunca registra ni persiste la clave",     "status": "done" },
+        { "label_en": "Profile/edit Configure UI with Save/Test/Clear",    "label_es": "UI Configure en Perfil/Editar con Save/Test/Clear",        "status": "done" },
+        { "label_en": "testConnection() probe verifies a live key",       "label_es": "Probe testConnection() verifica una clave activa",         "status": "done" }
+      ]
+    },
+    "webllm-default": {
+      "phase": "v0.3",
+      "title_en": "WebLLM as default AI fallback (download warning on first use)",
+      "title_es": "WebLLM como fallback de IA por defecto (advertencia de descarga en primer uso)",
+      "modules": ["11-in-browser-ai.md","13-identifier-registry.md"],
+      "subtasks": [
+        { "label_en": "Phi-3.5-vision plugin registered in bootstrapIdentifiers()", "label_es": "Plugin Phi-3.5-vision registrado en bootstrapIdentifiers()", "status": "done" },
+        { "label_en": "Cascade automatically falls back to WebLLM when network plugins fail", "label_es": "La cascada cae a WebLLM cuando los plugins de red fallan", "status": "done" },
+        { "label_en": "First-use download dialog with size + persistence consent", "label_es": "Diálogo de descarga en primer uso con tamaño + consentimiento de persistencia", "status": "done" },
+        { "label_en": "Cache management (probe/delete/re-download) in profile",   "label_es": "Gestión de caché en perfil (probe/delete/re-download)",   "status": "done" },
+        { "label_en": "0.35 confidence cap to prevent low-quality auto-promote",  "label_es": "Cap de confianza 0.35 para evitar auto-promote",            "status": "done" }
+      ]
+    },
+    "identification-block": {
+      "phase": "v0.3",
+      "title_en": "Visible identification block in observation form",
+      "title_es": "Bloque de identificación visible en formulario",
+      "modules": ["02-observation.md","01-photo-id.md"],
+      "subtasks": [
+        { "label_en": "Inline ID block under photo grid (spinner + result chip)", "label_es": "Bloque inline bajo la grilla de fotos (spinner + chip)",  "status": "done" },
+        { "label_en": "Auto-fires on first photo + manual re-run button",         "label_es": "Auto-dispara en la primera foto + botón de re-correr",    "status": "done" },
+        { "label_en": "Manual scientific-name input overrides cascade",          "label_es": "Entrada manual de nombre científico sobreescribe cascada", "status": "done" },
+        { "label_en": "Confidence + source surfaced (PlantNet, Claude, …)",       "label_es": "Confianza y fuente visibles (PlantNet, Claude, …)",        "status": "done" },
+        { "label_en": "Low-confidence amber notice when conf < 0.4",              "label_es": "Aviso ámbar de baja confianza cuando conf < 0.4",          "status": "done" }
+      ]
+    },
+    "gps-two-pass": {
+      "phase": "v0.3",
+      "title_en": "Two-pass GPS: fast coarse fix then high-accuracy refinement",
+      "title_es": "GPS en dos pasos: rápido aproximado luego alta precisión",
+      "modules": ["02-observation.md"],
+      "subtasks": [
+        { "label_en": "First call: enableHighAccuracy=false, ~1 s timeout",  "label_es": "Primera llamada: enableHighAccuracy=false, timeout ~1 s", "status": "done" },
+        { "label_en": "Second call: enableHighAccuracy=true, ~10 s timeout", "label_es": "Segunda llamada: enableHighAccuracy=true, timeout ~10 s","status": "done" },
+        { "label_en": "Form preview updates live as fix improves",            "label_es": "Vista previa del formulario se actualiza al mejorar fix","status": "done" },
+        { "label_en": "Cancel logic on form submit / reset",                   "label_es": "Lógica de cancelación al enviar / reset del formulario", "status": "done" },
+        { "label_en": "Falls back to EXIF GPS on timeout",                      "label_es": "Cae a GPS EXIF si hay timeout",                          "status": "done" }
+      ]
+    },
+    "user-api-tokens": {
+      "phase": "v0.5",
+      "title_en": "User API tokens (rst_*, scoped, SHA-256 hashed)",
+      "title_es": "Tokens de API de usuario (rst_*, con scopes, hash SHA-256)",
+      "modules": ["14-user-api-tokens.md"],
+      "subtasks": [
+        { "label_en": "user_api_tokens table with hashed token + scopes[]",  "label_es": "Tabla user_api_tokens con hash + scopes[]",       "status": "done" },
+        { "label_en": "Crypto-strong rst_<base32> generation client-side",    "label_es": "Generación crypto-strong rst_<base32> en cliente", "status": "done" },
+        { "label_en": "RLS owner-only on user_api_tokens",                     "label_es": "RLS solo-dueño en user_api_tokens",               "status": "done" },
+        { "label_en": "Plaintext shown to user exactly once on creation",      "label_es": "Texto plano mostrado al usuario una sola vez",     "status": "done" },
+        { "label_en": "last_used_at fire-and-forget update on each call",      "label_es": "Actualización fire-and-forget de last_used_at",    "status": "done" }
+      ]
+    },
+    "token-rest-api": {
+      "phase": "v0.5",
+      "title_en": "Token-authenticated REST API",
+      "title_es": "API REST autenticada por token",
+      "modules": ["14-user-api-tokens.md"],
+      "subtasks": [
+        { "label_en": "supabase/functions/api Edge Function deployed",                    "label_es": "Edge Function supabase/functions/api desplegada",            "status": "done" },
+        { "label_en": "/api/observe POST creates a row in observations",                  "label_es": "/api/observe POST crea una fila en observations",            "status": "done" },
+        { "label_en": "/api/identify POST runs the cascade with the user's BYO keys",     "label_es": "/api/identify POST corre la cascada con BYO keys del usuario","status": "done" },
+        { "label_en": "/api/observations GET (paginated, RLS-scoped to caller)",          "label_es": "/api/observations GET (paginado, RLS por usuario)",          "status": "done" },
+        { "label_en": "/api/export GET returns Darwin Core CSV for caller",                "label_es": "/api/export GET devuelve CSV Darwin Core",                   "status": "done" },
+        { "label_en": "Scope enforcement (observe/identify/export) per route",             "label_es": "Aplicación de scopes por ruta",                                "status": "done" },
+        { "label_en": "Deployed --no-verify-jwt; the function validates rst_* itself",     "label_es": "Desplegada --no-verify-jwt; la función valida rst_*",         "status": "done" }
+      ]
+    },
+    "token-ui": {
+      "phase": "v0.5",
+      "title_en": "Token management UI at /profile/tokens (EN) and /perfil/tokens (ES)",
+      "title_es": "UI de gestión de tokens en /profile/tokens (EN) y /perfil/tokens (ES)",
+      "modules": ["14-user-api-tokens.md"],
+      "subtasks": [
+        { "label_en": "Locale-paired routes /profile/tokens and /perfil/tokens",      "label_es": "Rutas locale /profile/tokens y /perfil/tokens",         "status": "done" },
+        { "label_en": "Create form (label + scopes checkboxes) + plaintext modal",     "label_es": "Form de creación + modal de texto plano",                "status": "done" },
+        { "label_en": "List existing tokens (label, scopes, last used, created)",      "label_es": "Lista de tokens existentes",                              "status": "done" },
+        { "label_en": "Revoke action with confirm",                                     "label_es": "Acción de revocación con confirm",                        "status": "done" },
+        { "label_en": "i18n strings under tr.profile.tokens.*",                          "label_es": "Strings i18n bajo tr.profile.tokens.*",                   "status": "done" },
+        { "label_en": "Copy-to-clipboard button on creation",                            "label_es": "Botón copiar al portapapeles en creación",                "status": "done" }
+      ]
+    },
+    "map-location-picker": {
+      "phase": "v1.0",
+      "title_en": "Interactive map picker for observation location",
+      "title_es": "Selector de ubicación con mapa interactivo",
+      "modules": ["15-map-location-picker.md","02-observation.md"],
+      "subtasks": [
+        { "label_en": "Drag-pin + tap-to-place on MapLibre",                "label_es": "Arrastrar pin + tap para colocar en MapLibre",       "status": "done" },
+        { "label_en": "Locality search (geocoder) with EN/ES results",      "label_es": "Búsqueda de localidad con resultados EN/ES",         "status": "done" },
+        { "label_en": "Reverse-geocode to populate locality string",        "label_es": "Geocodificación inversa para poblar localidad",       "status": "done" },
+        { "label_en": "Mobile bottom-sheet UX for the picker",               "label_es": "UX bottom-sheet móvil para el selector",              "status": "done" },
+        { "label_en": "Round-trip integration with ObservationForm fields", "label_es": "Integración round-trip con campos del formulario",    "status": "done" }
+      ]
+    },
+    "my-observations": {
+      "phase": "v1.0",
+      "title_en": "Personal observation list/history page",
+      "title_es": "Página de historial de observaciones personales",
+      "modules": ["16-my-observations.md"],
+      "subtasks": [
+        { "label_en": "Route /profile/observations (EN) / /perfil/observaciones (ES)", "label_es": "Ruta /profile/observations (EN) / /perfil/observaciones (ES)", "status": "done" },
+        { "label_en": "MyObservationsView component (shared between locales)",         "label_es": "Componente MyObservationsView compartido",                       "status": "done" },
+        { "label_en": "Thumbnail grid with status pill (synced/pending/failed)",        "label_es": "Grid de miniaturas con pill de estado",                           "status": "done" },
+        { "label_en": "Click row → /share/obs/<id> for detail",                          "label_es": "Click en fila → /share/obs/<id> para detalle",                     "status": "done" },
+        { "label_en": "Includes outbox-pending rows (unsynced)",                          "label_es": "Incluye filas pendientes de outbox (sin sincronizar)",           "status": "done" },
+        { "label_en": "Pagination + newest-first sort",                                   "label_es": "Paginación + orden más reciente primero",                          "status": "done" }
+      ]
+    },
+    "camera-getUserMedia": {
+      "phase": "v1.0",
+      "title_en": "In-app camera via getUserMedia API with file-input fallback",
+      "title_es": "Cámara en app vía getUserMedia con fallback a input de archivo",
+      "modules": ["17-in-app-camera.md","02-observation.md"],
+      "subtasks": [
+        { "label_en": "navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}})", "label_es": "getUserMedia con facingMode environment", "status": "done" },
+        { "label_en": "Live <video> preview + capture-to-canvas → Blob",                       "label_es": "Preview <video> + captura a canvas → Blob",                "status": "done" },
+        { "label_en": "Permission denied → fallback to <input type=file capture=environment>", "label_es": "Permiso denegado → fallback a input file capture=environment", "status": "done" },
+        { "label_en": "Stream cleanup on close to avoid camera-on indicator",                    "label_es": "Cleanup de stream al cerrar para evitar indicador",        "status": "done" },
+        { "label_en": "Identify + Observe surfaces both wire to it",                              "label_es": "Las superficies Identify + Observe lo usan",                "status": "done" }
+      ]
+    },
+    "batch-exif-importer": {
+      "phase": "v1.0",
+      "title_en": "Batch photo importer with EXIF GPS/datetime extraction",
+      "title_es": "Importador masivo de fotos con extracción EXIF",
+      "modules": ["19-batch-photo-importer.md"],
+      "subtasks": [
+        { "label_en": "Drag-drop / file-input multi-photo intake",            "label_es": "Captura multi-foto por drag-drop / file-input",     "status": "done" },
+        { "label_en": "exifr extraction of GPS + DateTimeOriginal per file",  "label_es": "Extracción exifr de GPS + DateTimeOriginal por archivo", "status": "done" },
+        { "label_en": "Per-row review table (include/exclude, edit fields)",  "label_es": "Tabla de revisión por fila (include/exclude, edición)",  "status": "done" },
+        { "label_en": "Bulk insert into Dexie outbox + queued sync",           "label_es": "Insert masivo a outbox Dexie + sync en cola",           "status": "done" },
+        { "label_en": "EN /profile/import/, ES /perfil/importar/ pages",       "label_es": "Páginas EN /profile/import/, ES /perfil/importar/",      "status": "done" },
+        { "label_en": "Camera-trap deep-link (subroute) for staged uploads",   "label_es": "Deep-link cámara-trampa (subruta) para subidas escalonadas","status": "done" }
+      ]
+    },
+    "oauth-custom-domain": {
+      "phase": "v1.0",
+      "title_en": "Custom auth domain on Supabase OAuth (auth.rastrum.org)",
+      "title_es": "Dominio personalizado en OAuth de Supabase (auth.rastrum.org)",
+      "modules": ["04-auth.md"],
+      "subtasks": [
+        { "label_en": "Supabase Pro plan ($25/mo) — required by Supabase for custom auth domain", "label_es": "Plan Supabase Pro ($25/mes) — requerido para dominio de auth custom", "status": "blocked", "blocker_en": "Deferred for the zero-cost target; default Supabase callback host is fine for v1.0", "blocker_es": "Diferido por el target de costo cero; el host de callback por defecto sirve para v1.0" },
+        { "label_en": "DNS CNAME for auth.rastrum.org",                                "label_es": "CNAME DNS para auth.rastrum.org",                                "status": "planned" },
+        { "label_en": "Update Site URL + redirect allow-list in Supabase Auth",        "label_es": "Actualizar Site URL + allow-list en Supabase Auth",               "status": "planned" },
+        { "label_en": "Re-test Google + GitHub OAuth flows on custom domain",          "label_es": "Re-probar flujos OAuth Google + GitHub en dominio custom",        "status": "planned" }
+      ]
+    },
+    "mcp-server": {
+      "phase": "v1.0",
+      "title_en": "MCP server for AI agents (JSON-RPC over HTTP at /functions/v1/mcp)",
+      "title_es": "Servidor MCP para agentes de IA (JSON-RPC sobre HTTP)",
+      "modules": ["15-mcp-server.md","14-user-api-tokens.md"],
+      "subtasks": [
+        { "label_en": "supabase/functions/mcp Edge Function with JSON-RPC 2.0 transport", "label_es": "Edge Function supabase/functions/mcp con transporte JSON-RPC 2.0", "status": "done" },
+        { "label_en": "tools/list and tools/call backed by user_api_tokens scopes",       "label_es": "tools/list y tools/call respaldados por scopes de user_api_tokens", "status": "done" },
+        { "label_en": "5 tools: identify_species, submit_observation, list_observations, get_observation, export_darwin_core", "label_es": "5 herramientas: identify_species, submit_observation, list_observations, get_observation, export_darwin_core", "status": "done" },
+        { "label_en": "initialize + ping unauthenticated for capability probing",          "label_es": "initialize + ping sin auth para probing de capacidades",         "status": "done" },
+        { "label_en": "Deployed --no-verify-jwt; the function validates rst_* itself",     "label_es": "Desplegada --no-verify-jwt; la función valida rst_*",            "status": "done" },
+        { "label_en": "Documented Claude Desktop, Cursor, VS Code, Copilot Coding Agent integrations", "label_es": "Integraciones documentadas para Claude Desktop, Cursor, VS Code, Copilot Coding Agent", "status": "done" }
+      ]
+    },
+    "rastrum-org-domain": {
+      "phase": "v1.0",
+      "title_en": "Migrate canonical domain to rastrum.org",
+      "title_es": "Migrar dominio canónico a rastrum.org",
+      "modules": [],
+      "subtasks": [
+        { "label_en": "Register rastrum.org + DNS via Cloudflare",            "label_es": "Registrar rastrum.org + DNS vía Cloudflare",          "status": "done" },
+        { "label_en": "Update Astro site config + sitemap host",               "label_es": "Actualizar config de Astro + host del sitemap",       "status": "done" },
+        { "label_en": "Migrate media bucket hostname to media.rastrum.org",    "label_es": "Migrar hostname del bucket a media.rastrum.org",      "status": "done" },
+        { "label_en": "Service worker pass-through host list updated",         "label_es": "Lista de pass-through del SW actualizada",            "status": "done" },
+        { "label_en": "Old domain (rastrum.artemiop.com) 301-redirects",       "label_es": "Dominio antiguo redirige 301",                         "status": "done" },
+        { "label_en": "Documentation updated to reference rastrum.org",         "label_es": "Documentación actualizada a rastrum.org",              "status": "done" }
+      ]
     }
   }
 }

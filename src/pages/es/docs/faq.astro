@@ -1,0 +1,13 @@
+---
+import DocLayout from '../../../layouts/DocLayout.astro';
+import FaqView from '../../../components/FaqView.astro';
+import { t } from '../../../i18n/utils';
+
+const lang = 'es';
+const tr = t(lang);
+const sections = tr.docs.sections as Record<string, string>;
+---
+
+<DocLayout title={sections.faq} lang={lang} section="faq" editPath="docs/faq.md">
+  <FaqView lang={lang} />
+</DocLayout>

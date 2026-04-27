@@ -1,0 +1,138 @@
+---
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const isEs = lang === 'es';
+---
+
+<article class="prose prose-zinc dark:prose-invert max-w-3xl">
+  <h1>{isEs ? 'Términos de uso' : 'Terms of Use'}</h1>
+  <blockquote class="not-italic font-semibold text-amber-700 dark:text-amber-400 border-l-4 border-amber-500 pl-4">
+    {isEs
+      ? 'Esta es una descripción en lenguaje simple de cómo esperamos que se use Rastrum, no un documento revisado por abogados. Consulta a un abogado antes de tratarlo como un acuerdo vinculante.'
+      : 'This is a plain-language description of how we expect Rastrum to be used, not a legally reviewed document. Consult a lawyer before treating this as a binding agreement.'}
+  </blockquote>
+  <p class="text-sm text-zinc-500">{isEs ? 'Última actualización: 2026-04-25.' : 'Last updated: 2026-04-25.'}</p>
+
+  <h2>{isEs ? 'Aceptación' : 'Acceptance'}</h2>
+  <p>
+    {isEs
+      ? 'Al visitar https://rastrum.org o cualquier subdominio, al iniciar sesión, o al usar cualquier API o servidor MCP de Rastrum, aceptas estos términos. Si no los aceptas, no uses el servicio.'
+      : 'By visiting https://rastrum.org or any subdomain, by signing in, or by using any Rastrum API or MCP server, you accept these terms. If you don\'t accept them, don\'t use the service.'}
+  </p>
+  <p>
+    {isEs
+      ? 'El servicio lo opera el proyecto Rastrum (voluntarios y mantenedores listados en '
+      : 'The service is operated by the Rastrum project (volunteers + maintainers listed at '}
+    <a href="https://github.com/ArtemioPadilla/rastrum" target="_blank" rel="noopener">github.com/ArtemioPadilla/rastrum</a>
+    {isEs
+      ? '). El código se publica bajo licencia MIT (cliente) y AGPL-3.0 (servidor). Los datos por observación los licencia el observador (tú) bajo una de las opciones Creative Commons descritas abajo.'
+      : '). The codebase is released under the MIT license (client) and AGPL-3.0 (server). Per-observation data is licensed by you, the observer, under one of the Creative Commons options described below.'}
+  </p>
+
+  <h2>{isEs ? 'Cuenta y tokens' : 'Account and tokens'}</h2>
+  <ul>
+    <li>{isEs ? 'Una cuenta por persona. No permitimos cuentas organizacionales compartidas en este momento. Si necesitas una configuración multi-usuario (una ONG, un laboratorio, una agencia), abre un issue y lo resolvemos.' : 'One account per human. We do not allow shared organisational accounts at this time. If you need a multi-user setup (a NGO, a research lab, an agency), open an issue and we\'ll work it out.'}</li>
+    <li>{isEs ? 'Eres responsable de la seguridad de tu autenticación y de tus tokens API personales (' : 'You are responsible for the security of your authentication and your personal API tokens ('}<code>rst_*</code>{isEs ? '). Los tokens se guardan con hash SHA-256 de nuestro lado, pero el texto plano se te muestra exactamente una vez al crearlo y no podemos recuperarlo. Si filtras un token, revócalo en ' : '). Tokens are SHA-256 hashed on our side, but the plaintext is shown to you exactly once at creation and we cannot recover it. If you leak a token, revoke it at '}<code>/{lang === 'es' ? 'perfil/tokens' : 'profile/tokens'}</code>.</li>
+    <li>{isEs ? 'No compartas tu cuenta o token con otra persona. Si necesitas una identidad separada para un colega o un co-investigador, pídele que cree la suya.' : 'Don\'t share an account or token with someone else. If you need a separate identity for a coworker or a co-researcher, ask them to create their own.'}</li>
+  </ul>
+
+  <h2>{isEs ? 'Uso aceptable' : 'Acceptable use'}</h2>
+  <p>{isEs ? 'Lo que pedimos:' : 'What we ask:'}</p>
+  <ul>
+    <li><strong>{isEs ? 'No hagas scraping.' : 'Don\'t scrape.'}</strong>{isEs ? ' Los datos públicos se publican bajo licencias CC por registro; respeta la licencia de cada uno. Para uso académico masivo, prefiere la exportación Darwin Core (' : ' The public data is published under per-record CC licenses; respect each record\'s license. For bulk academic use, prefer the Darwin Core export ('}<code>/{lang === 'es' ? 'perfil/exportar' : 'profile/export'}/</code>{isEs ? ') o el espejo de GBIF cuando esa pipeline esté en vivo.' : ') or the GBIF mirror once that pipeline is live.'}</li>
+    <li><strong>{isEs ? 'No envíes observaciones falsas o fabricadas por IA.' : 'Don\'t submit fake or AI-fabricated observations.'}</strong>{isEs ? ' Rastrum es una plataforma de ciencia ciudadana; la integridad de los datos depende de que sean reales. Las identificaciones por IA de fotos reales están bien y son explícitamente soportadas. Generar fotos falsas y subirlas no.' : ' Rastrum is a citizen science platform; the integrity of the data depends on it being real. AI identifications of real photos are fine and explicitly supported. Generating fake photos and uploading them is not.'}</li>
+    <li><strong>{isEs ? 'No acoses a otros usuarios.' : 'Don\'t harass other users.'}</strong>{isEs ? ' Sin abuso dirigido, sin doxxing, sin amenazas — en comentarios de observaciones, en bios de perfil, en ningún lado.' : ' No targeted abuse, no doxxing, no threats — in observation comments, in profile bios, anywhere.'}</li>
+    <li><strong>{isEs ? 'No intentes evadir el oscurecimiento de especies sensibles.' : 'Don\'t try to circumvent sensitive-species obscuration.'}</strong>{isEs ? ' El recorte de coordenadas para especies NOM-059 / CITES existe para protegerlas del furtivismo. No intentes des-anonimizarlo vía ataques de timing, consultas repetidas, scraping, ingeniería social u otros medios.' : ' The coordinate-coarsening for NOM-059 / CITES species exists to protect those species from poaching. Do not attempt to de-anonymise it via timing attacks, repeated queries, scraping, social engineering, or any other means.'}</li>
+    <li><strong>{isEs ? 'No abuses la API.' : 'Don\'t abuse the API.'}</strong>{isEs ? ' Aplican límites de tasa suaves por token; revocaremos tokens que los excedan de manera que sugiera automatización en lugar de un cliente de buena fe.' : ' Soft rate limits apply per token; we will revoke tokens that exceed them in a way that suggests automation rather than a good-faith client.'}</li>
+  </ul>
+
+  <h2>{isEs ? 'Licencia por observación' : 'Per-observation licensing'}</h2>
+  <p>{isEs ? 'Cuando envías una observación, eliges una licencia para ella:' : 'When you submit an observation, you choose a license for it:'}</p>
+  <ul>
+    <li><strong>CC BY 4.0</strong>{isEs ? ' (predeterminada) — cualquiera puede reusar la foto y los metadatos siempre que te dé crédito.' : ' (default) — anyone can reuse the photo and metadata as long as they credit you.'}</li>
+    <li><strong>CC BY-NC 4.0</strong>{isEs ? ' — igual que la anterior pero solo uso no comercial.' : ' — same as above but non-commercial use only.'}</li>
+    <li><strong>CC0</strong>{isEs ? ' — renuncias a todos los derechos; la observación queda en el dominio público.' : ' — you waive all rights; the observation is in the public domain.'}</li>
+  </ul>
+  <p>
+    {isEs
+      ? 'Al enviar la observación nos otorgas a Rastrum una licencia no exclusiva e intransferible para mostrarla, generar tarjetas para compartir, incluirla en exportaciones Darwin Core, espejarla a GBIF (si optas por ello) y servirla por la API pública — todo bajo la licencia por registro que elegiste.'
+      : 'By submitting the observation, you grant Rastrum a non-exclusive, non-transferable license to display the observation, generate share cards, include it in Darwin Core exports, mirror it to GBIF (if you opt in), and serve it through the public API — all under the per-record license you selected.'}
+  </p>
+  <p>{isEs ? 'Nunca cambiamos la licencia que escogiste. Puedes editar un registro (o eliminarlo) desde ' : 'We do not ever change the license you picked. You can edit a record (or delete it) from '}<code>/{lang === 'es' ? 'perfil/observaciones' : 'profile/observations'}/</code>.</p>
+
+  <h2>{isEs ? 'Especies sensibles' : 'Sensitive species'}</h2>
+  <p>
+    {isEs
+      ? 'Si tu observación coincide con una especie listada en NOM-059-SEMARNAT-2010 o apéndices de CITES, Rastrum recortará las coordenadas públicas a aproximadamente un cuadrado de 10×10 km. Las coordenadas precisas siguen siendo legibles para:'
+      : 'If your observation matches a species listed in NOM-059-SEMARNAT-2010 or CITES appendices, Rastrum will coarsen the public coordinates to approximately a 10×10 km square. Precise coordinates remain readable to:'}
+  </p>
+  <ul>
+    <li>{isEs ? 'tú (el observador)' : 'you (the observer)'}</li>
+    <li>{isEs ? 'investigadores credenciados, cuando estén autenticados' : 'credentialed researchers, when authenticated'}</li>
+  </ul>
+  <p>
+    {isEs
+      ? 'No intentes evadir esto. No publiques coordenadas GPS precisas de especies sensibles en las notas de la observación, ni publiques capturas de mapas que muestren la ubicación precisa.'
+      : 'Don\'t attempt to circumvent this. Don\'t post precise GPS coordinates of sensitive species in your observation notes, and don\'t post screenshots of maps that show the precise location.'}
+  </p>
+
+  <h2>{isEs ? 'APIs de terceros' : 'Third-party APIs'}</h2>
+  <p>{isEs ? 'Rastrum se integra con servicios que tienen sus propios términos:' : 'Rastrum integrates with services that have their own terms:'}</p>
+  <ul>
+    <li><strong>PlantNet</strong>{isEs ? ' — al enviar una foto para identificación de plantas, la foto y los metadatos asociados viajan a los servidores de PlantNet bajo sus términos (' : ' — when you submit a photo for plant identification, the photo and any associated metadata travel to PlantNet\'s servers under their terms ('}<a href="https://my.plantnet.org/legal" target="_blank" rel="noopener">my.plantnet.org/legal</a>{isEs ? '). Su licencia también gobierna cómo PlantNet puede almacenar y reutilizar la foto.' : '). Their license also governs how PlantNet may store and reuse the photo.'}</li>
+    <li><strong>Anthropic</strong>{isEs ? ' — cuando traes tu propia clave (BYO) de Anthropic, las fotos usadas para identificación con Claude vision se envían a Anthropic bajo *tu* contrato con Anthropic (' : ' — when you bring your own (BYO) Anthropic API key, photos used for Claude vision identification are sent to Anthropic under *your* contract with Anthropic ('}<a href="https://www.anthropic.com/legal" target="_blank" rel="noopener">anthropic.com/legal</a>{isEs ? '). Rastrum no guarda la clave y no enruta tu llamada a través de nuestros servidores.' : '). Rastrum does not store the key and does not relay your call through our servers.'}</li>
+    <li><strong>OpenFreeMap, Cloudflare R2, Supabase</strong>{isEs ? ' — proveedores de infraestructura; sus términos gobiernan disponibilidad y almacenamiento.' : ' — infrastructure providers; their terms govern uptime and storage.'}</li>
+  </ul>
+  <p>{isEs ? 'Cuando uses claves BYO, *tú* estás vinculado por los términos del proveedor upstream. No pegues la clave de otra persona.' : 'When you use BYO keys, *you* are bound by the upstream provider\'s terms. Don\'t paste somebody else\'s key.'}</p>
+
+  <h2>{isEs ? 'Suspensión y apelaciones' : 'Suspension and appeals'}</h2>
+  <p>
+    {isEs
+      ? 'Podemos suspender o terminar cuentas que violen estos términos. Tratamos de avisar excepto en casos de abuso claro (suplantar a alguien, hacer scraping, subir falsos en masa, intentar comprometer el sistema). Si crees que tu cuenta fue suspendida por error:'
+      : 'We may suspend or terminate accounts that violate these terms. We try to give warning except in the case of clear abuse (impersonating someone, scraping, mass-uploading fakes, attempting to compromise the system). If you think your account was suspended in error:'}
+  </p>
+  <ul>
+    <li>
+      <a href="https://github.com/ArtemioPadilla/rastrum/issues" target="_blank" rel="noopener">{isEs ? 'Abre un issue' : 'Open an issue'}</a>
+      {isEs ? ' y etiqueta a ' : ' and tag '}
+      <code>@ArtemioPadilla</code>.
+    </li>
+    <li>{isEs ? 'O contáctanos por el correo del perfil de GitHub del mantenedor.' : 'Or reach out via the email address listed on the maintainer\'s GitHub profile.'}</li>
+  </ul>
+  <p>{isEs ? 'Lo revisamos y respondemos, normalmente en una semana.' : 'We\'ll review and reply, usually within a week.'}</p>
+
+  <h2>{isEs ? 'Descargo de garantía' : 'Disclaimer of warranty'}</h2>
+  <p>
+    {isEs
+      ? 'Rastrum se proporciona "tal cual", con base en mejor esfuerzo. No hay acuerdo de nivel de servicio (SLA), no hay garantía de tiempo activo, no hay garantía de aptitud para un propósito particular. El servidor está licenciado bajo AGPL-3.0; el descargo de garantía de AGPL-3.0 aplica completamente.'
+      : 'Rastrum is provided "as is", on a best-effort basis. There is no service level agreement (SLA), no uptime guarantee, no warranty of fitness for a particular purpose. The server is licensed under AGPL-3.0; the AGPL-3.0 disclaimer of warranty applies in full.'}
+  </p>
+  <p>
+    {isEs
+      ? 'En particular: las identificaciones producidas por Rastrum son sugerencias, no determinaciones autoritativas. Trata cada identificación de especie como una hipótesis a verificar contra conocimiento experto o fuentes peer-reviewed antes de tomar cualquier decisión basada en ella (conservación, forrajeo, regulatoria, médica, o cualquier otra).'
+      : 'In particular: identifications produced by Rastrum are suggestions, not authoritative determinations. Treat every species identification as a hypothesis to verify against expert knowledge or peer-reviewed sources before taking any decision based on it (conservation, foraging, regulatory, medical, or otherwise).'}
+  </p>
+
+  <h2>{isEs ? 'Ley aplicable' : 'Governing law'}</h2>
+  <p>
+    {isEs
+      ? 'Estos términos se interpretan de buena fe. Cuando surge una cuestión de derecho, el operador está basado en México, y aplica la ley mexicana en ausencia de un acuerdo más específico. Esta cláusula debe ser revisada por un abogado antes de tratarla como vinculante — ver el descargo al inicio de esta página.'
+      : 'These terms are intended to be read in good faith. Where a question of law arises, the operator is based in Mexico, and Mexican law applies in the absence of a more specific agreement. This clause should be reviewed by a lawyer before treating it as binding — see the disclaimer at the top of this page.'}
+  </p>
+
+  <h2>{isEs ? 'Cambios a estos términos' : 'Changes to these terms'}</h2>
+  <p>
+    {isEs
+      ? 'Podemos actualizar estos términos — por ejemplo, para clarificar una práctica de privacidad, agregar una nueva integración de tercero, o cerrar un loophole. Cuando lo hacemos, la fecha de "Última actualización" al inicio de esta página cambia, y se agrega una nota al log de commits de GitHub. Cambios materiales se anuncian en '
+      : 'We may update these terms — for example to clarify a privacy practice, add a new third-party integration, or close a loophole. When we do, the "Last updated" date at the top of this page changes, and a note is added to the GitHub commit log. Material changes are announced in '}
+    <a href="https://github.com/ArtemioPadilla/rastrum/discussions" target="_blank" rel="noopener">GitHub Discussions</a>.
+  </p>
+
+  <h2>{isEs ? 'Contacto' : 'Contact'}</h2>
+  <p>{isEs ? 'Para preguntas relacionadas a los términos:' : 'For terms-related questions:'}</p>
+  <ul>
+    <li>{isEs ? 'Abre un issue en ' : 'Open an issue at '}<a href="https://github.com/ArtemioPadilla/rastrum/issues" target="_blank" rel="noopener">github.com/ArtemioPadilla/rastrum/issues</a>.</li>
+    <li>{isEs ? 'O contacta a ' : 'Or contact '}<code>@ArtemioPadilla</code>{isEs ? ' en GitHub.' : ' on GitHub.'}</li>
+  </ul>
+  <p class="text-sm text-zinc-500 mt-8">{isEs ? 'Última actualización: 2026-04-25.' : 'Last updated: 2026-04-25.'}</p>
+</article>

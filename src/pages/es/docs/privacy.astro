@@ -1,0 +1,13 @@
+---
+import DocLayout from '../../../layouts/DocLayout.astro';
+import PrivacyView from '../../../components/PrivacyView.astro';
+import { t } from '../../../i18n/utils';
+
+const lang = 'es';
+const tr = t(lang);
+const sections = tr.docs.sections as Record<string, string>;
+---
+
+<DocLayout title={sections.privacy} lang={lang} section="privacy" editPath="docs/privacy.md">
+  <PrivacyView lang={lang} />
+</DocLayout>

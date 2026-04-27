@@ -42,11 +42,15 @@ export const routes: Record<string, Record<Locale, string>> = {
     es: '/perfil/importar/camara-trampa',
   },
   chat: { en: '/chat', es: '/chat' },
+  privacy: { en: '/privacy', es: '/privacidad' },
+  terms: { en: '/terms', es: '/terminos' },
+  faq: { en: '/faq', es: '/preguntas-frecuentes' },
 };
 
 export const docPages = [
   'vision', 'features', 'roadmap', 'tasks', 'market',
   'architecture', 'indigenous', 'funding', 'contribute',
+  'faq', 'privacy', 'terms',
 ] as const;
 
 export type DocPage = (typeof docPages)[number];
