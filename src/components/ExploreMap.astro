@@ -1,5 +1,6 @@
 ---
 import { t } from '../i18n/utils';
+import TimeSlider from './TimeSlider.astro';
 
 interface Props {
   lang: 'en' | 'es';
@@ -11,9 +12,13 @@ const tr = t(lang);
 <div>
   <h1 class="text-2xl font-bold tracking-tight mb-2">{tr.map.title}</h1>
   <p class="text-sm text-zinc-500 mb-4" id="map-status">{tr.map.loading}</p>
-  <div id="map" class="w-full h-[70vh] rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900"></div>
+  <div class="relative">
+    <div id="map" class="w-full h-[70vh] rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900"></div>
+    <div id="map-skeleton" class="absolute inset-0 w-full h-full rounded-lg bg-zinc-200 dark:bg-zinc-800 animate-pulse" aria-hidden="true"></div>
+  </div>
   <p id="map-source-note" class="hidden mt-2 text-[11px] text-zinc-500 dark:text-zinc-400"></p>
   <p id="map-offline-hint" class="hidden mt-2 text-xs text-amber-700 dark:text-amber-400"></p>
+  <TimeSlider lang={lang} />
 </div>
 
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.css" />
@@ -35,7 +40,10 @@ const tr = t(lang);
   const status = document.getElementById('map-status');
   const sourceNote = document.getElementById('map-source-note');
   const offlineHint = document.getElementById('map-offline-hint');
+  const skeleton = document.getElementById('map-skeleton');
   if (!container) throw new Error('no map container');
+
+  const hideSkeleton = () => skeleton?.classList.add('hidden');
 
   const KINGDOM_COLORS: Record<string, string> = {
     Plantae:  '#16a34a',
@@ -152,6 +160,7 @@ const tr = t(lang);
 
   const choice = await chooseStyle();
   if (!choice) {
+    hideSkeleton();
     emptyOfflineState(
       tr(
         "You are offline and the Mexico map isn't downloaded yet. Open Profile → Edit → Offline maps to download it next time you have Wi-Fi.",
@@ -178,6 +187,7 @@ const tr = t(lang);
 
   map.on('load', async () => {
     status?.classList.add('hidden');
+    hideSkeleton();
 
     const supabase = getSupabase();
     const { data, error } = await supabase
@@ -195,10 +205,16 @@ const tr = t(lang);
     for (const row of data ?? []) {
       const geom = (row as { location: unknown }).location as GeoJSON.Point | null;
       if (!geom?.coordinates) continue;
+      const observedAt = (row as { observed_at?: string | null }).observed_at ?? null;
+      const observedMonth = observedAt ? new Date(observedAt).getUTCMonth() : null;
       features.push({
         type: 'Feature',
         geometry: geom,
-        properties: { id: row.id, kingdom: 'Plantae' /* TODO: join taxa */ },
+        properties: {
+          id: row.id,
+          kingdom: 'Plantae' /* TODO: join taxa */,
+          observed_month: observedMonth,
+        },
       });
     }
 
@@ -209,9 +225,40 @@ const tr = t(lang);
       }
     }
 
+    document.dispatchEvent(
+      new CustomEvent('rastrum:time-slider-count', {
+        detail: { count: features.length, ready: features.length > 0 },
+      }),
+    );
+
+    const allFeatures = features;
+    let activeMonth: number | null = null;
+
+    function applyMonthFilter(): void {
+      const filtered = activeMonth === null
+        ? allFeatures
+        : allFeatures.filter((f) => {
+            const m = (f.properties as { observed_month?: number | null } | null)?.observed_month;
+            return typeof m === 'number' && m === activeMonth;
+          });
+      const src = map.getSource('observations') as maplibregl.GeoJSONSource | undefined;
+      src?.setData({ type: 'FeatureCollection', features: filtered });
+      document.dispatchEvent(
+        new CustomEvent('rastrum:time-slider-count', {
+          detail: { count: filtered.length, ready: allFeatures.length > 0 },
+        }),
+      );
+    }
+
+    document.addEventListener('rastrum:time-slider-change', (ev) => {
+      const detail = (ev as CustomEvent<{ month: number | null }>).detail || { month: null };
+      activeMonth = typeof detail.month === 'number' ? detail.month : null;
+      applyMonthFilter();
+    });
+
     map.addSource('observations', {
       type: 'geojson',
-      data: { type: 'FeatureCollection', features },
+      data: { type: 'FeatureCollection', features: allFeatures },
       cluster: true,
       clusterMaxZoom: 14,
       clusterRadius: 50,

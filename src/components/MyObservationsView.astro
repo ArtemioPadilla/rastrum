@@ -11,6 +11,8 @@
  * empty state pushes the user to the observe form.
  */
 import { t, getLocalizedPath, routes } from '../i18n/utils';
+import Skeleton from './Skeleton.astro';
+import FirstObservationCelebration from './FirstObservationCelebration.astro';
 
 interface Props {
   lang: 'en' | 'es';
@@ -76,8 +78,8 @@ const tabs = [
 
     <ul id="mo-list" class="space-y-3"></ul>
 
-    <div id="mo-loading" class="hidden py-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
-      {tr.profile.my_observations_loading}
+    <div id="mo-loading" class="hidden">
+      <Skeleton variant="row" count={5} ariaLabel={tr.profile.my_observations_loading} />
     </div>
 
     <div id="mo-empty" class="hidden rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-8 text-center">
@@ -101,6 +103,8 @@ const tabs = [
     </div>
   </div>
 </div>
+
+<FirstObservationCelebration lang={lang} />
 
 <script>
   import { getSupabase } from '../lib/supabase';

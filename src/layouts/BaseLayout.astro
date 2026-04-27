@@ -2,6 +2,8 @@
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import InstallPwaButton from '../components/InstallPwaButton.astro';
+import InstallDiscoveryHint from '../components/InstallDiscoveryHint.astro';
+import OnboardingTour from '../components/OnboardingTour.astro';
 import ReportIssueButton from '../components/ReportIssueButton.astro';
 
 interface Props {
@@ -49,11 +51,13 @@ const installLang: 'en' | 'es' = lang === 'es' ? 'es' : 'en';
   </head>
   <body class="min-h-screen bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 transition-colors pb-20 sm:pb-0">
     <Header lang={lang} currentPath={currentPath} />
+    <InstallDiscoveryHint lang={installLang} />
     <main class="max-w-5xl mx-auto px-4 py-8">
       <slot />
     </main>
     <Footer lang={lang} />
     <InstallPwaButton lang={installLang} />
     <ReportIssueButton lang={lang} />
+    <OnboardingTour lang={installLang} />
   </body>
 </html>

@@ -8,6 +8,7 @@
  * filter on the client — RLS does the gating.
  */
 import { t } from '../i18n/utils';
+import Skeleton from './Skeleton.astro';
 
 interface Props {
   lang: 'en' | 'es';
@@ -33,6 +34,10 @@ const tr = t(lang);
     >
       {tr.social.mark_all_read}
     </button>
+  </div>
+
+  <div class="watchlist-skeleton">
+    <Skeleton variant="row" count={3} ariaLabel={tr.social.no_activity} />
   </div>
 
   <ul class="watchlist-list space-y-2"></ul>
@@ -101,12 +106,14 @@ const tr = t(lang);
     const listEl = root.querySelector('.watchlist-list') as HTMLUListElement | null;
     const emptyEl = root.querySelector('.watchlist-empty') as HTMLElement | null;
     const markBtn = root.querySelector('.watchlist-mark-read') as HTMLButtonElement | null;
+    const skeletonEl = root.querySelector('.watchlist-skeleton') as HTMLElement | null;
+    const hideSkeleton = () => skeletonEl?.classList.add('hidden');
 
     let supabase;
-    try { supabase = getSupabase(); } catch { return; }
+    try { supabase = getSupabase(); } catch { hideSkeleton(); return; }
 
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) { hideSkeleton(); return; }
 
     const since = new Date();
     since.setDate(since.getDate() - 30);
@@ -119,6 +126,7 @@ const tr = t(lang);
 
     const actorPool = Array.from(new Set([user.id, ...followeeIds]));
     if (actorPool.length === 0) {
+      hideSkeleton();
       emptyEl?.classList.remove('hidden');
       return;
     }
@@ -132,6 +140,7 @@ const tr = t(lang);
       .limit(50);
 
     const rows = (events ?? []) as ActivityRow[];
+    hideSkeleton();
     if (!rows.length) {
       emptyEl?.classList.remove('hidden');
       return;
