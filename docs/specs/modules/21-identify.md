@@ -1,144 +1,137 @@
-# Module 21 — Identify (no-save quick probe)
+# Module 21 — Identify (quick-probe surface)
 
-**Status:** v1.0 (shipped 2026-04-25)
-**Code:** `src/components/IdentifyView.astro`
+**Status:** v1.0 (shipped 2026-04-25, redesigned 2026-04-27)
+**Code:** `src/components/IdentifyView.astro` (thin wrapper) →
+`src/components/ObservationForm.astro` mounted with `mode="identify-only"`
 **Routes:** `/{en,es}/identify/` (`/en/identify/`, `/es/identificar/`)
 
 The `/identify` page is the lowest-friction "what is this?" surface in
-Rastrum. The user picks a photo, the page asks PlantNet, the page
-renders the top match plus alternates. **It never saves.** That choice
-is deliberate — `/observe` is the right surface for a logged
-observation, and `/chat` is the right surface for a free-form
-conversation. `/identify` exists for the hallway naturalist who wants
-the answer in two taps and is gone.
+Rastrum. The user picks a photo and an identification appears within
+seconds. The same photo can be promoted to a full observation with one
+tap; the GPS / habitat / notes fields stay collapsed until they are.
 
----
-
-## Why deliberately narrow
-
-| Surface | Saves obs | Cascade scope | LLM | Friction |
-|---|---|---|---|---|
-| `/identify` | no | PlantNet only | none | 2 taps (camera/gallery → result) |
-| `/chat` | no (handoff) | full cascade (excl. Phi) | Llama interpreter | 2 taps + reply latency |
-| `/observe` | yes (Dexie outbox) | full cascade | none | full form |
-
-The page intentionally does **not** call `runCascade()`. PlantNet is
-chosen as the single gateway because:
-
-1. It's the cheapest plugin to run on a stranger's phone — no model
-   download, no Anthropic billing, just a single REST call.
-2. It returns a clean top-N list with common names per locale, which
-   maps trivially to the page's "top match + others" layout.
-3. The page would otherwise need to handle Phi-vision consent, BYO
-   Claude prompts, and BirdNET audio handoff — all of which already
-   exist on `/chat` or `/observe`.
-
-If a user wants the full cascade, the page links them to `/observe`
-explicitly:
-
-> "Quick identify, no save. Want to log a full observation with location?
-> Go to the observation form."
+After 2026-04-27 the page is no longer a separate component — it is
+the **observation form** mounted in identify-only mode. This collapses
+two surfaces that were drifting apart and lets the user move from
+"just identify" to "save observation" without losing context.
 
 ---
 
 ## Architecture
 
-```
-file (camera or gallery)
-       │
-       ├── resolvePlantNetKey()
-       │     ├── window.__RASTRUM_PLANTNET_KEY__   // dev injection
-       │     ├── import.meta.env.PUBLIC_PLANTNET_KEY  // build-time
-       │     └── byo-keys.getKey('plantnet','plantnet')  // user-supplied
-       │
-       └── POST https://my-api.plantnet.org/v2/identify/all?api-key=<k>&lang=<lang>&nb-results=5
-             body: FormData { images: <file>, organs: 'auto' }
-             timeout: 20 s (AbortController)
-       └── renderResults(top, alternates)
-```
+### Parallel cascade
 
-There is no Edge Function in the path. The page calls PlantNet directly
-from the browser. The key is resolved client-side from three sources, in
-order of preference. If no key is found, the page renders an inline
-amber notice pointing the user to `/profile/edit`.
+`/identify` calls **`runParallelIdentify(file, { runners })`** from
+[`src/lib/identify-cascade-client.ts`](../../../src/lib/identify-cascade-client.ts).
+All available runners race in parallel — first responder with
+`confidence ≥ 0.5` wins; the others are aborted via `AbortController`.
 
----
+Available runners (see `src/lib/identify-runners.ts`):
 
-## File map
+| Runner | Source | When it fires | Cost |
+|---|---|---|---|
+| `makePlantNetRunner` | PlantNet HTTP API | Always (key resolves from project secret + BYO chain) | Free quota (500/day shared) |
+| `makeClaudeRunner` | Claude Haiku 4.5 vision | When `resolveAnthropicKey()` returns a key | Per-token; only fires if user has BYO key (zero-cost target keeps the project key unset) |
+| `makePhiRunner` | WebLLM Phi-3.5-vision on-device | When the model is already cached | Free, offline; ~2.4 GB one-time download |
 
-| File | Purpose |
-|---|---|
-| `src/components/IdentifyView.astro` | Single-file UI + script. ~183 lines. |
-| `src/pages/en/identify.astro` | EN entry, mounts `<IdentifyView lang="en"/>`. |
-| `src/pages/es/identificar.astro` | ES entry, same component, `lang="es"`. |
-| `src/lib/byo-keys.ts` | Per-plugin key store, used as the third resolver. |
+If the cascade's best response is `< 0.5` confidence, the result still
+renders with an "Uncertain" pill instead of a hard failure.
 
-The page does not depend on `src/lib/identifiers/`. Adding a new plugin
-to the registry has no effect on `/identify`. That's a feature.
+If PlantNet 403/404s (= no plant detected) and Phi-vision is not yet
+cached, the user sees an inline offer card to download Phi-vision once
+on Wi-Fi. The card frames the trade-off honestly: ~2.4 GB once, then
+forever offline, photos never leave the device. Skipping the offer
+hides the message; the user can still type the species name manually
+or retry with a different photo.
 
----
+### Result rendering
 
-## i18n / EN-ES parity
+The result card shows:
+- **Top match** (scientific name, common name)
+- A single confidence pill (e.g. `87%`)
+- An info `i` icon — tapping it surfaces the source identifier
+  (PlantNet / Claude / Phi-vision / etc.) and license
+- **Alternates collapsed** behind `+ N alternatives` when top
+  confidence ≥ 0.85; visible when 0.5–0.85; expanded by default when
+  < 0.5 (uncertain) so the user can pick from options.
 
-The page is bilingual but renders inline ES strings for two messages
-(amber "no key" notice and the link CTA) because they reference
-locale-specific routes (`/perfil/editar/` vs `/profile/edit/`). All
-other strings come from `tr.identify.*` and `tr.observe.*`.
-
-Routes are declared in `src/i18n/utils.ts → routes.identify`:
-
-```ts
-identify: { en: '/identify', es: '/identificar' }
-```
+Below the card sits an emerald **"Save as observation →"** link that
+expands the previously hidden form fields (GPS, habitat, evidence,
+notes) and switches the primary CTA from "Just identify" to "Save
+observation". The photo and identification are preserved across the
+mode toggle.
 
 ---
 
-## Edge cases
+## Comparison vs other surfaces
 
-| Case | Behaviour |
-|---|---|
-| No PlantNet key (env, BYO, or window) | Amber notice with a link to `/{lang}/{profile-edit}` and `getDocPath(lang, 'features')`. No network call. |
-| PlantNet returns 0 results | "No matches. Try another photo, closer or with better light." |
-| PlantNet HTTP error | Renders `Error: PlantNet HTTP <status>` in red. The 20 s `AbortController` timeout surfaces as `Error: ABORT_ERR`. |
-| Non-plant photo | PlantNet still returns plant guesses with low scores. The page does not gate on confidence — the user sees the % and can decide. The page does not redirect to Claude/Phi-vision. |
-| Camera not available | The `capture="environment"` hint falls back to a normal file picker on desktop browsers. |
-| HTML injection in API response | `escapeHtml(s)` is applied to every species name, common name, and error message before innerHTML insertion. |
+| Surface | Saves obs | Identifiers | LLM interpreter | Default reveal |
+|---|---|---|---|---|
+| `/identify` | optional (one-tap reveal) | parallel: PlantNet + Claude (BYO) + Phi (cached) | none | photo + result only |
+| `/chat` | optional (sessionStorage handoff) | full cascade incl. BirdNET + audio | Llama-3.2-1B narrates the cascade | photo / audio + chat history |
+| `/observe` | yes (Dexie outbox + sync) | full cascade | none | every form field visible |
+
+`/identify` is the right surface when the user just wants the answer.
+`/chat` is the right surface when they want to ask follow-up questions
+about the photo or recording. `/observe` is the right surface when
+they intend to log the observation with location + metadata.
 
 ---
 
-## Privacy
+## Mode prop on ObservationForm
 
-- The photo is uploaded **to PlantNet only**, identified by the user's
-  own API key. Rastrum's servers never see the image.
-- No `observations` row is written. Nothing persists beyond the in-memory
-  preview URL (revoked when the page navigates away).
-- The 20 s timeout is short on purpose — a stalled call should fail loud
-  rather than hang on a metered connection.
+The form takes a `mode?: 'observe' | 'identify-only'` prop. Pure helpers
+in [`src/lib/observation-form-mode.ts`](../../../src/lib/observation-form-mode.ts)
+encode the mode contract:
 
-The page is safe to use signed-out and offline-capable up to the
-network call.
+- `pickModeLabels(mode, lang)` — primary CTA copy
+- `submitIntent(mode)` — `'identify' | 'save'`
+- `shouldAutoStartGPS(mode)` — false in identify-only (don't trigger
+  the geolocation permission prompt unless the user has signaled
+  intent to save)
+- `hiddenBlocks(mode)` — array of block ids to hide in identify-only
+  (gps, habitat, evidence, notes, sensitive-warning)
+
+When the user clicks "Save as observation →" inline, the form switches
+mode to `observe` at runtime, reveals the hidden blocks, and triggers
+GPS resolution. The photo + identification chip stay populated.
 
 ---
 
 ## Tests
 
-The page is intentionally unit-test-thin: `escapeHtml` and the rendering
-paths are exercised by manual / Playwright coverage. The shared
-`byo-keys` resolver path is covered by `src/lib/byo-keys.test.ts`. If a
-future change introduces a non-trivial transform on PlantNet results, it
-should land in a `identify-helpers.ts` so we can unit-test it without
-the DOM.
+- `src/lib/identify-cascade-client.test.ts` — 16 race-outcome cases
+  (PlantNet wins, Claude wins, Phi wins, all-failed, all-uncertain,
+  AbortController cleanup, JSON parse for Claude/Phi prose)
+- `src/lib/anthropic-key.test.ts` — 5 cases for the runtime → project →
+  BYO resolver chain
+- `src/lib/observation-form-mode.test.ts` — 9 cases for the mode-prop
+  contract (label picking, GPS auto-start gating, hidden-block list)
+
+Run via `npm test`. Total identify-related coverage: 30 cases.
 
 ---
 
-## When to extend
+## Source-of-truth files
 
-If `/identify` ever needs:
+```
+src/components/IdentifyView.astro            # thin wrapper, sets mode
+src/components/ObservationForm.astro         # the actual surface
+src/lib/identify-cascade-client.ts           # runParallelIdentify orchestrator
+src/lib/identify-runners.ts                  # PlantNet / Claude / Phi runners
+src/lib/anthropic-key.ts                     # resolver chain (runtime → project → BYO)
+src/lib/observation-form-mode.ts             # mode-prop contract
+```
 
-- **Audio support** — re-route the user to `/observe` instead. The
-  cascade is already there.
-- **Phi-vision fallback** — that's `/chat`. Don't recreate it here.
-- **Saving** — that's `/observe`. The "Save" button on the page
-  should remain a link, not a form.
+---
 
-The page is a hallway probe. Keep it that way.
+## Why parallel beats serial
+
+The original v1.0 design ran identifiers serially: PlantNet first,
+Claude/Phi only on rejection. For a non-plant photo (e.g. a dog) the
+user waited ~5 s for PlantNet to fail before any vision LLM started,
+total ~10 s. Parallel cascade collapses that: median for non-plant
+photos drops to ~3 s, with no UX change other than the spinner not
+morphing labels mid-wait. The trade-off is a small extra API call when
+PlantNet would have succeeded anyway — acceptable because Claude /
+Phi are cheap-or-free and the latency win on the failure path is large.

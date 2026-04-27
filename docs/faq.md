@@ -59,17 +59,29 @@ egress + Supabase's free tier carry the project today).
 
 ### Why don't I see identification suggestions?
 
-The most common reasons:
+The platform runs PlantNet, Claude (if you've added your own key), and
+Phi-3.5-vision on-device (if downloaded) **in parallel** on every
+photo. The first confident match wins. Most common reasons you'd see
+no suggestion:
 
-- **No PlantNet key configured.** Sign in, go to `Profile → Edit`, and add a
-  free PlantNet key (`my.plantnet.org/account`). Without a key, the cascade
-  skips PlantNet and falls through to slower / opt-in plugins.
-- **Offline-only cascade.** If you're offline and don't have any on-device
-  models downloaded, the cascade has nothing to run. You can still log the
-  observation without an ID; the cascade re-runs when you sync.
-- **Photo too dark / blurry / cropped.** Identifiers like PlantNet fail
-  silently on photos with no recognisable subject. Retake closer or with
-  better light.
+- **The photo isn't a plant and no vision model is available yet.**
+  PlantNet only identifies plants; for animals / mushrooms / scenery
+  Rastrum offers a one-time ~2.4 GB download of an on-device AI
+  (Phi-3.5-vision) that runs offline forever. If you skipped that
+  offer, you can download it later from `Profile → Edit → AI settings`
+  or type the species name manually.
+- **Offline + no on-device models downloaded.** If you're offline and
+  haven't downloaded BirdNET-Lite (audio) or Phi-3.5-vision (photos),
+  identification has nothing local to run. The observation still saves
+  locally and identifies on next sync.
+- **Photo too dark / blurry / out-of-frame.** All identifiers fail on
+  photos without a recognisable subject. Retake closer or with better
+  light.
+- **Power-user shortcut:** if you have an Anthropic API key, paste it
+  in `Profile → Edit → AI settings → Claude key`. Identification then
+  runs through Claude Haiku 4.5 in parallel with PlantNet, which gives
+  instant identification for animals + plants + everything else
+  without downloading any model.
 
 ### How accurate is identification?
 
