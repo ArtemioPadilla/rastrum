@@ -1,11 +1,17 @@
 ---
-// No props. The component reads <main><h2> elements client-side.
+import { t } from '../i18n/utils';
+
+interface Props {
+  lang?: string;
+}
+const { lang = 'en' } = Astro.props;
+const tr = t(lang);
 ---
 
 <nav
   id="doc-toc"
   class="lg:hidden hidden sticky top-0 z-30 -mx-4 mb-4 border-b border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-950/95 backdrop-blur"
-  aria-label="Section navigation"
+  aria-label={tr.docs.toc_aria_label}
 >
   <div id="doc-toc-track" class="flex items-center gap-2 overflow-x-auto px-4 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
     <!-- Pills injected by client script -->
@@ -13,68 +19,106 @@
 </nav>
 
 <script is:inline>
+  // Defer until the DOM is parsed — without this, querySelectorAll('h2')
+  // would run before the page's <slot/> content (which sits AFTER the inline
+  // <script> in document order) is in the DOM, finding zero headings.
   (function () {
-    const nav = document.getElementById('doc-toc');
-    const track = document.getElementById('doc-toc-track');
-    if (!nav || !track) return;
-    const main = document.querySelector('main');
-    if (!main) return;
-    const headings = Array.from(main.querySelectorAll('h2'));
-    if (headings.length === 0) return;
+    function init() {
+      const nav = document.getElementById('doc-toc');
+      const track = document.getElementById('doc-toc-track');
+      if (!nav || !track) return;
+      const main = document.querySelector('main');
+      if (!main) return;
+      const headings = Array.from(main.querySelectorAll('h2'));
+      if (headings.length === 0) return;
 
-    function slugify(text) {
-      return text.normalize('NFKD').replace(/[̀-ͯ]/g, '')
-        .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      function slugify(text) {
+        return text.normalize('NFKD').replace(/[̀-ͯ]/g, '')
+          .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      }
+
+      // Strip anchor-link prefixes (e.g. `<a href="#x">#</a> Title`) and
+      // any leading "#" so pill labels read "Title", not "# Title".
+      function cleanHeadingText(h) {
+        const clone = h.cloneNode(true);
+        clone.querySelectorAll('a').forEach(function (a) { a.remove(); });
+        return (clone.textContent || '').replace(/^[#\s]+/, '').trim();
+      }
+
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const usedIds = new Set();
+      Array.from(document.querySelectorAll('[id]')).forEach(function (el) {
+        if (el.id) usedIds.add(el.id);
+      });
+
+      function uniqueId(base) {
+        if (!base) base = 'section';
+        if (!usedIds.has(base)) { usedIds.add(base); return base; }
+        let n = 2;
+        while (usedIds.has(base + '-' + n)) n++;
+        const id = base + '-' + n;
+        usedIds.add(id);
+        return id;
+      }
+
+      const pills = headings.map(function (h) {
+        const label = cleanHeadingText(h);
+        if (!h.id) h.id = uniqueId(slugify(label));
+        const a = document.createElement('a');
+        a.href = '#' + h.id;
+        a.textContent = label;
+        a.className = 'inline-flex items-center min-h-9 px-3 rounded-full text-[13px] text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 whitespace-nowrap shrink-0 border border-transparent transition-colors';
+        a.dataset.tocTarget = h.id;
+        a.addEventListener('click', function (e) {
+          e.preventDefault();
+          h.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+          history.replaceState(null, '', '#' + h.id);
+          // Move focus into the heading so keyboard / SR users continue
+          // reading from there. tabindex=-1 makes the heading focusable
+          // without inserting it into the tab order.
+          if (h.getAttribute('tabindex') === null) h.setAttribute('tabindex', '-1');
+          h.focus({ preventScroll: true });
+        });
+        track.appendChild(a);
+        return { id: h.id, h: h, a: a };
+      });
+
+      nav.classList.remove('hidden');
+
+      const idToPill = new Map(pills.map(function (p) { return [p.id, p.a]; }));
+      let activeId = null;
+
+      function setActive(id) {
+        if (activeId === id) return;
+        activeId = id;
+        pills.forEach(function (p) {
+          const isActive = p.id === id;
+          p.a.classList.toggle('text-emerald-600', isActive);
+          p.a.classList.toggle('dark:text-emerald-400', isActive);
+          p.a.classList.toggle('bg-emerald-500/10', isActive);
+          p.a.classList.toggle('font-semibold', isActive);
+          if (isActive) p.a.setAttribute('aria-current', 'true');
+          else p.a.removeAttribute('aria-current');
+        });
+        const a = idToPill.get(id);
+        if (a) a.scrollIntoView({ inline: 'center', block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' });
+      }
+
+      const observer = new IntersectionObserver(function (entries) {
+        const visible = entries
+          .filter(function (e) { return e.isIntersecting; })
+          .map(function (e) { return { id: e.target.id, top: e.boundingClientRect.top }; })
+          .sort(function (a, b) { return a.top - b.top; });
+        if (visible[0]) setActive(visible[0].id);
+      }, { rootMargin: '-80px 0px -60% 0px', threshold: 0 });
+
+      headings.forEach(function (h) { observer.observe(h); });
     }
 
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-    const pills = headings.map(function (h) {
-      const text = (h.textContent || '').trim();
-      if (!h.id) h.id = slugify(text) || 'section';
-      const a = document.createElement('a');
-      a.href = '#' + h.id;
-      a.textContent = text;
-      a.className = 'inline-flex items-center min-h-9 px-3 rounded-full text-[13px] text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 whitespace-nowrap shrink-0 border border-transparent transition-colors';
-      a.dataset.tocTarget = h.id;
-      a.addEventListener('click', function (e) {
-        e.preventDefault();
-        h.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
-        history.replaceState(null, '', '#' + h.id);
-      });
-      track.appendChild(a);
-      return { id: h.id, h: h, a: a };
-    });
-
-    nav.classList.remove('hidden');
-
-    const idToPill = new Map(pills.map(function (p) { return [p.id, p.a]; }));
-    let activeId = null;
-
-    function setActive(id) {
-      if (activeId === id) return;
-      activeId = id;
-      pills.forEach(function (p) {
-        const isActive = p.id === id;
-        p.a.classList.toggle('text-emerald-600', isActive);
-        p.a.classList.toggle('dark:text-emerald-400', isActive);
-        p.a.classList.toggle('bg-emerald-500/10', isActive);
-        p.a.classList.toggle('font-semibold', isActive);
-        if (isActive) p.a.setAttribute('aria-current', 'true');
-        else p.a.removeAttribute('aria-current');
-      });
-      const a = idToPill.get(id);
-      if (a) a.scrollIntoView({ inline: 'center', block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' });
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
     }
-
-    const observer = new IntersectionObserver(function (entries) {
-      const visible = entries
-        .filter(function (e) { return e.isIntersecting; })
-        .map(function (e) { return { id: e.target.id, top: e.boundingClientRect.top }; })
-        .sort(function (a, b) { return a.top - b.top; });
-      if (visible[0]) setActive(visible[0].id);
-    }, { rootMargin: '-80px 0px -60% 0px', threshold: 0 });
-
-    headings.forEach(function (h) { observer.observe(h); });
   })();
 </script>
