@@ -23,12 +23,13 @@ const exploreMapPath = getLocalizedPath(lang, routes.exploreMap[locale] + '/');
 const signInPath  = getLocalizedPath(lang, routes.signIn[locale] + '/');
 
 // Active-state precomputes (so the markup stays tidy)
-const obsActive  = isActiveSection(currentPath, 'observe',  lang);
-const expActive  = isActiveSection(currentPath, 'explore',  lang);
-const chatActive = isActiveSection(currentPath, 'chat',     lang);
-const profActive = isActiveSection(currentPath, 'profile',  lang);
-const homeActive = isActiveSection(currentPath, 'home',     lang);
-const idActive   = isActiveSection(currentPath, 'identify', lang);
+const obsActive    = isActiveSection(currentPath, 'observe',       lang);
+const expActive    = isActiveSection(currentPath, 'explore',       lang);
+const chatActive   = isActiveSection(currentPath, 'chat',          lang);
+const profActive   = isActiveSection(currentPath, 'profile',       lang);
+const homeActive   = isActiveSection(currentPath, 'home',          lang);
+const idActive     = isActiveSection(currentPath, 'identify',      lang);
+const recentActive = isActiveSection(currentPath, 'exploreRecent', lang);
 ---
 
 <!--
@@ -81,8 +82,7 @@ const idActive   = isActiveSection(currentPath, 'identify', lang);
 
     <a href={exploreRecentPath} class:list={[
       'flex flex-col items-center justify-center gap-0.5 py-1 text-[10px]',
-      currentPath.includes('/explore/recent') || currentPath.includes('/explorar/recientes')
-        ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-500 dark:text-zinc-400'
+      recentActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-500 dark:text-zinc-400'
     ]}>
       <svg aria-hidden="true" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
       <span>{tr.nav.bottom.recent}</span>
