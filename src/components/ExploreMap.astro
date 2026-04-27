@@ -190,9 +190,12 @@ const tr = t(lang);
     hideSkeleton();
 
     const supabase = getSupabase();
+    // Join taxa via primary_taxon_id so the cluster colors actually reflect
+    // kingdom diversity (Plantae green / Animalia amber / Fungi violet / …).
+    // RLS still gates the rows.
     const { data, error } = await supabase
       .from('observations')
-      .select('id, location, primary_taxon_id, obscure_level, observed_at')
+      .select('id, location, obscure_level, observed_at, taxa:primary_taxon_id(kingdom)')
       .eq('sync_status', 'synced')
       .limit(500);
 
@@ -207,12 +210,14 @@ const tr = t(lang);
       if (!geom?.coordinates) continue;
       const observedAt = (row as { observed_at?: string | null }).observed_at ?? null;
       const observedMonth = observedAt ? new Date(observedAt).getUTCMonth() : null;
+      const taxon = (row as { taxa?: { kingdom?: string | null } | null }).taxa;
+      const kingdom = taxon?.kingdom ?? 'Unknown';
       features.push({
         type: 'Feature',
         geometry: geom,
         properties: {
           id: row.id,
-          kingdom: 'Plantae' /* TODO: join taxa */,
+          kingdom,
           observed_month: observedMonth,
         },
       });

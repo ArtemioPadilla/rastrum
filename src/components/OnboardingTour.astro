@@ -13,7 +13,7 @@
  *
  * Mounted globally in BaseLayout.astro.
  */
-import { t, getLocalizedPath, routes } from '../i18n/utils';
+import { t, getLocalizedPath, getAlternateLocale, routes, type Locale } from '../i18n/utils';
 
 interface Props {
   lang: 'en' | 'es';
@@ -21,7 +21,21 @@ interface Props {
 const { lang } = Astro.props;
 const tr = t(lang);
 const onb = (tr as unknown as { onboarding: Record<string, string> }).onboarding;
+const drawerStrings = (tr as unknown as { nav: { drawer: Record<string, string> } }).nav.drawer;
 const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
+
+const alt = getAlternateLocale(lang);
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const pathWithoutBase = Astro.url.pathname.replace(base, '') || '/';
+const segments = pathWithoutBase.split('/').filter(Boolean);
+const currentLang = (segments[0] || lang) as Locale;
+const currentSlug = '/' + (segments.slice(1).join('/') || '');
+const matchedKey = Object.keys(routes).find(key => {
+  const slug = routes[key][currentLang] || '';
+  return slug === currentSlug || (currentSlug === '/' && slug === '');
+});
+const altSlug = matchedKey ? (routes[matchedKey][alt] || '') : currentSlug;
+const altHref = `${base}/${alt}${altSlug}/`;
 ---
 
 <div
@@ -43,7 +57,28 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
 >
   <div class="relative w-full sm:w-[32rem] sm:max-w-[92vw] sm:rounded-2xl bg-white dark:bg-zinc-900 shadow-2xl border-0 sm:border border-zinc-200 dark:border-zinc-800 h-full sm:h-auto sm:max-h-[90vh] flex flex-col">
 
-    <div class="flex-1 overflow-y-auto p-6 pt-10 sm:pt-8">
+    <div class="absolute top-3 right-3 z-10 flex items-center gap-1">
+      <a
+        href={altHref}
+        id="onb-lang-toggle"
+        data-target-lang={alt}
+        aria-label={drawerStrings.language}
+        class="text-xs font-medium px-2 py-1 rounded border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+      >
+        {alt.toUpperCase()}
+      </a>
+      <button
+        type="button"
+        id="onb-theme-toggle"
+        aria-label={drawerStrings.toggle_theme}
+        class="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+      >
+        <svg aria-hidden="true" class="w-4 h-4 hidden dark:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+        <svg aria-hidden="true" class="w-4 h-4 block dark:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+      </button>
+    </div>
+
+    <div class="flex-1 overflow-y-auto p-6 pt-14 sm:pt-12">
       <p id="onb-step-label" class="text-xs font-medium text-emerald-700 dark:text-emerald-400 mb-3" aria-live="polite"></p>
 
       <!-- ─── Step 0: Pipeline explanation ─── -->
@@ -59,18 +94,18 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
         <p class="mt-3 text-sm text-zinc-600 dark:text-zinc-300 text-center leading-relaxed">
           {onb.pipeline_body}
         </p>
-        <!-- Pipeline diagram -->
-        <div class="mt-5 flex items-center justify-center gap-2 flex-wrap text-xs">
+        <!-- Pipeline diagram: vertical on mobile, horizontal on sm+ -->
+        <div class="mt-5 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2 text-xs">
           <div class="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2 text-center">
             <div class="font-semibold text-emerald-800 dark:text-emerald-300">{onb.pipeline_diagram_specialized}</div>
             <div class="text-[10px] text-zinc-500 mt-0.5">PlantNet 🌿 | BirdNET 🎵 | EfficientNet 🔍</div>
           </div>
-          <svg class="w-4 h-4 text-zinc-400 flex-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+          <svg class="w-4 h-4 text-zinc-400 flex-none self-center rotate-90 sm:rotate-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
           <div class="rounded-lg border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-900/20 px-3 py-2 text-center">
             <div class="font-semibold text-sky-800 dark:text-sky-300">{onb.pipeline_diagram_llm}</div>
             <div class="text-[10px] text-zinc-500 mt-0.5">Claude / Phi</div>
           </div>
-          <svg class="w-4 h-4 text-zinc-400 flex-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+          <svg class="w-4 h-4 text-zinc-400 flex-none self-center rotate-90 sm:rotate-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
           <div class="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-center">
             <div class="font-semibold text-amber-800 dark:text-amber-300">{onb.pipeline_diagram_result}</div>
           </div>
@@ -472,6 +507,19 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
         `;
       }).join('');
     }
+
+    // ── Theme + language toggles (mirrors Header.astro / MobileDrawer.astro) ──
+    root.querySelector<HTMLButtonElement>('#onb-theme-toggle')?.addEventListener('click', () => {
+      const dark = document.documentElement.classList.toggle('dark');
+      try { localStorage.setItem('theme', dark ? 'dark' : 'light'); } catch { /* ignore */ }
+    });
+    const langTog = root.querySelector<HTMLAnchorElement>('#onb-lang-toggle');
+    langTog?.addEventListener('click', () => {
+      const target = langTog.dataset.targetLang;
+      if (target) {
+        try { localStorage.setItem('rastrum.lang', target); } catch { /* ignore */ }
+      }
+    });
 
     // ── Navigation ──
     nextBtn?.addEventListener('click', () => {

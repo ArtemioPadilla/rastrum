@@ -12,15 +12,11 @@
  * request and stored in the browser's Cache storage. Subsequent map
  * loads can be served entirely from the cache, even when offline.
  *
- * TODO(deploy): Generate a Mexico-bounded pmtiles archive at zoom 0–10
- * from OpenStreetMap-derived data (e.g. via `protomaps` extracts
- * https://maps.protomaps.com/builds, or `tippecanoe` from a Mexico OSM
- * extract). Upload the resulting `mexico-z0-10.pmtiles` to Cloudflare R2
- * with public read access and CORS allowing the production origin
- * (https://rastrum.org). Then set `PUBLIC_PMTILES_MX_URL` in
- * the deployment environment to the absolute URL of the archive
- * (including the filename). When unset, the offline-map UI surfaces
- * a clear "not configured" message instead of a broken download.
+ * Deployed at https://media.rastrum.org/maps/mexico_z0_10.pmtiles (~48 MB,
+ * Mexico bbox at zoom 0–10, OSM-derived via the protomaps daily build,
+ * extracted via the bundle-models.yml workflow on R2). Refresh by
+ * re-running `gh workflow run bundle-models.yml -f asset=pmtiles-mx`
+ * and bumping `PUBLIC_PMTILES_MX_URL` if the path changes.
  *
  * Upstream tools: https://github.com/protomaps/PMTiles
  *                 https://github.com/protomaps/basemaps
