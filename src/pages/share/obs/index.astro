@@ -106,8 +106,19 @@ const obsIdPlaceholder = '';
       document.getElementById('meta')!.textContent = `${date.toLocaleDateString()}${obs.state_province ? '  ·  ' + obs.state_province : ''}`;
       if (obs.state_province)  document.getElementById('region')!.textContent  = obs.state_province as string;
       if (obs.habitat)         document.getElementById('habitat')!.textContent = (obs.habitat as string).replace(/_/g, ' ');
+      // Privacy rule: a private profile shows as "Anonymous" to everyone
+      // EXCEPT the observer themselves. The observer always sees their
+      // own name on their own observation — otherwise looking at your
+      // own list is bizarre. ("Why is my own photo by Anónimo?")
       const isPublic = user?.profile_public;
-      document.getElementById('observer')!.textContent = isPublic ? (user?.display_name || user?.username || '—') : 'Anonymous';
+      let viewerIsObserver = false;
+      try {
+        const { data: { user: viewer } } = await supabase.auth.getUser();
+        viewerIsObserver = !!(viewer?.id && obs.observer_id && viewer.id === obs.observer_id);
+      } catch { /* signed out viewer */ }
+      const fallback = (document.documentElement.lang === 'es') ? 'Anónimo' : 'Anonymous';
+      const name = user?.display_name || user?.username || '—';
+      document.getElementById('observer')!.textContent = (isPublic || viewerIsObserver) ? name : fallback;
 
       // Pull the primary photo if we can read media_files (RLS gates this)
       const { data: media } = await supabase

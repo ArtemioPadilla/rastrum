@@ -22,7 +22,10 @@ const { lang } = Astro.props;
 const tr = t(lang);
 const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
 const profilePath = getLocalizedPath(lang, routes.profile[lang] + '/');
-const shareObsBase = `/${lang}/share/obs/`;
+// Share route is locale-neutral: src/pages/share/obs/index.astro.
+// Earlier this was built as `/${lang}/share/obs/` and 404'd in
+// production — the locale-prefixed share route does not exist.
+const shareObsBase = `/share/obs/`;
 
 const profileStrings = tr.profile as unknown as Record<string, string>;
 const draftsFilterLabel = profileStrings.my_observations_filter_drafts ?? (lang === 'es' ? 'Borradores' : 'Drafts');
