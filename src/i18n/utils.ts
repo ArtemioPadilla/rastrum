@@ -26,6 +26,10 @@ export const routes: Record<string, Record<Locale, string>> = {
   home: { en: '', es: '' },
   identify: { en: '/identify', es: '/identificar' },
   explore: { en: '/explore', es: '/explorar' },
+  exploreMap: { en: '/explore/map', es: '/explorar/mapa' },
+  exploreRecent: { en: '/explore/recent', es: '/explorar/recientes' },
+  exploreWatchlist: { en: '/explore/watchlist', es: '/explorar/seguimiento' },
+  exploreSpecies: { en: '/explore/species', es: '/explorar/especies' },
   observe: { en: '/observe', es: '/observar' },
   about: { en: '/about', es: '/acerca' },
   docs: { en: '/docs', es: '/docs' },
@@ -62,4 +66,54 @@ export function getDocPath(lang: string, page?: string) {
 
 export function getAlternateLocale(lang: string): Locale {
   return lang === 'es' ? 'en' : 'es';
+}
+
+// ---------------------------------------------------------------------------
+// Route tree — single source for nav labels + parent relationships.
+// Consumed by the chrome (mega-menu, mobile drawer), and from PR 3 onward by
+// breadcrumbs and (PR 4) the search index.
+// ---------------------------------------------------------------------------
+
+export interface RouteNode {
+  /** Human-readable labels per locale. Falls back to the route key. */
+  labels: Record<Locale, string>;
+  /** Optional parent route key — used by breadcrumbs (PR 3) and IA grouping. */
+  parent?: string;
+}
+
+export const routeTree: Record<string, RouteNode> = {
+  home:        { labels: { en: 'Home',         es: 'Inicio' } },
+  identify:    { labels: { en: 'Identify',     es: 'Identificar' } },
+  observe:     { labels: { en: 'Observe',      es: 'Observar' } },
+  explore:     { labels: { en: 'Explore',      es: 'Explorar' } },
+  exploreMap:        { labels: { en: 'Map',       es: 'Mapa' },         parent: 'explore' },
+  exploreRecent:     { labels: { en: 'Recent',    es: 'Recientes' },    parent: 'explore' },
+  exploreWatchlist:  { labels: { en: 'Watchlist', es: 'Seguimiento' },  parent: 'explore' },
+  exploreSpecies:    { labels: { en: 'Species',   es: 'Especies' },     parent: 'explore' },
+  chat:        { labels: { en: 'Chat',          es: 'Chat' } },
+  about:       { labels: { en: 'About',         es: 'Acerca' } },
+  docs:        { labels: { en: 'Docs',          es: 'Docs' } },
+  signIn:      { labels: { en: 'Sign in',       es: 'Ingresar' } },
+  profile:     { labels: { en: 'Profile',       es: 'Perfil' } },
+  profileEdit:               { labels: { en: 'Edit profile',     es: 'Editar perfil' },     parent: 'profile' },
+  profileExport:             { labels: { en: 'Export',           es: 'Exportar' },          parent: 'profile' },
+  profileObservations:       { labels: { en: 'My observations',  es: 'Mis observaciones' }, parent: 'profile' },
+  profileExpertApply:        { labels: { en: 'Apply expert',     es: 'Aplicar experto' },   parent: 'profile' },
+  profileUser:               { labels: { en: 'Public profile',   es: 'Perfil público' },    parent: 'profile' },
+  profileImport:             { labels: { en: 'Import',           es: 'Importar' },          parent: 'profile' },
+  profileImportCameraTrap:   { labels: { en: 'Camera trap',      es: 'Cámara trampa' },     parent: 'profileImport' },
+  privacy:     { labels: { en: 'Privacy',       es: 'Privacidad' } },
+  terms:       { labels: { en: 'Terms',         es: 'Términos' } },
+  faq:         { labels: { en: 'FAQ',           es: 'Preguntas frecuentes' } },
+};
+
+export function getRouteLabel(key: string, lang: string): string {
+  const node = routeTree[key];
+  if (!node) return key;
+  const locale: Locale = lang === 'es' ? 'es' : 'en';
+  return node.labels[locale];
+}
+
+export function getRouteParent(key: string): string | undefined {
+  return routeTree[key]?.parent;
 }

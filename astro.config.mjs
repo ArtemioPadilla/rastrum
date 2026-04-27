@@ -16,4 +16,11 @@ export default defineConfig({
       prefixDefaultLocale: true,
     },
   },
+  // PR-1 (UX revamp) IA reshuffle: watchlist is public-data exploration,
+  // not personal admin, so it lives under /explore now. Old URL keeps
+  // working via 301 so existing bookmarks survive.
+  redirects: {
+    '/en/profile/watchlist':  { status: 301, destination: '/en/explore/watchlist/' },
+    '/es/perfil/seguimiento': { status: 301, destination: '/es/explorar/seguimiento/' },
+  },
 });

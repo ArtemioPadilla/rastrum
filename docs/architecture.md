@@ -5,7 +5,7 @@
 > file is for "how do the pieces fit together" — block diagram + the
 > four critical-path flows + decision rationale.
 >
-> Last sync: 2026-04-26 (v1.0 shipped).
+> Last sync: 2026-04-26 (v1.0 + chrome revamp).
 
 ---
 
@@ -62,6 +62,22 @@ The MCP server (`/functions/v1/mcp`) sits inline with the REST API
 (`/functions/v1/api/*`) — same `rst_*` token, same scope strings, same
 RLS gates. AI agents (Claude Desktop, Cursor, Copilot Coding Agent)
 call the MCP surface; shell scripts call the REST surface.
+
+---
+
+## Frontend chrome
+
+The app shell uses a verb-first IA introduced in the UX-revamp PR 1
+(2026-04-26). Three action items sit on the left of the header — **Observe**,
+**Explore ▾**, **Chat** — and a reference cluster (**About**, **Docs ▾**) on
+the right. On mobile, a bottom bar with a center camera FAB replaces the
+header actions; a right-side drawer handles reference links and account
+settings. Each top-level section has a named accent colour (Observe = emerald,
+Explore = teal, Chat = sky, About/Docs = stone) rendered via a dynamic
+`railClass()` in `Header.astro` — those classes are safelisted in
+`tailwind.config.mjs`. New explore subroutes `/explore/{recent,watchlist,species}`
+are placeholder pages as of this sync; `/profile/watchlist` issues a 301 to
+`/explore/watchlist`.
 
 ---
 
@@ -164,7 +180,7 @@ the Edge Function rather than at the client to keep the outbox simple.
 | Shared per-feature views | `src/components/*View.astro` |
 | Forms | `src/components/*Form.astro` |
 | i18n strings | `src/i18n/{en,es}.json` |
-| i18n helpers | `src/i18n/utils.ts` (`t()`, `routes`, `docPages`) |
+| i18n helpers | `src/i18n/utils.ts` (`t()`, `routes`, `routeTree`, `docPages`) |
 | Auth (magic link, OAuth, OTP, passkey) | `src/lib/auth.ts` |
 | BYO key store | `src/lib/byo-keys.ts` |
 | Identifier plugin platform | `src/lib/identifiers/` |
@@ -173,6 +189,8 @@ the Edge Function rather than at the client to keep the outbox simple.
 | Upload (R2 + Supabase Storage) | `src/lib/upload.ts` |
 | Darwin Core mapping | `src/lib/darwin-core.ts` + `src/lib/dwca.ts` |
 | In-browser AI bootstrap | `src/lib/local-ai.ts` |
+| Chrome mode helper | `src/lib/chrome-mode.ts` (`resolveChromeMode`) |
+| Chrome accent / FAB helpers | `src/lib/chrome-helpers.ts` (`getFabTarget`, `isActiveSection`) |
 | Edge Functions | `supabase/functions/<name>/index.ts` |
 | Schema (idempotent SQL) | `docs/specs/infra/supabase-schema.sql` |
 | Module specs | `docs/specs/modules/NN-*.md` |
