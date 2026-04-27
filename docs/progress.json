@@ -504,6 +504,114 @@
           "label": "UI for per-observation license selection (CC-BY default; CC0, CC-BY-NC, all-rights-reserved options)",
           "label_es": "UI para selección de licencia por observación (CC-BY por defecto; opciones CC0, CC-BY-NC, derechos reservados)",
           "done": false
+        },
+        {
+          "id": "docs-toc-mobile",
+          "label": "Sticky scrollspy TOC pill row on mobile doc pages (auto-extracts h2s, IntersectionObserver active state)",
+          "label_es": "Barra horizontal sticky con TOC scrollspy en docs móviles (extrae h2 automáticamente, estado activo vía IntersectionObserver)",
+          "done": false,
+          "blocked_by": "Open PR #23 — pending rebase + aria-current fix; reviewed and approved-with-comments"
+        }
+      ]
+    },
+    "v1.1": {
+      "name": "UX polish (post-launch brainstorm)",
+      "name_es": "Pulido de UX (lluvia de ideas post-lanzamiento)",
+      "period": "Weeks 2–6 after launch (2026-05-02 → 2026-06-06 target)",
+      "period_es": "Semanas 2–6 tras lanzamiento (2026-05-02 → 2026-06-06)",
+      "status": "planned",
+      "status_es": "planeado",
+      "items": [
+        {
+          "id": "ux-confidence-ring",
+          "label": "Confidence ring (SVG arc graded emerald→amber→red) instead of percentage pill — faster comprehension for non-technical users",
+          "label_es": "Anillo de confianza (arco SVG en emerald→ámbar→rojo) en lugar de pastilla con porcentaje — más fácil de leer para no-técnicos",
+          "done": false
+        },
+        {
+          "id": "ux-quick-taxon-chips",
+          "label": "Quick-taxon icons under photo upload (🌿 plant · 🐦 bird · 🐾 mammal · 🐛 insect · 🍄 fungus) — primes the cascade and sets honest user expectations",
+          "label_es": "Íconos rápidos de taxón bajo el subidor de fotos (🌿 planta · 🐦 ave · 🐾 mamífero · 🐛 insecto · 🍄 hongo) — orienta la cascada y fija expectativas honestas",
+          "done": false
+        },
+        {
+          "id": "ux-photo-compression",
+          "label": "Auto-compress photos > 4 MP to 4 MP via canvas before upload — cuts R2 footprint 4×, speeds sync on slow networks, no ID quality loss",
+          "label_es": "Compresión automática de fotos > 4 MP a 4 MP vía canvas antes de subir — reduce R2 4×, acelera la sincronización en redes lentas, sin pérdida de calidad de ID",
+          "done": false
+        },
+        {
+          "id": "ux-share-button",
+          "label": "Share button on result card → /share/obs/<id> with existing OG card; critical for viral pickup during family launch",
+          "label_es": "Botón de compartir en la tarjeta de resultado → /share/obs/<id> con la OG card existente; clave para difusión viral durante el lanzamiento familiar",
+          "done": false
+        },
+        {
+          "id": "ux-save-as-draft",
+          "label": "Save observation as draft without GPS — current form blocks submit on missing location, breaking the flow for users in cell-dead zones",
+          "label_es": "Guardar observación como borrador sin GPS — el formulario actual bloquea el submit si falta ubicación, lo que rompe el flujo en zonas sin señal",
+          "done": false
+        },
+        {
+          "id": "ux-onboarding-tour",
+          "label": "First-signup onboarding — 3 dismissible cards (install PWA → take a photo → see your profile); skippable; never repeats",
+          "label_es": "Onboarding al primer registro — 3 tarjetas descartables (instala la PWA → toma una foto → mira tu perfil); saltable; sin repeticiones",
+          "done": false
+        },
+        {
+          "id": "ux-chat-suggestions",
+          "label": "Chat follow-up suggestion chips below each AI reply (¿Es venenosa?, ¿Cómo distingo de X?, Hábitat) — reduce cold-start friction",
+          "label_es": "Chips de sugerencia de seguimiento bajo cada respuesta de IA en chat (¿Es venenosa?, ¿Cómo distinguir de X?, Hábitat) — reduce fricción de arranque",
+          "done": false
+        },
+        {
+          "id": "ux-chat-persistence",
+          "label": "Persist chat conversation history per device in Dexie — currently lost on reload",
+          "label_es": "Persistir historial de chat por dispositivo en Dexie — actualmente se pierde al recargar",
+          "done": false
+        },
+        {
+          "id": "ux-explore-time-slider",
+          "label": "Time-slider on /explore map — drag months to see phenological patterns; visually striking for first-time visitors",
+          "label_es": "Deslizador temporal en el mapa /explore — arrastra meses para ver patrones fenológicos; impacta visualmente a nuevos visitantes",
+          "done": false
+        },
+        {
+          "id": "ux-skeleton-screens",
+          "label": "Replace bare spinners with skeleton screens on /observations, /explore, profile — cumulatively makes the platform feel snappier",
+          "label_es": "Reemplazar spinners desnudos con esqueletos en /observations, /explore y perfil — la plataforma se siente más ágil en su conjunto",
+          "done": false
+        },
+        {
+          "id": "ux-voice-chat-input",
+          "label": "SpeechRecognition voice input in /chat — accessibility win, especially for indigenous-language native speakers",
+          "label_es": "Entrada de voz vía SpeechRecognition en /chat — accesibilidad, sobre todo para hablantes nativos de lenguas indígenas",
+          "done": false
+        },
+        {
+          "id": "ux-first-observation-celebration",
+          "label": "First-observation confetti + 'Bienvenido a Rastrum 🌱' banner on the user's literal first synced observation",
+          "label_es": "Confetti + banner 'Bienvenido a Rastrum 🌱' en la primera observación sincronizada del usuario",
+          "done": false
+        },
+        {
+          "id": "ux-indigenous-taxa-search",
+          "label": "Indigenous-language taxon search (Zapoteco / Náhuatl / Maya / Mixteco / Tseltal → scientific name); requires corpus + governance per local-contexts",
+          "label_es": "Búsqueda de taxón en lenguas indígenas (Zapoteco / Náhuatl / Maya / Mixteco / Tseltal → nombre científico); requiere corpus + gobernanza per local-contexts",
+          "done": false,
+          "blocked_by": "Needs corpus partnership (CONABIO + community Co-PIs) and governance review before code lands"
+        },
+        {
+          "id": "ux-photo-dedupe",
+          "label": "Image deduplication on submit — perceptual hash warns when the same photo is being re-uploaded",
+          "label_es": "Deduplicación de imágenes al enviar — hash perceptual avisa cuando se re-sube la misma foto",
+          "done": false
+        },
+        {
+          "id": "ux-streak-push",
+          "label": "Web Push notification at 8 PM local when a streak is 1 day from breaking — opt-in only, single nightly notification",
+          "label_es": "Notificación push a las 20:00 hora local cuando una racha está a 1 día de romperse — opcional, una notificación nocturna",
+          "done": false
         }
       ]
     },
