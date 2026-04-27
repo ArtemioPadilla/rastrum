@@ -22,6 +22,11 @@ on:
           - plantnet-monitor
           - streak-push
           - sync-error
+      sync_secrets:
+        description: 'Sync GitHub Actions secrets → Supabase Edge Function secrets before deploy'
+        required: false
+        default: true
+        type: boolean
 
 jobs:
   deploy:
@@ -36,6 +41,54 @@ jobs:
         uses: supabase/setup-cli@v1
         with:
           version: latest
+
+      - name: Sync GitHub secrets → Supabase
+        # Single source of truth: GitHub Actions secrets. Each secret is
+        # only pushed if non-empty in CI (no clobbering existing Supabase
+        # values with empty strings). Skip with `sync_secrets=false` when
+        # you need to deploy code without touching credentials.
+        if: ${{ inputs.sync_secrets != false }}
+        env:
+          # R2 / Cloudflare
+          CF_ACCOUNT_ID:        ${{ secrets.CF_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID:     ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET_NAME:       ${{ secrets.R2_BUCKET_NAME }}
+          R2_PUBLIC_URL:        ${{ secrets.R2_PUBLIC_URL }}
+          # Identifier providers (operator-shared keys)
+          PLANTNET_API_KEY:     ${{ secrets.PLANTNET_API_KEY }}
+          ANTHROPIC_API_KEY:    ${{ secrets.ANTHROPIC_API_KEY }}
+          # Web Push (VAPID private; the public half is built into the bundle)
+          VAPID_PRIVATE_KEY:    ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_SUBJECT:        ${{ secrets.VAPID_SUBJECT }}
+          # Stripe (subscription tier — see runbook stripe-pro-tier.md)
+          STRIPE_SECRET_KEY:    ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+        run: |
+          set -e
+          push_secret() {
+            local name="$1"
+            # Read the env var via indirect expansion so `set -u` and
+            # logs don't leak the value.
+            local val="${!name:-}"
+            if [ -n "$val" ]; then
+              echo "→ syncing $name"
+              # supabase CLI accepts repeated KEY=VALUE pairs; we set one
+              # at a time so a single bad value doesn't silently fail
+              # the rest. The CLI never echoes values.
+              supabase secrets set "$name=$val" --project-ref "$PROJECT_REF" >/dev/null
+            else
+              echo "→ skipping $name (not set in GitHub Actions)"
+            fi
+          }
+          for k in \
+            CF_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_BUCKET_NAME R2_PUBLIC_URL \
+            PLANTNET_API_KEY ANTHROPIC_API_KEY \
+            VAPID_PRIVATE_KEY VAPID_SUBJECT \
+            STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET
+          do
+            push_secret "$k"
+          done
 
       - name: Deploy
         run: |
