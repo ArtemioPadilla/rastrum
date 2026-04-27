@@ -21,7 +21,9 @@ interface Props {
 const { lang } = Astro.props;
 const tr = t(lang);
 const page = tr.explore_pages.species;
-const shareBase = `/${lang}/share/obs/`;
+// Share route is locale-neutral: src/pages/share/obs/index.astro is the
+// only file. Building it as `/${lang}/share/obs/` 404s in production.
+const shareBase = `/share/obs/`;
 const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/species'}/`;
 ---
 
@@ -172,7 +174,7 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
 
   async function wire(root: HTMLElement) {
     const lang = (root.dataset.lang === 'es' ? 'es' : 'en') as Lang;
-    const shareBase = root.dataset.shareBase ?? `/${lang}/share/obs/`;
+    const shareBase = root.dataset.shareBase ?? '/share/obs/';
     const indexBase = root.dataset.indexBase ?? `/${lang}/explore/species/`;
 
     const indexPane = root.querySelector('.es-index') as HTMLElement | null;

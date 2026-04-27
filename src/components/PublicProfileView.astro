@@ -34,7 +34,7 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
   data-label-loading={tr.profile.public_profile_loading}
   data-label-recent={tr.profile.public_profile_recent}
   data-label-unknown-species={tr.profile.my_observations_unknown_species}
-  data-share-obs-base={`/${lang}/share/obs/`}
+  data-share-obs-base="/share/obs/"
 >
   <div id="pp-loading" class="py-12 text-center text-sm text-zinc-500 dark:text-zinc-400">
     {tr.profile.public_profile_loading}
@@ -309,7 +309,7 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
       return;
     }
 
-    const shareBase = root.dataset.shareObsBase ?? '/en/share/obs/';
+    const shareBase = root.dataset.shareObsBase ?? '/share/obs/';
     const unknown = root.dataset.labelUnknownSpecies ?? 'Unidentified';
     if (obsList) {
       obsList.innerHTML = (obs as ObsRow[]).map(o => {

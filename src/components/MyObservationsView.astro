@@ -168,7 +168,7 @@ const tabs = [
 
   const root = document.querySelector<HTMLElement>('.rastrum-my-observations');
   const lang: Lang = root?.dataset.lang === 'es' ? 'es' : 'en';
-  const shareBase = root?.dataset.shareObsBase ?? '/en/share/obs/';
+  const shareBase = root?.dataset.shareObsBase ?? '/share/obs/';
 
   let currentTab: SyncFilter = 'all';
   let offset = 0;

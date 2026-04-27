@@ -95,3 +95,21 @@ test('lang attribute matches locale segment', async ({ page }) => {
   await page.goto('/es/');
   await expect(page.locator('html')).toHaveAttribute('lang', 'es');
 });
+
+// Regression: src/pages/share/obs/index.astro is the only share-obs file
+// (locale-neutral). Three explore views previously built `/${lang}/share/obs/`
+// which 404'd in production. Catch any future regression by hitting the
+// canonical path with a junk id; the page must render its "id required"
+// state, not a 404.
+test('share/obs/ is locale-neutral and renders for any id', async ({ page }) => {
+  const okPaths = ['/share/obs/', '/share/obs/?id=00000000-0000-0000-0000-000000000000'];
+  for (const p of okPaths) {
+    const res = await page.goto(p);
+    expect(res?.status(), `expected 200 for ${p}`).toBe(200);
+  }
+  // The locale-prefixed forms must NOT exist.
+  for (const bad of ['/en/share/obs/', '/es/share/obs/']) {
+    const res = await page.goto(bad);
+    expect(res?.status(), `expected non-200 for ${bad}`).not.toBe(200);
+  }
+});

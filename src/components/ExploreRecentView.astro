@@ -19,7 +19,9 @@ const { lang } = Astro.props;
 const tr = t(lang);
 const page = tr.explore_pages.recent;
 const profileBase = `/${lang}/${lang === 'es' ? 'perfil/u' : 'profile/u'}/`;
-const shareBase = `/${lang}/share/obs/`;
+// Share route is locale-neutral: src/pages/share/obs/index.astro is the
+// only file. Building it as `/${lang}/share/obs/` 404s in production.
+const shareBase = `/share/obs/`;
 ---
 
 <section
@@ -172,7 +174,7 @@ const shareBase = `/${lang}/share/obs/`;
 
   async function wire(root: HTMLElement) {
     const lang = (root.dataset.lang === 'es' ? 'es' : 'en') as Lang;
-    const shareBase = root.dataset.shareBase ?? `/${lang}/share/obs/`;
+    const shareBase = root.dataset.shareBase ?? '/share/obs/';
     const profileBase = root.dataset.profileBase ?? `/${lang}/profile/u/`;
     const anonLabel = root.dataset.labelAnon ?? 'Anonymous';
     const unknownLabel = root.dataset.labelUnknownSpecies ?? 'Unknown species';
