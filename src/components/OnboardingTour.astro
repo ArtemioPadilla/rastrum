@@ -1,0 +1,247 @@
+---
+/**
+ * OnboardingTour — first-signup 3-card carousel.
+ *
+ * - Mounted globally in BaseLayout.astro.
+ * - Triggers on the user's first authed paint when
+ *   `localStorage.rastrum.onboardingShown !== 'true'`.
+ * - Three cards: install / take a photo / your profile.
+ *   On iOS, the install card swaps in the Add-to-Home-Screen body.
+ * - Skippable; never re-shows once dismissed or completed.
+ *
+ * No dependencies; uses CustomEvent listeners only when present.
+ */
+import { t, getLocalizedPath, routes } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+const { lang } = Astro.props;
+const tr = t(lang);
+const onb = (tr as unknown as { onboarding: Record<string, string> }).onboarding;
+const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
+const profilePath = getLocalizedPath(lang, routes.profile[lang] + '/');
+---
+
+<div
+  id="onboarding-tour"
+  class="hidden fixed inset-0 z-[60] items-center justify-center bg-zinc-950/70 backdrop-blur-sm p-0 sm:p-4"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="onboarding-title"
+  data-shown-key="rastrum.onboardingShown"
+  data-step-label={onb.step_label}
+  data-install-body={onb.install_body}
+  data-install-body-ios={onb.install_body_ios}
+  data-label-next={onb.next}
+  data-label-done={onb.done}
+>
+  <div class="relative w-full sm:w-[28rem] sm:max-w-[92vw] sm:rounded-2xl bg-white dark:bg-zinc-900 shadow-2xl border-0 sm:border border-zinc-200 dark:border-zinc-800 h-full sm:h-auto sm:max-h-[90vh] flex flex-col">
+    <button
+      type="button"
+      id="onb-close"
+      class="absolute top-3 right-3 inline-flex items-center justify-center w-9 h-9 rounded-full text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 transition-colors z-10"
+      aria-label={onb.close_label}
+    >
+      <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    </button>
+
+    <div class="flex-1 overflow-y-auto p-6 pt-12 sm:pt-8">
+      <p id="onb-step-label" class="text-xs font-medium text-emerald-700 dark:text-emerald-400 mb-3" aria-live="polite"></p>
+
+      <article class="onb-card" data-step="0">
+        <div class="mx-auto mb-4 w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-700 dark:text-emerald-300">
+          <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v12m0 0l-4-4m4 4l4-4M4 20h16" />
+          </svg>
+        </div>
+        <h2 id="onboarding-title" class="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 text-center">
+          {onb.install_title}
+        </h2>
+        <p id="onb-install-body" class="mt-3 text-sm text-zinc-600 dark:text-zinc-300 text-center leading-relaxed">
+          {onb.install_body}
+        </p>
+      </article>
+
+      <article class="onb-card hidden" data-step="1">
+        <div class="mx-auto mb-4 w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-700 dark:text-emerald-300">
+          <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.66-.9l.82-1.2A2 2 0 0110.07 4h3.86a2 2 0 011.66.9l.82 1.2a2 2 0 001.66.9H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        </div>
+        <h2 class="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 text-center">
+          {onb.observe_title}
+        </h2>
+        <p class="mt-3 text-sm text-zinc-600 dark:text-zinc-300 text-center leading-relaxed">
+          {onb.observe_body}
+        </p>
+        <div class="mt-5 flex justify-center">
+          <a
+            href={observePath}
+            class="inline-flex min-h-[44px] items-center rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white"
+            data-onb-cta
+          >
+            {onb.observe_cta}
+          </a>
+        </div>
+      </article>
+
+      <article class="onb-card hidden" data-step="2">
+        <div class="mx-auto mb-4 w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-700 dark:text-emerald-300">
+          <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <h2 class="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 text-center">
+          {onb.profile_title}
+        </h2>
+        <p class="mt-3 text-sm text-zinc-600 dark:text-zinc-300 text-center leading-relaxed">
+          {onb.profile_body}
+        </p>
+        <div class="mt-5 flex justify-center">
+          <a
+            href={profilePath}
+            class="inline-flex min-h-[44px] items-center rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white"
+            data-onb-cta
+          >
+            {onb.profile_cta}
+          </a>
+        </div>
+      </article>
+    </div>
+
+    <footer class="border-t border-zinc-200 dark:border-zinc-800 p-4 flex items-center justify-between gap-3">
+      <button
+        type="button"
+        id="onb-skip"
+        class="text-sm font-medium text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 min-h-[44px] px-2"
+      >
+        {onb.skip}
+      </button>
+      <div class="flex items-center gap-1.5" aria-hidden="true">
+        <span class="onb-dot w-2 h-2 rounded-full bg-emerald-600 dark:bg-emerald-400" data-step="0"></span>
+        <span class="onb-dot w-2 h-2 rounded-full bg-zinc-300 dark:bg-zinc-700" data-step="1"></span>
+        <span class="onb-dot w-2 h-2 rounded-full bg-zinc-300 dark:bg-zinc-700" data-step="2"></span>
+      </div>
+      <button
+        type="button"
+        id="onb-next"
+        class="inline-flex min-h-[44px] items-center rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white"
+      >
+        <span data-onb-next-label>{onb.next}</span>
+      </button>
+    </footer>
+  </div>
+</div>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { isIOS } from '../lib/local-ai-helpers';
+
+  const root = document.getElementById('onboarding-tour') as HTMLDivElement | null;
+  if (root) {
+    const SHOWN_KEY = root.dataset.shownKey ?? 'rastrum.onboardingShown';
+    const stepLabelTpl = root.dataset.stepLabel ?? 'Step {current} of {total}';
+    const installBody = root.dataset.installBody ?? '';
+    const installBodyIos = root.dataset.installBodyIos ?? installBody;
+    const labelNext = root.dataset.labelNext ?? 'Next';
+    const labelDone = root.dataset.labelDone ?? 'Done';
+
+    const cards = Array.from(root.querySelectorAll<HTMLElement>('.onb-card'));
+    const dots = Array.from(root.querySelectorAll<HTMLElement>('.onb-dot'));
+    const stepLabelEl = root.querySelector<HTMLElement>('#onb-step-label');
+    const nextBtn = root.querySelector<HTMLButtonElement>('#onb-next');
+    const nextLabel = root.querySelector<HTMLElement>('[data-onb-next-label]');
+    const skipBtn = root.querySelector<HTMLButtonElement>('#onb-skip');
+    const closeBtn = root.querySelector<HTMLButtonElement>('#onb-close');
+    const installBodyEl = root.querySelector<HTMLElement>('#onb-install-body');
+
+    let current = 0;
+
+    function shouldShow(): boolean {
+      try {
+        return localStorage.getItem(SHOWN_KEY) !== 'true';
+      } catch {
+        return false;
+      }
+    }
+
+    function markShown(): void {
+      try { localStorage.setItem(SHOWN_KEY, 'true'); } catch { /* ignore */ }
+    }
+
+    function show(): void {
+      if (installBodyEl) {
+        installBodyEl.textContent = isIOS() ? installBodyIos : installBody;
+      }
+      root.classList.remove('hidden');
+      root.classList.add('flex');
+      document.body.style.overflow = 'hidden';
+      render();
+    }
+
+    function hide(): void {
+      root.classList.add('hidden');
+      root.classList.remove('flex');
+      document.body.style.overflow = '';
+      markShown();
+    }
+
+    function render(): void {
+      cards.forEach((c, i) => c.classList.toggle('hidden', i !== current));
+      dots.forEach((d, i) => {
+        d.classList.toggle('bg-emerald-600', i === current);
+        d.classList.toggle('dark:bg-emerald-400', i === current);
+        d.classList.toggle('bg-zinc-300', i !== current);
+        d.classList.toggle('dark:bg-zinc-700', i !== current);
+      });
+      if (stepLabelEl) {
+        stepLabelEl.textContent = stepLabelTpl
+          .replace('{current}', String(current + 1))
+          .replace('{total}', String(cards.length));
+      }
+      const last = current === cards.length - 1;
+      if (nextLabel) {
+        nextLabel.textContent = last ? labelDone : labelNext;
+      }
+    }
+
+    nextBtn?.addEventListener('click', () => {
+      if (current >= cards.length - 1) { hide(); return; }
+      current += 1;
+      render();
+    });
+    skipBtn?.addEventListener('click', hide);
+    closeBtn?.addEventListener('click', hide);
+    root.addEventListener('click', (ev) => {
+      if (ev.target === root) hide();
+    });
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape' && !root.classList.contains('hidden')) hide();
+    });
+
+    async function maybeShow(): Promise<void> {
+      if (!shouldShow()) return;
+      let supabase;
+      try {
+        supabase = getSupabase();
+      } catch {
+        return;
+      }
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      setTimeout(show, 600);
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => {
+        maybeShow().catch(() => { /* env not configured */ });
+      });
+    } else {
+      maybeShow().catch(() => { /* env not configured */ });
+    }
+  }
+</script>

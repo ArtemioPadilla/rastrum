@@ -2,6 +2,7 @@
 import { t, getLocalizedPath, routes } from '../i18n/utils';
 import WatchlistView from './WatchlistView.astro';
 import StreakCard from './StreakCard.astro';
+import Skeleton from './Skeleton.astro';
 
 interface Props {
   lang: 'en' | 'es';
@@ -114,6 +115,9 @@ const expertApplyPath = getLocalizedPath(lang, routes.profileExpertApply[lang] +
       <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-3">
         {tr.profile.section_activity}
       </h2>
+      <div id="activity-skeleton">
+        <Skeleton variant="card" count={3} ariaLabel={tr.profile.my_observations_loading} />
+      </div>
       <ul id="activity-list" class="space-y-2"></ul>
       <div id="no-observations" class="hidden rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-8 text-center">
         <p class="text-sm text-zinc-500 dark:text-zinc-400">{tr.profile.no_observations_yet}</p>
@@ -238,6 +242,7 @@ const expertApplyPath = getLocalizedPath(lang, routes.profileExpertApply[lang] +
 
     const list = document.getElementById('activity-list') as HTMLUListElement | null;
     const empty = document.getElementById('no-observations');
+    document.getElementById('activity-skeleton')?.classList.add('hidden');
     if (!events?.length) {
       empty?.classList.remove('hidden');
       return;

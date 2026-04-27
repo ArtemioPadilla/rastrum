@@ -1,0 +1,185 @@
+---
+/**
+ * FirstObservationCelebration — confetti + welcome banner on the
+ * user's literal first synced observation.
+ *
+ * Listens for the global DOM event `rastrum:first-observation-synced`
+ * (dispatched from ObservationForm on save). On receipt, fires a 3s
+ * canvas-confetti burst and shows a banner. Sets
+ * `localStorage.rastrum.firstObservationCelebrated = 'true'` so it
+ * never repeats.
+ *
+ * Vanilla canvas — no `canvas-confetti` dep.
+ */
+import { t } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+const { lang } = Astro.props;
+const tr = t(lang);
+const onb = (tr as unknown as { onboarding: Record<string, string> }).onboarding;
+---
+
+<div
+  id="first-obs-celebration"
+  class="hidden pointer-events-none fixed inset-0 z-[55]"
+  aria-hidden="true"
+  data-celebrated-key="rastrum.firstObservationCelebrated"
+>
+  <canvas
+    id="first-obs-canvas"
+    class="absolute inset-0 w-full h-full"
+  ></canvas>
+
+  <div
+    id="first-obs-banner"
+    role="status"
+    aria-live="polite"
+    class="pointer-events-auto absolute left-1/2 -translate-x-1/2 top-6 sm:top-10 max-w-[90vw] sm:max-w-md w-fit rounded-xl bg-emerald-700 text-white shadow-2xl px-5 py-4 text-center transition-all duration-300 opacity-0 -translate-y-4"
+  >
+    <p class="text-base font-bold">{onb.first_obs_title}</p>
+    <p class="mt-1 text-sm text-emerald-50/90">{onb.first_obs_body}</p>
+    <button
+      type="button"
+      id="first-obs-close"
+      class="mt-3 inline-flex min-h-[40px] items-center rounded-lg bg-white/20 hover:bg-white/30 px-3 py-1.5 text-sm font-semibold text-white"
+    >
+      {onb.first_obs_close}
+    </button>
+  </div>
+</div>
+
+<script>
+  const root = document.getElementById('first-obs-celebration') as HTMLDivElement | null;
+  const canvas = document.getElementById('first-obs-canvas') as HTMLCanvasElement | null;
+  const banner = document.getElementById('first-obs-banner') as HTMLDivElement | null;
+  const closeBtn = document.getElementById('first-obs-close') as HTMLButtonElement | null;
+
+  if (root && canvas && banner) {
+    const CELEBRATED_KEY = root.dataset.celebratedKey ?? 'rastrum.firstObservationCelebrated';
+    const COLORS = ['#10b981', '#059669', '#34d399', '#fbbf24', '#f59e0b', '#3b82f6'];
+    const DURATION_MS = 3000;
+    const PARTICLE_COUNT = 120;
+
+    interface Particle {
+      x: number;
+      y: number;
+      vx: number;
+      vy: number;
+      gravity: number;
+      size: number;
+      color: string;
+      rotation: number;
+      vRotation: number;
+      life: number;
+    }
+
+    function alreadyCelebrated(): boolean {
+      try { return localStorage.getItem(CELEBRATED_KEY) === 'true'; }
+      catch { return false; }
+    }
+
+    function markCelebrated(): void {
+      try { localStorage.setItem(CELEBRATED_KEY, 'true'); } catch { /* ignore */ }
+    }
+
+    function hide(): void {
+      root.classList.add('hidden');
+      banner.classList.add('opacity-0', '-translate-y-4');
+      banner.classList.remove('opacity-100', 'translate-y-0');
+    }
+
+    function showBanner(): void {
+      banner.classList.remove('hidden');
+      requestAnimationFrame(() => {
+        banner.classList.remove('opacity-0', '-translate-y-4');
+        banner.classList.add('opacity-100', 'translate-y-0');
+      });
+    }
+
+    function fireConfetti(): void {
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      const dpr = window.devicePixelRatio || 1;
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+      ctx.scale(dpr, dpr);
+
+      const particles: Particle[] = [];
+      const originX = width / 2;
+      const originY = height / 3;
+
+      for (let i = 0; i < PARTICLE_COUNT; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 4 + Math.random() * 8;
+        particles.push({
+          x: originX,
+          y: originY,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 4,
+          gravity: 0.18,
+          size: 5 + Math.random() * 5,
+          color: COLORS[Math.floor(Math.random() * COLORS.length)],
+          rotation: Math.random() * Math.PI,
+          vRotation: (Math.random() - 0.5) * 0.3,
+          life: 1,
+        });
+      }
+
+      const startTime = performance.now();
+      let raf = 0;
+
+      function step(now: number): void {
+        const elapsed = now - startTime;
+        const remaining = Math.max(0, 1 - elapsed / DURATION_MS);
+        if (!ctx) return;
+        ctx.clearRect(0, 0, width, height);
+        for (const p of particles) {
+          p.vy += p.gravity;
+          p.x += p.vx;
+          p.y += p.vy;
+          p.rotation += p.vRotation;
+          p.life = remaining;
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate(p.rotation);
+          ctx.globalAlpha = Math.max(0, p.life);
+          ctx.fillStyle = p.color;
+          ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.4);
+          ctx.restore();
+        }
+        if (elapsed < DURATION_MS) {
+          raf = requestAnimationFrame(step);
+        } else {
+          ctx.clearRect(0, 0, width, height);
+          cancelAnimationFrame(raf);
+        }
+      }
+
+      raf = requestAnimationFrame(step);
+    }
+
+    function celebrate(): void {
+      if (alreadyCelebrated()) return;
+      markCelebrated();
+      root.classList.remove('hidden');
+      showBanner();
+      fireConfetti();
+      window.setTimeout(() => {
+        banner.classList.add('opacity-0', '-translate-y-4');
+        window.setTimeout(hide, 400);
+      }, 5000);
+    }
+
+    closeBtn?.addEventListener('click', hide);
+
+    document.addEventListener('rastrum:first-observation-synced', () => {
+      celebrate();
+    });
+  }
+</script>

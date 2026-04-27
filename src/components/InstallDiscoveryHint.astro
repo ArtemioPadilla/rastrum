@@ -1,0 +1,213 @@
+---
+/**
+ * InstallDiscoveryHint — earlier PWA install prompt + iOS Add-to-
+ * Home-Screen walkthrough.
+ *
+ * - One-time banner at the top of the page on the user's 2nd visit
+ *   (count via `localStorage.rastrum.visitCount`).
+ * - Android: "Instalar" button triggers the existing
+ *   `beforeinstallprompt` flow; the button hides if no prompt
+ *   becomes available.
+ * - iOS: shows a 3-frame inline-SVG walkthrough (Share → Add to Home
+ *   Screen → Add). Frames auto-cycle every 2s.
+ * - Dismissible; never re-shows after dismiss
+ *   (`localStorage.rastrum.installHintDismissed`).
+ */
+import { t } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+const { lang } = Astro.props;
+const tr = t(lang);
+const pwa = (tr as unknown as { pwa: Record<string, string> }).pwa;
+---
+
+<aside
+  id="install-discovery-hint"
+  class="hidden border-b border-emerald-200 dark:border-emerald-800/70 bg-emerald-50 dark:bg-emerald-900/20"
+  role="region"
+  aria-label={pwa.discovery_title}
+  data-visit-key="rastrum.visitCount"
+  data-dismissed-key="rastrum.installHintDismissed"
+  data-ios-label={pwa.discovery_ios_label}
+>
+  <div class="max-w-5xl mx-auto px-4 py-3">
+    <div class="flex items-start gap-3 flex-wrap">
+      <span class="text-xl shrink-0" aria-hidden="true">{pwa.discovery_emoji}</span>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
+          {pwa.discovery_title}
+        </p>
+        <p class="mt-0.5 text-xs text-emerald-800/80 dark:text-emerald-200/80">
+          {pwa.discovery_body}
+        </p>
+
+        <div
+          id="install-hint-ios"
+          class="hidden mt-3"
+          aria-label={pwa.discovery_ios_label}
+        >
+          <div class="flex items-center gap-3">
+            <div class="relative w-16 h-16 shrink-0">
+              <svg id="ios-frame-1" class="install-hint-frame absolute inset-0 w-16 h-16 text-emerald-700 dark:text-emerald-300" fill="none" viewBox="0 0 64 64" stroke="currentColor" stroke-width="3" aria-hidden="true">
+                <rect x="16" y="14" width="32" height="42" rx="4" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M32 36V14m0 0l-6 6m6-6l6 6" />
+              </svg>
+              <svg id="ios-frame-2" class="install-hint-frame hidden absolute inset-0 w-16 h-16 text-emerald-700 dark:text-emerald-300" fill="none" viewBox="0 0 64 64" stroke="currentColor" stroke-width="3" aria-hidden="true">
+                <rect x="10" y="10" width="44" height="44" rx="6" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M22 32h20M32 22v20" />
+              </svg>
+              <svg id="ios-frame-3" class="install-hint-frame hidden absolute inset-0 w-16 h-16 text-emerald-700 dark:text-emerald-300" fill="none" viewBox="0 0 64 64" stroke="currentColor" stroke-width="3" aria-hidden="true">
+                <rect x="10" y="10" width="44" height="44" rx="10" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M22 32l8 8 14-16" />
+              </svg>
+            </div>
+            <ol class="text-xs text-emerald-900 dark:text-emerald-100 space-y-0.5 list-decimal list-inside">
+              <li id="ios-step-1" class="font-semibold">{pwa.discovery_ios_step1}</li>
+              <li id="ios-step-2">{pwa.discovery_ios_step2}</li>
+              <li id="ios-step-3">{pwa.discovery_ios_step3}</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 shrink-0 ml-auto">
+        <button
+          type="button"
+          id="install-hint-cta"
+          class="hidden inline-flex min-h-[40px] items-center rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-1.5 text-xs font-semibold"
+        >
+          {pwa.discovery_install}
+        </button>
+        <button
+          type="button"
+          id="install-hint-dismiss"
+          class="inline-flex min-h-[40px] items-center rounded-lg border border-emerald-300 dark:border-emerald-700 px-3 py-1.5 text-xs font-medium text-emerald-800 dark:text-emerald-200 hover:bg-emerald-100/60 dark:hover:bg-emerald-900/40"
+        >
+          {pwa.discovery_dismiss}
+        </button>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<script>
+  import { isIOS, isStandaloneDisplayMode } from '../lib/local-ai-helpers';
+
+  type InstallPromptEvent = Event & {
+    prompt: () => Promise<void>;
+    userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+  };
+
+  const root = document.getElementById('install-discovery-hint') as HTMLElement | null;
+  if (root) {
+    const VISIT_KEY = root.dataset.visitKey ?? 'rastrum.visitCount';
+    const DISMISSED_KEY = root.dataset.dismissedKey ?? 'rastrum.installHintDismissed';
+    const cta = document.getElementById('install-hint-cta') as HTMLButtonElement | null;
+    const dismiss = document.getElementById('install-hint-dismiss') as HTMLButtonElement | null;
+    const iosBlock = document.getElementById('install-hint-ios') as HTMLElement | null;
+
+    let savedPrompt: InstallPromptEvent | null = null;
+    let cycleTimer: number | null = null;
+
+    function readCount(): number {
+      try { return Number(localStorage.getItem(VISIT_KEY) ?? '0') || 0; }
+      catch { return 0; }
+    }
+
+    function writeCount(n: number): void {
+      try { localStorage.setItem(VISIT_KEY, String(n)); } catch { /* ignore */ }
+    }
+
+    function isDismissed(): boolean {
+      try { return localStorage.getItem(DISMISSED_KEY) === 'true'; }
+      catch { return false; }
+    }
+
+    function markDismissed(): void {
+      try { localStorage.setItem(DISMISSED_KEY, 'true'); } catch { /* ignore */ }
+    }
+
+    function show(): void {
+      root.classList.remove('hidden');
+    }
+    function hide(): void {
+      root.classList.add('hidden');
+      if (cycleTimer !== null) {
+        window.clearInterval(cycleTimer);
+        cycleTimer = null;
+      }
+    }
+
+    function cycleIosFrames(): void {
+      const frames = ['ios-frame-1', 'ios-frame-2', 'ios-frame-3'].map((id) => document.getElementById(id));
+      const steps  = ['ios-step-1', 'ios-step-2', 'ios-step-3'].map((id) => document.getElementById(id));
+      let i = 0;
+      const tick = () => {
+        frames.forEach((el, idx) => el?.classList.toggle('hidden', idx !== i));
+        steps.forEach((el, idx) => {
+          if (!el) return;
+          el.classList.toggle('font-semibold', idx === i);
+          el.classList.toggle('text-emerald-900', idx === i);
+          el.classList.toggle('dark:text-emerald-100', idx === i);
+        });
+        i = (i + 1) % frames.length;
+      };
+      tick();
+      cycleTimer = window.setInterval(tick, 2000);
+    }
+
+    dismiss?.addEventListener('click', () => {
+      markDismissed();
+      hide();
+    });
+
+    cta?.addEventListener('click', async () => {
+      if (!savedPrompt) return;
+      try {
+        await savedPrompt.prompt();
+        const choice = await savedPrompt.userChoice;
+        if (choice.outcome === 'accepted' || choice.outcome === 'dismissed') {
+          savedPrompt = null;
+          markDismissed();
+          hide();
+        }
+      } catch {
+        hide();
+      }
+    });
+
+    window.addEventListener('beforeinstallprompt', (ev) => {
+      ev.preventDefault();
+      savedPrompt = ev as InstallPromptEvent;
+      cta?.classList.remove('hidden');
+    });
+
+    window.addEventListener('appinstalled', () => {
+      savedPrompt = null;
+      markDismissed();
+      hide();
+    });
+
+    function init(): void {
+      if (isStandaloneDisplayMode() || isDismissed()) return;
+      const count = readCount() + 1;
+      writeCount(count);
+      if (count < 2) return;
+
+      if (isIOS()) {
+        iosBlock?.classList.remove('hidden');
+        cta?.classList.add('hidden');
+        cycleIosFrames();
+      }
+      show();
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
+    }
+  }
+</script>
