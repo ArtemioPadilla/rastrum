@@ -33,4 +33,14 @@ describe('getAlternateUrl', () => {
   it('returns same-lang url when targetLang matches current', () => {
     expect(getAlternateUrl('/en/observe/', 'en')).toBe('/en/observe/');
   });
+
+  it('returns locale-less paths unchanged (auth callback)', () => {
+    expect(getAlternateUrl('/auth/callback/', 'es')).toBe('/auth/callback/');
+    expect(getAlternateUrl('/auth/callback/', 'en')).toBe('/auth/callback/');
+  });
+
+  it('returns locale-less paths unchanged (share obs)', () => {
+    expect(getAlternateUrl('/share/obs/', 'es')).toBe('/share/obs/');
+    expect(getAlternateUrl('/share/obs/', 'en')).toBe('/share/obs/');
+  });
 });

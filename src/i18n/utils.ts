@@ -185,8 +185,16 @@ export function getAlternateUrl(currentPath: string, targetLang: 'en' | 'es'): s
   const pathWithoutBase = currentPath.replace(base, '') || '/';
   const segments = pathWithoutBase.split('/').filter(Boolean);
   const currentLang = segments[0];
-  const currentSlug = '/' + (segments.slice(1).join('/') || '');
 
+  // Locale-less paths (e.g. /auth/callback/, /share/obs/) — these are
+  // language-neutral transit/share routes; alternate is itself.
+  if (currentLang !== 'en' && currentLang !== 'es') {
+    const trailing = pathWithoutBase.endsWith('/') ? '' : '/';
+    return `${base}${pathWithoutBase}${trailing}`;
+  }
+
+  // Locale-prefixed paths — existing route-key swap logic continues here
+  const currentSlug = '/' + (segments.slice(1).join('/') || '');
   const matchedKey = Object.keys(routes).find(key => {
     const slug = routes[key][currentLang as Locale] || '';
     return slug === currentSlug || (currentSlug === '/' && slug === '');
