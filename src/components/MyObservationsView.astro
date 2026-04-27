@@ -352,6 +352,16 @@ const tabs = [
       loadMore().catch(() => { /* no-op */ });
     });
     await resetAndLoad();
+
+    // Auto-retry the outbox in the background. If the user is here looking
+    // at their list, they care about anything stuck in 'pending' from a
+    // previous session. Re-render the list when sync completes so the
+    // pending → synced transition is visible.
+    try {
+      const { syncOutbox } = await import('../lib/sync');
+      const result = await syncOutbox();
+      if (result.synced > 0) await resetAndLoad();
+    } catch { /* silent — user already sees the list */ }
   }
 
   init().catch(() => {
