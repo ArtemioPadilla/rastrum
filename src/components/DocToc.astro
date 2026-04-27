@@ -1,0 +1,80 @@
+---
+// No props. The component reads <main><h2> elements client-side.
+---
+
+<nav
+  id="doc-toc"
+  class="lg:hidden hidden sticky top-0 z-30 -mx-4 mb-4 border-b border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-950/95 backdrop-blur"
+  aria-label="Section navigation"
+>
+  <div id="doc-toc-track" class="flex items-center gap-2 overflow-x-auto px-4 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <!-- Pills injected by client script -->
+  </div>
+</nav>
+
+<script is:inline>
+  (function () {
+    const nav = document.getElementById('doc-toc');
+    const track = document.getElementById('doc-toc-track');
+    if (!nav || !track) return;
+    const main = document.querySelector('main');
+    if (!main) return;
+    const headings = Array.from(main.querySelectorAll('h2'));
+    if (headings.length === 0) return;
+
+    function slugify(text) {
+      return text.normalize('NFKD').replace(/[̀-ͯ]/g, '')
+        .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    }
+
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const pills = headings.map(function (h) {
+      const text = (h.textContent || '').trim();
+      if (!h.id) h.id = slugify(text) || 'section';
+      const a = document.createElement('a');
+      a.href = '#' + h.id;
+      a.textContent = text;
+      a.className = 'inline-flex items-center min-h-9 px-3 rounded-full text-[13px] text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 whitespace-nowrap shrink-0 border border-transparent transition-colors';
+      a.dataset.tocTarget = h.id;
+      a.addEventListener('click', function (e) {
+        e.preventDefault();
+        h.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+        history.replaceState(null, '', '#' + h.id);
+      });
+      track.appendChild(a);
+      return { id: h.id, h: h, a: a };
+    });
+
+    nav.classList.remove('hidden');
+
+    const idToPill = new Map(pills.map(function (p) { return [p.id, p.a]; }));
+    let activeId = null;
+
+    function setActive(id) {
+      if (activeId === id) return;
+      activeId = id;
+      pills.forEach(function (p) {
+        const isActive = p.id === id;
+        p.a.classList.toggle('text-emerald-600', isActive);
+        p.a.classList.toggle('dark:text-emerald-400', isActive);
+        p.a.classList.toggle('bg-emerald-500/10', isActive);
+        p.a.classList.toggle('font-semibold', isActive);
+        if (isActive) p.a.setAttribute('aria-current', 'true');
+        else p.a.removeAttribute('aria-current');
+      });
+      const a = idToPill.get(id);
+      if (a) a.scrollIntoView({ inline: 'center', block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' });
+    }
+
+    const observer = new IntersectionObserver(function (entries) {
+      const visible = entries
+        .filter(function (e) { return e.isIntersecting; })
+        .map(function (e) { return { id: e.target.id, top: e.boundingClientRect.top }; })
+        .sort(function (a, b) { return a.top - b.top; });
+      if (visible[0]) setActive(visible[0].id);
+    }, { rootMargin: '-80px 0px -60% 0px', threshold: 0 });
+
+    headings.forEach(function (h) { observer.observe(h); });
+  })();
+</script>
