@@ -1,11 +1,12 @@
 ---
-import { t } from '../i18n/utils';
+import { t, getLocalizedPath, routes } from '../i18n/utils';
 
 interface Props {
   lang: 'en' | 'es';
 }
 const { lang } = Astro.props;
 const tr = t(lang);
+const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
 ---
 
 <!-- The chat lays out as full-height with a fixed input bar on small screens.
@@ -48,7 +49,7 @@ const tr = t(lang);
   <!-- Conversation -->
   <div
     id="chat-history"
-    class="hidden space-y-3 mb-4 pb-44 sm:pb-4"
+    class="hidden space-y-3 mb-4 pb-56 sm:pb-4"
     role="log"
     aria-live="polite"
   >
@@ -63,22 +64,120 @@ const tr = t(lang);
     class="hidden fixed bottom-0 left-0 right-0 sm:static border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 sm:border-0 sm:bg-transparent z-30"
     style="padding-bottom: env(safe-area-inset-bottom);"
   >
-    <div class="max-w-3xl mx-auto px-4 sm:px-0 py-3 sm:py-0 flex items-end gap-2">
-      <textarea
-        id="chat-input"
-        rows="1"
-        placeholder={tr.chat.placeholder}
-        class="flex-1 resize-none rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-base min-h-11 max-h-40"
-      ></textarea>
-      <button
-        id="chat-send-btn"
-        type="submit"
-        class="rounded-lg bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 px-4 py-2 text-sm font-semibold text-white min-h-11 whitespace-nowrap"
-      >
-        <span data-csl>{tr.chat.send}</span>
-      </button>
+    <div class="max-w-3xl mx-auto px-4 sm:px-0 py-3 sm:py-0 space-y-2">
+      <!-- Attachment chip (shown when an attachment is staged) -->
+      <div id="chat-attachment-chip" class="hidden flex items-center gap-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 p-2">
+        <div id="chat-attachment-thumb" class="w-12 h-12 rounded-md overflow-hidden bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 text-xs flex-shrink-0"></div>
+        <div class="flex-1 min-w-0">
+          <p id="chat-attachment-label" class="text-xs font-medium text-zinc-700 dark:text-zinc-300 truncate"></p>
+          <p id="chat-attachment-meta" class="text-[10px] text-zinc-500 truncate"></p>
+        </div>
+        <button
+          id="chat-attachment-remove"
+          type="button"
+          aria-label={tr.chat.attach_remove}
+          class="w-7 h-7 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-sm flex items-center justify-center hover:bg-zinc-300 dark:hover:bg-zinc-700 flex-shrink-0"
+        >×</button>
+      </div>
+
+      <!-- Buttons + textarea row -->
+      <div class="flex flex-col sm:flex-row sm:items-end gap-2">
+        <!-- Attachment buttons: above on mobile, inline on sm+ -->
+        <div class="flex gap-2 sm:gap-1">
+          <button
+            id="chat-photo-btn"
+            type="button"
+            aria-label={tr.chat.attach_photo}
+            title={tr.chat.attach_photo}
+            class="min-h-11 min-w-11 sm:min-w-0 rounded-lg border border-zinc-300 dark:border-zinc-700 px-2 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 flex items-center justify-center gap-1"
+          >
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 0 1 2-2h2l1.5-2h7L17 7h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+            <span class="sr-only">{tr.chat.attach_photo}</span>
+          </button>
+          <input id="chat-photo-input" type="file" accept="image/*" capture="environment" class="sr-only" />
+
+          <button
+            id="chat-gallery-btn"
+            type="button"
+            aria-label={tr.chat.attach_gallery}
+            title={tr.chat.attach_gallery}
+            class="min-h-11 min-w-11 sm:min-w-0 rounded-lg border border-zinc-300 dark:border-zinc-700 px-2 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 flex items-center justify-center gap-1"
+          >
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 5h16v14H4z"/><path stroke-linecap="round" stroke-linejoin="round" d="m4 16 4-4 4 4 3-3 5 5"/><circle cx="9" cy="9" r="1.5" fill="currentColor"/></svg>
+            <span class="sr-only">{tr.chat.attach_gallery}</span>
+          </button>
+          <input id="chat-gallery-input" type="file" accept="image/*" class="sr-only" />
+
+          <button
+            id="chat-audio-btn"
+            type="button"
+            aria-label={tr.chat.attach_audio}
+            title={tr.chat.attach_audio}
+            class="min-h-11 min-w-11 sm:min-w-0 rounded-lg border border-zinc-300 dark:border-zinc-700 px-2 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 flex items-center justify-center gap-1"
+          >
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path stroke-linecap="round" stroke-linejoin="round" d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+            <span data-audio-label class="sr-only">{tr.chat.attach_audio}</span>
+            <span id="chat-audio-elapsed" class="hidden text-[10px] font-mono text-red-600 dark:text-red-400"></span>
+          </button>
+        </div>
+
+        <textarea
+          id="chat-input"
+          rows="1"
+          placeholder={tr.chat.placeholder}
+          class="flex-1 resize-none rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-base min-h-11 max-h-40"
+        ></textarea>
+        <button
+          id="chat-send-btn"
+          type="submit"
+          class="rounded-lg bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 px-4 py-2 text-sm font-semibold text-white min-h-11 whitespace-nowrap"
+        >
+          <span data-csl>{tr.chat.send}</span>
+        </button>
+      </div>
+      <p id="chat-attach-error" class="hidden text-xs text-red-600 dark:text-red-400"></p>
     </div>
   </form>
+
+  <!-- Vision-download consent dialog -->
+  <dialog id="chat-vision-dialog" class="rounded-xl p-0 m-auto bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 shadow-2xl border border-zinc-200 dark:border-zinc-800 max-w-md w-[92vw] backdrop:bg-black/50">
+    <form method="dialog" class="p-6">
+      <h2 class="text-lg font-bold mb-3">{tr.chat.vision_consent_title}</h2>
+      <p class="text-sm text-zinc-700 dark:text-zinc-300">{tr.chat.vision_consent_body}</p>
+      <div class="mt-6 flex justify-end gap-2">
+        <button value="cancel" class="rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
+          {tr.chat.vision_consent_cancel}
+        </button>
+        <button value="ok" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 text-sm font-semibold text-white">
+          {tr.chat.vision_consent_ok}
+        </button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Hidden bag of route + label strings the script reads at runtime.
+       Kept in the markup so EN/ES variants stay in sync without
+       duplicating the script. -->
+  <div
+    id="chat-i18n"
+    class="hidden"
+    data-observe-path={observePath}
+    data-attach-photo={tr.chat.attach_photo}
+    data-attach-gallery={tr.chat.attach_gallery}
+    data-attach-audio={tr.chat.attach_audio}
+    data-attach-audio-stop={tr.chat.attach_audio_stop}
+    data-attach-audio-unsupported={tr.chat.attach_audio_unsupported}
+    data-attach-audio-permission={tr.chat.attach_audio_permission}
+    data-identifying={tr.chat.identifying}
+    data-identifying-audio={tr.chat.identifying_audio}
+    data-looking-more-carefully={tr.chat.looking_more_carefully}
+    data-cascade-no-match={tr.chat.cascade_no_match}
+    data-vision-unavailable-hint={tr.chat.vision_unavailable_hint}
+    data-save-as-observation={tr.chat.save_as_observation}
+    data-vision-download-progress={tr.chat.vision_download_progress}
+    data-attach-photo-label={lang === 'es' ? 'Foto' : 'Photo'}
+    data-attach-audio-label={lang === 'es' ? 'Audio' : 'Audio'}
+  ></div>
 </div>
 
 <script>
@@ -87,12 +186,43 @@ const tr = t(lang);
     CHAT_SYSTEM_PROMPT,
     type Locale as ChatLocale,
   } from '../lib/local-ai-helpers';
+  import {
+    buildCascadeInterpretationPrompt,
+    buildVisionFallbackPrompt,
+    buildPendingObservation,
+    pluginIdToObservationSource,
+    PENDING_OBSERVATION_KEY,
+    type CascadeCandidate,
+  } from '../lib/chat-attachment-helpers';
 
   type ChatRole = 'user' | 'assistant';
-  interface ChatTurn { role: ChatRole; content: string; }
+  interface ChatAttachment {
+    kind: 'photo' | 'audio';
+    blob: Blob;
+    objectUrl: string;
+    mimeType: string;
+    durationSec?: number;
+  }
+  interface ChatTurn {
+    role: ChatRole;
+    content: string;
+    attachment?: ChatAttachment;
+    /** Cascade result attached to assistant turns that interpret an upload. */
+    cascadeResult?: {
+      best: CascadeCandidate | null;
+      attachmentKind: 'photo' | 'audio';
+      attachmentBlobUrl: string;
+      attachmentMime: string;
+    };
+    /** Streaming/loading flag so the bubble can show a spinner placeholder. */
+    pending?: boolean;
+  }
 
   const isEs = (document.documentElement.lang === 'es');
   const docLocale: ChatLocale = detectLocaleFromDoc();
+
+  const i18nBag = document.getElementById('chat-i18n');
+  const i18nGet = (k: string) => i18nBag?.dataset[camelize(k)] ?? '';
 
   const consentBox      = document.getElementById('chat-consent');
   const unsupNote       = document.getElementById('chat-unsup');
@@ -107,14 +237,41 @@ const tr = t(lang);
   const sendLabel       = sendBtn?.querySelector('[data-csl]') as HTMLElement | null;
   const clearBtn        = document.getElementById('chat-clear-btn') as HTMLButtonElement | null;
 
+  const photoBtn        = document.getElementById('chat-photo-btn') as HTMLButtonElement | null;
+  const photoInput      = document.getElementById('chat-photo-input') as HTMLInputElement | null;
+  const galleryBtn      = document.getElementById('chat-gallery-btn') as HTMLButtonElement | null;
+  const galleryInput    = document.getElementById('chat-gallery-input') as HTMLInputElement | null;
+  const audioBtn        = document.getElementById('chat-audio-btn') as HTMLButtonElement | null;
+  const audioBtnLabel   = audioBtn?.querySelector('[data-audio-label]') as HTMLElement | null;
+  const audioElapsedEl  = document.getElementById('chat-audio-elapsed');
+  const attachChip      = document.getElementById('chat-attachment-chip');
+  const attachThumb     = document.getElementById('chat-attachment-thumb');
+  const attachLabel     = document.getElementById('chat-attachment-label');
+  const attachMeta      = document.getElementById('chat-attachment-meta');
+  const attachRemove    = document.getElementById('chat-attachment-remove');
+  const attachErr       = document.getElementById('chat-attach-error');
+  const visionDialog    = document.getElementById('chat-vision-dialog') as HTMLDialogElement | null;
+
   const SEND_DEFAULT  = sendLabel?.textContent ?? 'Send';
   const SEND_BUSY     = isEs ? 'Pensando…' : 'Thinking…';
   const DL_DEFAULT    = downloadLabel?.textContent ?? 'Download';
-  const DL_LOADING    = isEs ? 'Cargando modelo en la GPU…' : 'Loading model into GPU…';
 
   let modelReady = false;
   let busy = false;
   const conversation: ChatTurn[] = [];
+  let pendingAttachment: ChatAttachment | null = null;
+
+  // Audio recorder state (attachment buttons)
+  let mediaRecorder: MediaRecorder | null = null;
+  let audioChunks: Blob[] = [];
+  let recordStartedAt = 0;
+  let elapsedTimer: number | null = null;
+  let durationCutoffTimer: number | null = null;
+  const AUDIO_MAX_SECS = 30;
+
+  function camelize(s: string): string {
+    return s.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+  }
 
   function escapeHtml(s: string): string {
     return s.replace(/[<>&'"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&#39;','"':'&quot;'}[c]!));
@@ -131,6 +288,7 @@ const tr = t(lang);
     emptyState?.remove();
     historyEl.innerHTML = conversation.map((t, i) => bubbleHtml(t, i)).join('');
     clearBtn?.classList.remove('hidden');
+    wireBubbleActions();
     historyEl.scrollIntoView({ block: 'end', behavior: 'smooth' });
     window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
   }
@@ -142,16 +300,82 @@ const tr = t(lang);
       ? 'bg-emerald-700 text-white'
       : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800';
     const role   = isUser ? (isEs ? 'Tú' : 'You') : 'Rastrum';
+
+    const attachmentHtml = turn.attachment ? renderAttachmentPreview(turn.attachment) : '';
+    const bodyContent = turn.pending
+      ? `<span class="inline-flex items-center gap-2 text-zinc-600 dark:text-zinc-400 italic">
+           <svg class="animate-spin h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
+           ${escapeHtml(turn.content)}
+         </span>`
+      : escapeHtml(turn.content);
+    const cascadeHtml = (!isUser && turn.cascadeResult && !turn.pending) ? renderCascadeFooter(turn, idx) : '';
+
     return `
       <div class="${align} max-w-[85%] sm:max-w-[75%]" data-bubble="${idx}">
         <p class="text-[10px] uppercase tracking-wider text-zinc-400 mb-0.5 ${isUser ? 'text-right' : ''}">${escapeHtml(role)}</p>
-        <div data-bubble-body class="${bg} rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap break-words">${escapeHtml(turn.content)}</div>
+        <div data-bubble-body class="${bg} rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap break-words">
+          ${attachmentHtml}
+          <span data-bubble-text>${bodyContent}</span>
+        </div>
+        ${cascadeHtml}
       </div>
     `;
   }
 
+  function renderAttachmentPreview(att: ChatAttachment): string {
+    if (att.kind === 'photo') {
+      return `<img src="${escapeHtml(att.objectUrl)}" alt="" class="block max-w-full max-h-64 rounded-md mb-1" />`;
+    }
+    const dur = att.durationSec != null ? `${att.durationSec.toFixed(1)}s · ` : '';
+    return `<audio controls src="${escapeHtml(att.objectUrl)}" class="block w-full max-w-xs mb-1 h-9"></audio>
+            <p class="text-[10px] text-zinc-500 mb-1">${dur}${escapeHtml(att.mimeType)}</p>`;
+  }
+
+  function renderCascadeFooter(turn: ChatTurn, idx: number): string {
+    const cr = turn.cascadeResult;
+    if (!cr || !cr.best) return '';
+    const best = cr.best;
+    const pct = Math.round((best.confidence ?? 0) * 100);
+    const sciHtml = best.scientific_name ? `<span class="italic font-medium">${escapeHtml(best.scientific_name)}</span>` : '';
+    const sourceHtml = `<span class="text-[10px] text-zinc-500">${pct}% · ${escapeHtml(best.source)}</span>`;
+    const saveLabel = i18nGet('save-as-observation');
+    return `
+      <div class="mt-1 flex items-center gap-2 flex-wrap">
+        ${sciHtml}
+        ${sourceHtml}
+        <button data-save-obs="${idx}" type="button"
+          class="ml-auto inline-flex items-center min-h-9 rounded-lg border border-emerald-600/60 px-3 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20">
+          + ${escapeHtml(saveLabel)}
+        </button>
+      </div>
+    `;
+  }
+
+  function wireBubbleActions() {
+    historyEl?.querySelectorAll<HTMLButtonElement>('button[data-save-obs]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = Number(btn.dataset.saveObs);
+        const turn = conversation[idx];
+        if (!turn?.cascadeResult) return;
+        const best = turn.cascadeResult.best;
+        const payload = buildPendingObservation({
+          blob_url: turn.cascadeResult.attachmentBlobUrl,
+          mime_type: turn.cascadeResult.attachmentMime,
+          scientific_name: best?.scientific_name ?? '',
+          confidence: best?.confidence ?? 0,
+          source: best ? pluginIdToObservationSource(best.source) : 'human',
+          common_name: best ? (isEs ? best.common_name_es ?? best.common_name_en ?? null : best.common_name_en ?? best.common_name_es ?? null) : null,
+          kind: turn.cascadeResult.attachmentKind,
+        });
+        try { sessionStorage.setItem(PENDING_OBSERVATION_KEY, payload); } catch { /* private mode */ }
+        const observePath = i18nGet('observe-path') || (isEs ? '/es/observar/' : '/en/observe/');
+        window.location.href = observePath;
+      });
+    });
+  }
+
   function setBubbleStreaming(idx: number, content: string) {
-    const wrap = historyEl?.querySelector(`[data-bubble="${idx}"] [data-bubble-body]`);
+    const wrap = historyEl?.querySelector(`[data-bubble="${idx}"] [data-bubble-text]`);
     if (wrap) wrap.textContent = content;
     window.scrollTo({ top: document.body.scrollHeight, behavior: 'auto' });
   }
@@ -161,6 +385,130 @@ const tr = t(lang);
     inputEl.style.height = 'auto';
     inputEl.style.height = Math.min(inputEl.scrollHeight, 160) + 'px';
   }
+
+  // ── Attachment chip ──
+  function clearAttachmentChip() {
+    if (pendingAttachment?.objectUrl) URL.revokeObjectURL(pendingAttachment.objectUrl);
+    pendingAttachment = null;
+    attachChip?.classList.add('hidden');
+    if (attachThumb) attachThumb.innerHTML = '';
+    if (attachLabel) attachLabel.textContent = '';
+    if (attachMeta) attachMeta.textContent = '';
+  }
+
+  function setAttachment(kind: 'photo' | 'audio', blob: Blob, durationSec?: number) {
+    if (pendingAttachment?.objectUrl) URL.revokeObjectURL(pendingAttachment.objectUrl);
+    const objectUrl = URL.createObjectURL(blob);
+    const mimeType = blob.type || (kind === 'photo' ? 'image/jpeg' : 'audio/webm');
+    pendingAttachment = { kind, blob, objectUrl, mimeType, durationSec };
+    if (!attachChip || !attachThumb || !attachLabel || !attachMeta) return;
+    attachChip.classList.remove('hidden');
+    if (kind === 'photo') {
+      attachThumb.innerHTML = `<img src="${escapeHtml(objectUrl)}" alt="" class="w-full h-full object-cover" />`;
+      attachLabel.textContent = i18nGet('attach-photo-label');
+      attachMeta.textContent = mimeType;
+    } else {
+      attachThumb.innerHTML = `<svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM21 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/></svg>`;
+      attachLabel.textContent = i18nGet('attach-audio-label');
+      attachMeta.textContent = `${(durationSec ?? 0).toFixed(1)}s · ${mimeType}`;
+    }
+  }
+
+  attachRemove?.addEventListener('click', () => clearAttachmentChip());
+
+  // ── File pickers ──
+  photoBtn?.addEventListener('click', () => photoInput?.click());
+  galleryBtn?.addEventListener('click', () => galleryInput?.click());
+  photoInput?.addEventListener('change', () => {
+    const f = photoInput.files?.[0];
+    if (f) setAttachment('photo', f);
+    if (photoInput) photoInput.value = '';
+  });
+  galleryInput?.addEventListener('change', () => {
+    const f = galleryInput.files?.[0];
+    if (f) setAttachment('photo', f);
+    if (galleryInput) galleryInput.value = '';
+  });
+
+  // ── Audio recording ──
+  function audioSupported(): boolean {
+    return typeof navigator !== 'undefined'
+      && !!navigator.mediaDevices
+      && typeof navigator.mediaDevices.getUserMedia === 'function'
+      && typeof MediaRecorder !== 'undefined';
+  }
+
+  function pickAudioMime(): string {
+    const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'];
+    for (const m of candidates) {
+      if (MediaRecorder.isTypeSupported(m)) return m;
+    }
+    return 'audio/webm';
+  }
+
+  function setAudioBtnRecording(rec: boolean) {
+    if (audioBtnLabel) {
+      audioBtnLabel.textContent = rec ? i18nGet('attach-audio-stop') : i18nGet('attach-audio');
+    }
+    audioBtn?.classList.toggle('border-red-500', rec);
+    audioBtn?.classList.toggle('text-red-600', rec);
+    audioElapsedEl?.classList.toggle('hidden', !rec);
+  }
+
+  if (!audioSupported()) {
+    audioBtn?.setAttribute('disabled', 'true');
+    audioBtn?.classList.add('opacity-50');
+  }
+
+  async function startRecording() {
+    if (!audioBtn) return;
+    attachErr?.classList.add('hidden');
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      if (attachErr) {
+        attachErr.textContent = i18nGet('attach-audio-permission');
+        attachErr.classList.remove('hidden');
+      }
+      return;
+    }
+    audioChunks = [];
+    const mime = pickAudioMime();
+    mediaRecorder = new MediaRecorder(stream, { mimeType: mime });
+    mediaRecorder.addEventListener('dataavailable', e => {
+      if (e.data && e.data.size > 0) audioChunks.push(e.data);
+    });
+    mediaRecorder.addEventListener('stop', () => {
+      stream.getTracks().forEach(t => t.stop());
+      const blob = new Blob(audioChunks, { type: mime });
+      const durationSec = Math.min((Date.now() - recordStartedAt) / 1000, AUDIO_MAX_SECS);
+      setAttachment('audio', blob, durationSec);
+      setAudioBtnRecording(false);
+      if (elapsedTimer != null) { clearInterval(elapsedTimer); elapsedTimer = null; }
+      if (durationCutoffTimer != null) { clearTimeout(durationCutoffTimer); durationCutoffTimer = null; }
+    });
+    recordStartedAt = Date.now();
+    mediaRecorder.start();
+    setAudioBtnRecording(true);
+    if (audioElapsedEl) audioElapsedEl.textContent = '0.0s';
+    elapsedTimer = window.setInterval(() => {
+      const e = (Date.now() - recordStartedAt) / 1000;
+      if (audioElapsedEl) audioElapsedEl.textContent = e.toFixed(1) + 's';
+    }, 100);
+    durationCutoffTimer = window.setTimeout(() => {
+      try { mediaRecorder?.stop(); } catch { /* already stopped */ }
+    }, AUDIO_MAX_SECS * 1000);
+  }
+
+  function stopRecording() {
+    try { mediaRecorder?.stop(); } catch { /* already stopped */ }
+  }
+
+  audioBtn?.addEventListener('click', () => {
+    if (mediaRecorder && mediaRecorder.state === 'recording') stopRecording();
+    else                                                       startRecording();
+  });
 
   // Wire textarea Enter / Shift+Enter
   inputEl?.addEventListener('keydown', (e) => {
@@ -172,6 +520,9 @@ const tr = t(lang);
   inputEl?.addEventListener('input', autosize);
 
   clearBtn?.addEventListener('click', () => {
+    for (const turn of conversation) {
+      if (turn.attachment?.objectUrl) URL.revokeObjectURL(turn.attachment.objectUrl);
+    }
     conversation.length = 0;
     paintConversation();
   });
@@ -227,12 +578,162 @@ const tr = t(lang);
     }
   });
 
+  // ── Cascade helpers ──
+  async function runAttachmentCascade(att: ChatAttachment): Promise<{
+    best: CascadeCandidate | null;
+    alternates: CascadeCandidate[];
+  }> {
+    const { bootstrapIdentifiers, runCascade } = await import('../lib/identifiers');
+    bootstrapIdentifiers();
+    const mediaKind = att.kind === 'photo' ? 'photo' : 'audio';
+    const result = await runCascade(
+      {
+        media: { kind: 'blob', blob: att.blob, mime: att.mimeType },
+        mediaKind,
+        byo_keys: {},
+      },
+      {
+        media: mediaKind,
+        taxa: mediaKind === 'audio' ? 'Animalia.Aves' : undefined,
+        // Phi-vision is the slow expensive fallback — exclude it from the
+        // primary cascade pass; we surface it explicitly via the "looking
+        // more carefully" step below if the cascade returns nothing.
+        excluded: ['webllm_phi35_vision'],
+      },
+    );
+    const best = result.best ? toCandidate(result.best) : null;
+    const alternates = result.attempts
+      .filter(a => a.ok && a.result && a.result !== result.best)
+      .map(a => toCandidate(a.result!))
+      .filter(c => c.scientific_name);
+    return { best, alternates };
+  }
+
+  function toCandidate(r: {
+    scientific_name: string; common_name_en: string | null; common_name_es: string | null;
+    family: string | null; kingdom: string; confidence: number; source: string;
+  }): CascadeCandidate {
+    return {
+      scientific_name: r.scientific_name,
+      common_name_en: r.common_name_en,
+      common_name_es: r.common_name_es,
+      family: r.family,
+      kingdom: r.kingdom,
+      confidence: r.confidence,
+      source: r.source,
+    };
+  }
+
+  /** Convert a Blob to a data URL — needed for Phi-3.5-vision and Claude vision payloads. */
+  function blobToDataUrl(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result as string);
+      r.onerror = () => reject(r.error);
+      r.readAsDataURL(blob);
+    });
+  }
+
+  /** Best-effort vision-LLM fallback. Returns the text reply or null if unavailable. */
+  async function runVisionFallback(
+    att: ChatAttachment,
+    userText: string,
+    onUpdate: (s: string) => void,
+  ): Promise<string | null> {
+    if (att.kind !== 'photo') return null;
+    const lib = await import('../lib/local-ai');
+    if (!lib.localAISupported()) {
+      // Try Claude BYO key fallback
+      return await tryClaudeVisionFallback(att, userText);
+    }
+    const status = await lib.getModelCacheStatus(lib.VISION_MODEL_ID);
+    if (!status.cached) {
+      if (!visionDialog) return await tryClaudeVisionFallback(att, userText);
+      visionDialog.returnValue = '';
+      const ok: boolean = await new Promise((resolve) => {
+        const handler = () => { resolve(visionDialog.returnValue === 'ok'); visionDialog.removeEventListener('close', handler); };
+        visionDialog.addEventListener('close', handler);
+        visionDialog.showModal();
+      });
+      if (!ok) return await tryClaudeVisionFallback(att, userText);
+      onUpdate(i18nGet('vision-download-progress'));
+      try {
+        await lib.loadVisionEngine((p) => {
+          onUpdate(`${i18nGet('vision-download-progress')} ${Math.round((p.progress ?? 0) * 100)}%`);
+        });
+      } catch {
+        return await tryClaudeVisionFallback(att, userText);
+      }
+    }
+    onUpdate(i18nGet('looking-more-carefully'));
+    const dataUrl = await blobToDataUrl(att.blob);
+    const engine = await lib.loadVisionEngine(() => {});
+    const prompt = buildVisionFallbackPrompt({ userText, locale: docLocale });
+    const reply = await engine.chat.completions.create({
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image_url', image_url: { url: dataUrl } },
+          { type: 'text', text: prompt },
+        ],
+      }],
+      max_tokens: 256,
+    });
+    const raw = reply.choices?.[0]?.message?.content ?? '';
+    return typeof raw === 'string' ? raw.trim() : null;
+  }
+
+  /** If a BYO Anthropic key is set, send the image to Claude Haiku for a vision-native reply. */
+  async function tryClaudeVisionFallback(att: ChatAttachment, userText: string): Promise<string | null> {
+    if (att.kind !== 'photo') return null;
+    try {
+      const { getKey } = await import('../lib/byo-keys');
+      const key = getKey('claude_haiku', 'anthropic');
+      if (!key) return null;
+      const dataUrl = await blobToDataUrl(att.blob);
+      const m = /^data:([^;]+);base64,(.+)$/.exec(dataUrl);
+      if (!m) return null;
+      const [, mediaType, base64] = m;
+      const prompt = buildVisionFallbackPrompt({ userText, locale: docLocale });
+      const ac = new AbortController();
+      const t = setTimeout(() => ac.abort(), 25_000);
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        signal: ac.signal,
+        headers: {
+          'x-api-key': key,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5',
+          max_tokens: 400,
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
+              { type: 'text', text: prompt },
+            ],
+          }],
+        }),
+      }).finally(() => clearTimeout(t));
+      if (!res.ok) return null;
+      const data = await res.json() as { content?: Array<{ type: string; text?: string }> };
+      const piece = data.content?.find(p => p.type === 'text');
+      return piece?.text?.trim() ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   // ── Send ──
   formEl?.addEventListener('submit', async (e) => {
     e.preventDefault();
     if (busy || !inputEl || !sendBtn || !sendLabel) return;
     const text = inputEl.value.trim();
-    if (!text) return;
+    const att = pendingAttachment;
+    if (!text && !att) return;
     if (!modelReady) {
       consentBox?.classList.remove('hidden');
       return;
@@ -241,59 +742,184 @@ const tr = t(lang);
     sendBtn.disabled = true;
     sendLabel.textContent = SEND_BUSY;
 
-    conversation.push({ role: 'user', content: text });
-    conversation.push({ role: 'assistant', content: '' });
+    // Detach the staged attachment from the chip immediately so the user
+    // can stage another while this turn streams.
+    pendingAttachment = null;
+    attachChip?.classList.add('hidden');
+    if (attachThumb) attachThumb.innerHTML = '';
+    if (attachLabel) attachLabel.textContent = '';
+    if (attachMeta) attachMeta.textContent = '';
+
+    conversation.push({ role: 'user', content: text, attachment: att ?? undefined });
     inputEl.value = '';
     autosize();
-    paintConversation();
-    const assistantIdx = conversation.length - 1;
 
-    try {
-      const lib = await import('../lib/local-ai');
-      if (dlProgress) dlProgress.classList.remove('hidden');
-      const engine = await lib.loadTextEngine((p) => {
-        if (dlProgress) dlProgress.textContent = `${Math.round((p.progress ?? 0) * 100)}%  ${p.text ?? ''}`;
-        if ((p.progress ?? 0) >= 1) dlProgress?.classList.add('hidden');
-      });
-      dlProgress?.classList.add('hidden');
+    if (att) {
+      // Add a placeholder bot turn while the cascade runs.
+      const placeholderText = att.kind === 'audio'
+        ? i18nGet('identifying-audio')
+        : i18nGet('identifying');
+      conversation.push({ role: 'assistant', content: placeholderText, pending: true });
+      paintConversation();
+      const placeholderIdx = conversation.length - 1;
 
-      const messages = [
-        { role: 'system' as const, content: CHAT_SYSTEM_PROMPT },
-        ...conversation.slice(0, -1).map(t => ({ role: t.role, content: t.content })),
-      ];
-
-      let assembled = '';
       try {
-        const stream = await engine.chat.completions.create({
-          messages,
-          max_tokens: 512,
-          stream: true,
-        });
-        for await (const chunk of stream as AsyncIterable<{ choices?: Array<{ delta?: { content?: string } }> }>) {
-          const delta = chunk.choices?.[0]?.delta?.content ?? '';
-          if (!delta) continue;
-          assembled += delta;
-          conversation[assistantIdx].content = assembled;
-          setBubbleStreaming(assistantIdx, assembled);
+        const { best, alternates } = await runAttachmentCascade(att);
+        const ACCEPT_LOW = 0.4;
+        const cascadeOk = !!best && best.confidence >= ACCEPT_LOW;
+
+        if (cascadeOk) {
+          conversation[placeholderIdx].cascadeResult = {
+            best,
+            attachmentKind: att.kind,
+            attachmentBlobUrl: att.objectUrl,
+            attachmentMime: att.mimeType,
+          };
+          conversation[placeholderIdx].content = '';
+          conversation[placeholderIdx].pending = false;
+          paintConversation();
+          await streamLlamaInterpretation(placeholderIdx, att, text, best, alternates);
+        } else {
+          // Cascade failed → try vision fallback (photo only).
+          if (att.kind === 'photo') {
+            conversation[placeholderIdx].content = i18nGet('looking-more-carefully');
+            paintConversation();
+            const reply = await runVisionFallback(att, text, (s) => {
+              conversation[placeholderIdx].content = s;
+              setBubbleStreaming(placeholderIdx, s);
+            });
+            if (reply) {
+              conversation[placeholderIdx].content = reply;
+              conversation[placeholderIdx].pending = false;
+              if (best) {
+                conversation[placeholderIdx].cascadeResult = {
+                  best,
+                  attachmentKind: att.kind,
+                  attachmentBlobUrl: att.objectUrl,
+                  attachmentMime: att.mimeType,
+                };
+              }
+            } else {
+              conversation[placeholderIdx].content = i18nGet('vision-unavailable-hint');
+              conversation[placeholderIdx].pending = false;
+            }
+            paintConversation();
+          } else {
+            // Audio with no confident match — there's no audio LLM fallback.
+            conversation[placeholderIdx].content = i18nGet('cascade-no-match') + ' ' + (best?.scientific_name
+              ? (isEs ? `Mejor candidato: ${best.scientific_name} (${Math.round(best.confidence * 100)}%).`
+                      : `Best candidate: ${best.scientific_name} (${Math.round(best.confidence * 100)}%).`)
+              : '');
+            conversation[placeholderIdx].pending = false;
+            if (best) {
+              conversation[placeholderIdx].cascadeResult = {
+                best,
+                attachmentKind: att.kind,
+                attachmentBlobUrl: att.objectUrl,
+                attachmentMime: att.mimeType,
+              };
+            }
+            paintConversation();
+          }
         }
-      } catch {
-        // Streaming not supported — fall back to a single completion
-        const reply = await engine.chat.completions.create({ messages, max_tokens: 512 });
-        const raw = reply.choices?.[0]?.message?.content ?? '';
-        assembled = typeof raw === 'string' ? raw : '';
-        conversation[assistantIdx].content = assembled;
+      } catch (err) {
+        conversation[placeholderIdx].content = (isEs ? 'Error: ' : 'Error: ') + (err instanceof Error ? err.message : String(err));
+        conversation[placeholderIdx].pending = false;
+        paintConversation();
       }
+    } else {
+      // Text-only flow (original behaviour).
+      conversation.push({ role: 'assistant', content: '' });
       paintConversation();
-    } catch (err) {
-      conversation[assistantIdx].content = (isEs ? 'Error: ' : 'Error: ') + (err instanceof Error ? err.message : String(err));
-      paintConversation();
-    } finally {
-      busy = false;
-      sendBtn.disabled = false;
-      sendLabel.textContent = SEND_DEFAULT;
-      // The system prompt is intentionally locale-aware via doc lang
-      void docLocale;
-      void DL_LOADING;
+      const assistantIdx = conversation.length - 1;
+      try {
+        const lib = await import('../lib/local-ai');
+        if (dlProgress) dlProgress.classList.remove('hidden');
+        const engine = await lib.loadTextEngine((p) => {
+          if (dlProgress) dlProgress.textContent = `${Math.round((p.progress ?? 0) * 100)}%  ${p.text ?? ''}`;
+          if ((p.progress ?? 0) >= 1) dlProgress?.classList.add('hidden');
+        });
+        dlProgress?.classList.add('hidden');
+
+        const messages = [
+          { role: 'system' as const, content: CHAT_SYSTEM_PROMPT },
+          ...conversation
+            .slice(0, -1)
+            .filter(t => !t.attachment) // skip prior attached turns from text-only history
+            .map(t => ({ role: t.role, content: t.content })),
+        ];
+
+        let assembled = '';
+        try {
+          const stream = await engine.chat.completions.create({ messages, max_tokens: 512, stream: true });
+          for await (const chunk of stream as AsyncIterable<{ choices?: Array<{ delta?: { content?: string } }> }>) {
+            const delta = chunk.choices?.[0]?.delta?.content ?? '';
+            if (!delta) continue;
+            assembled += delta;
+            conversation[assistantIdx].content = assembled;
+            setBubbleStreaming(assistantIdx, assembled);
+          }
+        } catch {
+          const reply = await engine.chat.completions.create({ messages, max_tokens: 512 });
+          const raw = reply.choices?.[0]?.message?.content ?? '';
+          assembled = typeof raw === 'string' ? raw : '';
+          conversation[assistantIdx].content = assembled;
+        }
+        paintConversation();
+      } catch (err) {
+        conversation[assistantIdx].content = (isEs ? 'Error: ' : 'Error: ') + (err instanceof Error ? err.message : String(err));
+        paintConversation();
+      }
     }
+
+    busy = false;
+    sendBtn.disabled = false;
+    sendLabel.textContent = SEND_DEFAULT;
   });
+
+  /** Stream a Llama interpretation of the cascade result into a specific bubble. */
+  async function streamLlamaInterpretation(
+    idx: number,
+    att: ChatAttachment,
+    userText: string,
+    best: CascadeCandidate,
+    alternates: CascadeCandidate[],
+  ): Promise<void> {
+    const lib = await import('../lib/local-ai');
+    const engine = await lib.loadTextEngine(() => {});
+    const prompt = buildCascadeInterpretationPrompt({
+      kind: att.kind, userText, locale: docLocale, best, alternates,
+    });
+    let assembled = '';
+    try {
+      const stream = await engine.chat.completions.create({
+        messages: [
+          { role: 'system' as const, content: CHAT_SYSTEM_PROMPT },
+          { role: 'user' as const, content: prompt },
+        ],
+        max_tokens: 320,
+        stream: true,
+      });
+      for await (const chunk of stream as AsyncIterable<{ choices?: Array<{ delta?: { content?: string } }> }>) {
+        const delta = chunk.choices?.[0]?.delta?.content ?? '';
+        if (!delta) continue;
+        assembled += delta;
+        conversation[idx].content = assembled;
+        setBubbleStreaming(idx, assembled);
+      }
+    } catch {
+      const reply = await engine.chat.completions.create({
+        messages: [
+          { role: 'system' as const, content: CHAT_SYSTEM_PROMPT },
+          { role: 'user' as const, content: prompt },
+        ],
+        max_tokens: 320,
+      });
+      const raw = reply.choices?.[0]?.message?.content ?? '';
+      assembled = typeof raw === 'string' ? raw : '';
+      conversation[idx].content = assembled;
+    }
+    conversation[idx].pending = false;
+    paintConversation();
+  }
 </script>
