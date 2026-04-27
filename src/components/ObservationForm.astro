@@ -3,10 +3,25 @@ import { t } from '../i18n/utils';
 
 interface Props {
   lang: 'en' | 'es';
+  /**
+   * 'full' = standard observation form.
+   * 'identify-only' = photo + identification only; GPS/habitat/notes/evidence
+   * are hidden behind a "Save as observation" reveal. Used by /identify.
+   */
+  mode?: 'full' | 'identify-only';
 }
-const { lang } = Astro.props;
+const { lang, mode = 'full' } = Astro.props;
 const tr = t(lang);
 const isEs = lang === 'es';
+const identifyOnly = mode === 'identify-only';
+const idStrings = tr.identify as unknown as Record<string, string>;
+const submitFullLabel = isEs ? 'Guardar observación' : 'Save observation';
+const submitIdentifyLabel = idStrings.just_identify_cta ?? (isEs ? 'Solo identificar' : 'Just identify');
+const saveAsObservationLabel = idStrings.save_as_observation ?? (isEs ? 'Guardar como observación' : 'Save as observation');
+const backToIdentifyLabel = idStrings.back_to_identify ?? (isEs ? 'Volver a solo identificar' : 'Back to identify only');
+const saveInlineLinkLabel = idStrings.save_inline_link ?? (isEs ? 'Guardar como observación' : 'Save this as an observation');
+const saveObservationCtaLabel = idStrings.save_observation_cta ?? submitFullLabel;
+const initialSubmitLabel = identifyOnly ? submitIdentifyLabel : submitFullLabel;
 
 const habitats = [
   'forest_pine_oak','cloud_forest','tropical_dry_forest','riparian','wetland',
@@ -39,9 +54,14 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
 ---
 
 <div class="max-w-xl mx-auto">
-  <h1 class="text-2xl font-bold tracking-tight mb-6">{tr.observe.title}</h1>
+  <h1 class="text-2xl font-bold tracking-tight mb-6">{identifyOnly ? tr.identify.title : tr.observe.title}</h1>
 
-  <form id="obs-form" class="space-y-5" novalidate>
+  <form id="obs-form" class="space-y-5" novalidate data-mode={mode}
+    data-label-full={submitFullLabel}
+    data-label-identify={submitIdentifyLabel}
+    data-label-save-cta={saveObservationCtaLabel}
+    data-label-save-as={saveAsObservationLabel}
+    data-label-back-identify={backToIdentifyLabel}>
 
     <!-- Pre-filled from chat banner (revealed by consumeChatPrefillIfAny) -->
     <div id="chat-prefill-banner" class="hidden rounded-lg border border-emerald-300 dark:border-emerald-800/40 bg-emerald-50 dark:bg-emerald-900/10 px-3 py-2 text-sm text-emerald-900 dark:text-emerald-200">
@@ -99,26 +119,79 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
       <p class="mt-1 text-xs text-zinc-500">{videoMaxDuration}</p>
     </div>
 
-    <!-- Identification block -->
+    <!-- Identification block (overhauled: parallel cascade + progressive disclosure + tooltip) -->
     <div id="id-block">
       <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">{tr.observe.id_label ?? (isEs ? 'Identificación' : 'Identification')}</label>
 
-      <!-- Spinner shown while PlantNet is running -->
+      <!-- Single, non-morphing spinner -->
       <div id="id-spinner" class="hidden flex items-center gap-2 text-sm text-zinc-500 mb-2">
         <svg class="animate-spin h-4 w-4 text-emerald-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
         </svg>
-        <span id="id-spinner-label">{isEs ? 'Identificando con PlantNet…' : 'Identifying with PlantNet…'}</span>
+        <span id="id-spinner-label">{idStrings.spinner_label ?? (isEs ? 'Identificando…' : 'Identifying…')}</span>
       </div>
 
-      <!-- Result chip -->
-      <div id="id-result" class="hidden mb-2 flex items-center gap-2 flex-wrap">
-        <span id="id-name" class="font-medium text-sm italic text-emerald-800 dark:text-emerald-300"></span>
-        <span id="id-confidence" class="text-xs text-zinc-500"></span>
-        <span id="id-source" class="text-xs bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded"></span>
-        <button id="id-clear" type="button" class="text-xs text-zinc-400 hover:text-red-500 ml-auto">{isEs ? 'Cambiar' : 'Change'}</button>
+      <!-- Phi-vision offer card (no model cached, no Claude key) -->
+      <div id="phi-offer" class="hidden rounded-lg border border-emerald-300/50 dark:border-emerald-700/40 bg-emerald-50/40 dark:bg-emerald-900/10 p-4 mb-3 space-y-3">
+        <p class="text-sm font-semibold text-zinc-800 dark:text-zinc-200">{idStrings.phi_offer_title}</p>
+        <p class="text-sm text-zinc-700 dark:text-zinc-300">{idStrings.phi_offer_body}</p>
+        <div class="flex flex-wrap gap-2">
+          <button id="phi-download-btn" type="button" class="min-h-11 inline-flex items-center gap-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-2 text-sm font-semibold text-white">{idStrings.phi_download}</button>
+          <button id="phi-skip-btn" type="button" class="min-h-11 inline-flex items-center gap-2 rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40">{idStrings.phi_skip}</button>
+        </div>
       </div>
+
+      <!-- Phi-vision download progress -->
+      <div id="phi-progress" class="hidden rounded-lg border border-emerald-300/40 bg-white dark:bg-zinc-900 p-3 mb-3">
+        <p class="text-xs text-zinc-600 dark:text-zinc-300 mb-1" id="phi-progress-label">{idStrings.phi_progress}</p>
+        <div class="w-full h-2 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
+          <div id="phi-progress-bar" class="h-full bg-emerald-600" style="width:0%"></div>
+        </div>
+      </div>
+
+      <!-- Result card -->
+      <div id="id-result-card" class="hidden rounded-xl border border-zinc-200 dark:border-zinc-800 p-4 mb-2 bg-white dark:bg-zinc-900/40">
+        <div class="flex items-baseline justify-between gap-2 flex-wrap">
+          <div class="space-y-0.5 min-w-0">
+            <p class="text-xs uppercase tracking-wider text-zinc-500">{isEs ? 'Mejor coincidencia' : 'Top match'}</p>
+            <p id="id-name" class="text-lg italic font-semibold text-emerald-700 dark:text-emerald-400 break-words"></p>
+            <p id="id-common" class="hidden text-sm text-zinc-600 dark:text-zinc-300"></p>
+          </div>
+          <div class="flex items-center gap-2 flex-none">
+            <span id="id-confidence" class="rounded-full bg-emerald-50 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 px-2 py-0.5 text-xs font-semibold tabular-nums"></span>
+            <span id="id-uncertain-pill" class="hidden rounded-full bg-amber-50 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 px-2 py-0.5 text-xs font-semibold">{idStrings.uncertain_pill}</span>
+            <button id="id-source-info" type="button" class="min-h-9 min-w-9 rounded-full text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 inline-flex items-center justify-center" aria-label={idStrings.source_info_label} aria-expanded="false">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path stroke-linecap="round" d="M12 8v.01M11 12h1v4h1"/></svg>
+            </button>
+            <button id="id-clear" type="button" class="text-xs text-zinc-400 hover:text-red-500" aria-label={isEs ? 'Cambiar' : 'Change'}>{isEs ? 'Cambiar' : 'Change'}</button>
+          </div>
+        </div>
+        <p id="id-note" class="hidden mt-2 text-sm text-zinc-700 dark:text-zinc-300"></p>
+        <!-- Source tooltip (hidden by default) -->
+        <div id="id-source-tooltip" class="hidden mt-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/60 p-3 text-xs text-zinc-700 dark:text-zinc-300 space-y-1" role="region">
+          <p id="id-source-tooltip-title" class="font-semibold text-zinc-900 dark:text-zinc-100"></p>
+          <p id="id-source-tooltip-body"></p>
+          <a id="id-source-tooltip-link" href="#" class="inline-block underline text-emerald-700 dark:text-emerald-400">{idStrings.source_link_label}</a>
+        </div>
+
+        <!-- Alternates section (progressive disclosure) -->
+        <div id="id-alternates-wrap" class="hidden mt-3">
+          <button id="id-alternates-toggle" type="button" class="text-xs text-emerald-700 dark:text-emerald-400 hover:underline" aria-expanded="false"></button>
+          <div id="id-alternates" class="hidden mt-2">
+            <p class="text-xs uppercase tracking-wider text-zinc-500 mb-1">{idStrings.alternates_title}</p>
+            <ul id="id-alternates-list" class="space-y-1 text-sm"></ul>
+          </div>
+        </div>
+
+        <!-- Save-as-observation inline link (only meaningful in identify-only mode after success) -->
+        <div id="id-save-inline" class="hidden mt-3 pt-3 border-t border-zinc-200 dark:border-zinc-800">
+          <button type="button" id="save-inline-btn" class="text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:underline">{saveInlineLinkLabel} →</button>
+        </div>
+      </div>
+
+      <!-- All-failed banner -->
+      <div id="id-all-failed" class="hidden rounded-lg border border-amber-300 dark:border-amber-700/40 bg-amber-50 dark:bg-amber-900/10 p-3 text-sm text-amber-800 dark:text-amber-200 mb-2"></div>
 
       <!-- Manual input (always available, pre-filled by cascade) -->
       <input
@@ -130,7 +203,7 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
         autocomplete="off"
         spellcheck={false}
       />
-      <p class="mt-1 text-xs text-zinc-500">{isEs ? 'PlantNet identifica automáticamente al subir la foto. Puedes corregirlo aquí.' : 'PlantNet identifies automatically on photo upload. Correct it here if needed.'}</p>
+      <p class="mt-1 text-xs text-zinc-500">{isEs ? 'Identificación automática al subir la foto. Puedes corregirla aquí.' : 'Auto-identifies on photo upload. Correct it here if needed.'}</p>
     </div>
 
     <!-- Audio -->
@@ -148,7 +221,7 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
     </div>
 
     <!-- Evidence type -->
-    <div>
+    <div data-identify-hide>
       <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.observe.evidence_type}</label>
       <select name="evidence_type" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
         <option value="direct_sighting">{lang === 'es' ? 'Avistamiento directo' : 'Direct sighting'}</option>
@@ -164,7 +237,7 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
     </div>
 
     <!-- Location -->
-    <div>
+    <div data-identify-hide>
       <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.observe.gps_label}</label>
       <div id="gps-display" class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 px-3 py-2 text-sm">
         <span id="gps-status" class="text-zinc-500"
@@ -184,7 +257,7 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
     </div>
 
     <!-- Habitat / weather -->
-    <div class="grid grid-cols-2 gap-3">
+    <div class="grid grid-cols-2 gap-3" data-identify-hide>
       <div>
         <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.observe.habitat}</label>
         <select name="habitat" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
@@ -202,7 +275,7 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
     </div>
 
     <!-- Notes -->
-    <div>
+    <div data-identify-hide>
       <div class="flex items-end justify-between gap-2 flex-wrap mb-1">
         <label for="obs-notes" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300">{tr.observe.notes}</label>
         <div class="flex flex-wrap gap-2 ml-auto">
@@ -236,15 +309,21 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
     </div>
 
     <!-- Privacy notice — always visible. Becomes louder once an ID resolves to a NOM-059 species -->
-    <div class="rounded-lg border border-amber-300 dark:border-amber-700/40 bg-amber-50 dark:bg-amber-900/10 p-3 text-xs text-amber-800 dark:text-amber-200">
+    <div class="rounded-lg border border-amber-300 dark:border-amber-700/40 bg-amber-50 dark:bg-amber-900/10 p-3 text-xs text-amber-800 dark:text-amber-200" data-identify-hide>
       {lang === 'es'
         ? 'Las coordenadas exactas se guardan privadamente. Si la especie identificada está en NOM-059 o CITES, mostraremos sólo una zona aproximada en el mapa público.'
         : 'Exact coordinates are stored privately. If the identified species is on NOM-059 or CITES, the public map will only show a coarsened area.'}
     </div>
 
-    <div class="flex items-center gap-3 pt-2">
-      <button type="submit" id="submit-btn" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
-        <span data-label>{tr.observe.submit}</span>
+    <div class="flex items-center gap-3 pt-2 flex-wrap">
+      <button type="submit" id="submit-btn" class="min-h-11 rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+        <span data-label>{initialSubmitLabel}</span>
+      </button>
+      <button type="button" id="save-as-observation-btn" class="hidden min-h-11 rounded-lg border border-emerald-600/60 px-4 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20">
+        {saveAsObservationLabel}
+      </button>
+      <button type="button" id="back-to-identify-btn" class="hidden min-h-11 rounded-lg border border-zinc-300 dark:border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
+        {backToIdentifyLabel}
       </button>
     </div>
     <p id="err" class="hidden text-sm text-red-600 dark:text-red-400"></p>
@@ -308,6 +387,13 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
 
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.css" />
 
+<style is:global>
+  /* identify-only mode: hide observation-only sections until the user
+     opts to "Save as observation". The form re-shows them by toggling
+     data-mode to 'full' at runtime. */
+  form#obs-form[data-mode="identify-only"] [data-identify-hide] { display: none; }
+</style>
+
 <script>
   import { parse as parseExif } from 'exifr';
   import { syncOutbox, registerSyncTriggers } from '../lib/sync';
@@ -359,7 +445,7 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
   const anotherBtn   = document.getElementById('another-btn');
 
   const ORIGINAL_LABEL = btnLabel?.textContent ?? 'Save';
-  const SUBMITTING = btnLabel?.textContent?.trim() === 'Guardar observación' ? 'Guardando…' : 'Saving…';
+  const SUBMITTING = (document.documentElement.lang === 'es') ? 'Guardando…' : 'Saving…';
 
   type LocState = {
     lat: number; lng: number; accuracyM: number;
@@ -415,114 +501,327 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
     });
   }
 
-  // ── Identification block ──────────────────────────────────────────────
-  const idSpinner     = document.getElementById('id-spinner');
-  const idSpinnerLbl  = document.getElementById('id-spinner-label');
-  const idResult      = document.getElementById('id-result');
-  const idName        = document.getElementById('id-name');
-  const idConfidence  = document.getElementById('id-confidence');
-  const idSource      = document.getElementById('id-source');
-  const idClear       = document.getElementById('id-clear');
-  const idInput       = document.getElementById('id-scientific-name') as HTMLInputElement | null;
-  const isEs          = document.documentElement.lang === 'es';
+  // ── Identification block (parallel cascade + progressive disclosure) ──
+  const idSpinner       = document.getElementById('id-spinner');
+  const idResultCard    = document.getElementById('id-result-card');
+  const idName          = document.getElementById('id-name');
+  const idCommon        = document.getElementById('id-common');
+  const idConfidence    = document.getElementById('id-confidence');
+  const idUncertainPill = document.getElementById('id-uncertain-pill');
+  const idNote          = document.getElementById('id-note');
+  const idSourceInfoBtn = document.getElementById('id-source-info');
+  const idSourceTooltip = document.getElementById('id-source-tooltip');
+  const idSourceTipTitle= document.getElementById('id-source-tooltip-title');
+  const idSourceTipBody = document.getElementById('id-source-tooltip-body');
+  const idSourceTipLink = document.getElementById('id-source-tooltip-link') as HTMLAnchorElement | null;
+  const idAlternatesWrap = document.getElementById('id-alternates-wrap');
+  const idAlternatesToggle = document.getElementById('id-alternates-toggle');
+  const idAlternatesPanel = document.getElementById('id-alternates');
+  const idAlternatesList = document.getElementById('id-alternates-list');
+  const idSaveInline    = document.getElementById('id-save-inline');
+  const idAllFailed     = document.getElementById('id-all-failed');
+  const idClear         = document.getElementById('id-clear');
+  const idInput         = document.getElementById('id-scientific-name') as HTMLInputElement | null;
+  const phiOffer        = document.getElementById('phi-offer');
+  const phiDownloadBtn  = document.getElementById('phi-download-btn');
+  const phiSkipBtn      = document.getElementById('phi-skip-btn');
+  const phiProgress     = document.getElementById('phi-progress');
+  const phiProgressBar  = document.getElementById('phi-progress-bar');
+  const phiProgressLbl  = document.getElementById('phi-progress-label');
+  const isEs            = document.documentElement.lang === 'es';
+
+  // Source registry — display name, license, doc-spec link.
+  const SOURCE_META: Record<string, { name: string; meta: string; spec: string }> = {
+    plantnet: {
+      name: 'PlantNet',
+      meta: isEs
+        ? 'PlantNet — identificación regional gratuita de plantas por INRIA. Licencia CC BY-SA 4.0 sobre los datos de identificación.'
+        : 'PlantNet — free regional plant identification by INRIA. CC BY-SA 4.0 on identification data.',
+      spec: '/en/docs/architecture/#identifier-cascade',
+    },
+    claude_haiku: {
+      name: 'Claude Haiku 4.5',
+      meta: isEs
+        ? 'Claude Haiku 4.5 — LLM visual de Anthropic, generalista. Pago por consulta (~$0.003).'
+        : 'Claude Haiku 4.5 — Anthropic vision LLM, generalist. Pay-per-call (~$0.003).',
+      spec: '/en/docs/architecture/#identifier-cascade',
+    },
+    webllm_phi35_vision: {
+      name: 'Phi-3.5-vision',
+      meta: isEs
+        ? 'Phi-3.5-vision — VLM general de Microsoft en el dispositivo. Confianza limitada por diseño (sin entrenamiento taxonómico).'
+        : 'Phi-3.5-vision — Microsoft on-device general VLM. Confidence is hard-capped by design (no taxonomic training).',
+      spec: '/en/docs/architecture/#in-browser-ai',
+    },
+  };
+
+  // Local interface, kept here so the form can stay the single mount point
+  // for the cascade UI without needing an extra cross-file abstraction.
+  type CascadeUnified = {
+    source: string;
+    scientific_name: string;
+    common_name: string | null;
+    confidence: number;
+    alternates: Array<{ scientific_name: string; common_name: string | null; score: number }>;
+    note?: string | null;
+  };
 
   let currentIdentification: { scientific_name: string; confidence: number; source: string } | null = null;
+  let lastFile: File | null = null;
+  let activeAbort: AbortController | null = null;
 
-  function showIdResult(name: string, confidence: number, source: string) {
-    currentIdentification = { scientific_name: name, confidence, source };
-    if (idInput) idInput.value = name;
-    if (idName) idName.textContent = name;
-    if (idConfidence) idConfidence.textContent = `${Math.round(confidence * 100)}%`;
-    if (idSource) idSource.textContent = source;
-    idResult?.classList.remove('hidden');
+  function hideAllIdStates() {
     idSpinner?.classList.add('hidden');
+    idResultCard?.classList.add('hidden');
+    idAllFailed?.classList.add('hidden');
+    phiOffer?.classList.add('hidden');
+    phiProgress?.classList.add('hidden');
   }
 
   function clearIdResult() {
     currentIdentification = null;
     if (idInput) idInput.value = '';
-    idResult?.classList.add('hidden');
-    idSpinner?.classList.add('hidden');
+    hideAllIdStates();
+    if (activeAbort) { activeAbort.abort(); activeAbort = null; }
   }
-
   idClear?.addEventListener('click', clearIdResult);
 
-  async function triggerClientIdentify(file: File) {
-    idSpinner?.classList.remove('hidden');
-    idResult?.classList.add('hidden');
-    if (idSpinnerLbl) idSpinnerLbl.textContent = isEs ? 'Identificando con PlantNet…' : 'Identifying with PlantNet…';
+  // Toggle the source-info popover. Native popover API is preferred but
+  // we render a region in-card on browsers without it for robustness.
+  idSourceInfoBtn?.addEventListener('click', () => {
+    if (!idSourceTooltip) return;
+    const open = !idSourceTooltip.classList.contains('hidden');
+    idSourceTooltip.classList.toggle('hidden', open);
+    idSourceInfoBtn.setAttribute('aria-expanded', String(!open));
+  });
 
-    try {
-      // Resolve key from (in order): runtime injection, build-time env,
-      // user-supplied BYO key in localStorage. If none, show a hint instead
-      // of silently doing nothing — server-side cascade will still run on
-      // sync, but the user expects to see why the spinner disappeared.
-      let plantnetKey: string = (window as any).__RASTRUM_PLANTNET_KEY__ ?? '';
-      if (!plantnetKey) {
-        plantnetKey = (import.meta.env.PUBLIC_PLANTNET_KEY as string | undefined) ?? '';
-      }
-      if (!plantnetKey) {
-        try {
-          const { getKey } = await import('../lib/byo-keys');
-          plantnetKey = getKey('plantnet', 'plantnet') ?? '';
-        } catch { /* byo-keys unavailable */ }
-      }
+  idAlternatesToggle?.addEventListener('click', () => {
+    if (!idAlternatesPanel) return;
+    const open = !idAlternatesPanel.classList.contains('hidden');
+    idAlternatesPanel.classList.toggle('hidden', open);
+    idAlternatesToggle.setAttribute('aria-expanded', String(!open));
+    idAlternatesToggle.textContent = open
+      ? (idStringsRT.show_alternates ?? '+ {n} alternatives').replace('{n}', String(currentAlternates.length))
+      : (idStringsRT.hide_alternates ?? 'Hide alternatives');
+  });
 
-      if (!plantnetKey) {
-        idSpinner?.classList.add('hidden');
-        if (idSpinnerLbl) {
-          idSpinnerLbl.textContent = isEs
-            ? 'Configura una clave PlantNet en Perfil → Editar para identificar al instante.'
-            : 'Add a PlantNet key in Profile → Edit for instant ID.';
-        }
-        // Reveal the hint by showing the spinner row WITHOUT the spinning icon.
-        // Cheaper alternative: a dedicated hint element. Reuse spinner row with the label-only state.
-        const spinnerSvg = idSpinner?.querySelector('svg');
-        spinnerSvg?.classList.add('hidden');
-        idSpinner?.classList.remove('hidden');
-        return; // Server-side cascade will still run after sync.
-      }
+  // Read i18n strings injected on the form via dataset (i18n is a function
+  // call in the frontmatter; we dropped the keys we need into static text
+  // already, but a couple are dynamic — read them off the existing form).
+  const idStringsRT = {
+    show_alternates: isEs ? '+ {n} alternativas' : '+ {n} alternatives',
+    hide_alternates: isEs ? 'Ocultar alternativas' : 'Hide alternatives',
+    all_failed:      isEs ? 'Todos los identificadores fallaron. Revisa tu conexión y prueba con una foto más clara.' : 'All identifiers failed. Check your connection and try a clearer photo.',
+    result_unknown:  isEs ? 'No se pudo identificar esta foto con confianza.' : 'Could not identify this photo confidently.',
+    phi_running:     isEs ? 'Identificando con IA en el dispositivo…' : 'Identifying with on-device AI…',
+    phi_skip_hint:   isEs ? 'Agrega una clave Claude en Perfil → Editar para identificación instantánea.' : 'Add a Claude key in Profile → Edit for instant ID.',
+  };
 
-      const form = new FormData();
-      form.append('images', file);
-      form.append('organs', 'auto');
+  let currentAlternates: Array<{ scientific_name: string; common_name: string | null; score: number }> = [];
 
-      const ac = new AbortController();
-      const timeoutId = setTimeout(() => ac.abort(), 15_000);
-      const res = await fetch(
-        `https://my-api.plantnet.org/v2/identify/all?api-key=${plantnetKey}&lang=${isEs ? 'es' : 'en'}&nb-results=3`,
-        { method: 'POST', body: form, signal: ac.signal }
-      ).finally(() => clearTimeout(timeoutId));
-
-      if (!res.ok) throw new Error(`PlantNet ${res.status}`);
-      const data = await res.json();
-      const top = data?.results?.[0];
-      if (top && top.score >= 0.1) {
-        showIdResult(
-          top.species?.scientificNameWithoutAuthor ?? top.species?.scientificName ?? '',
-          top.score,
-          'PlantNet'
-        );
+  function paintCard(r: CascadeUnified, uncertain: boolean) {
+    if (!idResultCard) return;
+    if (idName) idName.textContent = r.scientific_name;
+    if (idCommon) {
+      if (r.common_name) {
+        idCommon.textContent = r.common_name;
+        idCommon.classList.remove('hidden');
       } else {
-        idSpinner?.classList.add('hidden');
-        if (idSpinnerLbl) {
-          idSpinnerLbl.textContent = isEs
-            ? 'Sin coincidencia clara. Sincronizaremos para usar la cascada de IA.'
-            : 'No confident match. Will use AI cascade on sync.';
-        }
-        idSpinner?.classList.remove('hidden');
+        idCommon.classList.add('hidden');
       }
-    } catch (err) {
-      console.warn('[rastrum] client identify failed:', err);
-      idSpinner?.classList.add('hidden');
-      if (idSpinnerLbl) {
-        idSpinnerLbl.textContent = isEs
-          ? 'Identificación local falló. Reintentaremos al sincronizar.'
-          : 'Client-side identify failed. Will retry on sync.';
+    }
+    if (idConfidence) idConfidence.textContent = `${Math.round(r.confidence * 100)}%`;
+    if (idUncertainPill) idUncertainPill.classList.toggle('hidden', !uncertain);
+    if (idNote) {
+      if (r.note) {
+        idNote.textContent = r.note;
+        idNote.classList.remove('hidden');
+      } else {
+        idNote.classList.add('hidden');
       }
-      idSpinner?.classList.remove('hidden');
+    }
+    const meta = SOURCE_META[r.source] ?? { name: r.source, meta: r.source, spec: '/en/docs/architecture/' };
+    if (idSourceTipTitle) idSourceTipTitle.textContent = (isEs ? 'Identificado vía ' : 'Identified via ') + meta.name;
+    if (idSourceTipBody) idSourceTipBody.textContent = meta.meta;
+    if (idSourceTipLink) idSourceTipLink.href = meta.spec;
+    idSourceTooltip?.classList.add('hidden');
+    idSourceInfoBtn?.setAttribute('aria-expanded', 'false');
+
+    // Alternates progressive disclosure.
+    currentAlternates = r.alternates.filter(a => a.scientific_name);
+    if (idAlternatesList) {
+      idAlternatesList.innerHTML = currentAlternates.slice(0, 4).map(a => {
+        const pct = Math.round((a.score ?? 0) * 100);
+        const safeSci = escapeHtml(a.scientific_name);
+        const safeCommon = a.common_name ? escapeHtml(a.common_name) + ' · ' : '';
+        return `<li class="flex items-baseline justify-between gap-2"><span class="italic">${safeSci}</span><span class="text-xs text-zinc-500">${safeCommon}${pct}%</span></li>`;
+      }).join('');
+    }
+
+    if (currentAlternates.length === 0) {
+      idAlternatesWrap?.classList.add('hidden');
+    } else {
+      idAlternatesWrap?.classList.remove('hidden');
+      // Visibility rules:
+      //   ≥0.85 → collapsed behind toggle
+      //   0.5..0.85 → visible
+      //   <0.5 → visible (uncertain case)
+      const collapsed = r.confidence >= 0.85;
+      idAlternatesPanel?.classList.toggle('hidden', collapsed);
+      if (idAlternatesToggle) {
+        idAlternatesToggle.setAttribute('aria-expanded', String(!collapsed));
+        idAlternatesToggle.textContent = collapsed
+          ? idStringsRT.show_alternates.replace('{n}', String(currentAlternates.length))
+          : idStringsRT.hide_alternates;
+      }
+    }
+
+    idResultCard.classList.remove('hidden');
+    if (idInput) idInput.value = r.scientific_name;
+    currentIdentification = {
+      scientific_name: r.scientific_name,
+      confidence: r.confidence,
+      source: r.source,
+    };
+    // Show the inline "Save as observation" link in identify-only mode.
+    if (form?.dataset.mode === 'identify-only') {
+      idSaveInline?.classList.remove('hidden');
+    } else {
+      idSaveInline?.classList.add('hidden');
     }
   }
+
+  function escapeHtml(s: string): string {
+    return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
+  }
+
+  async function triggerClientIdentify(file: File) {
+    lastFile = file;
+    hideAllIdStates();
+    idSpinner?.classList.remove('hidden');
+
+    // Build the runner set based on what's actually available.
+    const { runParallelIdentify } = await import('../lib/identify-cascade-client');
+    const { makePlantNetRunner, makeClaudeRunner, makePhiRunner, resolvePlantNetKey } = await import('../lib/identify-runners');
+    const { hasAnthropicKey } = await import('../lib/anthropic-key');
+
+    const runners: Record<string, import('../lib/identify-cascade-client').IdentifierRunner> = {};
+    const locale = isEs ? 'es' : 'en';
+
+    if (await resolvePlantNetKey()) {
+      runners.plantnet = makePlantNetRunner(locale);
+    }
+    if (await hasAnthropicKey()) {
+      runners.claude_haiku = makeClaudeRunner(locale);
+    }
+    // Phi-vision: only include if cached (otherwise we offer the download below).
+    try {
+      const { getModelCacheStatus, VISION_MODEL_ID, localAISupported } = await import('../lib/local-ai');
+      if (localAISupported()) {
+        const status = await getModelCacheStatus(VISION_MODEL_ID);
+        if (status.cached) runners.webllm_phi35_vision = makePhiRunner(locale);
+      }
+    } catch { /* WebLLM unavailable in this environment */ }
+
+    if (Object.keys(runners).length === 0) {
+      // No identifier available — show offer for Phi-vision (always free).
+      idSpinner?.classList.add('hidden');
+      offerPhiVision();
+      return;
+    }
+
+    if (activeAbort) activeAbort.abort();
+    activeAbort = new AbortController();
+    const out = await runParallelIdentify(file, { runners }, activeAbort.signal);
+    activeAbort = null;
+    idSpinner?.classList.add('hidden');
+
+    if (out.kind === 'winner') {
+      paintCard(out.result, false);
+    } else if (out.kind === 'uncertain') {
+      paintCard(out.result, true);
+    } else {
+      // All failed — if Phi isn't cached, offer it as a recovery path.
+      try {
+        const { getModelCacheStatus, VISION_MODEL_ID, localAISupported } = await import('../lib/local-ai');
+        if (localAISupported()) {
+          const status = await getModelCacheStatus(VISION_MODEL_ID);
+          if (!status.cached) {
+            offerPhiVision();
+            return;
+          }
+        }
+      } catch { /* fall through to error banner */ }
+      if (idAllFailed) {
+        idAllFailed.textContent = idStringsRT.all_failed;
+        idAllFailed.classList.remove('hidden');
+      }
+    }
+  }
+
+  function offerPhiVision() {
+    if (!phiOffer) return;
+    phiOffer.classList.remove('hidden');
+  }
+
+  phiSkipBtn?.addEventListener('click', () => {
+    phiOffer?.classList.add('hidden');
+    if (idAllFailed) {
+      idAllFailed.textContent = idStringsRT.phi_skip_hint;
+      idAllFailed.classList.remove('hidden');
+    }
+  });
+
+  phiDownloadBtn?.addEventListener('click', async () => {
+    if (!lastFile) return;
+    phiOffer?.classList.add('hidden');
+    phiProgress?.classList.remove('hidden');
+    if (phiProgressBar) phiProgressBar.style.width = '0%';
+
+    try {
+      const { loadVisionEngine } = await import('../lib/local-ai');
+      await loadVisionEngine((p) => {
+        const pct = Math.round((p.progress ?? 0) * 100);
+        if (phiProgressBar) phiProgressBar.style.width = `${pct}%`;
+        if (phiProgressLbl) phiProgressLbl.textContent = `${pct}% — ${p.text ?? ''}`;
+      });
+      // Now run identification automatically.
+      phiProgress?.classList.add('hidden');
+      idSpinner?.classList.remove('hidden');
+      const idSpinnerLabel = document.getElementById('id-spinner-label');
+      if (idSpinnerLabel) idSpinnerLabel.textContent = idStringsRT.phi_running;
+
+      const { makePhiRunner } = await import('../lib/identify-runners');
+      const runner = makePhiRunner(isEs ? 'es' : 'en');
+      const ctrl = new AbortController();
+      const out = await runner(lastFile, ctrl.signal);
+      idSpinner?.classList.add('hidden');
+      if (out && out.scientific_name) {
+        paintCard(out, out.confidence < 0.5);
+      } else if (out && out.note) {
+        // Phi returned prose, not JSON — show it under an "Identification" header.
+        paintCard({
+          source: 'webllm_phi35_vision',
+          scientific_name: isEs ? 'Identificación' : 'Identification',
+          common_name: null,
+          confidence: 0.3,
+          alternates: [],
+          note: out.note,
+        }, true);
+      } else {
+        if (idAllFailed) {
+          idAllFailed.textContent = idStringsRT.result_unknown;
+          idAllFailed.classList.remove('hidden');
+        }
+      }
+    } catch (err) {
+      phiProgress?.classList.add('hidden');
+      if (idAllFailed) {
+        idAllFailed.textContent = err instanceof Error ? err.message : String(err);
+        idAllFailed.classList.remove('hidden');
+      }
+    }
+  });
 
   function addPhotos(fileList: FileList | File[]) {
     const files = (fileList instanceof Array)
@@ -535,6 +834,74 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
     }
     repaintGrid();
   }
+
+  /**
+   * Map the cascade plugin id (or legacy display label) to the
+   * `Observation['identification']['source']` union accepted by the
+   * outbox. Falls back to 'human' so a manual edit always saves cleanly.
+   */
+  function mapIdentificationSource(source: string | undefined): 'plantnet' | 'claude_haiku' | 'claude_sonnet' | 'onnx_offline' | 'human' {
+    switch (source) {
+      case 'plantnet':
+      case 'PlantNet':
+        return 'plantnet';
+      case 'claude_haiku':
+      case 'Claude Haiku':
+        return 'claude_haiku';
+      case 'claude_sonnet':
+        return 'claude_sonnet';
+      case 'webllm_phi35_vision':
+      case 'onnx_efficientnet_lite0':
+      case 'birdnet_lite':
+        return 'onnx_offline';
+      default:
+        return 'human';
+    }
+  }
+
+  // ── identify-only ↔ full mode toggle ──────────────────────────────────
+  const saveAsObsBtn  = document.getElementById('save-as-observation-btn');
+  const backToIdBtn   = document.getElementById('back-to-identify-btn');
+  const inlineSaveBtn = document.getElementById('save-inline-btn');
+
+  function applyMode(next: 'full' | 'identify-only') {
+    if (!form || !btnLabel) return;
+    form.dataset.mode = next;
+    if (next === 'identify-only') {
+      btnLabel.textContent = form.dataset.labelIdentify ?? (isEs ? 'Solo identificar' : 'Just identify');
+      saveAsObsBtn?.classList.remove('hidden');
+      backToIdBtn?.classList.add('hidden');
+      // Re-show the inline save link if there's a result already.
+      if (currentIdentification && idResultCard && !idResultCard.classList.contains('hidden')) {
+        idSaveInline?.classList.remove('hidden');
+      }
+    } else {
+      btnLabel.textContent = form.dataset.labelSaveCta ?? (isEs ? 'Guardar observación' : 'Save observation');
+      saveAsObsBtn?.classList.add('hidden');
+      // Show "back to identify" only when we entered full mode FROM identify-only.
+      if (form.dataset.enteredFromIdentify === '1') {
+        backToIdBtn?.classList.remove('hidden');
+      }
+      // Kick off GPS now — the user revealed the location field.
+      void getLiveGPS();
+      // Hide the inline link in full mode (the main submit button does the save).
+      idSaveInline?.classList.add('hidden');
+    }
+  }
+
+  function switchToFullMode() {
+    if (!form) return;
+    form.dataset.enteredFromIdentify = '1';
+    applyMode('full');
+  }
+
+  saveAsObsBtn?.addEventListener('click', switchToFullMode);
+  inlineSaveBtn?.addEventListener('click', switchToFullMode);
+  backToIdBtn?.addEventListener('click', () => {
+    if (!form) return;
+    applyMode('identify-only');
+    backToIdBtn.classList.add('hidden');
+  });
 
   /**
    * If the user landed here from the chat page after attaching a photo or
@@ -576,11 +943,13 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
       }
 
       if (pending.scientific_name) {
-        showIdResult(
-          pending.scientific_name,
-          pending.confidence,
-          pending.source,
-        );
+        paintCard({
+          source: pending.source,
+          scientific_name: pending.scientific_name,
+          common_name: pending.common_name,
+          confidence: pending.confidence,
+          alternates: [],
+        }, pending.confidence < 0.5);
       }
     } catch (err) {
       console.warn('[rastrum] chat prefill failed:', err);
@@ -1202,6 +1571,14 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
     const isEsSubmit = document.documentElement.lang === 'es';
     errBox?.classList.add('hidden');
 
+    // identify-only mode: submitting just confirms the displayed result.
+    // The user must click "Save as observation" to switch to full save mode.
+    if (form.dataset.mode === 'identify-only') {
+      // No-op: result card is already visible. Re-flash the inline link.
+      idSaveInline?.classList.remove('hidden');
+      return;
+    }
+
     if (photos.length === 0 && audios.length === 0 && videos.length === 0) {
       if (errBox) { errBox.textContent = isEsSubmit
         ? 'Se requiere al menos una foto, un audio o un video.'
@@ -1257,7 +1634,7 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
       identification: {
         scientificName: idInput?.value.trim() || currentIdentification?.scientific_name || '',
         confidence: currentIdentification?.confidence ?? 0,
-        source: (currentIdentification?.source === 'PlantNet' ? 'plantnet' : 'human') as Observation['identification']['source'],
+        source: mapIdentificationSource(currentIdentification?.source) as Observation['identification']['source'],
         status: (idInput?.value.trim() ? 'accepted' : 'pending') as Observation['identification']['status'],
       },
       habitat: ((form.elements.namedItem('habitat') as HTMLSelectElement).value || null) as Observation['habitat'],
@@ -1310,7 +1687,10 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
       // Leave the form visible so the user can retry without losing input.
     } finally {
       submitBtn.disabled = false;
-      btnLabel.textContent = ORIGINAL_LABEL;
+      const restoreLabel = form.dataset.mode === 'identify-only'
+        ? form.dataset.labelIdentify ?? ORIGINAL_LABEL
+        : form.dataset.labelSaveCta ?? ORIGINAL_LABEL;
+      btnLabel.textContent = restoreLabel;
     }
   });
 
@@ -1318,9 +1698,14 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
     window.location.reload();
   });
 
-  // Kick off GPS + sync triggers on page load
+  // Kick off GPS + sync triggers on page load.
+  // In identify-only mode, defer GPS until the user reveals the location
+  // field by tapping "Save as observation" — we don't want a permission
+  // prompt for users who only want a quick ID.
   registerSyncTriggers();
-  getLiveGPS();
+  if (form?.dataset.mode !== 'identify-only') {
+    getLiveGPS();
+  }
 
   // Show the Android-specific camera hint only on Android user agents —
   // covers the 'capture=environment opens an empty file picker folder'

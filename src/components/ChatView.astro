@@ -683,12 +683,12 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
     return typeof raw === 'string' ? raw.trim() : null;
   }
 
-  /** If a BYO Anthropic key is set, send the image to Claude Haiku for a vision-native reply. */
+  /** If any Anthropic key is resolvable (project, runtime, or BYO), send the image to Claude Haiku for a vision-native reply. */
   async function tryClaudeVisionFallback(att: ChatAttachment, userText: string): Promise<string | null> {
     if (att.kind !== 'photo') return null;
     try {
-      const { getKey } = await import('../lib/byo-keys');
-      const key = getKey('claude_haiku', 'anthropic');
+      const { resolveAnthropicKey } = await import('../lib/anthropic-key');
+      const { key } = await resolveAnthropicKey();
       if (!key) return null;
       const dataUrl = await blobToDataUrl(att.blob);
       const m = /^data:([^;]+);base64,(.+)$/.exec(dataUrl);
