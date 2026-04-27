@@ -97,7 +97,7 @@ const ctText = (key: string, fallback: string): string => trapTr?.[key] ?? fallb
     <p class="text-base font-semibold text-emerald-900 dark:text-emerald-200">{trText('drop_label', 'Drop photos here')}</p>
     <p class="mt-1 text-xs text-emerald-800 dark:text-emerald-300/80">{trText('drop_hint', 'or tap to choose files. JPEG/HEIC with embedded GPS work best.')}</p>
     <label class="inline-block mt-4 rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white cursor-pointer">
-      <input id="batch-file-input" type="file" accept="image/*" multiple class="hidden" />
+      <input id="batch-file-input" type="file" accept="image/*" multiple class="sr-only" />
       {trText('choose_files', 'Choose photos')}
     </label>
   </section>
