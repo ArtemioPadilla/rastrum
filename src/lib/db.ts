@@ -37,10 +37,33 @@ export interface IDQueueRecord {
   last_error?: string;
 }
 
+/**
+ * Persisted chat turn — per-device only, NEVER synced to Supabase. The
+ * `attachments` field is light metadata (kind + mime + last cascade match)
+ * so we can re-render the bubble; the original Blob is not preserved across
+ * reloads (object URLs are revoked on unload anyway).
+ */
+export interface ChatTurnRecord {
+  id: string;                             // monotonic local id
+  role: 'user' | 'assistant';
+  content: string;
+  attachments?: Array<{
+    kind: 'photo' | 'audio';
+    mime_type: string;
+    duration_sec?: number;
+    /** Best cascade scientific name, if the assistant turn carried one. */
+    scientific_name?: string;
+    confidence?: number;
+    source?: string;
+  }>;
+  created_at: string;
+}
+
 export class RastrumDB extends Dexie {
   observations!: Table<ObservationRecord, string>;
   mediaBlobs!: Table<MediaBlobRecord, string>;
   idQueue!: Table<IDQueueRecord, string>;
+  chatTurns!: Table<ChatTurnRecord, string>;
 
   constructor() {
     super('rastrum-v1');
@@ -50,6 +73,14 @@ export class RastrumDB extends Dexie {
       observations: 'id, observer_kind, sync_status, created_at',
       mediaBlobs:   'id, observation_id, uploaded',
       idQueue:      'observation_id, queued_at',
+    });
+    // Schema v2 — adds the per-device chat history store. Older clients
+    // simply gain the empty store on next open; no data migration needed.
+    this.version(2).stores({
+      observations: 'id, observer_kind, sync_status, created_at',
+      mediaBlobs:   'id, observation_id, uploaded',
+      idQueue:      'observation_id, queued_at',
+      chatTurns:    'id, role, created_at',
     });
   }
 }

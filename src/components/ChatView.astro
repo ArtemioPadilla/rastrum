@@ -119,6 +119,18 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
             <span data-audio-label class="sr-only">{tr.chat.attach_audio}</span>
             <span id="chat-audio-elapsed" class="hidden text-[10px] font-mono text-red-600 dark:text-red-400"></span>
           </button>
+
+          <button
+            id="chat-voice-btn"
+            type="button"
+            hidden
+            aria-label={tr.chat.voice_input_label}
+            title={tr.chat.voice_input_label}
+            class="min-h-11 min-w-11 sm:min-w-0 rounded-lg border border-zinc-300 dark:border-zinc-700 px-2 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 flex items-center justify-center gap-1"
+          >
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path stroke-linecap="round" stroke-linejoin="round" d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+            <span data-voice-label class="sr-only">{tr.chat.voice_input_label}</span>
+          </button>
         </div>
 
         <textarea
@@ -177,6 +189,9 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
     data-vision-download-progress={tr.chat.vision_download_progress}
     data-attach-photo-label={lang === 'es' ? 'Foto' : 'Photo'}
     data-attach-audio-label={lang === 'es' ? 'Audio' : 'Audio'}
+    data-suggestions-label={tr.chat.suggestions.label}
+    data-voice-input-label={tr.chat.voice_input_label}
+    data-voice-input-stop-label={tr.chat.voice_input_stop_label}
   ></div>
 </div>
 
@@ -190,10 +205,25 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
     buildCascadeInterpretationPrompt,
     buildVisionFallbackPrompt,
     buildPendingObservation,
+    buildChatSuggestions,
     pluginIdToObservationSource,
     PENDING_OBSERVATION_KEY,
     type CascadeCandidate,
+    type ChatSuggestion,
   } from '../lib/chat-attachment-helpers';
+  import {
+    appendTurn,
+    clearChatHistory,
+    defaultStore as defaultChatStore,
+    readRecentTurns,
+    makeTurnId,
+  } from '../lib/chat-history';
+  import {
+    createSpeechRecognition,
+    isSpeechRecognitionSupported,
+    speechRecognitionLang,
+    type SpeechRecognitionLike,
+  } from '../lib/speech-recognition';
 
   type ChatRole = 'user' | 'assistant';
   interface ChatAttachment {
@@ -251,6 +281,9 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
   const attachRemove    = document.getElementById('chat-attachment-remove');
   const attachErr       = document.getElementById('chat-attach-error');
   const visionDialog    = document.getElementById('chat-vision-dialog') as HTMLDialogElement | null;
+  const voiceBtn        = document.getElementById('chat-voice-btn') as HTMLButtonElement | null;
+  const voiceBtnLabel   = voiceBtn?.querySelector('[data-voice-label]') as HTMLElement | null;
+  const chatStore       = defaultChatStore();
 
   const SEND_DEFAULT  = sendLabel?.textContent ?? 'Send';
   const SEND_BUSY     = isEs ? 'Pensando…' : 'Thinking…';
@@ -309,6 +342,9 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
          </span>`
       : escapeHtml(turn.content);
     const cascadeHtml = (!isUser && turn.cascadeResult && !turn.pending) ? renderCascadeFooter(turn, idx) : '';
+    const suggestionsHtml = (!isUser && !turn.pending && idx === conversation.length - 1)
+      ? renderSuggestionChips(turn, idx)
+      : '';
 
     return `
       <div class="${align} max-w-[85%] sm:max-w-[75%]" data-bubble="${idx}">
@@ -318,8 +354,48 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
           <span data-bubble-text>${bodyContent}</span>
         </div>
         ${cascadeHtml}
+        ${suggestionsHtml}
       </div>
     `;
+  }
+
+  function renderSuggestionChips(turn: ChatTurn, idx: number): string {
+    const best = turn.cascadeResult?.best ?? null;
+    const commonName = best
+      ? (isEs ? best.common_name_es ?? best.common_name_en ?? null : best.common_name_en ?? best.common_name_es ?? null)
+      : null;
+    const suggestions = buildChatSuggestions({
+      locale: docLocale,
+      scientificName: best?.scientific_name ?? null,
+      commonName,
+    });
+    const label = i18nGet('suggestions-label');
+    const chips = suggestions.map((s, sIdx) => `
+      <button
+        type="button"
+        data-suggestion="${idx}"
+        data-suggestion-idx="${sIdx}"
+        class="inline-flex items-center min-h-9 rounded-full border border-sky-300 dark:border-sky-700/60 bg-sky-50 dark:bg-sky-900/20 px-3 py-1 text-xs font-medium text-sky-800 dark:text-sky-200 hover:bg-sky-100 dark:hover:bg-sky-900/40"
+      >${escapeHtml(s.label)}</button>
+    `).join('');
+    return `
+      <div class="mt-2 flex flex-wrap gap-2" role="group" aria-label="${escapeHtml(label)}">
+        ${chips}
+      </div>
+    `;
+  }
+
+  /** All suggestions surfaced for the latest assistant turn — kept in sync with the rendered chip set. */
+  function suggestionsForTurn(turn: ChatTurn): ChatSuggestion[] {
+    const best = turn.cascadeResult?.best ?? null;
+    const commonName = best
+      ? (isEs ? best.common_name_es ?? best.common_name_en ?? null : best.common_name_en ?? best.common_name_es ?? null)
+      : null;
+    return buildChatSuggestions({
+      locale: docLocale,
+      scientificName: best?.scientific_name ?? null,
+      commonName,
+    });
   }
 
   function renderAttachmentPreview(att: ChatAttachment): string {
@@ -370,6 +446,21 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
         try { sessionStorage.setItem(PENDING_OBSERVATION_KEY, payload); } catch { /* private mode */ }
         const observePath = i18nGet('observe-path') || (isEs ? '/es/observar/' : '/en/observe/');
         window.location.href = observePath;
+      });
+    });
+
+    historyEl?.querySelectorAll<HTMLButtonElement>('button[data-suggestion]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = Number(btn.dataset.suggestion);
+        const sIdx = Number(btn.dataset.suggestionIdx);
+        const turn = conversation[idx];
+        if (!turn) return;
+        const suggestions = suggestionsForTurn(turn);
+        const choice = suggestions[sIdx];
+        if (!choice || !inputEl) return;
+        inputEl.value = choice.prompt;
+        autosize();
+        formEl?.requestSubmit();
       });
     });
   }
@@ -525,6 +616,7 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
     }
     conversation.length = 0;
     paintConversation();
+    void clearChatHistory(chatStore).catch(() => { /* best effort */ });
   });
 
   // ── Consent + setup ──
@@ -543,7 +635,12 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
         consentBox?.classList.add('hidden');
         historyEl?.classList.remove('hidden');
         formEl?.classList.remove('hidden');
+        await restoreChatHistory();
         paintConversation();
+        // chat-phi-autoload: when Phi-3.5-vision weights are already cached
+        // from a previous session, warm the engine in the background so the
+        // first vision-attachment send doesn't trigger a consent modal.
+        autoloadVisionEngineIfCached();
       } else {
         consentBox?.classList.remove('hidden');
         historyEl?.classList.add('hidden');
@@ -554,6 +651,83 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
     }
   }
   refreshState();
+
+  /** Load the Phi-vision engine silently when its weights are already cached. */
+  function autoloadVisionEngineIfCached(): void {
+    void (async () => {
+      try {
+        const lib = await import('../lib/local-ai');
+        if (!lib.localAISupported()) return;
+        const status = await lib.getModelCacheStatus(lib.VISION_MODEL_ID);
+        if (!status.cached) return;
+        await lib.loadVisionEngine(() => { /* silent — already cached */ });
+      } catch { /* best effort */ }
+    })();
+  }
+
+  async function restoreChatHistory(): Promise<void> {
+    try {
+      const recent = await readRecentTurns(chatStore);
+      for (const r of recent) {
+        const att = r.attachments?.[0];
+        const turn: ChatTurn = {
+          role: r.role,
+          content: r.content,
+        };
+        if (att && att.scientific_name) {
+          turn.cascadeResult = {
+            best: {
+              scientific_name: att.scientific_name,
+              common_name_en: null,
+              common_name_es: null,
+              family: null,
+              kingdom: 'Unknown',
+              confidence: att.confidence ?? 0,
+              source: att.source ?? 'human',
+            },
+            attachmentKind: att.kind,
+            attachmentBlobUrl: '',
+            attachmentMime: att.mime_type,
+          };
+        }
+        conversation.push(turn);
+      }
+    } catch { /* best effort */ }
+  }
+
+  /** Persist a user turn before the LLM call. */
+  function persistUserTurn(text: string, att: ChatAttachment | null): void {
+    const attachments = att ? [{
+      kind: att.kind,
+      mime_type: att.mimeType,
+      duration_sec: att.durationSec,
+    }] : undefined;
+    void appendTurn(chatStore, {
+      id: makeTurnId(),
+      role: 'user',
+      content: text,
+      attachments,
+    }).catch(() => { /* best effort */ });
+  }
+
+  /** Persist an assistant turn after streaming completes. */
+  function persistAssistantTurn(turn: ChatTurn): void {
+    if (turn.pending) return;
+    const cr = turn.cascadeResult;
+    const attachments = cr?.best ? [{
+      kind: cr.attachmentKind,
+      mime_type: cr.attachmentMime,
+      scientific_name: cr.best.scientific_name,
+      confidence: cr.best.confidence,
+      source: cr.best.source,
+    }] : undefined;
+    void appendTurn(chatStore, {
+      id: makeTurnId(),
+      role: 'assistant',
+      content: turn.content,
+      attachments,
+    }).catch(() => { /* best effort */ });
+  }
 
   downloadBtn?.addEventListener('click', async () => {
     if (!downloadBtn || !downloadLabel) return;
@@ -751,6 +925,7 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
     if (attachMeta) attachMeta.textContent = '';
 
     conversation.push({ role: 'user', content: text, attachment: att ?? undefined });
+    persistUserTurn(text, att);
     inputEl.value = '';
     autosize();
 
@@ -804,6 +979,7 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
               conversation[placeholderIdx].pending = false;
             }
             paintConversation();
+            persistAssistantTurn(conversation[placeholderIdx]);
           } else {
             // Audio with no confident match — there's no audio LLM fallback.
             conversation[placeholderIdx].content = i18nGet('cascade-no-match') + ' ' + (best?.scientific_name
@@ -820,12 +996,14 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
               };
             }
             paintConversation();
+            persistAssistantTurn(conversation[placeholderIdx]);
           }
         }
       } catch (err) {
         conversation[placeholderIdx].content = (isEs ? 'Error: ' : 'Error: ') + (err instanceof Error ? err.message : String(err));
         conversation[placeholderIdx].pending = false;
         paintConversation();
+        persistAssistantTurn(conversation[placeholderIdx]);
       }
     } else {
       // Text-only flow (original behaviour).
@@ -866,9 +1044,11 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
           conversation[assistantIdx].content = assembled;
         }
         paintConversation();
+        persistAssistantTurn(conversation[assistantIdx]);
       } catch (err) {
         conversation[assistantIdx].content = (isEs ? 'Error: ' : 'Error: ') + (err instanceof Error ? err.message : String(err));
         paintConversation();
+        persistAssistantTurn(conversation[assistantIdx]);
       }
     }
 
@@ -921,5 +1101,77 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
     }
     conversation[idx].pending = false;
     paintConversation();
+    persistAssistantTurn(conversation[idx]);
+  }
+
+  // ── Voice input (SpeechRecognition) ──
+  let voiceRecognition: SpeechRecognitionLike | null = null;
+  let voiceFinalText = '';
+  const VOICE_DEFAULT_LABEL = i18nGet('voice-input-label') || (isEs ? 'Dictar con voz' : 'Dictate with voice');
+  const VOICE_STOP_LABEL    = i18nGet('voice-input-stop-label') || (isEs ? 'Detener dictado' : 'Stop dictation');
+
+  if (voiceBtn) {
+    if (!isSpeechRecognitionSupported()) {
+      voiceBtn.hidden = true;
+    } else {
+      voiceBtn.hidden = false;
+      voiceBtn.addEventListener('click', () => {
+        if (voiceRecognition) {
+          voiceRecognition.stop();
+          return;
+        }
+        startVoiceRecognition();
+      });
+    }
+  }
+
+  function startVoiceRecognition(): void {
+    if (!inputEl) return;
+    const rec = createSpeechRecognition({
+      lang: speechRecognitionLang(docLocale),
+      continuous: true,
+      interimResults: true,
+    });
+    if (!rec) return;
+    voiceFinalText = inputEl.value;
+    voiceRecognition = rec;
+    setVoiceBtnRecording(true);
+
+    rec.onresult = (ev) => {
+      let interim = '';
+      for (let i = ev.resultIndex; i < ev.results.length; i++) {
+        const result = ev.results[i];
+        const piece = result[0]?.transcript ?? '';
+        if (result.isFinal) {
+          voiceFinalText = (voiceFinalText + ' ' + piece).trim();
+        } else {
+          interim += piece;
+        }
+      }
+      if (!inputEl) return;
+      // Show finalized text as-is; interim text is appended (visually italic
+      // would need a contentEditable surface, so we simply concatenate here).
+      inputEl.value = interim ? `${voiceFinalText} ${interim}`.trim() : voiceFinalText;
+      autosize();
+    };
+
+    rec.onerror = () => stopVoiceRecognition();
+    rec.onend = () => stopVoiceRecognition();
+    try { rec.start(); } catch { stopVoiceRecognition(); }
+  }
+
+  function stopVoiceRecognition(): void {
+    voiceRecognition = null;
+    setVoiceBtnRecording(false);
+  }
+
+  function setVoiceBtnRecording(rec: boolean): void {
+    if (!voiceBtn) return;
+    voiceBtn.classList.toggle('border-red-500', rec);
+    voiceBtn.classList.toggle('text-red-600', rec);
+    const label = rec ? VOICE_STOP_LABEL : VOICE_DEFAULT_LABEL;
+    voiceBtn.setAttribute('aria-label', label);
+    voiceBtn.setAttribute('title', label);
+    if (voiceBtnLabel) voiceBtnLabel.textContent = label;
   }
 </script>

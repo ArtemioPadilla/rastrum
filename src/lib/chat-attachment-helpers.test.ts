@@ -3,6 +3,7 @@ import {
   buildCascadeInterpretationPrompt,
   buildVisionFallbackPrompt,
   buildPendingObservation,
+  buildChatSuggestions,
   parsePendingObservation,
   pluginIdToObservationSource,
   PENDING_OBSERVATION_KEY,
@@ -184,5 +185,46 @@ describe('chat-attachment-helpers · plugin id → IDSource', () => {
   it('falls back to human for unknown plugins', () => {
     expect(pluginIdToObservationSource('made_up_plugin')).toBe('human');
     expect(pluginIdToObservationSource('')).toBe('human');
+  });
+});
+
+describe('chat-attachment-helpers · suggestion chips', () => {
+  it('returns 3 generic chips on the first turn (no species in scope) — EN', () => {
+    const chips = buildChatSuggestions({ locale: 'en' });
+    expect(chips).toHaveLength(3);
+    expect(chips[0].label).toMatch(/poisonous/i);
+    expect(chips[1].label).toMatch(/tell.*apart/i);
+    expect(chips[2].label).toMatch(/habitat/i);
+  });
+
+  it('returns 3 generic chips on the first turn (no species in scope) — ES', () => {
+    const chips = buildChatSuggestions({ locale: 'es' });
+    expect(chips).toHaveLength(3);
+    expect(chips[0].label).toBe('¿Es venenosa?');
+    expect(chips[1].label).toBe('¿Cómo la distingo?');
+    expect(chips[2].label).toBe('Hábitat típico');
+  });
+
+  it('personalises chips when a scientific name is in scope', () => {
+    const chips = buildChatSuggestions({
+      locale: 'es',
+      scientificName: 'Brongniartia argentea',
+    });
+    expect(chips[0].prompt).toContain('Brongniartia argentea');
+    expect(chips[1].prompt).toContain('Brongniartia argentea');
+    expect(chips[2].prompt).toContain('Brongniartia argentea');
+  });
+
+  it('uses the common name in chip labels when supplied', () => {
+    const chips = buildChatSuggestions({
+      locale: 'en',
+      scientificName: 'Pharomachrus mocinno',
+      commonName: 'Resplendent Quetzal',
+    });
+    expect(chips[0].label).toContain('Resplendent Quetzal');
+    expect(chips[1].label).toContain('Resplendent Quetzal');
+    expect(chips[2].label).toContain('Resplendent Quetzal');
+    // Prompts still carry the scientific name
+    expect(chips[0].prompt).toContain('Pharomachrus mocinno');
   });
 });
