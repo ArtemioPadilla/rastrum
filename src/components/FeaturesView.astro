@@ -1,0 +1,204 @@
+---
+import { t } from '../i18n/utils';
+
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+const isEs = lang === 'es';
+
+interface Feature {
+  title: string;
+  desc: string;
+  detail?: string;
+}
+interface Section {
+  id: string;
+  title: string;
+  blurb: string;
+  iconPath: string;     // single path 'd' attribute used inside the icon SVG
+  iconColor: string;    // tailwind text color class
+  features: Feature[];
+}
+
+const sections: Section[] = [
+  {
+    id: 'identification',
+    title: isEs ? 'Identificación (cascada por costo de licencia)' : 'Identification (cascade-driven)',
+    blurb: isEs
+      ? 'Una sola entrada (foto, audio, video, evidencia) corre por una cascada que prioriza plugins gratuitos, luego on-device, y finalmente APIs con BYO key. El primer resultado con confianza ≥ 0.7 gana.'
+      : 'A single input (photo, audio, video, evidence) runs through a cascade that prioritises free plugins first, then on-device, then BYO-key APIs. First result with confidence ≥ 0.7 wins.',
+    iconPath: 'M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.456-2.456L14.25 6l1.035-.259a3.375 3.375 0 0 0 2.456-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z',
+    iconColor: 'text-emerald-500',
+    features: [
+      { title: 'PlantNet',                      desc: isEs ? 'Cloud · gratis (cuota 500/día) · 78K plantas'    : 'Cloud · free (500/day quota) · 78K plant species' },
+      { title: 'Claude Haiku 4.5',              desc: isEs ? 'Cloud · BYO key · visión multi-taxón'             : 'Cloud · BYO key · multi-taxon vision fallback' },
+      { title: 'BirdNET-Lite (audio)',          desc: isEs ? 'On-device · CC BY-NC-SA · ~50 MB · ~6,000 aves'  : 'On-device · CC BY-NC-SA · ~50 MB · ~6,000 birds' },
+      { title: 'EfficientNet-Lite0',            desc: isEs ? 'On-device · MIT · ~18 MB INT8 · base ImageNet'   : 'On-device · MIT · ~18 MB INT8 · ImageNet base' },
+      { title: 'Phi-3.5-vision (WebLLM)',       desc: isEs ? 'On-device · ~2.4 GB · respaldo de baja confianza' : 'On-device · ~2.4 GB · low-confidence fallback' },
+      { title: 'MegaDetector v5a',              desc: isEs ? 'On-device · ~134 MB · cámara trampa'             : 'On-device · ~134 MB · camera-trap pipeline' },
+      { title: '/identify',                     desc: isEs ? 'Sondeo rápido sin guardar (foto)'                : 'Quick no-save photo probe' },
+      { title: '/chat',                         desc: isEs ? 'Foto + audio → cascada → Llama-3.2-1B interpreta' : 'Photo + audio attachments → cascade → Llama-3.2-1B interprets' },
+    ],
+  },
+  {
+    id: 'observation',
+    title: isEs ? 'Registro de observaciones' : 'Observation logging',
+    blurb: isEs
+      ? 'Captura geolocalizada con auto-relleno EXIF, multi-medios, y oscurecimiento de coordenadas para especies sensibles.'
+      : 'Geolocated capture with EXIF auto-fill, multi-media support, and coordinate obscuration for sensitive species.',
+    iconPath: 'M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z',
+    iconColor: 'text-sky-500',
+    features: [
+      { title: '/observe',                  desc: isEs ? 'GPS de dos pasos + EXIF + oscurecimiento NOM-059'                            : 'Two-pass GPS + EXIF + sensitive-species obscuration' },
+      { title: isEs ? 'Multi-imagen' : 'Multi-image',           desc: isEs ? 'Galería con primary + remove' : 'Gallery with primary + remove' },
+      { title: isEs ? 'Audio' : 'Audio',                       desc: isEs ? 'MediaRecorder ≤30 s'         : 'MediaRecorder ≤30 s' },
+      { title: 'Video',                                          desc: isEs ? '≤30 s (H.265/AV1)'           : '≤30 s (H.265/AV1)' },
+      { title: isEs ? 'Cámara en app' : 'In-app camera',        desc: isEs ? 'getUserMedia + fallback a input file' : 'getUserMedia + file-input fallback' },
+      { title: isEs ? 'Selector de mapa' : 'Map location picker', desc: isEs ? 'Drag-pin + búsqueda + reverse geocode' : 'Drag-pin + search + reverse geocode' },
+      { title: isEs ? 'Mis observaciones' : 'My observations',  desc: isEs ? '/perfil/observaciones — historial con miniaturas' : '/profile/observations — thumbnail history' },
+      { title: isEs ? 'Importador EXIF batch' : 'Batch EXIF importer', desc: isEs ? '/perfil/importar — multi-foto + revisión por fila' : '/profile/import — multi-photo + per-row review' },
+      { title: isEs ? 'Cámara trampa batch' : 'Camera-trap batch', desc: isEs ? '/perfil/importar/camara-trampa — GPS único + EXIF por foto' : '/profile/import/camera-trap — single GPS + per-photo EXIF' },
+    ],
+  },
+  {
+    id: 'social',
+    title: isEs ? 'Social + curación' : 'Social + curation',
+    blurb: isEs
+      ? 'Redes sociales sin patrones oscuros: feed de actividad, follows, comentarios, listas de seguimiento, rachas opt-in y consenso ponderado por experto.'
+      : 'No-dark-patterns social layer: activity feed, follows, comments, watchlists, opt-in streaks, and expert-weighted consensus.',
+    iconPath: 'M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z',
+    iconColor: 'text-rose-500',
+    features: [
+      { title: isEs ? 'Follows + comentarios + watchlists' : 'Follows + comments + watchlists', desc: isEs ? 'Componentes Astro: FollowButton, Comments, WatchlistView' : 'Astro components: FollowButton, Comments, WatchlistView' },
+      { title: isEs ? 'Rachas (opt-in)' : 'Streaks (opt-in)',        desc: isEs ? 'Ventana de gracia diaria, recompute nocturno' : 'Daily grace window, nightly recompute' },
+      { title: isEs ? 'Insignias de descubrimiento' : 'Discovery badges', desc: isEs ? '39 semilla, evaluador nocturno (5 cat × 4 tiers)' : '39 seed badges, nightly evaluator (5 cat × 4 tiers)' },
+      { title: isEs ? 'UI de aplicación experta' : 'Expert application UI', desc: isEs ? 'ExpertApplyView + 3× peso de consenso' : 'ExpertApplyView + 3× weighted consensus' },
+      { title: isEs ? 'Feed de actividad' : 'Activity feed',        desc: isEs ? 'Triggers de servidor + 12 tipos de evento' : 'Server-side triggers + 12 event kinds' },
+      { title: isEs ? 'Badge de campana' : 'Bell-icon unread badge', desc: isEs ? 'Contador en dropdown del avatar (99+ overflow)' : 'Avatar-dropdown badge (99+ overflow)' },
+    ],
+  },
+  {
+    id: 'data-export',
+    title: isEs ? 'Datos + exportación' : 'Data + export',
+    blurb: isEs
+      ? 'Tu trabajo, tus datos. Exporta en Darwin Core, publica a GBIF, o conecta agentes de IA con el servidor MCP.'
+      : 'Your work, your data. Export Darwin Core, publish to GBIF, or wire AI agents to the MCP server.',
+    iconPath: 'M3.75 3v11.25A2.25 2.25 0 0 0 6 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0 1 18 16.5h-2.25m-7.5 0h7.5m-7.5 0-1 3m8.5-3 1 3m0 0 .5 1.5m-.5-1.5h-9.5m0 0-.5 1.5M9 11.25v1.5M12 9v3.75m3-6v6',
+    iconColor: 'text-indigo-500',
+    features: [
+      { title: isEs ? 'Darwin Core CSV' : 'Darwin Core CSV',     desc: isEs ? 'Presets: DwC, SNIB, CONANP'  : 'Presets: DwC, SNIB, CONANP' },
+      { title: isEs ? 'Darwin Core Archive ZIP' : 'Darwin Core Archive ZIP', desc: isEs ? 'Para GBIF IPT (export-dwca Edge Function)' : 'For GBIF IPT (export-dwca Edge Function)' },
+      { title: isEs ? 'Tokens API personales' : 'Personal API tokens', desc: isEs ? 'rst_* con scopes, hash SHA-256'    : 'rst_* with scopes, SHA-256 hashed' },
+      { title: 'REST API',                                       desc: isEs ? '/functions/v1/api/{observe,identify,observations,export}' : '/functions/v1/api/{observe,identify,observations,export}' },
+      { title: 'MCP server',                                      desc: isEs ? '/functions/v1/mcp para Claude Desktop, Cursor, VS Code, Copilot' : '/functions/v1/mcp for Claude Desktop, Cursor, VS Code, Copilot' },
+    ],
+  },
+  {
+    id: 'offline-pwa',
+    title: isEs ? 'Offline + PWA' : 'Offline + PWA',
+    blurb: isEs
+      ? 'Funciona en el campo. Outbox local, modelos en dispositivo, mapas offline pmtiles e instalación PWA en una sola pantalla.'
+      : 'Works in the field. Local outbox, on-device models, offline pmtiles maps, and one-tap PWA install.',
+    iconPath: 'M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z',
+    iconColor: 'text-cyan-500',
+    features: [
+      { title: isEs ? 'Botón de instalación' : 'Install button',  desc: isEs ? 'Android Chrome directo · iOS Safari hint' : 'Android Chrome direct · iOS Safari hint' },
+      { title: isEs ? 'Service worker' : 'Service worker',        desc: isEs ? 'Network-first HTML, cache-first assets' : 'Network-first HTML, cache-first hashed assets' },
+      { title: 'Dexie outbox',                                    desc: isEs ? 'IndexedDB para observaciones offline' : 'IndexedDB for offline observations' },
+      { title: 'pmtiles MX',                                      desc: isEs ? '~48 MB para mapa offline' : '~48 MB offline-map archive' },
+      { title: isEs ? 'Modelos en caché' : 'On-device model cache', desc: isEs ? 'BirdNET, EfficientNet, Phi-vision en IndexedDB' : 'BirdNET, EfficientNet, Phi-vision in IndexedDB' },
+    ],
+  },
+  {
+    id: 'privacy',
+    title: isEs ? 'Privacidad + gobernanza' : 'Privacy + governance',
+    blurb: isEs
+      ? 'BYO API keys nunca dejan el navegador. IA on-device nunca envía datos. Especies sensibles oscurecidas. CARE/FPIC para datos indígenas.'
+      : 'BYO API keys never leave the browser. On-device AI never phones home. Sensitive species obscured. CARE/FPIC posture for indigenous data.',
+    iconPath: 'M9 12.75 11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 0 1-1.043 3.296 3.745 3.745 0 0 1-3.296 1.043A3.745 3.745 0 0 1 12 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 0 1-3.296-1.043 3.745 3.745 0 0 1-1.043-3.296A3.745 3.745 0 0 1 3 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 0 1 1.043-3.296 3.746 3.746 0 0 1 3.296-1.043A3.746 3.746 0 0 1 12 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 0 1 3.296 1.043 3.746 3.746 0 0 1 1.043 3.296A3.745 3.745 0 0 1 21 12Z',
+    iconColor: 'text-amber-500',
+    features: [
+      { title: isEs ? 'Oscurecimiento NOM-059 / CITES' : 'NOM-059 / CITES obscuration', desc: isEs ? 'RLS sobre obscure_level' : 'RLS-driven obscure_level' },
+      { title: isEs ? 'Licencia por observación' : 'Per-record license', desc: isEs ? 'CC-BY (default), BY-NC, CC0' : 'CC-BY default, BY-NC, CC0' },
+      { title: 'CARE / FPIC',                                     desc: isEs ? 'Postura para datos indígenas' : 'Indigenous-data care posture' },
+      { title: isEs ? 'BYO keys solo en cliente' : 'BYO keys client-side only', desc: isEs ? 'localStorage, nunca en servidor' : 'localStorage, never server-persisted' },
+      { title: isEs ? 'IA on-device sin red' : 'Network-free on-device AI', desc: isEs ? 'BirdNET, EfficientNet, Phi-vision, Llama' : 'BirdNET, EfficientNet, Phi-vision, Llama' },
+    ],
+  },
+  {
+    id: 'i18n',
+    title: isEs ? 'Internacionalización' : 'Internationalisation',
+    blurb: isEs
+      ? 'EN/ES desde el día uno con paridad estructural. 11 pares de rutas con slugs por idioma. Listo para Zapoteco/Mixteco cuando aterrice el FPIC.'
+      : 'EN/ES from day one with structural parity. 11 locale-paired routes with per-language slugs. Ready for Zapoteco/Mixteco when FPIC lands.',
+    iconPath: 'm10.5 21 5.25-11.25L21 21m-9-3h7.5M3 5.621a48.474 48.474 0 0 1 6-.371m0 0c1.12 0 2.233.038 3.334.114M9 5.25V3m3.334 2.364C11.176 10.658 7.69 15.08 3 17.502m9.334-12.138c.896.061 1.785.147 2.666.257m-4.589 8.495a18.023 18.023 0 0 1-3.827-5.802',
+    iconColor: 'text-violet-500',
+    features: [
+      { title: isEs ? 'Paridad EN/ES total'  : 'Full EN/ES parity', desc: isEs ? 'Cada string vive en src/i18n/{en,es}.json' : 'Every string lives in src/i18n/{en,es}.json' },
+      { title: isEs ? '11 pares de rutas'    : '11 locale-paired routes', desc: '/en/observe ↔ /es/observar, /en/profile ↔ /es/perfil, …' },
+      { title: isEs ? 'Componentes *View'    : 'Shared *View components', desc: isEs ? 'Cuerpo compartido entre locales' : 'Shared body between locales' },
+    ],
+  },
+];
+
+const heroTitle = isEs ? 'Lo que entrega Rastrum hoy' : 'What Rastrum ships today';
+const heroSub = isEs
+  ? 'Las funcionalidades de v1.0 son lo que se ejecuta en producción. Cada fila se mapea a un módulo con spec dedicado y código en main.'
+  : 'v1.0 features are what runs in production. Every row maps to a module with a dedicated spec and code on main.';
+---
+
+<article class="space-y-10">
+  <header>
+    <h1 class="text-3xl font-bold tracking-tight mb-4">{tr.docs.sections.features}</h1>
+    <p class="text-lg text-zinc-600 dark:text-zinc-400 max-w-3xl">{tr.docs.descriptions.features}</p>
+  </header>
+
+  <!-- Hero card -->
+  <section class="not-prose rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 via-sky-500/5 to-transparent dark:from-emerald-500/10 dark:via-sky-500/10 p-6">
+    <div class="flex items-start gap-4">
+      <span class="shrink-0 mt-1 inline-flex items-center justify-center w-10 h-10 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
+          <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/>
+        </svg>
+      </span>
+      <div>
+        <h2 class="text-xl font-semibold text-zinc-900 dark:text-zinc-100">{heroTitle}</h2>
+        <p class="text-sm text-zinc-700 dark:text-zinc-300 mt-1 max-w-2xl">{heroSub}</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Sections -->
+  {sections.map((s, idx) => (
+    <section>
+      <header class="flex items-start gap-3 mb-4">
+        <span class:list={["shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900", s.iconColor]}>
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor" class="w-5 h-5">
+            <path stroke-linecap="round" stroke-linejoin="round" d={s.iconPath}/>
+          </svg>
+        </span>
+        <div>
+          <h2 id={s.id} class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+            <span class="text-zinc-400 dark:text-zinc-600 font-mono text-base">{String(idx + 1).padStart(2, '0')}</span>
+            <a href={`#${s.id}`} class="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">{s.title}</a>
+          </h2>
+          <p class="text-sm text-zinc-600 dark:text-zinc-400 max-w-2xl mt-1 leading-relaxed">{s.blurb}</p>
+        </div>
+      </header>
+      <div class="not-prose grid sm:grid-cols-2 gap-3">
+        {s.features.map(f => (
+          <div class="p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 hover:border-emerald-500/40 dark:hover:border-emerald-500/30 transition-colors">
+            <p class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 leading-tight">{f.title}</p>
+            <p class="text-[13px] text-zinc-600 dark:text-zinc-400 mt-1 leading-relaxed">{f.desc}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  ))}
+
+  <p class="text-xs text-zinc-500 dark:text-zinc-600 pt-4 border-t border-zinc-200 dark:border-zinc-800">
+    {isEs
+      ? 'Fuente de la verdad: docs/progress.json (v0.1 → v1.0 ítems hechos), src/lib/identifiers/index.ts (plugins registrados) y supabase/functions/ (Edge Functions desplegadas).'
+      : 'Source of truth: docs/progress.json (v0.1 → v1.0 done items), src/lib/identifiers/index.ts (registered plugins), and supabase/functions/ (deployed Edge Functions).'}
+  </p>
+</article>

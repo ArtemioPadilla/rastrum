@@ -22,157 +22,263 @@ function loc<T extends Record<string, unknown>>(obj: T, field: string): string {
   return typeof v === 'string' ? v : '';
 }
 
-const phases = Object.entries(progressData.phases).map(([ver, phase]) => ({
-  ver,
-  raw: phase,
-  name:   loc(phase as Record<string, unknown>, 'name'),
-  period: loc(phase as Record<string, unknown>, 'period'),
-  status: phase.status,
-  items: (phase.items as Array<Record<string, unknown>>).map(item => ({
-    id:    item.id as string,
-    label: loc(item, 'label'),
-    done:  item.done as boolean,
-  })),
-}));
+interface DisplayItem {
+  id: string;
+  label: string;
+  done: boolean;
+  blocked: boolean;
+  blockedBy: string;
+}
+interface DisplayPhase {
+  ver: string;
+  name: string;
+  period: string;
+  status: string;
+  statusLong: string;
+  items: DisplayItem[];
+}
 
-const notesLoc      = loc(progressData as unknown as Record<string, unknown>, 'notes');
-const govName       = progressData.governance_track ? loc(progressData.governance_track as unknown as Record<string, unknown>, 'name')  : '';
-const govNotes      = progressData.governance_track ? loc(progressData.governance_track as unknown as Record<string, unknown>, 'notes') : '';
-const govItems      = progressData.governance_track
+const phases: DisplayPhase[] = Object.entries(progressData.phases).map(([ver, phase]) => {
+  const phaseRec = phase as Record<string, unknown>;
+  return {
+    ver,
+    name:   loc(phaseRec, 'name'),
+    period: loc(phaseRec, 'period'),
+    status: phase.status as string,
+    statusLong: loc(phaseRec, 'status'),
+    items: (phase.items as Array<Record<string, unknown>>).map(item => {
+      const blockedBy = loc(item, 'blocked_by');
+      return {
+        id:        item.id as string,
+        label:     loc(item, 'label'),
+        done:      Boolean(item.done),
+        blocked:   blockedBy.length > 0,
+        blockedBy,
+      };
+    }),
+  };
+});
+
+// Status hero — count items shipped across v0.1 → v1.0.
+const launchPhases = ['v0.1','v0.3','v0.5','v1.0'];
+let launchTotal = 0, launchDone = 0;
+for (const p of phases) {
+  if (!launchPhases.includes(p.ver)) continue;
+  launchTotal += p.items.length;
+  launchDone  += p.items.filter(i => i.done).length;
+}
+const launchPct = launchTotal ? Math.round((launchDone / launchTotal) * 100) : 0;
+
+const notesLoc = loc(progressData as unknown as Record<string, unknown>, 'notes');
+
+const govName  = progressData.governance_track ? loc(progressData.governance_track as unknown as Record<string, unknown>, 'name')  : '';
+const govNotes = progressData.governance_track ? loc(progressData.governance_track as unknown as Record<string, unknown>, 'notes') : '';
+const govItems = progressData.governance_track
   ? (progressData.governance_track.items as Array<Record<string, unknown>>).map(item => ({
       id:    item.id as string,
       label: loc(item, 'label'),
-      done:  item.done as boolean,
+      done:  Boolean(item.done),
     }))
   : [];
 
-type StatusKey = 'in_progress' | 'planned' | 'done' | 'current';
-const statusConfig: Record<StatusKey, { label: string; badge: string; dot: string }> = {
-  in_progress: { label: isEs ? 'En progreso' : 'In Progress', badge: 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30', dot: 'bg-emerald-500' },
-  planned:     { label: isEs ? 'Planeado'    : 'Planned',     badge: 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border-zinc-300 dark:border-zinc-700', dot: 'bg-zinc-400' },
-  done:        { label: isEs ? 'Lanzado'     : 'Shipped',     badge: 'bg-sky-500/20 text-sky-600 dark:text-sky-400 border-sky-500/30', dot: 'bg-sky-500' },
-  current:     { label: isEs ? 'Activo'      : 'Active',      badge: 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30', dot: 'bg-emerald-500' },
+// Visual treatment per phase: shipped (sky), in_progress/active (emerald),
+// shipped-but-deferred (amber, status string mentions "deferred"), planned (zinc).
+type PhaseTone = 'shipped' | 'partial' | 'active' | 'planned';
+function phaseTone(status: string): PhaseTone {
+  const s = status.toLowerCase();
+  if (s.includes('deferred') || s.includes('partial')) return 'partial';
+  if (s === 'done' || s.startsWith('shipped')) return 'shipped';
+  if (s === 'in_progress' || s === 'current') return 'active';
+  return 'planned';
+}
+
+interface ToneConfig {
+  ring: string;
+  border: string;
+  bg: string;
+  dot: string;
+  pillBadge: string;
+  pillLabel: string;
+  bar: string;
+}
+const toneConfig: Record<PhaseTone, ToneConfig> = {
+  shipped: {
+    ring: 'ring-sky-500/20',
+    border: 'border-sky-500/30',
+    bg: 'bg-sky-500/5 dark:bg-sky-500/5',
+    dot: 'bg-sky-500',
+    pillBadge: 'bg-sky-500/20 text-sky-700 dark:text-sky-400 border-sky-500/30',
+    pillLabel: isEs ? 'Lanzado' : 'Shipped',
+    bar: 'bg-sky-500',
+  },
+  partial: {
+    ring: 'ring-amber-500/20',
+    border: 'border-amber-500/40',
+    bg: 'bg-amber-500/5 dark:bg-amber-500/5',
+    dot: 'bg-amber-500',
+    pillBadge: 'bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-500/30',
+    pillLabel: isEs ? 'Parcial' : 'Partial',
+    bar: 'bg-amber-500',
+  },
+  active: {
+    ring: 'ring-emerald-500/20',
+    border: 'border-emerald-500/40',
+    bg: 'bg-emerald-500/5 dark:bg-emerald-500/5',
+    dot: 'bg-emerald-500',
+    pillBadge: 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border-emerald-500/30',
+    pillLabel: isEs ? 'En progreso' : 'In progress',
+    bar: 'bg-emerald-500',
+  },
+  planned: {
+    ring: '',
+    border: 'border-zinc-200 dark:border-zinc-800',
+    bg: 'bg-white dark:bg-zinc-900/50',
+    dot: 'bg-zinc-400',
+    pillBadge: 'bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border-zinc-300 dark:border-zinc-700',
+    pillLabel: isEs ? 'Planeado' : 'Planned',
+    bar: 'bg-zinc-400',
+  },
 };
 
-const lastUpdated = isEs ? 'última actualización' : 'last updated';
-const itemsLabel = isEs ? 'ítems' : 'items';
+const lastUpdatedText = isEs
+  ? `Última actualización: ${progressData.updated}`
+  : `Last updated: ${progressData.updated}`;
 
 const helpText = isEs
-  ? 'Para actualizar el progreso: edita docs/progress.json en el repositorio y marca "done": true en los ítems completados. La página se reconstruye automáticamente con cada push.'
-  : 'To update progress: edit docs/progress.json in the repo and set "done": true for completed items. The page rebuilds automatically on each push.';
+  ? 'Para actualizar: edita docs/progress.json en el repositorio. La página se reconstruye en cada push.'
+  : 'To update progress: edit docs/progress.json in the repo. The page rebuilds on every push.';
 
-const syncedFromText = isEs
-  ? `Progreso sincronizado desde docs/progress.json — ${lastUpdated} ${progressData.updated}`
-  : `Progress synced from docs/progress.json — ${lastUpdated} ${progressData.updated}`;
+const heroTitle = isEs
+  ? `v1.0 lanzado el 2026-04-26 — ${launchDone}/${launchTotal} ítems hechos en v0.1 → v1.0`
+  : `v1.0 shipped 2026-04-26 — ${launchDone}/${launchTotal} items done across v0.1 → v1.0`;
+const heroSub = isEs
+  ? 'Construido en código abierto. Las fases siguen siendo concretas; las que están más allá de v1.0 dependen de licencias externas, dinero o gobernanza.'
+  : 'Built fully open-source. Phases stay concrete; anything past v1.0 depends on external licensing, funding or governance.';
 
-function pct(items: { done: boolean }[]) {
-  const done = items.filter(i => i.done).length;
-  return { done, total: items.length, pct: items.length ? Math.round((done / items.length) * 100) : 0 };
-}
+const itemsLabel = isEs ? 'ítems' : 'items';
+const blockedLabelText = isEs ? 'Bloqueado: ' : 'Blocked by: ';
 ---
 
-<article class="space-y-2">
-  <div class="mb-8">
+<article class="space-y-6">
+  <header class="mb-6">
     <h1 class="text-3xl font-bold tracking-tight mb-2">{tr.docs.sections.roadmap}</h1>
     <p class="text-zinc-600 dark:text-zinc-400 max-w-2xl">{tr.docs.descriptions.roadmap}</p>
-    <p class="text-xs text-zinc-500 dark:text-zinc-500 mt-2">
-      {syncedFromText}
-    </p>
-    {notesLoc && (
-      <p class="text-xs text-zinc-500 dark:text-zinc-500 mt-1 italic">{notesLoc}</p>
-    )}
-  </div>
+  </header>
 
-  {phases.map((phase) => {
-    const prog = pct(phase.items);
-    const cfg = statusConfig[phase.status as StatusKey] ?? statusConfig.planned;
-    const isActive = phase.status === 'in_progress' || phase.status === 'current';
-    return (
-      <div class:list={[
-        "relative rounded-xl border transition-all",
-        isActive
-          ? "border-emerald-500/40 bg-emerald-500/5 dark:bg-emerald-500/5"
-          : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50"
-      ]}>
-        <div class="p-5 pb-3">
-          <div class="flex flex-wrap items-start gap-3 justify-between mb-3">
-            <div class="flex items-center gap-3 flex-wrap">
-              <span class:list={[
-                "w-2.5 h-2.5 rounded-full shrink-0 mt-0.5",
-                cfg.dot,
-                isActive ? "ring-4 ring-emerald-500/20" : ""
-              ]} />
-              <div>
-                <div class="flex items-center gap-2 flex-wrap">
-                  <code class="text-sm font-mono font-bold text-zinc-900 dark:text-zinc-100">{phase.ver}</code>
-                  <span class="text-sm font-semibold text-zinc-700 dark:text-zinc-300">{phase.name}</span>
-                  <span class:list={["text-xs px-2 py-0.5 rounded-full border font-medium", cfg.badge]}>{cfg.label}</span>
-                </div>
-                <p class="text-xs text-zinc-500 dark:text-zinc-500 mt-0.5">{phase.period}</p>
-              </div>
-            </div>
-            <div class="text-right shrink-0">
-              <span class:list={[
-                "text-sm font-semibold",
-                prog.pct === 100 ? "text-emerald-600 dark:text-emerald-400" :
-                prog.pct > 0 ? "text-zinc-700 dark:text-zinc-300" : "text-zinc-400 dark:text-zinc-600"
-              ]}>
-                {prog.done}/{prog.total}
-              </span>
-              <p class="text-xs text-zinc-400 dark:text-zinc-600">{itemsLabel}</p>
-            </div>
-          </div>
-
-          <div class="w-full h-1.5 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
-            <div
-              class:list={[
-                "h-full rounded-full transition-all",
-                prog.pct === 100 ? "bg-sky-500" : isActive ? "bg-emerald-500" : "bg-zinc-400"
-              ]}
-              style={`width: ${prog.pct}%`}
-            />
-          </div>
-        </div>
-
-        <div class="px-5 pb-5 grid sm:grid-cols-2 gap-x-6 gap-y-1.5 mt-1">
-          {phase.items.map(item => (
-            <div class="flex items-start gap-2.5">
-              <div class:list={[
-                "mt-0.5 w-4 h-4 rounded shrink-0 border-2 flex items-center justify-center transition-colors",
-                item.done
-                  ? "bg-emerald-500 border-emerald-500"
-                  : "border-zinc-300 dark:border-zinc-700 bg-transparent"
-              ]}>
-                {item.done && (
-                  <svg class="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 12 12" stroke="currentColor" stroke-width="2.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M2 6l3 3 5-5"/>
-                  </svg>
-                )}
-              </div>
-              <span class:list={[
-                "text-sm leading-relaxed",
-                item.done
-                  ? "text-zinc-500 dark:text-zinc-500 line-through"
-                  : isActive
-                    ? "text-zinc-800 dark:text-zinc-200"
-                    : "text-zinc-600 dark:text-zinc-400"
-              ]}>
-                {item.label}
-              </span>
-            </div>
-          ))}
-        </div>
+  <!-- Status hero -->
+  <section class="not-prose rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 via-sky-500/5 to-transparent dark:from-emerald-500/10 dark:via-sky-500/10 p-6">
+    <div class="flex flex-col sm:flex-row sm:items-center gap-4">
+      <div class="shrink-0 w-20 h-20 rounded-full border-4 border-emerald-500/30 flex items-center justify-center bg-white dark:bg-zinc-950">
+        <span class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{launchPct}%</span>
       </div>
-    );
-  })}
+      <div class="min-w-0 flex-1">
+        <p class="text-sm font-semibold text-emerald-700 dark:text-emerald-400">{heroTitle}</p>
+        <p class="text-sm text-zinc-700 dark:text-zinc-300 mt-1">{heroSub}</p>
+        <p class="text-xs text-zinc-500 dark:text-zinc-500 mt-2">{lastUpdatedText}</p>
+      </div>
+    </div>
+    {notesLoc && (
+      <p class="text-xs text-zinc-500 dark:text-zinc-500 mt-3 italic leading-relaxed">{notesLoc}</p>
+    )}
+  </section>
+
+  <!-- Phases -->
+  <div class="space-y-3">
+    {phases.map((phase) => {
+      const tone = phaseTone(phase.status);
+      const cfg = toneConfig[tone];
+      const doneCount = phase.items.filter(i => i.done).length;
+      const total = phase.items.length;
+      const pct = total ? Math.round((doneCount / total) * 100) : 0;
+      const showStatusString = phase.status.length > 16; // long descriptive statuses
+      return (
+        <div class:list={["relative rounded-xl border transition-all", cfg.border, cfg.bg]}>
+          <div class="p-5 pb-3">
+            <div class="flex flex-wrap items-start gap-3 justify-between mb-3">
+              <div class="flex items-start gap-3 min-w-0 flex-1">
+                <span class:list={["w-2.5 h-2.5 rounded-full shrink-0 mt-1.5", cfg.dot, cfg.ring && "ring-4 " + cfg.ring]}></span>
+                <div class="min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <code class="text-sm font-mono font-bold text-zinc-900 dark:text-zinc-100">{phase.ver}</code>
+                    <span class="text-sm font-semibold text-zinc-800 dark:text-zinc-200">{phase.name}</span>
+                    <span class:list={["text-xs px-2 py-0.5 rounded-full border font-medium", cfg.pillBadge]}>{cfg.pillLabel}</span>
+                  </div>
+                  <p class="text-xs text-zinc-500 dark:text-zinc-500 mt-0.5">{phase.period}</p>
+                  {showStatusString && phase.statusLong && (
+                    <p class="text-[11px] text-zinc-600 dark:text-zinc-400 mt-1 leading-relaxed">{phase.statusLong}</p>
+                  )}
+                </div>
+              </div>
+              <div class="text-right shrink-0">
+                <span class:list={[
+                  "text-lg font-bold tabular-nums",
+                  pct === 100 ? "text-sky-600 dark:text-sky-400" :
+                  pct > 0     ? "text-emerald-600 dark:text-emerald-400" :
+                                "text-zinc-400 dark:text-zinc-600"
+                ]}>
+                  {doneCount}<span class="text-zinc-400 dark:text-zinc-600 font-normal">/{total}</span>
+                </span>
+                <p class="text-[10px] text-zinc-400 dark:text-zinc-600 uppercase tracking-wide">{itemsLabel}</p>
+              </div>
+            </div>
+
+            <div class="w-full h-1.5 bg-zinc-200/70 dark:bg-zinc-800/70 rounded-full overflow-hidden">
+              <div
+                class:list={["h-full rounded-full transition-all", cfg.bar]}
+                style={`width: ${pct}%`}
+              ></div>
+            </div>
+          </div>
+
+          <div class="px-5 pb-5 grid sm:grid-cols-2 gap-x-6 gap-y-1.5 mt-1">
+            {phase.items.map(item => {
+              const symbol = item.done ? 'check' : item.blocked ? 'block' : 'todo';
+              return (
+                <div class="flex items-start gap-2.5">
+                  <div class:list={[
+                    "mt-0.5 w-4 h-4 rounded shrink-0 border-2 flex items-center justify-center transition-colors",
+                    symbol === 'check' ? "bg-emerald-500 border-emerald-500"
+                    : symbol === 'block' ? "border-amber-500 bg-amber-500/20"
+                    : "border-zinc-300 dark:border-zinc-700 bg-transparent"
+                  ]}>
+                    {symbol === 'check' && (
+                      <svg class="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 12 12" stroke="currentColor" stroke-width="2.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M2 6l3 3 5-5"/>
+                      </svg>
+                    )}
+                    {symbol === 'block' && (
+                      <span class="text-[9px] font-bold text-amber-600 dark:text-amber-400">!</span>
+                    )}
+                  </div>
+                  <div class="min-w-0">
+                    <span class:list={[
+                      "text-sm leading-relaxed",
+                      item.done ? "text-zinc-500 dark:text-zinc-500 line-through"
+                      : item.blocked ? "text-zinc-700 dark:text-zinc-300"
+                      : "text-zinc-700 dark:text-zinc-300"
+                    ]}>
+                      {item.label}
+                    </span>
+                    {item.blocked && (
+                      <p class="text-[11px] text-amber-600 dark:text-amber-400 italic mt-0.5">{blockedLabelText}{item.blockedBy}</p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    })}
+  </div>
 
   {progressData.governance_track && (
     <div class="mt-6 rounded-xl border border-amber-500/30 bg-amber-500/5 dark:bg-amber-500/5 p-5">
       <div class="flex items-center gap-2 mb-2">
-        <span class="w-2.5 h-2.5 rounded-full bg-amber-500" />
+        <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
         <h2 class="text-sm font-semibold text-zinc-800 dark:text-zinc-200">{govName}</h2>
       </div>
-      <p class="text-xs text-zinc-600 dark:text-zinc-400 mb-3">{govNotes}</p>
+      <p class="text-xs text-zinc-600 dark:text-zinc-400 mb-3 leading-relaxed">{govNotes}</p>
       <div class="grid sm:grid-cols-2 gap-x-6 gap-y-1.5">
         {govItems.map(item => (
           <div class="flex items-start gap-2.5">
@@ -196,7 +302,5 @@ function pct(items: { done: boolean }[]) {
     </div>
   )}
 
-  <div class="pt-4 px-1">
-    <p class="text-xs text-zinc-500 dark:text-zinc-600">{helpText}</p>
-  </div>
+  <p class="text-xs text-zinc-500 dark:text-zinc-600 px-1 pt-2">{helpText}</p>
 </article>

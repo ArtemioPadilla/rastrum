@@ -1,5 +1,5 @@
 {
-  "updated": "2026-04-25",
+  "updated": "2026-04-26",
   "schema_version": 1,
   "notes_en": "Per-item task breakdown. Each entry mirrors docs/tasks.md. Subtasks: 'done'|'in_progress'|'blocked'|'planned'. The page at /{lang}/docs/tasks/ renders this with progress bars + commit/spec links.",
   "notes_es": "Desglose por ítem. Cada entrada refleja docs/tasks.md. Subtareas: 'done'|'in_progress'|'blocked'|'planned'. La página /{lang}/docs/tasks/ la renderiza con barras de progreso y enlaces a commits y specs.",
@@ -148,7 +148,7 @@
         { "label_en": "Clustering at low zoom + pins at high zoom",    "label_es": "Clustering en zoom bajo + pines en zoom alto", "status": "done" },
         { "label_en": "Kingdom-coloured pins",                          "label_es": "Pines coloreados por reino",                   "status": "done" },
         { "label_en": "Click pin → popup with thumbnail + link",        "label_es": "Click en pin → popup con miniatura",           "status": "done" },
-        { "label_en": "pmtiles offline layer (deferred to v0.3)",       "label_es": "Capa pmtiles offline (diferido a v0.3)",       "status": "planned" }
+        { "label_en": "pmtiles offline layer (handed off to v0.3 offline-maps)", "label_es": "Capa pmtiles offline (entregada a offline-maps v0.3)", "status": "done", "ref_en": "tracked under offline-maps", "ref_es": "rastreado en offline-maps" }
       ]
     },
     "darwin-core-csv": {
@@ -355,20 +355,19 @@
     },
     "birdnet-audio": {
       "phase": "v0.5",
-      "title_en": "BirdNET-Lite audio ID",
-      "title_es": "ID de audio con BirdNET-Lite",
+      "title_en": "BirdNET-Lite audio ID (Cornell Lab CC BY-NC-SA 4.0, ONNX hosted on R2)",
+      "title_es": "ID de audio con BirdNET-Lite (Cornell Lab CC BY-NC-SA 4.0, ONNX en R2)",
       "modules": ["12-birdnet-audio.md"],
       "subtasks": [
-        { "label_en": "Audio capture in observation form (≤30s)",          "label_es": "Captura de audio en formulario (≤30s)",    "status": "done" },
-        { "label_en": "Sync engine routes audio to R2 + cascade",          "label_es": "Sync routes audio → R2 + cascade",          "status": "done" },
-        { "label_en": "BirdNET plugin stub (model_not_bundled)",            "label_es": "Stub plugin BirdNET",                        "status": "done" },
-        { "label_en": "Module 12 spec written",                              "label_es": "Spec módulo 12",                             "status": "done" },
-        { "label_en": "Re-host TFLite/ONNX on R2",                          "label_es": "Re-hospedar TFLite/ONNX en R2",              "status": "blocked", "blocker_en": "Need to fetch model from Cornell + convert", "blocker_es": "Falta obtener el modelo y convertir" },
-        { "label_en": "Mel-spectrogram preprocessing (Meyda)",              "label_es": "Preprocesamiento mel-spectrogram",          "status": "planned" },
-        { "label_en": "onnxruntime-web inference in plugin",                "label_es": "Inferencia con onnxruntime-web",            "status": "planned" },
-        { "label_en": "Bundle species labels JSON",                          "label_es": "Bundle labels JSON",                         "status": "planned" },
-        { "label_en": "Profile/edit download card",                          "label_es": "Card de descarga en perfil",                 "status": "planned" },
-        { "label_en": "Cornell Lab attribution in UI + DwC export",          "label_es": "Atribución Cornell Lab",                     "status": "planned" }
+        { "label_en": "Audio capture in observation form (≤30s)",                       "label_es": "Captura de audio en formulario (≤30s)",                       "status": "done" },
+        { "label_en": "Sync engine routes audio to R2 + cascade",                       "label_es": "Motor de sync enruta audio a R2 + cascade",                  "status": "done" },
+        { "label_en": "Module 12 spec written",                                         "label_es": "Spec módulo 12 escrito",                                      "status": "done" },
+        { "label_en": "BirdNET-Lite v2.4 ONNX hosted on R2 + PUBLIC_BIRDNET_WEIGHTS_URL", "label_es": "BirdNET-Lite v2.4 ONNX en R2 + PUBLIC_BIRDNET_WEIGHTS_URL",  "status": "done" },
+        { "label_en": "Audio decode + 48 kHz resample + 3 s window pre-processing",     "label_es": "Decodificación de audio + remuestreo 48 kHz + ventana 3 s",   "status": "done" },
+        { "label_en": "onnxruntime-web inference in plugin (top-K species)",            "label_es": "Inferencia onnxruntime-web en el plugin (top-K especies)",    "status": "done" },
+        { "label_en": "Bundle species labels JSON (~6,000 species)",                    "label_es": "Bundle de labels JSON (~6,000 especies)",                     "status": "done" },
+        { "label_en": "Profile/edit download card with consent + cache management",     "label_es": "Card de descarga en perfil con consentimiento + caché",       "status": "done" },
+        { "label_en": "Cornell Lab CC BY-NC-SA 4.0 attribution in UI + DwC export",      "label_es": "Atribución Cornell Lab CC BY-NC-SA 4.0 en UI + export DwC",   "status": "done" }
       ]
     },
     "streaks": {
@@ -381,7 +380,7 @@
         { "label_en": "recompute_streak() with single-grace-per-30-days",     "label_es": "recompute_streak() con gracia mensual",       "status": "done" },
         { "label_en": "recompute-streaks Edge Function (nightly)",           "label_es": "Edge Function recompute-streaks",             "status": "done" },
         { "label_en": "Quality gate: confidence ≥ 0.4",                       "label_es": "Compuerta de calidad",                        "status": "done" },
-        { "label_en": "Streak display on profile page",                       "label_es": "Display de racha en perfil",                  "status": "planned" },
+        { "label_en": "Streak display on profile page (StreakCard)",          "label_es": "Display de racha en perfil (StreakCard)",      "status": "done" },
         { "label_en": "Inbox-digest email for milestones",                    "label_es": "Email de hito por correo",                    "status": "planned" }
       ]
     },
@@ -407,7 +406,7 @@
         { "label_en": "follows table (anti-self-follow + RLS)",  "label_es": "Tabla follows (anti-self + RLS)",   "status": "done" },
         { "label_en": "observation_comments (threading + soft-delete)", "label_es": "observation_comments (threading + soft-delete)", "status": "done" },
         { "label_en": "watchlists with radius_km",                "label_es": "watchlists con radius_km",          "status": "done" },
-        { "label_en": "UI implementation",                         "label_es": "Implementación UI",                  "status": "planned", "ref_en": "tracked as follows-comments-ui", "ref_es": "rastreado como follows-comments-ui" }
+        { "label_en": "UI implementation (Comments, FollowButton, WatchlistView)", "label_es": "Implementación UI (Comments, FollowButton, WatchlistView)", "status": "done", "ref_en": "tracked under follows-comments-ui", "ref_es": "rastreado en follows-comments-ui" }
       ]
     },
     "expert-system": {
@@ -418,7 +417,7 @@
       "subtasks": [
         { "label_en": "users.is_expert + users.expert_taxa[] columns",       "label_es": "Columnas is_expert + expert_taxa[]",       "status": "done" },
         { "label_en": "recompute_consensus() applies 3× weight",              "label_es": "recompute_consensus aplica peso 3×",       "status": "done" },
-        { "label_en": "Expert-application UI",                                 "label_es": "UI de solicitud de experto",                 "status": "planned" },
+        { "label_en": "Expert-application UI (ExpertApplyView)",              "label_es": "UI de solicitud de experto (ExpertApplyView)", "status": "done" },
         { "label_en": "Expert badges in profile",                              "label_es": "Insignias de experto en perfil",            "status": "planned" }
       ]
     },
@@ -486,28 +485,30 @@
     },
     "onnx-base": {
       "phase": "v0.3",
-      "title_en": "EfficientNet-Lite0 ONNX base fallback (~3 MB)",
-      "title_es": "Fallback ONNX base EfficientNet-Lite0 (~3 MB)",
+      "title_en": "EfficientNet-Lite0 ONNX base fallback (~18 MB INT8 hosted on R2)",
+      "title_es": "Fallback ONNX base EfficientNet-Lite0 (~18 MB INT8 alojado en R2)",
       "modules": ["13-identifier-registry.md"],
       "subtasks": [
-        { "label_en": "Train or convert model to int8 ONNX",  "label_es": "Entrenar / convertir modelo a ONNX int8", "status": "blocked", "blocker_en": "ONNX training/conversion pipeline", "blocker_es": "Pipeline de entrenamiento/conversión" },
-        { "label_en": "Bundle species labels JSON",            "label_es": "Bundle de labels JSON",                    "status": "planned" },
-        { "label_en": "src/lib/identifiers/onnx-base.ts impl", "label_es": "Implementación onnx-base.ts",             "status": "planned" },
-        { "label_en": "Image preprocessing (resize, normalise)", "label_es": "Preprocesamiento de imagen",            "status": "planned" },
-        { "label_en": "Plugin isAvailable() flips to ready",   "label_es": "isAvailable() pasa a ready",               "status": "planned" }
+        { "label_en": "Convert model to ONNX (TF Model Garden EfficientNet-Lite0)", "label_es": "Convertir modelo a ONNX (TF Model Garden EfficientNet-Lite0)", "status": "done" },
+        { "label_en": "Bundle ImageNet labels JSON",                                "label_es": "Bundle de labels ImageNet JSON",                                "status": "done" },
+        { "label_en": "src/lib/identifiers/onnx-base.ts implementation",            "label_es": "Implementación src/lib/identifiers/onnx-base.ts",               "status": "done" },
+        { "label_en": "Image preprocessing (224x224 cover crop + ImageNet mean/std)", "label_es": "Preprocesamiento (cover crop 224x224 + media/std ImageNet)",    "status": "done" },
+        { "label_en": "On-device inference via onnxruntime-web (cached in IndexedDB)", "label_es": "Inferencia en dispositivo vía onnxruntime-web (cacheada en IndexedDB)", "status": "done" },
+        { "label_en": "Profile/edit AI download card with consent + cache management", "label_es": "Card de descarga en perfil con consentimiento + gestión de caché", "status": "done" }
       ]
     },
     "offline-maps": {
       "phase": "v0.3",
-      "title_en": "pmtiles offline map download (Mexico zoom 0–10)",
-      "title_es": "Descarga de mapas offline pmtiles (México zoom 0–10)",
+      "title_en": "pmtiles offline map download (Mexico zoom 0–10, ~48 MB)",
+      "title_es": "Descarga de mapas offline pmtiles (México zoom 0–10, ~48 MB)",
       "modules": ["05-map.md"],
       "subtasks": [
-        { "label_en": "Generate Mexico zoom 0–10 pmtiles (~250 MB)",  "label_es": "Generar pmtiles México zoom 0–10",       "status": "blocked", "blocker_en": "pmtiles tooling (Tippecanoe + clipping)", "blocker_es": "Tooling pmtiles" },
-        { "label_en": "Upload to R2 at tiles.rastrum.app",             "label_es": "Subir a R2 en tiles.rastrum.app",         "status": "planned" },
-        { "label_en": "Download trigger in profile (cell-conn warn)",  "label_es": "Disparador de descarga con aviso",        "status": "planned" },
-        { "label_en": "Cache via OPFS + pmtiles:// MapLibre protocol", "label_es": "Cache OPFS + protocolo pmtiles://",      "status": "planned" },
-        { "label_en": "Per-region zoom 11–14 chunks on-demand",        "label_es": "Chunks zoom 11–14 por región",            "status": "planned" }
+        { "label_en": "Mexico-bounded pmtiles archive hosted on R2",             "label_es": "Archivo pmtiles delimitado a México alojado en R2",          "status": "done" },
+        { "label_en": "PUBLIC_PMTILES_MX_URL env var wired into the build",      "label_es": "Variable PUBLIC_PMTILES_MX_URL conectada al build",          "status": "done" },
+        { "label_en": "src/lib/offline-map.ts download + Cache API persistence", "label_es": "Descarga src/lib/offline-map.ts + persistencia Cache API",   "status": "done" },
+        { "label_en": "MapLibre pmtiles:// protocol registered for offline reads", "label_es": "Protocolo MapLibre pmtiles:// registrado para lecturas offline", "status": "done" },
+        { "label_en": "Profile/edit download card with cell-conn warning",       "label_es": "Card de descarga en perfil con aviso de conexión móvil",     "status": "done" },
+        { "label_en": "Per-region zoom 11–14 chunks on-demand",                  "label_es": "Chunks zoom 11–14 por región bajo demanda",                  "status": "planned" }
       ]
     },
     "onnx-regional": {
@@ -553,25 +554,27 @@
       "phase": "v1.0",
       "title_en": "Video support ≤30s (H.265/AV1)",
       "title_es": "Soporte de video ≤30s (H.265/AV1)",
-      "modules": [],
+      "modules": ["02-observation.md"],
       "subtasks": [
-        { "label_en": "Server-side ffmpeg transcoding pipeline",        "label_es": "Pipeline de transcodificación con ffmpeg",       "status": "blocked", "blocker_en": "Cloud Run + ffmpeg layer", "blocker_es": "Cloud Run + capa ffmpeg" },
-        { "label_en": "Video capture in observation form",                "label_es": "Captura de video en formulario",                  "status": "planned" },
-        { "label_en": "Frame extraction for ID + audio for BirdNET",      "label_es": "Extracción de frames + audio",                    "status": "planned" },
-        { "label_en": "Video player on observation page",                  "label_es": "Reproductor en la página de observación",         "status": "planned" }
+        { "label_en": "Video capture in observation form (MediaRecorder ≤30s)", "label_es": "Captura de video en formulario (MediaRecorder ≤30s)", "status": "done" },
+        { "label_en": "media_files row with media_type='video' + R2 upload",    "label_es": "Fila media_files con media_type='video' + carga R2",   "status": "done" },
+        { "label_en": "Video preview tile in form grid (autoplay muted)",        "label_es": "Tile de vista previa de video en grilla (autoplay muted)", "status": "done" },
+        { "label_en": "Server-side ffmpeg transcoding pipeline",                 "label_es": "Pipeline de transcodificación con ffmpeg",              "status": "planned" },
+        { "label_en": "Frame extraction for ID + audio split for BirdNET",       "label_es": "Extracción de frames + separación de audio para BirdNET","status": "planned" },
+        { "label_en": "Video player on share/obs page",                          "label_es": "Reproductor en página share/obs",                       "status": "planned" }
       ]
     },
     "camera-trap-ingest": {
       "phase": "v1.0",
-      "title_en": "Camera trap ingestion (SpeciesNet + MegaDetector)",
-      "title_es": "Ingesta de cámara trampa",
-      "modules": ["09-camera-trap.md"],
+      "title_en": "Camera trap ingestion (MegaDetector v5a INT8 ONNX)",
+      "title_es": "Ingesta de cámara trampa (MegaDetector v5a INT8 ONNX)",
+      "modules": ["09-camera-trap.md","19-batch-photo-importer.md"],
       "subtasks": [
-        { "label_en": "MegaDetector + SpeciesNet model deployment",     "label_es": "Despliegue de MegaDetector + SpeciesNet",     "status": "blocked", "blocker_en": "ML infra (~5 GB models)", "blocker_es": "Infra ML" },
-        { "label_en": "Bulk-upload UI (drag-drop + per-file progress)",  "label_es": "UI de carga masiva",                          "status": "planned" },
-        { "label_en": "camera_trap_deployments table",                    "label_es": "Tabla camera_trap_deployments",               "status": "planned" },
-        { "label_en": "camera_trap_processing_queue table",                "label_es": "Tabla camera_trap_processing_queue",           "status": "planned" },
-        { "label_en": "Edge Function: motion → ID → research-grade",       "label_es": "Edge Function: motion → ID → research-grade",  "status": "planned" }
+        { "label_en": "Bulk-upload UI at /profile/import/camera-trap (drag-drop)", "label_es": "UI de carga masiva en /perfil/importar/camara-trampa (drag-drop)", "status": "done" },
+        { "label_en": "Shared trap location (single GPS) + per-photo EXIF timestamp", "label_es": "Ubicación compartida del trap (GPS único) + timestamp EXIF",   "status": "done" },
+        { "label_en": "MegaDetector v5a INT8 ONNX hosted on R2 (model_not_bundled stub)", "label_es": "MegaDetector v5a INT8 ONNX en R2 (stub model_not_bundled)",    "status": "done" },
+        { "label_en": "camera_trap_deployments + processing_queue tables (deferred)",  "label_es": "Tablas camera_trap_deployments + processing_queue (diferidas)", "status": "planned" },
+        { "label_en": "Edge Function: motion → ID → research-grade pipeline",          "label_es": "Edge Function: motion → ID → research-grade",                   "status": "planned" }
       ]
     },
     "capacitor-ios": {
@@ -589,15 +592,15 @@
     },
     "follows-comments-ui": {
       "phase": "v1.0",
-      "title_en": "UI for follows + threaded comments + watchlist alerts",
-      "title_es": "UI de seguidores + comentarios + alertas",
+      "title_en": "UI for follows + threaded comments + watchlists",
+      "title_es": "UI de seguidores + comentarios + listas",
       "modules": ["08-profile-activity-gamification.md"],
       "subtasks": [
-        { "label_en": "Follow button on public profile pages",                "label_es": "Botón Seguir en perfiles públicos",          "status": "planned" },
-        { "label_en": "Threaded comments component on share/obs page",         "label_es": "Componente de comentarios anidados",          "status": "planned" },
-        { "label_en": "Followers' research-grade events in activity feed",     "label_es": "Eventos de seguidos en feed",                  "status": "planned" },
-        { "label_en": "Watchlist add/edit form in profile",                     "label_es": "Formulario de listas en perfil",               "status": "planned" },
-        { "label_en": "Watchlist alerts (inbox digest, daily cron)",            "label_es": "Alertas de lista (digest, cron diario)",       "status": "planned" }
+        { "label_en": "Follow button on public profile pages (FollowButton.astro)",   "label_es": "Botón Seguir en perfiles públicos (FollowButton.astro)",      "status": "done" },
+        { "label_en": "Threaded comments component on share/obs page (Comments.astro)", "label_es": "Componente de comentarios anidados (Comments.astro)",         "status": "done" },
+        { "label_en": "Watchlist add/edit view in profile (WatchlistView.astro)",     "label_es": "Vista de listas en perfil (WatchlistView.astro)",              "status": "done" },
+        { "label_en": "Followers' research-grade events in activity feed",            "label_es": "Eventos de seguidos en feed",                                   "status": "planned" },
+        { "label_en": "Watchlist alerts (inbox digest, daily cron)",                  "label_es": "Alertas de lista (digest, cron diario)",                        "status": "planned" }
       ]
     },
     "biodiversity-trails": {
