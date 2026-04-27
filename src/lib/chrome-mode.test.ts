@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { resolveChromeMode } from './chrome-mode';
 
 describe('resolveChromeMode', () => {
@@ -55,5 +55,31 @@ describe('resolveChromeMode', () => {
   it('handles missing trailing slash', () => {
     expect(resolveChromeMode('/en/observe')).toBe('app');
     expect(resolveChromeMode('/en/about')).toBe('read');
+  });
+});
+
+describe('resolveChromeMode with BASE_URL=/rastrum/', () => {
+  afterEach(() => {
+    // nothing to tear down — baseUrl is passed explicitly
+  });
+
+  it('observe under base is app-mode', () => {
+    expect(resolveChromeMode('/rastrum/en/observe/', '/rastrum/')).toBe('app');
+  });
+
+  it('observe (es) under base is app-mode', () => {
+    expect(resolveChromeMode('/rastrum/es/observar/', '/rastrum/')).toBe('app');
+  });
+
+  it('docs under base is read-mode', () => {
+    expect(resolveChromeMode('/rastrum/en/docs/', '/rastrum/')).toBe('read');
+  });
+
+  it('auth callback under base is app-mode', () => {
+    expect(resolveChromeMode('/rastrum/auth/callback/', '/rastrum/')).toBe('app');
+  });
+
+  it('home under base is read-mode', () => {
+    expect(resolveChromeMode('/rastrum/en/', '/rastrum/')).toBe('read');
   });
 });

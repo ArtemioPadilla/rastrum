@@ -17,15 +17,23 @@ const APP_PREFIXES = [
 
 const AUTH_PREFIXES = ['/auth/'] as const;
 
-export function resolveChromeMode(pathname: string): ChromeMode {
+function normalizeBase(baseUrl: string | undefined): string {
+  if (!baseUrl || baseUrl === '/') return '';
+  const withSlash = baseUrl.startsWith('/') ? baseUrl : `/${baseUrl}`;
+  return withSlash.replace(/\/$/, '');
+}
+
+export function resolveChromeMode(pathname: string, baseUrl?: string): ChromeMode {
   if (!pathname) return 'read';
+  const base = normalizeBase(baseUrl ?? import.meta.env?.BASE_URL);
+  const noBase = base && pathname.startsWith(base) ? pathname.slice(base.length) : pathname;
   // Locale-neutral check for /auth/* first
   for (const p of AUTH_PREFIXES) {
-    if (pathname.startsWith(p)) return 'app';
+    if (noBase.startsWith(p)) return 'app';
   }
   // Strip the leading locale (e.g. "/en", "/es"); handle missing trailing slash.
   // Pathnames look like "/en/observe/" or "/es/perfil/exportar/" or "/en".
-  const stripped = pathname.replace(/^\/(en|es)(?=\/|$)/, '') || '/';
+  const stripped = noBase.replace(/^\/(en|es)(?=\/|$)/, '') || '/';
   for (const p of APP_PREFIXES) {
     if (stripped === p || stripped.startsWith(p + '/') || stripped.startsWith(p + '?')) {
       return 'app';
