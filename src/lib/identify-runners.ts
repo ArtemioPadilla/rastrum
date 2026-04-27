@@ -51,7 +51,12 @@ export function makePlantNetRunner(locale: Locale): IdentifierRunner {
     form.append('organs', 'auto');
     const url = `https://my-api.plantnet.org/v2/identify/all?api-key=${encodeURIComponent(key)}&lang=${locale}&nb-results=5`;
     const res = await fetch(url, { method: 'POST', body: form, signal });
-    if (res.status === 403 || res.status === 404) return null;  // not a plant
+    // Soft-fail on the well-known "skip this runner" responses:
+    //   403 → key revoked / origin not allowed (key needs config; not fatal here)
+    //   404 → PlantNet's "not a plant" or unknown key — no winner from us
+    //   429 → daily quota exhausted (shared key shipped 500/day; the operator
+    //         hit the cap, but Claude / Phi can still answer)
+    if (res.status === 403 || res.status === 404 || res.status === 429) return null;
     if (!res.ok) throw new Error(`PlantNet HTTP ${res.status}`);
     const data = await res.json() as { results?: PlantNetMatch[] };
     const results = data.results ?? [];

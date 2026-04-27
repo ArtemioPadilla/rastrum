@@ -14,6 +14,13 @@ interface ImportMetaEnv {
   readonly PUBLIC_ANTHROPIC_KEY?: string;
   readonly PUBLIC_VAPID_PUBLIC_KEY?: string;
   readonly PUBLIC_BUILD_SHA?: string;
+  /**
+   * Stable per-deploy version string. Used as a CORS preflight cache
+   * buster (sent as `x-rastrum-build` on `get-upload-url` calls). Set
+   * in CI from the deploy SHA; falls back to today's ISO date when
+   * unset (good enough for local dev).
+   */
+  readonly PUBLIC_BUILD_VERSION?: string;
 }
 
 interface ImportMeta {

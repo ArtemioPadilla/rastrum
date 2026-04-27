@@ -9,7 +9,7 @@
 //   - Manifest, favicon, sw.js itself: network-first so updates land fast.
 //
 // Bump VERSION to invalidate every cached entry on the next visit.
-const VERSION = 'rastrum-shell-v5-2026-04-27';
+const VERSION = 'rastrum-shell-v6-2026-04-27-cors-fix';
 const SHELL = [
   '/',
   '/en/',

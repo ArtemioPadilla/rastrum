@@ -219,9 +219,40 @@ const tr = t(lang);
           id: row.id,
           kingdom,
           observed_month: observedMonth,
+          pending: false,
         },
       });
     }
+
+    // Merge in the user's local Dexie unsynced rows so a just-uploaded
+    // observation appears immediately, before the round-trip to Supabase
+    // resolves. Marked `pending: true` so the styling can differentiate
+    // (semi-transparent / dashed outline). RLS guarantees we only ever
+    // see our own local rows here.
+    try {
+      const { getDB } = await import('../lib/db');
+      const db = getDB();
+      const local = await db.observations
+        .where('sync_status').anyOf('pending', 'error')
+        .toArray();
+      for (const rec of local) {
+        const loc = rec.data?.location;
+        if (!loc || !Number.isFinite(loc.lat) || !Number.isFinite(loc.lng)) continue;
+        if (loc.lat === 0 && loc.lng === 0) continue;
+        const ts = rec.data?.createdAt;
+        const observedMonth = ts ? new Date(ts).getUTCMonth() : null;
+        features.push({
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [loc.lng, loc.lat] } as GeoJSON.Point,
+          properties: {
+            id: rec.id,
+            kingdom: 'Unknown',
+            observed_month: observedMonth,
+            pending: true,
+          },
+        });
+      }
+    } catch { /* Dexie unavailable in this environment */ }
 
     if (!features.length) {
       if (status) {

@@ -1191,3 +1191,62 @@ CREATE POLICY "push_subs_delete_own" ON public.push_subscriptions
   FOR DELETE TO authenticated USING (auth.uid() = user_id);
 
 GRANT SELECT, INSERT, DELETE ON public.push_subscriptions TO authenticated;
+
+-- ─────────────────────────────────────────────────────────────────────
+-- Sync failures (post-launch #2 — runbook docs/runbooks/post-launch-improvements.md)
+-- Aggregated per (user, error_hash, day) so a single retry storm collapses
+-- into one row. Service role only — written by the sync-error Edge Function.
+-- ─────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.sync_failures (
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id        uuid REFERENCES public.users(id) ON DELETE SET NULL,
+  error_hash     text NOT NULL,
+  error_message  text NOT NULL,
+  blob_count     int  NOT NULL DEFAULT 0,
+  sync_attempts  int  NOT NULL DEFAULT 1,
+  app_version    text,
+  failure_day    date NOT NULL,
+  first_seen_at  timestamptz NOT NULL DEFAULT now(),
+  last_seen_at   timestamptz NOT NULL DEFAULT now(),
+  hit_count      int NOT NULL DEFAULT 1,
+  UNIQUE (user_id, error_hash, failure_day)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sync_failures_day
+  ON public.sync_failures(failure_day DESC);
+CREATE INDEX IF NOT EXISTS idx_sync_failures_user
+  ON public.sync_failures(user_id, failure_day DESC);
+
+-- On conflict, bump hit_count + refresh last_seen_at instead of duplicating.
+CREATE OR REPLACE FUNCTION public.tg_sync_failures_upsert()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  -- Triggered by a no-op upsert; we let the Edge Function call upsert with
+  -- onConflict — this trigger fires on UPDATE of the same key to bump the
+  -- counter. Without it, a retry storm would only show as one row regardless
+  -- of how loud the error was.
+  IF TG_OP = 'UPDATE' THEN
+    NEW.hit_count := COALESCE(OLD.hit_count, 0) + 1;
+    NEW.last_seen_at := now();
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS sync_failures_upsert_trigger ON public.sync_failures;
+CREATE TRIGGER sync_failures_upsert_trigger
+  BEFORE UPDATE ON public.sync_failures
+  FOR EACH ROW EXECUTE FUNCTION public.tg_sync_failures_upsert();
+
+ALTER TABLE public.sync_failures ENABLE ROW LEVEL SECURITY;
+
+-- Read: experts only (operators triaging incidents).
+DROP POLICY IF EXISTS "sync_failures_read_admin" ON public.sync_failures;
+CREATE POLICY "sync_failures_read_admin" ON public.sync_failures
+  FOR SELECT TO authenticated
+  USING (
+    auth.uid() IN (SELECT id FROM public.users WHERE is_expert = true)
+  );
+
+-- Write: service_role only (the Edge Function bypasses RLS via service key).
+GRANT SELECT ON public.sync_failures TO authenticated;
+-- No INSERT/UPDATE grant for anon/authenticated.

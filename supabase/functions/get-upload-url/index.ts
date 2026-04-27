@@ -49,7 +49,7 @@ function safeKey(userId: string, key: string): string | null {
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info',
+  'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info, x-rastrum-build',
   'Access-Control-Max-Age': '86400',
 };
 
@@ -90,6 +90,25 @@ serve(async (req) => {
   });
   const { data: { user }, error: userErr } = await supa.auth.getUser();
   if (userErr || !user) return textResponse('Invalid token', 401);
+
+  // Rate limit: a single user signing more than ~60 PUT URLs per minute
+  // is almost certainly a runaway retry storm or a bad actor. The cap
+  // is intentionally generous — a typical observation is 1-3 photos and
+  // a fresh sync of 10 stuck observations is 30-ish blobs at once. We
+  // store counts in-memory per worker. Across multiple workers the
+  // effective limit is N × 60/min, which is fine for our intent.
+  const rateMap = (globalThis as unknown as { __rastrumRateMap?: Map<string, number[]> }).__rastrumRateMap
+    ?? new Map<string, number[]>();
+  (globalThis as unknown as { __rastrumRateMap?: Map<string, number[]> }).__rastrumRateMap = rateMap;
+  const RATE_WINDOW_MS = 60_000;
+  const RATE_LIMIT = 60;
+  const now = Date.now();
+  const recent = (rateMap.get(user.id) ?? []).filter(t => now - t < RATE_WINDOW_MS);
+  if (recent.length >= RATE_LIMIT) {
+    return textResponse('Rate limited — too many upload URL requests in the last minute', 429);
+  }
+  recent.push(now);
+  rateMap.set(user.id, recent);
 
   let body: Body;
   try {

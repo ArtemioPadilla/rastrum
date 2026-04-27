@@ -95,8 +95,18 @@ async function uploadToR2(
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Not signed in — cannot upload to R2');
 
+  // Adding a custom header here means the CORS preflight cache key
+  // (URL + method + Access-Control-Request-Headers) changes whenever
+  // PUBLIC_BUILD_VERSION changes — so a deploy that fixes a CORS bug
+  // forces every browser to re-issue OPTIONS against the new function,
+  // bypassing any stale failed-preflight state. The Edge Function
+  // includes `x-rastrum-build` in its Access-Control-Allow-Headers list
+  // so the new preflight succeeds.
+  const buildVersion = (import.meta.env.PUBLIC_BUILD_VERSION as string | undefined)
+    ?? new Date().toISOString().slice(0, 10);
   const { data, error } = await supabase.functions.invoke<PresignedResponse>('get-upload-url', {
     body: { key, contentType },
+    headers: { 'x-rastrum-build': buildVersion },
   });
   if (error || !data) throw error ?? new Error('Failed to get presigned URL');
 

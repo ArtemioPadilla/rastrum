@@ -21,6 +21,7 @@ on:
           - api
           - plantnet-monitor
           - streak-push
+          - sync-error
 
 jobs:
   deploy:
@@ -55,9 +56,18 @@ jobs:
             supabase functions deploy "$fn" --project-ref "$PROJECT_REF" $flag
           }
           if [ "${{ inputs.function }}" = "all" ]; then
-            for fn in get-upload-url identify enrich-environment recompute-streaks award-badges share-card export-dwca mcp api plantnet-monitor streak-push; do
+            for fn in get-upload-url identify enrich-environment recompute-streaks award-badges share-card export-dwca mcp api plantnet-monitor streak-push sync-error; do
               deploy_one "$fn"
             done
           else
             deploy_one "${{ inputs.function }}"
           fi
+
+      - name: Audit CORS on every browser-facing function
+        # Catches the class of bug where a function ships without proper
+        # CORS headers and silently breaks every browser POST. See
+        # docs/runbooks/post-launch-improvements.md (#7).
+        run: |
+          # Give Supabase a beat to propagate the deploy.
+          sleep 5
+          ./scripts/audit-edge-cors.sh

@@ -306,6 +306,35 @@ serve(async (req) => {
     return new Response('Method not allowed', { status: 405 });
   }
 
+  // Per-IP rate limit for unauthenticated callers — guests on the
+  // /es/identificar page can otherwise mass-drain the shared PlantNet
+  // 500/day quota. Signed-in users (with an Authorization header) are
+  // assumed to be paying their own quota cost via BYO key or are
+  // already gated by RLS on the resulting INSERT. See runbook #10.
+  const hasAuth = req.headers.has('authorization')
+    && req.headers.get('authorization')!.toLowerCase().startsWith('bearer ');
+  if (!hasAuth) {
+    const ip = req.headers.get('cf-connecting-ip')
+      ?? req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+      ?? 'unknown';
+    const key = `ip:${ip}`;
+    const ipMap = (globalThis as unknown as { __identifyRateMap?: Map<string, number[]> }).__identifyRateMap
+      ?? new Map<string, number[]>();
+    (globalThis as unknown as { __identifyRateMap?: Map<string, number[]> }).__identifyRateMap = ipMap;
+    const WINDOW_MS = 60 * 60 * 1000;        // 1 hour
+    const ANON_LIMIT = 10;                    // 10 IDs / hour / IP
+    const now = Date.now();
+    const recent = (ipMap.get(key) ?? []).filter(t => now - t < WINDOW_MS);
+    if (recent.length >= ANON_LIMIT) {
+      return new Response(
+        JSON.stringify({ error: 'rate_limited', retry_after_seconds: 3600 }),
+        { status: 429, headers: { 'content-type': 'application/json' } },
+      );
+    }
+    recent.push(now);
+    ipMap.set(key, recent);
+  }
+
   let body: IdentifyRequest;
   try {
     body = await req.json();

@@ -348,16 +348,90 @@ async function syncOutboxInner(): Promise<SyncResult> {
     }
   }
   if (synced > 0) setLastSyncAt();
+
+  // Telemetry beacon — fire-and-forget after we record any failure. One
+  // beacon per syncOutbox call, regardless of how many rows failed; the
+  // Edge Function aggregates per (user, error_hash, day). See runbook #2.
+  if (failed > 0 && last_error) {
+    void sendSyncErrorBeacon({ message: last_error, blob_count: failed });
+  }
+
   const result: SyncResult = { synced, failed, skipped_guest, last_error };
   emit<SyncDoneDetail>(SYNC_EVENTS.done, result);
   await announcePendingCount();
   return result;
 }
 
+async function sendSyncErrorBeacon(opts: { message: string; blob_count: number }): Promise<void> {
+  if (typeof navigator === 'undefined') return;
+  try {
+    const supabase = getSupabase();
+    const { data: { user } } = await supabase.auth.getUser();
+    const supabaseUrl = (import.meta.env.PUBLIC_SUPABASE_URL as string | undefined) ?? '';
+    if (!supabaseUrl) return;
+    const url = `${supabaseUrl.replace(/\/$/, '')}/functions/v1/sync-error`;
+    const body = JSON.stringify({
+      user_id: user?.id ?? null,
+      error_message: opts.message.slice(0, 500),
+      blob_count: opts.blob_count,
+      sync_attempts: 1,
+      app_version: (import.meta.env.PUBLIC_BUILD_VERSION as string | undefined) ?? 'unknown',
+    });
+    if (typeof navigator.sendBeacon === 'function') {
+      // sendBeacon is the right API for telemetry — survives navigation
+      // and avoids the keepalive-fetch limit. Content-Type defaults to
+      // text/plain;charset=utf-8 which is fine for our function.
+      navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }));
+    } else {
+      fetch(url, {
+        method: 'POST', body, keepalive: true,
+        headers: { 'content-type': 'application/json' },
+      }).catch(() => { /* swallow */ });
+    }
+  } catch { /* never let telemetry break sync */ }
+}
+
+/**
+ * Promote any draft observation that now has a real GPS fix back to
+ * 'pending', so the outbox flush picks it up. A "real fix" = lat+lng
+ * are finite AND not (0,0). Drafts created at (0,0) by the form's
+ * fallback path are explicitly excluded.
+ */
+export async function promoteDraftsWithGps(): Promise<number> {
+  const db = getDB();
+  const drafts = await db.observations.where('sync_status').equals('draft').toArray();
+  let promoted = 0;
+  for (const rec of drafts) {
+    const loc = rec.data?.location;
+    const hasFix = loc
+      && Number.isFinite(loc.lat) && Number.isFinite(loc.lng)
+      && !(loc.lat === 0 && loc.lng === 0);
+    if (!hasFix) continue;
+    await db.observations.update(rec.id, {
+      sync_status: 'pending',
+      updated_at: new Date().toISOString(),
+    });
+    // Mirror the change in the embedded Observation snapshot too — the row
+    // marshals through `data` when the sync engine serialises it.
+    if (rec.data) {
+      rec.data.syncStatus = 'pending';
+      await db.observations.update(rec.id, { data: rec.data });
+    }
+    promoted++;
+  }
+  if (promoted > 0) await announcePendingCount();
+  return promoted;
+}
+
 /** Register listeners that auto-flush the outbox when the app is visible/online. */
 export function registerSyncTriggers(): void {
   if (typeof window === 'undefined') return;
-  const maybeSync = () => {
+  const maybeSync = async () => {
+    // Promote any drafts whose location got filled in since last visit
+    // (manual entry on a previous mount, EXIF GPS recovered from a photo,
+    // map-picker click). Without this, drafts stay in limbo even after the
+    // user has fixed the missing field.
+    await promoteDraftsWithGps().catch(() => { /* draft promotion non-fatal */ });
     if (navigator.onLine) {
       syncOutbox().catch(err => console.warn('[rastrum] sync failed', err));
     }

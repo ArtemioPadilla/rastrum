@@ -85,6 +85,14 @@ const tabs = [
       <p id="mo-last-sync" class="mt-1 text-xs text-zinc-500 dark:text-zinc-500" aria-live="polite"></p>
     </div>
   </header>
+  <!-- Self-healing banner — shown when there are error rows older than 24h -->
+  <div id="mo-stale-banner" class="hidden mb-4 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 p-3 flex items-start gap-2">
+    <svg class="w-4 h-4 text-amber-700 dark:text-amber-400 flex-none mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4a2 2 0 00-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z"/></svg>
+    <div class="text-xs text-amber-900 dark:text-amber-200 flex-1">
+      <span id="mo-stale-msg">—</span>
+      <button id="mo-stale-retry" type="button" class="ml-2 underline font-semibold">{lang === 'es' ? 'Reintentar todo' : 'Retry all'}</button>
+    </div>
+  </div>
   <div id="mo-toast" class="hidden fixed bottom-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg text-sm shadow-lg" role="status" aria-live="polite"></div>
 
   <div id="mo-signin" class="hidden rounded-lg border border-zinc-300 dark:border-zinc-700 p-4 text-sm">
@@ -200,6 +208,10 @@ const tabs = [
       actionBtn = `<button type="button" data-retry-id="${r.id}" class="mo-retry-btn shrink-0 inline-flex items-center gap-1 rounded-lg border border-amber-500/60 px-2 py-1 text-xs font-medium text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20" aria-label="${retryLabelText}">
           <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M20 20v-5h-5M4 9a8 8 0 0114-3M20 15a8 8 0 01-14 3"/></svg>
           ${retryLabelText}
+        </button>
+        <button type="button" data-share-when-id="${r.id}" data-share-when-name="${escapeText(name)}" class="mo-share-when-btn shrink-0 inline-flex items-center gap-1 rounded-lg border border-emerald-600/40 px-2 py-1 text-xs font-medium text-emerald-700/70 dark:text-emerald-400/70 hover:bg-emerald-50 dark:hover:bg-emerald-900/20" title="${shareLabelText}">
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 2m6-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          ${shareLabelText}
         </button>`;
     }
     const shareBtn = actionBtn;
@@ -219,6 +231,42 @@ const tabs = [
       </div>
     </li>`;
   }
+
+  // Queue a "share when synced" intent. Stored in localStorage so it
+  // survives page reloads — the user might tap Share, close the tab,
+  // come back later, and we still honour the intent the next time the
+  // matching row syncs.
+  const SHARE_WHEN_KEY = 'rastrum.shareWhenSynced';
+  type ShareIntent = { id: string; name: string };
+  function readShareQueue(): ShareIntent[] {
+    try { return JSON.parse(localStorage.getItem(SHARE_WHEN_KEY) ?? '[]') as ShareIntent[]; }
+    catch { return []; }
+  }
+  function writeShareQueue(q: ShareIntent[]) {
+    try { localStorage.setItem(SHARE_WHEN_KEY, JSON.stringify(q)); } catch { /* full */ }
+  }
+  function queueShareWhenSynced(id: string, name: string) {
+    const q = readShareQueue();
+    if (!q.find(x => x.id === id)) q.push({ id, name });
+    writeShareQueue(q);
+    showToast(lang === 'es'
+      ? '✓ Compartiremos cuando se sincronice.'
+      : '✓ We\'ll share once it syncs.', 'ok');
+  }
+
+  // Listen for row-done events; if the just-synced row matches a queued
+  // intent, fire navigator.share() and dequeue.
+  window.addEventListener('rastrum:sync-row-done', ((ev: Event) => {
+    const detail = (ev as CustomEvent<{ observation_id: string }>).detail;
+    if (!detail?.observation_id) return;
+    const q = readShareQueue();
+    const idx = q.findIndex(x => x.id === detail.observation_id);
+    if (idx < 0) return;
+    const intent = q[idx];
+    q.splice(idx, 1);
+    writeShareQueue(q);
+    shareObservation(intent.id, intent.name);
+  }) as EventListener);
 
   async function shareObservation(id: string, name: string): Promise<void> {
     const url = `https://rastrum.org/share/obs/?id=${encodeURIComponent(id)}`;
@@ -315,6 +363,52 @@ const tabs = [
     setTimeout(() => el.classList.add('hidden'), 4_000);
   }
 
+  // Self-healing: any error row older than 24h gets surfaced in a banner
+  // with a retry-all button. Without this, a row that the auto-retry-on-
+  // mount can't resolve (PlantNet quota, RLS regression, etc.) silently
+  // hangs around forever.
+  async function paintStaleBanner() {
+    const banner = document.getElementById('mo-stale-banner');
+    const msg = document.getElementById('mo-stale-msg');
+    const retry = document.getElementById('mo-stale-retry') as HTMLButtonElement | null;
+    if (!banner || !msg) return;
+    try {
+      const { getDB } = await import('../lib/db');
+      const db = getDB();
+      const all = await db.observations.where('sync_status').anyOf('pending', 'error').toArray();
+      const stale = all.filter(r => Date.now() - new Date(r.updated_at ?? r.created_at ?? Date.now()).getTime() > 24 * 60 * 60 * 1000);
+      if (stale.length === 0) {
+        banner.classList.add('hidden');
+        return;
+      }
+      msg.textContent = lang === 'es'
+        ? `${stale.length} observación${stale.length === 1 ? '' : 'es'} llevan más de 24 h sin subir.`
+        : `${stale.length} observation${stale.length === 1 ? '' : 's'} ${stale.length === 1 ? 'has' : 'have'} been waiting over 24 h.`;
+      banner.classList.remove('hidden');
+      if (retry && !retry.dataset.bound) {
+        retry.dataset.bound = '1';
+        retry.addEventListener('click', async (ev) => {
+          ev.preventDefault();
+          retry.disabled = true;
+          try {
+            const { syncOutbox } = await import('../lib/sync');
+            const res = await syncOutbox();
+            if (res.synced > 0) {
+              showToast(root?.dataset.labelRetryOk ?? 'Synced.', 'ok');
+              await resetAndLoad();
+            } else if (res.last_error) {
+              const tpl = root?.dataset.labelRetryFailed ?? 'Sync failed: {error}';
+              showToast(tpl.replace('{error}', res.last_error), 'err');
+            }
+          } finally {
+            retry.disabled = false;
+            await paintStaleBanner();
+          }
+        });
+      }
+    } catch { banner.classList.add('hidden'); }
+  }
+
   function paintLastSync() {
     if (typeof localStorage === 'undefined') return;
     const stampEl = document.getElementById('mo-last-sync');
@@ -394,6 +488,16 @@ const tabs = [
             if (id) retryRow(id, btn);
           });
         });
+        // Wire freshly-rendered "share when synced" buttons.
+        list.querySelectorAll<HTMLButtonElement>('button.mo-share-when-btn:not([data-bound])').forEach((btn) => {
+          btn.dataset.bound = '1';
+          btn.addEventListener('click', (ev) => {
+            ev.preventDefault();
+            const id = btn.dataset.shareWhenId ?? '';
+            const name = btn.dataset.shareWhenName ?? 'Rastrum';
+            if (id) queueShareWhenSynced(id, name);
+          });
+        });
       }
       offset += page.length;
       if (page.length < PAGE_SIZE) exhausted = true;
@@ -457,6 +561,7 @@ const tabs = [
     });
     paintLastSync();
     setInterval(paintLastSync, 60_000); // refresh "hace 3 min" once a minute
+    await paintStaleBanner();
     await resetAndLoad();
 
     // Auto-retry the outbox in the background. If the user is here looking
