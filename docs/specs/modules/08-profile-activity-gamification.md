@@ -109,7 +109,7 @@ Client-side validation mirrors the `CHECK` constraints in the schema:
 - `display_name`: ≤ 80 chars
 - `bio`: ≤ 500 chars
 
-Avatar upload goes to R2 bucket `media.rastrum.app/avatars/{user_id}/{ts}.jpg`
+Avatar upload goes to R2 bucket `media.rastrum.org/avatars/{user_id}/{ts}.jpg`
 (see module 03 for R2 integration details).
 
 ### Header integration (v0.1)

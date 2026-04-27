@@ -1,9 +1,11 @@
 # Module Index
 
+> Last full doc sync: 2026-04-26 (v1.0 shipped).
+
 Implementation specs are sliced from the monolithic [`rastrum-v1.md`](../rastrum-v1.md)
 vision document into focused, build-ready module specs. This index tracks every
-module that has been scoped or is planned, its target version, and whether a
-dedicated spec file exists yet.
+module that has a dedicated spec file, its target version, and its current
+implementation status against the live codebase.
 
 When `rastrum-v1.md` and a module spec disagree, the **module spec wins** — it's
 the canonical implementation reference. The monolithic spec is the vision &
@@ -14,132 +16,116 @@ narrative source.
 ## Legend
 
 - **Status**
-  - `spec`     — module spec exists at `modules/NN-*.md`
-  - `draft`    — spec file exists but is incomplete
-  - `planned`  — described in `rastrum-v1.md` only; no dedicated spec yet
+  - `shipped`  — feature is live in production (`https://rastrum.org`).
+  - `partial`  — code shipped but operator action (model weights, license,
+    DNS) is required to fully activate.
+  - `planned`  — spec exists, code not yet started or stubbed only.
+  - `deferred` — spec exists, scheduled for a later phase.
 - **Target** — the version in which the module is scheduled to ship
   (see [`docs/progress.json`](../../progress.json) for the phase schedule).
 
----
-
-## Shipped & v0.1 scope (online-first MVP)
-
-| # | Module | Target | Status | Spec |
-|---|---|---|---|---|
-| 01 | Photo ID pipeline (PlantNet + Claude Haiku cascade) | v0.1 | spec | [`01-photo-id.md`](01-photo-id.md) |
-| 02 | Observation form & GPS | v0.1 | spec | [`02-observation.md`](02-observation.md) |
-| 03 | Offline-first / PWA / sync (outbox; ID deferred to v0.3) | v0.1 | spec | [`03-offline.md`](03-offline.md) |
-| 04 | Authentication (magic link + guest mode) | v0.1 | spec | [`04-auth.md`](04-auth.md) |
-| 05 | Map view (MapLibre + pmtiles) | v0.1 | spec | [`05-map.md`](05-map.md) |
-| 06 | Darwin Core export (CSV + SNIB + CONANP presets) | v0.1 | **shipped** | [`06-darwin-core.md`](06-darwin-core.md) |
-| 07 | Licensing, ML training gates, governance | v0.1 policy → v2.0 enforcement | spec | [`07-licensing.md`](07-licensing.md) |
-| 08 | Profile, activity feed, badges, streaks, events | v0.1 → v1.0 (staged) | **shipped (v0.1, v0.3, v0.5, v1.0 slices)** | [`08-profile-activity-gamification.md`](08-profile-activity-gamification.md) |
-| 10 | Media storage (R2 + presigned URLs + CDN) | v0.1 → v0.3 migration | spec | [`10-media-storage.md`](10-media-storage.md) |
-| 11 | In-browser AI (WebLLM: Phi-3.5-vision + Llama-3.2-1B) | v0.3 → v0.5 | **shipped (opt-in)** | [`11-in-browser-ai.md`](11-in-browser-ai.md) |
-| 12 | BirdNET audio ID (Cornell Lab, CC BY-NC-SA model) | v0.5 | spec | [`12-birdnet-audio.md`](12-birdnet-audio.md) |
-| 13 | Identifier registry (plugin platform) | v0.5 | **shipped (scaffold)** | [`13-identifier-registry.md`](13-identifier-registry.md) |
-
-## v0.3 — Offline intelligence
-
-Module 08 extends here with `activity_events` + activity feed UI — see 08 spec § v0.3.
-
-| # | Module | Target | Status | Spec |
-|---|---|---|---|---|
-| 09 | On-device ONNX ID (EfficientNet-Lite0 base) | v0.3 | planned | — |
-| 10 | Offline map tile download (Mexico pmtiles) | v0.3 | planned | — |
-| 11 | EXIF/XMP/ID3 auto-extraction | v0.3 | planned | — |
-| 12 | NOM-059 / CITES obscuration grid enforcement | v0.3 | planned | — |
-
-## v0.5 — Beta
-
-Module 08 extends here with badges + quality gates + anti-sybil CHECK — see 08 spec § v0.5.
-
-| # | Module | Target | Status | Spec |
-|---|---|---|---|---|
-| 13 | BirdNET audio ID (requires Cornell commercial license) | v0.5 | planned | — |
-| 14 | Multi-image observations | v0.5 | planned | — |
-| 15 | Ecological evidence fields (tracks, scat, substrate) | v0.5 | planned | — |
-| 16 | Rastrum Scout v0 (conversational, pgvector RAG) | v0.5 | planned | — |
-| 17 | Research-grade consensus (2/3 identifier workflow) | v0.5 | planned | — |
-| 18 | Regional ONNX packs (Oaxaca, Yucatán) | v0.5 | planned | — |
-| 19 | GBIF IPT pilot + Darwin Core Archive ZIP | v0.5 | planned | — |
-| 20 | Local Contexts BC/TK Notices integration | v0.5 | planned | — |
-
-## v1.0 — Public launch
-
-Module 08 extends here with streaks + BioBlitz + shareables + social features — see 08 spec § v1.0.
-The previous line items "Opt-in gamification" and "Community profiles / badges / BioBlitz events"
-are now wholly covered by module 08 and are removed from this phase.
-
-| # | Module | Target | Status | Spec |
-|---|---|---|---|---|
-| 21 | Camera trap ingestion (SpeciesNet + MegaDetector) | v1.0 | planned | — |
-| 22 | Video support (≤30 s, H.265/AV1) | v1.0 | planned | — |
-| 23 | Institutional exports (MIA, SNIB, CONANP, INAH) | v1.0 | planned | — |
-| 24 | Credentialed researcher access tier | v1.0 | planned | — |
-| 25 | Environmental enrichment (lunar, weather, NDVI) | v1.0 | planned | — |
-| 26 | Capacitor iOS wrapper | v1.2 | planned | — |
-
-## v1.5 — Territory layer (parallel to v1.0)
-
-| # | Module | Target | Status | Spec |
-|---|---|---|---|---|
-| 27 | Biodiversity Trails (GPS waypoints + diversity metrics) | v1.5 | planned | — |
-| 28 | PITs + QR/NFC anchors (Puntos de Información Territorial) | v1.5 | planned | — |
-| 29 | Spatial analysis (ANP/INEGI/INAH GeoJSON layers) | v1.5 | planned | — |
-| 30 | Diversity indices (S, H′, D, Chao1, Pielou J) | v1.5 | planned | — |
-| 31 | Trail PDF export (field-guide style) | v1.5 | planned | — |
-
-## v2.0 — Institutional
-
-| # | Module | Target | Status | Spec |
-|---|---|---|---|---|
-| 32 | Camera trap advanced (occupancy, activity histograms) | v2.0 | planned | — |
-| 33 | GBIF publisher + DOI generation | v2.0 | planned | — |
-| 34 | Regional ML training pipeline (see module 07 for gates) | v2.0 | planned | — |
-| 35 | B2G dashboard (CONANP / state agencies) | v2.0 | planned | — |
-| 36 | iNaturalist import/export bridge | v2.0 | planned | — |
-
-## v2.5 — AI + AR
-
-| # | Module | Target | Status | Spec |
-|---|---|---|---|---|
-| 37 | Rastrum Scout full (conversational field AI) | v2.5 | planned | — |
-| 38 | AR species overlay | v2.5 | planned | — |
-| 39 | Indigenous language voice I/O | v2.5 | planned | — |
-| 40 | CONABIO / CONANP / INAH partnership APIs | v2.5 | planned | — |
+> The index is grouped by phase. Each row links to the spec file. File
+> numbers reflect the actual filename on disk; gaps and the duplicated
+> `15-*.md` are historical (`15-map-location-picker.md` was claimed first,
+> then `15-mcp-server.md` shipped under the same number — see the note
+> below the table).
 
 ---
 
-## Shipped modules (post-v0.5)
+## v0.1 — Alpha MVP (online-first) — shipped
 
 | # | Module | Target | Status | Spec |
 |---|---|---|---|---|
-| 14 | User API tokens (`rst_*`, scoped, SHA-256 hashed) | v0.5 | shipped | [`14-user-api-tokens.md`](14-user-api-tokens.md) |
-| 15 | MCP server (JSON-RPC over HTTP for AI agents) | v1.0 | shipped | [`15-mcp-server.md`](15-mcp-server.md) |
+| 01 | Photo ID Pipeline (PlantNet → Claude Haiku cascade) | v0.1 | shipped | [`01-photo-id.md`](01-photo-id.md) |
+| 02 | Observation Form & GPS | v0.1 | shipped | [`02-observation.md`](02-observation.md) |
+| 03 | Offline-First / PWA / Sync | v0.1 | shipped | [`03-offline.md`](03-offline.md) |
+| 04 | Authentication (magic link, OTP, OAuth, passkey) | v0.1 | shipped | [`04-auth.md`](04-auth.md) |
+| 05 | Map View (MapLibre + observations layer) | v0.1 | shipped | [`05-map.md`](05-map.md) |
+| 06 | Darwin Core Export (CSV + SNIB + CONANP presets) | v0.1 | shipped | [`06-darwin-core.md`](06-darwin-core.md) |
+| 07 | Licensing, ML Training Gates & Data Governance | v0.1 policy → v2.0 enforcement | shipped (policy + per-record license; ML gate at v2.0) | [`07-licensing.md`](07-licensing.md) |
+| 10 | Media Storage (Cloudflare R2 + CDN) | v0.1 | shipped | [`10-media-storage.md`](10-media-storage.md) |
 
-> **Note:** the planned-module table above (rows 13–20) was authored
-> early in v0.3 with provisional numbers and is stale relative to actual
-> shipped numbering. Trust the file names and statuses in this section
-> over the planned table for anything past 12.
+## v0.3 — Offline intelligence + activity — partially shipped
+
+| # | Module | Target | Status | Spec |
+|---|---|---|---|---|
+| 08 | Profile, Activity & Gamification (staged across v0.1–v1.0) | v0.1 → v1.0 | shipped (all four slices) | [`08-profile-activity-gamification.md`](08-profile-activity-gamification.md) |
+| 11 | In-Browser AI (WebLLM Phi-3.5-vision + Llama-3.2-1B) | v0.3 → v0.5 | shipped | [`11-in-browser-ai.md`](11-in-browser-ai.md) |
+
+## v0.5 — Beta — partially shipped
+
+| # | Module | Target | Status | Spec |
+|---|---|---|---|---|
+| 12 | BirdNET Audio ID (Cornell Lab, NC license) | v0.5 → v1.0 | shipped (BirdNET-Lite ONNX, weights on R2) | [`12-birdnet-audio.md`](12-birdnet-audio.md) |
+| 13 | Identifier Registry (plugin platform) | v0.5 | shipped (7 plugins registered) | [`13-identifier-registry.md`](13-identifier-registry.md) |
+| 14 | User API Tokens (`rst_*`, scoped, SHA-256 hashed) | v0.5 | shipped | [`14-user-api-tokens.md`](14-user-api-tokens.md) |
+
+## v1.0 — Public launch — shipped
+
+| # | Module | Target | Status | Spec |
+|---|---|---|---|---|
+| 09 | Camera Trap Analysis (MegaDetector + SpeciesNet) | v1.0 | partial (UI + plugin stub shipped; weights operator-hosted) | [`09-camera-trap.md`](09-camera-trap.md) |
+| 15 | Map Location Picker (drag pin, search locality) | v1.0 | shipped | [`15-map-location-picker.md`](15-map-location-picker.md) |
+| 15 | MCP Server (JSON-RPC over HTTP for AI agents) | v1.0 | shipped | [`15-mcp-server.md`](15-mcp-server.md) |
+| 16 | My Observations (personal history page) | v1.0 | shipped | [`16-my-observations.md`](16-my-observations.md) |
+| 17 | In-App Camera (`getUserMedia`) | v1.0 | shipped | [`17-in-app-camera.md`](17-in-app-camera.md) |
+| 18 | Onboarding Flow | v1.0 | shipped | [`18-onboarding.md`](18-onboarding.md) |
+| 19 | Batch Photo Importer (Google Photos / Drive / file upload) | v1.0 | shipped | [`19-batch-photo-importer.md`](19-batch-photo-importer.md) |
+
+> **Numbering note.** Two specs share the `15-` prefix:
+> [`15-map-location-picker.md`](15-map-location-picker.md) was claimed first
+> during the v1.0 push, then [`15-mcp-server.md`](15-mcp-server.md) shipped
+> under the same number. Both are real, both reference each other from
+> consuming specs. New specs should claim the next free number (`20`+).
+
+---
+
+## Planned but unscoped
+
+The roadmap items below are tracked in
+[`docs/progress.json`](../../progress.json) but have no dedicated module
+spec yet. Most are blocked on external dependencies (Cornell BirdNET
+commercial license, GBIF publisher account, Apple Developer Program,
+ML training pipeline) rather than waiting on engineering capacity.
+
+| Roadmap item | Target | Blocker |
+|---|---|---|
+| `scout-v0` (conversational ID, pgvector RAG) | v0.5 | pgvector + embedding corpus |
+| `gbif-ipt` (GBIF IPT pilot) | v0.5 | GBIF publisher account; DwC-A generator already shipped |
+| `local-contexts` (BC/TK Notice integration) | v0.5 + governance | community consent before code |
+| `video-support` (≤30 s, H.265/AV1) | v1.0 | ✅ shipped (per progress.json) — spec stub welcome |
+| `oauth-custom-domain` (`auth.rastrum.org`) | v1.0 | Supabase Pro $25/mo (deferred for zero-cost target) |
+| `capacitor-ios` (App Store wrapper) | v1.2 | Apple Developer Program $99/yr |
+| `biodiversity-trails`, `pits-qr`, `spatial-analysis`, `diversity-indices`, `trail-pdf-export` | v1.5 | future spec |
+| `camera-trap-advanced`, `gbif-publisher`, `regional-ml`, `b2g-dashboard`, `inat-bridge` | v2.0 | future spec |
+| `scout-full`, `ar-overlay`, `voice-indigenous`, `conabio-api` | v2.5 | future spec |
+
+---
 
 ## Infra & cross-cutting
 
 | Doc | Purpose |
 |---|---|
-| [`infra/supabase-schema.sql`](../infra/supabase-schema.sql) | Canonical v0.1 schema |
+| [`infra/supabase-schema.sql`](../infra/supabase-schema.sql) | Canonical idempotent schema |
+| [`infra/seed-badges.sql`](../infra/seed-badges.sql) | 39-badge multilingual seed |
+| [`infra/cron-schedules.sql`](../infra/cron-schedules.sql) | `pg_cron` schedules for nightly Edge Functions |
+| [`infra/cron-test.sql`](../infra/cron-test.sql) | One-shot cron job verification |
 | [`infra/future-migrations.md`](../infra/future-migrations.md) | Deferred schema changes (partitioning, pgvector, …) |
 | [`infra/testing.md`](../infra/testing.md) | Test pyramid, RLS pgTAP, Lighthouse budgets |
-| [`infra/github-actions.yml`](../infra/github-actions.yml) | CI workflow |
+| [`infra/github-actions.yml`](../infra/github-actions.yml) | Reference CI workflow |
+| [`../architecture.md`](../architecture.md) | High-level architecture across modules |
+| [`../gbif-ipt.md`](../gbif-ipt.md) | Operator notes for publishing to GBIF via IPT |
 
 ---
 
 ## How to add a new module spec
 
-1. Claim the next `NN-*.md` slot from the tables above.
-2. Copy the structure of an existing spec (`01-photo-id.md` is a good template).
+1. Claim the next free `NN-*.md` slot (currently `20-`).
+2. Copy the structure of an existing spec
+   (`01-photo-id.md` is a good template).
 3. Include: **Overview → Data model → APIs / logic → Edge cases → Cost / risk
    notes → Data stored**.
 4. Link from this index and from any module it depends on.
-5. If the new module duplicates a narrative section in `rastrum-v1.md`, trim the
-   duplicate from the monolithic spec and leave a pointer to the module spec.
+5. If the new module duplicates a narrative section in `rastrum-v1.md`,
+   trim the duplicate from the monolithic spec and leave a pointer to the
+   module spec.

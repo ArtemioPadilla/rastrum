@@ -1,9 +1,10 @@
 # Module 17 — In-App Camera (getUserMedia)
 
 **Version target:** v1.0
-**Status:** Planned
+**Status:** shipped — `getUserMedia` capture wired into `ObservationForm.astro` with file-input fallback.
 **GitHub Issue:** #18
 **Requested by:** Eugenio Padilla (first user, 2026-04-25)
+**Last verified:** 2026-04-26.
 
 ---
 

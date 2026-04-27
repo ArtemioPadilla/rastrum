@@ -1,9 +1,10 @@
 # Module 19 — Batch Photo Importer
 
 **Version target:** v1.0
-**Status:** Planned
+**Status:** shipped — Google Photos / Drive / file-upload importer with EXIF GPS + datetime extraction live.
 **GitHub Issue:** #19
 **Requested by:** Eugenio Padilla (field biologist, 2026-04-25)
+**Last verified:** 2026-04-26 — `src/lib/batch-import.ts` running in production.
 
 ---
 

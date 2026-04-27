@@ -1,9 +1,10 @@
 # Module 15 — Map Location Picker
 
 **Version target:** v1.0
-**Status:** Planned
+**Status:** shipped — drag-pin + tap-to-place + locality search wired into `ObservationForm.astro`.
 **GitHub Issue:** #9
 **Requested by:** Eugenio Padilla (first user, 2026-04-25)
+**Last verified:** 2026-04-26.
 
 ---
 

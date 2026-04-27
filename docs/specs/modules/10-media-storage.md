@@ -156,7 +156,7 @@ async function uploadObservationPhoto(
   });
 
   // 4. Return public CDN URL
-  return `https://media.rastrum.app/${key}`;
+  return `https://media.rastrum.org/${key}`;
 }
 ```
 
@@ -218,7 +218,7 @@ export async function uploadPendingMedia(): Promise<void> {
 
       await db.mediaBlobs.update(item.id, {
         uploaded: true,
-        upload_url: `https://media.rastrum.app/${key}`,
+        upload_url: `https://media.rastrum.org/${key}`,
       });
     } catch (e) {
       console.error(`Failed to upload ${item.id}:`, e);
@@ -273,7 +273,7 @@ async function uploadCameraTrapBatch(
 ## Cloudflare R2 Custom Domain Setup
 
 1. Create R2 bucket: `rastrum-media`
-2. Add custom domain in Cloudflare dashboard: `media.rastrum.app`
+2. Add custom domain in Cloudflare dashboard: `media.rastrum.org`
 3. Cloudflare CDN automatically serves from R2 — zero config
 4. Enable Cloudflare Transform Rules for automatic WebP conversion:
    ```
@@ -293,7 +293,7 @@ CF_ACCOUNT_ID=xxxxxxxxxxxxxxxxxxxx
 R2_ACCESS_KEY_ID=xxxxxxxxxxxxxxxxxxxx
 R2_SECRET_ACCESS_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 R2_BUCKET_NAME=rastrum-media
-R2_PUBLIC_URL=https://media.rastrum.app
+R2_PUBLIC_URL=https://media.rastrum.org
 ```
 
 ---

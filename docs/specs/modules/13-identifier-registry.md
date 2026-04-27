@@ -1,9 +1,12 @@
 # Module 13 — Identifier Registry (Plugin Platform)
 
 **Version target:** v0.5
-**Status:** spec + scaffold shipped. Plugins for PlantNet, Claude Haiku,
-Phi-3.5-vision are wired through it; BirdNET-Lite and EfficientNet-Lite0
-are stubbed pending model weights.
+**Status:** shipped. Seven plugins registered as of 2026-04-26:
+`plantnet`, `claude_haiku`, `webllm_phi35_vision`,
+`webllm_llama32_1b`, `birdnet_lite` (ONNX, weights on R2),
+`onnx_efficientnet_lite0` (ONNX, weights on R2),
+`camera_trap_megadetector` (operator-hosted endpoint).
+**Last verified:** 2026-04-26.
 
 ---
 

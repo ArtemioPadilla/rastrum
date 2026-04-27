@@ -41,7 +41,7 @@ curl -s -X POST "https://reppvlqejgoqvitturxp.supabase.co/functions/v1/api/obser
     "lng": -96.74,
     "observed_at": "2026-04-24T15:30:00Z",
     "notes": "Bosque de encino, hojarasca",
-    "photo_url": "https://media.rastrum.app/..."
+    "photo_url": "https://media.rastrum.org/..."
   }'
 ```
 

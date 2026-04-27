@@ -1,8 +1,9 @@
 # Module 18 — Onboarding Flow
 
 **Version target:** v1.0
-**Status:** Planned
+**Status:** shipped — onboarding flow live for new authenticated users.
 **Discovered:** First user session with Eugenio Padilla (2026-04-25)
+**Last verified:** 2026-04-26.
 
 ---
 

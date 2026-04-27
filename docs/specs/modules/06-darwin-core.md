@@ -1,7 +1,8 @@
 # Module 06 — Darwin Core Export
 
 **Version target:** v0.1
-**Status:** Not started
+**Status:** shipped — `src/lib/darwin-core.ts` (CSV) + `src/lib/dwca.ts` (DwC-A ZIP) live; `export-dwca` Edge Function deployed.
+**Last verified:** 2026-04-26 — three column presets (DwC, SNIB, CONANP) plus DwC-A archive available from Export view + Edge Function.
 
 ---
 

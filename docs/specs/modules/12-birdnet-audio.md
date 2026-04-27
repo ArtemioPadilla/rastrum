@@ -1,9 +1,10 @@
 # Module 12 — BirdNET Audio ID
 
 **Version target:** v0.5
-**Status:** plugin stub registered; weights not yet bundled.
-**License:** code MIT, model **CC BY-NC-SA 4.0** (Cornell Lab).
+**Status:** shipped — BirdNET-Lite ONNX runs in-browser via `onnxruntime-web`. Weights hosted on R2 at `PUBLIC_BIRDNET_WEIGHTS_URL`. Spectrogram preprocessing in JS; cache management in `birdnet-cache.ts`.
+**License:** code MIT, model **CC BY-NC-SA 4.0** (Cornell Lab) — non-commercial citizen-science use only.
 **Plugin id:** `birdnet_lite`
+**Last verified:** 2026-04-26 — `src/lib/identifiers/birdnet-audio.ts` + `birdnet-cache.ts` running in production.
 
 ---
 

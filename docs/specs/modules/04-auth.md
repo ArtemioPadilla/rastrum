@@ -1,7 +1,8 @@
 # Module 04 — Authentication
 
 **Version target:** v0.1
-**Status:** Not started
+**Status:** shipped — magic link, OTP code, Google + GitHub OAuth, passkey/WebAuthn, sign-out-everywhere all wired in `src/components/SignInForm.astro` and `src/lib/auth.ts`.
+**Last verified:** 2026-04-26 — five sign-in methods present in `SignInForm.astro` (verified during this doc pass); custom OAuth domain (`auth.rastrum.org`) deferred (requires Supabase Pro $25/mo, out of scope for the zero-cost target).
 
 ---
 
