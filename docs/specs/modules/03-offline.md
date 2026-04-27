@@ -1,7 +1,8 @@
 # Module 03 — Offline-First / PWA / Sync
 
 **Version target:** v0.1
-**Status:** Not started
+**Status:** shipped — Dexie outbox + `syncOutbox()` + identify trigger live; service worker shell-cached.
+**Last verified:** 2026-04-26 — `src/lib/db.ts` (RastrumDB), `src/lib/sync.ts`, `public/sw.js` running in production. Workbox-style background sync queue intentionally deferred (visibilitychange + online events suffice).
 
 ---
 

@@ -1,7 +1,8 @@
 # Module 02 — Observation Form & GPS
 
 **Version target:** v0.1
-**Status:** Not started
+**Status:** shipped — `ObservationForm.astro` plus the Dexie outbox in `src/lib/db.ts` are live.
+**Last verified:** 2026-04-26 — multi-image, audio (≤30 s), EXIF GPS, two-pass live GPS, manual coords, evidence-type dropdown, identification block, NOM-059 notice all in production.
 
 ---
 

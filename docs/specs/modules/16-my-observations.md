@@ -1,9 +1,10 @@
 # Module 16 — My Observations (Personal History)
 
 **Version target:** v1.0
-**Status:** Planned
+**Status:** shipped — `/{lang}/profile/observations/` (`/perfil/observaciones/`) live with status + thumbnails.
 **GitHub Issue:** #17
 **Requested by:** Eugenio Padilla (first user, 2026-04-25)
+**Last verified:** 2026-04-26.
 
 ---
 

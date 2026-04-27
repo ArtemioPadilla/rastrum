@@ -2,6 +2,8 @@
 
 > Briefing for AI coding agents (Claude Code, Copilot, Cursor, Codex, …)
 > working in this repo. Read this before making changes.
+>
+> **Last full doc sync:** 2026-04-26 (v1.0 shipped).
 
 ---
 
@@ -25,7 +27,8 @@ Bilingual EN/ES from day one.
 |---|---|
 | [`docs/progress.json`](docs/progress.json)              | Source of truth for the roadmap. Bilingual labels (`_es` suffix). |
 | [`docs/tasks.json`](docs/tasks.json) + [`docs/tasks.md`](docs/tasks.md) | Per-roadmap-item subtask breakdown. Check current status before starting work. |
-| [`docs/specs/modules/00-index.md`](docs/specs/modules/00-index.md) | Catalog of 13 module specs. Each module has its own design doc. |
+| [`docs/specs/modules/00-index.md`](docs/specs/modules/00-index.md) | Catalog of 20 module specs (numbers `01`–`19`, with two `15-` files). Each module has its own design doc. |
+| [`docs/architecture.md`](docs/architecture.md)            | High-level architecture diagram + critical-path flows. |
 | [`docs/specs/infra/supabase-schema.sql`](docs/specs/infra/supabase-schema.sql) | Idempotent SQL — apply with `make db-apply`. |
 | `Makefile`                                                | Run `make help` to see every dev workflow. |
 
@@ -38,7 +41,7 @@ make help                     # list every target with descriptions
 make install                  # npm ci
 make dev                      # astro dev — http://localhost:4321
 make build                    # static build into dist/
-make test                     # vitest run (~20 tests today)
+make test                     # vitest run (225 tests today)
 make typecheck                # tsc --noEmit
 make db-apply                 # apply supabase-schema.sql (idempotent)
 make db-verify                # show tables, RLS, triggers, extensions
@@ -92,18 +95,27 @@ src/
 └── env.d.ts                Typed import.meta.env
 
 supabase/
-├── functions/<name>/index.ts    Deno Edge Functions (identify, enrich-environment,
-│                                 recompute-streaks, award-badges, share-card,
-│                                 get-upload-url, export-dwca, api, mcp)
+├── functions/<name>/index.ts    Deno Edge Functions (deploy via CI)
+│   ├── identify              Photo cascade entry point
+│   ├── enrich-environment    Lunar phase + OpenMeteo backfill
+│   ├── recompute-streaks     Nightly cron
+│   ├── award-badges          Nightly cron
+│   ├── share-card            Public OG card renderer
+│   ├── get-upload-url        R2 presigned upload URLs
+│   ├── export-dwca           Darwin Core Archive ZIP
+│   ├── api                   REST API (rst_* token auth)
+│   └── mcp                   MCP server for AI agents (rst_* token auth, JSON-RPC over HTTP)
 └── config.toml             Local CLI config (deploy via CI, not local)
 
 docs/
 ├── progress.json           Roadmap (60+ items, bilingual labels)
 ├── tasks.json              Per-item subtask breakdown (rendered at /docs/tasks/)
-├── tasks.md                Markdown audit of every item + subtasks
+├── tasks.md                Phase summary (regenerated from tasks.json)
+├── architecture.md         High-level architecture + critical-path flows
+├── gbif-ipt.md             Operator notes for GBIF IPT publishing
 └── specs/
     ├── infra/              SQL schema, cron, testing, future migrations, CI yml
-    └── modules/            13 module specs + 00-index.md
+    └── modules/            20 module specs + 00-index.md (see numbering note)
 ```
 
 ---
@@ -188,12 +200,17 @@ The registry has runtime collision detection on `id`. See
 |---|---|---|
 | `supabase functions deploy` → "Missing required field: db.port" | CLI 2.90.0 has a regression on this project's config | Deploy via `gh workflow run deploy-functions.yml`. Never local. |
 | Astro build: `Expected ")" but found <string,…>` | Inline `Record<…>` cast in JSX | Pull the cast into the frontmatter as a typed const |
+| Astro page renders `[object Object]` for translation keys | `t(lang)` returns a translation **tree**, not a getter — the tokens.astro pages tripped on this | Drill into the tree directly: `const tr = t(lang); tr.profile.tokens.heading`. Don't call it like a function on a key path. |
 | Vitest: `localStorage.clear is not a function` | Node 22's experimental localStorage shadows happy-dom's | Map-backed shim at top of test file (see `byo-keys.test.ts`) |
 | Magic link redirects to `localhost:3000` | Supabase Site URL still default | Dashboard → Authentication → URL Configuration → set Site URL + allow-list `/auth/callback/` |
 | Email auth "rate limit exceeded" after 3 sends | Supabase free tier built-in SMTP cap | Custom SMTP (Gmail App Password or Resend) — see module 04 |
 | 403 from `/rest/v1/users` even with valid JWT | "Auto-expose new tables" was disabled at project creation | Schema includes explicit `GRANT SELECT/INSERT/UPDATE/DELETE` to anon + authenticated; replay `make db-apply` |
 | OAuth provider returns no email | GitHub user has private email | `signInWithGitHub('read:user user:email')` scope requested in `auth.ts` |
 | Edge Function 401 from cron | publishable `sb_publishable_…` key not accepted as Bearer by Edge Functions | Cron-only functions are deployed `--no-verify-jwt` |
+| Custom OAuth domain (`auth.rastrum.org`) fails | Requires Supabase Pro plan ($25/mo) | **Resolved by deferring** (2026-04-26): default Supabase callback host is fine for v1.0; revisit if billing changes. Out of scope for the zero-cost target. |
+| 404 on `media.rastrum.app/...` after domain migration | Old hostname `media.rastrum.app` retired | **Resolved 2026-04-26:** use `https://media.rastrum.org/...`. Service worker pass-through list and env vars updated. |
+| Test file imports `phi-vision.ts` directly and panics in Node | WebLLM bundle pulls WebGPU APIs at import time | Mock at the module boundary in your test, not at the WebLLM SDK level (see `local-ai.test.ts`). |
+| `gh` CLI deploys still hit `rastrum.artemiop.com` in docs | Old canonical domain | **Resolved 2026-04-26:** all docs migrated to `rastrum.org`; the old domain redirects but new content goes to `rastrum.org`. |
 
 ---
 
@@ -230,10 +247,10 @@ See "Identifier plugin contract" above. Use the existing plugins
 (`plantnet.ts`, `claude.ts`, `phi-vision.ts`) as templates.
 
 ### A new module spec
-1. Find the next free number in `modules/00-index.md`.
+1. Find the next free number in `modules/00-index.md` (currently `20-`).
 2. Create `docs/specs/modules/NN-<slug>.md`. Use the structure of an
    existing spec (`07-licensing.md` is a good template).
-3. Add the row to `00-index.md`.
+3. Add the row to `00-index.md` under the right phase section.
 4. Cross-link from any consuming module.
 
 ### A new schema change
@@ -255,10 +272,19 @@ See "Identifier plugin contract" above. Use the existing plugins
 ## Pre-PR checklist
 
 ```bash
-make typecheck     # zero errors
-make test          # all green (currently 19 tests)
-make build         # zero errors, page count matches expectations
-git status -s      # nothing untracked except .claude/ or .env.local
+npm run typecheck   # tsc --noEmit, zero errors
+npm run test        # vitest run — 225 tests today, all green
+npm run build       # zero errors, 57 pages today, EN/ES paired
+git status -s       # nothing untracked except .claude/ or .env.local
+```
+
+Optional but encouraged when touching the UI shell, identifier UX, or
+service worker:
+
+```bash
+npm run test:e2e        # Playwright on chromium + mobile-chrome
+npm run test:lhci       # Lighthouse CI against ./dist
+npm run test:audit      # build + e2e + lhci end-to-end
 ```
 
 If touching SQL: `make db-apply` then `make db-verify`. If touching Edge

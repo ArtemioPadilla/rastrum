@@ -1,8 +1,9 @@
 # Module 09 — Camera Trap Analysis (Fototrampeo)
 
 **Version target:** v1.0 (months 7–12)
-**Status:** Not started
+**Status:** partial — UI shipped at `/profile/import/camera-trap`; `camera_trap_megadetector` plugin stub registered (`src/lib/identifiers/camera-trap-megadetector.ts`); inference pending operator-hosted weights at `PUBLIC_MEGADETECTOR_ENDPOINT`.
 **Spec author:** Eugenio Padilla + Claude (2026-04-24)
+**Last verified:** 2026-04-26.
 
 ---
 

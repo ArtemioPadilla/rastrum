@@ -1,7 +1,8 @@
 # Module 14 — User API Tokens
 
 **Version target:** v1.0
-**Status:** Not started
+**Status:** shipped — `user_api_tokens` table with RLS, `/profile/tokens` UI, REST API (`/functions/v1/api/*`) and MCP server (`/functions/v1/mcp`) all gate on the same scope strings.
+**Last verified:** 2026-04-26.
 
 ---
 
@@ -159,7 +160,7 @@ Submit a new observation.
   "lng": -96.74,
   "observed_at": "2026-04-24T15:30:00Z",
   "notes": "Bosque de encino, hojarasca",
-  "photo_url": "https://media.rastrum.app/observations/xxx/primary.jpg"
+  "photo_url": "https://media.rastrum.org/observations/xxx/primary.jpg"
 }
 ```
 

@@ -231,6 +231,22 @@ Observer (PWA)
 
 ---
 
+## Deploy / redeploy the Edge Function
+
+Edge Function deploys go through CI (the local `supabase` CLI 2.90.0
+has a regression on this project's config — see `AGENTS.md`):
+
+```bash
+gh workflow run deploy-functions.yml -f function=export-dwca
+gh run watch
+```
+
+The function name `export-dwca` is one of the choices declared in
+[`.github/workflows/deploy-functions.yml`](../.github/workflows/deploy-functions.yml).
+Pass `function=all` to redeploy every function in one run.
+
+---
+
 ## Future work
 
 The roadmap item [`gbif-publisher`](./progress.json) tracks deeper

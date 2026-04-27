@@ -1,7 +1,8 @@
 # Module 05 — Map View
 
 **Version target:** v0.1
-**Status:** Not started
+**Status:** shipped — MapLibre + clustered observation pins live; pmtiles MX archive hosted on R2 (`PUBLIC_PMTILES_MX_URL`).
+**Last verified:** 2026-04-26 — `src/components/ExploreMap.astro` running in production; offline tiles activate when the env var is set.
 
 ---
 
@@ -36,7 +37,7 @@ const map = new maplibregl.Map({
     sources: {
       'osm-tiles': {
         type: 'vector',
-        url: 'pmtiles://https://r2.rastrum.app/tiles/mexico-v1.pmtiles',
+        url: 'pmtiles://https://tiles.rastrum.org/tiles/mexico-v1.pmtiles',
       }
     },
     layers: [/* OSM style layers */],
@@ -66,7 +67,7 @@ map.on('error', (e) => {
 ```typescript
 async function downloadRegionTiles(center: LngLat, radiusKm: number): Promise<void> {
   const bbox = centerToBbox(center, radiusKm);
-  const chunkUrl = `https://r2.rastrum.app/tiles/chunks/${tileKey(bbox)}.pmtiles`;
+  const chunkUrl = `https://tiles.rastrum.org/tiles/chunks/${tileKey(bbox)}.pmtiles`;
   const response = await fetch(chunkUrl);
   const buffer = await response.arrayBuffer();
   // Store in Dexie blob

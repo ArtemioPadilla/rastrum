@@ -1,7 +1,8 @@
 # Module 01 — Photo ID Pipeline
 
 **Version target:** v0.1
-**Status:** Not started
+**Status:** shipped (PlantNet + Claude Haiku cascade live; on-device fallbacks via module 11/13)
+**Last verified:** 2026-04-26 — `supabase/functions/identify/index.ts` + `src/lib/identifiers/{plantnet,claude}.ts` running in production.
 
 ---
 
