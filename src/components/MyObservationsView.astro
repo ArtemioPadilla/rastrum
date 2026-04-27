@@ -153,7 +153,7 @@ const tabs = [
 
   type Lang = 'en' | 'es';
 
-  type Ident = { scientific_name: string; is_primary: boolean };
+  type Ident = { scientific_name: string; is_primary: boolean; is_research_grade?: boolean };
   type Media = { url: string; is_primary: boolean };
   type Row = {
     id: string;
@@ -232,7 +232,10 @@ const tabs = [
           <div class="min-w-0 flex-1">
             <p class="text-sm italic font-medium text-zinc-900 dark:text-zinc-100 truncate">${escapeText(name)}</p>
             <p class="text-xs text-zinc-500 truncate">${date}${escapeText(region)}</p>
-            <div class="mt-1">${statusBadge(r.sync_status)}</div>
+            <div class="mt-1 flex items-center gap-1.5 flex-wrap">
+              ${statusBadge(r.sync_status)}
+              ${ident?.is_research_grade ? `<span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 px-2 py-0.5 text-[11px] font-semibold text-emerald-800 dark:text-emerald-300" title="${lang === 'es' ? 'Grado investigación' : 'Research grade'}"><svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>${lang === 'es' ? 'Grado investigación' : 'Research grade'}</span>` : ''}
+            </div>
           </div>
         </${wrapTag}>
         ${shareBtn}
@@ -347,7 +350,7 @@ const tabs = [
     const supabase = getSupabase();
     let q = supabase
       .from('observations')
-      .select('id, observed_at, sync_status, state_province, identifications(scientific_name, is_primary), media_files(url, is_primary)')
+      .select('id, observed_at, sync_status, state_province, identifications(scientific_name, is_primary, is_research_grade), media_files(url, is_primary)')
       .eq('observer_id', userId)
       .order('observed_at', { ascending: false })
       .range(offset, offset + PAGE_SIZE - 1);

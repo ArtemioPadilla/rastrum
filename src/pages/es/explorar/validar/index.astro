@@ -1,0 +1,13 @@
+---
+import BaseLayout from '../../../../layouts/BaseLayout.astro';
+import ValidationQueueView from '../../../../components/ValidationQueueView.astro';
+import { t } from '../../../../i18n/utils';
+
+const lang = 'es';
+const tr = t(lang);
+const v = (tr as unknown as { validation: Record<string, string> }).validation;
+---
+
+<BaseLayout title={`${v.queue_title} — Rastrum`} description={v.dashboard_subtitle ?? 'Cola de validación'} lang={lang}>
+  <ValidationQueueView lang={lang} />
+</BaseLayout>

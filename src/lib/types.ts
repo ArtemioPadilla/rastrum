@@ -143,3 +143,22 @@ export interface UserStats {
   streak_days: number;
   streak_best: number;
 }
+
+/**
+ * Row shape returned by the public.validation_queue view.
+ * See docs/specs/modules/22-community-validation.md.
+ */
+export interface ValidationQueueRow {
+  observation_id: string;
+  observer_id: string;
+  observed_at: string;
+  state_province: string | null;
+  habitat: string | null;
+  obscure_level: 'none' | '0.1deg' | '0.2deg' | '5km' | 'full';
+  primary_id_id: string | null;
+  current_scientific_name: string | null;
+  current_confidence: number | null;
+  is_research_grade: boolean | null;
+  suggestion_count: number;
+  distinct_voter_count: number;
+}

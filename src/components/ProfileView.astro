@@ -12,6 +12,7 @@ const { lang } = Astro.props;
 const tr = t(lang);
 const myObservationsPath = getLocalizedPath(lang, routes.profileObservations[lang] + '/');
 const expertApplyPath = getLocalizedPath(lang, routes.profileExpertApply[lang] + '/');
+const validatePath = getLocalizedPath(lang, routes.profileValidate[lang] + '/');
 ---
 
 <div class="max-w-3xl mx-auto pb-28 sm:pb-6">
@@ -84,6 +85,12 @@ const expertApplyPath = getLocalizedPath(lang, routes.profileExpertApply[lang] +
         class="inline-flex items-center rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
       >
         {tr.expert.apply_title}
+      </a>
+      <a
+        href={validatePath}
+        class="inline-flex items-center rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
+      >
+        {(tr as unknown as { validation: { dashboard_title: string } }).validation.dashboard_title}
       </a>
     </nav>
 

@@ -1,0 +1,97 @@
+---
+/**
+ * ValidationDashboardView — personal stats for users who have made
+ * community validation suggestions. Sources from `identifications`
+ * rows where validated_by = auth.uid().
+ *
+ * See docs/specs/modules/22-community-validation.md.
+ */
+import { t, getLocalizedPath, routes } from '../i18n/utils';
+
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+const v = (tr as unknown as { validation: Record<string, string> }).validation;
+const profilePath = getLocalizedPath(lang, routes.profile[lang] + '/');
+const queuePath = lang === 'es' ? '/es/explorar/validar/' : '/en/explore/validate/';
+---
+
+<div class="rastrum-validation-dashboard max-w-3xl mx-auto" data-lang={lang}>
+  <header class="mb-6">
+    <h1 class="text-2xl md:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+      {v.dashboard_title}
+    </h1>
+    <p class="text-sm text-zinc-600 dark:text-zinc-400">{v.dashboard_subtitle}</p>
+    <a href={profilePath} class="text-sm text-zinc-500 dark:text-zinc-500 hover:underline">
+      ← {tr.profile.view_profile}
+    </a>
+  </header>
+
+  <div id="vd-signin" class="hidden rounded-lg border border-zinc-300 dark:border-zinc-700 p-4 text-sm">
+    <p>{tr.profile.not_signed_in}</p>
+  </div>
+
+  <div id="vd-content" class="hidden">
+    <div class="grid grid-cols-3 gap-3 mb-6">
+      <div class="rounded-xl border border-zinc-200 dark:border-zinc-800 p-4">
+        <p class="text-2xl font-bold text-emerald-700 dark:text-emerald-400" id="vd-stat-suggestions">—</p>
+        <p class="text-xs text-zinc-500 mt-1">{v.stat_suggestions}</p>
+      </div>
+      <div class="rounded-xl border border-zinc-200 dark:border-zinc-800 p-4">
+        <p class="text-2xl font-bold text-emerald-700 dark:text-emerald-400" id="vd-stat-research">—</p>
+        <p class="text-xs text-zinc-500 mt-1">{v.stat_research_grade}</p>
+      </div>
+      <div class="rounded-xl border border-zinc-200 dark:border-zinc-800 p-4">
+        <p class="text-2xl font-bold text-emerald-700 dark:text-emerald-400" id="vd-stat-kingdoms">—</p>
+        <p class="text-xs text-zinc-500 mt-1">{v.stat_kingdoms}</p>
+      </div>
+    </div>
+
+    <div class="rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-6 text-center" id="vd-empty">
+      <p class="text-sm text-zinc-500 dark:text-zinc-400">{v.dashboard_empty}</p>
+      <a href={queuePath} class="mt-3 inline-flex items-center rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white">
+        {v.go_to_queue}
+      </a>
+    </div>
+  </div>
+</div>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+
+  const root = document.querySelector<HTMLElement>('.rastrum-validation-dashboard');
+  if (root) {
+    (async () => {
+      const supabase = getSupabase();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        document.getElementById('vd-signin')?.classList.remove('hidden');
+        return;
+      }
+      document.getElementById('vd-content')?.classList.remove('hidden');
+
+      // Total suggestions = identifications rows where validated_by = me
+      const { data: rows, count } = await supabase
+        .from('identifications')
+        .select('id, scientific_name, is_research_grade, is_primary, taxon_id', { count: 'exact' })
+        .eq('validated_by', user.id);
+
+      const total = count ?? (rows?.length ?? 0);
+      const reachedRG = (rows ?? []).filter(r => (r as { is_research_grade?: boolean }).is_research_grade && (r as { is_primary?: boolean }).is_primary).length;
+
+      document.getElementById('vd-stat-suggestions')!.textContent = String(total);
+      document.getElementById('vd-stat-research')!.textContent    = String(reachedRG);
+
+      // Kingdoms validated — distinct taxon kingdom for the user's IDs.
+      const taxonIds = Array.from(new Set((rows ?? []).map(r => (r as { taxon_id?: string }).taxon_id).filter(Boolean) as string[]));
+      let kingdoms = 0;
+      if (taxonIds.length > 0) {
+        const { data: taxa } = await supabase.from('taxa').select('kingdom').in('id', taxonIds);
+        kingdoms = new Set((taxa ?? []).map(t => (t as { kingdom?: string }).kingdom).filter(Boolean)).size;
+      }
+      document.getElementById('vd-stat-kingdoms')!.textContent = String(kingdoms);
+
+      if (total > 0) document.getElementById('vd-empty')?.classList.add('hidden');
+    })();
+  }
+</script>

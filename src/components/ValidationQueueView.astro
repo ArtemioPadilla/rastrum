@@ -1,0 +1,240 @@
+---
+/**
+ * ValidationQueueView — public queue of observations needing community
+ * help. Reads from the `validation_queue` SQL view; eligibility rules
+ * live server-side so the frontend can't drift.
+ *
+ * Authenticated users see a "Sugerir" CTA per row. Anonymous users see
+ * a sign-in prompt. The actual suggestion path lives in
+ * SuggestIdModal.astro; this view just opens it via window.__rastrumOpenSuggestId().
+ *
+ * See docs/specs/modules/22-community-validation.md.
+ */
+import { t, getLocalizedPath, routes } from '../i18n/utils';
+import SuggestIdModal from './SuggestIdModal.astro';
+
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+const v = (tr as unknown as { validation: Record<string, string> }).validation;
+const signInPath = getLocalizedPath(lang, routes.signIn[lang] + '/');
+const isEs = lang === 'es';
+const sharePathBase = '/share/obs/';
+---
+
+<div
+  class="rastrum-validation-queue max-w-3xl mx-auto"
+  data-lang={lang}
+  data-label-loading={v.queue_loading}
+  data-label-empty={v.queue_empty}
+  data-label-error={v.queue_error}
+  data-label-no-id={v.no_id_yet}
+  data-label-suggest={v.suggest_id}
+  data-label-suggest-different={v.suggest_different}
+  data-label-confirm={v.confirm_id}
+  data-label-pending={v.pending_validation}
+  data-label-research-grade={v.research_grade}
+  data-label-promoted={v.research_grade_promoted}
+  data-label-tie={v.tie_warning}
+  data-label-by-observer={v.by_observer}
+  data-label-votes-one={v.votes_count_one}
+  data-label-votes-other={v.votes_count_other}
+  data-label-cant-vote-own={v.cannot_vote_own}
+  data-label-signin={v.validate_signin_prompt}
+  data-signin-href={signInPath}
+  data-share-base={sharePathBase}
+>
+  <header class="mb-6">
+    <h1 class="text-2xl md:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+      {v.queue_title}
+    </h1>
+    <p id="vq-count" class="mt-1 text-sm text-zinc-600 dark:text-zinc-400" aria-live="polite"></p>
+  </header>
+
+  <div id="vq-signin" class="hidden mb-4 rounded-lg border border-emerald-300 dark:border-emerald-800/40 bg-emerald-50 dark:bg-emerald-900/20 p-3 text-sm flex items-center justify-between gap-3 flex-wrap">
+    <span>{v.validate_signin_prompt}</span>
+    <a href={signInPath} class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 text-xs font-semibold text-white">
+      {isEs ? 'Iniciar sesión' : 'Sign in'}
+    </a>
+  </div>
+
+  <ul id="vq-list" class="space-y-3"></ul>
+  <p id="vq-loading" class="hidden text-sm text-zinc-500 text-center py-8">{v.queue_loading}</p>
+  <p id="vq-empty"   class="hidden text-sm text-zinc-500 text-center py-8 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700">{v.queue_empty}</p>
+  <p id="vq-error"   class="hidden text-sm text-red-600 dark:text-red-400 text-center py-8" role="alert"></p>
+
+  <div id="vq-toast" class="hidden fixed bottom-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg text-sm shadow-lg" role="status" aria-live="polite"></div>
+</div>
+
+<SuggestIdModal lang={lang} />
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import type { ValidationQueueRow } from '../lib/types';
+
+  const root = document.querySelector<HTMLElement>('.rastrum-validation-queue');
+  if (root) {
+    const lang = root.dataset.lang === 'es' ? 'es' : 'en';
+    const isEs = lang === 'es';
+    const labels = root.dataset;
+
+    let userId: string | null = null;
+    let rows: ValidationQueueRow[] = [];
+
+    function escapeText(s: string): string {
+      return s.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function rowMarkup(r: ValidationQueueRow, mediaUrl: string | null, observerName: string | null): string {
+      const sharePath = `${labels.shareBase ?? '/share/obs/'}?id=${encodeURIComponent(r.observation_id)}`;
+      const isOwn = !!userId && userId === r.observer_id;
+      const hasId = !!r.current_scientific_name;
+      const conf = typeof r.current_confidence === 'number' ? Math.round(r.current_confidence * 100) : null;
+      const date = new Date(r.observed_at).toLocaleDateString(isEs ? 'es' : 'en');
+      const region = r.state_province ? ' · ' + escapeText(r.state_province) : '';
+      const observer = observerName ? (labels.labelByObserver ?? '').replace('{name}', escapeText(observerName)) : '';
+      const votes = r.suggestion_count > 0
+        ? (r.suggestion_count === 1
+            ? (labels.labelVotesOne ?? '1')
+            : (labels.labelVotesOther ?? '{n}').replace('{n}', String(r.suggestion_count)))
+        : '';
+
+      let cta = '';
+      if (!userId) {
+        cta = `<a href="${labels.signinHref ?? '/'}" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 text-xs font-semibold text-white">${labels.labelSignin ?? 'Sign in'}</a>`;
+      } else if (isOwn) {
+        cta = `<span class="text-xs text-zinc-500 italic">${labels.labelCantVoteOwn ?? ''}</span>`;
+      } else if (hasId) {
+        const conf_btn_label = (labels.labelConfirm ?? '').replace('{name}', escapeText(r.current_scientific_name!));
+        cta = `
+          <button type="button" data-action="confirm" data-obs="${r.observation_id}" data-name="${escapeText(r.current_scientific_name!)}" data-observer="${observerName ?? ''}" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 text-xs font-semibold text-white">${conf_btn_label}</button>
+          <button type="button" data-action="suggest" data-obs="${r.observation_id}" data-observer="${observerName ?? ''}" class="rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300">${labels.labelSuggestDifferent ?? ''}</button>`;
+      } else {
+        cta = `<button type="button" data-action="suggest" data-obs="${r.observation_id}" data-observer="${observerName ?? ''}" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 text-xs font-semibold text-white">${labels.labelSuggest ?? ''}</button>`;
+      }
+
+      return `<li class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 overflow-hidden">
+        <div class="flex gap-3 p-3">
+          <a href="${sharePath}" class="block w-20 h-20 shrink-0 rounded-lg overflow-hidden bg-zinc-100 dark:bg-zinc-800">
+            ${mediaUrl ? `<img src="${escapeText(mediaUrl)}" alt="" class="w-full h-full object-cover" loading="lazy" />` : ''}
+          </a>
+          <div class="min-w-0 flex-1">
+            <p class="text-sm italic font-semibold ${hasId ? 'text-emerald-700 dark:text-emerald-400' : 'text-zinc-500'}">
+              ${hasId ? escapeText(r.current_scientific_name!) : (labels.labelNoId ?? '')}
+              ${conf !== null ? `<span class="not-italic font-normal text-xs text-zinc-500 ml-1">${conf}%</span>` : ''}
+            </p>
+            <p class="text-xs text-zinc-500 truncate">${date}${region}</p>
+            <p class="text-xs text-zinc-400">${observer}${votes ? ' · ' + votes : ''}</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 p-3 pt-0 flex-wrap">
+          ${cta}
+        </div>
+      </li>`;
+    }
+
+    function showToast(msg: string) {
+      const el = document.getElementById('vq-toast');
+      if (!el) return;
+      el.textContent = msg;
+      el.className = 'fixed bottom-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg text-sm shadow-lg bg-emerald-700 text-white';
+      el.classList.remove('hidden');
+      setTimeout(() => el.classList.add('hidden'), 4000);
+    }
+
+    async function load() {
+      document.getElementById('vq-loading')?.classList.remove('hidden');
+      document.getElementById('vq-empty')?.classList.add('hidden');
+      document.getElementById('vq-error')?.classList.add('hidden');
+
+      try {
+        const supabase = getSupabase();
+        // Auth state (decides whether to show signin prompt + Sugerir CTAs).
+        const { data: { user } } = await supabase.auth.getUser();
+        userId = user?.id ?? null;
+        if (!userId) document.getElementById('vq-signin')?.classList.remove('hidden');
+
+        const { data, error } = await supabase
+          .from('validation_queue')
+          .select('*')
+          .order('observed_at', { ascending: false })
+          .limit(50);
+        if (error) throw error;
+        rows = (data ?? []) as ValidationQueueRow[];
+
+        // Subtitle count
+        const countEl = document.getElementById('vq-count');
+        const tplCount = (root.dataset.labelEmpty && rows.length === 0)
+          ? ''
+          : (isEs ? `${rows.length} observaciones necesitan ayuda` : `${rows.length} observations need help`);
+        if (countEl) countEl.textContent = tplCount;
+
+        if (rows.length === 0) {
+          document.getElementById('vq-empty')?.classList.remove('hidden');
+          return;
+        }
+
+        // Side-fetch primary photo + observer username for each row.
+        const obsIds = rows.map(r => r.observation_id);
+        const observerIds = Array.from(new Set(rows.map(r => r.observer_id)));
+        const [{ data: media }, { data: users }] = await Promise.all([
+          supabase.from('media_files').select('observation_id, url, is_primary').in('observation_id', obsIds),
+          supabase.from('users').select('id, username, display_name').in('id', observerIds),
+        ]);
+        const mediaByObs: Record<string, string> = {};
+        for (const m of (media ?? [])) {
+          const k = (m as { observation_id: string }).observation_id;
+          if (!mediaByObs[k] || (m as { is_primary?: boolean }).is_primary) {
+            mediaByObs[k] = (m as { url: string }).url;
+          }
+        }
+        const observerById: Record<string, string> = {};
+        for (const u of (users ?? [])) {
+          const id = (u as { id: string }).id;
+          observerById[id] = (u as { display_name?: string; username?: string }).display_name
+                          ?? (u as { username?: string }).username
+                          ?? '?';
+        }
+
+        const list = document.getElementById('vq-list');
+        if (list) {
+          list.innerHTML = rows.map(r => rowMarkup(r, mediaByObs[r.observation_id] ?? null, observerById[r.observer_id] ?? null)).join('');
+          // Wire CTA buttons to the modal.
+          list.querySelectorAll<HTMLButtonElement>('button[data-action="suggest"], button[data-action="confirm"]').forEach(btn => {
+            btn.addEventListener('click', () => {
+              const obsId = btn.dataset.obs!;
+              const observer = btn.dataset.observer || null;
+              const opener = (window as unknown as { __rastrumOpenSuggestId?: (id: string, name: string | null) => void }).__rastrumOpenSuggestId;
+              if (typeof opener === 'function') {
+                opener(obsId, observer);
+                // If "confirm" — pre-fill the scientific name field.
+                const name = btn.dataset.name;
+                if (name) {
+                  const inp = document.getElementById('sid-name') as HTMLInputElement | null;
+                  if (inp) inp.value = name;
+                }
+              }
+            });
+          });
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        const errEl = document.getElementById('vq-error');
+        if (errEl) {
+          errEl.textContent = (root.dataset.labelError ?? 'Error') + ' (' + msg + ')';
+          errEl.classList.remove('hidden');
+        }
+      } finally {
+        document.getElementById('vq-loading')?.classList.add('hidden');
+      }
+    }
+
+    // Re-fetch when a suggestion lands.
+    window.addEventListener('rastrum:suggestion-submitted', () => {
+      showToast(root.dataset.labelPromoted ?? '✓');
+      load();
+    });
+
+    load();
+  }
+</script>
