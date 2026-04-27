@@ -70,6 +70,25 @@ const pwa = (tr as unknown as { pwa: Record<string, string> }).pwa;
             </ol>
           </div>
         </div>
+
+        <!--
+          Firefox-specific instructions. Firefox doesn't fire
+          beforeinstallprompt on any platform. On Android the
+          three-dot menu has an "Install" entry; on desktop, Mozilla
+          removed the Site-Specific Browsers feature in v79 and there
+          is no install path — we surface "use Chrome / Edge / Safari"
+          honestly instead of leaving an actionless banner.
+        -->
+        <div id="install-hint-firefox" class="hidden mt-3" aria-live="polite">
+          <p id="install-hint-firefox-android" class="hidden text-xs text-emerald-900 dark:text-emerald-100">
+            <span class="font-semibold">{pwa.discovery_firefox_android_title}</span><br />
+            {pwa.discovery_firefox_android_step1}
+          </p>
+          <p id="install-hint-firefox-desktop" class="hidden text-xs text-emerald-900 dark:text-emerald-100">
+            <span class="font-semibold">{pwa.discovery_firefox_desktop_title}</span><br />
+            {pwa.discovery_firefox_desktop_body}
+          </p>
+        </div>
       </div>
 
       <div class="flex items-center gap-2 shrink-0 ml-auto">
@@ -93,7 +112,7 @@ const pwa = (tr as unknown as { pwa: Record<string, string> }).pwa;
 </aside>
 
 <script>
-  import { isIOS, isStandaloneDisplayMode } from '../lib/local-ai-helpers';
+  import { isIOS, isFirefox, isAndroid, isStandaloneDisplayMode } from '../lib/local-ai-helpers';
 
   type InstallPromptEvent = Event & {
     prompt: () => Promise<void>;
@@ -196,7 +215,18 @@ const pwa = (tr as unknown as { pwa: Record<string, string> }).pwa;
       writeCount(count);
       if (count < 2) return;
 
-      if (isIOS()) {
+      if (isFirefox()) {
+        // Firefox path: no beforeinstallprompt anywhere. Show
+        // platform-specific instructions and hide the cta — there's
+        // nothing to "click to install" on Firefox.
+        const ffBlock         = document.getElementById('install-hint-firefox');
+        const ffAndroidPara   = document.getElementById('install-hint-firefox-android');
+        const ffDesktopPara   = document.getElementById('install-hint-firefox-desktop');
+        ffBlock?.classList.remove('hidden');
+        if (isAndroid()) ffAndroidPara?.classList.remove('hidden');
+        else             ffDesktopPara?.classList.remove('hidden');
+        cta?.classList.add('hidden');
+      } else if (isIOS()) {
         iosBlock?.classList.remove('hidden');
         cta?.classList.add('hidden');
         cycleIosFrames();

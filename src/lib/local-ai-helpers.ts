@@ -84,6 +84,19 @@ export function isIOS(ua: string = typeof navigator !== 'undefined' ? navigator.
   return false;
 }
 
+/** True when the user agent is Firefox (any platform). */
+export function isFirefox(ua: string = typeof navigator !== 'undefined' ? navigator.userAgent : ''): boolean {
+  // Firefox identifies as "Firefox/<ver>"; Gecko-based forks also match.
+  // Excludes Edge (which used to ship "FxiOS" on iOS — Apple still
+  // forces WebKit, so iOS Firefox can't install PWAs anyway).
+  return /Firefox\/|FxiOS\//.test(ua);
+}
+
+/** True when running on an Android device. */
+export function isAndroid(ua: string = typeof navigator !== 'undefined' ? navigator.userAgent : ''): boolean {
+  return /Android/.test(ua);
+}
+
 /** True when the page is running as an installed PWA (display-mode standalone). */
 export function isStandaloneDisplayMode(): boolean {
   if (typeof window === 'undefined') return false;
