@@ -39,6 +39,7 @@ export const routes: Record<string, Record<Locale, string>> = {
   profileExport: { en: '/profile/export', es: '/perfil/exportar' },
   profileObservations: { en: '/profile/observations', es: '/perfil/observaciones' },
   profileExpertApply: { en: '/profile/expert-apply', es: '/perfil/aplicar-experto' },
+  profileAdminExperts: { en: '/profile/admin/experts', es: '/perfil/admin/expertos' },
   profileUser: { en: '/profile/u', es: '/perfil/u' },
   profileImport: { en: '/profile/import', es: '/perfil/importar' },
   profileImportCameraTrap: {
@@ -99,6 +100,7 @@ export const routeTree: Record<string, RouteNode> = {
   profileExport:             { labels: { en: 'Export',           es: 'Exportar' },          parent: 'profile' },
   profileObservations:       { labels: { en: 'My observations',  es: 'Mis observaciones' }, parent: 'profile' },
   profileExpertApply:        { labels: { en: 'Apply expert',     es: 'Aplicar experto' },   parent: 'profile' },
+  profileAdminExperts:       { labels: { en: 'Admin: experts',   es: 'Admin: expertos' },   parent: 'profile' },
   profileUser:               { labels: { en: 'Public profile',   es: 'Perfil público' },    parent: 'profile' },
   profileImport:             { labels: { en: 'Import',           es: 'Importar' },          parent: 'profile' },
   profileImportCameraTrap:   { labels: { en: 'Camera trap',      es: 'Cámara trampa' },     parent: 'profileImport' },

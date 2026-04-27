@@ -1078,3 +1078,79 @@ CREATE POLICY "expert_apps_insert_own" ON public.expert_applications
 -- regular users by design.
 
 GRANT SELECT, INSERT ON public.expert_applications TO authenticated;
+
+-- ─────────────────────────────────────────────────────────────────────
+-- API usage log (v1.0.x — `plantnet-quota-monitor`)
+-- One row per (date, provider). The `plantnet-monitor` Edge Function
+-- upserts the daily probe; admins read for dashboards. anon never reads.
+-- ─────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.api_usage (
+  date       date NOT NULL,
+  provider   text NOT NULL,                    -- 'plantnet' (more later)
+  used       integer NOT NULL DEFAULT 0,
+  quota      integer NOT NULL DEFAULT 0,
+  remaining  integer NOT NULL DEFAULT 0,
+  raw        jsonb,                            -- verbatim provider response
+  recorded_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (date, provider)
+);
+
+CREATE INDEX IF NOT EXISTS idx_api_usage_provider_date
+  ON public.api_usage(provider, date DESC);
+
+ALTER TABLE public.api_usage ENABLE ROW LEVEL SECURITY;
+
+-- Read policy: admins (proxied today by users.is_expert) can read; service
+-- role bypasses RLS for the EF write path. anon never reads. When the
+-- proper users.is_admin column lands (see expert-app-admin-ui notes), swap
+-- the predicate.
+DROP POLICY IF EXISTS "api_usage_read_admin" ON public.api_usage;
+CREATE POLICY "api_usage_read_admin" ON public.api_usage
+  FOR SELECT TO authenticated
+  USING (
+    auth.uid() IN (
+      SELECT id FROM public.users WHERE is_expert = true
+    )
+  );
+
+GRANT SELECT ON public.api_usage TO authenticated;
+-- service_role retains the implicit bypass — no INSERT grant for anon/auth.
+
+-- ─────────────────────────────────────────────────────────────────────
+-- Push subscriptions (v1.1 — `ux-streak-push`)
+-- One row per (user, endpoint). The PWA upserts on opt-in; the
+-- `streak-push` Edge Function reads to fan out at 19:55 local time.
+-- ─────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.push_subscriptions (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  endpoint    text NOT NULL,                  -- unique per browser/device
+  p256dh      text NOT NULL,                  -- public key for the subscription
+  auth        text NOT NULL,                  -- shared secret
+  user_agent  text,
+  -- IANA tz; defaults to America/Mexico_City for v1.0.x scope. The EF
+  -- batches subscribers by tz so 8 PM local fires once per zone.
+  tz          text NOT NULL DEFAULT 'America/Mexico_City',
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  last_seen_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (user_id, endpoint)
+);
+
+CREATE INDEX IF NOT EXISTS idx_push_subs_tz
+  ON public.push_subscriptions(tz);
+
+ALTER TABLE public.push_subscriptions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "push_subs_select_own" ON public.push_subscriptions;
+CREATE POLICY "push_subs_select_own" ON public.push_subscriptions
+  FOR SELECT TO authenticated USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "push_subs_insert_own" ON public.push_subscriptions;
+CREATE POLICY "push_subs_insert_own" ON public.push_subscriptions
+  FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "push_subs_delete_own" ON public.push_subscriptions;
+CREATE POLICY "push_subs_delete_own" ON public.push_subscriptions
+  FOR DELETE TO authenticated USING (auth.uid() = user_id);
+
+GRANT SELECT, INSERT, DELETE ON public.push_subscriptions TO authenticated;
