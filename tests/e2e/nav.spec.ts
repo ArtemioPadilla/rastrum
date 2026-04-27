@@ -79,6 +79,13 @@ test.describe('navigation', () => {
     await expect(link).toHaveClass(/text-emerald-600/);
   });
 
+  test('active section rail highlights Docs on /docs/*', async ({ page }) => {
+    await page.goto('/en/docs/architecture/');
+    // The MegaMenu trigger button gets the stone accent classes when active.
+    const docsBtn = page.locator('#megamenu-docs-btn');
+    await expect(docsBtn).toHaveClass(/text-stone-600/);
+  });
+
   test('explore dropdown reveals 4 sub-items', async ({ page }) => {
     await page.goto('/en/');
     const expBtn = page.locator('#hdr-explore-btn');
