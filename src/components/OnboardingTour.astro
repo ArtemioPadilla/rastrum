@@ -24,7 +24,14 @@ interface Props {
 const { lang } = Astro.props;
 const tr = t(lang);
 const onb = (tr as unknown as { onboarding: Record<string, string> }).onboarding;
+const onbAny = (tr as unknown as { onboarding: Record<string, unknown> }).onboarding;
 const drawerStrings = (tr as unknown as { nav: { drawer: Record<string, string> } }).nav.drawer;
+const claudeHelpJson = JSON.stringify({
+  summary: onbAny.key_help_summary ?? '',
+  intro: onbAny.key_help_anthropic_intro ?? '',
+  steps: Array.isArray(onbAny.key_help_anthropic_steps) ? onbAny.key_help_anthropic_steps : [],
+  privacy: onbAny.key_help_privacy ?? '',
+});
 const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
 
 const alt = getAlternateLocale(lang);
@@ -65,6 +72,7 @@ const altHref = `${base}/${alt}${altSlug}/`;
   data-key-unauth={onb.key_unauth}
   data-key-network={onb.key_network}
   data-key-other={onb.key_other_error}
+  data-key-help={claudeHelpJson}
   data-dl-warning={onb.download_size_warning}
   data-dl-cancel={onb.download_cancel}
   data-dl-confirm={onb.download_confirm}
@@ -253,6 +261,9 @@ const altHref = `${base}/${alt}${altSlug}/`;
     const keyUnauth = root.dataset.keyUnauth ?? 'Auth failed';
     const keyNetwork = root.dataset.keyNetwork ?? 'Network error';
     const keyOther = root.dataset.keyOther ?? 'Anthropic error';
+    type KeyHelpPayload = { summary: string; intro: string; steps: string[]; privacy: string };
+    let keyHelp: KeyHelpPayload = { summary: '', intro: '', steps: [], privacy: '' };
+    try { keyHelp = JSON.parse(root.dataset.keyHelp ?? '{}') as KeyHelpPayload; } catch { /* keep default */ }
     const dlWarning = root.dataset.dlWarning ?? '';
     const dlCancelLabel = root.dataset.dlCancel ?? 'Cancel';
     const dlConfirmLabel = root.dataset.dlConfirm ?? 'Start download';
@@ -511,6 +522,23 @@ const altHref = `${base}/${alt}${altSlug}/`;
 
         let actionHtml = '';
         if (s.id === 'claude_haiku') {
+          // The help payload is trusted i18n with intentional inline markup
+          // (links + <b>/<code> in step strings), so we render it raw rather
+          // than escaping. Only operator-controlled strings flow in here.
+          const stepsHtml = keyHelp.steps.length
+            ? `<ol class="list-decimal ml-5 mt-2 space-y-1">${keyHelp.steps.map(s2 => `<li>${s2}</li>`).join('')}</ol>`
+            : '';
+          const helpHtml = keyHelp.summary
+            ? `
+              <details class="mt-2 group">
+                <summary class="cursor-pointer text-xs font-medium text-emerald-700 dark:text-emerald-400 select-none">${escape(keyHelp.summary)}</summary>
+                <div class="mt-2 pt-2 border-t border-zinc-200 dark:border-zinc-800 text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                  ${keyHelp.intro ? `<p>${keyHelp.intro}</p>` : ''}
+                  ${stepsHtml}
+                  ${keyHelp.privacy ? `<p class="mt-2 text-[11px] text-zinc-500 dark:text-zinc-500">${keyHelp.privacy}</p>` : ''}
+                </div>
+              </details>`
+            : '';
           actionHtml = `
             <div class="mt-2" id="onb-claude-key-wrap">
               <label for="onb-claude-key" class="sr-only">Anthropic API key</label>
@@ -523,6 +551,7 @@ const altHref = `${base}/${alt}${altSlug}/`;
                 <button type="button" id="onb-claude-save" disabled class="rounded bg-emerald-700 hover:bg-emerald-800 px-2 py-1 text-xs font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed">${isEs ? 'Guardar' : 'Save'}</button>
                 <span id="onb-claude-status" class="text-xs" aria-live="polite"></span>
               </div>
+              ${helpHtml}
             </div>`;
         }
 

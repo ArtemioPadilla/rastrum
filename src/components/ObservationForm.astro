@@ -931,11 +931,25 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
       runners.claude_haiku = makeClaudeRunner(locale);
     }
     // Phi-vision: only include if cached (otherwise we offer the download below).
+    // Phi-3.5-vision is strict opt-in. The MLC q4f16_1 build crashes
+    // with a flood of WebGPU "Binding size 1 isn't a multiple of 4"
+    // errors on certain GPU/driver combos (esp. Apple Silicon Metal,
+    // Chromium 147+). Until MLC ships an alignment-fixed artifact, we
+    // only enable Phi when the user has explicitly opted in via
+    // localStorage.rastrum.prefs.usePhiVision = 'true' AND the model
+    // is already cached on disk. The session-broken flag inside the
+    // runner kicks in if Phi crashes mid-session, so subsequent calls
+    // skip it cleanly.
     try {
-      const { getModelCacheStatus, VISION_MODEL_ID, localAISupported } = await import('../lib/local-ai');
-      if (localAISupported()) {
-        const status = await getModelCacheStatus(VISION_MODEL_ID);
-        if (status.cached) runners.webllm_phi35_vision = makePhiRunner(locale);
+      const optedIn = (typeof localStorage !== 'undefined')
+        ? localStorage.getItem('rastrum.prefs.usePhiVision') === 'true'
+        : false;
+      if (optedIn) {
+        const { getModelCacheStatus, VISION_MODEL_ID, localAISupported } = await import('../lib/local-ai');
+        if (localAISupported()) {
+          const status = await getModelCacheStatus(VISION_MODEL_ID);
+          if (status.cached) runners.webllm_phi35_vision = makePhiRunner(locale);
+        }
       }
     } catch { /* WebLLM unavailable in this environment */ }
 
