@@ -1,6 +1,6 @@
 # Module 22 — Community Validation (Expert ID Queue)
 
-**Status:** Spec v1.2 — 2026-04-27 (rev. after #26 review × 2)
+**Status:** Spec v1.3 — 2026-04-27 (rev. after schema-verification audit)
 **Author:** Nyx (via Rastrum group), revised by code-reviewer pass
 **Milestone:** v1.1
 **Routes:** (canonical EN ↔ ES pairing — must match `src/i18n/utils.ts` `routes`)
@@ -43,19 +43,163 @@ duplicating it.
 
 ## Coexistence with the existing consensus engine
 
-The schema already implements community consensus end-to-end:
+The v1.1/v1.2 spec assumed a richer set of pre-existing policies and
+triggers. The v1.3 audit (verifying line numbers against the current
+`supabase-schema.sql`) found only two of them actually shipped. The
+implementation PR therefore needs both a UI layer **and** a small
+RLS / trigger migration. Listed honestly below.
 
-| Existing piece | Lives at | What it does |
+### What already exists today
+
+| Piece | Lives at | What it does |
 |---|---|---|
 | `identifications` table with `validated_by uuid` | `supabase-schema.sql:259` | Multiple ID rows per observation, each tagged with the user who suggested it |
-| `tg_check_validator_not_observer` trigger | `:615` | Refuses inserts/updates where `validated_by = observer_id` (anti-self-vote) |
+| `id_owner` policy (FOR ALL) | `:387` | Observation owner has full CRUD on their observation's identifications |
+| `id_public_read` policy (FOR SELECT) | `:395` | Anyone can read identifications on synced observations |
 | `recompute_consensus(observation_id)` function | `:893` | Weighted aggregation: `is_expert AND kingdom = ANY(expert_taxa)` votes count 3×, everyone else 1×. Flips `is_research_grade = true` when winning score ≥ 2.0 AND distinct validators ≥ 2 |
-| `tg_research_grade_min_confidence` trigger | `:633` | Refuses `is_research_grade = true` when confidence < 0.4 |
-| `tg_research_grade_activity_event` trigger | `:1017` | Fires `activity_events` row on the research-grade transition (already wired to push notifications) |
+| `sync_primary_identification()` + `sync_primary_id_trigger` | `:500`, `:533` | Coordinates `is_primary` flips and denormalises taxon/obscure fields onto `observations` |
+| `activity_events` table with the `'observation_research_grade'` enum value | `:933` (kind enum), `:937–943` | Already accepts the event we'll fire from the new trigger |
 
-**This module's job is to expose that machinery through a UI**, not to
-replace it. We add zero tables. We add one read-only SQL view (queue
-eligibility) and ship the components.
+### What this module's migration must ADD
+
+**These do NOT exist today** — the implementation PR ships them:
+
+1. **`id_validator_insert` policy.** Today the `id_owner` policy
+   means only the observation's owner can insert identifications.
+   Community votes need a parallel INSERT path scoped to the validator:
+   ```sql
+   DROP POLICY IF EXISTS "id_validator_insert" ON public.identifications;
+   CREATE POLICY "id_validator_insert" ON public.identifications
+     FOR INSERT TO authenticated
+     WITH CHECK (
+       (SELECT auth.uid()) = validated_by
+       AND validated_by IS NOT NULL
+       AND validated_by <> (
+         SELECT observer_id FROM public.observations WHERE id = observation_id
+       )
+       AND is_primary = false   -- community votes never insert as primary
+     );
+   ```
+
+2. **`id_validator_update` policy.** Validators can update their own
+   suggestion (e.g. change confidence, change taxon if they reconsider):
+   ```sql
+   DROP POLICY IF EXISTS "id_validator_update" ON public.identifications;
+   CREATE POLICY "id_validator_update" ON public.identifications
+     FOR UPDATE TO authenticated
+     USING (
+       validated_by IS NOT NULL
+       AND (SELECT auth.uid()) = validated_by
+     )
+     WITH CHECK (
+       (SELECT auth.uid()) = validated_by
+     );
+   ```
+
+3. **`id_validator_delete` policy.** Vote retraction:
+   ```sql
+   DROP POLICY IF EXISTS "id_validator_delete" ON public.identifications;
+   CREATE POLICY "id_validator_delete" ON public.identifications
+     FOR DELETE TO authenticated
+     USING (
+       validated_by IS NOT NULL
+       AND (SELECT auth.uid()) = validated_by
+     );
+   ```
+
+4. **`tg_check_validator_not_observer` trigger.** Belt-and-suspenders
+   anti-self-vote at the row layer (the policy already prevents this
+   on INSERT, but UPDATE could still try to flip `validated_by` to
+   the observer's id):
+   ```sql
+   CREATE OR REPLACE FUNCTION public.tg_check_validator_not_observer()
+   RETURNS trigger LANGUAGE plpgsql AS $$
+   DECLARE obs_owner uuid;
+   BEGIN
+     IF NEW.validated_by IS NULL THEN RETURN NEW; END IF;
+     SELECT observer_id INTO obs_owner
+       FROM public.observations
+       WHERE id = NEW.observation_id;
+     IF obs_owner = NEW.validated_by THEN
+       RAISE EXCEPTION 'A user cannot validate their own observation';
+     END IF;
+     RETURN NEW;
+   END;
+   $$;
+   DROP TRIGGER IF EXISTS check_validator_not_observer ON public.identifications;
+   CREATE TRIGGER check_validator_not_observer
+     BEFORE INSERT OR UPDATE OF validated_by ON public.identifications
+     FOR EACH ROW EXECUTE FUNCTION public.tg_check_validator_not_observer();
+   ```
+
+5. **`tg_research_grade_min_confidence` trigger.** Refuse promoting a
+   row to research grade with implausibly low confidence (defence in
+   depth in case `recompute_consensus()` is ever bypassed):
+   ```sql
+   CREATE OR REPLACE FUNCTION public.tg_research_grade_min_confidence()
+   RETURNS trigger LANGUAGE plpgsql AS $$
+   BEGIN
+     IF NEW.is_research_grade = true AND COALESCE(NEW.confidence, 0) < 0.4 THEN
+       RAISE EXCEPTION 'Cannot promote to research grade with confidence < 0.4';
+     END IF;
+     RETURN NEW;
+   END;
+   $$;
+   DROP TRIGGER IF EXISTS research_grade_min_confidence ON public.identifications;
+   CREATE TRIGGER research_grade_min_confidence
+     BEFORE INSERT OR UPDATE OF is_research_grade ON public.identifications
+     FOR EACH ROW EXECUTE FUNCTION public.tg_research_grade_min_confidence();
+   ```
+
+6. **`tg_research_grade_activity_event` trigger.** Fires the activity
+   event the schema's enum is already prepared for — drives the
+   observer's notification on promotion:
+   ```sql
+   CREATE OR REPLACE FUNCTION public.tg_research_grade_activity_event()
+   RETURNS trigger LANGUAGE plpgsql AS $$
+   DECLARE obs_owner uuid;
+   BEGIN
+     IF NEW.is_research_grade = true
+        AND (OLD.is_research_grade IS DISTINCT FROM NEW.is_research_grade) THEN
+       SELECT observer_id INTO obs_owner
+         FROM public.observations WHERE id = NEW.observation_id;
+       INSERT INTO public.activity_events
+         (actor_id, subject_id, kind, payload, visibility)
+       VALUES (
+         obs_owner,
+         NEW.observation_id,
+         'observation_research_grade',
+         jsonb_build_object(
+           'scientific_name', NEW.scientific_name,
+           'taxon_id',        NEW.taxon_id,
+           'identification_id', NEW.id
+         ),
+         'self'
+       );
+     END IF;
+     RETURN NEW;
+   END;
+   $$;
+   DROP TRIGGER IF EXISTS research_grade_activity_event ON public.identifications;
+   CREATE TRIGGER research_grade_activity_event
+     AFTER UPDATE OF is_research_grade ON public.identifications
+     FOR EACH ROW EXECUTE FUNCTION public.tg_research_grade_activity_event();
+   ```
+
+7. **Tie-handling patch on `recompute_consensus()`.** One-line guard
+   so a perfect-score tie blocks promotion (covered in v1.2):
+   ```sql
+   -- inside the function, before the UPDATE:
+   IF (SELECT count(*) FROM weighted WHERE score = winning_score) > 1 THEN
+     RETURN;   -- tie; wait for a tiebreaker
+   END IF;
+   ```
+
+8. **`validation_queue` view + partial UNIQUE index** as defined
+   below.
+
+All idempotent, all in the same migration file. Net delta: ~120
+lines of SQL.
 
 ---
 
@@ -133,35 +277,34 @@ expert-weighted ≥ 2-distinct-voter rule. We add nothing.
 
 ### Anti-self-vote
 
-`tg_check_validator_not_observer` already refuses
-`validated_by = observer_id` at the DB layer. The UI repeats the
-check before showing the "Sugerir" button. Same defence twice; no
-new trigger needed.
+The new `id_validator_insert` policy refuses INSERTs where
+`validated_by = observer_id`, and the new
+`tg_check_validator_not_observer` trigger covers the UPDATE path.
+The UI repeats the check client-side before showing the "Sugerir"
+button so a self-vote attempt fails at the form layer rather than
+leaking through to a 403. Same defence three times.
 
 ### RLS — privacy implications spelled out
 
-Reuse of `identifications.validated_by` means we inherit the existing
-policies. The privacy-relevant guarantees, made explicit:
+After the migration above lands, the privacy-relevant guarantees
+break down like this:
 
 | Concern | Enforced by |
 |---|---|
-| Anon users can't see private-observation suggestions | `obs_public_read` on `observations`. Suggestions on private obs are filtered when the parent obs row isn't visible. |
-| Anon users CAN see suggestions on public obs | `id_select_public` on `identifications`, which gates SELECT on `EXISTS(obs row visible to caller)`. |
-| Only the suggester can edit / delete their suggestion | `id_insert_self`, `id_update_validators_only`, `id_delete_validators_only` — all filter on `auth.uid() = validated_by`. |
-| Self-vote refused | `tg_check_validator_not_observer` BEFORE INSERT/UPDATE on `identifications`. |
-| Suggestion can't bypass min-confidence on research-grade promotion | `tg_research_grade_min_confidence` BEFORE UPDATE of `is_research_grade`. |
-
-**Implementation PR must verify** each of those five policies/triggers
-exists in the current `supabase-schema.sql` before merging. If any
-are missing, add them in the same migration as the view; do NOT ship
-the UI before the DB-side guarantees are in place.
+| Anon users can't see private-observation suggestions | `obs_public_read` on `observations` — suggestions on private obs are filtered when the parent obs row isn't visible to the caller. |
+| Anon users CAN see suggestions on public obs | `id_public_read` on `identifications` — gates SELECT on `observation_id IN (synced public observations)`. |
+| Observation owner retains full control over their obs's IDs | `id_owner FOR ALL` (existing) — owner can still INSERT/UPDATE/DELETE the primary identification. |
+| Any signed-in user can suggest a non-primary ID | `id_validator_insert` (NEW) — INSERT permitted only when `validated_by = auth.uid()` AND `validated_by ≠ observer_id` AND `is_primary = false`. |
+| Only the suggester can edit / delete their suggestion | `id_validator_update`, `id_validator_delete` (NEW) — filter on `validated_by = auth.uid()`. |
+| Self-vote refused at row layer too | `tg_check_validator_not_observer` (NEW) — defence in depth in case the policy is ever loosened. |
+| Suggestion can't bypass min-confidence on research-grade promotion | `tg_research_grade_min_confidence` (NEW) — refuses `is_research_grade = true` when `confidence < 0.4`. |
 
 Action / write eligibility: any signed-in user can suggest. The
 existing 3× expert-in-kingdom weight in `recompute_consensus()`
-prevents non-experts from outvoting an expert in their field. This is
-the *intended* social model — open to all, signal dominated by
+prevents non-experts from outvoting an expert in their field. This
+is the *intended* social model — open to all, signal dominated by
 experts. If a future revision wants experts-only voting, the
-restriction belongs on `id_insert_self`, not on a new table.
+restriction belongs on `id_validator_insert`, not on a new table.
 
 ### Eligibility — voting is open, expert weight matters
 
@@ -273,8 +416,9 @@ explicit confidence/research-grade test.)
 
 ## Notifications
 
-`tg_research_grade_activity_event` already inserts a row in
-`activity_events` with the schema's actual column names:
+The NEW `tg_research_grade_activity_event` trigger (defined in the
+RLS migration above) inserts a row in `activity_events` with the
+schema's actual column names:
 
 ```sql
 INSERT INTO public.activity_events (actor_id, subject_id, kind, payload, visibility)
@@ -453,9 +597,10 @@ src/lib/types.ts                                # ValidationQueueRow type matchi
   existing `recompute_consensus(uuid)` function already implements
   the same rule with stricter weighting. The UI calls it via
   PostgREST RPC after each insert.
-- **Replaced the proposed `prevent_self_vote_trigger`.** The
-  existing `tg_check_validator_not_observer` enforces it for the
-  `identifications.validated_by` path we now use.
+- **Replaced the proposed `prevent_self_vote_trigger`** with what
+  v1.1 thought was an existing `tg_check_validator_not_observer`.
+  v1.3's audit revealed it didn't actually exist; the migration in
+  this spec ships it.
 - **Replaced `needs_review` and `is_sensitive` references** with the
   schema's actual `obscure_level` enum and explicit `confidence` /
   `is_research_grade` predicates — those phantom columns don't exist
@@ -488,3 +633,35 @@ src/lib/types.ts                                # ValidationQueueRow type matchi
 - **Tie handling hardened in spec**: `recompute_consensus()` gets a
   one-line `RETURN` when multiple rows share the winning score, so
   ties don't arbitrary-promote.
+
+## What changed in v1.3 (schema-verification audit)
+
+The v1.1/v1.2 spec confidently claimed five RLS policies + triggers
+already existed in `supabase-schema.sql`. Audit revealed only one of
+the five (`obs_public_read`) actually shipped — the rest were
+cargo-culted from how *I assumed* the schema was organised in
+parallel with `recompute_consensus()`. They never existed.
+
+Concretely:
+
+| Spec v1.2 claimed | Reality |
+|---|---|
+| `id_select_public` policy | Doesn't exist; actual is `id_public_read` (different name, broader scope) |
+| `id_insert_self` policy (validator-scoped INSERT) | **Doesn't exist** — `id_owner FOR ALL` blocks community votes entirely (only the obs owner can insert) |
+| `id_update_validators_only` policy | Doesn't exist |
+| `id_delete_validators_only` policy | Doesn't exist |
+| `tg_check_validator_not_observer` trigger | Doesn't exist |
+| `tg_research_grade_min_confidence` trigger | Doesn't exist |
+| `tg_research_grade_activity_event` trigger | Doesn't exist |
+
+So the v1.2 spec, if followed verbatim, would have failed RLS on the
+**very first community vote** because `id_owner FOR ALL` permits only
+the observation owner to insert identifications.
+
+v1.3 fixes:
+- Replaced "verify these exist" hand-wave with **explicit migration
+  SQL** for the missing pieces (≈120 lines, all idempotent).
+- Updated the Coexistence section to honestly distinguish "what
+  exists today" from "what this module's migration adds".
+- Updated the Notifications and Anti-self-vote sections to label the
+  new pieces as new, not pre-existing.
