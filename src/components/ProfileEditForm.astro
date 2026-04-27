@@ -121,7 +121,27 @@ const onb = (tr as unknown as { onboarding: Record<string, string> }).onboarding
     <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2">
       {pip.section_title}
     </h2>
-    <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">{pip.section_hint}</p>
+    <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-4">{pip.section_hint}</p>
+
+    <!-- ▶ Quick setup banner — shown until at least one non-PlantNet identifier is ready -->
+    <div id="quick-setup-banner" class="mb-6 rounded-xl border border-emerald-300 dark:border-emerald-700/50 bg-emerald-50 dark:bg-emerald-900/10 p-4">
+      <p class="text-sm font-semibold text-emerald-800 dark:text-emerald-300 mb-1">
+        {lang === 'es' ? '⚡ Activa la identificación de animales' : '⚡ Enable animal identification'}
+      </p>
+      <p class="text-xs text-zinc-600 dark:text-zinc-400 mb-3">
+        {lang === 'es'
+          ? 'PlantNet ya está listo (plantas). Para aves, mamíferos e insectos activa uno de estos:'
+          : 'PlantNet is ready (plants). For birds, mammals and insects, activate one of these:'}
+      </p>
+      <div class="flex flex-wrap gap-2">
+        <a href="#on-device-ai-section" class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-2 text-xs font-semibold text-white">
+          🧠 {lang === 'es' ? 'Descargar modelo local (~4 GB, gratis)' : 'Download local model (~4 GB, free)'}
+        </a>
+        <a href="#claude-key-section" class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-600/60 px-3 py-2 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20">
+          ✦ {lang === 'es' ? 'Usar Claude (tu API key)' : 'Use Claude (your API key)'}
+        </a>
+      </div>
+    </div>
 
     <!-- Collapsible pipeline explanation -->
     <details class="mb-4 group">
@@ -161,7 +181,7 @@ const onb = (tr as unknown as { onboarding: Record<string, string> }).onboarding
     <span id="ak-saved" class="hidden"></span>
 
     <!-- On-device AI controls -->
-    <div class="mt-6 pt-5 border-t border-zinc-100 dark:border-zinc-800/60">
+    <div id="on-device-ai-section" class="mt-6 pt-5 border-t border-zinc-100 dark:border-zinc-800/60">
       <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">{tr.auth.local_ai_section}</h3>
       <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">{tr.auth.local_ai_hint}</p>
       <p id="local-ai-unsup" class="hidden text-xs text-amber-700 dark:text-amber-400">{tr.auth.local_ai_unsupported}</p>
@@ -1150,6 +1170,15 @@ const onb = (tr as unknown as { onboarding: Record<string, string> }).onboarding
     }));
 
     list.innerHTML = cards.join('');
+
+    // Hide quick-setup banner when at least one non-PlantNet identifier is ready
+    const readyCount = plugins.filter(p => p.id !== 'plantnet').filter(async p => (await p.isAvailable()).ready).length;
+    const banner = document.getElementById('quick-setup-banner');
+    // Use synchronous check from already-resolved cards
+    const anyNonPlantNetReady = plugins
+      .filter(p => p.id !== 'plantnet')
+      .some(p => cards[plugins.indexOf(p)]?.includes('LISTO') || cards[plugins.indexOf(p)]?.includes('READY'));
+    if (anyNonPlantNetReady && banner) banner.classList.add('hidden');
 
     // Wire up Save / Test / Clear handlers (delegated)
     list.querySelectorAll<HTMLButtonElement>('[data-save]').forEach(btn => {
