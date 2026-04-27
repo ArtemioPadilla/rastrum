@@ -65,14 +65,14 @@ const videoMaxDuration  = observeStrings.video_max_duration  ?? (isEs ? 'Máximo
         <button id="camera-open-btn" type="button" class="flex-1 min-h-11 rounded-lg border border-emerald-600/60 px-3 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-400 text-center hover:bg-emerald-50 dark:hover:bg-emerald-900/20">
           {cameraOpen}
         </button>
-        <label class="flex-1 cursor-pointer min-h-11 rounded-lg border border-emerald-600/60 px-3 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-400 text-center hover:bg-emerald-50 dark:hover:bg-emerald-900/20 flex items-center justify-center">
-          <input id="camera-input" type="file" accept="image/*" capture="environment" class="sr-only" />
+        <button id="camera-legacy-btn" type="button" class="flex-1 cursor-pointer min-h-11 rounded-lg border border-emerald-600/60 px-3 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-400 text-center hover:bg-emerald-50 dark:hover:bg-emerald-900/20 flex items-center justify-center">
           {tr.observe.use_camera}
-        </label>
-        <label class="flex-1 cursor-pointer min-h-11 rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 text-center hover:bg-zinc-50 dark:hover:bg-zinc-800/40 flex items-center justify-center">
-          <input id="gallery-input" type="file" accept="image/*" multiple class="sr-only" />
+        </button>
+        <input id="camera-input" type="file" accept="image/*" capture="environment" class="sr-only" />
+        <button id="gallery-btn" type="button" class="flex-1 cursor-pointer min-h-11 rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 text-center hover:bg-zinc-50 dark:hover:bg-zinc-800/40 flex items-center justify-center">
           {tr.observe.choose_file}
-        </label>
+        </button>
+        <input id="gallery-input" type="file" accept="image/*" multiple class="sr-only" />
       </div>
       <p class="mt-1 text-xs text-zinc-500">{tr.observe.photo_hint}</p>
     </div>
@@ -1074,6 +1074,15 @@ const videoMaxDuration  = observeStrings.video_max_duration  ?? (isEs ? 'Máximo
     });
   }
 
+  // Explicit button → input.click() — more reliable than wrapping a hidden
+  // <input> in a <label>, which fails on some iOS Safari and Android
+  // Chromium versions when the input is display:none or even sr-only.
+  document.getElementById('camera-legacy-btn')?.addEventListener('click', () => {
+    cameraInput?.click();
+  });
+  document.getElementById('gallery-btn')?.addEventListener('click', () => {
+    galleryInput?.click();
+  });
   cameraInput?.addEventListener('change', async () => {
     if (!cameraInput.files?.length) return;
     addPhotos(cameraInput.files);
