@@ -1039,8 +1039,8 @@
     "trap_altitude": "Altitude (m, optional)",
     "use_my_location": "Use my current GPS",
     "use_my_location_failed": "Couldn't read your GPS. Type the coordinates manually.",
-    "id_pipeline": "Identification will use MegaDetector + SpeciesNet when available.",
-    "id_pipeline_pending": "Inference is pending model deployment — observations save now and re-identify on sync once the pipeline is wired.",
+    "id_pipeline": "MegaDetector filters animal vs. empty/human/vehicle frames; SpeciesNet classifies each animal crop to species.",
+    "id_pipeline_pending": "When the operator hasn't configured PUBLIC_MEGADETECTOR_ENDPOINT, photos fall through to the standard cascade (PlantNet → Claude → on-device).",
     "tag_camera_trap": "Camera trap"
   },
   "tokens": {

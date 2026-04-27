@@ -1089,11 +1089,23 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
     }
   });
 
+  // beforeunload guard while the Phi-vision download is in flight. The
+  // model is multi-MB; closing the tab cancels the fetch and the user
+  // wastes the download. WebLLM's Cache API does keep partial chunks,
+  // so resumption works on revisit, but we still want to warn first.
+  let phiBusy = false;
+  window.addEventListener('beforeunload', (e: BeforeUnloadEvent) => {
+    if (!phiBusy) return;
+    e.preventDefault();
+    e.returnValue = '';
+  });
+
   phiDownloadBtn?.addEventListener('click', async () => {
     if (!lastFile) return;
     phiOffer?.classList.add('hidden');
     phiProgress?.classList.remove('hidden');
     if (phiProgressBar) phiProgressBar.style.width = '0%';
+    phiBusy = true;
 
     try {
       const { loadVisionEngine } = await import('../lib/local-ai');
@@ -1137,6 +1149,8 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
         idAllFailed.textContent = err instanceof Error ? err.message : String(err);
         idAllFailed.classList.remove('hidden');
       }
+    } finally {
+      phiBusy = false;
     }
   });
 

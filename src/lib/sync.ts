@@ -221,10 +221,10 @@ async function triggerIdentify(observationId: string): Promise<void> {
   if (!localAIEnabled) excluded.push('webllm_phi35_vision', 'onnx_efficientnet_lite0', 'birdnet_lite');
   if (!hasAnthropicKey) excluded.push('claude_haiku');
 
-  // Camera-trap photos prefer the MegaDetector + SpeciesNet pipeline when
-  // available — see docs/specs/modules/09-camera-trap.md. The plugin is a
-  // stub today (returns ready:false), but registering it as preferred now
-  // means the cascade auto-picks it up the moment weights are hosted.
+  // Camera-trap photos prefer the MegaDetector + SpeciesNet pipeline.
+  // When PUBLIC_MEGADETECTOR_ENDPOINT is unset the plugin reports
+  // model_not_bundled and the cascade transparently falls through to
+  // the standard waterfall (PlantNet → Claude → on-device).
   const preferred: string[] = [];
   if (mediaKind === 'photo' && evidenceType === 'camera_trap') {
     preferred.push('camera_trap_megadetector');
@@ -290,7 +290,23 @@ async function triggerIdentify(observationId: string): Promise<void> {
  * required GPS and live local-only until the user adds location and the UI
  * flips them back to 'pending'. See `ux-save-as-draft` in the v1.1 backlog.
  */
+/**
+ * Wraps the actual outbox flush in a Web Lock so two tabs of the same
+ * user can't both walk the queue simultaneously (which double-uploads
+ * blobs and can cause UNIQUE conflicts on identifications). Lock is
+ * scoped per-origin via navigator.locks; if the API isn't available
+ * (older Safari), we fall through and rely on the existing per-row
+ * `uploaded` flag to prevent double-PUT.
+ */
 export async function syncOutbox(): Promise<SyncResult> {
+  const locks = (typeof navigator !== 'undefined' ? (navigator as Navigator & { locks?: LockManager }).locks : undefined);
+  if (locks?.request) {
+    return await locks.request('rastrum-sync-outbox', { mode: 'exclusive' }, async () => syncOutboxInner());
+  }
+  return syncOutboxInner();
+}
+
+async function syncOutboxInner(): Promise<SyncResult> {
   const db = getDB();
   // Pending AND error rows both belong in the queue. An 'error' row is one
   // that previously failed (e.g. CORS, network blip); we want manual retry
@@ -349,5 +365,22 @@ export function registerSyncTriggers(): void {
   window.addEventListener('online', maybeSync);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') maybeSync();
+  });
+
+  // Warn the user before unload while a sync is in flight. Otherwise the
+  // browser cancels the XHR PUT mid-upload and the row drops back to
+  // 'error' state — the next page mount picks it up via auto-retry, but
+  // the user just lost progress on a connection they may not have again.
+  // Tracked via the start/done sync events.
+  let busy = false;
+  window.addEventListener(SYNC_EVENTS.start, () => { busy = true; });
+  window.addEventListener(SYNC_EVENTS.done,  () => { busy = false; });
+  window.addEventListener('beforeunload', (e: BeforeUnloadEvent) => {
+    if (!busy) return;
+    e.preventDefault();
+    // Most browsers ignore the message and show their own generic prompt
+    // ("Leave site? Changes you made may not be saved"), but legacy
+    // Chrome/Firefox still honour the returnValue/return-string contract.
+    e.returnValue = '';
   });
 }
