@@ -7,6 +7,7 @@ interface Props {
 const { lang } = Astro.props;
 const tr = t(lang);
 const pip = (tr as unknown as { pipeline: Record<string, string> }).pipeline;
+const onb = (tr as unknown as { onboarding: Record<string, string> }).onboarding;
 ---
 
 <div class="max-w-2xl mx-auto">
@@ -337,6 +338,13 @@ const pip = (tr as unknown as { pipeline: Record<string, string> }).pipeline;
           <span data-so-label>{tr.auth.sign_out_everywhere}</span>
         </button>
       </div>
+      <div class="pt-2">
+        <button id="replay-tour-btn" type="button"
+          aria-label={onb.replay_tour_label}
+          class="text-sm text-emerald-700 dark:text-emerald-400 hover:underline">
+          {onb.replay_tour_button}
+        </button>
+      </div>
     </div>
   </section>
 </div>
@@ -454,6 +462,10 @@ const pip = (tr as unknown as { pipeline: Record<string, string> }).pipeline;
   const pkUnsup     = document.getElementById('passkey-unsupported');
   const soBtn       = document.getElementById('signout-all-btn') as HTMLButtonElement | null;
   const soLabel     = soBtn?.querySelector('[data-so-label]') as HTMLElement | null;
+  const replayTourBtn = document.getElementById('replay-tour-btn') as HTMLButtonElement | null;
+  replayTourBtn?.addEventListener('click', () => {
+    window.dispatchEvent(new CustomEvent('rastrum:replay-onboarding'));
+  });
 
   const isEsLang = document.documentElement.lang === 'es';
   const PK_DEFAULT = pkLabel?.textContent ?? 'Register a passkey';
