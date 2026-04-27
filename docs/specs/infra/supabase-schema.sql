@@ -55,13 +55,33 @@ ALTER TABLE public.users
   ADD COLUMN IF NOT EXISTS credentialed_at       timestamptz,
   ADD COLUMN IF NOT EXISTS credentialed_by       uuid REFERENCES public.users(id);
 
--- Auto-create user profile on sign-up
+-- Auto-create user profile on sign-up. Pulls avatar + display name from
+-- the OAuth provider's metadata when present:
+--   Google → user_metadata.picture (preferred) or .avatar_url
+--   GitHub → user_metadata.avatar_url
+--   Magic link / OTP → no metadata, falls through to NULL (UI shows initials)
+-- ON CONFLICT updates only fields that are still NULL, so a user who later
+-- uploaded their own avatar isn't overwritten on next OAuth re-link.
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$
+DECLARE
+  meta jsonb := COALESCE(NEW.raw_user_meta_data, '{}'::jsonb);
+  picked_avatar text := COALESCE(
+    meta->>'avatar_url',
+    meta->>'picture'
+  );
+  picked_name text := COALESCE(
+    meta->>'full_name',
+    meta->>'name',
+    meta->>'user_name',
+    NULLIF(split_part(NEW.email, '@', 1), '')
+  );
 BEGIN
-  INSERT INTO public.users (id)
-  VALUES (NEW.id)
-  ON CONFLICT DO NOTHING;
+  INSERT INTO public.users (id, avatar_url, display_name)
+  VALUES (NEW.id, picked_avatar, picked_name)
+  ON CONFLICT (id) DO UPDATE SET
+    avatar_url   = COALESCE(public.users.avatar_url,   EXCLUDED.avatar_url),
+    display_name = COALESCE(public.users.display_name, EXCLUDED.display_name);
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -70,6 +90,33 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- Also fire on raw_user_meta_data updates so existing users who re-auth
+-- pick up an avatar they didn't have before. Same COALESCE guard so the
+-- user's own custom avatar wins.
+DROP TRIGGER IF EXISTS on_auth_user_updated ON auth.users;
+CREATE TRIGGER on_auth_user_updated
+  AFTER UPDATE OF raw_user_meta_data ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- One-shot backfill for users who signed up before this trigger existed:
+-- copy any avatar / name in auth.users.raw_user_meta_data into
+-- public.users where the public row's value is still NULL.
+UPDATE public.users u
+SET avatar_url = COALESCE(
+      au.raw_user_meta_data->>'avatar_url',
+      au.raw_user_meta_data->>'picture'
+    ),
+    display_name = COALESCE(
+      u.display_name,
+      au.raw_user_meta_data->>'full_name',
+      au.raw_user_meta_data->>'name',
+      au.raw_user_meta_data->>'user_name',
+      NULLIF(split_part(au.email, '@', 1), '')
+    )
+FROM auth.users au
+WHERE au.id = u.id
+  AND (u.avatar_url IS NULL OR u.display_name IS NULL);
 
 -- ============================================================
 -- TAXA
