@@ -1,26 +1,86 @@
 ---
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const site = 'https://rastrum.org';
+const ogImage = `${site}/rastrum-logo-512.png`;
+const description = 'Open-source biodiversity observation platform for Latin America. Multi-modal AI species identification, offline-first, indigenous-language ready.';
+const descriptionEs = 'Plataforma open-source de observación de biodiversidad para América Latina. Identificación de especies multi-modal con IA, offline-first, lista para lenguas indígenas.';
 ---
 
 <!doctype html>
-<html>
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Rastrum — Redirecting</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rastrum — Identify any living thing, anywhere</title>
+    <meta name="description" content={description} />
+
+    <!-- Crawlers: this is a transit page; prefer indexing the locale roots. -->
+    <meta name="robots" content="noindex,follow" />
+    <link rel="canonical" href={`${site}/en/`} />
+    <link rel="alternate" hreflang="en" href={`${site}/en/`} />
+    <link rel="alternate" hreflang="es" href={`${site}/es/`} />
+    <link rel="alternate" hreflang="x-default" href={`${site}/en/`} />
+
+    <!-- Open Graph + Twitter -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={`${site}/`} />
+    <meta property="og:title" content="Rastrum — Identify any living thing, anywhere" />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:locale:alternate" content="es_MX" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Rastrum — Identify any living thing, anywhere" />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+
+    <meta name="theme-color" content="#10b981" />
+    <link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
+
+    <!-- JS: redirect to the user's preferred locale (saved or browser-detected). -->
     <script is:inline define:vars={{ base }}>
-      const langs = ['es', 'en'];
-      // 1. Prefer a previously saved choice
-      const saved = localStorage.getItem('rastrum.lang');
-      if (saved && langs.includes(saved)) {
-        window.location.replace(base + '/' + saved + '/');
-      } else {
-        // 2. Use browser language, defaulting to 'es' (primary audience)
-        const browserLang = navigator.language?.slice(0, 2);
-        const lang = langs.includes(browserLang) ? browserLang : 'es';
-        window.location.replace(base + '/' + lang + '/');
-      }
+      (function () {
+        try {
+          const langs = ['es', 'en'];
+          const saved = localStorage.getItem('rastrum.lang');
+          let target;
+          if (saved && langs.includes(saved)) {
+            target = saved;
+          } else {
+            const browserLang = (navigator.language || '').slice(0, 2);
+            target = langs.includes(browserLang) ? browserLang : 'es';
+          }
+          window.location.replace(base + '/' + target + '/');
+        } catch {
+          window.location.replace(base + '/en/');
+        }
+      })();
     </script>
-    <meta http-equiv="refresh" content={`0;url=${base}/es/`} />
+    <!-- Final fallback for users with JS disabled. -->
+    <meta http-equiv="refresh" content={`2;url=${base}/en/`} />
+
+    <style>
+      body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #09090b; color: #e5e7eb; margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+      main { text-align: center; max-width: 28rem; }
+      img { width: 80px; height: 80px; margin-bottom: 1rem; }
+      h1 { font-size: 1.5rem; margin: 0 0 0.25rem; color: #10b981; font-weight: 700; letter-spacing: -0.02em; }
+      .tagline { color: #9ca3af; font-size: 0.875rem; margin: 0 0 1.5rem; }
+      .desc { color: #71717a; font-size: 0.8125rem; line-height: 1.5; margin: 0 0 2rem; }
+      .links { display: flex; gap: 0.75rem; justify-content: center; }
+      .links a { color: #10b981; text-decoration: none; padding: 0.625rem 1.25rem; border: 1px solid #10b98166; border-radius: 0.5rem; font-weight: 500; font-size: 0.875rem; transition: border-color 0.15s, background-color 0.15s; }
+      .links a:hover { border-color: #10b981; background-color: rgba(16, 185, 129, 0.1); }
+    </style>
   </head>
-  <body></body>
+  <body>
+    <main>
+      <img src={`${base}/rastrum-logo.svg`} alt="Rastrum" />
+      <h1>Rastrum</h1>
+      <p class="tagline">Identify any living thing, anywhere · Identifica cualquier ser vivo, donde sea</p>
+      <p class="desc">{description}<br /><br />{descriptionEs}</p>
+      <div class="links">
+        <a href={`${base}/en/`} hreflang="en">English →</a>
+        <a href={`${base}/es/`} hreflang="es">Español →</a>
+      </div>
+    </main>
+  </body>
 </html>
