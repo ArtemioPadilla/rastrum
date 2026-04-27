@@ -150,8 +150,8 @@ const docColumns = [
       <MegaMenu lang={locale} trigger={tr.nav.docs} columns={docColumns} align="right" active={docsActive} />
     </nav>
 
-    <!-- Auth + utilities -->
-    <div class="flex items-center gap-2 sm:ml-2">
+    <!-- Auth + utilities — ml-auto on mobile pushes to the right edge since the reference nav (which carries ml-auto on desktop) is hidden under sm: -->
+    <div class="flex items-center gap-2 ml-auto sm:ml-2">
       <a
         href={getLocalizedPath(lang, routes.signIn[locale] + '/')}
         id="sign-in-link"
