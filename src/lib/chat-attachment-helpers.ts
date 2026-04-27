@@ -99,6 +99,82 @@ function pickCommonName(c: CascadeCandidate, locale: Locale): string | null {
   return en ?? es ?? null;
 }
 
+// ───────────────────────── Follow-up suggestion chips ─────────────────────────
+
+export interface ChatSuggestion {
+  /** Short label rendered on the chip. */
+  label: string;
+  /** Prompt inserted into the textarea (and auto-submitted). */
+  prompt: string;
+}
+
+export interface SuggestionContext {
+  locale: Locale;
+  /** Top species from the cascade if the previous turn produced an ID. */
+  scientificName?: string | null;
+  /** Localised common name to enrich chip labels when present. */
+  commonName?: string | null;
+}
+
+/**
+ * Build 3 follow-up suggestion chips for after an assistant turn.
+ *
+ * When a species is in scope (`scientificName` set), chips are personalised
+ * with the species name. Otherwise we fall back to generic chips that work
+ * even on the very first turn.
+ */
+export function buildChatSuggestions(ctx: SuggestionContext): ChatSuggestion[] {
+  const isEs = ctx.locale === 'es';
+  const sci = (ctx.scientificName ?? '').trim();
+  const display = (ctx.commonName ?? '').trim() || sci;
+
+  if (sci) {
+    if (isEs) {
+      return [
+        {
+          label: `¿Es ${display} venenosa?`,
+          prompt: `¿Es ${sci} venenosa o peligrosa para humanos o mascotas?`,
+        },
+        {
+          label: `¿Cómo distingo a ${display} de especies similares?`,
+          prompt: `¿Cómo puedo distinguir a ${sci} de especies similares en campo?`,
+        },
+        {
+          label: `Hábitat típico de ${display}`,
+          prompt: `Describe el hábitat típico de ${sci} y dónde es más probable encontrarla.`,
+        },
+      ];
+    }
+    return [
+      {
+        label: `Is ${display} poisonous?`,
+        prompt: `Is ${sci} poisonous or dangerous to humans or pets?`,
+      },
+      {
+        label: `How do I tell ${display} apart from similar species?`,
+        prompt: `How can I tell ${sci} apart from similar species in the field?`,
+      },
+      {
+        label: `Typical habitat of ${display}`,
+        prompt: `Describe the typical habitat of ${sci} and where I'm most likely to find it.`,
+      },
+    ];
+  }
+
+  if (isEs) {
+    return [
+      { label: '¿Es venenosa?', prompt: '¿Esta especie es venenosa o peligrosa?' },
+      { label: '¿Cómo la distingo?', prompt: '¿Cómo la distingo de otras especies similares?' },
+      { label: 'Hábitat típico', prompt: '¿Cuál es su hábitat típico?' },
+    ];
+  }
+  return [
+    { label: 'Is it poisonous?', prompt: 'Is this species poisonous or dangerous?' },
+    { label: 'How do I tell it apart?', prompt: 'How do I tell it apart from similar species?' },
+    { label: 'Typical habitat', prompt: 'What is its typical habitat?' },
+  ];
+}
+
 // ───────────────────────── Observe-page handoff ─────────────────────────
 
 /** Payload stored in sessionStorage under `PENDING_OBSERVATION_KEY`. */
