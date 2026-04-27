@@ -33,6 +33,9 @@ const cameraStarting    = observeStrings.camera_starting     ?? (isEs ? 'Inician
 const videoRecord       = observeStrings.video_record        ?? (isEs ? 'Grabar video' : 'Record video');
 const videoLabel        = observeStrings.video_label         ?? 'Video';
 const videoMaxDuration  = observeStrings.video_max_duration  ?? (isEs ? 'Máximo 30 segundos' : 'Maximum 30 seconds');
+const gpsErrPermission  = observeStrings.gps_error_permission_denied ?? (isEs ? 'Permiso de ubicación denegado. Actívalo en ajustes.' : 'Location permission denied. Enable it in settings.');
+const gpsErrUnavailable = observeStrings.gps_error_unavailable       ?? (isEs ? 'Ubicación no disponible.' : 'Location unavailable.');
+const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 'Tiempo de espera agotado.' : 'Location timed out.');
 ---
 
 <div class="max-w-xl mx-auto">
@@ -164,7 +167,11 @@ const videoMaxDuration  = observeStrings.video_max_duration  ?? (isEs ? 'Máximo
     <div>
       <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.observe.gps_label}</label>
       <div id="gps-display" class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 px-3 py-2 text-sm">
-        <span id="gps-status" class="text-zinc-500">{tr.observe.gps_getting}</span>
+        <span id="gps-status" class="text-zinc-500"
+          data-err-permission={gpsErrPermission}
+          data-err-unavailable={gpsErrUnavailable}
+          data-err-timeout={gpsErrTimeout}
+        >{tr.observe.gps_getting}</span>
       </div>
       <div id="gps-manual-wrap" class="hidden mt-2 grid grid-cols-2 gap-2">
         <input id="manual-lat" name="lat" type="number" step="any" placeholder="Lat" class="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-base" />
@@ -1094,11 +1101,11 @@ const videoMaxDuration  = observeStrings.video_max_duration  ?? (isEs ? 'Máximo
 
   function showGpsError(code: number) {
     if (!gpsStatus) return;
-    const obs = tr.observe as Record<string, string>;
+    const d = (gpsStatus as HTMLElement).dataset;
     let msg: string;
-    if (code === 1)      msg = obs.gps_error_permission_denied;
-    else if (code === 2) msg = obs.gps_error_unavailable;
-    else                 msg = obs.gps_error_timeout;
+    if (code === 1)      msg = d.errPermission ?? '';
+    else if (code === 2) msg = d.errUnavailable ?? '';
+    else                 msg = d.errTimeout ?? '';
     gpsStatus.textContent = msg;
     gpsStatus.className = 'text-amber-700 dark:text-amber-400 text-xs';
     // Auto-reveal manual entry — that's the recovery path the message
