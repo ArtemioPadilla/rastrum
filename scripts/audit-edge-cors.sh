@@ -31,6 +31,7 @@ FUNCTIONS=(
 )
 
 failed=0
+warned=0
 for fn in "${FUNCTIONS[@]}"; do
   url="${BASE}/${fn}"
   echo "→ ${fn}"
@@ -42,6 +43,17 @@ for fn in "${FUNCTIONS[@]}"; do
     --max-time 10 || true)
   status=$(printf '%s\n' "$hdrs" | head -1 | awk '{print $2}')
   acao=$(printf '%s\n' "$hdrs" | grep -i '^access-control-allow-origin:' || true)
+
+  # 404 = function never deployed (or recently undeployed). Not a CORS
+  # bug — just absent. Warn so we're aware, but don't fail the gate;
+  # otherwise a single-function deploy fails because of unrelated
+  # functions that legitimately don't exist yet.
+  if [[ "$status" == "404" ]]; then
+    echo "    ⚠ 404 not deployed (skip)"
+    warned=$((warned + 1))
+    continue
+  fi
+
   if [[ -z "$status" || ! "$status" =~ ^(200|204)$ ]]; then
     echo "    ✗ unexpected status: $status"
     failed=$((failed + 1))
@@ -55,10 +67,14 @@ for fn in "${FUNCTIONS[@]}"; do
   echo "    ✓ ${status} | ${acao#access-control-allow-origin: }"
 done
 
+echo
 if (( failed > 0 )); then
-  echo
   echo "${failed} function(s) failed the CORS audit."
+  (( warned > 0 )) && echo "${warned} function(s) skipped (not deployed)."
   exit 1
 fi
-echo
-echo "All ${#FUNCTIONS[@]} edge functions pass the CORS audit."
+if (( warned > 0 )); then
+  echo "$(( ${#FUNCTIONS[@]} - warned )) edge functions pass the CORS audit; ${warned} skipped (not deployed yet)."
+else
+  echo "All ${#FUNCTIONS[@]} edge functions pass the CORS audit."
+fi
