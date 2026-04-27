@@ -1,0 +1,154 @@
+---
+import { t, getLocalizedPath, routes, type Locale } from '../i18n/utils';
+import { getFabTarget, isActiveSection } from '../lib/chrome-helpers';
+
+interface Props {
+  lang: 'en' | 'es';
+  currentPath: string;
+}
+const { lang, currentPath } = Astro.props;
+const tr = t(lang);
+const locale = lang as Locale;
+
+const fab = getFabTarget(currentPath, lang);
+
+// Build href helpers — these read from `routes` so they stay symmetric across locales.
+const explorePath = getLocalizedPath(lang, routes.explore[locale] + '/');
+const exploreRecentPath = getLocalizedPath(lang, routes.exploreRecent[locale] + '/');
+const chatPath    = getLocalizedPath(lang, routes.chat[locale] + '/');
+const profilePath = getLocalizedPath(lang, routes.profile[locale] + '/');
+const homePath    = getLocalizedPath(lang, '/');
+const identifyPath = getLocalizedPath(lang, routes.identify[locale] + '/');
+const exploreMapPath = getLocalizedPath(lang, routes.exploreMap[locale] + '/');
+const signInPath  = getLocalizedPath(lang, routes.signIn[locale] + '/');
+
+// Active-state precomputes (so the markup stays tidy)
+const obsActive  = isActiveSection(currentPath, 'observe',  lang);
+const expActive  = isActiveSection(currentPath, 'explore',  lang);
+const chatActive = isActiveSection(currentPath, 'chat',     lang);
+const profActive = isActiveSection(currentPath, 'profile',  lang);
+const homeActive = isActiveSection(currentPath, 'home',     lang);
+const idActive   = isActiveSection(currentPath, 'identify', lang);
+---
+
+<!--
+  Mobile bottom bar. Two layouts driven by auth state, swapped by the
+  inline script below: the signed-in 5-slot version (Explore · Chat ·
+  [FAB] · Recent · Profile) and the signed-out 4-slot version (Home ·
+  Identify · Map · Sign in) — sacred geometry: the FAB only appears
+  when it means "observe."
+-->
+<nav
+  id="mobile-bottom-bar"
+  class="sm:hidden fixed inset-x-0 bottom-0 z-40 border-t border-zinc-200 dark:border-zinc-800 bg-white/90 dark:bg-zinc-950/90 backdrop-blur"
+  style="padding-bottom: max(env(safe-area-inset-bottom), 0px);"
+  aria-label={tr.nav.bottom.observe}
+>
+  <!-- Signed-in: 5 slots, center FAB -->
+  <div id="mbb-authed" class="hidden grid grid-cols-5 items-end h-16 relative">
+    <a href={explorePath} class:list={[
+      'flex flex-col items-center justify-center gap-0.5 py-1 text-[10px]',
+      expActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-500 dark:text-zinc-400'
+    ]} data-tour="explore-tab">
+      <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l5.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-1.447-.894L15 9m0 8V9"/></svg>
+      <span>{tr.nav.bottom.explore}</span>
+    </a>
+    <a href={chatPath} class:list={[
+      'flex flex-col items-center justify-center gap-0.5 py-1 text-[10px]',
+      chatActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-500 dark:text-zinc-400'
+    ]}>
+      <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4-.83L3 20l1.41-3.18A8 8 0 0121 12z"/></svg>
+      <span>{tr.nav.bottom.chat}</span>
+    </a>
+
+    <!-- FAB slot -->
+    <div class="relative">
+      <a
+        href={fab.href}
+        data-tour="fab"
+        aria-label={fab.mode === 'quick-id' ? tr.nav.bottom.fab_quick_id_label : tr.nav.bottom.fab_observe_label}
+        class="absolute left-1/2 -translate-x-1/2 -top-7 w-14 h-14 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center shadow-lg ring-4 ring-white dark:ring-zinc-950 motion-reduce:transition-none transition-transform active:scale-95"
+      >
+        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 0 1 2-2h2l1.5-2h7L17 7h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+        {fab.mode === 'quick-id' && (
+          <span aria-hidden="true" class="absolute -top-1 -right-1 w-5 h-5 bg-yellow-400 text-zinc-900 rounded-full flex items-center justify-center text-[10px] font-bold border-2 border-white dark:border-zinc-950">⚡</span>
+        )}
+      </a>
+      <span class="absolute left-1/2 -translate-x-1/2 top-9 text-[9px] text-zinc-500 dark:text-zinc-400 whitespace-nowrap">
+        {fab.mode === 'quick-id' ? tr.nav.bottom.quick_id : tr.nav.bottom.observe}
+      </span>
+    </div>
+
+    <a href={exploreRecentPath} class:list={[
+      'flex flex-col items-center justify-center gap-0.5 py-1 text-[10px]',
+      currentPath.includes('/explore/recent') || currentPath.includes('/explorar/recientes')
+        ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-500 dark:text-zinc-400'
+    ]}>
+      <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      <span>{tr.nav.bottom.recent}</span>
+    </a>
+    <a href={profilePath} class:list={[
+      'flex flex-col items-center justify-center gap-0.5 py-1 text-[10px]',
+      profActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-500 dark:text-zinc-400'
+    ]}>
+      <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      <span>{tr.nav.bottom.profile}</span>
+    </a>
+  </div>
+
+  <!-- Signed-out: 4-tab no-FAB layout -->
+  <div id="mbb-anon" class="grid grid-cols-4 items-end h-16">
+    <a href={homePath} class:list={[
+      'flex flex-col items-center justify-center gap-0.5 py-1 text-[10px]',
+      homeActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-500 dark:text-zinc-400'
+    ]}>
+      <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h3v-7h6v7h3a1 1 0 001-1V10"/></svg>
+      <span>{tr.nav.bottom.home}</span>
+    </a>
+    <a href={identifyPath} class:list={[
+      'flex flex-col items-center justify-center gap-0.5 py-1 text-[10px]',
+      idActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-500 dark:text-zinc-400'
+    ]}>
+      <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 0 1 2-2h2l1.5-2h7L17 7h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+      <span>{tr.nav.bottom.identify}</span>
+    </a>
+    <a href={exploreMapPath} class:list={[
+      'flex flex-col items-center justify-center gap-0.5 py-1 text-[10px]',
+      expActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-500 dark:text-zinc-400'
+    ]}>
+      <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l5.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-1.447-.894L15 9m0 8V9"/></svg>
+      <span>{tr.nav.bottom.explore}</span>
+    </a>
+    <a href={signInPath} class="flex flex-col items-center justify-center gap-0.5 py-1 text-[10px] text-emerald-600 dark:text-emerald-400">
+      <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H9m-4 8H4a1 1 0 01-1-1V5a1 1 0 011-1h1"/></svg>
+      <span>{tr.nav.bottom.sign_in}</span>
+    </a>
+  </div>
+</nav>
+
+<!--
+  Auth-state swap. Mirrors the existing pattern in Header.astro: read the
+  Supabase session, toggle visibility for the signed-in vs signed-out
+  layout. The `mbb-anon` block is shown by default so the layout never
+  flashes empty.
+-->
+<script>
+  import { getSupabase } from '../lib/supabase';
+
+  const authed = document.getElementById('mbb-authed');
+  const anon   = document.getElementById('mbb-anon');
+
+  function paint(hasSession: boolean) {
+    if (!authed || !anon) return;
+    authed.classList.toggle('hidden', !hasSession);
+    anon.classList.toggle('hidden',   hasSession);
+  }
+
+  (async () => {
+    try {
+      const { data: { session } } = await getSupabase().auth.getSession();
+      paint(!!session);
+      getSupabase().auth.onAuthStateChange((_e, s) => paint(!!s));
+    } catch { /* env not set; leave anon visible */ }
+  })();
+</script>
