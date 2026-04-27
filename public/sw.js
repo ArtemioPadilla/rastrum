@@ -9,7 +9,7 @@
 //   - Manifest, favicon, sw.js itself: network-first so updates land fast.
 //
 // Bump VERSION to invalidate every cached entry on the next visit.
-const VERSION = 'rastrum-shell-v4-2026-04-27';
+const VERSION = 'rastrum-shell-v5-2026-04-27';
 const SHELL = [
   '/',
   '/en/',
@@ -105,18 +105,26 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url);
 
   // Never intercept third-party API calls — Supabase, Anthropic, PlantNet,
-  // OpenFreeMap tiles, R2 media. Failures should surface so the outbox kicks in.
+  // OpenFreeMap tiles. Failures should surface so the outbox kicks in.
   if (url.hostname.includes('supabase.co')
    || url.hostname.includes('anthropic.com')
    || url.hostname.includes('plantnet.org')
    || url.hostname.includes('openfreemap.org')
-   || url.hostname.includes('unpkg.com')
-   || url.hostname.includes('rastrum-media')
-   || url.hostname === 'media.rastrum.org'
-   || url.hostname === 'tiles.rastrum.org') {
+   || url.hostname.includes('unpkg.com')) {
     return;
   }
-  if (url.origin !== location.origin) return;
+
+  // R2 user-media (observation photos/audio) — skip caching, let network handle.
+  // Model weights and tiles hosted on rastrum.app ARE cached below.
+  const isUserMedia = (url.hostname === 'media.rastrum.app' || url.hostname === 'media.rastrum.org')
+    && url.pathname.startsWith('/observations/');
+  if (isUserMedia) return;
+
+  // Only intercept same-origin + known rastrum.app asset hosts.
+  const isRastrumAsset = url.origin === location.origin
+    || url.hostname === 'media.rastrum.app'
+    || url.hostname === 'tiles.rastrum.app';
+  if (!isRastrumAsset) return;
 
   // HTML navigations: network-first — always pull the latest so new JS
   // hashes land. Fall back to whatever is in the cache (or '/') offline.
