@@ -200,6 +200,28 @@ const pwa = (tr as unknown as { pwa: Record<string, string> }).pwa;
         iosBlock?.classList.remove('hidden');
         cta?.classList.add('hidden');
         cycleIosFrames();
+      } else {
+        // Desktop / Android Chrome: if beforeinstallprompt has already
+        // fired (race), the cta is already visible. If it hasn't fired
+        // within ~1.5 s after the banner shows, surface a static
+        // "click the install icon in the address bar" hint so the
+        // banner isn't actionless. Most Chromium variants fire the
+        // event within a few hundred ms once the manifest is valid;
+        // a missed fire usually means the PWA is already installed in
+        // another profile, the engagement heuristic isn't met, or the
+        // user has previously dismissed it at the OS level.
+        setTimeout(() => {
+          if (!savedPrompt && cta && cta.classList.contains('hidden')) {
+            const isEs = document.documentElement.lang === 'es';
+            const hint = document.createElement('span');
+            hint.id = 'install-hint-fallback';
+            hint.className = 'text-xs text-emerald-800 dark:text-emerald-200 italic';
+            hint.textContent = isEs
+              ? 'Toca el icono ⊕ en la barra de direcciones para instalar.'
+              : 'Click the ⊕ icon in your address bar to install.';
+            cta.replaceWith(hint);
+          }
+        }, 1500);
       }
       show();
     }
