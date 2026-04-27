@@ -1,11 +1,11 @@
 # Module 22 — Community Validation (Expert ID Queue)
 
-**Status:** Spec v1.1 — 2026-04-27 (rev. after #26 review)
+**Status:** Spec v1.2 — 2026-04-27 (rev. after #26 review × 2)
 **Author:** Nyx (via Rastrum group), revised by code-reviewer pass
 **Milestone:** v1.1
-**Routes:**
-- `/{en,es}/{explore,explorar}/{validate,validar}/` — public queue (read-only for all; suggest action requires sign-in)
-- `/{en,es}/{profile,perfil}/{validate,validar}/` — personal validation dashboard
+**Routes:** (canonical EN ↔ ES pairing — must match `src/i18n/utils.ts` `routes`)
+- Public queue: `/en/explore/validate/` ↔ `/es/explorar/validar/` (read-only for all; suggest action requires sign-in)
+- Personal validator dashboard: `/en/profile/validate/` ↔ `/es/perfil/validar/`
 
 ---
 
@@ -138,17 +138,30 @@ expert-weighted ≥ 2-distinct-voter rule. We add nothing.
 check before showing the "Sugerir" button. Same defence twice; no
 new trigger needed.
 
-### RLS
+### RLS — privacy implications spelled out
 
-The existing `identifications` policies cover community votes by
-construction:
-- `id_select_public`: SELECT permitted on rows whose observation passes `obs_public_read`
-- `id_insert_self`: INSERT permitted when `auth.uid() = validated_by` (i.e. you can only insert *your own* suggestion)
-- `id_update_validators_only`: UPDATE refused for everyone except the original suggester
+Reuse of `identifications.validated_by` means we inherit the existing
+policies. The privacy-relevant guarantees, made explicit:
 
-**No new RLS needed.** Verify the three policies exist in current
-schema before merging this module's PR; if any are missing, add them
-via the same migration as the view.
+| Concern | Enforced by |
+|---|---|
+| Anon users can't see private-observation suggestions | `obs_public_read` on `observations`. Suggestions on private obs are filtered when the parent obs row isn't visible. |
+| Anon users CAN see suggestions on public obs | `id_select_public` on `identifications`, which gates SELECT on `EXISTS(obs row visible to caller)`. |
+| Only the suggester can edit / delete their suggestion | `id_insert_self`, `id_update_validators_only`, `id_delete_validators_only` — all filter on `auth.uid() = validated_by`. |
+| Self-vote refused | `tg_check_validator_not_observer` BEFORE INSERT/UPDATE on `identifications`. |
+| Suggestion can't bypass min-confidence on research-grade promotion | `tg_research_grade_min_confidence` BEFORE UPDATE of `is_research_grade`. |
+
+**Implementation PR must verify** each of those five policies/triggers
+exists in the current `supabase-schema.sql` before merging. If any
+are missing, add them in the same migration as the view; do NOT ship
+the UI before the DB-side guarantees are in place.
+
+Action / write eligibility: any signed-in user can suggest. The
+existing 3× expert-in-kingdom weight in `recompute_consensus()`
+prevents non-experts from outvoting an expert in their field. This is
+the *intended* social model — open to all, signal dominated by
+experts. If a future revision wants experts-only voting, the
+restriction belongs on `id_insert_self`, not on a new table.
 
 ### Eligibility — voting is open, expert weight matters
 
@@ -261,34 +274,81 @@ explicit confidence/research-grade test.)
 ## Notifications
 
 `tg_research_grade_activity_event` already inserts a row in
-`activity_events`. No additional code. The push-notification fanout
-in module 11 picks it up automatically.
+`activity_events` with the schema's actual column names:
+
+```sql
+INSERT INTO public.activity_events (actor_id, subject_id, kind, payload, visibility)
+VALUES (
+  <observer_id>,                    -- the OWNER of the obs receives the notif
+  <observation_id>,
+  'observation_research_grade',     -- enum value already in the CHECK list
+  jsonb_build_object('scientific_name', <name>, 'taxon_id', <taxon_id>),
+  'self'                            -- visible to owner; not in public feed
+);
+```
+
+No additional code in this module. The push-notification fanout in
+module 11 picks it up automatically. Validators ALSO get a
+`'validation_given'` event (already enum-allowed) optionally — TBD in
+the implementation PR if surface area warrants it.
 
 ---
 
 ## i18n keys
 
-Add to both `en.json` and `es.json`:
+Both `en.json` and `es.json` must add identical keys, listed below.
+Placeholders use `{n}`, `{name}`, `{kingdom}` (mirror existing
+`my_observations_load_more` / `streak_milestone` style):
+
+### `src/i18n/es.json` — `validation` block (new)
 
 ```json
-{
-  "validation_queue_title": "Cola de validación",
-  "validation_queue_subtitle": "{n} observaciones necesitan ayuda",
-  "suggest_id": "Sugerir identificación",
-  "confirm_id": "Confirmar {name}",
-  "suggest_different": "Sugerir otra",
-  "votes_count_one": "1 sugerencia",
-  "votes_count_other": "{n} sugerencias",
-  "experts_count": "{n} expertos en {kingdom}",
-  "research_grade": "Grado de investigación",
-  "research_grade_promoted": "¡Identificación promovida a grado investigación!",
-  "pending_validation": "Esperando validación de la comunidad",
-  "cannot_vote_own": "No puedes validar tus propias observaciones",
-  "expert_note_placeholder": "Notas (opcional)",
-  "confidence_high": "Alta",
-  "confidence_medium": "Media",
-  "confidence_low": "Baja",
-  "validate_signin_prompt": "Inicia sesión para sugerir una identificación"
+"validation": {
+  "queue_title":              "Cola de validación",
+  "queue_subtitle":           "{n} observaciones necesitan ayuda",
+  "queue_empty":              "No hay observaciones esperando validación. ¡Buen trabajo!",
+  "suggest_id":               "Sugerir identificación",
+  "confirm_id":               "Confirmar {name}",
+  "suggest_different":        "Sugerir otra",
+  "votes_count_one":          "1 sugerencia",
+  "votes_count_other":        "{n} sugerencias",
+  "experts_count":            "{n} expertos en {kingdom}",
+  "research_grade":           "Grado de investigación",
+  "research_grade_promoted":  "¡Identificación promovida a grado investigación!",
+  "pending_validation":       "Esperando validación de la comunidad",
+  "cannot_vote_own":          "No puedes validar tus propias observaciones",
+  "tie_warning":              "Dos sugerencias empatadas — se necesita un voto desempate.",
+  "expert_note_placeholder":  "Notas (opcional)",
+  "confidence_high":          "Alta",
+  "confidence_medium":        "Media",
+  "confidence_low":           "Baja",
+  "validate_signin_prompt":   "Inicia sesión para sugerir una identificación"
+}
+```
+
+### `src/i18n/en.json` — `validation` block (new)
+
+```json
+"validation": {
+  "queue_title":              "Validation queue",
+  "queue_subtitle":           "{n} observations need help",
+  "queue_empty":              "No observations waiting for validation. Nice work!",
+  "suggest_id":               "Suggest identification",
+  "confirm_id":               "Confirm {name}",
+  "suggest_different":        "Suggest another",
+  "votes_count_one":          "1 suggestion",
+  "votes_count_other":        "{n} suggestions",
+  "experts_count":            "{n} {kingdom} experts",
+  "research_grade":           "Research grade",
+  "research_grade_promoted":  "Identification promoted to research grade!",
+  "pending_validation":       "Waiting for community validation",
+  "cannot_vote_own":          "You can't validate your own observations",
+  "tie_warning":              "Two suggestions are tied — a tiebreaker vote is needed.",
+  "expert_note_placeholder":  "Notes (optional)",
+  "confidence_high":          "High",
+  "confidence_medium":        "Medium",
+  "confidence_low":           "Low",
+  "validate_signin_prompt":   "Sign in to suggest an identification"
 }
 ```
 
@@ -302,10 +362,21 @@ Add to both `en.json` and `es.json`:
    rows. If they later reach consensus on a different taxon, the
    normal trigger flow picks the new primary; no special handling.
 
-2. **Tie between two taxa** — `recompute_consensus` picks the one
-   with higher *score* (expert-weighted). On exact tie, the function
-   currently keeps the existing `is_primary` row. UI should warn:
-   "Dos sugerencias empatadas — se necesita un voto desempate."
+2. **Tie between two taxa.** `recompute_consensus()` orders by
+   `score DESC LIMIT 1`, which on a perfect tie returns *one* of the
+   tied rows non-deterministically (Postgres ORDER BY without a
+   tiebreaker). To avoid arbitrary promotion, the implementation PR
+   should harden the function:
+   ```sql
+   -- before the UPDATE:
+   IF (SELECT count(*) FROM weighted WHERE score = winning_score) > 1 THEN
+     RETURN;   -- tie; do not promote, wait for a tiebreaker vote
+   END IF;
+   ```
+   The UI surfaces the tie via the `validation.tie_warning` i18n
+   string. This change is in scope for this module's migration since
+   it's a one-line patch to `recompute_consensus()`; the function is
+   already `SECURITY DEFINER` and idempotent.
 
 3. **Vote retraction** — DELETE on the user's own
    `identifications` row is permitted by `id_delete_validators_only`
@@ -399,3 +470,21 @@ src/lib/types.ts                                # ValidationQueueRow type matchi
 - **Added a partial UNIQUE index suggestion** on
   `(observation_id, validated_by)` to enforce one-suggestion-per-user-per-obs
   at the DB layer.
+
+## What changed in v1.2 (Copilot review pass on v1.1)
+
+- **Routes canonicalised**: `/en/explore/validate/` ↔ `/es/explorar/validar/`
+  + `/en/profile/validate/` ↔ `/es/perfil/validar/`. Earlier draft
+  mixed both styles.
+- **i18n: explicit EN side**, with `{n}` / `{name}` / `{kingdom}`
+  placeholders to match the mock-up counts.
+- **Notifications example fixed**: actual schema columns are
+  `actor_id, subject_id, kind, payload, visibility` — not the v1.0
+  spec's `user_id, event_type`. `kind = 'observation_research_grade'`
+  is already enum-allowed.
+- **RLS reasoning made explicit** with a five-row table mapping each
+  privacy concern to the existing policy/trigger that enforces it.
+  No new RLS, but the implementation PR must verify the five exist.
+- **Tie handling hardened in spec**: `recompute_consensus()` gets a
+  one-line `RETURN` when multiple rows share the winning score, so
+  ties don't arbitrary-promote.
