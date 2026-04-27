@@ -196,6 +196,27 @@ CREATE POLICY "Public read" ON public.users FOR SELECT USING (true);
 CREATE POLICY "Self update" ON public.users FOR UPDATE USING (auth.uid() = id);
 ```
 
+### Auto-population from OAuth metadata (`handle_new_user` trigger)
+
+Google and GitHub OAuth pre-populate `auth.users.raw_user_meta_data`
+with the user's profile picture and name. The `handle_new_user()`
+trigger lifts those into `public.users` on every insert and on every
+update of `raw_user_meta_data`, so signed-in users see their picture
+in the header without uploading anything:
+
+| OAuth provider | `raw_user_meta_data` keys read |
+|---|---|
+| Google      | `picture` (preferred), `avatar_url`, `full_name`, `name` |
+| GitHub      | `avatar_url`, `name`, `user_name`, `full_name` |
+| Magic link / OTP | none — falls through to email-prefix as `display_name`, NULL avatar (UI shows initials) |
+
+Two important guards in the trigger:
+- `ON CONFLICT (id) DO UPDATE … COALESCE(public.users.avatar_url, EXCLUDED.avatar_url)` so a user who later uploads their own avatar is not overwritten on next OAuth re-link.
+- A one-shot backfill `UPDATE` runs at schema apply time so existing users (signed up before the trigger landed) get their picture pulled in retroactively without re-auth.
+
+See `docs/specs/infra/supabase-schema.sql` for the trigger body.
+
+
 ---
 
 ## RLS Pattern (used across all tables)

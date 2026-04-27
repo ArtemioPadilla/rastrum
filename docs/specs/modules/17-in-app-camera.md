@@ -1,10 +1,12 @@
 # Module 17 — In-App Camera (getUserMedia)
 
-**Version target:** v1.0
-**Status:** shipped — `getUserMedia` capture wired into `ObservationForm.astro` with file-input fallback.
-**GitHub Issue:** #18
+**Version target:** v1.0 → reverted, deferred to v1.1
+**Status:** **deferred.** A getUserMedia modal was prototyped during the v1.0 push but removed before launch — the live preview added latency, the captured frames were lower resolution than the OS camera, and the system camera (`<input type="file" capture="environment">`) was more reliable on the devices we tested. The /observe form ships with two buttons: **'Take photo'** (system camera via the capture attribute) and **'Upload from gallery'**.
+**GitHub Issue:** #18 (open — Android Chrome quirk where `capture` is ignored on some devices/skins)
 **Requested by:** Eugenio Padilla (first user, 2026-04-25)
-**Last verified:** 2026-04-26.
+**Last verified:** 2026-04-27.
+
+When v1.1 brings this back, it should ship as a **secondary** path (button labeled "In-app camera (preview)" or similar) with the system camera as primary, so users on devices where `capture=environment` works keep the higher-resolution OS camera.
 
 ---
 

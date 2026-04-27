@@ -79,7 +79,7 @@ include a citation in the dataset's EML metadata.
    mel-spectrogram, runs the model, returns top-N candidates per
    3-second window.
 4. **Audio capture in the observation form.** Add a "Record audio"
-   button next to the existing "Use camera" / "Choose file" buttons.
+   button next to the existing "Take photo" / "Upload from gallery" buttons.
    `mediaRecorder.start()` for ≤30 seconds, save as WebM/Opus to Dexie
    blobs, sync engine routes through R2 just like photos do.
 5. **UI surfacing.** The `identifications` table already has audio
