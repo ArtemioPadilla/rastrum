@@ -1,33 +1,12 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
-import ObservationCard from '../../components/ObservationCard.astro';
+import ExploreIndexView from '../../components/ExploreIndexView.astro';
 import { t } from '../../i18n/utils';
 
 const lang = 'en';
 const tr = t(lang);
-
-const observations = [
-  { species: 'Quercus robur', confidence: 95, location: 'Sierra de Guadarrama', date: '2026-04-20' },
-  { species: 'Amanita muscaria', confidence: 88, location: 'Black Forest, Germany', date: '2026-04-19' },
-  { species: 'Parus major', confidence: 92, location: 'Hyde Park, London', date: '2026-04-18' },
-  { species: 'Vulpes vulpes', confidence: 76, location: 'Doñana, Spain', date: '2026-04-17' },
-  { species: 'Boletus edulis', confidence: 84, location: 'Dolomites, Italy', date: '2026-04-16' },
-  { species: 'Cervus elaphus', confidence: 91, location: 'Scottish Highlands', date: '2026-04-15' },
-  { species: 'Lavandula angustifolia', confidence: 97, location: 'Provence, France', date: '2026-04-14' },
-  { species: 'Salamandra salamandra', confidence: 69, location: 'Picos de Europa, Spain', date: '2026-04-13' },
-];
 ---
 
 <BaseLayout title={`${tr.explore.title} — Rastrum`} lang={lang}>
-  <div class="space-y-6">
-    <div>
-      <h1 class="text-3xl font-bold">{tr.explore.title}</h1>
-      <p class="text-zinc-600 dark:text-zinc-400 mt-1">{tr.explore.subtitle}</p>
-    </div>
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-      {observations.map((obs) => (
-        <ObservationCard {...obs} lang={lang} />
-      ))}
-    </div>
-  </div>
+  <ExploreIndexView lang={lang} />
 </BaseLayout>

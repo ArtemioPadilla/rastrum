@@ -264,6 +264,26 @@ CREATE TABLE IF NOT EXISTS public.identifications (
 CREATE INDEX IF NOT EXISTS idx_id_observation ON identifications(observation_id);
 CREATE INDEX IF NOT EXISTS idx_id_taxon ON identifications(taxon_id);
 
+-- FK from identifications.observation_id → observations.id. Without
+-- this, PostgREST's nested-select introspection refuses to embed
+-- identifications in observations queries, breaking every observation
+-- list page with "Could not find a relationship between
+-- 'observations' and 'identifications' in the schema cache".
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'identifications_observation_id_fkey'
+      AND conrelid = 'public.identifications'::regclass
+  ) THEN
+    ALTER TABLE public.identifications
+      ADD CONSTRAINT identifications_observation_id_fkey
+      FOREIGN KEY (observation_id)
+      REFERENCES public.observations(id) ON DELETE CASCADE;
+  END IF;
+END $$;
+NOTIFY pgrst, 'reload schema';
+
 -- ============================================================
 -- MEDIA FILES
 -- ============================================================
@@ -296,6 +316,23 @@ CREATE TABLE IF NOT EXISTS public.media_files (
 );
 
 CREATE INDEX IF NOT EXISTS idx_media_observation ON media_files(observation_id);
+
+-- Same FK story as identifications above — needed so PostgREST can
+-- embed media_files in observations queries.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'media_files_observation_id_fkey'
+      AND conrelid = 'public.media_files'::regclass
+  ) THEN
+    ALTER TABLE public.media_files
+      ADD CONSTRAINT media_files_observation_id_fkey
+      FOREIGN KEY (observation_id)
+      REFERENCES public.observations(id) ON DELETE CASCADE;
+  END IF;
+END $$;
+NOTIFY pgrst, 'reload schema';
 
 -- ============================================================
 -- RLS POLICIES

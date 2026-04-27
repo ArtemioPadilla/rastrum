@@ -1,0 +1,67 @@
+---
+import { t, getLocalizedPath, routes } from '../i18n/utils';
+
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+const isEs = lang === 'es';
+
+const cards = [
+  {
+    href: getLocalizedPath(lang, routes.exploreMap[lang] + '/'),
+    title: isEs ? 'Mapa' : 'Map',
+    body:  isEs ? 'Observaciones de la comunidad agrupadas en un mapa interactivo, filtrables por mes.'
+                : "Community observations clustered on an interactive map, filterable by month.",
+    iconPath: 'M3 21l6-3 6 3 6-3v-15l-6 3-6-3-6 3v15zM9 18V6m6 3v12',
+  },
+  {
+    href: getLocalizedPath(lang, routes.exploreRecent[lang] + '/'),
+    title: isEs ? 'Recientes' : 'Recent',
+    body:  isEs ? 'Las observaciones más recientes con foto, identificación y observador.'
+                : 'The most recent observations with photo, identification, and observer.',
+    iconPath: 'M3 5h18M3 12h18M3 19h18',
+  },
+  {
+    href: getLocalizedPath(lang, routes.exploreSpecies[lang] + '/'),
+    title: isEs ? 'Especies' : 'Species',
+    body:  isEs ? 'Catálogo de especies con número de observaciones públicas y badges de conservación.'
+                : 'Species catalogue with public observation counts and conservation badges.',
+    iconPath: 'M5 4l4 4 4-4 4 4 4-4M5 20l4-4 4 4 4-4 4 4M12 4v16',
+  },
+  {
+    href: getLocalizedPath(lang, routes.exploreWatchlist[lang] + '/'),
+    title: isEs ? 'Seguimiento' : 'Watchlist',
+    body:  isEs ? 'Actividad reciente de las especies y observadores que sigues.'
+                : 'Recent activity from the species and observers you follow.',
+    iconPath: 'M5 4v3M19 4v3M3 12h18M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
+  },
+];
+---
+
+<div class="space-y-6">
+  <div>
+    <h1 class="text-3xl font-bold tracking-tight">{tr.explore.title}</h1>
+    <p class="text-zinc-600 dark:text-zinc-400 mt-1">{tr.explore.subtitle}</p>
+  </div>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 not-prose">
+    {cards.map((c) => (
+      <a
+        href={c.href}
+        class="group p-5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:border-emerald-500/60 dark:hover:border-emerald-500/60 hover:shadow-md transition-all"
+      >
+        <div class="flex items-center gap-3 mb-2">
+          <span class="w-9 h-9 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 inline-flex items-center justify-center">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d={c.iconPath} />
+            </svg>
+          </span>
+          <h2 class="text-base font-semibold text-zinc-900 dark:text-zinc-100 group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors">
+            {c.title}
+          </h2>
+        </div>
+        <p class="text-sm text-zinc-600 dark:text-zinc-400">{c.body}</p>
+      </a>
+    ))}
+  </div>
+</div>
