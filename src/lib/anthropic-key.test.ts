@@ -59,3 +59,50 @@ describe('resolveAnthropicKey', () => {
     expect(await hasAnthropicKey()).toBe(true);
   });
 });
+
+describe('validateAnthropicKey', () => {
+  const origFetch = globalThis.fetch;
+  afterEach(() => {
+    globalThis.fetch = origFetch;
+  });
+
+  it('rejects shape mismatches without hitting the network', async () => {
+    const spy = vi.fn();
+    globalThis.fetch = spy as unknown as typeof fetch;
+    const { validateAnthropicKey } = await import('./anthropic-key');
+    const r = await validateAnthropicKey('not-a-key');
+    expect(r).toEqual({ valid: false, status: 0, reason: 'shape', message: 'Invalid key format' });
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('returns valid:true on a 200', async () => {
+    globalThis.fetch = vi.fn(async () => new Response('{}', { status: 200 })) as unknown as typeof fetch;
+    const { validateAnthropicKey } = await import('./anthropic-key');
+    const r = await validateAnthropicKey('sk-ant-' + 'a'.repeat(40));
+    expect(r).toEqual({ valid: true, status: 200 });
+  });
+
+  it('returns reason=auth on 401', async () => {
+    globalThis.fetch = vi.fn(async () => new Response('{}', { status: 401 })) as unknown as typeof fetch;
+    const { validateAnthropicKey } = await import('./anthropic-key');
+    const r = await validateAnthropicKey('sk-ant-' + 'b'.repeat(40));
+    expect(r.valid).toBe(false);
+    if (!r.valid) expect(r.reason).toBe('auth');
+  });
+
+  it('returns reason=network on fetch rejection', async () => {
+    globalThis.fetch = vi.fn(async () => { throw new Error('offline'); }) as unknown as typeof fetch;
+    const { validateAnthropicKey } = await import('./anthropic-key');
+    const r = await validateAnthropicKey('sk-ant-' + 'c'.repeat(40));
+    expect(r.valid).toBe(false);
+    if (!r.valid) expect(r.reason).toBe('network');
+  });
+
+  it('returns reason=other on 500', async () => {
+    globalThis.fetch = vi.fn(async () => new Response('{}', { status: 500 })) as unknown as typeof fetch;
+    const { validateAnthropicKey } = await import('./anthropic-key');
+    const r = await validateAnthropicKey('sk-ant-' + 'd'.repeat(40));
+    expect(r.valid).toBe(false);
+    if (!r.valid) expect(r.reason).toBe('other');
+  });
+});

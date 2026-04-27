@@ -54,3 +54,54 @@ export async function hasAnthropicKey(): Promise<boolean> {
   const r = await resolveAnthropicKey();
   return r.key !== '';
 }
+
+export type KeyValidationResult =
+  | { valid: true; status: number }
+  | { valid: false; status: number; reason: 'auth' | 'network' | 'shape' | 'other'; message: string };
+
+/**
+ * Live-test an Anthropic key with a 1-token `messages` call. Used by
+ * the onboarding flow to give users an immediate "your key works"
+ * signal. Costs effectively nothing per call (max_tokens=1).
+ *
+ * Returns `{valid:false, reason:'shape'}` without hitting the network
+ * if the key obviously isn't an Anthropic key. Returns `reason:'auth'`
+ * for 401/403, `reason:'network'` if the request couldn't complete.
+ */
+export async function validateAnthropicKey(
+  key: string,
+  opts?: { signal?: AbortSignal },
+): Promise<KeyValidationResult> {
+  if (!/^sk-ant-[\w-]{20,}$/.test(key)) {
+    return { valid: false, status: 0, reason: 'shape', message: 'Invalid key format' };
+  }
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      signal: opts?.signal,
+      headers: {
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5',
+        max_tokens: 1,
+        messages: [{ role: 'user', content: 'ping' }],
+      }),
+    });
+    if (res.ok) return { valid: true, status: res.status };
+    if (res.status === 401 || res.status === 403) {
+      return { valid: false, status: res.status, reason: 'auth', message: `HTTP ${res.status}` };
+    }
+    return { valid: false, status: res.status, reason: 'other', message: `HTTP ${res.status}` };
+  } catch (err) {
+    return {
+      valid: false,
+      status: 0,
+      reason: 'network',
+      message: err instanceof Error ? err.message : 'network error',
+    };
+  }
+}

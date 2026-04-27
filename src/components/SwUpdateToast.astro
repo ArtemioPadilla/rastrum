@@ -1,0 +1,113 @@
+---
+/**
+ * Service-worker update prompt.
+ *
+ * When a new bundle is deployed, the SW registers, downloads the new
+ * assets, and waits in "installed" state until the next navigation.
+ * Without a prompt, users on existing tabs can stay on stale code for
+ * hours. This toast notices the wait, offers a one-tap reload, and
+ * sends `SKIP_WAITING` to the waiting SW (which calls `clients.claim()`
+ * and takes over immediately on reload).
+ *
+ * No-ops on first install (no existing controller = nothing stale to
+ * replace, the page will pick up the SW on its own normal flow).
+ */
+import { t } from '../i18n/utils';
+
+interface Props { lang: string }
+const { lang } = Astro.props;
+const tr = t(lang);
+---
+
+<div
+  id="sw-update-toast"
+  class="hidden fixed left-1/2 -translate-x-1/2 bottom-[calc(5rem+env(safe-area-inset-bottom))] sm:bottom-4 z-50 max-w-md w-[92vw] sm:w-auto rounded-xl border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-zinc-900 shadow-2xl px-4 py-3 flex items-center gap-3"
+  role="status"
+  aria-live="polite"
+>
+  <svg class="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M20 20v-5h-5M5 9a8 8 0 0114-3m1 9a8 8 0 01-14 3" />
+  </svg>
+  <p class="flex-1 text-sm text-zinc-800 dark:text-zinc-200">{tr.pwa.update_available}</p>
+  <button
+    id="sw-update-reload-btn"
+    type="button"
+    class="shrink-0 min-h-9 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-1.5 text-sm font-semibold"
+  >
+    {tr.pwa.update_reload}
+  </button>
+  <button
+    id="sw-update-dismiss-btn"
+    type="button"
+    aria-label={tr.pwa.update_dismiss}
+    class="shrink-0 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 p-1"
+  >
+    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+  </button>
+</div>
+
+<script is:inline>
+  (function () {
+    if (!('serviceWorker' in navigator)) return;
+    if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') return;
+
+    var toast = document.getElementById('sw-update-toast');
+    var reloadBtn = document.getElementById('sw-update-reload-btn');
+    var dismissBtn = document.getElementById('sw-update-dismiss-btn');
+    if (!toast || !reloadBtn || !dismissBtn) return;
+
+    var pendingSw = null;
+    var dismissed = false;
+
+    function show(sw) {
+      if (dismissed) return;
+      pendingSw = sw;
+      toast.classList.remove('hidden');
+    }
+
+    reloadBtn.addEventListener('click', function () {
+      // Tell the waiting SW to activate; it calls clients.claim() and
+      // becomes the controller. Reload to pick up the new bundle.
+      if (pendingSw) pendingSw.postMessage('SKIP_WAITING');
+      // Give the SW ~250ms to handle skipWaiting + activate before
+      // reload, so the reloaded page hits the new SW immediately.
+      setTimeout(function () { location.reload(); }, 250);
+    });
+
+    dismissBtn.addEventListener('click', function () {
+      dismissed = true;
+      toast.classList.add('hidden');
+    });
+
+    navigator.serviceWorker.getRegistration().then(function (reg) {
+      if (!reg) return;
+
+      // Already a waiting SW from a previous update we never reloaded for.
+      if (reg.waiting && navigator.serviceWorker.controller) {
+        show(reg.waiting);
+      }
+
+      reg.addEventListener('updatefound', function () {
+        var installing = reg.installing;
+        if (!installing) return;
+        installing.addEventListener('statechange', function () {
+          // 'installed' + a current controller = this is an update,
+          // not a first install. First installs don't need a prompt.
+          if (installing.state === 'installed' && navigator.serviceWorker.controller) {
+            show(installing);
+          }
+        });
+      });
+
+      // Poll once every 30 minutes for an update — covers users who
+      // leave the tab open all day. The browser also checks on each
+      // navigation, but long-lived tabs won't navigate.
+      setInterval(function () { reg.update().catch(function () {}); }, 30 * 60 * 1000);
+    });
+
+    // When the new SW takes over (after our reload or any other reason),
+    // we want the next navigation to pick up the new HTML. The browser
+    // does this automatically; nothing to do here. We avoid auto-reloading
+    // on `controllerchange` because the user already clicked Reload.
+  })();
+</script>

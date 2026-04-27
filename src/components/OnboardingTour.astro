@@ -60,6 +60,11 @@ const altHref = `${base}/${alt}${altSlug}/`;
   data-skip-confirm={onb.skip_confirm}
   data-key-hint-ok={onb.key_format_hint}
   data-key-hint-bad={onb.key_format_invalid}
+  data-key-verifying={onb.key_verifying}
+  data-key-verified={onb.key_verified}
+  data-key-unauth={onb.key_unauth}
+  data-key-network={onb.key_network}
+  data-key-other={onb.key_other_error}
   data-dl-warning={onb.download_size_warning}
   data-dl-cancel={onb.download_cancel}
   data-dl-confirm={onb.download_confirm}
@@ -243,6 +248,11 @@ const altHref = `${base}/${alt}${altSlug}/`;
     const skipConfirm = root.dataset.skipConfirm ?? '';
     const keyHintOk = root.dataset.keyHintOk ?? '';
     const keyHintBad = root.dataset.keyHintBad ?? '';
+    const keyVerifying = root.dataset.keyVerifying ?? 'Verifying…';
+    const keyVerified = root.dataset.keyVerified ?? '✓ Key verified';
+    const keyUnauth = root.dataset.keyUnauth ?? 'Auth failed';
+    const keyNetwork = root.dataset.keyNetwork ?? 'Network error';
+    const keyOther = root.dataset.keyOther ?? 'Anthropic error';
     const dlWarning = root.dataset.dlWarning ?? '';
     const dlCancelLabel = root.dataset.dlCancel ?? 'Cancel';
     const dlConfirmLabel = root.dataset.dlConfirm ?? 'Start download';
@@ -266,6 +276,30 @@ const altHref = `${base}/${alt}${altSlug}/`;
     const TOTAL = cards.length;
     let current = 0;
     let returnFocusEl: HTMLElement | null = null;
+
+    /**
+     * Lightweight telemetry: dispatch a CustomEvent on `window`. No analytics
+     * provider is wired by default — operators can listen for these to track
+     * onboarding drop-off and configuration outcomes without coupling the
+     * component to any vendor SDK.
+     *
+     * Events emitted:
+     *   - opened, resumed:        { step }
+     *   - step_change:            { from, to }
+     *   - skip_to_summary:        {}
+     *   - dismissed_before_done:  { step }
+     *   - completed:              {}
+     *   - key_saved:              {}
+     *   - key_verify_failed:      { reason }
+     *   - download_started:       { id }
+     */
+    function emit(type: string, detail: Record<string, unknown> = {}): void {
+      try {
+        window.dispatchEvent(new CustomEvent('rastrum:onboarding-event', {
+          detail: { type, step: current, ...detail },
+        }));
+      } catch { /* ignore */ }
+    }
 
     // Initialise dot aria-labels from template
     dots.forEach((d, i) => {
@@ -326,6 +360,7 @@ const altHref = `${base}/${alt}${altSlug}/`;
 
     function show(opts?: { resume?: boolean }): void {
       returnFocusEl = (document.activeElement as HTMLElement | null) ?? null;
+      const resumed = !!opts?.resume && loadStep() > 0;
       current = opts?.resume ? loadStep() : 0;
       if (installBodyEl) {
         installBodyEl.textContent = isIOS() ? installBodyIos : installBody;
@@ -335,20 +370,21 @@ const altHref = `${base}/${alt}${altSlug}/`;
       lockScroll();
       buildIdentifierCards();
       render();
-      // Move focus into the dialog (heading is focusable for a11y).
       requestAnimationFrame(() => {
         const targets = focusableInDialog();
         (targets[0] ?? card)?.focus();
       });
+      emit(resumed ? 'resumed' : 'opened');
     }
 
     function hide(): void {
+      const wasLast = current === TOTAL - 1;
       root.classList.add('hidden');
       root.classList.remove('flex');
       unlockScroll();
       markShown();
-      // Restore focus to whatever opened us (or the body if it's gone).
       try { returnFocusEl?.focus(); } catch { /* ignore */ }
+      emit(wasLast ? 'completed' : 'dismissed_before_done');
     }
 
     function render(): void {
@@ -562,21 +598,47 @@ const altHref = `${base}/${alt}${altSlug}/`;
       claudeKeyInput?.addEventListener('input', refreshKeyValidity);
 
       claudeSaveBtn?.addEventListener('click', async () => {
-        if (!claudeKeyInput) return;
+        if (!claudeKeyInput || !claudeSaveBtn) return;
         const val = claudeKeyInput.value.trim();
         if (!val || val === '********' || !ANTHROPIC_KEY_RE.test(val)) return;
+        // Live-verify against Anthropic before persisting.
+        claudeSaveBtn.disabled = true;
+        if (claudeStatus) {
+          claudeStatus.textContent = keyVerifying;
+          claudeStatus.className = 'text-xs text-zinc-500 dark:text-zinc-400 ml-2';
+        }
+        let result;
+        try {
+          const { validateAnthropicKey } = await import('../lib/anthropic-key');
+          result = await validateAnthropicKey(val);
+        } catch {
+          result = { valid: false, status: 0, reason: 'network' as const, message: 'load failed' };
+        }
+        if (!result.valid) {
+          let msg = keyOther;
+          if (result.reason === 'auth') msg = keyUnauth;
+          else if (result.reason === 'network') msg = keyNetwork;
+          else if (result.reason === 'shape') msg = keyHintBad;
+          if (claudeStatus) {
+            claudeStatus.textContent = msg;
+            claudeStatus.className = 'text-xs text-amber-700 dark:text-amber-400 ml-2';
+          }
+          claudeSaveBtn.disabled = false;
+          emit('key_verify_failed', { reason: result.reason });
+          return;
+        }
         try {
           const { setKey } = await import('../lib/byo-keys');
           setKey('claude_haiku', 'anthropic', val);
           const state = idStates.find(s => s.id === 'claude_haiku');
           if (state) { state.status = 'ready'; state.hasKey = true; }
           if (claudeStatus) {
-            claudeStatus.textContent = isEs ? '✓ Guardada' : '✓ Saved';
+            claudeStatus.textContent = keyVerified;
             claudeStatus.className = 'text-xs text-emerald-600 dark:text-emerald-400 ml-2';
           }
           claudeKeyInput.value = '********';
           claudeSaveBtn.disabled = true;
-          // Re-render to reflect "ready" badge in the card header
+          emit('key_saved');
           renderIdCards();
         } catch { /* ignore */ }
       });
@@ -613,6 +675,7 @@ const altHref = `${base}/${alt}${altSlug}/`;
     }
 
     async function startDownload(modelId: string) {
+      emit('download_started', { id: modelId });
       const dlBtn = root.querySelector<HTMLButtonElement>(`[data-onb-download="${modelId}"]`);
       const statusEl = root.querySelector<HTMLElement>(`[data-onb-dl-status="${modelId}"]`);
       if (dlBtn) dlBtn.disabled = true;
@@ -679,26 +742,31 @@ const altHref = `${base}/${alt}${altSlug}/`;
     });
 
     // ── Navigation ──
+    function go(to: number) {
+      if (to === current || to < 0 || to >= TOTAL) return;
+      const from = current;
+      current = to;
+      render();
+      emit('step_change', { from, to });
+    }
     nextBtn?.addEventListener('click', () => {
       if (current >= TOTAL - 1) { hide(); return; }
-      current += 1;
-      render();
+      go(current + 1);
     });
     backBtn?.addEventListener('click', () => {
-      if (current > 0) { current -= 1; render(); }
+      if (current > 0) go(current - 1);
     });
     skipBtn?.addEventListener('click', () => {
       if (current >= TOTAL - 1) { hide(); return; }
-      current += 1;
-      render();
+      go(current + 1);
     });
     // "Skip — set up later" on the configure step → confirm, then jump to summary.
     skipSetupBtn?.addEventListener('click', () => {
       // eslint-disable-next-line no-alert
       const ok = window.confirm(skipConfirm);
       if (!ok) return;
-      current = 2; // summary
-      render();
+      emit('skip_to_summary');
+      go(2);
     });
 
     // Backdrop click + Escape close the modal (skippable everywhere now).

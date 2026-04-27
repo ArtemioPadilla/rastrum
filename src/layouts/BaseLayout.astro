@@ -5,6 +5,7 @@ import InstallPwaButton from '../components/InstallPwaButton.astro';
 import InstallDiscoveryHint from '../components/InstallDiscoveryHint.astro';
 import OnboardingTour from '../components/OnboardingTour.astro';
 import ReportIssueButton from '../components/ReportIssueButton.astro';
+import SwUpdateToast from '../components/SwUpdateToast.astro';
 
 interface Props {
   title: string;
@@ -59,5 +60,6 @@ const installLang: 'en' | 'es' = lang === 'es' ? 'es' : 'en';
     <InstallPwaButton lang={installLang} />
     <ReportIssueButton lang={lang} />
     <OnboardingTour lang={installLang} />
+    <SwUpdateToast lang={lang} />
   </body>
 </html>
