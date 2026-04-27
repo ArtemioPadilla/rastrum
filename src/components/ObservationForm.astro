@@ -184,7 +184,7 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
     </div>
 
     <!-- Identification block (overhauled: parallel cascade + progressive disclosure + tooltip) -->
-    <div id="id-block">
+    <div id="id-block" class="min-h-32">
       <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">{tr.observe.id_label ?? (isEs ? 'Identificación' : 'Identification')}</label>
 
       <!-- Single, non-morphing spinner -->
@@ -323,7 +323,7 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
     <!-- Location -->
     <div data-identify-hide>
       <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.observe.gps_label}</label>
-      <div id="gps-display" class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 px-3 py-2 text-sm">
+      <div id="gps-display" class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 px-3 py-2 text-sm min-h-9">
         <span id="gps-status" class="text-zinc-500 dark:text-zinc-400"
           data-err-permission={gpsErrPermission}
           data-err-unavailable={gpsErrUnavailable}
