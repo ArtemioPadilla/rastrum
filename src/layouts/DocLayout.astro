@@ -121,3 +121,19 @@ const getSectionLabel = (key: string) => (tr.docs.sections as Record<string, str
     </main>
   </div>
 </BaseLayout>
+
+<style>
+  /* Inline links inside doc prose: underline so they don't rely on color alone (WCAG SC 1.4.1). */
+  main :global(p a),
+  main :global(li a),
+  main :global(td a) {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    text-decoration-thickness: 1px;
+  }
+  main :global(p a:hover),
+  main :global(li a:hover),
+  main :global(td a:hover) {
+    text-decoration-thickness: 2px;
+  }
+</style>
