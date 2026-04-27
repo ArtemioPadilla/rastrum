@@ -137,6 +137,7 @@ docs/
   intentional (icons, brand marks).
 - **No `console.log` in shipped code.** `console.warn` for genuinely
   exceptional ignored errors only.
+- **Below-fold images use `loading="lazy"`.** The hero / first-paint image stays default-loaded for LCP; everything below the fold (doc screenshots, observation thumbnails, profile avatars in lists) gets `loading="lazy"`.
 
 ### Astro JSX gotcha — `Record<…>` is parsed as a tag
 Inline TypeScript casts like `(foo as Record<string, unknown>).bar` inside
@@ -198,21 +199,6 @@ Adding a new model/service for species ID is a 3-step recipe:
 3. (Server-side only) extend the Edge Function's `force_provider` switch.
 The registry has runtime collision detection on `id`. See
 `docs/specs/modules/13-identifier-registry.md` for the full contract.
-
-**Cascade short-circuits:** a plugin can throw `FilteredFrameError`
-(from `src/lib/identifiers/errors.ts`) to stop the cascade entirely —
-used by MegaDetector when a camera-trap photo is empty / human / vehicle
-so we don't burn cloud quota on plugins that have nothing to identify.
-Regular thrown errors fall through to the next plugin as usual.
-
-**Camera-trap pipeline:** MegaDetector v5a runs as YOLOv5 ONNX in the
-browser via `onnxruntime-web` — see `megadetector-yolo.ts` (preprocess +
-NMS), `megadetector-cache.ts` (download/cache), and
-`camera-trap-megadetector.ts` (plugin glue). Operator hosts the ~134 MB
-INT8 ONNX behind `PUBLIC_MEGADETECTOR_WEIGHTS_URL`; the plugin reports
-`model_not_bundled` when unset. For `evidence_type=camera_trap` photos
-sync.ts pushes the plugin into the cascade's `preferred` array so the
-filter runs first.
 
 ### Chrome / IA conventions
 
