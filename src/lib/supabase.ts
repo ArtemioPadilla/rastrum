@@ -32,12 +32,24 @@ let client: SupabaseClient | null = null;
  */
 export function getSupabase(): SupabaseClient {
   if (client) return client;
+  // Use the browser's native Web Locks API for the gotrue mutex (instead
+  // of the library's default async-mutex polyfill). Native locks are
+  // automatically released when the holder tab/page closes, eliminating
+  // the "Lock 'lock:rastrum-auth-v1' was not released within 5000ms"
+  // warnings on every page nav.
+  const lock = (typeof navigator !== 'undefined' && navigator.locks)
+    ? async <T>(name: string, acquireTimeout: number, fn: () => Promise<T>): Promise<T> => {
+        return navigator.locks.request(name, { mode: 'exclusive' }, async () => fn());
+      }
+    : undefined;
+
   client = createClient(url ?? '', anonKey ?? '', {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
       storageKey: 'rastrum-auth-v1',
+      ...(lock ? { lock } : {}),
     },
   });
   return client;

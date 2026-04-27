@@ -160,6 +160,13 @@ export function makePhiRunner(
   onProgress?: (text: string, fraction: number) => void,
 ): IdentifierRunner {
   return async (file, signal) => {
+    // Mark this device session as Phi-broken if a previous run crashed —
+    // certain GPU/driver combos hit WebGPU validation errors
+    // ("Binding size isn't a multiple of 4") that brick the device for
+    // subsequent calls. Skip Phi for the rest of the session.
+    if (typeof window !== 'undefined' && (window as { __rastrumPhiBroken?: boolean }).__rastrumPhiBroken) {
+      throw new Error('phi-vision disabled this session (prior WebGPU error)');
+    }
     const { loadVisionEngine, VISION_MODEL_ID, getModelCacheStatus, prepareImageForPhi } = await import('./local-ai');
     const status = await getModelCacheStatus(VISION_MODEL_ID);
     if (!status.cached) throw new Error('phi-vision not cached');
@@ -174,16 +181,31 @@ export function makePhiRunner(
     const rawDataUrl = await fileToDataUrl(file);
     const dataUrl = await prepareImageForPhi(rawDataUrl, 336);
     const prompt = buildClaudePrompt(locale);  // reuse JSON-locked prompt
-    const reply = await engine.chat.completions.create({
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'image_url', image_url: { url: dataUrl } },
-          { type: 'text', text: prompt },
-        ],
-      }],
-      max_tokens: 400,
-    });
+
+    let reply;
+    try {
+      reply = await engine.chat.completions.create({
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image_url', image_url: { url: dataUrl } },
+            { type: 'text', text: prompt },
+          ],
+        }],
+        max_tokens: 400,
+      });
+    } catch (err) {
+      // WebGPU / MLC runtime errors brick the GPUDevice for the rest of
+      // the session. Mark Phi as broken so subsequent cascade runs skip
+      // it instead of repeatedly crashing.
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/WebGPU|GPUValidation|BindGroup|Binding size|CommandBuffer/i.test(msg)) {
+        if (typeof window !== 'undefined') {
+          (window as { __rastrumPhiBroken?: boolean }).__rastrumPhiBroken = true;
+        }
+      }
+      throw err;
+    }
     const raw = reply.choices?.[0]?.message?.content ?? '';
     const text = typeof raw === 'string' ? raw : '';
     const parsed = parseVisionJson(text);
