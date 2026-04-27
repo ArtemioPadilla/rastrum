@@ -1,17 +1,20 @@
 ---
 /**
- * OnboardingTour — mandatory pipeline setup flow for first-time authed users.
+ * OnboardingTour — pipeline setup flow for first-time authed users.
  *
  * 4 steps:
  *   0. Pipeline explanation ("How Rastrum identifies species")
  *   1. Configure identifiers (PlantNet, Claude, Phi, BirdNET, EfficientNet)
  *   2. Summary ("Your pipeline is ready")
- *   3. Install PWA hint (skippable)
+ *   3. Install PWA hint
  *
- * Steps 0-1 cannot be skipped; steps 2-3 can be dismissed.
- * Controlled by localStorage key `rastrum.onboardingV2`.
+ * PlantNet is always available, so steps 0/1 can be skipped — users land in
+ * the app with PlantNet as their default identifier. Step state persists in
+ * sessionStorage so reloads resume mid-flow. Focus is trapped while open
+ * and restored on close (WCAG dialog pattern).
  *
  * Mounted globally in BaseLayout.astro.
+ * Replay anywhere by dispatching `window` event 'rastrum:replay-onboarding'.
  */
 import { t, getLocalizedPath, getAlternateLocale, routes, type Locale } from '../i18n/utils';
 
@@ -45,6 +48,7 @@ const altHref = `${base}/${alt}${altSlug}/`;
   aria-modal="true"
   aria-labelledby="onboarding-title"
   data-shown-key="rastrum.onboardingV2"
+  data-step-key="rastrum.onboardingV2.step"
   data-step-label={onb.step_label}
   data-install-body={onb.install_pwa_body}
   data-install-body-ios={onb.install_pwa_body_ios}
@@ -52,6 +56,14 @@ const altHref = `${base}/${alt}${altSlug}/`;
   data-label-back={onb.back}
   data-label-done={onb.done}
   data-label-skip={onb.skip}
+  data-label-skip-setup={onb.skip_setup}
+  data-skip-confirm={onb.skip_confirm}
+  data-key-hint-ok={onb.key_format_hint}
+  data-key-hint-bad={onb.key_format_invalid}
+  data-dl-warning={onb.download_size_warning}
+  data-dl-cancel={onb.download_cancel}
+  data-dl-confirm={onb.download_confirm}
+  data-dot-aria={onb.step_dot_aria}
   data-observe-path={observePath}
   data-lang={lang}
 >
@@ -82,15 +94,16 @@ const altHref = `${base}/${alt}${altSlug}/`;
       <p id="onb-step-label" class="text-xs font-medium text-emerald-700 dark:text-emerald-400 mb-3" aria-live="polite"></p>
 
       <!-- ─── Step 0: Pipeline explanation ─── -->
-      <article class="onb-card" data-step="0" data-required="true">
+      <article class="onb-card" data-step="0">
         <div class="mx-auto mb-4 w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-700 dark:text-emerald-300">
           <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
           </svg>
         </div>
-        <h2 id="onboarding-title" class="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 text-center">
+        <h2 id="onboarding-title" class="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 text-center" data-onb-title>
           {onb.pipeline_title}
         </h2>
+        <p class="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400 text-center">{onb.duration_hint}</p>
         <p class="mt-3 text-sm text-zinc-600 dark:text-zinc-300 text-center leading-relaxed">
           {onb.pipeline_body}
         </p>
@@ -113,14 +126,25 @@ const altHref = `${base}/${alt}${altSlug}/`;
       </article>
 
       <!-- ─── Step 1: Configure identifiers ─── -->
-      <article class="onb-card hidden" data-step="1" data-required="true">
-        <h2 class="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 text-center">
+      <article class="onb-card hidden" data-step="1">
+        <div class="mx-auto mb-4 w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-700 dark:text-emerald-300">
+          <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+          </svg>
+        </div>
+        <h2 id="onboarding-title-1" class="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 text-center" data-onb-title>
           {onb.configure_title}
         </h2>
         <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400 text-center">{onb.configure_subtitle}</p>
 
         <div id="onb-identifiers" class="mt-4 space-y-2">
           <!-- Populated by script -->
+        </div>
+        <div class="mt-3 text-center">
+          <button type="button" id="onb-skip-setup" class="text-xs font-medium text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 underline-offset-2 hover:underline">
+            {onb.skip_setup}
+          </button>
         </div>
       </article>
 
@@ -131,7 +155,7 @@ const altHref = `${base}/${alt}${altSlug}/`;
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         </div>
-        <h2 class="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 text-center">
+        <h2 id="onboarding-title-2" class="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 text-center" data-onb-title>
           {onb.summary_title}
         </h2>
         <p class="mt-3 text-sm text-zinc-600 dark:text-zinc-300 text-center leading-relaxed">
@@ -158,7 +182,7 @@ const altHref = `${base}/${alt}${altSlug}/`;
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v12m0 0l-4-4m4 4l4-4M4 20h16" />
           </svg>
         </div>
-        <h2 class="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 text-center">
+        <h2 id="onboarding-title-3" class="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 text-center" data-onb-title>
           {onb.install_pwa_title}
         </h2>
         <p id="onb-install-body" class="mt-3 text-sm text-zinc-600 dark:text-zinc-300 text-center leading-relaxed">
@@ -175,11 +199,11 @@ const altHref = `${base}/${alt}${altSlug}/`;
       >
         {onb.skip}
       </button>
-      <div class="flex items-center gap-1.5" aria-hidden="true">
-        <span class="onb-dot w-2 h-2 rounded-full bg-emerald-600 dark:bg-emerald-400" data-step="0"></span>
-        <span class="onb-dot w-2 h-2 rounded-full bg-zinc-300 dark:bg-zinc-700" data-step="1"></span>
-        <span class="onb-dot w-2 h-2 rounded-full bg-zinc-300 dark:bg-zinc-700" data-step="2"></span>
-        <span class="onb-dot w-2 h-2 rounded-full bg-zinc-300 dark:bg-zinc-700" data-step="3"></span>
+      <div class="flex items-center gap-1.5" role="group" aria-label={onb.step_label.replace('{current}', '1').replace('{total}', '4').replace('Paso 1 de 4','Pasos').replace('Step 1 of 4','Steps')}>
+        <span class="onb-dot w-2 h-2 rounded-full bg-emerald-600 dark:bg-emerald-400" data-step="0" data-aria-template={onb.step_dot_aria}></span>
+        <span class="onb-dot w-2 h-2 rounded-full bg-zinc-300 dark:bg-zinc-700" data-step="1" data-aria-template={onb.step_dot_aria}></span>
+        <span class="onb-dot w-2 h-2 rounded-full bg-zinc-300 dark:bg-zinc-700" data-step="2" data-aria-template={onb.step_dot_aria}></span>
+        <span class="onb-dot w-2 h-2 rounded-full bg-zinc-300 dark:bg-zinc-700" data-step="3" data-aria-template={onb.step_dot_aria}></span>
       </div>
       <div class="flex items-center gap-2">
         <button
@@ -208,6 +232,7 @@ const altHref = `${base}/${alt}${altSlug}/`;
   const root = document.getElementById('onboarding-tour') as HTMLDivElement | null;
   if (root) {
     const SHOWN_KEY = root.dataset.shownKey ?? 'rastrum.onboardingV2';
+    const STEP_KEY = root.dataset.stepKey ?? 'rastrum.onboardingV2.step';
     const stepLabelTpl = root.dataset.stepLabel ?? 'Step {current} of {total}';
     const installBody = root.dataset.installBody ?? '';
     const installBodyIos = root.dataset.installBodyIos ?? installBody;
@@ -215,6 +240,13 @@ const altHref = `${base}/${alt}${altSlug}/`;
     const labelBack = root.dataset.labelBack ?? 'Back';
     const labelDone = root.dataset.labelDone ?? 'Done';
     const labelSkip = root.dataset.labelSkip ?? 'Skip';
+    const skipConfirm = root.dataset.skipConfirm ?? '';
+    const keyHintOk = root.dataset.keyHintOk ?? '';
+    const keyHintBad = root.dataset.keyHintBad ?? '';
+    const dlWarning = root.dataset.dlWarning ?? '';
+    const dlCancelLabel = root.dataset.dlCancel ?? 'Cancel';
+    const dlConfirmLabel = root.dataset.dlConfirm ?? 'Start download';
+    const dotAriaTpl = root.dataset.dotAria ?? 'Step {n}';
     const observePath = root.dataset.observePath ?? '/en/observe/';
     const isEs = root.dataset.lang === 'es';
 
@@ -225,16 +257,21 @@ const altHref = `${base}/${alt}${altSlug}/`;
     const nextLabel = root.querySelector<HTMLElement>('[data-onb-next-label]');
     const backBtn = root.querySelector<HTMLButtonElement>('#onb-back');
     const skipBtn = root.querySelector<HTMLButtonElement>('#onb-skip');
+    const skipSetupBtn = root.querySelector<HTMLButtonElement>('#onb-skip-setup');
     const installBodyEl = root.querySelector<HTMLElement>('#onb-install-body');
     const idContainer = root.querySelector<HTMLElement>('#onb-identifiers');
     const summaryList = root.querySelector<HTMLElement>('#onb-summary-list');
+    const card = root.querySelector<HTMLElement>('div.relative');
 
     const TOTAL = cards.length;
     let current = 0;
+    let returnFocusEl: HTMLElement | null = null;
 
-    function isRequired(step: number): boolean {
-      return cards[step]?.dataset.required === 'true';
-    }
+    // Initialise dot aria-labels from template
+    dots.forEach((d, i) => {
+      d.setAttribute('aria-label', dotAriaTpl.replace('{n}', String(i + 1)));
+      d.setAttribute('role', 'img');
+    });
 
     function shouldShow(): boolean {
       try {
@@ -245,25 +282,73 @@ const altHref = `${base}/${alt}${altSlug}/`;
     }
 
     function markShown(): void {
-      try { localStorage.setItem(SHOWN_KEY, 'true'); } catch { /* ignore */ }
+      try {
+        localStorage.setItem(SHOWN_KEY, 'true');
+        sessionStorage.removeItem(STEP_KEY);
+      } catch { /* ignore */ }
     }
 
-    function show(): void {
+    function persistStep(): void {
+      try { sessionStorage.setItem(STEP_KEY, String(current)); } catch { /* ignore */ }
+    }
+
+    function loadStep(): number {
+      try {
+        const raw = sessionStorage.getItem(STEP_KEY);
+        if (raw === null) return 0;
+        const n = parseInt(raw, 10);
+        return Number.isFinite(n) && n >= 0 && n < TOTAL ? n : 0;
+      } catch { return 0; }
+    }
+
+    // Defeat iOS rubber-band by locking <html> too; restore on close.
+    function lockScroll(): void {
+      document.documentElement.style.overflow = 'hidden';
+      document.body.style.overflow = 'hidden';
+    }
+    function unlockScroll(): void {
+      document.documentElement.style.overflow = '';
+      document.body.style.overflow = '';
+    }
+
+    function focusableInDialog(): HTMLElement[] {
+      if (!card) return [];
+      const sel = 'a[href], button:not([disabled]), input:not([disabled]):not([type=hidden]), [tabindex]:not([tabindex="-1"])';
+      return Array.from(card.querySelectorAll<HTMLElement>(sel)).filter(el => {
+        // Skip elements in hidden cards
+        const parentCard = el.closest('.onb-card');
+        if (parentCard && parentCard.classList.contains('hidden')) return false;
+        if (el.classList.contains('hidden')) return false;
+        if (el.offsetParent === null && el !== document.activeElement) return false;
+        return true;
+      });
+    }
+
+    function show(opts?: { resume?: boolean }): void {
+      returnFocusEl = (document.activeElement as HTMLElement | null) ?? null;
+      current = opts?.resume ? loadStep() : 0;
       if (installBodyEl) {
         installBodyEl.textContent = isIOS() ? installBodyIos : installBody;
       }
       root.classList.remove('hidden');
       root.classList.add('flex');
-      document.body.style.overflow = 'hidden';
+      lockScroll();
       buildIdentifierCards();
       render();
+      // Move focus into the dialog (heading is focusable for a11y).
+      requestAnimationFrame(() => {
+        const targets = focusableInDialog();
+        (targets[0] ?? card)?.focus();
+      });
     }
 
     function hide(): void {
       root.classList.add('hidden');
       root.classList.remove('flex');
-      document.body.style.overflow = '';
+      unlockScroll();
       markShown();
+      // Restore focus to whatever opened us (or the body if it's gone).
+      try { returnFocusEl?.focus(); } catch { /* ignore */ }
     }
 
     function render(): void {
@@ -273,29 +358,36 @@ const altHref = `${base}/${alt}${altSlug}/`;
         d.classList.toggle('dark:bg-emerald-400', i === current);
         d.classList.toggle('bg-zinc-300', i !== current);
         d.classList.toggle('dark:bg-zinc-700', i !== current);
+        if (i === current) d.setAttribute('aria-current', 'step');
+        else d.removeAttribute('aria-current');
       });
       if (stepLabelEl) {
         stepLabelEl.textContent = stepLabelTpl
           .replace('{current}', String(current + 1))
           .replace('{total}', String(TOTAL));
       }
+      // Keep aria-labelledby pointing at the visible heading
+      const visibleTitle = cards[current]?.querySelector<HTMLElement>('[data-onb-title]');
+      if (visibleTitle && visibleTitle.id) {
+        root.setAttribute('aria-labelledby', visibleTitle.id);
+      }
       const last = current === TOTAL - 1;
       if (nextLabel) {
         nextLabel.textContent = last ? labelDone : labelNext;
       }
-      // Back button: visible on steps > 0
       if (backBtn) {
         backBtn.classList.toggle('hidden', current === 0);
       }
-      // Skip button: visible only on non-required steps
+      // Skip button visible everywhere except when it'd duplicate "Done"
       if (skipBtn) {
-        skipBtn.classList.toggle('hidden', isRequired(current));
+        skipBtn.classList.toggle('hidden', last);
         skipBtn.textContent = labelSkip;
       }
       // On step 2, build summary
       if (current === 2) {
         buildSummary();
       }
+      persistStep();
     }
 
     // ── Identifier cards for Step 1 ──

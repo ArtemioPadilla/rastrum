@@ -205,31 +205,46 @@ const tabs = [
 
   async function fetchPage(): Promise<Row[]> {
     if (!userId) return [];
-    if (currentTab === 'draft') {
-      // Drafts live only in Dexie — they're missing required GPS so the
-      // server never sees them until the user re-opens and adds location.
+
+    // Dexie-backed tabs (drafts, pending, error) read from the local
+    // outbox — these rows haven't made it to Supabase yet. The "all" tab
+    // merges Dexie unsynced rows with Supabase synced rows so users
+    // can actually see observations that haven't uploaded yet (offline
+    // capture, slow network, server hiccup). Without this merge, a user
+    // who took 4 photos with flaky signal sees an empty list and thinks
+    // the app dropped their work.
+    async function fetchDexie(statuses: ReadonlyArray<'pending' | 'error' | 'draft'>): Promise<Row[]> {
       try {
         const { getDB } = await import('../lib/db');
         const db = getDB();
-        const all = await db.observations
-          .where('sync_status').equals('draft')
-          .reverse()
-          .sortBy('created_at');
-        const slice = all.slice(offset, offset + PAGE_SIZE);
-        return slice.map(rec => ({
-          id: rec.id,
-          observed_at: rec.created_at,
-          sync_status: 'draft' as const,
-          state_province: null,
-          identifications: rec.data.identification?.scientificName
-            ? { scientific_name: rec.data.identification.scientificName, is_primary: true }
-            : null,
-          media_files: [],
-        }));
-      } catch {
-        return [];
-      }
+        const all: Row[] = [];
+        for (const status of statuses) {
+          const recs = await db.observations
+            .where('sync_status').equals(status)
+            .reverse()
+            .sortBy('created_at');
+          for (const rec of recs) {
+            all.push({
+              id: rec.id,
+              observed_at: rec.created_at,
+              sync_status: status,
+              state_province: null,
+              identifications: rec.data.identification?.scientificName
+                ? { scientific_name: rec.data.identification.scientificName, is_primary: true }
+                : null,
+              media_files: [],
+            });
+          }
+        }
+        return all;
+      } catch { return []; }
     }
+
+    if (currentTab === 'draft' || currentTab === 'pending' || currentTab === 'error') {
+      const all = await fetchDexie([currentTab]);
+      return all.slice(offset, offset + PAGE_SIZE);
+    }
+
     const supabase = getSupabase();
     let q = supabase
       .from('observations')
@@ -239,7 +254,17 @@ const tabs = [
       .range(offset, offset + PAGE_SIZE - 1);
     if (currentTab !== 'all') q = q.eq('sync_status', currentTab);
     const { data } = await q;
-    return ((data ?? []) as unknown) as Row[];
+    const remote = ((data ?? []) as unknown) as Row[];
+
+    if (currentTab !== 'all' || offset !== 0) return remote;
+
+    // Top of "All" tab: merge in Dexie unsynced rows so users see their
+    // pending/error/draft work alongside successfully synced rows.
+    const local = await fetchDexie(['pending', 'error', 'draft']);
+    const merged = [...local, ...remote].sort((a, b) =>
+      (b.observed_at ?? '').localeCompare(a.observed_at ?? '')
+    );
+    return merged.slice(0, PAGE_SIZE);
   }
 
   function setEmptyState(visible: boolean) {
