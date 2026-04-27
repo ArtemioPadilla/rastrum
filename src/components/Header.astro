@@ -1,6 +1,10 @@
 ---
-import { t, getLocalizedPath, getDocPath, routes, getAlternateLocale, docPages, type Locale } from '../i18n/utils';
+import { t, getLocalizedPath, getAlternateLocale, routes, type Locale } from '../i18n/utils';
+import { isActiveSection } from '../lib/chrome-helpers';
 import BellIcon from './BellIcon.astro';
+import MegaMenu from './MegaMenu.astro';
+import MobileBottomBar from './MobileBottomBar.astro';
+import MobileDrawer from './MobileDrawer.astro';
 
 interface Props {
   lang: string;
@@ -10,196 +14,247 @@ interface Props {
 const { lang, currentPath = '/' } = Astro.props;
 const tr = t(lang);
 const alt = getAlternateLocale(lang);
+const locale = (lang === 'es' ? 'es' : 'en') as Locale;
 
+// alt-language href (preserves the existing route-key swap behavior)
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const pathWithoutBase = currentPath.replace(base, '') || '/';
 const segments = pathWithoutBase.split('/').filter(Boolean);
 const currentLang = segments[0] || lang;
 const currentSlug = '/' + (segments.slice(1).join('/') || '');
-
 const matchedKey = Object.keys(routes).find(key => {
-  const routeSlug = routes[key][currentLang as Locale] || '';
-  return routeSlug === currentSlug || (currentSlug === '/' && routeSlug === '');
+  const slug = routes[key][currentLang as Locale] || '';
+  return slug === currentSlug || (currentSlug === '/' && slug === '');
 });
-
 const altSlug = matchedKey ? (routes[matchedKey][alt] || '') : currentSlug;
-const altHref = base + '/' + alt + altSlug + '/';
+const altHref = `${base}/${alt}${altSlug}/`;
 
-const getDocLabel = (key: string) => (tr.docs.sections as Record<string, string>)[key] || key;
+// Active-state precomputes for the verbs
+const obsActive  = isActiveSection(currentPath, 'observe',  lang);
+const expActive  = isActiveSection(currentPath, 'explore',  lang);
+const chatActive = isActiveSection(currentPath, 'chat',     lang);
+const docsActive = isActiveSection(currentPath, 'docs',     lang);
+const aboutActive = isActiveSection(currentPath, 'about',   lang);
 
-const isDocsPage = currentPath.includes('/docs');
+// Section accent — emerald is the default (the brand). Per spec §7,
+// Explore = teal-500, Chat = sky-500, Docs/About = stone-500. The active
+// rail picks the right token. PR 1 wires the rail; refinement is in PR 5.
+const railClass = (active: boolean, accent: 'emerald' | 'teal' | 'sky' | 'stone') => active
+  ? `text-${accent}-600 dark:text-${accent}-400 after:bg-${accent}-500 after:scale-x-100`
+  : 'text-zinc-700 dark:text-zinc-300 hover:text-emerald-600 dark:hover:text-emerald-400 after:scale-x-0';
+
+// Safelist note: the dynamic section-accent class strings (`text-teal-600`,
+// `after:bg-sky-500`, etc.) must be kept reachable for Tailwind. The
+// safelist is wired in `tailwind.config.mjs`; if a build emits unstyled
+// rails, check that file.
+
+const explorePath = getLocalizedPath(lang, routes.explore[locale] + '/');
+const exploreMapPath = getLocalizedPath(lang, routes.exploreMap[locale] + '/');
+const exploreRecentPath = getLocalizedPath(lang, routes.exploreRecent[locale] + '/');
+const exploreWatchlistPath = getLocalizedPath(lang, routes.exploreWatchlist[locale] + '/');
+const exploreSpeciesPath = getLocalizedPath(lang, routes.exploreSpecies[locale] + '/');
+
+const docColumns = [
+  {
+    heading: tr.nav.docs_groups.product,
+    items: [
+      { key: 'vision',       label: tr.nav.docs_groups.product_items.vision },
+      { key: 'features',     label: tr.nav.docs_groups.product_items.features },
+      { key: 'architecture', label: tr.nav.docs_groups.product_items.architecture },
+    ],
+  },
+  {
+    heading: tr.nav.docs_groups.progress,
+    items: [
+      { key: 'roadmap', label: tr.nav.docs_groups.progress_items.roadmap },
+      { key: 'tasks',   label: tr.nav.docs_groups.progress_items.tasks },
+      { key: 'market',  label: tr.nav.docs_groups.progress_items.market },
+    ],
+  },
+  {
+    heading: tr.nav.docs_groups.community,
+    items: [
+      { key: 'indigenous', label: tr.nav.docs_groups.community_items.indigenous },
+      { key: 'funding',    label: tr.nav.docs_groups.community_items.funding },
+      { key: 'contribute', label: tr.nav.docs_groups.community_items.contribute },
+    ],
+  },
+];
 ---
 
 <header class="border-b border-zinc-200 dark:border-zinc-800">
-  <div class="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
-    <a href={getLocalizedPath(lang, '/')} class="flex items-center gap-2 text-xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
-      <img src="/rastrum-logo.svg" alt="Rastrum" class="w-8 h-8" />
-      Rastrum
+  <div class="max-w-5xl mx-auto px-4 py-3 flex items-center gap-4">
+    <!-- Lockup -->
+    <a href={getLocalizedPath(lang, '/')} class="flex flex-col leading-tight">
+      <span class="flex items-center gap-2 text-lg font-bold text-emerald-600 dark:text-emerald-400">
+        <img src="/rastrum-logo.svg" alt="Rastrum" class="w-7 h-7" />
+        Rastrum
+      </span>
+      <span class="hidden md:block text-[11px] text-zinc-500 dark:text-zinc-500 -mt-0.5 ml-9">
+        {tr.nav.tagline}
+      </span>
     </a>
-    <nav class="hidden sm:flex items-center gap-6 text-sm">
-      <a href={getLocalizedPath(lang, routes.home[lang as 'en'|'es'] + '/')} class="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">{tr.nav.home}</a>
-      <a href={getLocalizedPath(lang, routes.observe[lang as 'en'|'es'] + '/')} class="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">{tr.nav.observe}</a>
-      <a href={getLocalizedPath(lang, (lang === 'es' ? '/explorar/mapa' : '/explore/map') + '/')} class="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">{tr.nav.map}</a>
-      <a href={getLocalizedPath(lang, routes.chat[lang as 'en'|'es'] + '/')} class="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">{tr.nav.chat}</a>
-      <a href={getLocalizedPath(lang, routes.about[lang as 'en'|'es'] + '/')} class="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">{tr.nav.about}</a>
 
-      <!-- Docs dropdown -->
-      <div class="relative" id="docs-dropdown">
+    <span class="hidden sm:block w-px h-6 bg-zinc-200 dark:bg-zinc-800"></span>
+
+    <!-- Verbs (left) -->
+    <nav class="hidden sm:flex items-center gap-5 text-sm">
+      <a href={getLocalizedPath(lang, routes.observe[locale] + '/')}
+         class:list={[
+           'relative pb-1 transition-colors after:content-[""] after:absolute after:left-0 after:right-0 after:-bottom-3 after:h-[2px] after:rounded after:transition-transform after:origin-left',
+           railClass(obsActive, 'emerald'),
+         ]}>
+        {tr.nav.observe}
+      </a>
+
+      <!-- Explore dropdown (small list, not mega) -->
+      <div class="relative" id="hdr-explore">
         <button
+          id="hdr-explore-btn"
+          type="button"
           class:list={[
-            "flex items-center gap-1 transition-colors",
-            isDocsPage
-              ? "text-emerald-600 dark:text-emerald-400"
-              : "hover:text-emerald-600 dark:hover:text-emerald-400"
+            'flex items-center gap-1 pb-1 transition-colors after:content-[""] after:absolute after:left-0 after:right-0 after:-bottom-3 after:h-[2px] after:rounded after:transition-transform after:origin-left',
+            railClass(expActive, 'teal'),
           ]}
-          id="docs-dropdown-btn"
+          aria-haspopup="true" aria-expanded="false" aria-controls="hdr-explore-menu"
         >
-          {tr.nav.docs}
-          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-          </svg>
+          {tr.nav.explore}
+          <svg aria-hidden="true" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
         </button>
-        <div id="docs-dropdown-menu" class="hidden absolute right-0 top-full mt-2 w-56 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-lg py-1 z-50">
-          <a href={getDocPath(lang)} class="block px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 font-medium">
-            {tr.docs.back_to_docs}
-          </a>
-          <div class="border-t border-zinc-200 dark:border-zinc-800 my-1"></div>
-          {docPages.map(page => (
-            <a
-              href={getDocPath(lang, page)}
-              class="block px-4 py-1.5 text-sm text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100"
-            >
-              {getDocLabel(page)}
-            </a>
-          ))}
+        <div id="hdr-explore-menu" class="hidden absolute left-0 top-full mt-2 w-56 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-lg py-1 z-50">
+          <a href={exploreMapPath}        class="block px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800">{tr.nav.explore_dropdown.map}</a>
+          <a href={exploreRecentPath}     class="block px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800">{tr.nav.explore_dropdown.recent}</a>
+          <a href={exploreWatchlistPath}  class="block px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800">{tr.nav.explore_dropdown.watchlist}</a>
+          <a href={exploreSpeciesPath}    class="block px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800">{tr.nav.explore_dropdown.species}</a>
         </div>
       </div>
+
+      <a href={getLocalizedPath(lang, routes.chat[locale] + '/')}
+         class:list={[
+           'relative pb-1 transition-colors after:content-[""] after:absolute after:left-0 after:right-0 after:-bottom-3 after:h-[2px] after:rounded after:transition-transform after:origin-left',
+           railClass(chatActive, 'sky'),
+         ]}>
+        {tr.nav.chat}
+      </a>
     </nav>
-    <div class="flex items-center gap-3">
+
+    <!-- Reference (right of verbs, before auth) -->
+    <nav class="hidden sm:flex items-center gap-5 text-sm ml-auto">
+      <a href={getLocalizedPath(lang, routes.about[locale] + '/')}
+         class:list={[
+           'relative pb-1 transition-colors after:content-[""] after:absolute after:left-0 after:right-0 after:-bottom-3 after:h-[2px] after:rounded after:transition-transform after:origin-left',
+           railClass(aboutActive, 'stone'),
+         ]}>
+        {tr.nav.about}
+      </a>
+      <MegaMenu lang={locale} trigger={tr.nav.docs} columns={docColumns} align="right" />
+    </nav>
+
+    <!-- Auth + utilities -->
+    <div class="flex items-center gap-2 sm:ml-2">
       <a
-        href={getLocalizedPath(lang, routes.signIn[lang as 'en'|'es'] + '/')}
+        href={getLocalizedPath(lang, routes.signIn[locale] + '/')}
         id="sign-in-link"
         class="hidden text-xs font-medium px-2.5 py-1 rounded border border-emerald-600/60 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
       >
         {tr.auth.sign_in}
       </a>
-      <BellIcon lang={lang as 'en' | 'es'} />
-      <!-- Avatar dropdown (hidden until authenticated) -->
+      <BellIcon lang={locale} />
       <div id="avatar-wrap" class="hidden relative">
-        <button id="avatar-btn" aria-label="Account menu" class="block rounded-full relative focus:outline-none focus:ring-2 focus:ring-emerald-500">
+        <button id="avatar-btn" aria-label="Account menu" class="block rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500">
           <img id="header-avatar" src="" alt="" class="w-8 h-8 rounded-full bg-emerald-600 object-cover" />
         </button>
         <div id="avatar-menu" class="hidden absolute right-0 top-full mt-2 w-48 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-lg py-1 z-50">
-          <a id="menu-profile" href={getLocalizedPath(lang, routes.profile[lang as 'en'|'es'] + '/')} class="block px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800">{tr.profile.view_profile}</a>
-          <a id="menu-edit" href={getLocalizedPath(lang, routes.profileEdit[lang as 'en'|'es'] + '/')} class="block px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800">{tr.profile.edit}</a>
+          <a id="menu-profile" href={getLocalizedPath(lang, routes.profile[locale] + '/')} class="block px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800">{tr.profile.view_profile}</a>
+          <a id="menu-edit"    href={getLocalizedPath(lang, routes.profileEdit[locale] + '/')} class="block px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800">{tr.profile.edit}</a>
           <div class="border-t border-zinc-200 dark:border-zinc-800 my-1"></div>
           <button id="sign-out-btn" class="block w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800">{tr.auth.sign_out}</button>
         </div>
       </div>
+
       <a
         href={altHref}
         id="lang-toggle"
         data-target-lang={alt}
-        class="text-xs font-medium px-2 py-1 rounded border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+        class="hidden md:block text-xs font-medium px-2 py-1 rounded border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
       >
         {alt.toUpperCase()}
       </a>
       <button
         id="theme-toggle"
         aria-label="Toggle dark mode"
-        class="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+        class="hidden md:block p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
       >
-        <svg class="w-5 h-5 hidden dark:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-        </svg>
-        <svg class="w-5 h-5 block dark:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-        </svg>
+        <svg aria-hidden="true" class="w-5 h-5 hidden dark:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+        <svg aria-hidden="true" class="w-5 h-5 block dark:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
       </button>
-      <button id="mobile-menu-toggle" class="sm:hidden p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors" aria-label="Toggle menu">
-        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-        </svg>
+
+      <!-- Hamburger (mobile only) — opens MobileDrawer via window hook -->
+      <button
+        id="mobile-menu-toggle"
+        type="button"
+        class="sm:hidden p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+        aria-label={tr.nav.drawer.open_menu}
+      >
+        <svg aria-hidden="true" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
     </div>
   </div>
-  <nav id="mobile-menu" class="sm:hidden hidden border-t border-zinc-200 dark:border-zinc-800 px-4 py-3 space-y-2 text-sm">
-    <a href={getLocalizedPath(lang, routes.home[lang as 'en'|'es'] + '/')} class="block hover:text-emerald-600 dark:hover:text-emerald-400">{tr.nav.home}</a>
-    <a href={getLocalizedPath(lang, routes.observe[lang as 'en'|'es'] + '/')} class="block hover:text-emerald-600 dark:hover:text-emerald-400">{tr.nav.observe}</a>
-    <a href={getLocalizedPath(lang, (lang === 'es' ? '/explorar/mapa' : '/explore/map') + '/')} class="block hover:text-emerald-600 dark:hover:text-emerald-400">{tr.nav.map}</a>
-    <a href={getLocalizedPath(lang, routes.chat[lang as 'en'|'es'] + '/')} class="block hover:text-emerald-600 dark:hover:text-emerald-400">{tr.nav.chat}</a>
-    <a href={getLocalizedPath(lang, routes.about[lang as 'en'|'es'] + '/')} class="block hover:text-emerald-600 dark:hover:text-emerald-400">{tr.nav.about}</a>
-    <div class="border-t border-zinc-200 dark:border-zinc-800 pt-2 mt-2">
-      <p class="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">{tr.nav.docs}</p>
-      <a href={getDocPath(lang)} class="block py-1 hover:text-emerald-600 dark:hover:text-emerald-400">{tr.docs.back_to_docs}</a>
-      {docPages.map(page => (
-        <a href={getDocPath(lang, page)} class="block py-1 text-zinc-600 dark:text-zinc-400 hover:text-emerald-600 dark:hover:text-emerald-400">
-          {getDocLabel(page)}
-        </a>
-      ))}
-    </div>
-    <div id="mobile-auth-links" class="hidden border-t border-zinc-200 dark:border-zinc-800 pt-2 mt-2 space-y-1">
-      <a id="mobile-menu-profile" href={getLocalizedPath(lang, routes.profile[lang as 'en'|'es'] + '/')} class="block py-1 hover:text-emerald-600 dark:hover:text-emerald-400">{tr.profile.view_profile}</a>
-      <a id="mobile-menu-edit" href={getLocalizedPath(lang, routes.profileEdit[lang as 'en'|'es'] + '/')} class="block py-1 hover:text-emerald-600 dark:hover:text-emerald-400">{tr.profile.edit}</a>
-      <button id="mobile-sign-out-btn" class="block w-full text-left py-1 text-red-600 dark:text-red-400 hover:text-red-700">{tr.auth.sign_out}</button>
-    </div>
-  </nav>
 </header>
 
+<MobileDrawer lang={locale} currentPath={currentPath} />
+<MobileBottomBar lang={locale} currentPath={currentPath} />
+
 <script is:inline>
+  // Theme + lang toggles (desktop chrome — kept until PR 3 moves them into the footer/Preferences)
   document.getElementById('theme-toggle')?.addEventListener('click', () => {
-    const isDark = document.documentElement.classList.toggle('dark');
-    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    const dark = document.documentElement.classList.toggle('dark');
+    localStorage.setItem('theme', dark ? 'dark' : 'light');
   });
-  document.getElementById('mobile-menu-toggle')?.addEventListener('click', () => {
-    document.getElementById('mobile-menu')?.classList.toggle('hidden');
-  });
-  // Docs dropdown
-  const ddBtn = document.getElementById('docs-dropdown-btn');
-  const ddMenu = document.getElementById('docs-dropdown-menu');
-  if (ddBtn && ddMenu) {
-    ddBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      ddMenu.classList.toggle('hidden');
-    });
-    document.addEventListener('click', () => {
-      ddMenu.classList.add('hidden');
-    });
-  }
-  // Save language preference when toggling
   document.getElementById('lang-toggle')?.addEventListener('click', function() {
-    const targetLang = this.dataset.targetLang;
-    if (targetLang) localStorage.setItem('rastrum.lang', targetLang);
+    const target = this.dataset.targetLang;
+    if (target) localStorage.setItem('rastrum.lang', target);
   });
+
+  // Hamburger → drawer (handler exposed by MobileDrawer)
+  document.getElementById('mobile-menu-toggle')?.addEventListener('click', () => {
+    if (typeof window.__rastrumOpenDrawer === 'function') window.__rastrumOpenDrawer();
+  });
+
+  // Explore dropdown
+  (function() {
+    const btn  = document.getElementById('hdr-explore-btn');
+    const menu = document.getElementById('hdr-explore-menu');
+    if (!btn || !menu) return;
+    btn.addEventListener('click', (e) => { e.stopPropagation(); menu.classList.toggle('hidden'); btn.setAttribute('aria-expanded', menu.classList.contains('hidden') ? 'false' : 'true'); });
+    document.addEventListener('click', (e) => {
+      if (!menu.classList.contains('hidden') && !menu.contains(e.target) && e.target !== btn) {
+        menu.classList.add('hidden'); btn.setAttribute('aria-expanded', 'false');
+      }
+    });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { menu.classList.add('hidden'); btn.setAttribute('aria-expanded', 'false'); } });
+  })();
 </script>
 
-<!-- Auth status: swaps sign-in link for avatar dropdown when authenticated. -->
+<!-- Auth status: keeps the existing avatar-swap behavior -->
 <script>
   import { getSupabase } from '../lib/supabase';
   import { signOut } from '../lib/auth';
   import type { UserProfile } from '../lib/types';
 
-  const signInLink       = document.getElementById('sign-in-link');
-  const avatarWrap       = document.getElementById('avatar-wrap');
-  const avatarBtn        = document.getElementById('avatar-btn');
-  const avatarMenu       = document.getElementById('avatar-menu');
-  const avatarImg        = document.getElementById('header-avatar') as HTMLImageElement | null;
-  const signOutBtn       = document.getElementById('sign-out-btn');
-  const mobileAuthLinks  = document.getElementById('mobile-auth-links');
-  const mobileSignOutBtn = document.getElementById('mobile-sign-out-btn');
+  const signInLink = document.getElementById('sign-in-link');
+  const avatarWrap = document.getElementById('avatar-wrap');
+  const avatarBtn  = document.getElementById('avatar-btn');
+  const avatarMenu = document.getElementById('avatar-menu');
+  const avatarImg  = document.getElementById('header-avatar') as HTMLImageElement | null;
+  const signOutBtn = document.getElementById('sign-out-btn');
 
   function initialsAvatar(name: string): string {
     const clean = (name || '?').trim().slice(0, 2).toUpperCase();
-    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'>
-      <rect width='32' height='32' fill='#10b981'/>
-      <text x='50%' y='58%' text-anchor='middle' fill='white' font-family='system-ui,sans-serif' font-size='14' font-weight='700'>${clean}</text>
-    </svg>`;
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><rect width='32' height='32' fill='#10b981'/><text x='50%' y='58%' text-anchor='middle' fill='white' font-family='system-ui,sans-serif' font-size='14' font-weight='700'>${clean}</text></svg>`;
     return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
   }
 
-  // Cached avatar src so reloads don't flash the placeholder while we
-  // wait for getSession() + the public.users round-trip. Updated below
-  // every time paint() resolves a fresh URL.
   const AVATAR_CACHE_KEY = 'rastrum.headerAvatar';
   const AVATAR_NAME_KEY  = 'rastrum.headerName';
   function paintCachedAvatar() {
@@ -212,27 +267,19 @@ const isDocsPage = currentPath.includes('/docs');
         if (cachedAlt) avatarImg.alt = cachedAlt;
         avatarWrap?.classList.remove('hidden');
         signInLink?.classList.add('hidden');
-        mobileAuthLinks?.classList.remove('hidden');
       }
     } catch { /* localStorage unavailable */ }
   }
   paintCachedAvatar();
 
-  // Unread badge handled by <BellIcon> — see BellIcon.astro.
   async function paint(hasSession: boolean, sessionUser?: { id: string; email?: string; user_metadata?: Record<string, unknown> }) {
     if (signInLink) signInLink.classList.toggle('hidden', hasSession);
     if (avatarWrap) avatarWrap.classList.toggle('hidden', !hasSession);
-    if (mobileAuthLinks) mobileAuthLinks.classList.toggle('hidden', !hasSession);
-
     if (!hasSession) {
-      // Signed out — clear the cache so the next render starts clean.
       try { localStorage.removeItem(AVATAR_CACHE_KEY); localStorage.removeItem(AVATAR_NAME_KEY); } catch { /* ignore */ }
       return;
     }
     if (!avatarImg) return;
-
-    // Fast path: read avatar straight from the session's user_metadata
-    // (already in localStorage from Supabase auth — no DB round-trip).
     if (sessionUser) {
       const meta = (sessionUser.user_metadata ?? {}) as Record<string, string | undefined>;
       const fastSrc = meta.picture || meta.avatar_url;
@@ -245,9 +292,6 @@ const isDocsPage = currentPath.includes('/docs');
         avatarImg.alt = fastName;
       }
     }
-
-    // Slow path: refine from public.users (in case the operator-controlled
-    // record has a different avatar — e.g. user uploaded a custom one).
     try {
       const supabase = getSupabase();
       const userId = sessionUser?.id;
@@ -261,10 +305,7 @@ const isDocsPage = currentPath.includes('/docs');
       const finalSrc = profile?.avatar_url || avatarImg.src || initialsAvatar(name);
       avatarImg.src = finalSrc;
       avatarImg.alt = name;
-      try {
-        localStorage.setItem(AVATAR_CACHE_KEY, finalSrc);
-        localStorage.setItem(AVATAR_NAME_KEY, name);
-      } catch { /* ignore */ }
+      try { localStorage.setItem(AVATAR_CACHE_KEY, finalSrc); localStorage.setItem(AVATAR_NAME_KEY, name); } catch { /* ignore */ }
     } catch { /* env not set */ }
   }
 
@@ -276,18 +317,7 @@ const isDocsPage = currentPath.includes('/docs');
     } catch { /* env not set */ }
   })();
 
-  avatarBtn?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    avatarMenu?.classList.toggle('hidden');
-  });
+  avatarBtn?.addEventListener('click', (e) => { e.stopPropagation(); avatarMenu?.classList.toggle('hidden'); });
   document.addEventListener('click', () => avatarMenu?.classList.add('hidden'));
-
-  signOutBtn?.addEventListener('click', async () => {
-    await signOut();
-    window.location.reload();
-  });
-  mobileSignOutBtn?.addEventListener('click', async () => {
-    await signOut();
-    window.location.reload();
-  });
+  signOutBtn?.addEventListener('click', async () => { await signOut(); window.location.reload(); });
 </script>
