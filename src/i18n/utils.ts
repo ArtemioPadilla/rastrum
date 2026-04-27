@@ -119,3 +119,86 @@ export function getRouteLabel(key: string, lang: string): string {
 export function getRouteParent(key: string): string | undefined {
   return routeTree[key]?.parent;
 }
+
+/**
+ * Per-page meta descriptions for doc pages. Consumed by DocLayout when no
+ * explicit description prop is passed. Keep 120-160 chars, keyword-rich.
+ */
+export const docPageMeta: Record<DocPage, { en: string; es: string }> = {
+  vision: {
+    en: "Why Rastrum exists: making every living thing identifiable by anyone, anywhere — even offline, even in indigenous languages, even for tracks and scat.",
+    es: "Por qué existe Rastrum: hacer cada ser vivo identificable por cualquier persona, en cualquier lugar — sin conexión, en lenguas indígenas, hasta huellas y excrementos.",
+  },
+  features: {
+    en: "What Rastrum does today: photo + audio + video identification, multi-modal cascade (PlantNet → Claude → on-device), offline-first PWA, Darwin Core export.",
+    es: "Lo que Rastrum hace hoy: identificación con foto, audio y video, cascade multi-modal (PlantNet → Claude → en dispositivo), PWA sin conexión, export Darwin Core.",
+  },
+  roadmap: {
+    en: "What's next on Rastrum's roadmap. v1.0 shipped — chrome revamp, parallel cascade. v1.1+: account hub, command palette, onboarding tour, species pages.",
+    es: "Qué sigue en la hoja de ruta de Rastrum. v1.0 listo — renovación de chrome, cascade paralelo. v1.1+: hub de cuenta, paleta de comandos, tour, páginas de especies.",
+  },
+  tasks: {
+    en: "Current implementation tasks across all roadmap items. Live status from docs/tasks.json — see what's in progress, what's done, what's deferred.",
+    es: "Tareas actuales de implementación en cada ítem de hoja de ruta. Estado en vivo desde docs/tasks.json — ve qué está en curso, listo o diferido.",
+  },
+  market: {
+    en: "How Rastrum compares to iNaturalist, Pl@ntNet, and Merlin Bird ID. Positioning, differentiators, and target Latin American biodiversity research community.",
+    es: "Cómo se compara Rastrum con iNaturalist, Pl@ntNet y Merlin Bird ID. Posicionamiento, diferenciadores y la comunidad latinoamericana de investigación en biodiversidad.",
+  },
+  architecture: {
+    en: "How Rastrum's identifier cascade, offline outbox, R2 media storage, and Darwin Core pipeline fit together. Block diagram, data flows, decisions.",
+    es: "Cómo se integran el cascade de identificadores, outbox offline, almacén de medios R2 y pipeline Darwin Core de Rastrum. Diagrama de bloques, flujos, decisiones.",
+  },
+  indigenous: {
+    en: "Indigenous-language commitments in Rastrum: Zapoteco, Mixteco, Náhuatl, Maya, Tsotsil/Tseltal. Built with CARE principles and community consent.",
+    es: "Compromiso de Rastrum con lenguas indígenas: Zapoteco, Mixteco, Náhuatl, Maya, Tsotsil/Tseltal. Construido con principios CARE y consentimiento comunitario.",
+  },
+  funding: {
+    en: "How Rastrum is funded today (zero-cost, BYO-key model) and how to support development. Grant outreach, GitHub Sponsors, operator-paid project keys.",
+    es: "Cómo se financia Rastrum hoy (modelo zero-cost con tus propias keys) y cómo apoyar su desarrollo. Subvenciones, GitHub Sponsors, claves de proyecto pagadas por el operador.",
+  },
+  contribute: {
+    en: "How to contribute to Rastrum: code (PRs welcome), translations, indigenous-language partnerships, observation data, and bug reports via the in-app reporter.",
+    es: "Cómo contribuir a Rastrum: código (PRs bienvenidos), traducciones, alianzas con lenguas indígenas, datos de observación, y reportes de bugs desde la app.",
+  },
+  faq: {
+    en: "Frequently asked questions about Rastrum: identification accuracy, privacy, sensitive species, offline mode, BYO API keys, and how to contribute.",
+    es: "Preguntas frecuentes sobre Rastrum: precisión de identificación, privacidad, especies sensibles, modo sin conexión, claves API propias y cómo contribuir.",
+  },
+  privacy: {
+    en: "Rastrum's privacy policy. What we collect, how we store it, and what we never log — your API keys, your queries, your precise location.",
+    es: "Política de privacidad de Rastrum. Qué recopilamos, cómo lo almacenamos, y qué nunca registramos — tus claves API, consultas, ubicación precisa.",
+  },
+  terms: {
+    en: "Rastrum's terms of service. Open-source under MIT (code) and AGPL-3.0 (server). Per-observation Creative Commons licensing — BY, BY-NC, or CC0.",
+    es: "Términos de servicio de Rastrum. Open-source bajo MIT (código) y AGPL-3.0 (servidor). Licencias Creative Commons por observación — BY, BY-NC o CC0.",
+  },
+};
+
+/**
+ * Given a pathname like '/en/observe/' and a target locale like 'es',
+ * returns the equivalent path in that locale: '/es/observar/'.
+ * Falls back to a locale-prefix swap when no route key matches.
+ */
+export function getAlternateUrl(currentPath: string, targetLang: 'en' | 'es'): string {
+  const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+  const pathWithoutBase = currentPath.replace(base, '') || '/';
+  const segments = pathWithoutBase.split('/').filter(Boolean);
+  const currentLang = segments[0];
+
+  // Locale-less paths (e.g. /auth/callback/, /share/obs/) — these are
+  // language-neutral transit/share routes; alternate is itself.
+  if (currentLang !== 'en' && currentLang !== 'es') {
+    const trailing = pathWithoutBase.endsWith('/') ? '' : '/';
+    return `${base}${pathWithoutBase}${trailing}`;
+  }
+
+  // Locale-prefixed paths — existing route-key swap logic continues here
+  const currentSlug = '/' + (segments.slice(1).join('/') || '');
+  const matchedKey = Object.keys(routes).find(key => {
+    const slug = routes[key][currentLang as Locale] || '';
+    return slug === currentSlug || (currentSlug === '/' && slug === '');
+  });
+  const altSlug = matchedKey ? (routes[matchedKey][targetLang] || '') : currentSlug;
+  return `${base}/${targetLang}${altSlug}/`;
+}
