@@ -75,6 +75,12 @@ const resolvedOgImage = ogImage ?? `${SITE_URL}/og/${ogSlugForPath(currentPath)}
     <link rel="apple-touch-icon" sizes="180x180" href={`${import.meta.env.BASE_URL}rastrum-logo-240.png`} />
     <link rel="manifest" href={`${import.meta.env.BASE_URL}manifest.webmanifest`} />
     <meta name="theme-color" content="#10b981" />
+    <!--
+      Standard `mobile-web-app-capable` (the cross-vendor name Chrome
+      now warns when only the Apple-prefixed variant is present).
+      Apple still requires the prefixed one, so we ship both.
+    -->
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="application-name" content="Rastrum" />

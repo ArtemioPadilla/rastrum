@@ -1105,20 +1105,28 @@ const onb = (tr as unknown as { onboarding: Record<string, string> }).onboarding
           ${s.details ? `<p class="text-[10px] text-zinc-500 ml-4 mt-0.5">${escape(s.details)}</p>` : ''}
         </li>
       `).join('');
-      const inputsHtml = (p.keySpec ?? []).map(k => {
-        const current = byo.getKey(p.id, k.name) ?? '';
-        return `
-          <div class="mt-2">
-            <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">${escape(k.label)}${k.optional ? ' <span class="text-zinc-400 font-normal">(optional)</span>' : ''}</label>
-            <input type="password" autocomplete="off"
-                   data-key-input data-plugin="${escape(p.id)}" data-key-name="${escape(k.name)}"
-                   value="${escape(current)}"
-                   placeholder="${escape(k.placeholder ?? '')}"
-                   class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm font-mono" />
-            ${k.hint ? `<p class="text-[10px] text-zinc-500 mt-0.5">${escape(k.hint)}</p>` : ''}
-          </div>
-        `;
-      }).join('');
+      // Per-plugin inputs are wrapped in a no-submit <form> so each
+      // password field has the implicit-form ancestor Chrome / password
+      // managers expect (otherwise emits "Password field is not contained
+      // in a form" warnings × N keySpecs). The form's onsubmit blocks
+      // the default action since saves go through a separate handler.
+      const inputsHtml = (p.keySpec ?? []).length === 0 ? '' : `
+        <form class="space-y-2" autocomplete="off" onsubmit="event.preventDefault(); return false;" data-plugin-key-form="${escape(p.id)}">
+          ${(p.keySpec ?? []).map(k => {
+            const current = byo.getKey(p.id, k.name) ?? '';
+            return `
+              <div class="mt-2">
+                <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">${escape(k.label)}${k.optional ? ' <span class="text-zinc-400 font-normal">(optional)</span>' : ''}</label>
+                <input type="password" autocomplete="off"
+                       data-key-input data-plugin="${escape(p.id)}" data-key-name="${escape(k.name)}"
+                       value="${escape(current)}"
+                       placeholder="${escape(k.placeholder ?? '')}"
+                       class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm font-mono" />
+                ${k.hint ? `<p class="text-[10px] text-zinc-500 mt-0.5">${escape(k.hint)}</p>` : ''}
+              </div>
+            `;
+          }).join('')}
+        </form>`;
 
       const configureBlock = hasKeySpec ? `
         <details class="mt-2 group">

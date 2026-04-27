@@ -620,7 +620,7 @@ const altHref = `${base}/${alt}${altSlug}/`;
               </details>`
             : '';
           actionHtml = `
-            <div class="mt-2" id="onb-claude-key-wrap">
+            <form class="mt-2" id="onb-claude-key-wrap" onsubmit="event.preventDefault(); return false;" autocomplete="off">
               <label for="onb-claude-key" class="sr-only">Anthropic API key</label>
               <input type="password" id="onb-claude-key" autocomplete="off" inputmode="text" spellcheck="false"
                 aria-describedby="onb-claude-status"
@@ -632,7 +632,7 @@ const altHref = `${base}/${alt}${altSlug}/`;
                 <span id="onb-claude-status" class="text-xs" aria-live="polite"></span>
               </div>
               ${helpHtml}
-            </div>`;
+            </form>`;
         }
 
         if (
