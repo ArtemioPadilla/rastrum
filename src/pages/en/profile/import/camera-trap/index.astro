@@ -8,6 +8,6 @@ const tr = t(lang);
 const ctTitle = (tr as unknown as { camera_trap?: { title?: string } }).camera_trap?.title ?? 'Camera trap import';
 ---
 
-<BaseLayout title={`${ctTitle} — Rastrum`} lang={lang}>
+<BaseLayout title={`${ctTitle} — Rastrum`} description="Import camera-trap photos with shared GPS metadata. MegaDetector pre-filters empty, human, and vehicle frames before species identification." lang={lang}>
   <BatchImporter lang={lang} mode="camera_trap" />
 </BaseLayout>

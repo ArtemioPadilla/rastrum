@@ -8,6 +8,6 @@ const tr = t(lang);
 const importTitle = (tr as unknown as { import?: { title?: string } }).import?.title ?? 'Batch import photos';
 ---
 
-<BaseLayout title={`${importTitle} — Rastrum`} lang={lang}>
+<BaseLayout title={`${importTitle} — Rastrum`} description="Bulk-import biodiversity observations from CSV or other sources into your Rastrum account for GBIF and CONABIO reporting." lang={lang}>
   <BatchImporter lang={lang} mode="generic" />
 </BaseLayout>
