@@ -115,6 +115,17 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
         `https://my-api.plantnet.org/v2/identify/all?api-key=${encodeURIComponent(key)}&lang=${isEs ? 'es' : 'en'}&nb-results=5`,
         { method: 'POST', body: form, signal: ac.signal }
       ).finally(() => clearTimeout(timeout));
+      if (res.status === 403 || res.status === 404) {
+        // PlantNet returns 403/404 when no plant organ is detected — usually
+        // an animal, mushroom, scenery, or unclear photo. Point users to
+        // /chat (vision LLM) and /observe (full cascade) instead.
+        renderNotPlant();
+        return;
+      }
+      if (res.status === 401) {
+        renderKeyInvalid();
+        return;
+      }
       if (!res.ok) throw new Error(`PlantNet HTTP ${res.status}`);
       const data = await res.json();
       const results = Array.isArray(data?.results) ? data.results : [];
@@ -129,6 +140,46 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
     } finally {
       spinner?.classList.add('hidden');
     }
+  }
+
+  function renderNotPlant() {
+    if (!resultsBox) return;
+    const chatPath = isEs ? '/es/chat/'     : '/en/chat/';
+    const obsPath  = isEs ? '/es/observar/' : '/en/observe/';
+    resultsBox.innerHTML = `
+      <div class="space-y-3">
+        <p class="text-amber-700 dark:text-amber-400">${
+          isEs
+            ? 'PlantNet no reconoció una planta en esta foto. Esta página identifica solo plantas.'
+            : 'PlantNet did not recognize a plant in this photo. This page identifies plants only.'
+        }</p>
+        <p class="text-sm text-zinc-700 dark:text-zinc-300">${
+          isEs ? 'Para animales, hongos o cualquier otra cosa, prueba:' : 'For animals, mushrooms, or anything else, try:'
+        }</p>
+        <div class="flex flex-wrap gap-2">
+          <a href="${chatPath}" class="inline-flex items-center gap-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-2 text-sm font-semibold text-white">
+            ${isEs ? 'Chat con foto' : 'Chat with photo'}
+          </a>
+          <a href="${obsPath}" class="inline-flex items-center gap-2 rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
+            ${isEs ? 'Formulario de observación' : 'Observation form'}
+          </a>
+        </div>
+        <p class="text-xs text-zinc-500">${
+          isEs
+            ? 'El chat usa una IA de visión general (en tu dispositivo o vía Claude) que reconoce animales y otras cosas. El formulario de observación corre toda la cascada y guarda con ubicación.'
+            : 'Chat uses a general vision AI (on-device or via Claude) that recognizes animals and other subjects. The observation form runs the full cascade and saves with location.'
+        }</p>
+      </div>
+    `;
+  }
+
+  function renderKeyInvalid() {
+    if (!resultsBox) return;
+    resultsBox.innerHTML = `<p class="text-red-600 dark:text-red-400">${
+      isEs
+        ? 'La clave de PlantNet no es válida (HTTP 401). Avísale al operador para que la rote.'
+        : "PlantNet key invalid (HTTP 401). Operator needs to rotate it."
+    }</p>`;
   }
 
   function renderResults(results: Array<Record<string, any>>) {
