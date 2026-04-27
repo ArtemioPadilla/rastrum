@@ -263,7 +263,13 @@ async function triggerIdentify(observationId: string): Promise<void> {
 // Legacy runLocalFallback was replaced by the cascade engine above; the
 // Phi-3.5-vision fallback is now a registered plugin (phi-vision.ts).
 
-/** Flush all pending observations. Safe to call on every `online` event. */
+/**
+ * Flush all pending observations. Safe to call on every `online` event.
+ *
+ * Drafts (sync_status='draft') are intentionally skipped — they're missing
+ * required GPS and live local-only until the user adds location and the UI
+ * flips them back to 'pending'. See `ux-save-as-draft` in the v1.1 backlog.
+ */
 export async function syncOutbox(): Promise<SyncResult> {
   const db = getDB();
   const pending = await db.observations.where('sync_status').equals('pending').toArray();

@@ -3,6 +3,7 @@ import {
   runParallelIdentify,
   parseVisionJson,
   extractJsonObject,
+  filterRunnersByHint,
   type IdentifierRunner,
   type UnifiedIdResult,
 } from './identify-cascade-client';
@@ -118,6 +119,62 @@ describe('runParallelIdentify', () => {
   it('returns all_failed when no runners are supplied', async () => {
     const out = await runParallelIdentify(fakeFile, { runners: {} });
     expect(out.kind).toBe('all_failed');
+  });
+});
+
+describe('filterRunnersByHint', () => {
+  const noopRunner: IdentifierRunner = async () => null;
+  const runners = {
+    plantnet: noopRunner,
+    claude_haiku: noopRunner,
+    webllm_phi35_vision: noopRunner,
+  };
+
+  it('returns the runner set unchanged when no hint is supplied', () => {
+    const out = filterRunnersByHint(runners, null);
+    expect(Object.keys(out).sort()).toEqual(['claude_haiku', 'plantnet', 'webllm_phi35_vision']);
+  });
+
+  it('keeps PlantNet for the plant hint', () => {
+    const out = filterRunnersByHint(runners, 'Plantae');
+    expect(Object.keys(out)).toContain('plantnet');
+    expect(Object.keys(out)).toContain('claude_haiku');
+  });
+
+  it('drops PlantNet for the bird hint', () => {
+    const out = filterRunnersByHint(runners, 'Animalia.Aves');
+    expect(Object.keys(out)).not.toContain('plantnet');
+    expect(Object.keys(out)).toContain('claude_haiku');
+    expect(Object.keys(out)).toContain('webllm_phi35_vision');
+  });
+
+  it('drops PlantNet for the mammal hint', () => {
+    const out = filterRunnersByHint(runners, 'Animalia.Mammalia');
+    expect(Object.keys(out)).not.toContain('plantnet');
+  });
+
+  it('drops PlantNet for the insect hint', () => {
+    const out = filterRunnersByHint(runners, 'Animalia.Insecta');
+    expect(Object.keys(out)).not.toContain('plantnet');
+  });
+
+  it('drops PlantNet for the fungus hint', () => {
+    const out = filterRunnersByHint(runners, 'Fungi');
+    expect(Object.keys(out)).not.toContain('plantnet');
+  });
+});
+
+describe('runParallelIdentify with taxonHint', () => {
+  it('skips PlantNet entirely when given a bird hint, even if PlantNet would have won', async () => {
+    const plantnet: IdentifierRunner = vi.fn(async () => makeResult({ source: 'plantnet', confidence: 0.95 }));
+    const claude: IdentifierRunner = vi.fn(async () => makeResult({ source: 'claude_haiku', confidence: 0.6 }));
+    const out = await runParallelIdentify(fakeFile, {
+      runners: { plantnet, claude_haiku: claude },
+      taxonHint: 'Animalia.Aves',
+    });
+    expect(plantnet).not.toHaveBeenCalled();
+    expect(out.kind).toBe('winner');
+    if (out.kind === 'winner') expect(out.result.source).toBe('claude_haiku');
   });
 });
 

@@ -23,6 +23,22 @@ const saveInlineLinkLabel = idStrings.save_inline_link ?? (isEs ? 'Guardar como 
 const saveObservationCtaLabel = idStrings.save_observation_cta ?? submitFullLabel;
 const initialSubmitLabel = identifyOnly ? submitIdentifyLabel : submitFullLabel;
 
+// taxon-hint chip strings (extracted to typed locals for the JSX)
+const taxonHintStrings = (tr.observe as unknown as { taxon_hint?: Record<string, string> }).taxon_hint ?? {};
+const taxonHintLabel = taxonHintStrings.label ?? (isEs ? '¿Qué viste?' : 'What did you see?');
+const taxonHintPlant   = taxonHintStrings.plant   ?? (isEs ? 'Planta'   : 'Plant');
+const taxonHintBird    = taxonHintStrings.bird    ?? (isEs ? 'Ave'      : 'Bird');
+const taxonHintMammal  = taxonHintStrings.mammal  ?? (isEs ? 'Mamífero' : 'Mammal');
+const taxonHintInsect  = taxonHintStrings.insect  ?? (isEs ? 'Insecto'  : 'Insect');
+const taxonHintFungus  = taxonHintStrings.fungus  ?? (isEs ? 'Hongo'    : 'Fungus');
+const taxonHintClear   = taxonHintStrings.clear   ?? (isEs ? 'Quitar pista' : 'Clear hint');
+const observeStringsForLabels = tr.observe as unknown as Record<string, string>;
+const shareLabel = observeStringsForLabels.share ?? (isEs ? 'Compartir' : 'Share');
+const shareUnavailableHint = observeStringsForLabels.share_unavailable_hint ?? (isEs ? 'Guarda primero la observación para compartirla.' : 'Save the observation first to share.');
+const draftSaveLabel = observeStringsForLabels.draft_save_button ?? (isEs ? 'Guardar borrador' : 'Save draft');
+const dedupeContinueLabel = observeStringsForLabels.photo_dedupe_continue ?? (isEs ? 'Continuar' : 'Continue');
+const dedupeReplaceLabel  = observeStringsForLabels.photo_dedupe_replace  ?? (isEs ? 'Reemplazar' : 'Replace');
+
 const habitats = [
   'forest_pine_oak','cloud_forest','tropical_dry_forest','riparian','wetland',
   'grassland','agricultural','urban','coastal','reef','scrubland','cave',
@@ -103,6 +119,31 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
       </div>
       <p class="mt-1 text-xs text-zinc-500">{tr.observe.photo_hint}</p>
       <p id="photo-hint-android" class="hidden mt-1 text-xs text-amber-700 dark:text-amber-400">{observeStrings.photo_hint_android}</p>
+
+      <!-- Quick-taxon chips (ux-quick-taxon-chips). Pure routing hint —
+           selecting one filters the cascade runners; default = no hint. -->
+      <fieldset id="taxon-hint-chips" class="mt-3" aria-label={taxonHintLabel}>
+        <legend class="text-xs uppercase tracking-wider text-zinc-500 mb-1">{taxonHintLabel}</legend>
+        <div class="flex flex-wrap gap-1.5">
+          <button type="button" data-hint="Plantae" class="taxon-chip min-h-9 px-2.5 py-1 rounded-full text-xs font-medium border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 data-[active=true]:bg-emerald-700 data-[active=true]:text-white data-[active=true]:border-emerald-700"><span aria-hidden="true">🌿</span> {taxonHintPlant}</button>
+          <button type="button" data-hint="Animalia.Aves" class="taxon-chip min-h-9 px-2.5 py-1 rounded-full text-xs font-medium border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 data-[active=true]:bg-emerald-700 data-[active=true]:text-white data-[active=true]:border-emerald-700"><span aria-hidden="true">🐦</span> {taxonHintBird}</button>
+          <button type="button" data-hint="Animalia.Mammalia" class="taxon-chip min-h-9 px-2.5 py-1 rounded-full text-xs font-medium border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 data-[active=true]:bg-emerald-700 data-[active=true]:text-white data-[active=true]:border-emerald-700"><span aria-hidden="true">🐾</span> {taxonHintMammal}</button>
+          <button type="button" data-hint="Animalia.Insecta" class="taxon-chip min-h-9 px-2.5 py-1 rounded-full text-xs font-medium border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 data-[active=true]:bg-emerald-700 data-[active=true]:text-white data-[active=true]:border-emerald-700"><span aria-hidden="true">🐛</span> {taxonHintInsect}</button>
+          <button type="button" data-hint="Fungi" class="taxon-chip min-h-9 px-2.5 py-1 rounded-full text-xs font-medium border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 data-[active=true]:bg-emerald-700 data-[active=true]:text-white data-[active=true]:border-emerald-700"><span aria-hidden="true">🍄</span> {taxonHintFungus}</button>
+          <button type="button" id="taxon-hint-clear" class="hidden min-h-9 px-2.5 py-1 rounded-full text-xs font-medium border border-transparent text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-200 underline">{taxonHintClear}</button>
+        </div>
+      </fieldset>
+
+      <!-- Photo dedupe warning (ux-photo-dedupe). Shown when the perceptual
+           hash of a freshly-added photo matches one uploaded by this observer
+           in the last 7 days. -->
+      <div id="photo-dedupe-warn" class="hidden mt-2 rounded-lg border border-amber-300 dark:border-amber-700/40 bg-amber-50 dark:bg-amber-900/10 p-3 text-sm text-amber-800 dark:text-amber-200">
+        <p id="photo-dedupe-warn-text"></p>
+        <div class="mt-2 flex gap-2">
+          <button type="button" id="photo-dedupe-keep" class="rounded bg-amber-700 hover:bg-amber-800 px-3 py-1 text-xs text-white">{dedupeContinueLabel}</button>
+          <button type="button" id="photo-dedupe-replace" class="rounded border border-amber-300 px-3 py-1 text-xs text-amber-800 hover:bg-amber-100 dark:hover:bg-amber-800/40">{dedupeReplaceLabel}</button>
+        </div>
+      </div>
     </div>
 
     <!-- Video (multi) -->
@@ -159,10 +200,14 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
             <p id="id-common" class="hidden text-sm text-zinc-600 dark:text-zinc-300"></p>
           </div>
           <div class="flex items-center gap-2 flex-none">
-            <span id="id-confidence" class="rounded-full bg-emerald-50 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 px-2 py-0.5 text-xs font-semibold tabular-nums"></span>
+            <span id="id-confidence-ring" class="inline-flex items-center" aria-hidden="false"></span>
             <span id="id-uncertain-pill" class="hidden rounded-full bg-amber-50 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 px-2 py-0.5 text-xs font-semibold">{idStrings.uncertain_pill}</span>
             <button id="id-source-info" type="button" class="min-h-9 min-w-9 rounded-full text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 inline-flex items-center justify-center" aria-label={idStrings.source_info_label} aria-expanded="false">
               <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path stroke-linecap="round" d="M12 8v.01M11 12h1v4h1"/></svg>
+            </button>
+            <button id="id-share-btn" type="button" class="min-h-9 inline-flex items-center gap-1 rounded-lg border border-emerald-600/60 px-2 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 disabled:opacity-50" disabled title={shareUnavailableHint}>
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v14"/></svg>
+              {shareLabel}
             </button>
             <button id="id-clear" type="button" class="text-xs text-zinc-400 hover:text-red-500" aria-label={isEs ? 'Cambiar' : 'Change'}>{isEs ? 'Cambiar' : 'Change'}</button>
           </div>
@@ -318,6 +363,9 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
     <div class="flex items-center gap-3 pt-2 flex-wrap">
       <button type="submit" id="submit-btn" class="min-h-11 rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
         <span data-label>{initialSubmitLabel}</span>
+      </button>
+      <button type="button" id="save-draft-btn" class={`min-h-11 rounded-lg border border-emerald-600/60 px-4 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 ${identifyOnly ? 'hidden' : ''}`} data-identify-hide>
+        {draftSaveLabel}
       </button>
       <button type="button" id="save-as-observation-btn" class="hidden min-h-11 rounded-lg border border-emerald-600/60 px-4 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20">
         {saveAsObservationLabel}
@@ -506,7 +554,8 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
   const idResultCard    = document.getElementById('id-result-card');
   const idName          = document.getElementById('id-name');
   const idCommon        = document.getElementById('id-common');
-  const idConfidence    = document.getElementById('id-confidence');
+  const idConfidenceRing= document.getElementById('id-confidence-ring');
+  const idShareBtn      = document.getElementById('id-share-btn') as HTMLButtonElement | null;
   const idUncertainPill = document.getElementById('id-uncertain-pill');
   const idNote          = document.getElementById('id-note');
   const idSourceInfoBtn = document.getElementById('id-source-info');
@@ -595,6 +644,43 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
     idSourceInfoBtn.setAttribute('aria-expanded', String(!open));
   });
 
+  // ── Share button (ux-share-button) ────────────────────────────────
+  // Enabled only after the observation has been saved (we need an id to
+  // build the /share/obs/?id=… URL). On mobile, opens navigator.share();
+  // on desktop, falls back to clipboard.
+  idShareBtn?.addEventListener('click', async () => {
+    if (!lastSavedObservationId) {
+      if (errBox) {
+        errBox.textContent = shareUnavailableHint;
+        errBox.classList.remove('hidden');
+      }
+      return;
+    }
+    const url = `https://rastrum.org/share/obs/?id=${encodeURIComponent(lastSavedObservationId)}`;
+    const title = idName?.textContent ?? 'Rastrum';
+    const text = isEs ? '¡Mira esta observación!' : 'Look at this observation!';
+    type NavShare = Navigator & { share?: (data: ShareData) => Promise<void> };
+    const nav = navigator as NavShare;
+    try {
+      if (typeof nav.share === 'function') {
+        await nav.share({ url, title, text });
+      } else if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+        if (idAllFailed) {
+          idAllFailed.textContent = observeStringsRT.share_copied;
+          idAllFailed.classList.remove('hidden');
+        }
+      } else {
+        if (errBox) {
+          errBox.textContent = observeStringsRT.share_failed + ' ' + url;
+          errBox.classList.remove('hidden');
+        }
+      }
+    } catch {
+      // User cancelled or clipboard denied — non-fatal.
+    }
+  });
+
   idAlternatesToggle?.addEventListener('click', () => {
     if (!idAlternatesPanel) return;
     const open = !idAlternatesPanel.classList.contains('hidden');
@@ -630,7 +716,7 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
         idCommon.classList.add('hidden');
       }
     }
-    if (idConfidence) idConfidence.textContent = `${Math.round(r.confidence * 100)}%`;
+    if (idConfidenceRing) idConfidenceRing.innerHTML = renderConfidenceRing(r.confidence);
     if (idUncertainPill) idUncertainPill.classList.toggle('hidden', !uncertain);
     if (idNote) {
       if (r.note) {
@@ -695,6 +781,62 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
     return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
   }
 
+  /**
+   * Render an SVG confidence ring (replaces the old % text pill).
+   * Mirrors src/components/ConfidenceRing.astro for parity — same color
+   * thresholds: emerald-500 ≥ 0.85, amber-500 0.5–0.85, red-500 < 0.5.
+   */
+  function renderConfidenceRing(confidence: number): string {
+    const c = Math.max(0, Math.min(1, Number.isFinite(confidence) ? confidence : 0));
+    const size = 32;
+    const stroke = 3;
+    const r = (size - stroke) / 2;
+    const circumference = 2 * Math.PI * r;
+    const dash = (circumference * c).toFixed(2);
+    const gap  = (circumference - (circumference * c)).toFixed(2);
+    const colorClass = c >= 0.85 ? 'text-emerald-500' : c >= 0.5 ? 'text-amber-500' : 'text-red-500';
+    const pct = Math.round(c * 100);
+    return `<span class="relative inline-flex items-center justify-center ${colorClass}" style="width:${size}px;height:${size}px" role="img" aria-label="${pct}% confidence">
+      <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" class="absolute inset-0 -rotate-90" aria-hidden="true">
+        <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="currentColor" stroke-opacity="0.15" stroke-width="${stroke}"/>
+        <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="currentColor" stroke-width="${stroke}" stroke-linecap="round" stroke-dasharray="${dash} ${gap}"/>
+      </svg>
+      <span class="relative text-[9px] font-semibold tabular-nums leading-none">${pct}</span>
+    </span>`;
+  }
+
+  // ── Taxon hint chips (ux-quick-taxon-chips) ──────────────────────────
+  // Tapping a chip primes the cascade by filtering runners (e.g. 🐦 drops
+  // PlantNet, prefers Phi/Claude). Default state = no hint.
+  type TaxonHint = 'Plantae' | 'Animalia.Aves' | 'Animalia.Mammalia' | 'Animalia.Insecta' | 'Fungi';
+  let activeTaxonHint: TaxonHint | null = null;
+  const taxonChipBtns = document.querySelectorAll<HTMLButtonElement>('.taxon-chip');
+  const taxonClearBtn = document.getElementById('taxon-hint-clear');
+
+  function paintTaxonChips() {
+    taxonChipBtns.forEach((btn) => {
+      btn.dataset.active = String(btn.dataset.hint === activeTaxonHint);
+    });
+    taxonClearBtn?.classList.toggle('hidden', !activeTaxonHint);
+  }
+
+  taxonChipBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const v = btn.dataset.hint as TaxonHint | undefined;
+      if (!v) return;
+      activeTaxonHint = activeTaxonHint === v ? null : v;
+      paintTaxonChips();
+      // Re-run identify on the first photo if we already have one — the chip
+      // is a routing hint, so changing it should re-route.
+      if (lastFile) triggerClientIdentify(lastFile);
+    });
+  });
+  taxonClearBtn?.addEventListener('click', () => {
+    activeTaxonHint = null;
+    paintTaxonChips();
+    if (lastFile) triggerClientIdentify(lastFile);
+  });
+
   async function triggerClientIdentify(file: File) {
     lastFile = file;
     hideAllIdStates();
@@ -732,7 +874,7 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
 
     if (activeAbort) activeAbort.abort();
     activeAbort = new AbortController();
-    const out = await runParallelIdentify(file, { runners }, activeAbort.signal);
+    const out = await runParallelIdentify(file, { runners, taxonHint: activeTaxonHint }, activeAbort.signal);
     activeAbort = null;
     idSpinner?.classList.add('hidden');
 
@@ -823,17 +965,106 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
     }
   });
 
-  function addPhotos(fileList: FileList | File[]) {
+  async function addPhotos(fileList: FileList | File[]) {
     const files = (fileList instanceof Array)
       ? fileList
       : Array.from(fileList as FileList);
-    for (const file of files) {
+
+    // Auto-resize > 4 MP photos before they hit Dexie. Saves R2 bytes,
+    // speeds sync on Latin America's mobile networks. PlantNet/Claude
+    // downscale anyway; nothing above 1024 px improves top-1 accuracy.
+    const { compressIfLarge } = await import('../lib/photo-compress');
+    const compressed: File[] = [];
+    for (const f of files) {
+      try {
+        const out = await compressIfLarge(f);
+        compressed.push(out.file);
+      } catch {
+        compressed.push(f);  // not an image / compress failed — keep original
+      }
+    }
+
+    // Perceptual-hash dedupe — warn if the user has uploaded a near-identical
+    // photo in the last 7 days. We hash + warn on the *first* added photo only
+    // (the common "double tap upload" failure mode).
+    if (compressed.length > 0) {
+      void warnIfDuplicatePhoto(compressed[0]);
+    }
+
+    for (const file of compressed) {
       photos.push({ file, blobId: crypto.randomUUID() });
-      // Trigger identification on first photo
       if (photos.length === 1) triggerClientIdentify(file);
     }
     repaintGrid();
   }
+
+  // ── Perceptual-hash dedupe (ux-photo-dedupe) ─────────────────────────
+  const photoDedupeWarn = document.getElementById('photo-dedupe-warn');
+  const photoDedupeText = document.getElementById('photo-dedupe-warn-text');
+  const photoDedupeKeep = document.getElementById('photo-dedupe-keep');
+  const photoDedupeReplace = document.getElementById('photo-dedupe-replace');
+
+  photoDedupeKeep?.addEventListener('click', () => {
+    photoDedupeWarn?.classList.add('hidden');
+  });
+  photoDedupeReplace?.addEventListener('click', () => {
+    // Drop the freshly-added photo (the last one in the array).
+    photos.pop();
+    repaintGrid();
+    clearIdResult();
+    photoDedupeWarn?.classList.add('hidden');
+  });
+
+  async function warnIfDuplicatePhoto(file: File): Promise<void> {
+    try {
+      const { hashFile, hammingDistance } = await import('../lib/perceptual-hash');
+      const hash = await hashFile(file);
+      const { resolveObserverRef: getRef } = await import('../lib/observe');
+      const ref = await getRef(2_000);
+      if (ref.kind !== 'user') return;  // guests don't have history to dedupe against
+      const db = (await import('../lib/db')).getDB();
+      const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      const recent = await db.observations
+        .where('observer_kind').equals('user')
+        .toArray();
+      for (const rec of recent) {
+        if (new Date(rec.created_at).getTime() < cutoff) continue;
+        const blobs = await db.mediaBlobs.where('observation_id').equals(rec.id).toArray();
+        for (const b of blobs) {
+          if (!b.mime_type.startsWith('image/')) continue;
+          let storedHash: string | null = null;
+          try {
+            storedHash = await hashFile(new File([b.blob], b.id, { type: b.mime_type }));
+          } catch { continue; }
+          if (hammingDistance(hash, storedHash) < 5) {
+            const date = new Date(rec.created_at).toLocaleDateString(isEs ? 'es' : 'en');
+            const tpl = (observeStringsRT.photo_dedupe_warn ?? 'You uploaded a similar photo on {date}. Continue or replace?');
+            if (photoDedupeText) photoDedupeText.textContent = tpl.replace('{date}', date);
+            photoDedupeWarn?.classList.remove('hidden');
+            return;
+          }
+        }
+      }
+    } catch { /* dedupe is best-effort */ }
+  }
+
+  // i18n strings used by the dedupe warning + share + draft success
+  const observeStringsRT: Record<string, string> = (() => {
+    const root = document.getElementById('obs-form');
+    return {
+      photo_dedupe_warn: isEs
+        ? 'Subiste una foto similar el {date}. ¿Continuar o reemplazar?'
+        : 'You uploaded a similar photo on {date}. Continue or replace?',
+      share_copied: isEs ? 'Enlace copiado al portapapeles.' : 'Link copied to clipboard.',
+      share_failed: isEs ? 'No se pudo compartir — copia la URL manualmente.' : 'Could not share — try copying the URL.',
+      draft_saved_offline: isEs
+        ? 'Guardada como borrador. Agrega una ubicación luego para sincronizar.'
+        : 'Saved as draft. Add a location later to sync.',
+      draft_no_media: isEs
+        ? 'Agrega al menos una foto, audio o video antes de guardar un borrador.'
+        : 'Add at least one photo, audio, or video before saving a draft.',
+    };
+  })();
 
   /**
    * Map the cascade plugin id (or legacy display label) to the
@@ -867,10 +1098,12 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
   function applyMode(next: 'full' | 'identify-only') {
     if (!form || !btnLabel) return;
     form.dataset.mode = next;
+    const draftBtnEl = document.getElementById('save-draft-btn');
     if (next === 'identify-only') {
       btnLabel.textContent = form.dataset.labelIdentify ?? (isEs ? 'Solo identificar' : 'Just identify');
       saveAsObsBtn?.classList.remove('hidden');
       backToIdBtn?.classList.add('hidden');
+      draftBtnEl?.classList.add('hidden');
       // Re-show the inline save link if there's a result already.
       if (currentIdentification && idResultCard && !idResultCard.classList.contains('hidden')) {
         idSaveInline?.classList.remove('hidden');
@@ -882,6 +1115,7 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
       if (form.dataset.enteredFromIdentify === '1') {
         backToIdBtn?.classList.remove('hidden');
       }
+      draftBtnEl?.classList.remove('hidden');
       // Kick off GPS now — the user revealed the location field.
       void getLiveGPS();
       // Hide the inline link in full mode (the main submit button does the save).
@@ -1178,7 +1412,7 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
     });
     if (!blob) return;
     const file = new File([blob], `camera-${Date.now()}.jpg`, { type: 'image/jpeg' });
-    addPhotos([file]);
+    await addPhotos([file]);
     await fillFromExif(file);
     closeCameraModal();
   });
@@ -1542,12 +1776,12 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
   });
   cameraInput?.addEventListener('change', async () => {
     if (!cameraInput.files?.length) return;
-    addPhotos(cameraInput.files);
+    await addPhotos(cameraInput.files);
     await fillFromExif(cameraInput.files[0]);
   });
   galleryInput?.addEventListener('change', async () => {
     if (!galleryInput.files?.length) return;
-    addPhotos(galleryInput.files);
+    await addPhotos(galleryInput.files);
     await fillFromExif(galleryInput.files[0]);
   });
 
@@ -1564,6 +1798,86 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
       paintLocation();
     }
   }
+
+  let lastSavedObservationId: string | null = null;
+
+  async function buildSaveDraft(asDraft: boolean): Promise<Parameters<typeof saveObservationToOutbox>[0] | null> {
+    if (!form) return null;
+    const ref = await resolveObserverRef();
+    const draftLoc = (location && Number.isFinite(location.lat) && Number.isFinite(location.lng))
+      ? location
+      : { lat: 0, lng: 0, accuracyM: 0, altitudeM: null, capturedFrom: 'manual' as const };
+    return {
+      observerRef: ref,
+      media: [
+        ...photos.map(p => ({
+          blobId: p.blobId,
+          blob: p.file,
+          mimeType: p.file.type,
+          sizeBytes: p.file.size,
+          mediaType: 'photo' as const,
+        })),
+        ...audios.map(a => ({
+          blobId: a.blobId,
+          blob: a.blob,
+          mimeType: a.mimeType,
+          sizeBytes: a.blob.size,
+          mediaType: 'audio' as const,
+        })),
+        ...videos.map(v => ({
+          blobId: v.blobId,
+          blob: v.blob,
+          mimeType: v.mimeType,
+          sizeBytes: v.blob.size,
+          mediaType: 'video' as const,
+        })),
+      ],
+      primaryPhotoIndex: 0,
+      location: draftLoc,
+      identification: {
+        scientificName: idInput?.value.trim() || currentIdentification?.scientific_name || '',
+        confidence: currentIdentification?.confidence ?? 0,
+        source: mapIdentificationSource(currentIdentification?.source) as Observation['identification']['source'],
+        status: (idInput?.value.trim() ? 'accepted' : 'pending') as Observation['identification']['status'],
+      },
+      habitat: ((form.elements.namedItem('habitat') as HTMLSelectElement).value || null) as Observation['habitat'],
+      weather: ((form.elements.namedItem('weather') as HTMLSelectElement).value || null) as Observation['weather'],
+      evidenceType: ((form.elements.namedItem('evidence_type') as HTMLSelectElement).value || 'direct_sighting') as Observation['evidenceType'],
+      notes: ((form.elements.namedItem('notes') as HTMLTextAreaElement).value || null),
+      asDraft,
+    };
+  }
+
+  // ── Save as draft (ux-save-as-draft) ────────────────────────────────
+  const saveDraftBtn = document.getElementById('save-draft-btn') as HTMLButtonElement | null;
+  saveDraftBtn?.addEventListener('click', async () => {
+    if (!form) return;
+    errBox?.classList.add('hidden');
+    if (photos.length === 0 && audios.length === 0 && videos.length === 0) {
+      if (errBox) {
+        errBox.textContent = observeStringsRT.draft_no_media;
+        errBox.classList.remove('hidden');
+      }
+      return;
+    }
+    saveDraftBtn.disabled = true;
+    try {
+      const draft = await buildSaveDraft(true);
+      if (!draft) return;
+      const obs = await saveObservationToOutbox(draft);
+      lastSavedObservationId = obs.id;
+      form.classList.add('hidden');
+      successBox?.classList.remove('hidden');
+      if (successMsg) successMsg.textContent = observeStringsRT.draft_saved_offline;
+    } catch (err) {
+      if (errBox) {
+        errBox.textContent = err instanceof Error ? err.message : String(err);
+        errBox.classList.remove('hidden');
+      }
+    } finally {
+      saveDraftBtn.disabled = false;
+    }
+  });
 
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -1603,45 +1917,10 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
     // Resolve the ObserverRef from the Supabase session. If not signed in,
     // fall back to a guest ref — observation stays Dexie-only per module 04.
     const ref = await resolveObserverRef();
-
-    await saveObservationToOutbox({
-      observerRef: ref,
-      media: [
-        ...photos.map(p => ({
-          blobId: p.blobId,
-          blob: p.file,
-          mimeType: p.file.type,
-          sizeBytes: p.file.size,
-          mediaType: 'photo' as const,
-        })),
-        ...audios.map(a => ({
-          blobId: a.blobId,
-          blob: a.blob,
-          mimeType: a.mimeType,
-          sizeBytes: a.blob.size,
-          mediaType: 'audio' as const,
-        })),
-        ...videos.map(v => ({
-          blobId: v.blobId,
-          blob: v.blob,
-          mimeType: v.mimeType,
-          sizeBytes: v.blob.size,
-          mediaType: 'video' as const,
-        })),
-      ],
-      primaryPhotoIndex: 0,
-      location,
-      identification: {
-        scientificName: idInput?.value.trim() || currentIdentification?.scientific_name || '',
-        confidence: currentIdentification?.confidence ?? 0,
-        source: mapIdentificationSource(currentIdentification?.source) as Observation['identification']['source'],
-        status: (idInput?.value.trim() ? 'accepted' : 'pending') as Observation['identification']['status'],
-      },
-      habitat: ((form.elements.namedItem('habitat') as HTMLSelectElement).value || null) as Observation['habitat'],
-      weather: ((form.elements.namedItem('weather') as HTMLSelectElement).value || null) as Observation['weather'],
-      evidenceType: ((form.elements.namedItem('evidence_type') as HTMLSelectElement).value || 'direct_sighting') as Observation['evidenceType'],
-      notes: ((form.elements.namedItem('notes') as HTMLTextAreaElement).value || null),
-    });
+    const obsDraft = await buildSaveDraft(false);
+    if (!obsDraft) return;
+    const savedObs = await saveObservationToOutbox(obsDraft);
+    lastSavedObservationId = savedObs.id;
 
     // Attempt immediate sync if online; otherwise it'll flush on next online event.
     // Use a timeout to prevent hanging indefinitely if Edge Functions are unavailable.
@@ -1664,6 +1943,10 @@ const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 
 
     form.classList.add('hidden');
     successBox?.classList.remove('hidden');
+    if (idShareBtn && lastSavedObservationId) {
+      idShareBtn.disabled = false;
+      idShareBtn.removeAttribute('title');
+    }
     if (successMsg) {
       if (syncErrMsg) {
         successMsg.textContent = isEsSubmit
