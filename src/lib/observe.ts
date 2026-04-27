@@ -132,20 +132,63 @@ export async function saveObservationToOutbox(draft: ObservationDraft): Promise<
 }
 
 /**
- * Resolve the current ObserverRef from Supabase auth, with a hard timeout
- * so an unreachable auth server does not hang submission. Falls back to a
- * fresh guest ref — guest observations stay local-only by design.
+ * Resolve the current ObserverRef.
+ *
+ * **Critical:** a network failure must NOT downgrade a signed-in user to
+ * guest — that would orphan the observation as a guest row that `syncOne`
+ * refuses to sync, losing the data forever even after connectivity returns.
+ *
+ * Resolution order (each step is local-only, no network):
+ *   1. `auth.getSession()` — supabase-js reads its persisted session from
+ *      localStorage. No network round-trip in the cached path.
+ *   2. Direct localStorage read of `sb-<project-ref>-auth-token` as a
+ *      defensive fallback (in case getSession() throws synchronously).
+ *   3. Only if BOTH return nothing do we treat the user as a guest.
+ *
+ * The optional timeout exists purely to bound step 1 in pathological cases;
+ * step 2 is sync. We never network-fetch the user here.
  */
-export async function resolveObserverRef(timeoutMs: number = 5_000): Promise<ObserverRef> {
+export async function resolveObserverRef(timeoutMs: number = 2_000): Promise<ObserverRef> {
   const guest: ObserverRef = { kind: 'guest', localId: 'local-' + crypto.randomUUID() };
+
   try {
-    const authPromise = getSupabase().auth.getUser();
+    const sessionPromise = getSupabase().auth.getSession();
     const timeout = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('auth timeout')), timeoutMs),
+      setTimeout(() => reject(new Error('session timeout')), timeoutMs),
     );
-    const { data: { user } } = await Promise.race([authPromise, timeout]);
-    return user ? { kind: 'user', id: user.id } : guest;
+    const { data: { session } } = await Promise.race([sessionPromise, timeout]);
+    if (session?.user?.id) return { kind: 'user', id: session.user.id };
   } catch {
-    return guest;
+    // fall through to localStorage probe
   }
+
+  const cachedId = readCachedUserIdFromLocalStorage();
+  if (cachedId) return { kind: 'user', id: cachedId };
+
+  return guest;
+}
+
+/**
+ * Last-ditch synchronous fallback: read the supabase-js persisted session
+ * straight out of localStorage. supabase-js stores it under
+ * `sb-<project-ref>-auth-token` as JSON `{ access_token, refresh_token, user, ... }`.
+ * Used only if `auth.getSession()` itself rejects, e.g. during a partial
+ * mutex wedge or a corrupted in-memory state.
+ */
+function readCachedUserIdFromLocalStorage(): string | null {
+  if (typeof localStorage === 'undefined') return null;
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || !k.startsWith('sb-') || !k.endsWith('-auth-token')) continue;
+      const raw = localStorage.getItem(k);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw) as { user?: { id?: string } } | null;
+      const uid = parsed?.user?.id;
+      if (typeof uid === 'string' && uid.length > 0) return uid;
+    }
+  } catch {
+    // localStorage disabled or JSON malformed — fall through
+  }
+  return null;
 }
