@@ -42,35 +42,65 @@ function safeKey(userId: string, key: string): string | null {
   return key;
 }
 
+// CORS headers — applied to every response (including errors and the
+// preflight OPTIONS). Without these, browsers from rastrum.org block the
+// response body before it ever reaches our JS, and every photo upload
+// silently fails at the cross-origin layer.
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info',
+  'Access-Control-Max-Age': '86400',
+};
+
+function jsonResponse(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...CORS_HEADERS, 'content-type': 'application/json' },
+  });
+}
+
+function textResponse(body: string, status: number): Response {
+  return new Response(body, {
+    status,
+    headers: { ...CORS_HEADERS, 'content-type': 'text/plain' },
+  });
+}
+
 serve(async (req) => {
-  if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
+  // Preflight — must return CORS headers and a 2xx status BEFORE the
+  // browser will dispatch the actual POST.
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
+  }
+  if (req.method !== 'POST') return textResponse('Method not allowed', 405);
 
   const env = (k: string) => Deno.env.get(k);
   const required = ['CF_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET_NAME', 'R2_PUBLIC_URL', 'SUPABASE_URL', 'SUPABASE_ANON_KEY'];
   for (const k of required) {
-    if (!env(k)) return new Response(`Function not configured: ${k}`, { status: 500 });
+    if (!env(k)) return textResponse(`Function not configured: ${k}`, 500);
   }
 
   // Validate caller's JWT
   const auth = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
-  if (!auth) return new Response('Missing Authorization header', { status: 401 });
+  if (!auth) return textResponse('Missing Authorization header', 401);
 
   const supa = createClient(env('SUPABASE_URL')!, env('SUPABASE_ANON_KEY')!, {
     global: { headers: { Authorization: `Bearer ${auth}` } },
   });
   const { data: { user }, error: userErr } = await supa.auth.getUser();
-  if (userErr || !user) return new Response('Invalid token', { status: 401 });
+  if (userErr || !user) return textResponse('Invalid token', 401);
 
   let body: Body;
   try {
     body = await req.json();
   } catch {
-    return new Response('Invalid JSON', { status: 400 });
+    return textResponse('Invalid JSON', 400);
   }
-  if (!body?.key || !body?.contentType) return new Response('Missing key or contentType', { status: 400 });
+  if (!body?.key || !body?.contentType) return textResponse('Missing key or contentType', 400);
 
   const safe = safeKey(user.id, body.key);
-  if (!safe) return new Response('Forbidden key prefix', { status: 403 });
+  if (!safe) return textResponse('Forbidden key prefix', 403);
 
   // Construct the R2 client. R2 emulates S3; region is always 'auto'.
   const r2 = new S3Client({
@@ -91,7 +121,5 @@ serve(async (req) => {
   const signedUrl = await getSignedUrl(r2, command, { expiresIn: 300 });
   const publicUrl = `${env('R2_PUBLIC_URL')!.replace(/\/$/, '')}/${safe}`;
 
-  return new Response(JSON.stringify({ uploadUrl: signedUrl, publicUrl, expiresIn: 300 }), {
-    headers: { 'content-type': 'application/json' },
-  });
+  return jsonResponse({ uploadUrl: signedUrl, publicUrl, expiresIn: 300 });
 });
