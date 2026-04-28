@@ -49,6 +49,19 @@ test.describe('Settings shell — EN', () => {
     expect(html).toMatch(/href="[^"]*expert-apply/);
   });
 
+  test('privacy tab renders the matrix shell with 3 presets and 19 facets', async ({ request }) => {
+    const { response, html } = await fetchHtml(request, '/en/profile/settings/privacy/');
+    expect(response.status()).toBeLessThan(400);
+    expect(html).toMatch(/<title>[^<]*Settings/i);
+    expect(html).toContain('rastrum-privacy-matrix');
+    expect(html).toContain('data-preset="open_scientist"');
+    expect(html).toContain('data-preset="researcher"');
+    expect(html).toContain('data-preset="private_observer"');
+    // 19 facet rows
+    const rowMatches = html.match(/data-facet-row="/g) ?? [];
+    expect(rowMatches.length).toBe(19);
+  });
+
   test('/profile/settings/ (no tab) redirects to profile tab', async ({ request }) => {
     const { response, html } = await fetchHtml(request, '/en/profile/settings/');
     // Astro emits a meta-refresh redirect stub for the index path.

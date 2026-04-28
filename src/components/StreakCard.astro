@@ -171,9 +171,18 @@ const tr = t(lang);
         label.textContent = root.dataset.labelEnabling ?? original;
         err?.classList.add('hidden');
         try {
+          // Module 25: also flip the new privacy facet so the matrix
+          // and the legacy boolean stay in sync during the deprecation
+          // window. The boolean is dropped in v1.3.
+          const { data: existing } = await supabase
+            .from('users')
+            .select('profile_privacy')
+            .eq('id', user.id)
+            .maybeSingle<{ profile_privacy: Record<string, string> | null }>();
+          const nextPrivacy = { ...(existing?.profile_privacy ?? {}), profile: 'public' };
           const { error: upErr } = await supabase
             .from('users')
-            .update({ gamification_opt_in: true, profile_public: true })
+            .update({ gamification_opt_in: true, profile_public: true, profile_privacy: nextPrivacy })
             .eq('id', user.id);
           if (upErr) throw upErr;
           // Fire one recompute now; the nightly cron handles future runs.

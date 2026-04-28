@@ -18,7 +18,7 @@ interface Props {
 const { lang } = Astro.props;
 const tr = t(lang);
 const page = tr.explore_pages.recent;
-const profileBase = `/${lang}/${lang === 'es' ? 'perfil/u' : 'profile/u'}/`;
+const profileBase = `/${lang}/u/`;
 // Share route is locale-neutral: src/pages/share/obs/index.astro is the
 // only file. Building it as `/${lang}/share/obs/` 404s in production.
 const shareBase = `/share/obs/`;
@@ -90,6 +90,7 @@ const rgTitle = validation.research_grade_title  ?? rgLabel;
     username: string | null;
     display_name: string | null;
     profile_public: boolean | null;
+    profile_privacy: Record<string, string> | null;
   };
 
   type Row = {
@@ -131,7 +132,17 @@ const rgTitle = validation.research_grade_title  ?? rgLabel;
     return r.users;
   }
 
-  function rowMarkup(r: Row, lang: Lang, anonLabel: string, unknownLabel: string, shareBase: string, profileBase: string, rgLabel: string, rgTitle: string): string {
+  function canShowRealName(observer: Observer | null, viewerAuthed: boolean): boolean {
+    if (!observer) return false;
+    const level = observer.profile_privacy?.real_name;
+    if (level === 'public') return true;
+    if (level === 'signed_in') return viewerAuthed;
+    if (level === 'private') return false;
+    // Forward-compat: missing level falls through to legacy boolean.
+    return !!observer.profile_public;
+  }
+
+  function rowMarkup(r: Row, lang: Lang, anonLabel: string, unknownLabel: string, shareBase: string, profileBase: string, rgLabel: string, rgTitle: string, viewerAuthed: boolean): string {
     const ident = pickIdent(r);
     const observer = pickObserver(r);
     const sci = ident?.scientific_name ?? unknownLabel;
@@ -141,7 +152,7 @@ const rgTitle = validation.research_grade_title  ?? rgLabel;
     const confidence = typeof ident?.confidence === 'number' ? Math.max(0, Math.min(1, ident.confidence)) : null;
     const photo = (r.media_files ?? []).find(m => m?.is_primary)?.url ?? (r.media_files ?? []).find(m => !!m?.url)?.url ?? '';
     const ago = formatTimeAgo(r.observed_at, lang);
-    const isPublic = !!observer?.profile_public;
+    const isPublic = canShowRealName(observer, viewerAuthed);
     const observerName = isPublic ? (observer?.display_name || observer?.username || '') : '';
     const observerUsername = isPublic ? observer?.username ?? '' : '';
 
@@ -185,7 +196,7 @@ const rgTitle = validation.research_grade_title  ?? rgLabel;
   async function wire(root: HTMLElement) {
     const lang = (root.dataset.lang === 'es' ? 'es' : 'en') as Lang;
     const shareBase = root.dataset.shareBase ?? '/share/obs/';
-    const profileBase = root.dataset.profileBase ?? `/${lang}/profile/u/`;
+    const profileBase = root.dataset.profileBase ?? `/${lang}/u/`;
     const anonLabel = root.dataset.labelAnon ?? 'Anonymous';
     const unknownLabel = root.dataset.labelUnknownSpecies ?? 'Unknown species';
     const rgLabel = root.dataset.labelResearchGrade ?? 'Research grade';
@@ -216,6 +227,12 @@ const rgTitle = validation.research_grade_title  ?? rgLabel;
       return;
     }
 
+    let viewerAuthed = false;
+    try {
+      const { data } = await supabase.auth.getUser();
+      viewerAuthed = !!data.user;
+    } catch { viewerAuthed = false; }
+
     async function fetchPage(): Promise<Row[]> {
       const { data, error } = await supabase
         .from('observations')
@@ -223,7 +240,7 @@ const rgTitle = validation.research_grade_title  ?? rgLabel;
           id, observed_at, state_province, observer_id,
           identifications(scientific_name, is_primary, is_research_grade, confidence, taxa(common_name_es, common_name_en)),
           media_files(url, is_primary),
-          users(id, username, display_name, profile_public)
+          users(id, username, display_name, profile_public, profile_privacy)
         `)
         .eq('sync_status', 'synced')
         .order('observed_at', { ascending: false })
@@ -242,7 +259,7 @@ const rgTitle = validation.research_grade_title  ?? rgLabel;
         if (listEl) {
           listEl.insertAdjacentHTML(
             'beforeend',
-            page.map(r => rowMarkup(r, lang, anonLabel, unknownLabel, shareBase, profileBase, rgLabel, rgTitle)).join(''),
+            page.map(r => rowMarkup(r, lang, anonLabel, unknownLabel, shareBase, profileBase, rgLabel, rgTitle, viewerAuthed)).join(''),
           );
         }
         offset += page.length;

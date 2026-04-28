@@ -1998,3 +1998,174 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 GRANT EXECUTE ON FUNCTION public.recompute_consensus(uuid) TO service_role;
 
 GRANT EXECUTE ON FUNCTION public.refresh_taxon_rarity() TO service_role;
+
+-- =====================================================================
+-- Module 25 — Profile Privacy & Public Profile (v1.2.0)
+-- See docs/specs/modules/25-profile-privacy.md
+-- =====================================================================
+
+-- 19-key privacy matrix on users. Backed by JSONB so new facets are
+-- additive (a missing key falls back to 'public' in can_see_facet).
+ALTER TABLE public.users
+  ADD COLUMN IF NOT EXISTS profile_privacy jsonb NOT NULL DEFAULT '{
+    "profile":          "public",
+    "real_name":        "signed_in",
+    "bio":              "public",
+    "location":         "signed_in",
+    "stats_counts":     "public",
+    "observation_map":  "public",
+    "calendar_heatmap": "public",
+    "taxonomic_donut":  "public",
+    "top_species":      "public",
+    "streak":           "signed_in",
+    "badges":           "public",
+    "activity_feed":    "signed_in",
+    "validation_rep":   "public",
+    "obs_list":         "public",
+    "watchlist":        "private",
+    "goals":            "private",
+    "karma_total":      "public",
+    "expertise":        "public",
+    "pokedex":          "public"
+  }'::jsonb,
+  ADD COLUMN IF NOT EXISTS dismissed_privacy_intro_at timestamptz;
+
+CREATE INDEX IF NOT EXISTS idx_users_profile_privacy
+  ON public.users USING gin (profile_privacy jsonb_path_ops);
+
+-- One-shot backfill of profile facet from the legacy boolean. The
+-- WHERE guard makes this idempotent — only rows whose facet still
+-- disagrees with the boolean are touched.
+UPDATE public.users
+SET profile_privacy = jsonb_set(
+  profile_privacy,
+  '{profile}',
+  CASE WHEN profile_public THEN '"public"'::jsonb ELSE '"signed_in"'::jsonb END
+)
+WHERE profile_privacy ->> 'profile' IS DISTINCT FROM
+      CASE WHEN profile_public THEN 'public' ELSE 'signed_in' END;
+
+-- Single source of truth for facet visibility. Owner always passes;
+-- anyone else gets the matrix's per-facet level. Missing key →
+-- 'public' (forward-compat for new facets shipped before migration).
+CREATE OR REPLACE FUNCTION public.can_see_facet(
+  target uuid,
+  facet  text,
+  viewer uuid DEFAULT NULL
+) RETURNS boolean
+LANGUAGE sql STABLE SECURITY INVOKER AS $$
+  SELECT CASE
+    WHEN viewer IS NOT NULL AND viewer = target THEN true
+    ELSE (
+      SELECT CASE COALESCE(profile_privacy ->> facet, 'public')
+        WHEN 'public'    THEN true
+        WHEN 'signed_in' THEN viewer IS NOT NULL
+        WHEN 'private'   THEN false
+        ELSE false
+      END
+      FROM public.users
+      WHERE id = target
+    )
+  END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.can_see_facet(uuid, text, uuid)
+  TO anon, authenticated;
+
+-- Batched companion — one round-trip for all facets a page needs.
+CREATE OR REPLACE FUNCTION public.can_see_facets(
+  target uuid,
+  facets text[],
+  viewer uuid DEFAULT NULL
+) RETURNS jsonb
+LANGUAGE sql STABLE SECURITY INVOKER AS $$
+  SELECT jsonb_object_agg(f, public.can_see_facet(target, f, viewer))
+  FROM unnest(facets) AS f;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.can_see_facets(uuid, text[], uuid)
+  TO anon, authenticated;
+
+-- Owner-only updates of the matrix.
+DROP POLICY IF EXISTS "users_update_self_privacy" ON public.users;
+CREATE POLICY "users_update_self_privacy" ON public.users
+  FOR UPDATE TO authenticated
+  USING ((SELECT auth.uid()) = id)
+  WITH CHECK ((SELECT auth.uid()) = id);
+
+-- Observation pins for the public observation_map facet. Honours
+-- obscure_level + location_obscured: sensitive species → coarsened to
+-- ~11 km grid, 'private' obs filtered out entirely. Visibility gate
+-- runs in the WHERE clause itself so client code never sees a row it
+-- shouldn't.
+CREATE OR REPLACE VIEW public.profile_observation_pins AS
+SELECT
+  o.observer_id,
+  o.id AS observation_id,
+  CASE
+    WHEN o.location_obscured
+      THEN ST_SnapToGrid(o.location, 0.1)
+    ELSE o.location
+  END AS location,
+  i.scientific_name,
+  i.is_research_grade,
+  o.observed_at
+FROM public.observations o
+LEFT JOIN public.identifications i
+  ON i.observation_id = o.id AND i.is_primary = true
+WHERE
+  o.sync_status = 'synced'
+  AND o.obscure_level <> 'private'
+  AND public.can_see_facet(o.observer_id, 'observation_map', (SELECT auth.uid()));
+
+GRANT SELECT ON public.profile_observation_pins TO anon, authenticated;
+
+-- Aggregate counts gated by the stats_counts facet. The
+-- kingdoms_validated count is the distinct-kingdom set across the
+-- user's research-grade IDs; matches the "kingdoms" stat module 22
+-- derives elsewhere.
+CREATE OR REPLACE VIEW public.profile_stats_counts AS
+SELECT
+  u.id AS owner_id,
+  COALESCE((
+    SELECT count(*) FROM public.observations o
+     WHERE o.observer_id = u.id
+       AND o.sync_status = 'synced'
+       AND o.obscure_level <> 'private'
+  ), 0) AS total_observations,
+  COALESCE((
+    SELECT count(*) FROM public.observations o
+     JOIN public.identifications i
+       ON i.observation_id = o.id AND i.is_primary = true
+     WHERE o.observer_id = u.id
+       AND o.sync_status = 'synced'
+       AND o.obscure_level <> 'private'
+       AND i.is_research_grade = true
+  ), 0) AS research_grade_count,
+  COALESCE((
+    SELECT count(DISTINCT t.kingdom) FROM public.observations o
+     JOIN public.identifications i
+       ON i.observation_id = o.id AND i.is_primary = true
+     JOIN public.taxa t ON t.id = i.taxon_id
+     WHERE o.observer_id = u.id
+       AND o.sync_status = 'synced'
+       AND o.obscure_level <> 'private'
+       AND i.is_research_grade = true
+       AND t.kingdom IS NOT NULL
+  ), 0) AS kingdoms_validated
+FROM public.users u
+WHERE public.can_see_facet(u.id, 'stats_counts', (SELECT auth.uid()));
+
+GRANT SELECT ON public.profile_stats_counts TO anon, authenticated;
+
+-- Module 23 hand-off: replace the open user_expertise_public_read
+-- policy with a facet-gated equivalent. The drop+create is idempotent;
+-- re-running module 23's migration after this lands does not regress
+-- the gate (its policy creation also DROPs first, but the name has
+-- diverged — superseded by user_expertise_facet_read here).
+DROP POLICY IF EXISTS user_expertise_public_read ON public.user_expertise;
+DROP POLICY IF EXISTS user_expertise_facet_read  ON public.user_expertise;
+CREATE POLICY user_expertise_facet_read ON public.user_expertise
+  FOR SELECT USING (
+    public.can_see_facet(user_id, 'expertise', (SELECT auth.uid()))
+  );

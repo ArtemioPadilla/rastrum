@@ -1,12 +1,35 @@
 ---
-import BaseLayout from '../../../../layouts/BaseLayout.astro';
-import PublicProfileView from '../../../../components/PublicProfileView.astro';
-import { t } from '../../../../i18n/utils';
-
+/**
+ * Module 25 v1.2.0 — legacy public-profile route.
+ *
+ * The canonical shape is /{lang}/u/?username=<name>. We keep this stub
+ * at the old /{lang}/profile/u/ path so external links keep working,
+ * but redirect (meta-refresh, since output: 'static' can't issue 301)
+ * to the new path. Remove in v1.3.
+ */
 const lang = 'en';
-const tr = t(lang);
 ---
 
-<BaseLayout title={`${tr.profile.public_profile_title} — Rastrum`} description="Public profile page for a Rastrum observer: their biodiversity observations, badges, day streak, and species list." lang={lang}>
-  <PublicProfileView lang={lang} />
-</BaseLayout>
+<!doctype html>
+<html lang={lang}>
+  <head>
+    <meta charset="utf-8" />
+    <title>Redirecting…</title>
+    <meta name="robots" content="noindex,nofollow" />
+    <link rel="canonical" href="https://rastrum.org/en/u/" />
+  </head>
+  <body>
+    <p>Redirecting to the new public profile…</p>
+    <script>
+      (function () {
+        const params = new URLSearchParams(window.location.search);
+        const username = params.get('username') || params.get('u') || '';
+        const target = '/en/u/' + (username ? `?username=${encodeURIComponent(username)}` : '');
+        window.location.replace(target);
+      })();
+    </script>
+    <noscript>
+      <p><a href="/en/u/">Continue</a></p>
+    </noscript>
+  </body>
+</html>

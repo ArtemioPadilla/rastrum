@@ -119,6 +119,10 @@ export interface UserProfile {
   observer_license: 'CC BY 4.0' | 'CC BY-NC 4.0' | 'CC0';
   observation_count: number;
   profile_public: boolean;
+  /** Module 25 v1.2.0: per-facet privacy matrix. JSONB column. */
+  profile_privacy?: Record<string, string> | null;
+  /** Module 25 v1.2.0: timestamp recorded when user dismisses the privacy intro banner. */
+  dismissed_privacy_intro_at?: string | null;
   gamification_opt_in: boolean;
   streak_digest_opt_in: boolean;
   region_primary: string | null;

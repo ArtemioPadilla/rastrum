@@ -2,6 +2,7 @@
 import BaseLayout from '../../../../layouts/BaseLayout.astro';
 import SettingsShell from '../../../../components/SettingsShell.astro';
 import ProfileEditForm from '../../../../components/ProfileEditForm.astro';
+import PrivacyMatrix from '../../../../components/PrivacyMatrix.astro';
 import { t, getLocalizedPath, routes } from '../../../../i18n/utils';
 
 export function getStaticPaths() {
@@ -10,6 +11,7 @@ export function getStaticPaths() {
     { params: { tab: 'preferences' } },
     { params: { tab: 'data' } },
     { params: { tab: 'developer' } },
+    { params: { tab: 'privacy' } },
   ];
 }
 
@@ -18,7 +20,7 @@ const tr = t(lang);
 const settings = (tr as unknown as { settings: { title: string; tabs: Record<string, string>; preferences: Record<string, string>; data: Record<string, string>; developer: Record<string, string> } }).settings;
 
 const { tab } = Astro.params;
-const activeTab = tab as 'profile' | 'preferences' | 'data' | 'developer';
+const activeTab = tab as 'profile' | 'preferences' | 'data' | 'developer' | 'privacy';
 
 const importPath        = getLocalizedPath(lang, routes.profileImport['es'] + '/');
 const importCameraTrap  = getLocalizedPath(lang, routes.profileImportCameraTrap['es'] + '/');
@@ -178,6 +180,10 @@ const mcpUrl = 'https://reppvlqejgoqvitturxp.supabase.co/functions/v1/mcp';
           </a>
         </section>
       </div>
+    )}
+
+    {activeTab === 'privacy' && (
+      <PrivacyMatrix lang={lang} />
     )}
   </SettingsShell>
 </BaseLayout>

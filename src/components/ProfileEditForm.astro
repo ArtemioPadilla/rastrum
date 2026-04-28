@@ -8,6 +8,7 @@ const { lang } = Astro.props;
 const tr = t(lang);
 const pip = (tr as unknown as { pipeline: Record<string, string> }).pipeline;
 const onb = (tr as unknown as { onboarding: Record<string, string> }).onboarding;
+const privacyTr = (tr as unknown as { privacy_matrix: { manage_in_tab_note: string } }).privacy_matrix;
 ---
 
 <div class="max-w-2xl mx-auto">
@@ -61,13 +62,12 @@ const onb = (tr as unknown as { onboarding: Record<string, string> }).onboarding
     </div>
 
     <fieldset class="space-y-3 border-t border-zinc-200 dark:border-zinc-800 pt-5">
-      <label class="flex items-start gap-3 cursor-pointer">
-        <input type="checkbox" name="profile_public" class="mt-1" />
-        <div>
-          <p class="text-sm font-medium text-zinc-700 dark:text-zinc-300">{tr.profile.public_profile}</p>
-          <p class="text-xs text-zinc-500">{tr.profile.public_profile_hint}</p>
-        </div>
-      </label>
+      <p class="text-xs text-zinc-500 dark:text-zinc-400">
+        <a href={`/${lang}/${lang === 'es' ? 'perfil/ajustes' : 'profile/settings'}/privacy/`}
+           class="text-emerald-700 dark:text-emerald-400 hover:underline">
+          {privacyTr.manage_in_tab_note}
+        </a>
+      </p>
       <label class="flex items-start gap-3 cursor-pointer">
         <input type="checkbox" name="gamification_opt_in" class="mt-1" />
         <div>
@@ -421,7 +421,7 @@ const onb = (tr as unknown as { onboarding: Record<string, string> }).onboarding
   type EditableKey =
     | 'username' | 'display_name' | 'bio' | 'region_primary' | 'avatar_url'
     | 'preferred_lang' | 'observer_license'
-    | 'profile_public' | 'gamification_opt_in' | 'streak_digest_opt_in';
+    | 'gamification_opt_in' | 'streak_digest_opt_in';
 
   async function load() {
     if (!form) return;
@@ -446,7 +446,6 @@ const onb = (tr as unknown as { onboarding: Record<string, string> }).onboarding
     (form.elements.namedItem('avatar_url') as HTMLInputElement).value = profile.avatar_url ?? '';
     (form.elements.namedItem('preferred_lang') as HTMLSelectElement).value = profile.preferred_lang ?? 'es';
     (form.elements.namedItem('observer_license') as HTMLSelectElement).value = profile.observer_license ?? 'CC BY 4.0';
-    (form.elements.namedItem('profile_public') as HTMLInputElement).checked = profile.profile_public;
     (form.elements.namedItem('gamification_opt_in') as HTMLInputElement).checked = profile.gamification_opt_in;
     (form.elements.namedItem('streak_digest_opt_in') as HTMLInputElement).checked = profile.streak_digest_opt_in;
   }
@@ -473,7 +472,6 @@ const onb = (tr as unknown as { onboarding: Record<string, string> }).onboarding
       avatar_url:           nullableText('avatar_url'),
       preferred_lang:       (data.get('preferred_lang') ?? 'es').toString(),
       observer_license:     (data.get('observer_license') ?? 'CC BY 4.0').toString(),
-      profile_public:       data.get('profile_public') === 'on',
       gamification_opt_in:  data.get('gamification_opt_in') === 'on',
       streak_digest_opt_in: data.get('streak_digest_opt_in') === 'on',
       updated_at:           new Date().toISOString(),
