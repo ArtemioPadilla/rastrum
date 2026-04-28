@@ -2940,3 +2940,54 @@ CREATE POLICY reports_owner_read ON public.reports FOR SELECT
 DROP POLICY IF EXISTS reports_owner_write ON public.reports;
 CREATE POLICY reports_owner_write ON public.reports FOR INSERT
   WITH CHECK (reporter_id = auth.uid());
+
+-- 12) notifications
+CREATE TABLE IF NOT EXISTS public.notifications (
+  id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     uuid        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  kind        text        NOT NULL
+                          CHECK (kind IN ('follow','follow_accepted','reaction','comment','mention',
+                                          'identification','badge','digest')),
+  payload     jsonb       NOT NULL DEFAULT '{}',
+  read_at     timestamptz,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_unread
+  ON public.notifications(user_id, read_at) WHERE read_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_notifications_user_created
+  ON public.notifications(user_id, created_at DESC);
+
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS notif_owner_read ON public.notifications;
+CREATE POLICY notif_owner_read ON public.notifications FOR SELECT
+  USING (user_id = auth.uid());
+
+DROP POLICY IF EXISTS notif_owner_update ON public.notifications;
+CREATE POLICY notif_owner_update ON public.notifications FOR UPDATE
+  USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
+
+DROP POLICY IF EXISTS notif_owner_delete ON public.notifications;
+CREATE POLICY notif_owner_delete ON public.notifications FOR DELETE
+  USING (user_id = auth.uid());
+
+-- Server-side inserts (Edge Functions) use service role and bypass RLS;
+-- explicitly forbid client-side inserts.
+DROP POLICY IF EXISTS notif_no_client_insert ON public.notifications;
+CREATE POLICY notif_no_client_insert ON public.notifications FOR INSERT
+  WITH CHECK (false);
+
+CREATE OR REPLACE FUNCTION public.prune_old_notifications()
+RETURNS integer
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_count integer;
+BEGIN
+  DELETE FROM public.notifications
+   WHERE read_at IS NOT NULL
+     AND read_at < now() - interval '90 days';
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  RETURN v_count;
+END;
+$$;

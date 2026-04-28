@@ -93,3 +93,12 @@ SELECT jobid, jobname, schedule, active
 FROM cron.job
 WHERE jobname IN ('streaks-nightly', 'badges-nightly', 'plantnet-quota-daily', 'streak-push-nightly', 'refresh-taxon-rarity-nightly')
 ORDER BY jobname;
+
+-- m26: prune read notifications older than 90 days, daily at 04:30 UTC.
+SELECT cron.unschedule('prune_old_notifications')
+  WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'prune_old_notifications');
+SELECT cron.schedule(
+  'prune_old_notifications',
+  '30 4 * * *',
+  $$ SELECT public.prune_old_notifications(); $$
+);
