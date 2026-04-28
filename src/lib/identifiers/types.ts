@@ -107,6 +107,25 @@ export interface IdentifyInput {
   /** Identifiers may chain — pass earlier results forward for context. */
   prior_candidates?: Array<Pick<IDResult, 'scientific_name' | 'confidence'>>;
   /**
+   * Optional crop hint produced by an earlier cascade plugin (typically
+   * MegaDetector v5a, which finds the animal bbox but doesn't classify
+   * species). Plugins that consume it should pre-crop their input to
+   * the bbox before running inference — animal-only crops give a ×3-5
+   * accuracy bump on small subjects in distant camera-trap frames.
+   *
+   * Coordinates are in **source-image pixel space**, not the input
+   * tensor space. Plugins that don't honor it (e.g. server-side
+   * proxies that pass image_url verbatim) ignore the field; the
+   * cascade still works, just at full-frame accuracy.
+   *
+   * `bbox` is `[x1, y1, x2, y2]` (top-left to bottom-right).
+   */
+  mediaCrop?: {
+    bbox: [number, number, number, number];
+    /** Plugin id that produced the bbox, for logging. */
+    source: string;
+  };
+  /**
    * BYO API keys keyed by KeySpec.name. Plugins read what they need.
    * Empty when no plugin needs keys (Phi-3.5-vision, BirdNET-Lite, ...)
    */

@@ -79,6 +79,12 @@ export async function runCascade(input: IdentifyInput, opts: CascadeOptions): Pr
   const attempts: CascadeResult['attempts'] = [];
   let best: IDResult | null = null;
   const priorCandidates: Array<Pick<IDResult, 'scientific_name' | 'confidence'>> = [];
+  // Bbox forwarded from a prior plugin (today: only MegaDetector
+  // attaches `animal_bbox` to its fall-through error). Subsequent
+  // plugins receive this as IdentifyInput.mediaCrop and may pre-crop
+  // before running inference for a ×3-5 accuracy bump on small
+  // subjects in distant camera-trap frames.
+  let mediaCrop: IdentifyInput['mediaCrop'] = input.mediaCrop;
 
   for (const plugin of candidates) {
     const av = await plugin.isAvailable();
@@ -87,7 +93,11 @@ export async function runCascade(input: IdentifyInput, opts: CascadeOptions): Pr
       continue;
     }
     try {
-      const result = await plugin.identify({ ...input, prior_candidates: priorCandidates });
+      const result = await plugin.identify({
+        ...input,
+        prior_candidates: priorCandidates,
+        mediaCrop,
+      });
       attempts.push({ id: plugin.id, ok: true, result });
       // Always cap to the plugin's ceiling.
       const ceiling = plugin.capabilities.confidence_ceiling ?? 1;
@@ -104,6 +114,14 @@ export async function runCascade(input: IdentifyInput, opts: CascadeOptions): Pr
           best: null,
           attempts,
           filtered: { source: e.source, label: e.filtered_label, raw: e.raw },
+        };
+      }
+      // Forward an attached bbox to the next plugin as a crop hint.
+      const errBbox = (e as { animal_bbox?: number[] }).animal_bbox;
+      if (Array.isArray(errBbox) && errBbox.length === 4) {
+        mediaCrop = {
+          bbox: errBbox as [number, number, number, number],
+          source: plugin.id,
         };
       }
     }

@@ -22,6 +22,7 @@ on:
           - plantnet-monitor
           - streak-push
           - sync-error
+          - delete-observation
       sync_secrets:
         description: 'Sync GitHub Actions secrets → Supabase Edge Function secrets before deploy'
         required: false
@@ -144,7 +145,7 @@ jobs:
             supabase functions deploy "$fn" --project-ref "$PROJECT_REF" $flag
           }
           if [ "${{ inputs.function }}" = "all" ]; then
-            for fn in get-upload-url identify enrich-environment recompute-streaks award-badges share-card export-dwca mcp api plantnet-monitor streak-push sync-error; do
+            for fn in get-upload-url identify enrich-environment recompute-streaks award-badges share-card export-dwca mcp api plantnet-monitor streak-push sync-error delete-observation; do
               deploy_one "$fn"
             done
           else

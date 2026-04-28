@@ -34,53 +34,54 @@ export const phiVisionIdentifier: Identifier = {
     return { ready: true };
   },
   async identify(input: IdentifyInput): Promise<IDResult> {
+    let dataUrl: string;
     if (input.media.kind === 'url') {
-      // Fetch and turn into a data URL so the model can read it
       const res = await fetch(input.media.url);
       const blob = await res.blob();
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const r = new FileReader();
-        r.onload = () => resolve(r.result as string);
-        r.onerror = () => reject(r.error);
-        r.readAsDataURL(blob);
-      });
-      const { identifyImageLocal } = await import('../local-ai');
-      const local = await identifyImageLocal(dataUrl, input.onProgress ?? (() => {}), {
-        lat: input.location?.lat, lng: input.location?.lng, habitat: input.habitat ?? undefined,
-      });
-      return {
-        scientific_name: local.scientific_name,
-        common_name_en: local.common_name_en,
-        common_name_es: local.common_name_es,
-        family: local.family,
-        kingdom: local.kingdom,
-        confidence: Math.min(local.confidence, 0.35),
-        source: 'webllm_phi35_vision',
-        raw: local,
-        warning: local.warning,
-      };
+      dataUrl = await blobToDataUrl(blob);
+    } else if (input.media.kind === 'blob') {
+      dataUrl = await blobToDataUrl(input.media.blob);
+    } else {
+      throw new Error('phi-vision: media.kind=bytes not supported');
     }
-    if (input.media.kind === 'blob') {
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const r = new FileReader();
-        r.onload = () => resolve(r.result as string);
-        r.onerror = () => reject(r.error);
-        r.readAsDataURL(input.media.kind === 'blob' ? input.media.blob : new Blob());
-      });
-      const { identifyImageLocal } = await import('../local-ai');
-      const local = await identifyImageLocal(dataUrl, input.onProgress ?? (() => {}));
-      return {
-        scientific_name: local.scientific_name,
-        common_name_en: local.common_name_en,
-        common_name_es: local.common_name_es,
-        family: local.family,
-        kingdom: local.kingdom,
-        confidence: Math.min(local.confidence, 0.35),
-        source: 'webllm_phi35_vision',
-        raw: local,
-        warning: local.warning,
-      };
+
+    // Bbox crop forwarded by an upstream plugin (typically MegaDetector
+    // for camera-trap photos). Pre-cropping to the animal lifts Phi's
+    // accuracy substantially on small subjects in distant frames.
+    if (input.mediaCrop?.bbox) {
+      try {
+        const { cropDataUrlToBbox } = await import('./bbox-crop');
+        dataUrl = await cropDataUrlToBbox(dataUrl, { bbox: input.mediaCrop.bbox });
+      } catch {
+        // Crop failed (image decode, no canvas, etc.) — fall through to
+        // full-frame inference. Better to identify with reduced accuracy
+        // than to fail the cascade entirely.
+      }
     }
-    throw new Error('phi-vision: media.kind=bytes not supported');
+
+    const { identifyImageLocal } = await import('../local-ai');
+    const local = await identifyImageLocal(dataUrl, input.onProgress ?? (() => {}), {
+      lat: input.location?.lat, lng: input.location?.lng, habitat: input.habitat ?? undefined,
+    });
+    return {
+      scientific_name: local.scientific_name,
+      common_name_en: local.common_name_en,
+      common_name_es: local.common_name_es,
+      family: local.family,
+      kingdom: local.kingdom,
+      confidence: Math.min(local.confidence, 0.35),
+      source: 'webllm_phi35_vision',
+      raw: local,
+      warning: local.warning,
+    };
   },
 };
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result as string);
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(blob);
+  });
+}

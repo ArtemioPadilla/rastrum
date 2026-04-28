@@ -28,6 +28,7 @@ FUNCTIONS=(
   api
   mcp
   sync-error
+  delete-observation
 )
 
 failed=0

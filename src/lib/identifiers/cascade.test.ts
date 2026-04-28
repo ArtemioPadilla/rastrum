@@ -102,4 +102,41 @@ describe('runCascade — FilteredFrameError short-circuit', () => {
     expect(result.best?.scientific_name).toBe('Lynx rufus');
     expect(result.filtered).toBeUndefined();
   });
+
+  it('forwards animal_bbox from a thrown error to the next plugin as mediaCrop', async () => {
+    let receivedCrop: unknown = 'unset';
+    const detector = fakePlugin({
+      id: 'test_detector',
+      identifyImpl: async () => {
+        const err = new Error('animal detected, no species') as Error & { animal_bbox?: number[] };
+        err.animal_bbox = [100, 200, 400, 600];
+        throw err;
+      },
+    });
+    const classifier = fakePlugin({
+      id: 'test_classifier',
+      identifyImpl: async (input) => {
+        receivedCrop = input.mediaCrop;
+        return {
+          scientific_name: 'Lynx rufus',
+          common_name_en: 'Bobcat',
+          common_name_es: null,
+          family: 'Felidae',
+          kingdom: 'Animalia' as const,
+          confidence: 0.9,
+          source: 'test_classifier',
+          raw: {},
+        };
+      },
+    });
+    registry.register(detector);
+    registry.register(classifier);
+
+    const result = await runCascade(
+      { media: { kind: 'url', url: 'https://example.com/x.jpg' }, mediaKind: 'photo' },
+      { media: 'photo', preferred: ['test_detector'] },
+    );
+    expect(result.best?.scientific_name).toBe('Lynx rufus');
+    expect(receivedCrop).toEqual({ bbox: [100, 200, 400, 600], source: 'test_detector' });
+  });
 });

@@ -29,7 +29,7 @@ import {
   getMegadetectorWeightsBaseUrl, getMegadetectorCacheStatus, getCachedModelBuffer,
 } from './megadetector-cache';
 import {
-  letterboxRgba, postprocessYolo, pickDominant, YOLO_INPUT_SIZE, type LetterboxResult,
+  letterboxRgba, postprocessYolo, pickDominant, unletterbox, YOLO_INPUT_SIZE, type LetterboxResult,
 } from './megadetector-yolo';
 
 export const CAMERA_TRAP_PLUGIN_ID = 'camera_trap_megadetector';
@@ -212,14 +212,21 @@ export const cameraTrapMegadetectorIdentifier: Identifier = {
     }
 
     // Animal detected — but MegaDetector doesn't classify species. Throw
-    // so the cascade falls through to a species-capable plugin. The bbox
-    // is preserved in the error.raw payload for callers that want to
-    // pre-crop in a future iteration (see module 09 spec, "next steps").
+    // so the cascade falls through to a species-capable plugin (Phi
+    // first, then PlantNet/Claude server-side). The bbox is converted
+    // from input-tensor space to source-image pixel space here so
+    // downstream plugins can pre-crop without redoing letterbox math.
     const err = new Error(
       'camera_trap_megadetector: animal detected but species classification not on-device — falling through to cascade.',
-    ) as Error & { animal_bbox?: number[]; raw?: unknown };
-    if (dominant.detection) err.animal_bbox = dominant.detection.bbox;
-    err.raw = { detections, top: dominant.detection };
+    ) as Error & { animal_bbox?: [number, number, number, number]; raw?: unknown };
+    if (dominant.detection) {
+      err.animal_bbox = unletterbox(dominant.detection.bbox, lb);
+    }
+    err.raw = {
+      detections,
+      top: dominant.detection,
+      source_dims: { w: rgba.width, h: rgba.height },
+    };
     throw err;
   },
 };

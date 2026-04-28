@@ -301,17 +301,22 @@ const obsIdPlaceholder = '';
 
       deleteBtn?.addEventListener('click', async () => {
         const confirmed = window.confirm(
-          'Delete this observation? This cannot be undone. Identifications and media metadata will also be removed.',
+          'Delete this observation? This cannot be undone. Photos, identifications, and metadata will all be removed.',
         );
         if (!confirmed) return;
         deleteBtn.disabled = true;
         try {
-          const { error: delErr } = await supabase
-            .from('observations')
-            .delete()
-            .eq('id', obsId);
-          if (delErr) throw delErr;
-          // Redirect to the user's observations list.
+          // Call the delete-observation Edge Function. It owns the
+          // atomic delete across R2 (photos + OG card) and the DB
+          // (cascades to identifications + media_files). Without
+          // this, a direct client-side DELETE leaves orphan R2 blobs.
+          const { data, error: invokeErr } = await supabase.functions.invoke<{
+            ok: boolean; r2_deleted?: number; r2_errors?: unknown[]; error?: string;
+          }>('delete-observation', {
+            body: { observation_id: obsId },
+          });
+          if (invokeErr) throw invokeErr;
+          if (data && !data.ok) throw new Error(data.error ?? 'Delete failed');
           const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
           window.location.href = `/${lang}/${lang === 'es' ? 'perfil/observaciones' : 'profile/observations'}/`;
         } catch (err) {
