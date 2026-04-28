@@ -16,6 +16,7 @@
  */
 import { t } from '../i18n/utils';
 import FollowButton from './FollowButton.astro';
+import ShareButton from './ShareButton.astro';
 
 interface Props {
   lang: 'en' | 'es';
@@ -84,8 +85,9 @@ const pm = pmTree.privacy;
         <p data-pp-since class="mt-2 text-xs text-zinc-500"></p>
         <p data-pp-name-owner-only data-owner-only-badge class="hidden mt-1 text-[10px] uppercase tracking-wider text-amber-700 dark:text-amber-400"></p>
       </div>
-      <div class="shrink-0">
+      <div class="shrink-0 flex flex-col gap-2 items-end">
         <FollowButton lang={lang} />
+        <ShareButton lang={lang} id="profile-share-btn" />
       </div>
     </header>
 
@@ -255,6 +257,14 @@ const pm = pmTree.privacy;
 
     const nameEl = root.querySelector<HTMLElement>('[data-pp-name]');
     if (nameEl) nameEl.textContent = name;
+
+    // Wire ShareButton for this profile
+    const shareProfBtn = document.getElementById('profile-share-btn');
+    if (shareProfBtn) {
+      shareProfBtn.dataset.shareTitle = `${name} — Rastrum`;
+      shareProfBtn.dataset.shareText  = `Perfil de ${name} en Rastrum`;
+      shareProfBtn.dataset.shareUrl   = window.location.href;
+    }
     if (isOwner && facets.real_name === false) {
       const badge = root.querySelector<HTMLElement>('[data-pp-name-owner-only]');
       if (badge) { badge.textContent = ownerLabel; badge.classList.remove('hidden'); }

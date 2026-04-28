@@ -1,0 +1,105 @@
+---
+/**
+ * ShareButton — comparte la URL actual usando la Web Share API nativa.
+ *
+ * En Android/iOS con Web Share API: abre el sheet nativo del OS
+ * (WhatsApp, iMessage, etc.).
+ * En desktop o browsers sin soporte: copia la URL al portapapeles
+ * y muestra un toast de confirmación.
+ *
+ * Props:
+ *   title  — título para el share sheet (ej. nombre de especie)
+ *   text   — descripción opcional
+ *   url    — URL a compartir (default: window.location.href)
+ *   label  — texto del botón (default: "Compartir" / "Share")
+ *   size   — 'sm' | 'md' (default: 'sm')
+ */
+import { t } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+  title?: string;
+  text?: string;
+  url?: string;
+  label?: string;
+  size?: 'sm' | 'md';
+  id?: string;
+}
+
+const { lang, title = '', text = '', url = '', label, size = 'sm', id = 'share-btn' } = Astro.props;
+const tr = t(lang);
+const defaultLabel = lang === 'es' ? 'Compartir' : 'Share';
+const btnLabel = label ?? defaultLabel;
+const toastCopied = lang === 'es' ? '🔗 Link copiado' : '🔗 Link copied';
+const sizeClass = size === 'md'
+  ? 'min-h-[44px] px-4 py-2 text-sm'
+  : 'min-h-[36px] px-3 py-1.5 text-xs';
+---
+
+<button
+  type="button"
+  id={id}
+  data-share-title={title}
+  data-share-text={text}
+  data-share-url={url}
+  data-toast-copied={toastCopied}
+  class={`rastrum-share-btn inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors ${sizeClass}`}
+  aria-label={btnLabel}
+>
+  <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
+  </svg>
+  <span class="share-label">{btnLabel}</span>
+</button>
+
+<!-- Toast notification -->
+<div
+  id={`${id}-toast`}
+  class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-lg bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 px-4 py-2 text-sm font-medium shadow-lg pointer-events-none"
+  aria-live="polite"
+></div>
+
+<script>
+  for (const btn of document.querySelectorAll<HTMLButtonElement>('.rastrum-share-btn')) {
+    btn.addEventListener('click', async () => {
+      const shareTitle = btn.dataset.shareTitle ?? document.title;
+      const shareText  = btn.dataset.shareText  ?? '';
+      const shareUrl   = btn.dataset.shareUrl   || window.location.href;
+      const toastMsg   = btn.dataset.toastCopied ?? '🔗 Link copied';
+      const toastEl    = document.getElementById(`${btn.id}-toast`);
+
+      function showToast(msg: string) {
+        if (!toastEl) return;
+        toastEl.textContent = msg;
+        toastEl.classList.remove('hidden');
+        setTimeout(() => toastEl.classList.add('hidden'), 2500);
+      }
+
+      // Web Share API — Android/iOS native sheet
+      if (navigator.share) {
+        try {
+          await navigator.share({ title: shareTitle, text: shareText, url: shareUrl });
+          return;
+        } catch (e) {
+          // User cancelled or error — fall through to clipboard
+          if ((e as Error).name === 'AbortError') return;
+        }
+      }
+
+      // Fallback: copy to clipboard
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        showToast(toastMsg);
+      } catch {
+        // Last resort: select a temp input
+        const inp = document.createElement('input');
+        inp.value = shareUrl;
+        document.body.appendChild(inp);
+        inp.select();
+        document.execCommand('copy');
+        document.body.removeChild(inp);
+        showToast(toastMsg);
+      }
+    });
+  }
+</script>
