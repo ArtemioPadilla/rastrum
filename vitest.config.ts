@@ -5,7 +5,7 @@ export default defineConfig({
     // happy-dom: smaller, faster than jsdom, and avoids vitest 4's
     // node-localstorage conflict that breaks localStorage.clear().
     environment: 'happy-dom',
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'tests/unit/**/*.test.ts'],
     coverage: {
       reporter: ['text', 'json'],
       include: ['src/lib/**/*.ts'],
