@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "astro dev",
-    "build": "npm run build:og && astro build",
+    "build": "npm run build:og && astro build && node scripts/sitemap-hreflang.js",
     "build:og": "npx --yes tsx scripts/generate-og.ts",
     "preview": "astro preview",
     "astro": "astro",
