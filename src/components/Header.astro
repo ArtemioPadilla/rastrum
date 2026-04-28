@@ -181,9 +181,11 @@ const docColumns = [
         <button id="avatar-btn" aria-label="Account menu" class="block rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500">
           <img id="header-avatar" src="" alt="" class="w-8 h-8 rounded-full bg-emerald-600 object-cover" />
         </button>
-        <div id="avatar-menu" class="hidden absolute right-0 top-full mt-2 w-48 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-lg py-1 z-50">
+        <div id="avatar-menu" class="hidden absolute right-0 top-full mt-2 w-52 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-lg py-1 z-50">
           <a id="menu-profile" href={getLocalizedPath(lang, routes.profile[locale] + '/')} class="block px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800">{tr.profile.view_profile}</a>
-          <a id="menu-edit"    href={getLocalizedPath(lang, routes.profileEdit[locale] + '/')} class="block px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800">{tr.profile.edit}</a>
+          <a id="menu-observations" href={getLocalizedPath(lang, routes.profileObservations[locale] + '/')} class="block px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800">{tr.profile.my_observations_title}</a>
+          <a id="menu-watchlist" href={getLocalizedPath(lang, routes.exploreWatchlist[locale] + '/')} class="block px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800">{tr.nav.explore_dropdown.watchlist}</a>
+          <a id="menu-settings" href={getLocalizedPath(lang, routes.profileSettings[locale] + '/profile/')} class="block px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800">{tr.profile.settings_link} ▸</a>
           <div class="border-t border-zinc-200 dark:border-zinc-800 my-1"></div>
           <button id="sign-out-btn" class="block w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800">{tr.auth.sign_out}</button>
         </div>

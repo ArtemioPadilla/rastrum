@@ -1,0 +1,225 @@
+---
+import BaseLayout from '../../../../layouts/BaseLayout.astro';
+import SettingsShell from '../../../../components/SettingsShell.astro';
+import ProfileEditForm from '../../../../components/ProfileEditForm.astro';
+import { t, getLocalizedPath, routes } from '../../../../i18n/utils';
+
+export function getStaticPaths() {
+  return [
+    { params: { tab: 'profile' } },
+    { params: { tab: 'preferences' } },
+    { params: { tab: 'data' } },
+    { params: { tab: 'developer' } },
+  ];
+}
+
+const lang = 'es';
+const tr = t(lang);
+const settings = (tr as unknown as { settings: { title: string; tabs: Record<string, string>; preferences: Record<string, string>; data: Record<string, string>; developer: Record<string, string> } }).settings;
+
+const { tab } = Astro.params;
+const activeTab = tab as 'profile' | 'preferences' | 'data' | 'developer';
+
+const importPath        = getLocalizedPath(lang, routes.profileImport['es'] + '/');
+const importCameraTrap  = getLocalizedPath(lang, routes.profileImportCameraTrap['es'] + '/');
+const exportPath        = getLocalizedPath(lang, routes.profileExport['es'] + '/');
+
+const tabTitle = settings.tabs[activeTab] ?? activeTab;
+const pageTitle = `${tabTitle} — ${settings.title} — Rastrum`;
+const mcpUrl = 'https://reppvlqejgoqvitturxp.supabase.co/functions/v1/mcp';
+---
+
+<BaseLayout title={pageTitle} description="Ajustes de cuenta Rastrum." lang={lang}>
+  <SettingsShell lang={lang} activeTab={activeTab}>
+    {activeTab === 'profile' && (
+      <ProfileEditForm lang={lang} />
+    )}
+
+    {activeTab === 'preferences' && (
+      <div class="space-y-8">
+        <!-- Language -->
+        <section>
+          <h2 class="text-base font-semibold text-zinc-900 dark:text-zinc-100 mb-3">{settings.preferences.language_label}</h2>
+          <div class="flex gap-2">
+            <a href="/en/profile/settings/preferences/"
+              class="px-4 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 text-sm font-medium hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+              onclick="localStorage.setItem('rastrum.lang','en')">
+              English
+            </a>
+            <a href="/es/perfil/ajustes/preferences/" data-target-lang="es" id="lang-es"
+              class="px-4 py-2 rounded-lg border border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 text-sm font-medium">
+              Español
+            </a>
+          </div>
+        </section>
+
+        <!-- Theme -->
+        <section>
+          <h2 class="text-base font-semibold text-zinc-900 dark:text-zinc-100 mb-3">{settings.preferences.theme_label}</h2>
+          <div class="flex gap-2">
+            <button id="theme-light" class="px-4 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 text-sm font-medium hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+              {settings.preferences.theme_light}
+            </button>
+            <button id="theme-dark" class="px-4 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 text-sm font-medium hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+              {settings.preferences.theme_dark}
+            </button>
+            <button id="theme-auto" class="px-4 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 text-sm font-medium hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+              {settings.preferences.theme_auto}
+            </button>
+          </div>
+        </section>
+
+        <!-- BYO API Keys -->
+        <section>
+          <h2 class="text-base font-semibold text-zinc-900 dark:text-zinc-100 mb-1">{settings.preferences.byo_keys_title}</h2>
+          <p class="text-sm text-zinc-500 dark:text-zinc-400 mb-4">{settings.preferences.byo_keys_subtitle}</p>
+          <div class="space-y-4" id="byo-keys-form">
+            <div>
+              <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1" for="plantnet-key">
+                {settings.preferences.plantnet_key_label}
+              </label>
+              <div class="flex gap-2">
+                <input id="plantnet-key" type="password" autocomplete="off" class="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" placeholder="2b10…" />
+                <button id="plantnet-save" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-2 text-xs font-semibold text-white">{settings.preferences.key_saved}</button>
+                <button id="plantnet-clear" class="rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40">{settings.preferences.key_clear}</button>
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1" for="anthropic-key">
+                {settings.preferences.anthropic_key_label}
+              </label>
+              <div class="flex gap-2">
+                <input id="anthropic-key" type="password" autocomplete="off" class="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" placeholder="sk-ant-…" />
+                <button id="anthropic-save" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-2 text-xs font-semibold text-white">{settings.preferences.key_saved}</button>
+                <button id="anthropic-clear" class="rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40">{settings.preferences.key_clear}</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Notifications (placeholder) -->
+        <section>
+          <h2 class="text-base font-semibold text-zinc-900 dark:text-zinc-100 mb-3">{settings.preferences.notifications_title}</h2>
+          <p class="text-sm text-zinc-500 dark:text-zinc-400">{settings.preferences.notifications_placeholder}</p>
+        </section>
+      </div>
+    )}
+
+    {activeTab === 'data' && (
+      <div class="space-y-6">
+        <!-- Import -->
+        <section class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-5">
+          <h2 class="text-base font-semibold text-zinc-900 dark:text-zinc-100 mb-1">{settings.data.import_title}</h2>
+          <p class="text-sm text-zinc-500 dark:text-zinc-400 mb-4">{settings.data.import_subtitle}</p>
+          <div class="flex flex-wrap gap-3">
+            <a href={importPath} class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white">
+              {settings.data.import_link}
+            </a>
+            <a href={importCameraTrap} class="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
+              {settings.data.import_camera_trap_link}
+            </a>
+          </div>
+        </section>
+
+        <!-- Export -->
+        <section class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-5">
+          <h2 class="text-base font-semibold text-zinc-900 dark:text-zinc-100 mb-1">{settings.data.export_title}</h2>
+          <p class="text-sm text-zinc-500 dark:text-zinc-400 mb-4">{settings.data.export_subtitle}</p>
+          <a href={exportPath} class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white">
+            {settings.data.export_link}
+          </a>
+        </section>
+      </div>
+    )}
+
+    {activeTab === 'developer' && (
+      <div class="space-y-6">
+        <!-- API Tokens -->
+        <section class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-5">
+          <h2 class="text-base font-semibold text-zinc-900 dark:text-zinc-100 mb-1">{settings.developer.tokens_title}</h2>
+          <p class="text-sm text-zinc-500 dark:text-zinc-400 mb-4">{settings.developer.tokens_subtitle}</p>
+          <a href="/es/perfil/tokens/" class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white">
+            {settings.developer.tokens_link}
+          </a>
+        </section>
+
+        <!-- MCP Server -->
+        <section class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-5">
+          <h2 class="text-base font-semibold text-zinc-900 dark:text-zinc-100 mb-1">{settings.developer.mcp_title}</h2>
+          <p class="text-sm text-zinc-500 dark:text-zinc-400 mb-2">{settings.developer.mcp_url_label}</p>
+          <code class="block rounded bg-zinc-100 dark:bg-zinc-800 px-3 py-2 text-xs font-mono text-zinc-800 dark:text-zinc-200 break-all select-all">
+            {mcpUrl}
+          </code>
+        </section>
+
+        <!-- Expert Application -->
+        <section class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-5">
+          <h2 class="text-base font-semibold text-zinc-900 dark:text-zinc-100 mb-1">{settings.developer.expert_title}</h2>
+          <p class="text-sm text-zinc-500 dark:text-zinc-400 mb-4">{settings.developer.expert_subtitle}</p>
+          <a href="/es/perfil/aplicar-experto/" class="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
+            {settings.developer.expert_link}
+          </a>
+        </section>
+      </div>
+    )}
+  </SettingsShell>
+</BaseLayout>
+
+<script>
+  // Theme buttons
+  (function () {
+    const buttons: Record<string, string> = { 'theme-light': 'light', 'theme-dark': 'dark', 'theme-auto': 'auto' };
+    function applyTheme(value: string) {
+      if (value === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else if (value === 'light') {
+        document.documentElement.classList.remove('dark');
+      } else {
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.classList.toggle('dark', prefersDark);
+      }
+      localStorage.setItem('theme', value);
+    }
+    for (const [id, value] of Object.entries(buttons)) {
+      document.getElementById(id)?.addEventListener('click', () => applyTheme(value));
+    }
+  })();
+
+  // BYO keys
+  (async function () {
+    const { getKey, setKey, clearKey } = await import('../../../../lib/byo-keys');
+
+    const plantnetInput  = document.getElementById('plantnet-key')  as HTMLInputElement | null;
+    const anthropicInput = document.getElementById('anthropic-key') as HTMLInputElement | null;
+
+    if (plantnetInput) {
+      const existing = getKey('plantnet', 'plantnet');
+      if (existing) plantnetInput.value = existing;
+    }
+    if (anthropicInput) {
+      const existing = getKey('claude_haiku', 'anthropic') || getKey('claude_sonnet', 'anthropic');
+      if (existing) anthropicInput.value = existing;
+    }
+
+    document.getElementById('plantnet-save')?.addEventListener('click', () => {
+      const val = plantnetInput?.value.trim();
+      if (val) setKey('plantnet', 'plantnet', val);
+    });
+    document.getElementById('plantnet-clear')?.addEventListener('click', () => {
+      clearKey('plantnet', 'plantnet');
+      if (plantnetInput) plantnetInput.value = '';
+    });
+    document.getElementById('anthropic-save')?.addEventListener('click', () => {
+      const val = anthropicInput?.value.trim();
+      if (val) {
+        setKey('claude_haiku', 'anthropic', val);
+        setKey('claude_sonnet', 'anthropic', val);
+      }
+    });
+    document.getElementById('anthropic-clear')?.addEventListener('click', () => {
+      clearKey('claude_haiku', 'anthropic');
+      clearKey('claude_sonnet', 'anthropic');
+      if (anthropicInput) anthropicInput.value = '';
+    });
+  })();
+</script>

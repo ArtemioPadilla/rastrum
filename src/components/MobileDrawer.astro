@@ -12,9 +12,12 @@ const locale = lang as Locale;
 
 const altHref = getAlternateUrl(currentPath, alt);
 
-const aboutPath = getLocalizedPath(lang, routes.about[locale] + '/');
-const signInPath = getLocalizedPath(lang, routes.signIn[locale] + '/');
-const profilePath = getLocalizedPath(lang, routes.profile[locale] + '/');
+const aboutPath          = getLocalizedPath(lang, routes.about[locale] + '/');
+const signInPath         = getLocalizedPath(lang, routes.signIn[locale] + '/');
+const profilePath        = getLocalizedPath(lang, routes.profile[locale] + '/');
+const myObsPath          = getLocalizedPath(lang, routes.profileObservations[locale] + '/');
+const watchlistPath      = getLocalizedPath(lang, routes.exploreWatchlist[locale] + '/');
+const settingsPath       = getLocalizedPath(lang, routes.profileSettings[locale] + '/profile/');
 
 const getDocLabel = (key: string) => (tr.docs.sections as Record<string, string>)[key] || key;
 ---
@@ -75,7 +78,10 @@ const getDocLabel = (key: string) => (tr.docs.sections as Record<string, string>
     <!-- Account: signed-in branch -->
     <section id="drawer-authed" class="hidden">
       <p class="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-2">{tr.nav.drawer.account}</p>
-      <a href={profilePath} class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{tr.profile.view_profile}</a>
+      <a href={profilePath}   class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{tr.profile.view_profile}</a>
+      <a href={myObsPath}     class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{tr.profile.my_observations_title}</a>
+      <a href={watchlistPath} class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{tr.nav.explore_dropdown.watchlist}</a>
+      <a href={settingsPath}  class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{tr.profile.settings_link} ▸</a>
       <button id="drawer-sign-out" class="block w-full text-left py-1.5 text-red-600 dark:text-red-400 hover:text-red-700">{tr.auth.sign_out}</button>
     </section>
 

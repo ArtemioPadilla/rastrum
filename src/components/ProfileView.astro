@@ -1,6 +1,5 @@
 ---
-import { t, getLocalizedPath, routes } from '../i18n/utils';
-import WatchlistView from './WatchlistView.astro';
+import { t, getLocalizedPath, routes, type Locale } from '../i18n/utils';
 import StreakCard from './StreakCard.astro';
 import Skeleton from './Skeleton.astro';
 
@@ -10,9 +9,11 @@ interface Props {
 
 const { lang } = Astro.props;
 const tr = t(lang);
-const myObservationsPath = getLocalizedPath(lang, routes.profileObservations[lang] + '/');
-const expertApplyPath = getLocalizedPath(lang, routes.profileExpertApply[lang] + '/');
-const validatePath = getLocalizedPath(lang, routes.profileValidate[lang] + '/');
+const locale = lang as Locale;
+
+const myObservationsPath = getLocalizedPath(lang, routes.profileObservations[locale] + '/');
+const settingsPath       = getLocalizedPath(lang, routes.profileSettings[locale] + '/profile/');
+const publicProfileBase  = getLocalizedPath(lang, routes.profileUser[locale] + '/');
 ---
 
 <div class="max-w-3xl mx-auto pb-28 sm:pb-6">
@@ -26,17 +27,20 @@ const validatePath = getLocalizedPath(lang, routes.profileValidate[lang] + '/');
 
   <!-- Signed-in state -->
   <div id="signed-in" class="hidden">
+    <!-- Identity strip -->
     <header class="mb-8">
-      <!-- Row 1: avatar + name -->
-      <div class="flex items-center gap-4 mb-3">
+      <div class="flex items-start gap-4">
+        <!-- Avatar (large) -->
         <div class="shrink-0">
           <img
             id="avatar-img"
             src=""
             alt=""
-            class="w-16 h-16 md:w-20 md:h-20 rounded-full bg-zinc-200 dark:bg-zinc-800 object-cover"
+            class="w-20 h-20 md:w-24 md:h-24 rounded-full bg-zinc-200 dark:bg-zinc-800 object-cover"
           />
         </div>
+
+        <!-- Name + handle + meta -->
         <div class="min-w-0 flex-1">
           <h1 id="display-name" class="text-xl md:text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 break-words">
             —
@@ -46,70 +50,80 @@ const validatePath = getLocalizedPath(lang, routes.profileValidate[lang] + '/');
             <span id="region-sep" class="hidden"> · </span>
             <span id="region"></span>
           </p>
+          <p id="joined-date" class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5 hidden"></p>
           <p id="bio" class="mt-1 text-sm text-zinc-700 dark:text-zinc-300 hidden"></p>
         </div>
-      </div>
-      <!-- Row 2: action buttons -->
-      <div class="flex flex-wrap gap-2">
-        <a
-          href={`/${lang}/${lang === 'es' ? 'perfil/editar' : 'profile/edit'}/`}
-          class="rounded-lg border border-emerald-600/60 px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 text-center"
-        >
-          {tr.profile.edit}
-        </a>
-        <a
-          href={`/${lang}/${lang === 'es' ? 'perfil/exportar' : 'profile/export'}/`}
-          class="rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 text-center"
-        >
-          {tr.profile.export}
-        </a>
-        <a
-          href={`/${lang}/${lang === 'es' ? 'perfil/importar' : 'profile/import'}/`}
-          class="rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 text-center"
-        >
-          {((tr as unknown as { import?: { title?: string } }).import?.title) ?? (lang === 'es' ? 'Importar fotos' : 'Import photos')}
-        </a>
+
+        <!-- Actions (top-right of strip) -->
+        <div class="flex flex-col sm:flex-row items-end sm:items-center gap-2 shrink-0">
+          <a
+            id="view-public-link"
+            href="#"
+            class="text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:underline hidden"
+          >
+            {tr.profile.view_public} ↗
+          </a>
+          <a
+            href={settingsPath}
+            class="inline-flex items-center gap-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 px-3 py-1.5 text-sm font-semibold text-zinc-800 dark:text-zinc-100 transition-colors"
+          >
+            <svg aria-hidden="true" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            {tr.profile.settings_link}
+          </a>
+        </div>
       </div>
     </header>
 
-    <!-- Quick links (self only) -->
-    <nav class="flex flex-wrap gap-2 mb-6 text-xs">
-      <a
-        href={myObservationsPath}
-        class="inline-flex items-center rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
-      >
-        {tr.profile.my_observations_link}
-      </a>
-      <a
-        href={expertApplyPath}
-        class="inline-flex items-center rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
-      >
-        {tr.expert.apply_title}
-      </a>
-      <a
-        href={validatePath}
-        class="inline-flex items-center rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
-      >
-        {(tr as unknown as { validation: { dashboard_title: string } }).validation.dashboard_title}
-      </a>
-    </nav>
-
-    <!-- Streak card (module 08) -->
-    <StreakCard lang={lang} />
-
-    <!-- Stats strip -->
-    <section class="grid grid-cols-3 gap-3 mb-10">
+    <!-- Stats row -->
+    <section class="grid grid-cols-3 gap-3 mb-8">
       <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4">
         <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100" id="stat-observations">0</p>
         <p class="text-xs text-zinc-500 dark:text-zinc-400">{tr.profile.total_observations}</p>
       </div>
       <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4">
-        <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100" id="stat-species">0</p>
-        <p class="text-xs text-zinc-500 dark:text-zinc-400">{tr.profile.species_count}</p>
+        <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100" id="stat-watchlist">0</p>
+        <p class="text-xs text-zinc-500 dark:text-zinc-400">{lang === 'es' ? 'Seguimiento' : 'Watchlist'}</p>
       </div>
-      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4">
-        <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100" id="stat-rg">0</p>
-        <p class="text-xs text-zinc-500 dark:text-zinc-400">{tr.profile.research_grade}</p>
+      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4" id="stat-streak-card">
+        <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100" id="stat-streak">0</p>
+        <p class="text-xs text-zinc-500 dark:text-zinc-400">{lang === 'es' ? 'Racha diaria' : 'Day streak'}</p>
+      </div>
+    </section>
+
+    <!-- Streak card (module 08) — hidden, used for data only -->
+    <div class="hidden">
+      <StreakCard lang={lang} />
+    </div>
+
+    <!-- Recent observations preview -->
+    <section class="mb-10">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
+          {tr.profile.section_activity}
+        </h2>
+        <a
+          href={myObservationsPath}
+          class="text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:underline"
+        >
+          {tr.profile.my_observations_link} →
+        </a>
+      </div>
+
+      <div id="recent-skeleton">
+        <Skeleton variant="card" count={4} ariaLabel={tr.profile.my_observations_loading} />
+      </div>
+
+      <!-- 4-thumbnail grid -->
+      <div id="recent-grid" class="hidden grid grid-cols-2 sm:grid-cols-4 gap-3"></div>
+
+      <div id="no-observations" class="hidden rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-8 text-center">
+        <p class="text-sm text-zinc-500 dark:text-zinc-400">{tr.profile.no_observations_yet}</p>
+        <a href={`/${lang}/${lang === 'es' ? 'observar' : 'observe'}/`} class="mt-3 inline-block text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:underline">
+          {tr.profile.my_observations_cta}
+        </a>
       </div>
     </section>
 
@@ -120,23 +134,6 @@ const validatePath = getLocalizedPath(lang, routes.profileValidate[lang] + '/');
       </h2>
       <ul id="badges-list" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2"></ul>
     </section>
-
-    <!-- Recent activity feed (module 08) -->
-    <section>
-      <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-3">
-        {tr.profile.section_activity}
-      </h2>
-      <div id="activity-skeleton">
-        <Skeleton variant="card" count={3} ariaLabel={tr.profile.my_observations_loading} />
-      </div>
-      <ul id="activity-list" class="space-y-2"></ul>
-      <div id="no-observations" class="hidden rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-8 text-center">
-        <p class="text-sm text-zinc-500 dark:text-zinc-400">{tr.profile.no_observations_yet}</p>
-      </div>
-    </section>
-
-    <!-- Watchlist (followed users + species) — module 08 -->
-    <WatchlistView lang={lang} />
   </div>
 </div>
 
@@ -144,17 +141,19 @@ const validatePath = getLocalizedPath(lang, routes.profileValidate[lang] + '/');
   import { getSupabase } from '../lib/supabase';
   import type { UserProfile } from '../lib/types';
 
-  const signedOut = document.getElementById('signed-out') as HTMLDivElement | null;
-  const signedIn = document.getElementById('signed-in') as HTMLDivElement | null;
-  const avatarImg = document.getElementById('avatar-img') as HTMLImageElement | null;
-  const displayName = document.getElementById('display-name');
-  const usernameAt = document.getElementById('username-at');
-  const region = document.getElementById('region');
-  const regionSep = document.getElementById('region-sep');
-  const bio = document.getElementById('bio');
-  const statObs = document.getElementById('stat-observations');
-  const statSpecies = document.getElementById('stat-species');
-  const statRG = document.getElementById('stat-rg');
+  const signedOut    = document.getElementById('signed-out') as HTMLDivElement | null;
+  const signedIn     = document.getElementById('signed-in') as HTMLDivElement | null;
+  const avatarImg    = document.getElementById('avatar-img') as HTMLImageElement | null;
+  const displayName  = document.getElementById('display-name');
+  const usernameAt   = document.getElementById('username-at');
+  const region       = document.getElementById('region');
+  const regionSep    = document.getElementById('region-sep');
+  const bio          = document.getElementById('bio');
+  const joinedDate   = document.getElementById('joined-date');
+  const statObs      = document.getElementById('stat-observations');
+  const statWatchlist = document.getElementById('stat-watchlist');
+  const statStreak   = document.getElementById('stat-streak');
+  const viewPublicLink = document.getElementById('view-public-link') as HTMLAnchorElement | null;
 
   function initialsAvatar(name: string): string {
     const clean = name.trim().slice(0, 2).toUpperCase();
@@ -163,6 +162,10 @@ const validatePath = getLocalizedPath(lang, routes.profileValidate[lang] + '/');
       <text x='50%' y='58%' text-anchor='middle' fill='white' font-family='system-ui,sans-serif' font-size='40' font-weight='700'>${clean}</text>
     </svg>`;
     return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+  }
+
+  function escAttr(s: string): string {
+    return s.replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' } as Record<string, string>)[c]);
   }
 
   async function run() {
@@ -196,6 +199,13 @@ const validatePath = getLocalizedPath(lang, routes.profileValidate[lang] + '/');
       avatarImg.alt = name;
     }
 
+    if (profile.username && viewPublicLink) {
+      const lang = document.documentElement.lang || 'en';
+      const base = lang === 'es' ? `/${lang}/perfil/u/${profile.username}/` : `/${lang}/profile/u/${profile.username}/`;
+      viewPublicLink.href = base;
+      viewPublicLink.classList.remove('hidden');
+    }
+
     if (profile.region_primary) {
       if (region) region.textContent = profile.region_primary;
       regionSep?.classList.remove('hidden');
@@ -206,12 +216,25 @@ const validatePath = getLocalizedPath(lang, routes.profileValidate[lang] + '/');
       bio.classList.remove('hidden');
     }
 
-    const stats = profile.stats_json;
-    if (statObs) statObs.textContent = String(stats?.total_observations ?? profile.observation_count ?? 0);
-    if (statSpecies) statSpecies.textContent = String(stats?.species_count ?? 0);
-    if (statRG) statRG.textContent = String(stats?.research_grade_count ?? 0);
+    if (profile.created_at && joinedDate) {
+      const lang = document.documentElement.lang || 'en';
+      const since = lang === 'es' ? 'Miembro desde' : 'Member since';
+      joinedDate.textContent = `${since} ${new Date(profile.created_at as string).toLocaleDateString()}`;
+      joinedDate.classList.remove('hidden');
+    }
 
-    // Badges (only show if the user opted into gamification)
+    const stats = profile.stats_json;
+    if (statObs)   statObs.textContent   = String(stats?.total_observations ?? profile.observation_count ?? 0);
+    if (statStreak) statStreak.textContent = String(stats?.current_streak ?? 0);
+
+    // Watchlist count
+    const { count: watchlistCount } = await supabase
+      .from('watchlist_entries')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id);
+    if (statWatchlist) statWatchlist.textContent = String(watchlistCount ?? 0);
+
+    // Badges
     if (profile.gamification_opt_in) {
       const { data: rows } = await supabase
         .from('user_badges')
@@ -219,23 +242,23 @@ const validatePath = getLocalizedPath(lang, routes.profileValidate[lang] + '/');
         .eq('user_id', user.id)
         .is('revoked_at', null)
         .order('awarded_at', { ascending: false })
-        .limit(40);
+        .limit(8);
       const earned = (rows ?? []).map(r => r.badges as unknown as { key: string; name_es: string; name_en: string; tier: string; category: string });
       if (earned.length) {
-        const sec = document.getElementById('badges-section');
+        const sec  = document.getElementById('badges-section');
         const list = document.getElementById('badges-list');
-        const isEs2 = document.documentElement.lang === 'es';
+        const isEs = document.documentElement.lang === 'es';
         sec?.classList.remove('hidden');
         if (list) {
-          const tierColor = (t: string) =>
-            t === 'platinum' ? 'bg-zinc-200 text-zinc-800 dark:bg-zinc-300 dark:text-zinc-900' :
-            t === 'gold'     ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300' :
-            t === 'silver'   ? 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200' :
-                               'bg-orange-50 text-orange-800 dark:bg-orange-900/20 dark:text-orange-300';
+          const tierColor = (tier: string) =>
+            tier === 'platinum' ? 'bg-zinc-200 text-zinc-800 dark:bg-zinc-300 dark:text-zinc-900' :
+            tier === 'gold'     ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300' :
+            tier === 'silver'   ? 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200' :
+                                  'bg-orange-50 text-orange-800 dark:bg-orange-900/20 dark:text-orange-300';
           list.innerHTML = earned.map(b => `
             <li class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
               <div class="text-xs uppercase tracking-wider mb-1 ${tierColor(b.tier)} inline-block px-1.5 py-0.5 rounded">${b.tier}</div>
-              <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">${isEs2 ? b.name_es : b.name_en}</p>
+              <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">${isEs ? b.name_es : b.name_en}</p>
               <p class="text-xs text-zinc-500 capitalize">${b.category}</p>
             </li>
           `).join('');
@@ -243,123 +266,61 @@ const validatePath = getLocalizedPath(lang, routes.profileValidate[lang] + '/');
       }
     }
 
-    // Load activity events (last 20). subject_id points at the
-    // observation for kinds like 'observation_created' /
-    // 'observation_research_grade' — needed so each row is clickable
-    // and can hydrate a thumbnail.
-    const { data: events } = await supabase
-      .from('activity_events')
-      .select('id, kind, payload, created_at, read_at, subject_id')
-      .eq('actor_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(20);
+    // Recent observations — 4 thumbnails
+    const { data: obsRows } = await supabase
+      .from('observations')
+      .select('id, sync_status, obscure_level, observed_at')
+      .eq('user_id', user.id)
+      .eq('sync_status', 'synced')
+      .order('observed_at', { ascending: false })
+      .limit(4);
 
-    const list = document.getElementById('activity-list') as HTMLUListElement | null;
-    const empty = document.getElementById('no-observations');
-    document.getElementById('activity-skeleton')?.classList.add('hidden');
-    if (!events?.length) {
+    const skeleton = document.getElementById('recent-skeleton');
+    const grid     = document.getElementById('recent-grid');
+    const empty    = document.getElementById('no-observations');
+    skeleton?.classList.add('hidden');
+
+    if (!obsRows?.length) {
       empty?.classList.remove('hidden');
       return;
     }
-    const isEs = document.documentElement.lang === 'es';
-    const labels: Record<string,(p: Record<string, unknown> | null) => string> = {
-      observation_created: (p) => isEs
-        ? `Observación nueva${p?.state_province ? ' en ' + p.state_province : ''}`
-        : `New observation${p?.state_province ? ' in ' + p.state_province : ''}`,
-      observation_research_grade: (p) => isEs
-        ? `Grado-investigación: ${p?.scientific_name ?? ''}`
-        : `Reached research-grade: ${p?.scientific_name ?? ''}`,
-      observation_id_accepted: () => isEs ? 'Identificación aceptada' : 'Identification accepted',
-      observation_id_changed:  () => isEs ? 'Identificación cambió'   : 'Identification changed',
-      badge_earned: (p) => isEs ? `Insignia obtenida: ${p?.badge_key ?? ''}` : `Badge earned: ${p?.badge_key ?? ''}`,
-      streak_milestone: (p) => isEs ? `Racha de ${p?.days ?? ''} días` : `${p?.days ?? ''}-day streak`,
-      first_of_species_in_region: (p) => isEs
-        ? `Primera ${p?.scientific_name ?? ''} en la región`
-        : `First ${p?.scientific_name ?? ''} in region`,
-      first_observation_of_day: () => isEs ? 'Primera observación del día' : 'First observation of the day',
-      comment_received: () => isEs ? 'Comentario recibido' : 'Comment received',
-      validation_given: () => isEs ? 'Validación dada' : 'Validation given',
-      validation_received: () => isEs ? 'Validación recibida' : 'Validation received',
-      follow_received: () => isEs ? 'Nuevo seguidor' : 'New follower',
-    };
-    // Hydrate observation-flavored events with species name + primary
-    // photo via a single batched lookup (one query per joined table).
-    // Without this, "New observation" rows show no thumbnail and no
-    // link — users can't tell which observation any given row refers
-    // to. The kinds we hydrate are observation_created and
-    // observation_research_grade; both store the obs id in subject_id.
-    const obsKinds = new Set(['observation_created', 'observation_research_grade']);
-    const obsEventIds = events
-      .filter(e => obsKinds.has(e.kind as string) && e.subject_id)
-      .map(e => e.subject_id as string);
-    const obsMeta = new Map<string, { sci: string | null; photo: string | null; obscured: boolean }>();
-    if (obsEventIds.length > 0) {
-      const [{ data: obsRows }, { data: idRows }, { data: mediaRows }] = await Promise.all([
-        supabase.from('observations').select('id, sync_status, obscure_level').in('id', obsEventIds),
-        supabase.from('identifications').select('observation_id, scientific_name, is_primary').in('observation_id', obsEventIds).eq('is_primary', true),
-        supabase.from('media_files').select('observation_id, url, is_primary').in('observation_id', obsEventIds),
-      ]);
-      const sciByObs = new Map<string, string>();
-      for (const r of (idRows ?? [])) {
-        const oid = (r as { observation_id: string }).observation_id;
-        const sci = (r as { scientific_name?: string | null }).scientific_name;
-        if (sci) sciByObs.set(oid, sci);
-      }
-      const photoByObs = new Map<string, string>();
-      for (const m of (mediaRows ?? [])) {
-        const oid = (m as { observation_id: string }).observation_id;
-        const url = (m as { url?: string | null }).url;
-        const primary = (m as { is_primary?: boolean }).is_primary;
-        if (!url) continue;
-        if (primary || !photoByObs.has(oid)) photoByObs.set(oid, url);
-      }
-      for (const o of (obsRows ?? [])) {
-        const id = (o as { id: string }).id;
-        obsMeta.set(id, {
-          sci:      sciByObs.get(id) ?? null,
-          photo:    photoByObs.get(id) ?? null,
-          obscured: (o as { obscure_level?: string }).obscure_level === 'full',
-        });
-      }
+
+    const obsIds = obsRows.map(o => (o as { id: string }).id);
+    const [{ data: idRows }, { data: mediaRows }] = await Promise.all([
+      supabase.from('identifications').select('observation_id, scientific_name, is_primary').in('observation_id', obsIds).eq('is_primary', true),
+      supabase.from('media_files').select('observation_id, url, is_primary').in('observation_id', obsIds),
+    ]);
+
+    const sciByObs   = new Map<string, string>();
+    const photoByObs = new Map<string, string>();
+    for (const r of (idRows ?? [])) {
+      const oid = (r as { observation_id: string }).observation_id;
+      const sci = (r as { scientific_name?: string | null }).scientific_name;
+      if (sci) sciByObs.set(oid, sci);
+    }
+    for (const m of (mediaRows ?? [])) {
+      const oid     = (m as { observation_id: string }).observation_id;
+      const url     = (m as { url?: string | null }).url;
+      const primary = (m as { is_primary?: boolean }).is_primary;
+      if (!url) continue;
+      if (primary || !photoByObs.has(oid)) photoByObs.set(oid, url);
     }
 
-    function escAttr(s: string): string {
-      return s.replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' } as Record<string, string>)[c]);
-    }
-
-    if (list) {
-      list.innerHTML = events.map(ev => {
-        const fn = labels[ev.kind as string] ?? ((p: Record<string, unknown> | null) => `${ev.kind}${p ? ' — ' + JSON.stringify(p) : ''}`);
-        const text = fn(ev.payload as Record<string, unknown> | null);
-        const date = new Date(ev.created_at as string).toLocaleDateString();
-        const obsId = (ev.subject_id as string | null) ?? null;
-        const meta  = obsId ? obsMeta.get(obsId) : undefined;
-        const sci   = meta?.sci ?? null;
-        const photo = meta?.photo ?? null;
-        const isObs = obsKinds.has(ev.kind as string) && !!obsId;
-        const href  = isObs ? `/share/obs/?id=${encodeURIComponent(obsId!)}` : null;
-
-        const inner = `
-          ${photo ? `<img src="${escAttr(photo)}" alt="" loading="lazy" class="w-12 h-12 rounded-lg object-cover bg-zinc-100 dark:bg-zinc-800 shrink-0" />` : `<span class="mt-1 w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>`}
-          <div class="flex-1 min-w-0">
-            <p class="text-sm text-zinc-800 dark:text-zinc-200">${text}</p>
-            ${sci ? `<p class="text-sm italic text-emerald-700 dark:text-emerald-400 truncate">${escAttr(sci)}</p>` : ''}
-            <p class="text-xs text-zinc-500">${date}</p>
-          </div>`;
-
-        return href
-          ? `<li><a href="${href}" class="flex items-start gap-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 hover:border-emerald-400 dark:hover:border-emerald-700 transition-colors p-3">${inner}</a></li>`
-          : `<li class="flex items-start gap-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-3">${inner}</li>`;
+    if (grid) {
+      grid.innerHTML = obsRows.map(o => {
+        const id    = (o as { id: string }).id;
+        const photo = photoByObs.get(id);
+        const sci   = sciByObs.get(id);
+        const href  = `/share/obs/?id=${encodeURIComponent(id)}`;
+        return `
+          <a href="${escAttr(href)}" class="block rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden hover:border-emerald-400 dark:hover:border-emerald-700 transition-colors aspect-square bg-zinc-100 dark:bg-zinc-800">
+            ${photo
+              ? `<img src="${escAttr(photo)}" alt="${escAttr(sci ?? '')}" loading="lazy" class="w-full h-full object-cover" />`
+              : `<div class="w-full h-full flex items-center justify-center text-zinc-400"><svg aria-hidden="true" class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909"/></svg></div>`
+            }
+          </a>`;
       }).join('');
-    }
-
-    // Mark all as read in the background
-    const unreadIds = events.filter(e => !e.read_at).map(e => e.id);
-    if (unreadIds.length) {
-      supabase.from('activity_events')
-        .update({ read_at: new Date().toISOString() })
-        .in('id', unreadIds)
-        .then(() => { /* fire and forget */ });
+      grid.classList.remove('hidden');
     }
   }
 
