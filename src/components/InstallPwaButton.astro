@@ -64,16 +64,36 @@ const tr = t(lang);
   }
 
   // Check if already installed via getInstalledRelatedApps (Chrome Android)
+  // or via localStorage flag (set on appinstalled event), or via display-mode
+  // standalone media query (running as installed PWA).
+  //
+  // NOTE: `getInstalledRelatedApps()` requires the manifest to have a
+  // `related_applications` entry with `platform: 'webapp'` (already present).
+  // It also requires HTTPS and returns [] on first call in some Chrome versions —
+  // that's why we have the localStorage fallback.
+  //
+  // KNOWN BUG (Eugenio, 2026-04-28): button showed even after install on Android.
+  // Root cause: `beforeinstallprompt` fires even when the app is installed if
+  // the user opens the site in the browser (not from the home-screen icon).
+  // Fix: check localStorage flag first (set by appinstalled), then probe
+  // getInstalledRelatedApps async, and only show the button if both are clean.
   async function isAlreadyInstalled(): Promise<boolean> {
+    // Fast path: localStorage flag set the moment the user accepted install.
+    try { if (localStorage.getItem('rastrum.pwaInstalled') === 'true') return true; } catch { /* ignore */ }
+    // Fast path: running in standalone mode = already installed and open from icon.
+    if (isStandaloneDisplayMode()) return true;
+    // Slow path: ask Chrome directly (async, may be empty on older versions).
     try {
       const nav = window.navigator as Navigator & { getInstalledRelatedApps?: () => Promise<unknown[]> };
       if (nav.getInstalledRelatedApps) {
         const apps = await nav.getInstalledRelatedApps();
-        if (apps.length > 0) return true;
+        if (apps.length > 0) {
+          // Cache the result so future calls are fast.
+          try { localStorage.setItem('rastrum.pwaInstalled', 'true'); } catch { /* ignore */ }
+          return true;
+        }
       }
     } catch { /* not supported */ }
-    // Fallback: check localStorage flag set on appinstalled event
-    try { if (localStorage.getItem('rastrum.pwaInstalled') === 'true') return true; } catch { /* ignore */ }
     return false;
   }
 
