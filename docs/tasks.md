@@ -16,7 +16,7 @@
 | v0.3 | Offline intelligence + activity | done | 11 / 11 |
 | v0.5 | Beta | shipped (partial) | 11 / 13 |
 | v1.0 | Public Launch | shipped (partial) | 18 / 21 |
-| v1.0.x | Post-launch polish | in_progress | 5 / 21 |
+| v1.0.x | Post-launch polish | in_progress | 6 / 22 |
 | v1.1 | UX polish (post-launch brainstorm) | planned | 13 / 15 |
 | **v0.1 → v1.0** | **Public launch** | **shipped 2026-04-26** | **54 / 59** |
 
@@ -59,11 +59,11 @@ Remaining:
 
 ## v1.0.x — Post-launch polish — in_progress
 
-**5 of 21 items done.**
+**6 of 22 items done.**
 
 Remaining:
 
-- `megadetector-bbox-cascade` — Bbox-aware species cascade — when MegaDetector finds an animal, crop the photo to the bbox before passing to PlantNet/Claude/Phi (×3-5 accuracy bump on small subjects in distant traps)  _(· planned)_
+- `megadetector-bbox-cascade-server` — Server-side bbox crop on the identify Edge Function so Claude + PlantNet also receive an animal-only crop  _(· planned — Phi-side already shipped via the client cascade in `megadetector-bbox-cascade`)_
 - `speciesnet-distilled` — Distilled SpeciesNet for on-device animal classification (~100 MB ONNX, iWildCam categories) so common camera-trap species don't need cloud LLMs  _(· planned)_
 - `arch-diagram-parallel` — Update architecture page cascade SVG to show parallel race (currently shows serial waterfall)  _(· planned)_
 - `identify-server-cascade` — Move runParallelIdentify to identify Edge Function for server-side parity (currently client-only)  _(· planned)_

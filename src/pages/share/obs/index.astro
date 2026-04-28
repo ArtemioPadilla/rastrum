@@ -2,6 +2,7 @@
 import BaseLayout from '../../../layouts/BaseLayout.astro';
 import Comments from '../../../components/Comments.astro';
 import FollowButton from '../../../components/FollowButton.astro';
+import SuggestIdModal from '../../../components/SuggestIdModal.astro';
 
 // SSG: query string is unknown at build time. Comments component reads
 // observation_id from data attribute, which we set at runtime in the
@@ -48,6 +49,32 @@ const obsIdPlaceholder = '';
       <p id="sensitive" class="hidden text-sm text-amber-700 dark:text-amber-400 border-l-4 border-amber-500 pl-3">
         This observation is of a sensitive species. Precise coordinates are obscured to protect it.
       </p>
+
+      <!--
+        Community identifications + suggest CTA. Visible to ALL viewers
+        (so the public can see what experts and other observers have
+        proposed). The "Suggest identification" button is only enabled
+        for signed-in non-owners — owner uses the Manage panel below
+        instead, anonymous users see a sign-in prompt.
+      -->
+      <section id="community-ids" class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 space-y-3">
+        <div class="flex items-start justify-between gap-2 flex-wrap">
+          <div>
+            <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">Community suggestions</h2>
+            <p id="community-ids-empty" class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+              No one has suggested an identification yet. Be the first.
+            </p>
+          </div>
+          <button id="ci-suggest-btn" type="button" class="hidden rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 text-xs font-semibold text-white">
+            Suggest identification
+          </button>
+          <a id="ci-signin-link" href="/en/sign-in/" class="hidden rounded-lg border border-emerald-600/60 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20">
+            Sign in to suggest
+          </a>
+          <span id="ci-owner-note" class="hidden text-xs text-zinc-500 italic">Use the Manage panel below to update your own identification.</span>
+        </div>
+        <ul id="ci-list" class="space-y-1.5 text-sm"></ul>
+      </section>
 
       <!--
         Owner-only Manage panel. Visible only when the signed-in viewer
@@ -101,6 +128,9 @@ const obsIdPlaceholder = '';
       <Comments lang={lang} observationId={obsIdPlaceholder} />
     </div>
   </div>
+
+  <!-- Suggest-identification modal — opened by the Suggest CTA above. -->
+  <SuggestIdModal lang={lang} />
 
   <script>
     import { getSupabase } from '../../../lib/supabase';
@@ -208,6 +238,116 @@ const obsIdPlaceholder = '';
 
       // Owner-only Manage panel.
       if (viewerIsObserver) wireManagePanel(id, obs as Record<string, unknown>, ident);
+
+      // Community suggestions list + Suggest CTA — visible to everyone,
+      // actionable for signed-in non-owners.
+      await wireCommunityIds(id, viewerIsObserver);
+    }
+
+    /**
+     * Render the community-suggestions section: a list of every
+     * `identifications` row with `validated_by IS NOT NULL` for this
+     * observation, plus the right CTA depending on viewer state.
+     */
+    async function wireCommunityIds(obsId: string, viewerIsObserver: boolean) {
+      const supabase = getSupabase();
+      const section = document.getElementById('community-ids');
+      const listEl = document.getElementById('ci-list') as HTMLUListElement | null;
+      const emptyEl = document.getElementById('community-ids-empty');
+      const suggestBtn = document.getElementById('ci-suggest-btn') as HTMLButtonElement | null;
+      const signInLink = document.getElementById('ci-signin-link') as HTMLAnchorElement | null;
+      const ownerNote = document.getElementById('ci-owner-note');
+      if (!section || !listEl) return;
+
+      // Pick the right CTA.
+      const { data: { user } } = await supabase.auth.getUser();
+      const isEs = document.documentElement.lang === 'es';
+      if (viewerIsObserver) {
+        ownerNote?.classList.remove('hidden');
+      } else if (user) {
+        suggestBtn?.classList.remove('hidden');
+        suggestBtn?.addEventListener('click', () => {
+          // Look up observer username for the modal's target line
+          // (stored in the page's <h1 #observer> we already populated).
+          const observerName = document.getElementById('observer')?.textContent ?? null;
+          const opener = (window as unknown as { __rastrumOpenSuggestId?: (id: string, n: string | null) => void }).__rastrumOpenSuggestId;
+          if (typeof opener === 'function') opener(obsId, observerName);
+        });
+      } else if (signInLink) {
+        const lang = isEs ? 'es' : 'en';
+        signInLink.href = `/${lang}/${lang === 'es' ? 'ingresar' : 'sign-in'}/`;
+        signInLink.classList.remove('hidden');
+      }
+
+      async function refresh() {
+        const { data: rows } = await supabase
+          .from('identifications')
+          .select('id, scientific_name, confidence, validated_by, created_at, is_research_grade, source')
+          .eq('observation_id', obsId)
+          .not('validated_by', 'is', null)
+          .order('created_at', { ascending: true });
+        const arr = (rows ?? []) as Array<{
+          id: string; scientific_name: string | null; confidence: number | null;
+          validated_by: string | null; is_research_grade: boolean | null;
+          source: string | null;
+        }>;
+
+        if (arr.length === 0) {
+          emptyEl?.classList.remove('hidden');
+          listEl!.innerHTML = '';
+          return;
+        }
+        emptyEl?.classList.add('hidden');
+
+        // Hydrate validator names. RLS lets us read the user's
+        // display_name when profile_public; otherwise fall back.
+        const validatorIds = Array.from(new Set(arr.map(r => r.validated_by!).filter(Boolean)));
+        const nameById = new Map<string, string>();
+        if (validatorIds.length > 0) {
+          const { data: users } = await supabase
+            .from('users')
+            .select('id, display_name, username, profile_public')
+            .in('id', validatorIds);
+          for (const u of (users ?? [])) {
+            const uid = (u as { id: string }).id;
+            const pub = (u as { profile_public?: boolean }).profile_public;
+            const display = (u as { display_name?: string }).display_name;
+            const username = (u as { username?: string }).username;
+            nameById.set(uid, pub ? (display || username || (isEs ? 'Anónimo' : 'Anonymous')) : (isEs ? 'Anónimo' : 'Anonymous'));
+          }
+        }
+
+        // Group by scientific name to make consensus visible.
+        const byName = new Map<string, number>();
+        for (const r of arr) {
+          if (!r.scientific_name) continue;
+          byName.set(r.scientific_name, (byName.get(r.scientific_name) ?? 0) + 1);
+        }
+
+        function escAttr(s: string): string {
+          return s.replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' } as Record<string, string>)[c]);
+        }
+
+        listEl!.innerHTML = arr.map(r => {
+          const name = r.scientific_name ?? (isEs ? 'Sin nombre' : 'No name');
+          const supportCount = byName.get(name) ?? 1;
+          const supportLine = supportCount > 1 ? ` · ${supportCount} ${isEs ? 'sugerencias' : 'suggestions'}` : '';
+          const validator = nameById.get(r.validated_by ?? '') ?? '?';
+          const conf = typeof r.confidence === 'number' ? `${Math.round(r.confidence * 100)}%` : '';
+          const rgChip = r.is_research_grade
+            ? `<span class="ml-1 inline-flex items-center rounded-full bg-emerald-100 dark:bg-emerald-900/30 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800 dark:text-emerald-300">${isEs ? 'Grado investigación' : 'Research grade'}</span>`
+            : '';
+          return `<li class="flex items-baseline gap-2 flex-wrap py-1.5 border-b border-zinc-100 dark:border-zinc-800/60 last:border-b-0">
+            <span class="italic font-medium text-emerald-700 dark:text-emerald-400">${escAttr(name)}</span>
+            ${rgChip}
+            <span class="text-xs text-zinc-500">${escAttr(validator)}${conf ? ' · ' + conf : ''}${supportLine}</span>
+          </li>`;
+        }).join('');
+      }
+
+      // Initial paint + refresh on every successful suggestion.
+      window.addEventListener('rastrum:suggestion-submitted', () => { void refresh(); });
+      await refresh();
     }
 
     /**

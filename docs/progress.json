@@ -436,8 +436,15 @@
         },
         {
           "id": "megadetector-bbox-cascade",
-          "label": "Bbox-aware species cascade — when MegaDetector finds an animal, crop the photo to the bbox before passing to PlantNet/Claude/Phi (×3-5 accuracy bump on small subjects in distant traps)",
-          "label_es": "Cascade de especies consciente del bbox — cuando MegaDetector encuentra un animal, recortar la foto al bbox antes de pasarla a PlantNet/Claude/Phi (×3-5 mejora de precisión en sujetos pequeños/lejanos)",
+          "label": "Bbox-aware species cascade — IdentifyInput.mediaCrop shipped + cascade forwards bbox + Phi-vision pre-crops via cropDataUrlToBbox(); server-side Claude/PlantNet still see full frame (need crop_bbox on the identify Edge Function)",
+          "label_es": "Cascade de especies consciente del bbox — IdentifyInput.mediaCrop listo + cascade reenvía bbox + Phi-vision recorta vía cropDataUrlToBbox(); Claude/PlantNet server-side aún ven el frame completo (falta crop_bbox en la Edge Function identify)",
+          "done": true,
+          "done_at": "2026-04-27"
+        },
+        {
+          "id": "megadetector-bbox-cascade-server",
+          "label": "Server-side bbox crop — extend the identify Edge Function with a crop_bbox body field so Claude and PlantNet also receive an animal-only crop",
+          "label_es": "Recorte server-side por bbox — extender la Edge Function identify con un campo crop_bbox para que Claude y PlantNet también reciban un recorte solo del animal",
           "done": false
         },
         {

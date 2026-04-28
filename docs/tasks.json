@@ -1719,26 +1719,24 @@
         "13-identifier-registry.md"
       ],
       "subtasks": [
-        {
-          "label_en": "Extend IdentifyInput with optional `mediaCrop?: bbox` field",
-          "label_es": "Extender IdentifyInput con campo opcional `mediaCrop?: bbox`",
-          "status": "planned"
-        },
-        {
-          "label_en": "MegaDetector throws fall-through error with bbox attached (already done)",
-          "label_es": "MegaDetector lanza fall-through con bbox adjunto (ya hecho)",
-          "status": "done"
-        },
-        {
-          "label_en": "Cascade reads bbox from previous error and passes to next plugin",
-          "label_es": "Cascade lee bbox del error previo y lo pasa al siguiente plugin",
-          "status": "planned"
-        },
-        {
-          "label_en": "PlantNet/Claude/Phi pre-crop image to bbox in their decode step",
-          "label_es": "PlantNet/Claude/Phi pre-recortan al bbox en su decode",
-          "status": "planned"
-        }
+        { "label_en": "Extend IdentifyInput with optional `mediaCrop?: { bbox, source }` field (src/lib/identifiers/types.ts)", "label_es": "Extender IdentifyInput con campo opcional `mediaCrop?: { bbox, source }` (src/lib/identifiers/types.ts)", "status": "done" },
+        { "label_en": "MegaDetector emits source-space bbox via unletterbox() and attaches to thrown error.animal_bbox", "label_es": "MegaDetector emite bbox en espacio de la imagen original vía unletterbox() y lo adjunta a error.animal_bbox", "status": "done" },
+        { "label_en": "Cascade engine forwards animal_bbox from one plugin's error to the next plugin's IdentifyInput.mediaCrop (cascade.ts + cascade.test.ts regression test)", "label_es": "El motor del cascade reenvía animal_bbox del error de un plugin al IdentifyInput.mediaCrop del siguiente (cascade.ts + test de regresión en cascade.test.ts)", "status": "done" },
+        { "label_en": "src/lib/identifiers/bbox-crop.ts: clampAndPad() + cropDataUrlToBbox() with 7 unit tests", "label_es": "src/lib/identifiers/bbox-crop.ts: clampAndPad() + cropDataUrlToBbox() con 7 tests unitarios", "status": "done" },
+        { "label_en": "Phi-vision plugin pre-crops dataUrl to bbox before running local inference", "label_es": "El plugin Phi-vision pre-recorta el dataUrl al bbox antes de correr inferencia local", "status": "done" },
+        { "label_en": "Claude + PlantNet pre-crop — needs crop_bbox body field on identify Edge Function (tracked separately as megadetector-bbox-cascade-server)", "label_es": "Pre-recorte para Claude + PlantNet — requiere campo crop_bbox en la Edge Function identify (rastreado por separado como megadetector-bbox-cascade-server)", "status": "blocked", "blocker_en": "Edge Function code change + Deno crop step + redeploy", "blocker_es": "Cambio en Edge Function + paso de recorte en Deno + redeploy" }
+      ]
+    },
+    "megadetector-bbox-cascade-server": {
+      "phase": "v1.0.x",
+      "title_en": "Server-side bbox crop on the identify Edge Function",
+      "title_es": "Recorte por bbox del lado del servidor en la Edge Function identify",
+      "modules": ["09-camera-trap.md","13-identifier-registry.md"],
+      "subtasks": [
+        { "label_en": "Add crop_bbox body field to supabase/functions/identify/index.ts (Deno)", "label_es": "Agregar campo crop_bbox al body de supabase/functions/identify/index.ts (Deno)", "status": "planned" },
+        { "label_en": "Crop the fetched image in Deno (Image API or external service) before forwarding to PlantNet/Anthropic", "label_es": "Recortar la imagen descargada en Deno (Image API o servicio externo) antes de reenviar a PlantNet/Anthropic", "status": "planned" },
+        { "label_en": "Update claude.ts + plantnet.ts client plugins to forward input.mediaCrop.bbox as crop_bbox", "label_es": "Actualizar los plugins claude.ts + plantnet.ts para reenviar input.mediaCrop.bbox como crop_bbox", "status": "planned" },
+        { "label_en": "Deploy via gh workflow run deploy-functions.yml -f function=identify", "label_es": "Desplegar vía gh workflow run deploy-functions.yml -f function=identify", "status": "planned" }
       ]
     },
     "megadetector-hosting-recipe": {
