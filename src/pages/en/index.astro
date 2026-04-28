@@ -16,11 +16,20 @@ const tr = t(lang);
       {tr.home.hero_subtitle}
     </p>
     <div class="flex flex-wrap justify-center gap-3">
+      <!-- Primary CTA: Observe (save with GPS + share) -->
+      <a
+        href={getLocalizedPath(lang, routes.observe[lang] + '/')}
+        class="inline-flex flex-col items-center px-6 py-3 bg-emerald-700 hover:bg-emerald-800 text-white font-medium rounded-lg transition-colors"
+      >
+        <span>{tr.home.cta}</span>
+        <span class="text-xs font-normal opacity-80">{tr.home.cta_subtitle}</span>
+      </a>
+      <!-- Secondary CTA: Quick identify (no save) -->
       <a
         href={getLocalizedPath(lang, routes.identify[lang] + '/')}
-        class="inline-block px-6 py-3 bg-emerald-700 hover:bg-emerald-800 text-white font-medium rounded-lg transition-colors"
+        class="inline-block px-6 py-3 border border-zinc-300 dark:border-zinc-700 hover:border-emerald-500/50 text-zinc-700 dark:text-zinc-300 font-medium rounded-lg transition-colors"
       >
-        {tr.home.cta}
+        {tr.home.cta_identify}
       </a>
       <a
         href={getDocPath(lang)}
