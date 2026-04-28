@@ -169,24 +169,35 @@ Maintained by trigger (`tg_follows_counter`) on `follows` insert/delete, only wh
 
 ### Privacy composition
 
+The existing schema gates observation visibility through two orthogonal mechanisms:
+- `observations.obscure_level` (coord-precision coarsening for sensitive species, gated row-level by `obs_public_read`).
+- `users.profile_privacy` JSONB + `can_see_facet(target, facet, viewer)` (per-user facet visibility from module 25).
+
+There is **no** per-observation `visibility` column with `public/followers/collaborators/private` values; we don't add one. Instead, social actions inherit those mechanisms:
+
 ```sql
+-- Is the actor a follower or the owner themselves?
 CREATE OR REPLACE FUNCTION public.social_visible_to(viewer uuid, owner uuid)
 RETURNS boolean
 LANGUAGE sql STABLE PARALLEL SAFE AS $$
   SELECT
-    viewer = owner
-    OR EXISTS (
-      SELECT 1 FROM public.follows f
-       WHERE f.follower_id = viewer
-         AND f.followee_id = owner
-         AND f.status     = 'accepted'
+    viewer IS NOT NULL AND (
+      viewer = owner
+      OR EXISTS (
+        SELECT 1 FROM public.follows f
+         WHERE f.follower_id = viewer
+           AND f.followee_id = owner
+           AND f.status      = 'accepted'
+      )
     );
 $$;
 
+-- Is the actor an accepted close-collaborator? Collaborators get the same
+-- coord-precision unlock as `is_credentialed_researcher` does today.
 CREATE OR REPLACE FUNCTION public.is_collaborator_of(viewer uuid, owner uuid)
 RETURNS boolean
 LANGUAGE sql STABLE PARALLEL SAFE AS $$
-  SELECT EXISTS (
+  SELECT viewer IS NOT NULL AND EXISTS (
     SELECT 1 FROM public.follows f
      WHERE f.follower_id = viewer
        AND f.followee_id = owner
@@ -198,7 +209,8 @@ $$;
 
 Both functions are `STABLE` and `PARALLEL SAFE` so the planner can inline them into RLS USING clauses. No `PLPGSQL` in the hot path.
 
-**RLS on reactions** (illustrative; mirror across all four reaction tables):
+**RLS on reactions** (illustrative; mirror across all four reaction tables) — a reaction is readable iff the *observation* is readable AND the reactor is not block-symmetric to the viewer:
+
 ```sql
 ALTER TABLE public.observation_reactions ENABLE ROW LEVEL SECURITY;
 
@@ -209,9 +221,12 @@ CREATE POLICY obsreact_read ON public.observation_reactions FOR SELECT
       SELECT 1 FROM public.observations o
        WHERE o.id = observation_reactions.observation_id
          AND (
-           o.visibility = 'public'
-           OR public.social_visible_to(auth.uid(), o.observer_id)
-           OR (o.visibility = 'collaborators' AND public.is_collaborator_of(auth.uid(), o.observer_id))
+           o.observer_id = auth.uid()
+           OR (
+             o.obscure_level <> 'full'
+             AND public.can_see_facet(o.observer_id, 'observations', auth.uid())
+           )
+           OR public.is_collaborator_of(auth.uid(), o.observer_id)
          )
     )
     AND NOT EXISTS (
@@ -230,7 +245,9 @@ CREATE POLICY obsreact_delete ON public.observation_reactions FOR DELETE
   USING (user_id = auth.uid());
 ```
 
-For obscured-locality observations, the **count** of reactions is visible to anyone who can read the observation; the **list of reactors** is gated through `social_visible_to`. This is enforced by exposing two views: `observation_reaction_counts` (public) and `observation_reactions` (gated).
+**Collaborator coord-precision unlock.** Extend the existing `obs_credentialed_read` analog so collaborators see precise coords on obscured observations of users they collaborate with — same shape as the credentialed-researcher policy that already exists.
+
+**Reaction-count visibility on obscured observations.** Counts are exposed via the `observation_reaction_counts` view; the *list* of reactors goes through the gated `observation_reactions` table (RLS above). When `obscure_level <> 'none'` AND total reactions < 3, the count is also gated to prevent identity inference (see Risks).
 
 ### Edge Functions
 
