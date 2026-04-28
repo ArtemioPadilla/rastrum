@@ -4,6 +4,9 @@ import type { UserRole } from './types';
 /**
  * Read the active roles for a given user from public.user_roles.
  * Filters out revoked rows. Returns an empty Set for unauthenticated callers.
+ *
+ * Duplicates are impossible by construction — public.user_roles has a
+ * PRIMARY KEY (user_id, role), so each (user, role) pair appears at most once.
  */
 export async function getUserRoles(userId: string | null | undefined): Promise<Set<UserRole>> {
   if (!userId) return new Set();

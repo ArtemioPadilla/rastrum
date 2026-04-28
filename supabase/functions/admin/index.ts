@@ -61,6 +61,12 @@ serve(async (req) => {
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
     const result = await handler.execute(admin, parsed.data, actor);
 
+    // x-forwarded-for can be comma-separated ("client, proxy1, proxy2")
+    // when behind multiple proxies; the inet column only accepts a single
+    // address. Take the first (the originating client).
+    const xff = req.headers.get('x-forwarded-for');
+    const ip = xff ? xff.split(',')[0].trim() || null : null;
+
     const auditId = await insertAuditRow(admin, {
       actor_id: actor.id,
       op: handler.op,
@@ -69,7 +75,7 @@ serve(async (req) => {
       before: result.before ?? null,
       after: result.after ?? null,
       reason,
-      ip: req.headers.get('x-forwarded-for'),
+      ip,
       user_agent: req.headers.get('user-agent'),
     });
 

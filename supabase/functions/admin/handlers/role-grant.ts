@@ -34,16 +34,33 @@ export const roleGrantHandler: ActionHandler<RoleGrantPayload> = {
       .select('*')
       .eq('user_id', payload.target_user_id);
 
-    const { error } = await admin
-      .from('user_roles')
-      .upsert({
-        user_id: payload.target_user_id,
-        role: payload.role,
-        granted_at: new Date().toISOString(),
-        granted_by: actor.id,
-        revoked_at: payload.expires_at ?? null,
-      }, { onConflict: 'user_id,role' });
-    if (error) throw new Error(`role.grant: ${error.message}`);
+    // Existing row dictates whether this is a fresh grant, a re-grant after
+    // a soft-revoke, or an extension of an active grant. We preserve the
+    // original granted_at / granted_by on every conflict so audit history
+    // is intact; only revoked_at moves on the conflict path. Fresh grants
+    // get the new timestamps.
+    const existing = (before ?? []).find(r => r.role === payload.role);
+    const expiresAt = payload.expires_at ?? null;
+
+    if (existing) {
+      const { error } = await admin
+        .from('user_roles')
+        .update({ revoked_at: expiresAt })
+        .eq('user_id', payload.target_user_id)
+        .eq('role', payload.role);
+      if (error) throw new Error(`role.grant (extend): ${error.message}`);
+    } else {
+      const { error } = await admin
+        .from('user_roles')
+        .insert({
+          user_id: payload.target_user_id,
+          role: payload.role,
+          granted_at: new Date().toISOString(),
+          granted_by: actor.id,
+          revoked_at: expiresAt,
+        });
+      if (error) throw new Error(`role.grant (insert): ${error.message}`);
+    }
 
     const { data: after } = await admin
       .from('user_roles')

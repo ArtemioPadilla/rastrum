@@ -32,8 +32,8 @@ export async function verifyJwtAndLoadRoles(req: Request): Promise<Actor> {
   const { data: userRes, error: userErr } = await userClient.auth.getUser(jwt);
   if (userErr || !userRes.user) throw new HttpError(401, 'invalid token');
 
-  const adminClient = createClient(SUPABASE_URL, SERVICE_KEY);
-  const { data: rows, error: rolesErr } = await adminClient
+  const serviceClient = createClient(SUPABASE_URL, SERVICE_KEY);
+  const { data: rows, error: rolesErr } = await serviceClient
     .from('user_roles')
     .select('role, revoked_at')
     .eq('user_id', userRes.user.id);

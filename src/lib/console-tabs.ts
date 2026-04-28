@@ -1,6 +1,11 @@
 import type { UserRole } from './types';
 import { routes } from '../i18n/utils';
 
+// `researcher` is intentionally omitted from CONSOLE_TABS and rolePillsFor.
+// It is a data-access role (RLS gate for precise GPS coords on obscured
+// observations) — not a console role. It surfaces only as a chip in the
+// Users / Credentials tabs (PR2), never as its own pill or tab set.
+
 export interface ConsoleTab {
   id: string;
   role: UserRole;
