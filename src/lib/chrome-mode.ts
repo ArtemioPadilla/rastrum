@@ -1,4 +1,4 @@
-export type ChromeMode = 'app' | 'read';
+export type ChromeMode = 'app' | 'read' | 'console';
 
 // Path prefixes that should render the app-mode chrome (no footer, bottom
 // bar dominant on mobile). Order doesn't matter; matched by `startsWith`
@@ -27,6 +27,8 @@ export function resolveChromeMode(pathname: string, baseUrl?: string): ChromeMod
   if (!pathname) return 'read';
   const base = normalizeBase(baseUrl ?? import.meta.env?.BASE_URL);
   const noBase = base && pathname.startsWith(base) ? pathname.slice(base.length) : pathname;
+  // Console mode: privileged-actions surface, fully separate chrome.
+  if (/^\/(en|es)\/(console|consola)(\/|$)/.test(noBase)) return 'console';
   // Locale-neutral check for /auth/* first
   for (const p of AUTH_PREFIXES) {
     if (noBase.startsWith(p)) return 'app';
