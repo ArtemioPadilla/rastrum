@@ -91,6 +91,7 @@ const docColumns = [
     <!-- Verbs (left) -->
     <nav class="hidden sm:flex items-center gap-5 text-sm">
       <a href={getLocalizedPath(lang, routes.observe[locale] + '/')}
+         data-tour="observe-nav"
          class:list={[
            'relative pb-1 transition-colors after:content-[""] after:absolute after:left-0 after:right-0 after:-bottom-3 after:h-[2px] after:rounded after:transition-transform after:origin-left',
            railClass(obsActive, 'emerald'),
@@ -102,6 +103,7 @@ const docColumns = [
       <div class="relative" id="hdr-explore">
         <button
           id="hdr-explore-btn"
+          data-tour="explore-nav"
           type="button"
           class:list={[
             'flex items-center gap-1 pb-1 transition-colors after:content-[""] after:absolute after:left-0 after:right-0 after:-bottom-3 after:h-[2px] after:rounded after:transition-transform after:origin-left',

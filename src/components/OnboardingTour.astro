@@ -1,981 +1,469 @@
 ---
 /**
- * OnboardingTour — pipeline setup flow for first-time authed users.
+ * OnboardingTour — 5-step spotlight tour shown after first sign-in.
  *
- * 4 steps:
- *   0. Pipeline explanation ("How Rastrum identifies species")
- *   1. Configure identifiers (PlantNet, Claude, Phi, BirdNET, EfficientNet)
- *   2. Summary ("Your pipeline is ready")
- *   3. Install PWA hint
+ * Steps:
+ *   0. Welcome modal (no spotlight)
+ *   1. FAB / Observe nav spotlight
+ *   2. Quick ID (FAB badged state on /observe)
+ *   3. Explore tab / nav spotlight
+ *   4. Settings + BYO key spotlight (Profile tab / avatar)
  *
- * PlantNet is always available, so steps 0/1 can be skipped — users land in
- * the app with PlantNet as their default identifier. Step state persists in
- * sessionStorage so reloads resume mid-flow. Focus is trapped while open
- * and restored on close (WCAG dialog pattern).
+ * Trigger: `localStorage.rastrum.onboarding.seen !== "v1"` + authed user.
+ * Replay:  dispatch `window` event `rastrum:replay-onboarding`.
+ * Respects prefers-reduced-motion (no spotlight pulse animation).
  *
  * Mounted globally in BaseLayout.astro.
- * Replay anywhere by dispatching `window` event 'rastrum:replay-onboarding'.
  */
-import { t, getLocalizedPath, getAlternateLocale, routes, type Locale } from '../i18n/utils';
+import { t, type Locale } from '../i18n/utils';
 
 interface Props {
   lang: 'en' | 'es';
 }
 const { lang } = Astro.props;
 const tr = t(lang);
-const onb = (tr as unknown as { onboarding: Record<string, string> }).onboarding;
-const onbAny = (tr as unknown as { onboarding: Record<string, unknown> }).onboarding;
-const drawerStrings = (tr as unknown as { nav: { drawer: Record<string, string> } }).nav.drawer;
-const claudeHelpJson = JSON.stringify({
-  summary: onbAny.key_help_summary ?? '',
-  intro: onbAny.key_help_anthropic_intro ?? '',
-  steps: Array.isArray(onbAny.key_help_anthropic_steps) ? onbAny.key_help_anthropic_steps : [],
-  privacy: onbAny.key_help_privacy ?? '',
-});
-const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
-
-const alt = getAlternateLocale(lang);
-const base = import.meta.env.BASE_URL.replace(/\/$/, '');
-const pathWithoutBase = Astro.url.pathname.replace(base, '') || '/';
-const segments = pathWithoutBase.split('/').filter(Boolean);
-const currentLang = (segments[0] || lang) as Locale;
-const currentSlug = '/' + (segments.slice(1).join('/') || '');
-const matchedKey = Object.keys(routes).find(key => {
-  const slug = routes[key][currentLang] || '';
-  return slug === currentSlug || (currentSlug === '/' && slug === '');
-});
-const altSlug = matchedKey ? (routes[matchedKey][alt] || '') : currentSlug;
-const altHref = `${base}/${alt}${altSlug}/`;
+type OnbTree = {
+  skip: string; next: string; done: string; back: string; start: string;
+  step_label: string; step_dot_aria: string; close_label: string;
+  steps: {
+    welcome: { title: string; body: string };
+    fab: { title: string; body: string };
+    quick_id: { title: string; body: string };
+    explore: { title: string; body: string };
+    settings: { title: string; body: string };
+  };
+};
+const onb = (tr as unknown as { onboarding: OnbTree }).onboarding;
+const stepsData = onb.steps;
 ---
 
+<!--
+  Full-screen tour overlay. Hidden by default via `hidden` class; the script
+  below reveals it after auth check. The inner tooltip carries role="dialog"
+  and aria-modal per ARIA spec; the outer container is the spotlight canvas.
+-->
 <div
   id="onboarding-tour"
-  class="hidden fixed inset-0 z-[60] items-center justify-center bg-zinc-950/70 backdrop-blur-sm p-0 sm:p-4"
-  role="dialog"
-  aria-modal="true"
-  aria-labelledby="onboarding-title"
-  data-shown-key="rastrum.onboardingV2"
-  data-step-key="rastrum.onboardingV2.step"
+  class="hidden fixed inset-0 z-[70]"
+  data-seen-key="rastrum.onboarding.seen"
+  data-seen-value="v1"
   data-step-label={onb.step_label}
-  data-install-body={onb.install_pwa_body}
-  data-install-body-ios={onb.install_pwa_body_ios}
-  data-label-next={onb.next}
-  data-label-back={onb.back}
-  data-label-done={onb.done}
-  data-label-skip={onb.skip}
-  data-label-skip-setup={onb.skip_setup}
-  data-skip-confirm={onb.skip_confirm}
-  data-key-hint-ok={onb.key_format_hint}
-  data-key-hint-bad={onb.key_format_invalid}
-  data-key-verifying={onb.key_verifying}
-  data-key-verified={onb.key_verified}
-  data-key-unauth={onb.key_unauth}
-  data-key-network={onb.key_network}
-  data-key-other={onb.key_other_error}
-  data-key-help={claudeHelpJson}
-  data-dl-warning={onb.download_size_warning}
-  data-dl-cancel={onb.download_cancel}
-  data-dl-confirm={onb.download_confirm}
   data-dot-aria={onb.step_dot_aria}
-  data-observe-path={observePath}
-  data-lang={lang}
+  data-label-skip={onb.skip}
+  data-label-next={onb.next}
+  data-label-done={onb.done}
+  data-label-back={onb.back}
+  data-label-start={onb.start}
+  data-label-close={onb.close_label}
+  data-step-count="5"
 >
-  <div class="relative w-full sm:w-[32rem] sm:max-w-[92vw] sm:rounded-2xl bg-white dark:bg-zinc-900 shadow-2xl border-0 sm:border border-zinc-200 dark:border-zinc-800 h-full sm:h-auto sm:max-h-[90vh] flex flex-col focus:outline-none" tabindex="-1">
+  <!-- Backdrop with spotlight hole punched via clip-path -->
+  <div
+    id="onb-backdrop"
+    class="absolute inset-0 bg-zinc-950/60"
+    style="clip-path: none;"
+  ></div>
 
-    <div class="absolute top-3 right-3 z-10 flex items-center gap-1">
-      <a
-        href={altHref}
-        id="onb-lang-toggle"
-        data-target-lang={alt}
-        aria-label={drawerStrings.language}
-        class="text-xs font-medium px-2 py-1 rounded border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-      >
-        {alt.toUpperCase()}
-      </a>
+  <!-- Spotlight ring (visible border around the highlighted element) -->
+  <div
+    id="onb-spotlight-ring"
+    class="absolute pointer-events-none rounded-xl border-2 border-emerald-400 transition-all duration-200 hidden"
+    style="box-shadow: 0 0 0 4px rgba(52,211,153,0.25);"
+    aria-hidden="true"
+  ></div>
+
+  <!-- Tooltip card -->
+  <div
+    id="onb-tooltip"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="onb-tooltip-title"
+    class="absolute w-[calc(100vw-2rem)] max-w-xs sm:max-w-sm bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl border border-zinc-200 dark:border-zinc-800 p-5 focus:outline-none"
+    tabindex="-1"
+    style="left: 50%; top: 50%; transform: translate(-50%, -50%);"
+  >
+    <!-- Step indicator -->
+    <p id="onb-step-label" class="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-3" aria-live="polite"></p>
+
+    <!-- Step content -->
+    <h2 id="onb-tooltip-title" class="text-lg font-bold tracking-tight text-zinc-900 dark:text-zinc-100 mb-2"></h2>
+    <p id="onb-tooltip-body" class="text-sm text-zinc-600 dark:text-zinc-300 leading-relaxed"></p>
+
+    <!-- Navigation footer -->
+    <div class="mt-5 flex items-center justify-between gap-2">
       <button
-        type="button"
-        id="onb-theme-toggle"
-        aria-label={drawerStrings.toggle_theme}
-        class="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-      >
-        <svg aria-hidden="true" class="w-4 h-4 hidden dark:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
-        <svg aria-hidden="true" class="w-4 h-4 block dark:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
-      </button>
-    </div>
-
-    <div class="flex-1 overflow-y-auto p-6 pt-14 sm:pt-12">
-      <p id="onb-step-label" class="text-xs font-medium text-emerald-700 dark:text-emerald-400 mb-3" aria-live="polite"></p>
-
-      <!-- ─── Step 0: Pipeline explanation ─── -->
-      <article class="onb-card" data-step="0">
-        <div class="mx-auto mb-4 w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-700 dark:text-emerald-300">
-          <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-          </svg>
-        </div>
-        <h2 id="onboarding-title" class="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 text-center" data-onb-title>
-          {onb.pipeline_title}
-        </h2>
-        <p class="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400 text-center">{onb.duration_hint}</p>
-        <p class="mt-3 text-sm text-zinc-600 dark:text-zinc-300 text-center leading-relaxed">
-          {onb.pipeline_body}
-        </p>
-        <!-- Pipeline diagram: vertical on mobile, horizontal on sm+ -->
-        <div class="mt-5 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2 text-xs">
-          <div class="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2 text-center">
-            <div class="font-semibold text-emerald-800 dark:text-emerald-300">{onb.pipeline_diagram_specialized}</div>
-            <div class="text-[10px] text-zinc-500 mt-0.5">PlantNet 🌿 | BirdNET 🎵 | EfficientNet 🔍</div>
-          </div>
-          <svg class="w-4 h-4 text-zinc-400 flex-none self-center rotate-90 sm:rotate-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-          <div class="rounded-lg border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-900/20 px-3 py-2 text-center">
-            <div class="font-semibold text-sky-800 dark:text-sky-300">{onb.pipeline_diagram_llm}</div>
-            <div class="text-[10px] text-zinc-500 mt-0.5">Claude / Phi</div>
-          </div>
-          <svg class="w-4 h-4 text-zinc-400 flex-none self-center rotate-90 sm:rotate-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-          <div class="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-center">
-            <div class="font-semibold text-amber-800 dark:text-amber-300">{onb.pipeline_diagram_result}</div>
-          </div>
-        </div>
-      </article>
-
-      <!-- ─── Step 1: Configure identifiers ─── -->
-      <article class="onb-card hidden" data-step="1">
-        <div class="mx-auto mb-4 w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-700 dark:text-emerald-300">
-          <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-          </svg>
-        </div>
-        <h2 id="onboarding-title-1" class="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 text-center" data-onb-title>
-          {onb.configure_title}
-        </h2>
-        <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400 text-center">{onb.configure_subtitle}</p>
-
-        <div id="onb-identifiers" class="mt-4 space-y-2">
-          <!-- Populated by script -->
-        </div>
-        <div class="mt-3 text-center">
-          <button type="button" id="onb-skip-setup" class="text-xs font-medium text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 underline-offset-2 hover:underline">
-            {onb.skip_setup}
-          </button>
-        </div>
-      </article>
-
-      <!-- ─── Step 2: Summary ─── -->
-      <article class="onb-card hidden" data-step="2">
-        <div class="mx-auto mb-4 w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-700 dark:text-emerald-300">
-          <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        </div>
-        <h2 id="onboarding-title-2" class="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 text-center" data-onb-title>
-          {onb.summary_title}
-        </h2>
-        <p class="mt-3 text-sm text-zinc-600 dark:text-zinc-300 text-center leading-relaxed">
-          {onb.summary_body}
-        </p>
-        <div id="onb-summary-list" class="mt-4 space-y-1">
-          <!-- Populated by script -->
-        </div>
-        <div class="mt-5 flex justify-center">
-          <a
-            href={observePath}
-            id="onb-first-obs-cta"
-            class="inline-flex min-h-[44px] items-center rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white"
-          >
-            {onb.summary_cta}
-          </a>
-        </div>
-      </article>
-
-      <!-- ─── Step 3: Install PWA ─── -->
-      <article class="onb-card hidden" data-step="3">
-        <div class="mx-auto mb-4 w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-700 dark:text-emerald-300">
-          <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v12m0 0l-4-4m4 4l4-4M4 20h16" />
-          </svg>
-        </div>
-        <h2 id="onboarding-title-3" class="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 text-center" data-onb-title>
-          {onb.install_pwa_title}
-        </h2>
-        <p id="onb-install-body" class="mt-3 text-sm text-zinc-600 dark:text-zinc-300 text-center leading-relaxed">
-          {onb.install_pwa_body}
-        </p>
-      </article>
-    </div>
-
-    <footer class="border-t border-zinc-200 dark:border-zinc-800 p-4 flex items-center justify-between gap-3">
-      <button
-        type="button"
         id="onb-skip"
-        class="hidden text-sm font-medium text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 min-h-[44px] px-2"
+        type="button"
+        class="text-sm text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 min-h-[44px] px-1"
+      ></button>
+
+      <div
+        id="onb-dots"
+        class="flex items-center gap-1.5"
+        role="group"
+        aria-label="Tour progress"
       >
-        {onb.skip}
-      </button>
-      <div class="flex items-center gap-1.5" role="group" aria-label={onb.step_label.replace('{current}', '1').replace('{total}', '4').replace('Paso 1 de 4','Pasos').replace('Step 1 of 4','Steps')}>
-        <span class="onb-dot w-2 h-2 rounded-full bg-emerald-600 dark:bg-emerald-400" data-step="0" data-aria-template={onb.step_dot_aria}></span>
-        <span class="onb-dot w-2 h-2 rounded-full bg-zinc-300 dark:bg-zinc-700" data-step="1" data-aria-template={onb.step_dot_aria}></span>
-        <span class="onb-dot w-2 h-2 rounded-full bg-zinc-300 dark:bg-zinc-700" data-step="2" data-aria-template={onb.step_dot_aria}></span>
-        <span class="onb-dot w-2 h-2 rounded-full bg-zinc-300 dark:bg-zinc-700" data-step="3" data-aria-template={onb.step_dot_aria}></span>
+        <span class="onb-dot w-2 h-2 rounded-full" data-i="0"></span>
+        <span class="onb-dot w-2 h-2 rounded-full" data-i="1"></span>
+        <span class="onb-dot w-2 h-2 rounded-full" data-i="2"></span>
+        <span class="onb-dot w-2 h-2 rounded-full" data-i="3"></span>
+        <span class="onb-dot w-2 h-2 rounded-full" data-i="4"></span>
       </div>
+
       <div class="flex items-center gap-2">
         <button
-          type="button"
           id="onb-back"
-          class="hidden inline-flex min-h-[44px] items-center rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
-        >
-          {onb.back}
-        </button>
-        <button
           type="button"
+          class="hidden min-h-[44px] items-center rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
+        ></button>
+        <button
           id="onb-next"
-          class="inline-flex min-h-[44px] items-center rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white"
-        >
-          <span data-onb-next-label>{onb.next}</span>
-        </button>
+          type="button"
+          class="min-h-[44px] inline-flex items-center rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white"
+        ></button>
       </div>
-    </footer>
+    </div>
   </div>
 </div>
 
+<!-- Step data for the script — avoids serialising into data-* -->
+<script
+  id="onb-step-data"
+  type="application/json"
+  set:html={JSON.stringify([
+    {
+      title: stepsData.welcome.title,
+      body: stepsData.welcome.body,
+      target: null,
+    },
+    {
+      title: stepsData.fab.title,
+      body: stepsData.fab.body,
+      target: '[data-tour="fab"],[data-tour="observe-nav"]',
+    },
+    {
+      title: stepsData.quick_id.title,
+      body: stepsData.quick_id.body,
+      target: '[data-tour="fab"]',
+    },
+    {
+      title: stepsData.explore.title,
+      body: stepsData.explore.body,
+      target: '[data-tour="explore-tab"],[data-tour="explore-nav"]',
+    },
+    {
+      title: stepsData.settings.title,
+      body: stepsData.settings.body,
+      target: '[data-tour="profile-tab"],[data-tour="avatar-btn"]',
+    },
+  ])}
+/>
+
 <script>
   import { getSupabase } from '../lib/supabase';
-  import { isIOS } from '../lib/local-ai-helpers';
+
+  type StepDef = { title: string; body: string; target: string | null };
 
   const root = document.getElementById('onboarding-tour') as HTMLDivElement | null;
-  if (root) {
-    const SHOWN_KEY = root.dataset.shownKey ?? 'rastrum.onboardingV2';
-    const STEP_KEY = root.dataset.stepKey ?? 'rastrum.onboardingV2.step';
-    const stepLabelTpl = root.dataset.stepLabel ?? 'Step {current} of {total}';
-    const installBody = root.dataset.installBody ?? '';
-    const installBodyIos = root.dataset.installBodyIos ?? installBody;
-    const labelNext = root.dataset.labelNext ?? 'Next';
-    const labelBack = root.dataset.labelBack ?? 'Back';
-    const labelDone = root.dataset.labelDone ?? 'Done';
-    const labelSkip = root.dataset.labelSkip ?? 'Skip';
-    const skipConfirm = root.dataset.skipConfirm ?? '';
-    const keyHintOk = root.dataset.keyHintOk ?? '';
-    const keyHintBad = root.dataset.keyHintBad ?? '';
-    const keyVerifying = root.dataset.keyVerifying ?? 'Verifying…';
-    const keyVerified = root.dataset.keyVerified ?? '✓ Key verified';
-    const keyUnauth = root.dataset.keyUnauth ?? 'Auth failed';
-    const keyNetwork = root.dataset.keyNetwork ?? 'Network error';
-    const keyOther = root.dataset.keyOther ?? 'Anthropic error';
-    type KeyHelpPayload = { summary: string; intro: string; steps: string[]; privacy: string };
-    let keyHelp: KeyHelpPayload = { summary: '', intro: '', steps: [], privacy: '' };
-    try { keyHelp = JSON.parse(root.dataset.keyHelp ?? '{}') as KeyHelpPayload; } catch { /* keep default */ }
-    const dlWarning = root.dataset.dlWarning ?? '';
-    const dlCancelLabel = root.dataset.dlCancel ?? 'Cancel';
-    const dlConfirmLabel = root.dataset.dlConfirm ?? 'Start download';
-    const dotAriaTpl = root.dataset.dotAria ?? 'Step {n}';
-    const observePath = root.dataset.observePath ?? '/en/observe/';
-    const isEs = root.dataset.lang === 'es';
+  if (!root) throw new Error('OnboardingTour: root element missing');
+  const dialog = root;
 
-    const cards = Array.from(root.querySelectorAll<HTMLElement>('.onb-card'));
-    const dots = Array.from(root.querySelectorAll<HTMLElement>('.onb-dot'));
-    const stepLabelEl = root.querySelector<HTMLElement>('#onb-step-label');
-    const nextBtn = root.querySelector<HTMLButtonElement>('#onb-next');
-    const nextLabel = root.querySelector<HTMLElement>('[data-onb-next-label]');
-    const backBtn = root.querySelector<HTMLButtonElement>('#onb-back');
-    const skipBtn = root.querySelector<HTMLButtonElement>('#onb-skip');
-    const skipSetupBtn = root.querySelector<HTMLButtonElement>('#onb-skip-setup');
-    const installBodyEl = root.querySelector<HTMLElement>('#onb-install-body');
-    const idContainer = root.querySelector<HTMLElement>('#onb-identifiers');
-    const summaryList = root.querySelector<HTMLElement>('#onb-summary-list');
-    const card = root.querySelector<HTMLElement>('div.relative');
+  const backdrop     = document.getElementById('onb-backdrop') as HTMLDivElement;
+  const ring         = document.getElementById('onb-spotlight-ring') as HTMLDivElement;
+  const tooltip      = document.getElementById('onb-tooltip') as HTMLDivElement;
+  const titleEl      = document.getElementById('onb-tooltip-title') as HTMLElement;
+  const bodyEl       = document.getElementById('onb-tooltip-body') as HTMLElement;
+  const stepLabelEl  = document.getElementById('onb-step-label') as HTMLElement;
+  const skipBtn      = document.getElementById('onb-skip') as HTMLButtonElement;
+  const backBtn      = document.getElementById('onb-back') as HTMLButtonElement;
+  const nextBtn      = document.getElementById('onb-next') as HTMLButtonElement;
+  const dots         = Array.from(document.querySelectorAll<HTMLElement>('.onb-dot'));
 
-    const TOTAL = cards.length;
-    let current = 0;
-    let returnFocusEl: HTMLElement | null = null;
+  const SEEN_KEY   = dialog.dataset.seenKey   ?? 'rastrum.onboarding.seen';
+  const SEEN_VAL   = dialog.dataset.seenValue ?? 'v1';
+  const labelSkip  = dialog.dataset.labelSkip  ?? 'Skip';
+  const labelNext  = dialog.dataset.labelNext  ?? 'Next';
+  const labelDone  = dialog.dataset.labelDone  ?? 'Done';
+  const labelBack  = dialog.dataset.labelBack  ?? 'Back';
+  const labelStart = dialog.dataset.labelStart ?? 'Start';
+  const stepTpl    = dialog.dataset.stepLabel  ?? 'Step {current} of {total}';
+  const dotAriaTpl = dialog.dataset.dotAria    ?? 'Step {n}';
 
-    /**
-     * Lightweight telemetry: dispatch a CustomEvent on `window`. No analytics
-     * provider is wired by default — operators can listen for these to track
-     * onboarding drop-off and configuration outcomes without coupling the
-     * component to any vendor SDK.
-     *
-     * Events emitted:
-     *   - opened, resumed:        { step }
-     *   - step_change:            { from, to }
-     *   - skip_to_summary:        {}
-     *   - dismissed_before_done:  { step }
-     *   - completed:              {}
-     *   - key_saved:              {}
-     *   - key_verify_failed:      { reason }
-     *   - download_started:       { id }
-     */
-    function emit(type: string, detail: Record<string, unknown> = {}): void {
-      try {
-        window.dispatchEvent(new CustomEvent('rastrum:onboarding-event', {
-          detail: { type, step: current, ...detail },
-        }));
-      } catch { /* ignore */ }
+  const rawSteps = document.getElementById('onb-step-data');
+  let STEPS: StepDef[] = [];
+  try { STEPS = JSON.parse(rawSteps?.textContent ?? '[]') as StepDef[]; } catch { /* noop */ }
+  const TOTAL = STEPS.length;
+
+  let current = 0;
+  let returnFocusEl: HTMLElement | null = null;
+  let resizeRaf: number | undefined;
+
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  dots.forEach((d, i) => {
+    d.setAttribute('aria-label', dotAriaTpl.replace('{n}', String(i + 1)));
+    d.setAttribute('role', 'img');
+  });
+
+  function seen(): boolean {
+    try { return localStorage.getItem(SEEN_KEY) === SEEN_VAL; } catch { return true; }
+  }
+
+  function markSeen(): void {
+    try { localStorage.setItem(SEEN_KEY, SEEN_VAL); } catch { /* noop */ }
+  }
+
+  function resolveTarget(selector: string | null): Element | null {
+    if (!selector) return null;
+    const parts = selector.split(',').map(s => s.trim());
+    for (const sel of parts) {
+      const el = document.querySelector(sel);
+      if (el) return el;
+    }
+    return null;
+  }
+
+  function getSpotlightRect(el: Element): DOMRect {
+    const base = el.getBoundingClientRect();
+    const PAD = 8;
+    return new DOMRect(
+      base.left - PAD,
+      base.top  - PAD,
+      base.width  + PAD * 2,
+      base.height + PAD * 2,
+    );
+  }
+
+  function positionTooltip(targetEl: Element | null): void {
+    if (!targetEl) {
+      tooltip.style.left   = '50%';
+      tooltip.style.top    = '50%';
+      tooltip.style.transform = 'translate(-50%, -50%)';
+      ring.classList.add('hidden');
+      backdrop.style.clipPath = 'none';
+      return;
     }
 
-    // Initialise dot aria-labels from template
+    const tr = getSpotlightRect(targetEl);
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    // Spotlight ring
+    ring.style.left   = `${tr.left}px`;
+    ring.style.top    = `${tr.top  + window.scrollY}px`;
+    ring.style.width  = `${tr.width}px`;
+    ring.style.height = `${tr.height}px`;
+    ring.classList.remove('hidden');
+
+    // Backdrop with circular hole (polygon with outer box + inner rect)
+    if (!reduced) {
+      const x0 = tr.left;   const y0 = tr.top;
+      const x1 = tr.right;  const y1 = tr.bottom;
+      backdrop.style.clipPath = [
+        `polygon(`,
+        `0 0, 100% 0, 100% 100%, 0 100%, 0 0,`,
+        `${x0}px ${y0}px, ${x0}px ${y1}px, ${x1}px ${y1}px, ${x1}px ${y0}px, ${x0}px ${y0}px`,
+        `)`,
+      ].join(' ');
+    } else {
+      backdrop.style.clipPath = 'none';
+    }
+
+    // Tooltip placement: prefer below or above the spotlight rect
+    const TW = tooltip.getBoundingClientRect().width || 320;
+    const TH = tooltip.getBoundingClientRect().height || 180;
+    const MARGIN = 12;
+
+    let tx: number;
+    let ty: number;
+
+    // Horizontal: center on target, clamp to viewport
+    tx = tr.left + tr.width / 2 - TW / 2;
+    tx = Math.max(MARGIN, Math.min(tx, vw - TW - MARGIN));
+
+    // Vertical: prefer below, fall back to above, then center
+    if (tr.bottom + MARGIN + TH <= vh) {
+      ty = tr.bottom + MARGIN;
+    } else if (tr.top - MARGIN - TH >= 0) {
+      ty = tr.top - MARGIN - TH;
+    } else {
+      ty = Math.max(MARGIN, Math.min(vh / 2 - TH / 2, vh - TH - MARGIN));
+    }
+
+    tooltip.style.left      = `${tx}px`;
+    tooltip.style.top       = `${ty + window.scrollY}px`;
+    tooltip.style.transform = 'none';
+  }
+
+  function render(): void {
+    const step = STEPS[current];
+    if (!step) return;
+
+    titleEl.textContent = step.title;
+    bodyEl.textContent  = step.body;
+
+    stepLabelEl.textContent = stepTpl
+      .replace('{current}', String(current + 1))
+      .replace('{total}',   String(TOTAL));
+
     dots.forEach((d, i) => {
-      d.setAttribute('aria-label', dotAriaTpl.replace('{n}', String(i + 1)));
-      d.setAttribute('role', 'img');
+      const active = i === current;
+      d.classList.toggle('bg-emerald-500',       active);
+      d.classList.toggle('dark:bg-emerald-400',  active);
+      d.classList.toggle('bg-zinc-300',          !active);
+      d.classList.toggle('dark:bg-zinc-700',     !active);
+      if (active) d.setAttribute('aria-current', 'step');
+      else        d.removeAttribute('aria-current');
     });
 
-    function shouldShow(): boolean {
-      try {
-        return localStorage.getItem(SHOWN_KEY) !== 'true';
-      } catch {
-        return false;
-      }
-    }
+    const isLast  = current === TOTAL - 1;
+    const isFirst = current === 0;
 
-    function markShown(): void {
-      try {
-        localStorage.setItem(SHOWN_KEY, 'true');
-        sessionStorage.removeItem(STEP_KEY);
-      } catch { /* ignore */ }
-    }
+    skipBtn.textContent = isLast ? '' : labelSkip;
+    skipBtn.classList.toggle('hidden', isLast);
 
-    function persistStep(): void {
-      try { sessionStorage.setItem(STEP_KEY, String(current)); } catch { /* ignore */ }
-    }
+    nextBtn.textContent = isFirst ? labelStart : isLast ? labelDone : labelNext;
 
-    function loadStep(): number {
-      try {
-        const raw = sessionStorage.getItem(STEP_KEY);
-        if (raw === null) return 0;
-        const n = parseInt(raw, 10);
-        return Number.isFinite(n) && n >= 0 && n < TOTAL ? n : 0;
-      } catch { return 0; }
-    }
+    backBtn.textContent = labelBack;
+    backBtn.classList.toggle('hidden',  isFirst);
+    backBtn.classList.toggle('inline-flex', !isFirst);
 
-    // Defeat iOS rubber-band by locking <html> too; restore on close.
-    function lockScroll(): void {
-      document.documentElement.style.overflow = 'hidden';
-      document.body.style.overflow = 'hidden';
-    }
-    function unlockScroll(): void {
-      document.documentElement.style.overflow = '';
-      document.body.style.overflow = '';
-    }
+    // Spotlight
+    const targetEl = resolveTarget(step.target);
+    positionTooltip(targetEl);
+  }
 
-    function focusableInDialog(): HTMLElement[] {
-      if (!card) return [];
-      const sel = 'a[href], button:not([disabled]), input:not([disabled]):not([type=hidden]), [tabindex]:not([tabindex="-1"])';
-      return Array.from(card.querySelectorAll<HTMLElement>(sel)).filter(el => {
-        // Skip elements in hidden cards
-        const parentCard = el.closest('.onb-card');
-        if (parentCard && parentCard.classList.contains('hidden')) return false;
-        if (el.classList.contains('hidden')) return false;
-        if (el.offsetParent === null && el !== document.activeElement) return false;
-        return true;
-      });
-    }
+  function lockScroll(): void {
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow            = 'hidden';
+  }
 
-    function show(opts?: { resume?: boolean }): void {
-      returnFocusEl = (document.activeElement as HTMLElement | null) ?? null;
-      const resumed = !!opts?.resume && loadStep() > 0;
-      current = opts?.resume ? loadStep() : 0;
-      if (installBodyEl) {
-        installBodyEl.textContent = isIOS() ? installBodyIos : installBody;
-      }
-      root.classList.remove('hidden');
-      root.classList.add('flex');
-      lockScroll();
-      buildIdentifierCards();
-      render();
-      requestAnimationFrame(() => {
-        const targets = focusableInDialog();
-        (targets[0] ?? card)?.focus();
-      });
-      emit(resumed ? 'resumed' : 'opened');
-    }
+  function unlockScroll(): void {
+    document.documentElement.style.overflow = '';
+    document.body.style.overflow            = '';
+  }
 
-    function hide(): void {
-      const wasLast = current === TOTAL - 1;
-      root.classList.add('hidden');
-      root.classList.remove('flex');
-      unlockScroll();
-      markShown();
-      try { returnFocusEl?.focus(); } catch { /* ignore */ }
-      emit(wasLast ? 'completed' : 'dismissed_before_done');
-    }
+  function focusables(): HTMLElement[] {
+    const sel = 'a[href], button:not([disabled]), input:not([disabled]):not([type=hidden]), [tabindex]:not([tabindex="-1"])';
+    return Array.from(tooltip.querySelectorAll<HTMLElement>(sel)).filter(el =>
+      !el.classList.contains('hidden') && el.offsetParent !== null,
+    );
+  }
 
-    function render(): void {
-      cards.forEach((c, i) => c.classList.toggle('hidden', i !== current));
-      dots.forEach((d, i) => {
-        d.classList.toggle('bg-emerald-600', i === current);
-        d.classList.toggle('dark:bg-emerald-400', i === current);
-        d.classList.toggle('bg-zinc-300', i !== current);
-        d.classList.toggle('dark:bg-zinc-700', i !== current);
-        if (i === current) d.setAttribute('aria-current', 'step');
-        else d.removeAttribute('aria-current');
-      });
-      if (stepLabelEl) {
-        stepLabelEl.textContent = stepLabelTpl
-          .replace('{current}', String(current + 1))
-          .replace('{total}', String(TOTAL));
-      }
-      // Keep aria-labelledby pointing at the visible heading
-      const visibleTitle = cards[current]?.querySelector<HTMLElement>('[data-onb-title]');
-      if (visibleTitle && visibleTitle.id) {
-        root.setAttribute('aria-labelledby', visibleTitle.id);
-      }
-      const last = current === TOTAL - 1;
-      if (nextLabel) {
-        nextLabel.textContent = last ? labelDone : labelNext;
-      }
-      if (backBtn) {
-        backBtn.classList.toggle('hidden', current === 0);
-      }
-      // Skip button visible everywhere except when it'd duplicate "Done"
-      if (skipBtn) {
-        skipBtn.classList.toggle('hidden', last);
-        skipBtn.textContent = labelSkip;
-      }
-      // On step 2, build summary
-      if (current === 2) {
-        buildSummary();
-      }
-      persistStep();
-    }
-
-    // ── Identifier cards for Step 1 ──
-    type IdCardState = {
-      id: string;
-      name: string;
-      desc: string;
-      emoji: string;
-      type: 'cloud' | 'device' | 'map';
-      status: 'ready' | 'needs_key' | 'not_downloaded' | 'cached' | 'unavailable';
-      unavailableReason?: string;
-      hasKey?: boolean;
-    };
-
-    const idStates: IdCardState[] = [];
-
-    function statusLabel(s: IdCardState['status']): string {
-      const map: Record<string, string> = isEs
-        ? { ready: 'Listo', needs_key: 'Falta API key', not_downloaded: 'No descargado', cached: 'Descargado', unavailable: 'No disponible' }
-        : { ready: 'Ready', needs_key: 'Needs API key', not_downloaded: 'Not downloaded', cached: 'Downloaded', unavailable: 'Unavailable' };
-      return map[s] ?? s;
-    }
-
-    function statusColor(s: IdCardState['status']): string {
-      if (s === 'ready' || s === 'cached') return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400';
-      if (s === 'needs_key' || s === 'not_downloaded') return 'bg-amber-500/15 text-amber-700 dark:text-amber-400';
-      return 'bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400';
-    }
-
-    async function buildIdentifierCards() {
-      if (!idContainer) return;
-      idStates.length = 0;
-
-      // 1. PlantNet — always ready
-      idStates.push({ id: 'plantnet', name: isEs ? 'PlantNet' : 'PlantNet', desc: isEs ? 'Nube — solo plantas. Siempre disponible.' : 'Cloud — plants only. Always available.', emoji: '🌿', type: 'cloud', status: 'ready' });
-
-      // 2. Claude Haiku — check BYO key
-      let claudeHasKey = false;
-      try {
-        const { getKey } = await import('../lib/byo-keys');
-        claudeHasKey = !!getKey('claude_haiku', 'anthropic');
-      } catch { /* ignore */ }
-      idStates.push({ id: 'claude_haiku', name: 'Claude Haiku', desc: isEs ? 'Nube — intérprete LLM. Requiere API key.' : 'Cloud — LLM interpreter. Requires API key.', emoji: '🧠', type: 'cloud', status: claudeHasKey ? 'ready' : 'needs_key', hasKey: claudeHasKey });
-
-      // 3. Phi-3.5-vision — check cache
-      let phiCached = false;
-      try {
-        const { getModelCacheStatus, VISION_MODEL_ID } = await import('../lib/local-ai');
-        const s = await getModelCacheStatus(VISION_MODEL_ID);
-        phiCached = s.cached;
-      } catch { /* ignore */ }
-      idStates.push({ id: 'phi_vision', name: 'Phi-3.5-vision', desc: isEs ? 'En el dispositivo — visión general (~4 GB).' : 'On-device — general vision (~4 GB).', emoji: '📱', type: 'device', status: phiCached ? 'cached' : 'not_downloaded' });
-
-      // 4. BirdNET — check cache
-      let birdnetCached = false;
-      try {
-        const { getBirdNETCacheStatus } = await import('../lib/identifiers/birdnet-cache');
-        const s = await getBirdNETCacheStatus();
-        birdnetCached = s.modelCached && s.labelsCached;
-      } catch { /* ignore */ }
-      idStates.push({ id: 'birdnet', name: 'BirdNET', desc: isEs ? 'En el dispositivo — aves por sonido (~50 MB).' : 'On-device — birds by sound (~50 MB).', emoji: '🎵', type: 'device', status: birdnetCached ? 'cached' : 'not_downloaded' });
-
-      // 5b. MegaDetector v5a — on-device camera-trap filter (operator-hosted weights).
-      let mdCached = false;
-      let mdHasUrl = false;
-      try {
-        const { getMegadetectorWeightsBaseUrl, getMegadetectorCacheStatus } = await import('../lib/identifiers/megadetector-cache');
-        mdHasUrl = !!getMegadetectorWeightsBaseUrl();
-        if (mdHasUrl) {
-          const s = await getMegadetectorCacheStatus();
-          mdCached = s.modelCached;
-        }
-      } catch { /* ignore */ }
-      if (mdHasUrl) {
-        idStates.push({
-          id: 'megadetector',
-          name: 'MegaDetector v5a',
-          desc: isEs ? 'En el dispositivo — pre-filtro de cámara trampa (~134 MB).' : 'On-device — camera-trap pre-filter (~134 MB).',
-          emoji: '🎥',
-          type: 'device',
-          status: mdCached ? 'cached' : 'not_downloaded',
-        });
-      } else {
-        idStates.push({
-          id: 'megadetector',
-          name: 'MegaDetector v5a',
-          desc: isEs ? "El operador aún no publicó los pesos ONNX." : "Operator hasn't published the ONNX weights yet.",
-          emoji: '🎥',
-          type: 'device',
-          status: 'unavailable',
-          unavailableReason: 'no_url',
-        });
-      }
-
-      // 5c. EfficientNet — check cache
-      let onnxCached = false;
-      try {
-        const { getOnnxBaseCacheStatus } = await import('../lib/identifiers/onnx-base-cache');
-        const s = await getOnnxBaseCacheStatus();
-        onnxCached = s.modelCached && s.labelsCached;
-      } catch { /* ignore */ }
-      idStates.push({ id: 'onnx_base', name: 'EfficientNet-Lite0', desc: isEs ? 'En el dispositivo — respaldo offline (~2.8 MB).' : 'On-device — offline fallback (~2.8 MB).', emoji: '🔍', type: 'device', status: onnxCached ? 'cached' : 'not_downloaded' });
-
-      // 6. Llama-3.2-1B (text engine) — used by /chat and as the offline LLM
-      // interpreter when no Anthropic key is available. Same WebLLM path as Phi.
-      let llamaCached = false;
-      try {
-        const { getModelCacheStatus, TEXT_MODEL_ID } = await import('../lib/local-ai');
-        const s = await getModelCacheStatus(TEXT_MODEL_ID);
-        llamaCached = s.cached;
-      } catch { /* ignore */ }
-      idStates.push({
-        id: 'llama_text',
-        name: 'Llama-3.2-1B',
-        desc: isEs ? 'En el dispositivo — LLM offline para chat (~700 MB).' : 'On-device — offline LLM for chat (~700 MB).',
-        emoji: '💬',
-        type: 'device',
-        status: llamaCached ? 'cached' : 'not_downloaded',
-      });
-
-      // 7. Offline map (pmtiles, Mexico). Only listed if the operator has
-      // published an archive — otherwise mark unavailable so users see why.
-      try {
-        const { getPmtilesMxUrl, getPmtilesCacheStatus } = await import('../lib/offline-map');
-        const url = getPmtilesMxUrl();
-        if (url) {
-          const s = await getPmtilesCacheStatus();
-          idStates.push({
-            id: 'pmtiles_mx',
-            name: isEs ? 'Mapa offline — México' : 'Offline map — Mexico',
-            desc: isEs ? 'Zoom 0–10 (~48 MB) para /explore/map sin conexión.' : 'Zoom 0–10 (~48 MB) for offline /explore/map.',
-            emoji: '🗺️',
-            type: 'map',
-            status: s.cached ? 'cached' : 'not_downloaded',
-          });
-        } else {
-          idStates.push({
-            id: 'pmtiles_mx',
-            name: isEs ? 'Mapa offline — México' : 'Offline map — Mexico',
-            desc: isEs ? 'El operador aún no publicó un archivo de mapa offline.' : "Operator hasn't published an offline map archive yet.",
-            emoji: '🗺️',
-            type: 'map',
-            status: 'unavailable',
-            unavailableReason: 'no_url',
-          });
-        }
-      } catch { /* lib unavailable */ }
-
-      renderIdCards();
-    }
-
-    function escape(s: string): string {
-      return s.replace(/[<>&'"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&#39;','"':'&quot;'}[c]!));
-    }
-
-    function renderIdCards() {
-      if (!idContainer) return;
-      idContainer.innerHTML = idStates.map(s => {
-        const badge = `<span class="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded ${statusColor(s.status)}">${statusLabel(s.status)}</span>`;
-        const typeBadge = s.type === 'cloud'
-          ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-700 dark:text-sky-400">${isEs ? 'Nube' : 'Cloud'}</span>`
-          : s.type === 'map'
-            ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-700 dark:text-teal-400">${isEs ? 'Mapa' : 'Map'}</span>`
-            : `<span class="text-[10px] px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">${isEs ? 'Local' : 'Device'}</span>`;
-
-        let actionHtml = '';
-        if (s.id === 'claude_haiku') {
-          // The help payload is trusted i18n with intentional inline markup
-          // (links + <b>/<code> in step strings), so we render it raw rather
-          // than escaping. Only operator-controlled strings flow in here.
-          const stepsHtml = keyHelp.steps.length
-            ? `<ol class="list-decimal ml-5 mt-2 space-y-1">${keyHelp.steps.map(s2 => `<li>${s2}</li>`).join('')}</ol>`
-            : '';
-          const helpHtml = keyHelp.summary
-            ? `
-              <details class="mt-2 group">
-                <summary class="cursor-pointer text-xs font-medium text-emerald-700 dark:text-emerald-400 select-none">${escape(keyHelp.summary)}</summary>
-                <div class="mt-2 pt-2 border-t border-zinc-200 dark:border-zinc-800 text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                  ${keyHelp.intro ? `<p>${keyHelp.intro}</p>` : ''}
-                  ${stepsHtml}
-                  ${keyHelp.privacy ? `<p class="mt-2 text-[11px] text-zinc-500 dark:text-zinc-500">${keyHelp.privacy}</p>` : ''}
-                </div>
-              </details>`
-            : '';
-          actionHtml = `
-            <form class="mt-2" id="onb-claude-key-wrap" onsubmit="event.preventDefault(); return false;" autocomplete="off">
-              <label for="onb-claude-key" class="sr-only">Anthropic API key</label>
-              <input type="password" id="onb-claude-key" autocomplete="off" inputmode="text" spellcheck="false"
-                aria-describedby="onb-claude-status"
-                placeholder="sk-ant-..."
-                value="${escape(s.hasKey ? '********' : '')}"
-                class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-1.5 text-xs font-mono" />
-              <div class="flex items-center gap-2 mt-1">
-                <button type="button" id="onb-claude-save" disabled class="rounded bg-emerald-700 hover:bg-emerald-800 px-2 py-1 text-xs font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed">${isEs ? 'Guardar' : 'Save'}</button>
-                <span id="onb-claude-status" class="text-xs" aria-live="polite"></span>
-              </div>
-              ${helpHtml}
-            </form>`;
-        }
-
-        if (
-          (s.id === 'phi_vision' || s.id === 'birdnet' || s.id === 'onnx_base' ||
-           s.id === 'llama_text' || s.id === 'pmtiles_mx' || s.id === 'megadetector') && s.status === 'not_downloaded'
-        ) {
-          const sizes: Record<string, string> = {
-            phi_vision: '~4 GB',
-            birdnet: '~50 MB',
-            onnx_base: '~2.8 MB',
-            llama_text: '~700 MB',
-            pmtiles_mx: '~48 MB',
-            megadetector: '~134 MB',
-          };
-          // Heavy = anything large enough to warrant a Wi-Fi confirmation.
-          const isHeavy = s.id === 'phi_vision' || s.id === 'birdnet' || s.id === 'llama_text'
-            || s.id === 'pmtiles_mx' || s.id === 'megadetector';
-          actionHtml = `
-            <div class="mt-2" data-onb-dl-row="${escape(s.id)}">
-              <button type="button" data-onb-download="${escape(s.id)}" data-onb-size="${escape(sizes[s.id] ?? '')}" data-onb-heavy="${isHeavy ? '1' : '0'}" class="rounded-lg border border-emerald-600/60 px-3 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 disabled:opacity-50">
-                ${isEs ? 'Descargar' : 'Download'} <span class="text-zinc-500 dark:text-zinc-400">${escape(sizes[s.id] ?? '')}</span>
-              </button>
-              <span data-onb-dl-status="${escape(s.id)}" class="text-xs text-zinc-500 ml-2" aria-live="polite"></span>
-              <div data-onb-dl-confirm="${escape(s.id)}" class="hidden mt-2 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 p-2 text-xs">
-                <p class="text-amber-800 dark:text-amber-300">${escape(dlWarning)} <span class="font-semibold">${escape(sizes[s.id] ?? '')}</span></p>
-                <div class="mt-2 flex items-center gap-2">
-                  <button type="button" data-onb-dl-confirm-yes="${escape(s.id)}" class="rounded bg-emerald-700 hover:bg-emerald-800 px-2 py-1 text-xs font-semibold text-white">${escape(dlConfirmLabel)}</button>
-                  <button type="button" data-onb-dl-confirm-no="${escape(s.id)}" class="rounded border border-zinc-300 dark:border-zinc-700 px-2 py-1 text-xs font-medium text-zinc-700 dark:text-zinc-300">${escape(dlCancelLabel)}</button>
-                </div>
-              </div>
-            </div>`;
-        }
-
-        return `
-          <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
-            <div class="flex items-start justify-between gap-2">
-              <div class="min-w-0 flex-1">
-                <div class="flex items-center gap-2 flex-wrap">
-                  <span class="text-base">${escape(s.emoji)}</span>
-                  <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">${escape(s.name)}</span>
-                  ${typeBadge}
-                  ${badge}
-                </div>
-                <p class="text-xs text-zinc-500 mt-0.5">${escape(s.desc)}</p>
-                ${actionHtml}
-              </div>
-            </div>
-          </div>
-        `;
-      }).join('');
-
-      wireIdCardActions();
-    }
-
-    const ANTHROPIC_KEY_RE = /^sk-ant-[\w-]{20,}$/;
-
-    function wireIdCardActions() {
-      // Claude key save with format validation
-      const claudeSaveBtn = document.getElementById('onb-claude-save') as HTMLButtonElement | null;
-      const claudeKeyInput = document.getElementById('onb-claude-key') as HTMLInputElement | null;
-      const claudeStatus = document.getElementById('onb-claude-status');
-
-      function refreshKeyValidity() {
-        if (!claudeKeyInput || !claudeSaveBtn) return;
-        const v = claudeKeyInput.value.trim();
-        // The "********" placeholder represents a previously-saved key.
-        if (v === '********') {
-          claudeSaveBtn.disabled = true;
-          if (claudeStatus) { claudeStatus.textContent = ''; claudeStatus.className = 'text-xs ml-2'; }
-          return;
-        }
-        if (!v) {
-          claudeSaveBtn.disabled = true;
-          if (claudeStatus) { claudeStatus.textContent = ''; claudeStatus.className = 'text-xs ml-2'; }
-          return;
-        }
-        const ok = ANTHROPIC_KEY_RE.test(v);
-        claudeSaveBtn.disabled = !ok;
-        if (claudeStatus) {
-          claudeStatus.textContent = ok ? `✓ ${keyHintOk}` : keyHintBad;
-          claudeStatus.className = `text-xs ml-2 ${ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}`;
-        }
-      }
-      claudeKeyInput?.addEventListener('input', refreshKeyValidity);
-
-      claudeSaveBtn?.addEventListener('click', async () => {
-        if (!claudeKeyInput || !claudeSaveBtn) return;
-        const val = claudeKeyInput.value.trim();
-        if (!val || val === '********' || !ANTHROPIC_KEY_RE.test(val)) return;
-        // Live-verify against Anthropic before persisting.
-        claudeSaveBtn.disabled = true;
-        if (claudeStatus) {
-          claudeStatus.textContent = keyVerifying;
-          claudeStatus.className = 'text-xs text-zinc-500 dark:text-zinc-400 ml-2';
-        }
-        let result;
-        try {
-          const { validateAnthropicKey } = await import('../lib/anthropic-key');
-          result = await validateAnthropicKey(val);
-        } catch {
-          result = { valid: false, status: 0, reason: 'network' as const, message: 'load failed' };
-        }
-        if (!result.valid) {
-          let msg = keyOther;
-          if (result.reason === 'auth') msg = keyUnauth;
-          else if (result.reason === 'network') msg = keyNetwork;
-          else if (result.reason === 'shape') msg = keyHintBad;
-          if (claudeStatus) {
-            claudeStatus.textContent = msg;
-            claudeStatus.className = 'text-xs text-amber-700 dark:text-amber-400 ml-2';
-          }
-          claudeSaveBtn.disabled = false;
-          emit('key_verify_failed', { reason: result.reason });
-          return;
-        }
-        try {
-          const { setKey } = await import('../lib/byo-keys');
-          setKey('claude_haiku', 'anthropic', val);
-          const state = idStates.find(s => s.id === 'claude_haiku');
-          if (state) { state.status = 'ready'; state.hasKey = true; }
-          if (claudeStatus) {
-            claudeStatus.textContent = keyVerified;
-            claudeStatus.className = 'text-xs text-emerald-600 dark:text-emerald-400 ml-2';
-          }
-          claudeKeyInput.value = '********';
-          claudeSaveBtn.disabled = true;
-          emit('key_saved');
-          renderIdCards();
-        } catch { /* ignore */ }
-      });
-
-      // Download buttons for on-device models — show size confirm for heavy ones.
-      root.querySelectorAll<HTMLButtonElement>('[data-onb-download]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const modelId = btn.dataset.onbDownload!;
-          const heavy = btn.dataset.onbHeavy === '1';
-          if (heavy) {
-            const confirmRow = root.querySelector<HTMLElement>(`[data-onb-dl-confirm="${modelId}"]`);
-            confirmRow?.classList.remove('hidden');
-            confirmRow?.querySelector<HTMLButtonElement>(`[data-onb-dl-confirm-yes="${modelId}"]`)?.focus();
-          } else {
-            startDownload(modelId);
-          }
-        });
-      });
-
-      root.querySelectorAll<HTMLButtonElement>('[data-onb-dl-confirm-yes]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const modelId = btn.dataset.onbDlConfirmYes!;
-          const confirmRow = root.querySelector<HTMLElement>(`[data-onb-dl-confirm="${modelId}"]`);
-          confirmRow?.classList.add('hidden');
-          startDownload(modelId);
-        });
-      });
-      root.querySelectorAll<HTMLButtonElement>('[data-onb-dl-confirm-no]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const modelId = btn.dataset.onbDlConfirmNo!;
-          root.querySelector<HTMLElement>(`[data-onb-dl-confirm="${modelId}"]`)?.classList.add('hidden');
-        });
-      });
-    }
-
-    async function startDownload(modelId: string) {
-      emit('download_started', { id: modelId });
-      const dlBtn = root.querySelector<HTMLButtonElement>(`[data-onb-download="${modelId}"]`);
-      const statusEl = root.querySelector<HTMLElement>(`[data-onb-dl-status="${modelId}"]`);
-      if (dlBtn) dlBtn.disabled = true;
-      if (statusEl) statusEl.textContent = isEs ? 'Descargando…' : 'Downloading…';
-      try {
-        if (modelId === 'phi_vision') {
-          const { loadVisionEngine } = await import('../lib/local-ai');
-          await loadVisionEngine((p) => {
-            if (statusEl) statusEl.textContent = `${Math.round(p.progress * 100)}%`;
-          });
-          const state = idStates.find(s => s.id === 'phi_vision');
-          if (state) state.status = 'cached';
-        } else if (modelId === 'birdnet') {
-          const { downloadBirdNETWeights } = await import('../lib/identifiers/birdnet-cache');
-          await downloadBirdNETWeights((p) => {
-            if (statusEl) statusEl.textContent = `${Math.round(p.progress * 100)}%`;
-          });
-          const state = idStates.find(s => s.id === 'birdnet');
-          if (state) state.status = 'cached';
-        } else if (modelId === 'onnx_base') {
-          const { downloadOnnxBaseWeights } = await import('../lib/identifiers/onnx-base-cache');
-          await downloadOnnxBaseWeights((p) => {
-            if (statusEl) statusEl.textContent = `${Math.round(p.progress * 100)}%`;
-          });
-          const state = idStates.find(s => s.id === 'onnx_base');
-          if (state) state.status = 'cached';
-        } else if (modelId === 'llama_text') {
-          const { loadTextEngine } = await import('../lib/local-ai');
-          await loadTextEngine((p) => {
-            if (statusEl) statusEl.textContent = `${Math.round(p.progress * 100)}%`;
-          });
-          const state = idStates.find(s => s.id === 'llama_text');
-          if (state) state.status = 'cached';
-        } else if (modelId === 'pmtiles_mx') {
-          const { downloadPmtilesMx } = await import('../lib/offline-map');
-          await downloadPmtilesMx((p) => {
-            if (statusEl) statusEl.textContent = `${Math.round(p.progress * 100)}%`;
-          });
-          const state = idStates.find(s => s.id === 'pmtiles_mx');
-          if (state) state.status = 'cached';
-        } else if (modelId === 'megadetector') {
-          const { downloadMegadetectorWeights } = await import('../lib/identifiers/megadetector-cache');
-          await downloadMegadetectorWeights((p) => {
-            if (statusEl) statusEl.textContent = `${Math.round(p.progress * 100)}%`;
-          });
-          const state = idStates.find(s => s.id === 'megadetector');
-          if (state) state.status = 'cached';
-        }
-        renderIdCards();
-      } catch (e) {
-        if (statusEl) statusEl.textContent = e instanceof Error ? e.message : 'Failed';
-        if (dlBtn) dlBtn.disabled = false;
-      }
-    }
-
-    // ── Summary (Step 2) ──
-    function buildSummary() {
-      if (!summaryList) return;
-      summaryList.innerHTML = idStates.map(s => {
-        const active = s.status === 'ready' || s.status === 'cached';
-        const icon = active
-          ? '<svg class="w-4 h-4 text-emerald-500 flex-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>'
-          : '<svg class="w-4 h-4 text-zinc-400 flex-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20 12H4"/></svg>';
-        return `
-          <div class="flex items-center gap-2 text-sm ${active ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-400 dark:text-zinc-500'}">
-            ${icon}
-            <span>${escape(s.emoji)} ${escape(s.name)}</span>
-            <span class="text-[10px] ml-auto ${active ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-400'}">${active ? (isEs ? 'Activo' : 'Active') : (isEs ? 'Inactivo' : 'Inactive')}</span>
-          </div>
-        `;
-      }).join('');
-    }
-
-    // ── Theme + language toggles (mirrors Header.astro / MobileDrawer.astro) ──
-    root.querySelector<HTMLButtonElement>('#onb-theme-toggle')?.addEventListener('click', () => {
-      const dark = document.documentElement.classList.toggle('dark');
-      try { localStorage.setItem('theme', dark ? 'dark' : 'light'); } catch { /* ignore */ }
+  function show(): void {
+    returnFocusEl = document.activeElement as HTMLElement | null;
+    current = 0;
+    dialog.classList.remove('hidden');
+    lockScroll();
+    render();
+    requestAnimationFrame(() => {
+      tooltip.focus();
+      try { window.dispatchEvent(new CustomEvent('rastrum:onboarding-event', { detail: { type: 'opened', step: 0 } })); } catch { /* noop */ }
     });
-    const langTog = root.querySelector<HTMLAnchorElement>('#onb-lang-toggle');
-    langTog?.addEventListener('click', () => {
-      const target = langTog.dataset.targetLang;
-      if (target) {
-        try { localStorage.setItem('rastrum.lang', target); } catch { /* ignore */ }
-      }
-    });
+  }
 
-    // ── Navigation ──
-    function go(to: number) {
-      if (to === current || to < 0 || to >= TOTAL) return;
-      const from = current;
-      current = to;
-      render();
-      emit('step_change', { from, to });
-    }
-    nextBtn?.addEventListener('click', () => {
-      if (current >= TOTAL - 1) { hide(); return; }
-      go(current + 1);
-    });
-    backBtn?.addEventListener('click', () => {
-      if (current > 0) go(current - 1);
-    });
-    skipBtn?.addEventListener('click', () => {
-      if (current >= TOTAL - 1) { hide(); return; }
-      go(current + 1);
-    });
-    // "Skip — set up later" on the configure step → confirm, then jump to summary.
-    skipSetupBtn?.addEventListener('click', () => {
-      // eslint-disable-next-line no-alert
-      const ok = window.confirm(skipConfirm);
-      if (!ok) return;
-      emit('skip_to_summary');
-      go(2);
-    });
+  function hide(): void {
+    dialog.classList.add('hidden');
+    ring.classList.add('hidden');
+    backdrop.style.clipPath = 'none';
+    unlockScroll();
+    markSeen();
+    try { returnFocusEl?.focus(); } catch { /* noop */ }
+    try { window.dispatchEvent(new CustomEvent('rastrum:onboarding-event', { detail: { type: current === TOTAL - 1 ? 'completed' : 'dismissed', step: current } })); } catch { /* noop */ }
+  }
 
-    // Backdrop click + Escape close the modal (skippable everywhere now).
-    root.addEventListener('click', (ev) => {
-      if (ev.target === root) hide();
-    });
-    document.addEventListener('keydown', (ev) => {
-      if (root.classList.contains('hidden')) return;
-      if (ev.key === 'Escape') {
+  function go(to: number): void {
+    if (to < 0 || to >= TOTAL || to === current) return;
+    const from = current;
+    current = to;
+    render();
+    tooltip.focus();
+    try { window.dispatchEvent(new CustomEvent('rastrum:onboarding-event', { detail: { type: 'step_change', from, to } })); } catch { /* noop */ }
+  }
+
+  nextBtn.addEventListener('click', () => {
+    if (current === 0) { go(1); return; }
+    if (current >= TOTAL - 1) { hide(); return; }
+    go(current + 1);
+  });
+  backBtn.addEventListener('click', () => { if (current > 0) go(current - 1); });
+  skipBtn.addEventListener('click', () => { hide(); });
+
+  // Esc = skip, Enter/→ = next, ← = back, Tab = focus trap
+  document.addEventListener('keydown', (ev) => {
+    if (dialog.classList.contains('hidden')) return;
+    switch (ev.key) {
+      case 'Escape':
         ev.preventDefault();
         hide();
-        return;
-      }
-      // Focus trap: Tab/Shift+Tab cycle within the dialog.
-      if (ev.key === 'Tab') {
-        const focusables = focusableInDialog();
-        if (focusables.length === 0) return;
-        const first = focusables[0];
-        const last = focusables[focusables.length - 1];
+        break;
+      case 'Enter':
+      case 'ArrowRight':
+        if (document.activeElement === nextBtn || document.activeElement === tooltip) {
+          ev.preventDefault();
+          nextBtn.click();
+        }
+        break;
+      case 'ArrowLeft':
+        if (document.activeElement === backBtn || document.activeElement === tooltip) {
+          ev.preventDefault();
+          backBtn.click();
+        }
+        break;
+      case 'Tab': {
+        const items = focusables();
+        if (items.length === 0) { ev.preventDefault(); break; }
+        const first = items[0];
+        const last  = items[items.length - 1];
         const active = document.activeElement as HTMLElement | null;
         if (ev.shiftKey) {
-          if (active === first || !card?.contains(active)) {
+          if (!tooltip.contains(active) || active === first) {
             ev.preventDefault();
             last.focus();
           }
         } else {
-          if (active === last) {
-            ev.preventDefault();
-            first.focus();
-          } else if (!card?.contains(active)) {
+          if (!tooltip.contains(active) || active === last) {
             ev.preventDefault();
             first.focus();
           }
         }
+        break;
       }
-    });
-
-    // ── Public replay hook ──
-    // Any element can fire `window.dispatchEvent(new CustomEvent('rastrum:replay-onboarding'))`
-    // to re-open the tour. Profile → Edit wires a "Replay tour" button.
-    window.addEventListener('rastrum:replay-onboarding', () => {
-      try {
-        localStorage.removeItem(SHOWN_KEY);
-        sessionStorage.removeItem(STEP_KEY);
-      } catch { /* ignore */ }
-      show();
-    });
-
-    async function maybeShow(): Promise<void> {
-      if (!shouldShow()) return;
-      let supabase;
-      try {
-        supabase = getSupabase();
-      } catch {
-        return;
-      }
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      setTimeout(() => show({ resume: true }), 600);
     }
+  });
 
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => {
-        maybeShow().catch(() => { /* env not configured */ });
-      });
-    } else {
-      maybeShow().catch(() => { /* env not configured */ });
-    }
+  // Recompute spotlight on resize/orientation
+  function onResize(): void {
+    if (dialog.classList.contains('hidden')) return;
+    if (resizeRaf !== undefined) cancelAnimationFrame(resizeRaf);
+    resizeRaf = requestAnimationFrame(() => {
+      render();
+      resizeRaf = undefined;
+    });
+  }
+  window.addEventListener('resize', onResize);
+  window.addEventListener('orientationchange', onResize);
+
+  // Public replay hook
+  window.addEventListener('rastrum:replay-onboarding', () => {
+    try {
+      localStorage.removeItem(SEEN_KEY);
+    } catch { /* noop */ }
+    show();
+  });
+
+  async function maybeShow(): Promise<void> {
+    if (seen()) return;
+    let sb;
+    try { sb = getSupabase(); } catch { return; }
+    const { data: { user } } = await sb.auth.getUser();
+    if (!user) return;
+    setTimeout(() => show(), 600);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => { maybeShow().catch(() => { /* env not configured */ }); });
+  } else {
+    maybeShow().catch(() => { /* env not configured */ });
   }
 </script>
