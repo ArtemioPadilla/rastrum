@@ -243,10 +243,13 @@ const validatePath = getLocalizedPath(lang, routes.profileValidate[lang] + '/');
       }
     }
 
-    // Load activity events (last 20)
+    // Load activity events (last 20). subject_id points at the
+    // observation for kinds like 'observation_created' /
+    // 'observation_research_grade' — needed so each row is clickable
+    // and can hydrate a thumbnail.
     const { data: events } = await supabase
       .from('activity_events')
-      .select('id, kind, payload, created_at, read_at')
+      .select('id, kind, payload, created_at, read_at, subject_id')
       .eq('actor_id', user.id)
       .order('created_at', { ascending: false })
       .limit(20);
@@ -279,18 +282,74 @@ const validatePath = getLocalizedPath(lang, routes.profileValidate[lang] + '/');
       validation_received: () => isEs ? 'Validación recibida' : 'Validation received',
       follow_received: () => isEs ? 'Nuevo seguidor' : 'New follower',
     };
+    // Hydrate observation-flavored events with species name + primary
+    // photo via a single batched lookup (one query per joined table).
+    // Without this, "New observation" rows show no thumbnail and no
+    // link — users can't tell which observation any given row refers
+    // to. The kinds we hydrate are observation_created and
+    // observation_research_grade; both store the obs id in subject_id.
+    const obsKinds = new Set(['observation_created', 'observation_research_grade']);
+    const obsEventIds = events
+      .filter(e => obsKinds.has(e.kind as string) && e.subject_id)
+      .map(e => e.subject_id as string);
+    const obsMeta = new Map<string, { sci: string | null; photo: string | null; obscured: boolean }>();
+    if (obsEventIds.length > 0) {
+      const [{ data: obsRows }, { data: idRows }, { data: mediaRows }] = await Promise.all([
+        supabase.from('observations').select('id, sync_status, obscure_level').in('id', obsEventIds),
+        supabase.from('identifications').select('observation_id, scientific_name, is_primary').in('observation_id', obsEventIds).eq('is_primary', true),
+        supabase.from('media_files').select('observation_id, url, is_primary').in('observation_id', obsEventIds),
+      ]);
+      const sciByObs = new Map<string, string>();
+      for (const r of (idRows ?? [])) {
+        const oid = (r as { observation_id: string }).observation_id;
+        const sci = (r as { scientific_name?: string | null }).scientific_name;
+        if (sci) sciByObs.set(oid, sci);
+      }
+      const photoByObs = new Map<string, string>();
+      for (const m of (mediaRows ?? [])) {
+        const oid = (m as { observation_id: string }).observation_id;
+        const url = (m as { url?: string | null }).url;
+        const primary = (m as { is_primary?: boolean }).is_primary;
+        if (!url) continue;
+        if (primary || !photoByObs.has(oid)) photoByObs.set(oid, url);
+      }
+      for (const o of (obsRows ?? [])) {
+        const id = (o as { id: string }).id;
+        obsMeta.set(id, {
+          sci:      sciByObs.get(id) ?? null,
+          photo:    photoByObs.get(id) ?? null,
+          obscured: (o as { obscure_level?: string }).obscure_level === 'full',
+        });
+      }
+    }
+
+    function escAttr(s: string): string {
+      return s.replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' } as Record<string, string>)[c]);
+    }
+
     if (list) {
       list.innerHTML = events.map(ev => {
         const fn = labels[ev.kind as string] ?? ((p: Record<string, unknown> | null) => `${ev.kind}${p ? ' — ' + JSON.stringify(p) : ''}`);
         const text = fn(ev.payload as Record<string, unknown> | null);
         const date = new Date(ev.created_at as string).toLocaleDateString();
-        return `<li class="flex items-start gap-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-3">
-          <span class="mt-1 w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+        const obsId = (ev.subject_id as string | null) ?? null;
+        const meta  = obsId ? obsMeta.get(obsId) : undefined;
+        const sci   = meta?.sci ?? null;
+        const photo = meta?.photo ?? null;
+        const isObs = obsKinds.has(ev.kind as string) && !!obsId;
+        const href  = isObs ? `/share/obs/?id=${encodeURIComponent(obsId!)}` : null;
+
+        const inner = `
+          ${photo ? `<img src="${escAttr(photo)}" alt="" loading="lazy" class="w-12 h-12 rounded-lg object-cover bg-zinc-100 dark:bg-zinc-800 shrink-0" />` : `<span class="mt-1 w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>`}
           <div class="flex-1 min-w-0">
             <p class="text-sm text-zinc-800 dark:text-zinc-200">${text}</p>
+            ${sci ? `<p class="text-sm italic text-emerald-700 dark:text-emerald-400 truncate">${escAttr(sci)}</p>` : ''}
             <p class="text-xs text-zinc-500">${date}</p>
-          </div>
-        </li>`;
+          </div>`;
+
+        return href
+          ? `<li><a href="${href}" class="flex items-start gap-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 hover:border-emerald-400 dark:hover:border-emerald-700 transition-colors p-3">${inner}</a></li>`
+          : `<li class="flex items-start gap-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-3">${inner}</li>`;
       }).join('');
     }
 
