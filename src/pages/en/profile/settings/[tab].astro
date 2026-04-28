@@ -99,6 +99,23 @@ const mcpUrl = 'https://reppvlqejgoqvitturxp.supabase.co/functions/v1/mcp';
           </div>
         </section>
 
+        <!-- Camera -->
+        <section class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-5">
+          <h2 class="text-base font-semibold text-zinc-900 dark:text-zinc-100 mb-1">{settings.preferences.camera_title ?? 'Camera'}</h2>
+          <p class="text-sm text-zinc-500 dark:text-zinc-400 mb-4">{settings.preferences.camera_subtitle ?? 'Choose how the observation form opens the camera.'}</p>
+          <label class="flex items-start gap-3 cursor-pointer">
+            <input
+              id="pref-inapp-camera"
+              type="checkbox"
+              class="mt-0.5 h-4 w-4 rounded border-zinc-300 dark:border-zinc-600 text-emerald-600 focus:ring-emerald-500"
+            />
+            <span class="text-sm text-zinc-700 dark:text-zinc-300">
+              {settings.preferences.inapp_camera_label ?? 'Use in-app camera with live preview'}
+              <span class="ml-1 text-xs text-zinc-500">{settings.preferences.inapp_camera_hint ?? '(Recommended for Android devices where the system camera button is unreliable)'}</span>
+            </span>
+          </label>
+        </section>
+
         <!-- Notifications (placeholder) -->
         <section>
           <h2 class="text-base font-semibold text-zinc-900 dark:text-zinc-100 mb-3">{settings.preferences.notifications_title}</h2>
@@ -222,6 +239,20 @@ const mcpUrl = 'https://reppvlqejgoqvitturxp.supabase.co/functions/v1/mcp';
       clearKey('claude_haiku', 'anthropic');
       clearKey('claude_sonnet', 'anthropic');
       if (anthropicInput) anthropicInput.value = '';
+    });
+  })();
+
+  // In-app camera toggle
+  (function () {
+    const cb = document.getElementById('pref-inapp-camera') as HTMLInputElement | null;
+    if (!cb) return;
+    cb.checked = localStorage.getItem('rastrum.prefs.useInAppCamera') === 'true';
+    cb.addEventListener('change', () => {
+      if (cb.checked) {
+        localStorage.setItem('rastrum.prefs.useInAppCamera', 'true');
+      } else {
+        localStorage.removeItem('rastrum.prefs.useInAppCamera');
+      }
     });
   })();
 </script>
