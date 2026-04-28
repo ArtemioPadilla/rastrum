@@ -2841,3 +2841,48 @@ CREATE POLICY photoreact_write ON public.photo_reactions FOR INSERT
 DROP POLICY IF EXISTS photoreact_delete ON public.photo_reactions;
 CREATE POLICY photoreact_delete ON public.photo_reactions FOR DELETE
   USING (user_id = auth.uid());
+
+-- 9) identification_reactions
+CREATE TABLE IF NOT EXISTS public.identification_reactions (
+  id                uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id           uuid        NOT NULL REFERENCES public.users(id)           ON DELETE CASCADE,
+  identification_id uuid        NOT NULL REFERENCES public.identifications(id) ON DELETE CASCADE,
+  kind              text        NOT NULL CHECK (kind IN ('agree_id','disagree_id','helpful')),
+  created_at        timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(user_id, identification_id, kind)
+);
+CREATE INDEX IF NOT EXISTS idx_idreact_id_kind
+  ON public.identification_reactions(identification_id, kind);
+
+ALTER TABLE public.identification_reactions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS idreact_read ON public.identification_reactions;
+CREATE POLICY idreact_read ON public.identification_reactions FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.identifications i
+        JOIN public.observations o ON o.id = i.observation_id
+       WHERE i.id = identification_reactions.identification_id
+         AND (
+           o.observer_id = auth.uid()
+           OR (
+             o.obscure_level <> 'full'
+             AND public.can_see_facet(o.observer_id, 'observations', auth.uid())
+           )
+           OR public.is_collaborator_of(auth.uid(), o.observer_id)
+         )
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM public.blocks b
+       WHERE (b.blocker_id = auth.uid() AND b.blocked_id = identification_reactions.user_id)
+          OR (b.blocked_id = auth.uid() AND b.blocker_id = identification_reactions.user_id)
+    )
+  );
+
+DROP POLICY IF EXISTS idreact_write ON public.identification_reactions;
+CREATE POLICY idreact_write ON public.identification_reactions FOR INSERT
+  WITH CHECK (user_id = auth.uid());
+
+DROP POLICY IF EXISTS idreact_delete ON public.identification_reactions;
+CREATE POLICY idreact_delete ON public.identification_reactions FOR DELETE
+  USING (user_id = auth.uid());
