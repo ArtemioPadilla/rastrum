@@ -1469,11 +1469,54 @@ CREATE POLICY user_expertise_public_read ON public.user_expertise FOR SELECT
 -- user_expertise rows are written by the in-database award_karma()
 -- helper running under SECURITY DEFINER (added in a later task).
 
--- 2. taxa.ancestor_path: precomputed array of ancestor IDs (most-specific first).
+-- 2. taxa.parent_id + ancestor_path: graph + precomputed walk.
+-- parent_id is a self-FK that lets us walk the lineage. Existing taxa
+-- rows store the lineage as denormalized text columns (kingdom, phylum,
+-- class, "order", family, genus) — we backfill parent_id by joining
+-- each row to the next-shallower-rank row that exists in the table.
 ALTER TABLE public.taxa
+  ADD COLUMN IF NOT EXISTS parent_id     uuid REFERENCES public.taxa(id),
   ADD COLUMN IF NOT EXISTS ancestor_path uuid[] NOT NULL DEFAULT '{}';
+
+CREATE INDEX IF NOT EXISTS idx_taxa_parent_id
+  ON public.taxa(parent_id);
 CREATE INDEX IF NOT EXISTS idx_taxa_ancestor_path
   ON public.taxa USING GIN (ancestor_path);
+
+-- One-shot parent_id backfill: for each non-kingdom row, find the row
+-- whose taxon_rank is the immediate parent rank and whose
+-- scientific_name matches the parent's name in the denormalized
+-- columns. Rows without a matching parent in the table keep parent_id
+-- NULL — that's fine, ancestor_path will be '{}' and the consensus
+-- engine falls back to 1× weight, which is correct.
+UPDATE public.taxa t
+   SET parent_id = (
+     SELECT a.id FROM public.taxa a
+     WHERE a.taxon_rank = (
+       CASE t.taxon_rank
+         WHEN 'species' THEN 'genus'
+         WHEN 'genus'   THEN 'family'
+         WHEN 'family'  THEN 'order'
+         WHEN 'order'   THEN 'class'
+         WHEN 'class'   THEN 'phylum'
+         WHEN 'phylum'  THEN 'kingdom'
+       END
+     )
+       AND a.scientific_name = (
+         CASE t.taxon_rank
+           WHEN 'species' THEN t.genus
+           WHEN 'genus'   THEN t.family
+           WHEN 'family'  THEN t."order"
+           WHEN 'order'   THEN t.class
+           WHEN 'class'   THEN t.phylum
+           WHEN 'phylum'  THEN t.kingdom
+         END
+       )
+     LIMIT 1
+   )
+ WHERE t.parent_id IS NULL
+   AND t.taxon_rank IS NOT NULL
+   AND t.taxon_rank <> 'kingdom';
 
 -- 3. taxon_rarity: nightly-materialized rarity buckets and multipliers.
 CREATE TABLE IF NOT EXISTS public.taxon_rarity (
@@ -1593,7 +1636,7 @@ FROM   public.users u
 CROSS JOIN LATERAL unnest(u.expert_taxa) AS kingdom_name
 JOIN   public.taxa t
        ON  t.kingdom = kingdom_name
-       AND t.parent_id IS NULL
+       AND t.taxon_rank = 'kingdom'
 WHERE  u.is_expert = true
   AND  u.expert_taxa IS NOT NULL
 ON CONFLICT (user_id, taxon_id) DO NOTHING;
