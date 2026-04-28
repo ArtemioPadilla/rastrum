@@ -3,7 +3,7 @@ import { t, getLocalizedPath, routes, type Locale } from '../i18n/utils';
 
 interface Props {
   lang: 'en' | 'es';
-  activeTab: 'profile' | 'preferences' | 'data' | 'developer';
+  activeTab: 'profile' | 'preferences' | 'data' | 'developer' | 'privacy';
 }
 
 const { lang, activeTab } = Astro.props;
@@ -15,6 +15,7 @@ const profilePath      = getLocalizedPath(lang, routes.profileSettings[locale] +
 const preferencesPath  = getLocalizedPath(lang, routes.profileSettings[locale] + '/preferences/');
 const dataPath         = getLocalizedPath(lang, routes.profileSettings[locale] + '/data/');
 const developerPath    = getLocalizedPath(lang, routes.profileSettings[locale] + '/developer/');
+const privacyPath      = getLocalizedPath(lang, routes.profileSettings[locale] + '/privacy/');
 const profileHubPath   = getLocalizedPath(lang, routes.profile[locale] + '/');
 
 const tabs = [
@@ -22,6 +23,7 @@ const tabs = [
   { key: 'preferences', label: settings.tabs.preferences, href: preferencesPath },
   { key: 'data',        label: settings.tabs.data,        href: dataPath },
   { key: 'developer',   label: settings.tabs.developer,   href: developerPath },
+  { key: 'privacy',     label: settings.tabs.privacy,     href: privacyPath },
 ] as const;
 ---
 

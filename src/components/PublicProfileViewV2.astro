@@ -1,0 +1,394 @@
+---
+/**
+ * Module 25 v1.2.0 — public profile, gated by the privacy matrix.
+ *
+ * Resolves the target user by username (?username= or last path segment),
+ * calls can_see_facets() once for the facets the page renders, and
+ * conditionally shows each section. Owner viewing their own profile sees
+ * everything regardless, with a small "Only you see this" badge under each
+ * section that's gated to non-public.
+ *
+ * Note: with output: 'static' we cannot prerender per-username pages, so
+ * the route lives at /{lang}/u/ and accepts the username via the query
+ * param OR as the trailing path segment when CDN configured to fall
+ * through. The legacy /{lang}/profile/u/?username= path 301-redirects
+ * here via inline meta-refresh from the legacy index page.
+ */
+import { t } from '../i18n/utils';
+import FollowButton from './FollowButton.astro';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+
+const { lang } = Astro.props;
+const tr = t(lang);
+const pmTree = tr as unknown as {
+  privacy: {
+    private_profile_empty_title: string;
+    private_profile_empty_body: string;
+    signed_in_required_title: string;
+    signed_in_required_body: string;
+    owner_only_badge: string;
+  };
+};
+const pm = pmTree.privacy;
+---
+
+<div
+  class="rastrum-public-profile-v2 max-w-3xl mx-auto"
+  data-lang={lang}
+  data-label-not-found={tr.profile.public_profile_not_found}
+  data-label-private-title={pm.private_profile_empty_title}
+  data-label-private-body={pm.private_profile_empty_body}
+  data-label-signed-in-title={pm.signed_in_required_title}
+  data-label-signed-in-body={pm.signed_in_required_body}
+  data-label-owner-only={pm.owner_only_badge}
+  data-label-loading={tr.profile.public_profile_loading}
+  data-label-recent={tr.profile.public_profile_recent}
+  data-label-unknown-species={tr.profile.my_observations_unknown_species}
+  data-label-member-since={tr.profile.public_profile_member_since}
+  data-label-research-grade={tr.profile.research_grade}
+  data-label-stat-obs={tr.profile.total_observations}
+  data-label-stat-species={tr.profile.species_count}
+  data-share-obs-base="/share/obs/"
+>
+  <div data-pp-loading class="py-12 text-center text-sm text-zinc-500 dark:text-zinc-400">
+    {tr.profile.public_profile_loading}
+  </div>
+
+  <div data-pp-private class="hidden py-12 text-center">
+    <p class="text-base font-semibold text-zinc-900 dark:text-zinc-100">{pm.private_profile_empty_title}</p>
+    <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{pm.private_profile_empty_body}</p>
+  </div>
+
+  <div data-pp-signed-in class="hidden py-12 text-center">
+    <p class="text-base font-semibold text-zinc-900 dark:text-zinc-100">{pm.signed_in_required_title}</p>
+    <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{pm.signed_in_required_body}</p>
+    <a href={`/${lang}/${lang === 'es' ? 'ingresar' : 'sign-in'}/`} class="mt-3 inline-block text-emerald-700 dark:text-emerald-400 hover:underline">
+      {lang === 'es' ? 'Iniciar sesión →' : 'Sign in →'}
+    </a>
+  </div>
+
+  <article data-pp-profile class="hidden">
+    <header class="flex items-start gap-4 md:gap-6 mb-6">
+      <img data-pp-avatar src="" alt="" class="w-20 h-20 md:w-24 md:h-24 rounded-full bg-zinc-200 dark:bg-zinc-800 object-cover shrink-0" />
+      <div class="min-w-0 flex-1">
+        <h1 data-pp-name class="text-2xl md:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 truncate">—</h1>
+        <p class="text-sm text-zinc-500 mt-0.5">
+          <span data-pp-handle>@—</span>
+          <span data-pp-region-sep class="hidden"> · </span>
+          <span data-pp-region></span>
+        </p>
+        <p data-pp-bio class="mt-2 text-sm text-zinc-700 dark:text-zinc-300 hidden"></p>
+        <p data-pp-since class="mt-2 text-xs text-zinc-500"></p>
+        <p data-pp-name-owner-only data-owner-only-badge class="hidden mt-1 text-[10px] uppercase tracking-wider text-amber-700 dark:text-amber-400"></p>
+      </div>
+      <div class="shrink-0">
+        <FollowButton lang={lang} />
+      </div>
+    </header>
+
+    <section data-pp-stats class="hidden grid-cols-3 gap-3 mb-8 grid">
+      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4">
+        <p data-pp-stat-obs class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">0</p>
+        <p class="text-xs text-zinc-500">{tr.profile.total_observations}</p>
+      </div>
+      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4">
+        <p data-pp-stat-rg class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">0</p>
+        <p class="text-xs text-zinc-500">{tr.profile.research_grade}</p>
+      </div>
+      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4">
+        <p data-pp-stat-kingdoms class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">0</p>
+        <p class="text-xs text-zinc-500">{lang === 'es' ? 'Reinos' : 'Kingdoms'}</p>
+      </div>
+      <p data-pp-stats-owner-only data-owner-only-badge class="hidden col-span-3 text-[10px] uppercase tracking-wider text-amber-700 dark:text-amber-400"></p>
+    </section>
+
+    <section data-pp-map-section class="hidden mb-8">
+      <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-3">
+        {lang === 'es' ? 'Mapa de observaciones' : 'Observation map'}
+      </h2>
+      <p data-pp-map-summary class="text-xs text-zinc-500 dark:text-zinc-400"></p>
+      <p data-pp-map-owner-only data-owner-only-badge class="hidden mt-2 text-[10px] uppercase tracking-wider text-amber-700 dark:text-amber-400"></p>
+    </section>
+
+    <section data-pp-validation-section class="hidden mb-8">
+      <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-3">
+        {lang === 'es' ? 'Reputación de validación' : 'Validation reputation'}
+      </h2>
+      <p data-pp-validation-body class="text-sm text-zinc-700 dark:text-zinc-300"></p>
+      <p data-pp-validation-owner-only data-owner-only-badge class="hidden mt-2 text-[10px] uppercase tracking-wider text-amber-700 dark:text-amber-400"></p>
+    </section>
+
+    <section data-pp-karma-section class="hidden mb-8">
+      <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-3">
+        {lang === 'es' ? 'Karma' : 'Karma'}
+      </h2>
+      <p data-pp-karma-body class="text-sm text-zinc-700 dark:text-zinc-300"></p>
+      <p data-pp-karma-owner-only data-owner-only-badge class="hidden mt-2 text-[10px] uppercase tracking-wider text-amber-700 dark:text-amber-400"></p>
+    </section>
+
+    <section data-pp-pokedex-section class="hidden mb-8">
+      <a data-pp-pokedex-link class="block rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 hover:border-emerald-400 dark:hover:border-emerald-700">
+        <p class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Pokédex →</p>
+        <p class="text-xs text-zinc-500">{lang === 'es' ? 'Ver todas las especies observadas' : 'View every observed species'}</p>
+      </a>
+      <p data-pp-pokedex-owner-only data-owner-only-badge class="hidden mt-2 text-[10px] uppercase tracking-wider text-amber-700 dark:text-amber-400"></p>
+    </section>
+  </article>
+</div>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+
+  type Lang = 'en' | 'es';
+
+  type PublicUser = {
+    id: string;
+    username: string | null;
+    display_name: string | null;
+    bio: string | null;
+    avatar_url: string | null;
+    region_primary: string | null;
+    joined_at: string | null;
+    karma_total: number | null;
+    credentialed_researcher: boolean | null;
+  };
+
+  type FacetMap = Partial<Record<string, boolean>>;
+
+  function show(el: Element | null) { el?.classList.remove('hidden'); }
+  function hide(el: Element | null) { el?.classList.add('hidden'); }
+
+  function initialsAvatar(name: string): string {
+    const clean = (name || '?').trim().slice(0, 2).toUpperCase();
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'><rect width='96' height='96' fill='#10b981'/><text x='50%' y='58%' text-anchor='middle' fill='white' font-family='system-ui,sans-serif' font-size='40' font-weight='700'>${clean}</text></svg>`;
+    return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+  }
+
+  function readUsername(): string {
+    const params = new URLSearchParams(window.location.search);
+    const fromQuery = params.get('username') || params.get('u') || '';
+    if (fromQuery) return fromQuery.trim();
+    const segments = window.location.pathname.split('/').filter(Boolean);
+    const last = segments[segments.length - 1] || '';
+    if (last && last !== 'u') return last;
+    return '';
+  }
+
+  async function init() {
+    const root = document.querySelector<HTMLElement>('.rastrum-public-profile-v2');
+    if (!root) return;
+    const lang = (root.dataset.lang === 'es' ? 'es' : 'en') as Lang;
+    const username = readUsername();
+
+    if (!username || !/^[a-zA-Z0-9_]{3,30}$/.test(username)) {
+      hide(root.querySelector('[data-pp-loading]'));
+      show(root.querySelector('[data-pp-private]'));
+      return;
+    }
+
+    let supabase;
+    try { supabase = getSupabase(); } catch {
+      hide(root.querySelector('[data-pp-loading]'));
+      show(root.querySelector('[data-pp-private]'));
+      return;
+    }
+
+    const { data: { user: viewer } } = await supabase.auth.getUser();
+
+    const { data: profile } = await supabase
+      .from('users')
+      .select('id, username, display_name, bio, avatar_url, region_primary, joined_at, karma_total, credentialed_researcher')
+      .eq('username', username)
+      .maybeSingle<PublicUser>();
+
+    if (!profile) {
+      hide(root.querySelector('[data-pp-loading]'));
+      show(root.querySelector('[data-pp-private]'));
+      return;
+    }
+
+    const isOwner = viewer?.id === profile.id;
+
+    const facetList = [
+      'profile', 'real_name', 'bio', 'location',
+      'stats_counts', 'observation_map', 'validation_rep',
+      'obs_list', 'karma_total', 'pokedex',
+    ];
+
+    const { data: facetData } = await supabase.rpc('can_see_facets', {
+      target: profile.id,
+      facets: facetList,
+      viewer: viewer?.id ?? null,
+    });
+    const facets = (facetData ?? {}) as FacetMap;
+
+    if (!isOwner && facets.profile === false) {
+      hide(root.querySelector('[data-pp-loading]'));
+      // Differentiate signed_in vs private by checking whether viewer was authed.
+      if (viewer) {
+        show(root.querySelector('[data-pp-private]'));
+      } else {
+        show(root.querySelector('[data-pp-signed-in]'));
+      }
+      return;
+    }
+
+    hide(root.querySelector('[data-pp-loading]'));
+    show(root.querySelector('[data-pp-profile]'));
+
+    const showName = isOwner || facets.real_name !== false;
+    const showBio = isOwner || facets.bio !== false;
+    const showLocation = isOwner || facets.location !== false;
+    const showStats = isOwner || facets.stats_counts !== false;
+    const showMap = isOwner || facets.observation_map !== false;
+    const showValidation = isOwner || facets.validation_rep !== false;
+    const showKarma = isOwner || facets.karma_total !== false;
+    const showPokedex = isOwner || facets.pokedex !== false;
+
+    const ownerLabel = root.dataset.labelOwnerOnly ?? '';
+
+    const name = showName ? (profile.display_name || profile.username || 'Observer') : (profile.username || 'Observer');
+    document.title = `${name} — Rastrum`;
+
+    const nameEl = root.querySelector<HTMLElement>('[data-pp-name]');
+    if (nameEl) nameEl.textContent = name;
+    if (isOwner && facets.real_name === false) {
+      const badge = root.querySelector<HTMLElement>('[data-pp-name-owner-only]');
+      if (badge) { badge.textContent = ownerLabel; badge.classList.remove('hidden'); }
+    }
+
+    const handleEl = root.querySelector<HTMLElement>('[data-pp-handle]');
+    if (handleEl) handleEl.textContent = profile.username ? '@' + profile.username : '';
+
+    const avatarEl = root.querySelector<HTMLImageElement>('[data-pp-avatar]');
+    if (avatarEl) {
+      avatarEl.src = profile.avatar_url || initialsAvatar(name);
+      avatarEl.alt = name;
+    }
+
+    if (showLocation && profile.region_primary) {
+      const rEl = root.querySelector<HTMLElement>('[data-pp-region]');
+      if (rEl) rEl.textContent = profile.region_primary;
+      show(root.querySelector('[data-pp-region-sep]'));
+    }
+
+    if (showBio && profile.bio) {
+      const bEl = root.querySelector<HTMLElement>('[data-pp-bio]');
+      if (bEl) {
+        bEl.textContent = profile.bio;
+        bEl.classList.remove('hidden');
+      }
+    }
+
+    if (profile.joined_at) {
+      const lab = root.dataset.labelMemberSince ?? '';
+      const sEl = root.querySelector<HTMLElement>('[data-pp-since]');
+      if (sEl) sEl.textContent = `${lab}: ${new Date(profile.joined_at).toLocaleDateString(lang)}`;
+    }
+
+    // Stats
+    if (showStats) {
+      const { data: statsRow } = await supabase
+        .from('profile_stats_counts')
+        .select('total_observations, research_grade_count, kingdoms_validated')
+        .eq('owner_id', profile.id)
+        .maybeSingle<{ total_observations: number; research_grade_count: number; kingdoms_validated: number }>();
+      const statsEl = root.querySelector<HTMLElement>('[data-pp-stats]');
+      statsEl?.classList.remove('hidden');
+      if (statsRow) {
+        const obsEl = root.querySelector<HTMLElement>('[data-pp-stat-obs]');
+        if (obsEl) obsEl.textContent = String(statsRow.total_observations ?? 0);
+        const rgEl = root.querySelector<HTMLElement>('[data-pp-stat-rg]');
+        if (rgEl) rgEl.textContent = String(statsRow.research_grade_count ?? 0);
+        const kEl = root.querySelector<HTMLElement>('[data-pp-stat-kingdoms]');
+        if (kEl) kEl.textContent = String(statsRow.kingdoms_validated ?? 0);
+      }
+      if (isOwner && facets.stats_counts === false) {
+        const badge = root.querySelector<HTMLElement>('[data-pp-stats-owner-only]');
+        if (badge) { badge.textContent = ownerLabel; badge.classList.remove('hidden'); }
+      }
+    }
+
+    // Map (lightweight summary only in v1.2.0; real MapLibre comes in v1.2.1)
+    if (showMap) {
+      const { count } = await supabase
+        .from('profile_observation_pins')
+        .select('observation_id', { count: 'exact', head: true })
+        .eq('observer_id', profile.id);
+      show(root.querySelector('[data-pp-map-section]'));
+      const summary = root.querySelector<HTMLElement>('[data-pp-map-summary]');
+      if (summary) {
+        summary.textContent = lang === 'es'
+          ? `${count ?? 0} observaciones mapeadas. (Mapa interactivo en v1.2.1.)`
+          : `${count ?? 0} mapped observations. (Interactive map in v1.2.1.)`;
+      }
+      if (isOwner && facets.observation_map === false) {
+        const badge = root.querySelector<HTMLElement>('[data-pp-map-owner-only]');
+        if (badge) { badge.textContent = ownerLabel; badge.classList.remove('hidden'); }
+      }
+    }
+
+    // Validation reputation
+    if (showValidation) {
+      const { count: idCount } = await supabase
+        .from('identifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', profile.id);
+      show(root.querySelector('[data-pp-validation-section]'));
+      const body = root.querySelector<HTMLElement>('[data-pp-validation-body]');
+      if (body) {
+        body.textContent = lang === 'es'
+          ? `${idCount ?? 0} identificaciones aportadas.`
+          : `${idCount ?? 0} identifications contributed.`;
+      }
+      if (isOwner && facets.validation_rep === false) {
+        const badge = root.querySelector<HTMLElement>('[data-pp-validation-owner-only]');
+        if (badge) { badge.textContent = ownerLabel; badge.classList.remove('hidden'); }
+      }
+    }
+
+    // Karma
+    if (showKarma) {
+      show(root.querySelector('[data-pp-karma-section]'));
+      const body = root.querySelector<HTMLElement>('[data-pp-karma-body]');
+      if (body) body.textContent = `${profile.karma_total ?? 0}`;
+      if (isOwner && facets.karma_total === false) {
+        const badge = root.querySelector<HTMLElement>('[data-pp-karma-owner-only]');
+        if (badge) { badge.textContent = ownerLabel; badge.classList.remove('hidden'); }
+      }
+    }
+
+    // Pokédex link
+    if (showPokedex) {
+      const link = root.querySelector<HTMLAnchorElement>('[data-pp-pokedex-link]');
+      if (link) link.href = `/${lang}/u/${profile.username}/dex/`;
+      show(root.querySelector('[data-pp-pokedex-section]'));
+      if (isOwner && facets.pokedex === false) {
+        const badge = root.querySelector<HTMLElement>('[data-pp-pokedex-owner-only]');
+        if (badge) { badge.textContent = ownerLabel; badge.classList.remove('hidden'); }
+      }
+    }
+
+    // Wire FollowButton
+    const followRoot = root.querySelector<HTMLElement>('.rastrum-follow-btn');
+    if (followRoot) {
+      followRoot.dataset.targetId = profile.id;
+      document.dispatchEvent(new CustomEvent('rastrum:follow-ready'));
+    }
+
+    // Robots gate is rendered in static HTML by the page (BaseLayout
+    // robots="noindex,nofollow") — see C-3. The /u/?username= surface is
+    // intentionally not indexed; sitemap user enumeration (v1.2.1) is the
+    // discoverability path for public profiles.
+  }
+
+  init().catch(() => {
+    const root = document.querySelector<HTMLElement>('.rastrum-public-profile-v2');
+    if (!root) return;
+    hide(root.querySelector('[data-pp-loading]'));
+    show(root.querySelector('[data-pp-private]'));
+  });
+</script>

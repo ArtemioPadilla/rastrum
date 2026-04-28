@@ -27,9 +27,17 @@ interface Props {
   ogImage?: string;
   /** Open Graph type override; defaults to 'website'. Use 'article' for doc pages. */
   ogType?: 'website' | 'article';
+  /**
+   * Render a `<meta name="robots">` directive into the static HTML.
+   * Used by routes that should not be indexed (public profiles served
+   * via `?username=` query param, share-card surfaces, etc.). Static
+   * output cannot conditionally inject this from JS in time for
+   * crawlers, so the call site must set it deliberately.
+   */
+  robots?: string;
 }
 
-const { title, description = 'Species identification platform', lang = 'en', ogImage, ogType } = Astro.props;
+const { title, description = 'Species identification platform', lang = 'en', ogImage, ogType, robots } = Astro.props;
 const currentPath = Astro.url.pathname;
 const installLang: 'en' | 'es' = lang === 'es' ? 'es' : 'en';
 
@@ -78,6 +86,7 @@ const resolvedOgImage = ogImage ?? `${SITE_URL}/og/${ogLang}/${ogSlugForPath(cur
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content={description} />
+    {robots && <meta name="robots" content={robots} />}
     <link rel="canonical" href={canonical} />
     <link rel="alternate" hreflang={sameLang} href={sameUrl} />
     <link rel="alternate" hreflang={altLang} href={altUrl} />

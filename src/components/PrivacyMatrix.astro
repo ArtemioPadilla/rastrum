@@ -1,0 +1,472 @@
+---
+/**
+ * Module 25 v1.2.0 — privacy matrix UI.
+ *
+ * 19-row segmented-control grid. Saves on change (debounced 300 ms);
+ * optimistic update with rollback toast on failure. The 4 sections
+ * become accordions on mobile (≤ 640 px). Live preview in this PR is
+ * a static placeholder; v1.2.1 wires real widget mini-renders.
+ */
+import { t } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+
+const { lang } = Astro.props;
+const tr = t(lang);
+const tree = tr as unknown as {
+  privacy: {
+    heading: string;
+    subheading: string;
+    preset_open_scientist: string;
+    preset_researcher: string;
+    preset_private: string;
+    preset_custom: string;
+    preset_apply: string;
+    section_identity: string;
+    section_activity: string;
+    section_engagement: string;
+    section_personal: string;
+    level_public: string;
+    level_signed_in: string;
+    level_private: string;
+    preview_anonymous: string;
+    preview_signed_in: string;
+    preview_visible: string;
+    preview_hidden: string;
+    nuclear_button: string;
+    nuclear_confirm_title: string;
+    nuclear_confirm_body: string;
+    nuclear_confirm_confirm: string;
+    nuclear_confirm_cancel: string;
+    saved_toast: string;
+    save_failed_toast: string;
+    facet: Record<string, { label: string; description: string }>;
+  };
+};
+const pm = tree.privacy;
+
+const sections: Array<{ key: string; title: string; rows: string[] }> = [
+  { key: 'identity',   title: pm.section_identity,   rows: ['profile', 'real_name', 'bio', 'location'] },
+  { key: 'activity',   title: pm.section_activity,   rows: ['stats_counts', 'observation_map', 'calendar_heatmap', 'taxonomic_donut', 'top_species', 'obs_list'] },
+  { key: 'engagement', title: pm.section_engagement, rows: ['validation_rep', 'badges', 'activity_feed', 'karma_total', 'expertise', 'pokedex'] },
+  { key: 'personal',   title: pm.section_personal,   rows: ['streak', 'watchlist', 'goals'] },
+];
+
+const levels: Array<{ key: 'public' | 'signed_in' | 'private'; label: string }> = [
+  { key: 'public',    label: pm.level_public },
+  { key: 'signed_in', label: pm.level_signed_in },
+  { key: 'private',   label: pm.level_private },
+];
+---
+
+<section class="rastrum-privacy-matrix" data-lang={lang}>
+  <header class="mb-6">
+    <h2 class="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">{pm.heading}</h2>
+    <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-1">{pm.subheading}</p>
+  </header>
+
+  <!-- Presets -->
+  <div class="mb-6 flex flex-wrap items-center gap-2">
+    <button type="button" data-preset="open_scientist"
+      class="rastrum-preset-btn rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
+      {pm.preset_open_scientist}
+    </button>
+    <button type="button" data-preset="researcher"
+      class="rastrum-preset-btn rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
+      {pm.preset_researcher}
+    </button>
+    <button type="button" data-preset="private_observer"
+      class="rastrum-preset-btn rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
+      {pm.preset_private}
+    </button>
+    <span data-custom-chip class="hidden ml-2 inline-flex items-center rounded-full bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:text-amber-300">
+      {pm.preset_custom}
+    </span>
+  </div>
+
+  <!-- Live preview (static placeholders for v1.2.0) -->
+  <div class="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-3" aria-live="polite">
+    <article data-preview="anonymous" class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 p-4">
+      <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2">{pm.preview_anonymous}</h3>
+      <ul class="text-xs space-y-1 text-zinc-700 dark:text-zinc-300">
+        <li><span data-preview-row="profile">{pm.facet.profile.label}: <span data-state></span></span></li>
+        <li><span data-preview-row="real_name">{pm.facet.real_name.label}: <span data-state></span></span></li>
+        <li><span data-preview-row="observation_map">{pm.facet.observation_map.label}: <span data-state></span></span></li>
+        <li><span data-preview-row="stats_counts">{pm.facet.stats_counts.label}: <span data-state></span></span></li>
+      </ul>
+    </article>
+    <article data-preview="signed_in" class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 p-4">
+      <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2">{pm.preview_signed_in}</h3>
+      <ul class="text-xs space-y-1 text-zinc-700 dark:text-zinc-300">
+        <li><span data-preview-row="profile">{pm.facet.profile.label}: <span data-state></span></span></li>
+        <li><span data-preview-row="real_name">{pm.facet.real_name.label}: <span data-state></span></span></li>
+        <li><span data-preview-row="observation_map">{pm.facet.observation_map.label}: <span data-state></span></span></li>
+        <li><span data-preview-row="stats_counts">{pm.facet.stats_counts.label}: <span data-state></span></span></li>
+      </ul>
+    </article>
+  </div>
+
+  <!-- Matrix -->
+  <div class="space-y-6">
+    {sections.map(section => (
+      <section data-section={section.key} class="rounded-lg border border-zinc-200 dark:border-zinc-800">
+        <button
+          type="button"
+          data-section-toggle
+          class="w-full flex items-center justify-between px-4 py-3 text-left sm:cursor-default"
+          aria-expanded="true"
+          aria-controls={`pm-section-body-${section.key}`}
+        >
+          <h3 class="text-sm font-semibold text-zinc-800 dark:text-zinc-200 uppercase tracking-wider">{section.title}</h3>
+          <span class="sm:hidden text-xs text-zinc-500" data-section-chevron>−</span>
+        </button>
+        <div id={`pm-section-body-${section.key}`} data-section-body class="px-4 pb-3 space-y-3">
+          {section.rows.map(facet => (
+            <div data-facet-row={facet} class="flex items-start gap-3 sm:gap-4 py-2 border-t border-zinc-100 dark:border-zinc-800/60 first:border-t-0">
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{pm.facet[facet]?.label ?? facet}</p>
+                <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">{pm.facet[facet]?.description ?? ''}</p>
+              </div>
+              <div role="radiogroup" aria-label={pm.facet[facet]?.label ?? facet} class="inline-flex rounded-lg border border-zinc-300 dark:border-zinc-700 overflow-hidden text-xs font-medium shrink-0">
+                {levels.map(level => (
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked="false"
+                    data-facet={facet}
+                    data-level={level.key}
+                    class="px-2.5 py-1.5 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 border-r border-zinc-300 dark:border-zinc-700 last:border-r-0"
+                  >
+                    {level.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+    ))}
+  </div>
+
+  <div class="mt-8 flex items-center justify-between gap-3 flex-wrap">
+    <button
+      type="button"
+      data-nuclear
+      class="rounded-lg border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-3 py-2 text-sm font-medium text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/30"
+    >
+      {pm.nuclear_button}
+    </button>
+    <span data-toast class="hidden text-sm text-emerald-600 dark:text-emerald-400">{pm.saved_toast}</span>
+    <span data-toast-error class="hidden text-sm text-red-600 dark:text-red-400">{pm.save_failed_toast}</span>
+  </div>
+
+  <dialog data-nuclear-dialog class="rounded-xl backdrop:bg-black/40 p-0 max-w-md w-[90%] shadow-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100">
+    <form method="dialog" class="p-5 space-y-3">
+      <h3 class="text-base font-semibold">{pm.nuclear_confirm_title}</h3>
+      <p class="text-sm text-zinc-600 dark:text-zinc-300">{pm.nuclear_confirm_body}</p>
+      <div class="flex justify-end gap-2 pt-2">
+        <button type="submit" value="cancel" class="rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
+          {pm.nuclear_confirm_cancel}
+        </button>
+        <button type="submit" value="confirm" data-nuclear-confirm class="rounded-lg bg-red-600 hover:bg-red-700 px-3 py-1.5 text-sm font-semibold text-white">
+          {pm.nuclear_confirm_confirm}
+        </button>
+      </div>
+    </form>
+  </dialog>
+</section>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import {
+    applyPreset,
+    detectPreset,
+    DEFAULT_MATRIX,
+    FACET_KEYS,
+    normalizeMatrix,
+    nuclearPrivateMatrix,
+    type PresetKey,
+    type PrivacyFacetKey,
+    type PrivacyLevel,
+    type PrivacyMatrix,
+  } from '../lib/privacy-presets';
+
+  type LevelButton = HTMLButtonElement & { dataset: DOMStringMap };
+
+  const root = document.querySelector<HTMLElement>('.rastrum-privacy-matrix');
+  if (root) init(root);
+
+  async function init(rootEl: HTMLElement) {
+    const supabase = getSupabase();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      window.location.replace(rootEl.dataset.lang === 'es' ? '/es/ingresar/' : '/en/sign-in/');
+      return;
+    }
+
+    const { data: profile } = await supabase
+      .from('users')
+      .select('profile_privacy')
+      .eq('id', user.id)
+      .maybeSingle<{ profile_privacy: Record<string, string> | null }>();
+
+    let matrix: PrivacyMatrix = normalizeMatrix(profile?.profile_privacy ?? null);
+    paintMatrix(rootEl, matrix);
+
+    // Dual-write the legacy boolean so the 4 RLS policies that still gate
+    // on `users.profile_public` (follows / user_badges / user_streaks /
+    // activity_events) stay coherent with the matrix. Boolean is dropped
+    // in v1.3 once those policies are migrated to can_see_facet only.
+    const persist = async (next: PrivacyMatrix) => {
+      const { error } = await supabase
+        .from('users')
+        .update({
+          profile_privacy: next,
+          profile_public: next.profile === 'public',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', user.id);
+      if (error) throw error;
+    };
+
+    bindMatrix(rootEl, async (next) => {
+      matrix = next;
+      await persist(next);
+    }, () => matrix);
+
+    bindNuclear(rootEl, async () => {
+      const next = nuclearPrivateMatrix();
+      await persist(next);
+      matrix = next;
+      paintMatrix(rootEl, matrix);
+    });
+
+    bindAccordions(rootEl);
+    bindBeforeUnloadFlush(rootEl, () => user.id);
+  }
+
+  function paintMatrix(rootEl: HTMLElement, matrix: PrivacyMatrix) {
+    const buttons = rootEl.querySelectorAll<LevelButton>('button[data-facet][data-level]');
+    buttons.forEach(btn => {
+      const facet = btn.dataset.facet as PrivacyFacetKey;
+      const level = btn.dataset.level as PrivacyLevel;
+      const isActive = matrix[facet] === level;
+      btn.setAttribute('aria-checked', isActive ? 'true' : 'false');
+      if (isActive) {
+        btn.classList.add('bg-emerald-600', 'text-white', 'dark:bg-emerald-700');
+        btn.classList.remove('text-zinc-600', 'dark:text-zinc-300');
+      } else {
+        btn.classList.remove('bg-emerald-600', 'text-white', 'dark:bg-emerald-700');
+        btn.classList.add('text-zinc-600', 'dark:text-zinc-300');
+      }
+    });
+
+    const detected = detectPreset(matrix);
+    rootEl.querySelectorAll<HTMLButtonElement>('.rastrum-preset-btn').forEach(b => {
+      const isActive = b.dataset.preset === detected;
+      b.classList.toggle('border-emerald-500', isActive);
+      b.classList.toggle('bg-emerald-50', isActive);
+      b.classList.toggle('dark:bg-emerald-900/20', isActive);
+      b.classList.toggle('text-emerald-700', isActive);
+      b.classList.toggle('dark:text-emerald-300', isActive);
+    });
+    const customChip = rootEl.querySelector<HTMLElement>('[data-custom-chip]');
+    if (customChip) customChip.classList.toggle('hidden', detected !== 'custom');
+
+    paintPreview(rootEl, matrix);
+  }
+
+  function paintPreview(rootEl: HTMLElement, matrix: PrivacyMatrix) {
+    const lang = rootEl.dataset.lang === 'es' ? 'es' : 'en';
+    const visible = lang === 'es' ? 'visible' : 'visible';
+    const hidden = lang === 'es' ? 'oculto' : 'hidden';
+    const previewRows = ['profile', 'real_name', 'observation_map', 'stats_counts'] as const;
+
+    rootEl.querySelectorAll<HTMLElement>('article[data-preview]').forEach(card => {
+      const viewerKind = card.dataset.preview as 'anonymous' | 'signed_in';
+      previewRows.forEach(facet => {
+        const span = card.querySelector<HTMLElement>(`[data-preview-row="${facet}"] [data-state]`);
+        if (!span) return;
+        const level = matrix[facet];
+        const seen = level === 'public'
+          || (level === 'signed_in' && viewerKind === 'signed_in');
+        span.textContent = seen ? visible : hidden;
+        span.className = seen
+          ? 'text-emerald-600 dark:text-emerald-400 font-medium'
+          : 'text-zinc-400 dark:text-zinc-500';
+      });
+    });
+  }
+
+  // Module-level handle so the beforeunload flusher can drain whatever
+  // the debounce timer is still holding.
+  const pendingSave: { matrix: PrivacyMatrix | null } = { matrix: null };
+
+  function bindMatrix(
+    rootEl: HTMLElement,
+    save: (next: PrivacyMatrix) => Promise<void>,
+    getCurrent: () => PrivacyMatrix
+  ) {
+    let saveTimer: ReturnType<typeof setTimeout> | null = null;
+
+    rootEl.querySelectorAll<LevelButton>('button[data-facet][data-level]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const facet = btn.dataset.facet as PrivacyFacetKey;
+        const level = btn.dataset.level as PrivacyLevel;
+        const current = pendingSave.matrix ?? getCurrent();
+        if (current[facet] === level) return;
+        const next: PrivacyMatrix = { ...current, [facet]: level };
+        pendingSave.matrix = next;
+        paintMatrix(rootEl, next);
+        if (saveTimer) clearTimeout(saveTimer);
+        saveTimer = setTimeout(() => {
+          const snapshot = pendingSave.matrix ?? next;
+          pendingSave.matrix = null;
+          save(snapshot).then(() => showToast(rootEl, 'ok')).catch(() => {
+            paintMatrix(rootEl, getCurrent());
+            showToast(rootEl, 'err');
+          });
+        }, 300);
+      });
+      btn.addEventListener('keydown', (event: KeyboardEvent) => {
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+        event.preventDefault();
+        const group = btn.closest('[role="radiogroup"]');
+        if (!group) return;
+        const buttons = Array.from(group.querySelectorAll<LevelButton>('button[data-facet][data-level]'));
+        const idx = buttons.indexOf(btn);
+        const nextIdx = event.key === 'ArrowLeft'
+          ? (idx - 1 + buttons.length) % buttons.length
+          : (idx + 1) % buttons.length;
+        buttons[nextIdx]?.focus();
+        buttons[nextIdx]?.click();
+      });
+    });
+
+    rootEl.querySelectorAll<HTMLButtonElement>('.rastrum-preset-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const preset = btn.dataset.preset as PresetKey;
+        if (!preset) return;
+        const next = applyPreset(preset);
+        pendingSave.matrix = next;
+        paintMatrix(rootEl, next);
+        if (saveTimer) clearTimeout(saveTimer);
+        saveTimer = setTimeout(() => {
+          const snapshot = pendingSave.matrix ?? next;
+          pendingSave.matrix = null;
+          save(snapshot).then(() => showToast(rootEl, 'ok')).catch(() => {
+            paintMatrix(rootEl, getCurrent());
+            showToast(rootEl, 'err');
+          });
+        }, 300);
+      });
+    });
+  }
+
+  function readAccessToken(): string {
+    if (typeof localStorage === 'undefined') return '';
+    try {
+      const raw = localStorage.getItem('rastrum-auth-v1');
+      if (!raw) return '';
+      const parsed = JSON.parse(raw) as { access_token?: string; currentSession?: { access_token?: string } };
+      return parsed.access_token ?? parsed.currentSession?.access_token ?? '';
+    } catch {
+      return '';
+    }
+  }
+
+  function bindBeforeUnloadFlush(rootEl: HTMLElement, getUserId: () => string) {
+    const env = (import.meta as unknown as { env?: { PUBLIC_SUPABASE_URL?: string; PUBLIC_SUPABASE_ANON_KEY?: string } }).env;
+    const flush = () => {
+      const matrix = pendingSave.matrix;
+      if (!matrix) return;
+      pendingSave.matrix = null;
+      const supabaseUrl = env?.PUBLIC_SUPABASE_URL;
+      const anonKey    = env?.PUBLIC_SUPABASE_ANON_KEY;
+      if (!supabaseUrl || !anonKey) return;
+      const accessToken = readAccessToken();
+      if (!accessToken) return;
+      const userId = getUserId();
+      const url = `${supabaseUrl}/rest/v1/users?id=eq.${encodeURIComponent(userId)}`;
+      const body = JSON.stringify({
+        profile_privacy: matrix,
+        profile_public: matrix.profile === 'public',
+        updated_at: new Date().toISOString(),
+      });
+      // navigator.sendBeacon cannot set Authorization, so we PATCH with
+      // keepalive: true. This survives `beforeunload` and we drop the
+      // response — RLS keeps the operation safe whether it lands or not.
+      try {
+        fetch(url, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': anonKey,
+            'Authorization': `Bearer ${accessToken}`,
+            'Prefer': 'return=minimal',
+          },
+          body,
+          keepalive: true,
+        }).catch(() => { /* swallow — page is unloading */ });
+      } catch {
+        // beforeunload handlers cannot block; just drop quietly.
+      }
+      void rootEl;
+    };
+    window.addEventListener('beforeunload', flush);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') flush();
+    });
+  }
+
+  function bindNuclear(rootEl: HTMLElement, perform: () => Promise<void>) {
+    const dialog = rootEl.querySelector<HTMLDialogElement>('dialog[data-nuclear-dialog]');
+    const trigger = rootEl.querySelector<HTMLButtonElement>('button[data-nuclear]');
+    if (!dialog || !trigger) return;
+    trigger.addEventListener('click', () => {
+      if (typeof dialog.showModal === 'function') dialog.showModal();
+      else dialog.setAttribute('open', '');
+    });
+    dialog.addEventListener('close', () => {
+      if (dialog.returnValue === 'confirm') {
+        perform()
+          .then(() => showToast(rootEl, 'ok'))
+          .catch(() => showToast(rootEl, 'err'));
+      }
+    });
+  }
+
+  function bindAccordions(rootEl: HTMLElement) {
+    rootEl.querySelectorAll<HTMLButtonElement>('button[data-section-toggle]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (window.matchMedia('(min-width: 640px)').matches) return;
+        const expanded = btn.getAttribute('aria-expanded') === 'true';
+        btn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+        const body = btn.nextElementSibling as HTMLElement | null;
+        if (body) body.style.display = expanded ? 'none' : '';
+        const chev = btn.querySelector<HTMLElement>('[data-section-chevron]');
+        if (chev) chev.textContent = expanded ? '+' : '−';
+      });
+    });
+  }
+
+  function showToast(rootEl: HTMLElement, kind: 'ok' | 'err') {
+    const ok = rootEl.querySelector<HTMLElement>('[data-toast]');
+    const err = rootEl.querySelector<HTMLElement>('[data-toast-error]');
+    if (kind === 'ok') {
+      ok?.classList.remove('hidden');
+      err?.classList.add('hidden');
+      setTimeout(() => ok?.classList.add('hidden'), 1800);
+    } else {
+      err?.classList.remove('hidden');
+      ok?.classList.add('hidden');
+      setTimeout(() => err?.classList.add('hidden'), 2400);
+    }
+  }
+
+  // Reference unused imports so tree-shaking is explicit during dev.
+  void DEFAULT_MATRIX;
+  void FACET_KEYS;
+</script>
