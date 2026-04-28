@@ -185,7 +185,29 @@
   },
   "footer": {
     "license": "AGPL-3.0 License",
-    "source": "Source on GitHub"
+    "source": "Source on GitHub",
+    "tagline": "Biodiversity, observed in your language.",
+    "description_short": "Open-source biodiversity observation for Latin America.",
+    "columns": {
+      "product": "Product",
+      "learn": "Learn",
+      "community": "Community",
+      "legal": "Legal"
+    },
+    "links": {
+      "github_issues": "Issues ↗",
+      "github_discussions": "Discussions ↗",
+      "license_summary": "MIT (code) · AGPL-3.0 (server) · CC observations",
+      "privacy": "Privacy",
+      "terms": "Terms",
+      "faq": "FAQ",
+      "install_pwa": "Install PWA",
+      "mastodon": "Mastodon ↗",
+      "rss": "RSS",
+      "contribute": "Contribute",
+      "funding": "Funding",
+      "changelog": "Changelog"
+    }
   },
   "report": {
     "button_label": "Report an issue",
@@ -375,7 +397,9 @@
     "public_profile_no_username": "No username in URL.",
     "public_profile_loading": "Loading profile…",
     "public_profile_no_observations": "No public observations yet.",
-    "public_profile_member_since": "Member since"
+    "public_profile_member_since": "Member since",
+    "settings_link": "Settings",
+    "view_public": "View public"
   },
   "observe": {
     "title": "New observation",
@@ -635,7 +659,30 @@
       "Click <b>Create Key</b>, name it <code>Rastrum</code>, and copy the value starting with <code>sk-ant-</code>.",
       "Paste it above and tap Save."
     ],
-    "key_help_privacy": "Your key stays in this browser's local storage. It's only sent to Anthropic when you identify a photo — never to Rastrum's servers."
+    "key_help_privacy": "Your key stays in this browser's local storage. It's only sent to Anthropic when you identify a photo — never to Rastrum's servers.",
+    "start": "Start tour",
+    "steps": {
+      "welcome": {
+        "title": "Welcome to Rastrum",
+        "body": "Rastrum helps you identify and log any species. Quick 30-second tour — skip anytime."
+      },
+      "fab": {
+        "title": "Start observing",
+        "body": "Tap to start observing — anywhere in the app."
+      },
+      "quick_id": {
+        "title": "Quick ID",
+        "body": "While on the Observe screen, the same button becomes Quick ID — photo lookup, no save needed."
+      },
+      "explore": {
+        "title": "Explore",
+        "body": "Map, recent observations, your watchlist — all under Explore."
+      },
+      "settings": {
+        "title": "Instant identification",
+        "body": "Add a free PlantNet API key in Settings → Preferences for instant plant identification. Takes about 2 minutes."
+      }
+    }
   },
   "pipeline": {
     "section_title": "Identification pipeline",
@@ -1191,5 +1238,63 @@
     "first_seen": "First seen",
     "count_one": "{n} observation",
     "count_other": "{n} observations"
+  },
+  "search": {
+    "placeholder": "Search Rastrum…",
+    "empty_recent": "Recent",
+    "empty_quick_actions": "Quick actions",
+    "groups": {
+      "actions": "Quick actions",
+      "pages": "Pages",
+      "docs": "Docs",
+      "observations": "Your observations",
+      "species": "Species"
+    },
+    "no_results": "No results — try different keywords",
+    "toast_open": "Search"
+  },
+  "settings": {
+    "title": "Settings",
+    "settings_link": "Settings",
+    "tabs": {
+      "profile": "Profile",
+      "preferences": "Preferences",
+      "data": "Data",
+      "developer": "Developer"
+    },
+    "preferences": {
+      "language_label": "Language",
+      "theme_label": "Theme",
+      "theme_light": "Light",
+      "theme_dark": "Dark",
+      "theme_auto": "Auto",
+      "byo_keys_title": "API Keys (BYO)",
+      "byo_keys_subtitle": "Your own keys for paid identifiers — never sent to our servers, only forwarded per-request to the provider.",
+      "plantnet_key_label": "PlantNet API Key",
+      "anthropic_key_label": "Anthropic API Key",
+      "key_saved": "Saved",
+      "key_clear": "Clear",
+      "notifications_title": "Notifications",
+      "notifications_placeholder": "Notification preferences coming soon."
+    },
+    "data": {
+      "import_title": "Import",
+      "import_subtitle": "Batch-import photos with GPS. Also supports camera trap deployments.",
+      "import_link": "Open batch importer",
+      "import_camera_trap_link": "Open camera-trap importer",
+      "export_title": "Export",
+      "export_subtitle": "Download your observations as Darwin Core CSV or DwC-A ZIP for GBIF.",
+      "export_link": "Open exporter"
+    },
+    "developer": {
+      "tokens_title": "API Tokens",
+      "tokens_subtitle": "Personal tokens (rst_*) for scripts, agents, and external integrations.",
+      "tokens_link": "Manage tokens",
+      "mcp_title": "MCP Server",
+      "mcp_url_label": "Server URL",
+      "expert_title": "Expert Application",
+      "expert_subtitle": "Apply to become a validated expert and unlock the validation queue.",
+      "expert_link": "Apply for expert role"
+    }
   }
 }

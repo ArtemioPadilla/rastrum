@@ -1,0 +1,67 @@
+---
+import { t, getLocalizedPath, routes, type Locale } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+  activeTab: 'profile' | 'preferences' | 'data' | 'developer';
+}
+
+const { lang, activeTab } = Astro.props;
+const tr = t(lang);
+const locale = lang as Locale;
+const settings = (tr as unknown as { settings: { title: string; tabs: Record<string, string> } }).settings;
+
+const profilePath      = getLocalizedPath(lang, routes.profileSettings[locale] + '/profile/');
+const preferencesPath  = getLocalizedPath(lang, routes.profileSettings[locale] + '/preferences/');
+const dataPath         = getLocalizedPath(lang, routes.profileSettings[locale] + '/data/');
+const developerPath    = getLocalizedPath(lang, routes.profileSettings[locale] + '/developer/');
+const profileHubPath   = getLocalizedPath(lang, routes.profile[locale] + '/');
+
+const tabs = [
+  { key: 'profile',     label: settings.tabs.profile,     href: profilePath },
+  { key: 'preferences', label: settings.tabs.preferences, href: preferencesPath },
+  { key: 'data',        label: settings.tabs.data,        href: dataPath },
+  { key: 'developer',   label: settings.tabs.developer,   href: developerPath },
+] as const;
+---
+
+<div class="max-w-3xl mx-auto pb-28 sm:pb-6">
+  <!-- Settings header -->
+  <div class="mb-6">
+    <a href={profileHubPath} class="inline-flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 hover:text-emerald-600 dark:hover:text-emerald-400 mb-3">
+      <svg aria-hidden="true" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+      </svg>
+      {tr.profile.view_profile}
+    </a>
+    <h1 class="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+      {settings.title}
+    </h1>
+  </div>
+
+  <!-- Tab bar (horizontal, scrollable on mobile) -->
+  <nav
+    class="flex gap-1 overflow-x-auto pb-px mb-6 border-b border-zinc-200 dark:border-zinc-800"
+    aria-label="Settings tabs"
+  >
+    {tabs.map(tab => (
+      <a
+        href={tab.href}
+        class:list={[
+          'shrink-0 px-3 py-2 text-sm font-medium rounded-t transition-colors',
+          activeTab === tab.key
+            ? 'text-emerald-700 dark:text-emerald-400 border-b-2 border-emerald-500 -mb-px bg-emerald-50/50 dark:bg-emerald-900/10'
+            : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-50 dark:hover:bg-zinc-800/50',
+        ]}
+        aria-current={activeTab === tab.key ? 'page' : undefined}
+      >
+        {tab.label}
+      </a>
+    ))}
+  </nav>
+
+  <!-- Tab content -->
+  <div>
+    <slot />
+  </div>
+</div>

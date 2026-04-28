@@ -1,6 +1,7 @@
 ---
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
+import CommandPalette from '../components/CommandPalette.astro';
 import InstallPwaButton from '../components/InstallPwaButton.astro';
 import InstallDiscoveryHint from '../components/InstallDiscoveryHint.astro';
 import OnboardingTour from '../components/OnboardingTour.astro';
@@ -9,6 +10,7 @@ import SwUpdateToast from '../components/SwUpdateToast.astro';
 import OfflineBanner from '../components/OfflineBanner.astro';
 import { getAlternateUrl } from '../i18n/utils';
 import StructuredData from '../components/StructuredData.astro';
+import Breadcrumbs from '../components/Breadcrumbs.astro';
 
 interface Props {
   title: string;
@@ -129,9 +131,11 @@ const resolvedOgImage = ogImage ?? `${SITE_URL}/og/${ogSlugForPath(currentPath)}
     <Header lang={lang} currentPath={currentPath} />
     <InstallDiscoveryHint lang={installLang} />
     <main class="max-w-5xl mx-auto px-4 py-8">
+      <Breadcrumbs lang={installLang} currentPath={currentPath} />
       <slot />
     </main>
-    <Footer lang={lang} />
+    <Footer lang={lang} currentPath={currentPath} />
+    <CommandPalette lang={lang} />
     <InstallPwaButton lang={installLang} />
     <ReportIssueButton lang={lang} />
     <OnboardingTour lang={installLang} />

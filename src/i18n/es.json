@@ -185,7 +185,29 @@
   },
   "footer": {
     "license": "Licencia AGPL-3.0",
-    "source": "Código en GitHub"
+    "source": "Código en GitHub",
+    "tagline": "Biodiversidad, observada en tu idioma.",
+    "description_short": "Observación de biodiversidad open-source para América Latina.",
+    "columns": {
+      "product": "Producto",
+      "learn": "Aprender",
+      "community": "Comunidad",
+      "legal": "Legal"
+    },
+    "links": {
+      "github_issues": "Issues ↗",
+      "github_discussions": "Discusiones ↗",
+      "license_summary": "MIT (código) · AGPL-3.0 (servidor) · CC observaciones",
+      "privacy": "Privacidad",
+      "terms": "Términos",
+      "faq": "FAQ",
+      "install_pwa": "Instalar PWA",
+      "mastodon": "Mastodon ↗",
+      "rss": "RSS",
+      "contribute": "Contribuir",
+      "funding": "Financiamiento",
+      "changelog": "Cambios"
+    }
   },
   "report": {
     "button_label": "Reportar un problema",
@@ -375,7 +397,9 @@
     "public_profile_no_username": "Sin nombre de usuario en la URL.",
     "public_profile_loading": "Cargando perfil…",
     "public_profile_no_observations": "Aún no hay observaciones públicas.",
-    "public_profile_member_since": "Miembro desde"
+    "public_profile_member_since": "Miembro desde",
+    "settings_link": "Ajustes",
+    "view_public": "Ver perfil público"
   },
   "observe": {
     "title": "Nueva observación",
@@ -635,7 +659,30 @@
       "Haz clic en <b>Create Key</b>, ponle de nombre <code>Rastrum</code> y copia el valor que empieza con <code>sk-ant-</code>.",
       "Pégalo arriba y presiona Guardar."
     ],
-    "key_help_privacy": "Tu key se guarda solo en este navegador. Sólo viaja a Anthropic cuando identificas una foto — nunca a los servidores de Rastrum."
+    "key_help_privacy": "Tu key se guarda solo en este navegador. Sólo viaja a Anthropic cuando identificas una foto — nunca a los servidores de Rastrum.",
+    "start": "Iniciar tour",
+    "steps": {
+      "welcome": {
+        "title": "Bienvenido a Rastrum",
+        "body": "Rastrum te ayuda a identificar y registrar cualquier especie. Tour rápido de 30 segundos — puedes omitirlo en cualquier momento."
+      },
+      "fab": {
+        "title": "Comienza a observar",
+        "body": "Toca para iniciar una observación — desde cualquier pantalla de la app."
+      },
+      "quick_id": {
+        "title": "Identificación rápida",
+        "body": "Desde la pantalla de observación, el mismo botón se convierte en Identificación Rápida — búsqueda por foto, sin guardar."
+      },
+      "explore": {
+        "title": "Explorar",
+        "body": "Mapa, observaciones recientes y tu lista de seguimiento — todo bajo Explorar."
+      },
+      "settings": {
+        "title": "Identificación instantánea",
+        "body": "Agrega una API key gratuita de PlantNet en Ajustes → Preferencias para identificar plantas al instante. Tarda unos 2 minutos."
+      }
+    }
   },
   "pipeline": {
     "section_title": "Pipeline de identificación",
@@ -1191,5 +1238,63 @@
     "first_seen": "Primera vez",
     "count_one": "{n} observación",
     "count_other": "{n} observaciones"
+  },
+  "search": {
+    "placeholder": "Buscar Rastrum…",
+    "empty_recent": "Recientes",
+    "empty_quick_actions": "Acciones rápidas",
+    "groups": {
+      "actions": "Acciones",
+      "pages": "Páginas",
+      "docs": "Docs",
+      "observations": "Tus observaciones",
+      "species": "Especies"
+    },
+    "no_results": "Sin resultados — prueba con otras palabras",
+    "toast_open": "Buscar"
+  },
+  "settings": {
+    "title": "Ajustes",
+    "settings_link": "Ajustes",
+    "tabs": {
+      "profile": "Perfil",
+      "preferences": "Preferencias",
+      "data": "Datos",
+      "developer": "Desarrollador"
+    },
+    "preferences": {
+      "language_label": "Idioma",
+      "theme_label": "Tema",
+      "theme_light": "Claro",
+      "theme_dark": "Oscuro",
+      "theme_auto": "Automático",
+      "byo_keys_title": "Claves API (propias)",
+      "byo_keys_subtitle": "Tus propias claves para identificadores de pago — nunca se envían a nuestros servidores, solo se reenvían por solicitud al proveedor.",
+      "plantnet_key_label": "Clave API de PlantNet",
+      "anthropic_key_label": "Clave API de Anthropic",
+      "key_saved": "Guardado",
+      "key_clear": "Borrar",
+      "notifications_title": "Notificaciones",
+      "notifications_placeholder": "Preferencias de notificación próximamente."
+    },
+    "data": {
+      "import_title": "Importar",
+      "import_subtitle": "Importa fotos en lote con GPS. También soporta despliegues de cámara trampa.",
+      "import_link": "Abrir importador en lote",
+      "import_camera_trap_link": "Abrir importador de cámara trampa",
+      "export_title": "Exportar",
+      "export_subtitle": "Descarga tus observaciones como CSV Darwin Core o ZIP DwC-A para GBIF.",
+      "export_link": "Abrir exportador"
+    },
+    "developer": {
+      "tokens_title": "Tokens API",
+      "tokens_subtitle": "Tokens personales (rst_*) para scripts, agentes e integraciones externas.",
+      "tokens_link": "Gestionar tokens",
+      "mcp_title": "Servidor MCP",
+      "mcp_url_label": "URL del servidor",
+      "expert_title": "Solicitud de experto",
+      "expert_subtitle": "Aplica para ser validado como experto y acceder a la cola de validación.",
+      "expert_link": "Solicitar rol de experto"
+    }
   }
 }
