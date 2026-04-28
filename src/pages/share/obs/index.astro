@@ -49,6 +49,45 @@ const obsIdPlaceholder = '';
         This observation is of a sensitive species. Precise coordinates are obscured to protect it.
       </p>
 
+      <!--
+        Owner-only Manage panel. Visible only when the signed-in viewer
+        IS the observation's observer. Edit updates notes + scientific
+        name + obscure_level. Delete removes the observation row (FK
+        cascade on identifications + media_files; the R2 photo blobs
+        are left as orphans, acceptable for v1).
+      -->
+      <section id="manage-panel" class="hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 space-y-3">
+        <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">Manage your observation</h2>
+        <p class="text-xs text-zinc-500 dark:text-zinc-400">Only you see this. Other viewers won't.</p>
+        <form id="manage-form" class="space-y-3" novalidate>
+          <div>
+            <label for="m-sci" class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Scientific name (override)</label>
+            <input id="m-sci" type="text" autocomplete="off" placeholder="e.g. Quercus oleoides" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm font-mono italic" />
+            <p class="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">Replaces the primary identification with a manual one (you as validator). Leave blank to keep current.</p>
+          </div>
+          <div>
+            <label for="m-notes" class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Notes</label>
+            <textarea id="m-notes" rows="3" maxlength="2000" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm"></textarea>
+          </div>
+          <div>
+            <label for="m-obscure" class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Location privacy</label>
+            <select id="m-obscure" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
+              <option value="none">Show precise coordinates</option>
+              <option value="0.1deg">Coarsen to ~10 km</option>
+              <option value="0.2deg">Coarsen to ~20 km</option>
+              <option value="5km">Coarsen to ~5 km</option>
+              <option value="full">Hide location entirely</option>
+            </select>
+          </div>
+          <p id="m-error" class="hidden text-xs text-red-600 dark:text-red-400" role="alert"></p>
+          <p id="m-saved" class="hidden text-xs text-emerald-700 dark:text-emerald-400" aria-live="polite">Saved.</p>
+          <div class="flex flex-wrap items-center gap-2 pt-2">
+            <button type="submit" id="m-save" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Save changes</button>
+            <button type="button" id="m-delete" class="rounded-lg border border-red-300 dark:border-red-800 px-4 py-2 text-sm font-medium text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">Delete observation</button>
+          </div>
+        </form>
+      </section>
+
       {/* TODO(local-contexts): when public.observations gains a
           `local_contexts_notice_url` column (schema gap as of 2026-04-25 —
           see docs/specs/modules/07-licensing.md and the local-contexts
@@ -166,6 +205,123 @@ const obsIdPlaceholder = '';
         commentsRoot.dataset.observationId = id;
         document.dispatchEvent(new CustomEvent('rastrum:comments-ready'));
       }
+
+      // Owner-only Manage panel.
+      if (viewerIsObserver) wireManagePanel(id, obs as Record<string, unknown>, ident);
+    }
+
+    /**
+     * Wire the owner-only Manage panel: pre-populate fields, handle
+     * save (UPDATE observations + UPSERT primary identification when
+     * the user types an override), and handle delete (DELETE observation
+     * with FK cascade to identifications + media_files).
+     */
+    function wireManagePanel(
+      obsId: string,
+      obs: Record<string, unknown>,
+      ident: { scientific_name?: string; is_primary?: boolean } | undefined,
+    ) {
+      const supabase = getSupabase();
+      const panel = document.getElementById('manage-panel');
+      if (!panel) return;
+      panel.classList.remove('hidden');
+
+      const sciInput = document.getElementById('m-sci') as HTMLInputElement | null;
+      const notesEl  = document.getElementById('m-notes') as HTMLTextAreaElement | null;
+      const obsEl    = document.getElementById('m-obscure') as HTMLSelectElement | null;
+      const errEl    = document.getElementById('m-error');
+      const savedEl  = document.getElementById('m-saved');
+      const saveBtn  = document.getElementById('m-save') as HTMLButtonElement | null;
+      const deleteBtn = document.getElementById('m-delete') as HTMLButtonElement | null;
+      const form     = document.getElementById('manage-form') as HTMLFormElement | null;
+
+      // Pre-populate
+      if (sciInput) sciInput.value = '';                           // override field; blank = keep current
+      if (notesEl)  notesEl.value  = (obs.notes as string | null) ?? '';
+      if (obsEl)    obsEl.value    = (obs.obscure_level as string) ?? 'none';
+
+      form?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!saveBtn) return;
+        errEl?.classList.add('hidden');
+        savedEl?.classList.add('hidden');
+        saveBtn.disabled = true;
+        const origLabel = saveBtn.textContent ?? 'Save';
+        saveBtn.textContent = 'Saving…';
+        try {
+          // 1. Update the observation row (notes + obscure_level).
+          const { error: obsErr } = await supabase
+            .from('observations')
+            .update({
+              notes: notesEl?.value.trim() || null,
+              obscure_level: obsEl?.value ?? 'none',
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', obsId);
+          if (obsErr) throw obsErr;
+
+          // 2. If the user typed a scientific-name override, upsert a
+          //    new primary identification with source='human'. Demote
+          //    the previous primary by setting is_primary=false on
+          //    everything else first.
+          const sci = sciInput?.value.trim();
+          if (sci) {
+            await supabase.from('identifications')
+              .update({ is_primary: false })
+              .eq('observation_id', obsId)
+              .eq('is_primary', true);
+            const { data: { user: viewer } } = await supabase.auth.getUser();
+            const { error: idErr } = await supabase.from('identifications').insert({
+              observation_id: obsId,
+              scientific_name: sci,
+              confidence: 0.95,
+              source: 'human',
+              is_primary: true,
+              validated_by: null,                    // observer-set, not validator
+              validated_at: new Date().toISOString(),
+              raw_response: { manual_override: true, by: viewer?.id ?? null },
+            });
+            if (idErr) throw idErr;
+          }
+
+          savedEl?.classList.remove('hidden');
+          // Reflect in the page header without a full reload.
+          const speciesEl = document.getElementById('species');
+          if (sci && speciesEl) speciesEl.textContent = sci;
+        } catch (err) {
+          if (errEl) {
+            errEl.textContent = err instanceof Error ? err.message : String(err);
+            errEl.classList.remove('hidden');
+          }
+        } finally {
+          saveBtn.disabled = false;
+          saveBtn.textContent = origLabel;
+        }
+      });
+
+      deleteBtn?.addEventListener('click', async () => {
+        const confirmed = window.confirm(
+          'Delete this observation? This cannot be undone. Identifications and media metadata will also be removed.',
+        );
+        if (!confirmed) return;
+        deleteBtn.disabled = true;
+        try {
+          const { error: delErr } = await supabase
+            .from('observations')
+            .delete()
+            .eq('id', obsId);
+          if (delErr) throw delErr;
+          // Redirect to the user's observations list.
+          const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
+          window.location.href = `/${lang}/${lang === 'es' ? 'perfil/observaciones' : 'profile/observations'}/`;
+        } catch (err) {
+          if (errEl) {
+            errEl.textContent = err instanceof Error ? err.message : String(err);
+            errEl.classList.remove('hidden');
+          }
+          deleteBtn.disabled = false;
+        }
+      });
     }
   </script>
 </BaseLayout>
