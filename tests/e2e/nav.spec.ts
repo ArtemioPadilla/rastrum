@@ -50,8 +50,8 @@ test.describe('navigation', () => {
 
   test('language switcher swaps locale', async ({ page }) => {
     await page.goto('/en/about/');
-    // The header has a single ES/EN toggle button rendered as a link.
-    const altLink = page.getByRole('link', { name: /^ES$/ });
+    // Use the header's lang-toggle specifically to avoid matching the footer switch.
+    const altLink = page.locator('#lang-toggle');
     await expect(altLink).toBeVisible();
     await altLink.click();
     await expect(page).toHaveURL(/\/es\/acerca\/?$/);
@@ -59,7 +59,7 @@ test.describe('navigation', () => {
 
   test('language switcher preserves docs section', async ({ page }) => {
     await page.goto('/en/docs/vision/');
-    const altLink = page.getByRole('link', { name: /^ES$/ });
+    const altLink = page.locator('#lang-toggle');
     await altLink.click();
     await expect(page).toHaveURL(/\/es\/docs\/vision\/?$/);
   });

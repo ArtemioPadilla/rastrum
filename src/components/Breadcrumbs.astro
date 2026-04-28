@@ -1,0 +1,100 @@
+---
+import { routes, routeTree, getRouteLabel, getRouteParent, getLocalizedPath, t, type Locale } from '../i18n/utils';
+import { resolveChromeMode } from '../lib/chrome-mode';
+
+interface Props {
+  lang: 'en' | 'es';
+  currentPath: string;
+}
+
+const { lang, currentPath } = Astro.props;
+
+// Skip breadcrumbs on app-mode pages (they have their own header treatment)
+const chromeMode = resolveChromeMode(currentPath, import.meta.env.BASE_URL);
+if (chromeMode === 'app') return;
+
+const locale: Locale = lang === 'es' ? 'es' : 'en';
+const tr = t(lang);
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const localePrefix = `${base}/${lang}`;
+
+// Strip base + locale to get the path slug like '/docs/architecture' or '/profile/observations'
+const pathPart = currentPath.startsWith(localePrefix)
+  ? currentPath.slice(localePrefix.length).replace(/\/$/, '')
+  : currentPath.replace(/\/$/, '');
+
+// Determine depth: number of non-empty segments in pathPart
+const segments = pathPart.split('/').filter(Boolean);
+if (segments.length < 2) return; // single-segment paths (e.g. /observe, /profile) — no crumbs
+
+type Crumb = { label: string; href?: string };
+const trail: Crumb[] = [];
+
+const isDocsPage = segments[0] === 'docs' && segments.length >= 2;
+const docSlug = isDocsPage ? segments[1] : null;
+
+if (isDocsPage && docSlug) {
+  // Docs › <Section>
+  const docsHref = `${base}/${lang}/docs/`;
+  trail.push({ label: tr.nav.docs, href: docsHref });
+  const sections = tr.docs.sections as Record<string, string>;
+  const sectionLabel = sections[docSlug] ?? docSlug;
+  trail.push({ label: sectionLabel });
+} else {
+  // Find which route key the current pathPart matches
+  let matchedKey: string | undefined;
+  for (const [key, slugMap] of Object.entries(routes)) {
+    const slug = slugMap[locale] ?? '';
+    if (slug === pathPart || (pathPart === '' && slug === '')) {
+      matchedKey = key;
+      break;
+    }
+  }
+
+  if (!matchedKey) return; // no matching route — skip breadcrumbs
+
+  // Walk up via getRouteParent to build ancestor chain
+  const chain: string[] = [];
+  let key: string | undefined = matchedKey;
+  while (key) {
+    chain.unshift(key);
+    key = getRouteParent(key);
+  }
+
+  // Prepend home if the chain doesn't start from home
+  if (chain[0] !== 'home') {
+    chain.unshift('home');
+  }
+
+  // Build crumbs from chain
+  for (let i = 0; i < chain.length; i++) {
+    const k = chain[i];
+    const isLast = i === chain.length - 1;
+    const routeSlug = routes[k]?.[locale];
+    let href: string | undefined;
+    if (!isLast && routeSlug !== undefined) {
+      href = getLocalizedPath(lang, routeSlug ? routeSlug + '/' : '/');
+    }
+    trail.push({ label: getRouteLabel(k, lang), href });
+  }
+
+  // Need at least 2 crumbs (home + page) to be useful; but only show if chain length >= 2 past home
+  // i.e. we actually have a parent node beyond home itself
+  if (chain.length < 3) return;
+}
+---
+
+{trail.length >= 2 && (
+  <nav aria-label="Breadcrumb" class="text-xs text-zinc-500 dark:text-zinc-400 mb-4 flex items-center gap-1.5 overflow-x-auto whitespace-nowrap">
+    {trail.map((crumb, i) => (
+      <>
+        {i > 0 && <span class="text-zinc-400 dark:text-zinc-600 select-none" aria-hidden="true">›</span>}
+        {crumb.href ? (
+          <a href={crumb.href} class="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors shrink-0">{crumb.label}</a>
+        ) : (
+          <span class="text-zinc-700 dark:text-zinc-300 font-medium shrink-0" aria-current="page">{crumb.label}</span>
+        )}
+      </>
+    ))}
+  </nav>
+)}
