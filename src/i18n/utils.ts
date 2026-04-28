@@ -84,6 +84,10 @@ export const routes: Record<string, Record<Locale, string>> = {
   consoleExpertOverrides:   { en: '/console/overrides',        es: '/consola/correcciones' },
   consoleExpertExpertise:   { en: '/console/expertise',        es: '/consola/experiencia' },
   consoleExpertTaxonNotes:  { en: '/console/taxon-notes',      es: '/consola/notas-taxon' },
+  // Social graph (M26)
+  inbox:            { en: '/inbox',     es: '/bandeja' },
+  profileFollowers: { en: '/profile/u', es: '/perfil/u' },
+  profileFollowing: { en: '/profile/u', es: '/perfil/u' },
 };
 
 export const docPages = [
