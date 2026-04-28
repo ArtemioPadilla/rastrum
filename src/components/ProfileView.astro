@@ -1,6 +1,8 @@
 ---
 import { t, getLocalizedPath, routes, type Locale } from '../i18n/utils';
 import StreakCard from './StreakCard.astro';
+import ExpertiseLegendBadge from './ExpertiseLegendBadge.astro';
+import ExpertiseCoverageGrid from './ExpertiseCoverageGrid.astro';
 import Skeleton from './Skeleton.astro';
 import PrivacyIntroBanner from './PrivacyIntroBanner.astro';
 import ProfileObservationMap from './profile/ProfileObservationMap.astro';
@@ -118,6 +120,8 @@ const k = (tr as unknown as { karma: Record<string, string> }).karma;
     <ProfileTopSpeciesGrid lang={lang} viewer="self" />
     <ProfileStreakRing lang={lang} viewer="self" />
     <ProfileKarmaSection lang={lang} viewer="self" />
+    <ExpertiseLegendBadge lang={lang} class="mb-2" />
+    <ExpertiseCoverageGrid lang={lang} />
     <ProfilePokedexLink lang={lang} viewer="self" />
     <ProfileBadgesGrid lang={lang} viewer="self" />
     <ProfileActivityTimeline lang={lang} viewer="self" />

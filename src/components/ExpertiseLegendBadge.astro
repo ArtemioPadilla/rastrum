@@ -1,0 +1,69 @@
+---
+/**
+ * ExpertiseLegendBadge — muestra el badge de leyenda regional en el perfil.
+ *
+ * Llama a top_expertise_legend(userId) y renderiza el título dinámico:
+ *   "🥇 Top identificador de Fabaceae en Oaxaca"
+ *
+ * Si el usuario no tiene expertise registrado, no renderiza nada.
+ *
+ * Usage: <ExpertiseLegendBadge lang="es" userId={userId} />
+ * o: sin userId → carga dinámicamente desde JS con el auth.uid()
+ */
+import { t } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+  userId?: string;
+  class?: string;
+}
+
+const { lang, userId = '', class: extraClass = '' } = Astro.props;
+---
+
+<div
+  id="expertise-legend-badge"
+  class={`hidden ${extraClass}`}
+  data-user-id={userId}
+  data-lang={lang}
+  aria-live="polite"
+>
+  <!-- Populated by client script -->
+</div>
+
+<script>
+  import { getTopLegend, legendTitle, tierColors, tierLabel } from '../lib/expertise-legends';
+  import { getSupabase } from '../lib/supabase';
+
+  async function init() {
+    const el = document.getElementById('expertise-legend-badge');
+    if (!el) return;
+
+    const lang = (el.dataset.lang ?? 'es') as 'en' | 'es';
+    let userId = el.dataset.userId ?? '';
+
+    // If no userId provided, use current auth user
+    if (!userId) {
+      const { data } = await getSupabase().auth.getUser();
+      userId = data.user?.id ?? '';
+    }
+    if (!userId) return;
+
+    const legend = await getTopLegend(userId);
+    if (!legend) return;
+
+    const colors = tierColors(legend.tier);
+    const title  = legendTitle(legend, lang);
+    const rlabel = tierLabel(legend.tier, lang);
+
+    el.innerHTML = `
+      <div class="inline-flex items-center gap-2 rounded-full border ${colors.border} ${colors.bg} px-3 py-1">
+        <span class="text-xs font-semibold ${colors.text}">${title}</span>
+        ${legend.region_rank <= 3 ? `<span class="text-[10px] ${colors.text} opacity-70">#${legend.region_rank}</span>` : ''}
+      </div>
+    `;
+    el.classList.remove('hidden');
+  }
+
+  init();
+</script>
