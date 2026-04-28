@@ -28,7 +28,7 @@ narrative source.
 > numbers reflect the actual filename on disk; gaps and the duplicated
 > `15-*.md` are historical (`15-map-location-picker.md` was claimed first,
 > then `15-mcp-server.md` shipped under the same number — see the note
-> below the table). 22 module specs are tracked here today.
+> below the table). 25 module specs are tracked here today.
 
 ---
 
@@ -76,11 +76,23 @@ narrative source.
 | 22 | Community Validation (expert ID queue + research-grade auto-promotion) | v1.1 | shipped (spec v1.3 + impl) | [`22-community-validation.md`](22-community-validation.md) |
 | 23 | Karma + per-taxon expertise + rarity-weighted rewards | v1.1 | partial (Phase 1 shipped; Phases 2–3 deferred) | [`23-karma-expertise-rarity.md`](23-karma-expertise-rarity.md) |
 
+## v1.2 — Profile privacy & public profile — planned
+
+| # | Module | Target | Status | Spec |
+|---|---|---|---|---|
+| 25 | Profile Privacy & Public Profile (`/u/<username>` + per-facet matrix) | v1.2 | planned (spec v1.0) | [`25-profile-privacy.md`](25-profile-privacy.md) |
+
+## v1.5 — Territory layer — planned
+
+| # | Module | Target | Status | Spec |
+|---|---|---|---|---|
+| 24 | Diversity Indices & Spatial Analytics (Shannon, Simpson, Hill numbers, ANPs, municipios) | v1.5 | planned (spec v1.0) | [`24-diversity-indices.md`](24-diversity-indices.md) |
+
 > **Numbering note.** Two specs share the `15-` prefix:
 > [`15-map-location-picker.md`](15-map-location-picker.md) was claimed first
 > during the v1.0 push, then [`15-mcp-server.md`](15-mcp-server.md) shipped
 > under the same number. Both are real, both reference each other from
-> consuming specs. New specs should claim the next free number (`20`+).
+> consuming specs. New specs should claim the next free number (`25`+).
 
 ---
 
@@ -100,7 +112,7 @@ ML training pipeline) rather than waiting on engineering capacity.
 | `video-support` (≤30 s, H.265/AV1) | v1.0 | ✅ shipped (per progress.json) — spec stub welcome |
 | `oauth-custom-domain` (`auth.rastrum.org`) | v1.0 | Supabase Pro $25/mo (deferred for zero-cost target) |
 | `capacitor-ios` (App Store wrapper) | v1.2 | Apple Developer Program $99/yr |
-| `biodiversity-trails`, `pits-qr`, `spatial-analysis`, `diversity-indices`, `trail-pdf-export` | v1.5 | future spec |
+| `biodiversity-trails`, `pits-qr`, `trail-pdf-export` | v1.5 | future spec (`spatial-analysis` + `diversity-indices` now live as module 24) |
 | `camera-trap-advanced`, `gbif-publisher`, `regional-ml`, `b2g-dashboard`, `inat-bridge` | v2.0 | future spec |
 | `scout-full`, `ar-overlay`, `voice-indigenous`, `conabio-api` | v2.5 | future spec |
 
@@ -124,7 +136,7 @@ ML training pipeline) rather than waiting on engineering capacity.
 
 ## How to add a new module spec
 
-1. Claim the next free `NN-*.md` slot (currently `24-`).
+1. Claim the next free `NN-*.md` slot (currently `26-`).
 2. Copy the structure of an existing spec
    (`01-photo-id.md` is a good template).
 3. Include: **Overview → Data model → APIs / logic → Edge cases → Cost / risk
