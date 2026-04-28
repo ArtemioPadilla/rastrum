@@ -131,7 +131,7 @@ const resolvedOgImage = ogImage ?? `${SITE_URL}/og/${ogSlugForPath(currentPath)}
     <main class="max-w-5xl mx-auto px-4 py-8">
       <slot />
     </main>
-    <Footer lang={lang} />
+    <Footer lang={lang} currentPath={currentPath} />
     <InstallPwaButton lang={installLang} />
     <ReportIssueButton lang={lang} />
     <OnboardingTour lang={installLang} />
