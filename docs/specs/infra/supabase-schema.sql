@@ -2619,3 +2619,94 @@ UPDATE public.observations SET establishment_means = 'wild'
 -- Index for diversity queries filtering by establishment_means = 'wild'.
 CREATE INDEX IF NOT EXISTS idx_obs_establishment_means
   ON public.observations(establishment_means);
+
+-- =====================================================================
+-- Module 26 — social graph + reactions (2026-04-28)
+-- =====================================================================
+
+-- 1) follows
+CREATE TABLE IF NOT EXISTS public.follows (
+  follower_id   uuid        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  followee_id   uuid        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  tier          text        NOT NULL DEFAULT 'follower'
+                            CHECK (tier IN ('follower', 'collaborator')),
+  status        text        NOT NULL DEFAULT 'accepted'
+                            CHECK (status IN ('pending', 'accepted')),
+  requested_at  timestamptz NOT NULL DEFAULT now(),
+  accepted_at   timestamptz,
+  PRIMARY KEY (follower_id, followee_id),
+  CHECK (follower_id <> followee_id)
+);
+CREATE INDEX IF NOT EXISTS idx_follows_followee_status
+  ON public.follows(followee_id, status);
+CREATE INDEX IF NOT EXISTS idx_follows_follower_status
+  ON public.follows(follower_id, status);
+
+ALTER TABLE public.follows ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS follows_read ON public.follows;
+CREATE POLICY follows_read ON public.follows FOR SELECT USING (
+  -- Owners always see their edges; everyone else sees only accepted edges
+  follower_id = auth.uid()
+  OR followee_id = auth.uid()
+  OR status = 'accepted'
+);
+
+DROP POLICY IF EXISTS follows_owner_write ON public.follows;
+CREATE POLICY follows_owner_write ON public.follows FOR INSERT
+  WITH CHECK (follower_id = auth.uid());
+
+DROP POLICY IF EXISTS follows_followee_update ON public.follows;
+CREATE POLICY follows_followee_update ON public.follows FOR UPDATE
+  USING (followee_id = auth.uid())
+  WITH CHECK (followee_id = auth.uid());
+
+DROP POLICY IF EXISTS follows_owner_delete ON public.follows;
+CREATE POLICY follows_owner_delete ON public.follows FOR DELETE
+  USING (follower_id = auth.uid() OR followee_id = auth.uid());
+
+-- 2) Counters on users
+ALTER TABLE public.users
+  ADD COLUMN IF NOT EXISTS follower_count   integer NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS following_count  integer NOT NULL DEFAULT 0;
+
+-- 3) Counter trigger
+CREATE OR REPLACE FUNCTION public.tg_follows_counter()
+RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  IF (TG_OP = 'INSERT') THEN
+    IF NEW.status = 'accepted' THEN
+      UPDATE public.users SET follower_count  = follower_count  + 1 WHERE id = NEW.followee_id;
+      UPDATE public.users SET following_count = following_count + 1 WHERE id = NEW.follower_id;
+    END IF;
+    RETURN NEW;
+  ELSIF (TG_OP = 'UPDATE') THEN
+    IF OLD.status <> 'accepted' AND NEW.status = 'accepted' THEN
+      UPDATE public.users SET follower_count  = follower_count  + 1 WHERE id = NEW.followee_id;
+      UPDATE public.users SET following_count = following_count + 1 WHERE id = NEW.follower_id;
+    ELSIF OLD.status = 'accepted' AND NEW.status <> 'accepted' THEN
+      UPDATE public.users SET follower_count  = GREATEST(follower_count  - 1, 0) WHERE id = NEW.followee_id;
+      UPDATE public.users SET following_count = GREATEST(following_count - 1, 0) WHERE id = NEW.follower_id;
+    END IF;
+    RETURN NEW;
+  ELSIF (TG_OP = 'DELETE') THEN
+    IF OLD.status = 'accepted' THEN
+      UPDATE public.users SET follower_count  = GREATEST(follower_count  - 1, 0) WHERE id = OLD.followee_id;
+      UPDATE public.users SET following_count = GREATEST(following_count - 1, 0) WHERE id = OLD.follower_id;
+    END IF;
+    RETURN OLD;
+  END IF;
+  RETURN NULL;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS follows_counter_trigger ON public.follows;
+CREATE TRIGGER follows_counter_trigger
+  AFTER INSERT OR UPDATE OR DELETE ON public.follows
+  FOR EACH ROW EXECUTE FUNCTION public.tg_follows_counter();
+
+-- 4) Backfill counters (idempotent)
+UPDATE public.users u SET
+  follower_count  = (SELECT count(*) FROM public.follows WHERE followee_id = u.id AND status = 'accepted'),
+  following_count = (SELECT count(*) FROM public.follows WHERE follower_id = u.id AND status = 'accepted');
