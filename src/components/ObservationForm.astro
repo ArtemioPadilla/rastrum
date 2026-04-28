@@ -2067,20 +2067,25 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
       // First pass: quick low-accuracy fix (coarse network location)
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          location = {
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude,
-            accuracyM: pos.coords.accuracy,
-            altitudeM: pos.coords.altitude,
-            capturedFrom: 'gps',
-          };
-          paintLocation();
+          // Never overwrite EXIF coords — the photo was taken at that
+          // specific location. GPS in-page is only a fallback for photos
+          // without EXIF (or when no photo has been uploaded yet).
+          if (location?.capturedFrom !== 'exif') {
+            location = {
+              lat: pos.coords.latitude,
+              lng: pos.coords.longitude,
+              accuracyM: pos.coords.accuracy,
+              altitudeM: pos.coords.altitude,
+              capturedFrom: 'gps',
+            };
+            paintLocation();
+          }
           // Second pass: refine with high-accuracy GPS (up to 30s).
           // If the refine fails we silently keep the coarse fix — only
           // show an error if BOTH passes failed (handled below).
           navigator.geolocation.getCurrentPosition(
             (pos2) => {
-              if (pos2.coords.accuracy < (location?.accuracyM ?? 9999)) {
+              if (location?.capturedFrom !== 'exif' && pos2.coords.accuracy < (location?.accuracyM ?? 9999)) {
                 location = {
                   lat: pos2.coords.latitude,
                   lng: pos2.coords.longitude,
