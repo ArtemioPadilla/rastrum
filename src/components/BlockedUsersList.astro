@@ -1,0 +1,127 @@
+---
+/**
+ * Module 26 — Blocked users list (privacy settings panel).
+ *
+ * Renders the current user's `public.blocks` rows with an inline Unblock
+ * button per row. List is fetched client-side because the site is built
+ * statically; auth context only exists in the browser.
+ */
+import { t } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+
+const { lang } = Astro.props;
+const tr = t(lang);
+const block = (tr as unknown as {
+  socialgraph: {
+    block: {
+      button: string;
+      unblock: string;
+      blocked_users: string;
+      empty: string;
+    };
+  };
+}).socialgraph.block;
+---
+
+<section
+  class="rastrum-blocked-users mt-8 rounded-lg border border-zinc-200 dark:border-zinc-800 p-5"
+  data-label-unblock={block.unblock}
+  data-label-empty={block.empty}
+>
+  <h2 class="text-base font-semibold text-zinc-900 dark:text-zinc-100 mb-3">{block.blocked_users}</h2>
+  <ul class="rastrum-blocked-list divide-y divide-zinc-200 dark:divide-zinc-800 hidden"></ul>
+  <p class="rastrum-blocked-empty text-sm text-zinc-500 dark:text-zinc-400 hidden">{block.empty}</p>
+  <p class="rastrum-blocked-loading text-sm text-zinc-500 dark:text-zinc-400">…</p>
+</section>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { unblockUser } from '../lib/social';
+
+  type Row = {
+    blocked_id: string;
+    created_at: string;
+    users: { handle: string | null; display_name: string | null } | null;
+  };
+
+  async function render(root: HTMLElement) {
+    const list = root.querySelector('.rastrum-blocked-list') as HTMLUListElement | null;
+    const empty = root.querySelector('.rastrum-blocked-empty') as HTMLParagraphElement | null;
+    const loading = root.querySelector('.rastrum-blocked-loading') as HTMLParagraphElement | null;
+    if (!list || !empty || !loading) return;
+
+    const unblockLabel = root.dataset.labelUnblock ?? 'Unblock';
+
+    let supabase;
+    try {
+      supabase = getSupabase();
+    } catch {
+      loading.classList.add('hidden');
+      return;
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      loading.classList.add('hidden');
+      empty.classList.remove('hidden');
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('blocks')
+      .select('blocked_id, created_at, users:blocked_id(handle, display_name)')
+      .eq('blocker_id', user.id)
+      .order('created_at', { ascending: false });
+
+    loading.classList.add('hidden');
+
+    if (error || !data || data.length === 0) {
+      empty.classList.remove('hidden');
+      return;
+    }
+
+    const rows = data as unknown as Row[];
+    list.classList.remove('hidden');
+    list.innerHTML = '';
+    for (const row of rows) {
+      const li = document.createElement('li');
+      li.className = 'flex items-center justify-between py-2';
+      li.dataset.blockedId = row.blocked_id;
+
+      const handle = row.users?.handle ? `@${row.users.handle}` : row.blocked_id;
+      const label = document.createElement('span');
+      label.className = 'text-sm text-zinc-800 dark:text-zinc-200';
+      label.textContent = handle;
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'unblock-btn text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:underline';
+      btn.textContent = unblockLabel;
+
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        try {
+          await unblockUser(row.blocked_id);
+          li.remove();
+          if (list.children.length === 0) {
+            list.classList.add('hidden');
+            empty.classList.remove('hidden');
+          }
+        } catch {
+          btn.disabled = false;
+        }
+      });
+
+      li.appendChild(label);
+      li.appendChild(btn);
+      list.appendChild(li);
+    }
+  }
+
+  document.querySelectorAll<HTMLElement>('.rastrum-blocked-users').forEach((el) => {
+    render(el).catch(() => { /* env not configured */ });
+  });
+</script>
