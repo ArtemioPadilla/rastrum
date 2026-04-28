@@ -107,7 +107,7 @@ sync_primary_id_trigger (Postgres)
 activity_events row (visible in /profile/ feed)
 ```
 
-### 2. Photo identification — two cascade modes
+### 2. Photo identification — two cascade modes {#identifier-cascade}
 
 The identification pipeline runs differently depending on where it's triggered. See [`docs/specs/modules/21-identify.md`](specs/modules/21-identify.md) for the full contract.
 
@@ -155,6 +155,15 @@ identification row written by client + sync trigger
 The model is shipped from R2 rather than bundled (~50 MB) so the static
 PWA stays small. The Cornell Lab license is non-commercial; the v2.0
 B2G dashboard would require a separate commercial license.
+
+#### In-browser AI {#in-browser-ai}
+
+EfficientNet-Lite0 ONNX and Phi-3.5-vision are the on-device fallbacks at the
+bottom of both cascade modes. EfficientNet is always available (preloaded ONNX
+via `onnxruntime-web`). Phi-3.5-vision requires a first-run download
+(~2.7 GB cached via the Cache API) and is gated by `localStorage.rastrum.localAiOptIn`.
+Both run entirely in the browser — no server round-trip, no key needed.
+See `src/lib/local-ai.ts` and `src/lib/identifiers/phi-vision.ts`.
 
 ### 4. Sync after offline
 
