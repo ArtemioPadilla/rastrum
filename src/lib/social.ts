@@ -8,6 +8,10 @@
  * See docs/specs/modules/08-profile-activity-gamification.md for the
  * social schema. RLS is enforced server-side; we never gate on the client.
  */
+import { getSupabase } from './supabase';
+import type {
+  ReactionTarget, ReactionKind, ReportTarget, ReportReason, FollowTier,
+} from './types.social';
 
 export interface CommentRow {
   id: string;
@@ -264,4 +268,82 @@ export const SYNC_FILTERS: ReadonlyArray<SyncFilter> = ['all', 'synced', 'pendin
 
 export function isSyncFilter(value: string | null | undefined): value is SyncFilter {
   return !!value && (SYNC_FILTERS as ReadonlyArray<string>).includes(value);
+}
+
+export async function followUser(targetUserId: string, tier: FollowTier = 'follower') {
+  const { data, error } = await getSupabase().functions.invoke('follow', {
+    body: { action: 'follow', target_user_id: targetUserId, tier },
+  });
+  if (error) throw error;
+  return data as { ok: boolean; status: 'pending' | 'accepted' };
+}
+
+export async function unfollowUser(targetUserId: string) {
+  const { data, error } = await getSupabase().functions.invoke('follow', {
+    body: { action: 'unfollow', target_user_id: targetUserId },
+  });
+  if (error) throw error;
+  return data as { ok: boolean };
+}
+
+export async function acceptFollow(followerId: string) {
+  const { data, error } = await getSupabase().functions.invoke('follow', {
+    body: { action: 'accept', follower_id: followerId },
+  });
+  if (error) throw error;
+  return data as { ok: boolean };
+}
+
+export async function react(args: {
+  target: ReactionTarget;
+  target_id: string;
+  kind: ReactionKind;
+}) {
+  const { data, error } = await getSupabase().functions.invoke('react', {
+    body: { ...args, toggle: true },
+  });
+  if (error) throw error;
+  return data as { ok: boolean; action: 'inserted' | 'deleted' };
+}
+
+export async function unreact(args: {
+  target: ReactionTarget;
+  target_id: string;
+  kind: ReactionKind;
+}) {
+  const { data, error } = await getSupabase().functions.invoke('react', {
+    body: { ...args, toggle: false },
+  });
+  if (error) throw error;
+  return data as { ok: boolean; action: 'deleted' };
+}
+
+export async function reportTarget(args: {
+  target: ReportTarget;
+  target_id: string;
+  reason: ReportReason;
+  note?: string;
+}) {
+  const { data, error } = await getSupabase().functions.invoke('report', { body: args });
+  if (error) throw error;
+  return data as { ok: boolean; id: string };
+}
+
+export async function blockUser(targetUserId: string) {
+  const sb = getSupabase();
+  const { error } = await sb
+    .from('blocks')
+    .insert({ blocker_id: (await sb.auth.getUser()).data.user?.id, blocked_id: targetUserId });
+  if (error) throw error;
+}
+
+export async function unblockUser(targetUserId: string) {
+  const sb = getSupabase();
+  const me = (await sb.auth.getUser()).data.user?.id;
+  const { error } = await sb
+    .from('blocks')
+    .delete()
+    .eq('blocker_id', me)
+    .eq('blocked_id', targetUserId);
+  if (error) throw error;
 }
