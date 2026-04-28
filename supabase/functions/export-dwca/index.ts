@@ -105,7 +105,7 @@ const OCCURRENCE_COLUMNS = [
   'decimalLatitude','decimalLongitude','geodeticDatum','coordinateUncertaintyInMeters',
   'scientificName','taxonRank','kingdom',
   'identificationQualifier','identifiedBy','occurrenceStatus',
-  'license','rightsHolder','stateProvince','habitat',
+  'license','rightsHolder','stateProvince','habitat','establishmentMeans',
   'informationWithheld','dataGeneralizations',
 ] as const;
 
@@ -127,6 +127,7 @@ const OCCURRENCE_TERMS: Record<typeof OCCURRENCE_COLUMNS[number], string> = {
   rightsHolder:                  'http://purl.org/dc/terms/rightsHolder',
   stateProvince:                 'http://rs.tdwg.org/dwc/terms/stateProvince',
   habitat:                       'http://rs.tdwg.org/dwc/terms/habitat',
+  establishmentMeans:            'http://rs.tdwg.org/dwc/terms/establishmentMeans',
   informationWithheld:           'http://rs.tdwg.org/dwc/terms/informationWithheld',
   dataGeneralizations:           'http://rs.tdwg.org/dwc/terms/dataGeneralizations',
 };
@@ -351,7 +352,7 @@ serve(async (req) => {
   const db = createClient(SUPABASE_URL, SERVICE_ROLE);
 
   let q = db.from('observations').select(`
-    id, observed_at, accuracy_m, obscure_level, state_province, habitat, location,
+    id, observed_at, accuracy_m, obscure_level, state_province, habitat, establishment_means, location,
     primary_taxon_id, observer_id,
     taxa:primary_taxon_id(kingdom, family, scientific_name),
     identifications!inner(scientific_name, confidence, source, is_primary, is_research_grade),
@@ -414,6 +415,7 @@ serve(async (req) => {
       rightsHolder: o.users?.display_name || o.users?.username || '',
       stateProvince: o.state_province ?? '',
       habitat: o.habitat?.replace(/_/g, ' ') ?? '',
+      establishmentMeans: (o as unknown as { establishment_means?: string }).establishment_means ?? 'wild',
       informationWithheld: withheld ? `Precise location withheld: sensitive species (${o.obscure_level})` : '',
       dataGeneralizations: withheld ? `Coordinates rounded (${o.obscure_level})` : '',
     });

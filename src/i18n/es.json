@@ -442,6 +442,14 @@
     "habitat_placeholder": "Selecciona hábitat (opcional)",
     "weather": "Clima",
     "weather_placeholder": "Selecciona clima (opcional)",
+    "establishment_means": "Origen del organismo",
+    "establishment_means_placeholder": "Selecciona origen (opcional)",
+    "establishment_means_options": {
+      "wild": "🌿 Silvestre",
+      "cultivated": "🌱 Cultivada / plantada",
+      "captive": "🏠 Doméstica / cautiverio",
+      "uncertain": "❓ No sé"
+    },
     "notes": "Notas",
     "notes_placeholder": "Comportamiento, contexto, lo que el formulario no capture",
     "submit": "Guardar observación",
@@ -1189,56 +1197,56 @@
     "rank_in_region": "ranking {n} en {region}"
   },
   "validation": {
-    "queue_title":              "Cola de validación",
-    "queue_subtitle":           "{n} observaciones necesitan ayuda",
-    "queue_empty":              "No hay observaciones esperando validación. ¡Buen trabajo!",
-    "queue_error":              "No se pudo cargar la cola.",
-    "queue_loading":            "Cargando…",
-    "queue_filter_kingdom":     "Reino",
-    "queue_filter_status":      "Estado",
-    "queue_filter_all":         "Todas",
-    "queue_filter_no_id":       "Sin identificación",
-    "queue_filter_low_conf":    "Baja confianza",
-    "queue_filter_pending":     "Esperando validación",
-    "suggest_id":               "Sugerir identificación",
-    "confirm_id":               "Confirmar {name}",
-    "suggest_different":        "Sugerir otra",
-    "votes_count_one":          "1 sugerencia",
-    "votes_count_other":        "{n} sugerencias",
-    "experts_count":            "{n} experto(s) en {kingdom}",
-    "research_grade":           "Grado de investigación",
-    "research_grade_promoted":  "¡Identificación promovida a grado investigación!",
-    "pending_validation":       "Esperando validación de la comunidad",
-    "cannot_vote_own":          "No puedes validar tus propias observaciones",
-    "tie_warning":              "Dos sugerencias empatadas — se necesita un voto desempate.",
-    "expert_note_placeholder":  "Notas (opcional)",
-    "confidence_high":          "Alta",
-    "confidence_medium":        "Media",
-    "confidence_low":           "Baja",
-    "confidence_label":         "Tu confianza",
-    "scientific_name_label":    "Nombre científico",
+    "queue_title": "Cola de validación",
+    "queue_subtitle": "{n} observaciones necesitan ayuda",
+    "queue_empty": "No hay observaciones esperando validación. ¡Buen trabajo!",
+    "queue_error": "No se pudo cargar la cola.",
+    "queue_loading": "Cargando…",
+    "queue_filter_kingdom": "Reino",
+    "queue_filter_status": "Estado",
+    "queue_filter_all": "Todas",
+    "queue_filter_no_id": "Sin identificación",
+    "queue_filter_low_conf": "Baja confianza",
+    "queue_filter_pending": "Esperando validación",
+    "suggest_id": "Sugerir identificación",
+    "confirm_id": "Confirmar {name}",
+    "suggest_different": "Sugerir otra",
+    "votes_count_one": "1 sugerencia",
+    "votes_count_other": "{n} sugerencias",
+    "experts_count": "{n} experto(s) en {kingdom}",
+    "research_grade": "Grado de investigación",
+    "research_grade_promoted": "¡Identificación promovida a grado investigación!",
+    "pending_validation": "Esperando validación de la comunidad",
+    "cannot_vote_own": "No puedes validar tus propias observaciones",
+    "tie_warning": "Dos sugerencias empatadas — se necesita un voto desempate.",
+    "expert_note_placeholder": "Notas (opcional)",
+    "confidence_high": "Alta",
+    "confidence_medium": "Media",
+    "confidence_low": "Baja",
+    "confidence_label": "Tu confianza",
+    "scientific_name_label": "Nombre científico",
     "scientific_name_placeholder": "Empieza a escribir, p. ej. Quercus oleoides",
-    "validate_signin_prompt":   "Inicia sesión para sugerir una identificación",
-    "validate_signin_btn":      "Iniciar sesión",
-    "research_grade_title":     "Grado investigación — confirmado por la comunidad",
-    "submit_target_tpl":        "Sugerencia para la observación de {name}",
-    "nav_validate_label":       "Validar",
-    "submission_received":      "Sugerencia recibida.",
-    "submit_suggestion":        "Enviar sugerencia",
-    "submitting":               "Enviando…",
-    "cancel":                   "Cancelar",
-    "current_id_label":         "Identificación actual",
-    "no_id_yet":                "Sin identificar",
-    "by_observer":              "Por {name}",
-    "no_taxon_match":           "No se encontró ninguna especie con ese nombre. Asegúrate de escribir el nombre científico completo.",
-    "submit_failed":            "No se pudo enviar la sugerencia: {error}",
-    "dashboard_title":          "Mis validaciones",
-    "dashboard_subtitle":       "Sugerencias que has hecho y su impacto.",
-    "dashboard_empty":          "Aún no has validado ninguna observación. Visita la cola de validación para empezar.",
-    "stat_suggestions":         "Sugerencias hechas",
-    "stat_research_grade":      "Llegaron a grado investigación",
-    "stat_kingdoms":            "Reinos validados",
-    "go_to_queue":              "Ir a la cola",
+    "validate_signin_prompt": "Inicia sesión para sugerir una identificación",
+    "validate_signin_btn": "Iniciar sesión",
+    "research_grade_title": "Grado investigación — confirmado por la comunidad",
+    "submit_target_tpl": "Sugerencia para la observación de {name}",
+    "nav_validate_label": "Validar",
+    "submission_received": "Sugerencia recibida.",
+    "submit_suggestion": "Enviar sugerencia",
+    "submitting": "Enviando…",
+    "cancel": "Cancelar",
+    "current_id_label": "Identificación actual",
+    "no_id_yet": "Sin identificar",
+    "by_observer": "Por {name}",
+    "no_taxon_match": "No se encontró ninguna especie con ese nombre. Asegúrate de escribir el nombre científico completo.",
+    "submit_failed": "No se pudo enviar la sugerencia: {error}",
+    "dashboard_title": "Mis validaciones",
+    "dashboard_subtitle": "Sugerencias que has hecho y su impacto.",
+    "dashboard_empty": "Aún no has validado ninguna observación. Visita la cola de validación para empezar.",
+    "stat_suggestions": "Sugerencias hechas",
+    "stat_research_grade": "Llegaron a grado investigación",
+    "stat_kingdoms": "Reinos validados",
+    "go_to_queue": "Ir a la cola",
     "karma_microcopy_loading": "Cargando peso de voto…",
     "karma_microcopy_unavailable": "El peso de tu voto aparecerá tras tu primera guardada."
   },
@@ -1358,25 +1366,82 @@
     "save_failed_toast": "No se pudo guardar — intenta de nuevo",
     "owner_only_badge": "Solo lo ves tú",
     "facet": {
-      "profile":          { "label": "Perfil público",               "description": "Si la página de perfil está accesible." },
-      "real_name":        { "label": "Nombre visible",                "description": "Tu nombre visible cuando difiere de tu usuario." },
-      "bio":              { "label": "Biografía",                    "description": "La biografía que escribiste en tu perfil." },
-      "location":         { "label": "Región",                       "description": "Tu región principal (estado o país) — nunca tu dirección precisa." },
-      "stats_counts":     { "label": "Conteos",                      "description": "Total de observaciones, conteo grado-investigación, reinos validados." },
-      "observation_map":  { "label": "Mapa de observaciones",         "description": "Mapa de tus observaciones. Especies sensibles se siguen aproximando a ~11 km." },
-      "calendar_heatmap": { "label": "Calendario de actividad",       "description": "Cuadrícula de 12 meses con los días en que observaste." },
-      "taxonomic_donut":  { "label": "Desglose taxonómico",           "description": "Donut con los reinos o filos que más observas." },
-      "top_species":      { "label": "Especies destacadas",           "description": "Cuadrícula con tus especies más observadas y miniaturas." },
-      "streak":           { "label": "Racha",                        "description": "Racha actual y más larga." },
-      "badges":           { "label": "Insignias",                    "description": "Insignias que has desbloqueado." },
-      "activity_feed":    { "label": "Feed de actividad",             "description": "Cronología de tus observaciones, IDs y sugerencias." },
-      "validation_rep":   { "label": "Reputación de validación",       "description": "Conteo de IDs aceptadas y promovidas a grado-investigación. Anclaje del perfil de investigador credenciado." },
-      "obs_list":         { "label": "Lista de observaciones",         "description": "Enlace para explorar todo tu historial de observaciones." },
-      "watchlist":        { "label": "Seguimiento",                   "description": "Taxones que estás siguiendo." },
-      "goals":            { "label": "Metas",                         "description": "Metas mensuales de observación y progreso." },
-      "karma_total":      { "label": "Karma",                         "description": "Tu puntaje de karma y señal de confianza." },
-      "expertise":        { "label": "Experiencia",                   "description": "Puntajes de experiencia por taxón derivados de validaciones." },
-      "pokedex":          { "label": "Pokédex",                       "description": "Cuadrícula de cada taxón observado, con cubetas de rareza." }
+      "profile": {
+        "label": "Perfil público",
+        "description": "Si la página de perfil está accesible."
+      },
+      "real_name": {
+        "label": "Nombre visible",
+        "description": "Tu nombre visible cuando difiere de tu usuario."
+      },
+      "bio": {
+        "label": "Biografía",
+        "description": "La biografía que escribiste en tu perfil."
+      },
+      "location": {
+        "label": "Región",
+        "description": "Tu región principal (estado o país) — nunca tu dirección precisa."
+      },
+      "stats_counts": {
+        "label": "Conteos",
+        "description": "Total de observaciones, conteo grado-investigación, reinos validados."
+      },
+      "observation_map": {
+        "label": "Mapa de observaciones",
+        "description": "Mapa de tus observaciones. Especies sensibles se siguen aproximando a ~11 km."
+      },
+      "calendar_heatmap": {
+        "label": "Calendario de actividad",
+        "description": "Cuadrícula de 12 meses con los días en que observaste."
+      },
+      "taxonomic_donut": {
+        "label": "Desglose taxonómico",
+        "description": "Donut con los reinos o filos que más observas."
+      },
+      "top_species": {
+        "label": "Especies destacadas",
+        "description": "Cuadrícula con tus especies más observadas y miniaturas."
+      },
+      "streak": {
+        "label": "Racha",
+        "description": "Racha actual y más larga."
+      },
+      "badges": {
+        "label": "Insignias",
+        "description": "Insignias que has desbloqueado."
+      },
+      "activity_feed": {
+        "label": "Feed de actividad",
+        "description": "Cronología de tus observaciones, IDs y sugerencias."
+      },
+      "validation_rep": {
+        "label": "Reputación de validación",
+        "description": "Conteo de IDs aceptadas y promovidas a grado-investigación. Anclaje del perfil de investigador credenciado."
+      },
+      "obs_list": {
+        "label": "Lista de observaciones",
+        "description": "Enlace para explorar todo tu historial de observaciones."
+      },
+      "watchlist": {
+        "label": "Seguimiento",
+        "description": "Taxones que estás siguiendo."
+      },
+      "goals": {
+        "label": "Metas",
+        "description": "Metas mensuales de observación y progreso."
+      },
+      "karma_total": {
+        "label": "Karma",
+        "description": "Tu puntaje de karma y señal de confianza."
+      },
+      "expertise": {
+        "label": "Experiencia",
+        "description": "Puntajes de experiencia por taxón derivados de validaciones."
+      },
+      "pokedex": {
+        "label": "Pokédex",
+        "description": "Cuadrícula de cada taxón observado, con cubetas de rareza."
+      }
     }
   },
   "console": {

@@ -46,6 +46,8 @@ const habitats = [
 const habitatLabels = (tr.observe as any).habitat_options as Record<string,string> | undefined;
 const weathers = ['sunny','cloudy','overcast','light_rain','heavy_rain','fog','storm'];
 const weatherLabels = (tr.observe as any).weather_options as Record<string,string> | undefined;
+const establishmentMeans = ['wild','cultivated','captive','uncertain'] as const;
+const establishmentLabels = (tr.observe as any).establishment_means_options as Record<string,string> | undefined;
 
 // Pull strings into typed local consts so JSX never needs an inline
 // `Record<…>` cast (Astro/esbuild parses the angle brackets as a tag).
@@ -416,6 +418,29 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
           <option value="">{tr.observe.weather_placeholder}</option>
           {weathers.map(w => <option value={w}>{weatherLabels?.[w] ?? w.replace(/_/g, ' ')}</option>)}
         </select>
+      </div>
+    </div>
+
+    <!-- Establishment means (organism origin) -->
+    <div data-identify-hide>
+      <label for="obs-establishment" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+        {observeStrings.establishment_means}
+      </label>
+      <div class="flex flex-wrap gap-2">
+        {establishmentMeans.map((v) => (
+          <label class="cursor-pointer">
+            <input
+              type="radio"
+              name="establishment_means"
+              value={v}
+              class="peer sr-only"
+              checked={v === 'wild'}
+            />
+            <span class="inline-flex items-center rounded-full border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 peer-checked:bg-emerald-700 peer-checked:text-white peer-checked:border-emerald-700 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors">
+              {establishmentLabels?.[v] ?? v}
+            </span>
+          </label>
+        ))}
       </div>
     </div>
 
@@ -2253,6 +2278,7 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
       },
       habitat: ((form.elements.namedItem('habitat') as HTMLSelectElement).value || null) as Observation['habitat'],
       weather: ((form.elements.namedItem('weather') as HTMLSelectElement).value || null) as Observation['weather'],
+      establishmentMeans: (form.querySelector<HTMLInputElement>('input[name="establishment_means"]:checked')?.value ?? 'wild') as 'wild' | 'cultivated' | 'captive' | 'uncertain',
       evidenceType: ((form.elements.namedItem('evidence_type') as HTMLSelectElement).value || 'direct_sighting') as Observation['evidenceType'],
       notes: ((form.elements.namedItem('notes') as HTMLTextAreaElement).value || null),
       asDraft,
@@ -2660,6 +2686,7 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
       time: new Date().toISOString(),
       habitat: (form.elements.namedItem('habitat') as HTMLSelectElement | null)?.value || null,
       weather: (form.elements.namedItem('weather') as HTMLSelectElement | null)?.value || null,
+      establishment_means: form.querySelector<HTMLInputElement>('input[name="establishment_means"]:checked')?.value ?? 'wild',
       evidence_type: (form.elements.namedItem('evidence_type') as HTMLSelectElement | null)?.value || null,
       behavior_tags: null,
       count: null,
