@@ -158,6 +158,7 @@ const k = (tr as unknown as { karma: Record<string, string> }).karma;
 
 <script>
   import { getSupabase } from '../lib/supabase';
+  import { escAttr } from '../lib/karma';
   import type { UserProfile } from '../lib/types';
 
   const signedOut    = document.getElementById('signed-out') as HTMLDivElement | null;
@@ -181,10 +182,6 @@ const k = (tr as unknown as { karma: Record<string, string> }).karma;
       <text x='50%' y='58%' text-anchor='middle' fill='white' font-family='system-ui,sans-serif' font-size='40' font-weight='700'>${clean}</text>
     </svg>`;
     return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
-  }
-
-  function escAttr(s: string): string {
-    return s.replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' } as Record<string, string>)[c]);
   }
 
   async function run() {
@@ -348,13 +345,9 @@ const k = (tr as unknown as { karma: Record<string, string> }).karma;
 
 <script>
   import { getSupabase } from '../lib/supabase';
-  import { formatDelta } from '../lib/karma';
+  import { formatDelta, escAttr } from '../lib/karma';
 
   (async function hydrateKarma() {
-    function escAttr(s: string): string {
-      return s.replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' } as Record<string, string>)[c]);
-    }
-
     const totalEl   = document.getElementById('karma-total');
     const weeklyEl  = document.getElementById('karma-weekly');
     const listEl    = document.getElementById('karma-expertise-list') as HTMLUListElement | null;

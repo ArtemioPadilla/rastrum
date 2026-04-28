@@ -24,6 +24,14 @@ export function formatDelta(n: number): string {
   return r >= 0 ? `+${r}` : String(r);
 }
 
+const HTML_ESCAPES: Record<string, string> = {
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+};
+
+export function escAttr(s: string): string {
+  return s.replace(/[&<>"']/g, c => HTML_ESCAPES[c]);
+}
+
 export interface VoteMicrocopyInput {
   lang: 'en' | 'es';
   bucket: Bucket;

@@ -24,16 +24,12 @@ const px = (tr as unknown as { pokedex: Record<string, string> }).pokedex;
 
 <script>
   import { getSupabase } from '../lib/supabase';
-  import { rarityTier, type Bucket } from '../lib/karma';
+  import { rarityTier, escAttr, type Bucket } from '../lib/karma';
 
   const grid    = document.getElementById('pokedex-grid');
   const loading = document.getElementById('pokedex-loading');
   const empty   = document.getElementById('pokedex-empty');
   const isEs    = document.documentElement.lang === 'es';
-
-  function escAttr(s: string): string {
-    return s.replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' } as Record<string, string>)[c]);
-  }
 
   (async function () {
     if (!grid) return;

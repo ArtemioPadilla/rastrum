@@ -3,6 +3,7 @@ import {
   rarityTier,
   microcopyForVote,
   formatDelta,
+  escAttr,
   RARITY_BUCKETS,
 } from './karma';
 
@@ -66,5 +67,17 @@ describe('microcopyForVote', () => {
     expect(RARITY_BUCKETS).toHaveLength(5);
     expect(RARITY_BUCKETS[0].multiplier).toBe(1.0);
     expect(RARITY_BUCKETS[4].multiplier).toBe(5.0);
+  });
+});
+
+describe('escAttr', () => {
+  it('escapes the five HTML metacharacters', () => {
+    expect(escAttr(`&<>"'`)).toBe('&amp;&lt;&gt;&quot;&#39;');
+  });
+  it('passes through non-meta characters', () => {
+    expect(escAttr('Quercus oleoides')).toBe('Quercus oleoides');
+  });
+  it('escapes & first to avoid double-escaping', () => {
+    expect(escAttr('A & B')).toBe('A &amp; B');
   });
 });

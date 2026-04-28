@@ -48,7 +48,16 @@ jobs:
             echo "cron=true"    >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          changed=$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" || true)
+          # Force-push or first push to branch: github.event.before is 40 zeros.
+          # In that case there's no diff base; replay both files defensively
+          # since both are idempotent.
+          before='${{ github.event.before }}'
+          if [ "$before" = "0000000000000000000000000000000000000000" ] || [ -z "$before" ]; then
+            echo "schema=true"  >> "$GITHUB_OUTPUT"
+            echo "cron=true"    >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed=$(git diff --name-only "$before" "${{ github.sha }}" || true)
           echo "$changed"
           echo "$changed" | grep -qx 'docs/specs/infra/supabase-schema.sql' && echo "schema=true"  >> "$GITHUB_OUTPUT" || echo "schema=false" >> "$GITHUB_OUTPUT"
           echo "$changed" | grep -qx 'docs/specs/infra/cron-schedules.sql'  && echo "cron=true"    >> "$GITHUB_OUTPUT" || echo "cron=false"   >> "$GITHUB_OUTPUT"
