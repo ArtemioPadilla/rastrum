@@ -1843,4 +1843,157 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 GRANT EXECUTE ON FUNCTION public.award_karma(uuid, uuid, uuid, text, numeric) TO service_role;
 
+-- ============================================================
+-- recompute_consensus — replaced to (a) keep existing weighted
+-- aggregation + research-grade promotion, (b) award karma deltas
+-- to all voters when consensus actually changed.
+-- ============================================================
+CREATE OR REPLACE FUNCTION public.recompute_consensus(p_observation_id uuid)
+RETURNS void AS $$
+DECLARE
+  winning_taxon  uuid;
+  winning_score  numeric;
+  validator_count integer;
+  prev_research_grade boolean;
+  was_promoted   boolean := false;
+  v_voter        record;
+  v_winner_rank  integer;
+  v_voter_rank   integer;
+  v_obs_path     uuid[];
+  v_outcome      text;
+BEGIN
+  -- Existing aggregation (unchanged behavior at the top, expertise-aware
+  -- weighting now reads user_expertise rather than is_expert kingdom).
+  WITH weighted AS (
+    SELECT i.taxon_id,
+           SUM(
+             CASE
+               WHEN EXISTS (
+                 SELECT 1 FROM public.user_expertise ue
+                 WHERE ue.user_id = i.validated_by
+                   AND ue.taxon_id = ANY(
+                     SELECT array_prepend(t.id, t.ancestor_path)
+                     FROM public.taxa t WHERE t.id = i.taxon_id
+                   )
+               )
+               THEN 3.0
+               ELSE 1.0
+             END
+           ) AS score,
+           count(DISTINCT i.validated_by) AS validators
+    FROM   public.identifications i
+    WHERE  i.observation_id = p_observation_id
+      AND  i.taxon_id IS NOT NULL
+      AND  i.validated_by IS NOT NULL
+    GROUP BY i.taxon_id
+  )
+  SELECT taxon_id, score, validators
+    INTO winning_taxon, winning_score, validator_count
+    FROM weighted
+   ORDER BY score DESC
+   LIMIT 1;
+
+  IF winning_taxon IS NULL THEN RETURN; END IF;
+
+  -- Tie guard (existing behavior).
+  IF (
+    SELECT count(*) FROM (
+      SELECT i.taxon_id,
+             SUM(CASE
+                   WHEN EXISTS (
+                     SELECT 1 FROM public.user_expertise ue
+                     WHERE ue.user_id = i.validated_by
+                       AND ue.taxon_id = ANY(
+                         SELECT array_prepend(t.id, t.ancestor_path)
+                         FROM public.taxa t WHERE t.id = i.taxon_id
+                       )
+                   )
+                   THEN 3.0
+                   ELSE 1.0
+                 END) AS s
+      FROM public.identifications i
+      WHERE i.observation_id = p_observation_id
+        AND i.taxon_id IS NOT NULL
+        AND i.validated_by IS NOT NULL
+      GROUP BY i.taxon_id
+    ) sub
+    WHERE sub.s = winning_score
+  ) > 1 THEN
+    RETURN;  -- tie blocks promotion AND blocks karma awards
+  END IF;
+
+  -- Read previous research-grade state.
+  SELECT COALESCE(bool_or(is_research_grade), false)
+    INTO prev_research_grade
+    FROM public.identifications
+   WHERE observation_id = p_observation_id AND is_primary;
+
+  -- Promote if eligible.
+  IF winning_score >= 2.0 AND validator_count >= 2 THEN
+    UPDATE public.identifications
+       SET is_research_grade = true
+     WHERE observation_id = p_observation_id
+       AND taxon_id = winning_taxon
+       AND is_primary;
+    was_promoted := NOT prev_research_grade;
+  END IF;
+
+  -- Karma is only awarded when consensus actually crossed into research-grade
+  -- on this call. Repeat calls without a state change are no-ops.
+  IF NOT was_promoted THEN RETURN; END IF;
+
+  -- Determine the winning voter's expertise rank in the lineage of winning_taxon
+  -- (used to decide which losing voters got beaten by a deeper expert).
+  SELECT array_prepend(t.id, t.ancestor_path)
+    INTO v_obs_path
+    FROM public.taxa t
+   WHERE t.id = winning_taxon;
+
+  SELECT MIN(array_position(v_obs_path, ue.taxon_id))
+    INTO v_winner_rank
+    FROM public.identifications i
+    JOIN public.user_expertise ue ON ue.user_id = i.validated_by
+   WHERE i.observation_id = p_observation_id
+     AND i.taxon_id = winning_taxon
+     AND ue.taxon_id = ANY(v_obs_path);
+
+  -- For each distinct voter on this observation, award karma.
+  FOR v_voter IN
+    SELECT DISTINCT i.validated_by AS user_id, i.taxon_id, i.confidence
+    FROM   public.identifications i
+    WHERE  i.observation_id = p_observation_id
+      AND  i.validated_by IS NOT NULL
+  LOOP
+    IF v_voter.taxon_id = winning_taxon THEN
+      v_outcome := 'win';
+    ELSE
+      -- Loss only counts if SOME winning-side voter has a deeper expertise
+      -- in this lineage than this voter. Otherwise it was a peer disagreement
+      -- and we silently skip the karma update.
+      SELECT MIN(array_position(v_obs_path, ue.taxon_id))
+        INTO v_voter_rank
+        FROM public.user_expertise ue
+       WHERE ue.user_id = v_voter.user_id
+         AND ue.taxon_id = ANY(v_obs_path);
+
+      IF v_voter_rank IS NULL OR (v_winner_rank IS NOT NULL AND v_winner_rank < v_voter_rank) THEN
+        v_outcome := 'loss';
+      ELSE
+        CONTINUE;
+      END IF;
+    END IF;
+
+    PERFORM public.award_karma(
+      v_voter.user_id,
+      p_observation_id,
+      winning_taxon,
+      v_outcome,
+      COALESCE(v_voter.confidence, 0.7)
+    );
+  END LOOP;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION public.recompute_consensus(uuid) TO service_role;
+
 GRANT EXECUTE ON FUNCTION public.refresh_taxon_rarity() TO service_role;
