@@ -1,12 +1,3 @@
 ---
-import BaseLayout from '../../../../../layouts/BaseLayout.astro';
-import AdminExpertsView from '../../../../../components/AdminExpertsView.astro';
-import { t } from '../../../../../i18n/utils';
-
-const lang = 'es';
-const tr = t(lang);
+return Astro.redirect('/es/consola/expertos/', 308);
 ---
-
-<BaseLayout title={`${tr.admin.experts.title} — Rastrum`} description="Panel de administración para revisar y aprobar solicitudes de investigador credencializado en la plataforma de biodiversidad Rastrum." lang={lang}>
-  <AdminExpertsView lang={lang} />
-</BaseLayout>
