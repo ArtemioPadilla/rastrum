@@ -75,6 +75,7 @@ narrative source.
 | 21 | Identify (no-save quick PlantNet probe) | v1.0 | shipped | [`21-identify.md`](21-identify.md) |
 | 22 | Community Validation (expert ID queue + research-grade auto-promotion) | v1.1 | shipped (spec v1.3 + impl) | [`22-community-validation.md`](22-community-validation.md) |
 | 23 | Karma + per-taxon expertise + rarity-weighted rewards | v1.1 | partial (Phase 1 shipped; Phases 2–3 deferred) | [`23-karma-expertise-rarity.md`](23-karma-expertise-rarity.md) |
+| 24 | Admin / Moderator / Expert Console | v1.1 → v1.2 | partial (PR1 foundation shipping) | [`24-admin-console.md`](24-admin-console.md) |
 
 ## v1.2 — Profile privacy & public profile — shipped
 

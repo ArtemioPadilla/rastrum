@@ -89,7 +89,7 @@ export const routes: Record<string, Record<Locale, string>> = {
 export const docPages = [
   'vision', 'features', 'roadmap', 'tasks', 'market',
   'architecture', 'indigenous', 'funding', 'contribute',
-  'faq', 'privacy', 'terms',
+  'faq', 'privacy', 'terms', 'console',
 ] as const;
 
 export type DocPage = (typeof docPages)[number];
@@ -240,6 +240,10 @@ export const docPageMeta = {
   terms: {
     en: "Rastrum's terms of service. Open-source under MIT (code) and AGPL-3.0 (server). Per-observation Creative Commons licensing — BY, BY-NC, or CC0.",
     es: "Términos de servicio de Rastrum. Open-source bajo MIT (código) y AGPL-3.0 (servidor). Licencias Creative Commons por observación — BY, BY-NC o CC0.",
+  },
+  console: {
+    en: "Privileged-actions surface for admin, moderator, and expert roles. Role model, audit log, and per-action runbooks.",
+    es: "Superficie de acciones privilegiadas para roles de admin, moderador y experto. Modelo de roles, auditoría y runbooks por acción.",
   },
 } as const satisfies Record<DocPage, { en: string; es: string }>;
 

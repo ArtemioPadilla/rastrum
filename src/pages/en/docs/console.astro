@@ -1,0 +1,21 @@
+---
+import DocLayout from '../../../layouts/DocLayout.astro';
+const lang = 'en';
+---
+<DocLayout title="Console" lang={lang} section="console">
+
+# Console
+
+The **Console** is a privileged-actions surface for users who hold an admin, moderator, or expert role. If you don't see a "Console" pill in the header, this page doesn't apply to you.
+
+## What it's for
+
+- **Admins** manage user roles, review researcher credentials, watch sync failures and API quotas, audit every privileged action.
+- **Moderators** triage flagged content and manage soft-bans (PR3).
+- **Experts** review the validation queue scoped to their taxa and watch their per-taxon expertise score (PR2).
+
+## How it's built
+
+See [Module 24](https://github.com/ArtemioPadilla/rastrum/blob/main/docs/specs/modules/24-admin-console.md) for the implementation reference, and the [design doc](https://github.com/ArtemioPadilla/rastrum/blob/main/docs/superpowers/specs/2026-04-27-admin-console-design.md) for rationale.
+
+</DocLayout>

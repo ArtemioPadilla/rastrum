@@ -221,6 +221,33 @@ production builds.
 
 Full design rationale: `docs/superpowers/specs/2026-04-26-ux-revamp-design.md`.
 
+### Console / privileged surfaces
+
+The `'console'` chrome mode (third value of `ChromeMode`) renders the
+admin / moderator / expert dashboard at `/{en,es}/{console,consola}/*`.
+Three load-bearing rules:
+
+1. **`console-tabs.ts` is the single source of truth.** Sidebar, role
+   pills, and the route table are pure projections. Adding a tab = one
+   entry. Never hand-roll a route or a sidebar item.
+2. **Every privileged write goes through `supabase/functions/admin/`.**
+   The dispatcher re-verifies the JWT, enforces the action's required
+   role, runs the handler, and inserts an `admin_audit` row in the same
+   logical commit. No direct browser-side writes to privileged tables.
+3. **`has_role(uid, role)` is the RLS predicate.** Don't check
+   `users.is_expert` for new privilege checks — that's a denormalised
+   cache for the consensus hot-path. Use `has_role()` in any new
+   policy that gates console-relevant data.
+
+The `console` accent rail uses slate-500 (top header pill, sidebar active
+state). The classes are safelisted in `tailwind.config.mjs`; adding a
+new console-related accent class requires extending the safelist or
+production builds will purge it.
+
+Bootstrap docs: `docs/runbooks/admin-bootstrap.md`. Role model:
+`docs/runbooks/role-model.md`. Audit log: `docs/runbooks/admin-audit.md`.
+Per-action runbook: `docs/runbooks/admin-ops.md`.
+
 ### Onboarding events + CI smoke
 
 The onboarding tour exposes two public DOM events:
