@@ -17,11 +17,12 @@ interface Props {
   description?: string;
   lang?: string;
   /**
-   * Override the OG image. Defaults to a path-derived static PNG built
-   * by `npm run build:og` and shipped to public/og/<slug>.png. User-
-   * generated pages (share/obs, public profiles) pass their own URL
-   * (typically `https://media.rastrum.org/og/<id>.png`) which is
-   * client-side rendered at observation-save time.
+   * Override the OG image. Defaults to a path- and locale-derived static
+   * PNG built by `npm run build:og` and shipped to
+   * public/og/<lang>/<slug>.png. User-generated pages (share/obs,
+   * public profiles) pass their own URL (typically
+   * `https://media.rastrum.org/og/<id>.png`) which is client-side
+   * rendered at observation-save time.
    */
   ogImage?: string;
   /** Open Graph type override; defaults to 'website'. Use 'article' for doc pages. */
@@ -44,11 +45,13 @@ const ogLocale = lang === 'es' ? 'es_MX' : 'en_US';
 const ogLocaleAlt = lang === 'es' ? 'en_US' : 'es_MX';
 
 // Map the current path to the OG card slug emitted by scripts/generate-og.ts.
-// The slug system mirrors the route names but flattens locale prefixes,
-// since we render a single PNG per surface (the title/subtitle are
-// language-neutral enough at OG sizes — fine to revisit per-locale later).
+// The slug system flattens locale prefixes; the OG path keeps the locale
+// in a separate segment (`/og/<lang>/<slug>.png`) so EN and ES surfaces
+// pull localized titles/subtitles.
 function ogSlugForPath(path: string): string {
-  const p = path.replace(/\/(en|es)\//, '/').replace(/\/+$/, '') || '/';
+  // Anchored to the start so we only strip a leading locale segment.
+  // `/profile/en/foo` would not be affected, only `/en/profile/foo`.
+  const p = path.replace(/^\/(en|es)(?=\/|$)/, '').replace(/\/+$/, '') || '/';
   if (p === '/' || p === '/en' || p === '/es')                  return 'home';
   if (p.startsWith('/observe') || p.startsWith('/observar'))    return 'observe';
   if (p.startsWith('/identify') || p.startsWith('/identificar'))return 'identify';
@@ -60,7 +63,8 @@ function ogSlugForPath(path: string): string {
   if (p.includes('/contribute')   || p.includes('/contribuir'))   return 'docs-contribute';
   return 'default';
 }
-const resolvedOgImage = ogImage ?? `${SITE_URL}/og/${ogSlugForPath(currentPath)}.png`;
+const ogLang: 'en' | 'es' = lang === 'es' ? 'es' : 'en';
+const resolvedOgImage = ogImage ?? `${SITE_URL}/og/${ogLang}/${ogSlugForPath(currentPath)}.png`;
 ---
 
 <!doctype html>
