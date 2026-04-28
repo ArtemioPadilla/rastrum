@@ -5,11 +5,13 @@ import { test, expect, type Page } from '@playwright/test';
  * starts hidden, and normally reveals only for authed users on first
  * paint. We bypass auth by dispatching the public replay event the
  * Profile → Edit "Replay tour" button uses.
+ *
+ * The tour is a 5-step spotlight overlay using a <dialog> element.
+ * Steps: Welcome · FAB · Quick ID · Explore · Settings.
  */
 
 async function openTour(page: Page) {
   await page.goto('/en/');
-  // Modal is in the DOM but hidden; firing the replay event opens it.
   await page.evaluate(() => {
     window.dispatchEvent(new CustomEvent('rastrum:replay-onboarding'));
   });
@@ -19,12 +21,11 @@ async function openTour(page: Page) {
 }
 
 test.describe('OnboardingTour', () => {
-  test('replay event opens the dialog and shows step 1 of 4', async ({ page }) => {
+  test('replay event opens the dialog and shows step 1 of 5', async ({ page }) => {
     const dialog = await openTour(page);
-    await expect(dialog.locator('#onb-step-label')).toHaveText(/Step 1 of 4/);
-    // Heading on step 0 is the pipeline title and is the labelledby target.
-    await expect(dialog.locator('#onboarding-title')).toBeVisible();
-    await expect(dialog).toHaveAttribute('aria-modal', 'true');
+    await expect(dialog.locator('#onb-step-label')).toHaveText(/Step 1 of 5/);
+    await expect(dialog.locator('#onb-tooltip-title')).toBeVisible();
+    await expect(dialog.locator('#onb-tooltip')).toHaveAttribute('aria-modal', 'true');
   });
 
   test('Escape closes the dialog and restores focus to caller', async ({ page }) => {
@@ -35,47 +36,41 @@ test.describe('OnboardingTour', () => {
 
   test('focus is trapped inside the dialog on Tab', async ({ page }) => {
     const dialog = await openTour(page);
-    // Cycle Tab a few times; activeElement must stay inside the dialog card.
+    // Cycle Tab a few times; activeElement must stay inside the tooltip card.
     for (let i = 0; i < 12; i++) {
       await page.keyboard.press('Tab');
       const inside = await page.evaluate(() => {
-        const root = document.getElementById('onboarding-tour');
-        return root ? root.contains(document.activeElement) : false;
+        const tooltip = document.getElementById('onb-tooltip');
+        return tooltip ? tooltip.contains(document.activeElement) : false;
       });
       expect(inside).toBe(true);
     }
-    // Sanity-check the dialog is still open.
     await expect(dialog).toBeVisible();
   });
 
-  test('skip-to-summary jumps to step 3 of 4', async ({ page }) => {
+  test('next advances through all 5 steps', async ({ page }) => {
     const dialog = await openTour(page);
-    // Auto-accept the window.confirm() before clicking.
-    page.once('dialog', async d => { await d.accept(); });
-    // Advance to step 1 (Configure identifiers) where "Skip — set up later" lives.
+    await expect(dialog.locator('#onb-step-label')).toHaveText(/Step 1 of 5/);
+    // Step 1 has a "Start tour" button (labelStart), click it
     await dialog.locator('#onb-next').click();
-    await expect(dialog.locator('#onb-step-label')).toHaveText(/Step 2 of 4/);
-    await dialog.locator('#onb-skip-setup').click();
-    await expect(dialog.locator('#onb-step-label')).toHaveText(/Step 3 of 4/);
+    await expect(dialog.locator('#onb-step-label')).toHaveText(/Step 2 of 5/);
+    await dialog.locator('#onb-next').click();
+    await expect(dialog.locator('#onb-step-label')).toHaveText(/Step 3 of 5/);
+    await dialog.locator('#onb-next').click();
+    await expect(dialog.locator('#onb-step-label')).toHaveText(/Step 4 of 5/);
+    await dialog.locator('#onb-next').click();
+    await expect(dialog.locator('#onb-step-label')).toHaveText(/Step 5 of 5/);
+    // Step 5 "Done" should close the dialog
+    await dialog.locator('#onb-next').click();
+    await expect(page.locator('#onboarding-tour')).toBeHidden();
   });
 
-  test('Anthropic key save is gated by shape validation', async ({ page }) => {
+  test('skip button closes the dialog on non-final steps', async ({ page }) => {
     const dialog = await openTour(page);
     await dialog.locator('#onb-next').click();
-    await expect(dialog.locator('#onb-step-label')).toHaveText(/Step 2 of 4/);
-
-    const input = dialog.locator('#onb-claude-key');
-    const saveBtn = dialog.locator('#onb-claude-save');
-    await expect(saveBtn).toBeDisabled();
-
-    // Garbage input → still disabled, hint shown.
-    await input.fill('garbage');
-    await expect(saveBtn).toBeDisabled();
-    await expect(dialog.locator('#onb-claude-status')).toContainText(/sk-ant-/i);
-
-    // Valid shape → Save enables (we don't click — would hit the network).
-    await input.fill('sk-ant-' + 'a'.repeat(40));
-    await expect(saveBtn).toBeEnabled();
+    await expect(dialog.locator('#onb-step-label')).toHaveText(/Step 2 of 5/);
+    await dialog.locator('#onb-skip').click();
+    await expect(page.locator('#onboarding-tour')).toBeHidden();
   });
 
   test('emits onboarding telemetry events on transitions', async ({ page }) => {
@@ -96,6 +91,6 @@ test.describe('OnboardingTour', () => {
     const types = events.map(e => e.type);
     expect(types).toContain('opened');
     expect(types).toContain('step_change');
-    expect(types).toContain('dismissed_before_done');
+    expect(types).toContain('dismissed');
   });
 });
