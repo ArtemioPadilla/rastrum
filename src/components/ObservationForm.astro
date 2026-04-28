@@ -569,9 +569,24 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
   <div class="relative w-full sm:max-w-2xl h-full sm:h-[80vh] bg-white dark:bg-zinc-900 sm:rounded-lg overflow-hidden flex flex-col">
     <div class="flex items-center justify-between px-3 py-2 border-b border-zinc-200 dark:border-zinc-800">
       <h2 id="map-modal-title" class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{mapPickerTitle}</h2>
-      <button id="map-close-btn" type="button" class="min-h-11 min-w-11 rounded text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300" aria-label={mapPickerCancel}>
-        <svg class="w-5 h-5 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-      </button>
+      <div class="flex items-center gap-2">
+        <!-- Satellite / Map toggle -->
+        <button
+          id="map-satellite-toggle"
+          type="button"
+          class="inline-flex items-center gap-1 rounded-md border border-zinc-300 dark:border-zinc-700 px-2 py-1 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+          aria-pressed="false"
+          title={isEs ? 'Cambiar a satélite' : 'Switch to satellite'}
+        >
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/>
+          </svg>
+          <span id="map-satellite-label">{isEs ? 'Satélite' : 'Satellite'}</span>
+        </button>
+        <button id="map-close-btn" type="button" class="min-h-11 min-w-11 rounded text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300" aria-label={mapPickerCancel}>
+          <svg class="w-5 h-5 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
     </div>
     <p class="px-3 py-2 text-xs text-zinc-500 dark:text-zinc-400">{mapPickerHint}</p>
     <div id="map-picker" class="flex-1 bg-zinc-100 dark:bg-zinc-900"></div>
@@ -1911,8 +1926,26 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
   });
 
   // ── Map picker (MapLibre) ─────────────────────────────────────────────
-  const mapModal       = document.getElementById('map-modal');
-  const mapPickerEl    = document.getElementById('map-picker');
+  const mapModal          = document.getElementById('map-modal');
+  const mapPickerEl       = document.getElementById('map-picker');
+  const mapSatToggle      = document.getElementById('map-satellite-toggle');
+  const mapSatLabel       = document.getElementById('map-satellite-label');
+  const MAP_STYLE_STREET  = 'https://tiles.openfreemap.org/styles/liberty';
+  // ESRI World Imagery — free, no API key required
+  const MAP_STYLE_SAT: import('maplibre-gl').StyleSpecification = {
+    version: 8,
+    sources: {
+      esri_sat: {
+        type: 'raster',
+        tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+        tileSize: 256,
+        attribution: '© Esri, Maxar, Earthstar Geographics',
+        maxzoom: 19,
+      },
+    },
+    layers: [{ id: 'esri_sat', type: 'raster', source: 'esri_sat' }],
+  };
+  let isSatellite = false;
   const mapStatusEl    = document.getElementById('map-picker-status');
   const mapOpenBtn     = document.getElementById('map-picker-open-btn');
   const mapCloseBtn    = document.getElementById('map-close-btn');
@@ -1951,7 +1984,7 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
         const maplibre = (await import('maplibre-gl')).default;
         mapPickerInstance = new maplibre.Map({
           container: mapPickerEl,
-          style: 'https://tiles.openfreemap.org/styles/liberty',
+          style: MAP_STYLE_STREET,
           center: [initialLng, initialLat],
           zoom: initialZoom,
           attributionControl: { compact: true },
@@ -1970,6 +2003,33 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
           setMapSelected(e.lngLat.lat, e.lngLat.lng);
         });
         mapPickerInstance.on('load', () => setMapStatus(null));
+
+        // Satellite toggle
+        mapSatToggle?.addEventListener('click', () => {
+          if (!mapPickerInstance) return; // guard: map not loaded yet
+          isSatellite = !isSatellite;
+          mapPickerInstance?.setStyle(isSatellite ? MAP_STYLE_SAT : MAP_STYLE_STREET);
+          // Re-add marker after style change (MapLibre removes layers on setStyle)
+          mapPickerInstance?.once('styledata', () => {
+            if (mapPickerMarker && mapPickerSelected) {
+              mapPickerMarker.remove();
+              mapPickerMarker = new maplibre.Marker({ draggable: true, color: '#047857' })
+                .setLngLat([mapPickerSelected.lng, mapPickerSelected.lat])
+                .addTo(mapPickerInstance!);
+              mapPickerMarker.on('dragend', () => {
+                const ll = mapPickerMarker?.getLngLat();
+                if (ll) setMapSelected(ll.lat, ll.lng);
+              });
+            }
+          });
+          if (mapSatToggle) mapSatToggle.setAttribute('aria-pressed', String(isSatellite));
+          if (mapSatLabel) mapSatLabel.textContent = isSatellite
+            ? (isEs ? 'Mapa' : 'Map')
+            : (isEs ? 'Satélite' : 'Satellite');
+          if (mapSatToggle) mapSatToggle.classList.toggle('bg-emerald-50', isSatellite);
+          if (mapSatToggle) mapSatToggle.classList.toggle('dark:bg-emerald-900/20', isSatellite);
+          if (mapSatToggle) mapSatToggle.classList.toggle('border-emerald-500', isSatellite);
+        });
       } catch {
         setMapStatus(isEs
           ? 'No se pudo cargar el mapa. Usa la entrada manual.'
