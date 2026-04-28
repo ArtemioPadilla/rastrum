@@ -8,7 +8,7 @@ const { lang } = Astro.props;
 const tr = t(lang);
 const pip = (tr as unknown as { pipeline: Record<string, string> }).pipeline;
 const onb = (tr as unknown as { onboarding: Record<string, string> }).onboarding;
-const privacyTr = (tr as unknown as { privacy_matrix: { manage_in_tab_note: string } }).privacy_matrix;
+const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } }).privacy;
 ---
 
 <div class="max-w-2xl mx-auto">

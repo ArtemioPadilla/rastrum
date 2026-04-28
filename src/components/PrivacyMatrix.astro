@@ -16,7 +16,7 @@ interface Props {
 const { lang } = Astro.props;
 const tr = t(lang);
 const tree = tr as unknown as {
-  privacy_matrix: {
+  privacy: {
     heading: string;
     subheading: string;
     preset_open_scientist: string;
@@ -45,7 +45,7 @@ const tree = tr as unknown as {
     facet: Record<string, { label: string; description: string }>;
   };
 };
-const pm = tree.privacy_matrix;
+const pm = tree.privacy;
 
 const sections: Array<{ key: string; title: string; rows: string[] }> = [
   { key: 'identity',   title: pm.section_identity,   rows: ['profile', 'real_name', 'bio', 'location'] },
@@ -214,27 +214,37 @@ const levels: Array<{ key: 'public' | 'signed_in' | 'private'; label: string }> 
 
     let matrix: PrivacyMatrix = normalizeMatrix(profile?.profile_privacy ?? null);
     paintMatrix(rootEl, matrix);
-    bindMatrix(rootEl, async (next) => {
-      matrix = next;
+
+    // Dual-write the legacy boolean so the 4 RLS policies that still gate
+    // on `users.profile_public` (follows / user_badges / user_streaks /
+    // activity_events) stay coherent with the matrix. Boolean is dropped
+    // in v1.3 once those policies are migrated to can_see_facet only.
+    const persist = async (next: PrivacyMatrix) => {
       const { error } = await supabase
         .from('users')
-        .update({ profile_privacy: next, updated_at: new Date().toISOString() })
+        .update({
+          profile_privacy: next,
+          profile_public: next.profile === 'public',
+          updated_at: new Date().toISOString(),
+        })
         .eq('id', user.id);
       if (error) throw error;
+    };
+
+    bindMatrix(rootEl, async (next) => {
+      matrix = next;
+      await persist(next);
     }, () => matrix);
 
     bindNuclear(rootEl, async () => {
       const next = nuclearPrivateMatrix();
-      const { error } = await supabase
-        .from('users')
-        .update({ profile_privacy: next, updated_at: new Date().toISOString() })
-        .eq('id', user.id);
-      if (error) throw error;
+      await persist(next);
       matrix = next;
       paintMatrix(rootEl, matrix);
     });
 
     bindAccordions(rootEl);
+    bindBeforeUnloadFlush(rootEl, () => user.id);
   }
 
   function paintMatrix(rootEl: HTMLElement, matrix: PrivacyMatrix) {
@@ -290,27 +300,30 @@ const levels: Array<{ key: 'public' | 'signed_in' | 'private'; label: string }> 
     });
   }
 
+  // Module-level handle so the beforeunload flusher can drain whatever
+  // the debounce timer is still holding.
+  const pendingSave: { matrix: PrivacyMatrix | null } = { matrix: null };
+
   function bindMatrix(
     rootEl: HTMLElement,
     save: (next: PrivacyMatrix) => Promise<void>,
     getCurrent: () => PrivacyMatrix
   ) {
     let saveTimer: ReturnType<typeof setTimeout> | null = null;
-    let pending: PrivacyMatrix | null = null;
 
     rootEl.querySelectorAll<LevelButton>('button[data-facet][data-level]').forEach(btn => {
       btn.addEventListener('click', () => {
         const facet = btn.dataset.facet as PrivacyFacetKey;
         const level = btn.dataset.level as PrivacyLevel;
-        const current = pending ?? getCurrent();
+        const current = pendingSave.matrix ?? getCurrent();
         if (current[facet] === level) return;
         const next: PrivacyMatrix = { ...current, [facet]: level };
-        pending = next;
+        pendingSave.matrix = next;
         paintMatrix(rootEl, next);
         if (saveTimer) clearTimeout(saveTimer);
         saveTimer = setTimeout(() => {
-          const snapshot = pending ?? next;
-          pending = null;
+          const snapshot = pendingSave.matrix ?? next;
+          pendingSave.matrix = null;
           save(snapshot).then(() => showToast(rootEl, 'ok')).catch(() => {
             paintMatrix(rootEl, getCurrent());
             showToast(rootEl, 'err');
@@ -337,18 +350,74 @@ const levels: Array<{ key: 'public' | 'signed_in' | 'private'; label: string }> 
         const preset = btn.dataset.preset as PresetKey;
         if (!preset) return;
         const next = applyPreset(preset);
-        pending = next;
+        pendingSave.matrix = next;
         paintMatrix(rootEl, next);
         if (saveTimer) clearTimeout(saveTimer);
         saveTimer = setTimeout(() => {
-          const snapshot = pending ?? next;
-          pending = null;
+          const snapshot = pendingSave.matrix ?? next;
+          pendingSave.matrix = null;
           save(snapshot).then(() => showToast(rootEl, 'ok')).catch(() => {
             paintMatrix(rootEl, getCurrent());
             showToast(rootEl, 'err');
           });
         }, 300);
       });
+    });
+  }
+
+  function readAccessToken(): string {
+    if (typeof localStorage === 'undefined') return '';
+    try {
+      const raw = localStorage.getItem('rastrum-auth-v1');
+      if (!raw) return '';
+      const parsed = JSON.parse(raw) as { access_token?: string; currentSession?: { access_token?: string } };
+      return parsed.access_token ?? parsed.currentSession?.access_token ?? '';
+    } catch {
+      return '';
+    }
+  }
+
+  function bindBeforeUnloadFlush(rootEl: HTMLElement, getUserId: () => string) {
+    const env = (import.meta as unknown as { env?: { PUBLIC_SUPABASE_URL?: string; PUBLIC_SUPABASE_ANON_KEY?: string } }).env;
+    const flush = () => {
+      const matrix = pendingSave.matrix;
+      if (!matrix) return;
+      pendingSave.matrix = null;
+      const supabaseUrl = env?.PUBLIC_SUPABASE_URL;
+      const anonKey    = env?.PUBLIC_SUPABASE_ANON_KEY;
+      if (!supabaseUrl || !anonKey) return;
+      const accessToken = readAccessToken();
+      if (!accessToken) return;
+      const userId = getUserId();
+      const url = `${supabaseUrl}/rest/v1/users?id=eq.${encodeURIComponent(userId)}`;
+      const body = JSON.stringify({
+        profile_privacy: matrix,
+        profile_public: matrix.profile === 'public',
+        updated_at: new Date().toISOString(),
+      });
+      // navigator.sendBeacon cannot set Authorization, so we PATCH with
+      // keepalive: true. This survives `beforeunload` and we drop the
+      // response — RLS keeps the operation safe whether it lands or not.
+      try {
+        fetch(url, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': anonKey,
+            'Authorization': `Bearer ${accessToken}`,
+            'Prefer': 'return=minimal',
+          },
+          body,
+          keepalive: true,
+        }).catch(() => { /* swallow — page is unloading */ });
+      } catch {
+        // beforeunload handlers cannot block; just drop quietly.
+      }
+      void rootEl;
+    };
+    window.addEventListener('beforeunload', flush);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') flush();
     });
   }
 

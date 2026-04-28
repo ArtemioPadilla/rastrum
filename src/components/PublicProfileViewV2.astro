@@ -24,7 +24,7 @@ interface Props {
 const { lang } = Astro.props;
 const tr = t(lang);
 const pmTree = tr as unknown as {
-  privacy_matrix: {
+  privacy: {
     private_profile_empty_title: string;
     private_profile_empty_body: string;
     signed_in_required_title: string;
@@ -32,7 +32,7 @@ const pmTree = tr as unknown as {
     owner_only_badge: string;
   };
 };
-const pm = pmTree.privacy_matrix;
+const pm = pmTree.privacy;
 ---
 
 <div
@@ -177,13 +177,6 @@ const pm = pmTree.privacy_matrix;
     return '';
   }
 
-  function maybeMarkRobotsNoindex() {
-    const m = document.createElement('meta');
-    m.name = 'robots';
-    m.content = 'noindex,nofollow';
-    document.head.appendChild(m);
-  }
-
   async function init() {
     const root = document.querySelector<HTMLElement>('.rastrum-public-profile-v2');
     if (!root) return;
@@ -193,7 +186,6 @@ const pm = pmTree.privacy_matrix;
     if (!username || !/^[a-zA-Z0-9_]{3,30}$/.test(username)) {
       hide(root.querySelector('[data-pp-loading]'));
       show(root.querySelector('[data-pp-private]'));
-      maybeMarkRobotsNoindex();
       return;
     }
 
@@ -215,7 +207,6 @@ const pm = pmTree.privacy_matrix;
     if (!profile) {
       hide(root.querySelector('[data-pp-loading]'));
       show(root.querySelector('[data-pp-private]'));
-      maybeMarkRobotsNoindex();
       return;
     }
 
@@ -242,7 +233,6 @@ const pm = pmTree.privacy_matrix;
       } else {
         show(root.querySelector('[data-pp-signed-in]'));
       }
-      maybeMarkRobotsNoindex();
       return;
     }
 
@@ -389,14 +379,10 @@ const pm = pmTree.privacy_matrix;
       document.dispatchEvent(new CustomEvent('rastrum:follow-ready'));
     }
 
-    // Robots gate: only "public" profiles get indexed.
-    if (!isOwner) {
-      const profileFacet = facets.profile;
-      if (profileFacet !== true) maybeMarkRobotsNoindex();
-    } else {
-      // owner viewing own page: never index from this URL
-      maybeMarkRobotsNoindex();
-    }
+    // Robots gate is rendered in static HTML by the page (BaseLayout
+    // robots="noindex,nofollow") — see C-3. The /u/?username= surface is
+    // intentionally not indexed; sitemap user enumeration (v1.2.1) is the
+    // discoverability path for public profiles.
   }
 
   init().catch(() => {

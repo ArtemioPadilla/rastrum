@@ -81,6 +81,7 @@ const tr = t(lang);
 <script>
   import { getSupabase } from '../lib/supabase';
   import { summarizeStreak, formatStreakDays, type StreakRow, type StreakState } from '../lib/social';
+  import { normalizeMatrix } from '../lib/privacy-presets';
 
   type Lang = 'en' | 'es';
 
@@ -173,13 +174,17 @@ const tr = t(lang);
         try {
           // Module 25: also flip the new privacy facet so the matrix
           // and the legacy boolean stay in sync during the deprecation
-          // window. The boolean is dropped in v1.3.
+          // window. The boolean is dropped in v1.3. normalizeMatrix
+          // backfills any facet keys missing from an older stored row
+          // before we write — otherwise we'd persist a partial JSONB
+          // that defeats forward-compat for new facets.
           const { data: existing } = await supabase
             .from('users')
             .select('profile_privacy')
             .eq('id', user.id)
             .maybeSingle<{ profile_privacy: Record<string, string> | null }>();
-          const nextPrivacy = { ...(existing?.profile_privacy ?? {}), profile: 'public' };
+          const normalized = normalizeMatrix(existing?.profile_privacy ?? null);
+          const nextPrivacy = { ...normalized, profile: 'public' as const };
           const { error: upErr } = await supabase
             .from('users')
             .update({ gamification_opt_in: true, profile_public: true, profile_privacy: nextPrivacy })

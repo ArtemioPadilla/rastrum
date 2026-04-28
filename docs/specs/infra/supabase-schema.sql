@@ -2047,7 +2047,8 @@ WHERE profile_privacy ->> 'profile' IS DISTINCT FROM
 
 -- Single source of truth for facet visibility. Owner always passes;
 -- anyone else gets the matrix's per-facet level. Missing key →
--- 'public' (forward-compat for new facets shipped before migration).
+-- 'signed_in' (forward-compat: new facets shipped before a migration
+-- backfills the matrix default to opt-in privacy for anonymous viewers).
 CREATE OR REPLACE FUNCTION public.can_see_facet(
   target uuid,
   facet  text,
@@ -2057,7 +2058,7 @@ LANGUAGE sql STABLE SECURITY INVOKER AS $$
   SELECT CASE
     WHEN viewer IS NOT NULL AND viewer = target THEN true
     ELSE (
-      SELECT CASE COALESCE(profile_privacy ->> facet, 'public')
+      SELECT CASE COALESCE(profile_privacy ->> facet, 'signed_in')
         WHEN 'public'    THEN true
         WHEN 'signed_in' THEN viewer IS NOT NULL
         WHEN 'private'   THEN false
@@ -2093,6 +2094,31 @@ CREATE POLICY "users_update_self_privacy" ON public.users
   USING ((SELECT auth.uid()) = id)
   WITH CHECK ((SELECT auth.uid()) = id);
 
+-- Column-level UPDATE grant for `authenticated`. RLS WITH CHECK can only
+-- gate rows, not columns, so column-level GRANTs are the mechanism that
+-- prevents a user from self-elevating `is_expert` /
+-- `credentialed_researcher` / `karma_total` / streak counters etc. via a
+-- handcrafted REST call. The ALL-TABLES grant earlier in this file
+-- (`GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public
+-- TO authenticated`) covers everything else; here we narrow public.users
+-- specifically.
+REVOKE UPDATE ON public.users FROM authenticated;
+GRANT UPDATE (
+  username,
+  display_name,
+  bio,
+  avatar_url,
+  region_primary,
+  preferred_lang,
+  observer_license,
+  profile_public,
+  gamification_opt_in,
+  streak_digest_opt_in,
+  profile_privacy,
+  dismissed_privacy_intro_at,
+  expert_taxa
+) ON public.users TO authenticated;
+
 -- Observation pins for the public observation_map facet. Honours
 -- obscure_level + location_obscured: sensitive species → coarsened to
 -- ~11 km grid, 'private' obs filtered out entirely. Visibility gate
@@ -2103,8 +2129,8 @@ SELECT
   o.observer_id,
   o.id AS observation_id,
   CASE
-    WHEN o.location_obscured
-      THEN ST_SnapToGrid(o.location, 0.1)
+    WHEN o.location_obscured IS NOT NULL
+      THEN o.location_obscured
     ELSE o.location
   END AS location,
   i.scientific_name,
@@ -2115,7 +2141,7 @@ LEFT JOIN public.identifications i
   ON i.observation_id = o.id AND i.is_primary = true
 WHERE
   o.sync_status = 'synced'
-  AND o.obscure_level <> 'private'
+  AND o.obscure_level <> 'full'
   AND public.can_see_facet(o.observer_id, 'observation_map', (SELECT auth.uid()));
 
 GRANT SELECT ON public.profile_observation_pins TO anon, authenticated;
@@ -2131,7 +2157,7 @@ SELECT
     SELECT count(*) FROM public.observations o
      WHERE o.observer_id = u.id
        AND o.sync_status = 'synced'
-       AND o.obscure_level <> 'private'
+       AND o.obscure_level <> 'full'
   ), 0) AS total_observations,
   COALESCE((
     SELECT count(*) FROM public.observations o
@@ -2139,7 +2165,7 @@ SELECT
        ON i.observation_id = o.id AND i.is_primary = true
      WHERE o.observer_id = u.id
        AND o.sync_status = 'synced'
-       AND o.obscure_level <> 'private'
+       AND o.obscure_level <> 'full'
        AND i.is_research_grade = true
   ), 0) AS research_grade_count,
   COALESCE((
@@ -2149,7 +2175,7 @@ SELECT
      JOIN public.taxa t ON t.id = i.taxon_id
      WHERE o.observer_id = u.id
        AND o.sync_status = 'synced'
-       AND o.obscure_level <> 'private'
+       AND o.obscure_level <> 'full'
        AND i.is_research_grade = true
        AND t.kingdom IS NOT NULL
   ), 0) AS kingdoms_validated
@@ -2168,4 +2194,63 @@ DROP POLICY IF EXISTS user_expertise_facet_read  ON public.user_expertise;
 CREATE POLICY user_expertise_facet_read ON public.user_expertise
   FOR SELECT USING (
     public.can_see_facet(user_id, 'expertise', (SELECT auth.uid()))
+  );
+
+-- Defence-in-depth: fold the privacy-matrix `profile` facet into the four
+-- legacy public-read policies that still gate on `users.profile_public`.
+-- The matrix and the boolean stay dual-written by PrivacyMatrix.astro and
+-- StreakCard.astro during the deprecation window, so either side opening
+-- the gate is enough — but if PrivacyMatrix forgets to flip the boolean,
+-- can_see_facet still does the right thing.
+DROP POLICY IF EXISTS user_badges_public_read ON public.user_badges;
+CREATE POLICY user_badges_public_read ON public.user_badges FOR SELECT
+  USING (
+    revoked_at IS NULL
+    AND user_id IN (
+      SELECT id FROM public.users
+      WHERE gamification_opt_in = true
+        AND (
+          profile_public = true
+          OR public.can_see_facet(id, 'profile', (SELECT auth.uid()))
+        )
+    )
+  );
+
+DROP POLICY IF EXISTS streaks_public_read ON public.user_streaks;
+CREATE POLICY streaks_public_read ON public.user_streaks FOR SELECT
+  USING (
+    user_id IN (
+      SELECT id FROM public.users
+      WHERE gamification_opt_in = true
+        AND (
+          profile_public = true
+          OR public.can_see_facet(id, 'profile', (SELECT auth.uid()))
+        )
+    )
+  );
+
+DROP POLICY IF EXISTS follows_public_read ON public.follows;
+CREATE POLICY follows_public_read ON public.follows FOR SELECT
+  USING (
+    follower_id IN (
+      SELECT id FROM public.users
+      WHERE profile_public = true
+         OR public.can_see_facet(id, 'profile', (SELECT auth.uid()))
+    )
+    OR followee_id IN (
+      SELECT id FROM public.users
+      WHERE profile_public = true
+         OR public.can_see_facet(id, 'profile', (SELECT auth.uid()))
+    )
+  );
+
+DROP POLICY IF EXISTS activity_public_read ON public.activity_events;
+CREATE POLICY activity_public_read ON public.activity_events FOR SELECT
+  USING (
+    visibility = 'public'
+    AND actor_id IN (
+      SELECT id FROM public.users
+      WHERE profile_public = true
+         OR public.can_see_facet(id, 'profile', (SELECT auth.uid()))
+    )
   );
