@@ -106,6 +106,27 @@ const PAGES: PageSpec[] = [
       es: { kind: 'static', title: 'Contribuye',                    subtitle: 'Código abierto bajo AGPL-3.0. Únete al equipo.',                         accent: 'stone' },
     },
   },
+  {
+    slug: 'profile-dex',
+    cards: {
+      en: { kind: 'static', title: 'Your species log',              subtitle: 'A living Pokédex of every species you have observed.',                   accent: 'emerald' },
+      es: { kind: 'static', title: 'Tu registro de especies',       subtitle: 'Un Pokédex vivo de todas las especies que has observado.',               accent: 'emerald' },
+    },
+  },
+  {
+    slug: 'profile-settings',
+    cards: {
+      en: { kind: 'static', title: 'Settings',                      subtitle: 'Profile, preferences, data, developer.',                                 accent: 'stone' },
+      es: { kind: 'static', title: 'Ajustes',                       subtitle: 'Perfil, preferencias, datos, desarrollador.',                            accent: 'stone' },
+    },
+  },
+  {
+    slug: 'validate',
+    cards: {
+      en: { kind: 'static', title: 'Validate observations',         subtitle: 'Help confirm community species identifications.',                        accent: 'teal' },
+      es: { kind: 'static', title: 'Valida observaciones',          subtitle: 'Ayuda a confirmar identificaciones de la comunidad.',                    accent: 'teal' },
+    },
+  },
 ];
 
 async function renderOne(slug: string, lang: Lang, card: StaticCardInput, fontBold: ArrayBuffer, fontRegular: ArrayBuffer): Promise<Buffer> {
