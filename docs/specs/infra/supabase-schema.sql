@@ -1447,9 +1447,27 @@ CREATE INDEX IF NOT EXISTS idx_user_expertise_score
 
 ALTER TABLE public.user_expertise ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS user_expertise_self_read   ON public.user_expertise;
 DROP POLICY IF EXISTS user_expertise_public_read ON public.user_expertise;
-CREATE POLICY user_expertise_public_read ON public.user_expertise
-  FOR SELECT USING (true);
+
+-- Self-read: a user always sees their own expertise rows.
+CREATE POLICY user_expertise_self_read ON public.user_expertise FOR SELECT
+  USING ((SELECT auth.uid()) = user_id);
+
+-- Public read: only when the user has opted into both a public profile
+-- AND gamification surfaces (mirrors user_badges_public_read at L587 and
+-- streaks_public_read at L656).
+CREATE POLICY user_expertise_public_read ON public.user_expertise FOR SELECT
+  USING (
+    user_id IN (
+      SELECT id FROM public.users
+      WHERE profile_public = true AND gamification_opt_in = true
+    )
+  );
+
+-- INSERT/UPDATE/DELETE are intentionally NOT exposed to clients —
+-- user_expertise rows are written by the in-database award_karma()
+-- helper running under SECURITY DEFINER (added in a later task).
 
 -- 2. taxa.ancestor_path: precomputed array of ancestor IDs (most-specific first).
 ALTER TABLE public.taxa
@@ -1496,6 +1514,9 @@ ALTER TABLE public.karma_events ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS karma_events_self_read ON public.karma_events;
 CREATE POLICY karma_events_self_read ON public.karma_events
   FOR SELECT USING (auth.uid() = user_id);
+
+-- INSERT into karma_events is restricted to service_role / SECURITY DEFINER
+-- functions (award_karma). The append-only ledger has no client-write policy.
 
 -- 5. users: karma_total + grace columns.
 ALTER TABLE public.users
