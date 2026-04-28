@@ -1425,3 +1425,90 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- after submitting a suggestion. SECURITY DEFINER means the caller
 -- doesn't need elevated permissions on identifications/taxa.
 GRANT EXECUTE ON FUNCTION public.recompute_consensus(uuid) TO authenticated;
+
+-- ============================================================
+-- KARMA + EXPERTISE + RARITY (module 23) — additive Phase 1
+-- ============================================================
+
+-- 1. user_expertise: continuous score per (user, taxon).
+CREATE TABLE IF NOT EXISTS public.user_expertise (
+  user_id      uuid    NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  taxon_id     uuid    NOT NULL REFERENCES public.taxa(id)  ON DELETE CASCADE,
+  score        numeric NOT NULL DEFAULT 0,
+  verified_at  timestamptz,
+  verified_by  uuid    REFERENCES public.users(id),
+  updated_at   timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, taxon_id)
+);
+CREATE INDEX IF NOT EXISTS idx_user_expertise_taxon
+  ON public.user_expertise(taxon_id);
+CREATE INDEX IF NOT EXISTS idx_user_expertise_score
+  ON public.user_expertise(user_id, score DESC);
+
+ALTER TABLE public.user_expertise ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS user_expertise_public_read ON public.user_expertise;
+CREATE POLICY user_expertise_public_read ON public.user_expertise
+  FOR SELECT USING (true);
+
+-- 2. taxa.ancestor_path: precomputed array of ancestor IDs (most-specific first).
+ALTER TABLE public.taxa
+  ADD COLUMN IF NOT EXISTS ancestor_path uuid[] NOT NULL DEFAULT '{}';
+CREATE INDEX IF NOT EXISTS idx_taxa_ancestor_path
+  ON public.taxa USING GIN (ancestor_path);
+
+-- 3. taxon_rarity: nightly-materialized rarity buckets and multipliers.
+CREATE TABLE IF NOT EXISTS public.taxon_rarity (
+  taxon_id      uuid PRIMARY KEY REFERENCES public.taxa(id) ON DELETE CASCADE,
+  obs_count     integer NOT NULL,
+  percentile    numeric NOT NULL,
+  bucket        smallint NOT NULL CHECK (bucket BETWEEN 1 AND 5),
+  multiplier    numeric NOT NULL,
+  refreshed_at  timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.taxon_rarity ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS taxon_rarity_public_read ON public.taxon_rarity;
+CREATE POLICY taxon_rarity_public_read ON public.taxon_rarity
+  FOR SELECT USING (true);
+
+-- 4. karma_events: append-only ledger.
+CREATE TABLE IF NOT EXISTS public.karma_events (
+  id              bigserial PRIMARY KEY,
+  user_id         uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  observation_id  uuid REFERENCES public.observations(id) ON DELETE SET NULL,
+  taxon_id        uuid REFERENCES public.taxa(id) ON DELETE SET NULL,
+  delta           numeric NOT NULL,
+  reason          text NOT NULL CHECK (reason IN (
+    'consensus_win','consensus_loss','first_in_rastrum',
+    'observation_synced','comment_reaction','manual_adjust'
+  )),
+  rarity_bucket   smallint,
+  expertise_rank  integer,
+  created_at      timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_karma_events_user
+  ON public.karma_events(user_id, created_at DESC);
+
+ALTER TABLE public.karma_events ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS karma_events_self_read ON public.karma_events;
+CREATE POLICY karma_events_self_read ON public.karma_events
+  FOR SELECT USING (auth.uid() = user_id);
+
+-- 5. users: karma_total + grace columns.
+ALTER TABLE public.users
+  ADD COLUMN IF NOT EXISTS karma_total      numeric NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS karma_updated_at timestamptz NOT NULL DEFAULT now(),
+  ADD COLUMN IF NOT EXISTS grace_until      timestamptz,
+  ADD COLUMN IF NOT EXISTS vote_count       integer NOT NULL DEFAULT 0;
+
+-- 6. Backfill grace_until for existing users (only the first time).
+UPDATE public.users
+   SET grace_until = COALESCE(grace_until, created_at + INTERVAL '30 days')
+ WHERE grace_until IS NULL;
+
+GRANT SELECT ON public.user_expertise TO anon, authenticated;
+GRANT SELECT ON public.taxon_rarity   TO anon, authenticated;
+GRANT SELECT ON public.karma_events   TO authenticated;
