@@ -2910,3 +2910,33 @@ CREATE POLICY blocks_owner_write ON public.blocks FOR INSERT
 DROP POLICY IF EXISTS blocks_owner_delete ON public.blocks;
 CREATE POLICY blocks_owner_delete ON public.blocks FOR DELETE
   USING (blocker_id = auth.uid());
+
+-- 11) reports
+CREATE TABLE IF NOT EXISTS public.reports (
+  id           uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  reporter_id  uuid                 REFERENCES public.users(id) ON DELETE SET NULL,
+  target_type  text        NOT NULL
+                           CHECK (target_type IN ('user','observation','photo','identification','comment')),
+  target_id    uuid        NOT NULL,
+  reason       text        NOT NULL
+                           CHECK (reason IN ('spam','harassment','wrong_id','privacy_violation','copyright','other')),
+  note         text,
+  status       text        NOT NULL DEFAULT 'open'
+                           CHECK (status IN ('open','triaged','resolved','dismissed')),
+  created_at   timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_reports_status_created
+  ON public.reports(status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_reports_reporter
+  ON public.reports(reporter_id, created_at DESC);
+
+ALTER TABLE public.reports ENABLE ROW LEVEL SECURITY;
+
+-- Reporters can see their own reports; nobody else (operators read via service role).
+DROP POLICY IF EXISTS reports_owner_read ON public.reports;
+CREATE POLICY reports_owner_read ON public.reports FOR SELECT
+  USING (reporter_id = auth.uid());
+
+DROP POLICY IF EXISTS reports_owner_write ON public.reports;
+CREATE POLICY reports_owner_write ON public.reports FOR INSERT
+  WITH CHECK (reporter_id = auth.uid());
