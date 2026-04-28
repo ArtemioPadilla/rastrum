@@ -107,13 +107,13 @@ sync_primary_id_trigger (Postgres)
 activity_events row (visible in /profile/ feed)
 ```
 
-### 2. Photo identification (offline → online)
+### 2. Photo identification — two cascade modes
 
-When offline at submit time, the same outbox holds the row plus the
-binary; the cascade is deferred. On `online` event or
-`visibilitychange` returning to visible, `registerSyncTriggers()` runs
-`syncOutbox()`. The cascade then runs server-side via the `identify`
-Edge Function, which routes through:
+The identification pipeline runs differently depending on where it's triggered. See [`docs/specs/modules/21-identify.md`](specs/modules/21-identify.md) for the full contract.
+
+**Client-side (Identify page — `/en/identify/`):** PlantNet, Claude, and Phi-vision fire in parallel. The first provider to return a result above its confidence threshold wins and cancels the others. If all fail, Phi-vision prompts the user to opt in to the local model download.
+
+**Server-side (sync.ts → `identify` Edge Function):** the classic serial waterfall via `cascade.ts`:
 
 ```
 PlantNet API (cloud, when key present)
@@ -126,10 +126,15 @@ PlantNet API (cloud, when key present)
               └─ Phi-3.5-vision (in-browser, last resort, capped at 0.35)
 ```
 
-The cascade is deterministic by license cost: cloud first when keys are
+The serial cascade is deterministic by license cost: cloud first when keys are
 present, on-device when they aren't. The `force_provider` knob bypasses
 the waterfall for testing. All confidence < 0.4 results are blocked
 from research-grade by the `enforce_research_grade_quality` trigger.
+
+When offline at submit time, the outbox holds the row plus the binary;
+the cascade is deferred. On `online` event or `visibilitychange` returning
+to visible, `registerSyncTriggers()` runs `syncOutbox()`, which fires the
+server-side waterfall via the `identify` Edge Function.
 
 ### 3. Audio identification (BirdNET)
 

@@ -128,7 +128,7 @@ export function getRouteParent(key: string): string | undefined {
  * Per-page meta descriptions for doc pages. Consumed by DocLayout when no
  * explicit description prop is passed. Keep 120-160 chars, keyword-rich.
  */
-export const docPageMeta: Record<DocPage, { en: string; es: string }> = {
+export const docPageMeta = {
   vision: {
     en: "Why Rastrum exists: making every living thing identifiable by anyone, anywhere — even offline, even in indigenous languages, even for tracks and scat.",
     es: "Por qué existe Rastrum: hacer cada ser vivo identificable por cualquier persona, en cualquier lugar — sin conexión, en lenguas indígenas, hasta huellas y excrementos.",
@@ -177,7 +177,7 @@ export const docPageMeta: Record<DocPage, { en: string; es: string }> = {
     en: "Rastrum's terms of service. Open-source under MIT (code) and AGPL-3.0 (server). Per-observation Creative Commons licensing — BY, BY-NC, or CC0.",
     es: "Términos de servicio de Rastrum. Open-source bajo MIT (código) y AGPL-3.0 (servidor). Licencias Creative Commons por observación — BY, BY-NC o CC0.",
   },
-};
+} as const satisfies Record<DocPage, { en: string; es: string }>;
 
 /**
  * Given a pathname like '/en/observe/' and a target locale like 'es',
