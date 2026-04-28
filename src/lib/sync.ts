@@ -73,6 +73,12 @@ async function syncOne(record: ObservationRecord): Promise<void> {
   // If the observation was saved while the user was not yet authenticated (guest),
   // try to re-resolve the observer now. If there's an active session, upgrade
   // the record in Dexie so future syncs also pick it up.
+  //
+  // NOTE: syncOutboxInner() also has a guest-upgrade path added in the fix for
+  // the skipped_guest bug (2026-04-28). If this upgrade logic changes, update
+  // both places. The duplication is intentional: syncOutboxInner upgrades before
+  // the loop so the re-fetched record has the right observer_kind; this path
+  // handles edge cases where syncOne is called directly.
   let observerRef = obs.observerRef;
   if (observerRef.kind !== 'user') {
     try {
