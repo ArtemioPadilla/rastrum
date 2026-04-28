@@ -142,10 +142,32 @@ const docColumns = [
         {tr.nav.about}
       </a>
       <MegaMenu lang={locale} trigger={tr.nav.docs} columns={docColumns} align="right" active={docsActive} />
+      <!-- Search trigger (⌕) — desktop only; dispatches rastrum:open-palette -->
+      <button
+        id="hdr-search-btn"
+        type="button"
+        aria-label={tr.search.toast_open}
+        class="p-1.5 rounded-lg text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+      >
+        <svg aria-hidden="true" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+        </svg>
+      </button>
     </nav>
 
     <!-- Auth + utilities — ml-auto on mobile pushes to the right edge since the reference nav (which carries ml-auto on desktop) is hidden under sm: -->
     <div class="flex items-center gap-2 ml-auto sm:ml-2">
+      <!-- Search trigger (⌕) — mobile only (desktop version lives in the reference nav above) -->
+      <button
+        id="hdr-search-btn-mobile"
+        type="button"
+        aria-label={tr.search.toast_open}
+        class="sm:hidden p-2 rounded-lg text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+      >
+        <svg aria-hidden="true" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+        </svg>
+      </button>
       <a
         href={getLocalizedPath(lang, routes.signIn[locale] + '/')}
         id="sign-in-link"
@@ -215,6 +237,11 @@ const docColumns = [
   document.getElementById('mobile-menu-toggle')?.addEventListener('click', () => {
     if (typeof window.__rastrumOpenDrawer === 'function') window.__rastrumOpenDrawer();
   });
+
+  // Search buttons → command palette
+  function openPalette() { window.dispatchEvent(new CustomEvent('rastrum:open-palette')); }
+  document.getElementById('hdr-search-btn')?.addEventListener('click', openPalette);
+  document.getElementById('hdr-search-btn-mobile')?.addEventListener('click', openPalette);
 
   // Explore dropdown
   (function() {
