@@ -1,0 +1,33 @@
+---
+/**
+ * ConsoleOverviewView — action-primary alerts on the left, slim KPI rail
+ * on the right. PR1 renders an empty-state shell; queries land in PR3
+ * (sync, api, cron) and PR4 (flags, expert apps badge).
+ */
+import { t } from '../i18n/utils';
+
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+---
+
+<div class="grid grid-cols-1 md:grid-cols-[1fr_220px] gap-4 max-w-5xl">
+  <section>
+    <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-3">
+      {tr.console.overview_alerts_heading}
+    </h2>
+    <div id="console-overview-alerts" class="space-y-2">
+      <div class="rounded-md border border-dashed border-zinc-300 dark:border-zinc-700 p-4 text-sm text-zinc-500">
+        {tr.console.overview_no_alerts}
+      </div>
+    </div>
+  </section>
+  <aside class="md:border-l md:border-zinc-200 md:dark:border-zinc-800 md:pl-4">
+    <h2 class="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 mb-2">
+      {tr.console.overview_at_a_glance}
+    </h2>
+    <dl id="console-overview-kpis" class="space-y-1 text-xs text-zinc-700 dark:text-zinc-300">
+      <div class="flex justify-between"><dt class="text-zinc-500">—</dt><dd>—</dd></div>
+    </dl>
+  </aside>
+</div>

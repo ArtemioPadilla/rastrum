@@ -1,0 +1,39 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+const lang = 'es';
+---
+
+<BaseLayout lang={lang} title="Consola">
+  <div id="console-gate" class="p-6 text-sm text-zinc-600 dark:text-zinc-400">
+    Cargando…
+  </div>
+  <div id="console-shell" class="hidden">
+  </div>
+</BaseLayout>
+
+<script>
+  import { getSupabase } from '../../../lib/supabase';
+  import { getUserRoles } from '../../../lib/user-roles';
+  import { rolePillsFor } from '../../../lib/console-tabs';
+
+  async function init() {
+    const gate = document.getElementById('console-gate')!;
+    const supabase = getSupabase();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { gate.textContent = 'Se requiere iniciar sesión.'; return; }
+    const roles = await getUserRoles(user.id);
+    if (roles.size === 0) {
+      gate.textContent = 'No tienes acceso a la consola.';
+      return;
+    }
+    const pills = rolePillsFor(roles);
+    const requestedRole = new URL(window.location.href).searchParams.get('role');
+    const activeRole = (requestedRole && roles.has(requestedRole as never) ? requestedRole : pills[0]);
+    gate.classList.add('hidden');
+    document.getElementById('console-shell')!.classList.remove('hidden');
+    void activeRole;
+  }
+  init().catch(err => {
+    document.getElementById('console-gate')!.textContent = 'Error: ' + (err as Error).message;
+  });
+</script>
