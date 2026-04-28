@@ -179,6 +179,10 @@ export const routeTree: Record<string, RouteNode> = {
   consoleExpertOverrides:  { labels: { en: 'Overrides',        es: 'Correcciones' },      parent: 'console' },
   consoleExpertExpertise:  { labels: { en: 'Expertise',        es: 'Experiencia' },       parent: 'console' },
   consoleExpertTaxonNotes: { labels: { en: 'Taxon notes',      es: 'Notas de taxón' },    parent: 'console' },
+  // Social graph (M26)
+  inbox:             { labels: { en: 'Inbox',     es: 'Bandeja' } },
+  profileFollowers:  { labels: { en: 'Followers', es: 'Seguidores' }, parent: 'profileUser' },
+  profileFollowing:  { labels: { en: 'Following', es: 'Siguiendo' },  parent: 'profileUser' },
 };
 
 export function getRouteLabel(key: string, lang: string): string {
