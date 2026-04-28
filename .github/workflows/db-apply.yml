@@ -1,0 +1,97 @@
+name: db-apply
+
+# Apply idempotent SQL (schema + cron) to the production Supabase Postgres.
+#
+# Trigger paths:
+#   - workflow_dispatch — manual safety valve, fires regardless of file changes.
+#   - push to main with relevant SQL files changed — auto-apply on merge.
+#
+# Required secret: SUPABASE_DB_URL (postgres://… connection string from
+# Supabase dashboard → Settings → Database → Connection string).
+#
+# All SQL in this repo is written to be idempotent (CREATE … IF NOT EXISTS,
+# DROP POLICY IF EXISTS … ; CREATE POLICY …, ON CONFLICT DO UPDATE).
+# Re-runs are safe.
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_rarity_refresh:
+        description: 'Run refresh_taxon_rarity() once after apply'
+        type: boolean
+        default: false
+  push:
+    branches: [main]
+    paths:
+      - 'docs/specs/infra/supabase-schema.sql'
+      - 'docs/specs/infra/cron-schedules.sql'
+
+concurrency:
+  group: db-apply-prod
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PGCONNECT_TIMEOUT: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detect changed SQL files
+        id: changes
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "schema=true"  >> "$GITHUB_OUTPUT"
+            echo "cron=true"    >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Force-push or first push to branch: github.event.before is 40 zeros.
+          # In that case there's no diff base; replay both files defensively
+          # since both are idempotent.
+          before='${{ github.event.before }}'
+          if [ "$before" = "0000000000000000000000000000000000000000" ] || [ -z "$before" ]; then
+            echo "schema=true"  >> "$GITHUB_OUTPUT"
+            echo "cron=true"    >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed=$(git diff --name-only "$before" "${{ github.sha }}" || true)
+          echo "$changed"
+          echo "$changed" | grep -qx 'docs/specs/infra/supabase-schema.sql' && echo "schema=true"  >> "$GITHUB_OUTPUT" || echo "schema=false" >> "$GITHUB_OUTPUT"
+          echo "$changed" | grep -qx 'docs/specs/infra/cron-schedules.sql'  && echo "cron=true"    >> "$GITHUB_OUTPUT" || echo "cron=false"   >> "$GITHUB_OUTPUT"
+
+      - name: Apply schema
+        if: steps.changes.outputs.schema == 'true'
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f docs/specs/infra/supabase-schema.sql
+
+      - name: Apply cron schedules
+        if: steps.changes.outputs.cron == 'true'
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f docs/specs/infra/cron-schedules.sql
+
+      - name: Smoke verify (table count + RLS coverage)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          SELECT
+            count(*) FILTER (WHERE rowsecurity)     AS tables_with_rls,
+            count(*) FILTER (WHERE NOT rowsecurity) AS tables_without_rls,
+            count(*)                                AS public_tables_total
+          FROM pg_tables
+          WHERE schemaname = 'public';
+          SQL
+
+      - name: Refresh taxon_rarity (workflow_dispatch only)
+        if: github.event_name == 'workflow_dispatch' && inputs.run_rarity_refresh == true
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -c "SELECT public.refresh_taxon_rarity();"

@@ -19,6 +19,7 @@
 --   v2 (2026-04-25): functions redeployed --no-verify-jwt; header dropped.
 --   v3 (2026-04-27): added 'plantnet-quota-daily' (23:55 UTC) and
 --                    'streak-push-nightly' (01:55 UTC ≈ 19:55 America/Mexico_City).
+--   v4 (2026-04-27): added 'refresh-taxon-rarity-nightly' (03:00 UTC).
 -- ════════════════════════════════════════════════════════════════════════
 
 CREATE EXTENSION IF NOT EXISTS pg_cron;
@@ -73,11 +74,22 @@ BEGIN
     );
   $body$, v_base || '/streak-push'));
 
+  -- 5. refresh-taxon-rarity-nightly — 03:00 UTC
+  --    Calls public.refresh_taxon_rarity() to recompute rarity scores from
+  --    current observation counts. Runs before streak jobs so badges that
+  --    depend on rarity thresholds see fresh values.
+  PERFORM cron.unschedule('refresh-taxon-rarity-nightly') FROM cron.job WHERE jobname = 'refresh-taxon-rarity-nightly';
+  PERFORM cron.schedule(
+    'refresh-taxon-rarity-nightly',
+    '0 3 * * *',
+    $$ SELECT public.refresh_taxon_rarity(); $$
+  );
+
   RAISE NOTICE '✓ Cron schedules applied';
 END
 $migration$;
 
 SELECT jobid, jobname, schedule, active
 FROM cron.job
-WHERE jobname IN ('streaks-nightly', 'badges-nightly', 'plantnet-quota-daily', 'streak-push-nightly')
+WHERE jobname IN ('streaks-nightly', 'badges-nightly', 'plantnet-quota-daily', 'streak-push-nightly', 'refresh-taxon-rarity-nightly')
 ORDER BY jobname;

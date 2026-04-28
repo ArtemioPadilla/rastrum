@@ -1425,3 +1425,576 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- after submitting a suggestion. SECURITY DEFINER means the caller
 -- doesn't need elevated permissions on identifications/taxa.
 GRANT EXECUTE ON FUNCTION public.recompute_consensus(uuid) TO authenticated;
+
+-- ============================================================
+-- KARMA + EXPERTISE + RARITY (module 23) — additive Phase 1
+-- ============================================================
+
+-- 1. user_expertise: continuous score per (user, taxon).
+CREATE TABLE IF NOT EXISTS public.user_expertise (
+  user_id      uuid    NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  taxon_id     uuid    NOT NULL REFERENCES public.taxa(id)  ON DELETE CASCADE,
+  score        numeric NOT NULL DEFAULT 0,
+  verified_at  timestamptz,
+  verified_by  uuid    REFERENCES public.users(id),
+  updated_at   timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, taxon_id)
+);
+CREATE INDEX IF NOT EXISTS idx_user_expertise_taxon
+  ON public.user_expertise(taxon_id);
+CREATE INDEX IF NOT EXISTS idx_user_expertise_score
+  ON public.user_expertise(user_id, score DESC);
+
+ALTER TABLE public.user_expertise ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS user_expertise_self_read   ON public.user_expertise;
+DROP POLICY IF EXISTS user_expertise_public_read ON public.user_expertise;
+
+-- Self-read: a user always sees their own expertise rows.
+CREATE POLICY user_expertise_self_read ON public.user_expertise FOR SELECT
+  USING ((SELECT auth.uid()) = user_id);
+
+-- Public read: only when the user has opted into both a public profile
+-- AND gamification surfaces (mirrors user_badges_public_read at L587 and
+-- streaks_public_read at L656).
+CREATE POLICY user_expertise_public_read ON public.user_expertise FOR SELECT
+  USING (
+    user_id IN (
+      SELECT id FROM public.users
+      WHERE profile_public = true AND gamification_opt_in = true
+    )
+  );
+
+-- INSERT/UPDATE/DELETE are intentionally NOT exposed to clients —
+-- user_expertise rows are written by the in-database award_karma()
+-- helper running under SECURITY DEFINER (added in a later task).
+
+-- 2. taxa.parent_id + ancestor_path: graph + precomputed walk.
+-- parent_id is a self-FK that lets us walk the lineage. Existing taxa
+-- rows store the lineage as denormalized text columns (kingdom, phylum,
+-- class, "order", family, genus) — we backfill parent_id by joining
+-- each row to the next-shallower-rank row that exists in the table.
+ALTER TABLE public.taxa
+  ADD COLUMN IF NOT EXISTS parent_id     uuid REFERENCES public.taxa(id),
+  ADD COLUMN IF NOT EXISTS ancestor_path uuid[] NOT NULL DEFAULT '{}';
+
+CREATE INDEX IF NOT EXISTS idx_taxa_parent_id
+  ON public.taxa(parent_id);
+CREATE INDEX IF NOT EXISTS idx_taxa_ancestor_path
+  ON public.taxa USING GIN (ancestor_path);
+
+-- One-shot parent_id backfill: for each non-kingdom row, find the row
+-- whose taxon_rank is the immediate parent rank and whose
+-- scientific_name matches the parent's name in the denormalized
+-- columns. Rows without a matching parent in the table keep parent_id
+-- NULL — that's fine, ancestor_path will be '{}' and the consensus
+-- engine falls back to 1× weight, which is correct.
+UPDATE public.taxa t
+   SET parent_id = (
+     SELECT a.id FROM public.taxa a
+     WHERE a.taxon_rank = (
+       CASE t.taxon_rank
+         WHEN 'species' THEN 'genus'
+         WHEN 'genus'   THEN 'family'
+         WHEN 'family'  THEN 'order'
+         WHEN 'order'   THEN 'class'
+         WHEN 'class'   THEN 'phylum'
+         WHEN 'phylum'  THEN 'kingdom'
+       END
+     )
+       AND a.scientific_name = (
+         CASE t.taxon_rank
+           WHEN 'species' THEN t.genus
+           WHEN 'genus'   THEN t.family
+           WHEN 'family'  THEN t."order"
+           WHEN 'order'   THEN t.class
+           WHEN 'class'   THEN t.phylum
+           WHEN 'phylum'  THEN t.kingdom
+         END
+       )
+     LIMIT 1
+   )
+ WHERE t.parent_id IS NULL
+   AND t.taxon_rank IS NOT NULL
+   AND t.taxon_rank <> 'kingdom';
+
+-- 3. taxon_rarity: nightly-materialized rarity buckets and multipliers.
+CREATE TABLE IF NOT EXISTS public.taxon_rarity (
+  taxon_id      uuid PRIMARY KEY REFERENCES public.taxa(id) ON DELETE CASCADE,
+  obs_count     integer NOT NULL,
+  percentile    numeric NOT NULL,
+  bucket        smallint NOT NULL CHECK (bucket BETWEEN 1 AND 5),
+  multiplier    numeric NOT NULL,
+  refreshed_at  timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.taxon_rarity ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS taxon_rarity_public_read ON public.taxon_rarity;
+CREATE POLICY taxon_rarity_public_read ON public.taxon_rarity
+  FOR SELECT USING (true);
+
+-- 4. karma_events: append-only ledger.
+CREATE TABLE IF NOT EXISTS public.karma_events (
+  id              bigserial PRIMARY KEY,
+  user_id         uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  observation_id  uuid REFERENCES public.observations(id) ON DELETE SET NULL,
+  taxon_id        uuid REFERENCES public.taxa(id) ON DELETE SET NULL,
+  delta           numeric NOT NULL,
+  reason          text NOT NULL CHECK (reason IN (
+    'consensus_win','consensus_loss','first_in_rastrum',
+    'observation_synced','comment_reaction','manual_adjust'
+  )),
+  rarity_bucket   smallint,
+  expertise_rank  integer,
+  created_at      timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_karma_events_user
+  ON public.karma_events(user_id, created_at DESC);
+
+ALTER TABLE public.karma_events ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS karma_events_self_read ON public.karma_events;
+CREATE POLICY karma_events_self_read ON public.karma_events
+  FOR SELECT USING (auth.uid() = user_id);
+
+-- INSERT into karma_events is restricted to service_role / SECURITY DEFINER
+-- functions (award_karma). The append-only ledger has no client-write policy.
+
+-- 5. users: karma_total + grace columns.
+ALTER TABLE public.users
+  ADD COLUMN IF NOT EXISTS karma_total      numeric NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS karma_updated_at timestamptz NOT NULL DEFAULT now(),
+  ADD COLUMN IF NOT EXISTS grace_until      timestamptz,
+  ADD COLUMN IF NOT EXISTS vote_count       integer NOT NULL DEFAULT 0;
+
+-- 6. Backfill grace_until for existing users (only the first time).
+UPDATE public.users
+   SET grace_until = COALESCE(grace_until, created_at + INTERVAL '30 days')
+ WHERE grace_until IS NULL;
+
+GRANT SELECT ON public.user_expertise TO anon, authenticated;
+GRANT SELECT ON public.taxon_rarity   TO anon, authenticated;
+GRANT SELECT ON public.karma_events   TO authenticated;
+
+-- ============================================================
+-- ancestor_path computation: walk parent_id chain on INSERT/UPDATE.
+-- ============================================================
+-- compute_ancestor_path: given a taxon's IMMEDIATE PARENT id, walk the
+-- parent_id chain upward and return the array of ancestor ids
+-- (most-specific first → root last). Designed to be safe inside a
+-- BEFORE-trigger where NEW.id may not exist in the table yet.
+-- Pass NULL to get '{}' (used for kingdom rows).
+CREATE OR REPLACE FUNCTION public.compute_ancestor_path(p_parent_id uuid)
+RETURNS uuid[] AS $$
+DECLARE
+  result uuid[] := '{}';
+  current_id uuid := p_parent_id;
+  pid uuid;
+  guard int := 0;
+BEGIN
+  WHILE current_id IS NOT NULL LOOP
+    result := array_append(result, current_id);
+    SELECT t.parent_id INTO pid FROM public.taxa t WHERE t.id = current_id;
+    current_id := pid;
+    guard := guard + 1;
+    IF guard > 30 THEN
+      RAISE EXCEPTION 'compute_ancestor_path: cycle or runaway from parent %', p_parent_id;
+    END IF;
+  END LOOP;
+  RETURN result;
+END;
+$$ LANGUAGE plpgsql STABLE;
+
+CREATE OR REPLACE FUNCTION public.taxa_set_ancestor_path()
+RETURNS trigger AS $$
+BEGIN
+  NEW.ancestor_path := public.compute_ancestor_path(NEW.parent_id);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_taxa_ancestor_path ON public.taxa;
+CREATE TRIGGER trg_taxa_ancestor_path
+  BEFORE INSERT OR UPDATE OF parent_id ON public.taxa
+  FOR EACH ROW EXECUTE FUNCTION public.taxa_set_ancestor_path();
+
+-- One-shot backfill of every existing taxa row.
+UPDATE public.taxa SET ancestor_path = public.compute_ancestor_path(parent_id);
+
+-- ============================================================
+-- One-time migration: hydrate user_expertise from is_expert + expert_taxa.
+-- Idempotent thanks to ON CONFLICT DO NOTHING.
+-- ============================================================
+INSERT INTO public.user_expertise (user_id, taxon_id, score, verified_at, verified_by)
+SELECT u.id,
+       t.id,
+       50,
+       now(),
+       NULL
+FROM   public.users u
+CROSS JOIN LATERAL unnest(u.expert_taxa) AS kingdom_name
+JOIN   public.taxa t
+       ON  t.kingdom = kingdom_name
+       AND t.taxon_rank = 'kingdom'
+WHERE  u.is_expert = true
+  AND  u.expert_taxa IS NOT NULL
+ON CONFLICT (user_id, taxon_id) DO NOTHING;
+
+-- ============================================================
+-- refresh_taxon_rarity: nightly recompute of percentile buckets.
+-- Buckets:
+--   1 = top 10% most common  → multiplier 1.0
+--   2 = percentile 50–90     → multiplier 1.5
+--   3 = percentile 10–50     → multiplier 2.5
+--   4 = top 10% rarest       → multiplier 4.0
+--   5 = obs_count < 5        → multiplier 5.0  (overrides bucket 4)
+-- ============================================================
+CREATE OR REPLACE FUNCTION public.refresh_taxon_rarity()
+RETURNS void AS $$
+BEGIN
+  WITH counts AS (
+    SELECT t.id AS taxon_id,
+           COALESCE(c.n, 0) AS obs_count
+    FROM   public.taxa t
+    LEFT JOIN (
+      SELECT taxon_id, count(*) AS n
+      FROM   public.identifications
+      WHERE  taxon_id IS NOT NULL
+      GROUP BY taxon_id
+    ) c ON c.taxon_id = t.id
+  ),
+  ranked AS (
+    SELECT taxon_id, obs_count,
+           CASE WHEN obs_count = 0 THEN 100.0
+                ELSE 100.0 * (1.0 - percent_rank() OVER (ORDER BY obs_count DESC))
+           END AS percentile
+    FROM   counts
+  ),
+  bucketed AS (
+    SELECT taxon_id, obs_count, percentile,
+      CASE
+        WHEN obs_count > 0 AND obs_count < 5 THEN 5
+        WHEN percentile >= 90              THEN 1   -- top 10% common
+        WHEN percentile >= 50              THEN 2   -- 50–90
+        WHEN percentile >= 10              THEN 3   -- 10–50
+        ELSE                                    4   -- bottom 10% (rarest)
+      END AS bucket
+    FROM ranked
+  )
+  INSERT INTO public.taxon_rarity AS tr (taxon_id, obs_count, percentile, bucket, multiplier, refreshed_at)
+  SELECT taxon_id,
+         obs_count,
+         percentile,
+         bucket,
+         CASE bucket
+           WHEN 1 THEN 1.0
+           WHEN 2 THEN 1.5
+           WHEN 3 THEN 2.5
+           WHEN 4 THEN 4.0
+           WHEN 5 THEN 5.0
+         END,
+         now()
+  FROM   bucketed
+  ON CONFLICT (taxon_id) DO UPDATE
+    SET obs_count    = EXCLUDED.obs_count,
+        percentile   = EXCLUDED.percentile,
+        bucket       = EXCLUDED.bucket,
+        multiplier   = EXCLUDED.multiplier,
+        refreshed_at = EXCLUDED.refreshed_at;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================================
+-- award_karma: insert a karma_events row + update users/user_expertise.
+--   p_outcome ∈ ('win', 'loss')
+--   p_confidence ∈ (0.5, 0.7, 0.9)  → confidence_factor (0.4, 0.7, 1.0)
+-- ============================================================
+CREATE OR REPLACE FUNCTION public.award_karma(
+  p_user_id        uuid,
+  p_observation_id uuid,
+  p_taxon_id       uuid,
+  p_outcome        text,
+  p_confidence     numeric DEFAULT 0.7
+)
+RETURNS numeric AS $$
+DECLARE
+  v_rarity         public.taxon_rarity;
+  v_obs_path       uuid[];
+  v_matched_taxon  uuid;
+  v_matched_rank   integer;
+  v_streak_mult    numeric := 1.0;
+  v_expertise_mult numeric := 1.0;
+  v_conf_factor    numeric;
+  v_grace          boolean;
+  v_user           public.users;
+  v_delta          numeric;
+  v_penalty_rarity numeric;
+BEGIN
+  -- Confidence → factor.
+  v_conf_factor := CASE
+    WHEN p_confidence >= 0.85 THEN 1.0
+    WHEN p_confidence >= 0.65 THEN 0.7
+    ELSE                            0.4
+  END;
+
+  -- Rarity. Falls back to 1.0× if not yet materialized.
+  SELECT * INTO v_rarity FROM public.taxon_rarity WHERE taxon_id = p_taxon_id;
+  IF NOT FOUND THEN
+    v_rarity.multiplier := 1.0;
+    v_rarity.bucket     := 1;
+  END IF;
+
+  -- Observation taxon's lineage = self || ancestors.
+  SELECT array_prepend(t.id, t.ancestor_path)
+    INTO v_obs_path
+    FROM public.taxa t
+   WHERE t.id = p_taxon_id;
+
+  -- User's most-specific expertise that is in the observation lineage.
+  SELECT ue.taxon_id, array_position(v_obs_path, ue.taxon_id)
+    INTO v_matched_taxon, v_matched_rank
+    FROM public.user_expertise ue
+   WHERE ue.user_id = p_user_id
+     AND ue.taxon_id = ANY(v_obs_path)
+   ORDER BY array_position(v_obs_path, ue.taxon_id) ASC
+   LIMIT 1;
+
+  -- Verified expert in the matched ancestor → multiplier bump.
+  IF v_matched_taxon IS NOT NULL THEN
+    SELECT 1.5
+      INTO v_expertise_mult
+      FROM public.user_expertise
+     WHERE user_id = p_user_id
+       AND taxon_id = v_matched_taxon
+       AND verified_at IS NOT NULL;
+    IF v_expertise_mult IS NULL THEN v_expertise_mult := 1.0; END IF;
+  END IF;
+
+  -- Streak multiplier (reads existing user_streaks).
+  SELECT CASE
+           WHEN current_streak >= 30 THEN 1.5
+           WHEN current_streak >=  7 THEN 1.2
+           ELSE                            1.0
+         END
+    INTO v_streak_mult
+    FROM public.user_streaks
+   WHERE user_id = p_user_id;
+  IF v_streak_mult IS NULL THEN v_streak_mult := 1.0; END IF;
+
+  -- Grace check.
+  SELECT * INTO v_user FROM public.users WHERE id = p_user_id;
+  v_grace := (v_user.grace_until IS NOT NULL
+              AND v_user.grace_until > now()
+              AND COALESCE(v_user.vote_count, 0) < 20);
+
+  -- Delta computation.
+  IF p_outcome = 'win' THEN
+    v_delta := 5 * v_rarity.multiplier * v_streak_mult * v_expertise_mult * v_conf_factor;
+  ELSIF p_outcome = 'loss' THEN
+    IF v_grace THEN
+      v_delta := 0;
+    ELSE
+      v_penalty_rarity := LEAST(v_rarity.multiplier, 2.0);
+      v_delta := -2 * v_penalty_rarity * v_conf_factor;
+    END IF;
+  ELSE
+    RAISE EXCEPTION 'award_karma: invalid p_outcome %', p_outcome;
+  END IF;
+
+  -- Insert ledger row.
+  INSERT INTO public.karma_events
+    (user_id, observation_id, taxon_id, delta, reason,
+     rarity_bucket, expertise_rank)
+  VALUES
+    (p_user_id, p_observation_id, p_taxon_id, v_delta,
+     CASE WHEN p_outcome = 'win' THEN 'consensus_win' ELSE 'consensus_loss' END,
+     v_rarity.bucket, v_matched_rank);
+
+  -- Update user totals + vote counter.
+  UPDATE public.users
+     SET karma_total      = karma_total + v_delta,
+         karma_updated_at = now(),
+         vote_count       = COALESCE(vote_count, 0) + 1
+   WHERE id = p_user_id;
+
+  -- Wins also accrue per-taxon expertise on the matched ancestor (or
+  -- on the kingdom of the observation if no expertise existed yet).
+  IF p_outcome = 'win' AND v_delta > 0 THEN
+    IF v_matched_taxon IS NOT NULL THEN
+      UPDATE public.user_expertise
+         SET score = score + v_delta,
+             updated_at = now()
+       WHERE user_id = p_user_id AND taxon_id = v_matched_taxon;
+    ELSE
+      INSERT INTO public.user_expertise (user_id, taxon_id, score)
+      SELECT p_user_id,
+             COALESCE(v_obs_path[array_length(v_obs_path, 1)], p_taxon_id),
+             v_delta
+      ON CONFLICT (user_id, taxon_id) DO UPDATE
+         SET score = public.user_expertise.score + EXCLUDED.score,
+             updated_at = now();
+    END IF;
+  END IF;
+
+  RETURN v_delta;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION public.award_karma(uuid, uuid, uuid, text, numeric) TO service_role;
+
+-- ============================================================
+-- recompute_consensus — replaced to (a) keep existing weighted
+-- aggregation + research-grade promotion, (b) award karma deltas
+-- to all voters when consensus actually changed.
+-- ============================================================
+CREATE OR REPLACE FUNCTION public.recompute_consensus(p_observation_id uuid)
+RETURNS void AS $$
+DECLARE
+  winning_taxon  uuid;
+  winning_score  numeric;
+  validator_count integer;
+  prev_research_grade boolean;
+  was_promoted   boolean := false;
+  v_voter        record;
+  v_winner_rank  integer;
+  v_voter_rank   integer;
+  v_obs_path     uuid[];
+  v_outcome      text;
+BEGIN
+  -- Existing aggregation (unchanged behavior at the top, expertise-aware
+  -- weighting now reads user_expertise rather than is_expert kingdom).
+  WITH weighted AS (
+    SELECT i.taxon_id,
+           SUM(
+             CASE
+               WHEN EXISTS (
+                 SELECT 1 FROM public.user_expertise ue
+                 WHERE ue.user_id = i.validated_by
+                   AND ue.taxon_id = ANY(
+                     SELECT array_prepend(t.id, t.ancestor_path)
+                     FROM public.taxa t WHERE t.id = i.taxon_id
+                   )
+               )
+               THEN 3.0
+               ELSE 1.0
+             END
+           ) AS score,
+           count(DISTINCT i.validated_by) AS validators
+    FROM   public.identifications i
+    WHERE  i.observation_id = p_observation_id
+      AND  i.taxon_id IS NOT NULL
+      AND  i.validated_by IS NOT NULL
+    GROUP BY i.taxon_id
+  )
+  SELECT taxon_id, score, validators
+    INTO winning_taxon, winning_score, validator_count
+    FROM weighted
+   ORDER BY score DESC
+   LIMIT 1;
+
+  IF winning_taxon IS NULL THEN RETURN; END IF;
+
+  -- Tie guard (existing behavior).
+  IF (
+    SELECT count(*) FROM (
+      SELECT i.taxon_id,
+             SUM(CASE
+                   WHEN EXISTS (
+                     SELECT 1 FROM public.user_expertise ue
+                     WHERE ue.user_id = i.validated_by
+                       AND ue.taxon_id = ANY(
+                         SELECT array_prepend(t.id, t.ancestor_path)
+                         FROM public.taxa t WHERE t.id = i.taxon_id
+                       )
+                   )
+                   THEN 3.0
+                   ELSE 1.0
+                 END) AS s
+      FROM public.identifications i
+      WHERE i.observation_id = p_observation_id
+        AND i.taxon_id IS NOT NULL
+        AND i.validated_by IS NOT NULL
+      GROUP BY i.taxon_id
+    ) sub
+    WHERE sub.s = winning_score
+  ) > 1 THEN
+    RETURN;  -- tie blocks promotion AND blocks karma awards
+  END IF;
+
+  -- Read previous research-grade state.
+  SELECT COALESCE(bool_or(is_research_grade), false)
+    INTO prev_research_grade
+    FROM public.identifications
+   WHERE observation_id = p_observation_id AND is_primary;
+
+  -- Promote if eligible.
+  IF winning_score >= 2.0 AND validator_count >= 2 THEN
+    UPDATE public.identifications
+       SET is_research_grade = true
+     WHERE observation_id = p_observation_id
+       AND taxon_id = winning_taxon
+       AND is_primary;
+    was_promoted := NOT prev_research_grade;
+  END IF;
+
+  -- Karma is only awarded when consensus actually crossed into research-grade
+  -- on this call. Repeat calls without a state change are no-ops.
+  IF NOT was_promoted THEN RETURN; END IF;
+
+  -- Determine the winning voter's expertise rank in the lineage of winning_taxon
+  -- (used to decide which losing voters got beaten by a deeper expert).
+  SELECT array_prepend(t.id, t.ancestor_path)
+    INTO v_obs_path
+    FROM public.taxa t
+   WHERE t.id = winning_taxon;
+
+  SELECT MIN(array_position(v_obs_path, ue.taxon_id))
+    INTO v_winner_rank
+    FROM public.identifications i
+    JOIN public.user_expertise ue ON ue.user_id = i.validated_by
+   WHERE i.observation_id = p_observation_id
+     AND i.taxon_id = winning_taxon
+     AND ue.taxon_id = ANY(v_obs_path);
+
+  -- For each distinct voter on this observation, award karma.
+  FOR v_voter IN
+    SELECT DISTINCT i.validated_by AS user_id, i.taxon_id, i.confidence
+    FROM   public.identifications i
+    WHERE  i.observation_id = p_observation_id
+      AND  i.validated_by IS NOT NULL
+  LOOP
+    IF v_voter.taxon_id = winning_taxon THEN
+      v_outcome := 'win';
+    ELSE
+      -- Loss only counts if SOME winning-side voter has a deeper expertise
+      -- in this lineage than this voter. Otherwise it was a peer disagreement
+      -- and we silently skip the karma update.
+      SELECT MIN(array_position(v_obs_path, ue.taxon_id))
+        INTO v_voter_rank
+        FROM public.user_expertise ue
+       WHERE ue.user_id = v_voter.user_id
+         AND ue.taxon_id = ANY(v_obs_path);
+
+      IF v_winner_rank IS NOT NULL
+         AND (v_voter_rank IS NULL OR v_winner_rank < v_voter_rank) THEN
+        v_outcome := 'loss';
+      ELSE
+        CONTINUE;
+      END IF;
+    END IF;
+
+    PERFORM public.award_karma(
+      v_voter.user_id,
+      p_observation_id,
+      winning_taxon,
+      v_outcome,
+      COALESCE(v_voter.confidence, 0.7)
+    );
+  END LOOP;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION public.recompute_consensus(uuid) TO service_role;
+
+GRANT EXECUTE ON FUNCTION public.refresh_taxon_rarity() TO service_role;

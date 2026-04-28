@@ -14,6 +14,7 @@ const locale = lang as Locale;
 const myObservationsPath = getLocalizedPath(lang, routes.profileObservations[locale] + '/');
 const settingsPath       = getLocalizedPath(lang, routes.profileSettings[locale] + '/profile/');
 const publicProfileBase  = getLocalizedPath(lang, routes.profileUser[locale] + '/');
+const k = (tr as unknown as { karma: Record<string, string> }).karma;
 ---
 
 <div class="max-w-3xl mx-auto pb-28 sm:pb-6">
@@ -98,6 +99,24 @@ const publicProfileBase  = getLocalizedPath(lang, routes.profileUser[locale] + '
       <StreakCard lang={lang} />
     </div>
 
+    <!-- Karma & expertise section (module 23) -->
+    <section id="karma-section" class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 space-y-3 mb-6">
+      <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
+        {k.section_title}
+      </h2>
+      <div class="flex items-baseline gap-3">
+        <span id="karma-total" class="text-3xl font-bold text-emerald-700 dark:text-emerald-400">—</span>
+        <span class="text-xs text-zinc-500 dark:text-zinc-400">{k.total_label}</span>
+        <span id="karma-weekly" class="ml-auto text-xs font-medium text-emerald-700 dark:text-emerald-400"></span>
+      </div>
+      <div>
+        <h3 class="text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{k.expertise_heading}</h3>
+        <ul id="karma-expertise-list" class="space-y-1 text-sm">
+          <li class="text-xs text-zinc-500 italic">{k.expertise_empty}</li>
+        </ul>
+      </div>
+    </section>
+
     <!-- Recent observations preview -->
     <section class="mb-10">
       <div class="flex items-center justify-between mb-3">
@@ -139,6 +158,7 @@ const publicProfileBase  = getLocalizedPath(lang, routes.profileUser[locale] + '
 
 <script>
   import { getSupabase } from '../lib/supabase';
+  import { escAttr } from '../lib/karma';
   import type { UserProfile } from '../lib/types';
 
   const signedOut    = document.getElementById('signed-out') as HTMLDivElement | null;
@@ -162,10 +182,6 @@ const publicProfileBase  = getLocalizedPath(lang, routes.profileUser[locale] + '
       <text x='50%' y='58%' text-anchor='middle' fill='white' font-family='system-ui,sans-serif' font-size='40' font-weight='700'>${clean}</text>
     </svg>`;
     return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
-  }
-
-  function escAttr(s: string): string {
-    return s.replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' } as Record<string, string>)[c]);
   }
 
   async function run() {
@@ -325,4 +341,54 @@ const publicProfileBase  = getLocalizedPath(lang, routes.profileUser[locale] + '
   }
 
   run().catch(console.error);
+</script>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { formatDelta, escAttr } from '../lib/karma';
+
+  (async function hydrateKarma() {
+    const totalEl   = document.getElementById('karma-total');
+    const weeklyEl  = document.getElementById('karma-weekly');
+    const listEl    = document.getElementById('karma-expertise-list') as HTMLUListElement | null;
+    if (!totalEl || !listEl) return;
+
+    const supabase = getSupabase();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const [{ data: u }, { data: events }, { data: expertise }] = await Promise.all([
+      supabase.from('users').select('karma_total').eq('id', user.id).maybeSingle(),
+      supabase.from('karma_events')
+        .select('delta, created_at')
+        .eq('user_id', user.id)
+        .gte('created_at', new Date(Date.now() - 7 * 86400000).toISOString()),
+      supabase.from('user_expertise')
+        .select('taxon_id, score, verified_at, taxa(scientific_name)')
+        .eq('user_id', user.id)
+        .order('score', { ascending: false })
+        .limit(5),
+    ]);
+
+    const userRow = u as { karma_total?: number } | null;
+    totalEl.textContent = String(Math.round(userRow?.karma_total ?? 0));
+    const eventList = (events ?? []) as Array<{ delta: number; created_at: string }>;
+    const weekly = eventList.reduce((acc, e) => acc + Number(e.delta), 0);
+    if (weeklyEl) weeklyEl.textContent = weekly !== 0 ? formatDelta(weekly) : '';
+
+    const rows = (expertise ?? []) as Array<{
+      taxon_id: string; score: number; verified_at: string | null;
+      taxa: { scientific_name: string } | { scientific_name: string }[] | null;
+    }>;
+    if (rows.length > 0) {
+      listEl.innerHTML = rows.map((r) => {
+        const tx = Array.isArray(r.taxa) ? r.taxa[0] : r.taxa;
+        const name = tx?.scientific_name ?? '—';
+        const ver = r.verified_at
+          ? '<span class="ml-1 text-emerald-700 dark:text-emerald-400" title="verified">✓</span>'
+          : '';
+        return `<li class="flex items-center gap-2"><span class="italic">${escAttr(name)}</span>${ver}<span class="ml-auto font-mono text-xs">${Math.round(r.score)}</span></li>`;
+      }).join('');
+    }
+  })();
 </script>

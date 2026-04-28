@@ -1,0 +1,92 @@
+---
+import type { Locale } from '../i18n/utils';
+import { t } from '../i18n/utils';
+
+interface Props { lang: Locale }
+const { lang } = Astro.props;
+const tr = t(lang);
+const px = (tr as unknown as { pokedex: Record<string, string> }).pokedex;
+---
+
+<section class="max-w-5xl mx-auto px-4 py-6">
+  <header class="mb-5">
+    <h1 class="text-2xl md:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+      {px.title}
+    </h1>
+    <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-1">{px.subtitle}</p>
+  </header>
+
+  <p id="pokedex-loading" class="text-sm text-zinc-500 text-center py-8">…</p>
+  <p id="pokedex-empty"   class="hidden text-sm text-zinc-500 text-center py-8 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700">{px.empty}</p>
+
+  <ul id="pokedex-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3"></ul>
+</section>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { rarityTier, escAttr, type Bucket } from '../lib/karma';
+
+  const grid    = document.getElementById('pokedex-grid');
+  const loading = document.getElementById('pokedex-loading');
+  const empty   = document.getElementById('pokedex-empty');
+  const isEs    = document.documentElement.lang === 'es';
+
+  (async function () {
+    if (!grid) return;
+    const supabase = getSupabase();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      loading?.classList.add('hidden');
+      empty?.classList.remove('hidden');
+      return;
+    }
+    const { data } = await supabase
+      .from('observations')
+      .select(`
+        observed_at,
+        identifications!inner(scientific_name, taxon_id, is_primary)
+      `)
+      .eq('observer_id', user.id)
+      .eq('identifications.is_primary', true)
+      .order('observed_at', { ascending: false });
+    const rows = (data ?? []) as Array<{
+      observed_at: string;
+      identifications: Array<{ scientific_name: string; taxon_id: string; is_primary: boolean }>;
+    }>;
+    const byTaxon = new Map<string, { name: string; first: string; count: number }>();
+    for (const r of rows) {
+      for (const id of r.identifications) {
+        const prev = byTaxon.get(id.taxon_id);
+        if (prev) { prev.count++; if (r.observed_at < prev.first) prev.first = r.observed_at; }
+        else byTaxon.set(id.taxon_id, { name: id.scientific_name, first: r.observed_at, count: 1 });
+      }
+    }
+    if (byTaxon.size === 0) {
+      loading?.classList.add('hidden');
+      empty?.classList.remove('hidden');
+      return;
+    }
+    const taxonIds = Array.from(byTaxon.keys());
+    const { data: rarity } = await supabase
+      .from('taxon_rarity').select('taxon_id, bucket').in('taxon_id', taxonIds);
+    const rarityMap = new Map<string, Bucket>();
+    for (const r of (rarity ?? []) as Array<{ taxon_id: string; bucket: number }>) {
+      rarityMap.set(r.taxon_id, (r.bucket as Bucket) ?? 1);
+    }
+    grid.innerHTML = Array.from(byTaxon.entries())
+      .sort((a, b) => b[1].count - a[1].count)
+      .map(([taxonId, v]) => {
+        const stars = rarityTier(rarityMap.get(taxonId) ?? 1);
+        const date = new Date(v.first).toLocaleDateString();
+        const countLabel = v.count === 1
+          ? (isEs ? `${v.count} observación` : `${v.count} observation`)
+          : (isEs ? `${v.count} observaciones` : `${v.count} observations`);
+        return `<li class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-3 text-sm">
+          <div class="font-medium italic text-emerald-700 dark:text-emerald-400">${escAttr(v.name)}</div>
+          <div class="mt-1 text-xs text-zinc-500">${stars} · ${countLabel}</div>
+          <div class="text-[11px] text-zinc-400 mt-0.5">${escAttr(date)}</div>
+        </li>`;
+      }).join('');
+    loading?.classList.add('hidden');
+  })();
+</script>

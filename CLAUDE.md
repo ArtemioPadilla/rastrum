@@ -311,7 +311,12 @@ See "Identifier plugin contract" above. Use the existing plugins
    statement idempotent.
 2. Apply via `make db-apply`. Verify with `make db-verify` and
    `make db-policies`.
-3. If the change affects `progress.json` items, update the relevant
+3. **CI auto-apply** (`.github/workflows/db-apply.yml`) also fires when
+   that file or `cron-schedules.sql` changes on push to main. Requires
+   `SUPABASE_DB_URL` Actions secret. The workflow can also be fired
+   manually via `gh workflow run db-apply.yml` with an optional
+   `run_rarity_refresh=true` input to seed `taxon_rarity` immediately.
+4. If the change affects `progress.json` items, update the relevant
    item's subtasks in `docs/tasks.json` too.
 
 ### A new roadmap item

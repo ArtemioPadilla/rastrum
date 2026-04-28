@@ -3541,6 +3541,69 @@
           "status": "done"
         }
       ]
+    },
+    "karma-phase-1-foundation": {
+      "phase": "v1.1",
+      "title_en": "Karma engine — schema, computation, basic UI (Phase 1)",
+      "title_es": "Motor de karma — esquema, cómputo, UI base (Fase 1)",
+      "modules": ["23-karma-expertise-rarity"],
+      "subtasks": [
+        {
+          "label_en": "user_expertise + taxon_rarity + karma_events tables",
+          "label_es": "tablas user_expertise + taxon_rarity + karma_events",
+          "status": "done"
+        },
+        {
+          "label_en": "taxa.parent_id + ancestor_path trigger + name-rank backfill",
+          "label_es": "taxa.parent_id + trigger ancestor_path + backfill por nombre/rango",
+          "status": "done"
+        },
+        {
+          "label_en": "is_expert → user_expertise migration shim",
+          "label_es": "shim de migración is_expert → user_expertise",
+          "status": "done"
+        },
+        {
+          "label_en": "refresh_taxon_rarity() + nightly pg_cron",
+          "label_es": "refresh_taxon_rarity() + pg_cron nocturno",
+          "status": "done"
+        },
+        {
+          "label_en": "award_karma() helper",
+          "label_es": "helper award_karma()",
+          "status": "done"
+        },
+        {
+          "label_en": "recompute_consensus calls award_karma + uses user_expertise weights",
+          "label_es": "recompute_consensus invoca award_karma + usa pesos de user_expertise",
+          "status": "done"
+        },
+        {
+          "label_en": "src/lib/karma.ts pure helpers + Vitest",
+          "label_es": "helpers puros src/lib/karma.ts + Vitest",
+          "status": "done"
+        },
+        {
+          "label_en": "Suggest modal pre-vote rarity + magnitudes microcopy",
+          "label_es": "Microcopy de rareza + magnitudes en modal de Sugerir",
+          "status": "done"
+        },
+        {
+          "label_en": "Profile karma section + top-5 expertise",
+          "label_es": "Sección de karma + top-5 especialidades en perfil",
+          "status": "done"
+        },
+        {
+          "label_en": "Pokédex page (/profile/dex, /perfil/dex)",
+          "label_es": "Página de Pokédex (/profile/dex, /perfil/dex)",
+          "status": "done"
+        },
+        {
+          "label_en": "Apply schema via make db-apply (operator)",
+          "label_es": "Aplicar schema con make db-apply (operador)",
+          "status": "planned"
+        }
+      ]
     }
   }
 }
