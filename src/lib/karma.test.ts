@@ -4,7 +4,7 @@ import {
   microcopyForVote,
   formatDelta,
   RARITY_BUCKETS,
-} from '../../src/lib/karma';
+} from './karma';
 
 describe('rarityTier', () => {
   it('returns 1 star for bucket 1 (most common)', () => {
