@@ -74,6 +74,7 @@ narrative source.
 | 20 | Conversational Chat (cascade interpreter + vision fallback) | v1.0 | shipped | [`20-chat.md`](20-chat.md) |
 | 21 | Identify (no-save quick PlantNet probe) | v1.0 | shipped | [`21-identify.md`](21-identify.md) |
 | 22 | Community Validation (expert ID queue + research-grade auto-promotion) | v1.1 | shipped (spec v1.3 + impl) | [`22-community-validation.md`](22-community-validation.md) |
+| 23 | Karma + per-taxon expertise + rarity-weighted rewards | v1.1 | partial (Phase 1 shipped; Phases 2–3 deferred) | [`23-karma-expertise-rarity.md`](23-karma-expertise-rarity.md) |
 
 > **Numbering note.** Two specs share the `15-` prefix:
 > [`15-map-location-picker.md`](15-map-location-picker.md) was claimed first
@@ -123,7 +124,7 @@ ML training pipeline) rather than waiting on engineering capacity.
 
 ## How to add a new module spec
 
-1. Claim the next free `NN-*.md` slot (currently `23-`).
+1. Claim the next free `NN-*.md` slot (currently `24-`).
 2. Copy the structure of an existing spec
    (`01-photo-id.md` is a good template).
 3. Include: **Overview → Data model → APIs / logic → Edge cases → Cost / risk

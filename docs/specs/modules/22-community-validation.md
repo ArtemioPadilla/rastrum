@@ -555,7 +555,8 @@ Placeholders use `{n}`, `{name}`, `{kingdom}` (mirror existing
 
 ## Out of scope (revisit later)
 
-- v1.2: weighted votes by reputation score (cumulative validation history).
+- v1.2: realized as Module 23 (karma + per-taxon expertise + rarity).
+  See `23-karma-expertise-rarity.md`.
 - v1.3: per-observation chat thread for experts to debate.
 - v1.3: GBIF / iNaturalist cross-validation API.
 - v2.0: automated re-identification when a new model is deployed.
