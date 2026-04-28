@@ -35,6 +35,14 @@ const cards = [
                 : 'Recent activity from the species and observers you follow.',
     iconPath: 'M5 4v3M19 4v3M3 12h18M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
   },
+  {
+    href: getLocalizedPath(lang, routes.exploreValidate[lang] + '/'),
+    title: isEs ? 'Validar' : 'Validate',
+    body:  isEs ? 'Sugiere identificaciones para observaciones que necesitan ayuda. Las sugerencias de expertos pesan más en el consenso.'
+                : "Suggest identifications for observations that need community help. Expert suggestions carry more weight in consensus.",
+    // Magnifying-glass-with-checkmark — a "validate / verify" metaphor.
+    iconPath: 'M21 21l-4.35-4.35M16 9a7 7 0 11-14 0 7 7 0 0114 0zm-9 0l2 2 4-4',
+  },
 ];
 ---
 
