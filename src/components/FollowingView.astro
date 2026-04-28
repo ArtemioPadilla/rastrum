@@ -1,0 +1,209 @@
+---
+/**
+ * Module 26 — following list view.
+ *
+ * Lists users that the target profile is following. Mirrors
+ * FollowersView.astro but queries the opposite side of `public.follows`:
+ * filter by `follower_id = target.id` and join the `followee_id` user.
+ */
+import { t } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+
+const { lang } = Astro.props;
+const tr = t(lang);
+const sg = (tr as unknown as {
+  socialgraph: {
+    list: {
+      followers: string;
+      following: string;
+      empty_followers: string;
+      empty_following: string;
+    };
+    follow: { collaborator_accepted: string };
+  };
+}).socialgraph;
+
+const labelHeading = sg.list.following;
+const labelEmpty = sg.list.empty_following;
+const labelCollaborator = sg.follow.collaborator_accepted;
+const labelLoading = lang === 'es' ? 'Cargando…' : 'Loading…';
+const labelNotFound = lang === 'es' ? 'Perfil no encontrado.' : 'Profile not found.';
+---
+
+<section
+  class="rastrum-following-view mx-auto max-w-2xl px-4 py-6"
+  data-lang={lang}
+  data-mode="following"
+  data-label-heading={labelHeading}
+  data-label-empty={labelEmpty}
+  data-label-collaborator={labelCollaborator}
+  data-label-loading={labelLoading}
+  data-label-not-found={labelNotFound}
+>
+  <header class="mb-5">
+    <h1 class="text-2xl md:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+      {labelHeading}
+    </h1>
+    <p data-fv-subtitle class="text-sm text-zinc-500 dark:text-zinc-400 mt-1"></p>
+  </header>
+
+  <p data-fv-loading class="text-sm text-zinc-500 text-center py-8">{labelLoading}</p>
+  <p data-fv-not-found class="hidden text-sm text-zinc-500 text-center py-8 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700">{labelNotFound}</p>
+  <p data-fv-empty class="hidden text-sm text-zinc-500 text-center py-8 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700">{labelEmpty}</p>
+
+  <ul data-fv-list class="hidden divide-y divide-zinc-200 dark:divide-zinc-800"></ul>
+</section>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+
+  type Lang = 'en' | 'es';
+
+  type RowUser = {
+    id: string;
+    username: string | null;
+    display_name: string | null;
+    avatar_url: string | null;
+  };
+
+  type FollowRow = {
+    tier: 'follower' | 'collaborator';
+    accepted_at: string | null;
+    users: RowUser | RowUser[] | null;
+  };
+
+  function show(el: Element | null) { el?.classList.remove('hidden'); }
+  function hide(el: Element | null) { el?.classList.add('hidden'); }
+
+  function readUsername(): string {
+    const params = new URLSearchParams(window.location.search);
+    const fromQuery = params.get('username') || params.get('u') || '';
+    return fromQuery.trim();
+  }
+
+  function initialsAvatar(name: string): string {
+    const clean = (name || '?').trim().slice(0, 2).toUpperCase();
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'><rect width='80' height='80' fill='#10b981'/><text x='50%' y='58%' text-anchor='middle' fill='white' font-family='system-ui,sans-serif' font-size='32' font-weight='700'>${clean}</text></svg>`;
+    return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+  }
+
+  function pickUser(u: RowUser | RowUser[] | null): RowUser | null {
+    if (!u) return null;
+    if (Array.isArray(u)) return u[0] ?? null;
+    return u;
+  }
+
+  async function init() {
+    const root = document.querySelector<HTMLElement>('.rastrum-following-view');
+    if (!root) return;
+    const lang = (root.dataset.lang === 'es' ? 'es' : 'en') as Lang;
+
+    const username = readUsername();
+    if (!username || !/^[a-zA-Z0-9_]{3,30}$/.test(username)) {
+      hide(root.querySelector('[data-fv-loading]'));
+      show(root.querySelector('[data-fv-not-found]'));
+      return;
+    }
+
+    let supabase;
+    try { supabase = getSupabase(); } catch {
+      hide(root.querySelector('[data-fv-loading]'));
+      show(root.querySelector('[data-fv-not-found]'));
+      return;
+    }
+
+    const { data: target } = await supabase
+      .from('users')
+      .select('id, username, display_name')
+      .eq('username', username)
+      .maybeSingle<{ id: string; username: string | null; display_name: string | null }>();
+
+    if (!target) {
+      hide(root.querySelector('[data-fv-loading]'));
+      show(root.querySelector('[data-fv-not-found]'));
+      return;
+    }
+
+    const subtitle = root.querySelector<HTMLElement>('[data-fv-subtitle]');
+    if (subtitle) {
+      const name = target.display_name || target.username || username;
+      subtitle.textContent = `@${target.username ?? username} · ${name}`;
+    }
+
+    const { data: rows } = await supabase
+      .from('follows')
+      .select('tier, accepted_at, users:followee_id(id, username, display_name, avatar_url)')
+      .eq('follower_id', target.id)
+      .eq('status', 'accepted')
+      .order('accepted_at', { ascending: false })
+      .limit(200);
+
+    const list = (rows ?? []) as unknown as FollowRow[];
+    hide(root.querySelector('[data-fv-loading]'));
+
+    if (list.length === 0) {
+      show(root.querySelector('[data-fv-empty]'));
+      return;
+    }
+
+    const ul = root.querySelector<HTMLUListElement>('[data-fv-list]');
+    if (!ul) return;
+    show(ul);
+
+    const collaboratorLabel = root.dataset.labelCollaborator ?? '';
+
+    for (const row of list) {
+      const u = pickUser(row.users);
+      if (!u) continue;
+      const name = u.display_name || u.username || 'Observer';
+      const handleStr = u.username ?? '';
+
+      const li = document.createElement('li');
+      li.className = 'flex items-center gap-3 py-3';
+
+      const link = document.createElement('a');
+      link.className = 'flex items-center gap-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 rounded p-1 -m-1 flex-1 min-w-0';
+      link.href = handleStr ? `/${lang}/u/?username=${encodeURIComponent(handleStr)}` : '#';
+
+      const img = document.createElement('img');
+      img.className = 'w-10 h-10 rounded-full bg-zinc-200 dark:bg-zinc-800 object-cover shrink-0';
+      img.loading = 'lazy';
+      img.alt = '';
+      img.src = u.avatar_url || initialsAvatar(name);
+      link.appendChild(img);
+
+      const text = document.createElement('div');
+      text.className = 'min-w-0';
+      const nameEl = document.createElement('div');
+      nameEl.className = 'font-medium text-zinc-900 dark:text-zinc-100 truncate';
+      nameEl.textContent = name;
+      const handleEl = document.createElement('div');
+      handleEl.className = 'text-sm text-zinc-500 dark:text-zinc-400 truncate';
+      handleEl.textContent = handleStr ? `@${handleStr}` : '';
+      text.appendChild(nameEl);
+      text.appendChild(handleEl);
+      link.appendChild(text);
+
+      li.appendChild(link);
+
+      if (row.tier === 'collaborator') {
+        const badge = document.createElement('span');
+        badge.className = 'text-xs text-emerald-700 dark:text-emerald-400 ml-auto shrink-0';
+        badge.textContent = collaboratorLabel;
+        li.appendChild(badge);
+      }
+
+      ul.appendChild(li);
+    }
+  }
+
+  init().catch(() => {
+    const root = document.querySelector<HTMLElement>('.rastrum-following-view');
+    if (!root) return;
+    root.querySelector('[data-fv-loading]')?.classList.add('hidden');
+    root.querySelector('[data-fv-not-found]')?.classList.remove('hidden');
+  });
+</script>

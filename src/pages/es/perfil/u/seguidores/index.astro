@@ -1,0 +1,21 @@
+---
+/**
+ * Módulo 26 — página de seguidores (ES).
+ *
+ * Resuelve el perfil objetivo mediante `?username=<nombre>` (o
+ * `?handle=<nombre>`). La salida estática no admite segmentos
+ * dinámicos `[handle]` — ver correcciones en el plan del módulo 26.
+ */
+import BaseLayout from '../../../../../layouts/BaseLayout.astro';
+import FollowersView from '../../../../../components/FollowersView.astro';
+
+const lang = 'es' as const;
+---
+<BaseLayout
+  title="Seguidores — Rastrum"
+  description="Personas que siguen a este observador de Rastrum."
+  lang={lang}
+  robots="noindex,nofollow"
+>
+  <FollowersView lang={lang} />
+</BaseLayout>

@@ -3852,6 +3852,62 @@
           "status": "done"
         }
       ]
+    },
+    "social-graph-m26": {
+      "label_en": "Social graph + reactions (Module 26)",
+      "label_es": "Grafo social + reacciones (Módulo 26)",
+      "subtasks": [
+        {
+          "label_en": "follows table + counters trigger + privacy helpers (social_visible_to, is_collaborator_of) + collaborator coord-precision unlock",
+          "label_es": "tabla follows + trigger de contadores + helpers de privacidad (social_visible_to, is_collaborator_of) + desbloqueo de precisión de coordenadas para colaboradores",
+          "status": "done"
+        },
+        {
+          "label_en": "per-target reaction tables: observation_reactions, photo_reactions, identification_reactions (+ RLS, kind enums, unique constraints)",
+          "label_es": "tablas de reacciones por objetivo: observation_reactions, photo_reactions, identification_reactions (+ RLS, enums de kind, restricciones de unicidad)",
+          "status": "done"
+        },
+        {
+          "label_en": "blocks (read-symmetric) + reports (queue with reason enum) + notifications (kind enum + 90-day prune cron)",
+          "label_es": "bloqueos (lectura simétrica) + reportes (cola con enum de razón) + notificaciones (enum de kind + cron de poda a 90 días)",
+          "status": "done"
+        },
+        {
+          "label_en": "fan-out triggers: follow → notification, observation_reactions → notification (skip blocked recipients)",
+          "label_es": "triggers de propagación: follow → notificación, observation_reactions → notificación (omite destinatarios bloqueados)",
+          "status": "done"
+        },
+        {
+          "label_en": "Edge Functions: follow (request/accept/reject + rate-limit), react (idempotent toggle), report (with operator email)",
+          "label_es": "Edge Functions: follow (solicitar/aceptar/rechazar + límite de tasa), react (toggle idempotente), report (con email al operador)",
+          "status": "done"
+        },
+        {
+          "label_en": "TypeScript types (types.social.ts) + social client (followUser, react, reportTarget, blockUser) + 5 unit tests",
+          "label_es": "Tipos TypeScript (types.social.ts) + cliente social (followUser, react, reportTarget, blockUser) + 5 pruebas unitarias",
+          "status": "done"
+        },
+        {
+          "label_en": "i18n: socialgraph.* namespace EN+ES (sidesteps existing flat social.* namespace) + new routes (inbox, profileFollowers, profileFollowing)",
+          "label_es": "i18n: namespace socialgraph.* EN+ES (evita el namespace plano existente social.*) + nuevas rutas (inbox, profileFollowers, profileFollowing)",
+          "status": "done"
+        },
+        {
+          "label_en": "UI: ReactionStrip, FollowersView, FollowingView, InboxView, BlockedUsersList + EN/ES paired pages",
+          "label_es": "UI: ReactionStrip, FollowersView, FollowingView, InboxView, BlockedUsersList + páginas EN/ES emparejadas",
+          "status": "done"
+        },
+        {
+          "label_en": "tests: tests/sql/social-rls.sql regression + tests/e2e/social.spec.ts smoke",
+          "label_es": "pruebas: regresión tests/sql/social-rls.sql + smoke tests/e2e/social.spec.ts",
+          "status": "done"
+        },
+        {
+          "label_en": "deferred to operator: make db-apply (schema + cron) + gh workflow run deploy-functions.yml -f function={follow,react,report}",
+          "label_es": "diferido al operador: make db-apply (esquema + cron) + gh workflow run deploy-functions.yml -f function={follow,react,report}",
+          "status": "todo"
+        }
+      ]
     }
   }
 }

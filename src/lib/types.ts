@@ -168,3 +168,4 @@ export interface ValidationQueueRow {
 }
 
 export type UserRole = 'admin' | 'moderator' | 'expert' | 'researcher';
+export * from './types.social';

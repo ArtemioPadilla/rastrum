@@ -1,0 +1,214 @@
+---
+/**
+ * InboxView — signed-in user's notification inbox.
+ *
+ * Renders a static shell at build time and hydrates from the
+ * `notifications` table client-side. RLS scopes rows to the signed-in
+ * user; unauthenticated visitors get a sign-in prompt.
+ *
+ * See module 26 (social graph) plan, Task 20.
+ */
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { t, getLocalizedPath, routes } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+
+const { lang } = Astro.props;
+const tr = t(lang);
+const inboxTr = tr.socialgraph.inbox;
+const signInPath = getLocalizedPath(lang, routes.signIn[lang] + '/');
+const notSignedIn = (tr.profile as unknown as Record<string, string>).not_signed_in
+  ?? (lang === 'es' ? 'Inicia sesión para ver tu bandeja.' : 'Sign in to see your inbox.');
+const signInLabel = (tr.nav as unknown as Record<string, string>)?.signIn
+  ?? (lang === 'es' ? 'Ingresar' : 'Sign in');
+---
+
+<BaseLayout lang={lang} title={`${inboxTr.title} — Rastrum`} description={inboxTr.empty}>
+  <section
+    class="rastrum-inbox mx-auto max-w-2xl p-4"
+    data-lang={lang}
+    data-label-kind-follow={inboxTr.kind_follow}
+    data-label-kind-follow-request={inboxTr.kind_follow_request}
+    data-label-kind-follow-accepted={inboxTr.kind_follow_accepted}
+    data-label-kind-reaction={inboxTr.kind_reaction}
+    data-label-empty={inboxTr.empty}
+  >
+    <header class="flex items-center justify-between mb-4">
+      <h1 class="text-2xl md:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+        {inboxTr.title}
+      </h1>
+      <button
+        type="button"
+        id="inbox-mark-all-read"
+        class="hidden text-sm font-medium text-emerald-700 hover:underline disabled:opacity-50"
+      >
+        {inboxTr.mark_all_read}
+      </button>
+    </header>
+
+    <div
+      id="inbox-signin"
+      class="hidden rounded-lg border border-zinc-300 dark:border-zinc-700 p-4 text-sm"
+    >
+      <p class="text-zinc-700 dark:text-zinc-300">{notSignedIn}</p>
+      <a
+        href={signInPath}
+        class="mt-3 inline-flex min-h-[40px] items-center rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white"
+      >
+        {signInLabel}
+      </a>
+    </div>
+
+    <div id="inbox-loading" class="text-sm text-zinc-500 dark:text-zinc-400">
+      {tr.profile.my_observations_loading}
+    </div>
+
+    <ul id="inbox-list" class="hidden divide-y divide-zinc-200 dark:divide-zinc-800"></ul>
+
+    <div
+      id="inbox-empty"
+      class="hidden rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-8 text-center"
+    >
+      <p class="text-sm text-zinc-500 dark:text-zinc-400">{inboxTr.empty}</p>
+    </div>
+  </section>
+</BaseLayout>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+
+  type Lang = 'en' | 'es';
+
+  type NotificationKind =
+    | 'follow'
+    | 'follow_request'
+    | 'follow_accepted'
+    | 'reaction'
+    | string;
+
+  interface NotificationRow {
+    id: string;
+    kind: NotificationKind;
+    payload: Record<string, unknown> | null;
+    read_at: string | null;
+    created_at: string;
+  }
+
+  const root = document.querySelector<HTMLElement>('.rastrum-inbox');
+  const lang: Lang = root?.dataset.lang === 'es' ? 'es' : 'en';
+
+  function escapeText(s: string): string {
+    return s
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function templateFor(kind: NotificationKind): string {
+    if (!root) return '';
+    if (kind === 'follow') return root.dataset.labelKindFollow ?? '';
+    if (kind === 'follow_request') return root.dataset.labelKindFollowRequest ?? '';
+    if (kind === 'follow_accepted') return root.dataset.labelKindFollowAccepted ?? '';
+    if (kind === 'reaction') return root.dataset.labelKindReaction ?? '';
+    return '';
+  }
+
+  function actorFromPayload(payload: NotificationRow['payload']): string {
+    if (!payload) return '';
+    const handle = (payload as { actor_handle?: unknown }).actor_handle;
+    const display = (payload as { actor_display_name?: unknown }).actor_display_name;
+    const id = (payload as { actor_id?: unknown }).actor_id;
+    if (typeof display === 'string' && display.trim()) return display;
+    if (typeof handle === 'string' && handle.trim()) return '@' + handle;
+    if (typeof id === 'string' && id.trim()) return id;
+    return '';
+  }
+
+  function renderRow(n: NotificationRow): string {
+    const tpl = templateFor(n.kind);
+    const actor = actorFromPayload(n.payload);
+    const text = tpl ? tpl.replace('{{actor}}', escapeText(actor)) : '';
+    const when = new Date(n.created_at).toLocaleString(lang);
+    const dim = n.read_at ? 'opacity-60' : '';
+    return `<li class="py-3 ${dim}">
+      <div class="text-sm text-zinc-800 dark:text-zinc-200">${text}</div>
+      <div class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">${escapeText(when)}</div>
+    </li>`;
+  }
+
+  function showSignIn() {
+    document.getElementById('inbox-loading')?.classList.add('hidden');
+    document.getElementById('inbox-signin')?.classList.remove('hidden');
+  }
+
+  function showEmpty() {
+    document.getElementById('inbox-loading')?.classList.add('hidden');
+    document.getElementById('inbox-list')?.classList.add('hidden');
+    document.getElementById('inbox-empty')?.classList.remove('hidden');
+  }
+
+  function showList(html: string) {
+    document.getElementById('inbox-loading')?.classList.add('hidden');
+    const list = document.getElementById('inbox-list');
+    if (list) {
+      list.innerHTML = html;
+      list.classList.remove('hidden');
+    }
+    const markAll = document.getElementById('inbox-mark-all-read');
+    markAll?.classList.remove('hidden');
+  }
+
+  async function init() {
+    let supabase;
+    try {
+      supabase = getSupabase();
+    } catch {
+      showSignIn();
+      return;
+    }
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      showSignIn();
+      return;
+    }
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('id, kind, payload, read_at, created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(100);
+    if (error) {
+      showEmpty();
+      return;
+    }
+    const rows = (data ?? []) as NotificationRow[];
+    if (rows.length === 0) {
+      showEmpty();
+      return;
+    }
+    showList(rows.map(renderRow).join(''));
+
+    const markAll = document.getElementById('inbox-mark-all-read') as HTMLButtonElement | null;
+    markAll?.addEventListener('click', async () => {
+      markAll.disabled = true;
+      try {
+        const sb = getSupabase();
+        const { data: { user: me } } = await sb.auth.getUser();
+        if (!me) return;
+        await sb
+          .from('notifications')
+          .update({ read_at: new Date().toISOString() })
+          .eq('user_id', me.id)
+          .is('read_at', null);
+        location.reload();
+      } finally {
+        markAll.disabled = false;
+      }
+    });
+  }
+
+  init().catch(() => { showSignIn(); });
+</script>

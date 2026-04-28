@@ -2619,3 +2619,441 @@ UPDATE public.observations SET establishment_means = 'wild'
 -- Index for diversity queries filtering by establishment_means = 'wild'.
 CREATE INDEX IF NOT EXISTS idx_obs_establishment_means
   ON public.observations(establishment_means);
+
+-- =====================================================================
+-- Module 26 — social graph + reactions (2026-04-28)
+-- =====================================================================
+
+-- 1) follows
+CREATE TABLE IF NOT EXISTS public.follows (
+  follower_id   uuid        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  followee_id   uuid        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  tier          text        NOT NULL DEFAULT 'follower'
+                            CHECK (tier IN ('follower', 'collaborator')),
+  status        text        NOT NULL DEFAULT 'accepted'
+                            CHECK (status IN ('pending', 'accepted')),
+  requested_at  timestamptz NOT NULL DEFAULT now(),
+  accepted_at   timestamptz,
+  PRIMARY KEY (follower_id, followee_id),
+  CHECK (follower_id <> followee_id)
+);
+CREATE INDEX IF NOT EXISTS idx_follows_followee_status
+  ON public.follows(followee_id, status);
+CREATE INDEX IF NOT EXISTS idx_follows_follower_status
+  ON public.follows(follower_id, status);
+
+ALTER TABLE public.follows ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS follows_read ON public.follows;
+CREATE POLICY follows_read ON public.follows FOR SELECT USING (
+  -- Owners always see their edges; everyone else sees only accepted edges
+  follower_id = auth.uid()
+  OR followee_id = auth.uid()
+  OR status = 'accepted'
+);
+
+DROP POLICY IF EXISTS follows_owner_write ON public.follows;
+CREATE POLICY follows_owner_write ON public.follows FOR INSERT
+  WITH CHECK (follower_id = auth.uid());
+
+DROP POLICY IF EXISTS follows_followee_update ON public.follows;
+CREATE POLICY follows_followee_update ON public.follows FOR UPDATE
+  USING (followee_id = auth.uid())
+  WITH CHECK (followee_id = auth.uid());
+
+DROP POLICY IF EXISTS follows_owner_delete ON public.follows;
+CREATE POLICY follows_owner_delete ON public.follows FOR DELETE
+  USING (follower_id = auth.uid() OR followee_id = auth.uid());
+
+-- 2) Counters on users
+ALTER TABLE public.users
+  ADD COLUMN IF NOT EXISTS follower_count   integer NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS following_count  integer NOT NULL DEFAULT 0;
+
+-- 3) Counter trigger
+CREATE OR REPLACE FUNCTION public.tg_follows_counter()
+RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  IF (TG_OP = 'INSERT') THEN
+    IF NEW.status = 'accepted' THEN
+      UPDATE public.users SET follower_count  = follower_count  + 1 WHERE id = NEW.followee_id;
+      UPDATE public.users SET following_count = following_count + 1 WHERE id = NEW.follower_id;
+    END IF;
+    RETURN NEW;
+  ELSIF (TG_OP = 'UPDATE') THEN
+    IF OLD.status <> 'accepted' AND NEW.status = 'accepted' THEN
+      UPDATE public.users SET follower_count  = follower_count  + 1 WHERE id = NEW.followee_id;
+      UPDATE public.users SET following_count = following_count + 1 WHERE id = NEW.follower_id;
+    ELSIF OLD.status = 'accepted' AND NEW.status <> 'accepted' THEN
+      UPDATE public.users SET follower_count  = GREATEST(follower_count  - 1, 0) WHERE id = NEW.followee_id;
+      UPDATE public.users SET following_count = GREATEST(following_count - 1, 0) WHERE id = NEW.follower_id;
+    END IF;
+    RETURN NEW;
+  ELSIF (TG_OP = 'DELETE') THEN
+    IF OLD.status = 'accepted' THEN
+      UPDATE public.users SET follower_count  = GREATEST(follower_count  - 1, 0) WHERE id = OLD.followee_id;
+      UPDATE public.users SET following_count = GREATEST(following_count - 1, 0) WHERE id = OLD.follower_id;
+    END IF;
+    RETURN OLD;
+  END IF;
+  RETURN NULL;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS follows_counter_trigger ON public.follows;
+CREATE TRIGGER follows_counter_trigger
+  AFTER INSERT OR UPDATE OR DELETE ON public.follows
+  FOR EACH ROW EXECUTE FUNCTION public.tg_follows_counter();
+
+-- 4) Backfill counters (idempotent)
+UPDATE public.users u SET
+  follower_count  = (SELECT count(*) FROM public.follows WHERE followee_id = u.id AND status = 'accepted'),
+  following_count = (SELECT count(*) FROM public.follows WHERE follower_id = u.id AND status = 'accepted');
+
+-- 5) Social privacy helpers
+CREATE OR REPLACE FUNCTION public.social_visible_to(viewer uuid, owner uuid)
+RETURNS boolean
+LANGUAGE sql STABLE PARALLEL SAFE AS $$
+  SELECT
+    viewer IS NOT NULL AND (
+      viewer = owner
+      OR EXISTS (
+        SELECT 1 FROM public.follows f
+         WHERE f.follower_id = viewer
+           AND f.followee_id = owner
+           AND f.status      = 'accepted'
+      )
+    );
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_collaborator_of(viewer uuid, owner uuid)
+RETURNS boolean
+LANGUAGE sql STABLE PARALLEL SAFE AS $$
+  SELECT viewer IS NOT NULL AND EXISTS (
+    SELECT 1 FROM public.follows f
+     WHERE f.follower_id = viewer
+       AND f.followee_id = owner
+       AND f.tier        = 'collaborator'
+       AND f.status      = 'accepted'
+  );
+$$;
+
+GRANT EXECUTE ON FUNCTION public.social_visible_to(uuid, uuid) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.is_collaborator_of(uuid, uuid) TO anon, authenticated;
+
+-- 6) Collaborators inherit credentialed-researcher coord-precision unlock
+DROP POLICY IF EXISTS obs_collaborator_read ON public.observations;
+CREATE POLICY obs_collaborator_read ON public.observations FOR SELECT
+  USING (
+    obscure_level <> 'full'
+    AND public.is_collaborator_of(auth.uid(), observer_id)
+  );
+
+-- 7) observation_reactions
+CREATE TABLE IF NOT EXISTS public.observation_reactions (
+  id             uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id        uuid        NOT NULL REFERENCES public.users(id)        ON DELETE CASCADE,
+  observation_id uuid        NOT NULL REFERENCES public.observations(id) ON DELETE CASCADE,
+  kind           text        NOT NULL
+                             CHECK (kind IN ('fave','agree_id','needs_id','confirm_id','helpful')),
+  created_at     timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(user_id, observation_id, kind)
+);
+CREATE INDEX IF NOT EXISTS idx_obsreact_obs_kind
+  ON public.observation_reactions(observation_id, kind);
+CREATE INDEX IF NOT EXISTS idx_obsreact_user
+  ON public.observation_reactions(user_id, created_at DESC);
+
+ALTER TABLE public.observation_reactions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS obsreact_read ON public.observation_reactions;
+CREATE POLICY obsreact_read ON public.observation_reactions FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.observations o
+       WHERE o.id = observation_reactions.observation_id
+         AND (
+           o.observer_id = auth.uid()
+           OR (
+             o.obscure_level <> 'full'
+             AND public.can_see_facet(o.observer_id, 'observations', auth.uid())
+           )
+           OR public.is_collaborator_of(auth.uid(), o.observer_id)
+         )
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM public.blocks b
+       WHERE (b.blocker_id = auth.uid() AND b.blocked_id = observation_reactions.user_id)
+          OR (b.blocked_id = auth.uid() AND b.blocker_id = observation_reactions.user_id)
+    )
+  );
+
+DROP POLICY IF EXISTS obsreact_write ON public.observation_reactions;
+CREATE POLICY obsreact_write ON public.observation_reactions FOR INSERT
+  WITH CHECK (user_id = auth.uid());
+
+DROP POLICY IF EXISTS obsreact_delete ON public.observation_reactions;
+CREATE POLICY obsreact_delete ON public.observation_reactions FOR DELETE
+  USING (user_id = auth.uid());
+
+-- 8) photo_reactions (against media_files)
+CREATE TABLE IF NOT EXISTS public.photo_reactions (
+  id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id         uuid        NOT NULL REFERENCES public.users(id)       ON DELETE CASCADE,
+  media_file_id   uuid        NOT NULL REFERENCES public.media_files(id) ON DELETE CASCADE,
+  kind            text        NOT NULL CHECK (kind IN ('fave','helpful')),
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(user_id, media_file_id, kind)
+);
+CREATE INDEX IF NOT EXISTS idx_photoreact_media_kind
+  ON public.photo_reactions(media_file_id, kind);
+
+ALTER TABLE public.photo_reactions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS photoreact_read ON public.photo_reactions;
+CREATE POLICY photoreact_read ON public.photo_reactions FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.media_files m
+        JOIN public.observations o ON o.id = m.observation_id
+       WHERE m.id = photo_reactions.media_file_id
+         AND (
+           o.observer_id = auth.uid()
+           OR (
+             o.obscure_level <> 'full'
+             AND public.can_see_facet(o.observer_id, 'observations', auth.uid())
+           )
+           OR public.is_collaborator_of(auth.uid(), o.observer_id)
+         )
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM public.blocks b
+       WHERE (b.blocker_id = auth.uid() AND b.blocked_id = photo_reactions.user_id)
+          OR (b.blocked_id = auth.uid() AND b.blocker_id = photo_reactions.user_id)
+    )
+  );
+
+DROP POLICY IF EXISTS photoreact_write ON public.photo_reactions;
+CREATE POLICY photoreact_write ON public.photo_reactions FOR INSERT
+  WITH CHECK (user_id = auth.uid());
+
+DROP POLICY IF EXISTS photoreact_delete ON public.photo_reactions;
+CREATE POLICY photoreact_delete ON public.photo_reactions FOR DELETE
+  USING (user_id = auth.uid());
+
+-- 9) identification_reactions
+CREATE TABLE IF NOT EXISTS public.identification_reactions (
+  id                uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id           uuid        NOT NULL REFERENCES public.users(id)           ON DELETE CASCADE,
+  identification_id uuid        NOT NULL REFERENCES public.identifications(id) ON DELETE CASCADE,
+  kind              text        NOT NULL CHECK (kind IN ('agree_id','disagree_id','helpful')),
+  created_at        timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(user_id, identification_id, kind)
+);
+CREATE INDEX IF NOT EXISTS idx_idreact_id_kind
+  ON public.identification_reactions(identification_id, kind);
+
+ALTER TABLE public.identification_reactions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS idreact_read ON public.identification_reactions;
+CREATE POLICY idreact_read ON public.identification_reactions FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.identifications i
+        JOIN public.observations o ON o.id = i.observation_id
+       WHERE i.id = identification_reactions.identification_id
+         AND (
+           o.observer_id = auth.uid()
+           OR (
+             o.obscure_level <> 'full'
+             AND public.can_see_facet(o.observer_id, 'observations', auth.uid())
+           )
+           OR public.is_collaborator_of(auth.uid(), o.observer_id)
+         )
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM public.blocks b
+       WHERE (b.blocker_id = auth.uid() AND b.blocked_id = identification_reactions.user_id)
+          OR (b.blocked_id = auth.uid() AND b.blocker_id = identification_reactions.user_id)
+    )
+  );
+
+DROP POLICY IF EXISTS idreact_write ON public.identification_reactions;
+CREATE POLICY idreact_write ON public.identification_reactions FOR INSERT
+  WITH CHECK (user_id = auth.uid());
+
+DROP POLICY IF EXISTS idreact_delete ON public.identification_reactions;
+CREATE POLICY idreact_delete ON public.identification_reactions FOR DELETE
+  USING (user_id = auth.uid());
+
+-- 10) blocks
+CREATE TABLE IF NOT EXISTS public.blocks (
+  blocker_id  uuid        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  blocked_id  uuid        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (blocker_id, blocked_id),
+  CHECK (blocker_id <> blocked_id)
+);
+CREATE INDEX IF NOT EXISTS idx_blocks_blocked ON public.blocks(blocked_id);
+
+ALTER TABLE public.blocks ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS blocks_owner_read ON public.blocks;
+CREATE POLICY blocks_owner_read ON public.blocks FOR SELECT
+  USING (blocker_id = auth.uid());
+
+DROP POLICY IF EXISTS blocks_owner_write ON public.blocks;
+CREATE POLICY blocks_owner_write ON public.blocks FOR INSERT
+  WITH CHECK (blocker_id = auth.uid());
+
+DROP POLICY IF EXISTS blocks_owner_delete ON public.blocks;
+CREATE POLICY blocks_owner_delete ON public.blocks FOR DELETE
+  USING (blocker_id = auth.uid());
+
+-- 11) reports
+CREATE TABLE IF NOT EXISTS public.reports (
+  id           uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  reporter_id  uuid                 REFERENCES public.users(id) ON DELETE SET NULL,
+  target_type  text        NOT NULL
+                           CHECK (target_type IN ('user','observation','photo','identification','comment')),
+  target_id    uuid        NOT NULL,
+  reason       text        NOT NULL
+                           CHECK (reason IN ('spam','harassment','wrong_id','privacy_violation','copyright','other')),
+  note         text,
+  status       text        NOT NULL DEFAULT 'open'
+                           CHECK (status IN ('open','triaged','resolved','dismissed')),
+  created_at   timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_reports_status_created
+  ON public.reports(status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_reports_reporter
+  ON public.reports(reporter_id, created_at DESC);
+
+ALTER TABLE public.reports ENABLE ROW LEVEL SECURITY;
+
+-- Reporters can see their own reports; nobody else (operators read via service role).
+DROP POLICY IF EXISTS reports_owner_read ON public.reports;
+CREATE POLICY reports_owner_read ON public.reports FOR SELECT
+  USING (reporter_id = auth.uid());
+
+DROP POLICY IF EXISTS reports_owner_write ON public.reports;
+CREATE POLICY reports_owner_write ON public.reports FOR INSERT
+  WITH CHECK (reporter_id = auth.uid());
+
+-- 12) notifications
+CREATE TABLE IF NOT EXISTS public.notifications (
+  id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     uuid        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  kind        text        NOT NULL
+                          CHECK (kind IN ('follow','follow_accepted','reaction','comment','mention',
+                                          'identification','badge','digest')),
+  payload     jsonb       NOT NULL DEFAULT '{}',
+  read_at     timestamptz,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_unread
+  ON public.notifications(user_id, read_at) WHERE read_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_notifications_user_created
+  ON public.notifications(user_id, created_at DESC);
+
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS notif_owner_read ON public.notifications;
+CREATE POLICY notif_owner_read ON public.notifications FOR SELECT
+  USING (user_id = auth.uid());
+
+DROP POLICY IF EXISTS notif_owner_update ON public.notifications;
+CREATE POLICY notif_owner_update ON public.notifications FOR UPDATE
+  USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
+
+DROP POLICY IF EXISTS notif_owner_delete ON public.notifications;
+CREATE POLICY notif_owner_delete ON public.notifications FOR DELETE
+  USING (user_id = auth.uid());
+
+-- Server-side inserts (Edge Functions) use service role and bypass RLS;
+-- explicitly forbid client-side inserts.
+DROP POLICY IF EXISTS notif_no_client_insert ON public.notifications;
+CREATE POLICY notif_no_client_insert ON public.notifications FOR INSERT
+  WITH CHECK (false);
+
+CREATE OR REPLACE FUNCTION public.prune_old_notifications()
+RETURNS integer
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_count integer;
+BEGIN
+  DELETE FROM public.notifications
+   WHERE read_at IS NOT NULL
+     AND read_at < now() - interval '90 days';
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  RETURN v_count;
+END;
+$$;
+
+-- 13) Fan-out: follow → notification
+CREATE OR REPLACE FUNCTION public.tg_follow_notify()
+RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  -- Skip if recipient has blocked the actor.
+  IF EXISTS (SELECT 1 FROM public.blocks
+              WHERE blocker_id = NEW.followee_id AND blocked_id = NEW.follower_id) THEN
+    RETURN NEW;
+  END IF;
+
+  IF (TG_OP = 'INSERT' AND NEW.status = 'pending') THEN
+    INSERT INTO public.notifications(user_id, kind, payload)
+    VALUES (NEW.followee_id, 'follow',
+            jsonb_build_object('actor_id', NEW.follower_id, 'tier', NEW.tier, 'status', 'pending'));
+  ELSIF (TG_OP = 'INSERT' AND NEW.status = 'accepted') THEN
+    INSERT INTO public.notifications(user_id, kind, payload)
+    VALUES (NEW.followee_id, 'follow',
+            jsonb_build_object('actor_id', NEW.follower_id, 'tier', NEW.tier, 'status', 'accepted'));
+  ELSIF (TG_OP = 'UPDATE' AND OLD.status = 'pending' AND NEW.status = 'accepted') THEN
+    INSERT INTO public.notifications(user_id, kind, payload)
+    VALUES (NEW.follower_id, 'follow_accepted',
+            jsonb_build_object('actor_id', NEW.followee_id, 'tier', NEW.tier));
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS follows_notify_trigger ON public.follows;
+CREATE TRIGGER follows_notify_trigger
+  AFTER INSERT OR UPDATE ON public.follows
+  FOR EACH ROW EXECUTE FUNCTION public.tg_follow_notify();
+
+-- 14) Fan-out: observation_reactions → notification
+CREATE OR REPLACE FUNCTION public.tg_obsreact_notify()
+RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_owner uuid;
+BEGIN
+  SELECT observer_id INTO v_owner FROM public.observations
+   WHERE id = NEW.observation_id;
+  IF v_owner IS NULL OR v_owner = NEW.user_id THEN
+    RETURN NEW;
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.blocks
+              WHERE blocker_id = v_owner AND blocked_id = NEW.user_id) THEN
+    RETURN NEW;
+  END IF;
+  INSERT INTO public.notifications(user_id, kind, payload)
+  VALUES (v_owner, 'reaction',
+          jsonb_build_object(
+            'actor_id', NEW.user_id,
+            'target_type', 'observation',
+            'target_id', NEW.observation_id,
+            'kind', NEW.kind
+          ));
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS obsreact_notify_trigger ON public.observation_reactions;
+CREATE TRIGGER obsreact_notify_trigger
+  AFTER INSERT ON public.observation_reactions
+  FOR EACH ROW EXECUTE FUNCTION public.tg_obsreact_notify();

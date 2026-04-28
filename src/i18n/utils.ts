@@ -84,6 +84,10 @@ export const routes: Record<string, Record<Locale, string>> = {
   consoleExpertOverrides:   { en: '/console/overrides',        es: '/consola/correcciones' },
   consoleExpertExpertise:   { en: '/console/expertise',        es: '/consola/experiencia' },
   consoleExpertTaxonNotes:  { en: '/console/taxon-notes',      es: '/consola/notas-taxon' },
+  // Social graph (M26)
+  inbox:            { en: '/inbox',     es: '/bandeja' },
+  profileFollowers: { en: '/profile/u', es: '/perfil/u' },
+  profileFollowing: { en: '/profile/u', es: '/perfil/u' },
 };
 
 export const docPages = [
@@ -175,6 +179,10 @@ export const routeTree: Record<string, RouteNode> = {
   consoleExpertOverrides:  { labels: { en: 'Overrides',        es: 'Correcciones' },      parent: 'console' },
   consoleExpertExpertise:  { labels: { en: 'Expertise',        es: 'Experiencia' },       parent: 'console' },
   consoleExpertTaxonNotes: { labels: { en: 'Taxon notes',      es: 'Notas de taxón' },    parent: 'console' },
+  // Social graph (M26)
+  inbox:             { labels: { en: 'Inbox',     es: 'Bandeja' } },
+  profileFollowers:  { labels: { en: 'Followers', es: 'Seguidores' }, parent: 'profileUser' },
+  profileFollowing:  { labels: { en: 'Following', es: 'Siguiendo' },  parent: 'profileUser' },
 };
 
 export function getRouteLabel(key: string, lang: string): string {

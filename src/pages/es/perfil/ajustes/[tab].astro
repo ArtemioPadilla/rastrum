@@ -3,6 +3,7 @@ import BaseLayout from '../../../../layouts/BaseLayout.astro';
 import SettingsShell from '../../../../components/SettingsShell.astro';
 import ProfileEditForm from '../../../../components/ProfileEditForm.astro';
 import PrivacyMatrix from '../../../../components/PrivacyMatrix.astro';
+import BlockedUsersList from '../../../../components/BlockedUsersList.astro';
 import { t, getLocalizedPath, routes } from '../../../../i18n/utils';
 
 export function getStaticPaths() {
@@ -183,7 +184,10 @@ const mcpUrl = 'https://reppvlqejgoqvitturxp.supabase.co/functions/v1/mcp';
     )}
 
     {activeTab === 'privacy' && (
-      <PrivacyMatrix lang={lang} />
+      <>
+        <PrivacyMatrix lang={lang} />
+        <BlockedUsersList lang={lang} />
+      </>
     )}
   </SettingsShell>
 </BaseLayout>

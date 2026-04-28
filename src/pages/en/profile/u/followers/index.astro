@@ -1,0 +1,23 @@
+---
+/**
+ * Module 26 — followers list page (EN).
+ *
+ * Resolves the target via `?username=<name>` (or `?handle=<name>`); the
+ * canonical public-profile route is `/{lang}/u/?username=`, so this
+ * mirror under `/profile/u/` keeps the URL family local. Static output
+ * forbids dynamic `[handle]` segments — see plan corrections in the
+ * Module 26 plan doc.
+ */
+import BaseLayout from '../../../../../layouts/BaseLayout.astro';
+import FollowersView from '../../../../../components/FollowersView.astro';
+
+const lang = 'en' as const;
+---
+<BaseLayout
+  title="Followers — Rastrum"
+  description="People who follow this Rastrum observer."
+  lang={lang}
+  robots="noindex,nofollow"
+>
+  <FollowersView lang={lang} />
+</BaseLayout>

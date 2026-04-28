@@ -1,0 +1,21 @@
+---
+/**
+ * Module 26 — following list page (EN).
+ *
+ * Resolves the target via `?username=<name>` (or `?handle=<name>`).
+ * Static output forbids dynamic `[handle]` segments — see plan
+ * corrections in the Module 26 plan doc.
+ */
+import BaseLayout from '../../../../../layouts/BaseLayout.astro';
+import FollowingView from '../../../../../components/FollowingView.astro';
+
+const lang = 'en' as const;
+---
+<BaseLayout
+  title="Following — Rastrum"
+  description="People this Rastrum observer follows."
+  lang={lang}
+  robots="noindex,nofollow"
+>
+  <FollowingView lang={lang} />
+</BaseLayout>
