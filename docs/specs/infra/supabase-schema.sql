@@ -1533,3 +1533,44 @@ UPDATE public.users
 GRANT SELECT ON public.user_expertise TO anon, authenticated;
 GRANT SELECT ON public.taxon_rarity   TO anon, authenticated;
 GRANT SELECT ON public.karma_events   TO authenticated;
+
+-- ============================================================
+-- ancestor_path computation: walk parent_id chain on INSERT/UPDATE.
+-- ============================================================
+CREATE OR REPLACE FUNCTION public.compute_ancestor_path(p_taxon_id uuid)
+RETURNS uuid[] AS $$
+DECLARE
+  result uuid[] := '{}';
+  current_id uuid := p_taxon_id;
+  parent_id uuid;
+  guard int := 0;
+BEGIN
+  LOOP
+    SELECT t.parent_id INTO parent_id FROM public.taxa t WHERE t.id = current_id;
+    EXIT WHEN parent_id IS NULL;
+    result := array_append(result, parent_id);
+    current_id := parent_id;
+    guard := guard + 1;
+    IF guard > 30 THEN  -- safety: kingdoms are at most ~10 ranks deep
+      RAISE EXCEPTION 'compute_ancestor_path: cycle or runaway at taxon %', p_taxon_id;
+    END IF;
+  END LOOP;
+  RETURN result;
+END;
+$$ LANGUAGE plpgsql STABLE;
+
+CREATE OR REPLACE FUNCTION public.taxa_set_ancestor_path()
+RETURNS trigger AS $$
+BEGIN
+  NEW.ancestor_path := public.compute_ancestor_path(NEW.id);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_taxa_ancestor_path ON public.taxa;
+CREATE TRIGGER trg_taxa_ancestor_path
+  BEFORE INSERT OR UPDATE OF parent_id ON public.taxa
+  FOR EACH ROW EXECUTE FUNCTION public.taxa_set_ancestor_path();
+
+-- One-shot backfill of every existing taxa row.
+UPDATE public.taxa SET ancestor_path = public.compute_ancestor_path(id);
