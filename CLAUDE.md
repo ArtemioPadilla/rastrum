@@ -295,6 +295,23 @@ Failure modes + fixes in [`docs/runbooks/ci-smoke-checks.md`](docs/runbooks/ci-s
 4. Add `sections.<name>` and `descriptions.<name>` to both i18n files.
 5. Run `make build` and confirm both pages render identically.
 
+### A new top-level route (with social-share preview)
+For routes that get linked from outside (homepage, observe, explore, share
+pages, profile sub-pages, etc.), add a localized OG card so scrapers don't
+fall back to `default.png`:
+
+1. Add EN + ES copy entries to `PAGES` in `scripts/generate-og.ts`. Slugs
+   are language-neutral (e.g. `profile-dex`); copy is per-locale.
+2. Add the path → slug mapping in `ogSlugForPath()` in
+   `src/layouts/BaseLayout.astro`. Match BOTH the EN and ES path forms.
+3. Run `npm run build:og`. Cards land at `public/og/{en,es}/<slug>.png`,
+   plus a legacy `public/og/<slug>.png` (ES content) for cached scrapers.
+4. Verify in `dist/` after `npm run build` — `/en/<route>/index.html`
+   should reference `/og/en/<slug>.png` and `/es/<route>/` the ES one.
+
+Routes that aren't shareable (auth flows, dynamic share/obs, etc.) can
+fall back to `default.png` — no need to wire them up.
+
 ### A new identifier plugin
 See "Identifier plugin contract" above. Use the existing plugins
 (`plantnet.ts`, `claude.ts`, `phi-vision.ts`) as templates.
