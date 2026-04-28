@@ -1,0 +1,391 @@
+---
+import { t } from '../i18n/utils';
+
+interface Props {
+  lang: string;
+}
+
+const { lang } = Astro.props;
+const tr = t(lang);
+const s = tr.search;
+---
+
+<!-- CommandPalette — fixed overlay, renders once in BaseLayout. Triggered by
+     ⌘K/Ctrl-K or a rastrum:open-palette custom event from the ⌕ header button. -->
+<div
+  id="cmd-palette-backdrop"
+  class="fixed inset-0 z-[200] hidden"
+  role="presentation"
+  aria-hidden="true"
+>
+  <!-- Dim backdrop -->
+  <div
+    id="cmd-palette-dim"
+    class="absolute inset-0 bg-black/50 backdrop-blur-sm"
+  ></div>
+
+  <!-- Panel -->
+  <div
+    id="cmd-palette-panel"
+    role="combobox"
+    aria-label={s.placeholder}
+    aria-expanded="false"
+    aria-haspopup="listbox"
+    aria-controls="cmd-palette-listbox"
+    aria-activedescendant=""
+    class="relative mx-auto mt-[10vh] w-full max-w-xl rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-2xl overflow-hidden flex flex-col max-h-[70vh]"
+  >
+    <!-- Input row -->
+    <div class="flex items-center gap-3 px-4 py-3 border-b border-zinc-200 dark:border-zinc-800">
+      <!-- Search icon -->
+      <svg aria-hidden="true" class="w-5 h-5 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+      </svg>
+      <input
+        id="cmd-palette-input"
+        type="search"
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="off"
+        spellcheck="false"
+        placeholder={s.placeholder}
+        class="flex-1 bg-transparent text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 outline-none min-w-0"
+        aria-label={s.placeholder}
+        aria-autocomplete="list"
+        aria-controls="cmd-palette-listbox"
+      />
+      <kbd class="hidden sm:block text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 flex-shrink-0">Esc</kbd>
+    </div>
+
+    <!-- Results listbox -->
+    <ul
+      id="cmd-palette-listbox"
+      role="listbox"
+      aria-label={s.placeholder}
+      class="overflow-y-auto flex-1 py-2"
+    ></ul>
+
+    <!-- Footer hint -->
+    <div class="hidden sm:flex items-center gap-4 px-4 py-2 border-t border-zinc-200 dark:border-zinc-800 text-[10px] text-zinc-400">
+      <span><kbd class="font-mono">↑↓</kbd> navigate</span>
+      <span><kbd class="font-mono">↵</kbd> open</span>
+      <span><kbd class="font-mono">⌘↵</kbd> new tab</span>
+      <span><kbd class="font-mono">Esc</kbd> close</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  import { loadIndex, search, getEntriesByType } from '../lib/search/index';
+  import type { SearchEntry } from '../lib/search/types';
+
+  // ---------------------------------------------------------------------------
+  // State
+  // ---------------------------------------------------------------------------
+  const LANG = document.documentElement.lang || 'en';
+  const RECENT_KEY = 'rastrum.search.recent';
+  const MAX_RECENT = 5;
+  const DEBOUNCE_MS = 80;
+
+  let isOpen = false;
+  let activeIdx = -1;
+  let currentResults: SearchEntry[] = [];
+  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  let indexLoaded = false;
+
+  // ---------------------------------------------------------------------------
+  // DOM refs
+  // ---------------------------------------------------------------------------
+  const backdrop = document.getElementById('cmd-palette-backdrop') as HTMLDivElement | null;
+  const panel    = document.getElementById('cmd-palette-panel')    as HTMLDivElement | null;
+  const input    = document.getElementById('cmd-palette-input')    as HTMLInputElement | null;
+  const listbox  = document.getElementById('cmd-palette-listbox')  as HTMLUListElement | null;
+
+  if (!backdrop || !panel || !input || !listbox) {
+    // Missing DOM — bail silently (SSR mismatch or test env)
+    // eslint-disable-next-line no-useless-return
+  } else {
+    // ---------------------------------------------------------------------------
+    // Recent selections
+    // ---------------------------------------------------------------------------
+    function getRecent(): SearchEntry[] {
+      try {
+        const raw = localStorage.getItem(RECENT_KEY);
+        return raw ? (JSON.parse(raw) as SearchEntry[]) : [];
+      } catch { return []; }
+    }
+
+    function pushRecent(entry: SearchEntry) {
+      try {
+        const existing = getRecent().filter(e => e.id !== entry.id);
+        localStorage.setItem(RECENT_KEY, JSON.stringify([entry, ...existing].slice(0, MAX_RECENT)));
+      } catch { /* ignore */ }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Translations (inline — labels come from the index, only UI chrome from i18n)
+    // ---------------------------------------------------------------------------
+    const LABELS: Record<string, Record<string, string>> = {
+      en: {
+        groupActions: 'Quick actions', groupPages: 'Pages', groupDocs: 'Docs',
+        groupObs: 'Your observations', groupSpecies: 'Species',
+        emptyRecent: 'Recent', emptyActions: 'Quick actions',
+        noResults: 'No results — try different keywords',
+      },
+      es: {
+        groupActions: 'Acciones', groupPages: 'Páginas', groupDocs: 'Docs',
+        groupObs: 'Tus observaciones', groupSpecies: 'Especies',
+        emptyRecent: 'Recientes', emptyActions: 'Acciones rápidas',
+        noResults: 'Sin resultados — prueba con otras palabras',
+      },
+    };
+    const L = LABELS[LANG] ?? LABELS['en'];
+
+    // ---------------------------------------------------------------------------
+    // Open / close
+    // ---------------------------------------------------------------------------
+    async function open() {
+      if (isOpen) return;
+      isOpen = true;
+      backdrop!.classList.remove('hidden');
+      panel!.setAttribute('aria-expanded', 'true');
+      input!.value = '';
+      activeIdx = -1;
+      renderEmpty();
+      input!.focus();
+
+      if (!indexLoaded) {
+        try {
+          await loadIndex(LANG);
+          indexLoaded = true;
+        } catch { /* index unavailable — graceful degradation */ }
+      }
+    }
+
+    function close() {
+      if (!isOpen) return;
+      isOpen = false;
+      backdrop!.classList.add('hidden');
+      panel!.setAttribute('aria-expanded', 'false');
+      panel!.setAttribute('aria-activedescendant', '');
+      if (debounceTimer) clearTimeout(debounceTimer);
+    }
+
+    // ---------------------------------------------------------------------------
+    // Rendering
+    // ---------------------------------------------------------------------------
+    function typeIcon(type: SearchEntry['type']): string {
+      switch (type) {
+        case 'action':      return '<svg aria-hidden="true" class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>';
+        case 'page':        return '<svg aria-hidden="true" class="w-4 h-4 text-teal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>';
+        case 'doc':         return '<svg aria-hidden="true" class="w-4 h-4 text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>';
+        case 'observation': return '<svg aria-hidden="true" class="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>';
+        default:            return '<svg aria-hidden="true" class="w-4 h-4 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>';
+      }
+    }
+
+    function makeRow(entry: SearchEntry, idx: number): HTMLLIElement {
+      const li = document.createElement('li');
+      li.id = `cmd-row-${idx}`;
+      li.role = 'option';
+      li.setAttribute('aria-selected', 'false');
+      li.setAttribute('data-idx', String(idx));
+      li.setAttribute('aria-label', `${entry.label}, ${entry.type}`);
+      li.className = [
+        'flex items-center gap-3 px-4 py-2.5 cursor-pointer text-sm',
+        'text-zinc-800 dark:text-zinc-200',
+        'hover:bg-zinc-100 dark:hover:bg-zinc-800',
+        'aria-selected:bg-zinc-100 dark:aria-selected:bg-zinc-800',
+      ].join(' ');
+      li.innerHTML = `
+        <span class="flex-shrink-0">${typeIcon(entry.type)}</span>
+        <span class="flex-1 truncate">${entry.label}</span>
+        ${entry.description ? `<span class="text-xs text-zinc-400 flex-shrink-0">${entry.description}</span>` : ''}
+      `;
+      li.addEventListener('click', (e) => {
+        e.preventDefault();
+        activate(entry);
+      });
+      return li;
+    }
+
+    function makeGroupHeader(label: string): HTMLLIElement {
+      const li = document.createElement('li');
+      li.role = 'presentation';
+      li.className = 'px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500';
+      li.textContent = label;
+      return li;
+    }
+
+    function renderEmpty() {
+      if (!listbox) return;
+      listbox.innerHTML = '';
+      activeIdx = -1;
+      currentResults = [];
+
+      const recent = getRecent();
+      if (recent.length > 0) {
+        listbox.appendChild(makeGroupHeader(L.emptyRecent));
+        recent.forEach((e, i) => listbox.appendChild(makeRow(e, i)));
+        currentResults = recent;
+      } else {
+        // Show a handful of quick actions
+        const actions = getEntriesByType(LANG, 'action').slice(0, 4);
+        if (actions.length > 0) {
+          listbox.appendChild(makeGroupHeader(L.emptyActions));
+          actions.forEach((e, i) => listbox.appendChild(makeRow(e, i)));
+          currentResults = actions;
+        }
+      }
+    }
+
+    function renderResults(entries: SearchEntry[]) {
+      if (!listbox) return;
+      listbox.innerHTML = '';
+      activeIdx = -1;
+      panel!.setAttribute('aria-activedescendant', '');
+
+      if (entries.length === 0) {
+        const li = document.createElement('li');
+        li.role = 'presentation';
+        li.className = 'px-4 py-6 text-sm text-center text-zinc-400';
+        li.textContent = L.noResults;
+        listbox.appendChild(li);
+        currentResults = [];
+        return;
+      }
+
+      currentResults = entries;
+
+      // Group by type, in priority order
+      const order: SearchEntry['type'][] = ['action', 'page', 'doc', 'observation', 'species'];
+      const groupLabel: Record<string, string> = {
+        action: L.groupActions, page: L.groupPages, doc: L.groupDocs,
+        observation: L.groupObs, species: L.groupSpecies,
+      };
+      let globalIdx = 0;
+      for (const type of order) {
+        const group = entries.filter(e => e.type === type);
+        if (group.length === 0) continue;
+        listbox.appendChild(makeGroupHeader(groupLabel[type]));
+        for (const entry of group) {
+          listbox.appendChild(makeRow(entry, globalIdx));
+          globalIdx++;
+        }
+      }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Navigation
+    // ---------------------------------------------------------------------------
+    function setActive(idx: number) {
+      const rows = listbox!.querySelectorAll<HTMLLIElement>('[role="option"]');
+      rows.forEach(r => r.setAttribute('aria-selected', 'false'));
+      activeIdx = Math.max(-1, Math.min(idx, rows.length - 1));
+      if (activeIdx >= 0) {
+        const row = rows[activeIdx];
+        row.setAttribute('aria-selected', 'true');
+        panel!.setAttribute('aria-activedescendant', row.id);
+        row.scrollIntoView({ block: 'nearest' });
+      } else {
+        panel!.setAttribute('aria-activedescendant', '');
+      }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Activation (navigate or run action)
+    // ---------------------------------------------------------------------------
+    function activate(entry: SearchEntry, newTab = false) {
+      pushRecent(entry);
+      if (entry.action) {
+        close();
+        window.dispatchEvent(new CustomEvent(`rastrum:palette-action`, { detail: { action: entry.action } }));
+        return;
+      }
+      if (!entry.url) { close(); return; }
+      close();
+      if (newTab) {
+        window.open(entry.url, '_blank', 'noopener,noreferrer');
+      } else {
+        window.location.href = entry.url;
+      }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Search debounce
+    // ---------------------------------------------------------------------------
+    function handleInput() {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        const q = input!.value.trim();
+        if (!q) { renderEmpty(); return; }
+        renderResults(search(q, LANG));
+      }, DEBOUNCE_MS);
+    }
+
+    // ---------------------------------------------------------------------------
+    // Keyboard
+    // ---------------------------------------------------------------------------
+    function handleKeydown(e: KeyboardEvent) {
+      if (!isOpen) return;
+      switch (e.key) {
+        case 'Escape':
+          e.preventDefault();
+          close();
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          setActive(activeIdx + 1);
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          setActive(activeIdx - 1);
+          break;
+        case 'Enter': {
+          e.preventDefault();
+          const entry = currentResults[activeIdx];
+          if (entry) activate(entry, e.metaKey || e.ctrlKey);
+          break;
+        }
+      }
+    }
+
+    // Global ⌘K / Ctrl-K
+    function handleGlobalKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        if (isOpen) close(); else open();
+      }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Wire events
+    // ---------------------------------------------------------------------------
+    document.addEventListener('keydown', handleGlobalKey);
+    document.addEventListener('keydown', handleKeydown);
+    input.addEventListener('input', handleInput);
+
+    // Close on backdrop click
+    backdrop.addEventListener('click', (e) => {
+      if (e.target === backdrop || (e.target as HTMLElement).id === 'cmd-palette-dim') close();
+    });
+
+    // External open trigger (Header ⌕ button)
+    window.addEventListener('rastrum:open-palette', () => open());
+
+    // Palette action side-effects (theme toggle, lang switch, sign-out)
+    window.addEventListener('rastrum:palette-action', (e: Event) => {
+      const detail = (e as CustomEvent<{ action: string }>).detail;
+      if (detail.action === 'toggle-theme') {
+        const dark = document.documentElement.classList.toggle('dark');
+        try { localStorage.setItem('theme', dark ? 'dark' : 'light'); } catch { /* ignore */ }
+      } else if (detail.action === 'switch-lang') {
+        const altLink = document.querySelector<HTMLAnchorElement>('#lang-toggle');
+        if (altLink) { altLink.click(); }
+      } else if (detail.action === 'sign-out') {
+        const signOutBtn = document.querySelector<HTMLButtonElement>('#sign-out-btn');
+        if (signOutBtn) signOutBtn.click();
+      }
+    });
+  }
+</script>
