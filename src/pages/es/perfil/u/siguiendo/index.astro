@@ -1,0 +1,21 @@
+---
+/**
+ * Módulo 26 — página de siguiendo (ES).
+ *
+ * Resuelve el perfil objetivo mediante `?username=<nombre>` (o
+ * `?handle=<nombre>`). La salida estática no admite segmentos
+ * dinámicos `[handle]` — ver correcciones en el plan del módulo 26.
+ */
+import BaseLayout from '../../../../../layouts/BaseLayout.astro';
+import FollowingView from '../../../../../components/FollowingView.astro';
+
+const lang = 'es' as const;
+---
+<BaseLayout
+  title="Siguiendo — Rastrum"
+  description="Personas a las que sigue este observador de Rastrum."
+  lang={lang}
+  robots="noindex,nofollow"
+>
+  <FollowingView lang={lang} />
+</BaseLayout>
