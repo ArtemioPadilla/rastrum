@@ -189,7 +189,10 @@ const obsIdPlaceholder = '';
       const shareBtn = document.getElementById('obs-share-btn');
       if (shareBtn) {
         shareBtn.dataset.shareTitle = speciesName + ' — Rastrum';
-        shareBtn.dataset.shareText  = `Observación de ${speciesName} en Rastrum`;
+        const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
+        shareBtn.dataset.shareText  = lang === 'es'
+          ? `Observación de ${speciesName} en Rastrum`
+          : `Observation of ${speciesName} on Rastrum`;
         shareBtn.dataset.shareUrl   = window.location.href;
       }
       const date = new Date(obs.observed_at as string);
