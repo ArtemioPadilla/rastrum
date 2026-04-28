@@ -1,0 +1,280 @@
+---
+/**
+ * SuggestIdModal — modal triggered from a ValidationQueueView card.
+ * Inserts an `identifications` row with `validated_by = auth.uid()`,
+ * then calls `recompute_consensus(obs_id)` via PostgREST RPC. Shows a
+ * tie warning if the consensus engine declined to promote.
+ *
+ * Visibility is controlled via [hidden]/[aria-hidden]; the embedding
+ * page wires the open/close + observation-id binding.
+ *
+ * See docs/specs/modules/22-community-validation.md.
+ */
+import type { Locale } from '../i18n/utils';
+import { t } from '../i18n/utils';
+
+interface Props { lang: Locale }
+const { lang } = Astro.props;
+const tr = t(lang);
+const v = (tr as unknown as { validation: Record<string, string> }).validation;
+---
+
+<div
+  id="suggest-id-modal"
+  hidden
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="suggest-id-modal-title"
+  data-label-submitting={v.submitting}
+  data-label-failed={v.submit_failed}
+  data-label-no-taxon-match={v.no_taxon_match}
+  data-label-target-tpl={v.submit_target_tpl}
+  class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+>
+  <div class="w-full max-w-md rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 shadow-xl">
+    <div class="flex items-start justify-between gap-3 mb-4">
+      <h2 id="suggest-id-modal-title" class="text-lg font-bold text-zinc-900 dark:text-zinc-100">
+        {v.suggest_id}
+      </h2>
+      <button id="suggest-id-close" type="button" aria-label={v.cancel} class="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 -mt-1">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+
+    <p id="suggest-id-target" class="text-xs text-zinc-500 dark:text-zinc-400 mb-3"></p>
+
+    <form id="suggest-id-form" class="space-y-3" novalidate>
+      <div>
+        <label for="sid-name" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+          {v.scientific_name_label}
+        </label>
+        <input
+          id="sid-name"
+          name="scientific_name"
+          type="text"
+          autocomplete="off"
+          required
+          placeholder={v.scientific_name_placeholder}
+          class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm font-mono italic"
+          list="sid-taxa-list"
+        />
+        <datalist id="sid-taxa-list"></datalist>
+        <p id="sid-name-hint" class="text-xs text-zinc-500 dark:text-zinc-400 mt-1"></p>
+      </div>
+
+      <fieldset>
+        <legend class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+          {v.confidence_label}
+        </legend>
+        <div class="flex gap-2">
+          <label class="flex-1 cursor-pointer">
+            <input type="radio" name="confidence" value="0.9" class="peer sr-only" checked />
+            <span class="block text-center rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-xs font-medium peer-checked:bg-emerald-700 peer-checked:text-white peer-checked:border-emerald-700">{v.confidence_high}</span>
+          </label>
+          <label class="flex-1 cursor-pointer">
+            <input type="radio" name="confidence" value="0.7" class="peer sr-only" />
+            <span class="block text-center rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-xs font-medium peer-checked:bg-amber-600 peer-checked:text-white peer-checked:border-amber-600">{v.confidence_medium}</span>
+          </label>
+          <label class="flex-1 cursor-pointer">
+            <input type="radio" name="confidence" value="0.5" class="peer sr-only" />
+            <span class="block text-center rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-xs font-medium peer-checked:bg-zinc-700 peer-checked:text-white peer-checked:border-zinc-700">{v.confidence_low}</span>
+          </label>
+        </div>
+      </fieldset>
+
+      <div>
+        <label for="sid-note" class="sr-only">{v.expert_note_placeholder}</label>
+        <textarea id="sid-note" name="note" rows="2" maxlength="500" placeholder={v.expert_note_placeholder} class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm"></textarea>
+      </div>
+
+      <p id="sid-error" class="hidden text-xs text-red-600 dark:text-red-400" role="alert"></p>
+
+      <div class="flex items-center gap-2 pt-2">
+        <button type="submit" id="sid-submit" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+          <span data-label>{v.submit_suggestion}</span>
+        </button>
+        <button type="button" id="sid-cancel" class="rounded-lg border border-zinc-300 dark:border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          {v.cancel}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+
+  const modal = document.getElementById('suggest-id-modal') as HTMLElement | null;
+  const form  = document.getElementById('suggest-id-form') as HTMLFormElement | null;
+  const submitBtn = document.getElementById('sid-submit') as HTMLButtonElement | null;
+  const submitLabel = submitBtn?.querySelector('[data-label]') as HTMLElement | null;
+  const cancelBtn = document.getElementById('sid-cancel');
+  const closeBtn = document.getElementById('sid-close') as HTMLButtonElement | null;
+  const target  = document.getElementById('suggest-id-target');
+  const errorEl = document.getElementById('sid-error');
+  const nameInput = document.getElementById('sid-name') as HTMLInputElement | null;
+  const datalist  = document.getElementById('sid-taxa-list') as HTMLDataListElement | null;
+
+  if (modal && form && submitBtn && submitLabel) {
+    let observationId: string | null = null;
+    let observerName: string | null = null;
+    const original   = submitLabel.textContent ?? 'Submit';
+    const submitting = modal.dataset.labelSubmitting ?? 'Submitting…';
+    const failedTpl  = modal.dataset.labelFailed     ?? 'Could not submit: {error}';
+    const noTaxonMatch = modal.dataset.labelNoTaxonMatch ?? 'No taxon match.';
+    const targetTpl  = modal.dataset.labelTargetTpl  ?? 'Suggestion for {name}';
+
+    function open(obsId: string, observer: string | null) {
+      observationId = obsId;
+      observerName  = observer;
+      modal!.hidden = false;
+      if (target && observerName) {
+        target.textContent = targetTpl.replace('{name}', observerName);
+      } else if (target) {
+        target.textContent = '';
+      }
+      errorEl?.classList.add('hidden');
+      form!.reset();
+      nameInput?.focus();
+    }
+    function close() {
+      modal!.hidden = true;
+      observationId = null;
+      submitBtn!.disabled = false;
+      submitLabel!.textContent = original;
+    }
+
+    // Public open hook the queue view calls.
+    (window as unknown as { __rastrumOpenSuggestId?: typeof open }).__rastrumOpenSuggestId = open;
+
+    cancelBtn?.addEventListener('click', close);
+    closeBtn?.addEventListener('click', close);
+    modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+    document.addEventListener('keydown', (e) => { if (!modal.hidden && e.key === 'Escape') close(); });
+
+    // Autocomplete: query taxa table on input. Debounced + cached.
+    const taxonCache = new Map<string, Array<{ id: string; scientific_name: string }>>();
+    let acTimer: number | undefined;
+    nameInput?.addEventListener('input', () => {
+      const q = nameInput.value.trim();
+      if (q.length < 2) { datalist!.innerHTML = ''; return; }
+      window.clearTimeout(acTimer);
+      acTimer = window.setTimeout(async () => {
+        if (taxonCache.has(q)) {
+          renderDatalist(taxonCache.get(q)!);
+          return;
+        }
+        try {
+          const supabase = getSupabase();
+          const { data } = await supabase
+            .from('taxa')
+            .select('id, scientific_name')
+            .ilike('scientific_name', `${q}%`)
+            .limit(10);
+          const rows = (data ?? []) as Array<{ id: string; scientific_name: string }>;
+          taxonCache.set(q, rows);
+          renderDatalist(rows);
+        } catch { /* offline / RLS — silent */ }
+      }, 200);
+    });
+    function renderDatalist(rows: Array<{ id: string; scientific_name: string }>) {
+      // DOM-API set instead of innerHTML so the browser does the
+      // escaping. The scientific_name comes from the DB and could
+      // theoretically contain HTML metacharacters in malformed rows.
+      datalist!.replaceChildren(...rows.map(r => {
+        const opt = document.createElement('option');
+        opt.value = r.scientific_name;
+        opt.dataset.id = r.id;
+        return opt;
+      }));
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!observationId) return;
+      errorEl?.classList.add('hidden');
+      submitBtn!.disabled = true;
+      submitLabel!.textContent = submitting;
+
+      const data = new FormData(form);
+      const sci = String(data.get('scientific_name') ?? '').trim();
+      const confidence = Number(data.get('confidence') ?? 0.7);
+      const note = String(data.get('note') ?? '').trim() || null;
+
+      try {
+        const supabase = getSupabase();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('not_signed_in');
+
+        // Resolve taxon_id by name (required — see spec; the consensus
+        // function uses taxon_id to apply expert-kingdom weighting).
+        const { data: taxon } = await supabase
+          .from('taxa')
+          .select('id')
+          .eq('scientific_name', sci)
+          .maybeSingle();
+        if (!taxon?.id) {
+          if (errorEl) {
+            errorEl.textContent = noTaxonMatch;
+            errorEl.classList.remove('hidden');
+          }
+          submitBtn!.disabled = false;
+          submitLabel!.textContent = original;
+          return;
+        }
+
+        // Upsert against the partial UNIQUE index on
+        // (observation_id, validated_by) — repeating a vote (e.g.
+        // user picked Confirm twice or changed their mind via
+        // Suggest another) is a legitimate flow and must not throw a
+        // 23505. The unique index is the conflict target.
+        const { error: insertErr } = await supabase
+          .from('identifications')
+          .upsert({
+            observation_id: observationId,
+            taxon_id: taxon.id,
+            scientific_name: sci,
+            confidence,
+            source: 'human',
+            is_primary: false,
+            validated_by: user.id,
+            validated_at: new Date().toISOString(),
+            raw_response: note ? { note } : null,
+          }, { onConflict: 'observation_id,validated_by' });
+        if (insertErr) throw insertErr;
+
+        // Trigger consensus check; the DB handles the promotion.
+        // Re-fetch the now-current primary identification to learn
+        // whether THIS suggestion pushed the row into research grade.
+        const { error: rpcErr } = await supabase.rpc('recompute_consensus', { p_observation_id: observationId });
+        if (rpcErr) console.warn('[rastrum] recompute_consensus RPC failed', rpcErr);
+
+        let promoted = false;
+        try {
+          const { data: primary } = await supabase
+            .from('identifications')
+            .select('is_research_grade')
+            .eq('observation_id', observationId)
+            .eq('is_primary', true)
+            .maybeSingle();
+          promoted = !!(primary as { is_research_grade?: boolean } | null)?.is_research_grade;
+        } catch { /* leave promoted=false */ }
+
+        // Parent decides which toast to show. Pass the actual outcome
+        // so the queue view doesn't lie about promotion.
+        window.dispatchEvent(new CustomEvent('rastrum:suggestion-submitted', {
+          detail: { observation_id: observationId, promoted },
+        }));
+        close();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (errorEl) {
+          errorEl.textContent = failedTpl.replace('{error}', msg);
+          errorEl.classList.remove('hidden');
+        }
+        submitBtn!.disabled = false;
+        submitLabel!.textContent = original;
+      }
+    });
+  }
+</script>

@@ -22,6 +22,9 @@ const profileBase = `/${lang}/${lang === 'es' ? 'perfil/u' : 'profile/u'}/`;
 // Share route is locale-neutral: src/pages/share/obs/index.astro is the
 // only file. Building it as `/${lang}/share/obs/` 404s in production.
 const shareBase = `/share/obs/`;
+const validation = (tr as unknown as { validation?: Record<string, string> }).validation ?? {};
+const rgLabel = validation.research_grade        ?? (lang === 'es' ? 'Grado investigación' : 'Research grade');
+const rgTitle = validation.research_grade_title  ?? rgLabel;
 ---
 
 <section
@@ -33,6 +36,8 @@ const shareBase = `/share/obs/`;
   data-label-unknown-species={page.unknown_species}
   data-label-load-more={page.load_more}
   data-label-loading={page.loading}
+  data-label-research-grade={rgLabel}
+  data-label-research-grade-title={rgTitle}
 >
   <header class="space-y-3 py-6">
     <h1 class="text-3xl font-bold tracking-tight">{page.title}</h1>
@@ -73,6 +78,7 @@ const shareBase = `/share/obs/`;
   type Ident = {
     scientific_name: string | null;
     is_primary: boolean | null;
+    is_research_grade: boolean | null;
     confidence: number | null;
     taxa: { common_name_es: string | null; common_name_en: string | null } | null;
   };
@@ -125,7 +131,7 @@ const shareBase = `/share/obs/`;
     return r.users;
   }
 
-  function rowMarkup(r: Row, lang: Lang, anonLabel: string, unknownLabel: string, shareBase: string, profileBase: string): string {
+  function rowMarkup(r: Row, lang: Lang, anonLabel: string, unknownLabel: string, shareBase: string, profileBase: string, rgLabel: string, rgTitle: string): string {
     const ident = pickIdent(r);
     const observer = pickObserver(r);
     const sci = ident?.scientific_name ?? unknownLabel;
@@ -146,6 +152,9 @@ const shareBase = `/share/obs/`;
     const confidencePill = confidence !== null
       ? `<span class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${colorForConfidence(confidence)}">${Math.round(confidence * 100)}%</span>`
       : '';
+    const researchGradePill = ident?.is_research_grade
+      ? `<span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 border border-emerald-300 dark:border-emerald-800 px-2 py-0.5 text-[11px] font-semibold text-emerald-800 dark:text-emerald-300" title="${escapeText(rgTitle)}"><svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>${escapeText(rgLabel)}</span>`
+      : '';
 
     const commonHtml = common ? `<p class="text-sm text-zinc-600 dark:text-zinc-300 truncate">${escapeText(common)}</p>` : '';
 
@@ -163,6 +172,7 @@ const shareBase = `/share/obs/`;
           <p class="text-sm italic font-semibold text-zinc-900 dark:text-zinc-100 truncate">${escapeText(sci)}</p>
           ${commonHtml}
           <div class="flex items-center gap-2 flex-wrap text-xs text-zinc-500 dark:text-zinc-400">
+            ${researchGradePill}
             ${confidencePill}
             <span>${escapeText(ago)}</span>
           </div>
@@ -178,6 +188,8 @@ const shareBase = `/share/obs/`;
     const profileBase = root.dataset.profileBase ?? `/${lang}/profile/u/`;
     const anonLabel = root.dataset.labelAnon ?? 'Anonymous';
     const unknownLabel = root.dataset.labelUnknownSpecies ?? 'Unknown species';
+    const rgLabel = root.dataset.labelResearchGrade ?? 'Research grade';
+    const rgTitle = root.dataset.labelResearchGradeTitle ?? rgLabel;
 
     const listEl = root.querySelector('.er-list') as HTMLUListElement | null;
     const skeletonEl = root.querySelector('.er-skeleton') as HTMLElement | null;
@@ -209,7 +221,7 @@ const shareBase = `/share/obs/`;
         .from('observations')
         .select(`
           id, observed_at, state_province, observer_id,
-          identifications(scientific_name, is_primary, confidence, taxa(common_name_es, common_name_en)),
+          identifications(scientific_name, is_primary, is_research_grade, confidence, taxa(common_name_es, common_name_en)),
           media_files(url, is_primary),
           users(id, username, display_name, profile_public)
         `)
@@ -230,7 +242,7 @@ const shareBase = `/share/obs/`;
         if (listEl) {
           listEl.insertAdjacentHTML(
             'beforeend',
-            page.map(r => rowMarkup(r, lang, anonLabel, unknownLabel, shareBase, profileBase)).join(''),
+            page.map(r => rowMarkup(r, lang, anonLabel, unknownLabel, shareBase, profileBase, rgLabel, rgTitle)).join(''),
           );
         }
         offset += page.length;

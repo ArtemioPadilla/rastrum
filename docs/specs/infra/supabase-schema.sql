@@ -1250,3 +1250,178 @@ CREATE POLICY "sync_failures_read_admin" ON public.sync_failures
 -- Write: service_role only (the Edge Function bypasses RLS via service key).
 GRANT SELECT ON public.sync_failures TO authenticated;
 -- No INSERT/UPDATE grant for anon/authenticated.
+
+
+-- ─────────────────────────────────────────────────────────────────────
+-- Module 22 — Community validation (expert ID queue)
+-- See docs/specs/modules/22-community-validation.md
+--
+-- This migration is INTENTIONALLY MINIMAL. It reuses these existing
+-- pieces (do NOT redefine them):
+--   • prevent_self_validation() / prevent_self_validation_trigger     (line ~599)
+--   • enforce_research_grade_quality() / enforce_rg_quality_trigger   (line ~621)
+--   • fire_research_grade() / fire_research_grade_trigger             (line ~998)
+--   • recompute_consensus(uuid)                                       (line ~893)
+--
+-- Adds (all idempotent):
+--   • validation_queue VIEW              — server-side eligibility
+--   • id_validator_insert/update/delete  — RLS policies for the
+--                                          community-vote write path
+--   • partial UNIQUE index on (observation_id, validated_by)
+--   • tie-handling guard inside recompute_consensus() (in-place
+--     CREATE OR REPLACE — single source of truth)
+--
+-- ─────────────────────────────────────────────────────────────────────
+
+-- Eligibility view used by ValidationQueueView. RLS on the underlying
+-- observations table (obs_public_read) gates visibility — private obs
+-- never appear. Predicate: an observation is in the queue when it's
+-- synced + not fully redacted AND
+--   (no primary identification) OR
+--   (primary ID is not research-grade AND its confidence is < 0.5)
+-- The two-clause "needs help" test avoids re-queueing already-promoted
+-- rows whose confidence happens to sit between 0.4 and 0.5.
+CREATE OR REPLACE VIEW public.validation_queue AS
+SELECT
+  o.id                               AS observation_id,
+  o.observer_id,
+  o.observed_at,
+  o.state_province,
+  o.habitat,
+  o.obscure_level,
+  i.id                               AS primary_id_id,
+  i.scientific_name                  AS current_scientific_name,
+  i.confidence                       AS current_confidence,
+  COALESCE(i.is_research_grade, false) AS is_research_grade,
+  (SELECT count(*)
+     FROM public.identifications x
+    WHERE x.observation_id = o.id
+      AND x.validated_by IS NOT NULL)         AS suggestion_count,
+  (SELECT count(DISTINCT x.validated_by)
+     FROM public.identifications x
+    WHERE x.observation_id = o.id
+      AND x.validated_by IS NOT NULL)         AS distinct_voter_count
+FROM public.observations o
+LEFT JOIN public.identifications i
+       ON i.observation_id = o.id AND i.is_primary = true
+WHERE o.sync_status = 'synced'
+  AND o.obscure_level IN ('none','0.1deg','0.2deg','5km')
+  AND COALESCE(i.is_research_grade, false) = false
+  AND (
+       i.id IS NULL
+    OR COALESCE(i.confidence, 0) < 0.5
+  );
+
+GRANT SELECT ON public.validation_queue TO authenticated, anon;
+
+-- Validator INSERT path. Signed-in users can suggest a non-primary
+-- identification on observations that
+--   (a) they don't own,
+--   (b) are publicly readable (synced + not fully redacted) — without
+--       this clause, a UUID-guessing attacker could vote on any
+--       observation, including drafts, outside the queue.
+DROP POLICY IF EXISTS "id_validator_insert" ON public.identifications;
+CREATE POLICY "id_validator_insert" ON public.identifications
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    (SELECT auth.uid()) = validated_by
+    AND validated_by IS NOT NULL
+    AND is_primary = false
+    AND EXISTS (
+      SELECT 1 FROM public.observations o
+      WHERE o.id = observation_id
+        AND o.observer_id <> validated_by
+        AND o.sync_status = 'synced'
+        AND o.obscure_level IN ('none','0.1deg','0.2deg','5km')
+    )
+  );
+
+-- Validator UPDATE: own-row only.
+DROP POLICY IF EXISTS "id_validator_update" ON public.identifications;
+CREATE POLICY "id_validator_update" ON public.identifications
+  FOR UPDATE TO authenticated
+  USING (
+    validated_by IS NOT NULL
+    AND (SELECT auth.uid()) = validated_by
+  )
+  WITH CHECK (
+    (SELECT auth.uid()) = validated_by
+  );
+
+-- Validator DELETE: vote retraction.
+DROP POLICY IF EXISTS "id_validator_delete" ON public.identifications;
+CREATE POLICY "id_validator_delete" ON public.identifications
+  FOR DELETE TO authenticated
+  USING (
+    validated_by IS NOT NULL
+    AND (SELECT auth.uid()) = validated_by
+  );
+
+-- One suggestion per (user, observation). UPDATE the existing row to
+-- change a vote.
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_id_obs_validator
+  ON public.identifications(observation_id, validated_by)
+  WHERE validated_by IS NOT NULL;
+
+-- recompute_consensus() — IN-PLACE CREATE OR REPLACE. Adds a tie-
+-- handling guard: if multiple taxa share the winning weighted score,
+-- promotion is skipped and the queue waits for a tiebreaker. The rest
+-- of the function body is identical to the earlier definition.
+CREATE OR REPLACE FUNCTION public.recompute_consensus(p_observation_id uuid)
+RETURNS void AS $$
+DECLARE
+  winning_taxon uuid;
+  winning_score numeric;
+  validator_count integer;
+  tied_count integer;
+BEGIN
+  WITH weighted AS (
+    SELECT i.taxon_id,
+           SUM(CASE WHEN u.is_expert AND t.kingdom = ANY(u.expert_taxa) THEN 3.0 ELSE 1.0 END) AS score,
+           count(DISTINCT i.validated_by) AS validators
+    FROM public.identifications i
+    JOIN public.taxa t ON t.id = i.taxon_id
+    LEFT JOIN public.users u ON u.id = i.validated_by
+    WHERE i.observation_id = p_observation_id
+      AND i.taxon_id IS NOT NULL
+      AND i.validated_by IS NOT NULL
+    GROUP BY i.taxon_id
+  )
+  SELECT taxon_id, score, validators
+  INTO winning_taxon, winning_score, validator_count
+  FROM weighted
+  ORDER BY score DESC
+  LIMIT 1;
+
+  IF winning_taxon IS NULL THEN RETURN; END IF;
+
+  -- Tie guard: refuse promotion when multiple taxa share the winning
+  -- score. Without this, the LIMIT 1 above would promote one row
+  -- non-deterministically.
+  SELECT count(*) INTO tied_count
+  FROM (
+    SELECT i.taxon_id,
+           SUM(CASE WHEN u.is_expert AND t.kingdom = ANY(u.expert_taxa) THEN 3.0 ELSE 1.0 END) AS score
+    FROM public.identifications i
+    JOIN public.taxa t ON t.id = i.taxon_id
+    LEFT JOIN public.users u ON u.id = i.validated_by
+    WHERE i.observation_id = p_observation_id
+      AND i.taxon_id IS NOT NULL
+      AND i.validated_by IS NOT NULL
+    GROUP BY i.taxon_id
+  ) w
+  WHERE score = winning_score;
+  IF tied_count > 1 THEN RETURN; END IF;
+
+  IF winning_score >= 2.0 AND validator_count >= 2 THEN
+    UPDATE public.identifications
+       SET is_research_grade = true
+     WHERE observation_id = p_observation_id AND taxon_id = winning_taxon AND is_primary;
+  END IF;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Allow signed-in users to call recompute_consensus from PostgREST RPC
+-- after submitting a suggestion. SECURITY DEFINER means the caller
+-- doesn't need elevated permissions on identifications/taxa.
+GRANT EXECUTE ON FUNCTION public.recompute_consensus(uuid) TO authenticated;
