@@ -26,7 +26,7 @@ const signInLabel = (tr.nav as unknown as Record<string, string>)?.signIn
 ---
 
 <BaseLayout lang={lang} title={`${inboxTr.title} — Rastrum`} description={inboxTr.empty}>
-  <main
+  <section
     class="rastrum-inbox mx-auto max-w-2xl p-4"
     data-lang={lang}
     data-label-kind-follow={inboxTr.kind_follow}
@@ -73,7 +73,7 @@ const signInLabel = (tr.nav as unknown as Record<string, string>)?.signIn
     >
       <p class="text-sm text-zinc-500 dark:text-zinc-400">{inboxTr.empty}</p>
     </div>
-  </main>
+  </section>
 </BaseLayout>
 
 <script>
