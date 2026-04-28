@@ -1,7 +1,7 @@
 {
-  "updated": "2026-04-25",
+  "updated": "2026-04-27",
   "v0_1_completed": "2026-04-24",
-  "notes": "v0.1 → v1.0 code-complete in this push. Items marked done include features whose schema, RLS, Edge Function code, and client UI are all shipped to main. Items marked 'blocked' need an external action: API keys, Cornell BirdNET license, ML model training, Apple Developer account, Cloudflare R2 account + DNS, etc. Phases v1.5–v2.5 remain unchanged from prior plan. | 2026-04-25: First real user onboarding session (Eugenio Padilla). 10 bugs found and fixed, 5 new modules designed. Module 14 (User API Tokens) shipped. WebLLM set as default fallback. Identification block added to obs form.",
+  "notes": "v0.1 → v1.0 code-complete in this push. Items marked done include features whose schema, RLS, Edge Function code, and client UI are all shipped to main. Items marked 'blocked' need an external action: API keys, Cornell BirdNET license, ML model training, Apple Developer account, Cloudflare R2 account + DNS, etc. Phases v1.5–v2.5 remain unchanged from prior plan. | 2026-04-25: First real user onboarding session (Eugenio Padilla). 10 bugs found and fixed, 5 new modules designed. Module 14 (User API Tokens) shipped. WebLLM set as default fallback. Identification block added to obs form. | 2026-04-27: v1.1 cross-cutting drops + on-device camera-trap pipeline. Module 22 community validation, owner observation CRUD, atomic delete-observation Edge Function, suggest-from-share-page, OG pipeline (satori build-time + client-side at sync), onboarding v2 (4-step pipeline setup with WCAG focus trap + replay event + telemetry + Anthropic key live verify), MegaDetector v5a YOLOv5 ONNX on-device camera-trap pre-filter (FilteredFrameError short-circuits cascade for empty/human/vehicle frames), bbox-aware species cascade (Phi-vision pre-crops to MegaDetector's bbox), CI smoke check for model-asset URLs, infra/megadetector hosting recipe (convert.sh + INT8 quantise → ~134 MB R2 upload), share/obs locale-neutral 404 fix.",
   "notes_es": "v0.1 → v1.0 código completo en este push. Los ítems marcados como done incluyen funcionalidades cuyo schema, RLS, Edge Function y UI ya están desplegados en main. Los ítems marcados como 'blocked' requieren una acción externa: API keys, licencia comercial de BirdNET, entrenamiento ML, cuenta Apple Developer, DNS de Cloudflare R2, etc. Las fases v1.5–v2.5 no cambian respecto al plan anterior.",
   "phases": {
     "v0.1": {
@@ -692,31 +692,36 @@
           "id": "community-validation",
           "label": "Community validation queue (Module 22) — expert ID suggestions + research-grade auto-promotion",
           "label_es": "Cola de validación comunitaria (Módulo 22) — sugerencias de expertos + promoción automática a grado investigación",
-          "done": true
+          "done": true,
+          "done_at": "2026-04-27"
         },
         {
           "id": "owner-observation-crud",
           "label": "Owner CRUD on synced observations — Manage panel (edit notes, override scientific name, change obscure_level, delete)",
           "label_es": "CRUD del observador sobre sus observaciones sincronizadas — panel Gestionar (editar notas, sobreescribir nombre, cambiar privacidad, eliminar)",
-          "done": true
+          "done": true,
+          "done_at": "2026-04-27"
         },
         {
           "id": "delete-observation-atomic",
           "label": "Atomic delete-observation Edge Function — wipes R2 photos + OG card alongside DB rows; no orphan blobs",
           "label_es": "Función Edge atómica delete-observation — borra fotos en R2 + tarjeta OG además de filas DB; sin blobs huérfanos",
-          "done": true
+          "done": true,
+          "done_at": "2026-04-27"
         },
         {
           "id": "suggest-from-share-page",
           "label": "Suggest identification from any /share/obs page — community-suggestions list visible to all viewers",
           "label_es": "Sugerir identificación desde cualquier página /share/obs — lista de sugerencias comunitarias visible para todos",
-          "done": true
+          "done": true,
+          "done_at": "2026-04-27"
         },
         {
           "id": "og-pipeline",
           "label": "Open Graph pipeline — build-time satori PNGs for static pages + client-side rendering at sync time for user content",
           "label_es": "Pipeline Open Graph — PNGs satori en build para páginas estáticas + renderizado cliente al sincronizar contenido de usuarios",
-          "done": true
+          "done": true,
+          "done_at": "2026-04-27"
         }
       ]
     },

@@ -4,7 +4,7 @@
 > Source of truth for both surfaces; renders the live page at
 > [/docs/tasks/](https://rastrum.org/en/docs/tasks/).
 > 
-> **Updated:** 2026-04-27 (post-launch + v1.1 UX brainstorm shipped).
+> **Updated:** 2026-04-27 (post-launch + v1.1 cross-cutting shipments + on-device MegaDetector cascade).
 
 ---
 
@@ -16,8 +16,8 @@
 | v0.3 | Offline intelligence + activity | done | 11 / 11 |
 | v0.5 | Beta | shipped (partial) | 11 / 13 |
 | v1.0 | Public Launch | shipped (partial) | 18 / 21 |
-| v1.0.x | Post-launch polish | in_progress | 6 / 22 |
-| v1.1 | UX polish (post-launch brainstorm) | planned | 13 / 15 |
+| v1.0.x | Post-launch polish | in_progress | 8 / 24 |
+| v1.1 | UX polish (post-launch brainstorm) | shipped (mostly) | 19 / 21 |
 | **v0.1 → v1.0** | **Public launch** | **shipped 2026-04-26** | **54 / 59** |
 
 Phases v1.5, v2.0, v2.5 are tracked in [`progress.json`](progress.json) but have no shipped code yet — they are planned scope only.
@@ -59,7 +59,7 @@ Remaining:
 
 ## v1.0.x — Post-launch polish — in_progress
 
-**6 of 22 items done.**
+**8 of 24 items done.**
 
 Remaining:
 
@@ -80,16 +80,17 @@ Remaining:
 - `license-per-record-ui` — UI for per-observation license selection (CC-BY default; CC0, CC-BY-NC, all-rights-reserved options)  _(· planned)_
 - `docs-toc-mobile` — Sticky scrollspy TOC pill row on mobile doc pages (auto-extracts h2s, IntersectionObserver active state)  _(! blocked: Open PR #23 — pending rebase + aria-current fix; reviewed and approved-with-comments)_
 
-## v1.1 — UX polish (post-launch brainstorm) — planned
+## v1.1 — UX polish (post-launch brainstorm) — shipped (mostly)
 
-**18 of 20 items done.** (Originally 15; added 5 cross-cutting items
+**19 of 21 items done.** (Originally 15; added 6 cross-cutting items
 shipped 2026-04-27/28: M22, owner CRUD, atomic delete-observation,
-suggest-from-share-page, OG pipeline.)
+suggest-from-share-page, OG pipeline, onboarding v2.)
 
 Cross-cutting shipments (2026-04-27/28):
 - `community-validation` — Module 22 implementation: `validation_queue` view, 3 RLS policies, 4 routes, suggest modal + dashboard, research-grade chip on existing views, suggest CTA on `/share/obs`.  _(✓ done)_
 - `owner-observation-crud` — Manage panel on share/obs (notes / scientific-name override / obscure_level / delete) + atomic `delete-observation` Edge Function (no orphan R2 blobs).  _(✓ done)_
 - `og-pipeline` — Build-time satori PNGs for static pages + client-side renderer at sync time for user content; manifest has screenshots + 192px icon for richer install UI.  _(✓ done)_
+- `ux-onboarding-v2` — 4-step pipeline setup (explain → configure → summary → install) with WCAG focus trap, replay event, telemetry, Anthropic key live verify, missing model rows. See [`docs/runbooks/onboarding-events.md`](runbooks/onboarding-events.md).  _(✓ done)_
 
 Remaining:
 
