@@ -1705,4 +1705,142 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- ============================================================
+-- award_karma: insert a karma_events row + update users/user_expertise.
+--   p_outcome ∈ ('win', 'loss')
+--   p_confidence ∈ (0.5, 0.7, 0.9)  → confidence_factor (0.4, 0.7, 1.0)
+-- ============================================================
+CREATE OR REPLACE FUNCTION public.award_karma(
+  p_user_id        uuid,
+  p_observation_id uuid,
+  p_taxon_id       uuid,
+  p_outcome        text,
+  p_confidence     numeric DEFAULT 0.7
+)
+RETURNS numeric AS $$
+DECLARE
+  v_rarity         public.taxon_rarity;
+  v_obs_path       uuid[];
+  v_matched_taxon  uuid;
+  v_matched_rank   integer;
+  v_streak_mult    numeric := 1.0;
+  v_expertise_mult numeric := 1.0;
+  v_conf_factor    numeric;
+  v_grace          boolean;
+  v_user           public.users;
+  v_delta          numeric;
+  v_penalty_rarity numeric;
+BEGIN
+  -- Confidence → factor.
+  v_conf_factor := CASE
+    WHEN p_confidence >= 0.85 THEN 1.0
+    WHEN p_confidence >= 0.65 THEN 0.7
+    ELSE                            0.4
+  END;
+
+  -- Rarity. Falls back to 1.0× if not yet materialized.
+  SELECT * INTO v_rarity FROM public.taxon_rarity WHERE taxon_id = p_taxon_id;
+  IF NOT FOUND THEN
+    v_rarity.multiplier := 1.0;
+    v_rarity.bucket     := 1;
+  END IF;
+
+  -- Observation taxon's lineage = self || ancestors.
+  SELECT array_prepend(t.id, t.ancestor_path)
+    INTO v_obs_path
+    FROM public.taxa t
+   WHERE t.id = p_taxon_id;
+
+  -- User's most-specific expertise that is in the observation lineage.
+  SELECT ue.taxon_id, array_position(v_obs_path, ue.taxon_id)
+    INTO v_matched_taxon, v_matched_rank
+    FROM public.user_expertise ue
+   WHERE ue.user_id = p_user_id
+     AND ue.taxon_id = ANY(v_obs_path)
+   ORDER BY array_position(v_obs_path, ue.taxon_id) ASC
+   LIMIT 1;
+
+  -- Verified expert in the matched ancestor → multiplier bump.
+  IF v_matched_taxon IS NOT NULL THEN
+    SELECT 1.5
+      INTO v_expertise_mult
+      FROM public.user_expertise
+     WHERE user_id = p_user_id
+       AND taxon_id = v_matched_taxon
+       AND verified_at IS NOT NULL;
+    IF v_expertise_mult IS NULL THEN v_expertise_mult := 1.0; END IF;
+  END IF;
+
+  -- Streak multiplier (reads existing user_streaks).
+  SELECT CASE
+           WHEN current_streak >= 30 THEN 1.5
+           WHEN current_streak >=  7 THEN 1.2
+           ELSE                            1.0
+         END
+    INTO v_streak_mult
+    FROM public.user_streaks
+   WHERE user_id = p_user_id;
+  IF v_streak_mult IS NULL THEN v_streak_mult := 1.0; END IF;
+
+  -- Grace check.
+  SELECT * INTO v_user FROM public.users WHERE id = p_user_id;
+  v_grace := (v_user.grace_until IS NOT NULL
+              AND v_user.grace_until > now()
+              AND COALESCE(v_user.vote_count, 0) < 20);
+
+  -- Delta computation.
+  IF p_outcome = 'win' THEN
+    v_delta := 5 * v_rarity.multiplier * v_streak_mult * v_expertise_mult * v_conf_factor;
+  ELSIF p_outcome = 'loss' THEN
+    IF v_grace THEN
+      v_delta := 0;
+    ELSE
+      v_penalty_rarity := LEAST(v_rarity.multiplier, 2.0);
+      v_delta := -2 * v_penalty_rarity * v_conf_factor;
+    END IF;
+  ELSE
+    RAISE EXCEPTION 'award_karma: invalid p_outcome %', p_outcome;
+  END IF;
+
+  -- Insert ledger row.
+  INSERT INTO public.karma_events
+    (user_id, observation_id, taxon_id, delta, reason,
+     rarity_bucket, expertise_rank)
+  VALUES
+    (p_user_id, p_observation_id, p_taxon_id, v_delta,
+     CASE WHEN p_outcome = 'win' THEN 'consensus_win' ELSE 'consensus_loss' END,
+     v_rarity.bucket, v_matched_rank);
+
+  -- Update user totals + vote counter.
+  UPDATE public.users
+     SET karma_total      = karma_total + v_delta,
+         karma_updated_at = now(),
+         vote_count       = COALESCE(vote_count, 0) + 1
+   WHERE id = p_user_id;
+
+  -- Wins also accrue per-taxon expertise on the matched ancestor (or
+  -- on the kingdom of the observation if no expertise existed yet).
+  IF p_outcome = 'win' AND v_delta > 0 THEN
+    IF v_matched_taxon IS NOT NULL THEN
+      UPDATE public.user_expertise
+         SET score = score + v_delta,
+             updated_at = now()
+       WHERE user_id = p_user_id AND taxon_id = v_matched_taxon;
+    ELSE
+      INSERT INTO public.user_expertise (user_id, taxon_id, score)
+      SELECT p_user_id,
+             COALESCE(v_obs_path[array_length(v_obs_path, 1)], p_taxon_id),
+             v_delta
+      ON CONFLICT (user_id, taxon_id) DO UPDATE
+         SET score = public.user_expertise.score + EXCLUDED.score,
+             updated_at = now();
+    END IF;
+  END IF;
+
+  RETURN v_delta;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION public.award_karma(uuid, uuid, uuid, text, numeric) TO service_role;
+
 GRANT EXECUTE ON FUNCTION public.refresh_taxon_rarity() TO service_role;
