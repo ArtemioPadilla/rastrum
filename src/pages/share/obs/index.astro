@@ -2,6 +2,7 @@
 import BaseLayout from '../../../layouts/BaseLayout.astro';
 import Comments from '../../../components/Comments.astro';
 import FollowButton from '../../../components/FollowButton.astro';
+import ShareButton from '../../../components/ShareButton.astro';
 import SuggestIdModal from '../../../components/SuggestIdModal.astro';
 
 // SSG: query string is unknown at build time. Comments component reads
@@ -23,6 +24,7 @@ const obsIdPlaceholder = '';
         <div id="follow-mount">
           <FollowButton lang={lang} />
         </div>
+        <ShareButton lang={lang} id="obs-share-btn" />
       </header>
 
       <img id="img" src="" alt="" class="w-full max-h-[500px] object-contain rounded-xl border border-zinc-200 dark:border-zinc-800 hidden" />
@@ -181,7 +183,18 @@ const obsIdPlaceholder = '';
 
       document.getElementById('loading')?.classList.add('hidden');
       document.getElementById('obs')?.classList.remove('hidden');
-      document.getElementById('species')!.textContent = ident?.scientific_name ?? 'Unknown species';
+      const speciesName = ident?.scientific_name ?? 'Unknown species';
+      document.getElementById('species')!.textContent = speciesName;
+      // Wire ShareButton title dynamically once species is known
+      const shareBtn = document.getElementById('obs-share-btn');
+      if (shareBtn) {
+        shareBtn.dataset.shareTitle = speciesName + ' — Rastrum';
+        const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
+        shareBtn.dataset.shareText  = lang === 'es'
+          ? `Observación de ${speciesName} en Rastrum`
+          : `Observation of ${speciesName} on Rastrum`;
+        shareBtn.dataset.shareUrl   = window.location.href;
+      }
       const date = new Date(obs.observed_at as string);
       document.getElementById('date')!.textContent = date.toLocaleDateString();
       document.getElementById('meta')!.textContent = `${date.toLocaleDateString()}${obs.state_province ? '  ·  ' + obs.state_province : ''}`;

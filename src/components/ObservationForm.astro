@@ -40,8 +40,12 @@ const dedupeContinueLabel = observeStringsForLabels.photo_dedupe_continue ?? (is
 const dedupeReplaceLabel  = observeStringsForLabels.photo_dedupe_replace  ?? (isEs ? 'Reemplazar' : 'Replace');
 
 const habitats = [
-  'forest_pine_oak','cloud_forest','tropical_dry_forest','riparian','wetland',
-  'grassland','agricultural','urban','coastal','reef','scrubland','cave',
+  'forest_pine_oak','forest_oak','forest_pine',
+  'tropical_evergreen','tropical_subevergreen',
+  'cloud_forest','tropical_dry_forest',
+  'xerophytic','scrubland',
+  'riparian','wetland','grassland',
+  'agricultural','urban','coastal','reef','cave',
 ];
 const habitatLabels = (tr.observe as any).habitat_options as Record<string,string> | undefined;
 const weathers = ['sunny','cloudy','overcast','light_rain','heavy_rain','fog','storm'];
