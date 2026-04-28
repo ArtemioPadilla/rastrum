@@ -3057,3 +3057,80 @@ DROP TRIGGER IF EXISTS obsreact_notify_trigger ON public.observation_reactions;
 CREATE TRIGGER obsreact_notify_trigger
   AFTER INSERT ON public.observation_reactions
   FOR EACH ROW EXECUTE FUNCTION public.tg_obsreact_notify();
+
+-- ═════════════════════════════════════════════════════════════════════
+-- Module 27 — Expertise Legends (regional rankings)
+-- Issue #47 — "Top identificador de Fabaceae en Oaxaca"
+-- ═════════════════════════════════════════════════════════════════════
+
+-- View: user_expertise_regional
+-- Computes per-user, per-taxon, per-region score and rank.
+-- Region = state_province of the observations the user has made for that taxon.
+-- Only covers users with profile_public=true AND gamification_opt_in=true.
+CREATE OR REPLACE VIEW public.user_expertise_regional AS
+SELECT
+  ue.user_id,
+  ue.taxon_id,
+  t.scientific_name                              AS taxon_name,
+  COALESCE(t.family, t.scientific_name)          AS taxon_family,
+  t.taxon_rank,
+  COALESCE(o.state_province, 'México')           AS region,
+  ue.score,
+  rank() OVER (
+    PARTITION BY ue.taxon_id, COALESCE(o.state_province, 'México')
+    ORDER BY ue.score DESC
+  )                                              AS region_rank,
+  rank() OVER (
+    PARTITION BY ue.taxon_id
+    ORDER BY ue.score DESC
+  )                                              AS national_rank
+FROM public.user_expertise ue
+JOIN public.taxa t ON t.id = ue.taxon_id
+LEFT JOIN LATERAL (
+  SELECT DISTINCT state_province
+  FROM public.observations
+  WHERE observer_id = ue.user_id
+    AND primary_taxon_id = ue.taxon_id
+    AND state_province IS NOT NULL
+  LIMIT 1
+) o ON true
+JOIN public.users u ON u.id = ue.user_id
+WHERE u.profile_public = true
+  AND u.gamification_opt_in = true
+  AND ue.score > 0;
+
+GRANT SELECT ON public.user_expertise_regional TO anon, authenticated;
+
+-- Function: top_expertise_legend(user_id)
+-- Returns the single highest-ranked legend for a user (for badge display).
+CREATE OR REPLACE FUNCTION public.top_expertise_legend(p_user_id uuid)
+RETURNS TABLE (
+  taxon_name   text,
+  taxon_family text,
+  taxon_rank   text,
+  region       text,
+  score        numeric,
+  region_rank  bigint,
+  tier         text   -- 'legend' | 'expert' | 'reference' | 'active'
+)
+LANGUAGE sql STABLE SECURITY INVOKER AS $$
+  SELECT
+    taxon_name,
+    taxon_family,
+    taxon_rank,
+    region,
+    score,
+    region_rank,
+    CASE
+      WHEN region_rank = 1  THEN 'legend'
+      WHEN region_rank <= 3 THEN 'expert'
+      WHEN region_rank <= 10 THEN 'reference'
+      ELSE 'active'
+    END AS tier
+  FROM public.user_expertise_regional
+  WHERE user_id = p_user_id
+  ORDER BY region_rank ASC, score DESC
+  LIMIT 1;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.top_expertise_legend(uuid) TO anon, authenticated;

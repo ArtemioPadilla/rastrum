@@ -1,0 +1,80 @@
+---
+/**
+ * ExpertiseCoverageGrid — grid de familias taxonómicas coloreado por tier.
+ *
+ * Muestra hasta 50 taxones ordenados por score descendente.
+ * Cada celda indica el nombre del taxón, la región, y el rango regional.
+ *
+ * Usage: <ExpertiseCoverageGrid lang="es" userId={userId} />
+ */
+interface Props {
+  lang: 'en' | 'es';
+  userId?: string;
+}
+
+const { lang, userId = '' } = Astro.props;
+const title = lang === 'es' ? 'Territorios dominados' : 'Expertise coverage';
+const emptyMsg = lang === 'es'
+  ? 'Aún no hay expertise registrado. Las identificaciones validadas por la comunidad generan expertise automáticamente.'
+  : 'No expertise recorded yet. Community-validated identifications generate expertise automatically.';
+---
+
+<section class="mt-6">
+  <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-3">
+    {title}
+  </h3>
+  <div
+    id="expertise-coverage-grid"
+    class="grid grid-cols-2 sm:grid-cols-3 gap-2"
+    data-user-id={userId}
+    data-lang={lang}
+    data-empty={emptyMsg}
+  >
+    <p class="col-span-full text-xs text-zinc-400">{lang === 'es' ? 'Cargando…' : 'Loading…'}</p>
+  </div>
+</section>
+
+<script>
+  import { getExpertiseCoverage, legendTitle, tierColors } from '../lib/expertise-legends';
+  import { getSupabase } from '../lib/supabase';
+
+  async function init() {
+    const grid = document.getElementById('expertise-coverage-grid');
+    if (!grid) return;
+
+    const lang = (grid.dataset.lang ?? 'es') as 'en' | 'es';
+    let userId = grid.dataset.userId ?? '';
+    const emptyMsg = grid.dataset.empty ?? '';
+
+    if (!userId) {
+      const { data } = await getSupabase().auth.getUser();
+      userId = data.user?.id ?? '';
+    }
+    if (!userId) { grid.innerHTML = `<p class="col-span-full text-xs text-zinc-400">${emptyMsg}</p>`; return; }
+
+    const rows = await getExpertiseCoverage(userId);
+    if (rows.length === 0) {
+      grid.innerHTML = `<p class="col-span-full text-xs text-zinc-400">${emptyMsg}</p>`;
+      return;
+    }
+
+    grid.innerHTML = rows.map(r => {
+      const c = tierColors(r.tier);
+      const rankBadge = r.region_rank <= 10
+        ? `<span class="ml-auto text-[10px] font-bold ${c.text} opacity-80">#${r.region_rank}</span>`
+        : '';
+      const regionLine = `<span class="text-[10px] ${c.text} opacity-60 truncate">${r.region}</span>`;
+      return `
+        <div class="flex flex-col gap-0.5 rounded-lg border ${c.border} ${c.bg} px-3 py-2">
+          <div class="flex items-center gap-1">
+            <span class="text-xs font-semibold ${c.text} truncate flex-1">${r.taxon_family}</span>
+            ${rankBadge}
+          </div>
+          ${regionLine}
+        </div>
+      `;
+    }).join('');
+  }
+
+  init();
+</script>
