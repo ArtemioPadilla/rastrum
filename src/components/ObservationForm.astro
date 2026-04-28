@@ -111,7 +111,7 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
         <button id="webllm-ok" class="rounded bg-amber-700 px-3 py-1.5 text-xs text-white hover:bg-amber-800">
           {isEs ? 'Entendido, continuar' : 'Got it, continue'}
         </button>
-        <button id="webllm-skip" class="rounded border px-3 py-1.5 text-xs text-amber-700 border-amber-300 hover:bg-amber-100">
+        <button id="webllm-skip" class="rounded border px-3 py-1.5 text-xs text-amber-800 border-amber-400 hover:bg-amber-100">
           {isEs ? 'Solo usar PlantNet' : 'Use PlantNet only'}
         </button>
       </div>
@@ -202,7 +202,7 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
         <p class="text-sm text-zinc-700 dark:text-zinc-300">{idStrings.phi_offer_body}</p>
         <div class="flex flex-wrap gap-2">
           <button id="phi-download-btn" type="button" class="min-h-11 inline-flex items-center gap-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-2 text-sm font-semibold text-white">{idStrings.phi_download}</button>
-          <button id="phi-skip-btn" type="button" class="min-h-11 inline-flex items-center gap-2 rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40">{idStrings.phi_skip}</button>
+          <button id="phi-skip-btn" type="button" data-phi-skip-hint={idStrings.phi_skip_hint} class="min-h-11 inline-flex items-center gap-2 rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40">{idStrings.phi_skip}</button>
         </div>
       </div>
 
@@ -652,6 +652,9 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
   const isEs            = document.documentElement.lang === 'es';
 
   // Source registry — display name, license, doc-spec link, short description.
+  const docLang = document.documentElement.lang === 'es' ? 'es' : 'en';
+  const archCascadeUrl = `/${docLang}/docs/architecture/#identifier-cascade`;
+  const archInBrowserUrl = `/${docLang}/docs/architecture/#in-browser-ai`;
   const SOURCE_META: Record<string, { name: string; meta: string; desc: string; spec: string; isInterpreter?: boolean }> = {
     plantnet: {
       name: 'PlantNet',
@@ -661,7 +664,7 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
       desc: isEs
         ? 'Modelo especializado en plantas. Alta precisión para flora.'
         : 'Specialized plant model. High accuracy for flora.',
-      spec: '/en/docs/architecture/#identifier-cascade',
+      spec: archCascadeUrl,
     },
     claude_haiku: {
       name: 'Claude Haiku 4.5',
@@ -671,7 +674,7 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
       desc: isEs
         ? 'Modelo de lenguaje. Útil cuando los modelos especializados no están seguros.'
         : 'Language model. Useful when specialized models aren\'t confident.',
-      spec: '/en/docs/architecture/#identifier-cascade',
+      spec: archCascadeUrl,
       isInterpreter: true,
     },
     webllm_phi35_vision: {
@@ -682,7 +685,7 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
       desc: isEs
         ? 'IA en tu dispositivo. Funciona sin internet.'
         : 'On-device AI. Works without internet.',
-      spec: '/en/docs/architecture/#in-browser-ai',
+      spec: archInBrowserUrl,
       isInterpreter: true,
     },
     birdnet: {
@@ -693,7 +696,7 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
       desc: isEs
         ? 'Modelo especializado en aves por sonido. Cornell Lab.'
         : 'Specialized bird model by sound. Cornell Lab.',
-      spec: '/en/docs/architecture/#identifier-cascade',
+      spec: archCascadeUrl,
     },
     onnx_base: {
       name: 'EfficientNet-Lite0',
@@ -703,7 +706,7 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
       desc: isEs
         ? 'Clasificador offline de respaldo. Baja precisión, siempre disponible.'
         : 'Offline fallback classifier. Low accuracy, always available.',
-      spec: '/en/docs/architecture/#in-browser-ai',
+      spec: archInBrowserUrl,
     },
   };
 
@@ -810,7 +813,7 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
     all_failed:      isEs ? 'Todos los identificadores fallaron. Revisa tu conexión y prueba con una foto más clara.' : 'All identifiers failed. Check your connection and try a clearer photo.',
     result_unknown:  isEs ? 'No se pudo identificar esta foto con confianza.' : 'Could not identify this photo confidently.',
     phi_running:     isEs ? 'Identificando con IA en el dispositivo…' : 'Identifying with on-device AI…',
-    phi_skip_hint:   isEs ? 'Agrega una clave Claude en Perfil → Editar para identificación instantánea.' : 'Add a Claude key in Profile → Edit for instant ID.',
+    phi_skip_hint:   phiSkipBtn?.dataset.phiSkipHint ?? (isEs ? 'Puedes descargar el modelo más tarde desde Perfil → Editar → Configuración de IA, o escribe el nombre de la especie manualmente.' : 'You can download the model later from Profile → Edit → AI settings, or just type the species name manually.'),
   };
 
   let currentAlternates: Array<{ scientific_name: string; common_name: string | null; score: number }> = [];
@@ -1127,6 +1130,9 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
 
   function offerPhiVision() {
     if (!phiOffer) return;
+    try {
+      if (localStorage.getItem(LOCAL_AI_OPTIN) === 'false') return;
+    } catch { /* ignore */ }
     phiOffer.classList.remove('hidden');
   }
 
