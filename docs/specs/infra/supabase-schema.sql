@@ -3087,11 +3087,13 @@ SELECT
 FROM public.user_expertise ue
 JOIN public.taxa t ON t.id = ue.taxon_id
 LEFT JOIN LATERAL (
-  SELECT DISTINCT state_province
+  SELECT state_province
   FROM public.observations
   WHERE observer_id = ue.user_id
     AND primary_taxon_id = ue.taxon_id
     AND state_province IS NOT NULL
+  GROUP BY state_province
+  ORDER BY COUNT(*) DESC
   LIMIT 1
 ) o ON true
 JOIN public.users u ON u.id = ue.user_id
