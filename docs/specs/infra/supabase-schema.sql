@@ -1976,7 +1976,8 @@ BEGIN
        WHERE ue.user_id = v_voter.user_id
          AND ue.taxon_id = ANY(v_obs_path);
 
-      IF v_voter_rank IS NULL OR (v_winner_rank IS NOT NULL AND v_winner_rank < v_voter_rank) THEN
+      IF v_winner_rank IS NOT NULL
+         AND (v_voter_rank IS NULL OR v_winner_rank < v_voter_rank) THEN
         v_outcome := 'loss';
       ELSE
         CONTINUE;
