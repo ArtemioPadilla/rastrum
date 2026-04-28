@@ -3546,7 +3546,9 @@
       "phase": "v1.1",
       "title_en": "Karma engine — schema, computation, basic UI (Phase 1)",
       "title_es": "Motor de karma — esquema, cómputo, UI base (Fase 1)",
-      "modules": ["23-karma-expertise-rarity"],
+      "modules": [
+        "23-karma-expertise-rarity"
+      ],
       "subtasks": [
         {
           "label_en": "user_expertise + taxon_rarity + karma_events tables",
@@ -3616,77 +3618,77 @@
         {
           "label_en": "Schema: users.profile_privacy JSONB (19-key matrix) + dismissed_privacy_intro_at + GIN index",
           "label_es": "Esquema: users.profile_privacy JSONB (matriz de 19 claves) + dismissed_privacy_intro_at + índice GIN",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "can_see_facet(target, facet, viewer) STABLE SQL function",
           "label_es": "Función SQL STABLE can_see_facet(target, facet, viewer)",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "can_see_facets() batch RPC (jsonb result)",
           "label_es": "RPC en lote can_see_facets() (resultado jsonb)",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "Migration backfill from module 08's profile_public boolean",
           "label_es": "Backfill desde el booleano profile_public del módulo 08",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "users_update_self_privacy RLS policy",
           "label_es": "Política RLS users_update_self_privacy",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "Add Privacy as 5th tab in SettingsShell.astro (/profile/settings/privacy/) with 3 presets + 19-row matrix + live preview",
           "label_es": "Añadir Privacidad como 5ª pestaña en SettingsShell.astro (/profile/settings/privacy/) con 3 presets + matriz de 19 filas + vista previa en vivo",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "Widen SettingsShell activeTab union: 'profile'|'preferences'|'data'|'developer'|'privacy' + add settings.tabs.privacy i18n keys (EN+ES)",
           "label_es": "Ampliar union activeTab de SettingsShell con 'privacy' + añadir clave i18n settings.tabs.privacy (EN+ES)",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "Add 4 entries to PR-4 command-palette index: Privacy settings, Pokédex, View my public profile, Make profile private (action)",
           "label_es": "Añadir 4 entradas al índice de la paleta de comandos PR-4: Configuración de privacidad, Pokédex, Ver mi perfil público, Hacer perfil privado (acción)",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "Register routeTree entries: profileSettingsPrivacy, publicProfile, publicProfileDex (PR-3 breadcrumbs/footer pickup)",
           "label_es": "Registrar entradas routeTree: profileSettingsPrivacy, publicProfile, publicProfileDex (PR-3 breadcrumbs/footer)",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "Insert 6th onboarding step (PR-5 spotlight tour): Pick your privacy preset",
           "label_es": "Insertar 6º paso de onboarding (PR-5 spotlight tour): elige tu preset de privacidad",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "Module 23 hand-off: replace user_expertise_public_read with user_expertise_facet_read",
           "label_es": "Coordinación con módulo 23: reemplazar user_expertise_public_read por user_expertise_facet_read",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "Onboarding step (module 18): Pick your privacy preset",
           "label_es": "Paso de onboarding (módulo 18): elige tu preset de privacidad",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "Module 22 voter-link gating (anonymous expert when profile=private)",
           "label_es": "Gateo de enlace de votante en módulo 22 (experto anónimo cuando profile=private)",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "Intro banner + dismissed_privacy_intro_at",
           "label_es": "Banner introductorio + dismissed_privacy_intro_at",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "pgTAP test: 9-cell matrix coverage of can_see_facet()",
           "label_es": "Test pgTAP: cobertura de 9 celdas de can_see_facet()",
-          "status": "planned"
+          "status": "done"
         }
       ]
     },
@@ -3701,72 +3703,72 @@
         {
           "label_en": "Astro routes: /en/u/[username]/index.astro + /es/u/[username]/index.astro",
           "label_es": "Rutas Astro: /en/u/[username]/index.astro + /es/u/[username]/index.astro",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "PublicProfileView orchestrator with batched can_see_facets() call",
           "label_es": "Orquestador PublicProfileView con llamada en lote a can_see_facets()",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "ProfileHero + ProfileObservationMap + ProfileTopSpecies + ProfileValidationReputation components",
           "label_es": "Componentes ProfileHero + ProfileObservationMap + ProfileTopSpecies + ProfileValidationReputation",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "ProfileEmptyState (404-equivalent for profile=private)",
           "label_es": "ProfileEmptyState (equivalente a 404 cuando profile=private)",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "OG card gating (public/signed_in/private renders)",
           "label_es": "Gateo de OG card (renders público/registrado/privado)",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "Sitemap filter: exclude profile_privacy.profile <> 'public'",
           "label_es": "Filtro de sitemap: excluir profile_privacy.profile <> 'public'",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "noindex + nofollow meta on non-public profiles",
           "label_es": "Meta noindex + nofollow en perfiles no públicos",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "Person JSON-LD entity on /u/<username>/ when profile=public (PR-C/E SEO bar)",
           "label_es": "Entidad JSON-LD Person en /u/<username>/ cuando profile=public (barra SEO PR-C/E)",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "Per-page metadata for /u/<username>/: canonical, hreflang en↔es pair, OG/Twitter (PR-B parity)",
           "label_es": "Metadatos por página para /u/<username>/: canonical, par hreflang en↔es, OG/Twitter (paridad PR-B)",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "Sitemap enumeration of public profiles (filter profile_privacy.profile = 'public', emit hreflang pairs)",
           "label_es": "Enumeración en sitemap de perfiles públicos (filtrar profile_privacy.profile = 'public', emitir pares hreflang)",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "301 redirect from legacy /{lang}/profile/u/?username=… to /u/<username>/",
           "label_es": "Redirección 301 desde la ruta heredada /{lang}/profile/u/?username=… hacia /u/<username>/",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "Update internal links: MyObservationsView, ProfileView, ExploreRecentView, ValidationQueueView, /share/obs",
           "label_es": "Actualizar enlaces internos: MyObservationsView, ProfileView, ExploreRecentView, ValidationQueueView, /share/obs",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "Rewrite PublicProfileView to use can_see_facets() instead of profile_public",
           "label_es": "Reescribir PublicProfileView para usar can_see_facets() en vez de profile_public",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "Remove profile_public checkbox from ProfileEditForm; StreakCard sets profile_privacy.profile instead",
           "label_es": "Quitar checkbox profile_public de ProfileEditForm; StreakCard ajusta profile_privacy.profile",
-          "status": "planned"
+          "status": "done"
         }
       ]
     },
@@ -3782,27 +3784,27 @@
         {
           "label_en": "ProfileCalendarHeatmap (12-month SVG grid, click → filtered list)",
           "label_es": "ProfileCalendarHeatmap (cuadrícula SVG de 12 meses, click → lista filtrada)",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "ProfileTaxonomicDonut (kingdom/phylum/family breakdown)",
           "label_es": "ProfileTaxonomicDonut (desglose reino/filo/familia)",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "ProfileStreakRing (current arc + longest faded outer arc)",
           "label_es": "ProfileStreakRing (arco actual + arco exterior atenuado del más largo)",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "Facet-gated views: profile_calendar_buckets, profile_taxonomic_donut, profile_top_species, profile_karma, profile_pokedex",
           "label_es": "Vistas gateadas por faceta: profile_calendar_buckets, profile_taxonomic_donut, profile_top_species, profile_karma, profile_pokedex",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "ProfilePokedexLink + visitor route /u/<username>/dex/",
           "label_es": "ProfilePokedexLink + ruta de visitante /u/<username>/dex/",
-          "status": "planned"
+          "status": "done"
         }
       ]
     }

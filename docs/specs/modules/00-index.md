@@ -75,13 +75,12 @@ narrative source.
 | 21 | Identify (no-save quick PlantNet probe) | v1.0 | shipped | [`21-identify.md`](21-identify.md) |
 | 22 | Community Validation (expert ID queue + research-grade auto-promotion) | v1.1 | shipped (spec v1.3 + impl) | [`22-community-validation.md`](22-community-validation.md) |
 | 23 | Karma + per-taxon expertise + rarity-weighted rewards | v1.1 | partial (Phase 1 shipped; Phases 2–3 deferred) | [`23-karma-expertise-rarity.md`](23-karma-expertise-rarity.md) |
-| 25 | Profile Privacy & Public Profile (per-facet matrix + `/u/<username>/`) | v1.2 | partial (v1.2.0 foundation: schema + matrix UI + new route; v1.2.1 wires remaining widgets) | [`25-profile-privacy.md`](25-profile-privacy.md) |
 
-## v1.2 — Profile privacy & public profile — planned
+## v1.2 — Profile privacy & public profile — shipped
 
 | # | Module | Target | Status | Spec |
 |---|---|---|---|---|
-| 25 | Profile Privacy & Public Profile (`/u/<username>` + per-facet matrix) | v1.2 | planned (spec v1.0) | [`25-profile-privacy.md`](25-profile-privacy.md) |
+| 25 | Profile Privacy & Public Profile (per-facet matrix + `/u/<username>/`) | v1.2 | shipped (v1.2.0 + v1.2.1 merged 2026-04-28; v1.2.2 cleanup deferred) | [`25-profile-privacy.md`](25-profile-privacy.md) |
 
 ## v1.5 — Territory layer — planned
 
@@ -89,17 +88,11 @@ narrative source.
 |---|---|---|---|---|
 | 24 | Diversity Indices & Spatial Analytics (Shannon, Simpson, Hill numbers, ANPs, municipios) | v1.5 | planned (spec v1.0) | [`24-diversity-indices.md`](24-diversity-indices.md) |
 
-## v1.2 — Profile privacy & richer public profile — in flight
-
-| # | Module | Target | Status | Spec |
-|---|---|---|---|---|
-| 25 | Profile Privacy & Public Profile (`profile_privacy` matrix + `/u/<username>/`) | v1.2 | spec ready (v1.2.0 schema + matrix UI; v1.2.1 richer widgets) | [`25-profile-privacy.md`](25-profile-privacy.md) |
-
 > **Numbering note.** Two specs share the `15-` prefix:
 > [`15-map-location-picker.md`](15-map-location-picker.md) was claimed first
 > during the v1.0 push, then [`15-mcp-server.md`](15-mcp-server.md) shipped
 > under the same number. Both are real, both reference each other from
-> consuming specs. New specs should claim the next free number (`25`+).
+> consuming specs. New specs should claim the next free number (`26`+).
 
 ---
 

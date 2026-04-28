@@ -18,7 +18,7 @@
 | v1.0 | Public Launch | shipped (partial) | 18 / 21 |
 | v1.0.x | Post-launch polish | in_progress | 8 / 24 |
 | v1.1 | UX polish (post-launch brainstorm) | shipped (mostly) | 19 / 21 |
-| v1.2 | Profile privacy & public profile | planned | 0 / 3 |
+| v1.2 | Profile privacy & public profile | shipped 2026-04-28 | 3 / 3 |
 | **v0.1 → v1.0** | **Public launch** | **shipped 2026-04-26** | **54 / 59** |
 
 Phases v1.5, v2.0, v2.5 are tracked in [`progress.json`](progress.json) but have no shipped code yet — they are planned scope only.
@@ -98,19 +98,12 @@ Remaining:
 - `ux-indigenous-taxa-search` — Indigenous-language taxon search (Zapoteco / Náhuatl / Maya / Mixteco / Tseltal → scientific name); requires corpus + governance per local-contexts  _(! blocked: Needs corpus partnership (CONABIO + community Co-PIs) and governance review before code lands)_
 - `ux-streak-push` — Web Push notification at 8 PM local when a streak is 1 day from breaking — opt-in only, single nightly notification  _(· planned)_
 
-## v1.2 — Profile privacy & public profile — planned
+## v1.2 — Profile privacy & public profile — shipped 2026-04-28
 
-**0 of 3 items done.**
+**3 of 3 items done.** Shipped via PRs #38 (spec), #40 (v1.2.0 foundation), #41 (v1.2.1 widgets).
 
-Module 23 (karma + expertise + rarity) shipped Phase 1 on 2026-04-28
-(commit `c8af5ac`, PR #36) and is tracked under v1.1 along with
-its Phase 2/3 follow-ups. Module 24 (diversity indices, v1.5
-milestone) is a separate spec landed 2026-04-28. **Module 25** —
-profile privacy + public profile + richer widgets — slots into
-v1.2 and follows the karma + UX-revamp shipments.
+- `profile-privacy-matrix` — Per-facet visibility matrix on `users.profile_privacy` (19 keys × 3 levels) with 3 presets, `can_see_facet()` SQL helper, 10 facet-gated views. Replaces module 08's binary `profile_public`; tightens module 23's `user_expertise_public_read` policy. _(✓ done)_
+- `public-profile-route` — `/u/?username=` route with hero + observation map + stats counts + validation reputation + karma section + Pokédex link; static `noindex,nofollow` meta; 301 redirect from legacy `/profile/u/?username=…`. _(✓ done)_
+- `profile-widgets-richer` — Calendar heatmap, taxonomic donut, streak ring, top species grid, observation mini-map, badges grid, activity timeline, Pokédex page, intro banner; reused on `/profile/` (owner). _(✓ done)_
 
-Items:
-
-- `profile-privacy-matrix` — Per-facet visibility matrix on `users.profile_privacy` (19 keys × 3 levels) with 3 presets, `can_see_facet()` SQL helper, facet-gated views. Replaces module 08's binary `profile_public`; tightens module 23's open `user_expertise_public_read` policy. See [`docs/specs/modules/25-profile-privacy.md`](specs/modules/25-profile-privacy.md). _(· planned)_
-- `public-profile-route` — `/u/<username>/` route with hero + observation map + calendar heatmap + top species + validation reputation; OG-card gating; sitemap filter; `noindex` on non-public profiles; 301 redirect from legacy `/profile/u/?username=…`. _(· planned)_
-- `profile-widgets-richer` — Calendar heatmap, taxonomic donut, streak ring, top species grid, observation mini-map; reused on both `/profile/` (owner) and `/u/<username>/` (visitor, gated). _(· planned)_
+**v1.2.2 cleanup deferred:** visitor `/u/<username>/dex/` route, `Person` JSON-LD on PublicProfileViewV2, wire widgets into visitor `/u/<username>/`, migrate `share/obs/index.astro` off `profile_public`, drop legacy `profile_public` boolean (one-release safety net runs out at v1.3).
