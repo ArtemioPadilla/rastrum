@@ -2749,3 +2749,50 @@ CREATE POLICY obs_collaborator_read ON public.observations FOR SELECT
     obscure_level <> 'full'
     AND public.is_collaborator_of(auth.uid(), observer_id)
   );
+
+-- 7) observation_reactions
+CREATE TABLE IF NOT EXISTS public.observation_reactions (
+  id             uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id        uuid        NOT NULL REFERENCES public.users(id)        ON DELETE CASCADE,
+  observation_id uuid        NOT NULL REFERENCES public.observations(id) ON DELETE CASCADE,
+  kind           text        NOT NULL
+                             CHECK (kind IN ('fave','agree_id','needs_id','confirm_id','helpful')),
+  created_at     timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(user_id, observation_id, kind)
+);
+CREATE INDEX IF NOT EXISTS idx_obsreact_obs_kind
+  ON public.observation_reactions(observation_id, kind);
+CREATE INDEX IF NOT EXISTS idx_obsreact_user
+  ON public.observation_reactions(user_id, created_at DESC);
+
+ALTER TABLE public.observation_reactions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS obsreact_read ON public.observation_reactions;
+CREATE POLICY obsreact_read ON public.observation_reactions FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.observations o
+       WHERE o.id = observation_reactions.observation_id
+         AND (
+           o.observer_id = auth.uid()
+           OR (
+             o.obscure_level <> 'full'
+             AND public.can_see_facet(o.observer_id, 'observations', auth.uid())
+           )
+           OR public.is_collaborator_of(auth.uid(), o.observer_id)
+         )
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM public.blocks b
+       WHERE (b.blocker_id = auth.uid() AND b.blocked_id = observation_reactions.user_id)
+          OR (b.blocked_id = auth.uid() AND b.blocker_id = observation_reactions.user_id)
+    )
+  );
+
+DROP POLICY IF EXISTS obsreact_write ON public.observation_reactions;
+CREATE POLICY obsreact_write ON public.observation_reactions FOR INSERT
+  WITH CHECK (user_id = auth.uid());
+
+DROP POLICY IF EXISTS obsreact_delete ON public.observation_reactions;
+CREATE POLICY obsreact_delete ON public.observation_reactions FOR DELETE
+  USING (user_id = auth.uid());
