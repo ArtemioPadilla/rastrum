@@ -1640,3 +1640,69 @@ JOIN   public.taxa t
 WHERE  u.is_expert = true
   AND  u.expert_taxa IS NOT NULL
 ON CONFLICT (user_id, taxon_id) DO NOTHING;
+
+-- ============================================================
+-- refresh_taxon_rarity: nightly recompute of percentile buckets.
+-- Buckets:
+--   1 = top 10% most common  → multiplier 1.0
+--   2 = percentile 50–90     → multiplier 1.5
+--   3 = percentile 10–50     → multiplier 2.5
+--   4 = top 10% rarest       → multiplier 4.0
+--   5 = obs_count < 5        → multiplier 5.0  (overrides bucket 4)
+-- ============================================================
+CREATE OR REPLACE FUNCTION public.refresh_taxon_rarity()
+RETURNS void AS $$
+BEGIN
+  WITH counts AS (
+    SELECT t.id AS taxon_id,
+           COALESCE(c.n, 0) AS obs_count
+    FROM   public.taxa t
+    LEFT JOIN (
+      SELECT taxon_id, count(*) AS n
+      FROM   public.identifications
+      WHERE  taxon_id IS NOT NULL
+      GROUP BY taxon_id
+    ) c ON c.taxon_id = t.id
+  ),
+  ranked AS (
+    SELECT taxon_id, obs_count,
+           CASE WHEN obs_count = 0 THEN 100.0
+                ELSE 100.0 * (1.0 - percent_rank() OVER (ORDER BY obs_count DESC))
+           END AS percentile
+    FROM   counts
+  ),
+  bucketed AS (
+    SELECT taxon_id, obs_count, percentile,
+      CASE
+        WHEN obs_count > 0 AND obs_count < 5 THEN 5
+        WHEN percentile >= 90              THEN 1   -- top 10% common
+        WHEN percentile >= 50              THEN 2   -- 50–90
+        WHEN percentile >= 10              THEN 3   -- 10–50
+        ELSE                                    4   -- bottom 10% (rarest)
+      END AS bucket
+    FROM ranked
+  )
+  INSERT INTO public.taxon_rarity AS tr (taxon_id, obs_count, percentile, bucket, multiplier, refreshed_at)
+  SELECT taxon_id,
+         obs_count,
+         percentile,
+         bucket,
+         CASE bucket
+           WHEN 1 THEN 1.0
+           WHEN 2 THEN 1.5
+           WHEN 3 THEN 2.5
+           WHEN 4 THEN 4.0
+           WHEN 5 THEN 5.0
+         END,
+         now()
+  FROM   bucketed
+  ON CONFLICT (taxon_id) DO UPDATE
+    SET obs_count    = EXCLUDED.obs_count,
+        percentile   = EXCLUDED.percentile,
+        bucket       = EXCLUDED.bucket,
+        multiplier   = EXCLUDED.multiplier,
+        refreshed_at = EXCLUDED.refreshed_at;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION public.refresh_taxon_rarity() TO service_role;
