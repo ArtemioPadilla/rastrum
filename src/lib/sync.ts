@@ -388,9 +388,13 @@ async function syncOutboxInner(): Promise<SyncResult> {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user?.id) {
+          const upgradedData: Observation = {
+            ...(rec.data as Observation),
+            observerRef: { kind: 'user', id: session.user.id },
+          };
           await db.observations.update(rec.id, {
             observer_kind: 'user',
-            data: { ...(rec.data as Record<string, unknown>), observerRef: { kind: 'user', id: session.user.id } },
+            data: upgradedData,
           });
           // Re-fetch the updated record so syncOne uses the upgraded observer
           const upgraded = await db.observations.get(rec.id);
