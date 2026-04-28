@@ -352,6 +352,7 @@ export async function syncOutbox(): Promise<SyncResult> {
 
 async function syncOutboxInner(): Promise<SyncResult> {
   const db = getDB();
+  const supabase = getSupabase();
   // Pending AND error rows both belong in the queue. An 'error' row is one
   // that previously failed (e.g. CORS, network blip); we want manual retry
   // and the auto-retry-on-mount to re-attempt them, not just the never-tried
@@ -372,7 +373,45 @@ async function syncOutboxInner(): Promise<SyncResult> {
   let last_error: string | null = null;
 
   for (const rec of queued) {
-    if (rec.observer_kind === 'guest') { skipped_guest++; continue; }
+    // Guest rows were saved before the user authenticated. Before skipping,
+    // try to upgrade the record to the current authenticated user so it can
+    // be synced. The same upgrade runs inside syncOne() but the guard below
+    // was skipping guest rows before syncOne() ever ran — meaning observations
+    // saved offline before login never synced even after the user logged in.
+    if (rec.observer_kind === 'guest') {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.id) {
+          await db.observations.update(rec.id, {
+            observer_kind: 'user',
+            data: { ...(rec.data as Record<string, unknown>), observerRef: { kind: 'user', id: session.user.id } },
+          });
+          // Re-fetch the updated record so syncOne uses the upgraded observer
+          const upgraded = await db.observations.get(rec.id);
+          if (upgraded) {
+            try {
+              await syncOne(upgraded);
+              synced++;
+              emit<SyncRowDetail>(SYNC_EVENTS.rowDone, { observation_id: rec.id });
+            } catch (err) {
+              failed++;
+              const msg = err instanceof Error ? err.message : String(err);
+              last_error = msg;
+              console.warn('[rastrum] syncOne (upgraded guest) failed', rec.id, msg);
+              await db.observations.update(rec.id, {
+                sync_status: 'error', sync_error: msg,
+                sync_attempts: (rec.sync_attempts ?? 0) + 1,
+                updated_at: new Date().toISOString(),
+              });
+              emit<SyncRowDetail>(SYNC_EVENTS.rowFail, { observation_id: rec.id, error: msg });
+            }
+            continue;
+          }
+        }
+      } catch { /* couldn't upgrade, leave as guest for next sync */ }
+      skipped_guest++;
+      continue;
+    }
     try {
       await syncOne(rec);
       synced++;
