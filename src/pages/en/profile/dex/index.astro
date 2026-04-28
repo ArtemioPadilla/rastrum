@@ -1,0 +1,8 @@
+---
+import BaseLayout from '../../../../layouts/BaseLayout.astro';
+import PokedexView from '../../../../components/PokedexView.astro';
+const lang = 'en' as const;
+---
+<BaseLayout title="Your Pokédex — Rastrum" description="Every species you've observed or identified." lang={lang}>
+  <PokedexView lang={lang} />
+</BaseLayout>
