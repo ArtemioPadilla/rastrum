@@ -84,7 +84,8 @@ CREATE INDEX IF NOT EXISTS idx_spatial_units_kind ON public.spatial_units(kind);
 
 ### New table: `diversity_cache`
 
-Pre-computed results keyed by `(spatial_unit_id, taxon_kingdom, date_range, min_confidence)`.
+Pre-computed results keyed by `(spatial_unit_id, taxon_kingdom, date_range)`.
+Only research-grade observations are included (see design decision below).
 Invalidated nightly by `pg_cron` or on new research-grade observation within the polygon.
 
 ```sql
@@ -94,7 +95,8 @@ CREATE TABLE IF NOT EXISTS public.diversity_cache (
   taxon_kingdom       text,            -- NULL = all kingdoms
   date_from           date,
   date_to             date,
-  min_confidence      numeric DEFAULT 0.5,
+  -- Only research_grade observations are counted (is_research_grade = true).
+  -- min_confidence filter removed: research-grade is the quality gate.
   obs_count           int NOT NULL,
   species_richness    int NOT NULL,    -- S
   abundance           int NOT NULL,    -- N
@@ -124,12 +126,12 @@ CREATE OR REPLACE FUNCTION public.compute_diversity(
   p_kingdom         text    DEFAULT NULL,
   p_date_from       date    DEFAULT NULL,
   p_date_to         date    DEFAULT NULL,
-  p_min_confidence  numeric DEFAULT 0.5
+  p_research_grade_only boolean DEFAULT true  -- Eugenio: always true in production
 )
 RETURNS TABLE (
   obs_count         int,
   species_richness  int,
-  abundance         int,
+  abundance         int,   -- N = individual detections (one row per camera-trap event)
   shannon           numeric,
   simpson           numeric,
   simpson_evenness  numeric,
@@ -156,6 +158,7 @@ BEGIN
                         AND i.confidence  >= p_min_confidence
   JOIN taxa t ON t.id = i.taxon_id
   WHERE o.sync_status = 'synced'
+    AND (NOT p_research_grade_only OR o.is_research_grade = true)
     AND ST_Within(o.location::geometry, p_geom)
     AND (p_kingdom IS NULL OR t.kingdom = p_kingdom)
     AND (p_date_from IS NULL OR o.observed_at::date >= p_date_from)
@@ -213,8 +216,8 @@ CREATE OR REPLACE FUNCTION public.diversity_indices(
   p_kingdom         text    DEFAULT NULL,
   p_date_from       date    DEFAULT NULL,
   p_date_to         date    DEFAULT NULL,
-  p_min_confidence  numeric DEFAULT 0.5,
-  p_use_cache       boolean DEFAULT true
+  p_research_grade_only boolean DEFAULT true,
+  p_use_cache           boolean DEFAULT true
 )
 RETURNS TABLE (LIKE public.diversity_cache)
 ...
@@ -239,7 +242,7 @@ Content-Type: application/json
   "kingdom": "Plantae",          // optional
   "date_from": "2024-01-01",     // optional
   "date_to":   "2026-04-28",     // optional
-  "min_confidence": 0.5
+  "research_grade_only": true
 }
 ```
 
@@ -371,7 +374,7 @@ CREATE POLICY "diversity_cache_public_read"
 
 | Query type | Cache TTL | Invalidation trigger |
 |---|---|---|
-| Named ANP / municipio, no date filter | 24 h | new research-grade obs inside polygon |
+| Named ANP / municipio, no date filter | 24 h | new `is_research_grade = true` obs inside polygon |
 | Named polygon with date filter | 6 h | — |
 | Custom polygon (bbox / freehand) | No cache (compute on request) | — |
 
@@ -411,13 +414,12 @@ excluding them entirely while still respecting privacy.
 
 ---
 
-## Open questions for Eugenio
+## Design decisions (resolved 2026-04-28 — Eugenio Padilla)
 
-1. **Nivel mínimo de confianza:** ¿Solo observaciones `is_research_grade = true`, o incluir todas con `confidence >= 0.5`?  
-   Propuesta: research-grade por defecto, con toggle en la UI para incluir todas.
+1. ✅ **Solo `is_research_grade = true`** — no toggle, research-grade es el único gate de calidad.
 
-2. **Abundancia vs. detecciones:** ¿`N` = número de observaciones (detecciones individuales) o número de registros fotográficos únicos por especie? Para cámaras trampa puede importar la distinción.
+2. ✅ **N = detecciones individuales** — cada fila en `observations` cuenta como una detección. Las tarjetas de memoria de cámara trampa se agregan acumulativamente conforme se ingresan; los índices reflejan el total histórico sin necesidad de recalcular nada especial.
 
-3. **Polígonos adicionales prioritarios:** ¿Ejidos, cuencas, o RAMSAR/Reservas de la Biosfera antes que municipios?
+3. **Polígonos adicionales:** pendiente definir prioridad entre ejidos, cuencas, RAMSAR.
 
-4. **Exportación:** ¿El CSV debe incluir la lista completa de especies con abundancias, o solo los índices agregados?
+4. ✅ **CSV = lista completa de especies con abundancias** — todos los taxa con su `n` y `pᵢ`, más los índices agregados en el encabezado.
