@@ -2991,3 +2991,69 @@ BEGIN
   RETURN v_count;
 END;
 $$;
+
+-- 13) Fan-out: follow → notification
+CREATE OR REPLACE FUNCTION public.tg_follow_notify()
+RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  -- Skip if recipient has blocked the actor.
+  IF EXISTS (SELECT 1 FROM public.blocks
+              WHERE blocker_id = NEW.followee_id AND blocked_id = NEW.follower_id) THEN
+    RETURN NEW;
+  END IF;
+
+  IF (TG_OP = 'INSERT' AND NEW.status = 'pending') THEN
+    INSERT INTO public.notifications(user_id, kind, payload)
+    VALUES (NEW.followee_id, 'follow',
+            jsonb_build_object('actor_id', NEW.follower_id, 'tier', NEW.tier, 'status', 'pending'));
+  ELSIF (TG_OP = 'INSERT' AND NEW.status = 'accepted') THEN
+    INSERT INTO public.notifications(user_id, kind, payload)
+    VALUES (NEW.followee_id, 'follow',
+            jsonb_build_object('actor_id', NEW.follower_id, 'tier', NEW.tier, 'status', 'accepted'));
+  ELSIF (TG_OP = 'UPDATE' AND OLD.status = 'pending' AND NEW.status = 'accepted') THEN
+    INSERT INTO public.notifications(user_id, kind, payload)
+    VALUES (NEW.follower_id, 'follow_accepted',
+            jsonb_build_object('actor_id', NEW.followee_id, 'tier', NEW.tier));
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS follows_notify_trigger ON public.follows;
+CREATE TRIGGER follows_notify_trigger
+  AFTER INSERT OR UPDATE ON public.follows
+  FOR EACH ROW EXECUTE FUNCTION public.tg_follow_notify();
+
+-- 14) Fan-out: observation_reactions → notification
+CREATE OR REPLACE FUNCTION public.tg_obsreact_notify()
+RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_owner uuid;
+BEGIN
+  SELECT observer_id INTO v_owner FROM public.observations
+   WHERE id = NEW.observation_id;
+  IF v_owner IS NULL OR v_owner = NEW.user_id THEN
+    RETURN NEW;
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.blocks
+              WHERE blocker_id = v_owner AND blocked_id = NEW.user_id) THEN
+    RETURN NEW;
+  END IF;
+  INSERT INTO public.notifications(user_id, kind, payload)
+  VALUES (v_owner, 'reaction',
+          jsonb_build_object(
+            'actor_id', NEW.user_id,
+            'target_type', 'observation',
+            'target_id', NEW.observation_id,
+            'kind', NEW.kind
+          ));
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS obsreact_notify_trigger ON public.observation_reactions;
+CREATE TRIGGER obsreact_notify_trigger
+  AFTER INSERT ON public.observation_reactions
+  FOR EACH ROW EXECUTE FUNCTION public.tg_obsreact_notify();
