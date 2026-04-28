@@ -2796,3 +2796,48 @@ CREATE POLICY obsreact_write ON public.observation_reactions FOR INSERT
 DROP POLICY IF EXISTS obsreact_delete ON public.observation_reactions;
 CREATE POLICY obsreact_delete ON public.observation_reactions FOR DELETE
   USING (user_id = auth.uid());
+
+-- 8) photo_reactions (against media_files)
+CREATE TABLE IF NOT EXISTS public.photo_reactions (
+  id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id         uuid        NOT NULL REFERENCES public.users(id)       ON DELETE CASCADE,
+  media_file_id   uuid        NOT NULL REFERENCES public.media_files(id) ON DELETE CASCADE,
+  kind            text        NOT NULL CHECK (kind IN ('fave','helpful')),
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(user_id, media_file_id, kind)
+);
+CREATE INDEX IF NOT EXISTS idx_photoreact_media_kind
+  ON public.photo_reactions(media_file_id, kind);
+
+ALTER TABLE public.photo_reactions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS photoreact_read ON public.photo_reactions;
+CREATE POLICY photoreact_read ON public.photo_reactions FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.media_files m
+        JOIN public.observations o ON o.id = m.observation_id
+       WHERE m.id = photo_reactions.media_file_id
+         AND (
+           o.observer_id = auth.uid()
+           OR (
+             o.obscure_level <> 'full'
+             AND public.can_see_facet(o.observer_id, 'observations', auth.uid())
+           )
+           OR public.is_collaborator_of(auth.uid(), o.observer_id)
+         )
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM public.blocks b
+       WHERE (b.blocker_id = auth.uid() AND b.blocked_id = photo_reactions.user_id)
+          OR (b.blocked_id = auth.uid() AND b.blocker_id = photo_reactions.user_id)
+    )
+  );
+
+DROP POLICY IF EXISTS photoreact_write ON public.photo_reactions;
+CREATE POLICY photoreact_write ON public.photo_reactions FOR INSERT
+  WITH CHECK (user_id = auth.uid());
+
+DROP POLICY IF EXISTS photoreact_delete ON public.photo_reactions;
+CREATE POLICY photoreact_delete ON public.photo_reactions FOR DELETE
+  USING (user_id = auth.uid());
