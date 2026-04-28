@@ -21,7 +21,6 @@ const v = (tr as unknown as { validation: Record<string, string> }).validation;
 
 <div
   id="suggest-id-modal"
-  hidden
   role="dialog"
   aria-modal="true"
   aria-labelledby="suggest-id-modal-title"
@@ -29,7 +28,7 @@ const v = (tr as unknown as { validation: Record<string, string> }).validation;
   data-label-failed={v.submit_failed}
   data-label-no-taxon-match={v.no_taxon_match}
   data-label-target-tpl={v.submit_target_tpl}
-  class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+  class="hidden fixed inset-0 z-50 items-center justify-center bg-black/60 px-4"
 >
   <div class="w-full max-w-md rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 shadow-xl">
     <div class="flex items-start justify-between gap-3 mb-4">
@@ -127,7 +126,8 @@ const v = (tr as unknown as { validation: Record<string, string> }).validation;
     function open(obsId: string, observer: string | null) {
       observationId = obsId;
       observerName  = observer;
-      modal!.hidden = false;
+      modal!.classList.remove('hidden');
+      modal!.classList.add('flex');
       if (target && observerName) {
         target.textContent = targetTpl.replace('{name}', observerName);
       } else if (target) {
@@ -138,7 +138,8 @@ const v = (tr as unknown as { validation: Record<string, string> }).validation;
       nameInput?.focus();
     }
     function close() {
-      modal!.hidden = true;
+      modal!.classList.add('hidden');
+      modal!.classList.remove('flex');
       observationId = null;
       submitBtn!.disabled = false;
       submitLabel!.textContent = original;
@@ -150,7 +151,7 @@ const v = (tr as unknown as { validation: Record<string, string> }).validation;
     cancelBtn?.addEventListener('click', close);
     closeBtn?.addEventListener('click', close);
     modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
-    document.addEventListener('keydown', (e) => { if (!modal.hidden && e.key === 'Escape') close(); });
+    document.addEventListener('keydown', (e) => { if (!modal.classList.contains('hidden') && e.key === 'Escape') close(); });
 
     // Autocomplete: query taxa table on input. Debounced + cached.
     const taxonCache = new Map<string, Array<{ id: string; scientific_name: string }>>();
