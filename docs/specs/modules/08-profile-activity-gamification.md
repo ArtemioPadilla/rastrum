@@ -5,6 +5,16 @@
 **Depends on:** modules 01 (photo ID), 02 (observation), 04 (auth), 07 (licensing)
 **Impacts:** monolithic spec § "Module: Community & Gamification"
 
+> **v1.2 supersession notice.** The binary `users.profile_public` boolean
+> introduced here is **deprecated** by module 25 (`25-profile-privacy.md`,
+> v1.2 milestone), which replaces it with a 19-key `profile_privacy`
+> JSONB matrix. The column stays writable for one release as a safety
+> net and is dropped in v1.3. New code should call
+> `public.can_see_facet(target, facet, viewer)` instead of reading
+> `profile_public` directly. The reputation surface (karma, expertise,
+> pokédex) added by module 23 (`23-karma-expertise-rarity.md`, shipped
+> Phase 1 in v1.1) is also gated by the same matrix.
+
 ---
 
 ## Design philosophy — read this first
