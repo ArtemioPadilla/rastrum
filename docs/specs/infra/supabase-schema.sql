@@ -1578,3 +1578,22 @@ CREATE TRIGGER trg_taxa_ancestor_path
 
 -- One-shot backfill of every existing taxa row.
 UPDATE public.taxa SET ancestor_path = public.compute_ancestor_path(parent_id);
+
+-- ============================================================
+-- One-time migration: hydrate user_expertise from is_expert + expert_taxa.
+-- Idempotent thanks to ON CONFLICT DO NOTHING.
+-- ============================================================
+INSERT INTO public.user_expertise (user_id, taxon_id, score, verified_at, verified_by)
+SELECT u.id,
+       t.id,
+       50,
+       now(),
+       NULL
+FROM   public.users u
+CROSS JOIN LATERAL unnest(u.expert_taxa) AS kingdom_name
+JOIN   public.taxa t
+       ON  t.kingdom = kingdom_name
+       AND t.parent_id IS NULL
+WHERE  u.is_expert = true
+  AND  u.expert_taxa IS NOT NULL
+ON CONFLICT (user_id, taxon_id) DO NOTHING;
