@@ -28,7 +28,7 @@ narrative source.
 > numbers reflect the actual filename on disk; gaps and the duplicated
 > `15-*.md` are historical (`15-map-location-picker.md` was claimed first,
 > then `15-mcp-server.md` shipped under the same number — see the note
-> below the table). 25 module specs are tracked here today.
+> below the table). 26 module specs are tracked here today.
 
 ---
 
@@ -82,6 +82,7 @@ narrative source.
 | # | Module | Target | Status | Spec |
 |---|---|---|---|---|
 | 25 | Profile Privacy & Public Profile (per-facet matrix + `/u/<username>/`) | v1.2 | shipped (v1.2.0 + v1.2.1 merged 2026-04-28; v1.2.2 cleanup deferred) | [`25-profile-privacy.md`](25-profile-privacy.md) |
+| 26 | Social graph + reactions (follows, reactions, blocks, reports, notifications) | v1.3 | planned (spec v1.0) | [`26-social-graph.md`](26-social-graph.md) |
 
 ## v1.5 — Territory layer — planned
 
@@ -137,7 +138,7 @@ ML training pipeline) rather than waiting on engineering capacity.
 
 ## How to add a new module spec
 
-1. Claim the next free `NN-*.md` slot (currently `26-`).
+1. Claim the next free `NN-*.md` slot (currently `27-`).
 2. Copy the structure of an existing spec
    (`01-photo-id.md` is a good template).
 3. Include: **Overview → Data model → APIs / logic → Edge cases → Cost / risk
