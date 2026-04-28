@@ -82,7 +82,14 @@ Remaining:
 
 ## v1.1 — UX polish (post-launch brainstorm) — planned
 
-**13 of 15 items done.**
+**18 of 20 items done.** (Originally 15; added 5 cross-cutting items
+shipped 2026-04-27/28: M22, owner CRUD, atomic delete-observation,
+suggest-from-share-page, OG pipeline.)
+
+Cross-cutting shipments (2026-04-27/28):
+- `community-validation` — Module 22 implementation: `validation_queue` view, 3 RLS policies, 4 routes, suggest modal + dashboard, research-grade chip on existing views, suggest CTA on `/share/obs`.  _(✓ done)_
+- `owner-observation-crud` — Manage panel on share/obs (notes / scientific-name override / obscure_level / delete) + atomic `delete-observation` Edge Function (no orphan R2 blobs).  _(✓ done)_
+- `og-pipeline` — Build-time satori PNGs for static pages + client-side renderer at sync time for user content; manifest has screenshots + 192px icon for richer install UI.  _(✓ done)_
 
 Remaining:
 

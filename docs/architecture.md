@@ -236,6 +236,73 @@ the Edge Function rather than at the client to keep the outbox simple.
 
 ---
 
+## Community validation (Module 22, v1.1)
+
+Reuses the existing identification engine instead of adding a parallel
+votes table:
+
+```
+Signed-in user (not the observer)
+  └─ /share/obs/?id=<obs-id>         (or /explorar/validar/)
+      └─ Suggest CTA → SuggestIdModal
+          └─ INSERT identifications  (validated_by = auth.uid(),
+                                      is_primary = false)
+          └─ rpc('recompute_consensus', { p_observation_id })
+              └─ weighted aggregation: 3× for is_expert AND
+                 kingdom = ANY(expert_taxa); else 1×
+              └─ when winning_score ≥ 2.0 AND ≥ 2 distinct
+                 voters AND no tie → flips primary row to
+                 is_research_grade = true
+                  └─ existing fire_research_grade_trigger fires an
+                     'observation_research_grade' activity_event
+                     for the observer
+```
+
+Server-side eligibility lives in a single view
+(`public.validation_queue`) so the frontend can't drift from policy.
+The view includes only synced, non-fully-redacted observations whose
+primary identification is missing or low-confidence and not yet
+research-grade.
+
+## Atomic delete
+
+The `/share/obs` Manage-panel **Delete** button calls the
+`delete-observation` Edge Function (not a direct PostgREST DELETE) so
+that R2 photo blobs and the OG card are removed in lockstep with the
+DB row. The function:
+
+1. Verifies the caller's JWT and observation ownership
+2. Lists `media_files.url` → R2 keys via host-match against `R2_PUBLIC_URL`
+3. `DeleteObjects` to R2 (batched, includes `og/<obs-id>.png`)
+4. `DELETE FROM observations` with the service-role key
+   (FK cascades to identifications + media_files)
+
+The two halves are coupled inside the Edge Function so a partial
+failure leaves at most orphaned R2 blobs — never the inverse (DB rows
+that point at missing photos).
+
+## OG card pipeline (zero per-request server compute)
+
+Static pages: `npm run build` runs `scripts/generate-og.ts` which
+satori-renders one PNG per surface to `public/og/<slug>.png`.
+GitHub Pages CDN serves them; meta tags point at them via the
+`BaseLayout` path → slug mapping.
+
+User-generated cards (per observation, per profile): rendered
+client-side at sync time via `src/lib/og-card.ts` (lazy-imported
+satori → SVG → OffscreenCanvas → PNG) and PUT to R2 at
+`og/<obs-id>.png` / `og/u/<username>.png` next to the photos.
+Cloudflare CDN serves them; no per-request compute, no Edge Worker
+to maintain.
+
+Manifest carries `screenshots` (1280×720 + 750×1334) so Chrome
+shows the richer install UI. `related_applications` + the
+`isPwaInstalled()` helper combine display-mode + a localStorage memo
++ `getInstalledRelatedApps()` to suppress the install banner across
+browser-tab visits, not just inside the standalone session.
+
+---
+
 ## Further reading
 
 - [`AGENTS.md`](../AGENTS.md) — conventions, pitfalls, pre-PR checklist.

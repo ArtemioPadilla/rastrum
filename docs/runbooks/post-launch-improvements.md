@@ -152,3 +152,33 @@ explicitly out of scope for the "no per-request server" target.
 | 15 | MyObservations N+1 | TBD |
 
 (Update this table as items merge — `git log --oneline -- '*<item>*'` works.)
+
+## Beyond the original 17 — shipped 2026-04-27/28
+
+These weren't in the original post-launch list; they emerged during
+the family-launch debugging + Module 22 implementation cycle.
+
+| Theme | Item | Commit |
+|---|---|---|
+| **Module 22** | Community-validation spec v1.0 → v1.3 (Copilot + audit revisions) | `3853f59` |
+| | Module 22 implementation: SQL + 3 components + 4 routes + chip + nav | `e40cea7` |
+| | Validate card surfaced on `/explorar/` index | `4ff9487` |
+| | Suggest CTA + community-IDs list on every `/share/obs/?id=` | `9f03eb5` |
+| **Owner CRUD** | Manage panel on share/obs (notes/scientific-name/obscure/delete) | `b364866` |
+| | `delete-observation` Edge Function — atomic R2+DB delete (no orphans) | `51aa558` |
+| **Activity feed** | Hydrate per-row photo + species + click target | `21be914` |
+| **Share page** | LEFT join on identifications so unidentified obs show "Unknown species" instead of 404 | `6476c9e` |
+| **OG pipeline** | Build-time satori for static pages + client-side at sync | `0a22e2e` |
+| | Profile OG card on Profile→Edit save | `220dbd5` |
+| | Manifest cleanup (192px icon, screenshots, `mobile-web-app-capable`, `related_applications`, isPwaInstalled) | `d26aece` |
+| **Auth + Eugenio** | resolveObserverRef no longer downgrades signed-in users to guest | `92cdf24` |
+| | Manual `username` patch for Eugenio's pre-onboarding row | (SQL, ad-hoc) |
+| **Sync hardening** | Web Locks across tabs + beforeunload during in-flight upload | `a7b6e0a` |
+| | get-upload-url CORS + R2 secret rotation via CI sync | `3596fd0` |
+| **Console hygiene** | mobile-web-app-capable + password-fields-in-form | `e75f83c` |
+| | Firefox-aware install hint (Android menu vs. desktop fallback) | `c63035d` |
+
+The "remaining items" from the original 17 (#2 sync-failure telemetry,
+#9 self-healing error rows, #16 Resend SMTP, #17 Stripe Pro tier) are
+all still scaffolded but intentionally not turned on — they ship when
+the corresponding business need arrives.
