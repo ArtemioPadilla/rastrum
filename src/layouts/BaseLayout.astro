@@ -1,6 +1,7 @@
 ---
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
+import CommandPalette from '../components/CommandPalette.astro';
 import InstallPwaButton from '../components/InstallPwaButton.astro';
 import InstallDiscoveryHint from '../components/InstallDiscoveryHint.astro';
 import OnboardingTour from '../components/OnboardingTour.astro';
@@ -134,6 +135,7 @@ const resolvedOgImage = ogImage ?? `${SITE_URL}/og/${ogSlugForPath(currentPath)}
       <slot />
     </main>
     <Footer lang={lang} currentPath={currentPath} />
+    <CommandPalette lang={lang} />
     <InstallPwaButton lang={installLang} />
     <ReportIssueButton lang={lang} />
     <OnboardingTour lang={installLang} />
