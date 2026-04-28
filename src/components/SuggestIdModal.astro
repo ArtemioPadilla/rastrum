@@ -41,6 +41,9 @@ const v = (tr as unknown as { validation: Record<string, string> }).validation;
     </div>
 
     <p id="suggest-id-target" class="text-xs text-zinc-500 dark:text-zinc-400 mb-3"></p>
+    <p id="suggest-id-microcopy" class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">
+      {v.karma_microcopy_loading}
+    </p>
 
     <form id="suggest-id-form" class="space-y-3" novalidate>
       <div>
@@ -102,6 +105,7 @@ const v = (tr as unknown as { validation: Record<string, string> }).validation;
 
 <script>
   import { getSupabase } from '../lib/supabase';
+  import { microcopyForVote, type Bucket } from '../lib/karma';
 
   const modal = document.getElementById('suggest-id-modal') as HTMLElement | null;
   const form  = document.getElementById('suggest-id-form') as HTMLFormElement | null;
@@ -118,6 +122,66 @@ const v = (tr as unknown as { validation: Record<string, string> }).validation;
     let observationId: string | null = null;
     let observerName: string | null = null;
     const original   = submitLabel.textContent ?? 'Submit';
+    const microcopyEl = document.getElementById('suggest-id-microcopy') as HTMLElement | null;
+    const isEs = document.documentElement.lang === 'es';
+
+    async function refreshMicrocopy(taxonId: string | null, confidence: 0.5 | 0.7 | 0.9) {
+      if (!microcopyEl) return;
+      if (!taxonId) {
+        microcopyEl.textContent = isEs
+          ? 'El peso de tu voto aparecerá cuando elijas una especie.'
+          : 'Vote weight appears once you pick a species.';
+        return;
+      }
+      try {
+        const supabase = getSupabase();
+        const [{ data: rarity }, { data: { user } }] = await Promise.all([
+          supabase.from('taxon_rarity').select('bucket, multiplier').eq('taxon_id', taxonId).maybeSingle(),
+          supabase.auth.getUser(),
+        ]);
+        let inGrace = false;
+        let graceDaysLeft: number | undefined;
+        let expertiseLevel: string | null = null;
+        let expertiseWeight = 1.0;
+        let streakMultiplier = 1.0;
+        if (user) {
+          const { data: u } = await supabase
+            .from('users')
+            .select('grace_until, vote_count')
+            .eq('id', user.id).maybeSingle();
+          const gu = u as { grace_until?: string | null; vote_count?: number } | null;
+          if (gu?.grace_until && new Date(gu.grace_until) > new Date() && (gu.vote_count ?? 0) < 20) {
+            inGrace = true;
+            graceDaysLeft = Math.max(0, Math.ceil(
+              (new Date(gu.grace_until).getTime() - Date.now()) / 86400000));
+          }
+          const { data: streak } = await supabase
+            .from('user_streaks').select('current_streak').eq('user_id', user.id).maybeSingle();
+          const s = streak as { current_streak?: number } | null;
+          const cs = s?.current_streak ?? 0;
+          streakMultiplier = cs >= 30 ? 1.5 : cs >= 7 ? 1.2 : 1.0;
+        }
+        const r = rarity as { bucket?: number; multiplier?: number } | null;
+        const bucket = ((r?.bucket ?? 1) as Bucket);
+        const multiplier = r?.multiplier ?? 1.0;
+        microcopyEl.textContent = microcopyForVote({
+          lang: isEs ? 'es' : 'en',
+          bucket,
+          multiplier,
+          expertiseLevel,
+          expertiseWeight,
+          streakMultiplier,
+          confidence,
+          inGrace,
+          graceDaysLeft,
+        });
+      } catch {
+        microcopyEl.textContent = isEs
+          ? 'No se pudo calcular el peso de voto — guardar igual funciona.'
+          : 'Could not compute vote weight — saving still works.';
+      }
+    }
+
     const submitting = modal.dataset.labelSubmitting ?? 'Submitting…';
     const failedTpl  = modal.dataset.labelFailed     ?? 'Could not submit: {error}';
     const noTaxonMatch = modal.dataset.labelNoTaxonMatch ?? 'No taxon match.';
@@ -189,6 +253,26 @@ const v = (tr as unknown as { validation: Record<string, string> }).validation;
         return opt;
       }));
     }
+
+    nameInput?.addEventListener('change', () => {
+      const opt = datalist?.querySelector<HTMLOptionElement>(`option[value="${nameInput?.value}"]`);
+      const taxonId = opt?.dataset.id ?? null;
+      const confEl = form?.querySelector<HTMLInputElement>('input[name="confidence"]:checked');
+      const confValRaw = Number(confEl?.value ?? 0.9);
+      const conf = (confValRaw === 0.5 || confValRaw === 0.7 ? confValRaw : 0.9) as 0.5 | 0.7 | 0.9;
+      void refreshMicrocopy(taxonId, conf);
+    });
+    form.querySelectorAll<HTMLInputElement>('input[name="confidence"]').forEach((r) => {
+      r.addEventListener('change', () => {
+        const opt = datalist?.querySelector<HTMLOptionElement>(`option[value="${nameInput?.value}"]`);
+        const taxonId = opt?.dataset.id ?? null;
+        const valRaw = Number(r.value);
+        const conf = (valRaw === 0.5 || valRaw === 0.7 ? valRaw : 0.9) as 0.5 | 0.7 | 0.9;
+        void refreshMicrocopy(taxonId, conf);
+      });
+    });
+
+    void refreshMicrocopy(null, 0.9);
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
