@@ -2,10 +2,10 @@
 /**
  * Build-time OG card generator.
  *
- * Renders a 1200×630 PNG for every static page at `public/og/<slug>.png`,
- * served as a plain static file by GitHub Pages CDN — zero runtime
- * compute, zero per-request server-side. Pattern borrowed from
- * watchboard's social-preview pipeline.
+ * Renders a 1200×630 PNG for every (locale, page) at
+ * `public/og/<lang>/<slug>.png`, served as a plain static file by GitHub
+ * Pages CDN — zero runtime compute, zero per-request server-side. Pattern
+ * borrowed from watchboard's social-preview pipeline.
  *
  * Wired into npm run build via the prebuild script.
  *
@@ -24,29 +24,92 @@ const OUT_DIR = path.join(ROOT, 'public', 'og');
 const FONT_BOLD_PATH    = path.join(ROOT, 'public', 'fonts', 'DMSans-Bold.ttf');
 const FONT_REGULAR_PATH = path.join(ROOT, 'public', 'fonts', 'DMSans-Regular.ttf');
 
+type Lang = 'en' | 'es';
+const LANGS: Lang[] = ['en', 'es'];
+
 interface PageSpec {
   slug: string;
-  card: StaticCardInput;
+  cards: Record<Lang, StaticCardInput>;
 }
 
-// One PNG per surface that needs a custom OG. The slug becomes the
-// filename (`public/og/<slug>.png`); pages reference it by setting
-// `ogImage` in their frontmatter or via the BaseLayout default.
+// One PNG per (locale, surface). Rendered to `public/og/<lang>/<slug>.png`.
+// BaseLayout picks the path from the page's `lang` prop, so scrapers see
+// localized titles/subtitles for /en/ and /es/ paths alike.
 const PAGES: PageSpec[] = [
-  { slug: 'default',           card: { kind: 'static', title: 'Rastrum',                       subtitle: 'Plataforma de identificación de biodiversidad para América Latina.', accent: 'emerald' } },
-  { slug: 'home',              card: { kind: 'static', title: 'Identifica cualquier ser vivo', subtitle: 'Rastrum — biodiversidad observada en tu idioma.',                       accent: 'emerald' } },
-  { slug: 'observe',           card: { kind: 'static', title: 'Observa la naturaleza',         subtitle: 'Sube fotos, audio o evidencia. Sin conexión también funciona.',          accent: 'emerald' } },
-  { slug: 'identify',          card: { kind: 'static', title: 'Identifica una especie',        subtitle: 'PlantNet · Claude · Phi-3.5 — todos en paralelo.',                       accent: 'emerald' } },
-  { slug: 'explore',           card: { kind: 'static', title: 'Explora observaciones',         subtitle: 'Mapa, especies, recientes, seguimiento.',                                accent: 'teal' } },
-  { slug: 'chat',              card: { kind: 'static', title: 'Conversa sobre biodiversidad',  subtitle: 'Pregunta cualquier cosa sobre la flora y fauna que observas.',           accent: 'sky' } },
-  { slug: 'about',             card: { kind: 'static', title: 'Acerca de Rastrum',             subtitle: 'Código abierto · Sin conexión · Lenguas indígenas.',                     accent: 'stone' } },
-  { slug: 'docs-roadmap',      card: { kind: 'static', title: 'Hoja de ruta',                  subtitle: 'Lo que se ha enviado y lo que viene a continuación.',                    accent: 'stone' } },
-  { slug: 'docs-architecture', card: { kind: 'static', title: 'Arquitectura',                  subtitle: 'Astro · Supabase · R2 · WebLLM · ONNX.',                                  accent: 'stone' } },
-  { slug: 'docs-contribute',   card: { kind: 'static', title: 'Contribuye',                    subtitle: 'Código abierto bajo AGPL-3.0. Únete al equipo.',                          accent: 'stone' } },
+  {
+    slug: 'default',
+    cards: {
+      en: { kind: 'static', title: 'Rastrum',                       subtitle: 'Open biodiversity identification platform for Latin America.',          accent: 'emerald' },
+      es: { kind: 'static', title: 'Rastrum',                       subtitle: 'Plataforma de identificación de biodiversidad para América Latina.',     accent: 'emerald' },
+    },
+  },
+  {
+    slug: 'home',
+    cards: {
+      en: { kind: 'static', title: 'Identify any living thing',     subtitle: 'Rastrum — biodiversity observed in your language.',                      accent: 'emerald' },
+      es: { kind: 'static', title: 'Identifica cualquier ser vivo', subtitle: 'Rastrum — biodiversidad observada en tu idioma.',                        accent: 'emerald' },
+    },
+  },
+  {
+    slug: 'observe',
+    cards: {
+      en: { kind: 'static', title: 'Observe nature',                subtitle: 'Upload photos, audio, evidence. Works offline too.',                     accent: 'emerald' },
+      es: { kind: 'static', title: 'Observa la naturaleza',         subtitle: 'Sube fotos, audio o evidencia. Sin conexión también funciona.',          accent: 'emerald' },
+    },
+  },
+  {
+    slug: 'identify',
+    cards: {
+      en: { kind: 'static', title: 'Identify a species',            subtitle: 'PlantNet · Claude · Phi-3.5 — all in parallel.',                         accent: 'emerald' },
+      es: { kind: 'static', title: 'Identifica una especie',        subtitle: 'PlantNet · Claude · Phi-3.5 — todos en paralelo.',                       accent: 'emerald' },
+    },
+  },
+  {
+    slug: 'explore',
+    cards: {
+      en: { kind: 'static', title: 'Explore observations',          subtitle: 'Map, species, recent, watchlist.',                                       accent: 'teal' },
+      es: { kind: 'static', title: 'Explora observaciones',         subtitle: 'Mapa, especies, recientes, seguimiento.',                                accent: 'teal' },
+    },
+  },
+  {
+    slug: 'chat',
+    cards: {
+      en: { kind: 'static', title: 'Chat about biodiversity',       subtitle: 'Ask anything about the flora and fauna you observe.',                    accent: 'sky' },
+      es: { kind: 'static', title: 'Conversa sobre biodiversidad',  subtitle: 'Pregunta cualquier cosa sobre la flora y fauna que observas.',           accent: 'sky' },
+    },
+  },
+  {
+    slug: 'about',
+    cards: {
+      en: { kind: 'static', title: 'About Rastrum',                 subtitle: 'Open source · Offline-first · Indigenous-language ready.',               accent: 'stone' },
+      es: { kind: 'static', title: 'Acerca de Rastrum',             subtitle: 'Código abierto · Sin conexión · Lenguas indígenas.',                     accent: 'stone' },
+    },
+  },
+  {
+    slug: 'docs-roadmap',
+    cards: {
+      en: { kind: 'static', title: 'Roadmap',                       subtitle: 'What we shipped and what comes next.',                                   accent: 'stone' },
+      es: { kind: 'static', title: 'Hoja de ruta',                  subtitle: 'Lo que se ha enviado y lo que viene a continuación.',                    accent: 'stone' },
+    },
+  },
+  {
+    slug: 'docs-architecture',
+    cards: {
+      en: { kind: 'static', title: 'Architecture',                  subtitle: 'Astro · Supabase · R2 · WebLLM · ONNX.',                                  accent: 'stone' },
+      es: { kind: 'static', title: 'Arquitectura',                  subtitle: 'Astro · Supabase · R2 · WebLLM · ONNX.',                                  accent: 'stone' },
+    },
+  },
+  {
+    slug: 'docs-contribute',
+    cards: {
+      en: { kind: 'static', title: 'Contribute',                    subtitle: 'Open source under AGPL-3.0. Join the team.',                             accent: 'stone' },
+      es: { kind: 'static', title: 'Contribuye',                    subtitle: 'Código abierto bajo AGPL-3.0. Únete al equipo.',                         accent: 'stone' },
+    },
+  },
 ];
 
-async function renderOne(spec: PageSpec, fontBold: ArrayBuffer, fontRegular: ArrayBuffer): Promise<void> {
-  const tree = buildOgTree(spec.card);
+async function renderOne(slug: string, lang: Lang, card: StaticCardInput, fontBold: ArrayBuffer, fontRegular: ArrayBuffer): Promise<Buffer> {
+  const tree = buildOgTree(card);
   // satori expects a React-style element; our tree is shape-compatible.
   const svg = await satori(tree as unknown as Parameters<typeof satori>[0], {
     width: OG_WIDTH,
@@ -59,9 +122,10 @@ async function renderOne(spec: PageSpec, fontBold: ArrayBuffer, fontRegular: Arr
   const png = new Resvg(svg, {
     fitTo: { mode: 'width', value: OG_WIDTH },
   }).render().asPng();
-  const outPath = path.join(OUT_DIR, `${spec.slug}.png`);
+  const outPath = path.join(OUT_DIR, lang, `${slug}.png`);
   fs.writeFileSync(outPath, png);
-  console.log(`  ✓ ${spec.slug}.png  (${(png.length / 1024).toFixed(1)} KB)`);
+  console.log(`  ✓ ${lang}/${slug}.png  (${(png.length / 1024).toFixed(1)} KB)`);
+  return png;
 }
 
 // PWA screenshot specs — required by Chrome's "Richer PWA Install UI"
@@ -126,15 +190,30 @@ async function main() {
     }
   }
   fs.mkdirSync(OUT_DIR, { recursive: true });
+  for (const lang of LANGS) {
+    fs.mkdirSync(path.join(OUT_DIR, lang), { recursive: true });
+  }
   fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
   // Convert Buffer → ArrayBuffer (satori's Font['data'] type expects
   // ArrayBuffer | Buffer, not Uint8Array). The slice() copies.
   const toAb = (b: Buffer): ArrayBuffer => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
   const fontBold    = toAb(fs.readFileSync(FONT_BOLD_PATH));
   const fontRegular = toAb(fs.readFileSync(FONT_REGULAR_PATH));
-  console.log(`Generating ${PAGES.length} OG cards into public/og/…`);
+  const total = PAGES.length * LANGS.length;
+  console.log(`Generating ${total} OG cards into public/og/{en,es}/…`);
   for (const spec of PAGES) {
-    await renderOne(spec, fontBold, fontRegular);
+    let esPng: Buffer | null = null;
+    for (const lang of LANGS) {
+      const png = await renderOne(spec.slug, lang, spec.cards[lang], fontBold, fontRegular);
+      if (lang === 'es') esPng = png;
+    }
+    // Backward-compat shim for cached scrapers (Facebook/Twitter/LinkedIn)
+    // that already indexed the legacy /og/<slug>.png path. The legacy
+    // location matches the original Spanish content.
+    if (esPng) {
+      const legacyPath = path.join(OUT_DIR, `${spec.slug}.png`);
+      fs.writeFileSync(legacyPath, esPng);
+    }
   }
   console.log(`Generating ${SCREENSHOTS.length} PWA screenshots into public/screenshots/…`);
   for (const spec of SCREENSHOTS) {
