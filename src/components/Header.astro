@@ -191,6 +191,12 @@ const docColumns = [
         </div>
       </div>
 
+      <a id="header-console-pill"
+         href={getLocalizedPath(lang, routes.console[locale] + '/')}
+         class="hidden text-xs px-2.5 py-1 rounded-full text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/40 ml-2">
+        {tr.console.nav}
+      </a>
+
       <a
         href={altHref}
         id="lang-toggle"
@@ -264,6 +270,7 @@ const docColumns = [
 <script>
   import { getSupabase } from '../lib/supabase';
   import { signOut } from '../lib/auth';
+  import { getUserRoles } from '../lib/user-roles';
   import type { UserProfile } from '../lib/types';
 
   const signInLink = document.getElementById('sign-in-link');
@@ -333,11 +340,24 @@ const docColumns = [
     } catch { /* env not set */ }
   }
 
+  async function maybeShowConsolePill(userId: string) {
+    const pill = document.getElementById('header-console-pill');
+    if (!pill) return;
+    try {
+      const roles = await getUserRoles(userId);
+      if (roles.size > 0) pill.classList.remove('hidden');
+    } catch { /* silent — header pill is optional UX */ }
+  }
+
   (async () => {
     try {
       const { data: { session } } = await getSupabase().auth.getSession();
       await paint(!!session, session?.user as Parameters<typeof paint>[1]);
-      getSupabase().auth.onAuthStateChange((_evt, s) => paint(!!s, s?.user as Parameters<typeof paint>[1]));
+      if (session?.user) await maybeShowConsolePill(session.user.id);
+      getSupabase().auth.onAuthStateChange(async (_evt, s) => {
+        paint(!!s, s?.user as Parameters<typeof paint>[1]);
+        if (s?.user) await maybeShowConsolePill(s.user.id);
+      });
     } catch { /* env not set */ }
   })();
 
