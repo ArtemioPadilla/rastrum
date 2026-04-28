@@ -106,9 +106,10 @@ CREATE TABLE IF NOT EXISTS public.user_roles (
   PRIMARY KEY (user_id, role)
 );
 
+-- Partial index restricted to permanently-active rows (NULL revoked_at). Future-dated revocations are rare; has_role() handles the > now() check at query time.
 CREATE INDEX IF NOT EXISTS user_roles_active_idx
   ON public.user_roles (role)
-  WHERE revoked_at IS NULL OR revoked_at > now();
+  WHERE revoked_at IS NULL;
 
 ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
 
@@ -188,6 +189,11 @@ BEGIN
 END;
 $$;
 
+-- The trigger fires on changes to revoked_at because that's the only
+-- time the active-roles set changes for a given user. The PRIMARY KEY
+-- (user_id, role) prevents direct role-column mutations. If the schema
+-- ever adds an alternative deactivation column (e.g., is_active), this
+-- trigger needs to expand the UPDATE OF list.
 DROP TRIGGER IF EXISTS user_roles_sync_flags ON public.user_roles;
 CREATE TRIGGER user_roles_sync_flags
 AFTER INSERT OR UPDATE OF revoked_at OR DELETE ON public.user_roles
@@ -209,15 +215,24 @@ CREATE POLICY admin_audit_admin_read ON public.admin_audit
   FOR SELECT TO authenticated
   USING (public.has_role(auth.uid(), 'admin'));
 
+DROP POLICY IF EXISTS admin_audit_no_client_write ON public.admin_audit;
+CREATE POLICY admin_audit_no_client_write ON public.admin_audit
+  FOR ALL TO authenticated
+  USING (false) WITH CHECK (false);
+
 -- 8. Refactor existing api_usage / sync_failures predicates from is_expert → admin role
-DROP POLICY IF EXISTS api_usage_expert_read ON public.api_usage;
-DROP POLICY IF EXISTS api_usage_admin_read ON public.api_usage;
+--    Note: the original policies were named with a different convention; we drop
+--    both the historical and the new name for idempotency.
+DROP POLICY IF EXISTS "api_usage_read_admin"     ON public.api_usage;
+DROP POLICY IF EXISTS api_usage_expert_read       ON public.api_usage;
+DROP POLICY IF EXISTS api_usage_admin_read        ON public.api_usage;
 CREATE POLICY api_usage_admin_read ON public.api_usage
   FOR SELECT TO authenticated
   USING (public.has_role(auth.uid(), 'admin'));
 
-DROP POLICY IF EXISTS sync_failures_expert_read ON public.sync_failures;
-DROP POLICY IF EXISTS sync_failures_admin_read ON public.sync_failures;
+DROP POLICY IF EXISTS "sync_failures_read_admin" ON public.sync_failures;
+DROP POLICY IF EXISTS sync_failures_expert_read   ON public.sync_failures;
+DROP POLICY IF EXISTS sync_failures_admin_read    ON public.sync_failures;
 CREATE POLICY sync_failures_admin_read ON public.sync_failures
   FOR SELECT TO authenticated
   USING (public.has_role(auth.uid(), 'admin'));
