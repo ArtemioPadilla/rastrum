@@ -1,0 +1,151 @@
+---
+import type { Locale } from '../../i18n/utils';
+import { t } from '../../i18n/utils';
+
+interface Props {
+  lang: Locale;
+  viewer: 'self' | 'signed_in' | 'anonymous';
+  targetUserId?: string;
+  ownerOnly?: boolean;
+}
+
+const { lang, ownerOnly = false } = Astro.props;
+const tr = t(lang);
+const heading = lang === 'es' ? 'Actividad reciente' : 'Recent activity';
+const filterAll = lang === 'es' ? 'Todo' : 'All';
+const filterObs = lang === 'es' ? 'Observaciones' : 'Observations';
+const filterIds = lang === 'es' ? 'Identificaciones' : 'IDs';
+const filterSug = lang === 'es' ? 'Sugerencias' : 'Suggestions';
+const filterBadges = lang === 'es' ? 'Insignias' : 'Badges';
+const ownerPill = (tr as unknown as { privacy?: { owner_only_badge?: string } }).privacy?.owner_only_badge ?? (lang === 'es' ? '🔒 Solo tú lo ves' : '🔒 Only you see this');
+---
+
+<section
+  data-widget="activity-timeline"
+  data-target-user-id={Astro.props.targetUserId}
+  class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 mb-6"
+>
+  <header class="flex items-baseline justify-between mb-3">
+    <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">{heading}</h2>
+    {ownerOnly && (
+      <span class="text-[10px] font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded">
+        {ownerPill}
+      </span>
+    )}
+  </header>
+
+  <div class="flex flex-wrap gap-1.5 mb-4" role="tablist" aria-label={heading}>
+    <button data-filter="all"          class="px-2.5 py-1 text-xs font-medium rounded-md bg-emerald-700 text-white" data-active="true">{filterAll}</button>
+    <button data-filter="observations" class="px-2.5 py-1 text-xs font-medium rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">{filterObs}</button>
+    <button data-filter="ids"          class="px-2.5 py-1 text-xs font-medium rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">{filterIds}</button>
+    <button data-filter="suggestions"  class="px-2.5 py-1 text-xs font-medium rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">{filterSug}</button>
+    <button data-filter="badges"       class="px-2.5 py-1 text-xs font-medium rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">{filterBadges}</button>
+  </div>
+
+  <p data-state="empty" class="hidden text-xs text-zinc-500 italic py-4">
+    {lang === 'es' ? 'Sin actividad reciente.' : 'No recent activity.'}
+  </p>
+
+  <div data-groups class="space-y-4"></div>
+</section>
+
+<script>
+  import { getSupabase } from '../../lib/supabase';
+  import { groupActivityByWeek, type ActivityRow } from '../../lib/profile-widgets';
+  import { escAttr } from '../../lib/karma';
+
+  const KIND_TO_FILTER: Record<string, 'observations' | 'ids' | 'suggestions' | 'badges' | 'other'> = {
+    observation_created: 'observations',
+    observation_id_accepted: 'ids',
+    observation_id_changed: 'ids',
+    observation_research_grade: 'ids',
+    badge_earned: 'badges',
+    streak_milestone: 'badges',
+    first_of_species_in_region: 'observations',
+    first_observation_of_day: 'observations',
+    comment_received: 'other',
+    validation_given: 'suggestions',
+    validation_received: 'suggestions',
+    follow_received: 'other',
+  };
+
+  async function hydrate(el: HTMLElement) {
+    const groupsEl = el.querySelector<HTMLElement>('[data-groups]');
+    const empty = el.querySelector<HTMLElement>('[data-state="empty"]');
+    if (!groupsEl) return;
+
+    let supabase;
+    try { supabase = getSupabase(); } catch { return; }
+    let userId = el.dataset.targetUserId ?? null;
+    if (!userId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      userId = user.id;
+    }
+    const { data } = await supabase
+      .from('profile_activity_feed')
+      .select('event_id, event_kind, subject_id, payload, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    const rows = (data ?? []) as ActivityRow[];
+    if (!rows.length) {
+      empty?.classList.remove('hidden');
+      return;
+    }
+
+    const isEs = (document.documentElement.lang || 'en') === 'es';
+    const labels: Record<string, { en: string; es: string }> = {
+      this_week: { en: 'This week',  es: 'Esta semana' },
+      last_week: { en: 'Last week',  es: 'Semana pasada' },
+      older:     { en: 'Earlier',    es: 'Antes' },
+    };
+
+    let activeFilter: 'all' | 'observations' | 'ids' | 'suggestions' | 'badges' = 'all';
+
+    function paint() {
+      const filtered = rows.filter((r) => {
+        if (activeFilter === 'all') return true;
+        return KIND_TO_FILTER[r.event_kind] === activeFilter;
+      });
+      const groups = groupActivityByWeek(filtered);
+      if (!groups.length) {
+        groupsEl!.innerHTML = `<p class="text-xs text-zinc-500 italic py-2">${isEs ? 'Sin coincidencias.' : 'No matches.'}</p>`;
+        return;
+      }
+      groupsEl!.innerHTML = groups.map((g) => {
+        const label = labels[g.bucketKey][isEs ? 'es' : 'en'];
+        const items = g.rows.map((r) => `<li class="text-sm text-zinc-700 dark:text-zinc-300">
+            <span class="text-xs text-zinc-400">${new Date(r.created_at).toLocaleDateString()}</span>
+            <span class="ml-2 font-medium">${escAttr(r.event_kind)}</span>
+          </li>`).join('');
+        return `<div>
+          <h3 class="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">${escAttr(label)}</h3>
+          <ul class="space-y-1">${items}</ul>
+        </div>`;
+      }).join('');
+    }
+
+    paint();
+
+    el.querySelectorAll<HTMLButtonElement>('[data-filter]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const f = btn.dataset.filter as typeof activeFilter;
+        activeFilter = f;
+        el.querySelectorAll<HTMLButtonElement>('[data-filter]').forEach((b) => {
+          const isActive = b === btn;
+          b.dataset.active = isActive ? 'true' : 'false';
+          b.classList.toggle('bg-emerald-700', isActive);
+          b.classList.toggle('text-white', isActive);
+          b.classList.toggle('bg-zinc-100', !isActive);
+          b.classList.toggle('dark:bg-zinc-800', !isActive);
+          b.classList.toggle('text-zinc-700', !isActive);
+          b.classList.toggle('dark:text-zinc-300', !isActive);
+        });
+        paint();
+      });
+    });
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-widget="activity-timeline"]').forEach(hydrate);
+</script>

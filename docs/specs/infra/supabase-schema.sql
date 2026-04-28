@@ -2254,3 +2254,186 @@ CREATE POLICY activity_public_read ON public.activity_events FOR SELECT
          OR public.can_see_facet(id, 'profile', (SELECT auth.uid()))
     )
   );
+-- ============ Module 25 v1.2.1 — richer profile views ============
+-- Depends on v1.2.0 (sister PR): users.profile_privacy, can_see_facet(),
+-- can_see_facets(), profile_observation_pins, profile_stats_counts,
+-- users_update_self_privacy policy, user_expertise_facet_read policy.
+-- This block is append-only; v1.2.0 lands its block before this one.
+
+-- Calendar heatmap — daily bucket of synced observations, last 365 days.
+CREATE OR REPLACE VIEW public.profile_calendar_buckets AS
+SELECT
+  o.observer_id          AS user_id,
+  (o.observed_at AT TIME ZONE 'UTC')::date AS bucket_date,
+  COUNT(*)::int          AS daily_count
+FROM public.observations o
+WHERE
+  o.sync_status = 'synced'
+  AND o.observed_at >= (now() - interval '365 days')
+  AND public.can_see_facet(o.observer_id, 'calendar_heatmap', (SELECT auth.uid()))
+GROUP BY o.observer_id, (o.observed_at AT TIME ZONE 'UTC')::date;
+
+GRANT SELECT ON public.profile_calendar_buckets TO anon, authenticated;
+
+-- Taxonomic donut — kingdom-level breakdown of synced obs.
+CREATE OR REPLACE VIEW public.profile_taxonomic_donut AS
+SELECT
+  o.observer_id   AS user_id,
+  COALESCE(t.kingdom, 'Unknown') AS kingdom,
+  COUNT(*)::int   AS obs_count,
+  COUNT(DISTINCT i.taxon_id)::int AS species_count
+FROM public.observations o
+JOIN public.identifications i
+  ON i.observation_id = o.id AND i.is_primary = true
+LEFT JOIN public.taxa t ON t.id = i.taxon_id
+WHERE
+  o.sync_status = 'synced'
+  AND public.can_see_facet(o.observer_id, 'taxonomic_donut', (SELECT auth.uid()))
+GROUP BY o.observer_id, COALESCE(t.kingdom, 'Unknown');
+
+GRANT SELECT ON public.profile_taxonomic_donut TO anon, authenticated;
+
+-- Top species — top 12 species per user, with thumbnail from primary photo.
+CREATE OR REPLACE VIEW public.profile_top_species AS
+WITH counted AS (
+  SELECT
+    o.observer_id AS user_id,
+    i.taxon_id,
+    i.scientific_name,
+    COUNT(*)::int AS obs_count,
+    MIN(o.id) AS sample_obs_id
+  FROM public.observations o
+  JOIN public.identifications i
+    ON i.observation_id = o.id AND i.is_primary = true
+  WHERE
+    o.sync_status = 'synced'
+    AND o.obscure_level <> 'full'
+    AND public.can_see_facet(o.observer_id, 'top_species', (SELECT auth.uid()))
+  GROUP BY o.observer_id, i.taxon_id, i.scientific_name
+),
+ranked AS (
+  SELECT *,
+         row_number() OVER (PARTITION BY user_id ORDER BY obs_count DESC, scientific_name ASC) AS rnk
+  FROM counted
+)
+SELECT
+  r.user_id,
+  r.taxon_id,
+  r.scientific_name,
+  r.obs_count,
+  m.url AS thumbnail_url
+FROM ranked r
+LEFT JOIN LATERAL (
+  SELECT mf.url FROM public.media_files mf
+  WHERE mf.observation_id = r.sample_obs_id
+  ORDER BY mf.is_primary DESC NULLS LAST, mf.created_at ASC
+  LIMIT 1
+) m ON true
+WHERE r.rnk <= 12;
+
+GRANT SELECT ON public.profile_top_species TO anon, authenticated;
+
+-- Validation reputation — counts of identifications submitted as voter and
+-- those that promoted to research-grade.
+CREATE OR REPLACE VIEW public.profile_validation_reputation AS
+SELECT
+  i.validated_by AS user_id,
+  COUNT(*)::int  AS identifications_submitted,
+  COUNT(*) FILTER (WHERE i.is_research_grade = true)::int AS promoted_research_grade,
+  COUNT(*) FILTER (WHERE i.is_primary = true)::int AS accepted_as_primary
+FROM public.identifications i
+WHERE
+  i.validated_by IS NOT NULL
+  AND public.can_see_facet(i.validated_by, 'validation_rep', (SELECT auth.uid()))
+GROUP BY i.validated_by;
+
+GRANT SELECT ON public.profile_validation_reputation TO anon, authenticated;
+
+-- Badges visible — list of unlocked badges per user.
+CREATE OR REPLACE VIEW public.profile_badges_visible AS
+SELECT
+  ub.user_id,
+  ub.badge_key,
+  b.tier,
+  b.category,
+  b.name_en,
+  b.name_es,
+  b.description_en,
+  b.description_es,
+  ub.awarded_at
+FROM public.user_badges ub
+JOIN public.badges b ON b.key = ub.badge_key
+WHERE
+  ub.revoked_at IS NULL
+  AND public.can_see_facet(ub.user_id, 'badges', (SELECT auth.uid()));
+
+GRANT SELECT ON public.profile_badges_visible TO anon, authenticated;
+
+-- Activity feed — recent activity_events filtered by the activity_feed facet.
+CREATE OR REPLACE VIEW public.profile_activity_feed AS
+SELECT
+  ae.actor_id     AS user_id,
+  ae.id           AS event_id,
+  ae.kind         AS event_kind,
+  ae.subject_id,
+  ae.payload,
+  ae.created_at
+FROM public.activity_events ae
+WHERE public.can_see_facet(ae.actor_id, 'activity_feed', (SELECT auth.uid()));
+
+GRANT SELECT ON public.profile_activity_feed TO anon, authenticated;
+
+-- Karma + top expertise — gated by karma_total facet. When karma_total is
+-- hidden, no row is emitted; when it's visible but expertise is hidden, the
+-- top_expertise aggregate is returned as an empty array.
+CREATE OR REPLACE VIEW public.profile_karma AS
+SELECT
+  u.id               AS user_id,
+  u.username,
+  u.karma_total,
+  u.karma_updated_at,
+  CASE
+    WHEN public.can_see_facet(u.id, 'expertise', (SELECT auth.uid()))
+      THEN (
+        SELECT jsonb_agg(jsonb_build_object(
+                 'taxon_id',        e.taxon_id,
+                 'scientific_name', t.scientific_name,
+                 'score',           e.score
+               ) ORDER BY e.score DESC)
+        FROM (
+          SELECT * FROM public.user_expertise
+          WHERE user_id = u.id
+          ORDER BY score DESC
+          LIMIT 5
+        ) e
+        JOIN public.taxa t ON t.id = e.taxon_id
+      )
+    ELSE '[]'::jsonb
+  END AS top_expertise
+FROM public.users u
+WHERE public.can_see_facet(u.id, 'karma_total', (SELECT auth.uid()));
+
+GRANT SELECT ON public.profile_karma TO anon, authenticated;
+
+-- Pokédex — every taxon the user has observed, joined to taxon_rarity.
+CREATE OR REPLACE VIEW public.profile_pokedex AS
+SELECT
+  o.observer_id   AS user_id,
+  i.taxon_id,
+  t.scientific_name,
+  t.kingdom,
+  tr.bucket       AS rarity_bucket,
+  MIN(o.observed_at) AS first_observed_at,
+  COUNT(*)::int   AS obs_count
+FROM public.observations o
+JOIN public.identifications i
+  ON i.observation_id = o.id AND i.is_primary = true
+JOIN public.taxa t                ON t.id = i.taxon_id
+LEFT JOIN public.taxon_rarity tr  ON tr.taxon_id = i.taxon_id
+WHERE
+  o.sync_status = 'synced'
+  AND o.obscure_level <> 'private'
+  AND public.can_see_facet(o.observer_id, 'pokedex', (SELECT auth.uid()))
+GROUP BY o.observer_id, i.taxon_id, t.scientific_name, t.kingdom, tr.bucket;
+
+GRANT SELECT ON public.profile_pokedex TO anon, authenticated;

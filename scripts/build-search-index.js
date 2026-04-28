@@ -131,6 +131,31 @@ const quickActions = [
     url:     { en: '/en/profile/export/',    es: '/es/perfil/exportar/' },
     keywords: 'export darwin core archive dwca gbif',
   },
+  {
+    id: 'action-privacy-settings',
+    label:   { en: 'Privacy settings',      es: 'Configuración de privacidad' },
+    url:     { en: '/en/profile/settings/privacy/', es: '/es/perfil/ajustes/privacy/' },
+    keywords: 'privacy facets matrix profile visibility public signed-in private',
+  },
+  {
+    id: 'action-pokedex',
+    label:   { en: 'Pokédex',               es: 'Pokédex' },
+    url:     { en: '/en/profile/dex/',       es: '/es/perfil/dex/' },
+    keywords: 'pokedex dex species rarity collected discovered',
+  },
+  {
+    id: 'action-view-public-profile',
+    label:   { en: 'View my public profile', es: 'Ver mi perfil público' },
+    url:     { en: '/en/profile/',           es: '/es/perfil/' },
+    keywords: 'public profile share view username u',
+  },
+  {
+    id: 'action-make-profile-private',
+    label:   { en: 'Make profile private',  es: 'Hacer perfil privado' },
+    url:     null,
+    keywords: 'private hide privacy visibility off',
+    action: 'make-profile-private',
+  },
 ];
 
 // ---------------------------------------------------------------------------

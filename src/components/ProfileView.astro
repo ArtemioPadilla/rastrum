@@ -2,6 +2,16 @@
 import { t, getLocalizedPath, routes, type Locale } from '../i18n/utils';
 import StreakCard from './StreakCard.astro';
 import Skeleton from './Skeleton.astro';
+import PrivacyIntroBanner from './PrivacyIntroBanner.astro';
+import ProfileObservationMap from './profile/ProfileObservationMap.astro';
+import ProfileCalendarHeatmap from './profile/ProfileCalendarHeatmap.astro';
+import ProfileTaxonomicDonut from './profile/ProfileTaxonomicDonut.astro';
+import ProfileTopSpeciesGrid from './profile/ProfileTopSpeciesGrid.astro';
+import ProfileStreakRing from './profile/ProfileStreakRing.astro';
+import ProfileKarmaSection from './profile/ProfileKarmaSection.astro';
+import ProfilePokedexLink from './profile/ProfilePokedexLink.astro';
+import ProfileBadgesGrid from './profile/ProfileBadgesGrid.astro';
+import ProfileActivityTimeline from './profile/ProfileActivityTimeline.astro';
 
 interface Props {
   lang: 'en' | 'es';
@@ -28,6 +38,7 @@ const k = (tr as unknown as { karma: Record<string, string> }).karma;
 
   <!-- Signed-in state -->
   <div id="signed-in" class="hidden">
+    <PrivacyIntroBanner lang={lang} />
     <!-- Identity strip -->
     <header class="mb-8">
       <div class="flex items-start gap-4">
@@ -99,8 +110,24 @@ const k = (tr as unknown as { karma: Record<string, string> }).karma;
       <StreakCard lang={lang} />
     </div>
 
-    <!-- Karma & expertise section (module 23) -->
-    <section id="karma-section" class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 space-y-3 mb-6">
+    <!-- Module 25 v1.2.1 widgets (owner view always sees, "Only you" pill
+         flagged on visitor-hidden facets at runtime). -->
+    <ProfileObservationMap lang={lang} viewer="self" />
+    <ProfileCalendarHeatmap lang={lang} viewer="self" />
+    <ProfileTaxonomicDonut lang={lang} viewer="self" />
+    <ProfileTopSpeciesGrid lang={lang} viewer="self" />
+    <ProfileStreakRing lang={lang} viewer="self" />
+    <ProfileKarmaSection lang={lang} viewer="self" />
+    <ProfilePokedexLink lang={lang} viewer="self" />
+    <ProfileBadgesGrid lang={lang} viewer="self" />
+    <ProfileActivityTimeline lang={lang} viewer="self" />
+
+    <!-- Legacy karma & expertise section (module 23) — kept hidden as a
+         data hydration target while the new ProfileKarmaSection above is the
+         visible widget. The ProfileView script still reads from these
+         elements; once the legacy karma block is removed in v1.3, the
+         hidden flag below can drop too. -->
+    <section id="karma-section" class="hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 space-y-3 mb-6">
       <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
         {k.section_title}
       </h2>
@@ -146,8 +173,9 @@ const k = (tr as unknown as { karma: Record<string, string> }).karma;
       </div>
     </section>
 
-    <!-- Badges (module 08) -->
-    <section id="badges-section" class="hidden mb-8">
+    <!-- Badges (module 08) — superseded by ProfileBadgesGrid above; kept
+         hidden so the old hydrate script still has a target. -->
+    <section id="badges-section" class="hidden mb-8" data-legacy="true">
       <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-3">
         {lang === 'es' ? 'Insignias' : 'Badges'}
       </h2>
@@ -264,7 +292,7 @@ const k = (tr as unknown as { karma: Record<string, string> }).karma;
         const sec  = document.getElementById('badges-section');
         const list = document.getElementById('badges-list');
         const isEs = document.documentElement.lang === 'es';
-        sec?.classList.remove('hidden');
+        if (sec && !sec.dataset.legacy) sec.classList.remove('hidden');
         if (list) {
           const tierColor = (tier: string) =>
             tier === 'platinum' ? 'bg-zinc-200 text-zinc-800 dark:bg-zinc-300 dark:text-zinc-900' :

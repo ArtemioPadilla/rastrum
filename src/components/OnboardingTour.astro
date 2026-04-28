@@ -25,16 +25,27 @@ const tr = t(lang);
 type OnbTree = {
   skip: string; next: string; done: string; back: string; start: string;
   step_label: string; step_dot_aria: string; close_label: string;
+  preset_open_scientist?: string;
+  preset_researcher_recommended?: string;
+  preset_private_observer?: string;
   steps: {
     welcome: { title: string; body: string };
     fab: { title: string; body: string };
     quick_id: { title: string; body: string };
     explore: { title: string; body: string };
+    privacy?: { title: string; body: string };
     settings: { title: string; body: string };
   };
 };
 const onb = (tr as unknown as { onboarding: OnbTree }).onboarding;
 const stepsData = onb.steps;
+const privacyStep = stepsData.privacy ?? {
+  title: 'Pick your privacy preset',
+  body: 'Choose how visible your observations are to other naturalists. You can change this anytime.',
+};
+const presetOpen = onb.preset_open_scientist ?? 'Open scientist';
+const presetResearcher = onb.preset_researcher_recommended ?? 'Researcher (recommended)';
+const presetPrivate = onb.preset_private_observer ?? 'Private observer';
 ---
 
 <!--
@@ -55,7 +66,10 @@ const stepsData = onb.steps;
   data-label-back={onb.back}
   data-label-start={onb.start}
   data-label-close={onb.close_label}
-  data-step-count="5"
+  data-label-preset-open={presetOpen}
+  data-label-preset-researcher={presetResearcher}
+  data-label-preset-private={presetPrivate}
+  data-step-count="6"
 >
   <!-- Backdrop with spotlight hole punched via clip-path -->
   <div
@@ -108,6 +122,7 @@ const stepsData = onb.steps;
         <span class="onb-dot w-2 h-2 rounded-full" data-i="2"></span>
         <span class="onb-dot w-2 h-2 rounded-full" data-i="3"></span>
         <span class="onb-dot w-2 h-2 rounded-full" data-i="4"></span>
+        <span class="onb-dot w-2 h-2 rounded-full" data-i="5"></span>
       </div>
 
       <div class="flex items-center gap-2">
@@ -152,6 +167,12 @@ const stepsData = onb.steps;
       target: '[data-tour="explore-tab"],[data-tour="explore-nav"]',
     },
     {
+      title: privacyStep.title,
+      body: privacyStep.body,
+      target: null,
+      kind: 'privacy_preset',
+    },
+    {
       title: stepsData.settings.title,
       body: stepsData.settings.body,
       target: '[data-tour="profile-tab"],[data-tour="avatar-btn"]',
@@ -162,7 +183,7 @@ const stepsData = onb.steps;
 <script>
   import { getSupabase } from '../lib/supabase';
 
-  type StepDef = { title: string; body: string; target: string | null };
+  type StepDef = { title: string; body: string; target: string | null; kind?: 'privacy_preset' };
 
   const root = document.getElementById('onboarding-tour') as HTMLDivElement | null;
   if (!root) throw new Error('OnboardingTour: root element missing');
@@ -295,12 +316,114 @@ const stepsData = onb.steps;
     tooltip.style.transform = 'none';
   }
 
+  const PRESET_KEYS = ['open_scientist', 'researcher', 'private_observer'] as const;
+  const PRESET_DEFS: Record<typeof PRESET_KEYS[number], Record<string, 'public' | 'signed_in' | 'private'>> = {
+    open_scientist: {
+      profile: 'public', real_name: 'public', bio: 'public', location: 'public',
+      stats_counts: 'public', observation_map: 'public', calendar_heatmap: 'public',
+      taxonomic_donut: 'public', top_species: 'public', streak: 'public',
+      badges: 'public', activity_feed: 'public', validation_rep: 'public',
+      obs_list: 'public', watchlist: 'private', goals: 'private',
+      karma_total: 'public', expertise: 'public', pokedex: 'public',
+    },
+    researcher: {
+      profile: 'public', real_name: 'signed_in', bio: 'public', location: 'signed_in',
+      stats_counts: 'public', observation_map: 'public', calendar_heatmap: 'public',
+      taxonomic_donut: 'public', top_species: 'public', streak: 'signed_in',
+      badges: 'public', activity_feed: 'signed_in', validation_rep: 'public',
+      obs_list: 'public', watchlist: 'private', goals: 'private',
+      karma_total: 'public', expertise: 'public', pokedex: 'public',
+    },
+    private_observer: {
+      profile: 'signed_in', real_name: 'private', bio: 'private', location: 'private',
+      stats_counts: 'private', observation_map: 'private', calendar_heatmap: 'private',
+      taxonomic_donut: 'private', top_species: 'private', streak: 'private',
+      badges: 'private', activity_feed: 'private', validation_rep: 'private',
+      obs_list: 'private', watchlist: 'private', goals: 'private',
+      karma_total: 'private', expertise: 'private', pokedex: 'private',
+    },
+  };
+  const PRESET_LABELS = {
+    open_scientist:   dialog.dataset.labelPresetOpen       ?? 'Open scientist',
+    researcher:       dialog.dataset.labelPresetResearcher ?? 'Researcher (recommended)',
+    private_observer: dialog.dataset.labelPresetPrivate    ?? 'Private observer',
+  } as const;
+  const PRIVACY_PRESET_KEY = 'rastrum.onboarding.privacyPreset';
+  let chosenPreset: typeof PRESET_KEYS[number] = 'researcher';
+
+  async function persistPreset(preset: typeof PRESET_KEYS[number]): Promise<void> {
+    chosenPreset = preset;
+    try { localStorage.setItem(PRIVACY_PRESET_KEY, preset); } catch { /* noop */ }
+    let sb;
+    try { sb = getSupabase(); } catch { return; }
+    try {
+      const { data: { user } } = await sb.auth.getUser();
+      if (!user) return;
+      await sb.from('users').update({ profile_privacy: PRESET_DEFS[preset] }).eq('id', user.id);
+    } catch { /* env not configured / column missing — fail closed */ }
+  }
+
+  function renderPresetButtons(container: HTMLElement): void {
+    container.innerHTML = '';
+    const wrap = document.createElement('div');
+    wrap.className = 'mt-3 flex flex-col gap-1.5';
+    for (const key of PRESET_KEYS) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.dataset.preset = key;
+      btn.className = 'text-left text-xs px-3 py-2 rounded-md border transition-colors';
+      btn.textContent = PRESET_LABELS[key];
+      const setActive = (active: boolean) => {
+        btn.classList.toggle('border-emerald-600', active);
+        btn.classList.toggle('bg-emerald-50', active);
+        btn.classList.toggle('dark:bg-emerald-900/30', active);
+        btn.classList.toggle('text-emerald-900', active);
+        btn.classList.toggle('dark:text-emerald-100', active);
+        btn.classList.toggle('border-zinc-300', !active);
+        btn.classList.toggle('dark:border-zinc-700', !active);
+        btn.classList.toggle('text-zinc-700', !active);
+        btn.classList.toggle('dark:text-zinc-300', !active);
+      };
+      setActive(key === chosenPreset);
+      btn.addEventListener('click', () => {
+        wrap.querySelectorAll<HTMLButtonElement>('[data-preset]').forEach((b) => {
+          const active = b === btn;
+          b.classList.toggle('border-emerald-600', active);
+          b.classList.toggle('bg-emerald-50', active);
+          b.classList.toggle('dark:bg-emerald-900/30', active);
+          b.classList.toggle('text-emerald-900', active);
+          b.classList.toggle('dark:text-emerald-100', active);
+          b.classList.toggle('border-zinc-300', !active);
+          b.classList.toggle('dark:border-zinc-700', !active);
+          b.classList.toggle('text-zinc-700', !active);
+          b.classList.toggle('dark:text-zinc-300', !active);
+        });
+        persistPreset(key).catch(() => { /* env not configured */ });
+      });
+      wrap.appendChild(btn);
+    }
+    container.appendChild(wrap);
+  }
+
+  function clearPresetButtons(container: HTMLElement): void {
+    container.innerHTML = '';
+  }
+
   function render(): void {
     const step = STEPS[current];
     if (!step) return;
 
     titleEl.textContent = step.title;
     bodyEl.textContent  = step.body;
+
+    let presetWrap = document.getElementById('onb-preset-buttons');
+    if (!presetWrap) {
+      presetWrap = document.createElement('div');
+      presetWrap.id = 'onb-preset-buttons';
+      bodyEl.parentElement?.insertBefore(presetWrap, bodyEl.nextSibling);
+    }
+    if (step.kind === 'privacy_preset') renderPresetButtons(presetWrap);
+    else clearPresetButtons(presetWrap);
 
     stepLabelEl.textContent = stepTpl
       .replace('{current}', String(current + 1))
@@ -448,7 +571,9 @@ const stepsData = onb.steps;
   window.addEventListener('rastrum:replay-onboarding', () => {
     try {
       localStorage.removeItem(SEEN_KEY);
+      localStorage.removeItem(PRIVACY_PRESET_KEY);
     } catch { /* noop */ }
+    chosenPreset = 'researcher';
     show();
   });
 

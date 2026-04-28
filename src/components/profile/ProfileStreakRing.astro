@@ -1,0 +1,94 @@
+---
+import type { Locale } from '../../i18n/utils';
+import { t } from '../../i18n/utils';
+
+interface Props {
+  lang: Locale;
+  viewer: 'self' | 'signed_in' | 'anonymous';
+  targetUserId?: string;
+  ownerOnly?: boolean;
+}
+
+const { lang, ownerOnly = false } = Astro.props;
+const tr = t(lang);
+const heading = lang === 'es' ? 'Racha' : 'Streak';
+const currentLabel = lang === 'es' ? 'Actual' : 'Current';
+const longestLabel = lang === 'es' ? 'Récord' : 'Longest';
+const ownerPill = (tr as unknown as { privacy?: { owner_only_badge?: string } }).privacy?.owner_only_badge ?? (lang === 'es' ? '🔒 Solo tú lo ves' : '🔒 Only you see this');
+---
+
+<section
+  data-widget="streak-ring"
+  data-target-user-id={Astro.props.targetUserId}
+  class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 mb-6"
+>
+  <header class="flex items-baseline justify-between mb-3">
+    <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">{heading}</h2>
+    {ownerOnly && (
+      <span class="text-[10px] font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded">
+        {ownerPill}
+      </span>
+    )}
+  </header>
+
+  <div class="flex items-center gap-5">
+    <svg data-ring width="120" height="120" viewBox="0 0 120 120" role="img" aria-label={heading} class="shrink-0">
+      <circle cx="60" cy="60" r="50" stroke="#e4e4e7" stroke-width="10" fill="none" />
+      <circle data-longest-arc cx="60" cy="60" r="50" stroke="#86efac" stroke-width="10" fill="none" stroke-linecap="round" stroke-dasharray="0 314.159" transform="rotate(-90 60 60)" />
+      <circle data-current-arc cx="60" cy="60" r="50" stroke="#15803d" stroke-width="10" fill="none" stroke-linecap="round" stroke-dasharray="0 314.159" transform="rotate(-90 60 60)" />
+      <text data-current-text x="60" y="58" text-anchor="middle" font-size="22" font-weight="700" fill="currentColor">0</text>
+      <text x="60" y="78" text-anchor="middle" font-size="9" fill="#71717a">{lang === 'es' ? 'días' : 'days'}</text>
+    </svg>
+    <dl class="grid grid-cols-1 gap-2 text-sm">
+      <div>
+        <dt class="text-xs text-zinc-500">{currentLabel}</dt>
+        <dd data-current class="text-lg font-bold text-emerald-700 dark:text-emerald-400">—</dd>
+      </div>
+      <div>
+        <dt class="text-xs text-zinc-500">{longestLabel}</dt>
+        <dd data-longest class="text-lg font-bold text-zinc-700 dark:text-zinc-200">—</dd>
+      </div>
+    </dl>
+  </div>
+</section>
+
+<script>
+  import { getSupabase } from '../../lib/supabase';
+
+  async function hydrate(el: HTMLElement) {
+    let supabase;
+    try { supabase = getSupabase(); } catch { return; }
+    let userId = el.dataset.targetUserId ?? null;
+    if (!userId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      userId = user.id;
+    }
+    const { data } = await supabase
+      .from('user_streaks')
+      .select('current_days, longest_days')
+      .eq('user_id', userId)
+      .maybeSingle<{ current_days: number | null; longest_days: number | null }>();
+
+    const current = Math.max(0, data?.current_days ?? 0);
+    const longest = Math.max(0, data?.longest_days ?? 0, current);
+
+    const cap = Math.max(longest, 30);
+    const C = 2 * Math.PI * 50;
+    const currentArc = el.querySelector<SVGCircleElement>('[data-current-arc]');
+    const longestArc = el.querySelector<SVGCircleElement>('[data-longest-arc]');
+    const currentLen = (current / cap) * C;
+    const longestLen = (longest / cap) * C;
+    if (currentArc) currentArc.setAttribute('stroke-dasharray', `${currentLen} ${C - currentLen}`);
+    if (longestArc) longestArc.setAttribute('stroke-dasharray', `${longestLen} ${C - longestLen}`);
+
+    const currentText = el.querySelector<SVGTextElement>('[data-current-text]');
+    if (currentText) currentText.textContent = String(current);
+    const currentDd = el.querySelector<HTMLElement>('[data-current]');
+    if (currentDd) currentDd.textContent = String(current);
+    const longestDd = el.querySelector<HTMLElement>('[data-longest]');
+    if (longestDd) longestDd.textContent = String(longest);
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-widget="streak-ring"]').forEach(hydrate);
+</script>

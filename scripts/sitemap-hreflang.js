@@ -74,12 +74,63 @@ function hreflangBlock(enUrl, esUrl) {
   );
 }
 
-function run() {
+/**
+ * Best-effort enumeration of public profiles for /u/<username>/ entries.
+ * Requires SUPABASE_SERVICE_ROLE_KEY + SUPABASE_URL in the build env;
+ * silently skipped otherwise (CI does not always carry the service role
+ * for security reasons).
+ */
+async function fetchPublicUsernames() {
+  const url = process.env.SUPABASE_URL || process.env.PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) {
+    console.warn('[sitemap] SUPABASE_SERVICE_ROLE_KEY not set — skipping public-profile enumeration');
+    return [];
+  }
+  try {
+    const res = await fetch(
+      `${url.replace(/\/$/, '')}/rest/v1/users?select=username&profile_privacy->>profile=eq.public&username=not.is.null&limit=10000`,
+      {
+        headers: {
+          apikey: key,
+          Authorization: `Bearer ${key}`,
+          Accept: 'application/json',
+        },
+      },
+    );
+    if (!res.ok) {
+      console.warn(`[sitemap] users enumeration returned ${res.status} — skipping`);
+      return [];
+    }
+    const rows = await res.json();
+    return rows
+      .map((r) => (r && typeof r.username === 'string' ? r.username : null))
+      .filter((u) => !!u && /^[A-Za-z0-9._-]+$/.test(u));
+  } catch (err) {
+    console.warn(`[sitemap] users enumeration failed: ${err.message ?? err}`);
+    return [];
+  }
+}
+
+function appendUserUrls(xml, usernames) {
+  if (!usernames.length) return { xml, appended: 0 };
+  const blocks = usernames
+    .map((u) => {
+      const en = `${SITE}/en/u/${u}/`;
+      const es = `${SITE}/es/u/${u}/`;
+      return `<url><loc>${en}</loc>${hreflangBlock(en, es)}</url><url><loc>${es}</loc>${hreflangBlock(en, es)}</url>`;
+    })
+    .join('');
+  const injected = xml.replace('</urlset>', `${blocks}</urlset>`);
+  return { xml: injected, appended: usernames.length * 2 };
+}
+
+async function run() {
   const xml = readFileSync(SITEMAP, 'utf-8');
   const pairMap = buildPairMap();
 
   let injected = 0;
-  const result = xml.replace(/<url><loc>(https:\/\/rastrum\.org\/[^<]+)<\/loc><\/url>/g, (match, url) => {
+  let result = xml.replace(/<url><loc>(https:\/\/rastrum\.org\/[^<]+)<\/loc><\/url>/g, (match, url) => {
     // Already has hreflang (shouldn't match — but be defensive)
     if (match.includes('xhtml:link')) return match;
 
@@ -90,13 +141,23 @@ function run() {
     return `<url><loc>${url}</loc>${hreflangBlock(pair.en, pair.es)}</url>`;
   });
 
-  if (injected === 0) {
+  const usernames = await fetchPublicUsernames();
+  const userResult = appendUserUrls(result, usernames);
+  result = userResult.xml;
+
+  if (injected === 0 && userResult.appended === 0) {
     console.log('[sitemap-hreflang] No unpaired URLs found — sitemap already complete.');
     return;
   }
 
   writeFileSync(SITEMAP, result, 'utf-8');
   console.log(`[sitemap-hreflang] Injected hreflang into ${injected} previously-unpaired URLs.`);
+  if (userResult.appended) {
+    console.log(`[sitemap-hreflang] Appended ${userResult.appended} public-profile URLs.`);
+  }
 }
 
-run();
+run().catch((err) => {
+  console.error('[sitemap-hreflang] failed:', err);
+  process.exit(1);
+});

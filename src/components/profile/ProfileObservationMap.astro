@@ -1,0 +1,86 @@
+---
+import type { Locale } from '../../i18n/utils';
+import { t } from '../../i18n/utils';
+
+interface Props {
+  lang: Locale;
+  viewer: 'self' | 'signed_in' | 'anonymous';
+  targetUserId?: string;
+  ownerOnly?: boolean;
+}
+
+const { lang, ownerOnly = false } = Astro.props;
+const tr = t(lang);
+const heading = lang === 'es' ? 'Mapa de observaciones' : 'Observation map';
+const cta = lang === 'es' ? 'Ver mapa completo' : 'Open full map';
+const ownerPill = (tr as unknown as { privacy?: { owner_only_badge?: string } }).privacy?.owner_only_badge ?? (lang === 'es' ? '🔒 Solo tú lo ves' : '🔒 Only you see this');
+const mapPath = lang === 'es' ? '/es/explorar/mapa/' : '/en/explore/map/';
+---
+
+<section
+  data-widget="observation-map"
+  data-target-user-id={Astro.props.targetUserId}
+  class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 mb-6"
+>
+  <header class="flex items-baseline justify-between mb-3">
+    <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">{heading}</h2>
+    {ownerOnly && (
+      <span class="text-[10px] font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded">
+        {ownerPill}
+      </span>
+    )}
+  </header>
+
+  <p data-state="empty" class="hidden text-xs text-zinc-500 italic py-4">
+    {lang === 'es' ? 'Aún sin ubicaciones públicas.' : 'No public locations yet.'}
+  </p>
+
+  <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3">
+    <div class="aspect-[4/3] rounded-lg bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center text-emerald-700 dark:text-emerald-400 text-xs font-medium" data-stat="pin-count">—</div>
+    <div class="aspect-[4/3] rounded-lg bg-zinc-50 dark:bg-zinc-800/50 flex items-center justify-center text-zinc-700 dark:text-zinc-300 text-xs font-medium" data-stat="region-count">—</div>
+    <div class="aspect-[4/3] rounded-lg bg-zinc-50 dark:bg-zinc-800/50 flex items-center justify-center text-zinc-700 dark:text-zinc-300 text-xs font-medium" data-stat="recent-date">—</div>
+  </div>
+
+  <a href={mapPath} class="text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:underline">{cta} →</a>
+</section>
+
+<script>
+  import { getSupabase } from '../../lib/supabase';
+
+  async function hydrate(el: HTMLElement) {
+    let supabase;
+    try { supabase = getSupabase(); } catch { return; }
+    let userId = el.dataset.targetUserId ?? null;
+    if (!userId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      userId = user.id;
+    }
+    const isEs = (document.documentElement.lang || 'en') === 'es';
+
+    const { data, count } = await supabase
+      .from('observations')
+      .select('observed_at, state_province', { count: 'exact' })
+      .eq('observer_id', userId)
+      .eq('sync_status', 'synced')
+      .order('observed_at', { ascending: false })
+      .limit(100);
+    const rows = (data ?? []) as Array<{ observed_at: string; state_province: string | null }>;
+    const empty = el.querySelector<HTMLElement>('[data-state="empty"]');
+    if (!rows.length) {
+      empty?.classList.remove('hidden');
+      return;
+    }
+    const regionCount = new Set(rows.map((r) => r.state_province).filter(Boolean)).size;
+    const lastDate = rows.length ? new Date(rows[0].observed_at).toLocaleDateString() : '—';
+
+    const pinEl = el.querySelector<HTMLElement>('[data-stat="pin-count"]');
+    const regEl = el.querySelector<HTMLElement>('[data-stat="region-count"]');
+    const recEl = el.querySelector<HTMLElement>('[data-stat="recent-date"]');
+    if (pinEl) pinEl.textContent = `${count ?? rows.length} ${isEs ? 'pines' : 'pins'}`;
+    if (regEl) regEl.textContent = `${regionCount} ${isEs ? 'regiones' : 'regions'}`;
+    if (recEl) recEl.textContent = `${isEs ? 'Última' : 'Latest'}: ${lastDate}`;
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-widget="observation-map"]').forEach(hydrate);
+</script>

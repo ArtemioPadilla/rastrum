@@ -1,0 +1,103 @@
+---
+import type { Locale } from '../../i18n/utils';
+import { t } from '../../i18n/utils';
+
+interface Props {
+  lang: Locale;
+  viewer: 'self' | 'signed_in' | 'anonymous';
+  targetUserId?: string;
+  ownerOnly?: boolean;
+}
+
+const { lang, ownerOnly = false } = Astro.props;
+const tr = t(lang);
+const heading = lang === 'es' ? 'Distribución por reino' : 'Kingdom breakdown';
+const ownerPill = (tr as unknown as { privacy?: { owner_only_badge?: string } }).privacy?.owner_only_badge ?? (lang === 'es' ? '🔒 Solo tú lo ves' : '🔒 Only you see this');
+---
+
+<section
+  data-widget="taxonomic-donut"
+  data-target-user-id={Astro.props.targetUserId}
+  class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 mb-6"
+>
+  <header class="flex items-baseline justify-between mb-3">
+    <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">{heading}</h2>
+    {ownerOnly && (
+      <span class="text-[10px] font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded">
+        {ownerPill}
+      </span>
+    )}
+  </header>
+
+  <p data-state="empty" class="hidden text-xs text-zinc-500 italic py-4">
+    {lang === 'es' ? 'Sin datos suficientes.' : 'Not enough data yet.'}
+  </p>
+
+  <div class="flex items-center gap-4">
+    <svg data-donut width="140" height="140" viewBox="0 0 140 140" role="img" aria-label={heading} class="shrink-0"></svg>
+    <ul data-legend class="flex-1 space-y-1 text-sm"></ul>
+  </div>
+</section>
+
+<script>
+  import { getSupabase } from '../../lib/supabase';
+  import { arcPath, donutFromCounts } from '../../lib/profile-widgets';
+
+  const PALETTE: Record<string, string> = {
+    Plantae: '#22c55e',
+    Animalia: '#f59e0b',
+    Fungi: '#a855f7',
+    Bacteria: '#ef4444',
+    Archaea: '#0ea5e9',
+    Protista: '#ec4899',
+    Chromista: '#14b8a6',
+    Unknown: '#71717a',
+  };
+
+  async function hydrate(el: HTMLElement) {
+    const svg = el.querySelector<SVGSVGElement>('[data-donut]');
+    const legend = el.querySelector<HTMLUListElement>('[data-legend]');
+    const empty = el.querySelector<HTMLElement>('[data-state="empty"]');
+    if (!svg || !legend) return;
+
+    let supabase;
+    try { supabase = getSupabase(); } catch { return; }
+    let userId = el.dataset.targetUserId ?? null;
+    if (!userId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      userId = user.id;
+    }
+    const { data } = await supabase
+      .from('profile_taxonomic_donut')
+      .select('kingdom, obs_count, species_count')
+      .eq('user_id', userId);
+    const rows = (data ?? []) as Array<{ kingdom: string; obs_count: number; species_count: number }>;
+    if (!rows.length) {
+      empty?.classList.remove('hidden');
+      svg.classList.add('hidden');
+      legend.classList.add('hidden');
+      return;
+    }
+    const slices = donutFromCounts(rows);
+    let paths = '';
+    for (const s of slices) {
+      const colour = PALETTE[s.kingdom] ?? '#71717a';
+      const d = arcPath(70, 70, 60, 38, s.startDeg, s.endDeg);
+      paths += `<path d="${d}" fill="${colour}"><title>${s.kingdom}: ${Math.round(s.share * 100)}%</title></path>`;
+    }
+    svg.innerHTML = paths;
+
+    const totalObs = rows.reduce((acc, r) => acc + r.obs_count, 0);
+    legend.innerHTML = slices
+      .map((s, i) => {
+        const colour = PALETTE[s.kingdom] ?? '#71717a';
+        const pct = Math.round(s.share * 100);
+        const counts = `${rows[i].species_count} sp · ${s.obs_count} obs`;
+        return `<li class="flex items-center gap-2"><span class="inline-block w-2.5 h-2.5 rounded" style="background:${colour}"></span><span class="font-medium">${s.kingdom}</span><span class="ml-auto text-xs text-zinc-500">${pct}% · ${counts}</span></li>`;
+      })
+      .join('') + `<li class="text-xs text-zinc-500 mt-2">${totalObs} total</li>`;
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-widget="taxonomic-donut"]').forEach(hydrate);
+</script>
