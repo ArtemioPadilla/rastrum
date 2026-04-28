@@ -199,6 +199,11 @@ const pwa = (tr as unknown as { pwa: Record<string, string> }).pwa;
 
     window.addEventListener('beforeinstallprompt', (ev) => {
       ev.preventDefault();
+      // Don't show if already installed (localStorage flag is the fastest check).
+      // This handles the case where the user opens the site in the browser
+      // after having installed the PWA from the home screen — Chrome still
+      // fires beforeinstallprompt in that context.
+      if (isPwaInstalled() || isDismissed()) return;
       savedPrompt = ev as InstallPromptEvent;
       cta?.classList.remove('hidden');
     });

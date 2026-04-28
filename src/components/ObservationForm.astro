@@ -2009,17 +2009,16 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
     try {
       const exif = await parseExif(file, { gps: true, tiff: true, exif: true });
       if (exif?.latitude != null && exif?.longitude != null) {
-        // Only fall back to EXIF GPS if live GPS hasn't landed yet
-        if (!location || location.capturedFrom !== 'gps') {
-          location = {
-            lat: exif.latitude,
-            lng: exif.longitude,
-            accuracyM: 15,               // EXIF GPS is phone-derived; assume ~15m
-            altitudeM: exif.GPSAltitude ?? null,
-            capturedFrom: 'exif',
-          };
-          paintLocation();
-        }
+        // EXIF GPS always wins over live GPS — the photo was taken at that
+        // specific location. Live GPS is only a fallback for photos without EXIF.
+        location = {
+          lat: exif.latitude,
+          lng: exif.longitude,
+          accuracyM: 15,               // EXIF GPS is phone-derived; assume ~15m
+          altitudeM: exif.GPSAltitude ?? null,
+          capturedFrom: 'exif',
+        };
+        paintLocation();
       }
     } catch { /* non-fatal */ }
   }
