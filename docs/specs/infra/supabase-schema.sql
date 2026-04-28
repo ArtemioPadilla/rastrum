@@ -2710,3 +2710,42 @@ CREATE TRIGGER follows_counter_trigger
 UPDATE public.users u SET
   follower_count  = (SELECT count(*) FROM public.follows WHERE followee_id = u.id AND status = 'accepted'),
   following_count = (SELECT count(*) FROM public.follows WHERE follower_id = u.id AND status = 'accepted');
+
+-- 5) Social privacy helpers
+CREATE OR REPLACE FUNCTION public.social_visible_to(viewer uuid, owner uuid)
+RETURNS boolean
+LANGUAGE sql STABLE PARALLEL SAFE AS $$
+  SELECT
+    viewer IS NOT NULL AND (
+      viewer = owner
+      OR EXISTS (
+        SELECT 1 FROM public.follows f
+         WHERE f.follower_id = viewer
+           AND f.followee_id = owner
+           AND f.status      = 'accepted'
+      )
+    );
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_collaborator_of(viewer uuid, owner uuid)
+RETURNS boolean
+LANGUAGE sql STABLE PARALLEL SAFE AS $$
+  SELECT viewer IS NOT NULL AND EXISTS (
+    SELECT 1 FROM public.follows f
+     WHERE f.follower_id = viewer
+       AND f.followee_id = owner
+       AND f.tier        = 'collaborator'
+       AND f.status      = 'accepted'
+  );
+$$;
+
+GRANT EXECUTE ON FUNCTION public.social_visible_to(uuid, uuid) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.is_collaborator_of(uuid, uuid) TO anon, authenticated;
+
+-- 6) Collaborators inherit credentialed-researcher coord-precision unlock
+DROP POLICY IF EXISTS obs_collaborator_read ON public.observations;
+CREATE POLICY obs_collaborator_read ON public.observations FOR SELECT
+  USING (
+    obscure_level <> 'full'
+    AND public.is_collaborator_of(auth.uid(), observer_id)
+  );
