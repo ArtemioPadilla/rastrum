@@ -81,21 +81,33 @@ const obsIdPlaceholder = '';
 
     async function load(id: string) {
       const supabase = getSupabase();
+      // LEFT join on identifications: observations that haven't been
+      // through the identify cascade yet (or whose cascade returned no
+      // result) still load, just with "Unidentified" as the species
+      // name. The earlier !inner version filtered them out entirely
+      // and surfaced as "Observation not found" — which made every
+      // newly-synced observation invisible until the cascade
+      // completed.
       const { data: obs, error } = await supabase
         .from('observations')
         .select(`
           id, observed_at, obscure_level, state_province, habitat, observer_id,
-          identifications!inner(scientific_name, is_primary),
+          identifications(scientific_name, is_primary, is_research_grade),
           users(display_name, username, profile_public)
         `)
         .eq('id', id)
-        .eq('identifications.is_primary', true)
         .maybeSingle();
 
       if (error) throw error;
       if (!obs) throw new Error('Observation not found.');
 
-      const ident = Array.isArray(obs.identifications) ? obs.identifications[0] : obs.identifications;
+      // Without the inner join, identifications may be empty, contain
+      // multiple rows (community votes — non-primary), or one primary.
+      // Prefer the primary; if there isn't one, take the first row;
+      // if there are no rows at all, ident stays undefined and the
+      // species line reads "Unidentified".
+      const idArr = Array.isArray(obs.identifications) ? obs.identifications : (obs.identifications ? [obs.identifications] : []);
+      const ident = idArr.find((x: { is_primary?: boolean }) => x?.is_primary) ?? idArr[0];
       const user  = Array.isArray(obs.users) ? obs.users[0] : obs.users;
 
       document.getElementById('loading')?.classList.add('hidden');
