@@ -1,0 +1,21 @@
+---
+import type { Locale } from '../../i18n/utils';
+
+interface Props {
+  lang: Locale;
+}
+
+const { lang } = Astro.props;
+const title = lang === 'es' ? 'Tu perfil casi no tiene datos visibles' : 'Your profile shows almost nothing publicly';
+const body = lang === 'es'
+  ? 'Has limitado casi todos los facetas. Si querés que otros naturalistas validen tus IDs, considerá abrir al menos el mapa y la reputación.'
+  : 'You’ve hidden most facets. If you want other naturalists to validate your IDs, consider exposing at least the observation map and validation reputation.';
+const settingsCta = lang === 'es' ? 'Ajustar privacidad' : 'Adjust privacy';
+const settingsHref = lang === 'es' ? '/es/perfil/ajustes/privacy/' : '/en/profile/settings/privacy/';
+---
+
+<div class="rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 p-4 mb-6">
+  <p class="text-sm font-semibold text-amber-900 dark:text-amber-200">{title}</p>
+  <p class="text-xs text-amber-800 dark:text-amber-300 mt-1">{body}</p>
+  <a href={settingsHref} class="mt-2 inline-flex text-xs font-medium text-amber-900 dark:text-amber-200 underline">{settingsCta} →</a>
+</div>

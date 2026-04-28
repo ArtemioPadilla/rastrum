@@ -1,0 +1,83 @@
+---
+import type { Locale } from '../../i18n/utils';
+import { t } from '../../i18n/utils';
+
+interface Props {
+  lang: Locale;
+  viewer: 'self' | 'signed_in' | 'anonymous';
+  targetUserId?: string;
+  ownerOnly?: boolean;
+}
+
+const { lang, ownerOnly = false } = Astro.props;
+const tr = t(lang);
+const k = (tr as unknown as { karma: Record<string, string> }).karma;
+const ownerPill = (tr as unknown as { privacy?: { owner_only_badge?: string } }).privacy?.owner_only_badge ?? (lang === 'es' ? '🔒 Solo tú lo ves' : '🔒 Only you see this');
+---
+
+<section
+  data-widget="karma-section"
+  data-target-user-id={Astro.props.targetUserId}
+  class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 mb-6"
+>
+  <header class="flex items-baseline justify-between mb-3">
+    <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
+      {k?.section_title ?? (lang === 'es' ? 'Karma y experiencia' : 'Karma & expertise')}
+    </h2>
+    {ownerOnly && (
+      <span class="text-[10px] font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded">
+        {ownerPill}
+      </span>
+    )}
+  </header>
+
+  <div class="flex items-baseline gap-3 mb-3">
+    <span data-karma-total class="text-3xl font-bold text-emerald-700 dark:text-emerald-400">—</span>
+    <span class="text-xs text-zinc-500 dark:text-zinc-400">{k?.total_label ?? 'karma'}</span>
+  </div>
+
+  <div>
+    <h3 class="text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+      {k?.expertise_heading ?? (lang === 'es' ? 'Experiencia destacada' : 'Top expertise')}
+    </h3>
+    <ul data-expertise class="space-y-1 text-sm">
+      <li class="text-xs text-zinc-500 italic">{k?.expertise_empty ?? '…'}</li>
+    </ul>
+  </div>
+</section>
+
+<script>
+  import { getSupabase } from '../../lib/supabase';
+  import { escAttr } from '../../lib/karma';
+
+  async function hydrate(el: HTMLElement) {
+    const totalEl = el.querySelector<HTMLElement>('[data-karma-total]');
+    const listEl = el.querySelector<HTMLUListElement>('[data-expertise]');
+    if (!totalEl || !listEl) return;
+
+    let supabase;
+    try { supabase = getSupabase(); } catch { return; }
+    let userId = el.dataset.targetUserId ?? null;
+    if (!userId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      userId = user.id;
+    }
+    const { data } = await supabase
+      .from('profile_karma')
+      .select('karma_total, top_expertise')
+      .eq('user_id', userId)
+      .maybeSingle<{ karma_total: number | null; top_expertise: Array<{ taxon_id: string; scientific_name: string; score: number }> | null }>();
+
+    if (!data) return;
+    totalEl.textContent = String(Math.round(data.karma_total ?? 0));
+    const rows = data.top_expertise ?? [];
+    if (rows.length) {
+      listEl.innerHTML = rows
+        .map((r) => `<li class="flex items-center gap-2"><span class="italic">${escAttr(r.scientific_name)}</span><span class="ml-auto font-mono text-xs">${Math.round(r.score)}</span></li>`)
+        .join('');
+    }
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-widget="karma-section"]').forEach(hydrate);
+</script>

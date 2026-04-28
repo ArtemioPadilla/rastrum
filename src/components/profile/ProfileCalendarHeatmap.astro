@@ -1,0 +1,100 @@
+---
+import type { Locale } from '../../i18n/utils';
+import { t } from '../../i18n/utils';
+
+interface Props {
+  lang: Locale;
+  viewer: 'self' | 'signed_in' | 'anonymous';
+  targetUserId?: string;
+  ownerOnly?: boolean;
+}
+
+const { lang, ownerOnly = false } = Astro.props;
+const tr = t(lang);
+const px = (tr as unknown as { profile_widgets?: Record<string, string> }).profile_widgets ?? {};
+const heading = px.calendar_heatmap_title ?? (lang === 'es' ? 'Actividad anual' : 'Yearly activity');
+const ownerPill = (tr as unknown as { privacy?: { owner_only_badge?: string } }).privacy?.owner_only_badge ?? (lang === 'es' ? '🔒 Solo tú lo ves' : '🔒 Only you see this');
+---
+
+<section
+  data-widget="calendar-heatmap"
+  data-target-user-id={Astro.props.targetUserId}
+  class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 mb-6"
+>
+  <header class="flex items-baseline justify-between mb-3">
+    <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
+      {heading}
+    </h2>
+    {ownerOnly && (
+      <span class="text-[10px] font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded">
+        {ownerPill}
+      </span>
+    )}
+  </header>
+
+  <p data-state="empty" class="hidden text-xs text-zinc-500 italic py-4">
+    {lang === 'es' ? 'Sin observaciones en los últimos 12 meses.' : 'No observations in the last 12 months.'}
+  </p>
+
+  <div class="overflow-x-auto">
+    <svg
+      data-grid
+      width="720"
+      height="112"
+      viewBox="0 0 720 112"
+      role="img"
+      aria-label={heading}
+      class="block min-w-full"
+    ></svg>
+  </div>
+</section>
+
+<script>
+  import { getSupabase } from '../../lib/supabase';
+  import { buildCalendarGrid, type CalendarBucket } from '../../lib/profile-widgets';
+
+  const widgets = document.querySelectorAll<HTMLElement>('[data-widget="calendar-heatmap"]');
+
+  const PALETTE = ['#e4e4e7', '#bbf7d0', '#86efac', '#22c55e', '#15803d'];
+
+  function render(svg: SVGSVGElement, buckets: CalendarBucket[]) {
+    const cells = buildCalendarGrid(buckets);
+    const CELL = 12;
+    const GAP = 2;
+    let html = '';
+    for (const c of cells) {
+      const x = c.weekIndex * (CELL + GAP);
+      const y = c.dayOfWeek * (CELL + GAP);
+      html += `<rect x="${x}" y="${y}" width="${CELL}" height="${CELL}" rx="2" fill="${PALETTE[c.intensity]}"><title>${c.count} on ${c.date}</title></rect>`;
+    }
+    svg.innerHTML = html;
+  }
+
+  async function hydrate(el: HTMLElement) {
+    const svg = el.querySelector<SVGSVGElement>('[data-grid]');
+    const empty = el.querySelector<HTMLElement>('[data-state="empty"]');
+    if (!svg) return;
+    let supabase;
+    try { supabase = getSupabase(); } catch { return; }
+    let userId = el.dataset.targetUserId ?? null;
+    if (!userId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      userId = user.id;
+    }
+    const { data, error } = await supabase
+      .from('profile_calendar_buckets')
+      .select('bucket_date, daily_count')
+      .eq('user_id', userId);
+    if (error) return;
+    const rows = (data ?? []) as CalendarBucket[];
+    if (!rows.length) {
+      empty?.classList.remove('hidden');
+      svg.classList.add('hidden');
+      return;
+    }
+    render(svg, rows);
+  }
+
+  widgets.forEach(hydrate);
+</script>

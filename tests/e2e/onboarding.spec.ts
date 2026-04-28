@@ -6,8 +6,8 @@ import { test, expect, type Page } from '@playwright/test';
  * paint. We bypass auth by dispatching the public replay event the
  * Profile → Edit "Replay tour" button uses.
  *
- * The tour is a 5-step spotlight overlay using a <dialog> element.
- * Steps: Welcome · FAB · Quick ID · Explore · Settings.
+ * The tour is a 6-step spotlight overlay using a <dialog> element.
+ * Steps: Welcome · FAB · Quick ID · Explore · Privacy preset · Settings.
  */
 
 async function openTour(page: Page) {
@@ -23,7 +23,7 @@ async function openTour(page: Page) {
 test.describe('OnboardingTour', () => {
   test('replay event opens the dialog and shows step 1 of 5', async ({ page }) => {
     const dialog = await openTour(page);
-    await expect(dialog.locator('#onb-step-label')).toHaveText(/Step 1 of 5/);
+    await expect(dialog.locator('#onb-step-label')).toHaveText(/Step 1 of 6/);
     await expect(dialog.locator('#onb-tooltip-title')).toBeVisible();
     await expect(dialog.locator('#onb-tooltip')).toHaveAttribute('aria-modal', 'true');
   });
@@ -48,19 +48,21 @@ test.describe('OnboardingTour', () => {
     await expect(dialog).toBeVisible();
   });
 
-  test('next advances through all 5 steps', async ({ page }) => {
+  test('next advances through all 6 steps', async ({ page }) => {
     const dialog = await openTour(page);
-    await expect(dialog.locator('#onb-step-label')).toHaveText(/Step 1 of 5/);
+    await expect(dialog.locator('#onb-step-label')).toHaveText(/Step 1 of 6/);
     // Step 1 has a "Start tour" button (labelStart), click it
     await dialog.locator('#onb-next').click();
-    await expect(dialog.locator('#onb-step-label')).toHaveText(/Step 2 of 5/);
+    await expect(dialog.locator('#onb-step-label')).toHaveText(/Step 2 of 6/);
     await dialog.locator('#onb-next').click();
-    await expect(dialog.locator('#onb-step-label')).toHaveText(/Step 3 of 5/);
+    await expect(dialog.locator('#onb-step-label')).toHaveText(/Step 3 of 6/);
     await dialog.locator('#onb-next').click();
-    await expect(dialog.locator('#onb-step-label')).toHaveText(/Step 4 of 5/);
+    await expect(dialog.locator('#onb-step-label')).toHaveText(/Step 4 of 6/);
     await dialog.locator('#onb-next').click();
-    await expect(dialog.locator('#onb-step-label')).toHaveText(/Step 5 of 5/);
-    // Step 5 "Done" should close the dialog
+    await expect(dialog.locator('#onb-step-label')).toHaveText(/Step 5 of 6/);
+    await dialog.locator('#onb-next').click();
+    await expect(dialog.locator('#onb-step-label')).toHaveText(/Step 6 of 6/);
+    // Step 6 "Done" should close the dialog
     await dialog.locator('#onb-next').click();
     await expect(page.locator('#onboarding-tour')).toBeHidden();
   });
@@ -68,7 +70,7 @@ test.describe('OnboardingTour', () => {
   test('skip button closes the dialog on non-final steps', async ({ page }) => {
     const dialog = await openTour(page);
     await dialog.locator('#onb-next').click();
-    await expect(dialog.locator('#onb-step-label')).toHaveText(/Step 2 of 5/);
+    await expect(dialog.locator('#onb-step-label')).toHaveText(/Step 2 of 6/);
     await dialog.locator('#onb-skip').click();
     await expect(page.locator('#onboarding-tour')).toBeHidden();
   });

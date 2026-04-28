@@ -1,0 +1,86 @@
+---
+import type { Locale } from '../i18n/utils';
+import { t } from '../i18n/utils';
+
+interface Props {
+  lang: Locale;
+}
+
+const { lang } = Astro.props;
+const tr = t(lang);
+const pv = (tr as unknown as { privacy?: Record<string, string> }).privacy ?? {};
+
+const title       = pv.intro_banner_title   ?? (lang === 'es' ? 'Agregamos controles de privacidad' : 'We added privacy controls');
+const body        = pv.intro_banner_body    ?? (lang === 'es'
+  ? 'Ahora podés decidir, faceta por faceta, qué se ve en tu perfil. Revisá los valores predeterminados.'
+  : 'You can now decide, facet by facet, what shows on your profile. Review the defaults.');
+const cta_review  = lang === 'es' ? 'Revisar' : 'Review';
+const cta_default = lang === 'es' ? 'Usar predeterminados recomendados' : 'Use recommended defaults';
+const cta_dismiss = pv.intro_banner_dismiss ?? (lang === 'es' ? 'Descartar' : 'Dismiss');
+const settingsHref = lang === 'es' ? '/es/perfil/ajustes/privacy/' : '/en/profile/settings/privacy/';
+---
+
+<aside
+  id="privacy-intro-banner"
+  class="hidden rounded-xl border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 p-4 mb-6"
+  role="region"
+  aria-labelledby="privacy-intro-banner-title"
+>
+  <p id="privacy-intro-banner-title" class="text-sm font-semibold text-emerald-900 dark:text-emerald-100">{title}</p>
+  <p class="text-xs text-emerald-800 dark:text-emerald-200 mt-1">{body}</p>
+  <div class="mt-3 flex flex-wrap gap-2">
+    <a href={settingsHref} class="text-xs font-semibold inline-flex items-center rounded-md bg-emerald-700 hover:bg-emerald-800 px-2.5 py-1.5 text-white">{cta_review}</a>
+    <button id="privacy-intro-default" type="button" class="text-xs font-semibold inline-flex items-center rounded-md border border-emerald-700 dark:border-emerald-500 px-2.5 py-1.5 text-emerald-900 dark:text-emerald-100 hover:bg-emerald-100 dark:hover:bg-emerald-900/40">{cta_default}</button>
+    <button id="privacy-intro-dismiss" type="button" class="text-xs font-medium text-emerald-900 dark:text-emerald-200 hover:underline px-2 py-1.5">{cta_dismiss}</button>
+  </div>
+</aside>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { PRIVACY_PRESETS } from '../lib/profile-widgets';
+
+  async function init() {
+    const banner = document.getElementById('privacy-intro-banner');
+    if (!banner) return;
+    let supabase;
+    try { supabase = getSupabase(); } catch { return; }
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data } = await supabase
+      .from('users')
+      .select('dismissed_privacy_intro_at')
+      .eq('id', user.id)
+      .maybeSingle<{ dismissed_privacy_intro_at: string | null }>();
+    if (data && data.dismissed_privacy_intro_at) return;
+    banner.classList.remove('hidden');
+
+    document.getElementById('privacy-intro-dismiss')?.addEventListener('click', async () => {
+      banner.classList.add('hidden');
+      try {
+        await supabase
+          .from('users')
+          .update({ dismissed_privacy_intro_at: new Date().toISOString() })
+          .eq('id', user.id);
+      } catch { /* env not configured / column missing — best-effort */ }
+    });
+
+    document.getElementById('privacy-intro-default')?.addEventListener('click', async () => {
+      banner.classList.add('hidden');
+      try {
+        await supabase
+          .from('users')
+          .update({
+            profile_privacy: PRIVACY_PRESETS.researcher,
+            dismissed_privacy_intro_at: new Date().toISOString(),
+          })
+          .eq('id', user.id);
+      } catch { /* column may not exist if v1.2.0 hasn't landed yet */ }
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => { init().catch(() => { /* env not configured */ }); });
+  } else {
+    init().catch(() => { /* env not configured */ });
+  }
+</script>

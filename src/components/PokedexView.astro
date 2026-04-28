@@ -5,48 +5,72 @@ import { t } from '../i18n/utils';
 interface Props { lang: Locale }
 const { lang } = Astro.props;
 const tr = t(lang);
-const px = (tr as unknown as { pokedex: Record<string, string> }).pokedex;
+const px = (tr as unknown as { pokedex: Record<string, unknown> }).pokedex;
+const title       = px?.title       as string;
+const subtitle    = px?.subtitle    as string;
+const subheading  = px?.subheading  as string | undefined;
+const empty       = px?.empty       as string;
+const bucketMap   = (px?.bucket as Record<string, string> | undefined) ?? {};
+const bucketLabels = JSON.stringify(bucketMap);
 ---
 
 <section class="max-w-5xl mx-auto px-4 py-6">
   <header class="mb-5">
     <h1 class="text-2xl md:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
-      {px.title}
+      {title}
     </h1>
-    <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-1">{px.subtitle}</p>
+    <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-1">{subtitle}</p>
+    {subheading && <p class="text-xs text-zinc-500 dark:text-zinc-500 mt-1">{subheading}</p>}
   </header>
 
   <p id="pokedex-loading" class="text-sm text-zinc-500 text-center py-8">…</p>
-  <p id="pokedex-empty"   class="hidden text-sm text-zinc-500 text-center py-8 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700">{px.empty}</p>
+  <p id="pokedex-empty"   class="hidden text-sm text-zinc-500 text-center py-8 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700">{empty}</p>
 
-  <ul id="pokedex-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3"></ul>
+  <div id="pokedex-groups" class="space-y-6" data-bucket-labels={bucketLabels}></div>
 </section>
 
 <script>
   import { getSupabase } from '../lib/supabase';
   import { rarityTier, escAttr, type Bucket } from '../lib/karma';
 
-  const grid    = document.getElementById('pokedex-grid');
-  const loading = document.getElementById('pokedex-loading');
-  const empty   = document.getElementById('pokedex-empty');
-  const isEs    = document.documentElement.lang === 'es';
+  const groupsEl = document.getElementById('pokedex-groups');
+  const loading  = document.getElementById('pokedex-loading');
+  const emptyEl  = document.getElementById('pokedex-empty');
+  const isEs     = document.documentElement.lang === 'es';
 
-  (async function () {
-    if (!grid) return;
-    const supabase = getSupabase();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      loading?.classList.add('hidden');
-      empty?.classList.remove('hidden');
-      return;
-    }
+  type DexRow = {
+    taxon_id: string;
+    scientific_name: string;
+    kingdom: string | null;
+    rarity_bucket: number | null;
+    first_observed_at: string;
+    obs_count: number;
+  };
+
+  function bucketLabel(bucket: number | null): string {
+    if (!groupsEl) return '';
+    let labels: Record<string, string> = {};
+    try {
+      labels = JSON.parse(groupsEl.dataset.bucketLabels ?? '{}') as Record<string, string>;
+    } catch { /* noop */ }
+    const key = String(Math.max(1, Math.min(5, bucket ?? 1)));
+    return labels[key] ?? '';
+  }
+
+  async function loadFromView(supabase: ReturnType<typeof getSupabase>, userId: string): Promise<DexRow[] | null> {
+    const { data, error } = await supabase
+      .from('profile_pokedex')
+      .select('taxon_id, scientific_name, kingdom, rarity_bucket, first_observed_at, obs_count')
+      .eq('user_id', userId);
+    if (error) return null;
+    return (data ?? []) as DexRow[];
+  }
+
+  async function loadFallback(supabase: ReturnType<typeof getSupabase>, userId: string): Promise<DexRow[]> {
     const { data } = await supabase
       .from('observations')
-      .select(`
-        observed_at,
-        identifications!inner(scientific_name, taxon_id, is_primary)
-      `)
-      .eq('observer_id', user.id)
+      .select('observed_at, identifications!inner(scientific_name, taxon_id, is_primary)')
+      .eq('observer_id', userId)
       .eq('identifications.is_primary', true)
       .order('observed_at', { ascending: false });
     const rows = (data ?? []) as Array<{
@@ -61,32 +85,78 @@ const px = (tr as unknown as { pokedex: Record<string, string> }).pokedex;
         else byTaxon.set(id.taxon_id, { name: id.scientific_name, first: r.observed_at, count: 1 });
       }
     }
-    if (byTaxon.size === 0) {
-      loading?.classList.add('hidden');
-      empty?.classList.remove('hidden');
-      return;
-    }
     const taxonIds = Array.from(byTaxon.keys());
+    if (!taxonIds.length) return [];
     const { data: rarity } = await supabase
       .from('taxon_rarity').select('taxon_id, bucket').in('taxon_id', taxonIds);
-    const rarityMap = new Map<string, Bucket>();
+    const rarityMap = new Map<string, number>();
     for (const r of (rarity ?? []) as Array<{ taxon_id: string; bucket: number }>) {
-      rarityMap.set(r.taxon_id, (r.bucket as Bucket) ?? 1);
+      rarityMap.set(r.taxon_id, r.bucket ?? 1);
     }
-    grid.innerHTML = Array.from(byTaxon.entries())
-      .sort((a, b) => b[1].count - a[1].count)
-      .map(([taxonId, v]) => {
-        const stars = rarityTier(rarityMap.get(taxonId) ?? 1);
-        const date = new Date(v.first).toLocaleDateString();
-        const countLabel = v.count === 1
-          ? (isEs ? `${v.count} observación` : `${v.count} observation`)
-          : (isEs ? `${v.count} observaciones` : `${v.count} observations`);
+    return Array.from(byTaxon.entries()).map(([taxonId, v]) => ({
+      taxon_id: taxonId,
+      scientific_name: v.name,
+      kingdom: null,
+      rarity_bucket: rarityMap.get(taxonId) ?? 1,
+      first_observed_at: v.first,
+      obs_count: v.count,
+    }));
+  }
+
+  function render(rows: DexRow[]) {
+    if (!groupsEl) return;
+    if (!rows.length) {
+      emptyEl?.classList.remove('hidden');
+      loading?.classList.add('hidden');
+      return;
+    }
+    const byKingdom = new Map<string, DexRow[]>();
+    for (const r of rows) {
+      const k = r.kingdom ?? 'Unknown';
+      if (!byKingdom.has(k)) byKingdom.set(k, []);
+      byKingdom.get(k)!.push(r);
+    }
+    const kingdoms = Array.from(byKingdom.keys()).sort();
+
+    groupsEl.innerHTML = kingdoms.map((k) => {
+      const items = byKingdom.get(k)!.sort((a, b) => b.obs_count - a.obs_count);
+      const cards = items.map((v) => {
+        const stars = rarityTier((v.rarity_bucket ?? 1) as Bucket);
+        const date = new Date(v.first_observed_at).toLocaleDateString();
+        const countLabel = v.obs_count === 1
+          ? (isEs ? `${v.obs_count} observación` : `${v.obs_count} observation`)
+          : (isEs ? `${v.obs_count} observaciones` : `${v.obs_count} observations`);
+        const tier = bucketLabel(v.rarity_bucket);
         return `<li class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-3 text-sm">
-          <div class="font-medium italic text-emerald-700 dark:text-emerald-400">${escAttr(v.name)}</div>
-          <div class="mt-1 text-xs text-zinc-500">${stars} · ${countLabel}</div>
+          <div class="font-medium italic text-emerald-700 dark:text-emerald-400">${escAttr(v.scientific_name)}</div>
+          <div class="mt-1 text-xs text-zinc-500">${stars}${tier ? ` · ${escAttr(tier)}` : ''} · ${countLabel}</div>
           <div class="text-[11px] text-zinc-400 mt-0.5">${escAttr(date)}</div>
         </li>`;
       }).join('');
+      return `<div>
+        <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2">${escAttr(k)}</h2>
+        <ul class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">${cards}</ul>
+      </div>`;
+    }).join('');
     loading?.classList.add('hidden');
+  }
+
+  (async function () {
+    if (!groupsEl) return;
+    let supabase;
+    try { supabase = getSupabase(); } catch {
+      loading?.classList.add('hidden');
+      emptyEl?.classList.remove('hidden');
+      return;
+    }
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      loading?.classList.add('hidden');
+      emptyEl?.classList.remove('hidden');
+      return;
+    }
+    let rows = await loadFromView(supabase, user.id);
+    if (rows === null) rows = await loadFallback(supabase, user.id);
+    render(rows);
   })();
 </script>

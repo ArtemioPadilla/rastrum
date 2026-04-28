@@ -1,0 +1,93 @@
+---
+import type { Locale } from '../../i18n/utils';
+import { t } from '../../i18n/utils';
+
+interface Props {
+  lang: Locale;
+  viewer: 'self' | 'signed_in' | 'anonymous';
+  targetUserId?: string;
+  ownerOnly?: boolean;
+}
+
+const { lang, ownerOnly = false } = Astro.props;
+const tr = t(lang);
+const heading = lang === 'es' ? 'Insignias' : 'Badges';
+const ownerPill = (tr as unknown as { privacy?: { owner_only_badge?: string } }).privacy?.owner_only_badge ?? (lang === 'es' ? '🔒 Solo tú lo ves' : '🔒 Only you see this');
+---
+
+<section
+  data-widget="badges-grid"
+  data-target-user-id={Astro.props.targetUserId}
+  class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 mb-6"
+>
+  <header class="flex items-baseline justify-between mb-3">
+    <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">{heading}</h2>
+    {ownerOnly && (
+      <span class="text-[10px] font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded">
+        {ownerPill}
+      </span>
+    )}
+  </header>
+
+  <p data-state="empty" class="hidden text-xs text-zinc-500 italic py-4">
+    {lang === 'es' ? 'Sin insignias aún.' : 'No badges yet.'}
+  </p>
+
+  <ul data-grid class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2"></ul>
+</section>
+
+<script>
+  import { getSupabase } from '../../lib/supabase';
+  import { escAttr } from '../../lib/karma';
+
+  async function hydrate(el: HTMLElement) {
+    const grid = el.querySelector<HTMLUListElement>('[data-grid]');
+    const empty = el.querySelector<HTMLElement>('[data-state="empty"]');
+    if (!grid) return;
+
+    let supabase;
+    try { supabase = getSupabase(); } catch { return; }
+    let userId = el.dataset.targetUserId ?? null;
+    if (!userId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      userId = user.id;
+    }
+    const isEs = (document.documentElement.lang || 'en') === 'es';
+    const { data } = await supabase
+      .from('profile_badges_visible')
+      .select('badge_key, tier, category, name_en, name_es, description_en, description_es, awarded_at')
+      .eq('user_id', userId)
+      .order('awarded_at', { ascending: false });
+    const rows = (data ?? []) as Array<{
+      badge_key: string; tier: string; category: string;
+      name_en: string; name_es: string;
+      description_en: string; description_es: string;
+      awarded_at: string;
+    }>;
+    if (!rows.length) {
+      empty?.classList.remove('hidden');
+      grid.classList.add('hidden');
+      return;
+    }
+    const tierColor = (tier: string) =>
+      tier === 'platinum' ? 'bg-zinc-200 text-zinc-800 dark:bg-zinc-300 dark:text-zinc-900' :
+      tier === 'gold' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300' :
+      tier === 'silver' ? 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200' :
+      'bg-orange-50 text-orange-800 dark:bg-orange-900/20 dark:text-orange-300';
+
+    grid.innerHTML = rows
+      .map((b) => {
+        const name = isEs ? b.name_es : b.name_en;
+        const desc = isEs ? b.description_es : b.description_en;
+        return `<li class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3" title="${escAttr(desc)}">
+          <div class="text-xs uppercase tracking-wider mb-1 ${tierColor(b.tier)} inline-block px-1.5 py-0.5 rounded">${b.tier}</div>
+          <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">${escAttr(name)}</p>
+          <p class="text-xs text-zinc-500 capitalize">${escAttr(b.category)}</p>
+        </li>`;
+      })
+      .join('');
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-widget="badges-grid"]').forEach(hydrate);
+</script>

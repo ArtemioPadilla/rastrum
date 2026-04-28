@@ -89,6 +89,12 @@ narrative source.
 |---|---|---|---|---|
 | 24 | Diversity Indices & Spatial Analytics (Shannon, Simpson, Hill numbers, ANPs, municipios) | v1.5 | planned (spec v1.0) | [`24-diversity-indices.md`](24-diversity-indices.md) |
 
+## v1.2 — Profile privacy & richer public profile — in flight
+
+| # | Module | Target | Status | Spec |
+|---|---|---|---|---|
+| 25 | Profile Privacy & Public Profile (`profile_privacy` matrix + `/u/<username>/`) | v1.2 | spec ready (v1.2.0 schema + matrix UI; v1.2.1 richer widgets) | [`25-profile-privacy.md`](25-profile-privacy.md) |
+
 > **Numbering note.** Two specs share the `15-` prefix:
 > [`15-map-location-picker.md`](15-map-location-picker.md) was claimed first
 > during the v1.0 push, then [`15-mcp-server.md`](15-mcp-server.md) shipped
