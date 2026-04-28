@@ -2886,3 +2886,27 @@ CREATE POLICY idreact_write ON public.identification_reactions FOR INSERT
 DROP POLICY IF EXISTS idreact_delete ON public.identification_reactions;
 CREATE POLICY idreact_delete ON public.identification_reactions FOR DELETE
   USING (user_id = auth.uid());
+
+-- 10) blocks
+CREATE TABLE IF NOT EXISTS public.blocks (
+  blocker_id  uuid        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  blocked_id  uuid        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (blocker_id, blocked_id),
+  CHECK (blocker_id <> blocked_id)
+);
+CREATE INDEX IF NOT EXISTS idx_blocks_blocked ON public.blocks(blocked_id);
+
+ALTER TABLE public.blocks ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS blocks_owner_read ON public.blocks;
+CREATE POLICY blocks_owner_read ON public.blocks FOR SELECT
+  USING (blocker_id = auth.uid());
+
+DROP POLICY IF EXISTS blocks_owner_write ON public.blocks;
+CREATE POLICY blocks_owner_write ON public.blocks FOR INSERT
+  WITH CHECK (blocker_id = auth.uid());
+
+DROP POLICY IF EXISTS blocks_owner_delete ON public.blocks;
+CREATE POLICY blocks_owner_delete ON public.blocks FOR DELETE
+  USING (blocker_id = auth.uid());
