@@ -38,7 +38,7 @@ const toastMsg = lang === 'es' ? '🔗 Link copiado' : '🔗 Link copied';
   aria-label={label}
   title={label}
   data-toast={toastMsg}
-  class="hidden fixed bottom-20 right-4 sm:bottom-6 z-40 w-11 h-11 rounded-full bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white shadow-lg flex items-center justify-center transition-colors"
+  class="hidden fixed bottom-[calc(5rem+env(safe-area-inset-bottom)+3.75rem)] sm:bottom-20 right-4 z-40 w-11 h-11 rounded-full bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white shadow-lg flex items-center justify-center transition-colors"
 >
   <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
     <path stroke-linecap="round" stroke-linejoin="round"
@@ -49,7 +49,7 @@ const toastMsg = lang === 'es' ? '🔗 Link copiado' : '🔗 Link copied';
 <!-- Toast -->
 <div
   id="global-share-toast"
-  class="hidden fixed bottom-36 sm:bottom-20 right-4 z-50 rounded-lg bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 px-4 py-2 text-sm font-medium shadow-lg pointer-events-none"
+  class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-lg bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 px-4 py-2 text-sm font-medium shadow-lg pointer-events-none"
   aria-live="polite"
 ></div>
 
