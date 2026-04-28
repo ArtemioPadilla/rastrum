@@ -1,0 +1,21 @@
+---
+import DocLayout from '../../../layouts/DocLayout.astro';
+const lang = 'es';
+---
+<DocLayout title="Consola" lang={lang} section="console">
+
+# Consola
+
+La **Consola** es una superficie de acciones privilegiadas para usuarios con rol de admin, moderador o experto. Si no ves la píldora "Consola" en el encabezado, esta página no aplica para ti.
+
+## Para qué sirve
+
+- **Admins** gestionan roles de usuario, revisan credenciales de investigador, monitorean fallos de sync y cuotas de API, y auditan cada acción privilegiada.
+- **Moderadores** atienden contenido reportado y gestionan suspensiones (PR3).
+- **Expertos** revisan la cola de validación filtrada por sus taxa y miran su puntaje de experiencia por taxón (PR2).
+
+## Cómo está construida
+
+Consulta [Módulo 24](https://github.com/ArtemioPadilla/rastrum/blob/main/docs/specs/modules/24-admin-console.md) para la referencia de implementación, y el [doc de diseño](https://github.com/ArtemioPadilla/rastrum/blob/main/docs/superpowers/specs/2026-04-27-admin-console-design.md) para el rationale.
+
+</DocLayout>

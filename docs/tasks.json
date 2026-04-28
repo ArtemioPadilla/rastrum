@@ -3807,6 +3807,51 @@
           "status": "done"
         }
       ]
+    },
+    "admin-console-foundation": {
+      "phase": "v1.1",
+      "title_en": "Admin/Moderator/Expert console — PR1 foundation",
+      "title_es": "Consola Admin/Moderador/Experto — PR1 base",
+      "modules": [
+        "24-admin-console.md"
+      ],
+      "subtasks": [
+        {
+          "label_en": "Schema migration: user_roles + admin_audit + has_role + sync trigger + RLS",
+          "label_es": "Migración: user_roles + admin_audit + has_role + trigger + RLS",
+          "status": "done"
+        },
+        {
+          "label_en": "Console chrome mode + ConsoleLayout + sidebar + i18n",
+          "label_es": "Modo chrome console + ConsoleLayout + sidebar + i18n",
+          "status": "done"
+        },
+        {
+          "label_en": "admin Edge Function dispatcher + 3 handlers (role.grant/revoke + user_audit)",
+          "label_es": "Edge Function admin + 3 handlers",
+          "status": "done"
+        },
+        {
+          "label_en": "Three tabs ship: Overview, Experts (moved), Audit log",
+          "label_es": "Tres tabs: Resumen, Expertos (movido), Auditoría",
+          "status": "done"
+        },
+        {
+          "label_en": "Old /profile/admin/experts/ → 308 redirect",
+          "label_es": "/profile/admin/experts/ → 308 redirect",
+          "status": "done"
+        },
+        {
+          "label_en": "Module spec 24, runbooks (bootstrap, role-model, audit, ops), CLAUDE.md update",
+          "label_es": "Spec módulo 24, runbooks, CLAUDE.md",
+          "status": "done"
+        },
+        {
+          "label_en": "Vitest (chrome-mode, console-tabs, admin-client) + Playwright smoke",
+          "label_es": "Vitest + Playwright smoke",
+          "status": "done"
+        }
+      ]
     }
   }
 }

@@ -3,10 +3,9 @@
  * AdminExpertsView — admin review queue for `expert_applications`.
  *
  * AUTHZ MODEL (v1.0.x):
- *   The `users` table has no `is_admin` column today. Per the v1.0.x brief
- *   we proxy admin access by `users.is_expert = true`. When a real
- *   `is_admin boolean` lands (idempotent ALTER … ADD COLUMN), swap the
- *   gate predicate below. Schema notes:
+ *   We gate by `has_role(auth.uid(), 'admin')` (read directly via the
+ *   user_roles table from the client-side script). The legacy
+ *   `users.is_expert = true` proxy has been replaced. Schema notes:
  *
  *     -- Proposed (don't apply yet — needs reviewer note):
  *     ALTER TABLE public.users
@@ -193,13 +192,15 @@ const profilePath = getLocalizedPath(lang, routes.profile[lang] + '/');
       return;
     }
 
-    // v1.0.x: gate by is_expert as the admin proxy. is_admin will replace this.
-    const { data: me } = await supabase
-      .from('users')
-      .select('is_expert')
-      .eq('id', user.id)
-      .maybeSingle<{ is_expert: boolean | null }>();
-    if (!me?.is_expert) {
+    const { data: roleRows } = await supabase
+      .from('user_roles')
+      .select('role, revoked_at')
+      .eq('user_id', user.id);
+    const now = Date.now();
+    const isAdmin = (roleRows ?? []).some((r: { role: string; revoked_at: string | null }) =>
+      r.role === 'admin' && (!r.revoked_at || new Date(r.revoked_at).getTime() > now)
+    );
+    if (!isAdmin) {
       hide('admin-loading');
       show('admin-not-auth');
       return;

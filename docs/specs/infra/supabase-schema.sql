@@ -1997,6 +1997,164 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 GRANT EXECUTE ON FUNCTION public.recompute_consensus(uuid) TO service_role;
 
+-- ═════════════════════════════════════════════════════════════════════
+-- ADMIN CONSOLE FOUNDATION (PR1)
+-- See docs/superpowers/specs/2026-04-27-admin-console-design.md
+-- ═════════════════════════════════════════════════════════════════════
+
+-- 1. user_role enum
+DO $$ BEGIN
+  CREATE TYPE public.user_role AS ENUM ('admin', 'moderator', 'expert', 'researcher');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- 2. user_roles join table
+CREATE TABLE IF NOT EXISTS public.user_roles (
+  user_id     uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  role        public.user_role NOT NULL,
+  granted_at  timestamptz NOT NULL DEFAULT now(),
+  granted_by  uuid REFERENCES public.users(id),
+  revoked_at  timestamptz,
+  notes       text,
+  PRIMARY KEY (user_id, role)
+);
+
+-- Partial index restricted to permanently-active rows (NULL revoked_at). Future-dated revocations are rare; has_role() handles the > now() check at query time.
+CREATE INDEX IF NOT EXISTS user_roles_active_idx
+  ON public.user_roles (role)
+  WHERE revoked_at IS NULL;
+
+ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
+
+-- 3. has_role() helper, callable from RLS predicates
+CREATE OR REPLACE FUNCTION public.has_role(uid uuid, r public.user_role)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.user_roles
+    WHERE user_id = uid
+      AND role = r
+      AND (revoked_at IS NULL OR revoked_at > now())
+  );
+$$;
+REVOKE ALL ON FUNCTION public.has_role(uuid, public.user_role) FROM public;
+GRANT EXECUTE ON FUNCTION public.has_role(uuid, public.user_role) TO authenticated, service_role;
+
+-- 4. audit_op enum
+DO $$ BEGIN
+  CREATE TYPE public.audit_op AS ENUM (
+    'role_grant', 'role_revoke',
+    'user_ban', 'user_unban', 'user_delete',
+    'observation_hide', 'observation_unhide',
+    'observation_obscure', 'observation_force_unobscure',
+    'observation_license_override', 'observation_hard_delete',
+    'comment_hide', 'comment_lock', 'comment_unlock',
+    'badge_award_manual', 'badge_revoke',
+    'token_force_revoke',
+    'feature_flag_toggle',
+    'cron_force_run',
+    'precise_coords_read',
+    'user_pii_read',
+    'token_list_read',
+    'user_audit_read'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- 5. admin_audit table
+CREATE TABLE IF NOT EXISTS public.admin_audit (
+  id          bigserial PRIMARY KEY,
+  actor_id    uuid NOT NULL REFERENCES public.users(id),
+  op          public.audit_op NOT NULL,
+  target_type text,
+  target_id   text,
+  before      jsonb,
+  after       jsonb,
+  reason      text NOT NULL,
+  ip          inet,
+  user_agent  text,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS admin_audit_actor_idx ON public.admin_audit (actor_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS admin_audit_target_idx ON public.admin_audit (target_type, target_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS admin_audit_op_idx ON public.admin_audit (op, created_at DESC);
+
+ALTER TABLE public.admin_audit ENABLE ROW LEVEL SECURITY;
+
+-- 6. Sync trigger keeps users.is_expert / .credentialed_researcher cached
+CREATE OR REPLACE FUNCTION public.sync_user_role_flags() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  IF (TG_OP = 'INSERT' OR TG_OP = 'UPDATE') THEN
+    UPDATE public.users
+       SET is_expert = public.has_role(NEW.user_id, 'expert'),
+           credentialed_researcher = public.has_role(NEW.user_id, 'researcher')
+     WHERE id = NEW.user_id;
+  ELSIF (TG_OP = 'DELETE') THEN
+    UPDATE public.users
+       SET is_expert = public.has_role(OLD.user_id, 'expert'),
+           credentialed_researcher = public.has_role(OLD.user_id, 'researcher')
+     WHERE id = OLD.user_id;
+  END IF;
+  RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
+-- The trigger fires on changes to revoked_at because that's the only
+-- time the active-roles set changes for a given user. The PRIMARY KEY
+-- (user_id, role) prevents direct role-column mutations. If the schema
+-- ever adds an alternative deactivation column (e.g., is_active), this
+-- trigger needs to expand the UPDATE OF list.
+DROP TRIGGER IF EXISTS user_roles_sync_flags ON public.user_roles;
+CREATE TRIGGER user_roles_sync_flags
+AFTER INSERT OR UPDATE OF revoked_at OR DELETE ON public.user_roles
+FOR EACH ROW EXECUTE FUNCTION public.sync_user_role_flags();
+
+-- 7. RLS policies
+DROP POLICY IF EXISTS user_roles_admin_or_self_read ON public.user_roles;
+CREATE POLICY user_roles_admin_or_self_read ON public.user_roles
+  FOR SELECT TO authenticated
+  USING (public.has_role(auth.uid(), 'admin') OR user_id = auth.uid());
+
+DROP POLICY IF EXISTS user_roles_no_self_write ON public.user_roles;
+CREATE POLICY user_roles_no_self_write ON public.user_roles
+  FOR ALL TO authenticated
+  USING (false) WITH CHECK (false);
+
+DROP POLICY IF EXISTS admin_audit_admin_read ON public.admin_audit;
+CREATE POLICY admin_audit_admin_read ON public.admin_audit
+  FOR SELECT TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'));
+
+DROP POLICY IF EXISTS admin_audit_no_client_write ON public.admin_audit;
+CREATE POLICY admin_audit_no_client_write ON public.admin_audit
+  FOR ALL TO authenticated
+  USING (false) WITH CHECK (false);
+
+-- 8. Refactor existing api_usage / sync_failures predicates from is_expert → admin role
+--    Note: the original policies were named with a different convention; we drop
+--    both the historical and the new name for idempotency.
+DROP POLICY IF EXISTS "api_usage_read_admin"     ON public.api_usage;
+DROP POLICY IF EXISTS api_usage_expert_read       ON public.api_usage;
+DROP POLICY IF EXISTS api_usage_admin_read        ON public.api_usage;
+CREATE POLICY api_usage_admin_read ON public.api_usage
+  FOR SELECT TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'));
+
+DROP POLICY IF EXISTS "sync_failures_read_admin" ON public.sync_failures;
+DROP POLICY IF EXISTS sync_failures_expert_read   ON public.sync_failures;
+DROP POLICY IF EXISTS sync_failures_admin_read    ON public.sync_failures;
+CREATE POLICY sync_failures_admin_read ON public.sync_failures
+  FOR SELECT TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'));
+
+-- 9. Grants
+GRANT SELECT                          ON public.user_roles  TO authenticated;
+GRANT SELECT                          ON public.admin_audit TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE  ON public.user_roles  TO service_role;
+GRANT SELECT, INSERT                  ON public.admin_audit TO service_role;
+
 GRANT EXECUTE ON FUNCTION public.refresh_taxon_rarity() TO service_role;
 
 -- =====================================================================

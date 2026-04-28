@@ -60,12 +60,36 @@ export const routes: Record<string, Record<Locale, string>> = {
   privacy: { en: '/privacy', es: '/privacidad' },
   terms: { en: '/terms', es: '/terminos' },
   faq: { en: '/faq', es: '/preguntas-frecuentes' },
+  // Console (admin / moderator / expert privileged surface)
+  console:                  { en: '/console',                  es: '/consola' },
+  consoleUsers:             { en: '/console/users',            es: '/consola/usuarios' },
+  consoleCredentials:       { en: '/console/credentials',      es: '/consola/credenciales' },
+  consoleExperts:           { en: '/console/experts',          es: '/consola/expertos' },
+  consoleObservations:      { en: '/console/observations',     es: '/consola/observaciones' },
+  consoleApi:               { en: '/console/api',              es: '/consola/api' },
+  consoleSync:              { en: '/console/sync',             es: '/consola/sync' },
+  consoleCron:              { en: '/console/cron',             es: '/consola/cron' },
+  consoleBadges:            { en: '/console/badges',           es: '/consola/insignias' },
+  consoleTaxa:              { en: '/console/taxa',             es: '/consola/taxa' },
+  consoleKarma:             { en: '/console/karma',            es: '/consola/karma' },
+  consoleFlags:             { en: '/console/flags',            es: '/consola/banderas' },
+  consoleAudit:             { en: '/console/audit',            es: '/consola/auditoria' },
+  consoleFeatureFlags:      { en: '/console/features',         es: '/consola/caracteristicas' },
+  consoleBioblitz:          { en: '/console/bioblitz',         es: '/consola/bioblitz' },
+  consoleModFlagQueue:      { en: '/console/flag-queue',       es: '/consola/cola-banderas' },
+  consoleModComments:       { en: '/console/comments',         es: '/consola/comentarios' },
+  consoleModBans:           { en: '/console/bans',             es: '/consola/suspensiones' },
+  consoleModDisputes:       { en: '/console/disputes',         es: '/consola/disputas' },
+  consoleExpertValidation:  { en: '/console/validation',       es: '/consola/validacion' },
+  consoleExpertOverrides:   { en: '/console/overrides',        es: '/consola/correcciones' },
+  consoleExpertExpertise:   { en: '/console/expertise',        es: '/consola/experiencia' },
+  consoleExpertTaxonNotes:  { en: '/console/taxon-notes',      es: '/consola/notas-taxon' },
 };
 
 export const docPages = [
   'vision', 'features', 'roadmap', 'tasks', 'market',
   'architecture', 'indigenous', 'funding', 'contribute',
-  'faq', 'privacy', 'terms',
+  'faq', 'privacy', 'terms', 'console',
 ] as const;
 
 export type DocPage = (typeof docPages)[number];
@@ -127,6 +151,30 @@ export const routeTree: Record<string, RouteNode> = {
   privacy:     { labels: { en: 'Privacy',       es: 'Privacidad' } },
   terms:       { labels: { en: 'Terms',         es: 'Términos' } },
   faq:         { labels: { en: 'FAQ',           es: 'Preguntas frecuentes' } },
+  // Console
+  console:                 { labels: { en: 'Console',          es: 'Consola' } },
+  consoleUsers:            { labels: { en: 'Users',            es: 'Usuarios' },          parent: 'console' },
+  consoleCredentials:      { labels: { en: 'Credentials',      es: 'Credenciales' },      parent: 'console' },
+  consoleExperts:          { labels: { en: 'Experts',          es: 'Expertos' },          parent: 'console' },
+  consoleObservations:     { labels: { en: 'Observations',     es: 'Observaciones' },     parent: 'console' },
+  consoleApi:              { labels: { en: 'API',              es: 'API' },               parent: 'console' },
+  consoleSync:             { labels: { en: 'Sync',             es: 'Sync' },              parent: 'console' },
+  consoleCron:             { labels: { en: 'Cron',             es: 'Cron' },              parent: 'console' },
+  consoleBadges:           { labels: { en: 'Badges',           es: 'Insignias' },         parent: 'console' },
+  consoleTaxa:             { labels: { en: 'Taxa',             es: 'Taxa' },              parent: 'console' },
+  consoleKarma:            { labels: { en: 'Karma',            es: 'Karma' },             parent: 'console' },
+  consoleFlags:            { labels: { en: 'Flags',            es: 'Banderas' },          parent: 'console' },
+  consoleAudit:            { labels: { en: 'Audit',            es: 'Auditoría' },         parent: 'console' },
+  consoleFeatureFlags:     { labels: { en: 'Features',         es: 'Características' },   parent: 'console' },
+  consoleBioblitz:         { labels: { en: 'Bioblitz',         es: 'Bioblitz' },          parent: 'console' },
+  consoleModFlagQueue:     { labels: { en: 'Flag queue',       es: 'Cola de banderas' },  parent: 'console' },
+  consoleModComments:      { labels: { en: 'Comments',         es: 'Comentarios' },       parent: 'console' },
+  consoleModBans:          { labels: { en: 'Bans',             es: 'Suspensiones' },      parent: 'console' },
+  consoleModDisputes:      { labels: { en: 'Disputes',         es: 'Disputas' },          parent: 'console' },
+  consoleExpertValidation: { labels: { en: 'Validation',       es: 'Validación' },        parent: 'console' },
+  consoleExpertOverrides:  { labels: { en: 'Overrides',        es: 'Correcciones' },      parent: 'console' },
+  consoleExpertExpertise:  { labels: { en: 'Expertise',        es: 'Experiencia' },       parent: 'console' },
+  consoleExpertTaxonNotes: { labels: { en: 'Taxon notes',      es: 'Notas de taxón' },    parent: 'console' },
 };
 
 export function getRouteLabel(key: string, lang: string): string {
@@ -192,6 +240,10 @@ export const docPageMeta = {
   terms: {
     en: "Rastrum's terms of service. Open-source under MIT (code) and AGPL-3.0 (server). Per-observation Creative Commons licensing — BY, BY-NC, or CC0.",
     es: "Términos de servicio de Rastrum. Open-source bajo MIT (código) y AGPL-3.0 (servidor). Licencias Creative Commons por observación — BY, BY-NC o CC0.",
+  },
+  console: {
+    en: "Privileged-actions surface for admin, moderator, and expert roles. Role model, audit log, and per-action runbooks.",
+    es: "Superficie de acciones privilegiadas para roles de admin, moderador y experto. Modelo de roles, auditoría y runbooks por acción.",
   },
 } as const satisfies Record<DocPage, { en: string; es: string }>;
 

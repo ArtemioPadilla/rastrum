@@ -166,3 +166,5 @@ export interface ValidationQueueRow {
   suggestion_count: number;
   distinct_voter_count: number;
 }
+
+export type UserRole = 'admin' | 'moderator' | 'expert' | 'researcher';

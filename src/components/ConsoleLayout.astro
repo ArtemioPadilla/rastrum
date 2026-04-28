@@ -1,0 +1,86 @@
+---
+/**
+ * ConsoleLayout — privileged-actions chrome. No public Header/Footer.
+ * Top bar: wordmark + role pills + identity + Exit.
+ * Body: ConsoleSidebar + slot.
+ *
+ * Role pills only show for roles the signed-in user holds. The active
+ * role is read from URL ?role=… or defaulted to the first held role.
+ */
+import type { UserRole } from '../lib/types';
+import { rolePillsFor } from '../lib/console-tabs';
+import { t, getLocalizedPath, routes } from '../i18n/utils';
+import ConsoleSidebar from './ConsoleSidebar.astro';
+
+interface Props {
+  lang: 'en' | 'es';
+  allRoles: Set<UserRole>;
+  activeRole: UserRole;
+  currentPath: string;
+  identity: { username: string | null; avatar?: string };
+}
+
+const { lang, allRoles, activeRole, currentPath, identity } = Astro.props;
+const tr = t(lang);
+const pills = rolePillsFor(allRoles);
+const exitHref = getLocalizedPath(lang, '/');
+const dashboardHref = getLocalizedPath(lang, routes.console[lang] + '/');
+
+function pillHref(role: UserRole): string {
+  return `${dashboardHref}?role=${role}`;
+}
+
+const railColour = (role: UserRole): string => {
+  switch (role) {
+    case 'admin':     return 'bg-emerald-700 text-white';
+    case 'moderator': return 'bg-amber-600 text-white';
+    case 'expert':    return 'bg-sky-700 text-white';
+    default:          return 'bg-slate-600 text-white';
+  }
+};
+
+const labelKey: Record<UserRole, string> = {
+  admin: tr.console.role_admin_pill,
+  moderator: tr.console.role_moderator_pill,
+  expert: tr.console.role_expert_pill,
+  researcher: '',
+};
+---
+
+<div class="min-h-screen flex flex-col bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
+  <header class="flex items-center gap-3 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-4 py-2.5">
+    <a href={exitHref} class="font-bold tracking-tight text-emerald-700 dark:text-emerald-400">
+      Rastrum
+    </a>
+    <span class="ml-1 hidden sm:inline-block text-xs text-zinc-500 uppercase tracking-wide">
+      {tr.console.nav}
+    </span>
+    <nav class="ml-3 flex gap-1.5">
+      {pills.map(role => {
+        const isActive = role === activeRole;
+        const cls = isActive
+          ? `${railColour(role)} px-2.5 py-1 rounded-full text-xs font-semibold`
+          : 'px-2.5 py-1 rounded-full text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900';
+        return (
+          <a href={pillHref(role)} class={cls}>{labelKey[role]}</a>
+        );
+      })}
+    </nav>
+    <div class="ml-auto flex items-center gap-3 text-xs text-zinc-600 dark:text-zinc-400">
+      <span>{identity.username ?? ''}</span>
+      <a href={exitHref} class="hover:underline">↩ {tr.console.exit}</a>
+    </div>
+  </header>
+
+  <div class="flex flex-1 min-h-0">
+    <ConsoleSidebar
+      lang={lang}
+      activeRole={activeRole}
+      allRoles={allRoles}
+      currentPath={currentPath}
+    />
+    <main class="flex-1 overflow-y-auto p-4 md:p-6">
+      <slot />
+    </main>
+  </div>
+</div>

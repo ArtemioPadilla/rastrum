@@ -1,0 +1,96 @@
+---
+/**
+ * ConsoleAuditLogView — hybrid timeline + filter pills + JSONB diff drill-down.
+ * PR1 ships a basic browse view: render the last 100 admin_audit rows grouped
+ * by day with click-to-expand. Filter pills + URL-state + CSV export land in PR3.
+ */
+import { t } from '../i18n/utils';
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+---
+
+<section class="max-w-5xl">
+  <h1 class="text-xl font-semibold mb-4">{tr.console.audit}</h1>
+  <div id="audit-not-auth" class="hidden rounded border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-900 dark:text-amber-100">
+    {tr.console.not_authorized}
+  </div>
+  <div id="audit-loading" class="text-sm text-zinc-500 italic">{tr.console.loading}</div>
+  <div id="audit-rows" class="hidden space-y-2"></div>
+  <p id="audit-error" class="hidden mt-3 text-sm text-red-600 dark:text-red-400"></p>
+</section>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+
+  type Row = {
+    id: number;
+    actor_id: string;
+    op: string;
+    target_type: string | null;
+    target_id: string | null;
+    before: unknown;
+    after: unknown;
+    reason: string;
+    created_at: string;
+  };
+
+  function show(id: string) { document.getElementById(id)?.classList.remove('hidden'); }
+  function hide(id: string) { document.getElementById(id)?.classList.add('hidden'); }
+  function escapeHtml(s: string): string {
+    return s.replace(/[<>&'"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&#39;','"':'&quot;'}[c]!));
+  }
+
+  async function load() {
+    const supabase = getSupabase();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { hide('audit-loading'); show('audit-not-auth'); return; }
+
+    const { data, error } = await supabase
+      .from('admin_audit')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    if (error) {
+      hide('audit-loading');
+      const e = document.getElementById('audit-error')!;
+      e.textContent = error.message; e.classList.remove('hidden');
+      return;
+    }
+    const rows = (data ?? []) as Row[];
+    if (rows.length === 0) {
+      hide('audit-loading');
+      const wrap = document.getElementById('audit-rows')!;
+      wrap.innerHTML = '<div class="rounded border border-dashed border-zinc-300 dark:border-zinc-700 p-4 text-sm text-zinc-500">No audit entries yet.</div>';
+      wrap.classList.remove('hidden');
+      return;
+    }
+
+    const wrap = document.getElementById('audit-rows')!;
+    wrap.innerHTML = rows.map(r => `
+      <details class="rounded border border-zinc-200 dark:border-zinc-800 p-3 text-sm">
+        <summary class="flex justify-between cursor-pointer">
+          <span><span class="font-mono text-xs text-zinc-500">${escapeHtml(r.created_at)}</span>
+                <span class="ml-2 font-semibold">${escapeHtml(r.op)}</span>
+                <span class="ml-2 text-zinc-600 dark:text-zinc-400">${escapeHtml(r.target_type ?? '')}/${escapeHtml(r.target_id ?? '')}</span></span>
+          <span class="text-xs text-zinc-500">#${r.id}</span>
+        </summary>
+        <div class="mt-2 text-xs text-zinc-700 dark:text-zinc-300">
+          <div class="mb-1"><strong>Reason:</strong> ${escapeHtml(r.reason)}</div>
+          <div class="grid grid-cols-2 gap-2">
+            <pre class="bg-zinc-50 dark:bg-zinc-900 p-2 rounded overflow-x-auto"><code>${escapeHtml(JSON.stringify(r.before, null, 2))}</code></pre>
+            <pre class="bg-zinc-50 dark:bg-zinc-900 p-2 rounded overflow-x-auto"><code>${escapeHtml(JSON.stringify(r.after, null, 2))}</code></pre>
+          </div>
+        </div>
+      </details>
+    `).join('');
+    hide('audit-loading');
+    show('audit-rows');
+  }
+  load().catch(err => {
+    hide('audit-loading');
+    const e = document.getElementById('audit-error')!;
+    e.textContent = (err as Error).message; e.classList.remove('hidden');
+  });
+</script>

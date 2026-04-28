@@ -82,6 +82,11 @@ const getDocLabel = (key: string) => (tr.docs.sections as Record<string, string>
       <a href={myObsPath}     class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{tr.profile.my_observations_title}</a>
       <a href={watchlistPath} class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{tr.nav.explore_dropdown.watchlist}</a>
       <a href={settingsPath}  class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{tr.profile.settings_link} ▸</a>
+      <a id="mobile-console-link"
+         href={getLocalizedPath(lang, routes.console[locale] + '/')}
+         class="hidden block px-3 py-2 text-sm rounded hover:bg-zinc-100 dark:hover:bg-zinc-900">
+        {tr.console.nav}
+      </a>
       <button id="drawer-sign-out" class="block w-full text-left py-1.5 text-red-600 dark:text-red-400 hover:text-red-700">{tr.auth.sign_out}</button>
     </section>
 
@@ -119,6 +124,7 @@ const getDocLabel = (key: string) => (tr.docs.sections as Record<string, string>
 <script>
   import { getSupabase } from '../lib/supabase';
   import { signOut } from '../lib/auth';
+  import { getUserRoles } from '../lib/user-roles';
 
   const drawer   = document.getElementById('mobile-drawer');
   const backdrop = document.getElementById('mobile-drawer-backdrop');
@@ -147,6 +153,15 @@ const getDocLabel = (key: string) => (tr.docs.sections as Record<string, string>
   backdrop?.addEventListener('click', close);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
 
+  async function maybeShowConsoleLink(userId: string) {
+    const link = document.getElementById('mobile-console-link');
+    if (!link) return;
+    try {
+      const roles = await getUserRoles(userId);
+      if (roles.size > 0) link.classList.remove('hidden');
+    } catch { /* silent — drawer console link is optional UX */ }
+  }
+
   // Auth-state swap, same shape as MobileBottomBar
   function paintAuth(has: boolean) {
     authed?.classList.toggle('hidden', !has);
@@ -156,7 +171,11 @@ const getDocLabel = (key: string) => (tr.docs.sections as Record<string, string>
     try {
       const { data: { session } } = await getSupabase().auth.getSession();
       paintAuth(!!session);
-      getSupabase().auth.onAuthStateChange((_e, s) => paintAuth(!!s));
+      if (session?.user) await maybeShowConsoleLink(session.user.id);
+      getSupabase().auth.onAuthStateChange(async (_e, s) => {
+        paintAuth(!!s);
+        if (s?.user) await maybeShowConsoleLink(s.user.id);
+      });
     } catch { /* env not set */ }
   })();
 

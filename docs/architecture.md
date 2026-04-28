@@ -273,6 +273,32 @@ The view includes only synced, non-fully-redacted observations whose
 primary identification is missing or low-confidence and not yet
 research-grade.
 
+## Console (privileged surfaces)
+
+Three role tiers — admin, moderator, expert — share one chrome surface
+under `/console/`. Privileged writes flow through one Edge Function with
+an atomic write+audit transaction:
+
+```
+Browser ──POST {action,payload,reason}──▶ /functions/v1/admin
+                                              │
+                                              ├─ verifyJwtAndLoadRoles()
+                                              ├─ requireRole(action.required)
+                                              ├─ payloadSchema.parse()
+                                              ├─ handler.execute()       ┐
+                                              ├─ insertAuditRow()        ├ logical tx
+                                              └─ return {audit_id}        ┘
+```
+
+RLS predicates use `has_role(auth.uid(), <role>)`. The `users.is_expert`
+and `users.credentialed_researcher` columns are denormalised caches kept
+in sync via `user_roles_sync_flags` trigger; consensus computation and
+the `obs_credentialed_read` RLS policy continue to read those columns
+on the hot path.
+
+Phased rollout: foundation (PR1), high-pain (PR2), operator value (PR3),
+on-demand (PR4+). See [Module 24](specs/modules/24-admin-console.md).
+
 ## Atomic delete
 
 The `/share/obs` Manage-panel **Delete** button calls the
