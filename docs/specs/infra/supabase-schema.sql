@@ -2595,3 +2595,27 @@ WHERE
 GROUP BY o.observer_id, i.taxon_id, t.scientific_name, t.kingdom, tr.bucket;
 
 GRANT SELECT ON public.profile_pokedex TO anon, authenticated;
+
+-- ═════════════════════════════════════════════════════════════════════
+-- Module 27 — Establishment Means (organism origin)
+-- Requested by Eugenio Padilla, 2026-04-28.
+-- Darwin Core: establishmentMeans / occurrenceStatus field.
+-- ═════════════════════════════════════════════════════════════════════
+
+ALTER TABLE public.observations
+  ADD COLUMN IF NOT EXISTS establishment_means text NOT NULL DEFAULT 'wild'
+    CHECK (establishment_means IN ('wild','cultivated','captive','uncertain'));
+
+COMMENT ON COLUMN public.observations.establishment_means IS
+  'Darwin Core establishmentMeans. wild=native wild individual; '
+  'cultivated=planted/cultivated plant or managed population; '
+  'captive=domestic animal, zoo, aquarium; uncertain=observer not sure.';
+
+-- Backfill existing rows (all pre-existing observations assumed wild —
+-- the only reasonable default for a biodiversity app in the field).
+UPDATE public.observations SET establishment_means = 'wild'
+  WHERE establishment_means IS DISTINCT FROM 'wild';
+
+-- Index for diversity queries filtering by establishment_means = 'wild'.
+CREATE INDEX IF NOT EXISTS idx_obs_establishment_means
+  ON public.observations(establishment_means);
