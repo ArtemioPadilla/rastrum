@@ -390,6 +390,10 @@ const k = (tr as unknown as { karma: Record<string, string> }).karma;
   import { formatDelta } from '../lib/karma';
 
   (async function hydrateKarma() {
+    function escAttr(s: string): string {
+      return s.replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' } as Record<string, string>)[c]);
+    }
+
     const totalEl   = document.getElementById('karma-total');
     const weeklyEl  = document.getElementById('karma-weekly');
     const listEl    = document.getElementById('karma-expertise-list') as HTMLUListElement | null;
@@ -429,7 +433,7 @@ const k = (tr as unknown as { karma: Record<string, string> }).karma;
         const ver = r.verified_at
           ? '<span class="ml-1 text-emerald-700 dark:text-emerald-400" title="verified">✓</span>'
           : '';
-        return `<li class="flex items-center gap-2"><span class="italic">${name}</span>${ver}<span class="ml-auto font-mono text-xs">${Math.round(r.score)}</span></li>`;
+        return `<li class="flex items-center gap-2"><span class="italic">${escAttr(name)}</span>${ver}<span class="ml-auto font-mono text-xs">${Math.round(r.score)}</span></li>`;
       }).join('');
     }
   })();
