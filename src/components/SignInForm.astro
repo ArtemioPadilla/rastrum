@@ -97,6 +97,18 @@ const tr = t(lang);
     verifyPasskey,
     passkeySupported,
   } from '../lib/auth';
+  import { getSupabase } from '../lib/supabase';
+
+  // If the user already has a valid session, skip the form entirely.
+  (async () => {
+    try {
+      const { data: { session } } = await getSupabase().auth.getSession();
+      if (session?.user) {
+        const isEsPath = window.location.pathname.startsWith('/es/');
+        window.location.replace(isEsPath ? '/es/' : '/en/');
+      }
+    } catch { /* env not set or storage unavailable — show the form */ }
+  })();
 
   const googleBtn  = document.getElementById('google-btn') as HTMLButtonElement | null;
   const githubBtn  = document.getElementById('github-btn') as HTMLButtonElement | null;

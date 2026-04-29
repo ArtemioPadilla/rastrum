@@ -363,5 +363,13 @@ const docColumns = [
 
   avatarBtn?.addEventListener('click', (e) => { e.stopPropagation(); avatarMenu?.classList.toggle('hidden'); });
   document.addEventListener('click', () => avatarMenu?.classList.add('hidden'));
-  signOutBtn?.addEventListener('click', async () => { await signOut(); window.location.reload(); });
+  signOutBtn?.addEventListener('click', async () => {
+    try { await signOut(); } catch { /* dead refresh token — fall through to local cleanup */ }
+    try {
+      localStorage.removeItem(AVATAR_CACHE_KEY);
+      localStorage.removeItem(AVATAR_NAME_KEY);
+      localStorage.removeItem('rastrum-auth-v1');
+    } catch { /* ignore */ }
+    window.location.replace(window.location.pathname.startsWith('/es/') ? '/es/' : '/en/');
+  });
 </script>

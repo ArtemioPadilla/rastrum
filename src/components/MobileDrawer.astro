@@ -179,7 +179,15 @@ const getDocLabel = (key: string) => (tr.docs.sections as Record<string, string>
     } catch { /* env not set */ }
   })();
 
-  signOutBtn?.addEventListener('click', async () => { await signOut(); window.location.reload(); });
+  signOutBtn?.addEventListener('click', async () => {
+    try { await signOut(); } catch { /* dead refresh token — fall through to local cleanup */ }
+    try {
+      localStorage.removeItem('rastrum.headerAvatar');
+      localStorage.removeItem('rastrum.headerName');
+      localStorage.removeItem('rastrum-auth-v1');
+    } catch { /* ignore */ }
+    window.location.replace(window.location.pathname.startsWith('/es/') ? '/es/' : '/en/');
+  });
 
   themeBtn?.addEventListener('click', () => {
     const dark = document.documentElement.classList.toggle('dark');
