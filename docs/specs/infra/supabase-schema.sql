@@ -4436,7 +4436,8 @@ VALUES
   ('localAiIdentification',  'Local AI identification (WebLLM)',      'On-device Phi-3.5-vision identification via WebLLM. Downloads a ~2 GB model on first use. Off by default — gated on explicit user opt-in.',                            false, 'identification'),
   ('darwinCoreExport',       'Darwin Core Archive export',            'Allow authenticated users to download their observations as a DwC-A ZIP via the export-dwca Edge Function.',                                                            true,  'admin'),
   ('socialGraph',            'Social graph (follows / reactions)',    'Module 26 social surfaces: follow/unfollow, notification bell, reactions strip on observation cards.',                                                                     true,  'social'),
-  ('bioblitzEvents',         'Bioblitz events UI',                    'Public listing and participation UI for bioblitz events. Ships when the first organizer requests an event.',                                                              false, 'admin')
+  ('bioblitzEvents',         'Bioblitz events UI',                    'Public listing and participation UI for bioblitz events. Ships when the first organizer requests an event.',                                                              false, 'admin'),
+  ('enforce_two_person_irreversible', 'Enforce two-person rule on irreversible ops', 'When enabled, the admin dispatcher rejects direct calls to role.revoke / user.ban / observation.hide / badge.revoke unless the call is invoked from proposal.approve. Off by default; flip after operators trust the Proposals queue.', false, 'admin')
 ON CONFLICT (key) DO UPDATE
   SET name        = EXCLUDED.name,
       description = EXCLUDED.description,
