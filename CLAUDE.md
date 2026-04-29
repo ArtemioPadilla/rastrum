@@ -355,13 +355,31 @@ See "Identifier plugin contract" above. Use the existing plugins
    statement idempotent.
 2. Apply via `make db-apply`. Verify with `make db-verify` and
    `make db-policies`.
-3. **CI auto-apply** (`.github/workflows/db-apply.yml`) also fires when
-   that file or `cron-schedules.sql` changes on push to main. Requires
-   `SUPABASE_DB_URL` Actions secret. The workflow can also be fired
-   manually via `gh workflow run db-apply.yml` with an optional
-   `run_rarity_refresh=true` input to seed `taxon_rarity` immediately.
-4. If the change affects `progress.json` items, update the relevant
+3. **Pre-merge gate** (`.github/workflows/db-validate.yml`) — fires on
+   any PR touching the schema. Spins up an ephemeral Postgres 17 +
+   PostGIS 3.4 service container, applies the schema TWICE (the second
+   pass enforces idempotency), and runs the sentinel-table check. If
+   anything errors — syntax, type mismatch (e.g., `MIN(uuid)`), missing
+   `IF NOT EXISTS`, forward references — the PR fails. Required status
+   check; do not bypass.
+4. **CI auto-apply** (`.github/workflows/db-apply.yml`) fires on push to
+   main when either SQL file changes. Requires `SUPABASE_DB_URL` Actions
+   secret. The workflow can be fired manually via `gh workflow run
+   db-apply.yml` with an optional `run_rarity_refresh=true` input to
+   seed `taxon_rarity` immediately. Hardened with `fetch-depth: 0`,
+   loud failure on unresolvable diff bases, and a sentinel-verify step
+   that asserts critical tables/functions exist after apply.
+5. If the change affects `progress.json` items, update the relevant
    item's subtasks in `docs/tasks.json` too.
+
+**Why the validate gate exists.** PR #42 (admin console) merged with a
+clean db-apply "success" status — but the apply step had silently
+skipped because `actions/checkout@v4`'s shallow clone made `git diff
+<before> <sha>` fail, and the script's `|| true` masked the error. A
+later schema bug (`MIN(o.id)` on a UUID column from a different PR)
+then made every subsequent apply fail mid-stream. Both issues survived
+because nothing tested the schema against a real Postgres before merge.
+The validate gate is the fix.
 
 ### A new roadmap item
 1. Add to `docs/progress.json` (the right phase, with `_es` translation).
