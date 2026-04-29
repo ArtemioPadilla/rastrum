@@ -3529,8 +3529,20 @@ CREATE POLICY comments_mod_read ON public.observation_comments
 -- docs/superpowers/specs/2026-04-28-ai-sponsorships-design.md
 -- ============================================================
 
--- Vault prerequisite (no-op if already enabled).
-CREATE EXTENSION IF NOT EXISTS vault;
+-- Vault prerequisite. Available on Supabase Cloud; vanilla Postgres (CI
+-- validate gate, local dev) doesn't ship the vault extension binary.
+-- We skip silently in those environments — the helper functions below
+-- reference vault.* via dynamic SQL (EXECUTE), so they compile even when
+-- the schema is missing. Decryption only fires in production via the
+-- Edge Function which runs against Supabase Cloud.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_available_extensions WHERE name = 'vault') THEN
+    CREATE EXTENSION IF NOT EXISTS vault;
+  ELSE
+    RAISE NOTICE 'vault extension not available — skipping (expected in CI / vanilla Postgres)';
+  END IF;
+END $$;
 
 -- 1. Enums (idempotent via DO blocks)
 DO $$ BEGIN CREATE TYPE public.ai_provider AS ENUM ('anthropic');
@@ -3839,21 +3851,25 @@ END $$;
 REVOKE ALL ON FUNCTION public.increment_rate_limit_bucket(uuid, public.ai_provider, timestamptz) FROM public;
 GRANT EXECUTE ON FUNCTION public.increment_rate_limit_bucket(uuid, public.ai_provider, timestamptz) TO service_role;
 
--- 16. Vault helpers.
+-- 16. Vault helpers. Function bodies use EXECUTE so the vault.* references
+--     are resolved at runtime, not at function-creation time. This lets
+--     the schema apply cleanly in CI / vanilla Postgres where the vault
+--     extension is absent. At runtime in production these only fire from
+--     the Edge Function (Supabase Cloud) where vault is always present.
 CREATE OR REPLACE FUNCTION public.create_vault_secret(p_secret text, p_name text)
-RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, vault AS $$
+RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE v_id uuid;
 BEGIN
-  v_id := vault.create_secret(p_secret, p_name);
+  EXECUTE 'SELECT vault.create_secret($1, $2)' INTO v_id USING p_secret, p_name;
   RETURN v_id;
 END $$;
 REVOKE ALL ON FUNCTION public.create_vault_secret(text, text) FROM public;
 GRANT EXECUTE ON FUNCTION public.create_vault_secret(text, text) TO service_role;
 
 CREATE OR REPLACE FUNCTION public.delete_vault_secret(p_secret_id uuid)
-RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, vault AS $$
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
-  DELETE FROM vault.secrets WHERE id = p_secret_id;
+  EXECUTE 'DELETE FROM vault.secrets WHERE id = $1' USING p_secret_id;
 END $$;
 REVOKE ALL ON FUNCTION public.delete_vault_secret(uuid) FROM public;
 GRANT EXECUTE ON FUNCTION public.delete_vault_secret(uuid) TO service_role;
