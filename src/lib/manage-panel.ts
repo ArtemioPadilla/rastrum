@@ -10,6 +10,7 @@
 // flagging is needed.
 
 import { getSupabase } from './supabase';
+import { t } from '../i18n/utils';
 
 type Ident = { scientific_name?: string; is_primary?: boolean } | undefined;
 
@@ -202,6 +203,106 @@ export async function wireManagePanelDetails(
         errEl.classList.remove('hidden');
       }
       deleteBtn.disabled = false;
+    }
+  });
+}
+
+/**
+ * Build the WKT geography literal Postgres expects for a `geography(POINT,4326)`
+ * column. Note longitude precedes latitude per PostGIS / GeoJSON convention,
+ * matching how `src/lib/sync.ts` and `ObservationForm.astro` write coords.
+ */
+export function pointGeographyLiteral(lat: number, lng: number): string {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    throw new Error('coords_invalid');
+  }
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    throw new Error('coords_invalid');
+  }
+  return `SRID=4326;POINT(${lng} ${lat})`;
+}
+
+/**
+ * Wire the Location tab of `ObsManagePanel.astro`. Listens for the
+ * `rastrum:mappicker-save` event with `detail.id === 'obs-detail-edit'`,
+ * UPDATEs `observations.location`, and lets the existing
+ * `observations_material_edit_check_trg` trigger flag
+ * `last_material_edit_at` for moves > 1 km. The trigger is server-side,
+ * so no application flag is set here.
+ *
+ * RLS gates the UPDATE on `auth.uid() = observer_id`, so non-owners can't
+ * land here even if they spoof the event.
+ */
+export async function wireManagePanelLocation(
+  obsId: string,
+  obs: Record<string, unknown>,
+): Promise<void> {
+  const supabase = getSupabase();
+  const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
+  const isEs = lang === 'es';
+  const errCopy = isEs
+    ? { saveFailed: 'No se pudo guardar la ubicación.', invalidCoords: 'Coordenadas no válidas.' }
+    : { saveFailed: 'Failed to save location.',         invalidCoords: 'Invalid coordinates.' };
+
+  // Pre-populate both pickers (view + edit modal) with the current coords
+  // pulled off the loaded observation. The location is a GeoJSON Point;
+  // PostgREST returns it as { coordinates: [lng, lat] }.
+  const loc = obs.location as { coordinates?: [number, number] } | null | undefined;
+  const coords = loc?.coordinates;
+  if (Array.isArray(coords) && coords.length >= 2) {
+    const lng = coords[0];
+    const lat = coords[1];
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      window.dispatchEvent(new CustomEvent('rastrum:mappicker-set', {
+        detail: { id: 'obs-detail-loc-view', coords: { lat, lng } },
+      }));
+      window.dispatchEvent(new CustomEvent('rastrum:mappicker-set-initial', {
+        detail: { id: 'obs-detail-edit', coords: { lat, lng } },
+      }));
+      const coordsEl = document.querySelector<HTMLElement>('[data-loc-coords]');
+      if (coordsEl) coordsEl.textContent = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    }
+  } else {
+    const coordsEl = document.querySelector<HTMLElement>('[data-loc-coords]');
+    const tree = t(lang) as { obs_detail: { location: { no_location: string } } };
+    if (coordsEl) coordsEl.textContent = tree.obs_detail.location.no_location;
+  }
+
+  const savingEl = document.getElementById('m-loc-saving');
+  const savedEl  = document.getElementById('m-loc-saved');
+  const errEl    = document.getElementById('m-loc-error');
+
+  window.addEventListener('rastrum:mappicker-save', async (ev) => {
+    const e = ev as CustomEvent<{ id: string; coords: { lat: number; lng: number } }>;
+    if (e.detail.id !== 'obs-detail-edit') return;
+    errEl?.classList.add('hidden');
+    savedEl?.classList.add('hidden');
+    savingEl?.classList.remove('hidden');
+    try {
+      const literal = pointGeographyLiteral(e.detail.coords.lat, e.detail.coords.lng);
+      const { error } = await supabase
+        .from('observations')
+        .update({ location: literal, updated_at: new Date().toISOString() })
+        .eq('id', obsId);
+      if (error) throw error;
+
+      window.dispatchEvent(new CustomEvent('rastrum:mappicker-set', {
+        detail: { id: 'obs-detail-loc-view', coords: e.detail.coords },
+      }));
+      window.dispatchEvent(new CustomEvent('rastrum:mappicker-set-initial', {
+        detail: { id: 'obs-detail-edit', coords: e.detail.coords },
+      }));
+      const coordsEl = document.querySelector<HTMLElement>('[data-loc-coords]');
+      if (coordsEl) coordsEl.textContent = `${e.detail.coords.lat.toFixed(4)}, ${e.detail.coords.lng.toFixed(4)}`;
+      savedEl?.classList.remove('hidden');
+    } catch (err) {
+      const code = err instanceof Error ? err.message : String(err);
+      if (errEl) {
+        errEl.textContent = code === 'coords_invalid' ? errCopy.invalidCoords : errCopy.saveFailed;
+        errEl.classList.remove('hidden');
+      }
+    } finally {
+      savingEl?.classList.add('hidden');
     }
   });
 }
