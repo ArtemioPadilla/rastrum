@@ -153,8 +153,18 @@ export async function saveObservationToOutbox(draft: ObservationDraft): Promise<
  * The optional timeout exists purely to bound step 1 in pathological cases;
  * step 2 is sync. We never network-fetch the user here.
  */
-export async function resolveObserverRef(timeoutMs: number = 2_000): Promise<ObserverRef> {
+export async function resolveObserverRef(timeoutMs: number = 8_000): Promise<ObserverRef> {
   const guest: ObserverRef = { kind: 'guest', localId: 'local-' + crypto.randomUUID() };
+
+  // Fast path: read the persisted session straight out of localStorage
+  // BEFORE awaiting `auth.getSession()`. supabase-js's auth lock can
+  // serialize getSession() calls on slow Android Chrome and the 2 s
+  // timeout fired prematurely (issue #127, Eugenio Oaxaca) — a cached
+  // signed-in user looked like a guest and the success message read
+  // "Sign in to sync" despite an active session. The fast path closes
+  // that race without a network or auth-lock dependency.
+  const cachedId = readCachedUserIdFromLocalStorage();
+  if (cachedId) return { kind: 'user', id: cachedId };
 
   try {
     const sessionPromise = getSupabase().auth.getSession();
@@ -164,11 +174,9 @@ export async function resolveObserverRef(timeoutMs: number = 2_000): Promise<Obs
     const { data: { session } } = await Promise.race([sessionPromise, timeout]);
     if (session?.user?.id) return { kind: 'user', id: session.user.id };
   } catch {
-    // fall through to localStorage probe
+    // session lookup failed — only fall through to guest if localStorage
+    // also had no cached user above.
   }
-
-  const cachedId = readCachedUserIdFromLocalStorage();
-  if (cachedId) return { kind: 'user', id: cachedId };
 
   return guest;
 }
