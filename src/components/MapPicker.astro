@@ -1,0 +1,347 @@
+---
+interface Props {
+  mode: 'view' | 'edit';
+  initialCoords?: { lat: number; lng: number } | null;
+  obscureLevel?: 'none' | '5km' | '0.1deg' | '0.2deg' | 'full';
+  lang: 'en' | 'es';
+  /** Stable id suffix so multiple MapPicker instances on one page don't collide. */
+  pickerId?: string;
+}
+const {
+  mode,
+  initialCoords = null,
+  obscureLevel = 'none',
+  lang,
+  pickerId = 'default',
+} = Astro.props;
+const isEs = lang === 'es';
+
+const labels = {
+  open:      isEs ? 'Elegir en el mapa' : 'Pick on map',
+  title:     isEs ? 'Elige una ubicación' : 'Pick a location',
+  hint:      isEs ? 'Toca o arrastra el alfiler para fijar la ubicación.' : 'Tap or drag the pin to set the location.',
+  use:       isEs ? 'Usar esta ubicación' : 'Use this location',
+  cancel:    isEs ? 'Cancelar' : 'Cancel',
+  loading:   isEs ? 'Cargando mapa…' : 'Loading map…',
+  satellite: isEs ? 'Satélite' : 'Satellite',
+  map:       isEs ? 'Mapa' : 'Map',
+  failed:    isEs
+    ? 'No se pudo cargar el mapa. Usa la entrada manual.'
+    : "Couldn't load the map. Use manual entry instead.",
+  satelliteSwitchTitle: isEs ? 'Cambiar a satélite' : 'Switch to satellite',
+};
+
+const containerId = `mp-${pickerId}`;
+const modalId     = `mp-modal-${pickerId}`;
+const initialLat  = initialCoords?.lat ?? '';
+const initialLng  = initialCoords?.lng ?? '';
+---
+
+{mode === 'view' && (
+  <div
+    id={containerId}
+    class="w-full h-[240px] rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900"
+    data-mappicker-mode="view"
+    data-mappicker-id={pickerId}
+    data-mappicker-initial-lat={String(initialLat)}
+    data-mappicker-initial-lng={String(initialLng)}
+    data-mappicker-obscure-level={obscureLevel}
+    data-mappicker-lang={lang}
+  ></div>
+)}
+
+{mode === 'edit' && (
+  <>
+    <button
+      type="button"
+      id={`map-picker-open-btn`}
+      data-mappicker-open={pickerId}
+      class="text-xs text-emerald-700 dark:text-emerald-400 underline"
+    >{labels.open}</button>
+
+    <div
+      id="map-modal"
+      data-mappicker-modal={pickerId}
+      data-mappicker-mode="edit"
+      data-mappicker-id={pickerId}
+      data-mappicker-initial-lat={String(initialLat)}
+      data-mappicker-initial-lng={String(initialLng)}
+      data-mappicker-obscure-level={obscureLevel}
+      data-mappicker-lang={lang}
+      class="hidden fixed inset-0 z-50 flex items-stretch sm:items-center justify-center bg-black/80 p-0 sm:p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={`${modalId}-title`}
+    >
+      <div class="relative w-full sm:max-w-2xl h-full sm:h-[80vh] bg-white dark:bg-zinc-900 sm:rounded-lg overflow-hidden flex flex-col">
+        <div class="flex items-center justify-between px-3 py-2 border-b border-zinc-200 dark:border-zinc-800">
+          <h2 id={`${modalId}-title`} class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{labels.title}</h2>
+          <div class="flex items-center gap-2">
+            <button
+              id="map-satellite-toggle"
+              data-mappicker-satellite={pickerId}
+              type="button"
+              class="inline-flex items-center gap-1 rounded-md border border-zinc-300 dark:border-zinc-700 px-2 py-1 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+              aria-pressed="false"
+              title={labels.satelliteSwitchTitle}
+            >
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/>
+              </svg>
+              <span id="map-satellite-label">{labels.satellite}</span>
+            </button>
+            <button
+              id="map-close-btn"
+              data-mappicker-close={pickerId}
+              type="button"
+              class="min-h-11 min-w-11 rounded text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"
+              aria-label={labels.cancel}
+            >
+              <svg class="w-5 h-5 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+        </div>
+        <p class="px-3 py-2 text-xs text-zinc-500 dark:text-zinc-400">{labels.hint}</p>
+        <div id="map-picker" class="flex-1 bg-zinc-100 dark:bg-zinc-900"></div>
+        <p id="map-picker-status" class="px-3 py-1 text-xs text-zinc-500 dark:text-zinc-400">{labels.loading}</p>
+        <div class="flex items-center justify-end gap-2 px-3 py-3 border-t border-zinc-200 dark:border-zinc-800">
+          <button
+            id="map-cancel-btn"
+            data-mappicker-cancel={pickerId}
+            type="button"
+            class="min-h-11 px-3 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+          >{labels.cancel}</button>
+          <button
+            id="map-use-btn"
+            data-mappicker-use={pickerId}
+            type="button"
+            class="min-h-11 rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            disabled
+          >{labels.use}</button>
+        </div>
+      </div>
+    </div>
+  </>
+)}
+
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.css" />
+
+<script>
+  import { MEXICO_DEFAULT_CENTER, isValidLatLng } from '../lib/media-helpers';
+
+  type Coords = { lat: number; lng: number };
+  type MapLibreMap = import('maplibre-gl').Map;
+  type MapLibreMarker = import('maplibre-gl').Marker;
+  type StyleSpec = import('maplibre-gl').StyleSpecification;
+
+  const MAP_STYLE_STREET = 'https://tiles.openfreemap.org/styles/liberty';
+  // ESRI World Imagery — free, no API key required.
+  const MAP_STYLE_SAT: StyleSpec = {
+    version: 8,
+    sources: {
+      esri_sat: {
+        type: 'raster',
+        tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+        tileSize: 256,
+        attribution: '© Esri, Maxar, Earthstar Geographics',
+        maxzoom: 19,
+      },
+    },
+    layers: [{ id: 'esri_sat', type: 'raster', source: 'esri_sat' }],
+  };
+
+  type EditState = {
+    pickerId: string;
+    modal: HTMLElement;
+    container: HTMLElement;
+    statusEl: HTMLElement | null;
+    openBtn: HTMLButtonElement | null;
+    closeBtn: HTMLButtonElement | null;
+    cancelBtn: HTMLButtonElement | null;
+    useBtn: HTMLButtonElement | null;
+    satToggle: HTMLButtonElement | null;
+    satLabel: HTMLElement | null;
+    isEs: boolean;
+    map: MapLibreMap | null;
+    marker: MapLibreMarker | null;
+    selected: Coords | null;
+    isSatellite: boolean;
+  };
+
+  function setStatus(state: EditState, text: string | null) {
+    if (!state.statusEl) return;
+    if (!text) { state.statusEl.classList.add('hidden'); return; }
+    state.statusEl.textContent = text;
+    state.statusEl.classList.remove('hidden');
+  }
+
+  function setSelected(state: EditState, lat: number, lng: number) {
+    if (!isValidLatLng(lat, lng)) return;
+    state.selected = { lat, lng };
+    if (state.useBtn) state.useBtn.disabled = false;
+  }
+
+  async function openPicker(state: EditState) {
+    state.modal.classList.remove('hidden');
+    setStatus(state, state.isEs ? 'Cargando mapa…' : 'Loading map…');
+
+    const initialLatAttr = state.modal.dataset.mappickerInitialLat ?? '';
+    const initialLngAttr = state.modal.dataset.mappickerInitialLng ?? '';
+    const parsedLat = parseFloat(initialLatAttr);
+    const parsedLng = parseFloat(initialLngAttr);
+    const haveInitial = Number.isFinite(parsedLat) && Number.isFinite(parsedLng);
+    const initialLat = haveInitial ? parsedLat : MEXICO_DEFAULT_CENTER.lat;
+    const initialLng = haveInitial ? parsedLng : MEXICO_DEFAULT_CENTER.lng;
+    const initialZoom = haveInitial ? 13 : MEXICO_DEFAULT_CENTER.zoom;
+
+    if (!state.map) {
+      try {
+        const maplibre = (await import('maplibre-gl')).default;
+        state.map = new maplibre.Map({
+          container: state.container,
+          style: MAP_STYLE_STREET,
+          center: [initialLng, initialLat],
+          zoom: initialZoom,
+          attributionControl: { compact: true },
+        });
+        state.map.addControl(new maplibre.NavigationControl({ showCompass: false }), 'top-right');
+        state.marker = new maplibre.Marker({ draggable: true, color: '#047857' })
+          .setLngLat([initialLng, initialLat])
+          .addTo(state.map);
+        if (haveInitial) setSelected(state, initialLat, initialLng);
+        state.marker.on('dragend', () => {
+          const ll = state.marker?.getLngLat();
+          if (ll) setSelected(state, ll.lat, ll.lng);
+        });
+        state.map.on('click', (e) => {
+          state.marker?.setLngLat(e.lngLat);
+          setSelected(state, e.lngLat.lat, e.lngLat.lng);
+        });
+        state.map.on('load', () => setStatus(state, null));
+
+        state.satToggle?.addEventListener('click', () => {
+          if (!state.map) return;
+          state.isSatellite = !state.isSatellite;
+          state.map.setStyle(state.isSatellite ? MAP_STYLE_SAT : MAP_STYLE_STREET);
+          state.map.once('styledata', () => {
+            if (state.marker && state.selected && state.map) {
+              state.marker.remove();
+              state.marker = new maplibre.Marker({ draggable: true, color: '#047857' })
+                .setLngLat([state.selected.lng, state.selected.lat])
+                .addTo(state.map);
+              state.marker.on('dragend', () => {
+                const ll = state.marker?.getLngLat();
+                if (ll) setSelected(state, ll.lat, ll.lng);
+              });
+            }
+          });
+          if (state.satToggle) state.satToggle.setAttribute('aria-pressed', String(state.isSatellite));
+          if (state.satLabel) {
+            state.satLabel.textContent = state.isSatellite
+              ? (state.isEs ? 'Mapa' : 'Map')
+              : (state.isEs ? 'Satélite' : 'Satellite');
+          }
+          if (state.satToggle) {
+            state.satToggle.classList.toggle('bg-emerald-50', state.isSatellite);
+            state.satToggle.classList.toggle('dark:bg-emerald-900/20', state.isSatellite);
+            state.satToggle.classList.toggle('border-emerald-500', state.isSatellite);
+          }
+        });
+      } catch {
+        setStatus(state, state.isEs
+          ? 'No se pudo cargar el mapa. Usa la entrada manual.'
+          : "Couldn't load the map. Use manual entry instead.");
+        return;
+      }
+    } else {
+      state.map.setCenter([initialLng, initialLat]);
+      state.map.setZoom(initialZoom);
+      state.marker?.setLngLat([initialLng, initialLat]);
+      if (haveInitial) setSelected(state, initialLat, initialLng);
+      setStatus(state, null);
+      setTimeout(() => state.map?.resize(), 50);
+    }
+    setTimeout(() => state.map?.resize(), 50);
+  }
+
+  function closePicker(state: EditState) {
+    state.modal.classList.add('hidden');
+  }
+
+  function initEditPicker(modal: HTMLElement) {
+    const pickerId = modal.dataset.mappickerId ?? 'default';
+    const isEs = (modal.dataset.mappickerLang ?? 'en') === 'es';
+    const container = modal.querySelector<HTMLElement>('#map-picker');
+    if (!container) return;
+
+    const state: EditState = {
+      pickerId,
+      modal,
+      container,
+      statusEl: modal.querySelector<HTMLElement>('#map-picker-status'),
+      openBtn: document.querySelector<HTMLButtonElement>(`[data-mappicker-open="${pickerId}"]`),
+      closeBtn: modal.querySelector<HTMLButtonElement>(`[data-mappicker-close="${pickerId}"]`),
+      cancelBtn: modal.querySelector<HTMLButtonElement>(`[data-mappicker-cancel="${pickerId}"]`),
+      useBtn: modal.querySelector<HTMLButtonElement>(`[data-mappicker-use="${pickerId}"]`),
+      satToggle: modal.querySelector<HTMLButtonElement>(`[data-mappicker-satellite="${pickerId}"]`),
+      satLabel: modal.querySelector<HTMLElement>('#map-satellite-label'),
+      isEs,
+      map: null,
+      marker: null,
+      selected: null,
+      isSatellite: false,
+    };
+
+    state.openBtn?.addEventListener('click', () => { void openPicker(state); });
+    state.closeBtn?.addEventListener('click', () => closePicker(state));
+    state.cancelBtn?.addEventListener('click', () => closePicker(state));
+    state.useBtn?.addEventListener('click', () => {
+      if (!state.selected) return;
+      const detail = { id: pickerId, coords: { lat: state.selected.lat, lng: state.selected.lng } };
+      window.dispatchEvent(new CustomEvent('rastrum:mappicker-save', { detail }));
+      closePicker(state);
+    });
+  }
+
+  async function initViewPicker(el: HTMLElement) {
+    const lat = parseFloat(el.dataset.mappickerInitialLat ?? '');
+    const lng = parseFloat(el.dataset.mappickerInitialLng ?? '');
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    try {
+      const maplibre = (await import('maplibre-gl')).default;
+      const map = new maplibre.Map({
+        container: el,
+        style: MAP_STYLE_STREET,
+        center: [lng, lat],
+        zoom: 12,
+        interactive: false,
+        attributionControl: { compact: true },
+      });
+      new maplibre.Marker({ color: '#047857' }).setLngLat([lng, lat]).addTo(map);
+    } catch {
+      /* non-fatal — caller can show fallback UI */
+    }
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-mappicker-mode="edit"]').forEach((el) => initEditPicker(el));
+  document.querySelectorAll<HTMLElement>('[data-mappicker-mode="view"]').forEach((el) => { void initViewPicker(el); });
+
+  // Consumers (e.g. ObservationForm) can update the initial coords used by an
+  // edit-mode picker before the user re-opens the modal. Dispatch
+  //   window.dispatchEvent(new CustomEvent('rastrum:mappicker-set-initial', {
+  //     detail: { id, coords: { lat, lng } | null }
+  //   }))
+  // to refresh the data-attrs that drive `openPicker`.
+  window.addEventListener('rastrum:mappicker-set-initial', (ev) => {
+    const e = ev as CustomEvent<{ id: string; coords: Coords | null }>;
+    const modal = document.querySelector<HTMLElement>(`[data-mappicker-modal="${e.detail.id}"]`);
+    if (!modal) return;
+    if (e.detail.coords) {
+      modal.dataset.mappickerInitialLat = String(e.detail.coords.lat);
+      modal.dataset.mappickerInitialLng = String(e.detail.coords.lng);
+    } else {
+      modal.dataset.mappickerInitialLat = '';
+      modal.dataset.mappickerInitialLng = '';
+    }
+  });
+</script>
