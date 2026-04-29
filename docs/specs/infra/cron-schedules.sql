@@ -132,7 +132,7 @@ SELECT cron.unschedule('ai_credentials_heartbeat')
 SELECT cron.schedule('ai_credentials_heartbeat', '0 4 * * 0',
   $$SELECT net.http_post(
     url := 'https://reppvlqejgoqvitturxp.supabase.co/functions/v1/sponsorships/heartbeat',
-    headers := jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.cron_token'))
+    headers := jsonb_build_object('Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'sponsorships_cron_token' LIMIT 1))
   )$$);
 
 SELECT cron.unschedule('ai_notifications_monthly_reset')
