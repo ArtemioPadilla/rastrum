@@ -35,17 +35,23 @@ test.describe('console — smoke', () => {
     await expect(pill).toHaveClass(/hidden/);
   });
 
-  test('/en/console/users/ renders the gate for an unauth visitor', async ({ page }) => {
-    await page.goto('/en/console/users/');
-    // The gate uses the same #console-gate id as the overview page or shows
-    // "Not authorized" inline. Either is acceptable for a smoke check.
-    const body = await page.locator('body').textContent();
-    expect(body).toBeTruthy();
+  test('/en/console/users/ renders not-auth banner element for an unauth visitor', async ({ page }) => {
+    await page.goto('/en/console/users/', { waitUntil: 'domcontentloaded' });
+    // #users-not-auth is hidden until JS resolves the session check;
+    // assert the element is present in the DOM and contains the right text.
+    const notAuth = page.locator('#users-not-auth');
+    await expect(notAuth).toHaveText(/don't have console access/i);
+    expect(page.url()).not.toContain('500');
+    expect(await page.locator('body').textContent()).not.toContain('Internal Server Error');
   });
 
-  test('/en/console/credentials/ renders for an unauth visitor', async ({ page }) => {
-    await page.goto('/en/console/credentials/');
-    const body = await page.locator('body').textContent();
-    expect(body).toBeTruthy();
+  test('/en/console/credentials/ renders not-auth banner element for an unauth visitor', async ({ page }) => {
+    await page.goto('/en/console/credentials/', { waitUntil: 'domcontentloaded' });
+    // #creds-not-auth is hidden until JS resolves the session check;
+    // assert the element is present in the DOM and contains the right text.
+    const notAuth = page.locator('#creds-not-auth');
+    await expect(notAuth).toHaveText(/don't have console access/i);
+    expect(page.url()).not.toContain('500');
+    expect(await page.locator('body').textContent()).not.toContain('Internal Server Error');
   });
 });
