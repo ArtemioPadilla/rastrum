@@ -1916,21 +1916,40 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
   });
 
   async function fillFromExif(file: File) {
+    let exif: Record<string, unknown> | undefined;
     try {
-      const exif = await parseExif(file, { gps: true, tiff: true, exif: true });
-      if (exif?.latitude != null && exif?.longitude != null) {
-        // EXIF GPS always wins over live GPS — the photo was taken at that
-        // specific location. Live GPS is only a fallback for photos without EXIF.
-        location = {
-          lat: exif.latitude,
-          lng: exif.longitude,
-          accuracyM: 15,               // EXIF GPS is phone-derived; assume ~15m
-          altitudeM: exif.GPSAltitude ?? null,
-          capturedFrom: 'exif',
-        };
-        paintLocation();
-      }
-    } catch { /* non-fatal */ }
+      exif = await parseExif(file, { gps: true, tiff: true, exif: true }) as Record<string, unknown> | undefined;
+    } catch (err) {
+      console.warn('[rastrum] EXIF parse failed', { name: file.name, type: file.type, err });
+      return;
+    }
+    if (!exif) {
+      console.warn('[rastrum] EXIF empty', { name: file.name, type: file.type });
+      return;
+    }
+    const lat = pickNumber(exif.latitude, exif.Latitude, exif.GPSLatitude);
+    const lng = pickNumber(exif.longitude, exif.Longitude, exif.GPSLongitude);
+    if (lat == null || lng == null) {
+      console.warn('[rastrum] EXIF has no GPS', { name: file.name, keys: Object.keys(exif).slice(0, 20) });
+      return;
+    }
+    // EXIF GPS always wins over live GPS — the photo was taken at that
+    // specific location. Live GPS is only a fallback for photos without EXIF.
+    location = {
+      lat,
+      lng,
+      accuracyM: 15,
+      altitudeM: pickNumber(exif.GPSAltitude),
+      capturedFrom: 'exif',
+    };
+    paintLocation();
+  }
+
+  function pickNumber(...candidates: unknown[]): number | null {
+    for (const c of candidates) {
+      if (typeof c === 'number' && Number.isFinite(c) && c !== 0) return c;
+    }
+    return null;
   }
 
   function showGpsError(code: number) {
@@ -2126,13 +2145,16 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
   // -------------------------------------------------------------------------
   cameraInput?.addEventListener('change', async () => {
     if (!cameraInput.files?.length) return;
-    await addPhotos(cameraInput.files);
+    // Read EXIF from the original File before any compression / canvas
+    // re-encode (which strips EXIF). compressIfLarge doesn't mutate the
+    // input, but reading metadata first matches intent and is cheaper.
     await fillFromExif(cameraInput.files[0]);
+    await addPhotos(cameraInput.files);
   });
   galleryInput?.addEventListener('change', async () => {
     if (!galleryInput.files?.length) return;
-    await addPhotos(galleryInput.files);
     await fillFromExif(galleryInput.files[0]);
+    await addPhotos(galleryInput.files);
   });
 
   gpsManualBtn?.addEventListener('click', () => {
