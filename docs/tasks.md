@@ -118,6 +118,10 @@ Remaining:
 
 Remaining:
 
-- `social-graph-m26-v11` — Follow-ups: ReactionStrip count overlay on feed cards (needs an aggregate RPC to avoid N+1), Block/Report on observation cards + comments, "Block this user" affordance on profile cards in lists, additional ARIA refinements. _(· planned)_
-- `deploy-functions-resilience` — Pin esm.sh imports to versioned URLs across `supabase/functions/*/index.ts` so a transient esm.sh 522 doesn't permanently park the auto-deploy. Surfaced when PR #66's auto-deploy 522'd on a Cloudflare hiccup. _(· planned)_
-- `visitor-pokedex-route` — Public `/u/<handle>/dex/` page so the Pokédex link on PublicProfileViewV2 doesn't have to be hidden for non-owners (PR #68 currently hides it as a workaround). _(· planned)_
+- `social-graph-m26-v11` — Reaction count chip on feed cards (`observation_reaction_summary` view with `security_invoker = true`, batched fetch with no N+1), overflow ⋮ menu (Block + Report) on observation cards via the existing `PublicProfileViewV2` pattern, per-comment Block/Report in `Comments.astro` (lazy import of `blockUser`), ARIA refinements (live region on ReactionStrip toggle, role=menu/menuitem on overflows, aria-label per InboxView row), 12 new i18n keys under `socialgraph.cards.*` + `socialgraph.reactions.*`. _(✓ done — PR #101)_
+- `deploy-functions-resilience` — Pinned `@supabase/supabase-js@2` → `@2.39.7` across 24 Edge Function files so a transient esm.sh 522 (which broke PR #66's auto-deploy until manual workflow_dispatch backfill) can't park the auto-deploy in a failed state again. _(✓ done — PR #97; one follow-up sub-item still planned: pin imports in PR #99's 5 new admin handlers once #99 merges)_
+- `visitor-pokedex-route` — Public `/{en,es}/u/dex/?username=<handle>` route. Parametrized `PokedexView.astro` with a visitor mode prop, gated by `can_see_facet(target, 'pokedex', viewer)` RPC, EN+ES paired pages with `noindex,nofollow`, OG card via `profile-dex-visitor` slug, un-hid the Pokédex link in `PublicProfileViewV2` (was workaround-hidden in PR #68), 7 new `pokedex.visitor_*` i18n keys. _(✓ done — PR #100)_
+
+### Bundled review follow-ups still planned
+
+- `m26-v1-1-review-followups` — Six small polish items flagged by ArtemIO/Nyx on PR #100 + #101 reviews: `?u=` alias documentation, `document.title` → i18n key, runVisitor error-vs-not-found split, `ConfirmDialog` component to replace `confirm()`/`alert()` in the Block flow (matches `ReportDialog` pattern), extract overflow-menu logic into `lib/overflow-menu.ts` (currently duplicated 3× across `PublicProfileViewV2`, `ExploreRecentView`, `Comments`), and `fave_count` data-attr naming standardization across feed views. All non-blocking; deferred for a deliberate v1.2 polish sweep. _(· planned)_

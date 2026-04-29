@@ -4085,10 +4085,64 @@
           "status": "done"
         },
         {
-          "label_en": "v1.1 follow-ups: ReactionStrip count overlay on feed cards (needs RPC), Block/Report on observation cards + comments, real-time push for inbox (M28), 'Block this user' affordance on profile cards in lists",
-          "label_es": "Seguimientos v1.1: superposición de conteos ReactionStrip en tarjetas del feed (requiere RPC), Bloquear/Reportar en tarjetas de observación + comentarios, push en tiempo real para bandeja (M28), 'Bloquear usuario' en tarjetas de listas",
-          "status": "planned"
+          "label_en": "v1.1 follow-ups (DELIVERED in PR #97 + #100 + #101): see social-graph-m26-v11, visitor-pokedex-route, deploy-functions-resilience entries below",
+          "label_es": "Seguimientos v1.1 (ENTREGADOS en PR #97 + #100 + #101): ver social-graph-m26-v11, visitor-pokedex-route, deploy-functions-resilience abajo",
+          "status": "done"
         }
+      ]
+    },
+    "social-graph-m26-v11": {
+      "phase": "v1.2",
+      "title_en": "M26 v1.1 polish — reactions on feed + Block/Report on cards/comments + ARIA",
+      "title_es": "Pulido M26 v1.1 — reacciones en feed + Bloquear/Reportar en tarjetas/comentarios + ARIA",
+      "modules": ["26-social-graph.md"],
+      "subtasks": [
+        { "label_en": "observation_reaction_summary view (security_invoker = true) for batched reaction counts without N+1", "label_es": "Vista observation_reaction_summary (security_invoker = true) para conteos por batch sin N+1", "status": "done" },
+        { "label_en": "❤ N reaction count chip on ExploreRecentView + MyObservationsView feed cards", "label_es": "Chip de conteo ❤ N en tarjetas ExploreRecentView + MyObservationsView", "status": "done" },
+        { "label_en": "Overflow ⋮ menu on observation cards (Block + Report) — same pattern as PublicProfileViewV2; hidden on owner cards", "label_es": "Menú ⋮ en tarjetas de observación (Bloquear + Reportar) — mismo patrón que PublicProfileViewV2; oculto en tarjetas propias", "status": "done" },
+        { "label_en": "Block/Report per-comment in Comments.astro (lazy import of blockUser, ReportDialog with target='comment')", "label_es": "Bloquear/Reportar por comentario en Comments.astro (lazy import de blockUser, ReportDialog con target='comment')", "status": "done" },
+        { "label_en": "ARIA: aria-live region on ReactionStrip toggle, role=menu/menuitem on overflows, aria-label per InboxView row", "label_es": "ARIA: región aria-live en toggle de ReactionStrip, role=menu/menuitem en overflows, aria-label por fila en InboxView", "status": "done" },
+        { "label_en": "i18n EN/ES under socialgraph.cards.* + socialgraph.reactions.* (12 new keys)", "label_es": "i18n EN/ES bajo socialgraph.cards.* + socialgraph.reactions.* (12 keys nuevas)", "status": "done" }
+      ]
+    },
+    "visitor-pokedex-route": {
+      "phase": "v1.2",
+      "title_en": "Public visitor Pokédex route /u/dex/?username=",
+      "title_es": "Ruta pública de Pokédex visitante /u/dex/?username=",
+      "modules": ["25-profile-privacy.md"],
+      "subtasks": [
+        { "label_en": "Parametrize PokedexView.astro with visitor mode prop (owner self-view fallback when prop absent)", "label_es": "Parametrizar PokedexView.astro con prop visitor (fallback a vista del dueño cuando ausente)", "status": "done" },
+        { "label_en": "Privacy gate via can_see_facet(target, 'pokedex', viewer) RPC; private fallback when false", "label_es": "Gate de privacidad vía RPC can_see_facet(target, 'pokedex', viewer); fallback privado cuando false", "status": "done" },
+        { "label_en": "EN + ES paired pages at /u/dex/ with noindex,nofollow", "label_es": "Páginas EN + ES emparejadas en /u/dex/ con noindex,nofollow", "status": "done" },
+        { "label_en": "PublicProfileViewV2.astro — un-hide Pokédex link for visitors (owner → /profile/dex/, visitor → /u/dex/?username=)", "label_es": "PublicProfileViewV2.astro — re-mostrar link Pokédex para visitantes (dueño → /profile/dex/, visitante → /u/dex/?username=)", "status": "done" },
+        { "label_en": "OG card: profile-dex-visitor slug in generate-og.ts + ogSlugForPath() in BaseLayout (EN + ES)", "label_es": "OG card: slug profile-dex-visitor en generate-og.ts + ogSlugForPath() en BaseLayout (EN + ES)", "status": "done" },
+        { "label_en": "i18n: pokedex.visitor_* keys (title, subtitle, empty, private, not_found, not_found_cta, back_to_profile)", "label_es": "i18n: keys pokedex.visitor_* (title, subtitle, empty, private, not_found, not_found_cta, back_to_profile)", "status": "done" }
+      ]
+    },
+    "deploy-functions-resilience": {
+      "phase": "v1.2",
+      "title_en": "Pin esm.sh imports across Edge Functions for deploy resilience",
+      "title_es": "Fijar imports esm.sh en Edge Functions para resiliencia de deploy",
+      "modules": ["13-identifier-registry.md"],
+      "subtasks": [
+        { "label_en": "Pin @supabase/supabase-js@2 → @2.39.7 across 24 Edge Function files", "label_es": "Fijar @supabase/supabase-js@2 → @2.39.7 en 24 archivos Edge Function", "status": "done" },
+        { "label_en": "Verify all other esm.sh imports already pinned (aws-sdk@3.658.1, jszip@3.10.1, zod@3.23.8)", "label_es": "Verificar que otros imports esm.sh ya estaban fijados (aws-sdk@3.658.1, jszip@3.10.1, zod@3.23.8)", "status": "done" },
+        { "label_en": "Inline pin during merge cascade for new file recompute-user-stats/index.ts that landed mid-PR", "label_es": "Pin inline durante cascada de merge para recompute-user-stats/index.ts que llegó a mid-PR", "status": "done" },
+        { "label_en": "Follow-up: pin imports in PR #99's 5 new admin handlers once #99 merges (~5 LOC patch)", "label_es": "Seguimiento: fijar imports en los 5 nuevos handlers admin de PR #99 cuando #99 mergee (~5 LOC patch)", "status": "planned" }
+      ]
+    },
+    "m26-v1-1-review-followups": {
+      "phase": "v1.2",
+      "title_en": "M26 v1.1 review follow-ups — minor polish from PR #100/#101 reviewer notes",
+      "title_es": "Seguimientos de review M26 v1.1 — pulido menor de los notes en PR #100/#101",
+      "modules": ["26-social-graph.md"],
+      "subtasks": [
+        { "label_en": "?u= alias on readUsername() — document or remove (PR #100 review)", "label_es": "Alias ?u= en readUsername() — documentar o eliminar (review de PR #100)", "status": "planned" },
+        { "label_en": "document.title in JS → use i18n key for consistency (PR #100 review)", "label_es": "document.title en JS → usar key i18n por consistencia (review de PR #100)", "status": "planned" },
+        { "label_en": "runVisitor catch-all → distinguish error vs not-found state (PR #100 review)", "label_es": "runVisitor catch-all → distinguir estado error vs not-found (review de PR #100)", "status": "planned" },
+        { "label_en": "ConfirmDialog component — replace confirm()/alert() in Block flow (matches ReportDialog pattern, PR #101 review)", "label_es": "Componente ConfirmDialog — reemplazar confirm()/alert() en flujo Block (patrón ReportDialog, review de PR #101)", "status": "planned" },
+        { "label_en": "Extract overflow-menu logic into lib/overflow-menu.ts (currently duplicated 3× across PublicProfileViewV2, ExploreRecentView, Comments)", "label_es": "Extraer lógica de overflow-menu a lib/overflow-menu.ts (duplicada 3× en PublicProfileViewV2, ExploreRecentView, Comments)", "status": "planned" },
+        { "label_en": "Standardize fave_count_one vs fave_aria_one data-attr naming across ExploreRecentView + MyObservationsView", "label_es": "Estandarizar naming de data-attrs fave_count_one vs fave_aria_one en ExploreRecentView + MyObservationsView", "status": "planned" }
       ]
     }
   }
