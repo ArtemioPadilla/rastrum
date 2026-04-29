@@ -333,6 +333,12 @@ RESET ROLE;
 
 -- Anon user: obs_public_read excludes hidden + obscured-full observations.
 -- The plain public observation should be visible; the hidden one should not.
+-- IMPORTANT: clear request.jwt.claim.sub before switching to anon. The earlier
+-- tests SET LOCAL it to user UUIDs and `SET LOCAL ROLE anon` does NOT reset
+-- GUCs — without this clear, auth.uid() still returns the leaked claim, which
+-- makes the obs_owner policy (FOR ALL, USING auth.uid() = observer_id) match
+-- the test's observer_id rows and bypass the hidden filter.
+SET LOCAL "request.jwt.claim.sub" = '';
 SET LOCAL ROLE anon;
 
 -- Test 16 of 21: observations: anon sees only public (non-hidden) rows
