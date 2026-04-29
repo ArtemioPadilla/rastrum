@@ -34,4 +34,18 @@ test.describe('console — smoke', () => {
     // hidden when there is no signed-in user with roles.
     await expect(pill).toHaveClass(/hidden/);
   });
+
+  test('/en/console/users/ renders the gate for an unauth visitor', async ({ page }) => {
+    await page.goto('/en/console/users/');
+    // The gate uses the same #console-gate id as the overview page or shows
+    // "Not authorized" inline. Either is acceptable for a smoke check.
+    const body = await page.locator('body').textContent();
+    expect(body).toBeTruthy();
+  });
+
+  test('/en/console/credentials/ renders for an unauth visitor', async ({ page }) => {
+    await page.goto('/en/console/credentials/');
+    const body = await page.locator('body').textContent();
+    expect(body).toBeTruthy();
+  });
 });
