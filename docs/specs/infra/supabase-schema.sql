@@ -2663,18 +2663,28 @@ CREATE INDEX IF NOT EXISTS idx_obs_establishment_means
 -- =====================================================================
 
 -- 1) follows
-CREATE TABLE IF NOT EXISTS public.follows (
-  follower_id   uuid        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-  followee_id   uuid        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-  tier          text        NOT NULL DEFAULT 'follower'
-                            CHECK (tier IN ('follower', 'collaborator')),
-  status        text        NOT NULL DEFAULT 'accepted'
-                            CHECK (status IN ('pending', 'accepted')),
-  requested_at  timestamptz NOT NULL DEFAULT now(),
-  accepted_at   timestamptz,
-  PRIMARY KEY (follower_id, followee_id),
-  CHECK (follower_id <> followee_id)
-);
+-- Note: public.follows was first defined in v1.0 (module 08, line ~792)
+-- with only (follower_id, followee_id, created_at). Module 26 extends it
+-- with tier/status/requested_at/accepted_at + CHECK constraints. We use
+-- ALTER TABLE ADD COLUMN IF NOT EXISTS so existing prod DBs (where the
+-- v1.0 definition already created the table) get the new columns rather
+-- than silently no-op'ing on CREATE TABLE IF NOT EXISTS.
+ALTER TABLE public.follows
+  ADD COLUMN IF NOT EXISTS tier         text        NOT NULL DEFAULT 'follower',
+  ADD COLUMN IF NOT EXISTS status       text        NOT NULL DEFAULT 'accepted',
+  ADD COLUMN IF NOT EXISTS requested_at timestamptz NOT NULL DEFAULT now(),
+  ADD COLUMN IF NOT EXISTS accepted_at  timestamptz;
+
+DO $$ BEGIN
+  ALTER TABLE public.follows ADD CONSTRAINT follows_tier_check   CHECK (tier IN ('follower', 'collaborator'));
+EXCEPTION WHEN duplicate_object OR invalid_table_definition THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TABLE public.follows ADD CONSTRAINT follows_status_check CHECK (status IN ('pending', 'accepted'));
+EXCEPTION WHEN duplicate_object OR invalid_table_definition THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TABLE public.follows ADD CONSTRAINT follows_no_self      CHECK (follower_id <> followee_id);
+EXCEPTION WHEN duplicate_object OR invalid_table_definition THEN NULL; END $$;
+
 CREATE INDEX IF NOT EXISTS idx_follows_followee_status
   ON public.follows(followee_id, status);
 CREATE INDEX IF NOT EXISTS idx_follows_follower_status
