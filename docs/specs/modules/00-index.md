@@ -85,6 +85,7 @@ narrative source.
 | 26 | Social graph + reactions (follows, reactions, blocks, reports, notifications) | v1.3 | planned (spec v1.0) | [`26-social-graph.md`](26-social-graph.md) |
 | 27 | AI Sponsorships (share Anthropic credentials with beneficiaries) | v1.3 | in implementation (PR feat/ai-sponsorships) | [`27-ai-sponsorships.md`](27-ai-sponsorships.md) |
 | 28 | Community discovery (observers page, leaderboards, nearby, experts, country filter) | v1.2 | shipped 2026-04-29 (PR1 #92 + PR2 #96 + PR4 #102 + PR5+PR6 atomic landing; PR3 manual cron fire = operator action) | [`28-community-discovery.md`](28-community-discovery.md) |
+| 30 | CLI batch import for camera-trap memory cards | v1.3 | in implementation (PR feat/cli-batch-import-110) | [`30-cli-batch-import.md`](30-cli-batch-import.md) |
 
 ## v1.5 — Territory layer — planned
 

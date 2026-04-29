@@ -3,12 +3,15 @@
  *
  * POST /api/observe       → submit observation (scope: observe)
  * POST /api/identify      → photo ID cascade (scope: identify)
+ * POST /api/upload-url    → presigned R2 PUT URL for batch CLI (scope: observe)
  * GET  /api/observations  → list own observations (scope: observe)
  * GET  /api/export        → export Darwin Core CSV (scope: export)
  *
  * See docs/specs/modules/14-user-api-tokens.md
  */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
+import { S3Client, PutObjectCommand } from 'https://esm.sh/@aws-sdk/client-s3@3.658.1';
+import { getSignedUrl } from 'https://esm.sh/@aws-sdk/s3-request-presigner@3.658.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -144,6 +147,45 @@ Deno.serve(async (req: Request) => {
 
     const result = await identifyRes.json();
     return json(result, identifyRes.status);
+  }
+
+  // ── POST /api/upload-url ──────────────────────────────────────────────────
+  // Issues a 5-minute presigned R2 PUT URL for the batch CLI (issue #110).
+  // The mobile UI uses /functions/v1/get-upload-url with a Supabase JWT;
+  // the CLI uses an `rst_` token, which that endpoint doesn't accept,
+  // so this is the token-friendly twin.
+  if (req.method === 'POST' && path === 'upload-url') {
+    const auth = await verifyToken(token, 'observe', supabase);
+    if (!auth) return json({ error: 'Unauthorized or insufficient scope' }, 401);
+
+    const body = await req.json().catch(() => null);
+    if (!body) return json({ error: 'Invalid JSON body' }, 400);
+    const ext = String(body.ext ?? 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (!['jpg','jpeg','png','heic','webp'].includes(ext)) {
+      return json({ error: 'ext must be jpg|jpeg|png|heic|webp' }, 400);
+    }
+    const contentType = String(body.content_type ?? `image/${ext === 'jpg' ? 'jpeg' : ext}`);
+    const accountId = Deno.env.get('CF_ACCOUNT_ID');
+    const bucket    = Deno.env.get('R2_BUCKET_NAME');
+    const accessKey = Deno.env.get('R2_ACCESS_KEY_ID');
+    const secretKey = Deno.env.get('R2_SECRET_ACCESS_KEY');
+    const publicUrl = Deno.env.get('R2_PUBLIC_URL');
+    if (!accountId || !bucket || !accessKey || !secretKey || !publicUrl) {
+      return json({ error: 'R2 not configured' }, 500);
+    }
+    // observations/<observer-uuid>/<random>.<ext> — the same prefix
+    // get-upload-url uses, so RLS / cleanup tooling sees one shape.
+    const blobId = crypto.randomUUID();
+    const key = `observations/${auth.user_id}/${blobId}.${ext}`;
+    const s3 = new S3Client({
+      region: 'auto',
+      endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+      credentials: { accessKeyId: accessKey, secretAccessKey: secretKey },
+    });
+    const command = new PutObjectCommand({ Bucket: bucket, Key: key, ContentType: contentType });
+    const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 300 });
+    const publicHref = `${publicUrl.replace(/\/$/, '')}/${key}`;
+    return json({ key, upload_url: uploadUrl, public_url: publicHref, content_type: contentType }, 201);
   }
 
   // ── GET /api/observations ────────────────────────────────────────────────
