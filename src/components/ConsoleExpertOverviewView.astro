@@ -1,0 +1,166 @@
+---
+/**
+ * ConsoleExpertOverviewView — KPI counters + action items for the expert role.
+ * Gate: expert OR admin. The /console/ root picks this view when the active
+ * role pill is 'expert'.
+ */
+import { t } from '../i18n/utils';
+
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+---
+
+<section class="max-w-5xl">
+  <div id="exp-overview-not-auth" class="hidden rounded border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-900 dark:text-amber-100">
+    {tr.console.not_authorized}
+  </div>
+
+  <div id="exp-overview-shell" class="hidden space-y-6">
+    <p class="text-sm text-zinc-500 dark:text-zinc-400">{tr.console.exp_overview_heading}</p>
+
+    <!-- KPI counters -->
+    <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+        <p class="text-xs text-zinc-500 mb-1">{tr.console.exp_overview_pending}</p>
+        <p id="exp-kpi-pending" class="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">—</p>
+      </div>
+      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+        <p class="text-xs text-zinc-500 mb-1">{tr.console.exp_overview_total_score}</p>
+        <p id="exp-kpi-total-score" class="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">—</p>
+      </div>
+      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+        <p class="text-xs text-zinc-500 mb-1">{tr.console.exp_overview_verified_taxa}</p>
+        <p id="exp-kpi-verified-taxa" class="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">—</p>
+      </div>
+    </div>
+
+    <!-- Action items -->
+    <div>
+      <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-3">
+        {tr.console.overview_alerts_heading}
+      </h2>
+      <div id="exp-overview-items" class="space-y-2">
+        <div class="rounded-md border border-dashed border-zinc-300 dark:border-zinc-700 p-4 text-sm text-zinc-500">
+          {tr.console.exp_overview_no_recent}
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent contributions -->
+    <div>
+      <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-3">
+        {tr.console.exp_overview_recent_heading}
+      </h2>
+      <div id="exp-overview-recent" class="space-y-2">
+        <div class="rounded-md border border-dashed border-zinc-300 dark:border-zinc-700 p-4 text-sm text-zinc-500">
+          {tr.console.exp_overview_no_recent}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p id="exp-overview-error" class="hidden mt-3 text-sm text-red-600 dark:text-red-400"></p>
+</section>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { getUserRoles } from '../lib/user-roles';
+
+  function show(id: string) { document.getElementById(id)?.classList.remove('hidden'); }
+  function setText(id: string, val: string) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val;
+  }
+
+  const supabase = getSupabase();
+
+  async function init() {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) { show('exp-overview-not-auth'); return; }
+    const myRoles = await getUserRoles(session.user.id);
+    if (!myRoles.has('expert') && !myRoles.has('admin')) {
+      show('exp-overview-not-auth');
+      return;
+    }
+    show('exp-overview-shell');
+    await loadKpis(session.user.id);
+  }
+
+  async function loadKpis(userId: string) {
+    const [scoreResult, verifiedResult, recentResult, queueResult, userResult] = await Promise.all([
+      supabase.from('user_expertise').select('score').eq('user_id', userId),
+      supabase.from('user_expertise').select('id', { count: 'exact', head: true }).eq('user_id', userId).not('verified_at', 'is', null),
+      supabase.from('identifications').select('id, taxon_id, created_at, observations(current_scientific_name)').eq('validated_by', userId).order('created_at', { ascending: false }).limit(5),
+      supabase.from('validation_queue').select('observation_id, current_scientific_name, current_taxon_id'),
+      supabase.from('users').select('expert_taxa').eq('id', userId).single(),
+    ]);
+
+    const scores = scoreResult.data ?? [];
+    const totalScore = scores.reduce((sum, r) => sum + (r.score ?? 0), 0);
+    setText('exp-kpi-total-score', String(Math.round(totalScore)));
+    setText('exp-kpi-verified-taxa', String(verifiedResult.count ?? 0));
+
+    // Filter validation queue by expert kingdoms
+    const expertTaxa: string[] = userResult.data?.expert_taxa ?? [];
+    let pendingCount = 0;
+    if (expertTaxa.length > 0 && queueResult.data && queueResult.data.length > 0) {
+      const taxonIds = queueResult.data.map(r => r.current_taxon_id).filter(Boolean) as string[];
+      if (taxonIds.length > 0) {
+        const { data: taxaData } = await supabase.from('taxa').select('id, kingdom').in('id', taxonIds);
+        const kingdomMap = new Map((taxaData ?? []).map(t => [t.id, t.kingdom]));
+        pendingCount = queueResult.data.filter(r => {
+          const kingdom = kingdomMap.get(r.current_taxon_id ?? '');
+          return kingdom && expertTaxa.includes(kingdom);
+        }).length;
+      }
+    } else if (expertTaxa.length === 0 && queueResult.data) {
+      pendingCount = queueResult.data.length;
+    }
+    setText('exp-kpi-pending', String(pendingCount));
+
+    // Action items
+    const itemsEl = document.getElementById('exp-overview-items');
+    if (itemsEl && pendingCount > 0) {
+      itemsEl.innerHTML = `
+        <div class="flex items-center justify-between rounded-md border border-amber-200 dark:border-amber-700/40 bg-amber-50 dark:bg-amber-900/10 px-3 py-2 text-sm">
+          <span class="text-amber-900 dark:text-amber-100">${pendingCount} pending validation(s) in your taxa</span>
+          <a href="../validation/" class="text-amber-700 dark:text-amber-300 underline text-xs">Pending validations →</a>
+        </div>
+        <div class="flex items-center justify-between rounded-md border border-zinc-200 dark:border-zinc-700 px-3 py-2 text-sm">
+          <span class="text-zinc-700 dark:text-zinc-300">Total score: ${Math.round(totalScore)}</span>
+          <a href="../expertise/" class="text-zinc-500 dark:text-zinc-400 underline text-xs">Your expertise →</a>
+        </div>
+      `;
+    } else if (itemsEl) {
+      itemsEl.innerHTML = `
+        <div class="flex items-center justify-between rounded-md border border-zinc-200 dark:border-zinc-700 px-3 py-2 text-sm">
+          <span class="text-zinc-700 dark:text-zinc-300">Total score: ${Math.round(totalScore)}</span>
+          <a href="../expertise/" class="text-zinc-500 dark:text-zinc-400 underline text-xs">Your expertise →</a>
+        </div>
+      `;
+    }
+
+    // Recent contributions
+    const recentEl = document.getElementById('exp-overview-recent');
+    const recent = recentResult.data ?? [];
+    if (recentEl && recent.length > 0) {
+      const rows = recent.map(r => {
+        const obsArr = r.observations as unknown as Array<{ current_scientific_name?: string }> | null;
+        const name = obsArr?.[0]?.current_scientific_name ?? r.taxon_id ?? '—';
+        const when = new Date(r.created_at).toLocaleDateString();
+        return `<div class="flex items-center justify-between rounded-md border border-zinc-200 dark:border-zinc-700 px-3 py-2 text-sm">
+          <span class="text-zinc-700 dark:text-zinc-300 font-medium italic">${name}</span>
+          <span class="text-xs text-zinc-400">${when}</span>
+        </div>`;
+      }).join('');
+      recentEl.innerHTML = rows;
+    }
+  }
+
+  init().catch(err => {
+    const e = document.getElementById('exp-overview-error')!;
+    e.textContent = (err as Error).message;
+    e.classList.remove('hidden');
+  });
+</script>
