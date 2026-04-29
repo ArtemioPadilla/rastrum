@@ -1,0 +1,259 @@
+---
+import { t } from '../i18n/utils';
+
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+---
+
+<section class="max-w-6xl">
+  <p class="mb-4 text-sm text-zinc-600 dark:text-zinc-400">{tr.console.taxa_intro}</p>
+
+  <div id="taxa-not-auth" class="hidden rounded border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-900 dark:text-amber-100">
+    {tr.console.not_authorized}
+  </div>
+
+  <div id="taxa-shell" class="hidden grid grid-cols-1 md:grid-cols-[300px_1fr] gap-4" style="height:calc(100vh - 180px)">
+    <!-- Left: taxon list -->
+    <aside class="flex flex-col border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden">
+      <div class="p-2 border-b border-zinc-200 dark:border-zinc-800 space-y-1.5">
+        <input
+          id="taxa-search"
+          type="search"
+          placeholder={tr.console.taxa_search_placeholder}
+          class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm"
+        />
+        <select id="taxa-filter-kingdom" class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-xs">
+          <option value="">{tr.console.taxa_all_kingdoms}</option>
+          <option value="Plantae">Plantae</option>
+          <option value="Animalia">Animalia</option>
+          <option value="Fungi">Fungi</option>
+          <option value="Chromista">Chromista</option>
+          <option value="Protozoa">Protozoa</option>
+          <option value="Bacteria">Bacteria</option>
+        </select>
+      </div>
+      <div id="taxa-list-loading" class="p-3 text-sm text-zinc-500 italic">{tr.console.loading}</div>
+      <div id="taxa-list-empty" class="hidden p-3 text-sm text-zinc-500">{tr.console.taxa_empty}</div>
+      <ul id="taxa-list" class="hidden flex-1 overflow-y-auto divide-y divide-zinc-100 dark:divide-zinc-800"></ul>
+    </aside>
+
+    <!-- Right: taxon detail -->
+    <div id="taxa-detail-empty" class="flex items-center justify-center text-sm text-zinc-400 dark:text-zinc-600 border border-dashed border-zinc-200 dark:border-zinc-700 rounded-lg">
+      {tr.console.taxa_select_prompt}
+    </div>
+    <div id="taxa-detail" class="hidden border border-zinc-200 dark:border-zinc-800 rounded-lg p-5 overflow-y-auto space-y-5">
+      <div>
+        <div id="taxa-detail-name" class="text-lg font-semibold italic text-zinc-900 dark:text-zinc-100"></div>
+        <div id="taxa-detail-common" class="text-sm text-zinc-500 mt-0.5"></div>
+        <div class="mt-2 flex flex-wrap gap-1.5" id="taxa-detail-chips"></div>
+      </div>
+
+      <dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+        <dt class="text-zinc-500">{tr.console.taxa_col_kingdom}</dt>
+        <dd id="taxa-detail-kingdom" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
+        <dt class="text-zinc-500">{tr.console.taxa_col_rank}</dt>
+        <dd id="taxa-detail-rank" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
+        <dt class="text-zinc-500">{tr.console.taxa_col_obs_count}</dt>
+        <dd id="taxa-detail-obs-count" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
+        <dt class="text-zinc-500">{tr.console.taxa_col_rarity_bucket}</dt>
+        <dd id="taxa-detail-rarity-bucket" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
+        <dt class="text-zinc-500">{tr.console.taxa_col_rarity_multiplier}</dt>
+        <dd id="taxa-detail-rarity-mult" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
+        <dt class="text-zinc-500">{tr.console.taxa_col_nom059}</dt>
+        <dd id="taxa-detail-nom059" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
+        <dt class="text-zinc-500">{tr.console.taxa_col_cites}</dt>
+        <dd id="taxa-detail-cites" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
+        <dt class="text-zinc-500">{tr.console.taxa_col_iucn}</dt>
+        <dd id="taxa-detail-iucn" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
+        <dt class="text-zinc-500">{tr.console.taxa_col_obscure}</dt>
+        <dd id="taxa-detail-obscure" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
+      </dl>
+
+      <div class="pt-2 border-t border-zinc-100 dark:border-zinc-800 flex gap-2">
+        <button
+          disabled
+          title={tr.console.taxa_flag_coming}
+          class="opacity-40 cursor-not-allowed inline-flex items-center gap-1.5 px-3 py-1.5 rounded border border-zinc-300 dark:border-zinc-700 text-sm text-zinc-700 dark:text-zinc-300"
+        >
+          {tr.console.taxa_flag_btn}
+        </button>
+        <button
+          disabled
+          title={tr.console.taxa_recompute_coming}
+          class="opacity-40 cursor-not-allowed inline-flex items-center gap-1.5 px-3 py-1.5 rounded border border-zinc-300 dark:border-zinc-700 text-sm text-zinc-700 dark:text-zinc-300"
+        >
+          {tr.console.taxa_recompute_btn}
+        </button>
+        <span class="ml-2 text-xs text-zinc-400 self-center">{tr.console.taxa_actions_coming}</span>
+      </div>
+    </div>
+  </div>
+
+  <p id="taxa-error" class="hidden mt-3 text-sm text-red-600 dark:text-red-400"></p>
+</section>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { getUserRoles } from '../lib/user-roles';
+
+  type TaxonRow = {
+    id: string;
+    scientific_name: string;
+    canonical_name: string | null;
+    taxon_rank: string;
+    kingdom: string | null;
+    common_name_en: string | null;
+    common_name_es: string | null;
+    nom059_status: string | null;
+    cites_appendix: string | null;
+    iucn_category: string | null;
+    obscure_level: string;
+    is_endemic_mexico: boolean | null;
+  };
+
+  type RarityRow = {
+    taxon_id: string;
+    obs_count: number;
+    percentile: number;
+    bucket: number;
+    multiplier: number;
+    refreshed_at: string;
+  };
+
+  function show(id: string) { document.getElementById(id)?.classList.remove('hidden'); }
+  function hide(id: string) { document.getElementById(id)?.classList.add('hidden'); }
+  function escHtml(s: string): string {
+    return s.replace(/[<>&'"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&#39;','"':'&quot;'}[c]!));
+  }
+
+  let allTaxa: TaxonRow[] = [];
+  let rarityMap: Map<string, RarityRow> = new Map();
+  let selectedId: string | null = null;
+
+  const supabase = getSupabase();
+
+  async function init() {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) { show('taxa-not-auth'); return; }
+    const myRoles = await getUserRoles(session.user.id);
+    if (!myRoles.has('admin')) { show('taxa-not-auth'); return; }
+    show('taxa-shell');
+    await loadTaxa('', '');
+  }
+
+  async function loadTaxa(q: string, kingdom: string) {
+    hide('taxa-list-empty');
+    hide('taxa-list');
+    show('taxa-list-loading');
+
+    let query = supabase
+      .from('taxa')
+      .select('id, scientific_name, canonical_name, taxon_rank, kingdom, common_name_en, common_name_es, nom059_status, cites_appendix, iucn_category, obscure_level, is_endemic_mexico')
+      .limit(100)
+      .order('scientific_name', { ascending: true });
+
+    if (q.trim()) query = query.ilike('scientific_name', `%${q}%`);
+    if (kingdom) query = query.eq('kingdom', kingdom);
+
+    const { data, error } = await query;
+    hide('taxa-list-loading');
+
+    if (error) {
+      const e = document.getElementById('taxa-error')!;
+      e.textContent = error.message;
+      show('taxa-error');
+      return;
+    }
+
+    allTaxa = (data ?? []) as TaxonRow[];
+
+    if (allTaxa.length > 0) {
+      const ids = allTaxa.map(t => t.id);
+      const { data: rarityData } = await supabase
+        .from('taxon_rarity')
+        .select('taxon_id, obs_count, percentile, bucket, multiplier, refreshed_at')
+        .in('taxon_id', ids);
+      rarityMap = new Map((rarityData ?? []).map((r: RarityRow) => [r.taxon_id, r]));
+    }
+
+    if (allTaxa.length === 0) { show('taxa-list-empty'); return; }
+    renderList();
+    show('taxa-list');
+  }
+
+  function renderList() {
+    const ul = document.getElementById('taxa-list')!;
+    ul.innerHTML = allTaxa.map(tx => {
+      const isSelected = tx.id === selectedId ? 'bg-zinc-100 dark:bg-zinc-800/60' : '';
+      const rarity = rarityMap.get(tx.id);
+      const bucketBadge = rarity
+        ? `<span class="text-[10px] rounded px-1.5 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">B${rarity.bucket}</span>`
+        : '';
+      const conservation = tx.nom059_status || tx.cites_appendix
+        ? `<span class="text-[10px] rounded px-1.5 py-0.5 bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300">protected</span>`
+        : '';
+      return `<li data-taxa-id="${escHtml(tx.id)}" class="px-3 py-2 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/40 ${isSelected}">
+        <div class="font-medium text-sm italic text-zinc-900 dark:text-zinc-100 truncate">${escHtml(tx.scientific_name)}</div>
+        <div class="text-xs text-zinc-500 capitalize">${escHtml(tx.kingdom ?? '')} · ${escHtml(tx.taxon_rank)}</div>
+        <div class="mt-0.5 flex gap-1">${bucketBadge}${conservation}</div>
+      </li>`;
+    }).join('');
+  }
+
+  function selectTaxon(id: string) {
+    selectedId = id;
+    const tx = allTaxa.find(x => x.id === id);
+    if (!tx) return;
+    renderList();
+    hide('taxa-detail-empty');
+    show('taxa-detail');
+
+    document.getElementById('taxa-detail-name')!.textContent = tx.scientific_name;
+    document.getElementById('taxa-detail-common')!.textContent =
+      [tx.common_name_en, tx.common_name_es].filter(Boolean).join(' / ') || '—';
+
+    document.getElementById('taxa-detail-kingdom')!.textContent = tx.kingdom ?? '—';
+    document.getElementById('taxa-detail-rank')!.textContent = tx.taxon_rank;
+    document.getElementById('taxa-detail-nom059')!.textContent = tx.nom059_status ?? '—';
+    document.getElementById('taxa-detail-cites')!.textContent = tx.cites_appendix ? `Appendix ${tx.cites_appendix}` : '—';
+    document.getElementById('taxa-detail-iucn')!.textContent = tx.iucn_category ?? '—';
+    document.getElementById('taxa-detail-obscure')!.textContent = tx.obscure_level;
+
+    const rarity = rarityMap.get(id);
+    document.getElementById('taxa-detail-obs-count')!.textContent = rarity ? String(rarity.obs_count) : '—';
+    document.getElementById('taxa-detail-rarity-bucket')!.textContent = rarity ? String(rarity.bucket) : '—';
+    document.getElementById('taxa-detail-rarity-mult')!.textContent = rarity ? `${rarity.multiplier}×` : '—';
+
+    const chips = document.getElementById('taxa-detail-chips')!;
+    const parts: string[] = [];
+    if (tx.is_endemic_mexico) parts.push('<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300">endemic MX</span>');
+    if (tx.nom059_status) parts.push(`<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300">NOM-059 ${escHtml(tx.nom059_status)}</span>`);
+    if (tx.cites_appendix) parts.push(`<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-300">CITES App.${escHtml(tx.cites_appendix)}</span>`);
+    chips.innerHTML = parts.join('');
+  }
+
+  document.addEventListener('click', (ev) => {
+    const li = (ev.target as HTMLElement).closest<HTMLElement>('li[data-taxa-id]');
+    if (li?.dataset.taxaId) selectTaxon(li.dataset.taxaId);
+  });
+
+  let searchTimer: ReturnType<typeof setTimeout> | null = null;
+  function onFilter() {
+    if (searchTimer) clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      const q = (document.getElementById('taxa-search') as HTMLInputElement)?.value ?? '';
+      const kingdom = (document.getElementById('taxa-filter-kingdom') as HTMLSelectElement)?.value ?? '';
+      loadTaxa(q, kingdom);
+    }, 300);
+  }
+
+  document.getElementById('taxa-search')?.addEventListener('input', onFilter);
+  document.getElementById('taxa-filter-kingdom')?.addEventListener('change', onFilter);
+
+  init().catch(err => {
+    const e = document.getElementById('taxa-error')!;
+    e.textContent = (err as Error).message;
+    show('taxa-error');
+  });
+</script>

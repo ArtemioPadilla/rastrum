@@ -1,0 +1,285 @@
+---
+import { t } from '../i18n/utils';
+
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+---
+
+<section class="max-w-6xl">
+  <p class="mb-4 text-sm text-zinc-600 dark:text-zinc-400">{tr.console.bioblitz_intro}</p>
+
+  <div id="bioblitz-not-auth" class="hidden rounded border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-900 dark:text-amber-100">
+    {tr.console.not_authorized}
+  </div>
+
+  <div id="bioblitz-shell" class="hidden space-y-4">
+    <div class="flex items-center justify-between">
+      <div class="flex gap-2">
+        <button
+          id="bioblitz-filter-upcoming"
+          data-filter="upcoming"
+          class="px-3 py-1.5 rounded border border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 text-sm font-medium text-zinc-700 dark:text-zinc-300"
+        >
+          {tr.console.bioblitz_filter_upcoming}
+        </button>
+        <button
+          id="bioblitz-filter-active"
+          data-filter="active"
+          class="px-3 py-1.5 rounded border border-zinc-300 dark:border-zinc-700 text-sm text-zinc-600 dark:text-zinc-400"
+        >
+          {tr.console.bioblitz_filter_active}
+        </button>
+        <button
+          id="bioblitz-filter-past"
+          data-filter="past"
+          class="px-3 py-1.5 rounded border border-zinc-300 dark:border-zinc-700 text-sm text-zinc-600 dark:text-zinc-400"
+        >
+          {tr.console.bioblitz_filter_past}
+        </button>
+        <button
+          id="bioblitz-filter-all"
+          data-filter="all"
+          class="px-3 py-1.5 rounded border border-zinc-300 dark:border-zinc-700 text-sm text-zinc-600 dark:text-zinc-400"
+        >
+          {tr.console.bioblitz_filter_all}
+        </button>
+      </div>
+      <button
+        disabled
+        title={tr.console.bioblitz_create_coming}
+        class="opacity-40 cursor-not-allowed inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-emerald-600 text-white text-sm font-medium"
+      >
+        {tr.console.bioblitz_create_btn}
+      </button>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-4" style="height:calc(100vh - 240px)">
+      <!-- Left: event list -->
+      <aside class="flex flex-col border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden">
+        <div id="bioblitz-list-loading" class="p-3 text-sm text-zinc-500 italic">{tr.console.loading}</div>
+        <div id="bioblitz-list-empty" class="hidden p-4 text-sm text-zinc-500">
+          <p>{tr.console.bioblitz_no_events}</p>
+          <p class="mt-2 text-xs text-zinc-400">{tr.console.bioblitz_create_hint}</p>
+        </div>
+        <ul id="bioblitz-list" class="hidden flex-1 overflow-y-auto divide-y divide-zinc-100 dark:divide-zinc-800"></ul>
+      </aside>
+
+      <!-- Right: event detail -->
+      <div id="bioblitz-detail-empty" class="flex items-center justify-center text-sm text-zinc-400 dark:text-zinc-600 border border-dashed border-zinc-200 dark:border-zinc-700 rounded-lg">
+        {tr.console.bioblitz_select_prompt}
+      </div>
+      <div id="bioblitz-detail" class="hidden border border-zinc-200 dark:border-zinc-800 rounded-lg p-5 overflow-y-auto space-y-4">
+        <div>
+          <div id="bioblitz-detail-name" class="text-lg font-semibold text-zinc-900 dark:text-zinc-100"></div>
+          <div class="mt-1 flex flex-wrap gap-1.5" id="bioblitz-detail-chips"></div>
+        </div>
+
+        <dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+          <dt class="text-zinc-500">{tr.console.bioblitz_col_kind}</dt>
+          <dd id="bioblitz-detail-kind" class="font-medium text-zinc-800 dark:text-zinc-200 capitalize"></dd>
+          <dt class="text-zinc-500">{tr.console.bioblitz_col_starts}</dt>
+          <dd id="bioblitz-detail-starts" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
+          <dt class="text-zinc-500">{tr.console.bioblitz_col_ends}</dt>
+          <dd id="bioblitz-detail-ends" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
+          <dt class="text-zinc-500">{tr.console.bioblitz_col_organiser}</dt>
+          <dd id="bioblitz-detail-organiser" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
+          <dt class="text-zinc-500">{tr.console.bioblitz_col_participants}</dt>
+          <dd id="bioblitz-detail-participants" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
+          <dt class="text-zinc-500">{tr.console.bioblitz_col_observations}</dt>
+          <dd id="bioblitz-detail-obs" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
+        </dl>
+
+        <div id="bioblitz-detail-desc-block" class="hidden">
+          <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-1">{tr.console.bioblitz_desc_heading}</h3>
+          <p id="bioblitz-detail-desc" class="text-sm text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap"></p>
+        </div>
+
+        <div class="pt-2 border-t border-zinc-100 dark:border-zinc-800">
+          <button
+            disabled
+            title={tr.console.bioblitz_edit_coming}
+            class="opacity-40 cursor-not-allowed inline-flex items-center gap-1.5 px-3 py-1.5 rounded border border-zinc-300 dark:border-zinc-700 text-sm text-zinc-700 dark:text-zinc-300"
+          >
+            {tr.console.bioblitz_edit_btn}
+          </button>
+          <span class="ml-2 text-xs text-zinc-400">{tr.console.bioblitz_edit_coming}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p id="bioblitz-error" class="hidden mt-3 text-sm text-red-600 dark:text-red-400"></p>
+</section>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { getUserRoles } from '../lib/user-roles';
+
+  type EventRow = {
+    id: string;
+    slug: string;
+    name: string;
+    description_md: string | null;
+    organiser_id: string | null;
+    starts_at: string;
+    ends_at: string;
+    kind: string;
+    created_at: string;
+  };
+
+  function show(id: string) { document.getElementById(id)?.classList.remove('hidden'); }
+  function hide(id: string) { document.getElementById(id)?.classList.add('hidden'); }
+  function escHtml(s: string): string {
+    return s.replace(/[<>&'"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&#39;','"':'&quot;'}[c]!));
+  }
+  function fmtDate(iso: string): string {
+    return iso.slice(0, 10);
+  }
+  function eventStatus(e: EventRow): 'upcoming' | 'active' | 'past' {
+    const now = Date.now();
+    if (new Date(e.ends_at).getTime() < now) return 'past';
+    if (new Date(e.starts_at).getTime() <= now) return 'active';
+    return 'upcoming';
+  }
+
+  const STATUS_COLORS: Record<string, string> = {
+    upcoming: 'bg-sky-100 dark:bg-sky-900/40 text-sky-800 dark:text-sky-300',
+    active:   'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300',
+    past:     'bg-zinc-100 dark:bg-zinc-800 text-zinc-500',
+  };
+
+  let allEvents: EventRow[] = [];
+  let filtered: EventRow[] = [];
+  let activeFilter = 'upcoming';
+  let selectedId: string | null = null;
+
+  const supabase = getSupabase();
+
+  async function init() {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) { show('bioblitz-not-auth'); return; }
+    const myRoles = await getUserRoles(session.user.id);
+    if (!myRoles.has('admin')) { show('bioblitz-not-auth'); return; }
+    show('bioblitz-shell');
+    await loadEvents();
+  }
+
+  async function loadEvents() {
+    const { data, error } = await supabase
+      .from('events')
+      .select('id, slug, name, description_md, organiser_id, starts_at, ends_at, kind, created_at')
+      .order('starts_at', { ascending: false })
+      .limit(100);
+
+    hide('bioblitz-list-loading');
+
+    if (error) {
+      const e = document.getElementById('bioblitz-error')!;
+      e.textContent = error.message;
+      show('bioblitz-error');
+      return;
+    }
+
+    allEvents = (data ?? []) as EventRow[];
+    applyFilter();
+  }
+
+  function applyFilter() {
+    if (activeFilter === 'all') {
+      filtered = allEvents;
+    } else {
+      filtered = allEvents.filter(e => eventStatus(e) === activeFilter);
+    }
+
+    if (filtered.length === 0) {
+      hide('bioblitz-list');
+      show('bioblitz-list-empty');
+      return;
+    }
+    renderList();
+    show('bioblitz-list');
+    hide('bioblitz-list-empty');
+  }
+
+  function renderList() {
+    const ul = document.getElementById('bioblitz-list')!;
+    ul.innerHTML = filtered.map(ev => {
+      const status = eventStatus(ev);
+      const isSelected = ev.id === selectedId ? 'bg-zinc-100 dark:bg-zinc-800/60' : '';
+      const statusBadge = `<span class="text-[10px] rounded px-1.5 py-0.5 ${STATUS_COLORS[status]}">${status}</span>`;
+      return `<li data-bioblitz-id="${escHtml(ev.id)}" class="px-3 py-2 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/40 ${isSelected}">
+        <div class="font-medium text-sm text-zinc-900 dark:text-zinc-100 truncate">${escHtml(ev.name)}</div>
+        <div class="text-xs text-zinc-500">${fmtDate(ev.starts_at)} – ${fmtDate(ev.ends_at)}</div>
+        <div class="mt-0.5 flex gap-1">${statusBadge}</div>
+      </li>`;
+    }).join('');
+  }
+
+  async function selectEvent(id: string) {
+    selectedId = id;
+    const ev = allEvents.find(x => x.id === id);
+    if (!ev) return;
+    renderList();
+    hide('bioblitz-detail-empty');
+    show('bioblitz-detail');
+
+    document.getElementById('bioblitz-detail-name')!.textContent = ev.name;
+    document.getElementById('bioblitz-detail-kind')!.textContent = ev.kind;
+    document.getElementById('bioblitz-detail-starts')!.textContent = fmtDate(ev.starts_at);
+    document.getElementById('bioblitz-detail-ends')!.textContent = fmtDate(ev.ends_at);
+    document.getElementById('bioblitz-detail-organiser')!.textContent = ev.organiser_id ? ev.organiser_id.slice(0, 8) + '…' : '—';
+    document.getElementById('bioblitz-detail-participants')!.textContent = '…';
+    document.getElementById('bioblitz-detail-obs')!.textContent = '…';
+
+    const status = eventStatus(ev);
+    const chips = document.getElementById('bioblitz-detail-chips')!;
+    chips.innerHTML = `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${STATUS_COLORS[status]}">${status}</span>
+      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 capitalize">${escHtml(ev.kind)}</span>`;
+
+    const descBlock = document.getElementById('bioblitz-detail-desc-block')!;
+    if (ev.description_md) {
+      document.getElementById('bioblitz-detail-desc')!.textContent = ev.description_md;
+      descBlock.classList.remove('hidden');
+    } else {
+      descBlock.classList.add('hidden');
+    }
+
+    try {
+      const { count: obsCount } = await supabase
+        .from('observations')
+        .select('id', { count: 'exact', head: true })
+        .gte('observed_at', ev.starts_at)
+        .lte('observed_at', ev.ends_at);
+      document.getElementById('bioblitz-detail-obs')!.textContent = String(obsCount ?? 0);
+    } catch {
+      document.getElementById('bioblitz-detail-obs')!.textContent = '—';
+    }
+    document.getElementById('bioblitz-detail-participants')!.textContent = '—';
+  }
+
+  document.addEventListener('click', (ev) => {
+    const li = (ev.target as HTMLElement).closest<HTMLElement>('li[data-bioblitz-id]');
+    if (li?.dataset.bioblitzId) { selectEvent(li.dataset.bioblitzId); return; }
+
+    const filterBtn = (ev.target as HTMLElement).closest<HTMLElement>('[data-filter]');
+    if (filterBtn?.dataset.filter) {
+      activeFilter = filterBtn.dataset.filter;
+      document.querySelectorAll<HTMLElement>('[data-filter]').forEach(btn => {
+        const isActive = btn.dataset.filter === activeFilter;
+        btn.classList.toggle('bg-zinc-100', isActive);
+        btn.classList.toggle('dark:bg-zinc-800', isActive);
+        btn.classList.toggle('font-medium', isActive);
+        btn.classList.toggle('text-zinc-700', isActive);
+        btn.classList.toggle('text-zinc-600', !isActive);
+      });
+      applyFilter();
+    }
+  });
+
+  init().catch(err => {
+    const e = document.getElementById('bioblitz-error')!;
+    e.textContent = (err as Error).message;
+    show('bioblitz-error');
+  });
+</script>

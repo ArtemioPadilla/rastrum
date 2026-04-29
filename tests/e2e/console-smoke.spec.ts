@@ -100,4 +100,34 @@ test.describe('console — smoke', () => {
     await page.goto('/en/console/expertise/');
     await expect(page.locator('#exp-skill-not-auth')).toHaveText(/console access/i);
   });
+
+  test('/en/console/badges/ shows not-auth banner for unauth visitor', async ({ page }) => {
+    await page.goto('/en/console/badges/');
+    await expect(page.locator('#badges-not-auth')).toHaveText(/don't have console access/i);
+    expect(await page.locator('body').textContent()).not.toContain('Internal Server Error');
+  });
+
+  test('/en/console/taxa/ shows not-auth banner for unauth visitor', async ({ page }) => {
+    await page.goto('/en/console/taxa/');
+    await expect(page.locator('#taxa-not-auth')).toHaveText(/don't have console access/i);
+    expect(await page.locator('body').textContent()).not.toContain('Internal Server Error');
+  });
+
+  test('/en/console/karma/ shows not-auth banner for unauth visitor', async ({ page }) => {
+    await page.goto('/en/console/karma/');
+    await expect(page.locator('#karma-not-auth')).toHaveText(/don't have console access/i);
+    expect(await page.locator('body').textContent()).not.toContain('Internal Server Error');
+  });
+
+  test('/en/console/features/ shows not-auth banner for unauth visitor', async ({ page }) => {
+    await page.goto('/en/console/features/');
+    await expect(page.locator('#features-not-auth')).toHaveText(/don't have console access/i);
+    expect(await page.locator('body').textContent()).not.toContain('Internal Server Error');
+  });
+
+  test('/en/console/bioblitz/ shows not-auth banner for unauth visitor', async ({ page }) => {
+    await page.goto('/en/console/bioblitz/');
+    await expect(page.locator('#bioblitz-not-auth')).toHaveText(/don't have console access/i);
+    expect(await page.locator('body').textContent()).not.toContain('Internal Server Error');
+  });
 });
