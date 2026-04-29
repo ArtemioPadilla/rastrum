@@ -39,7 +39,7 @@ type TaskItem = {
 
 // Group items by phase. Precompute every localised string here so the JSX
 // stays free of `Record<…>` casts (which Astro's parser misreads as tags).
-const phaseOrder = ['v0.1','v0.3','v0.5','v1.0','v1.5','v2.0','v2.5'];
+const phaseOrder = ['v0.1','v0.3','v0.5','v1.0','v1.1','v1.2','v1.5','v2.0','v2.5'];
 const items = tasksData.items as Record<string, TaskItem>;
 
 interface DisplaySubtask {

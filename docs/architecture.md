@@ -338,6 +338,75 @@ browser-tab visits, not just inside the standalone session.
 
 ---
 
+## Social graph (Module 26)
+
+Asymmetric-follow social layer added in v1.2. Composes against the
+existing privacy mechanics — no parallel `visibility` enum on
+observations.
+
+**Tables (all RLS-enabled):**
+- `follows(follower_id, followee_id, tier ∈ {follower,collaborator}, status ∈ {pending,accepted}, requested_at, accepted_at)`
+- `observation_reactions(user_id, observation_id, kind, …)` — kinds
+  `fave`/`agree_id`/`needs_id`/`confirm_id`/`helpful`
+- `photo_reactions(user_id, media_file_id, kind, …)` — kinds `fave`/`helpful`
+- `identification_reactions(user_id, identification_id, kind, …)` —
+  kinds `agree_id`/`disagree_id`/`helpful`
+- `blocks(blocker_id, blocked_id)` — read-symmetric: hide rows in
+  both directions
+- `reports(reporter_id, target_type, target_id, reason, note, status)`
+- `notifications(user_id, kind, payload jsonb, read_at, created_at)` —
+  pruned daily by `pg_cron` at 04:30 UTC for `read_at < now() - 90 days`
+
+**Counter columns** (denormalised, trigger-maintained):
+`users.follower_count` / `users.following_count`. Updated by
+`tg_follows_counter` only when `status='accepted'` is gained or lost.
+
+**Privacy helpers** (STABLE SQL, inlined into RLS predicates):
+- `social_visible_to(viewer, owner)` — owner-or-accepted-follower
+- `is_collaborator_of(viewer, owner)` — accepted collaborator-tier
+  follower; gives the same coord-precision unlock on obscured obs that
+  `is_credentialed_researcher` does
+
+**Edge Functions** (deployed via auto-deploy on push to `main`):
+- `follow` — request/accept/reject + collaborator-tier upgrades; rate
+  limits 30 follows/hr, 5 collab requests/day
+- `react` — idempotent (target, kind) toggle on the per-target tables;
+  rate limit 200/hr
+- `report` — inserts into `reports`, best-effort operator email via
+  Resend; rate limit 10/day
+
+**Fan-out triggers** (skip blocked recipients before insert):
+- `tg_follow_notify` on `follows` insert/update → `notifications`
+  (kinds `follow` / `follow_accepted`)
+- `tg_obsreact_notify` on `observation_reactions` insert →
+  `notifications` (kind `reaction`)
+
+**RLS pattern for reactions** (illustrative):
+
+```
+reaction is readable
+  iff observation is readable
+       AND not block-symmetric to viewer.
+
+observation is readable
+  iff o.observer_id = auth.uid()
+       OR (o.obscure_level <> 'full'
+           AND can_see_facet(o.observer_id, 'observations', auth.uid()))
+       OR is_collaborator_of(auth.uid(), o.observer_id)
+```
+
+**UI surfaces (chrome integration in v1.2):**
+- Header bell → `/inbox` ↔ `/bandeja` with unread badge
+- Public profile: follower / following pills + overflow ⋮ menu (Block /
+  Report)
+- `/share/obs/` observation viewer: interactive `ReactionStrip` + Report
+  button next to Follow / Share
+- Settings → Privacy: blocked users list
+
+Full spec + plan: [`docs/superpowers/specs/2026-04-28-social-features-design.md`](superpowers/specs/2026-04-28-social-features-design.md), [`docs/superpowers/plans/2026-04-28-m26-social-graph.md`](superpowers/plans/2026-04-28-m26-social-graph.md).
+
+---
+
 ## Further reading
 
 - [`AGENTS.md`](../AGENTS.md) — conventions, pitfalls, pre-PR checklist.
