@@ -3473,10 +3473,15 @@ CREATE POLICY user_bans_mod_read ON public.user_bans
   );
 
 -- No client-side writes — service role only via Edge Function.
+-- Three separate per-command policies replace the previous FOR ALL form for
+-- clarity; Postgres processes them independently per statement type.
 DROP POLICY IF EXISTS user_bans_no_client_write ON public.user_bans;
-CREATE POLICY user_bans_no_client_write ON public.user_bans
-  FOR ALL TO authenticated
-  USING (false) WITH CHECK (false);
+DROP POLICY IF EXISTS user_bans_no_client_insert ON public.user_bans;
+DROP POLICY IF EXISTS user_bans_no_client_update ON public.user_bans;
+DROP POLICY IF EXISTS user_bans_no_client_delete ON public.user_bans;
+CREATE POLICY user_bans_no_client_insert ON public.user_bans FOR INSERT TO authenticated WITH CHECK (false);
+CREATE POLICY user_bans_no_client_update ON public.user_bans FOR UPDATE TO authenticated USING (false);
+CREATE POLICY user_bans_no_client_delete ON public.user_bans FOR DELETE TO authenticated USING (false);
 
 GRANT SELECT ON public.user_bans TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.user_bans TO service_role;
