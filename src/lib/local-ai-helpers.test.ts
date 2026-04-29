@@ -8,6 +8,7 @@ import {
   compactFields,
   CHAT_SYSTEM_PROMPT,
   isIOS,
+  isFromAndroidIntent,
 } from './local-ai-helpers';
 
 describe('local-ai-helpers · locale detection', () => {
@@ -107,5 +108,15 @@ describe('local-ai-helpers · iOS detection', () => {
     expect(isIOS('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36')).toBe(false);
     expect(isIOS('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')).toBe(false);
     expect(isIOS('')).toBe(false);
+  });
+});
+
+describe('local-ai-helpers · Android intent referrer', () => {
+  it('matches android-app:// referrers', () => {
+    expect(isFromAndroidIntent('android-app://org.rastrum.twa/https/rastrum.org')).toBe(true);
+  });
+  it('rejects regular web referrers and empty strings', () => {
+    expect(isFromAndroidIntent('https://google.com/')).toBe(false);
+    expect(isFromAndroidIntent('')).toBe(false);
   });
 });
