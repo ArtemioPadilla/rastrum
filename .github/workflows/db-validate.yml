@@ -66,10 +66,16 @@ jobs:
           CREATE SCHEMA IF NOT EXISTS auth;
 
           -- Minimal stub of auth.users with the columns the rastrum schema reads.
+          -- raw_user_meta_data is the JSONB Supabase populates from the
+          -- OAuth provider's identity payload (name, avatar_url, picture, etc.).
           CREATE TABLE IF NOT EXISTS auth.users (
-            id     uuid PRIMARY KEY,
-            email  text,
-            phone  text
+            id                 uuid PRIMARY KEY,
+            email              text,
+            phone              text,
+            raw_user_meta_data jsonb,
+            raw_app_meta_data  jsonb,
+            created_at         timestamptz DEFAULT now(),
+            updated_at         timestamptz DEFAULT now()
           );
 
           -- auth.uid() returns the calling user's UUID; null in this validate context.
