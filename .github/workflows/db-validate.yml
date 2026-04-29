@@ -241,8 +241,21 @@ jobs:
             FROM pg_class c
             JOIN pg_namespace n ON n.oid = c.relnamespace
            WHERE n.nspname = 'public'
-             AND c.relkind = 'r'
+             -- 'r' = regular table, 'p' = partitioned table parent (RLS
+             -- is defined on the parent in Postgres; partition children
+             -- inherit it).
+             AND c.relkind IN ('r', 'p')
              AND NOT c.relrowsecurity
+             -- Exclude tables owned by an extension (e.g. PostGIS's
+             -- spatial_ref_sys, pg_cron's job tables in some installs).
+             -- Extensions manage their own tables; we don't want to
+             -- police RLS on them, and Supabase's own lint excludes
+             -- them too.
+             AND NOT EXISTS (
+               SELECT 1 FROM pg_depend d
+                WHERE d.objid = c.oid
+                  AND d.deptype = 'e'
+             )
            ORDER BY 1;
           SQL
           )
