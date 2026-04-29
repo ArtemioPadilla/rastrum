@@ -307,3 +307,54 @@ await adminClient.featureFlag.toggle(
 ```
 
 **Note:** Updates `app_feature_flags.value` and sets `updated_at` + `updated_by`. The `key` must match an existing row seeded from `src/lib/feature-flags.ts`; if the key is not found the handler throws HTTP 400. Runtime behaviour change is immediate on the next Edge Function cold start; warm isolates keep the previous value until they recycle (typically within a few minutes on the free tier).
+
+## anomaly.acknowledge
+
+**Required role:** admin
+**Audit op:** `anomaly_acknowledge`
+**Payload:** `{ anomalyId: string (uuid), notes?: string }`
+
+```ts
+await adminClient.anomaly.acknowledge(
+  { anomalyId: '<uuid>', notes: 'False positive — bulk import context' },
+  'reviewed and dismissed — not a real anomaly',
+  session!.access_token,
+);
+```
+
+**Note:** Sets `admin_anomalies.acknowledged_at = now()`,
+`acknowledged_by = actor.id`, `ack_notes = notes`. Throws HTTP 400 if the
+anomaly is already acknowledged. Read-side the row stays in
+`admin_anomalies`; the audit trail is preserved. See
+`docs/runbooks/admin-anomalies.md` for tuning + manual SQL fallback.
+
+## audit.export
+
+**Required role:** admin
+**Audit op:** `audit_export`
+**Payload:** `{ from?: ISO timestamp, to?: ISO timestamp, actorId?: uuid, op?: text, limit?: int (default 1000, max 10000) }`
+
+```ts
+await adminClient.auditExport(
+  {
+    from: '2026-04-01T00:00:00Z',
+    to: '2026-04-29T00:00:00Z',
+    op: 'observation_hide',
+    limit: 5000,
+  },
+  'monthly compliance review export',
+  session!.access_token,
+);
+// → { result: { rows: AdminAuditRow[], csv: string } }
+```
+
+**Note:** The CSV is built **server-side** (header
+`id,created_at,actor_id,op,target_type,target_id,details`) so the client
+just needs to wrap it in a Blob + download. Each row's `details` cell is
+a single-line JSON string of `{ before, after, reason }`. Quote escape
+follows RFC 4180 — fields containing `,`, `"`, or `\n` are wrapped in
+double quotes and inner quotes are doubled. The export call itself
+inserts an `admin_audit` row with `op = 'audit_export'`,
+`target_type = 'admin_audit'`, `target_id = 'export'`, and an
+`after` jsonb of `{ from, to, actorId, op, limit, returned }` so the
+filter context is recoverable from the audit log.

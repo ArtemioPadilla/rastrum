@@ -55,6 +55,28 @@ interface FeatureFlagTogglePayload { key: string; value: boolean }
 interface AppealAcceptPayload { appeal_id: string }
 interface AppealRejectPayload { appeal_id: string; reviewer_note?: string }
 
+interface AnomalyAcknowledgePayload { anomalyId: string; notes?: string }
+interface AuditExportFilters {
+  from?: string;
+  to?: string;
+  actorId?: string;
+  op?: string;
+  limit?: number;
+}
+export interface AdminAuditRow {
+  id: number;
+  created_at: string;
+  actor_id: string;
+  op: string;
+  target_type: string | null;
+  target_id: string | null;
+  details: unknown;
+}
+export interface AuditExportResult {
+  rows: AdminAuditRow[];
+  csv: string;
+}
+
 interface DispatcherResponse<T = unknown> {
   ok: true;
   audit_id: number;
@@ -153,4 +175,10 @@ export const adminClient = {
     reject: (payload: AppealRejectPayload, reason: string, jwt: string) =>
       call('appeal.reject', payload, reason, jwt),
   },
+  anomaly: {
+    acknowledge: (payload: AnomalyAcknowledgePayload, reason: string, jwt: string) =>
+      call('anomaly.acknowledge', payload, reason, jwt),
+  },
+  auditExport: (filters: AuditExportFilters, reason: string, jwt: string) =>
+    call<AuditExportResult>('audit.export', filters, reason, jwt),
 };

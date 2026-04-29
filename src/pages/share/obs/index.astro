@@ -14,7 +14,7 @@ const lang: 'en' | 'es' = 'en';
   <script>
     import { getSupabase } from '../../../lib/supabase';
     import { labelFor } from '../../../lib/observation-enums';
-    import { wireManagePanelDetails } from '../../../lib/manage-panel';
+    import { wireManagePanelDetails, wireManagePanelLocation, wireManagePanelPhotos } from '../../../lib/manage-panel';
     import { t } from '../../../i18n/utils';
 
     const id = new URLSearchParams(window.location.search).get('id');
@@ -108,13 +108,11 @@ const lang: 'en' | 'es' = 'en';
         detail: { photos, galleryId: 'obs-detail' },
       }));
 
-      // Coords readout below the map. PostgREST returns `location` as a
-      // GeoJSON Point; for non-owner viewers we prefer `location_obscured`
-      // when present (sensitive species). The MapPicker mini-map itself
-      // SSRs with `initialCoords={null}` — its dynamic hydration via a
-      // `rastrum:mappicker-set` event lands in PR5; until then the host
-      // shows MapPicker's "Location not available" fallback for non-empty
-      // coords. The coords readout is independent of the MapLibre paint.
+      // Coords readout + view-mode mini-map hydration. PostgREST returns
+      // `location` as a GeoJSON Point; for non-owner viewers we prefer
+      // `location_obscured` when present (sensitive species). The
+      // MapPicker mini-map SSRs with `initialCoords={null}` — we hydrate
+      // it now via `rastrum:mappicker-set` (PR5).
       const obsLoc = (obs as { location?: { coordinates?: [number, number] } | null }).location;
       const obscuredLoc = (obs as { location_obscured?: { coordinates?: [number, number] } | null }).location_obscured;
       const usePoint = (!viewerIsObserver && obscuredLoc?.coordinates) ? obscuredLoc : obsLoc;
@@ -122,6 +120,9 @@ const lang: 'en' | 'es' = 'en';
       if (Array.isArray(coords) && coords.length >= 2) {
         const lng = coords[0];
         const lat = coords[1];
+        window.dispatchEvent(new CustomEvent('rastrum:mappicker-set', {
+          detail: { id: 'obs-detail', coords: { lat, lng } },
+        }));
         const coordsEl = document.querySelector('[data-obs-coords]');
         if (coordsEl) {
           const isEs = document.documentElement.lang === 'es';
@@ -175,12 +176,27 @@ const lang: 'en' | 'es' = 'en';
 
       if (viewerIsObserver) {
         // ObsManagePanel.astro renders Details / Location / Photos tabs.
-        // PR4 wires Details; PR5 wires Location, PR6 wires Photos.
-        // The "Edit location" button on the left aside is still a stub —
-        // PR5 wires its click to a MapPicker edit-mode modal.
-        const editLocBtn = document.getElementById('obs-edit-location-btn');
-        editLocBtn?.classList.remove('hidden');
+        // PR4 wires Details; PR5 wires Location; PR6 wires Photos
+        // (atomic delete via the delete-photo Edge Function — soft-delete
+        // + ID demote + last_material_edit_at bump in one transaction).
+        // The left-aside "Edit location" button (`obs-edit-location-btn`)
+        // is a shortcut that scrolls to the manage panel and activates
+        // the Location tab — the actual Edit Location modal lives inside
+        // the tab via `MapPicker mode='edit'` with pickerId 'obs-detail-edit'.
+        const editLocBtn = document.getElementById('obs-edit-location-btn') as HTMLButtonElement | null;
+        if (editLocBtn) {
+          editLocBtn.classList.remove('hidden');
+          editLocBtn.disabled = false;
+          editLocBtn.removeAttribute('aria-disabled');
+          editLocBtn.addEventListener('click', () => {
+            const tab = document.getElementById('m-tab-location') as HTMLButtonElement | null;
+            tab?.click();
+            tab?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          });
+        }
         await wireManagePanelDetails(id, obs as Record<string, unknown>, ident);
+        await wireManagePanelLocation(id, obs as Record<string, unknown>);
+        await wireManagePanelPhotos(id);
       }
 
       // Surface the "edited after IDs" badge (PR2 schema column).

@@ -299,7 +299,7 @@ Bootstrap docs: `docs/runbooks/admin-bootstrap.md`. Role model:
 `docs/runbooks/role-model.md`. Audit log: `docs/runbooks/admin-audit.md`.
 Per-action runbook: `docs/runbooks/admin-ops.md`.
 
-**Status:** 22 of 25 console tabs functional, 21 admin Edge Function handlers deployed, all admin write affordances live, CORS tightened to rastrum.org + dev/preview ports, token-bucket rate limit + pgTAP RLS suite enforced in CI. Deferred stubs (no concrete users): License disputes, Identification overrides, Taxon notes, Bioblitz.
+**Status:** 24 of 28 console tabs functional, 23 admin Edge Function handlers deployed, all admin write affordances live, CORS tightened to rastrum.org + dev/preview ports, token-bucket rate limit + pgTAP RLS suite enforced in CI. PR12 (observability) added Anomalies + Forensics tabs backed by hourly `detect_admin_anomalies()` cron, weekly `compute_admin_health_digest()` snapshot, and a structured `function_errors` sink wired into the dispatcher. Deferred stubs (no concrete users): License disputes, Identification overrides, Taxon notes, Bioblitz.
 
 ### Onboarding events + CI smoke
 

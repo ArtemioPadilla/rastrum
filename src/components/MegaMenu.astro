@@ -1,16 +1,48 @@
 ---
 import { getDocPath } from '../i18n/utils';
 
-interface Item { key: string; label: string; desc?: string; }
-interface Column { heading: string; items: Item[]; }
+interface Item {
+  key: string;
+  label: string;
+  desc?: string;
+  /**
+   * Optional explicit href. When provided, used verbatim (no
+   * `getDocPath()` lookup). Lets non-docs callers (e.g. the Explore
+   * mega-menu in M28) drop in routed links + filter-preset URLs.
+   */
+  href?: string;
+}
+interface Column {
+  heading: string;
+  items: Item[];
+}
 interface Props {
   lang: 'en' | 'es';
   trigger: string;          // visible button label, e.g. "Docs"
-  columns: Column[];        // 3 columns by convention
+  columns: Column[];        // 2-3 columns by convention
   align?: 'left' | 'right'; // dropdown anchor; defaults to right
   active?: boolean;
+  /**
+   * Tailwind colour token for the active rail + chevron heading.
+   * Defaults to 'stone' (Docs/About). Explore uses 'teal'.
+   * Each value must be safelisted in tailwind.config.mjs.
+   */
+  accent?: 'stone' | 'teal' | 'emerald' | 'sky';
+  /**
+   * Number of grid columns. Defaults to 3 (legacy Docs shape). The
+   * M28 Explore mega-menu uses 2 (Biodiversity + Community).
+   */
+  cols?: 2 | 3;
 }
-const { lang, trigger, columns, align = 'right', active = false } = Astro.props;
+const {
+  lang,
+  trigger,
+  columns,
+  align = 'right',
+  active = false,
+  accent = 'stone',
+  cols = 3,
+} = Astro.props;
 const safeTriggerId = trigger
   .normalize('NFKD')
   .replace(/[̀-ͯ]/g, '')
@@ -28,7 +60,7 @@ const id = `megamenu-${safeTriggerId || 'menu'}`;
       'relative flex items-center gap-1 pb-1 transition-colors',
       'after:content-[""] after:absolute after:left-0 after:right-0 after:-bottom-3 after:h-[2px] after:rounded after:transition-transform after:origin-left',
       active
-        ? 'text-stone-600 dark:text-stone-400 font-semibold after:bg-stone-500 after:scale-x-100'
+        ? `text-${accent}-600 dark:text-${accent}-400 font-semibold after:bg-${accent}-500 after:scale-x-100`
         : 'text-zinc-700 dark:text-zinc-300 hover:text-emerald-600 dark:hover:text-emerald-400 after:scale-x-0',
     ]}
     aria-haspopup="true"
@@ -46,7 +78,7 @@ const id = `megamenu-${safeTriggerId || 'menu'}`;
     class:list={[
       'hidden absolute top-full mt-2 z-50',
       align === 'right' ? 'right-0' : 'left-0',
-      'min-w-[640px] grid grid-cols-3 gap-6',
+      cols === 2 ? 'min-w-[480px] grid grid-cols-2 gap-6' : 'min-w-[640px] grid grid-cols-3 gap-6',
       'rounded-lg border border-zinc-200 dark:border-zinc-800',
       'bg-white dark:bg-zinc-900 shadow-lg p-4',
     ]}
@@ -61,7 +93,7 @@ const id = `megamenu-${safeTriggerId || 'menu'}`;
           {col.items.map(item => (
             <li>
               <a
-                href={getDocPath(lang, item.key)}
+                href={item.href ?? getDocPath(lang, item.key)}
                 class="block px-2 py-1.5 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-sm text-zinc-700 dark:text-zinc-300"
                 role="menuitem"
               >

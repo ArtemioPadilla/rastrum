@@ -106,6 +106,17 @@ export function isStandaloneDisplayMode(): boolean {
   return navStandalone === true;
 }
 
+/**
+ * True when the navigation came from an Android app intent
+ * (e.g. the user tapped a link inside the installed Rastrum PWA on
+ * Android Chrome and landed back in a browser tab). This is a strong
+ * signal the PWA is installed even when display-mode is 'browser' and
+ * `getInstalledRelatedApps()` hasn't yet populated.
+ */
+export function isFromAndroidIntent(referrer: string = typeof document !== 'undefined' ? document.referrer : ''): boolean {
+  return typeof referrer === 'string' && referrer.startsWith('android-app://');
+}
+
 const PWA_INSTALLED_KEY = 'rastrum.pwaInstalled';
 
 /**
@@ -126,6 +137,10 @@ const PWA_INSTALLED_KEY = 'rastrum.pwaInstalled';
 export function isPwaInstalled(): boolean {
   if (typeof window === 'undefined') return false;
   if (isStandaloneDisplayMode()) return true;
+  if (isFromAndroidIntent()) {
+    markPwaInstalled();
+    return true;
+  }
   try { return localStorage.getItem(PWA_INSTALLED_KEY) === 'true'; }
   catch { return false; }
 }

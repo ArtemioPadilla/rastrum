@@ -166,8 +166,9 @@ const hasMany = photos.length > 1;
   // photo. Photos hydrate via `rastrum:photos-ready` (share/obs runs a
   // client-side query). Owner-mode delete dispatches
   // `rastrum:photogallery-delete`; PR6's delete-photo EF wires the handler.
+  import { escapeHtml as ESC } from '../lib/escape';
+
   type Photo = { id: string; url: string; thumbnail_url?: string | null; caption?: string | null };
-  const ESC = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c] ?? c));
 
   document.querySelectorAll<HTMLElement>('[data-photo-gallery]').forEach((root) => {
     const heroBtn = root.querySelector<HTMLButtonElement>('[data-photo-hero]');

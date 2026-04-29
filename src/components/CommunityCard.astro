@@ -1,0 +1,97 @@
+---
+/**
+ * CommunityCard — server-renderable observer card for the
+ * /community/observers/ list.
+ *
+ * The live page (CommunityView.astro) builds cards in JS to keep the
+ * filter UX snappy without an Astro round-trip. This Astro version
+ * exists for any future server-rendered consumer (OG card, an SSR
+ * variant, or a static "featured observers" surface).
+ */
+import FollowButton from './FollowButton.astro';
+import { t, getLocalizedPath, routes } from '../i18n/utils';
+import type { CommunityObserver } from '../lib/community';
+
+interface Props {
+  lang: 'en' | 'es';
+  observer: CommunityObserver;
+}
+const { lang, observer } = Astro.props;
+const tr = t(lang);
+
+interface CommunityCopy {
+  expert_pill: string;
+  today: string;
+  yesterday: string;
+  days_ago: string;
+  months_ago: string;
+  years_ago: string;
+  card: { obs: string; species: string; last_seen: string };
+}
+const cm = (tr as unknown as { community: CommunityCopy }).community;
+
+const handle = observer.username ?? observer.id.slice(0, 8);
+const displayName = observer.display_name ?? handle;
+const profileHref = getLocalizedPath(lang, routes.publicProfile[lang] + '/' + handle + '/');
+
+function relativeTime(iso: string | null): string {
+  if (!iso) return '—';
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400_000);
+  if (days <= 0) return cm.today;
+  if (days === 1) return cm.yesterday;
+  if (days < 30)  return cm.days_ago.replace('{n}', String(days));
+  if (days < 365) return cm.months_ago.replace('{n}', String(Math.floor(days / 30)));
+  return cm.years_ago.replace('{n}', String(Math.floor(days / 365)));
+}
+
+const obsLabel = cm.card.obs.replace('{n}', String(observer.observation_count));
+const speciesLabel = cm.card.species.replace('{n}', String(observer.species_count));
+const lastSeenLabel = cm.card.last_seen.replace('{when}', relativeTime(observer.last_observation_at));
+const taxaList = (observer.expert_taxa ?? []).join(', ');
+---
+
+<article class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 flex items-start gap-3">
+  <a href={profileHref} class="flex-none">
+    {observer.avatar_url ? (
+      <img
+        src={observer.avatar_url}
+        alt=""
+        loading="lazy"
+        class="w-12 h-12 rounded-full bg-zinc-200 dark:bg-zinc-800 object-cover"
+      />
+    ) : (
+      <div class="w-12 h-12 rounded-full bg-emerald-700 text-white flex items-center justify-center font-semibold">
+        {displayName.slice(0, 1).toUpperCase()}
+      </div>
+    )}
+  </a>
+  <div class="flex-1 min-w-0">
+    <div class="flex items-center gap-2 flex-wrap">
+      <a href={profileHref} class="text-sm font-semibold text-zinc-800 dark:text-zinc-100 truncate">
+        @{handle}
+      </a>
+      {observer.display_name && (
+        <span class="text-xs text-zinc-500 dark:text-zinc-400 truncate">· {observer.display_name}</span>
+      )}
+      {observer.is_expert && (
+        <span class="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+          {cm.expert_pill}
+        </span>
+      )}
+    </div>
+    <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400 truncate">
+      {observer.country_code && <span>{observer.country_code} · </span>}
+      {taxaList}
+    </p>
+    <p class="mt-1 text-xs text-zinc-600 dark:text-zinc-300">
+      <span>{obsLabel}</span>
+      <span class="mx-1.5 text-zinc-400">·</span>
+      <span>{speciesLabel}</span>
+      <span class="mx-1.5 text-zinc-400">·</span>
+      <span>{lastSeenLabel}</span>
+    </p>
+  </div>
+  <div class="flex-none">
+    <FollowButton lang={lang} targetUserId={observer.id} />
+  </div>
+</article>

@@ -1,0 +1,95 @@
+name: Community discovery — manual backfill
+
+# One-time / on-demand fire of the deployed `recompute-user-stats` Edge
+# Function. Computes counters (species_count, obs_count_7d, obs_count_30d),
+# centroid_geog, and country_code (where currently NULL) for every user.
+#
+# Why this exists: the nightly cron (08:00 UTC) only sees users who are
+# active. Until each user posts a new observation, their counters stay at
+# zero and they don't appear on /{en,es}/community/observers/. Firing this
+# once after Module 28 ships gives the page useful data on day 1.
+#
+# This replaces the previous "operator runs curl" instruction in
+# docs/runbooks/community-discovery.md (PR3 — backfill).
+#
+# Safe to run repeatedly: the EF is idempotent (UPDATE … FROM stats CTE
+# rewrites the same fields each call). At v1 scale runs in under 2 seconds.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'If true, only HEADs the EF endpoint to verify it resolves; does NOT recompute.'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+permissions:
+  contents: read
+
+jobs:
+  backfill:
+    name: Fire recompute-user-stats once
+    runs-on: ubuntu-latest
+    env:
+      PROJECT_REF: reppvlqejgoqvitturxp
+    steps:
+      - name: Dry-run — probe endpoint only
+        if: ${{ inputs.dry_run == 'true' }}
+        run: |
+          set -euo pipefail
+          url="https://${PROJECT_REF}.supabase.co/functions/v1/recompute-user-stats"
+          echo "Probing $url (HEAD; no recompute)"
+          # HEAD verifies the function is deployed and routable. We accept
+          # any 2xx/4xx — Edge Functions sometimes 405 HEAD, which still
+          # confirms reachability.
+          status=$(curl -sS -o /dev/null -w '%{http_code}' -X HEAD "$url")
+          echo "HTTP $status"
+          if [ -z "$status" ] || [ "$status" -ge 500 ] 2>/dev/null; then
+            echo "::error::Endpoint unreachable (HTTP ${status:-no-response})"
+            exit 1
+          fi
+          echo "::notice::Dry-run OK — endpoint reachable (HTTP $status). No backfill performed."
+          echo "## Community discovery — dry-run OK" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Endpoint \`recompute-user-stats\` reachable (HTTP $status). No recompute performed. Re-run with \`dry_run=false\` to fire the actual backfill." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Invoke recompute-user-stats Edge Function
+        if: ${{ inputs.dry_run != 'true' }}
+        run: |
+          set -euo pipefail
+          url="https://${PROJECT_REF}.supabase.co/functions/v1/recompute-user-stats"
+          echo "POST $url"
+          # The EF is deployed --no-verify-jwt (cron-only contract); no Auth
+          # header needed. Internal access control happens inside via the
+          # auto-injected SUPABASE_SERVICE_ROLE_KEY.
+          response=$(curl -sS -X POST \
+            -H "Content-Type: application/json" \
+            -d '{}' \
+            -w '\n%{http_code}' \
+            "$url")
+          body="${response%$'\n'*}"
+          status="${response##*$'\n'}"
+
+          echo "::group::Response"
+          echo "HTTP $status"
+          echo "$body"
+          echo "::endgroup::"
+
+          if [ "$status" != "200" ]; then
+            echo "::error::Edge Function returned HTTP $status"
+            exit 1
+          fi
+
+          # Surface the rows_updated count so the operator can sanity-check
+          # in the Actions UI. The EF returns { ok, elapsed_ms, rows_updated }.
+          rows=$(echo "$body" | grep -oE '"rows_updated"[[:space:]]*:[[:space:]]*[0-9]+' | grep -oE '[0-9]+' || echo '?')
+          elapsed=$(echo "$body" | grep -oE '"elapsed_ms"[[:space:]]*:[[:space:]]*[0-9]+' | grep -oE '[0-9]+' || echo '?')
+          echo "::notice::Backfilled $rows users in ${elapsed}ms"
+
+          echo "## Community discovery — backfill complete" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Fired \`recompute-user-stats\` against project \`${PROJECT_REF}\`. \`$rows\` users updated in \`${elapsed}ms\`. The nightly cron at 08:00 UTC will continue to refresh counters going forward." >> "$GITHUB_STEP_SUMMARY"

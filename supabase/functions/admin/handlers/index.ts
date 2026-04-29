@@ -1,5 +1,7 @@
+import { anomalyAcknowledgeHandler } from './anomaly-acknowledge.ts';
 import { appealAcceptHandler } from './appeal-accept.ts';
 import { appealRejectHandler } from './appeal-reject.ts';
+import { auditExportHandler } from './audit-export.ts';
 import { roleGrantHandler } from './role-grant.ts';
 import { roleRevokeHandler } from './role-revoke.ts';
 import { sensitiveReadUserAuditHandler } from './sensitive-read-user-audit.ts';
@@ -47,4 +49,6 @@ export const HANDLERS: Record<string, ActionHandler<unknown>> = {
   'feature_flag.toggle': featureFlagToggleHandler as unknown as ActionHandler<unknown>,
   'appeal.accept': appealAcceptHandler as unknown as ActionHandler<unknown>,
   'appeal.reject': appealRejectHandler as unknown as ActionHandler<unknown>,
+  'anomaly.acknowledge': anomalyAcknowledgeHandler as unknown as ActionHandler<unknown>,
+  'audit.export': auditExportHandler as unknown as ActionHandler<unknown>,
 };

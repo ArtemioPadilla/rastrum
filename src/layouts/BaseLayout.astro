@@ -10,6 +10,7 @@ import GlobalShareFab from '../components/GlobalShareFab.astro';
 import SwUpdateToast from '../components/SwUpdateToast.astro';
 import OfflineBanner from '../components/OfflineBanner.astro';
 import ReportDialog from '../components/ReportDialog.astro';
+import PhotoCropModal from '../components/PhotoCropModal.astro';
 import BanBanner from '../components/BanBanner.astro';
 import { getAlternateUrl } from '../i18n/utils';
 import StructuredData from '../components/StructuredData.astro';
@@ -72,6 +73,8 @@ function ogSlugForPath(path: string): string {
   // Validate queue lives under both /profile/ and /explore/ — same intent,
   // share one card. Keep this BEFORE the generic /explore match below.
   if (p.includes('/validate') || p.includes('/validar'))        return 'validate';
+  if (p.startsWith('/community/observers') || p.startsWith('/comunidad/observadores'))
+                                                                return 'community-observers';
   if (p.startsWith('/explore')  || p.startsWith('/explorar'))   return 'explore';
   if (p.startsWith('/chat'))                                    return 'chat';
   if (p.startsWith('/about')  || p.startsWith('/acerca'))       return 'about';
@@ -165,5 +168,6 @@ const resolvedOgImage = ogImage ?? `${SITE_URL}/og/${ogLang}/${ogSlugForPath(cur
     <OnboardingTour lang={installLang} />
     <SwUpdateToast lang={lang} />
     <ReportDialog lang={installLang} />
+    <PhotoCropModal lang={installLang} />
   </body>
 </html>
