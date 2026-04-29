@@ -3607,6 +3607,49 @@
         }
       ]
     },
+    "ai-sponsorships": {
+      "phase": "v1.1",
+      "title_en": "AI sponsorships — operator/community-sponsored Anthropic budget",
+      "title_es": "Patrocinios IA — presupuesto Anthropic patrocinado por operador/comunidad",
+      "modules": [],
+      "subtasks": [
+        {
+          "label_en": "Schema + RLS (sponsorships table, monthly USD budget, owner/public read policies)",
+          "label_es": "Schema + RLS (tabla sponsorships, presupuesto mensual USD, políticas de lectura dueño/público)",
+          "status": "done"
+        },
+        {
+          "label_en": "_shared/sponsorship.ts helper + unit tests (budget check, charge accounting)",
+          "label_es": "Helper _shared/sponsorship.ts + pruebas unitarias (verificación de presupuesto, contabilidad de cargos)",
+          "status": "done"
+        },
+        {
+          "label_en": "sponsorships Edge Function (CRUD + budget reads, JWT-gated)",
+          "label_es": "Edge Function sponsorships (CRUD + lectura de presupuesto, gated por JWT)",
+          "status": "done"
+        },
+        {
+          "label_en": "identify Edge Function modified to use sponsored key when within budget, BYOK fallback otherwise",
+          "label_es": "Edge Function identify modificada para usar clave patrocinada dentro del presupuesto, respaldo BYOK en caso contrario",
+          "status": "done"
+        },
+        {
+          "label_en": "UI + i18n + routes (sponsor settings page, profile widget, EN/ES paired)",
+          "label_es": "UI + i18n + rutas (página de patrocinio, widget en perfil, EN/ES emparejado)",
+          "status": "done"
+        },
+        {
+          "label_en": "Smoke tests + lint in CI (Edge Function smoke, type/lint gates)",
+          "label_es": "Pruebas smoke + lint en CI (smoke de Edge Function, gates de tipos/lint)",
+          "status": "done"
+        },
+        {
+          "label_en": "Rollout + remove server-side ANTHROPIC_API_KEY (operator action)",
+          "label_es": "Rollout + remover ANTHROPIC_API_KEY del servidor (acción del operador)",
+          "status": "planned"
+        }
+      ]
+    },
     "profile-privacy-matrix": {
       "phase": "v1.2",
       "title_en": "Profile privacy matrix (module 25)",
