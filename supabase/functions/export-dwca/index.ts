@@ -25,7 +25,7 @@
  * See docs/gbif-ipt.md for operator deployment notes.
  */
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import JSZip from 'https://esm.sh/jszip@3.10.1';
 
 // Inline the pure builders. Edge Functions can't import from `src/lib/*`

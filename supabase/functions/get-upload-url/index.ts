@@ -21,7 +21,7 @@
  *   SUPABASE_URL / SUPABASE_ANON_KEY for JWT validation
  */
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { S3Client, PutObjectCommand } from 'https://esm.sh/@aws-sdk/client-s3@3.658.1';
 import { getSignedUrl } from 'https://esm.sh/@aws-sdk/s3-request-presigner@3.658.1';
 

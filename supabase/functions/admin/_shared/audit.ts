@@ -2,7 +2,7 @@
  * insertAuditRow — single-purpose helper that writes to public.admin_audit
  * using the service-role client passed in by the caller.
  */
-import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 
 export type AuditOp =
   | 'role_grant' | 'role_revoke'
