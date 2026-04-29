@@ -124,7 +124,7 @@ have an automated parity check.
 | #103 | merged 2026-04-29 | PR3 — `PhotoGallery.astro` + `ShareObsView.astro` two-column layout + viewer e2e |
 | #120 | merged 2026-04-29 | PR4 — `ObsManagePanel.astro` Details tab (date/time + habitat + weather + establishment + name override + notes + obscure level) |
 | TBD | planned | PR5 — Location tab (drop-in `MapPicker mode='edit'` for coordinate edit) |
-| this PR | merged 2026-04-29 | PR6 — Photos tab + `delete-photo` Edge Function (atomic soft-delete + ID demote + last_material_edit_at bump via `delete_photo_atomic` SECURITY DEFINER RPC) |
+| #125 | merged 2026-04-29 | PR6 — Photos tab + `delete-photo` Edge Function (atomic soft-delete + ID demote + last_material_edit_at bump via `delete_photo_atomic` SECURITY DEFINER RPC) |
 
 ## Future work (v1.1)
 
