@@ -462,7 +462,8 @@ serve(async (req) => {
     const col = role === 'sponsor' ? 'target_sponsor_id' : 'requester_id';
     const { data, error } = await supabase
       .from('sponsorship_requests').select('*').eq(col, ctx.userId)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(100);
     if (error) return jsonResponse(500, { error: 'list_failed', detail: error.message });
     return jsonResponse(200, data ?? []);
   }
@@ -499,12 +500,18 @@ serve(async (req) => {
           monthly_call_cap,
           priority,
         }).select('*').single();
-      if (insErr) {
-        if ((insErr as { code?: string }).code === '23505') {
-          // Sponsorship already exists; mark request approved anyway.
-        } else {
-          return jsonResponse(500, { error: 'sponsorship_insert_failed', detail: insErr.message });
-        }
+      let resolvedSponsorship = sponsorship;
+      if (insErr && (insErr as { code?: string }).code === '23505') {
+        // Sponsorship already exists between this sponsor + beneficiary; fetch it.
+        const { data: existing } = await supabase
+          .from('sponsorships')
+          .select('*')
+          .eq('sponsor_id', ctx.userId)
+          .eq('beneficiary_id', r.requester_id)
+          .single();
+        resolvedSponsorship = existing;
+      } else if (insErr) {
+        return jsonResponse(500, { error: 'sponsorship_insert_failed', detail: insErr.message });
       }
       // Update request status
       await supabase.from('sponsorship_requests')
@@ -513,9 +520,9 @@ serve(async (req) => {
       await supabase.from('admin_audit').insert({
         actor_id: ctx.userId, op: 'sponsorship_request_approve',
         target_type: 'sponsorship_request', target_id: id,
-        reason: 'sponsor_approved', after: { sponsorship_id: sponsorship?.id ?? null, monthly_call_cap, priority },
+        reason: 'sponsor_approved', after: { sponsorship_id: resolvedSponsorship?.id ?? null, monthly_call_cap, priority },
       });
-      return jsonResponse(200, { ok: true, sponsorship });
+      return jsonResponse(200, { ok: true, sponsorship: resolvedSponsorship });
     }
   }
 

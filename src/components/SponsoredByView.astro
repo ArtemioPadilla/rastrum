@@ -233,7 +233,11 @@ const i18nBag = {
     if (!list) return;
     const { listRequests } = await import('../lib/sponsorships');
     let requests: Awaited<ReturnType<typeof listRequests>> = [];
-    try { requests = await listRequests('requester'); } catch { /* silent */ }
+    try {
+      requests = await listRequests('requester');
+    } catch (err) {
+      console.error('[sponsored-by] refreshMyRequests failed:', err);
+    }
     list.innerHTML = '';
     if (requests.length === 0) {
       list.innerHTML = `<li class="text-zinc-500">${escHtml(i18nBag.my_requests_empty ?? '')}</li>`;

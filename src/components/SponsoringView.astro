@@ -17,6 +17,7 @@ const i18nBag = {
   request_approve:            tr.sponsoring.request_approve,
   request_reject:             tr.sponsoring.request_reject,
   add_credential:             tr.sponsoring.add_credential,
+  confirm_reject_request:     lang === 'es' ? '¿Rechazar esta solicitud?' : 'Reject this request?',
   paused_reason: {
     rate_limit:         tr.sponsoring.paused_reason_rate_limit,
     cred_invalid:       tr.sponsoring.paused_reason_cred_invalid,
@@ -210,6 +211,11 @@ const i18nBag = {
     self_sponsorship_badge: string;
     report_abuse: string;
     calls_last_Nd: string;
+    requests_empty: string;
+    request_approve: string;
+    request_reject: string;
+    add_credential: string;
+    confirm_reject_request: string;
     paused_reason: {
       rate_limit: string;
       cred_invalid: string;
@@ -463,6 +469,9 @@ const i18nBag = {
         dialog.dataset.targetId    = target.dataset.reportBen;
         dialog.dataset.targetLabel = `@${target.dataset.username || ''}`;
         dialog.classList.remove('hidden');
+      } else {
+        console.warn('[sponsoring] #rastrum-report-dialog not in DOM — report dialog unavailable');
+        alert('Report dialog unavailable — please reload the page.');
       }
     }
   });
@@ -566,7 +575,78 @@ const i18nBag = {
     refreshAnalytics(Number.isFinite(days) ? days : 30);
   });
 
+  async function refreshRequests() {
+    const list = document.getElementById('requests-list');
+    if (!list) return;
+    const { listRequests } = await import('../lib/sponsorships');
+    let requests: Awaited<ReturnType<typeof listRequests>> = [];
+    try {
+      requests = (await listRequests('sponsor')).filter(r => r.status === 'pending');
+    } catch (err) {
+      console.error('[sponsoring] refreshRequests failed:', err);
+    }
+    list.innerHTML = '';
+    if (requests.length === 0) {
+      list.innerHTML = `<li class="py-3 text-sm text-zinc-500">${escHtml(tr.requests_empty ?? '')}</li>`;
+      return;
+    }
+    const supabase = (await import('../lib/supabase')).getSupabase();
+    const ids = Array.from(new Set(requests.map(r => r.requester_id)));
+    let usersMap: Record<string, { username: string; display_name?: string }> = {};
+    if (ids.length > 0) {
+      const { data: users } = await supabase.from('users').select('id,username,display_name').in('id', ids);
+      const userRows = (users ?? []) as Array<{ id: string; username: string; display_name?: string }>;
+      usersMap = Object.fromEntries(userRows.map(u => [u.id, u]));
+    }
+    for (const req of requests) {
+      const u = usersMap[req.requester_id];
+      const name = u?.display_name || u?.username || (req.requester_id.slice(0, 8) + '…');
+      const handle = u ? `@${u.username}` : '';
+      const li = document.createElement('li');
+      li.className = 'py-3 flex items-start justify-between gap-4';
+      li.innerHTML = `
+        <div class="flex-1">
+          <div class="font-medium">${escHtml(name)} <span class="text-xs text-zinc-500">${escHtml(handle)}</span></div>
+          ${req.message ? `<div class="text-sm text-zinc-600 dark:text-zinc-400 mt-1 italic">"${escHtml(req.message)}"</div>` : ''}
+        </div>
+        <div class="flex gap-2 shrink-0">
+          <button data-approve="${escHtml(req.id)}" class="text-sm text-emerald-700 hover:text-emerald-900">${escHtml(tr.request_approve)}</button>
+          <button data-reject="${escHtml(req.id)}" class="text-sm text-red-600 hover:text-red-800">${escHtml(tr.request_reject)}</button>
+        </div>`;
+      list.appendChild(li);
+    }
+  }
+
+  document.getElementById('requests-list')?.addEventListener('click', async (e) => {
+    const target = e.target as HTMLElement;
+    if (target.dataset.approve) {
+      const { approveRequest, listCredentials } = await import('../lib/sponsorships');
+      let creds: Awaited<ReturnType<typeof listCredentials>> = [];
+      try { creds = await listCredentials(); } catch { alert('Could not load credentials.'); return; }
+      const activeCreds = creds.filter(c => !c.revoked_at);
+      if (activeCreds.length === 0) { alert(tr.add_credential ?? 'Add a credential first.'); return; }
+      try {
+        await approveRequest(target.dataset.approve, { credential_id: activeCreds[0].id, monthly_call_cap: 200 });
+        await refreshRequests();
+        await refreshBens();
+      } catch (err) {
+        alert(`Error: ${(err as Error).message}`);
+      }
+    } else if (target.dataset.reject) {
+      const { rejectRequest } = await import('../lib/sponsorships');
+      if (await showConfirm(tr.confirm_reject_request ?? 'Reject this request?')) {
+        try {
+          await rejectRequest(target.dataset.reject);
+          await refreshRequests();
+        } catch (err) {
+          alert(`Error: ${(err as Error).message}`);
+        }
+      }
+    }
+  });
+
   refreshCreds();
   refreshBens();
   refreshAnalytics();
+  refreshRequests();
 </script>
