@@ -85,6 +85,7 @@ narrative source.
 | 26 | Social graph + reactions (follows, reactions, blocks, reports, notifications) | v1.2 | shipped 2026-04-28 (PR #43 schema + Edge Functions; PRs #63 + #64 UI integration; PR #101 v1.1 follow-ups) | [`26-social-graph.md`](26-social-graph.md) |
 | 27 | AI Sponsorships (share Anthropic credentials with beneficiaries) | v1.3 | shipped 2026-04-28 (PRs #78 core + #84 UX polish + #94 cobertura completa) | [`27-ai-sponsorships.md`](27-ai-sponsorships.md) |
 | 28 | Community discovery (observers page, leaderboards, nearby, experts, country filter) | v1.2 | shipped 2026-04-29 (PR1 #92 + PR2 #96 + PR4 #102 + PR5+PR6 atomic landing; PR3 manual cron fire = operator action) | [`28-community-discovery.md`](28-community-discovery.md) |
+| 31 | Camera stations + sampling-effort tracking | v1.3 | in implementation (PR feat/camera-stations-112 — schema only; UI v1.1) | [`31-camera-stations.md`](31-camera-stations.md) |
 
 ## v1.5 — Territory layer — planned
 

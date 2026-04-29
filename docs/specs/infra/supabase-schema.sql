@@ -5324,3 +5324,186 @@ SELECT u.id AS user_id,
  );
 
 GRANT SELECT ON public.moderator_trust_scores TO authenticated;
+
+-- ============================================================
+-- CAMERA STATIONS (M31) — sampling-effort metadata for camera traps
+-- ============================================================
+-- A station is a fixed camera deployment. Active periods record
+-- when the camera was capturing — needed for trap-night counts +
+-- standardised wildlife monitoring indices (RAI, detection rate per
+-- 100 trap-nights, species richness per station/project).
+--
+-- Depends on M29 (projects) — every station belongs to a project,
+-- and the auto-tagging trigger on observations writes project_id
+-- before this module's logic ever runs.
+--
+-- v1 ships the schema + minimal owner-RLS. UI / metric rollups are
+-- v1.1 follow-ups.
+
+CREATE TABLE IF NOT EXISTS public.camera_stations (
+  id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  project_id      uuid NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
+  station_key     text NOT NULL CHECK (length(station_key) BETWEEN 1 AND 64),
+  name            text NOT NULL CHECK (length(name) BETWEEN 1 AND 200),
+  name_es         text CHECK (length(name_es) BETWEEN 1 AND 200),
+  coords          geography(Point, 4326) NOT NULL,
+  habitat         text,
+  camera_model    text,
+  notes           text CHECK (length(notes) <= 4000),
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  updated_at      timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (project_id, station_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_camera_stations_project ON public.camera_stations(project_id);
+CREATE INDEX IF NOT EXISTS idx_camera_stations_coords  ON public.camera_stations USING GIST(coords);
+
+CREATE TABLE IF NOT EXISTS public.camera_station_periods (
+  id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  station_id  uuid NOT NULL REFERENCES public.camera_stations(id) ON DELETE CASCADE,
+  start_date  date NOT NULL,
+  end_date    date,
+  notes       text CHECK (length(notes) <= 1000),
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  CHECK (end_date IS NULL OR end_date >= start_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_csp_station ON public.camera_station_periods(station_id, start_date);
+
+-- Optional FK from observations → station; populated by the CLI
+-- importer when --station-key is supplied. The auto-tagging by
+-- coordinates happens via the project polygon (M29) — station
+-- assignment stays explicit because two stations within one polygon
+-- need different trap-night counts.
+ALTER TABLE public.observations
+  ADD COLUMN IF NOT EXISTS camera_station_id uuid
+    REFERENCES public.camera_stations(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_obs_camera_station ON public.observations(camera_station_id)
+  WHERE camera_station_id IS NOT NULL;
+
+-- ── RLS ──────────────────────────────────────────────────────────────
+-- A camera_station inherits its project's visibility — public projects
+-- expose stations to anon; private projects restrict to project members.
+
+ALTER TABLE public.camera_stations         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.camera_station_periods  ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS camera_stations_read ON public.camera_stations;
+CREATE POLICY camera_stations_read ON public.camera_stations
+  FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.projects p
+       WHERE p.id = camera_stations.project_id
+         AND (
+           p.visibility = 'public'
+           OR p.owner_user_id = auth.uid()
+           OR EXISTS (
+             SELECT 1 FROM public.project_members pm
+              WHERE pm.project_id = p.id AND pm.user_id = auth.uid()
+           )
+         )
+    )
+  );
+
+DROP POLICY IF EXISTS camera_stations_owner_write ON public.camera_stations;
+CREATE POLICY camera_stations_owner_write ON public.camera_stations
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.projects p
+       WHERE p.id = camera_stations.project_id
+         AND p.owner_user_id = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS camera_stations_owner_update ON public.camera_stations;
+CREATE POLICY camera_stations_owner_update ON public.camera_stations
+  FOR UPDATE TO authenticated
+  USING (
+    EXISTS (SELECT 1 FROM public.projects p WHERE p.id = camera_stations.project_id AND p.owner_user_id = auth.uid())
+  )
+  WITH CHECK (
+    EXISTS (SELECT 1 FROM public.projects p WHERE p.id = camera_stations.project_id AND p.owner_user_id = auth.uid())
+  );
+
+DROP POLICY IF EXISTS camera_stations_owner_delete ON public.camera_stations;
+CREATE POLICY camera_stations_owner_delete ON public.camera_stations
+  FOR DELETE TO authenticated
+  USING (
+    EXISTS (SELECT 1 FROM public.projects p WHERE p.id = camera_stations.project_id AND p.owner_user_id = auth.uid())
+  );
+
+DROP POLICY IF EXISTS camera_station_periods_read ON public.camera_station_periods;
+CREATE POLICY camera_station_periods_read ON public.camera_station_periods
+  FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.camera_stations cs
+       JOIN public.projects p ON p.id = cs.project_id
+       WHERE cs.id = camera_station_periods.station_id
+         AND (
+           p.visibility = 'public'
+           OR p.owner_user_id = auth.uid()
+           OR EXISTS (
+             SELECT 1 FROM public.project_members pm
+              WHERE pm.project_id = p.id AND pm.user_id = auth.uid()
+           )
+         )
+    )
+  );
+
+DROP POLICY IF EXISTS camera_station_periods_owner_write ON public.camera_station_periods;
+CREATE POLICY camera_station_periods_owner_write ON public.camera_station_periods
+  FOR ALL TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.camera_stations cs
+       JOIN public.projects p ON p.id = cs.project_id
+       WHERE cs.id = camera_station_periods.station_id
+         AND p.owner_user_id = auth.uid()
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.camera_stations cs
+       JOIN public.projects p ON p.id = cs.project_id
+       WHERE cs.id = camera_station_periods.station_id
+         AND p.owner_user_id = auth.uid()
+    )
+  );
+
+GRANT SELECT                        ON public.camera_stations         TO anon, authenticated;
+GRANT INSERT, UPDATE, DELETE        ON public.camera_stations         TO authenticated;
+GRANT SELECT                        ON public.camera_station_periods  TO anon, authenticated;
+GRANT INSERT, UPDATE, DELETE        ON public.camera_station_periods  TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.camera_stations         TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.camera_station_periods  TO service_role;
+
+-- ── Trap-night helper ────────────────────────────────────────────────
+-- Returns the number of nights a station was active across all its
+-- periods, optionally bounded to a date range. NULL end_date means
+-- "still active" — counted up to the supplied upper bound (or now()).
+CREATE OR REPLACE FUNCTION public.station_trap_nights(
+  p_station_id uuid,
+  p_from       date DEFAULT NULL,
+  p_to         date DEFAULT NULL
+)
+RETURNS integer
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT COALESCE(SUM(
+    GREATEST(
+      0,
+      LEAST(COALESCE(end_date, COALESCE(p_to, current_date)), COALESCE(p_to, current_date))
+        - GREATEST(start_date, COALESCE(p_from, start_date))
+    )
+  ), 0)::integer
+  FROM public.camera_station_periods
+  WHERE station_id = p_station_id;
+$$;
+
+REVOKE ALL ON FUNCTION public.station_trap_nights(uuid, date, date) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.station_trap_nights(uuid, date, date) TO anon, authenticated, service_role;
