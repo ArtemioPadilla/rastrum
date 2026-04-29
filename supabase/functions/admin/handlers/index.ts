@@ -23,6 +23,9 @@ import { badgeRevokeHandler } from './badge-revoke.ts';
 import { taxonRecomputeRarityHandler } from './taxon-recompute-rarity.ts';
 import { taxonToggleConservationHandler } from './taxon-toggle-conservation.ts';
 import { featureFlagToggleHandler } from './feature-flag-toggle.ts';
+import { proposalCreateHandler } from './proposal-create.ts';
+import { proposalApproveHandler } from './proposal-approve.ts';
+import { proposalRejectHandler } from './proposal-reject.ts';
 import type { ActionHandler } from './role-grant.ts';
 
 export const HANDLERS: Record<string, ActionHandler<unknown>> = {
@@ -51,4 +54,7 @@ export const HANDLERS: Record<string, ActionHandler<unknown>> = {
   'appeal.reject': appealRejectHandler as unknown as ActionHandler<unknown>,
   'anomaly.acknowledge': anomalyAcknowledgeHandler as unknown as ActionHandler<unknown>,
   'audit.export': auditExportHandler as unknown as ActionHandler<unknown>,
+  'proposal.create': proposalCreateHandler as unknown as ActionHandler<unknown>,
+  'proposal.approve': proposalApproveHandler as unknown as ActionHandler<unknown>,
+  'proposal.reject': proposalRejectHandler as unknown as ActionHandler<unknown>,
 };

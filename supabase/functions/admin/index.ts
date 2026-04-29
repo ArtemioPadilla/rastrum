@@ -49,6 +49,8 @@ const WRITE_ACTIONS = new Set([
   'taxon.recompute_rarity', 'taxon.toggle_conservation',
   'feature_flag.toggle',
   'anomaly.acknowledge',
+  'proposal.create', 'proposal.approve', 'proposal.reject',
+  'webhook.create', 'webhook.update', 'webhook.delete', 'webhook.test',
 ]);
 
 function json(body: unknown, status = 200, req: Request): Response {
