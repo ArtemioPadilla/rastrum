@@ -19,7 +19,7 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: 'If true, only checks the EF responds; does not record output as a backfill run.'
+        description: 'If true, only HEADs the EF endpoint to verify it resolves; does NOT recompute.'
         required: false
         default: 'false'
         type: choice
@@ -37,7 +37,28 @@ jobs:
     env:
       PROJECT_REF: reppvlqejgoqvitturxp
     steps:
+      - name: Dry-run — probe endpoint only
+        if: ${{ inputs.dry_run == 'true' }}
+        run: |
+          set -euo pipefail
+          url="https://${PROJECT_REF}.supabase.co/functions/v1/recompute-user-stats"
+          echo "Probing $url (HEAD; no recompute)"
+          # HEAD verifies the function is deployed and routable. We accept
+          # any 2xx/4xx — Edge Functions sometimes 405 HEAD, which still
+          # confirms reachability.
+          status=$(curl -sS -o /dev/null -w '%{http_code}' -X HEAD "$url")
+          echo "HTTP $status"
+          if [ -z "$status" ] || [ "$status" -ge 500 ] 2>/dev/null; then
+            echo "::error::Endpoint unreachable (HTTP ${status:-no-response})"
+            exit 1
+          fi
+          echo "::notice::Dry-run OK — endpoint reachable (HTTP $status). No backfill performed."
+          echo "## Community discovery — dry-run OK" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Endpoint \`recompute-user-stats\` reachable (HTTP $status). No recompute performed. Re-run with \`dry_run=false\` to fire the actual backfill." >> "$GITHUB_STEP_SUMMARY"
+
       - name: Invoke recompute-user-stats Edge Function
+        if: ${{ inputs.dry_run != 'true' }}
         run: |
           set -euo pipefail
           url="https://${PROJECT_REF}.supabase.co/functions/v1/recompute-user-stats"
@@ -69,9 +90,6 @@ jobs:
           elapsed=$(echo "$body" | grep -oE '"elapsed_ms"[[:space:]]*:[[:space:]]*[0-9]+' | grep -oE '[0-9]+' || echo '?')
           echo "::notice::Backfilled $rows users in ${elapsed}ms"
 
-      - name: Annotate run
-        if: ${{ inputs.dry_run != 'true' }}
-        run: |
           echo "## Community discovery — backfill complete" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Fired \`recompute-user-stats\` against project \`${PROJECT_REF}\`. The nightly cron at 08:00 UTC will continue to refresh counters going forward." >> "$GITHUB_STEP_SUMMARY"
+          echo "Fired \`recompute-user-stats\` against project \`${PROJECT_REF}\`. \`$rows\` users updated in \`${elapsed}ms\`. The nightly cron at 08:00 UTC will continue to refresh counters going forward." >> "$GITHUB_STEP_SUMMARY"
