@@ -155,14 +155,19 @@ specs at `docs/superpowers/specs/2026-04-29-*-design.md`.
   the two shipped "no leaderboards" strings + OG card + roadmap flip. PR3 manual
   cron fire is the only remaining backfill task (operator action). _(✓ done)_
 
-- `obs-detail-redesign` — Rebuilds `/share/obs/?id=...` as two-column desktop /
+- `obs-detail-redesign` — Rebuilt `/share/obs/?id=...` as two-column desktop /
   stacked mobile layout. PR1 (#91) extracted reusable `MapPicker.astro` from
   `ObservationForm.astro`. PR2 (#98) added schema deltas
   (`last_material_edit_at` + `media_files.deleted_at` +
   `observations_material_edit_check_trg` material-edit trigger),
   `observation-enums.ts`, and `obs_detail.*` i18n. PR3 (#103) shipped
   `PhotoGallery.astro` (native lightbox + keyboard + swipe + share) plus the new
-  two-column layout. PR4 (Details tab), PR5 (Location tab — coordinate edit), PR6
-  (Photos tab + atomic `delete-photo` Edge Function) remaining. Soft-delete only
-  for v1; R2 orphan GC is a v1.1 follow-up. _(in implementation — see
+  two-column layout. PR4 (#120) wired the Details tab (date/time + habitat +
+  weather + establishment + scientific-name override + notes + obscure-level).
+  PR6 wired the Photos tab + the atomic `delete-photo` Edge Function (soft-delete
+  + ID demote clearing validated_by/validated_at/is_research_grade +
+  last_material_edit_at bump in one transaction via `delete_photo_atomic`
+  SECURITY DEFINER RPC). PR5 (Location tab — coordinate edit modal) is the only
+  remaining slice and is tracked as a v1.1 follow-up under the spec. Soft-delete
+  only for v1; R2 orphan GC is a v1.1 follow-up. _(✓ shipped — see
   `docs/runbooks/obs-detail-redesign.md`)_

@@ -122,9 +122,15 @@ have an automated parity check.
 | #91 | merged 2026-04-29 | PR1 — extract `MapPicker.astro` (no behavior change) + Playwright regression test |
 | #98 | merged 2026-04-29 | PR2 — schema deltas + material-edit trigger + `observation-enums.ts` + `obs_detail.*` i18n |
 | #103 | merged 2026-04-29 | PR3 — `PhotoGallery.astro` + `ShareObsView.astro` two-column layout + viewer e2e |
+<<<<<<< HEAD
+| #120 | merged 2026-04-29 | PR4 — `ObsManagePanel.astro` Details tab (date/time + habitat + weather + establishment + name override + notes + obscure level) |
+| TBD | planned | PR5 — Location tab (drop-in `MapPicker mode='edit'` for coordinate edit) |
+| #125 | merged 2026-04-29 | PR6 — Photos tab + `delete-photo` Edge Function (atomic soft-delete + ID demote + last_material_edit_at bump via `delete_photo_atomic` SECURITY DEFINER RPC) |
+=======
 | TBD | planned | PR4 — `ObsManagePanel.astro` Details tab (date/time + habitat + weather + establishment + name override + notes + obscure level) |
 | TBD | in-flight | PR5 — Location tab (read-only `MapPicker mode='view'` + edit-modal `MapPicker mode='edit'` with `pickerId='obs-detail-edit'`; `wireManagePanelLocation` listens for `rastrum:mappicker-save` and UPDATEs `observations.location` as `SRID=4326;POINT(lng lat)`) |
 | TBD | planned | PR6 — Photos tab + `delete-photo` Edge Function (atomic soft-delete + ID demote + edit-flag) |
+>>>>>>> origin/main
 
 ## Future work (v1.1)
 

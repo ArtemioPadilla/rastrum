@@ -14,7 +14,7 @@ const lang: 'en' | 'es' = 'en';
   <script>
     import { getSupabase } from '../../../lib/supabase';
     import { labelFor } from '../../../lib/observation-enums';
-    import { wireManagePanelDetails, wireManagePanelLocation } from '../../../lib/manage-panel';
+    import { wireManagePanelDetails, wireManagePanelLocation, wireManagePanelPhotos } from '../../../lib/manage-panel';
     import { t } from '../../../i18n/utils';
 
     const id = new URLSearchParams(window.location.search).get('id');
@@ -176,7 +176,9 @@ const lang: 'en' | 'es' = 'en';
 
       if (viewerIsObserver) {
         // ObsManagePanel.astro renders Details / Location / Photos tabs.
-        // PR4 wires Details; PR5 wires Location; PR6 wires Photos.
+        // PR4 wires Details; PR5 wires Location; PR6 wires Photos
+        // (atomic delete via the delete-photo Edge Function — soft-delete
+        // + ID demote + last_material_edit_at bump in one transaction).
         // The left-aside "Edit location" button (`obs-edit-location-btn`)
         // is a shortcut that scrolls to the manage panel and activates
         // the Location tab — the actual Edit Location modal lives inside
@@ -194,6 +196,7 @@ const lang: 'en' | 'es' = 'en';
         }
         await wireManagePanelDetails(id, obs as Record<string, unknown>, ident);
         await wireManagePanelLocation(id, obs as Record<string, unknown>);
+        await wireManagePanelPhotos(id);
       }
 
       // Surface the "edited after IDs" badge (PR2 schema column).
