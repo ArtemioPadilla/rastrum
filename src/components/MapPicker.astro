@@ -29,6 +29,7 @@ const labels = {
     ? 'No se pudo cargar el mapa. Usa la entrada manual.'
     : "Couldn't load the map. Use manual entry instead.",
   satelliteSwitchTitle: isEs ? 'Cambiar a satélite' : 'Switch to satellite',
+  unavailable: isEs ? 'Ubicación no disponible' : 'Location not available',
 };
 
 const containerId = `mp-${pickerId}`;
@@ -40,27 +41,34 @@ const initialLng  = initialCoords?.lng ?? '';
 {mode === 'view' && (
   <div
     id={containerId}
-    class="w-full h-[240px] rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900"
+    class="relative w-full h-[240px] rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900"
     data-mappicker-mode="view"
     data-mappicker-id={pickerId}
     data-mappicker-initial-lat={String(initialLat)}
     data-mappicker-initial-lng={String(initialLng)}
     data-mappicker-obscure-level={obscureLevel}
     data-mappicker-lang={lang}
-  ></div>
+  >
+    {(initialCoords == null || !Number.isFinite(initialCoords.lat) || !Number.isFinite(initialCoords.lng)) && (
+      <p
+        data-mappicker-fallback={pickerId}
+        class="absolute inset-0 flex items-center justify-center text-xs text-zinc-500 dark:text-zinc-400"
+      >{labels.unavailable}</p>
+    )}
+  </div>
 )}
 
 {mode === 'edit' && (
   <>
     <button
       type="button"
-      id={`map-picker-open-btn`}
+      id={`map-picker-open-btn-${pickerId}`}
       data-mappicker-open={pickerId}
       class="text-xs text-emerald-700 dark:text-emerald-400 underline"
     >{labels.open}</button>
 
     <div
-      id="map-modal"
+      id={`map-modal-${pickerId}`}
       data-mappicker-modal={pickerId}
       data-mappicker-mode="edit"
       data-mappicker-id={pickerId}
@@ -78,7 +86,7 @@ const initialLng  = initialCoords?.lng ?? '';
           <h2 id={`${modalId}-title`} class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{labels.title}</h2>
           <div class="flex items-center gap-2">
             <button
-              id="map-satellite-toggle"
+              id={`map-satellite-toggle-${pickerId}`}
               data-mappicker-satellite={pickerId}
               type="button"
               class="inline-flex items-center gap-1 rounded-md border border-zinc-300 dark:border-zinc-700 px-2 py-1 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800"
@@ -88,10 +96,10 @@ const initialLng  = initialCoords?.lng ?? '';
               <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/>
               </svg>
-              <span id="map-satellite-label">{labels.satellite}</span>
+              <span data-mappicker-satellite-label={pickerId}>{labels.satellite}</span>
             </button>
             <button
-              id="map-close-btn"
+              id={`map-close-btn-${pickerId}`}
               data-mappicker-close={pickerId}
               type="button"
               class="min-h-11 min-w-11 rounded text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"
@@ -102,17 +110,17 @@ const initialLng  = initialCoords?.lng ?? '';
           </div>
         </div>
         <p class="px-3 py-2 text-xs text-zinc-500 dark:text-zinc-400">{labels.hint}</p>
-        <div id="map-picker" class="flex-1 bg-zinc-100 dark:bg-zinc-900"></div>
-        <p id="map-picker-status" class="px-3 py-1 text-xs text-zinc-500 dark:text-zinc-400">{labels.loading}</p>
+        <div id={`map-picker-${pickerId}`} data-mappicker-canvas={pickerId} class="flex-1 bg-zinc-100 dark:bg-zinc-900"></div>
+        <p id={`map-picker-status-${pickerId}`} data-mappicker-status={pickerId} class="px-3 py-1 text-xs text-zinc-500 dark:text-zinc-400">{labels.loading}</p>
         <div class="flex items-center justify-end gap-2 px-3 py-3 border-t border-zinc-200 dark:border-zinc-800">
           <button
-            id="map-cancel-btn"
+            id={`map-cancel-btn-${pickerId}`}
             data-mappicker-cancel={pickerId}
             type="button"
             class="min-h-11 px-3 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
           >{labels.cancel}</button>
           <button
-            id="map-use-btn"
+            id={`map-use-btn-${pickerId}`}
             data-mappicker-use={pickerId}
             type="button"
             class="min-h-11 rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
@@ -124,7 +132,7 @@ const initialLng  = initialCoords?.lng ?? '';
   </>
 )}
 
-<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.css" />
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.0/dist/maplibre-gl.css" />
 
 <script>
   import { MEXICO_DEFAULT_CENTER, isValidLatLng } from '../lib/media-helpers';
@@ -271,20 +279,23 @@ const initialLng  = initialCoords?.lng ?? '';
   function initEditPicker(modal: HTMLElement) {
     const pickerId = modal.dataset.mappickerId ?? 'default';
     const isEs = (modal.dataset.mappickerLang ?? 'en') === 'es';
-    const container = modal.querySelector<HTMLElement>('#map-picker');
+    // Selectors below are scoped to `modal.querySelector` so two MapPicker
+    // instances on the same page don't cross-wire — each modal finds only
+    // its own descendants.
+    const container = modal.querySelector<HTMLElement>(`[data-mappicker-canvas="${pickerId}"]`);
     if (!container) return;
 
     const state: EditState = {
       pickerId,
       modal,
       container,
-      statusEl: modal.querySelector<HTMLElement>('#map-picker-status'),
+      statusEl: modal.querySelector<HTMLElement>(`[data-mappicker-status="${pickerId}"]`),
       openBtn: document.querySelector<HTMLButtonElement>(`[data-mappicker-open="${pickerId}"]`),
       closeBtn: modal.querySelector<HTMLButtonElement>(`[data-mappicker-close="${pickerId}"]`),
       cancelBtn: modal.querySelector<HTMLButtonElement>(`[data-mappicker-cancel="${pickerId}"]`),
       useBtn: modal.querySelector<HTMLButtonElement>(`[data-mappicker-use="${pickerId}"]`),
       satToggle: modal.querySelector<HTMLButtonElement>(`[data-mappicker-satellite="${pickerId}"]`),
-      satLabel: modal.querySelector<HTMLElement>('#map-satellite-label'),
+      satLabel: modal.querySelector<HTMLElement>(`[data-mappicker-satellite-label="${pickerId}"]`),
       isEs,
       map: null,
       marker: null,
