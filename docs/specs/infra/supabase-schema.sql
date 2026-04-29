@@ -3422,3 +3422,99 @@ CREATE POLICY "obs_admin_full_read" ON public.observations
   FOR SELECT
   TO authenticated
   USING (public.has_role(auth.uid(), 'admin'));
+
+-- ═════════════════════════════════════════════════════════════════════
+-- ADMIN CONSOLE PR5 — moderator surface (reports / comments / bans)
+-- ═════════════════════════════════════════════════════════════════════
+
+-- Extend audit_op for new moderator actions.
+DO $$ BEGIN
+  ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'report_triaged';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'report_resolved';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'report_dismissed';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'comment_unhide';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- locked column on comments for mod use (enforcement-on-insert is a v1.1 follow-up).
+ALTER TABLE public.observation_comments ADD COLUMN IF NOT EXISTS locked boolean NOT NULL DEFAULT false;
+
+-- Soft-ban table — rows are never deleted on unban; revoked_at marks the lift.
+CREATE TABLE IF NOT EXISTS public.user_bans (
+  id            uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id       uuid        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  banned_by     uuid        REFERENCES public.users(id),
+  reason        text        NOT NULL,
+  expires_at    timestamptz,
+  revoked_at    timestamptz,
+  revoked_by    uuid        REFERENCES public.users(id),
+  revoke_reason text,
+  created_at    timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_user_bans_user_active
+  ON public.user_bans(user_id)
+  WHERE revoked_at IS NULL;
+
+ALTER TABLE public.user_bans ENABLE ROW LEVEL SECURITY;
+
+-- Moderators and admins can read all bans. Banned users can read their own row.
+DROP POLICY IF EXISTS user_bans_mod_read ON public.user_bans;
+CREATE POLICY user_bans_mod_read ON public.user_bans
+  FOR SELECT TO authenticated
+  USING (
+    public.has_role(auth.uid(), 'moderator')
+    OR public.has_role(auth.uid(), 'admin')
+    OR user_id = auth.uid()
+  );
+
+-- No client-side writes — service role only via Edge Function.
+DROP POLICY IF EXISTS user_bans_no_client_write ON public.user_bans;
+CREATE POLICY user_bans_no_client_write ON public.user_bans
+  FOR ALL TO authenticated
+  USING (false) WITH CHECK (false);
+
+GRANT SELECT ON public.user_bans TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.user_bans TO service_role;
+
+-- is_user_banned(uid) — SECURITY DEFINER so RLS predicates can call it
+-- without exposing user_bans rows directly.
+CREATE OR REPLACE FUNCTION public.is_user_banned(uid uuid)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.user_bans
+    WHERE user_id = uid
+      AND revoked_at IS NULL
+      AND (expires_at IS NULL OR expires_at > now())
+  );
+$$;
+REVOKE ALL ON FUNCTION public.is_user_banned(uuid) FROM public;
+GRANT EXECUTE ON FUNCTION public.is_user_banned(uuid) TO authenticated, service_role;
+
+-- Moderator read access for reports (previously service_role only).
+DROP POLICY IF EXISTS reports_mod_read ON public.reports;
+CREATE POLICY reports_mod_read ON public.reports
+  FOR SELECT TO authenticated
+  USING (
+    public.has_role(auth.uid(), 'moderator')
+    OR public.has_role(auth.uid(), 'admin')
+    OR reporter_id = auth.uid()
+  );
+
+-- Moderator read access for observation_comments (full view, including deleted).
+DROP POLICY IF EXISTS comments_mod_read ON public.observation_comments;
+CREATE POLICY comments_mod_read ON public.observation_comments
+  FOR SELECT TO authenticated
+  USING (
+    public.has_role(auth.uid(), 'moderator')
+    OR public.has_role(auth.uid(), 'admin')
+    OR author_id = auth.uid()
+    OR (deleted_at IS NULL AND EXISTS (SELECT 1 FROM public.observations o WHERE o.id = observation_id AND o.hidden = false))
+  );
