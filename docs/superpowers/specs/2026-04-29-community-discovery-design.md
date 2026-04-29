@@ -256,21 +256,21 @@ New Edge Function `supabase/functions/recompute-user-stats/index.ts`. Deno, depl
 
 ### Schedule
 
-Nightly at 03:30 UTC (after `recompute-streaks` at 03:00 to avoid contention with the streak cron's `users` writes).
+Nightly at 08:00 UTC, slotted after the existing `streaks-nightly` (07:00 UTC) and `badges-nightly` (07:30 UTC) cluster in `docs/specs/infra/cron-schedules.sql`. The 30-minute gap after badges-nightly is enough headroom; the recompute job is read-mostly with one bulk UPDATE so contention with badges (which writes user_badges) is minimal even if badges runs long.
+
+The schedule registration goes into `docs/specs/infra/cron-schedules.sql` alongside the existing entries, in the same `DO $$ ... v_base := … $$` block. Match the existing cron pattern verbatim — `recompute-user-stats` is deployed `--no-verify-jwt` (cron-only, not user-facing), so no Authorization header is needed and no Bearer token / vault read is involved.
 
 ```sql
-SELECT cron.unschedule('recompute-user-stats');
-SELECT cron.schedule(
-  'recompute-user-stats',
-  '30 3 * * *',
-  $$
-    SELECT net.http_post(
-      url := current_setting('app.settings.functions_base_url') || '/recompute-user-stats',
-      headers := jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.settings.cron_token')),
-      timeout_milliseconds := 90000
-    );
-  $$
-);
+PERFORM cron.unschedule('recompute-user-stats')
+  FROM cron.job WHERE jobname = 'recompute-user-stats';
+
+PERFORM cron.schedule('recompute-user-stats', '0 8 * * *', format($body$
+  SELECT net.http_post(
+    url     := %L,
+    headers := '{"Content-Type":"application/json"}'::jsonb,
+    body    := '{}'::jsonb
+  );
+$body$, v_base || '/recompute-user-stats'));
 ```
 
 ### Function logic

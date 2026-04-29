@@ -165,11 +165,17 @@ CREATE INDEX IF NOT EXISTS idx_media_files_active
 ### Material edit detection (trigger)
 
 ```sql
--- Composes with sync_primary_id_trigger (also BEFORE UPDATE on observations).
--- The sync trigger *writes* primary_taxon_id from the identifications table;
--- this trigger *reads* (compares NEW.primary_taxon_id vs OLD) to decide
--- whether to flag the row as materially edited. Different responsibilities,
--- no column-write contention, alphabetical trigger ordering is irrelevant.
+-- Composition with sync_primary_id_trigger (the AFTER INSERT/UPDATE trigger
+-- on the *identifications* table that cascades primary-ID changes into
+-- observations.primary_taxon_id):
+--   1. owner switches primary identification on identifications row
+--   2. sync_primary_id_trigger fires AFTER, runs UPDATE on observations
+--      setting primary_taxon_id to the new taxon
+--   3. that UPDATE on observations fires this BEFORE UPDATE trigger
+--   4. NEW.primary_taxon_id IS DISTINCT FROM OLD.primary_taxon_id
+--      → is_material := true → last_material_edit_at := now()
+-- The two triggers operate on different tables, so there is no ordering
+-- ambiguity at all. They compose in the conventional cascading style.
 CREATE OR REPLACE FUNCTION public.observations_material_edit_check()
 RETURNS trigger AS $$
 DECLARE
@@ -211,7 +217,7 @@ CREATE TRIGGER observations_material_edit_check_trg
   EXECUTE FUNCTION public.observations_material_edit_check();
 ```
 
-The trigger fires `BEFORE UPDATE` and only mutates `last_material_edit_at` on `NEW`. It composes safely with the existing `sync_primary_id_trigger` (which propagates primary-identification changes into `observations.primary_taxon_id`): when an owner changes the primary ID, the sync trigger updates `primary_taxon_id`, this trigger then fires on the same UPDATE row and sees `NEW.primary_taxon_id IS DISTINCT FROM OLD.primary_taxon_id`. Trigger ordering is alphabetical by name in Postgres; `observations_material_edit_check_trg` sorts after any `sync_primary_…` name, but trigger ordering only matters when both triggers mutate the same column — they don't here, so the apparent ordering is irrelevant.
+The trigger fires `BEFORE UPDATE` on `observations` and only mutates `last_material_edit_at` on `NEW`. It composes with the existing `sync_primary_id_trigger`, which lives on the *`identifications`* table (not `observations`) and fires `AFTER INSERT OR UPDATE OF is_primary, taxon_id`. The composition is purely cascading: a primary-identification change on `identifications` → `sync_primary_id_trigger` AFTER fires → it issues an UPDATE on `observations` setting `primary_taxon_id` → that UPDATE fires this BEFORE UPDATE trigger on `observations` → it observes `NEW.primary_taxon_id IS DISTINCT FROM OLD.primary_taxon_id` and stamps `last_material_edit_at`. The two triggers run on different tables, so there is no ordering or column-contention concern.
 
 Photo material-edits — adding/removing photos — are detected in application code at the `media_files` insert/soft-delete site, which then issues `UPDATE observations SET last_material_edit_at = now() WHERE id = $1`. This UPDATE will pass through the trigger above; none of the watched columns (`location`, `observed_at`, `primary_taxon_id`) change, so the trigger is a no-op for that pass.
 
@@ -269,7 +275,11 @@ Before issuing the soft-delete, the client checks:
 
 ```ts
 const willLeaveZeroPhotos = photos.filter(p => p.id !== id && !p.deleted_at).length === 0;
-const isCascadePhoto = primaryIdentification?.source_photo_id === id;
+// media_files.is_primary marks the cover/lead photo for the observation;
+// it is the column the AI cascade and the public viewer key off. Removing
+// it without a replacement leaves the obs in a needs-review state.
+const photoToDelete = photos.find(p => p.id === id);
+const isCascadePhoto = photoToDelete?.is_primary === true;
 const willDemote = willLeaveZeroPhotos || isCascadePhoto;
 ```
 
@@ -278,8 +288,15 @@ If `willDemote`, render confirm: *"This photo was the basis for the current iden
 On confirm, after the soft-delete UPDATE succeeds, the client (or — preferably — a `delete-photo` Edge Function for atomicity):
 
 ```sql
+-- The identifications table has no `verified` column; community validation
+-- is tracked by validated_at/validated_by, and research-grade status by
+-- is_research_grade. Demoting clears all three so the consensus view drops
+-- the row from is_research_grade joins and the UI's "needs review" pill
+-- can read either flag.
 UPDATE public.identifications
-   SET verified = false
+   SET validated_by      = NULL,
+       validated_at      = NULL,
+       is_research_grade = false
  WHERE observation_id = $obs_id AND is_primary = true;
 
 UPDATE public.observations
