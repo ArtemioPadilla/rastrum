@@ -1,0 +1,180 @@
+---
+import { t } from '../i18n/utils';
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+---
+
+<section class="max-w-4xl mx-auto p-6 space-y-10">
+  <header>
+    <h1 class="text-2xl md:text-3xl font-bold text-zinc-900 dark:text-zinc-100">
+      {tr.sponsoring.page_title}
+    </h1>
+    <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{tr.sponsoring.page_subtitle}</p>
+  </header>
+
+  <!-- Section A: Credentials -->
+  <section id="creds-section" data-empty-msg={tr.sponsoring.credentials_empty} class="space-y-4">
+    <h2 class="text-lg font-semibold">{tr.sponsoring.credentials_section}</h2>
+    <button id="add-cred-btn" type="button"
+      class="rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white px-4 py-2 text-sm font-medium">
+      {tr.sponsoring.add_credential}
+    </button>
+    <ul id="creds-list" class="divide-y divide-zinc-200 dark:divide-zinc-800"></ul>
+  </section>
+
+  <!-- Section B: Beneficiaries -->
+  <section id="bens-section" data-empty-msg={tr.sponsoring.beneficiaries_empty} class="space-y-4">
+    <h2 class="text-lg font-semibold">{tr.sponsoring.beneficiaries_section}</h2>
+    <button id="add-ben-btn" type="button"
+      class="rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white px-4 py-2 text-sm font-medium">
+      {tr.sponsoring.add_beneficiary}
+    </button>
+    <table class="min-w-full text-sm">
+      <thead>
+        <tr class="text-left text-zinc-500">
+          <th class="py-2 pr-4">{tr.sponsoring.beneficiary_username}</th>
+          <th class="py-2 pr-4">{tr.sponsoring.monthly_cap}</th>
+          <th class="py-2 pr-4">{tr.sponsoring.priority}</th>
+          <th class="py-2 pr-4">Status</th>
+          <th class="py-2"></th>
+        </tr>
+      </thead>
+      <tbody id="bens-tbody"></tbody>
+    </table>
+  </section>
+
+  <!-- Section C: Analytics -->
+  <section class="space-y-4">
+    <h2 class="text-lg font-semibold">{tr.sponsoring.analytics_section}</h2>
+    <div id="analytics-content" class="space-y-2 text-sm text-zinc-600 dark:text-zinc-400">
+      <p>—</p>
+    </div>
+  </section>
+</section>
+
+<script>
+  import {
+    listCredentials, createCredential, rotateCredential, deleteCredential,
+    listSponsorships, createSponsorship, unpauseSponsorship, revokeSponsorship,
+  } from '../lib/sponsorships';
+
+  function fmtDate(s: string | null): string {
+    if (!s) return '';
+    const d = new Date(s);
+    return d.toLocaleDateString();
+  }
+
+  async function refreshCreds() {
+    const credsList = document.getElementById('creds-list');
+    const credsSection = document.getElementById('creds-section');
+    if (!credsList || !credsSection) return;
+    let creds: Awaited<ReturnType<typeof listCredentials>> = [];
+    try { creds = await listCredentials(); } catch { /* not authed or fn unavailable */ }
+    credsList.innerHTML = '';
+    if (creds.length === 0) {
+      const emptyMsg = (credsSection as HTMLElement).dataset.emptyMsg ?? '';
+      credsList.innerHTML = `<li class="py-3 text-sm text-zinc-500">${emptyMsg}</li>`;
+      return;
+    }
+    for (const c of creds) {
+      const li = document.createElement('li');
+      li.className = 'py-3 flex items-center justify-between';
+      const validated = c.validated_at ? `validated ${fmtDate(c.validated_at)}` : 'never validated';
+      li.innerHTML = `
+        <div>
+          <div class="font-medium">${c.label} <span class="text-xs text-zinc-500">(${c.kind})</span></div>
+          <div class="text-xs text-zinc-500">${validated}</div>
+        </div>
+        <div class="flex gap-2">
+          <button data-rotate="${c.id}" class="text-sm text-emerald-700 hover:text-emerald-900">Rotate</button>
+          <button data-revoke="${c.id}" class="text-sm text-red-600 hover:text-red-800">Revoke</button>
+        </div>`;
+      credsList.appendChild(li);
+    }
+  }
+
+  document.getElementById('add-cred-btn')?.addEventListener('click', async () => {
+    const label  = prompt('Label?');
+    if (!label) return;
+    const secret = prompt('Anthropic secret (sk-ant-api03-… or sk-ant-oat01-…)?');
+    if (!secret) return;
+    try {
+      await createCredential({ label, secret });
+      await refreshCreds();
+    } catch (e) { alert(`Error: ${(e as Error).message}`); }
+  });
+
+  document.getElementById('creds-list')?.addEventListener('click', async (e) => {
+    const target = e.target as HTMLElement;
+    if (target.dataset.rotate) {
+      const newSecret = prompt('New secret?');
+      if (newSecret) {
+        try { await rotateCredential(target.dataset.rotate, newSecret); await refreshCreds(); }
+        catch (err) { alert(`Error: ${(err as Error).message}`); }
+      }
+    } else if (target.dataset.revoke) {
+      if (confirm('Revoke this credential? Sponsorships using it will be paused.')) {
+        await deleteCredential(target.dataset.revoke);
+        await refreshCreds();
+        await refreshBens();
+      }
+    }
+  });
+
+  async function refreshBens() {
+    const tbody = document.getElementById('bens-tbody');
+    if (!tbody) return;
+    let bens: Awaited<ReturnType<typeof listSponsorships>> = [];
+    try { bens = await listSponsorships('sponsor'); } catch { /* silent */ }
+    tbody.innerHTML = '';
+    for (const b of bens) {
+      const row = document.createElement('tr');
+      row.className = 'border-t border-zinc-200 dark:border-zinc-800';
+      const statusColor = b.status === 'active' ? 'text-emerald-600' :
+                          b.status === 'paused' ? 'text-amber-600' : 'text-zinc-500';
+      const pausedExtra = b.paused_reason ? ` (${b.paused_reason})` : '';
+      const unpauseBtn = b.status === 'paused'
+        ? `<button data-unpause="${b.id}" class="text-sm text-emerald-700">Reactivate</button>`
+        : '';
+      row.innerHTML = `
+        <td class="py-2 pr-4">${b.beneficiary_id.slice(0, 8)}…</td>
+        <td class="py-2 pr-4">${b.monthly_call_cap}</td>
+        <td class="py-2 pr-4">${b.priority}</td>
+        <td class="py-2 pr-4"><span class="${statusColor}">${b.status}${pausedExtra}</span></td>
+        <td class="py-2">
+          ${unpauseBtn}
+          <button data-revoke-spons="${b.id}" class="text-sm text-red-600 ml-2">Revoke</button>
+        </td>`;
+      tbody.appendChild(row);
+    }
+  }
+
+  document.getElementById('add-ben-btn')?.addEventListener('click', async () => {
+    const username = prompt('Beneficiary username?');
+    if (!username) return;
+    let creds: Awaited<ReturnType<typeof listCredentials>> = [];
+    try { creds = await listCredentials(); } catch { alert('Could not load credentials.'); return; }
+    if (creds.length === 0) { alert('Add a credential first.'); return; }
+    const credential_id = creds[0].id;
+    const cap = parseInt(prompt('Monthly cap?', '200') ?? '200', 10);
+    try {
+      await createSponsorship({ beneficiary_username: username, credential_id, monthly_call_cap: cap });
+      await refreshBens();
+    } catch (e) { alert(`Error: ${(e as Error).message}`); }
+  });
+
+  document.getElementById('bens-tbody')?.addEventListener('click', async (e) => {
+    const target = e.target as HTMLElement;
+    if (target.dataset.unpause) {
+      const r = await unpauseSponsorship(target.dataset.unpause);
+      if (r.error === 'three_strike') alert('Three-strike: revoke and recreate.');
+      await refreshBens();
+    } else if (target.dataset.revokeSpons) {
+      if (confirm('Revoke?')) { await revokeSponsorship(target.dataset.revokeSpons); await refreshBens(); }
+    }
+  });
+
+  refreshCreds();
+  refreshBens();
+</script>
