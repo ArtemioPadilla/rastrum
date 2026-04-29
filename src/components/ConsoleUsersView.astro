@@ -51,7 +51,7 @@ const tr = t(lang);
 
       <div>
         <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-2">{tr.console.users_activity_heading}</h3>
-        <dl id="detail-activity" class="grid grid-cols-2 gap-2 text-sm text-zinc-700 dark:text-zinc-300"></dl>
+        <dl id="detail-activity" data-failed-msg={tr.console.users_activity_failed} class="grid grid-cols-2 gap-2 text-sm text-zinc-700 dark:text-zinc-300"></dl>
       </div>
     </div>
   </div>
@@ -228,18 +228,27 @@ const tr = t(lang);
     const dl = document.getElementById('detail-activity')!;
     dl.innerHTML = '<dt class="text-zinc-500 col-span-2 text-xs italic">Loading…</dt>';
 
-    const [obsResult, rgResult] = await Promise.all([
-      supabase.from('observations').select('id', { count: 'exact', head: true }).eq('observer_id', userId),
-      supabase.from('identifications').select('id', { count: 'exact', head: true }).eq('identifier_id', userId).eq('quality_grade', 'research'),
-    ]);
+    try {
+      const [obsResult, rgResult] = await Promise.all([
+        supabase.from('observations').select('id', { count: 'exact', head: true }).eq('observer_id', userId),
+        supabase.from('identifications').select('id', { count: 'exact', head: true }).eq('identifier_id', userId).eq('quality_grade', 'research'),
+      ]);
 
-    const obsCount = obsResult.count ?? 0;
-    const rgCount = rgResult.count ?? 0;
+      if (obsResult.error) throw obsResult.error;
+      if (rgResult.error) throw rgResult.error;
 
-    dl.innerHTML = `
-      <dt class="text-zinc-500">Observations</dt><dd class="font-medium">${obsCount}</dd>
-      <dt class="text-zinc-500">Research grade</dt><dd class="font-medium">${rgCount}</dd>
-    `;
+      const obsCount = obsResult.count ?? 0;
+      const rgCount = rgResult.count ?? 0;
+
+      dl.innerHTML = `
+        <dt class="text-zinc-500">Observations</dt><dd class="font-medium">${obsCount}</dd>
+        <dt class="text-zinc-500">Research grade</dt><dd class="font-medium">${rgCount}</dd>
+      `;
+    } catch (err) {
+      console.warn('console: loadActivity failed', err);
+      const msg = dl.dataset.failedMsg ?? 'Could not load activity stats.';
+      dl.innerHTML = `<dt class="text-zinc-500 col-span-2 text-sm">${msg}</dt>`;
+    }
   }
 
   document.addEventListener('click', (ev) => {
