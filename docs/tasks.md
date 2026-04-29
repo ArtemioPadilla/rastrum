@@ -19,6 +19,7 @@
 | v1.0.x | Post-launch polish | in_progress | 8 / 24 |
 | v1.1 | UX polish (post-launch brainstorm) | shipped (mostly) | 19 / 21 |
 | v1.2 | Profile privacy & public profile | shipped 2026-04-28 | 3 / 3 |
+| v1.3 | Module 27: AI Sponsorships | shipped 2026-04-28 | 1 / 1 |
 | **v0.1 → v1.0** | **Public launch** | **shipped 2026-04-26** | **54 / 59** |
 
 Phases v1.5, v2.0, v2.5 are tracked in [`progress.json`](progress.json) but have no shipped code yet — they are planned scope only.
@@ -125,6 +126,15 @@ Remaining:
 ### Bundled review follow-ups still planned
 
 - `m26-v1-1-review-followups` — Six small polish items flagged by ArtemIO/Nyx on PR #100 + #101 reviews: `?u=` alias documentation, `document.title` → i18n key, runVisitor error-vs-not-found split, `ConfirmDialog` component to replace `confirm()`/`alert()` in the Block flow (matches `ReportDialog` pattern), extract overflow-menu logic into `lib/overflow-menu.ts` (currently duplicated 3× across `PublicProfileViewV2`, `ExploreRecentView`, `Comments`), and `fave_count` data-attr naming standardization across feed views. All non-blocking; deferred for a deliberate v1.2 polish sweep. _(· planned)_
+- `social-graph-m26-v11` — Follow-ups: ReactionStrip count overlay on feed cards (needs an aggregate RPC to avoid N+1), Block/Report on observation cards + comments, "Block this user" affordance on profile cards in lists, additional ARIA refinements. _(· planned)_
+- `deploy-functions-resilience` — Pin esm.sh imports to versioned URLs across `supabase/functions/*/index.ts` so a transient esm.sh 522 doesn't permanently park the auto-deploy. Surfaced when PR #66's auto-deploy 522'd on a Cloudflare hiccup. _(· planned)_
+- `visitor-pokedex-route` — Public `/u/<handle>/dex/` page so the Pokédex link on PublicProfileViewV2 doesn't have to be hidden for non-owners (PR #68 currently hides it as a workaround). _(· planned)_
+
+## v1.3 — Module 27: AI Sponsorships — shipped 2026-04-28
+
+**1 item done.** Shipped via PRs #78 (core), #84 (UX polish — 9 gaps), #94 (cobertura completa — stubs activados, request flow, docs page).
+
+- `ai-sponsorships` — Permite a cualquier user compartir su credencial Anthropic (API key u OAuth long-lived token) con beneficiaries específicos. Cuota mensual por llamadas, auto-pause por rate-limit, karma híbrido, y removal del operator-key fallback en `identify`. Entregado: schema (5 tablas + RLS + Vault) + cron jobs + audit log; Edge Functions `sponsorships` (CRUD + heartbeat) e `identify` modificado; UI en `/profile/sponsoring/`, `/profile/sponsored-by/`, banner en `/identify`, discovery card, header dropdown, mobile drawer entries, badge de sponsor + recíproco en perfil público; Resend SMTP para threshold (80%/100%) + auto-pause emails; request-to-be-sponsored flow (5 endpoints + dialogs ambos lados); onboarding tour first-visit + replay; página `/docs/sponsorships` (EN+ES); time range selector 7/30/90 en analytics; report abuse button por beneficiary; CI guards (smoke + secret-leak). **Operator action única:** `gh secret set SPONSORSHIPS_CRON_TOKEN` (hecho). **Operator action opcional:** `gh secret delete ANTHROPIC_API_KEY` (no urgente; identify ya no la lee). _(✓ done)_
 
 ### v1.2 in-flight (2026-04-29) — Module 28 + observation-detail redesign
 
@@ -139,9 +149,9 @@ specs at `docs/superpowers/specs/2026-04-29-*-design.md`.
   gate at the SQL layer via dual views: `community_observers` (anon-safe, no
   centroid) and `community_observers_with_centroid` (authenticated only). Country
   picker + `hide_from_leaderboards` opt-out + `country_code_source` 'auto'/'user'
-  badge on Profile → Edit. PR1 (#92) + PR2 (#96) merged. PR4 (#102) in review.
-  PR5+PR6 (page + MegaMenu + atomic i18n rewrite of the two shipped "no
-  leaderboards" strings) remaining. _(in implementation — see
+  badge on Profile → Edit. PR1 (#92) + PR2 (#96) + PR4 (#102) merged. PR3 manual
+  cron fire pending. PR5+PR6 (page + MegaMenu + atomic i18n rewrite of the two
+  shipped "no leaderboards" strings) remaining. _(in implementation — see
   `docs/runbooks/community-discovery.md`)_
 
 - `obs-detail-redesign` — Rebuilds `/share/obs/?id=...` as two-column desktop /
@@ -149,7 +159,7 @@ specs at `docs/superpowers/specs/2026-04-29-*-design.md`.
   `ObservationForm.astro`. PR2 (#98) added schema deltas
   (`last_material_edit_at` + `media_files.deleted_at` +
   `observations_material_edit_check_trg` material-edit trigger),
-  `observation-enums.ts`, and `obs_detail.*` i18n. PR3 (#103) ships
+  `observation-enums.ts`, and `obs_detail.*` i18n. PR3 (#103) shipped
   `PhotoGallery.astro` (native lightbox + keyboard + swipe + share) plus the new
   two-column layout. PR4 (Details tab), PR5 (Location tab — coordinate edit), PR6
   (Photos tab + atomic `delete-photo` Edge Function) remaining. Soft-delete only

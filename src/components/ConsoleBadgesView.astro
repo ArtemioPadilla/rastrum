@@ -76,15 +76,49 @@ const tr = t(lang);
         <div id="badges-detail-holders" class="text-sm text-zinc-700 dark:text-zinc-300"></div>
       </div>
 
-      <div class="pt-2 border-t border-zinc-100 dark:border-zinc-800">
+      <div class="pt-2 border-t border-zinc-100 dark:border-zinc-800 flex gap-2 flex-wrap">
         <button
-          disabled
+          id="badges-btn-award"
           title={tr.console.badges_award_coming}
-          class="opacity-40 cursor-not-allowed inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-emerald-600 text-white text-sm font-medium"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition-colors"
         >
           {tr.console.badges_award_btn}
         </button>
-        <span class="ml-2 text-xs text-zinc-400">{tr.console.badges_award_coming}</span>
+        <button
+          id="badges-btn-revoke"
+          title={tr.console.badges_revoke_btn}
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-red-600 hover:bg-red-700 text-white text-sm font-medium transition-colors"
+        >
+          {tr.console.badges_revoke_btn}
+        </button>
+      </div>
+
+      <p id="badges-action-success" class="hidden text-sm text-emerald-600 dark:text-emerald-400 mt-2"></p>
+      <p id="badges-action-error" class="hidden text-sm text-red-600 dark:text-red-400 mt-2"></p>
+
+      <!-- Award slide-over form -->
+      <div id="badges-award-form" class="hidden mt-4 border-t border-zinc-100 dark:border-zinc-800 pt-4 space-y-3">
+        <h4 class="text-sm font-semibold text-zinc-800 dark:text-zinc-200">{tr.console.badges_award_slide_heading}</h4>
+        <div>
+          <label class="block text-xs text-zinc-500 mb-1">{tr.console.badges_award_user_label}</label>
+          <input id="badges-award-target-user" type="text" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+            class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm font-mono" />
+        </div>
+        <div>
+          <label class="block text-xs text-zinc-500 mb-1">{tr.console.badges_award_reason_label}</label>
+          <textarea id="badges-award-reason" rows="2" placeholder={tr.console.badges_award_reason_placeholder}
+            class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm resize-none"></textarea>
+        </div>
+        <div class="flex gap-2">
+          <button id="badges-award-submit"
+            class="inline-flex items-center px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-sm transition-colors">
+            {tr.console.badges_award_submit}
+          </button>
+          <button id="badges-award-cancel"
+            class="inline-flex items-center px-3 py-1.5 rounded border border-zinc-300 dark:border-zinc-700 text-sm text-zinc-600 dark:text-zinc-400">
+            {tr.console.cancel}
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -101,6 +135,7 @@ const tr = t(lang);
 <script>
   import { getSupabase } from '../lib/supabase';
   import { getUserRoles } from '../lib/user-roles';
+  import { adminClient } from '../lib/admin-client';
 
   type BadgeRow = {
     key: string;
@@ -140,6 +175,7 @@ const tr = t(lang);
   let allBadges: BadgeRow[] = [];
   let filtered: BadgeRow[] = [];
   let selectedKey: string | null = null;
+  let sessionToken: string | null = null;
 
   const supabase = getSupabase();
 
@@ -148,10 +184,12 @@ const tr = t(lang);
     if (!session?.user) { show('badges-not-auth'); return; }
     const myRoles = await getUserRoles(session.user.id);
     if (!myRoles.has('admin')) { show('badges-not-auth'); return; }
+    sessionToken = session.access_token;
     show('badges-shell');
     await loadBadges();
     renderChart();
     show('badges-chart');
+    wireActions();
   }
 
   async function loadBadges() {
@@ -285,6 +323,83 @@ const tr = t(lang);
   });
   document.getElementById('badges-filter-category')?.addEventListener('change', applyFilter);
   document.getElementById('badges-filter-tier')?.addEventListener('change', applyFilter);
+
+  function wireActions() {
+    function showActionMsg(msg: string, isError: boolean) {
+      const success = document.getElementById('badges-action-success')!;
+      const error = document.getElementById('badges-action-error')!;
+      if (isError) {
+        error.textContent = msg;
+        show('badges-action-error');
+        hide('badges-action-success');
+      } else {
+        success.textContent = msg;
+        show('badges-action-success');
+        hide('badges-action-error');
+      }
+    }
+
+    document.getElementById('badges-btn-award')?.addEventListener('click', () => {
+      const form = document.getElementById('badges-award-form')!;
+      if (form.classList.contains('hidden')) {
+        show('badges-award-form');
+      } else {
+        hide('badges-award-form');
+      }
+    });
+
+    document.getElementById('badges-award-cancel')?.addEventListener('click', () => {
+      hide('badges-award-form');
+    });
+
+    document.getElementById('badges-award-submit')?.addEventListener('click', async () => {
+      if (!selectedKey || !sessionToken) return;
+      const targetUserId = (document.getElementById('badges-award-target-user') as HTMLInputElement).value.trim();
+      const reason = (document.getElementById('badges-award-reason') as HTMLTextAreaElement).value.trim();
+      if (!targetUserId || reason.length < 5) {
+        showActionMsg('Please fill in target user ID and a reason (min 5 chars).', true);
+        return;
+      }
+      const btn = document.getElementById('badges-award-submit') as HTMLButtonElement;
+      btn.disabled = true;
+      try {
+        await adminClient.badge.awardManual(
+          { target_user_id: targetUserId, badge_key: selectedKey },
+          reason,
+          sessionToken,
+        );
+        showActionMsg('Badge awarded successfully.', false);
+        hide('badges-award-form');
+        await selectBadge(selectedKey);
+      } catch (err) {
+        showActionMsg('Failed to award badge: ' + (err as Error).message, true);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    document.getElementById('badges-btn-revoke')?.addEventListener('click', async () => {
+      if (!selectedKey || !sessionToken) return;
+      const targetUserId = (document.getElementById('badges-award-target-user') as HTMLInputElement).value.trim();
+      if (!targetUserId) {
+        showActionMsg('Enter the target user ID in the award form field to revoke.', true);
+        show('badges-award-form');
+        return;
+      }
+      if (!confirm('Revoke this badge from the specified user?')) return;
+      try {
+        await adminClient.badge.revoke(
+          { target_user_id: targetUserId, badge_key: selectedKey },
+          `Admin revoked badge '${selectedKey}' from user ${targetUserId} via console`,
+          sessionToken,
+        );
+        showActionMsg('Badge revoked successfully.', false);
+        await selectBadge(selectedKey);
+      } catch (err) {
+        showActionMsg('Failed to revoke badge: ' + (err as Error).message, true);
+      }
+    });
+  }
 
   init().catch(err => {
     const e = document.getElementById('badges-error')!;

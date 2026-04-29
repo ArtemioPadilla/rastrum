@@ -795,3 +795,31 @@ const estimateCost = (tokensIn: number, tokensOut: number) =>
 ```
 
 For `oauth_token` credentials, the UI displays "Covered by your Claude subscription" instead of a USD figure. No server-side persistence of cost data — pricing changes only require a frontend release.
+
+---
+
+## Implementation outcome (post-ship)
+
+The feature shipped via 3 PRs over ~24 hours:
+
+- **PR #78** — module 27 core (schema + RLS + Vault + Edge Functions + base UI + cron jobs).
+- **PR #84** — UX polish (9 gaps closed: analytics section implemented, beneficiary username resolution, self-sponsorship badge, friendly paused_reason mapping, credential picker dropdown, live preview of secret kind, confirm modals).
+- **PR #94** — complete coverage of the 8 items reported as "not exposed", "stubbed", or "out of spec":
+  - Reciprocal "Sponsored by @X" badge on beneficiary's public profile
+  - Report abuse button on beneficiary cards (uses existing `reports` table + `ReportDialog`)
+  - Public docs page at `/{en,es}/docs/sponsorships`
+  - Onboarding tour (first-visit + replay)
+  - Time range selector for analytics (7/30/90 days)
+  - Real Resend SMTP integration (threshold 80%/100% + auto-pause emails)
+  - Sponsorship request flow (`sponsorship_requests` table + 5 endpoints + UI both sides) — beneficiary can ask, sponsor approves/rejects/credential-picks; requester can withdraw
+
+### Decisions made during implementation (not in original design)
+
+1. **Module number changed from 20 to 27** to avoid collision with the existing `20-chat.md`. Plan doc filename retains the old number for git history reasons.
+2. **`app.cron_token` GUC abandoned in favor of Vault** — Supabase managed Postgres restricts `ALTER DATABASE … SET` to superuser. Cron token is now upserted to `vault.secrets` named `sponsorships_cron_token`; the heartbeat cron reads via `SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = '…' LIMIT 1`.
+3. **Self-sponsoring permitted** — the `CHECK (sponsor_id <> beneficiary_id)` was removed so the same UI manages personal usage. Karma triggers guard against rewarding self-flow.
+4. **GitGuardian false positives** — test fixtures use `'sk-ant-api03-' + 'TEST_FIXTURE_NOT_A_REAL_SECRET'` concat trick + `.gitguardian.yml` ignore list to prevent the secret-detector from flagging deliberately-fake test strings.
+
+### Email integration — now active
+
+`maybeNotifyThreshold` and `autoPauseSponsorship` use Resend SMTP via `_shared/email.ts`. Idempotency is enforced via `notifications_sent (sponsorship_id, threshold, year_month)`. Graceful degradation if `RESEND_API_KEY` is unset (logs to `console.warn`, doesn't throw).

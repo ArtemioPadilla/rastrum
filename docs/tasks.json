@@ -3646,6 +3646,41 @@
         {
           "label_en": "Rollout + remove server-side ANTHROPIC_API_KEY (operator action)",
           "label_es": "Rollout + remover ANTHROPIC_API_KEY del servidor (acción del operador)",
+          "status": "done"
+        },
+        {
+          "label_en": "M27 polish — 9 UX gaps (PR #84)",
+          "label_es": "Pulido M27 — 9 gaps UX (PR #84)",
+          "status": "done"
+        },
+        {
+          "label_en": "M27 complete coverage (PR #94)",
+          "label_es": "Cobertura completa M27 (PR #94)",
+          "status": "done"
+        },
+        {
+          "label_en": "Resend SMTP integration (active)",
+          "label_es": "Integración Resend SMTP (activa)",
+          "status": "done"
+        },
+        {
+          "label_en": "Sponsorship request flow",
+          "label_es": "Flujo de solicitudes de patrocinio",
+          "status": "done"
+        },
+        {
+          "label_en": "Public docs page /docs/sponsorships",
+          "label_es": "Página pública /docs/sponsorships",
+          "status": "done"
+        },
+        {
+          "label_en": "Onboarding tour + replay",
+          "label_es": "Tour de bienvenida + replay",
+          "status": "done"
+        },
+        {
+          "label_en": "Optional: delete ANTHROPIC_API_KEY env",
+          "label_es": "Opcional: borrar env ANTHROPIC_API_KEY",
           "status": "planned"
         }
       ]
@@ -3965,6 +4000,57 @@
         { "label_en": "E2E smoke for validation + expertise not-auth banners", "label_es": "E2E smoke para banners de no-auth en validación + experiencia", "status": "done" }
       ]
     },
+    "admin-overview-real-kpis": {
+      "phase": "v1.1",
+      "title_en": "Admin overview — real platform-state KPIs + alerts + recent activity",
+      "title_es": "Resumen admin — KPIs reales del estado de la plataforma + alertas + actividad reciente",
+      "modules": ["24-admin-console.md"],
+      "subtasks": [
+        { "label_en": "Real KPI cards (user count, obs count, sync failures, cron health)", "label_es": "Tarjetas KPI reales (usuarios, obs, fallos de sync, salud de cron)", "status": "done" },
+        { "label_en": "Alert panel (elevated sync failure rate, stale cron run)", "label_es": "Panel de alertas (tasa elevada de fallos, cron desactualizado)", "status": "done" },
+        { "label_en": "Recent activity feed from admin_audit", "label_es": "Feed de actividad reciente desde admin_audit", "status": "done" }
+      ]
+    },
+    "admin-console-pr7-remaining-admin": {
+      "phase": "v1.1",
+      "title_en": "Admin console PR7 — Badges + Taxa + Karma + Features + Bioblitz tabs",
+      "title_es": "Consola admin PR7 — Badges + Taxa + Karma + Funcionalidades + Bioblitz",
+      "modules": ["24-admin-console.md"],
+      "subtasks": [
+        { "label_en": "ConsoleBadgesView: list + detail + tier chart (stub write buttons)", "label_es": "ConsoleBadgesView: lista + detalle + gráfico de tiers (botones stub)", "status": "done" },
+        { "label_en": "ConsoleTaxaView: list + detail + rarity map (stub write buttons)", "label_es": "ConsoleTaxaView: lista + detalle + mapa de rareza (botones stub)", "status": "done" },
+        { "label_en": "ConsoleKarmaView: config table + rarity multipliers + recent events", "label_es": "ConsoleKarmaView: tabla de config + multiplicadores + eventos recientes", "status": "done" },
+        { "label_en": "ConsoleFeatureFlagsView: flag grid grouped by category (stub toggles)", "label_es": "ConsoleFeatureFlagsView: grilla de flags por categoría (toggles stub)", "status": "done" },
+        { "label_en": "ConsoleBioblitzView: stub with upcoming feature notice", "label_es": "ConsoleBioblitzView: stub con aviso de funcionalidad próxima", "status": "done" },
+        { "label_en": "karma_events admin RLS fix (PR #88)", "label_es": "Fix de RLS admin en karma_events (PR #88)", "status": "done" }
+      ]
+    },
+    "admin-console-pr8-hardening": {
+      "phase": "v1.1",
+      "title_en": "Admin console PR8 — CORS tighten + rate limit + pgTAP RLS suite + 5 write handlers + DB-backed config",
+      "title_es": "Consola admin PR8 — CORS estricto + rate limit + pgTAP RLS + 5 handlers + config en DB",
+      "modules": ["24-admin-console.md"],
+      "subtasks": [
+        { "label_en": "CORS: restrict Access-Control-Allow-Origin to rastrum.org + localhost dev/preview ports", "label_es": "CORS: restringir Access-Control-Allow-Origin a rastrum.org + puertos dev/preview localhost", "status": "done" },
+        { "label_en": "Token-bucket rate limiter (30 req/min/actor, cost 3 for writes) — in-memory per isolate", "label_es": "Rate limiter token-bucket (30 req/min/actor, costo 3 para escrituras) — en memoria por isolate", "status": "done" },
+        { "label_en": "tests/pgtap/rls.sql — 24 TAP assertions covering has_role + 6 table RLS policies", "label_es": "tests/pgtap/rls.sql — 24 aserciones TAP cubriendo has_role + 6 políticas RLS de tabla", "status": "done" },
+        { "label_en": "db-validate.yml: install pgTAP + run RLS suite step", "label_es": "db-validate.yml: instalar pgTAP + paso de ejecución de suite RLS", "status": "done" },
+        { "label_en": "badge.award_manual handler — upsert user_badges + audit row", "label_es": "Handler badge.award_manual — upsert user_badges + fila de auditoría", "status": "done" },
+        { "label_en": "badge.revoke handler — delete user_badges + audit row", "label_es": "Handler badge.revoke — borrar user_badges + fila de auditoría", "status": "done" },
+        { "label_en": "taxon.recompute_rarity handler — call refresh_taxon_rarity() RPC", "label_es": "Handler taxon.recompute_rarity — llamar RPC refresh_taxon_rarity()", "status": "done" },
+        { "label_en": "taxon.toggle_conservation handler — update nom059_status/cites_appendix/iucn_category with taxon_conservation_set audit op", "label_es": "Handler taxon.toggle_conservation — actualizar nom059_status/cites_appendix/iucn_category con audit op taxon_conservation_set", "status": "done" },
+        { "label_en": "feature_flag.toggle handler — update app_feature_flags.value + updated_by", "label_es": "Handler feature_flag.toggle — actualizar app_feature_flags.value + updated_by", "status": "done" },
+        { "label_en": "app_feature_flags table + RLS policies + seed from FEATURE_FLAGS", "label_es": "Tabla app_feature_flags + políticas RLS + seed desde FEATURE_FLAGS", "status": "done" },
+        { "label_en": "karma_config + karma_rarity_multipliers tables + RLS policies + seed from TS modules", "label_es": "Tablas karma_config + karma_rarity_multipliers + políticas RLS + seed desde módulos TS", "status": "done" },
+        { "label_en": "ConsoleFeatureFlagsView: DB-backed reads + live toggle wired to adminClient.featureFlag.toggle", "label_es": "ConsoleFeatureFlagsView: lecturas desde DB + toggle en vivo usando adminClient.featureFlag.toggle", "status": "done" },
+        { "label_en": "ConsoleBadgesView: Award + Revoke buttons live with slide-over forms", "label_es": "ConsoleBadgesView: botones Award + Revoke activos con formularios deslizantes", "status": "done" },
+        { "label_en": "ConsoleTaxaView: Recompute Rarity + Toggle Conservation buttons live", "label_es": "ConsoleTaxaView: botones Recompute Rarity + Toggle Conservation activos", "status": "done" },
+        { "label_en": "ConsoleKarmaView: DB-backed reads (karma_config + karma_rarity_multipliers)", "label_es": "ConsoleKarmaView: lecturas desde DB (karma_config + karma_rarity_multipliers)", "status": "done" },
+        { "label_en": "adminClient SDK: badge.{awardManual,revoke} + taxon.{recomputeRarity,toggleConservation} + featureFlag.toggle", "label_es": "SDK adminClient: badge.{awardManual,revoke} + taxon.{recomputeRarity,toggleConservation} + featureFlag.toggle", "status": "done" },
+        { "label_en": "4 new unit tests for badge + featureFlag SDK methods", "label_es": "4 nuevas pruebas unitarias para métodos SDK de badge + featureFlag", "status": "done" },
+        { "label_en": "Doc sync: progress.json + tasks.json + module 24 + admin-ops.md + CLAUDE.md", "label_es": "Sincronización de docs: progress.json + tasks.json + módulo 24 + admin-ops.md + CLAUDE.md", "status": "todo" }
+      ]
+    },
     "social-graph-m26": {
       "phase": "v1.2",
       "title_en": "Social graph + reactions (Module 26)",
@@ -4103,7 +4189,7 @@
         { "label_en": "PR1 — schema deltas: 6 new users columns + 7 partial indexes scoped to (NOT hide_from_leaderboards AND profile_public) + iso_countries reference table + 28-country bilingual seed + normalize_country_code() + dual views (community_observers anon-safe / community_observers_with_centroid auth-only)", "label_es": "PR1 — deltas de schema: 6 columnas nuevas en users + 7 índices parciales filtrados a (NOT hide_from_leaderboards AND profile_public) + tabla iso_countries + seed bilingüe de 28 países + normalize_country_code() + vistas duales", "status": "done", "pr": 92 },
         { "label_en": "PR2 — recompute-user-stats Edge Function + nightly cron at 08:00 UTC + SECURITY DEFINER recompute_user_stats() wrapper", "label_es": "PR2 — Edge Function recompute-user-stats + cron nocturno 08:00 UTC + wrapper recompute_user_stats() SECURITY DEFINER", "status": "done", "pr": 96 },
         { "label_en": "PR3 — manual operator action: fire recompute-user-stats once to backfill counters/centroids before any opt-in surface goes live (not a code PR)", "label_es": "PR3 — acción manual del operador: disparar recompute-user-stats una vez para llenar contadores/centroides antes de la superficie opt-in (no es un PR)", "status": "planned" },
-        { "label_en": "PR4 — Profile → Edit: country picker + 'Show me in community discovery' toggle (UI-true → DB-false hide_from_leaderboards) + country_code_source 'auto'/'user' for the 'inferred from your region' badge + buildCommunityDiscoveryPayload() pure helper + 9 unit tests", "label_es": "PR4 — Perfil → Editar: selector de país + toggle 'Mostrarme en descubrimiento comunitario' (UI-true → DB-false hide_from_leaderboards) + country_code_source 'auto'/'user' para badge 'inferido por tu región' + helper puro buildCommunityDiscoveryPayload() + 9 tests unitarios", "status": "in_progress", "pr": 102 },
+        { "label_en": "PR4 — Profile → Edit: country picker + 'Show me in community discovery' toggle (UI-true → DB-false hide_from_leaderboards) + country_code_source 'auto'/'user' for the 'inferred from your region' badge + buildCommunityDiscoveryPayload() pure helper + 9 unit tests", "label_es": "PR4 — Perfil → Editar: selector de país + toggle 'Mostrarme en descubrimiento comunitario' (UI-true → DB-false hide_from_leaderboards) + country_code_source 'auto'/'user' para badge 'inferido por tu región' + helper puro buildCommunityDiscoveryPayload() + 9 tests unitarios", "status": "done", "pr": 102 },
         { "label_en": "PR5 — /community/observers/ page (CSR) with composable filter chips (sort, country, taxon, experts-only, nearby) + sign-in gate on Nearby + URL-state serializer + Vitest + Playwright e2e", "label_es": "PR5 — página /community/observers/ (CSR) con chips componibles + sign-in en Nearby + serializador de estado URL + Vitest + Playwright e2e", "status": "planned" },
         { "label_en": "PR6 — atomic landing: MegaMenu split (Biodiversity / Community columns) + MobileDrawer subheading + i18n rewrite of the two shipped 'no leaderboards' strings + roadmap entry + module spec status flip to 'shipped'", "label_es": "PR6 — aterrizaje atómico: split del MegaMenu + subheading en MobileDrawer + reescritura i18n de los dos strings 'no leaderboards' en producción + roadmap + flip del módulo a 'shipped'", "status": "planned" }
       ]
@@ -4116,7 +4202,7 @@
       "subtasks": [
         { "label_en": "PR1 — extract reusable MapPicker.astro from ObservationForm. Per-instance HTML IDs (-${pickerId} suffix). Native modal a11y preserved. Playwright regression test for the observe-form flow", "label_es": "PR1 — extraer MapPicker.astro reutilizable de ObservationForm. IDs HTML por instancia (sufijo -${pickerId}). A11y del modal nativo preservada. Regresión Playwright para el flujo del observe form", "status": "done", "pr": 91 },
         { "label_en": "PR2 — schema: observations.last_material_edit_at + media_files.deleted_at + idx_media_files_active + observations_material_edit_check_trg trigger (location > 1 km, observed_at > 24 h, primary_taxon_id change). Extract observation-enums.ts + obs_detail.* i18n namespace EN+ES", "label_es": "PR2 — schema: observations.last_material_edit_at + media_files.deleted_at + idx_media_files_active + trigger observations_material_edit_check_trg. Extraer observation-enums.ts + namespace i18n obs_detail.* EN+ES", "status": "done", "pr": 98 },
-        { "label_en": "PR3 — PhotoGallery.astro (native lightbox + keyboard + swipe + canShare probe + dynamic 'Photo N of M' aria-labels) + ShareObsView.astro extraction to two-column desktop / stacked mobile + share/obs/index.astro slimmed to ~15 LOC + coords readout + 'Edited after IDs' badge + Playwright e2e (5 cases) + ShareObsView ternary strings migrated to obs_detail.view.*", "label_es": "PR3 — PhotoGallery.astro (lightbox nativo + teclado + swipe + probe canShare + aria-labels dinámicos 'Foto N de M') + extracción de ShareObsView.astro a layout dos columnas / apilado móvil + share/obs/index.astro adelgazado + lectura de coordenadas + badge 'Editado tras IDs' + Playwright e2e (5 casos) + strings ternarios de ShareObsView migrados a obs_detail.view.*", "status": "in_progress", "pr": 103 },
+        { "label_en": "PR3 — PhotoGallery.astro (native lightbox + keyboard + swipe + canShare probe + dynamic 'Photo N of M' aria-labels) + ShareObsView.astro extraction to two-column desktop / stacked mobile + share/obs/index.astro slimmed to ~15 LOC + coords readout + 'Edited after IDs' badge + Playwright e2e (5 cases) + ShareObsView ternary strings migrated to obs_detail.view.*", "label_es": "PR3 — PhotoGallery.astro (lightbox nativo + teclado + swipe + probe canShare + aria-labels dinámicos 'Foto N de M') + extracción de ShareObsView.astro a layout dos columnas / apilado móvil + share/obs/index.astro adelgazado + lectura de coordenadas + badge 'Editado tras IDs' + Playwright e2e (5 casos) + strings ternarios de ShareObsView migrados a obs_detail.view.*", "status": "done", "pr": 103 },
         { "label_en": "PR4 — ObsManagePanel.astro Details tab: editable date/time + habitat + weather + establishment_means + scientific-name override + notes + obscure-level. Material-edit trigger fires automatically on save", "label_es": "PR4 — ObsManagePanel.astro tab Detalles: edición de fecha/hora + hábitat + clima + establishment_means + override científico + notas + obscure-level. Trigger material-edit dispara al guardar", "status": "planned" },
         { "label_en": "PR5 — ObsManagePanel.astro Location tab: drop-in MapPicker mode='edit' modal for coordinate edit; saves location + recomputes obscure_level via existing trigger", "label_es": "PR5 — ObsManagePanel.astro tab Ubicación: modal MapPicker mode='edit' para editar coordenadas; guarda location + recomputa obscure_level via trigger existente", "status": "planned" },
         { "label_en": "PR6 — Photos tab + delete-photo Edge Function (atomic transaction: media_files.deleted_at + identifications demote 'needs review' clearing validated_by/validated_at + is_research_grade + observations.last_material_edit_at). Photo add via R2 upload flow. Cascade-photo deletion confirm dialog", "label_es": "PR6 — Tab Fotos + Edge Function delete-photo (transacción atómica: media_files.deleted_at + degradar identifications a 'needs review' + observations.last_material_edit_at). Subir fotos via R2 + diálogo de confirmación cascade-photo", "status": "planned" },

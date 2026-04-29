@@ -52,6 +52,11 @@ BEGIN
   -- Console PR5 — moderator surface
   IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'user_bans')              THEN missing := array_append(missing, 'public.user_bans'); END IF;
 
+  -- Console PR8 — feature flags + karma config DB tables
+  IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'app_feature_flags')      THEN missing := array_append(missing, 'public.app_feature_flags'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'karma_config')           THEN missing := array_append(missing, 'public.karma_config'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'karma_rarity_multipliers') THEN missing := array_append(missing, 'public.karma_rarity_multipliers'); END IF;
+
   -- Module 26 — observation_comments.locked column added in PR #77
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns

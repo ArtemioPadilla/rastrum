@@ -33,6 +33,21 @@ const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } })
       <input name="region_primary" type="text" placeholder={tr.profile.region_placeholder} class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
     </div>
     <div>
+      <div class="flex items-center justify-between mb-1">
+        <label for="country_code" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300">{tr.profile.country}</label>
+        <span
+          id="country-inferred-badge"
+          class="hidden text-[11px] font-medium text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 rounded-full"
+          title={tr.profile.country_inferred_title}
+        >{tr.profile.country_inferred_badge}</span>
+      </div>
+      <select id="country_code" name="country_code" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
+        <option value="">{tr.profile.country_any}</option>
+      </select>
+      <p class="mt-1 text-xs text-zinc-500" data-country-hint>{tr.profile.country_hint}</p>
+      <p class="mt-1 hidden text-xs text-amber-700 dark:text-amber-400" data-country-load-error>{tr.profile.country_load_error}</p>
+    </div>
+    <div>
       <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.profile.avatar_url}</label>
       <input name="avatar_url" type="url" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
     </div>
@@ -80,6 +95,14 @@ const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } })
         <div>
           <p class="text-sm font-medium text-zinc-700 dark:text-zinc-300">{tr.profile.streak_digest}</p>
           <p class="text-xs text-zinc-500">{tr.profile.streak_digest_hint}</p>
+        </div>
+      </label>
+      <label class="flex items-start gap-3 cursor-pointer" id="community-visible-row">
+        <input type="checkbox" name="community_visible" class="mt-1" />
+        <div>
+          <p class="text-sm font-medium text-zinc-700 dark:text-zinc-300">{tr.profile.community_visible}</p>
+          <p class="text-xs text-zinc-500" data-helper-on>{tr.profile.community_visible_hint}</p>
+          <p class="text-xs text-amber-700 dark:text-amber-400 hidden" data-helper-off>{tr.profile.community_visible_disabled}</p>
         </div>
       </label>
     </fieldset>
@@ -407,6 +430,7 @@ const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } })
 
 <script>
   import { getSupabase } from '../lib/supabase';
+  import { shouldShowInferredCountryBadge, buildCommunityDiscoveryPayload } from '../lib/profile-edit';
   import type { UserProfile } from '../lib/types';
 
   const form = document.getElementById('edit-form') as HTMLFormElement | null;
@@ -420,8 +444,51 @@ const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } })
 
   type EditableKey =
     | 'username' | 'display_name' | 'bio' | 'region_primary' | 'avatar_url'
-    | 'preferred_lang' | 'observer_license'
+    | 'preferred_lang' | 'observer_license' | 'country_code'
     | 'gamification_opt_in' | 'streak_digest_opt_in';
+
+  type IsoCountry = { code: string; name_en: string; name_es: string };
+
+  function syncCommunityVisibleEnabled(isPublic: boolean) {
+    const visibleEl = form?.elements.namedItem('community_visible') as HTMLInputElement | null;
+    const helperOn = form?.querySelector('[data-helper-on]') as HTMLElement | null;
+    const helperOff = form?.querySelector('[data-helper-off]') as HTMLElement | null;
+    if (!visibleEl || !helperOn || !helperOff) return;
+    visibleEl.disabled = !isPublic;
+    helperOn.classList.toggle('hidden', !isPublic);
+    helperOff.classList.toggle('hidden', isPublic);
+    if (!isPublic) visibleEl.checked = false;
+  }
+
+  async function populateCountryOptions(supabase: ReturnType<typeof getSupabase>, selectedCode: string | null) {
+    const select = form?.elements.namedItem('country_code') as HTMLSelectElement | null;
+    if (!select) return;
+    const errEl  = document.querySelector<HTMLElement>('[data-country-load-error]');
+    const hintEl = document.querySelector<HTMLElement>('[data-country-hint]');
+    const isEs = document.documentElement.lang === 'es';
+    const nameCol: 'name_es' | 'name_en' = isEs ? 'name_es' : 'name_en';
+    const { data, error } = await supabase
+      .from('iso_countries')
+      .select('code, name_en, name_es')
+      .order(nameCol, { ascending: true });
+    if (error || !data || data.length === 0) {
+      // Network/RLS failure or empty seed — surface a load-error hint so the
+      // user doesn't see an empty select and assume there are no options.
+      errEl?.classList.remove('hidden');
+      hintEl?.classList.add('hidden');
+      return;
+    }
+    const rows = data as IsoCountry[];
+    const frag = document.createDocumentFragment();
+    for (const row of rows) {
+      const opt = document.createElement('option');
+      opt.value = row.code;
+      opt.textContent = row[nameCol];
+      frag.appendChild(opt);
+    }
+    select.appendChild(frag);
+    select.value = selectedCode ?? '';
+  }
 
   async function load() {
     if (!form) return;
@@ -448,6 +515,27 @@ const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } })
     (form.elements.namedItem('observer_license') as HTMLSelectElement).value = profile.observer_license ?? 'CC BY 4.0';
     (form.elements.namedItem('gamification_opt_in') as HTMLInputElement).checked = profile.gamification_opt_in;
     (form.elements.namedItem('streak_digest_opt_in') as HTMLInputElement).checked = profile.streak_digest_opt_in;
+    (form.elements.namedItem('community_visible') as HTMLInputElement).checked = !profile.hide_from_leaderboards;
+
+    await populateCountryOptions(supabase, profile.country_code ?? null);
+
+    const inferredBadge = document.getElementById('country-inferred-badge');
+    if (inferredBadge) {
+      inferredBadge.classList.toggle('hidden', !shouldShowInferredCountryBadge(profile));
+    }
+
+    // The inferred-country badge is meaningful only when a country is set.
+    // If the user clears the picker, hide the badge optimistically — saving
+    // will flip country_code_source to 'user' regardless, but this gives
+    // immediate UI feedback so they don't see "inferred" pinned to an empty
+    // field while editing.
+    const countrySelect = form.elements.namedItem('country_code') as HTMLSelectElement | null;
+    countrySelect?.addEventListener('change', () => {
+      if (!inferredBadge) return;
+      if (!countrySelect.value) inferredBadge.classList.add('hidden');
+    });
+
+    syncCommunityVisibleEnabled(Boolean(profile.profile_public));
   }
 
   form?.addEventListener('submit', async (e) => {
@@ -474,6 +562,12 @@ const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } })
       observer_license:     (data.get('observer_license') ?? 'CC BY 4.0').toString(),
       gamification_opt_in:  data.get('gamification_opt_in') === 'on',
       streak_digest_opt_in: data.get('streak_digest_opt_in') === 'on',
+      ...buildCommunityDiscoveryPayload({
+        country_code:       ((data.get('country_code') as string) ?? '').trim(),
+        // UI-true ("Show me…") inverts to DB-false (hide_from_leaderboards).
+        // Inversion happens inside buildCommunityDiscoveryPayload.
+        community_visible:  data.get('community_visible') === 'on',
+      }),
       // updated_at is bumped server-side by the users_touch_updated_at
       // trigger; clients can't write to it (column-level GRANT).
     };
@@ -506,6 +600,9 @@ const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } })
     }
     status?.classList.remove('hidden');
     setTimeout(() => status?.classList.add('hidden'), 3000);
+
+    // Save flips country_code_source to 'user'; hide the inferred badge.
+    document.getElementById('country-inferred-badge')?.classList.add('hidden');
 
     // Re-render the user's OG card so /perfil/u/<username>/ embeds the
     // latest display name + stats. Best-effort: a render or upload

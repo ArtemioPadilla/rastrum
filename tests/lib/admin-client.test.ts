@@ -125,4 +125,74 @@ describe('adminClient', () => {
       ).rejects.toBeInstanceOf(AdminClientError);
     });
   });
+
+  describe('badge namespace', () => {
+    it('badge.awardManual posts action=badge.award_manual with target_user_id + badge_key', async () => {
+      (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true, audit_id: 101, after: { badge_key: 'first_obs' } }),
+      });
+      const out = await adminClient.badge.awardManual(
+        { target_user_id: '00000000-0000-0000-0000-000000000001', badge_key: 'first_obs' },
+        'User hit milestone manually',
+        'admin-jwt',
+      );
+      expect(out.audit_id).toBe(101);
+      const body = JSON.parse(
+        ((globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1] as RequestInit).body as string,
+      );
+      expect(body.action).toBe('badge.award_manual');
+      expect(body.payload.badge_key).toBe('first_obs');
+    });
+
+    it('badge.revoke posts action=badge.revoke', async () => {
+      (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true, audit_id: 102, after: null }),
+      });
+      await adminClient.badge.revoke(
+        { target_user_id: '00000000-0000-0000-0000-000000000001', badge_key: 'first_obs' },
+        'Badge awarded in error',
+        'admin-jwt',
+      );
+      const body = JSON.parse(
+        ((globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1] as RequestInit).body as string,
+      );
+      expect(body.action).toBe('badge.revoke');
+    });
+  });
+
+  describe('featureFlag namespace', () => {
+    it('featureFlag.toggle posts action=feature_flag.toggle with key + value', async () => {
+      (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true, audit_id: 103, after: { key: 'parallelCascade', value: false } }),
+      });
+      const out = await adminClient.featureFlag.toggle(
+        { key: 'parallelCascade', value: false },
+        'Disabling parallel cascade due to cost spike',
+        'admin-jwt',
+      );
+      expect(out.audit_id).toBe(103);
+      const body = JSON.parse(
+        ((globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1] as RequestInit).body as string,
+      );
+      expect(body.action).toBe('feature_flag.toggle');
+      expect(body.payload.key).toBe('parallelCascade');
+      expect(body.payload.value).toBe(false);
+    });
+
+    it('featureFlag.toggle throws AdminClientError when key not found', async () => {
+      (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false, status: 400,
+        json: async () => ({ error: 'feature_flag.toggle: key not found: unknownFlag' }),
+      });
+      await expect(
+        adminClient.featureFlag.toggle({ key: 'unknownFlag', value: true }, 'testing', 'admin-jwt'),
+      ).rejects.toBeInstanceOf(AdminClientError);
+    });
+  });
 });

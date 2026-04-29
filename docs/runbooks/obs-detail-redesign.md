@@ -121,7 +121,7 @@ have an automated parity check.
 |---|---|---|
 | #91 | merged 2026-04-29 | PR1 — extract `MapPicker.astro` (no behavior change) + Playwright regression test |
 | #98 | merged 2026-04-29 | PR2 — schema deltas + material-edit trigger + `observation-enums.ts` + `obs_detail.*` i18n |
-| #103 | in review | PR3 — `PhotoGallery.astro` + `ShareObsView.astro` two-column layout + viewer e2e |
+| #103 | merged 2026-04-29 | PR3 — `PhotoGallery.astro` + `ShareObsView.astro` two-column layout + viewer e2e |
 | TBD | planned | PR4 — `ObsManagePanel.astro` Details tab (date/time + habitat + weather + establishment + name override + notes + obscure level) |
 | TBD | planned | PR5 — Location tab (drop-in `MapPicker mode='edit'` for coordinate edit) |
 | TBD | planned | PR6 — Photos tab + `delete-photo` Edge Function (atomic soft-delete + ID demote + edit-flag) |

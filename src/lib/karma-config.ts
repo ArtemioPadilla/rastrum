@@ -1,11 +1,12 @@
 /**
- * Karma config (Module 23 phase 1) — central source of truth for the
- * deltas applied per karma_event reason. Currently hardcoded; PR8+ may
- * promote this to a DB-backed `karma_config` table for runtime tuning.
+ * Karma config seed data. The canonical runtime source of truth is the
+ * `public.karma_config` and `public.karma_rarity_multipliers` DB tables
+ * (added in PR8). This module is the seed manifest — values here are
+ * inserted on first db-apply and preserved on replay. The admin console
+ * reads from the DB tables, not from this module.
  *
- * Mirrors the deltas in the award_karma() SQL function. Changes here
- * are display-only — the function in the DB owns the actual write
- * behavior. Keep both in sync.
+ * The award_karma() SQL function remains the runtime write source for actual
+ * karma deltas. A future PR can migrate it to read from `karma_config`.
  */
 export interface KarmaReason {
   id: string;

@@ -40,6 +40,9 @@ PATCH their own row through PostgREST, gated by RLS on row.
 | `profile_privacy` | jsonb | PrivacyMatrix component (m25) |
 | `dismissed_privacy_intro_at` | timestamptz | "Got it" button on the privacy intro banner |
 | `expert_taxa` | text[] | Self-declared expertise (read-only metadata; expert status itself is gated separately) |
+| `country_code` | text (ISO-3166 alpha-2) | Profile edit (m28 community discovery) |
+| `country_code_source` | text ('auto' / 'user') | Profile edit (m28); flipped to 'user' on every save so the "inferred from your region" badge disappears |
+| `hide_from_leaderboards` | boolean | Profile edit (m28); inverted UI ("Show me in community discovery and leaderboards") |
 
 ## Locked (UPDATE blocked at column level)
 
