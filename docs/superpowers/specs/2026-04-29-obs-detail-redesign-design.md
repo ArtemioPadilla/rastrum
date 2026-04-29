@@ -165,6 +165,11 @@ CREATE INDEX IF NOT EXISTS idx_media_files_active
 ### Material edit detection (trigger)
 
 ```sql
+-- Composes with sync_primary_id_trigger (also BEFORE UPDATE on observations).
+-- The sync trigger *writes* primary_taxon_id from the identifications table;
+-- this trigger *reads* (compares NEW.primary_taxon_id vs OLD) to decide
+-- whether to flag the row as materially edited. Different responsibilities,
+-- no column-write contention, alphabetical trigger ordering is irrelevant.
 CREATE OR REPLACE FUNCTION public.observations_material_edit_check()
 RETURNS trigger AS $$
 DECLARE
@@ -284,7 +289,9 @@ UPDATE public.observations
 
 The community-IDs section then renders a "needs review" pill on the primary ID. Owner can clear it by re-affirming manually (selecting a new primary identification, or making a new manual ID).
 
-The choice to do this client-side vs. server-side: an Edge Function `delete-photo` is preferred for atomicity (the soft-delete + ID demote + edit-flag should be one logical commit). Implementation-plan decision; spec says "the operation is atomic" without nailing the implementation.
+**Decision: server-side via a new `delete-photo` Edge Function.** The soft-delete + ID demote + `last_material_edit_at` bump must commit atomically. A client-side two-call implementation has a real failure mode: if the soft-delete succeeds and the user closes the tab before the demote call lands, the observation is left with no primary photo but an active primary ID — the exact "stale state" the spec is trying to prevent. Edge Functions wrap the operations in a single SQL transaction (`BEGIN ... COMMIT`) and return only after all three writes succeed.
+
+The function lives at `supabase/functions/delete-photo/index.ts` and is deployed via the existing `deploy-functions.yml` workflow. RLS on `media_files` and `identifications` already gates writes to the owner; the function re-verifies `auth.uid() = observer_id` before issuing the transaction.
 
 ---
 
@@ -357,6 +364,5 @@ Each step is independently shippable and independently revertible. The order is 
 (These are deliberately **not** decided here — they're for the planning step.)
 
 - Photo replacement workflow when the cascade-driving photo is deleted **and** the user immediately uploads a replacement: does the new photo become eligible to be "the" cascade photo (which would then need a fresh AI run), or does the obs stay in "needs review" until manually re-affirmed? Recommend: stay in needs-review; the cascade does not auto-re-fire on edit. Confirm during planning.
-- Is the photo-delete + ID-demote done client-side (two RLS-gated calls) or server-side (one `delete-photo` Edge Function)? Edge Function preferred for atomicity. Confirm during planning.
-- Lightbox library: bring in `photoswipe` (mature, ~30 kB gzipped) or write a minimal native one? PWA bundle is performance-sensitive per CLAUDE.md; default to native unless the savings are too small. Decide during planning.
+- Lightbox implementation: write a minimal native one if it lands at ≤150 lines (keyboard nav + swipe + Esc + share button per photo); fall back to `photoswipe` (~30 kB gzipped) only if the native version pushes past that line budget. PWA bundle is performance-sensitive per CLAUDE.md; native is the default. Final call after a prototype during planning.
 - Whether to add an "Edited at" line to the public-facing metadata grid (showing `updated_at` to viewers) — minor transparency win vs. extra clutter. Defer to planning.

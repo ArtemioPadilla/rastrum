@@ -186,7 +186,27 @@ CREATE INDEX IF NOT EXISTS idx_users_lb_expert_taxa ON public.users USING GIN (e
 -- predicate (`profile_public AND NOT hide_from_leaderboards`) means the
 -- predicate appears in exactly one place in application code and exactly
 -- one place in the SQL.
+-- Two views: an anon-safe one without geographic data, and an authenticated-
+-- only one that adds the centroid for the Nearby feature. This addresses the
+-- privacy concern that even a coarse 200 km centroid could narrow location
+-- for low-obs-count users when exposed without authentication.
 CREATE OR REPLACE VIEW public.community_observers AS
+SELECT
+  id, username, display_name, avatar_url, country_code,
+  expert_taxa, is_expert,
+  observation_count, species_count, obs_count_7d, obs_count_30d,
+  last_observation_at, joined_at
+FROM public.users
+WHERE profile_public = true
+  AND hide_from_leaderboards = false;
+
+GRANT SELECT ON public.community_observers TO anon, authenticated;
+
+-- Same eligibility predicate, plus centroid_geog. Authenticated only.
+-- The Nearby feature is sign-in-gated in the UI, and this view enforces
+-- the gate at the SQL layer too — anon callers cannot read centroid even
+-- if they bypass the UI.
+CREATE OR REPLACE VIEW public.community_observers_with_centroid AS
 SELECT
   id, username, display_name, avatar_url, country_code,
   expert_taxa, is_expert,
@@ -196,7 +216,7 @@ FROM public.users
 WHERE profile_public = true
   AND hide_from_leaderboards = false;
 
-GRANT SELECT ON public.community_observers TO anon, authenticated;
+GRANT SELECT ON public.community_observers_with_centroid TO authenticated;
 
 -- ISO-3166 reference table seeded once; used by the country-code normalizer
 -- in recompute-user-stats and by the Profile → Edit country picker.
@@ -214,6 +234,14 @@ GRANT SELECT ON public.iso_countries TO anon, authenticated;
 1. The eligibility predicate has two parts (`profile_public` + `NOT hide_from_leaderboards`); centralizing it in a view prevents drift if either rule evolves.
 2. RLS on `users` already exposes only-self for many columns; the view exposes only the discovery-safe columns (no email, no streak counters, no admin flags).
 3. The community page can `select('*')` against the view and trust the predicate.
+
+### Why two views?
+
+`community_observers` (anon + authenticated) supports the public list, sort, country filter, taxon filter, and experts filter — none of which need the centroid. `community_observers_with_centroid` (authenticated only) is consumed exclusively by the Nearby feature, which already requires sign-in for product reasons (a viewer needs at least one observation to compute their own centroid). Splitting the views means anon callers cannot read `centroid_geog` even via direct PostgREST traffic. The cost is one extra view definition; the benefit is the privacy gate is enforced at the SQL layer, not just in the UI.
+
+### Behavior when a user toggles `profile_public = false`
+
+Because both views read `profile_public` live (no caching, no nightly cron involvement on this column), a user who flips their profile from public to private drops out of `community_observers` and `community_observers_with_centroid` on their next request — no propagation delay. This matters for the rollout plan (step 4 below) and for the user mental model: privacy changes are immediate, not eventually-consistent.
 
 ### RLS
 
