@@ -2296,6 +2296,10 @@ CREATE POLICY "users_update_self_privacy" ON public.users
 -- (`GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public
 -- TO authenticated`) covers everything else; here we narrow public.users
 -- specifically.
+--
+-- **Inventory:** see `docs/specs/infra/users-column-grants.md` for the
+-- full per-column writer table + the SECURITY DEFINER checklist for new
+-- triggers. Adding a column to either side here MUST update that doc.
 REVOKE UPDATE ON public.users FROM authenticated;
 GRANT UPDATE (
   username,
