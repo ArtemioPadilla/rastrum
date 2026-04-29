@@ -4504,3 +4504,263 @@ CREATE POLICY ban_appeals_no_client_delete ON public.ban_appeals
 
 GRANT SELECT, INSERT ON public.ban_appeals TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.ban_appeals TO service_role;
+
+-- ============================================================
+-- PROJECTS (M29) — ANP / monitoring-protocol polygons
+-- ============================================================
+-- A project is a named polygon (typically an ANP, reserve, or sampling
+-- grid) that observations are auto-tagged into when their location
+-- falls inside the polygon. Used by professional monitoring workflows
+-- (PROREST 2026, DRFSIPS) to filter / export per-protocol data.
+--
+-- Auto-tagging happens via a BEFORE INSERT/UPDATE trigger on
+-- observations: if location is set and project_id is null, find the
+-- first project whose polygon contains the point and assign it.
+--
+-- Privacy: project polygons are public by default but visibility=
+-- 'private' restricts membership-only. Observation→project linkage
+-- gates the same way (a public project's tagged observations remain
+-- subject to the existing obs_public_read predicate; private projects
+-- only expose their tagged observations to project_members rows).
+
+CREATE TABLE IF NOT EXISTS public.projects (
+  id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  slug            text NOT NULL UNIQUE
+                  CHECK (slug ~ '^[a-z0-9][a-z0-9-]{1,63}$'),
+  name            text NOT NULL CHECK (length(name) BETWEEN 1 AND 200),
+  name_es         text CHECK (length(name_es) BETWEEN 1 AND 200),
+  description     text CHECK (length(description) <= 4000),
+  description_es  text CHECK (length(description_es) <= 4000),
+  polygon         geography(MultiPolygon, 4326) NOT NULL,
+  visibility      text NOT NULL DEFAULT 'public'
+                  CHECK (visibility IN ('public','private')),
+  owner_user_id   uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  species_list    jsonb,                 -- optional whitelist (PROREST taxon IDs)
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  updated_at      timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_projects_polygon ON public.projects USING GIST(polygon);
+CREATE INDEX IF NOT EXISTS idx_projects_owner   ON public.projects(owner_user_id);
+CREATE INDEX IF NOT EXISTS idx_projects_visible ON public.projects(visibility);
+
+CREATE TABLE IF NOT EXISTS public.project_members (
+  project_id  uuid NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
+  user_id     uuid NOT NULL REFERENCES public.users(id)    ON DELETE CASCADE,
+  role        text NOT NULL DEFAULT 'member'
+              CHECK (role IN ('owner','validator','member')),
+  added_at    timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (project_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_project_members_user ON public.project_members(user_id);
+
+-- Denormalised project_id on observations. Auto-assigned by trigger
+-- when location is provided. Manual override allowed for cases where
+-- the GPS is fuzzy / outside the polygon by mistake.
+ALTER TABLE public.observations
+  ADD COLUMN IF NOT EXISTS project_id uuid REFERENCES public.projects(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_obs_project ON public.observations(project_id)
+  WHERE project_id IS NOT NULL;
+
+-- ── Auto-assign trigger ────────────────────────────────────────────
+-- Picks the first project whose polygon contains NEW.location.
+-- "First" is ordered by `created_at ASC` so the longest-lived project
+-- wins on overlap (operators with overlapping polygons should resolve
+-- by editing one or the other).
+CREATE OR REPLACE FUNCTION public.assign_observation_to_project()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  -- Honour explicit assignments (or unassignments) from the client.
+  IF NEW.project_id IS NOT NULL THEN
+    RETURN NEW;
+  END IF;
+  IF NEW.location IS NULL THEN
+    RETURN NEW;
+  END IF;
+  SELECT id INTO NEW.project_id
+    FROM public.projects
+   WHERE ST_Covers(polygon, NEW.location)
+   ORDER BY created_at ASC
+   LIMIT 1;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS assign_observation_to_project_trigger ON public.observations;
+CREATE TRIGGER assign_observation_to_project_trigger
+  BEFORE INSERT OR UPDATE OF location ON public.observations
+  FOR EACH ROW
+  EXECUTE FUNCTION public.assign_observation_to_project();
+
+-- ── RLS ──────────────────────────────────────────────────────────────
+ALTER TABLE public.projects        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.project_members ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS projects_public_read ON public.projects;
+CREATE POLICY projects_public_read ON public.projects
+  FOR SELECT
+  USING (
+    visibility = 'public'
+    OR owner_user_id = auth.uid()
+    OR EXISTS (
+      SELECT 1 FROM public.project_members
+       WHERE project_id = projects.id
+         AND user_id    = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS projects_owner_insert ON public.projects;
+CREATE POLICY projects_owner_insert ON public.projects
+  FOR INSERT TO authenticated
+  WITH CHECK (owner_user_id = auth.uid());
+
+DROP POLICY IF EXISTS projects_owner_update ON public.projects;
+CREATE POLICY projects_owner_update ON public.projects
+  FOR UPDATE TO authenticated
+  USING (owner_user_id = auth.uid())
+  WITH CHECK (owner_user_id = auth.uid());
+
+DROP POLICY IF EXISTS projects_owner_delete ON public.projects;
+CREATE POLICY projects_owner_delete ON public.projects
+  FOR DELETE TO authenticated
+  USING (owner_user_id = auth.uid());
+
+DROP POLICY IF EXISTS project_members_read ON public.project_members;
+CREATE POLICY project_members_read ON public.project_members
+  FOR SELECT
+  USING (
+    user_id = auth.uid()
+    OR EXISTS (
+      SELECT 1 FROM public.projects p
+       WHERE p.id = project_members.project_id
+         AND (p.visibility = 'public' OR p.owner_user_id = auth.uid())
+    )
+  );
+
+DROP POLICY IF EXISTS project_members_owner_write ON public.project_members;
+CREATE POLICY project_members_owner_write ON public.project_members
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.projects p
+       WHERE p.id = project_members.project_id
+         AND p.owner_user_id = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS project_members_owner_delete ON public.project_members;
+CREATE POLICY project_members_owner_delete ON public.project_members
+  FOR DELETE TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.projects p
+       WHERE p.id = project_members.project_id
+         AND p.owner_user_id = auth.uid()
+    )
+  );
+
+GRANT SELECT                        ON public.projects        TO anon, authenticated;
+GRANT INSERT, UPDATE, DELETE        ON public.projects        TO authenticated;
+GRANT SELECT                        ON public.project_members TO anon, authenticated;
+GRANT INSERT, DELETE                ON public.project_members TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.projects        TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.project_members TO service_role;
+
+-- ── Read view (RLS-respecting) with polygon as GeoJSON ──────────────
+-- A SECURITY INVOKER view: queries inherit the caller's RLS, so anon
+-- gets only public rows; owners + members see private + public; service
+-- role sees all. supabase-js consumers use this instead of selecting
+-- `polygon` directly (PostgREST returns geography as base64 WKB).
+CREATE OR REPLACE VIEW public.projects_with_geojson AS
+SELECT
+  p.id,
+  p.slug,
+  p.name,
+  p.name_es,
+  p.description,
+  p.description_es,
+  p.visibility,
+  p.owner_user_id,
+  p.species_list,
+  p.created_at,
+  p.updated_at,
+  ST_AsGeoJSON(p.polygon)::jsonb           AS polygon_geojson,
+  ST_Area(p.polygon) / 1e6                 AS area_km2
+FROM public.projects p;
+
+GRANT SELECT ON public.projects_with_geojson TO anon, authenticated, service_role;
+
+-- ── Owner-scoped upsert RPC accepting GeoJSON text ──────────────────
+-- supabase-js can't write geography columns directly (PostgREST has no
+-- WKB encoder). The client passes GeoJSON; this RPC parses it and
+-- enforces owner_user_id = auth.uid() before INSERT/UPDATE. RLS still
+-- guards the underlying table — this just makes the write ergonomic.
+CREATE OR REPLACE FUNCTION public.upsert_project(
+  p_slug             text,
+  p_name             text,
+  p_name_es          text,
+  p_description      text,
+  p_description_es   text,
+  p_visibility       text,
+  p_polygon_geojson  jsonb
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_geom    geometry;
+  v_geog    geography;
+  v_uid     uuid := auth.uid();
+  v_owner   uuid;
+  v_id      uuid;
+BEGIN
+  IF v_uid IS NULL THEN
+    RAISE EXCEPTION 'auth required' USING ERRCODE = '42501';
+  END IF;
+  IF p_visibility NOT IN ('public','private') THEN
+    RAISE EXCEPTION 'visibility must be public|private' USING ERRCODE = '22023';
+  END IF;
+  v_geom := ST_SetSRID(ST_GeomFromGeoJSON(p_polygon_geojson::text), 4326);
+  -- Promote a Polygon to MultiPolygon so the column type is uniform.
+  IF GeometryType(v_geom) = 'POLYGON' THEN
+    v_geom := ST_Multi(v_geom);
+  END IF;
+  IF GeometryType(v_geom) <> 'MULTIPOLYGON' THEN
+    RAISE EXCEPTION 'GeoJSON must be Polygon or MultiPolygon' USING ERRCODE = '22023';
+  END IF;
+  v_geog := v_geom::geography;
+
+  -- Reject if the slug exists and isn't owned by the caller.
+  SELECT owner_user_id INTO v_owner
+    FROM public.projects WHERE slug = p_slug;
+  IF v_owner IS NOT NULL AND v_owner <> v_uid THEN
+    RAISE EXCEPTION 'slug taken' USING ERRCODE = '23505';
+  END IF;
+
+  INSERT INTO public.projects (
+    slug, name, name_es, description, description_es, visibility, owner_user_id, polygon
+  ) VALUES (
+    p_slug, p_name, p_name_es, p_description, p_description_es, p_visibility, v_uid, v_geog
+  )
+  ON CONFLICT (slug) DO UPDATE SET
+    name           = EXCLUDED.name,
+    name_es        = EXCLUDED.name_es,
+    description    = EXCLUDED.description,
+    description_es = EXCLUDED.description_es,
+    visibility     = EXCLUDED.visibility,
+    polygon        = EXCLUDED.polygon,
+    updated_at     = now()
+  RETURNING id INTO v_id;
+  RETURN v_id;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.upsert_project(text,text,text,text,text,text,jsonb) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.upsert_project(text,text,text,text,text,text,jsonb)
+  TO authenticated, service_role;

@@ -1,0 +1,182 @@
+---
+/**
+ * ProjectNewView — minimal create-form for a project. Polygon input
+ * accepts pasted GeoJSON or a `.geojson` upload (paste-only is the v1
+ * baseline; in-browser polygon drawing is a v1.1 follow-up).
+ */
+import { t, routes } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+
+const { lang } = Astro.props;
+const tr = t(lang);
+const proj = (tr as unknown as { projects: Record<string, string> }).projects;
+const projectsBase = routes.projects[lang];
+---
+
+<section class="max-w-2xl mx-auto px-4 py-8" data-projects-base={projectsBase}>
+  <h1 class="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">{proj.form_title_new}</h1>
+  <p id="project-signin-required" class="hidden mt-3 text-sm text-amber-700 dark:text-amber-400">
+    {proj.form_signin_required}
+  </p>
+
+  <form id="project-form" class="hidden mt-6 space-y-5">
+    <div>
+      <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300">{proj.form_slug}</label>
+      <input
+        type="text"
+        name="slug"
+        required
+        pattern="^[a-z0-9][a-z0-9-]{1,63}$"
+        class="mt-1 block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm font-mono"
+      />
+      <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{proj.form_slug_hint}</p>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div>
+        <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300">{proj.form_name}</label>
+        <input type="text" name="name" required maxlength="200" class="mt-1 block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300">{proj.form_name_es}</label>
+        <input type="text" name="name_es" maxlength="200" class="mt-1 block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm" />
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div>
+        <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300">{proj.form_description}</label>
+        <textarea name="description" rows="3" maxlength="4000" class="mt-1 block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm"></textarea>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300">{proj.form_description_es}</label>
+        <textarea name="description_es" rows="3" maxlength="4000" class="mt-1 block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm"></textarea>
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300">{proj.form_visibility}</label>
+      <select name="visibility" class="mt-1 block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm">
+        <option value="public">{proj.visibility_public}</option>
+        <option value="private">{proj.visibility_private}</option>
+      </select>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300">{proj.form_polygon}</label>
+      <textarea
+        id="project-polygon-text"
+        name="polygon_text"
+        required
+        rows="8"
+        spellcheck="false"
+        class="mt-1 block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-xs font-mono"
+        placeholder='{"type":"Polygon","coordinates":[[[-96.7,17.0],[-96.6,17.0],[-96.6,17.1],[-96.7,17.1],[-96.7,17.0]]]}'
+      ></textarea>
+      <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{proj.form_polygon_hint}</p>
+      <label class="mt-2 inline-flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-400 cursor-pointer hover:underline">
+        <input type="file" id="project-polygon-file" accept=".geojson,application/geo+json,application/json" class="hidden" />
+        <span>{proj.form_polygon_upload}</span>
+      </label>
+    </div>
+
+    <p id="project-form-error" class="hidden text-sm text-rose-600 dark:text-rose-400"></p>
+
+    <div class="flex items-center justify-end gap-2">
+      <a href={`/${lang}${projectsBase}/`} class="rounded-lg px-3 py-2 text-sm text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800">{proj.form_cancel}</a>
+      <button type="submit" id="project-form-submit" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white min-h-[40px]">{proj.form_save}</button>
+    </div>
+  </form>
+</section>
+
+<script>
+  import { upsertProject, validatePolygonGeoJSON, isValidSlug } from '../lib/projects';
+  import { getSupabase } from '../lib/supabase';
+
+  const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
+  const root = document.querySelector('[data-projects-base]') as HTMLElement | null;
+  if (root) {
+    const projectsBase = root.dataset.projectsBase ?? '/projects';
+    const signInWarn = document.getElementById('project-signin-required');
+    const form    = document.getElementById('project-form') as HTMLFormElement | null;
+    const fileEl  = document.getElementById('project-polygon-file') as HTMLInputElement | null;
+    const polyTxt = document.getElementById('project-polygon-text') as HTMLTextAreaElement | null;
+    const errEl   = document.getElementById('project-form-error');
+    const submit  = document.getElementById('project-form-submit') as HTMLButtonElement | null;
+
+    (async () => {
+      const sb = getSupabase();
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session?.user) {
+        signInWarn?.classList.remove('hidden');
+        return;
+      }
+      form?.classList.remove('hidden');
+    })();
+
+    fileEl?.addEventListener('change', async () => {
+      const f = fileEl.files?.[0];
+      if (!f) return;
+      const text = await f.text();
+      if (polyTxt) polyTxt.value = text;
+    });
+
+    function showError(msg: string) {
+      if (!errEl) return;
+      errEl.textContent = msg;
+      errEl.classList.remove('hidden');
+    }
+
+    function clearError() {
+      errEl?.classList.add('hidden');
+    }
+
+    form?.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      clearError();
+      const fd = new FormData(form);
+      const slug = String(fd.get('slug') ?? '').trim();
+      const name = String(fd.get('name') ?? '').trim();
+      const name_es = String(fd.get('name_es') ?? '').trim() || null;
+      const description = String(fd.get('description') ?? '').trim() || null;
+      const description_es = String(fd.get('description_es') ?? '').trim() || null;
+      const visibility = String(fd.get('visibility') ?? 'public') as 'public' | 'private';
+      const polyText = String(fd.get('polygon_text') ?? '').trim();
+
+      if (!isValidSlug(slug)) {
+        showError(lang === 'es' ? 'Slug inválido.' : 'Invalid slug.');
+        return;
+      }
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(polyText);
+      } catch {
+        showError(lang === 'es' ? 'GeoJSON no es JSON válido.' : 'GeoJSON is not valid JSON.');
+        return;
+      }
+      const polygon = validatePolygonGeoJSON(parsed);
+      if (!polygon) {
+        const proj = (await import('../i18n/' + lang + '.json')).default.projects;
+        showError(proj.error_invalid_polygon);
+        return;
+      }
+
+      submit?.setAttribute('disabled', 'true');
+      try {
+        await upsertProject({ slug, name, name_es, description, description_es, visibility, polygon });
+        window.location.assign(`/${lang}${projectsBase}/detail/?slug=${encodeURIComponent(slug)}`);
+      } catch (err) {
+        const code = (err instanceof Error) ? err.message : 'unknown';
+        const proj = (await import('../i18n/' + lang + '.json')).default.projects;
+        if (code === 'slug_taken')           showError(proj.error_slug_taken);
+        else if (code === 'invalid_polygon') showError(proj.error_invalid_polygon);
+        else                                  showError(proj.error_save_failed);
+      } finally {
+        submit?.removeAttribute('disabled');
+      }
+    });
+  }
+</script>

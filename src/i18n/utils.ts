@@ -92,6 +92,9 @@ export const routes: Record<string, Record<Locale, string>> = {
   inbox:            { en: '/inbox',     es: '/bandeja' },
   profileFollowers: { en: '/profile/u', es: '/perfil/u' },
   profileFollowing: { en: '/profile/u', es: '/perfil/u' },
+  // Projects (M29)
+  projects:     { en: '/projects',     es: '/proyectos' },
+  projectNew:   { en: '/projects/new', es: '/proyectos/nuevo' },
 };
 
 export const docPages = [
@@ -187,6 +190,10 @@ export const routeTree: Record<string, RouteNode> = {
   consoleExpertOverrides:  { labels: { en: 'Overrides',        es: 'Correcciones' },      parent: 'console' },
   consoleExpertExpertise:  { labels: { en: 'Expertise',        es: 'Experiencia' },       parent: 'console' },
   consoleExpertTaxonNotes: { labels: { en: 'Taxon notes',      es: 'Notas de taxón' },    parent: 'console' },
+  // Projects (M29)
+  projects:          { labels: { en: 'Projects', es: 'Proyectos' } },
+  projectDetail:     { labels: { en: 'Project',  es: 'Proyecto' }, parent: 'projects' },
+  projectNew:        { labels: { en: 'New project', es: 'Nuevo proyecto' }, parent: 'projects' },
   // Social graph (M26)
   inbox:             { labels: { en: 'Inbox',     es: 'Bandeja' } },
   profileFollowers:  { labels: { en: 'Followers', es: 'Seguidores' }, parent: 'profileUser' },

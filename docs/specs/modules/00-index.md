@@ -85,6 +85,7 @@ narrative source.
 | 26 | Social graph + reactions (follows, reactions, blocks, reports, notifications) | v1.3 | planned (spec v1.0) | [`26-social-graph.md`](26-social-graph.md) |
 | 27 | AI Sponsorships (share Anthropic credentials with beneficiaries) | v1.3 | in implementation (PR feat/ai-sponsorships) | [`27-ai-sponsorships.md`](27-ai-sponsorships.md) |
 | 28 | Community discovery (observers page, leaderboards, nearby, experts, country filter) | v1.3 | in implementation (PR1 — schema deltas) | [`28-community-discovery.md`](28-community-discovery.md) |
+| 29 | Projects (ANP polygon protocols + auto-tagging) | v1.3 | in implementation (PR feat/projects-anp-111) | [`29-projects-anp.md`](29-projects-anp.md) |
 
 ## v1.5 — Territory layer — planned
 
