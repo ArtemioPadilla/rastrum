@@ -95,7 +95,7 @@ export const routes: Record<string, Record<Locale, string>> = {
 export const docPages = [
   'vision', 'features', 'roadmap', 'tasks', 'market',
   'architecture', 'indigenous', 'funding', 'contribute',
-  'faq', 'privacy', 'terms', 'console',
+  'faq', 'privacy', 'terms', 'console', 'sponsorships',
 ] as const;
 
 export type DocPage = (typeof docPages)[number];
@@ -256,6 +256,10 @@ export const docPageMeta = {
   console: {
     en: "Privileged-actions surface for admin, moderator, and expert roles. Role model, audit log, and per-action runbooks.",
     es: "Superficie de acciones privilegiadas para roles de admin, moderador y experto. Modelo de roles, auditoría y runbooks por acción.",
+  },
+  sponsorships: {
+    en: "Share your Anthropic credential with friends, capped per month and audited. How sponsorship works for sponsors and beneficiaries.",
+    es: "Comparte tu credencial Anthropic con amigos, con límite mensual y auditoría. Cómo funcionan los patrocinios para sponsors y beneficiarios.",
   },
 } as const satisfies Record<DocPage, { en: string; es: string }>;
 

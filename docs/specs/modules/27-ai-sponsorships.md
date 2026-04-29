@@ -43,6 +43,12 @@ Lets any Rastrum user share their Anthropic credential (API key or long-lived OA
 - **`SPONSORSHIPS_CRON_TOKEN`** is upserted to Supabase Vault (as a secret named `sponsorships_cron_token`) by `.github/workflows/db-apply.yml` on every push to `main` that touches `supabase-schema.sql` or `cron-schedules.sql`. The `ai_credentials_heartbeat` pg_cron job reads it via `(SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'sponsorships_cron_token')` to authenticate against the sponsorships Edge Function. We use Vault rather than `ALTER DATABASE … SET` because Supabase managed Postgres restricts database-level GUC writes to superuser. The same secret value is also synced to the Edge Function via `deploy-functions.yml`. To rotate: `gh secret set SPONSORSHIPS_CRON_TOKEN --body $(openssl rand -hex 32)`, then trigger both workflows manually (`gh workflow run db-apply.yml` and `gh workflow run deploy-functions.yml -f function=sponsorships`). No manual `psql` is ever required.
 - **`ANTHROPIC_API_KEY`** is **NOT** read by the `identify` Edge Function once this module ships. After cutover, remove the secret from Edge Function env if present (operator step, run via `gh secret delete ANTHROPIC_API_KEY` followed by `gh workflow run deploy-functions.yml -f function=identify` to redeploy without it).
 
+### Email notifications (active)
+
+Threshold (80%/100%) and auto-pause notifications send real emails via Resend SMTP. Requires `RESEND_API_KEY` and `OPERATOR_EMAIL` in Edge Function env (already synced by `deploy-functions.yml`). Idempotency is enforced via `notifications_sent (sponsorship_id, threshold, year_month)` — a sponsor receives at most one 80% email per month and one 100% email per month per sponsorship. Auto-pauses send one email per pause event (no idempotency table; auto-pauses are inherently rare).
+
+If `RESEND_API_KEY` is unset, emails are skipped silently (logged via `console.warn`); sponsorships continue to function — only notifications are degraded.
+
 ### Cost notes
 
 - **`validateAnthropicCredential` makes a live Anthropic API call on every credential registration AND on weekly heartbeat.** The probe sends `max_tokens: 1` to `claude-haiku-4-5-20251001` (~$0.0001 per call). Heartbeat processes up to 50 stale credentials per run = ≤50 probe calls per week. Counted against the user's own Anthropic quota (or covered by their Claude subscription for OAT credentials). The `monthly_call_cap` does NOT bound these probe calls.

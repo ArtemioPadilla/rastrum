@@ -541,6 +541,29 @@
       "cave": "Cave"
     }
   },
+  "obs_detail": {
+    "tabs": {
+      "details": "Details",
+      "location": "Location",
+      "photos": "Photos"
+    },
+    "edit_location": "Edit location",
+    "coords_precise_label": "Precise (only you can see this)",
+    "coords_obscured_label": "Coarsened to ~{km} km (public)",
+    "edited_badge": "Edited after IDs were given. Suggesters may want to re-affirm.",
+    "needs_review": "Needs review",
+    "delete_photo_confirm": "This photo was the basis for the current identification. Deleting it will mark the observation as needing review. Continue?",
+    "delete_obs_confirm": "Delete this observation? This cannot be undone.",
+    "add_photo": "Add photo",
+    "delete_photo": "Delete photo",
+    "save_changes": "Save changes",
+    "saved": "Saved.",
+    "errors": {
+      "coords_invalid": "Latitude must be between −90 and 90, longitude between −180 and 180.",
+      "save_failed": "Save failed. Please try again.",
+      "upload_failed": "Photo upload failed. Please try again."
+    }
+  },
   "chat": {
     "title": "Chat",
     "subtitle": "On-device biodiversity assistant — runs fully in your browser. You can also attach a photo or audio.",
@@ -1077,7 +1100,37 @@
     "confirm_ok": "OK",
     "no_active": "No active sponsorship",
     "privacy_heading": "Privacy",
-    "quota_nav_label": "My AI quota"
+    "quota_nav_label": "My AI quota",
+    "report_abuse": "Report",
+    "range_7d": "Last 7 days",
+    "range_30d": "Last 30 days",
+    "range_90d": "Last 90 days",
+    "calls_last_Nd": "Calls (last {n} days)",
+    "sponsored_by_label": "Sponsored by",
+    "sponsored_by_multi": "Sponsored by {first} +{rest} more",
+    "tour_welcome_title": "Welcome to AI Sponsoring",
+    "tour_welcome_intro": "Share your Anthropic credential with specific friends. Here's the 30-second tour:",
+    "tour_step_1": "1️⃣ Add a credential — paste your sk-ant-api03-… or sk-ant-oat01-… key. It's encrypted in Vault, never logged.",
+    "tour_step_2": "2️⃣ Add beneficiaries by username with a monthly call cap. They identify with Claude using your key, you control the quota.",
+    "tour_step_3": "3️⃣ Earn karma — +20 per active sponsorship, +1 per call used. Capped to prevent farming. See the analytics card below.",
+    "tour_dismiss": "Got it",
+    "tour_show_again": "Show tour again",
+    "requests_section": "Pending requests",
+    "requests_empty": "No pending requests.",
+    "request_btn": "Request a sponsor",
+    "request_dialog_title": "Request a sponsor",
+    "request_sponsor_username": "Sponsor's username",
+    "request_message": "Message (optional, max 280 chars)",
+    "request_send": "Send request",
+    "request_status_pending": "Pending",
+    "request_status_approved": "Approved",
+    "request_status_rejected": "Rejected",
+    "request_status_withdrawn": "Withdrawn",
+    "request_approve": "Approve",
+    "request_reject": "Reject",
+    "request_withdraw": "Withdraw",
+    "my_requests_section": "My sponsor requests",
+    "my_requests_empty": "You haven't requested any sponsors yet."
   },
   "expert": {
     "apply_title": "Apply as an expert",
@@ -1173,7 +1226,8 @@
       "faq": "FAQ",
       "privacy": "Privacy",
       "terms": "Terms of Use",
-      "console": "Console"
+      "console": "Console",
+      "sponsorships": "AI Sponsorships"
     },
     "descriptions": {
       "vision": "Mission, problem statement, and why Oaxaca is the right place to start.",
@@ -1188,7 +1242,8 @@
       "faq": "Common questions about installing, identification, audio, privacy, offline, and the API.",
       "privacy": "What we collect, where it goes, and your right to delete — in plain language.",
       "terms": "Acceptable use, per-observation licensing, and how we handle account suspensions.",
-      "console": "Privileged-actions surface for admin, moderator, and expert roles. Role model, audit log, and per-action runbooks."
+      "console": "Privileged-actions surface for admin, moderator, and expert roles. Role model, audit log, and per-action runbooks.",
+      "sponsorships": "Share your Anthropic credential with friends, capped per month and audited."
     },
     "status": {
       "current": "Active",

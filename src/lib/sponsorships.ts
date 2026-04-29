@@ -1,5 +1,5 @@
 import { getSupabase } from './supabase';
-import type { SponsorCredential, Sponsorship, SponsorshipUsage } from './types.sponsorship';
+import type { SponsorCredential, Sponsorship, SponsorshipRequest, SponsorshipUsage } from './types.sponsorship';
 
 const FN_BASE = `${import.meta.env.PUBLIC_SUPABASE_URL}/functions/v1/sponsorships`;
 
@@ -90,4 +90,38 @@ export async function getUsage(id: string): Promise<SponsorshipUsage> {
   const r = await authedFetch(`/sponsorships/${id}/usage`);
   if (!r.ok) throw new Error(`getUsage: ${r.status}`);
   return r.json();
+}
+
+export async function createRequest(args: { sponsor_username: string; message?: string }): Promise<SponsorshipRequest> {
+  const r = await authedFetch('/requests', { method: 'POST', body: JSON.stringify(args) });
+  if (!r.ok) {
+    const body = await r.json().catch(() => ({}));
+    throw new Error(`createRequest: ${(body as { error?: string }).error ?? r.status}`);
+  }
+  return r.json();
+}
+
+export async function listRequests(role: 'requester' | 'sponsor'): Promise<SponsorshipRequest[]> {
+  const r = await authedFetch(`/requests?role=${role}`);
+  if (!r.ok) throw new Error(`listRequests: ${r.status}`);
+  return r.json();
+}
+
+export async function approveRequest(id: string, args: { credential_id: string; monthly_call_cap?: number; priority?: number }) {
+  const r = await authedFetch(`/requests/${id}/approve`, { method: 'POST', body: JSON.stringify(args) });
+  if (!r.ok) {
+    const body = await r.json().catch(() => ({}));
+    throw new Error(`approveRequest: ${(body as { error?: string }).error ?? r.status}`);
+  }
+  return r.json();
+}
+
+export async function rejectRequest(id: string): Promise<void> {
+  const r = await authedFetch(`/requests/${id}/reject`, { method: 'POST' });
+  if (!r.ok) throw new Error(`rejectRequest: ${r.status}`);
+}
+
+export async function withdrawRequest(id: string): Promise<void> {
+  const r = await authedFetch(`/requests/${id}`, { method: 'DELETE' });
+  if (!r.ok && r.status !== 204) throw new Error(`withdrawRequest: ${r.status}`);
 }
