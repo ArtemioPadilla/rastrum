@@ -4148,3 +4148,63 @@ $$;
 
 REVOKE ALL ON FUNCTION public.recompute_user_stats() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.recompute_user_stats() TO service_role;
+
+-- ============================================================
+-- Observation detail redesign — material edit tracking + soft-delete
+-- (2026-04-29) — see docs/superpowers/specs/2026-04-29-obs-detail-redesign-design.md
+-- ============================================================
+
+ALTER TABLE public.observations
+  ADD COLUMN IF NOT EXISTS last_material_edit_at timestamptz;
+
+ALTER TABLE public.media_files
+  ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
+
+CREATE INDEX IF NOT EXISTS idx_media_files_active
+  ON public.media_files (observation_id) WHERE deleted_at IS NULL;
+
+COMMENT ON COLUMN public.observations.last_material_edit_at IS
+  'Set by observations_material_edit_check_trg when the owner makes a material edit (location > 1 km, observed_at > 24 h, primary_taxon_id change, or photo soft-delete). NULL means no material edits since creation.';
+
+COMMENT ON COLUMN public.media_files.deleted_at IS
+  'Soft-delete sentinel. Non-NULL means the owner removed this photo via the obs detail Photos tab. R2 blob is NOT removed in v1; gc-orphan-media cron is a v1.1 follow-up.';
+
+CREATE OR REPLACE FUNCTION public.observations_material_edit_check()
+RETURNS trigger AS $$
+DECLARE
+  is_material boolean := false;
+BEGIN
+  -- Location moved more than 1 km
+  IF NEW.location IS DISTINCT FROM OLD.location AND OLD.location IS NOT NULL THEN
+    IF ST_Distance(NEW.location, OLD.location) > 1000 THEN
+      is_material := true;
+    END IF;
+  END IF;
+
+  -- observed_at moved more than 24 hours
+  IF NEW.observed_at IS DISTINCT FROM OLD.observed_at AND OLD.observed_at IS NOT NULL THEN
+    IF abs(extract(epoch FROM (NEW.observed_at - OLD.observed_at))) > 86400 THEN
+      is_material := true;
+    END IF;
+  END IF;
+
+  -- primary taxon changed (denormalized from identifications by sync_primary_id_trigger)
+  IF NEW.primary_taxon_id IS DISTINCT FROM OLD.primary_taxon_id THEN
+    is_material := true;
+  END IF;
+
+  IF is_material THEN
+    NEW.last_material_edit_at := now();
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS observations_material_edit_check_trg ON public.observations;
+CREATE TRIGGER observations_material_edit_check_trg
+  BEFORE UPDATE ON public.observations
+  FOR EACH ROW
+  EXECUTE FUNCTION public.observations_material_edit_check();
+
+NOTIFY pgrst, 'reload schema';

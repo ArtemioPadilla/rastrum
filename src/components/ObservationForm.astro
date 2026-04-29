@@ -1,6 +1,12 @@
 ---
 import { t } from '../i18n/utils';
 import MapPicker from './MapPicker.astro';
+import {
+  HABITATS,
+  WEATHERS,
+  ESTABLISHMENT_MEANS,
+  labelFor,
+} from '../lib/observation-enums';
 
 interface Props {
   lang: 'en' | 'es';
@@ -40,19 +46,10 @@ const draftSaveLabel = observeStringsForLabels.draft_save_button ?? (isEs ? 'Gua
 const dedupeContinueLabel = observeStringsForLabels.photo_dedupe_continue ?? (isEs ? 'Continuar' : 'Continue');
 const dedupeReplaceLabel  = observeStringsForLabels.photo_dedupe_replace  ?? (isEs ? 'Reemplazar' : 'Replace');
 
-const habitats = [
-  'forest_pine_oak','forest_oak','forest_pine',
-  'tropical_evergreen','tropical_subevergreen',
-  'cloud_forest','tropical_dry_forest',
-  'xerophytic','scrubland',
-  'riparian','wetland','grassland',
-  'agricultural','urban','coastal','reef','cave',
-];
-const habitatLabels = (tr.observe as any).habitat_options as Record<string,string> | undefined;
-const weathers = ['sunny','cloudy','overcast','light_rain','heavy_rain','fog','storm'];
-const weatherLabels = (tr.observe as any).weather_options as Record<string,string> | undefined;
-const establishmentMeans = ['wild','cultivated','captive','uncertain'] as const;
-const establishmentLabels = (tr.observe as any).establishment_means_options as Record<string,string> | undefined;
+const habitats = HABITATS;
+const weathers = WEATHERS;
+const establishmentMeans = ESTABLISHMENT_MEANS;
+const observeTree = tr.observe as unknown;
 
 // Pull strings into typed local consts so JSX never needs an inline
 // `Record<…>` cast (Astro/esbuild parses the angle brackets as a tag).
@@ -408,14 +405,14 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
         <label for="obs-habitat" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.observe.habitat}</label>
         <select id="obs-habitat" name="habitat" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
           <option value="">{tr.observe.habitat_placeholder}</option>
-          {habitats.map(h => <option value={h}>{habitatLabels?.[h] ?? h.replace(/_/g, ' ')}</option>)}
+          {habitats.map(h => <option value={h}>{labelFor(observeTree, 'habitat_options', h)}</option>)}
         </select>
       </div>
       <div>
         <label for="obs-weather" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.observe.weather}</label>
         <select id="obs-weather" name="weather" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
           <option value="">{tr.observe.weather_placeholder}</option>
-          {weathers.map(w => <option value={w}>{weatherLabels?.[w] ?? w.replace(/_/g, ' ')}</option>)}
+          {weathers.map(w => <option value={w}>{labelFor(observeTree, 'weather_options', w)}</option>)}
         </select>
       </div>
     </div>
@@ -436,7 +433,7 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
               checked={v === 'wild'}
             />
             <span class="inline-flex items-center rounded-full border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 peer-checked:bg-emerald-700 peer-checked:text-white peer-checked:border-emerald-700 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors">
-              {establishmentLabels?.[v] ?? v}
+              {labelFor(observeTree, 'establishment_means_options', v)}
             </span>
           </label>
         ))}
