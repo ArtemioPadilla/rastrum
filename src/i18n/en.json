@@ -1817,6 +1817,8 @@
     "anomalies": "Anomalies",
     "forensics": "Forensics & export",
     "features": "Feature flags",
+    "proposals": "Proposals",
+    "webhooks": "Webhooks",
     "bioblitz": "Bioblitz events",
     "modOverview": "Overview",
     "modFlagQueue": "Flag queue",
@@ -2336,6 +2338,83 @@
         "details": "details"
       },
       "empty": "No matches."
+    },
+
+    "proposalsView": {
+      "title": "Action proposals",
+      "description": "Two-person rule for irreversible actions. A proposal expires after 24 hours; the approver must differ from the proposer.",
+      "tabs": {
+        "pending": "Pending",
+        "all": "All"
+      },
+      "columns": {
+        "op": "Action",
+        "target": "Target",
+        "proposer": "Proposer",
+        "status": "Status",
+        "created": "Created",
+        "expires": "Expires"
+      },
+      "status": {
+        "pending": "Pending",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "expired": "Expired",
+        "executed": "Executed"
+      },
+      "actions": {
+        "approve": "Approve",
+        "reject": "Reject"
+      },
+      "slideOver": {
+        "approveTitle": "Approve proposal",
+        "rejectTitle": "Reject proposal",
+        "notes": "Notes (optional)"
+      },
+      "selfApprovalForbidden": "You cannot approve your own proposal.",
+      "empty": "No proposals match the current filter."
+    },
+
+    "webhooksView": {
+      "title": "Webhook subscriptions",
+      "description": "Outbound HMAC-SHA256-signed webhooks. Auto-disabled after 10 consecutive failures.",
+      "create": {
+        "heading": "New webhook",
+        "url": "URL (https://… required)",
+        "events": "Events",
+        "submit": "Create webhook",
+        "secretShown": "Secret (shown once — copy now):"
+      },
+      "events": {
+        "anomaly_created": "Anomaly created",
+        "user_banned": "User banned",
+        "user_unbanned": "User unbanned",
+        "role_granted": "Role granted",
+        "role_revoked": "Role revoked"
+      },
+      "columns": {
+        "url": "URL",
+        "events": "Events",
+        "enabled": "Enabled",
+        "lastDelivery": "Last delivery",
+        "consecutiveFailures": "Failures",
+        "actions": "Actions"
+      },
+      "actions": {
+        "test": "Test",
+        "disable": "Disable",
+        "enable": "Enable",
+        "delete": "Delete"
+      },
+      "deliveries": {
+        "heading": "Recent deliveries (last 20)",
+        "event": "Event",
+        "status": "Status",
+        "time": "Time",
+        "error": "Error"
+      },
+      "empty": "No webhooks configured.",
+      "deliveriesEmpty": "No deliveries yet."
     },
 
     "audit_op": {

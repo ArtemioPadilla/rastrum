@@ -56,6 +56,31 @@ interface AppealAcceptPayload { appeal_id: string }
 interface AppealRejectPayload { appeal_id: string; reviewer_note?: string }
 
 interface AnomalyAcknowledgePayload { anomalyId: string; notes?: string }
+
+interface ProposalCreatePayload {
+  targetOp: string;
+  targetType: string;
+  targetId: string;
+  payload: Record<string, unknown>;
+  reason: string;
+}
+interface ProposalApprovePayload { proposalId: string; notes?: string }
+interface ProposalRejectPayload { proposalId: string; reason: string }
+
+type WebhookEvent =
+  | 'anomaly_created'
+  | 'user_banned'
+  | 'user_unbanned'
+  | 'role_granted'
+  | 'role_revoked';
+interface WebhookCreatePayload { url: string; events: WebhookEvent[] }
+interface WebhookUpdatePayload {
+  webhookId: string;
+  url?: string;
+  events?: WebhookEvent[];
+  enabled?: boolean;
+}
+interface WebhookIdPayload { webhookId: string }
 interface AuditExportFilters {
   from?: string;
   to?: string;
@@ -181,4 +206,22 @@ export const adminClient = {
   },
   auditExport: (filters: AuditExportFilters, reason: string, jwt: string) =>
     call<AuditExportResult>('audit.export', filters, reason, jwt),
+  proposal: {
+    create: (payload: ProposalCreatePayload, reason: string, jwt: string) =>
+      call<{ proposalId: string; expiresAt: string }>('proposal.create', payload, reason, jwt),
+    approve: (payload: ProposalApprovePayload, reason: string, jwt: string) =>
+      call<{ executedAuditId: number }>('proposal.approve', payload, reason, jwt),
+    reject: (payload: ProposalRejectPayload, reason: string, jwt: string) =>
+      call('proposal.reject', payload, reason, jwt),
+  },
+  webhook: {
+    create: (payload: WebhookCreatePayload, reason: string, jwt: string) =>
+      call<{ id: string; secret: string }>('webhook.create', payload, reason, jwt),
+    update: (payload: WebhookUpdatePayload, reason: string, jwt: string) =>
+      call('webhook.update', payload, reason, jwt),
+    delete: (payload: WebhookIdPayload, reason: string, jwt: string) =>
+      call('webhook.delete', payload, reason, jwt),
+    test: (payload: WebhookIdPayload, reason: string, jwt: string) =>
+      call<{ statusCode: number | null; error: string | null }>('webhook.test', payload, reason, jwt),
+  },
 };

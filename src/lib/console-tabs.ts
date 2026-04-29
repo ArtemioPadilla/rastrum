@@ -34,6 +34,8 @@ export const CONSOLE_TABS: ConsoleTab[] = [
   { id: 'anomalies',      role: 'admin',     routeKey: 'consoleAnomalies',        i18nKey: 'console.anomalies',    icon: 'alert',       phase: 1 },
   { id: 'forensics',      role: 'admin',     routeKey: 'consoleForensics',        i18nKey: 'console.forensics',    icon: 'search',      phase: 1 },
   { id: 'features',       role: 'admin',     routeKey: 'consoleFeatureFlags',     i18nKey: 'console.features',     icon: 'toggle',      phase: 4 },
+  { id: 'proposals',      role: 'admin',     routeKey: 'consoleProposals',        i18nKey: 'console.proposals',    icon: 'gavel',       phase: 1 },
+  { id: 'webhooks',       role: 'admin',     routeKey: 'consoleWebhooks',         i18nKey: 'console.webhooks',     icon: 'plug',        phase: 1 },
   { id: 'bioblitz',       role: 'admin',     routeKey: 'consoleBioblitz',         i18nKey: 'console.bioblitz',     icon: 'calendar',    phase: 4 },
   // Moderator (5)
   { id: 'mod-overview',   role: 'moderator', routeKey: 'console',                 i18nKey: 'console.modOverview',   icon: 'gauge',      phase: 3 },

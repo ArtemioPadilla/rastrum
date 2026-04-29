@@ -1817,6 +1817,8 @@
     "anomalies": "Anomalías",
     "forensics": "Forenses y exportación",
     "features": "Banderas de funcionalidad",
+    "proposals": "Propuestas",
+    "webhooks": "Webhooks",
     "bioblitz": "Eventos bioblitz",
     "modOverview": "Resumen",
     "modFlagQueue": "Cola de banderas",
@@ -2336,6 +2338,83 @@
         "details": "detalles"
       },
       "empty": "Sin coincidencias."
+    },
+
+    "proposalsView": {
+      "title": "Propuestas de acción",
+      "description": "Regla de doble persona para acciones irreversibles. Una propuesta expira en 24 horas; quien aprueba debe ser distinto de quien propone.",
+      "tabs": {
+        "pending": "Pendientes",
+        "all": "Todas"
+      },
+      "columns": {
+        "op": "Acción",
+        "target": "Objetivo",
+        "proposer": "Propone",
+        "status": "Estado",
+        "created": "Creada",
+        "expires": "Expira"
+      },
+      "status": {
+        "pending": "Pendiente",
+        "approved": "Aprobada",
+        "rejected": "Rechazada",
+        "expired": "Expirada",
+        "executed": "Ejecutada"
+      },
+      "actions": {
+        "approve": "Aprobar",
+        "reject": "Rechazar"
+      },
+      "slideOver": {
+        "approveTitle": "Aprobar propuesta",
+        "rejectTitle": "Rechazar propuesta",
+        "notes": "Notas (opcional)"
+      },
+      "selfApprovalForbidden": "No puedes aprobar tu propia propuesta.",
+      "empty": "Ninguna propuesta coincide con el filtro actual."
+    },
+
+    "webhooksView": {
+      "title": "Suscripciones de webhooks",
+      "description": "Webhooks salientes firmados con HMAC-SHA256. Se desactivan automáticamente tras 10 fallos consecutivos.",
+      "create": {
+        "heading": "Nuevo webhook",
+        "url": "URL (se requiere https://…)",
+        "events": "Eventos",
+        "submit": "Crear webhook",
+        "secretShown": "Secreto (se muestra una sola vez — cópialo ahora):"
+      },
+      "events": {
+        "anomaly_created": "Anomalía creada",
+        "user_banned": "Usuario suspendido",
+        "user_unbanned": "Usuario rehabilitado",
+        "role_granted": "Rol otorgado",
+        "role_revoked": "Rol revocado"
+      },
+      "columns": {
+        "url": "URL",
+        "events": "Eventos",
+        "enabled": "Activo",
+        "lastDelivery": "Última entrega",
+        "consecutiveFailures": "Fallos",
+        "actions": "Acciones"
+      },
+      "actions": {
+        "test": "Probar",
+        "disable": "Desactivar",
+        "enable": "Activar",
+        "delete": "Eliminar"
+      },
+      "deliveries": {
+        "heading": "Entregas recientes (últimas 20)",
+        "event": "Evento",
+        "status": "Estado",
+        "time": "Hora",
+        "error": "Error"
+      },
+      "empty": "No hay webhooks configurados.",
+      "deliveriesEmpty": "Aún no hay entregas."
     },
 
     "audit_op": {

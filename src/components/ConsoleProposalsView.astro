@@ -1,0 +1,352 @@
+---
+/**
+ * ConsoleProposalsView — admin-only view of admin_action_proposals rows.
+ * Two filters: Pending (default) vs All. Each pending row that the
+ * viewer didn't propose gets Approve / Reject buttons. Approve and
+ * Reject open the shared ConsoleSlideOver to capture a reason; submit
+ * goes through proposal.approve / proposal.reject.
+ */
+import { t } from '../i18n/utils';
+import ConsoleSlideOver from './ConsoleSlideOver.astro';
+
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+const c = tr.console as unknown as Record<string, string>;
+const pNs = (tr.console as unknown as Record<string, Record<string, unknown>>).proposalsView as
+  unknown as Record<string, Record<string, string> | string>;
+const pTitle  = (pNs?.title as string) ?? 'Action proposals';
+const pDesc   = (pNs?.description as string) ?? '';
+const pTabs   = (pNs?.tabs as Record<string, string>) ?? {};
+const pCols   = (pNs?.columns as Record<string, string>) ?? {};
+const pStatus = (pNs?.status as Record<string, string>) ?? {};
+const pActions = (pNs?.actions as Record<string, string>) ?? {};
+const pSlide   = (pNs?.slideOver as Record<string, string>) ?? {};
+const pEmpty   = (pNs?.empty as string) ?? 'No proposals.';
+const pSelfApproval = (pNs?.selfApprovalForbidden as string) ?? 'You cannot approve your own proposal.';
+---
+
+<section
+  class="max-w-6xl"
+  data-label-status-pending={pStatus.pending}
+  data-label-status-approved={pStatus.approved}
+  data-label-status-rejected={pStatus.rejected}
+  data-label-status-expired={pStatus.expired}
+  data-label-status-executed={pStatus.executed}
+  data-label-self-approval={pSelfApproval}
+  data-label-approve-title={pSlide.approveTitle ?? 'Approve proposal'}
+  data-label-reject-title={pSlide.rejectTitle ?? 'Reject proposal'}
+>
+  <h1 class="text-xl font-semibold mb-1">{pTitle}</h1>
+  <p class="mb-4 text-sm text-zinc-500 dark:text-zinc-400">{pDesc}</p>
+
+  <div id="proposals-not-auth" class="hidden rounded border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-900 dark:text-amber-100">
+    {tr.console.not_authorized}
+  </div>
+
+  <div id="proposals-shell" class="hidden space-y-3">
+    <div class="flex flex-wrap items-center gap-2">
+      <div class="flex rounded border border-zinc-300 dark:border-zinc-700 overflow-hidden text-sm">
+        <button id="proposals-toggle-pending" class="px-3 py-1.5 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-medium">
+          {pTabs.pending ?? 'Pending'}
+        </button>
+        <button id="proposals-toggle-all" class="px-3 py-1.5 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300">
+          {pTabs.all ?? 'All'}
+        </button>
+      </div>
+    </div>
+
+    <div id="proposals-loading" class="text-sm text-zinc-500 italic">{c.loading}</div>
+    <div id="proposals-empty" class="hidden rounded border border-dashed border-zinc-200 dark:border-zinc-700 p-6 text-center text-sm text-zinc-500">
+      {pEmpty}
+    </div>
+    <div id="proposals-rows" class="hidden overflow-x-auto rounded border border-zinc-200 dark:border-zinc-800">
+      <table class="min-w-full text-sm">
+        <thead class="bg-zinc-50 dark:bg-zinc-900/40 text-left text-xs uppercase tracking-wide text-zinc-500">
+          <tr>
+            <th class="px-3 py-2">{pCols.op ?? 'Action'}</th>
+            <th class="px-3 py-2">{pCols.target ?? 'Target'}</th>
+            <th class="px-3 py-2">{pCols.proposer ?? 'Proposer'}</th>
+            <th class="px-3 py-2">{pCols.status ?? 'Status'}</th>
+            <th class="px-3 py-2">{pCols.created ?? 'Created'}</th>
+            <th class="px-3 py-2">{pCols.expires ?? 'Expires'}</th>
+            <th class="px-3 py-2"></th>
+          </tr>
+        </thead>
+        <tbody id="proposals-tbody" class="divide-y divide-zinc-100 dark:divide-zinc-800"></tbody>
+      </table>
+    </div>
+
+    <p id="proposals-error" class="hidden text-sm text-red-600 dark:text-red-400"></p>
+  </div>
+</section>
+
+<ConsoleSlideOver
+  lang={lang}
+  id="console-slideover-proposal-approve"
+  titleKey={pSlide.approveTitle ?? 'Approve proposal'}
+>
+  <label class="block text-sm">
+    <span class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+      {pSlide.notes ?? 'Notes (optional)'}
+    </span>
+    <textarea id="proposal-approve-notes" rows="2" maxlength="2000" class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-2 text-sm"></textarea>
+  </label>
+</ConsoleSlideOver>
+
+<ConsoleSlideOver
+  lang={lang}
+  id="console-slideover-proposal-reject"
+  titleKey={pSlide.rejectTitle ?? 'Reject proposal'}
+/>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { getUserRoles } from '../lib/user-roles';
+  import { adminClient, AdminClientError } from '../lib/admin-client';
+
+  type ProposalRow = {
+    id: string;
+    proposer_id: string;
+    op: string;
+    target_type: string;
+    target_id: string;
+    payload: Record<string, unknown>;
+    reason: string;
+    status: 'pending' | 'approved' | 'rejected' | 'expired' | 'executed';
+    approver_id: string | null;
+    approved_at: string | null;
+    rejected_at: string | null;
+    executed_at: string | null;
+    expires_at: string;
+    created_at: string;
+  };
+
+  type ActorMeta = { username: string | null; display_name: string | null };
+
+  const sectionEl = document.querySelector<HTMLElement>('section[data-label-status-pending]');
+  const statusLabels: Record<string, string> = {
+    pending:  sectionEl?.dataset.labelStatusPending  ?? 'Pending',
+    approved: sectionEl?.dataset.labelStatusApproved ?? 'Approved',
+    rejected: sectionEl?.dataset.labelStatusRejected ?? 'Rejected',
+    expired:  sectionEl?.dataset.labelStatusExpired  ?? 'Expired',
+    executed: sectionEl?.dataset.labelStatusExecuted ?? 'Executed',
+  };
+  const SELF_APPROVAL_MSG = sectionEl?.dataset.labelSelfApproval ?? 'You cannot approve your own proposal.';
+
+  let allRows: ProposalRow[] = [];
+  let actors: Record<string, ActorMeta> = {};
+  let filterPending = true;
+  let jwt: string | null = null;
+  let viewerId: string | null = null;
+
+  function show(id: string) { document.getElementById(id)?.classList.remove('hidden'); }
+  function hide(id: string) { document.getElementById(id)?.classList.add('hidden'); }
+  function esc(s: string): string {
+    return s.replace(/[<>&'"]/g, ch => ({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&#39;','"':'&quot;'}[ch]!));
+  }
+
+  function actorLabel(id: string | null): string {
+    if (!id) return '—';
+    const meta = actors[id];
+    if (meta?.username) return meta.username;
+    if (meta?.display_name) return meta.display_name;
+    return id.slice(0, 8) + '…';
+  }
+
+  function statusPill(status: string): string {
+    const palette: Record<string, string> = {
+      pending:  'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300',
+      approved: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300',
+      executed: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300',
+      rejected: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300',
+      expired:  'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400',
+    };
+    const cls = palette[status] ?? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700';
+    return `<span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${cls}">${esc(statusLabels[status] ?? status)}</span>`;
+  }
+
+  function fmtDate(iso: string): string {
+    return new Date(iso).toISOString().replace('T', ' ').slice(0, 16);
+  }
+
+  function renderRows() {
+    const rows = filterPending ? allRows.filter(r => r.status === 'pending') : allRows;
+    const empty = document.getElementById('proposals-empty');
+    const wrap = document.getElementById('proposals-rows');
+    const tbody = document.getElementById('proposals-tbody');
+    if (!tbody || !wrap || !empty) return;
+
+    if (rows.length === 0) {
+      wrap.classList.add('hidden');
+      empty.classList.remove('hidden');
+      return;
+    }
+    empty.classList.add('hidden');
+    wrap.classList.remove('hidden');
+
+    tbody.innerHTML = rows.map(r => {
+      const isOwn = r.proposer_id === viewerId;
+      const canAct = r.status === 'pending' && !isOwn;
+      return `
+        <tr>
+          <td class="px-3 py-2 font-mono text-xs">${esc(r.op)}</td>
+          <td class="px-3 py-2 text-xs text-zinc-500">${esc(r.target_type)}/${esc(r.target_id.slice(0, 8))}…</td>
+          <td class="px-3 py-2 text-zinc-700 dark:text-zinc-300">${esc(actorLabel(r.proposer_id))}</td>
+          <td class="px-3 py-2">${statusPill(r.status)}</td>
+          <td class="px-3 py-2 text-xs text-zinc-500">${esc(fmtDate(r.created_at))}</td>
+          <td class="px-3 py-2 text-xs text-zinc-500">${esc(fmtDate(r.expires_at))}</td>
+          <td class="px-3 py-2 text-right">
+            ${canAct
+              ? `<button data-approve-id="${esc(r.id)}" class="px-2 py-1 rounded border border-emerald-600 text-xs text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 mr-1">Approve</button>
+                 <button data-reject-id="${esc(r.id)}" class="px-2 py-1 rounded border border-red-500 text-xs text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">Reject</button>`
+              : (r.status === 'pending' && isOwn
+                ? `<span class="text-[11px] text-zinc-500 italic">${esc(SELF_APPROVAL_MSG)}</span>`
+                : '')}
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    tbody.querySelectorAll<HTMLElement>('[data-approve-id]').forEach(btn => {
+      btn.addEventListener('click', () => openSlideOver('approve', btn.dataset.approveId!));
+    });
+    tbody.querySelectorAll<HTMLElement>('[data-reject-id]').forEach(btn => {
+      btn.addEventListener('click', () => openSlideOver('reject', btn.dataset.rejectId!));
+    });
+  }
+
+  function openSlideOver(kind: 'approve' | 'reject', proposalId: string) {
+    const row = allRows.find(r => r.id === proposalId);
+    if (!row) return;
+    const id = kind === 'approve' ? 'console-slideover-proposal-approve' : 'console-slideover-proposal-reject';
+    const title = `${kind === 'approve' ? 'Approve' : 'Reject'} ${row.op}`;
+    const action = kind === 'approve' ? 'proposal.approve' : 'proposal.reject';
+    if (kind === 'approve') {
+      const notesEl = document.getElementById('proposal-approve-notes') as HTMLTextAreaElement | null;
+      if (notesEl) notesEl.value = '';
+    }
+    document.dispatchEvent(new CustomEvent('console:slideover-open', {
+      detail: { id, title, action, payload: { proposalId } },
+    }));
+  }
+
+  async function init() {
+    let supabase;
+    try { supabase = getSupabase(); } catch {
+      show('proposals-not-auth');
+      return;
+    }
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { show('proposals-not-auth'); return; }
+    viewerId = session.user.id;
+    const myRoles = await getUserRoles(session.user.id);
+    if (!myRoles.has('admin')) { show('proposals-not-auth'); return; }
+    jwt = session.access_token;
+
+    show('proposals-shell');
+
+    const { data, error } = await supabase
+      .from('admin_action_proposals')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    hide('proposals-loading');
+
+    if (error) {
+      const e = document.getElementById('proposals-error');
+      if (e) { e.textContent = error.message; e.classList.remove('hidden'); }
+      return;
+    }
+
+    allRows = (data ?? []) as ProposalRow[];
+
+    const ids = [...new Set(allRows.map(r => r.proposer_id))];
+    if (ids.length > 0) {
+      const { data: users } = await supabase
+        .from('users')
+        .select('id, username, display_name')
+        .in('id', ids);
+      for (const u of (users ?? []) as Array<{ id: string; username: string | null; display_name: string | null }>) {
+        actors[u.id] = { username: u.username, display_name: u.display_name };
+      }
+    }
+
+    renderRows();
+
+    document.getElementById('proposals-toggle-pending')?.addEventListener('click', () => {
+      filterPending = true;
+      const a = document.getElementById('proposals-toggle-pending');
+      const b = document.getElementById('proposals-toggle-all');
+      a?.classList.add('bg-zinc-900', 'dark:bg-zinc-100', 'text-white', 'dark:text-zinc-900', 'font-medium');
+      a?.classList.remove('bg-white', 'dark:bg-zinc-900', 'text-zinc-700', 'dark:text-zinc-300');
+      b?.classList.remove('bg-zinc-900', 'dark:bg-zinc-100', 'text-white', 'dark:text-zinc-900', 'font-medium');
+      b?.classList.add('bg-white', 'dark:bg-zinc-900', 'text-zinc-700', 'dark:text-zinc-300');
+      renderRows();
+    });
+    document.getElementById('proposals-toggle-all')?.addEventListener('click', () => {
+      filterPending = false;
+      const a = document.getElementById('proposals-toggle-pending');
+      const b = document.getElementById('proposals-toggle-all');
+      b?.classList.add('bg-zinc-900', 'dark:bg-zinc-100', 'text-white', 'dark:text-zinc-900', 'font-medium');
+      b?.classList.remove('bg-white', 'dark:bg-zinc-900', 'text-zinc-700', 'dark:text-zinc-300');
+      a?.classList.remove('bg-zinc-900', 'dark:bg-zinc-100', 'text-white', 'dark:text-zinc-900', 'font-medium');
+      a?.classList.add('bg-white', 'dark:bg-zinc-900', 'text-zinc-700', 'dark:text-zinc-300');
+      renderRows();
+    });
+  }
+
+  document.addEventListener('console:slideover-submit', async (ev) => {
+    const detail = (ev as CustomEvent<{ id: string; action: string; payload: { proposalId: string }; reason: string }>).detail;
+    if (detail.id !== 'console-slideover-proposal-approve' && detail.id !== 'console-slideover-proposal-reject') return;
+    if (!jwt) {
+      document.dispatchEvent(new CustomEvent('console:slideover-done', {
+        detail: { id: detail.id, ok: false, error: 'Not signed in' },
+      }));
+      return;
+    }
+    try {
+      if (detail.action === 'proposal.approve') {
+        const notesEl = document.getElementById('proposal-approve-notes') as HTMLTextAreaElement | null;
+        const notes = notesEl?.value.trim() || undefined;
+        await adminClient.proposal.approve(
+          { proposalId: detail.payload.proposalId, notes },
+          detail.reason,
+          jwt,
+        );
+      } else {
+        await adminClient.proposal.reject(
+          { proposalId: detail.payload.proposalId, reason: detail.reason },
+          detail.reason,
+          jwt,
+        );
+      }
+      // Reload the affected row.
+      const supabase = getSupabase();
+      const { data: refreshed } = await supabase
+        .from('admin_action_proposals')
+        .select('*')
+        .eq('id', detail.payload.proposalId)
+        .maybeSingle();
+      if (refreshed) {
+        const idx = allRows.findIndex(r => r.id === detail.payload.proposalId);
+        if (idx >= 0) allRows[idx] = refreshed as ProposalRow;
+      }
+      renderRows();
+      document.dispatchEvent(new CustomEvent('console:slideover-done', {
+        detail: { id: detail.id, ok: true },
+      }));
+    } catch (err) {
+      document.dispatchEvent(new CustomEvent('console:slideover-done', {
+        detail: {
+          id: detail.id,
+          ok: false,
+          error: err instanceof AdminClientError ? err.message : String(err),
+        },
+      }));
+    }
+  });
+
+  init().catch(() => { show('proposals-not-auth'); });
+</script>
