@@ -4675,7 +4675,8 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.project_members TO service_role;
 -- gets only public rows; owners + members see private + public; service
 -- role sees all. supabase-js consumers use this instead of selecting
 -- `polygon` directly (PostgREST returns geography as base64 WKB).
-CREATE OR REPLACE VIEW public.projects_with_geojson AS
+CREATE OR REPLACE VIEW public.projects_with_geojson
+  WITH (security_invoker = true) AS
 SELECT
   p.id,
   p.slug,
