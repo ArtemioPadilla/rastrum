@@ -1,8 +1,19 @@
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { sendEmail } from './email.ts';
 
-export type Provider = 'anthropic';
-export type CredentialKind = 'api_key' | 'oauth_token';
+// Provider variants from M27.1 (#116/#118). Direct-Anthropic remains
+// the default; the rest are gated by the credential row's `provider`
+// column. This file's helpers are still anthropic-flavoured; the
+// vision-provider abstraction lives in `vision-provider.ts`.
+export type Provider = 'anthropic' | 'bedrock' | 'openai' | 'azure_openai' | 'gemini' | 'vertex_ai';
+export type CredentialKind =
+  | 'api_key'
+  | 'oauth_token'
+  | 'bedrock'
+  | 'openai_api_key'
+  | 'azure_openai'
+  | 'gemini_api_key'
+  | 'vertex_ai';
 
 function escHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -17,6 +28,10 @@ export interface ResolvedSponsorship {
   kind:          CredentialKind;
   usedThisMonth: number;
   monthlyCap:    number;
+  /** Per-credential model override (M27.1, #116). Default 'claude-haiku-4-5'. */
+  preferredModel: string;
+  /** Azure OpenAI deployment URL or Vertex AI region; NULL for direct providers. */
+  endpoint:       string | null;
 }
 
 export function pickAuthHeader(kind: CredentialKind, secret: string): HeadersInit {
@@ -40,6 +55,7 @@ export async function resolveSponsorship(
     sponsorship_id: string; sponsor_id: string; credential_id: string;
     vault_secret_id: string; kind: CredentialKind;
     used_this_month: number; monthly_call_cap: number;
+    preferred_model?: string; endpoint?: string | null;
   }>)[0];
   return {
     sponsorshipId: row.sponsorship_id,
@@ -49,6 +65,8 @@ export async function resolveSponsorship(
     kind:          row.kind,
     usedThisMonth: row.used_this_month,
     monthlyCap:    row.monthly_call_cap,
+    preferredModel: row.preferred_model ?? 'claude-haiku-4-5',
+    endpoint:       row.endpoint ?? null,
   };
 }
 

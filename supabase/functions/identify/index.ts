@@ -35,10 +35,15 @@ import {
   checkAndBumpRateLimit,
   autoPauseSponsorship,
   maybeNotifyThreshold,
-  pickAuthHeader,
   type ResolvedSponsorship,
   type CredentialKind,
 } from '../_shared/sponsorship.ts';
+import {
+  buildProvider,
+  DEFAULT_SYSTEM_PROMPT,
+  type ResolvedCredential,
+  type VisionResult,
+} from '../_shared/vision-provider.ts';
 
 type IdentifyRequest = {
   observation_id: string;
@@ -148,6 +153,10 @@ async function callPlantNet(
 interface ClaudeContext {
   lat?: number;
   lng?: number;
+  /** When set, overrides the credential.kind → provider mapping. Used
+   *  for sponsored / pool calls where the provider/model came from
+   *  the sponsor_credentials row. */
+  resolvedCredential?: ResolvedCredential;
   plantnet_candidates?: string[];
   /**
    * Pre-resolved Anthropic credential. Either the BYO key forwarded by the
@@ -163,16 +172,32 @@ async function callClaudeHaiku(
   mimeType: string,
   context: ClaudeContext,
 ): Promise<IDResult | null> {
+  // Multi-provider path (M27.1, #116/#118): when a resolved credential
+  // is supplied, dispatch via the abstraction layer. The legacy
+  // BYO-key path (no resolvedCredential, just `credential`) falls
+  // through to direct-Anthropic for backwards compat.
+  if (context.resolvedCredential) {
+    return await callViaProvider(imageBytes, mimeType, context, context.resolvedCredential);
+  }
   if (!context.credential) return null;
 
-  const b64 = bytesToBase64(imageBytes);
+  // Legacy BYO direct-Anthropic path.
+  const legacyCred: ResolvedCredential = {
+    kind: context.credential.kind,
+    secret: context.credential.secret,
+    model: 'claude-haiku-4-5',
+    endpoint: null,
+  };
+  return await callViaProvider(imageBytes, mimeType, context, legacyCred);
+}
 
-  const systemPrompt = [
-    'You are a field biologist assistant specializing in Mexican biodiversity.',
-    'Identify the species in the photo. Respond ONLY with valid JSON matching the schema.',
-    'If you cannot identify, set confidence to 0 and explain in notes.',
-    'Focus on species found in Mexico, Central America, and the Caribbean.',
-  ].join('\n');
+async function callViaProvider(
+  imageBytes: Uint8Array,
+  mimeType: string,
+  context: ClaudeContext,
+  cred: ResolvedCredential,
+): Promise<IDResult | null> {
+  const b64 = bytesToBase64(imageBytes);
 
   const userText = context.plantnet_candidates?.length
     ? `PlantNet suggests: ${context.plantnet_candidates.join(', ')}. Confirm or correct.`
@@ -180,58 +205,36 @@ async function callClaudeHaiku(
       ? `Location: ${context.lat}, ${context.lng}. Identify this species.`
       : 'Identify this species.';
 
-  const body = {
-    model: 'claude-haiku-4-5',
-    max_tokens: 512,
-    system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
-    messages: [{
-      role: 'user',
-      content: [
-        { type: 'image', source: { type: 'base64', media_type: mimeType, data: b64 } },
-        { type: 'text', text: userText + '\n\nRespond with JSON only: {"scientific_name": "", "common_name_es": "", "common_name_en": "", "family": "", "kingdom": "Plantae|Animalia|Fungi|Unknown", "confidence": 0.0, "nom_059_status": null, "notes": null, "alternative_species": []}' },
-      ],
-    }],
-  };
-
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: pickAuthHeader(context.credential.kind, context.credential.secret),
-    body: JSON.stringify(body),
-    signal: context.signal,
-  });
-  if (!res.ok) return null;
-
-  const json = await res.json() as {
-    content: Array<{ type: string; text?: string }>;
-    usage?: { input_tokens?: number; output_tokens?: number };
-  };
-  const textBlock = json.content?.find(c => c.type === 'text');
-  if (!textBlock?.text) return null;
-
-  const cleaned = textBlock.text.replace(/^```(?:json)?\s*|\s*```$/g, '').trim();
-  let parsed: {
-    scientific_name: string;
-    common_name_es: string | null;
-    common_name_en: string | null;
-    family: string | null;
-    kingdom: IDResult['kingdom'];
-    confidence: number;
-  };
+  let provider;
   try {
-    parsed = JSON.parse(cleaned);
-  } catch {
+    provider = buildProvider(cred);
+  } catch (err) {
+    console.warn(`[identify] buildProvider failed for kind=${cred.kind}: ${err instanceof Error ? err.message : String(err)}`);
     return null;
   }
-
+  let visionResult: VisionResult | null;
+  try {
+    visionResult = await provider.identify({
+      imageBase64: b64,
+      mimeType,
+      systemPrompt: DEFAULT_SYSTEM_PROMPT,
+      userText,
+      signal: context.signal,
+    });
+  } catch (err) {
+    console.warn(`[identify] provider.identify failed kind=${cred.kind}: ${err instanceof Error ? err.message : String(err)}`);
+    return null;
+  }
+  if (!visionResult) return null;
   return {
-    scientific_name: parsed.scientific_name,
-    common_name_es: parsed.common_name_es,
-    common_name_en: parsed.common_name_en,
-    kingdom: parsed.kingdom,
-    family: parsed.family,
-    confidence: parsed.confidence,
-    source: 'claude_haiku',
-    raw: json,
+    scientific_name: visionResult.scientific_name,
+    common_name_es:  visionResult.common_name_es,
+    common_name_en:  visionResult.common_name_en,
+    kingdom:         visionResult.kingdom,
+    family:          visionResult.family,
+    confidence:      visionResult.confidence,
+    source:          visionResult.source as IDResult['source'],
+    raw:             visionResult.raw,
   };
 }
 
@@ -414,10 +417,14 @@ serve(async (req) => {
   // Decide what credential the Claude runner gets. Order:
   //   1. BYO key forwarded by the client.
   //   2. Sponsor-supplied credential resolved via _shared/sponsorship.ts.
-  //   3. Nothing — the Claude runner is skipped (no operator-key fallback).
+  //   3. Platform pool (M27.2, #115) — round-robin across active pools,
+  //      enforced by `consume_pool_slot()` SQL RPC.
+  //   4. Nothing — the Claude runner is skipped (no operator-key fallback).
   let claudeCred: { secret: string; kind: CredentialKind } | null = null;
+  let resolvedClaudeCred: ResolvedCredential | null = null;
   let sponsorshipCtx: ResolvedSponsorship | null = null;
   let sponsorshipSkipReason: string | null = null;
+  let poolUsed: { poolId: string; credentialId: string } | null = null;
 
   if (byoAnthropic) {
     claudeCred = { secret: byoAnthropic, kind: 'api_key' };
@@ -437,6 +444,46 @@ serve(async (req) => {
         if (sponsorshipCtx) {
           const secret = await decryptCredential(db(), sponsorshipCtx.vaultSecretId);
           claudeCred = { secret, kind: sponsorshipCtx.kind };
+          resolvedClaudeCred = {
+            kind:     sponsorshipCtx.kind as ResolvedCredential['kind'],
+            secret,
+            model:    sponsorshipCtx.preferredModel,
+            endpoint: sponsorshipCtx.endpoint,
+          };
+        } else {
+          // Step 3: platform pool. Atomic increment of pool.used + per-user
+          // daily count via consume_pool_slot RPC. Returns null when no pool
+          // has capacity OR the user has hit their daily cap.
+          const { data: poolRows, error: poolErr } = await db().rpc('consume_pool_slot', {
+            p_user_id: beneficiaryId,
+          });
+          if (poolErr) {
+            console.warn(`[identify] consume_pool_slot failed: ${poolErr.message}`);
+          } else if (Array.isArray(poolRows) && poolRows.length > 0) {
+            const slot = poolRows[0] as {
+              pool_id: string; credential_id: string; preferred_model: string;
+            };
+            // Look up the credential to fetch vault_secret_id + kind + endpoint.
+            const { data: credRow, error: credErr } = await db()
+              .from('sponsor_credentials')
+              .select('kind, vault_secret_id, endpoint')
+              .eq('id', slot.credential_id)
+              .single();
+            if (credErr) {
+              console.warn(`[identify] pool credential lookup failed: ${credErr.message}`);
+            } else if (credRow) {
+              const secret = await decryptCredential(db(), (credRow as { vault_secret_id: string }).vault_secret_id);
+              const kind = (credRow as { kind: CredentialKind }).kind;
+              claudeCred = { secret, kind };
+              resolvedClaudeCred = {
+                kind:     kind as ResolvedCredential['kind'],
+                secret,
+                model:    slot.preferred_model,
+                endpoint: (credRow as { endpoint: string | null }).endpoint,
+              };
+              poolUsed = { poolId: slot.pool_id, credentialId: slot.credential_id };
+            }
+          }
         }
       }
     } catch (err) {
@@ -454,6 +501,7 @@ serve(async (req) => {
       lat: body.location?.lat,
       lng: body.location?.lng,
       credential: claudeCred ?? undefined,
+      resolvedCredential: resolvedClaudeCred ?? undefined,
     });
   } else {
     // Default: race PlantNet, Claude Haiku, and (placeholder) ONNX-base in
@@ -469,6 +517,7 @@ serve(async (req) => {
       lat: body.location?.lat,
       lng: body.location?.lng,
       credential: claudeCred ?? undefined,
+      resolvedCredential: resolvedClaudeCred ?? undefined,
       signal,
     });
     runners.onnx_base = (signal) => callOnnxBase(imageBytes, signal);
