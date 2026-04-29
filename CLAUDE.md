@@ -41,7 +41,7 @@ make help                     # list every target with descriptions
 make install                  # npm ci
 make dev                      # astro dev — http://localhost:4321
 make build                    # static build into dist/
-make test                     # vitest run (~454 tests today)
+make test                     # vitest run (~465 tests today)
 make typecheck                # tsc --noEmit
 make db-apply                 # apply supabase-schema.sql (idempotent)
 make db-verify                # show tables, RLS, triggers, extensions
@@ -444,7 +444,7 @@ The validate gate is the fix.
 
 ```bash
 npm run typecheck   # tsc --noEmit, zero errors
-npm run test        # vitest run — 225 tests today, all green
+npm run test        # vitest run — ~465 tests today, all green
 npm run build       # zero errors, 57 pages today, EN/ES paired
 git status -s       # nothing untracked except .claude/ or .env.local
 ```
