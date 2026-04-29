@@ -122,7 +122,17 @@ const tr = t(lang);
   <p id="obs-error" class="hidden mt-3 text-sm text-red-600 dark:text-red-400"></p>
 </section>
 
-<ConsoleSlideOver lang={lang} id="console-slideover-obs" titleKey={tr.console.obs_action_title}>
+<ConsoleSlideOver
+  lang={lang}
+  id="console-slideover-obs"
+  titleKey={tr.console.obs_action_title}
+  reasonTemplates={[
+    tr.console.reason_stock_photo,
+    tr.console.reason_privacy_violation,
+    tr.console.reason_hate_speech,
+    tr.console.quick_reason_custom,
+  ]}
+>
   <!-- Obscure fields (shown for obscure action) -->
   <div id="slideover-obs-obscure-fields" class="hidden space-y-2">
     <label class="block">

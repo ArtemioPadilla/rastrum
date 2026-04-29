@@ -4,6 +4,13 @@
  * Hidden by default; toggled via DOM events from the parent view.
  * Required reason field + Cancel / Submit. The submit handler is wired
  * by the parent via a custom event ('console:slideover-submit').
+ *
+ * Improvement 1: Quick-reason pill row above the textarea.
+ * Improvement 5: Sticky bottom button row on mobile; safe-area-inset padding.
+ *
+ * Reason templates are passed via `reasonTemplates` prop (localized string
+ * array). The parent view always provides translated labels — no hardcoded
+ * English here. "Custom…" pill clears + focuses the textarea.
  */
 import { t } from '../i18n/utils';
 
@@ -11,32 +18,58 @@ interface Props {
   lang: 'en' | 'es';
   id: string;
   titleKey: string;
+  reasonTemplates?: string[];
 }
 
-const { lang, id, titleKey } = Astro.props;
+const { lang, id, titleKey, reasonTemplates } = Astro.props;
 const tr = t(lang);
+
+const defaultTemplates: string[] = [];
+const templates = reasonTemplates ?? defaultTemplates;
+const customLabel = tr.console.quick_reason_custom;
 ---
 
 <div id={id} class="hidden fixed inset-0 z-50 pointer-events-none">
   <div class="absolute inset-0 bg-black/40 pointer-events-auto" data-slideover-backdrop></div>
-  <aside class="absolute right-0 top-0 bottom-0 w-full md:w-[420px] bg-white dark:bg-zinc-950 border-l border-zinc-200 dark:border-zinc-800 shadow-xl pointer-events-auto overflow-y-auto p-5 flex flex-col gap-3">
-    <header class="flex justify-between items-start">
-      <h2 data-slideover-title class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">{titleKey}</h2>
-      <button type="button" data-slideover-close class="text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 text-xl leading-none">&times;</button>
-    </header>
-    <div data-slideover-fields class="space-y-3 text-sm">
-      <slot />
+  <aside class="absolute right-0 top-0 bottom-0 w-full md:w-[420px] bg-white dark:bg-zinc-950 border-l border-zinc-200 dark:border-zinc-800 shadow-xl pointer-events-auto flex flex-col">
+    <!-- Scrollable content area -->
+    <div class="flex-1 overflow-y-auto p-5 flex flex-col gap-3">
+      <header class="flex justify-between items-start">
+        <h2 data-slideover-title class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">{titleKey}</h2>
+        <button type="button" data-slideover-close class="text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 text-xl leading-none">&times;</button>
+      </header>
+      <div data-slideover-fields class="space-y-3 text-sm">
+        <slot />
+      </div>
+      <div class="space-y-2">
+        <label class="block text-sm">
+          <span class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.console.slideover_reason_label}</span>
+          {templates.length > 0 && (
+            <div data-reason-pills class="flex flex-wrap gap-1.5 mb-2">
+              <span class="text-[10px] text-zinc-500 self-center">{tr.console.quick_reasons_label}</span>
+              {templates.map(tmpl => (
+                <button
+                  type="button"
+                  data-reason-pill={tmpl === customLabel ? '__custom__' : tmpl}
+                  class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] border border-zinc-300 dark:border-zinc-600 text-zinc-700 dark:text-zinc-300 hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
+                >
+                  {tmpl}
+                </button>
+              ))}
+            </div>
+          )}
+          <textarea data-slideover-reason rows="3" class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-2 text-sm" placeholder={tr.console.slideover_reason_placeholder}></textarea>
+        </label>
+        <p data-slideover-error class="hidden text-sm text-red-600 dark:text-red-400"></p>
+      </div>
+      <p class="text-[10px] text-zinc-500">{tr.console.slideover_audit_note}</p>
     </div>
-    <label class="block text-sm">
-      <span class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.console.slideover_reason_label}</span>
-      <textarea data-slideover-reason rows="3" class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-2 text-sm" placeholder={tr.console.slideover_reason_placeholder}></textarea>
-    </label>
-    <p data-slideover-error class="hidden text-sm text-red-600 dark:text-red-400"></p>
-    <div class="mt-auto flex justify-end gap-2 pt-3">
+
+    <!-- Sticky bottom button row — sticky on mobile, relative on md+ -->
+    <div class="sticky bottom-0 md:relative flex justify-end gap-2 px-5 py-3 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950" style="padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0.75rem));">
       <button type="button" data-slideover-cancel class="px-3 py-1.5 rounded text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-900">{tr.console.slideover_cancel}</button>
       <button type="button" data-slideover-submit class="px-3 py-1.5 rounded bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium">{tr.console.slideover_submit}</button>
     </div>
-    <p class="text-[10px] text-zinc-500 mt-1">{tr.console.slideover_audit_note}</p>
   </aside>
 </div>
 
@@ -76,6 +109,23 @@ const tr = t(lang);
     const target = ev.target as HTMLElement;
     if (target.matches('[data-slideover-backdrop], [data-slideover-close], [data-slideover-cancel]')) {
       closePanel(target);
+      return;
+    }
+
+    // Quick-reason pill click
+    const pill = target.closest<HTMLElement>('[data-reason-pill]');
+    if (pill) {
+      const root = pill.closest<HTMLElement>('[id^="console-slideover"]');
+      if (!root) return;
+      const textarea = root.querySelector<HTMLTextAreaElement>('[data-slideover-reason]');
+      if (!textarea) return;
+      if (pill.dataset.reasonPill === '__custom__') {
+        textarea.value = '';
+      } else {
+        textarea.value = pill.dataset.reasonPill ?? '';
+      }
+      textarea.focus();
+      textarea.setSelectionRange(textarea.value.length, textarea.value.length);
     }
   });
 

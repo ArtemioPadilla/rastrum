@@ -111,7 +111,18 @@ const tr = t(lang);
   <p id="flagq-error" class="hidden mt-3 text-sm text-red-600 dark:text-red-400"></p>
 </section>
 
-<ConsoleSlideOver lang={lang} id="console-slideover-flagq" titleKey={tr.console.flagq_action_triage} />
+<ConsoleSlideOver
+  lang={lang}
+  id="console-slideover-flagq"
+  titleKey={tr.console.flagq_action_triage}
+  reasonTemplates={[
+    tr.console.reason_spam_confirmed,
+    tr.console.reason_not_a_violation,
+    tr.console.reason_resolved_by_hide,
+    tr.console.reason_resolved_by_comment_lock,
+    tr.console.quick_reason_custom,
+  ]}
+/>
 
 <script>
   import { getSupabase } from '../lib/supabase';

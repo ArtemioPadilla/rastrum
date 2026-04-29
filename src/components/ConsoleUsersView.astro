@@ -59,7 +59,17 @@ const tr = t(lang);
   <p id="users-error" class="hidden mt-3 text-sm text-red-600 dark:text-red-400"></p>
 </section>
 
-<ConsoleSlideOver lang={lang} id="console-slideover-users" titleKey={tr.console.users_grant_title}>
+<ConsoleSlideOver
+  lang={lang}
+  id="console-slideover-users"
+  titleKey={tr.console.users_grant_title}
+  reasonTemplates={[
+    tr.console.reason_promotion_after_participation,
+    tr.console.reason_policy_violation,
+    tr.console.reason_test_grant,
+    tr.console.quick_reason_custom,
+  ]}
+>
   <div id="slideover-users-fields" class="space-y-3">
     <label class="block">
       <span class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.console.users_grant_role_label}</span>

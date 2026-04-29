@@ -84,7 +84,18 @@ const tr = t(lang);
 </section>
 
 <!-- Unban slide-over -->
-<ConsoleSlideOver lang={lang} id="console-slideover-bans" titleKey={tr.console.bans_action_unban} />
+<ConsoleSlideOver
+  lang={lang}
+  id="console-slideover-bans"
+  titleKey={tr.console.bans_action_unban}
+  reasonTemplates={[
+    tr.console.reason_spam,
+    tr.console.reason_harassment,
+    tr.console.reason_multiple_policy_violations,
+    tr.console.reason_nom059_breach,
+    tr.console.quick_reason_custom,
+  ]}
+/>
 
 <!-- Issue ban slide-over (custom, not using ConsoleSlideOver because it needs extra fields) -->
 <div id="bans-issue-panel" class="hidden fixed inset-0 z-50 pointer-events-none">

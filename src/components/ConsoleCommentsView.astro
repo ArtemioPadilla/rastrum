@@ -98,7 +98,18 @@ const tr = t(lang);
   <p id="modcom-error" class="hidden mt-3 text-sm text-red-600 dark:text-red-400"></p>
 </section>
 
-<ConsoleSlideOver lang={lang} id="console-slideover-modcom" titleKey={tr.console.modcom_action_hide} />
+<ConsoleSlideOver
+  lang={lang}
+  id="console-slideover-modcom"
+  titleKey={tr.console.modcom_action_hide}
+  reasonTemplates={[
+    tr.console.reason_spam_confirmed,
+    tr.console.reason_not_a_violation,
+    tr.console.reason_resolved_by_hide,
+    tr.console.reason_resolved_by_comment_lock,
+    tr.console.quick_reason_custom,
+  ]}
+/>
 
 <script>
   import { getSupabase } from '../lib/supabase';
