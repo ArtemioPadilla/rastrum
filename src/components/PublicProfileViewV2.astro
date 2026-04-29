@@ -107,6 +107,11 @@ const pm = pmTree.privacy;
             <span data-pp-following-count class="font-semibold tabular-nums text-zinc-900 dark:text-zinc-100 group-hover:text-emerald-700 dark:group-hover:text-emerald-400">0</span>
             <span class="text-xs uppercase tracking-wider text-zinc-500 dark:text-zinc-400">{lang === 'es' ? 'siguiendo' : 'following'}</span>
           </a>
+          <a id="sponsor-badge" data-pp-sponsor-badge href="#" class="hidden inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300">
+            <span aria-hidden="true">🤝</span>
+            <span id="sponsor-badge-count" data-pp-sponsor-count>0</span>
+            <span>{lang === 'es' ? 'patrocina' : 'sponsors'}</span>
+          </a>
         </div>
       </div>
       <div class="shrink-0 flex flex-col gap-2 items-end">
@@ -408,6 +413,22 @@ const pm = pmTree.privacy;
       if (fwCount) fwCount.textContent = String(profile.follower_count ?? 0);
       if (fgCount) fgCount.textContent = String(profile.following_count ?? 0);
       pillsEl?.classList.remove('hidden');
+
+      try {
+        const { count: sponsorCount } = await supabase
+          .from('sponsorships')
+          .select('id', { count: 'exact', head: true })
+          .eq('sponsor_id', profile.id)
+          .eq('status', 'active')
+          .eq('sponsor_public', true)
+          .eq('beneficiary_public', true);
+        if (sponsorCount && sponsorCount > 0) {
+          const badge = root.querySelector<HTMLElement>('[data-pp-sponsor-badge]');
+          const countEl = root.querySelector<HTMLElement>('[data-pp-sponsor-count]');
+          if (countEl) countEl.textContent = String(sponsorCount);
+          badge?.classList.remove('hidden');
+        }
+      } catch { /* not reachable or RLS blocks — silent */ }
     }
 
     // Overflow menu (Block / Report) — only shown for non-self viewers

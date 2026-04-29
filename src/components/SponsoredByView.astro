@@ -13,7 +13,10 @@ const i18nBag = {
   sponsored_by: tr.sponsoring.quota_card_sponsors,
   show_publicly_template: tr.sponsoring.show_sponsor_publicly,
   decline: tr.sponsoring.decline_sponsorship,
+  decline_confirm: lang === 'es' ? '¿Rechazar este patrocinio?' : 'Decline this sponsorship?',
   privacy_section: privacyHeading,
+  cancel: lang === 'es' ? 'Cancelar' : 'Cancel',
+  ok: lang === 'es' ? 'Aceptar' : 'OK',
 };
 ---
 
@@ -39,6 +42,14 @@ const i18nBag = {
   </section>
 
   <script type="application/json" id="sponsored-by-i18n" set:html={JSON.stringify(i18nBag)} />
+
+  <dialog id="sb-confirm-dialog" class="rounded-xl p-6 max-w-md backdrop:bg-black/50 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100">
+    <p id="sb-confirm-message" class="text-sm">—</p>
+    <div class="mt-4 flex gap-2 justify-end">
+      <button type="button" id="sb-confirm-no" class="px-3 py-1.5 text-sm rounded border border-zinc-300 dark:border-zinc-700">{i18nBag.cancel}</button>
+      <button type="button" id="sb-confirm-yes" class="px-3 py-1.5 text-sm rounded bg-red-600 text-white">{i18nBag.ok}</button>
+    </div>
+  </dialog>
 </section>
 
 <script>
@@ -60,8 +71,26 @@ const i18nBag = {
     sponsored_by: string;
     show_publicly_template: string;
     decline: string;
+    decline_confirm: string;
     privacy_section: string;
+    cancel: string;
+    ok: string;
   };
+
+  function showConfirm(message: string): Promise<boolean> {
+    return new Promise((resolve) => {
+      const dlg = document.getElementById('sb-confirm-dialog') as HTMLDialogElement | null;
+      const msgEl = document.getElementById('sb-confirm-message');
+      const yes = document.getElementById('sb-confirm-yes');
+      const no = document.getElementById('sb-confirm-no');
+      if (!dlg || !msgEl || !yes || !no) { resolve(false); return; }
+      msgEl.textContent = message;
+      const cleanup = () => { yes.onclick = null; no.onclick = null; };
+      yes.onclick = () => { cleanup(); dlg.close(); resolve(true); };
+      no.onclick  = () => { cleanup(); dlg.close(); resolve(false); };
+      dlg.showModal();
+    });
+  }
 
   async function refresh() {
     let sponsorships: Awaited<ReturnType<typeof listSponsorships>> = [];
@@ -138,7 +167,7 @@ const i18nBag = {
   document.getElementById('privacy-list')?.addEventListener('click', async (e) => {
     const target = e.target as HTMLElement;
     if (target.dataset.decline) {
-      if (confirm('Decline this sponsorship?')) {
+      if (await showConfirm(i18nBag.decline_confirm ?? 'Decline this sponsorship?')) {
         try { await revokeSponsorship(target.dataset.decline); await refresh(); }
         catch (err) { alert(`Error: ${(err as Error).message}`); }
       }
