@@ -39,7 +39,7 @@ const tr = t(lang);
 </div>
 
 <script>
-  import { isIOS, isStandaloneDisplayMode } from '../lib/local-ai-helpers';
+  import { isIOS, isStandaloneDisplayMode, isFromAndroidIntent } from '../lib/local-ai-helpers';
 
   // The browser's beforeinstallprompt event isn't fully typed in lib.dom yet.
   type InstallPromptEvent = Event & {
@@ -86,7 +86,7 @@ const tr = t(lang);
     // tapped a link inside the installed PWA, which dropped them into a
     // browser tab). Strong signal the app is installed even when
     // display-mode is browser.
-    if (typeof document !== 'undefined' && document.referrer.startsWith('android-app://')) {
+    if (isFromAndroidIntent()) {
       try { localStorage.setItem('rastrum.pwaInstalled', 'true'); } catch { /* ignore */ }
       return true;
     }
