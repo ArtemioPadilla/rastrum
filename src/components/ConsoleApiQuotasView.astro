@@ -1,0 +1,225 @@
+---
+import { t } from '../i18n/utils';
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+---
+
+<section class="max-w-5xl">
+  <h1 class="text-xl font-semibold mb-1">{tr.console.api_heading}</h1>
+  <p class="mb-4 text-sm text-zinc-600 dark:text-zinc-400">{tr.console.api_intro}</p>
+
+  <div id="api-not-auth" class="hidden rounded border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-900 dark:text-amber-100">
+    {tr.console.not_authorized}
+  </div>
+
+  <div id="api-shell" class="hidden space-y-6">
+    <div id="api-loading" class="text-sm text-zinc-500 italic">{tr.console.loading}</div>
+    <div id="api-cards" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+    <div id="api-empty" class="hidden rounded border border-dashed border-zinc-300 dark:border-zinc-700 p-4 text-sm text-zinc-500">
+      {tr.console.api_empty}
+    </div>
+
+    <div id="api-table-section" class="hidden">
+      <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">{tr.console.api_30d_heading}</h2>
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-sm text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden">
+          <thead>
+            <tr class="text-left text-xs text-zinc-500 bg-zinc-50 dark:bg-zinc-900/60 border-b border-zinc-200 dark:border-zinc-800">
+              <th class="px-3 py-2 font-medium">Date</th>
+              <th class="px-3 py-2 font-medium">Provider</th>
+              <th class="px-3 py-2 font-medium text-right">{tr.console.api_used}</th>
+              <th class="px-3 py-2 font-medium text-right">{tr.console.api_quota}</th>
+              <th class="px-3 py-2 font-medium text-right">{tr.console.api_remaining}</th>
+            </tr>
+          </thead>
+          <tbody id="api-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <p id="api-error" class="hidden mt-3 text-sm text-red-600 dark:text-red-400"></p>
+</section>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { getUserRoles } from '../lib/user-roles';
+
+  type ApiUsageRow = {
+    date: string;
+    provider: string;
+    used: number;
+    quota: number;
+    remaining: number;
+    recorded_at: string | null;
+  };
+
+  function show(id: string) { document.getElementById(id)?.classList.remove('hidden'); }
+  function hide(id: string) { document.getElementById(id)?.classList.add('hidden'); }
+  function escHtml(s: string): string {
+    return s.replace(/[<>&'"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&#39;','"':'&quot;'}[c]!));
+  }
+
+  function barColor(pct: number): string {
+    if (pct >= 0.9) return 'bg-red-500';
+    if (pct >= 0.6) return 'bg-amber-400';
+    return 'bg-emerald-500';
+  }
+
+  function sparklinePath(points: number[]): string {
+    if (points.length === 0) return '';
+    const maxV = Math.max(...points, 1);
+    const w = 80;
+    const h = 24;
+    const pts = points.map((v, i) => {
+      const x = points.length === 1 ? w / 2 : (i / (points.length - 1)) * w;
+      const y = h - (v / maxV) * h;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    });
+    return `M${pts.join(' L')}`;
+  }
+
+  function computeEta(todayUsed: number, quota: number): string {
+    if (todayUsed <= 0) return 'Not at current rate';
+    const nowUtc = new Date();
+    const secondsSinceMidnight = nowUtc.getUTCHours() * 3600 + nowUtc.getUTCMinutes() * 60 + nowUtc.getUTCSeconds();
+    if (secondsSinceMidnight === 0) return 'Not at current rate';
+    const ratePerSecond = todayUsed / secondsSinceMidnight;
+    const remaining = quota - todayUsed;
+    if (remaining <= 0) return 'Exhausted';
+    const secsUntilExhaustion = remaining / ratePerSecond;
+    const exhaustAt = new Date(nowUtc.getTime() + secsUntilExhaustion * 1000);
+    if (exhaustAt.getUTCDate() !== nowUtc.getUTCDate()) return 'Not at current rate';
+    return `Will exhaust at ${String(exhaustAt.getUTCHours()).padStart(2,'0')}:${String(exhaustAt.getUTCMinutes()).padStart(2,'0')} UTC at current rate`;
+  }
+
+  const supabase = getSupabase();
+  let allRows: ApiUsageRow[] = [];
+
+  async function init() {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) { show('api-not-auth'); return; }
+    const myRoles = await getUserRoles(session.user.id);
+    if (!myRoles.has('admin')) { show('api-not-auth'); return; }
+    show('api-shell');
+    await loadRows();
+  }
+
+  async function loadRows() {
+    show('api-loading');
+    hide('api-cards');
+    hide('api-empty');
+    hide('api-table-section');
+
+    const cutoff = new Date();
+    cutoff.setUTCDate(cutoff.getUTCDate() - 30);
+    const cutoffStr = cutoff.toISOString().slice(0, 10);
+
+    try {
+      const { data, error } = await supabase
+        .from('api_usage')
+        .select('date, provider, used, quota, remaining, recorded_at')
+        .gte('date', cutoffStr)
+        .order('date', { ascending: false })
+        .limit(200);
+
+      hide('api-loading');
+
+      if (error) {
+        const e = document.getElementById('api-error')!;
+        e.textContent = error.message;
+        show('api-error');
+        return;
+      }
+
+      allRows = (data ?? []) as ApiUsageRow[];
+
+      if (allRows.length === 0) {
+        show('api-empty');
+        return;
+      }
+
+      renderCards();
+      renderTable();
+    } catch (err) {
+      hide('api-loading');
+      const e = document.getElementById('api-error')!;
+      e.textContent = (err as Error).message;
+      show('api-error');
+    }
+  }
+
+  function renderCards() {
+    // Group by provider and get today + last 7 entries
+    const providers = [...new Set(allRows.map(r => r.provider))];
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    const cardsEl = document.getElementById('api-cards')!;
+    cardsEl.innerHTML = providers.map(provider => {
+      const provRows = allRows.filter(r => r.provider === provider).sort((a, b) => b.date.localeCompare(a.date));
+      const todayRow = provRows.find(r => r.date === todayStr);
+      const used = todayRow?.used ?? 0;
+      const quota = todayRow?.quota ?? 1;
+      const remaining = todayRow?.remaining ?? quota;
+      const pct = Math.min(used / Math.max(quota, 1), 1);
+      const pctPx = Math.round(pct * 200);
+      const color = barColor(pct);
+      const sparkPoints = provRows.slice(0, 7).reverse().map(r => r.used);
+      const sparkPath = sparklinePath(sparkPoints);
+      const eta = computeEta(used, quota);
+
+      return `
+        <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="font-semibold capitalize text-zinc-900 dark:text-zinc-100">${escHtml(provider)}</span>
+            <span class="text-xs text-zinc-500">${escHtml(todayStr)}</span>
+          </div>
+          <div class="space-y-1">
+            <div class="flex justify-between text-sm">
+              <span class="text-zinc-600 dark:text-zinc-400">Used / Quota</span>
+              <span class="font-mono font-semibold">${used.toLocaleString()} / ${quota.toLocaleString()}</span>
+            </div>
+            <div class="rounded-full overflow-hidden bg-zinc-200 dark:bg-zinc-700 h-2 w-full">
+              <div class="${color} h-2 rounded-full transition-all" style="width:${pctPx / 2}%"></div>
+            </div>
+            <div class="text-right text-xs text-zinc-500">${(pct * 100).toFixed(1)}% used · ${remaining.toLocaleString()} remaining</div>
+          </div>
+          ${sparkPath ? `
+          <div>
+            <div class="text-xs text-zinc-500 mb-1">7-day usage</div>
+            <svg width="80" height="24" viewBox="0 0 80 24" class="overflow-visible">
+              <path d="${escHtml(sparkPath)}" fill="none" stroke="currentColor" stroke-width="1.5" class="text-emerald-500" />
+            </svg>
+          </div>` : ''}
+          <div class="text-xs text-zinc-500">
+            <span class="font-medium">ETA:</span> ${escHtml(eta)}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    show('api-cards');
+  }
+
+  function renderTable() {
+    const tbody = document.getElementById('api-table-body')!;
+    tbody.innerHTML = allRows.map(r => `
+      <tr class="border-t border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/30">
+        <td class="px-3 py-2 text-xs font-mono text-zinc-500">${escHtml(r.date)}</td>
+        <td class="px-3 py-2 text-xs capitalize">${escHtml(r.provider)}</td>
+        <td class="px-3 py-2 text-xs text-right font-mono">${r.used.toLocaleString()}</td>
+        <td class="px-3 py-2 text-xs text-right font-mono">${r.quota.toLocaleString()}</td>
+        <td class="px-3 py-2 text-xs text-right font-mono">${r.remaining.toLocaleString()}</td>
+      </tr>
+    `).join('');
+    show('api-table-section');
+  }
+
+  init().catch(err => {
+    hide('api-loading');
+    const e = document.getElementById('api-error')!;
+    e.textContent = (err as Error).message;
+    show('api-error');
+  });
+</script>

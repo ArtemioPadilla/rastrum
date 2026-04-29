@@ -1,0 +1,214 @@
+---
+import { t } from '../i18n/utils';
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+---
+
+<section class="max-w-5xl">
+  <h1 class="text-xl font-semibold mb-1">{tr.console.sync_heading}</h1>
+  <p class="mb-4 text-sm text-zinc-600 dark:text-zinc-400">{tr.console.sync_intro}</p>
+
+  <div id="sync-not-auth" class="hidden rounded border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-900 dark:text-amber-100">
+    {tr.console.not_authorized}
+  </div>
+
+  <div id="sync-shell" class="hidden space-y-4">
+    <div id="sync-summary-banner" class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300"></div>
+
+    <div class="flex flex-wrap gap-3 items-center">
+      <label class="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+        <span>{tr.console.sync_filter_days}:</span>
+        <select id="sync-days-filter" class="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1 text-sm">
+          <option value="7" selected>7</option>
+          <option value="14">14</option>
+          <option value="30">30</option>
+        </select>
+      </label>
+      <input
+        id="sync-error-filter"
+        type="search"
+        placeholder="Filter by error text…"
+        class="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1 text-sm w-64"
+      />
+    </div>
+
+    <div id="sync-loading" class="text-sm text-zinc-500 italic">{tr.console.loading}</div>
+
+    <div id="sync-empty" class="hidden rounded border border-dashed border-zinc-300 dark:border-zinc-700 p-4 text-sm text-zinc-500">
+      {tr.console.sync_empty}
+    </div>
+
+    <div id="sync-rows" class="hidden space-y-4"></div>
+  </div>
+
+  <p id="sync-error" class="hidden mt-3 text-sm text-red-600 dark:text-red-400"></p>
+</section>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { getUserRoles } from '../lib/user-roles';
+
+  type SyncFailureRow = {
+    id: string;
+    user_id: string | null;
+    error_hash: string;
+    error_message: string;
+    blob_count: number | null;
+    sync_attempts: number | null;
+    app_version: string | null;
+    failure_day: string;
+    first_seen_at: string | null;
+    last_seen_at: string | null;
+    hit_count: number | null;
+  };
+
+  function show(id: string) { document.getElementById(id)?.classList.remove('hidden'); }
+  function hide(id: string) { document.getElementById(id)?.classList.add('hidden'); }
+  function escHtml(s: string): string {
+    return s.replace(/[<>&'"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&#39;','"':'&quot;'}[c]!));
+  }
+
+  const notAuthEl = document.getElementById('sync-not-auth')!;
+  const viewUserLabel = notAuthEl.closest('section')?.querySelector<HTMLElement>('[data-view-user-label]')?.dataset.viewUserLabel ?? 'View user';
+  const retryLabel = notAuthEl.closest('section')?.querySelector<HTMLElement>('[data-retry-label]')?.dataset.retryLabel ?? 'Retry — coming in PR4';
+
+  const supabase = getSupabase();
+  let allRows: SyncFailureRow[] = [];
+
+  async function init() {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) { show('sync-not-auth'); return; }
+    const myRoles = await getUserRoles(session.user.id);
+    if (!myRoles.has('admin')) { show('sync-not-auth'); return; }
+    show('sync-shell');
+    await loadRows();
+  }
+
+  async function loadRows() {
+    hide('sync-empty');
+    hide('sync-rows');
+    show('sync-loading');
+
+    const days = parseInt((document.getElementById('sync-days-filter') as HTMLSelectElement).value, 10);
+    const cutoff = new Date();
+    cutoff.setUTCDate(cutoff.getUTCDate() - days);
+    const cutoffStr = cutoff.toISOString().slice(0, 10);
+
+    try {
+      const { data, error } = await supabase
+        .from('sync_failures')
+        .select('*')
+        .gte('failure_day', cutoffStr)
+        .order('failure_day', { ascending: false })
+        .order('hit_count', { ascending: false })
+        .limit(500);
+
+      hide('sync-loading');
+
+      if (error) {
+        const e = document.getElementById('sync-error')!;
+        e.textContent = error.message;
+        show('sync-error');
+        return;
+      }
+
+      allRows = (data ?? []) as SyncFailureRow[];
+      renderRows();
+    } catch (err) {
+      hide('sync-loading');
+      const e = document.getElementById('sync-error')!;
+      e.textContent = (err as Error).message;
+      show('sync-error');
+    }
+  }
+
+  function renderRows() {
+    const filterText = ((document.getElementById('sync-error-filter') as HTMLInputElement)?.value ?? '').toLowerCase();
+    const filtered = filterText
+      ? allRows.filter(r => r.error_message.toLowerCase().includes(filterText) || r.error_hash.toLowerCase().includes(filterText))
+      : allRows;
+
+    const totalHits = filtered.reduce((s, r) => s + (r.hit_count ?? 1), 0);
+    const uniqueGroups = new Set(filtered.map(r => r.error_hash)).size;
+
+    const banner = document.getElementById('sync-summary-banner')!;
+    banner.textContent = filtered.length === 0
+      ? 'No failures in the selected window.'
+      : `${totalHits} failure${totalHits !== 1 ? 's' : ''} across ${uniqueGroups} unique error group${uniqueGroups !== 1 ? 's' : ''} in the last ${(document.getElementById('sync-days-filter') as HTMLSelectElement).value} days`;
+
+    if (filtered.length === 0) {
+      show('sync-empty');
+      return;
+    }
+
+    // Group by error_hash for visual grouping
+    const grouped = new Map<string, SyncFailureRow[]>();
+    for (const row of filtered) {
+      if (!grouped.has(row.error_hash)) grouped.set(row.error_hash, []);
+      grouped.get(row.error_hash)!.push(row);
+    }
+
+    const wrap = document.getElementById('sync-rows')!;
+    wrap.innerHTML = Array.from(grouped.entries()).map(([hash, rows]) => {
+      const firstRow = rows[0];
+      const rowsHtml = rows.map(r => `
+        <tr class="border-t border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/30">
+          <td class="px-3 py-2 text-xs font-mono text-zinc-500">${escHtml(r.failure_day)}</td>
+          <td class="px-3 py-2 text-xs text-center font-semibold">${r.hit_count ?? 1}</td>
+          <td class="px-3 py-2 text-xs text-zinc-500">${escHtml(r.app_version ?? '—')}</td>
+          <td class="px-3 py-2 text-xs">
+            ${r.user_id
+              ? `<a href="/console/users/?focus=${escHtml(r.user_id)}" class="text-emerald-700 dark:text-emerald-400 underline text-xs">View user</a>`
+              : '<span class="text-zinc-400">—</span>'}
+          </td>
+          <td class="px-3 py-2 text-xs text-zinc-400">${r.blob_count ?? 0}</td>
+          <td class="px-3 py-2 text-xs text-zinc-500 font-mono">${r.last_seen_at ? escHtml(new Date(r.last_seen_at).toISOString().replace('T', ' ').slice(0, 19)) : '—'}</td>
+          <td class="px-3 py-2">
+            <button disabled title="Retry — coming in PR4" class="rounded px-2 py-0.5 text-xs border border-zinc-300 dark:border-zinc-700 text-zinc-400 cursor-not-allowed">Retry</button>
+          </td>
+        </tr>
+      `).join('');
+
+      return `
+        <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+          <div class="bg-zinc-100 dark:bg-zinc-800/60 px-4 py-2 flex items-center justify-between">
+            <span class="font-mono text-xs text-zinc-600 dark:text-zinc-400 truncate">${escHtml(hash)}</span>
+            <span class="text-xs text-zinc-500 shrink-0 ml-3">${rows.length} day${rows.length !== 1 ? 's' : ''}</span>
+          </div>
+          <div class="px-4 py-2 text-sm text-zinc-800 dark:text-zinc-200 bg-red-50 dark:bg-red-900/10 border-b border-zinc-200 dark:border-zinc-800 break-all">
+            ${escHtml(firstRow.error_message)}
+          </div>
+          <div class="overflow-x-auto">
+            <table class="min-w-full text-sm text-zinc-900 dark:text-zinc-100">
+              <thead>
+                <tr class="text-left text-xs text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
+                  <th class="px-3 py-2 font-medium">Day</th>
+                  <th class="px-3 py-2 font-medium text-center">Hits</th>
+                  <th class="px-3 py-2 font-medium">App version</th>
+                  <th class="px-3 py-2 font-medium">User</th>
+                  <th class="px-3 py-2 font-medium">Blobs</th>
+                  <th class="px-3 py-2 font-medium">Last seen</th>
+                  <th class="px-3 py-2 font-medium"></th>
+                </tr>
+              </thead>
+              <tbody>${rowsHtml}</tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    show('sync-rows');
+  }
+
+  document.getElementById('sync-days-filter')?.addEventListener('change', () => loadRows());
+  document.getElementById('sync-error-filter')?.addEventListener('input', () => renderRows());
+
+  init().catch(err => {
+    hide('sync-loading');
+    const e = document.getElementById('sync-error')!;
+    e.textContent = (err as Error).message;
+    show('sync-error');
+  });
+</script>
