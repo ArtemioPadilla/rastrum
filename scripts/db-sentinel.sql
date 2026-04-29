@@ -52,6 +52,9 @@ BEGIN
   -- Console PR5 — moderator surface
   IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'user_bans')              THEN missing := array_append(missing, 'public.user_bans'); END IF;
 
+  -- PR10 — subject UX: ban appeals
+  IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'ban_appeals')            THEN missing := array_append(missing, 'public.ban_appeals'); END IF;
+
   -- Console PR8 — feature flags + karma config DB tables
   IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'app_feature_flags')      THEN missing := array_append(missing, 'public.app_feature_flags'); END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'karma_config')           THEN missing := array_append(missing, 'public.karma_config'); END IF;

@@ -52,6 +52,9 @@ interface TaxonToggleConservationPayload {
 
 interface FeatureFlagTogglePayload { key: string; value: boolean }
 
+interface AppealAcceptPayload { appeal_id: string }
+interface AppealRejectPayload { appeal_id: string; reviewer_note?: string }
+
 interface DispatcherResponse<T = unknown> {
   ok: true;
   audit_id: number;
@@ -143,5 +146,11 @@ export const adminClient = {
   featureFlag: {
     toggle: (payload: FeatureFlagTogglePayload, reason: string, jwt: string) =>
       call('feature_flag.toggle', payload, reason, jwt),
+  },
+  appeal: {
+    accept: (payload: AppealAcceptPayload, reason: string, jwt: string) =>
+      call('appeal.accept', payload, reason, jwt),
+    reject: (payload: AppealRejectPayload, reason: string, jwt: string) =>
+      call('appeal.reject', payload, reason, jwt),
   },
 };

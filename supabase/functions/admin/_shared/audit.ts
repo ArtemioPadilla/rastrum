@@ -19,7 +19,9 @@ export type AuditOp =
   | 'precise_coords_read'
   | 'user_pii_read'
   | 'token_list_read'
-  | 'user_audit_read';
+  | 'user_audit_read'
+  | 'appeal_accepted'
+  | 'appeal_rejected';
 
 export interface AuditRow {
   actor_id: string;

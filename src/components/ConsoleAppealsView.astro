@@ -1,0 +1,320 @@
+---
+/**
+ * ConsoleAppealsView — moderator queue for ban appeals.
+ * Gate: moderator OR admin role.
+ */
+import { t } from '../i18n/utils';
+import ConsoleSlideOver from './ConsoleSlideOver.astro';
+
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+const c = tr.console as unknown as Record<string, string>;
+---
+
+<section class="max-w-6xl">
+  <div id="appeals-not-auth" class="hidden rounded border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-900 dark:text-amber-100">
+    {tr.console.not_authorized}
+  </div>
+
+  <div id="appeals-shell" class="hidden">
+    <p class="mb-4 text-sm text-zinc-500 dark:text-zinc-400">{c.mod_appeals_intro}</p>
+
+    <div class="flex flex-wrap items-center gap-2 mb-3">
+      <div class="flex rounded border border-zinc-300 dark:border-zinc-700 overflow-hidden text-sm">
+        <button id="appeals-toggle-pending" class="px-3 py-1.5 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-medium">
+          {c.mod_appeals_filter_pending}
+        </button>
+        <button id="appeals-toggle-all" class="px-3 py-1.5 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300">
+          {c.mod_appeals_filter_all}
+        </button>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-[320px_1fr] gap-4 h-[calc(100vh-230px)]">
+      <!-- Left: appeals list -->
+      <aside class="flex flex-col border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden">
+        <div id="appeals-list-loading" class="p-3 text-sm text-zinc-500 italic">{c.mod_appeals_loading}</div>
+        <div id="appeals-list-empty" class="hidden p-3 text-sm text-zinc-500">{c.mod_appeals_empty}</div>
+        <ul id="appeals-list" class="hidden flex-1 overflow-y-auto divide-y divide-zinc-100 dark:divide-zinc-800"></ul>
+      </aside>
+
+      <!-- Right: appeal detail -->
+      <div id="appeals-detail-empty" class="flex items-center justify-center text-sm text-zinc-400 dark:text-zinc-600 border border-dashed border-zinc-200 dark:border-zinc-700 rounded-lg">
+        {c.mod_appeals_select_prompt}
+      </div>
+      <div id="appeals-detail" class="hidden border border-zinc-200 dark:border-zinc-800 rounded-lg p-4 overflow-y-auto space-y-4">
+        <dl class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+          <dt class="text-zinc-500">{c.mod_appeals_col_user}</dt>
+          <dd id="appeals-detail-user" class="font-medium text-zinc-800 dark:text-zinc-200 text-xs break-all"></dd>
+
+          <dt class="text-zinc-500">{c.mod_appeals_col_ban_reason}</dt>
+          <dd id="appeals-detail-ban-reason" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
+
+          <dt class="text-zinc-500">{c.mod_appeals_col_status}</dt>
+          <dd id="appeals-detail-status" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
+
+          <dt class="text-zinc-500">{c.mod_appeals_col_created}</dt>
+          <dd id="appeals-detail-created" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
+        </dl>
+
+        <div>
+          <p class="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{c.mod_appeals_col_message}</p>
+          <p id="appeals-detail-message" class="text-sm text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap border border-zinc-200 dark:border-zinc-700 rounded p-2 bg-zinc-50 dark:bg-zinc-900/40"></p>
+        </div>
+
+        <!-- Reviewer note input -->
+        <div id="appeals-note-wrap" class="hidden space-y-1">
+          <label for="appeals-note" class="block text-xs font-medium text-zinc-700 dark:text-zinc-300">
+            {c.mod_appeals_reviewer_note_label}
+          </label>
+          <textarea
+            id="appeals-note"
+            rows="3"
+            maxlength="500"
+            class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm text-zinc-900 dark:text-zinc-100"
+          ></textarea>
+        </div>
+
+        <!-- Action chips -->
+        <div id="appeals-actions" class="hidden flex flex-wrap gap-2">
+          <button id="appeals-action-accept" class="px-3 py-1.5 rounded text-xs font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-200">
+            {c.mod_appeals_action_accept}
+          </button>
+          <button id="appeals-action-reject" class="px-3 py-1.5 rounded text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 hover:bg-red-200">
+            {c.mod_appeals_action_reject}
+          </button>
+        </div>
+
+        <p id="appeals-detail-error" class="hidden text-sm text-red-600 dark:text-red-400"></p>
+      </div>
+    </div>
+
+    <p id="appeals-error" class="hidden mt-3 text-sm text-red-600 dark:text-red-400"></p>
+  </div>
+</section>
+
+<!-- Accept slide-over -->
+<ConsoleSlideOver
+  lang={lang}
+  id="console-slideover-appeal-accept"
+  titleKey={c.mod_appeals_action_accept}
+  reasonTemplates={[
+    tr.console.reason_spam,
+    tr.console.reason_harassment,
+    tr.console.quick_reason_custom,
+  ]}
+/>
+
+<!-- Reject slide-over -->
+<ConsoleSlideOver
+  lang={lang}
+  id="console-slideover-appeal-reject"
+  titleKey={c.mod_appeals_action_reject}
+  reasonTemplates={[
+    tr.console.reason_spam,
+    tr.console.reason_harassment,
+    tr.console.quick_reason_custom,
+  ]}
+/>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { adminClient, AdminClientError } from '../lib/admin-client';
+
+  type AppealRow = {
+    id: string;
+    ban_id: string;
+    appellant_id: string;
+    message: string;
+    status: string;
+    reviewer_note: string | null;
+    created_at: string;
+    reviewed_at: string | null;
+    user_bans: { reason: string | null; user_id: string } | null;
+  };
+
+  let allAppeals: AppealRow[] = [];
+  let selected: AppealRow | null = null;
+  let filterPending = true;
+  let jwt: string | null = null;
+
+  function escapeText(s: string) {
+    return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as Record<string, string>)[c]);
+  }
+
+  function statusPill(status: string): string {
+    const map: Record<string, string> = {
+      pending:   'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300',
+      accepted:  'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300',
+      rejected:  'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300',
+      withdrawn: 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400',
+    };
+    return `<span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${escapeText(map[status] ?? 'bg-zinc-100 text-zinc-700')}">${escapeText(status)}</span>`;
+  }
+
+  function renderList() {
+    const list = document.getElementById('appeals-list');
+    const loading = document.getElementById('appeals-list-loading');
+    const empty = document.getElementById('appeals-list-empty');
+    if (!list) return;
+    loading?.classList.add('hidden');
+    const rows = filterPending ? allAppeals.filter(a => a.status === 'pending') : allAppeals;
+    if (rows.length === 0) {
+      list.classList.add('hidden');
+      empty?.classList.remove('hidden');
+      return;
+    }
+    empty?.classList.add('hidden');
+    list.classList.remove('hidden');
+    list.innerHTML = rows.map(a => `
+      <li class="cursor-pointer px-3 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors ${a.id === selected?.id ? 'bg-zinc-100 dark:bg-zinc-800/60' : ''}" data-appeal-id="${escapeText(a.id)}">
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-xs text-zinc-500 truncate">${escapeText(a.appellant_id.slice(0, 8))}…</span>
+          ${statusPill(a.status)}
+        </div>
+        <p class="text-xs text-zinc-700 dark:text-zinc-300 truncate mt-0.5">${escapeText(a.message.slice(0, 60))}…</p>
+        <p class="text-[10px] text-zinc-400 mt-0.5">${escapeText(new Date(a.created_at).toLocaleDateString())}</p>
+      </li>
+    `).join('');
+    list.querySelectorAll<HTMLElement>('[data-appeal-id]').forEach(el => {
+      el.addEventListener('click', () => {
+        const id = el.dataset.appealId ?? '';
+        selected = allAppeals.find(a => a.id === id) ?? null;
+        renderDetail();
+        renderList();
+      });
+    });
+  }
+
+  function renderDetail() {
+    const empty = document.getElementById('appeals-detail-empty');
+    const detail = document.getElementById('appeals-detail');
+    if (!selected) {
+      empty?.classList.remove('hidden');
+      detail?.classList.add('hidden');
+      return;
+    }
+    empty?.classList.add('hidden');
+    if (detail) detail.classList.remove('hidden');
+    const set = (id: string, val: string) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = val;
+    };
+    set('appeals-detail-user', selected.appellant_id);
+    set('appeals-detail-ban-reason', selected.user_bans?.reason ?? '—');
+    set('appeals-detail-status', selected.status);
+    set('appeals-detail-created', new Date(selected.created_at).toLocaleString());
+    set('appeals-detail-message', selected.message);
+    const actionsEl = document.getElementById('appeals-actions');
+    const noteWrap = document.getElementById('appeals-note-wrap');
+    if (selected.status === 'pending') {
+      actionsEl?.classList.remove('hidden');
+      noteWrap?.classList.remove('hidden');
+    } else {
+      actionsEl?.classList.add('hidden');
+      noteWrap?.classList.add('hidden');
+    }
+    document.getElementById('appeals-detail-error')?.classList.add('hidden');
+  }
+
+  async function doAction(action: 'accept' | 'reject') {
+    if (!selected || !jwt) return;
+    const noteEl = document.getElementById('appeals-note') as HTMLTextAreaElement | null;
+    const note = noteEl?.value.trim();
+    const errorEl = document.getElementById('appeals-detail-error');
+    try {
+      if (action === 'accept') {
+        await adminClient.appeal.accept({ appeal_id: selected.id }, note ?? 'appeal accepted via console', jwt);
+      } else {
+        await adminClient.appeal.reject({ appeal_id: selected.id, reviewer_note: note }, note ?? 'appeal rejected via console', jwt);
+      }
+      const idx = allAppeals.findIndex(a => a.id === selected?.id);
+      if (idx >= 0) allAppeals[idx] = { ...allAppeals[idx], status: action === 'accept' ? 'accepted' : 'rejected', reviewer_note: note ?? null };
+      selected = allAppeals[idx] ?? null;
+      renderList();
+      renderDetail();
+    } catch (err) {
+      if (errorEl) {
+        errorEl.textContent = err instanceof AdminClientError ? err.message : String(err);
+        errorEl.classList.remove('hidden');
+      }
+    }
+  }
+
+  async function init() {
+    let supabase;
+    try { supabase = getSupabase(); } catch {
+      document.getElementById('appeals-not-auth')?.classList.remove('hidden');
+      return;
+    }
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      document.getElementById('appeals-not-auth')?.classList.remove('hidden');
+      return;
+    }
+    jwt = session.access_token;
+
+    const { data: roles } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', session.user.id)
+      .is('revoked_at', null);
+    const roleSet = new Set((roles ?? []).map((r: { role: string }) => r.role));
+    if (!roleSet.has('moderator') && !roleSet.has('admin')) {
+      document.getElementById('appeals-not-auth')?.classList.remove('hidden');
+      return;
+    }
+
+    document.getElementById('appeals-shell')?.classList.remove('hidden');
+
+    // Load appeals.
+    const { data, error } = await supabase
+      .from('ban_appeals')
+      .select('id, ban_id, appellant_id, message, status, reviewer_note, created_at, reviewed_at, user_bans(reason, user_id)')
+      .order('created_at', { ascending: true });
+
+    document.getElementById('appeals-list-loading')?.classList.add('hidden');
+    if (error) {
+      const errEl = document.getElementById('appeals-error');
+      if (errEl) { errEl.textContent = error.message; errEl.classList.remove('hidden'); }
+      return;
+    }
+    allAppeals = (data ?? []) as AppealRow[];
+    renderList();
+
+    // Toggle filter.
+    document.getElementById('appeals-toggle-pending')?.addEventListener('click', () => {
+      filterPending = true;
+      const pending = document.getElementById('appeals-toggle-pending');
+      const all = document.getElementById('appeals-toggle-all');
+      pending?.classList.add('bg-zinc-900', 'dark:bg-zinc-100', 'text-white', 'dark:text-zinc-900');
+      pending?.classList.remove('bg-white', 'dark:bg-zinc-900', 'text-zinc-700', 'dark:text-zinc-300');
+      all?.classList.remove('bg-zinc-900', 'dark:bg-zinc-100', 'text-white', 'dark:text-zinc-900');
+      all?.classList.add('bg-white', 'dark:bg-zinc-900', 'text-zinc-700', 'dark:text-zinc-300');
+      selected = null;
+      renderList();
+      renderDetail();
+    });
+    document.getElementById('appeals-toggle-all')?.addEventListener('click', () => {
+      filterPending = false;
+      const pending = document.getElementById('appeals-toggle-pending');
+      const all = document.getElementById('appeals-toggle-all');
+      all?.classList.add('bg-zinc-900', 'dark:bg-zinc-100', 'text-white', 'dark:text-zinc-900');
+      all?.classList.remove('bg-white', 'dark:bg-zinc-900', 'text-zinc-700', 'dark:text-zinc-300');
+      pending?.classList.remove('bg-zinc-900', 'dark:bg-zinc-100', 'text-white', 'dark:text-zinc-900');
+      pending?.classList.add('bg-white', 'dark:bg-zinc-900', 'text-zinc-700', 'dark:text-zinc-300');
+      selected = null;
+      renderList();
+      renderDetail();
+    });
+
+    // Action buttons.
+    document.getElementById('appeals-action-accept')?.addEventListener('click', () => doAction('accept'));
+    document.getElementById('appeals-action-reject')?.addEventListener('click', () => doAction('reject'));
+  }
+
+  init().catch(() => {
+    document.getElementById('appeals-not-auth')?.classList.remove('hidden');
+  });
+</script>

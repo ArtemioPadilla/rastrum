@@ -36,6 +36,20 @@ export const userUnbanHandler: ActionHandler<Payload> = {
     if (!updated || updated.length === 0) throw new Error('unban: ban_id does not belong to target_user_id');
 
     const { data: after } = await admin.from('user_bans').select('*').eq('id', payload.ban_id).single();
+
+    try {
+      await admin.from('notifications').insert({
+        user_id: payload.target_user_id,
+        kind: 'ban_lifted',
+        payload: {
+          ban_id: payload.ban_id,
+          revoke_reason: reason,
+        },
+      });
+    } catch (notifErr) {
+      console.warn('[user.unban] notification insert failed:', notifErr);
+    }
+
     return { before, after, target: { type: 'user', id: payload.target_user_id } };
   },
 };

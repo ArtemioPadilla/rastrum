@@ -86,6 +86,11 @@ const tabs = [
   data-label-fave-aria-one={faveAriaOne}
   data-label-fave-aria-other={faveAriaOther}
   data-observe-path={observePath}
+  data-label-hidden-badge={profileStrings.obs_hidden_by_mod_badge ?? (lang === 'es' ? 'Oculto por moderación' : 'Hidden by moderation')}
+  data-label-hidden-reason-label={profileStrings.obs_hidden_by_mod_reason_label ?? (lang === 'es' ? 'Razón:' : 'Reason:')}
+  data-label-hidden-no-reason={profileStrings.obs_hidden_by_mod_no_reason ?? (lang === 'es' ? 'Sin razón especificada.' : 'No reason provided.')}
+  data-label-hidden-appeal-link={profileStrings.obs_hidden_by_mod_appeal_link ?? (lang === 'es' ? 'Ver razón / Apelar' : 'View reason / Appeal')}
+  data-appeal-path={lang === 'es' ? '/es/perfil/apelar/' : '/en/profile/appeal/'}
 >
   <header class="flex items-start justify-between gap-3 mb-6 flex-wrap">
     <div>
@@ -181,6 +186,8 @@ const tabs = [
     observed_at: string;
     sync_status: 'synced' | 'pending' | 'error' | 'draft';
     state_province: string | null;
+    hidden: boolean | null;
+    hidden_reason: string | null;
     identifications: Ident[] | Ident | null;
     media_files: Media[];
   };
@@ -249,8 +256,19 @@ const tabs = [
     const faveChipHtml = isSynced
       ? `<span class="mo-fave-chip hidden inline-flex items-center gap-1 rounded-full bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 px-2 py-0.5 text-[11px] font-semibold text-rose-700 dark:text-rose-300" data-fave-target="${escapeText(r.id)}"><svg class="w-3 h-3" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21s-7-4.5-9.5-9A5.5 5.5 0 0 1 12 6a5.5 5.5 0 0 1 9.5 6c-2.5 4.5-9.5 9-9.5 9Z"/></svg><span class="mo-fave-count tabular-nums">0</span></span>`
       : '';
-    return `<li class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 overflow-hidden">
-      <div class="flex items-center gap-3 p-3 ${isSynced ? 'hover:bg-zinc-50 dark:hover:bg-zinc-800/40' : 'opacity-90'}">
+    const hiddenBadgeHtml = r.hidden
+      ? `<span class="inline-flex items-center rounded-full bg-red-100 dark:bg-red-900/30 px-2 py-0.5 text-[11px] font-semibold text-red-700 dark:text-red-300" title="${escapeText(r.hidden_reason || (root?.dataset.labelHiddenNoReason ?? ''))}">🚫 ${escapeText(root?.dataset.labelHiddenBadge ?? 'Hidden by moderation')}</span>`
+      : '';
+    const hiddenOverlayClass = r.hidden ? 'relative opacity-60' : '';
+    const hiddenDetailHtml = r.hidden
+      ? `<div class="px-3 pb-2 text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-1">
+          <span>${escapeText(root?.dataset.labelHiddenReasonLabel ?? 'Reason:')}</span>
+          <span class="italic">${escapeText(r.hidden_reason || (root?.dataset.labelHiddenNoReason ?? ''))}</span>
+          <a href="${escapeText(root?.dataset.appealPath ?? '/en/profile/appeal/')}" class="ml-2 underline text-emerald-700 dark:text-emerald-400">${escapeText(root?.dataset.labelHiddenAppealLink ?? 'View / Appeal')}</a>
+        </div>`
+      : '';
+    return `<li class="rounded-lg border ${r.hidden ? 'border-red-200 dark:border-red-900/60' : 'border-zinc-200 dark:border-zinc-800'} bg-white dark:bg-zinc-900/50 overflow-hidden">
+      <div class="flex items-center gap-3 p-3 ${isSynced ? 'hover:bg-zinc-50 dark:hover:bg-zinc-800/40' : 'opacity-90'} ${hiddenOverlayClass}">
         <${wrapTag} ${wrapAttr} class="flex items-center gap-3 min-w-0 flex-1">
           <div class="w-16 h-16 shrink-0 rounded-lg overflow-hidden bg-zinc-100 dark:bg-zinc-800">
             ${photo ? `<img src="${escapeText(photo)}" alt="${escapeText(name)}" class="w-full h-full object-cover" loading="lazy" />` : ''}
@@ -262,11 +280,13 @@ const tabs = [
               ${statusBadge(r.sync_status)}
               ${ident?.is_research_grade ? `<span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 px-2 py-0.5 text-[11px] font-semibold text-emerald-800 dark:text-emerald-300" title="${escapeText(root?.dataset.labelResearchGradeTitle ?? '')}"><svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>${escapeText(root?.dataset.labelResearchGrade ?? '')}</span>` : ''}
               ${faveChipHtml}
+              ${hiddenBadgeHtml}
             </div>
           </div>
         </${wrapTag}>
         ${shareBtn}
       </div>
+      ${hiddenDetailHtml}
     </li>`;
   }
 
@@ -377,7 +397,7 @@ const tabs = [
     const supabase = getSupabase();
     let q = supabase
       .from('observations')
-      .select('id, observed_at, sync_status, state_province, identifications(scientific_name, is_primary, is_research_grade), media_files(url, is_primary)')
+      .select('id, observed_at, sync_status, state_province, hidden, hidden_reason, identifications(scientific_name, is_primary, is_research_grade), media_files(url, is_primary)')
       .eq('observer_id', userId)
       .order('observed_at', { ascending: false })
       .range(offset, offset + PAGE_SIZE - 1);
