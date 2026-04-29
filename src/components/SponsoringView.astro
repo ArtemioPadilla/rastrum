@@ -11,6 +11,8 @@ const i18nBag = {
   below_engagement_threshold: tr.sponsoring.below_engagement_threshold,
   covered_by_subscription:    tr.sponsoring.covered_by_subscription,
   self_sponsorship_badge:     tr.sponsoring.self_sponsorship_badge,
+  report_abuse:               tr.sponsoring.report_abuse,
+  calls_last_Nd:              tr.sponsoring.calls_last_Nd,
   paused_reason: {
     rate_limit:         tr.sponsoring.paused_reason_rate_limit,
     cred_invalid:       tr.sponsoring.paused_reason_cred_invalid,
@@ -22,11 +24,33 @@ const i18nBag = {
 ---
 
 <section class="max-w-4xl mx-auto p-6 space-y-10">
+  <aside id="sponsorship-tour" class="hidden mb-6 rounded-xl border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 p-5">
+    <div class="flex items-start justify-between gap-4">
+      <div class="space-y-3">
+        <h2 class="text-lg font-semibold text-emerald-900 dark:text-emerald-200">{tr.sponsoring.tour_welcome_title}</h2>
+        <p class="text-sm text-emerald-800 dark:text-emerald-300">{tr.sponsoring.tour_welcome_intro}</p>
+        <ul class="text-sm text-emerald-800 dark:text-emerald-300 space-y-1">
+          <li>{tr.sponsoring.tour_step_1}</li>
+          <li>{tr.sponsoring.tour_step_2}</li>
+          <li>{tr.sponsoring.tour_step_3}</li>
+        </ul>
+      </div>
+      <button id="dismiss-tour" type="button" class="shrink-0 rounded-lg border border-emerald-600 px-3 py-1.5 text-sm font-medium text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30">
+        {tr.sponsoring.tour_dismiss}
+      </button>
+    </div>
+  </aside>
+
   <header>
     <h1 class="text-2xl md:text-3xl font-bold text-zinc-900 dark:text-zinc-100">
       {tr.sponsoring.page_title}
     </h1>
-    <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{tr.sponsoring.page_subtitle}</p>
+    <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+      {tr.sponsoring.page_subtitle}
+      <button id="replay-tour" type="button" class="ml-2 text-xs underline text-emerald-700 dark:text-emerald-400 hover:text-emerald-900">
+        {tr.sponsoring.tour_show_again}
+      </button>
+    </p>
   </header>
 
   <!-- Section A: Credentials -->
@@ -62,10 +86,17 @@ const i18nBag = {
 
   <!-- Section C: Analytics -->
   <section class="space-y-4">
-    <h2 class="text-lg font-semibold">{tr.sponsoring.analytics_section}</h2>
+    <div class="flex items-center justify-between">
+      <h2 class="text-lg font-semibold">{tr.sponsoring.analytics_section}</h2>
+      <select id="analytics-range" class="text-sm rounded border border-zinc-300 dark:border-zinc-700 px-2 py-1 bg-white dark:bg-zinc-900">
+        <option value="7">{tr.sponsoring.range_7d}</option>
+        <option value="30" selected>{tr.sponsoring.range_30d}</option>
+        <option value="90">{tr.sponsoring.range_90d}</option>
+      </select>
+    </div>
     <div id="analytics-content" class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4">
-        <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">{tr.sponsoring.calls_last_30d}</h3>
+        <h3 id="sparkline-heading" class="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">{tr.sponsoring.calls_last_30d}</h3>
         <svg id="sparkline" class="w-full h-16" viewBox="0 0 300 64" preserveAspectRatio="none">
           <polyline id="sparkline-path" fill="none" stroke="currentColor" stroke-width="1.5" class="text-emerald-600" points="" />
         </svg>
@@ -167,6 +198,8 @@ const i18nBag = {
     below_engagement_threshold: string;
     covered_by_subscription: string;
     self_sponsorship_badge: string;
+    report_abuse: string;
+    calls_last_Nd: string;
     paused_reason: {
       rate_limit: string;
       cred_invalid: string;
@@ -218,6 +251,24 @@ const i18nBag = {
       dlg.showModal();
     });
   }
+
+  const TOUR_KEY = 'rastrum.sponsorshipsTourV1';
+  function showTourIfFirstVisit() {
+    try {
+      if (!localStorage.getItem(TOUR_KEY)) {
+        document.getElementById('sponsorship-tour')?.classList.remove('hidden');
+      }
+    } catch { /* localStorage unavailable */ }
+  }
+  document.getElementById('dismiss-tour')?.addEventListener('click', () => {
+    try { localStorage.setItem(TOUR_KEY, '1'); } catch { /* ignore */ }
+    document.getElementById('sponsorship-tour')?.classList.add('hidden');
+  });
+  document.getElementById('replay-tour')?.addEventListener('click', () => {
+    try { localStorage.removeItem(TOUR_KEY); } catch { /* ignore */ }
+    document.getElementById('sponsorship-tour')?.classList.remove('hidden');
+  });
+  showTourIfFirstVisit();
 
   async function refreshCreds() {
     const credsList = document.getElementById('creds-list');
@@ -339,6 +390,7 @@ const i18nBag = {
       const selfBadge = b.beneficiary_id === myId
         ? `<span class="ml-1 px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 text-xs">${escHtml(tr.self_sponsorship_badge)}</span>`
         : '';
+      const benUsername = u?.username ?? '';
       row.innerHTML = `
         <td class="py-2 pr-4">${benName} ${benHandle}${selfBadge}</td>
         <td class="py-2 pr-4">${b.monthly_call_cap}</td>
@@ -347,6 +399,7 @@ const i18nBag = {
         <td class="py-2">
           ${unpauseBtn}
           <button data-revoke-spons="${escHtml(b.id)}" class="text-sm text-red-600 ml-2">Revoke</button>
+          <button data-report-ben="${escHtml(b.beneficiary_id)}" data-username="${escHtml(benUsername)}" class="text-sm text-amber-600 hover:text-amber-800 ml-2">${escHtml(tr.report_abuse)}</button>
         </td>`;
       tbody.appendChild(row);
     }
@@ -393,22 +446,33 @@ const i18nBag = {
         await revokeSponsorship(target.dataset.revokeSpons);
         await refreshBens();
       }
+    } else if (target.dataset.reportBen) {
+      const dialog = document.getElementById('rastrum-report-dialog') as HTMLElement | null;
+      if (dialog) {
+        dialog.dataset.target      = 'user';
+        dialog.dataset.targetId    = target.dataset.reportBen;
+        dialog.dataset.targetLabel = `@${target.dataset.username || ''}`;
+        dialog.classList.remove('hidden');
+      }
     }
   });
 
-  async function refreshAnalytics() {
+  async function refreshAnalytics(days = 30) {
     const supabase = (await import('../lib/supabase')).getSupabase();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60_000).toISOString();
-    const monthStart    = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+    const sinceIso   = new Date(Date.now() - days * 24 * 60 * 60_000).toISOString();
+    const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+
+    const headingEl = document.getElementById('sparkline-heading');
+    if (headingEl) headingEl.textContent = tr.calls_last_Nd.replace('{n}', String(days));
 
     const { data: usageRows } = await supabase
       .from('ai_usage')
       .select('occurred_at, beneficiary_id, tokens_in, tokens_out')
       .eq('sponsor_id', user.id)
-      .gte('occurred_at', thirtyDaysAgo)
+      .gte('occurred_at', sinceIso)
       .order('occurred_at', { ascending: true });
 
     const byDay: Record<string, number> = {};
@@ -425,14 +489,15 @@ const i18nBag = {
       totalTokensOut += row.tokens_out ?? 0;
     }
 
-    const days: string[] = [];
-    for (let i = 29; i >= 0; i--) {
+    const daysArr: string[] = [];
+    for (let i = days - 1; i >= 0; i--) {
       const d = new Date(Date.now() - i * 24 * 60 * 60_000).toISOString().slice(0, 10);
-      days.push(d);
+      daysArr.push(d);
     }
-    const counts = days.map(d => byDay[d] ?? 0);
+    const counts = daysArr.map(d => byDay[d] ?? 0);
     const maxCount = Math.max(...counts, 1);
-    const points = counts.map((c, i) => `${(i / 29) * 300},${64 - (c / maxCount) * 60}`).join(' ');
+    const denom = Math.max(days - 1, 1);
+    const points = counts.map((c, i) => `${(i / denom) * 300},${64 - (c / maxCount) * 60}`).join(' ');
     const sparklineEl = document.getElementById('sparkline-path') as SVGPolylineElement | null;
     if (sparklineEl) sparklineEl.setAttribute('points', points);
     const totalEl = document.getElementById('sparkline-total');
@@ -481,10 +546,15 @@ const i18nBag = {
         const usd = (totalTokensIn / 1000) * HAIKU_45_INPUT_USD_PER_1K
                   + (totalTokensOut / 1000) * HAIKU_45_OUTPUT_USD_PER_1K;
         costEl.textContent = `$${usd.toFixed(2)}`;
-        costNoteEl.textContent = `${totalTokensIn.toLocaleString()} in / ${totalTokensOut.toLocaleString()} out (last 30d)`;
+        costNoteEl.textContent = `${totalTokensIn.toLocaleString()} in / ${totalTokensOut.toLocaleString()} out (last ${days}d)`;
       }
     }
   }
+
+  document.getElementById('analytics-range')?.addEventListener('change', (e) => {
+    const days = parseInt((e.target as HTMLSelectElement).value, 10);
+    refreshAnalytics(Number.isFinite(days) ? days : 30);
+  });
 
   refreshCreds();
   refreshBens();
