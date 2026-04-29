@@ -1,5 +1,14 @@
 name: Deploy Supabase Edge Functions
 
+# Auto-deploys on push to main when any function code changes (path-filtered),
+# only re-deploying the functions whose files actually changed. Manual
+# `workflow_dispatch` is preserved for surgical rollbacks, redeploys, or
+# secrets-only resync.
+#
+# Why auto-deploy: shipping merged-but-undeployed functions silently broke
+# Module 26 in prod (UI returned 404 for follow/react/report). Symmetric with
+# `db-apply.yml`, which already auto-applies schema changes on path-filtered
+# push. Functions and schema are equally critical to a working app.
 on:
   workflow_dispatch:
     inputs:
@@ -23,11 +32,19 @@ on:
           - streak-push
           - sync-error
           - delete-observation
+          - follow
+          - react
+          - report
       sync_secrets:
         description: 'Sync GitHub Actions secrets → Supabase Edge Function secrets before deploy'
         required: false
         default: true
         type: boolean
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/**'
+      - '.github/workflows/deploy-functions.yml'
 
 jobs:
   deploy:
@@ -37,52 +54,86 @@ jobs:
       PROJECT_REF: reppvlqejgoqvitturxp
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Need at least 2 commits so we can diff against the parent on push.
+          fetch-depth: 2
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
         with:
           version: latest
 
+      - name: Determine deploy targets
+        id: targets
+        run: |
+          set -e
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # Manual dispatch: honor the input verbatim.
+            INPUT="${{ inputs.function }}"
+            if [ "$INPUT" = "all" ]; then
+              # Keep this list in sync with the `options:` enum above.
+              echo "fns=get-upload-url identify enrich-environment recompute-streaks award-badges share-card export-dwca mcp api plantnet-monitor streak-push sync-error delete-observation follow react report" >> "$GITHUB_OUTPUT"
+            else
+              echo "fns=$INPUT" >> "$GITHUB_OUTPUT"
+            fi
+            echo "sync_secrets=${{ inputs.sync_secrets }}" >> "$GITHUB_OUTPUT"
+          else
+            # Push event: derive the changed function set from the diff.
+            # Pick the second column ($3) of supabase/functions/<name>/...
+            # paths, dedupe, drop blanks. If the workflow file itself changed,
+            # default to "all" so a workflow refactor redeploys everything.
+            BASE="${{ github.event.before }}"
+            HEAD="${{ github.sha }}"
+            CHANGED=$(git diff --name-only "$BASE" "$HEAD" 2>/dev/null || true)
+            WORKFLOW_TOUCHED=$(echo "$CHANGED" | grep -E '^\.github/workflows/deploy-functions\.yml$' || true)
+            FNS=""
+            if [ -n "$WORKFLOW_TOUCHED" ]; then
+              echo "→ workflow file changed; deploying all functions"
+              FNS="get-upload-url identify enrich-environment recompute-streaks award-badges share-card export-dwca mcp api plantnet-monitor streak-push sync-error delete-observation follow react report"
+            else
+              FNS=$(echo "$CHANGED" \
+                | grep -E '^supabase/functions/' \
+                | awk -F/ 'NF>=3 && $3!="" {print $3}' \
+                | sort -u \
+                | tr '\n' ' ')
+            fi
+            FNS=$(echo "$FNS" | xargs)
+            if [ -z "$FNS" ]; then
+              echo "→ no function-code changes detected; skipping deploy"
+            else
+              echo "→ deploying: $FNS"
+            fi
+            echo "fns=$FNS" >> "$GITHUB_OUTPUT"
+            # On push, never resync secrets — that's a privileged op reserved
+            # for explicit dispatch.
+            echo "sync_secrets=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Sync GitHub secrets → Supabase
-        # Single source of truth: GitHub Actions secrets. Each secret is
-        # only pushed if non-empty in CI (no clobbering existing Supabase
-        # values with empty strings). Skip with `sync_secrets=false` when
-        # you need to deploy code without touching credentials.
-        #
-        # Some GitHub secret names differ from the Edge-Function-expected
-        # names (e.g. R2_BUCKET vs R2_BUCKET_NAME). The mapping table
-        # below normalises both directions: we read the GH secret under
-        # the name you have, then write to Supabase under the canonical
-        # name the function code expects.
-        if: ${{ inputs.sync_secrets != false }}
+        if: ${{ steps.targets.outputs.sync_secrets == 'true' && steps.targets.outputs.fns != '' }}
         env:
-          # R2 / Cloudflare — GitHub names on the right, Supabase names
-          # established in the env-key columns below.
           R2_ACCESS_KEY_ID:     ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           R2_BUCKET:            ${{ secrets.R2_BUCKET }}
           R2_ENDPOINT_URL:      ${{ secrets.R2_ENDPOINT_URL }}
           PUBLIC_R2_MEDIA_URL:  ${{ secrets.PUBLIC_R2_MEDIA_URL }}
-          # Optional CF_ACCOUNT_ID — derived from R2_ENDPOINT_URL when
-          # absent (`https://<acct>.r2.cloudflarestorage.com`).
           CF_ACCOUNT_ID:        ${{ secrets.CF_ACCOUNT_ID }}
-          # Identifier providers
           PUBLIC_PLANTNET_KEY:  ${{ secrets.PUBLIC_PLANTNET_KEY }}
           PLANTNET_API_KEY:     ${{ secrets.PLANTNET_API_KEY }}
           ANTHROPIC_API_KEY:    ${{ secrets.ANTHROPIC_API_KEY }}
-          # Web Push
           VAPID_PRIVATE_KEY:    ${{ secrets.VAPID_PRIVATE_KEY }}
           VAPID_PUBLIC_KEY:     ${{ secrets.VAPID_PUBLIC_KEY }}
           VAPID_SUBJECT:        ${{ secrets.VAPID_SUBJECT }}
-          # Stripe (scaffolded; see runbook stripe-pro-tier.md)
           STRIPE_SECRET_KEY:    ${{ secrets.STRIPE_SECRET_KEY }}
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          RESEND_API_KEY:       ${{ secrets.RESEND_API_KEY }}
+          OPERATOR_EMAIL:       ${{ secrets.OPERATOR_EMAIL }}
         run: |
           set -e
 
           push_secret() {
-            local supabase_name="$1"   # name as the Edge Function reads it
-            local val="$2"             # already-resolved value
+            local supabase_name="$1"
+            local val="$2"
             if [ -n "$val" ]; then
               echo "→ syncing $supabase_name"
               supabase secrets set "$supabase_name=$val" --project-ref "$PROJECT_REF" >/dev/null
@@ -91,9 +142,6 @@ jobs:
             fi
           }
 
-          # Derive CF_ACCOUNT_ID from R2_ENDPOINT_URL when not set
-          # explicitly. R2 endpoint format:
-          #   https://<accountid>.r2.cloudflarestorage.com
           if [ -z "${CF_ACCOUNT_ID:-}" ] && [ -n "${R2_ENDPOINT_URL:-}" ]; then
             CF_ACCOUNT_ID=$(echo "$R2_ENDPOINT_URL" \
               | sed -E 's#^https?://([0-9a-f]+)\.r2\.cloudflarestorage\.com/?$#\1#')
@@ -103,7 +151,6 @@ jobs:
             fi
           fi
 
-          # R2 family — translate GitHub names → Supabase names
           push_secret R2_ACCESS_KEY_ID      "${R2_ACCESS_KEY_ID:-}"
           push_secret R2_SECRET_ACCESS_KEY  "${R2_SECRET_ACCESS_KEY:-}"
           push_secret R2_BUCKET_NAME        "${R2_BUCKET:-}"
@@ -111,22 +158,23 @@ jobs:
           push_secret R2_PUBLIC_URL         "${PUBLIC_R2_MEDIA_URL:-}"
           push_secret CF_ACCOUNT_ID         "${CF_ACCOUNT_ID:-}"
 
-          # Identifier providers — PLANTNET key has two GH names; Supabase
-          # uses PLANTNET_API_KEY. Prefer the explicit one if both are set.
           PLANTNET="${PLANTNET_API_KEY:-${PUBLIC_PLANTNET_KEY:-}}"
           push_secret PLANTNET_API_KEY      "$PLANTNET"
           push_secret ANTHROPIC_API_KEY     "${ANTHROPIC_API_KEY:-}"
 
-          # Web Push
           push_secret VAPID_PRIVATE_KEY     "${VAPID_PRIVATE_KEY:-}"
           push_secret VAPID_PUBLIC_KEY      "${VAPID_PUBLIC_KEY:-}"
           push_secret VAPID_SUBJECT         "${VAPID_SUBJECT:-mailto:hello@rastrum.org}"
 
-          # Stripe
           push_secret STRIPE_SECRET_KEY     "${STRIPE_SECRET_KEY:-}"
           push_secret STRIPE_WEBHOOK_SECRET "${STRIPE_WEBHOOK_SECRET:-}"
 
+          # Module 26 — report function emails the operator via Resend
+          push_secret RESEND_API_KEY        "${RESEND_API_KEY:-}"
+          push_secret OPERATOR_EMAIL        "${OPERATOR_EMAIL:-}"
+
       - name: Deploy
+        if: ${{ steps.targets.outputs.fns != '' }}
         run: |
           set -e
           # Functions that don't require a user JWT at the Edge layer:
@@ -136,6 +184,7 @@ jobs:
           #   plantnet-monitor  — cron-only; gates internally on service-role
           #   streak-push       — cron-only; gates internally on service-role
           #   mcp / api         — gate internally on rst_ tokens (not JWTs)
+          # Module 26 functions (follow / react / report) DO verify JWT.
           NO_JWT="share-card recompute-streaks award-badges plantnet-monitor streak-push mcp api"
           deploy_one() {
             local fn="$1"
@@ -144,18 +193,12 @@ jobs:
             echo "→ deploying $fn $flag"
             supabase functions deploy "$fn" --project-ref "$PROJECT_REF" $flag
           }
-          if [ "${{ inputs.function }}" = "all" ]; then
-            for fn in get-upload-url identify enrich-environment recompute-streaks award-badges share-card export-dwca mcp api plantnet-monitor streak-push sync-error delete-observation; do
-              deploy_one "$fn"
-            done
-          else
-            deploy_one "${{ inputs.function }}"
-          fi
+          for fn in ${{ steps.targets.outputs.fns }}; do
+            deploy_one "$fn"
+          done
 
       - name: Audit CORS on every browser-facing function
-        # Catches the class of bug where a function ships without proper
-        # CORS headers and silently breaks every browser POST. See
-        # docs/runbooks/post-launch-improvements.md (#7).
+        if: ${{ steps.targets.outputs.fns != '' }}
         run: |
           # Give Supabase a beat to propagate the deploy.
           sleep 5
