@@ -6,6 +6,11 @@
  * `notifications` table client-side. RLS scopes rows to the signed-in
  * user; unauthenticated visitors get a sign-in prompt.
  *
+ * Each row resolves its `actor_id` payload field to the actor's display
+ * name + handle + avatar via a single batched lookup; reactions resolve
+ * the `target_id` to the observation's thumbnail. Unread rows get an
+ * emerald left-rail; reads pop on click.
+ *
  * See module 26 (social graph) plan, Task 20.
  */
 import BaseLayout from '../layouts/BaseLayout.astro';
@@ -19,59 +24,90 @@ const { lang } = Astro.props;
 const tr = t(lang);
 const inboxTr = tr.socialgraph.inbox;
 const signInPath = getLocalizedPath(lang, routes.signIn[lang] + '/');
+const explorePath = getLocalizedPath(lang, routes.exploreRecent[lang] + '/');
 const notSignedIn = (tr.profile as unknown as Record<string, string>).not_signed_in
   ?? (lang === 'es' ? 'Inicia sesión para ver tu bandeja.' : 'Sign in to see your inbox.');
 const signInLabel = (tr.nav as unknown as Record<string, string>)?.signIn
   ?? (lang === 'es' ? 'Ingresar' : 'Sign in');
+const exploreLabel = lang === 'es' ? 'Explorar observaciones recientes' : 'Browse recent observations';
+const subtitleCopy = lang === 'es'
+  ? 'Avisos de seguidores, reacciones, menciones y validaciones a tus observaciones.'
+  : 'Heads-up on follows, reactions, mentions, and validations on your observations.';
 ---
 
-<BaseLayout lang={lang} title={`${inboxTr.title} — Rastrum`} description={inboxTr.empty}>
+<BaseLayout lang={lang} title={`${inboxTr.title} — Rastrum`} description={subtitleCopy}>
   <section
-    class="rastrum-inbox mx-auto max-w-2xl p-4"
+    class="rastrum-inbox mx-auto max-w-2xl px-4 py-8 md:py-12"
     data-lang={lang}
     data-label-kind-follow={inboxTr.kind_follow}
     data-label-kind-follow-request={inboxTr.kind_follow_request}
     data-label-kind-follow-accepted={inboxTr.kind_follow_accepted}
     data-label-kind-reaction={inboxTr.kind_reaction}
     data-label-empty={inboxTr.empty}
+    data-label-mark-read={lang === 'es' ? 'Marcar leído' : 'Mark read'}
+    data-label-just-now={lang === 'es' ? 'ahora' : 'just now'}
+    data-label-mins={lang === 'es' ? 'min' : 'm'}
+    data-label-hrs={lang === 'es' ? 'h' : 'h'}
+    data-label-days={lang === 'es' ? 'd' : 'd'}
+    data-label-weeks={lang === 'es' ? 'sem' : 'w'}
+    data-label-explore={exploreLabel}
+    data-explore-path={explorePath}
   >
-    <header class="flex items-center justify-between mb-4">
-      <h1 class="text-2xl md:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+    <header class="mb-6 md:mb-8">
+      <h1 class="text-3xl md:text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
         {inboxTr.title}
       </h1>
-      <button
-        type="button"
-        id="inbox-mark-all-read"
-        class="hidden text-sm font-medium text-emerald-700 hover:underline disabled:opacity-50"
-      >
-        {inboxTr.mark_all_read}
-      </button>
+      <p class="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400">{subtitleCopy}</p>
+      <div class="mt-4 flex items-center justify-between">
+        <span id="inbox-unread-count" class="text-xs font-medium text-zinc-600 dark:text-zinc-400 tabular-nums"></span>
+        <button
+          type="button"
+          id="inbox-mark-all-read"
+          class="hidden text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 transition-colors disabled:opacity-50"
+        >
+          {inboxTr.mark_all_read}
+        </button>
+      </div>
     </header>
 
     <div
       id="inbox-signin"
-      class="hidden rounded-lg border border-zinc-300 dark:border-zinc-700 p-4 text-sm"
+      class="hidden rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 text-center"
     >
-      <p class="text-zinc-700 dark:text-zinc-300">{notSignedIn}</p>
+      <p class="text-sm text-zinc-700 dark:text-zinc-300">{notSignedIn}</p>
       <a
         href={signInPath}
-        class="mt-3 inline-flex min-h-[40px] items-center rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white"
+        class="mt-4 inline-flex min-h-[44px] items-center justify-center rounded-lg bg-emerald-700 hover:bg-emerald-800 px-5 py-2.5 text-sm font-semibold text-white transition-colors"
       >
         {signInLabel}
       </a>
     </div>
 
-    <div id="inbox-loading" class="text-sm text-zinc-500 dark:text-zinc-400">
-      {tr.profile.my_observations_loading}
+    <div id="inbox-loading" class="space-y-3" aria-hidden="true">
+      <div class="h-16 rounded-xl bg-zinc-100 dark:bg-zinc-900 animate-pulse"></div>
+      <div class="h-16 rounded-xl bg-zinc-100 dark:bg-zinc-900 animate-pulse" style="animation-delay: 80ms"></div>
+      <div class="h-16 rounded-xl bg-zinc-100 dark:bg-zinc-900 animate-pulse" style="animation-delay: 160ms"></div>
     </div>
 
-    <ul id="inbox-list" class="hidden divide-y divide-zinc-200 dark:divide-zinc-800"></ul>
+    <ul id="inbox-list" class="hidden space-y-2"></ul>
 
     <div
       id="inbox-empty"
-      class="hidden rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-8 text-center"
+      class="hidden rounded-2xl border border-dashed border-emerald-300/70 dark:border-emerald-900/60 bg-emerald-50/40 dark:bg-emerald-950/20 p-10 text-center"
     >
-      <p class="text-sm text-zinc-500 dark:text-zinc-400">{inboxTr.empty}</p>
+      <svg class="mx-auto mb-4 h-12 w-12 text-emerald-700 dark:text-emerald-400" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M32 56c0-14 8-22 20-22-2 12-10 22-20 22Z" />
+        <path d="M32 56c0-14-8-22-20-22 2 12 10 22 20 22Z" />
+        <path d="M32 56V20" />
+        <path d="M32 20c0-6 4-10 10-12-2 8-6 12-10 12Z" />
+      </svg>
+      <p class="text-sm text-zinc-700 dark:text-zinc-300">{inboxTr.empty}</p>
+      <a
+        href={explorePath}
+        class="mt-5 inline-flex min-h-[40px] items-center rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white transition-colors"
+      >
+        {exploreLabel}
+      </a>
     </div>
   </section>
 </BaseLayout>
@@ -81,19 +117,29 @@ const signInLabel = (tr.nav as unknown as Record<string, string>)?.signIn
 
   type Lang = 'en' | 'es';
 
-  type NotificationKind =
-    | 'follow'
-    | 'follow_request'
-    | 'follow_accepted'
-    | 'reaction'
-    | string;
-
   interface NotificationRow {
     id: string;
-    kind: NotificationKind;
+    kind: string;
     payload: Record<string, unknown> | null;
     read_at: string | null;
     created_at: string;
+  }
+
+  interface ActorInfo {
+    id: string;
+    username: string | null;
+    display_name: string | null;
+    avatar_url: string | null;
+  }
+
+  interface ObsThumb {
+    id: string;
+    primary_taxon_id: string | null;
+  }
+
+  interface MediaThumb {
+    observation_id: string;
+    url: string | null;
   }
 
   const root = document.querySelector<HTMLElement>('.rastrum-inbox');
@@ -107,7 +153,23 @@ const signInLabel = (tr.nav as unknown as Record<string, string>)?.signIn
       .replace(/"/g, '&quot;');
   }
 
-  function templateFor(kind: NotificationKind): string {
+  function timeAgo(iso: string): string {
+    const now = Date.now();
+    const then = new Date(iso).getTime();
+    const sec = Math.max(0, Math.round((now - then) / 1000));
+    if (sec < 60) return root?.dataset.labelJustNow ?? 'just now';
+    const min = Math.round(sec / 60);
+    if (min < 60) return `${min}${root?.dataset.labelMins ?? 'm'}`;
+    const hr = Math.round(sec / 3600);
+    if (hr < 24) return `${hr}${root?.dataset.labelHrs ?? 'h'}`;
+    const d = Math.round(sec / 86400);
+    if (d < 7) return `${d}${root?.dataset.labelDays ?? 'd'}`;
+    const w = Math.round(d / 7);
+    if (w < 5) return `${w}${root?.dataset.labelWeeks ?? 'w'}`;
+    return new Date(iso).toLocaleDateString(lang);
+  }
+
+  function templateFor(kind: string): string {
     if (!root) return '';
     if (kind === 'follow') return root.dataset.labelKindFollow ?? '';
     if (kind === 'follow_request') return root.dataset.labelKindFollowRequest ?? '';
@@ -116,26 +178,107 @@ const signInLabel = (tr.nav as unknown as Record<string, string>)?.signIn
     return '';
   }
 
-  function actorFromPayload(payload: NotificationRow['payload']): string {
-    if (!payload) return '';
-    const handle = (payload as { actor_handle?: unknown }).actor_handle;
-    const display = (payload as { actor_display_name?: unknown }).actor_display_name;
-    const id = (payload as { actor_id?: unknown }).actor_id;
-    if (typeof display === 'string' && display.trim()) return display;
-    if (typeof handle === 'string' && handle.trim()) return '@' + handle;
-    if (typeof id === 'string' && id.trim()) return id;
-    return '';
+  function iconFor(kind: string): string {
+    // Hand-tuned 16px icons. Each is a circular ring + glyph in the
+    // accent color for that kind. Keeps the inbox visually scannable
+    // without leaning on emoji or heavy SVGs.
+    if (kind === 'follow' || kind === 'follow_accepted' || kind === 'follow_request') {
+      return `<span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-200 dark:ring-emerald-900/60">
+        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M19 8v6"/><path d="M22 11h-6"/></svg>
+      </span>`;
+    }
+    if (kind === 'reaction') {
+      return `<span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-rose-100 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 ring-1 ring-rose-200 dark:ring-rose-900/60">
+        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21s-7-4.5-9.5-9A5.5 5.5 0 0 1 12 6a5.5 5.5 0 0 1 9.5 6c-2.5 4.5-9.5 9-9.5 9Z"/></svg>
+      </span>`;
+    }
+    if (kind === 'comment' || kind === 'mention') {
+      return `<span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-100 dark:bg-sky-950/40 text-sky-700 dark:text-sky-400 ring-1 ring-sky-200 dark:ring-sky-900/60">
+        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+      </span>`;
+    }
+    if (kind === 'identification' || kind === 'badge') {
+      return `<span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-900/60">
+        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15 8.5 22 9.3 17 14.1 18.2 21 12 17.8 5.8 21 7 14.1 2 9.3 9 8.5 12 2"/></svg>
+      </span>`;
+    }
+    return `<span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 ring-1 ring-zinc-200 dark:ring-zinc-700"><span class="block h-1.5 w-1.5 rounded-full bg-current"/></span>`;
   }
 
-  function renderRow(n: NotificationRow): string {
+  function actorAvatar(actor: ActorInfo | null): string {
+    if (!actor) return '';
+    const url = actor.avatar_url;
+    const name = actor.display_name || actor.username || '?';
+    if (url) {
+      return `<img src="${escapeText(url)}" alt="" loading="lazy" class="absolute -bottom-0.5 -right-0.5 h-5 w-5 rounded-full ring-2 ring-white dark:ring-zinc-950 object-cover" />`;
+    }
+    return `<span class="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-zinc-700 text-[9px] font-bold text-white ring-2 ring-white dark:ring-zinc-950">${escapeText(name.slice(0, 1).toUpperCase())}</span>`;
+  }
+
+  function targetThumb(thumbUrl: string | null): string {
+    if (!thumbUrl) return '';
+    return `<img src="${escapeText(thumbUrl)}" alt="" loading="lazy" class="ml-3 h-12 w-12 shrink-0 rounded-lg object-cover ring-1 ring-zinc-200 dark:ring-zinc-800" />`;
+  }
+
+  function rowHref(n: NotificationRow, actor: ActorInfo | null): string {
+    const p = (n.payload ?? {}) as Record<string, unknown>;
+    if (n.kind === 'follow' || n.kind === 'follow_request' || n.kind === 'follow_accepted') {
+      const handle = actor?.username || (typeof p.actor_handle === 'string' ? (p.actor_handle as string) : '');
+      if (handle) return `/${lang === 'es' ? 'es/perfil' : 'en/profile'}/u/?username=${encodeURIComponent(handle)}`;
+    }
+    if (n.kind === 'reaction') {
+      const obsId = typeof p.target_id === 'string' ? (p.target_id as string) : '';
+      if (obsId) return `/share/obs/?id=${encodeURIComponent(obsId)}`;
+    }
+    return '#';
+  }
+
+  function actorLabel(n: NotificationRow, actor: ActorInfo | null): string {
+    if (actor) {
+      if (actor.display_name) return actor.display_name;
+      if (actor.username) return '@' + actor.username;
+    }
+    const p = (n.payload ?? {}) as Record<string, unknown>;
+    const handle = typeof p.actor_handle === 'string' ? (p.actor_handle as string) : '';
+    const display = typeof p.actor_display_name === 'string' ? (p.actor_display_name as string) : '';
+    if (display) return display;
+    if (handle) return '@' + handle;
+    return lang === 'es' ? 'Alguien' : 'Someone';
+  }
+
+  function renderRow(
+    n: NotificationRow,
+    actor: ActorInfo | null,
+    thumbUrl: string | null,
+  ): string {
     const tpl = templateFor(n.kind);
-    const actor = actorFromPayload(n.payload);
-    const text = tpl ? tpl.replace('{{actor}}', escapeText(actor)) : '';
-    const when = new Date(n.created_at).toLocaleString(lang);
-    const dim = n.read_at ? 'opacity-60' : '';
-    return `<li class="py-3 ${dim}">
-      <div class="text-sm text-zinc-800 dark:text-zinc-200">${text}</div>
-      <div class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">${escapeText(when)}</div>
+    const text = tpl ? tpl.replace('{{actor}}', `<span class="font-semibold text-zinc-900 dark:text-zinc-100">${escapeText(actorLabel(n, actor))}</span>`) : '';
+    const href = rowHref(n, actor);
+    const when = timeAgo(n.created_at);
+    const unread = !n.read_at;
+    const stateClasses = unread
+      ? 'bg-white dark:bg-zinc-900 ring-1 ring-emerald-200 dark:ring-emerald-900/60 shadow-[inset_3px_0_0_0] shadow-emerald-600 dark:shadow-emerald-500'
+      : 'bg-zinc-50/70 dark:bg-zinc-900/40 ring-1 ring-zinc-200/60 dark:ring-zinc-800/60';
+
+    const icon = iconFor(n.kind);
+    const avatar = actorAvatar(actor);
+    const thumb = thumbUrl ? targetThumb(thumbUrl) : '';
+
+    return `<li>
+      <a href="${escapeText(href)}" data-id="${escapeText(n.id)}"
+         class="inbox-row group block rounded-xl ${stateClasses} px-3.5 py-3 transition-all hover:ring-emerald-300 dark:hover:ring-emerald-800/80 hover:shadow-sm">
+        <div class="flex items-start gap-3">
+          <div class="relative shrink-0">${icon}${avatar}</div>
+          <div class="min-w-0 flex-1">
+            <div class="text-sm leading-snug text-zinc-700 dark:text-zinc-300">${text}</div>
+            <div class="mt-0.5 flex items-center gap-2 text-[11px] text-zinc-500 dark:text-zinc-500">
+              <span class="tabular-nums">${escapeText(when)}</span>
+              ${unread ? `<span class="inline-block h-1.5 w-1.5 rounded-full bg-emerald-600 dark:bg-emerald-500" aria-label="${escapeText(lang === 'es' ? 'no leído' : 'unread')}"></span>` : ''}
+            </div>
+          </div>
+          ${thumb}
+        </div>
+      </a>
     </li>`;
   }
 
@@ -150,15 +293,25 @@ const signInLabel = (tr.nav as unknown as Record<string, string>)?.signIn
     document.getElementById('inbox-empty')?.classList.remove('hidden');
   }
 
-  function showList(html: string) {
+  function showList(html: string, unreadCount: number) {
     document.getElementById('inbox-loading')?.classList.add('hidden');
     const list = document.getElementById('inbox-list');
     if (list) {
       list.innerHTML = html;
       list.classList.remove('hidden');
     }
+    const counter = document.getElementById('inbox-unread-count');
+    if (counter) {
+      if (unreadCount > 0) {
+        counter.textContent = lang === 'es'
+          ? `${unreadCount} sin leer`
+          : `${unreadCount} unread`;
+      } else {
+        counter.textContent = '';
+      }
+    }
     const markAll = document.getElementById('inbox-mark-all-read');
-    markAll?.classList.remove('hidden');
+    if (unreadCount > 0) markAll?.classList.remove('hidden');
   }
 
   async function init() {
@@ -179,7 +332,7 @@ const signInLabel = (tr.nav as unknown as Record<string, string>)?.signIn
       .select('id, kind, payload, read_at, created_at')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
-      .limit(100);
+      .limit(50);
     if (error) {
       showEmpty();
       return;
@@ -189,7 +342,67 @@ const signInLabel = (tr.nav as unknown as Record<string, string>)?.signIn
       showEmpty();
       return;
     }
-    showList(rows.map(renderRow).join(''));
+
+    // Batch-resolve actor info + observation thumbnails so we render
+    // names + avatars + photos without an N+1.
+    const actorIds = new Set<string>();
+    const obsIds = new Set<string>();
+    for (const r of rows) {
+      const p = (r.payload ?? {}) as Record<string, unknown>;
+      if (typeof p.actor_id === 'string') actorIds.add(p.actor_id);
+      if (r.kind === 'reaction' && typeof p.target_id === 'string') {
+        obsIds.add(p.target_id);
+      }
+    }
+
+    const actorById = new Map<string, ActorInfo>();
+    if (actorIds.size > 0) {
+      const { data: users } = await supabase
+        .from('users')
+        .select('id, username, display_name, avatar_url')
+        .in('id', Array.from(actorIds));
+      for (const u of (users ?? []) as ActorInfo[]) actorById.set(u.id, u);
+    }
+
+    const thumbByObsId = new Map<string, string>();
+    if (obsIds.size > 0) {
+      const { data: media } = await supabase
+        .from('media_files')
+        .select('observation_id, url, is_primary, created_at')
+        .in('observation_id', Array.from(obsIds))
+        .order('is_primary', { ascending: false })
+        .order('created_at', { ascending: true });
+      for (const m of (media ?? []) as (MediaThumb & { is_primary?: boolean })[]) {
+        if (!thumbByObsId.has(m.observation_id) && m.url) {
+          thumbByObsId.set(m.observation_id, m.url);
+        }
+      }
+    }
+
+    let unread = 0;
+    const html = rows.map((n) => {
+      if (!n.read_at) unread++;
+      const p = (n.payload ?? {}) as Record<string, unknown>;
+      const actor = (typeof p.actor_id === 'string') ? (actorById.get(p.actor_id as string) ?? null) : null;
+      const target = (n.kind === 'reaction' && typeof p.target_id === 'string')
+        ? (thumbByObsId.get(p.target_id as string) ?? null)
+        : null;
+      return renderRow(n, actor, target);
+    }).join('');
+    showList(html, unread);
+
+    // Click row → mark this notification as read (best-effort) before
+    // navigation. Fire-and-forget so the navigation isn't blocked.
+    document.querySelectorAll<HTMLAnchorElement>('.inbox-row').forEach((row) => {
+      row.addEventListener('click', () => {
+        const id = row.dataset.id;
+        if (!id) return;
+        getSupabase().from('notifications')
+          .update({ read_at: new Date().toISOString() })
+          .eq('id', id)
+          .then(() => undefined, () => undefined);
+      });
+    });
 
     const markAll = document.getElementById('inbox-mark-all-read') as HTMLButtonElement | null;
     markAll?.addEventListener('click', async () => {

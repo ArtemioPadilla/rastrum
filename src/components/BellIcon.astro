@@ -1,20 +1,13 @@
 ---
 /**
- * BellIcon — header bell with unread activity badge.
+ * BellIcon — header bell with unread inbox badge.
  *
- * Polls every 60s while the tab is visible. We use polling (not realtime)
- * because:
- *   1. Realtime subscriptions add a persistent socket that hurts the PWA
- *      cold-start budget for visitors who don't care about social.
- *   2. The activity-events table is small per-user; HEAD count requests
- *      are cheap.
- *   3. We pause the timer with the visibilitychange event to avoid
- *      burning battery in background tabs.
- *
- * Links to the profile page where the watchlist + activity live.
- *
- * Badge styling stays readable in both themes — bg-red-500 + white text
- * is contrasty enough to clear WCAG AA against the header background.
+ * Polls every 60s while the tab is visible. The destination is the m26
+ * social inbox (`/inbox` ↔ `/bandeja`). The badge counts unread rows in
+ * the `notifications` table (m26: follow / reaction / comment / mention).
+ * The legacy `activity_events` watchlist surface remains accessible from
+ * the profile page; bringing both into a unified inbox is a v1.1
+ * follow-up.
  */
 import { t, getLocalizedPath, routes } from '../i18n/utils';
 
@@ -24,14 +17,14 @@ interface Props {
 
 const { lang } = Astro.props;
 const tr = t(lang);
-const profilePath = getLocalizedPath(lang, routes.profile[lang] + '/');
-const ariaLabel = lang === 'es' ? 'Actividad' : 'Activity';
+const inboxPath = getLocalizedPath(lang, routes.inbox[lang] + '/');
+const ariaLabel = lang === 'es' ? 'Bandeja' : 'Inbox';
 ---
 
 <a
-  href={profilePath}
+  href={inboxPath}
   id="rastrum-bell"
-  class="rastrum-bell hidden relative inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+  class="rastrum-bell hidden relative inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors"
   aria-label={ariaLabel}
   data-bell-label-aria={tr.social.unread_label}
 >
@@ -40,7 +33,7 @@ const ariaLabel = lang === 'es' ? 'Actividad' : 'Activity';
   </svg>
   <span
     id="rastrum-bell-badge"
-    class="hidden absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 border-2 border-white dark:border-zinc-950 text-[10px] font-bold text-white flex items-center justify-center pointer-events-none"
+    class="hidden absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-emerald-600 border-2 border-white dark:border-zinc-950 text-[10px] font-bold text-white flex items-center justify-center pointer-events-none"
   >0</span>
 </a>
 
@@ -59,20 +52,25 @@ const ariaLabel = lang === 'es' ? 'Actividad' : 'Activity';
     async function tick() {
       let supabase;
       try { supabase = getSupabase(); } catch { return; }
-      const { data: { user } } = await supabase.auth.getUser();
+      // Use getSession() (localStorage-only) instead of getUser() (server
+      // round-trip) — we only need to know "is there a logged-in user"
+      // for showing the bell. JWT validation happens on the actual
+      // notification-count query against RLS.
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user ?? null;
       if (!user) {
         if (wrapper) wrapper.classList.add('hidden');
         return;
       }
       if (wrapper) wrapper.classList.remove('hidden');
       const { count, error } = await supabase
-        .from('activity_events')
+        .from('notifications')
         .select('id', { count: 'exact', head: true })
-        .eq('actor_id', user.id)
+        .eq('user_id', user.id)
         .is('read_at', null);
       if (error || !badge) return;
       if (count && count > 0) {
-        badge.textContent = count > 99 ? '99+' : String(count);
+        badge.textContent = count > 9 ? '9+' : String(count);
         badge.classList.remove('hidden');
       } else {
         badge.classList.add('hidden');
