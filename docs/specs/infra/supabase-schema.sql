@@ -201,6 +201,9 @@ CREATE TABLE IF NOT EXISTS public.taxon_usage_history (
   synonym_since       date,
   created_at          timestamptz NOT NULL DEFAULT now()
 );
+-- RLS for `public.taxon_usage_history` is enabled below in the RLS
+-- POLICIES section once `public.observations` exists (its read policy
+-- references that table; defining it here would forward-reference).
 
 -- ============================================================
 -- OBSERVATIONS (plain table; partition later if >1M rows)
@@ -447,6 +450,27 @@ CREATE POLICY "media_public_read" ON public.media_files FOR SELECT
   USING (
     observation_id IN (SELECT id FROM observations WHERE sync_status = 'synced')
     AND metadata_redacted = false
+  );
+
+-- Taxon usage history (taxonomy renames/synonyms bookkeeping). Read
+-- gate matches the obs_public_read pattern via correlated EXISTS:
+-- a row is readable iff its linked observation is publicly viewable.
+-- No write policy → RLS default-deny blocks all client writes; rows
+-- are populated by future server-side rename triggers / admin ops.
+--
+-- Surfaced by Supabase's `rls_disabled_in_public` lint on 2026-04-27;
+-- the table predates the table-by-table RLS audit and was missed.
+ALTER TABLE public.taxon_usage_history ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS taxon_usage_history_public_read ON public.taxon_usage_history;
+CREATE POLICY taxon_usage_history_public_read ON public.taxon_usage_history FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.observations o
+       WHERE o.id = taxon_usage_history.observation_id
+         AND o.sync_status = 'synced'
+         AND o.obscure_level <> 'full'
+    )
   );
 
 -- ============================================================
