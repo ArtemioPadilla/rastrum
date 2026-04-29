@@ -26,6 +26,10 @@ import { featureFlagToggleHandler } from './feature-flag-toggle.ts';
 import { proposalCreateHandler } from './proposal-create.ts';
 import { proposalApproveHandler } from './proposal-approve.ts';
 import { proposalRejectHandler } from './proposal-reject.ts';
+import { webhookCreateHandler } from './webhook-create.ts';
+import { webhookUpdateHandler } from './webhook-update.ts';
+import { webhookDeleteHandler } from './webhook-delete.ts';
+import { webhookTestHandler } from './webhook-test.ts';
 import type { ActionHandler } from './role-grant.ts';
 
 export const HANDLERS: Record<string, ActionHandler<unknown>> = {
@@ -57,4 +61,8 @@ export const HANDLERS: Record<string, ActionHandler<unknown>> = {
   'proposal.create': proposalCreateHandler as unknown as ActionHandler<unknown>,
   'proposal.approve': proposalApproveHandler as unknown as ActionHandler<unknown>,
   'proposal.reject': proposalRejectHandler as unknown as ActionHandler<unknown>,
+  'webhook.create': webhookCreateHandler as unknown as ActionHandler<unknown>,
+  'webhook.update': webhookUpdateHandler as unknown as ActionHandler<unknown>,
+  'webhook.delete': webhookDeleteHandler as unknown as ActionHandler<unknown>,
+  'webhook.test':   webhookTestHandler as unknown as ActionHandler<unknown>,
 };
