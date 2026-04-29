@@ -1,0 +1,269 @@
+---
+interface Photo {
+  id: string;
+  url: string;
+  thumbnail_url?: string | null;
+  caption?: string | null;
+  width?: number | null;
+  height?: number | null;
+}
+
+interface Props {
+  /** Filtered to deleted_at IS NULL upstream by the page script. */
+  photos: Photo[];
+  lang: 'en' | 'es';
+  mode?: 'viewer' | 'owner';
+  /** Stable id so multiple galleries on one page don't collide. */
+  galleryId?: string;
+}
+
+const { photos, lang, mode = 'viewer', galleryId = 'default' } = Astro.props;
+const isEs = lang === 'es';
+
+const labels = {
+  close:    isEs ? 'Cerrar' : 'Close',
+  previous: isEs ? 'Foto anterior' : 'Previous photo',
+  next:     isEs ? 'Foto siguiente' : 'Next photo',
+  share:    isEs ? 'Compartir' : 'Share',
+  shareAria: isEs ? 'Compartir foto' : 'Share photo',
+  open:     isEs ? 'Abrir foto en el visor' : 'Open photo in viewer',
+  noPhotos: isEs ? 'Aún no hay fotos.' : 'No photos yet.',
+  deletePhoto: isEs ? 'Eliminar foto' : 'Delete photo',
+};
+
+const hasPhotos = photos.length > 0;
+const hasMany = photos.length > 1;
+---
+
+<div
+  class="space-y-2"
+  data-photo-gallery
+  data-gallery-id={galleryId}
+  data-mode={mode}
+>
+  {/*
+    Empty-state placeholder. Hidden when photos render. The page script can
+    toggle aria-hidden on this element after dispatching `rastrum:photos-ready`.
+  */}
+  <p
+    data-photo-empty
+    class:list={[
+      'text-xs text-zinc-500 dark:text-zinc-400 italic',
+      hasPhotos && 'hidden',
+    ]}
+  >{labels.noPhotos}</p>
+
+  <button
+    type="button"
+    data-photo-hero
+    aria-label={labels.open}
+    class:list={[
+      'block w-full aspect-[16/10] overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900',
+      !hasPhotos && 'hidden',
+    ]}
+  >
+    <img
+      src={hasPhotos ? photos[0].url : ''}
+      alt={hasPhotos ? (photos[0].caption ?? '') : ''}
+      data-photo-id={hasPhotos ? photos[0].id : ''}
+      class="w-full h-full object-cover"
+      loading="eager"
+      decoding="async"
+    />
+  </button>
+
+  <div
+    data-photo-thumbs
+    class:list={[
+      'grid grid-cols-5 gap-1.5',
+      !hasMany && 'hidden',
+    ]}
+  >
+    {photos.slice(1).map((p, i) => (
+      <button
+        type="button"
+        data-photo-thumb
+        data-photo-id={p.id}
+        data-photo-index={i + 1}
+        aria-label={labels.open}
+        class="aspect-square overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-800 hover:border-emerald-500 dark:hover:border-emerald-400 transition-colors"
+      >
+        <img
+          src={p.thumbnail_url ?? p.url}
+          alt={p.caption ?? ''}
+          class="w-full h-full object-cover"
+          loading="lazy"
+          decoding="async"
+        />
+      </button>
+    ))}
+  </div>
+
+  {/* Native lightbox — keyboard nav + swipe + Esc + per-photo share + owner-mode delete stub */}
+  <div
+    data-photo-lightbox
+    class="hidden fixed inset-0 z-50 bg-black/95 items-center justify-center"
+    role="dialog"
+    aria-modal="true"
+    aria-label={labels.open}
+  >
+    <button
+      type="button"
+      data-photo-lightbox-close
+      class="absolute top-3 right-3 rounded-full bg-white/10 hover:bg-white/20 text-white p-2"
+      aria-label={labels.close}
+    >
+      <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+    </button>
+    <button
+      type="button"
+      data-photo-lightbox-prev
+      class="hidden md:inline-flex absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-white/10 hover:bg-white/20 text-white p-2"
+      aria-label={labels.previous}
+    >
+      <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+    </button>
+    <img
+      data-photo-lightbox-img
+      src=""
+      alt=""
+      class="max-w-[95vw] max-h-[90vh] object-contain"
+    />
+    <button
+      type="button"
+      data-photo-lightbox-next
+      class="hidden md:inline-flex absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-white/10 hover:bg-white/20 text-white p-2"
+      aria-label={labels.next}
+    >
+      <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+    </button>
+    <div class="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2">
+      <span data-photo-lightbox-counter class="rounded bg-white/10 text-white px-2 py-1 text-xs"></span>
+      <button
+        type="button"
+        data-photo-lightbox-share
+        class="rounded-lg bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 text-sm"
+        aria-label={labels.shareAria}
+      >{labels.share}</button>
+      {mode === 'owner' && (
+        <button
+          type="button"
+          data-photo-lightbox-delete
+          class="rounded-lg bg-red-600/90 hover:bg-red-600 text-white px-3 py-1.5 text-sm"
+          aria-label={labels.deletePhoto}
+        >{labels.deletePhoto}</button>
+      )}
+    </div>
+  </div>
+</div>
+
+<script>
+  // Native lightbox: keyboard ←/→/Esc, swipe on mobile, share button per
+  // photo. Photos hydrate via `rastrum:photos-ready` (share/obs runs a
+  // client-side query). Owner-mode delete dispatches
+  // `rastrum:photogallery-delete`; PR6's delete-photo EF wires the handler.
+  type Photo = { id: string; url: string; thumbnail_url?: string | null; caption?: string | null };
+  const ESC = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c] ?? c));
+
+  document.querySelectorAll<HTMLElement>('[data-photo-gallery]').forEach((root) => {
+    const heroBtn = root.querySelector<HTMLButtonElement>('[data-photo-hero]');
+    const heroImg = heroBtn?.querySelector<HTMLImageElement>('img') ?? null;
+    const thumbs  = root.querySelector<HTMLElement>('[data-photo-thumbs]');
+    const empty   = root.querySelector<HTMLElement>('[data-photo-empty]');
+    const lb      = root.querySelector<HTMLElement>('[data-photo-lightbox]');
+    const lbImg   = root.querySelector<HTMLImageElement>('[data-photo-lightbox-img]');
+    const counter = root.querySelector<HTMLElement>('[data-photo-lightbox-counter]');
+    if (!lb || !lbImg) return;
+
+    let photos: Photo[] = [];
+    let idx = 0;
+
+    function readInitial(): Photo[] {
+      const out: Photo[] = [];
+      const heroSrc = heroImg?.getAttribute('src') ?? '';
+      if (heroImg && heroSrc) out.push({ id: heroImg.dataset.photoId || '0', url: heroSrc, caption: heroImg.alt || null });
+      root.querySelectorAll<HTMLButtonElement>('[data-photo-thumb]').forEach((btn) => {
+        const img = btn.querySelector<HTMLImageElement>('img');
+        const src = img?.getAttribute('src') ?? '';
+        if (img && src) out.push({ id: btn.dataset.photoId || String(out.length), url: src, thumbnail_url: src, caption: img.alt || null });
+      });
+      return out;
+    }
+
+    function render(): void {
+      const has = photos.length > 0;
+      empty?.classList.toggle('hidden', has);
+      heroBtn?.classList.toggle('hidden', !has);
+      thumbs?.classList.toggle('hidden', photos.length < 2);
+      if (has && heroImg) { heroImg.src = photos[0].url; heroImg.alt = photos[0].caption ?? ''; heroImg.dataset.photoId = photos[0].id; }
+      if (thumbs) {
+        thumbs.innerHTML = photos.slice(1).map((p, i) => {
+          const src = p.thumbnail_url ?? p.url;
+          return `<button type="button" data-photo-thumb data-photo-id="${ESC(p.id)}" data-photo-index="${i + 1}" class="aspect-square overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-800 hover:border-emerald-500 dark:hover:border-emerald-400 transition-colors"><img src="${ESC(src)}" alt="${ESC(p.caption ?? '')}" class="w-full h-full object-cover" loading="lazy" decoding="async" /></button>`;
+        }).join('');
+      }
+    }
+
+    function paint(): void {
+      lbImg!.src = photos[idx].url;
+      lbImg!.alt = photos[idx].caption ?? '';
+      if (counter) { counter.textContent = `${idx + 1} / ${photos.length}`; counter.classList.toggle('hidden', photos.length < 2); }
+    }
+    function open(i: number): void {
+      if (photos.length === 0) return;
+      idx = Math.max(0, Math.min(i, photos.length - 1)); paint();
+      lb!.classList.remove('hidden'); lb!.classList.add('flex'); document.body.style.overflow = 'hidden';
+    }
+    function close(): void { lb!.classList.add('hidden'); lb!.classList.remove('flex'); document.body.style.overflow = ''; }
+    function go(d: number): void { if (photos.length === 0) return; idx = (idx + d + photos.length) % photos.length; paint(); }
+
+    heroBtn?.addEventListener('click', () => open(0));
+    root.addEventListener('click', (e) => {
+      const t = (e.target as HTMLElement | null)?.closest<HTMLElement>('[data-photo-thumb]');
+      if (t) open(Number(t.dataset.photoIndex ?? '0'));
+    });
+    root.querySelector('[data-photo-lightbox-close]')?.addEventListener('click', close);
+    root.querySelector('[data-photo-lightbox-prev]')?.addEventListener('click', () => go(-1));
+    root.querySelector('[data-photo-lightbox-next]')?.addEventListener('click', () => go(1));
+    document.addEventListener('keydown', (e) => {
+      if (lb!.classList.contains('hidden')) return;
+      if (e.key === 'Escape') { e.preventDefault(); close(); }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); go(-1); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); go(1); }
+    });
+    lb.addEventListener('click', (e) => { if (e.target === lb) close(); });
+
+    let tx = 0;
+    lb.addEventListener('touchstart', (e) => { tx = e.touches[0].clientX; }, { passive: true });
+    lb.addEventListener('touchend', (e) => {
+      const dx = e.changedTouches[0].clientX - tx;
+      if (Math.abs(dx) > 50) go(dx < 0 ? 1 : -1);
+    });
+
+    root.querySelector('[data-photo-lightbox-share]')?.addEventListener('click', async () => {
+      const params = new URLSearchParams(window.location.search);
+      const obsId = params.get('id');
+      const base = `${window.location.origin}${window.location.pathname}${obsId ? `?id=${obsId}` : ''}`;
+      const url = `${base}#photo-${encodeURIComponent(photos[idx]?.id ?? '')}`;
+      try {
+        if (navigator.share) await navigator.share({ url });
+        else if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(url);
+      } catch { /* cancelled */ }
+    });
+    root.querySelector('[data-photo-lightbox-delete]')?.addEventListener('click', () => {
+      const id = photos[idx]?.id;
+      if (!id) return;
+      window.dispatchEvent(new CustomEvent('rastrum:photogallery-delete', {
+        detail: { photoId: id, galleryId: root.dataset.galleryId ?? 'default' },
+      }));
+    });
+
+    photos = readInitial();
+    window.addEventListener('rastrum:photos-ready', (e) => {
+      const detail = (e as CustomEvent<{ photos?: Photo[]; galleryId?: string }>).detail ?? {};
+      if ((detail.galleryId ?? 'default') !== (root.dataset.galleryId ?? 'default')) return;
+      photos = Array.isArray(detail.photos) ? detail.photos : [];
+      idx = 0; render();
+    });
+  });
+</script>

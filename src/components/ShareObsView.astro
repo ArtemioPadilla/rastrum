@@ -1,0 +1,216 @@
+---
+import Comments from './Comments.astro';
+import FollowButton from './FollowButton.astro';
+import ShareButton from './ShareButton.astro';
+import SuggestIdModal from './SuggestIdModal.astro';
+import ReactionStrip from './ReactionStrip.astro';
+import PhotoGallery from './PhotoGallery.astro';
+import MapPicker from './MapPicker.astro';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+const { lang } = Astro.props;
+const obsIdPlaceholder = '';
+const isEs = lang === 'es';
+
+const labels = {
+  loading:           isEs ? 'Cargando observación…' : 'Loading observation…',
+  region:            isEs ? 'Región' : 'Region',
+  date:              isEs ? 'Fecha' : 'Date',
+  habitat:           isEs ? 'Hábitat' : 'Habitat',
+  weather:           isEs ? 'Clima' : 'Weather',
+  establishment:     isEs ? 'Establecimiento' : 'Establishment',
+  observer:          isEs ? 'Observado por' : 'Observed by',
+  sensitive:         isEs
+    ? 'Esta observación es de una especie sensible. Las coordenadas precisas se ocultan para protegerla.'
+    : 'This observation is of a sensitive species. Precise coordinates are obscured to protect it.',
+  reportBtn:         isEs ? 'Reportar observación' : 'Report observation',
+  reactionsHelp:     isEs ? 'Toca el corazón para marcar como favorita.' : 'Tap the heart to favorite this observation.',
+  communityIds:      isEs ? 'Sugerencias de la comunidad' : 'Community suggestions',
+  noSuggestions:     isEs ? 'Nadie ha sugerido una identificación todavía. Sé el primero.' : 'No one has suggested an identification yet. Be the first.',
+  suggestBtn:        isEs ? 'Sugerir identificación' : 'Suggest identification',
+  signInToSuggest:   isEs ? 'Inicia sesión para sugerir' : 'Sign in to suggest',
+  ownerNote:         isEs ? 'Usa el panel de gestión de abajo para actualizar tu identificación.' : 'Use the Manage panel below to update your own identification.',
+  manageHeading:     isEs ? 'Gestiona tu observación' : 'Manage your observation',
+  managePrivate:     isEs ? 'Sólo tú lo ves. Otros visitantes no.' : "Only you see this. Other viewers won't.",
+  scientificName:    isEs ? 'Nombre científico (override)' : 'Scientific name (override)',
+  scientificHelp:    isEs
+    ? 'Reemplaza la identificación principal con una manual (tú como validador). Deja en blanco para mantener la actual.'
+    : 'Replaces the primary identification with a manual one (you as validator). Leave blank to keep current.',
+  notes:             isEs ? 'Notas' : 'Notes',
+  locationPrivacy:   isEs ? 'Privacidad de ubicación' : 'Location privacy',
+  privacyShow:       isEs ? 'Mostrar coordenadas precisas' : 'Show precise coordinates',
+  privacy10km:       isEs ? 'Aproximar a ~10 km' : 'Coarsen to ~10 km',
+  privacy20km:       isEs ? 'Aproximar a ~20 km' : 'Coarsen to ~20 km',
+  privacy5km:        isEs ? 'Aproximar a ~5 km' : 'Coarsen to ~5 km',
+  privacyHide:       isEs ? 'Ocultar ubicación completamente' : 'Hide location entirely',
+  saveChanges:       isEs ? 'Guardar cambios' : 'Save changes',
+  deleteObs:         isEs ? 'Eliminar observación' : 'Delete observation',
+  saved:             isEs ? 'Guardado.' : 'Saved.',
+  editLocation:      isEs ? 'Editar ubicación' : 'Edit location',
+  editedBadge:       isEs
+    ? 'Editado después de las identificaciones. Los sugerentes pueden querer reafirmar.'
+    : 'Edited after IDs were given. Suggesters may want to re-affirm.',
+};
+---
+
+<div class="max-w-6xl mx-auto">
+  <div id="loading" class="py-16 text-center text-zinc-500">{labels.loading}</div>
+
+  <article id="obs" class="hidden">
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+      <aside class="md:col-span-7 lg:col-span-7 space-y-3 md:sticky md:top-20 self-start">
+        <PhotoGallery photos={[]} lang={lang} mode="viewer" galleryId="obs-detail" />
+
+        <div class="space-y-2">
+          <MapPicker mode="view" lang={lang} pickerId="obs-detail" initialCoords={null} />
+          <p data-obs-coords class="text-xs text-zinc-500 dark:text-zinc-400"></p>
+          <button
+            type="button"
+            id="obs-edit-location-btn"
+            data-show-when="owner"
+            class="hidden text-xs text-emerald-700 dark:text-emerald-400 underline"
+            disabled
+            aria-disabled="true"
+            title={labels.editLocation}
+          >{labels.editLocation}</button>
+        </div>
+      </aside>
+
+      <section class="md:col-span-5 lg:col-span-5 space-y-6">
+        <header class="space-y-2">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div class="min-w-0">
+              <h1 id="species" class="text-3xl md:text-4xl font-bold italic text-zinc-900 dark:text-zinc-100"></h1>
+              <p id="meta" class="text-sm text-zinc-500 dark:text-zinc-400"></p>
+            </div>
+            <div class="flex items-center gap-2">
+              <div id="follow-mount">
+                <FollowButton lang={lang} />
+              </div>
+              <ShareButton lang={lang} id="obs-share-btn" />
+              <button
+                id="obs-report-btn"
+                type="button"
+                class="hidden inline-flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors"
+                aria-label={labels.reportBtn}
+                title={labels.reportBtn}
+              >
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22V4a2 2 0 0 1 2-2h11l4 6-4 6H6"/><line x1="4" y1="22" x2="4" y2="14"/></svg>
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <div id="reactions-mount" class="flex items-center gap-3">
+          <ReactionStrip lang={lang} target="observation" targetId={obsIdPlaceholder} size="md" />
+          <span id="reactions-help" class="hidden text-xs text-zinc-500 dark:text-zinc-500">
+            {labels.reactionsHelp}
+          </span>
+        </div>
+
+        <p id="sensitive" class="hidden text-sm text-amber-700 dark:text-amber-400 border-l-4 border-amber-500 pl-3">
+          {labels.sensitive}
+        </p>
+
+        <p
+          id="edited-badge"
+          data-edited-badge
+          class="hidden text-xs text-amber-700 dark:text-amber-400 border-l-4 border-amber-500 pl-3 py-1"
+        >{labels.editedBadge}</p>
+
+        <dl class="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <dt class="text-zinc-500 dark:text-zinc-400">{labels.date}</dt>
+            <dd id="date" class="font-medium"></dd>
+          </div>
+          <div>
+            <dt class="text-zinc-500 dark:text-zinc-400">{labels.region}</dt>
+            <dd id="region" class="font-medium">—</dd>
+          </div>
+          <div>
+            <dt class="text-zinc-500 dark:text-zinc-400">{labels.habitat}</dt>
+            <dd id="habitat" class="font-medium">—</dd>
+          </div>
+          <div>
+            <dt class="text-zinc-500 dark:text-zinc-400">{labels.weather}</dt>
+            <dd id="weather" class="font-medium">—</dd>
+          </div>
+          <div>
+            <dt class="text-zinc-500 dark:text-zinc-400">{labels.establishment}</dt>
+            <dd id="establishment" class="font-medium">—</dd>
+          </div>
+          <div>
+            <dt class="text-zinc-500 dark:text-zinc-400">{labels.observer}</dt>
+            <dd id="observer" class="font-medium">—</dd>
+          </div>
+        </dl>
+
+        <section id="community-ids" class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 space-y-3">
+          <div class="flex items-start justify-between gap-2 flex-wrap">
+            <div>
+              <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">{labels.communityIds}</h2>
+              <p id="community-ids-empty" class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                {labels.noSuggestions}
+              </p>
+            </div>
+            <button id="ci-suggest-btn" type="button" class="hidden rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 text-xs font-semibold text-white">
+              {labels.suggestBtn}
+            </button>
+            <a id="ci-signin-link" href="/en/sign-in/" class="hidden rounded-lg border border-emerald-600/60 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20">
+              {labels.signInToSuggest}
+            </a>
+            <span id="ci-owner-note" class="hidden text-xs text-zinc-500 italic">{labels.ownerNote}</span>
+          </div>
+          <ul id="ci-list" class="space-y-1.5 text-sm"></ul>
+        </section>
+
+        {/*
+          Manage panel placeholder — PR4 fills in the Details tab. For PR3
+          the existing inline 3-field form below is preserved unchanged so
+          owner edit continues to work; PR4 replaces it with ObsManagePanel.
+        */}
+        <section id="manage-panel" class="hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 space-y-3">
+          <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">{labels.manageHeading}</h2>
+          <p class="text-xs text-zinc-500 dark:text-zinc-400">{labels.managePrivate}</p>
+          <form id="manage-form" class="space-y-3" novalidate>
+            <div>
+              <label for="m-sci" class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{labels.scientificName}</label>
+              <input id="m-sci" type="text" autocomplete="off" placeholder="e.g. Quercus oleoides" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm font-mono italic" />
+              <p class="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">{labels.scientificHelp}</p>
+            </div>
+            <div>
+              <label for="m-notes" class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{labels.notes}</label>
+              <textarea id="m-notes" rows="3" maxlength="2000" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm"></textarea>
+            </div>
+            <div>
+              <label for="m-obscure" class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{labels.locationPrivacy}</label>
+              <select id="m-obscure" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
+                <option value="none">{labels.privacyShow}</option>
+                <option value="0.1deg">{labels.privacy10km}</option>
+                <option value="0.2deg">{labels.privacy20km}</option>
+                <option value="5km">{labels.privacy5km}</option>
+                <option value="full">{labels.privacyHide}</option>
+              </select>
+            </div>
+            <p id="m-error" class="hidden text-xs text-red-600 dark:text-red-400" role="alert"></p>
+            <p id="m-saved" class="hidden text-xs text-emerald-700 dark:text-emerald-400" aria-live="polite">{labels.saved}</p>
+            <div class="flex flex-wrap items-center gap-2 pt-2">
+              <button type="submit" id="m-save" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{labels.saveChanges}</button>
+              <button type="button" id="m-delete" class="rounded-lg border border-red-300 dark:border-red-800 px-4 py-2 text-sm font-medium text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">{labels.deleteObs}</button>
+            </div>
+          </form>
+        </section>
+
+        <div id="social-mount" class="hidden">
+          <Comments lang={lang} observationId={obsIdPlaceholder} />
+        </div>
+      </section>
+    </div>
+  </article>
+
+  <div id="err" class="hidden py-16 text-center text-red-600 dark:text-red-400"></div>
+</div>
+
+<SuggestIdModal lang={lang} />
