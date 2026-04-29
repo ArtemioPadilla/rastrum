@@ -53,6 +53,21 @@ export const userBanHandler: ActionHandler<Payload> = {
       .limit(1)
       .single();
 
+    try {
+      await admin.from('notifications').insert({
+        user_id: payload.target_user_id,
+        kind: 'ban_received',
+        payload: {
+          ban_id: after?.id,
+          expires_at: after?.expires_at ?? null,
+          reason,
+          appealable: true,
+        },
+      });
+    } catch (notifErr) {
+      console.warn('[user.ban] notification insert failed:', notifErr);
+    }
+
     return { before: null, after, target: { type: 'user', id: payload.target_user_id } };
   },
 };
