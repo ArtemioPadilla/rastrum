@@ -202,6 +202,27 @@ CREATE TABLE IF NOT EXISTS public.taxon_usage_history (
   created_at          timestamptz NOT NULL DEFAULT now()
 );
 
+-- RLS — bookkeeping table for taxonomy renames/synonyms. A row is
+-- readable iff the linked observation is publicly viewable (matches
+-- the gate used by `media_public_read`). Writes are server-side only
+-- (populated by future rename triggers / admin operations); no client
+-- write policy is defined, so authenticated/anon writes are denied
+-- by RLS default-deny.
+--
+-- Surfaced by Supabase's `rls_disabled_in_public` lint on 2026-04-27;
+-- the table predates the table-by-table RLS audit and was missed.
+ALTER TABLE public.taxon_usage_history ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS taxon_usage_history_public_read ON public.taxon_usage_history;
+CREATE POLICY taxon_usage_history_public_read ON public.taxon_usage_history FOR SELECT
+  USING (
+    observation_id IN (
+      SELECT id FROM public.observations
+       WHERE sync_status = 'synced'
+         AND obscure_level <> 'full'
+    )
+  );
+
 -- ============================================================
 -- OBSERVATIONS (plain table; partition later if >1M rows)
 -- ============================================================
