@@ -6,52 +6,59 @@ import SuggestIdModal from './SuggestIdModal.astro';
 import ReactionStrip from './ReactionStrip.astro';
 import PhotoGallery from './PhotoGallery.astro';
 import MapPicker from './MapPicker.astro';
+import { t } from '../i18n/utils';
 
 interface Props {
   lang: 'en' | 'es';
 }
 const { lang } = Astro.props;
 const obsIdPlaceholder = '';
-const isEs = lang === 'es';
+
+// Pull from the i18n tree in frontmatter — Astro's JSX parser fights with
+// inline `Record<…>` casts, so we narrow once here and then read fields off
+// typed locals in the markup.
+type ObsDetailTree = {
+  view: Record<string, string>;
+  edit_location: string;
+  save_changes: string;
+  saved: string;
+  edited_badge: string;
+};
+const tr = t(lang) as { obs_detail: ObsDetailTree };
+const v  = tr.obs_detail.view;
 
 const labels = {
-  loading:           isEs ? 'Cargando observación…' : 'Loading observation…',
-  region:            isEs ? 'Región' : 'Region',
-  date:              isEs ? 'Fecha' : 'Date',
-  habitat:           isEs ? 'Hábitat' : 'Habitat',
-  weather:           isEs ? 'Clima' : 'Weather',
-  establishment:     isEs ? 'Establecimiento' : 'Establishment',
-  observer:          isEs ? 'Observado por' : 'Observed by',
-  sensitive:         isEs
-    ? 'Esta observación es de una especie sensible. Las coordenadas precisas se ocultan para protegerla.'
-    : 'This observation is of a sensitive species. Precise coordinates are obscured to protect it.',
-  reportBtn:         isEs ? 'Reportar observación' : 'Report observation',
-  reactionsHelp:     isEs ? 'Toca el corazón para marcar como favorita.' : 'Tap the heart to favorite this observation.',
-  communityIds:      isEs ? 'Sugerencias de la comunidad' : 'Community suggestions',
-  noSuggestions:     isEs ? 'Nadie ha sugerido una identificación todavía. Sé el primero.' : 'No one has suggested an identification yet. Be the first.',
-  suggestBtn:        isEs ? 'Sugerir identificación' : 'Suggest identification',
-  signInToSuggest:   isEs ? 'Inicia sesión para sugerir' : 'Sign in to suggest',
-  ownerNote:         isEs ? 'Usa el panel de gestión de abajo para actualizar tu identificación.' : 'Use the Manage panel below to update your own identification.',
-  manageHeading:     isEs ? 'Gestiona tu observación' : 'Manage your observation',
-  managePrivate:     isEs ? 'Sólo tú lo ves. Otros visitantes no.' : "Only you see this. Other viewers won't.",
-  scientificName:    isEs ? 'Nombre científico (override)' : 'Scientific name (override)',
-  scientificHelp:    isEs
-    ? 'Reemplaza la identificación principal con una manual (tú como validador). Deja en blanco para mantener la actual.'
-    : 'Replaces the primary identification with a manual one (you as validator). Leave blank to keep current.',
-  notes:             isEs ? 'Notas' : 'Notes',
-  locationPrivacy:   isEs ? 'Privacidad de ubicación' : 'Location privacy',
-  privacyShow:       isEs ? 'Mostrar coordenadas precisas' : 'Show precise coordinates',
-  privacy10km:       isEs ? 'Aproximar a ~10 km' : 'Coarsen to ~10 km',
-  privacy20km:       isEs ? 'Aproximar a ~20 km' : 'Coarsen to ~20 km',
-  privacy5km:        isEs ? 'Aproximar a ~5 km' : 'Coarsen to ~5 km',
-  privacyHide:       isEs ? 'Ocultar ubicación completamente' : 'Hide location entirely',
-  saveChanges:       isEs ? 'Guardar cambios' : 'Save changes',
-  deleteObs:         isEs ? 'Eliminar observación' : 'Delete observation',
-  saved:             isEs ? 'Guardado.' : 'Saved.',
-  editLocation:      isEs ? 'Editar ubicación' : 'Edit location',
-  editedBadge:       isEs
-    ? 'Editado después de las identificaciones. Los sugerentes pueden querer reafirmar.'
-    : 'Edited after IDs were given. Suggesters may want to re-affirm.',
+  loading:           v.loading,
+  region:            v.region,
+  date:              v.date,
+  habitat:           v.habitat,
+  weather:           v.weather,
+  establishment:     v.establishment,
+  observer:          v.observer,
+  sensitive:         v.sensitive,
+  reportBtn:         v.report_btn,
+  reactionsHelp:     v.reactions_help,
+  communityIds:      v.community_ids,
+  noSuggestions:     v.no_suggestions,
+  suggestBtn:        v.suggest_btn,
+  signInToSuggest:   v.signin_to_suggest,
+  ownerNote:         v.owner_note,
+  manageHeading:     v.manage_heading,
+  managePrivate:     v.manage_private,
+  scientificName:    v.scientific_name,
+  scientificHelp:    v.scientific_help,
+  notes:             v.notes,
+  locationPrivacy:   v.location_privacy,
+  privacyShow:       v.privacy_show,
+  privacy10km:       v.privacy_10km,
+  privacy20km:       v.privacy_20km,
+  privacy5km:        v.privacy_5km,
+  privacyHide:       v.privacy_hide,
+  deleteObs:         v.delete_obs,
+  saveChanges:       tr.obs_detail.save_changes,
+  saved:             tr.obs_detail.saved,
+  editLocation:      tr.obs_detail.edit_location,
+  editedBadge:       tr.obs_detail.edited_badge,
 };
 ---
 
