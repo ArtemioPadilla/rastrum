@@ -269,7 +269,7 @@ const docColumns = [
 <!-- Auth status: keeps the existing avatar-swap behavior -->
 <script>
   import { getSupabase } from '../lib/supabase';
-  import { signOut } from '../lib/auth';
+  import { signOut, SUPABASE_AUTH_STORAGE_KEY, HEADER_AVATAR_CACHE_KEY, HEADER_AVATAR_NAME_KEY } from '../lib/auth';
   import { getUserRoles } from '../lib/user-roles';
   import type { UserProfile } from '../lib/types';
 
@@ -286,8 +286,8 @@ const docColumns = [
     return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
   }
 
-  const AVATAR_CACHE_KEY = 'rastrum.headerAvatar';
-  const AVATAR_NAME_KEY  = 'rastrum.headerName';
+  const AVATAR_CACHE_KEY = HEADER_AVATAR_CACHE_KEY;
+  const AVATAR_NAME_KEY  = HEADER_AVATAR_NAME_KEY;
   function paintCachedAvatar() {
     if (!avatarImg) return;
     try {
@@ -368,7 +368,7 @@ const docColumns = [
     try {
       localStorage.removeItem(AVATAR_CACHE_KEY);
       localStorage.removeItem(AVATAR_NAME_KEY);
-      localStorage.removeItem('rastrum-auth-v1');
+      localStorage.removeItem(SUPABASE_AUTH_STORAGE_KEY);
     } catch { /* ignore */ }
     window.location.replace(window.location.pathname.startsWith('/es/') ? '/es/' : '/en/');
   });

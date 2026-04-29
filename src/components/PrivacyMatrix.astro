@@ -180,6 +180,7 @@ const levels: Array<{ key: 'public' | 'signed_in' | 'private'; label: string }> 
 
 <script>
   import { getSupabase } from '../lib/supabase';
+  import { SUPABASE_AUTH_STORAGE_KEY } from '../lib/auth';
   import {
     applyPreset,
     detectPreset,
@@ -368,7 +369,7 @@ const levels: Array<{ key: 'public' | 'signed_in' | 'private'; label: string }> 
   function readAccessToken(): string {
     if (typeof localStorage === 'undefined') return '';
     try {
-      const raw = localStorage.getItem('rastrum-auth-v1');
+      const raw = localStorage.getItem(SUPABASE_AUTH_STORAGE_KEY);
       if (!raw) return '';
       const parsed = JSON.parse(raw) as { access_token?: string; currentSession?: { access_token?: string } };
       return parsed.access_token ?? parsed.currentSession?.access_token ?? '';
