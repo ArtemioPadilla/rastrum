@@ -52,7 +52,12 @@ const ariaLabel = lang === 'es' ? 'Bandeja' : 'Inbox';
     async function tick() {
       let supabase;
       try { supabase = getSupabase(); } catch { return; }
-      const { data: { user } } = await supabase.auth.getUser();
+      // Use getSession() (localStorage-only) instead of getUser() (server
+      // round-trip) — we only need to know "is there a logged-in user"
+      // for showing the bell. JWT validation happens on the actual
+      // notification-count query against RLS.
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user ?? null;
       if (!user) {
         if (wrapper) wrapper.classList.add('hidden');
         return;

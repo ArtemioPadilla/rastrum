@@ -116,12 +116,34 @@ const reportTr = tr.socialgraph.report;
     const errorEl = dialog.querySelector<HTMLElement>('[data-rd-error]');
     const thanksEl = dialog.querySelector<HTMLElement>('[data-rd-thanks]');
 
+    let lastFocused: HTMLElement | null = null;
+
+    const FOCUSABLE_SEL = 'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+    function focusableEls(): HTMLElement[] {
+      return Array.from(dialog!.querySelectorAll<HTMLElement>(FOCUSABLE_SEL))
+        .filter((el) => el.offsetParent !== null);
+    }
+
     function close() {
       dialog?.classList.add('hidden');
       form?.reset();
       errorEl?.classList.add('hidden');
       thanksEl?.classList.add('hidden');
       if (submit) submit.disabled = false;
+      lastFocused?.focus();
+      lastFocused = null;
+    }
+
+    function onOpen() {
+      lastFocused = (document.activeElement as HTMLElement | null) ?? null;
+      if (targetLabelEl) {
+        targetLabelEl.textContent = dialog!.dataset.targetLabel ?? '';
+      }
+      // Focus the first reason radio so keyboard users land in-form.
+      const first = dialog!.querySelector<HTMLElement>('input[type="radio"]')
+        ?? focusableEls()[0];
+      first?.focus();
     }
 
     cancel?.addEventListener('click', close);
@@ -129,14 +151,32 @@ const reportTr = tr.socialgraph.report;
       if (e.target === dialog) close();
     });
     document.addEventListener('keydown', (e) => {
-      if (!dialog.classList.contains('hidden') && (e as KeyboardEvent).key === 'Escape') close();
+      const ev = e as KeyboardEvent;
+      if (dialog.classList.contains('hidden')) return;
+      if (ev.key === 'Escape') {
+        close();
+        return;
+      }
+      if (ev.key === 'Tab') {
+        // Trap focus inside the dialog.
+        const els = focusableEls();
+        if (els.length === 0) return;
+        const first = els[0];
+        const last = els[els.length - 1];
+        const active = document.activeElement as HTMLElement | null;
+        if (ev.shiftKey && active === first) {
+          ev.preventDefault();
+          last.focus();
+        } else if (!ev.shiftKey && active === last) {
+          ev.preventDefault();
+          first.focus();
+        }
+      }
     });
 
-    // Update the target-label whenever the dialog is opened.
+    // Update the target-label + focus-in whenever the dialog is opened.
     const observer = new MutationObserver(() => {
-      if (!dialog.classList.contains('hidden') && targetLabelEl) {
-        targetLabelEl.textContent = dialog.dataset.targetLabel ?? '';
-      }
+      if (!dialog.classList.contains('hidden')) onOpen();
     });
     observer.observe(dialog, { attributes: true, attributeFilter: ['class', 'data-target', 'data-target-id', 'data-target-label'] });
 
