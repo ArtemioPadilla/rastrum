@@ -3896,6 +3896,75 @@
         }
       ]
     },
+    "admin-console-pr2-users-credentials": {
+      "phase": "v1.1",
+      "title_en": "Admin/Moderator/Expert console — PR2 (Users + Credentials tabs, role grants UI)",
+      "title_es": "Consola — PR2 (Usuarios + Credenciales, UI de roles)",
+      "modules": ["24-admin-console.md"],
+      "subtasks": [
+        { "label_en": "ConsoleUsersView: search, role chips, grant/revoke slide-over", "label_es": "ConsoleUsersView: búsqueda, chips de rol, slide-over conceder/revocar", "status": "done" },
+        { "label_en": "ConsoleCredentialsView: researcher role grants with notes field", "label_es": "ConsoleCredentialsView: conceder rol de investigador con notas", "status": "done" },
+        { "label_en": "Expert console tabs declared (5 tabs, all stub initially)", "label_es": "Tabs de experto declarados (5 tabs, todos stub inicialmente)", "status": "done" },
+        { "label_en": "Role pill + sidebar routing for moderator + expert", "label_es": "Pill de rol + enrutamiento de sidebar para moderador + experto", "status": "done" },
+        { "label_en": "E2E smoke for users + credentials not-auth banners", "label_es": "E2E smoke para banners de no-auth en usuarios + credenciales", "status": "done" }
+      ]
+    },
+    "admin-console-pr3-ops-tabs": {
+      "phase": "v1.1",
+      "title_en": "Admin console — PR3 (Sync + API + Cron read-only ops tabs)",
+      "title_es": "Consola admin — PR3 (Sync + API + Cron, ops read-only)",
+      "modules": ["24-admin-console.md"],
+      "subtasks": [
+        { "label_en": "ConsoleSyncFailuresView: error groups table with 7-day filter", "label_es": "ConsoleSyncFailuresView: tabla de grupos de error con filtro de 7 días", "status": "done" },
+        { "label_en": "ConsoleApiQuotasView: daily quota burn-down + 30-day chart", "label_es": "ConsoleApiQuotasView: consumo de cuota diaria + gráfico 30 días", "status": "done" },
+        { "label_en": "ConsoleCronRunsView: pg_cron job status table", "label_es": "ConsoleCronRunsView: tabla de estado de jobs pg_cron", "status": "done" },
+        { "label_en": "Moderator console foundation: ConsoleModOverviewView + 4 tabs", "label_es": "Base de consola moderador: ConsoleModOverviewView + 4 tabs", "status": "done" },
+        { "label_en": "E2E smoke for sync + api + cron not-auth banners", "label_es": "E2E smoke para banners de no-auth en sync + api + cron", "status": "done" }
+      ]
+    },
+    "admin-console-pr4-observations": {
+      "phase": "v1.1",
+      "title_en": "Admin console — PR4 (Observations admin tab + 4 obs handlers)",
+      "title_es": "Consola admin — PR4 (Observaciones + 4 handlers)",
+      "modules": ["24-admin-console.md"],
+      "subtasks": [
+        { "label_en": "ConsoleObservationsView: global obs table with hide/obscure/license chips", "label_es": "ConsoleObservationsView: tabla global de obs con chips ocultar/obscurecer/licencia", "status": "done" },
+        { "label_en": "Handler: observation.hide + observation.unhide", "label_es": "Handler: observation.hide + observation.unhide", "status": "done" },
+        { "label_en": "Handler: observation.obscure + observation.license_override", "label_es": "Handler: observation.obscure + observation.license_override", "status": "done" },
+        { "label_en": "obs_public_read RLS excludes hidden observations", "label_es": "RLS obs_public_read excluye observaciones ocultas", "status": "done" },
+        { "label_en": "E2E smoke for observations not-auth banner", "label_es": "E2E smoke para banner de no-auth en observaciones", "status": "done" }
+      ]
+    },
+    "admin-console-pr5-moderator": {
+      "phase": "v1.1",
+      "title_en": "Console — PR5 (Moderator console: Flag queue, Comments, Soft-bans + 9 handlers)",
+      "title_es": "Consola — PR5 (Consola de moderador: Cola, Comentarios, Suspensiones + 9 handlers)",
+      "modules": ["24-admin-console.md"],
+      "subtasks": [
+        { "label_en": "ConsoleFlagQueueView: report triage/resolve/dismiss with slide-over", "label_es": "ConsoleFlagQueueView: triage/resolver/desestimar reportes con slide-over", "status": "done" },
+        { "label_en": "ConsoleCommentsView: hide/unhide/lock/unlock comments", "label_es": "ConsoleCommentsView: ocultar/mostrar/bloquear/desbloquear comentarios", "status": "done" },
+        { "label_en": "ConsoleBansView: issue + lift soft-bans", "label_es": "ConsoleBansView: emitir + levantar suspensiones", "status": "done" },
+        { "label_en": "Handlers: report.triage/resolve/dismiss (3)", "label_es": "Handlers: report.triage/resolve/dismiss (3)", "status": "done" },
+        { "label_en": "Handlers: comment.hide/unhide/lock/unlock (4)", "label_es": "Handlers: comment.hide/unhide/lock/unlock (4)", "status": "done" },
+        { "label_en": "Handlers: user.ban + user.unban (2)", "label_es": "Handlers: user.ban + user.unban (2)", "status": "done" },
+        { "label_en": "E2E smoke for flag-queue + comments + bans not-auth banners", "label_es": "E2E smoke para banners de no-auth en cola + comentarios + suspensiones", "status": "done" }
+      ]
+    },
+    "admin-console-pr6-expert": {
+      "phase": "v1.1",
+      "title_en": "Console — PR6 (Expert console: Overview, Validation queue, Your expertise)",
+      "title_es": "Consola — PR6 (Consola de experto: Resumen, Cola de validación, Tu experiencia)",
+      "modules": ["24-admin-console.md"],
+      "subtasks": [
+        { "label_en": "ConsoleExpertOverviewView: KPI counters + action items + recent contributions", "label_es": "ConsoleExpertOverviewView: contadores KPI + items de acción + contribuciones recientes", "status": "done" },
+        { "label_en": "ConsoleExpertValidationView: queue table filtered to expert_taxa + all-taxa toggle", "label_es": "ConsoleExpertValidationView: tabla de cola filtrada a expert_taxa + toggle todos los taxa", "status": "done" },
+        { "label_en": "ConsoleExpertExpertiseView: per-taxon scores + search/filter + SVG kingdom chart", "label_es": "ConsoleExpertExpertiseView: puntajes por taxón + búsqueda/filtro + gráfico SVG por reino", "status": "done" },
+        { "label_en": "Stub: ConsoleExpertOverridesView + ConsoleExpertTaxonNotesView", "label_es": "Stub: ConsoleExpertOverridesView + ConsoleExpertTaxonNotesView", "status": "done" },
+        { "label_en": "8 new EN/ES route pages + expert dispatch on /console/ root", "label_es": "8 nuevas páginas de ruta EN/ES + dispatch de experto en raíz /consola/", "status": "done" },
+        { "label_en": "Remove stub flag from 3 functional expert tabs in console-tabs.ts", "label_es": "Eliminar flag stub de 3 tabs funcionales de experto en console-tabs.ts", "status": "done" },
+        { "label_en": "E2E smoke for validation + expertise not-auth banners", "label_es": "E2E smoke para banners de no-auth en validación + experiencia", "status": "done" }
+      ]
+    },
     "social-graph-m26": {
       "phase": "v1.2",
       "title_en": "Social graph + reactions (Module 26)",
