@@ -19,6 +19,16 @@
       "watchlist": "Watchlist",
       "species": "Species"
     },
+    "explore_megamenu": {
+      "biodiversity": "Biodiversity",
+      "community": "Community",
+      "community_all": "Observers",
+      "community_top": "Top observers",
+      "community_nearby": "Nearby",
+      "community_experts": "Experts by taxon",
+      "community_country": "By country",
+      "nearby_signin_tooltip": "Sign in to find observers near you"
+    },
     "docs_groups": {
       "product": "Product",
       "progress": "Progress",
@@ -324,6 +334,49 @@
     "onnx_base_attribution": "Model: TensorFlow Model Garden (Apache-2.0). ImageNet labels are English common names — treat results as hints, not research-grade IDs.",
     "onnx_base_weights_url_missing": "Weights are not hosted yet — set PUBLIC_ONNX_BASE_URL to enable."
   },
+  "community": {
+    "page_title": "Community observers",
+    "page_subtitle": "Find observers by activity, expertise, location, or country.",
+    "loading": "Loading…",
+    "previous": "Previous",
+    "next": "Next",
+    "expert_pill": "expert",
+    "today": "today",
+    "yesterday": "yesterday",
+    "days_ago": "{n}d ago",
+    "months_ago": "{n}mo ago",
+    "years_ago": "{n}y ago",
+    "sort": {
+      "obs": "Most observations",
+      "species": "Most species",
+      "active_7d": "Most active this week",
+      "active_30d": "Most active this month",
+      "recent": "Recently active",
+      "newest": "Newest",
+      "distance": "Nearest to me"
+    },
+    "filter": {
+      "country": "Country",
+      "taxon": "Taxon",
+      "nearby": "Nearby",
+      "experts_only": "Experts only",
+      "any": "Any"
+    },
+    "card": {
+      "obs": "{n} obs",
+      "species": "{n} species",
+      "last_seen": "last seen {when}",
+      "follow": "Follow",
+      "following": "Following"
+    },
+    "empty": {
+      "no_match": "No observers match these filters. Try removing one.",
+      "nearby_no_centroid": "Log an observation to find observers near you.",
+      "nearby_anon": "Sign in to find observers near you."
+    },
+    "leaderboards_optout_link": "Hide me from community leaderboards",
+    "edit_profile_optout": "Profile → Edit"
+  },
   "profile": {
     "title": "Profile",
     "edit": "Edit profile",
@@ -346,7 +399,7 @@
     "public_profile": "Public profile",
     "public_profile_hint": "Others can view your profile page and public activity.",
     "gamification": "Badges & activity",
-    "gamification_hint": "Enable badges, streaks, and activity feed. Quality-gated. No leaderboards.",
+    "gamification_hint": "Enable badges, streaks, and activity feed. Quality-gated. Community leaderboards are opt-in.",
     "streak_digest": "Weekly digest email",
     "streak_digest_hint": "One summary email per week. No push notifications.",
     "total_observations": "Observations",
@@ -639,6 +692,13 @@
     "manage_establishment_label": "Establishment",
     "manage_tab_location_placeholder": "Location editing coming soon. The mini-map above shows the current pin.",
     "manage_tab_photos_placeholder": "Photo management coming soon.",
+    "location": {
+      "current_heading": "Current location",
+      "no_location": "This observation has no coordinates set.",
+      "edit_intro": "Drag the pin or type coordinates. If the species is sensitive, the public map will still show only a coarsened area.",
+      "edit_button": "Edit location",
+      "saving": "Saving location…"
+    },
     "errors": {
       "coords_invalid": "Latitude must be between −90 and 90, longitude between −180 and 180.",
       "save_failed": "Save failed. Please try again.",
@@ -1061,7 +1121,7 @@
     "streak_state_broken": "Streak ended",
     "streak_state_none": "Start your first streak",
     "streak_enable_title": "Enable streaks",
-    "streak_enable_body": "Track your daily observation streak. Quality-gated, opt-in, no leaderboards.",
+    "streak_enable_body": "Track your daily observation streak. Quality-gated and opt-in. Community leaderboards are a separate opt-in.",
     "streak_enable_cta": "Enable streaks",
     "streak_enabling": "Enabling…",
     "streak_recompute_failed": "Couldn't enable streaks. Try again in a moment.",

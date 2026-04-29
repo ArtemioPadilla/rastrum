@@ -4189,6 +4189,39 @@ $$;
 REVOKE ALL ON FUNCTION public.recompute_user_stats() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.recompute_user_stats() TO service_role;
 
+-- 9) Nearby helper — authenticated only. Reads the centroid view
+-- (which is not granted to anon), so the SQL-layer privacy gate
+-- fires regardless of the UI sign-in check. SECURITY INVOKER:
+-- runs with the caller's privileges, so anon callers fail the
+-- view-level grant check before the function body even runs.
+CREATE OR REPLACE FUNCTION public.community_observers_nearby(
+  p_radius_m numeric  DEFAULT 200000,
+  p_limit    int      DEFAULT 20,
+  p_offset   int      DEFAULT 0,
+  p_country  text     DEFAULT NULL,
+  p_taxa     text[]   DEFAULT NULL,
+  p_experts  boolean  DEFAULT false
+)
+RETURNS SETOF public.community_observers_with_centroid
+LANGUAGE sql STABLE PARALLEL SAFE AS $$
+  WITH viewer AS (
+    SELECT centroid_geog FROM public.users WHERE id = auth.uid()
+  )
+  SELECT v.*
+    FROM public.community_observers_with_centroid v, viewer
+   WHERE v.id <> auth.uid()
+     AND viewer.centroid_geog IS NOT NULL
+     AND ST_DWithin(v.centroid_geog, viewer.centroid_geog, p_radius_m)
+     AND (p_country IS NULL OR v.country_code = p_country)
+     AND (p_taxa    IS NULL OR v.expert_taxa @> p_taxa)
+     AND (p_experts = false OR v.is_expert = true)
+   ORDER BY v.centroid_geog <-> viewer.centroid_geog
+   LIMIT p_limit OFFSET p_offset;
+$$;
+
+REVOKE ALL ON FUNCTION public.community_observers_nearby(numeric, int, int, text, text[], boolean) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.community_observers_nearby(numeric, int, int, text, text[], boolean) TO authenticated;
+
 -- ============================================================
 -- Observation detail redesign — material edit tracking + soft-delete
 -- (2026-04-29) — see docs/superpowers/specs/2026-04-29-obs-detail-redesign-design.md
@@ -4552,3 +4585,76 @@ CREATE POLICY ban_appeals_no_client_delete ON public.ban_appeals
 
 GRANT SELECT, INSERT ON public.ban_appeals TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.ban_appeals TO service_role;
+
+-- ============================================================
+-- ADMIN RATE LIMIT BUCKETS (PR11 — durable across isolates)
+-- ============================================================
+-- Token-bucket state for the admin Edge Function dispatcher.
+-- The in-memory Map in rate-limit.ts resets on every cold start; this
+-- table persists across isolates so a determined attacker cannot evade
+-- the limit by outlasting cold-start windows.
+--
+-- Access: service_role only. No client reads, no client writes.
+-- The consume_rate_limit_token() function is SECURITY DEFINER so it
+-- bypasses RLS but is only callable by service_role.
+
+CREATE TABLE IF NOT EXISTS public.rate_limit_buckets (
+  actor_id    uuid PRIMARY KEY,
+  tokens      numeric NOT NULL DEFAULT 30,
+  last_refill timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.rate_limit_buckets ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS rate_limit_no_client_read ON public.rate_limit_buckets;
+CREATE POLICY rate_limit_no_client_read ON public.rate_limit_buckets
+  FOR SELECT TO authenticated, anon USING (false);
+
+GRANT SELECT, INSERT, UPDATE ON public.rate_limit_buckets TO service_role;
+
+-- Atomic UPSERT + token-consume in a single RPC call.
+-- Returns (allowed boolean, retry_after_seconds int, tokens_remaining numeric).
+-- Fail-open semantics live in the Edge Function: if this RPC errors, the
+-- dispatcher lets the request through rather than locking everyone out.
+CREATE OR REPLACE FUNCTION public.consume_rate_limit_token(
+  p_actor_id uuid,
+  p_cost numeric DEFAULT 1.0,
+  p_capacity numeric DEFAULT 30.0,
+  p_refill_per_second numeric DEFAULT 0.5
+) RETURNS TABLE (allowed boolean, retry_after_seconds int, tokens_remaining numeric)
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_now timestamptz := now();
+  v_tokens numeric;
+BEGIN
+  -- Atomic UPSERT — first call initialises the bucket at full capacity.
+  INSERT INTO public.rate_limit_buckets (actor_id, tokens, last_refill, updated_at)
+  VALUES (p_actor_id, p_capacity, v_now, v_now)
+  ON CONFLICT (actor_id) DO UPDATE
+  SET tokens = LEAST(p_capacity, public.rate_limit_buckets.tokens
+                                  + EXTRACT(EPOCH FROM (v_now - public.rate_limit_buckets.last_refill))
+                                  * p_refill_per_second),
+      last_refill = v_now,
+      updated_at = v_now
+  RETURNING public.rate_limit_buckets.tokens INTO v_tokens;
+
+  IF v_tokens >= p_cost THEN
+    UPDATE public.rate_limit_buckets
+    SET tokens = tokens - p_cost,
+        updated_at = v_now
+    WHERE actor_id = p_actor_id
+    RETURNING tokens INTO v_tokens;
+    RETURN QUERY SELECT true, 0, v_tokens;
+  ELSE
+    RETURN QUERY SELECT
+      false,
+      CEIL((p_cost - v_tokens) / p_refill_per_second)::int,
+      v_tokens;
+  END IF;
+END $$;
+
+REVOKE ALL ON FUNCTION public.consume_rate_limit_token(uuid, numeric, numeric, numeric) FROM public;
+GRANT EXECUTE ON FUNCTION public.consume_rate_limit_token(uuid, numeric, numeric, numeric) TO service_role;

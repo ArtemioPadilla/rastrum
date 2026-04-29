@@ -147,12 +147,13 @@ specs at `docs/superpowers/specs/2026-04-29-*-design.md`.
   `/community/observers/` page with composable filter chips (sort, country, taxon,
   experts-only, nearby) backed by denormalized counters refreshed nightly. Privacy
   gate at the SQL layer via dual views: `community_observers` (anon-safe, no
-  centroid) and `community_observers_with_centroid` (authenticated only). Country
-  picker + `hide_from_leaderboards` opt-out + `country_code_source` 'auto'/'user'
-  badge on Profile → Edit. PR1 (#92) + PR2 (#96) + PR4 (#102) merged. PR3 manual
-  cron fire pending. PR5+PR6 (page + MegaMenu + atomic i18n rewrite of the two
-  shipped "no leaderboards" strings) remaining. _(in implementation — see
-  `docs/runbooks/community-discovery.md`)_
+  centroid) and `community_observers_with_centroid` (authenticated only) plus the
+  authenticated-only `community_observers_nearby(...)` SQL RPC for the Nearby
+  filter. Country picker + `hide_from_leaderboards` opt-out + `country_code_source`
+  'auto'/'user' badge on Profile → Edit. PR1 (#92) + PR2 (#96) + PR4 (#102) merged.
+  PR5+PR6 (this PR) atomically lands the page + MegaMenu split + i18n rewrite of
+  the two shipped "no leaderboards" strings + OG card + roadmap flip. PR3 manual
+  cron fire is the only remaining backfill task (operator action). _(✓ done)_
 
 - `obs-detail-redesign` — Rebuilt `/share/obs/?id=...` as two-column desktop /
   stacked mobile layout. PR1 (#91) extracted reusable `MapPicker.astro` from

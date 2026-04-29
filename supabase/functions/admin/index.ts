@@ -79,8 +79,9 @@ serve(async (req) => {
     const actor = await verifyJwtAndLoadRoles(req);
     requireRole(actor, handler.requiredRole);
 
+    const admin = createClient(SUPABASE_URL, SERVICE_KEY);
     const rateCost = WRITE_ACTIONS.has(action) ? 3 : 1;
-    const rateResult = checkRateLimit(actor.id, rateCost);
+    const rateResult = await checkRateLimit(admin, actor.id, rateCost);
     if (!rateResult.allowed) {
       return new Response(
         JSON.stringify({ error: 'rate limit exceeded', retry_after: rateResult.retryAfterSeconds }),
@@ -98,7 +99,6 @@ serve(async (req) => {
     const parsed = handler.payloadSchema.safeParse(payload);
     if (!parsed.success) return json({ error: 'invalid payload', issues: parsed.error.issues }, 400);
 
-    const admin = createClient(SUPABASE_URL, SERVICE_KEY);
     const result = await handler.execute(admin, parsed.data, actor, reason);
 
     // x-forwarded-for can be comma-separated ("client, proxy1, proxy2")

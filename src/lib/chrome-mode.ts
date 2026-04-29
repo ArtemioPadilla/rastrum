@@ -10,6 +10,8 @@ const APP_PREFIXES = [
   '/observar',
   '/explore',
   '/explorar',
+  '/community',
+  '/comunidad',
   '/chat',
   '/profile',
   '/perfil',

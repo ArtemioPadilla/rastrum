@@ -7,9 +7,12 @@ const lang = 'es';
 ---
 
 <BaseLayout lang={lang} title="Consola">
-  <div id="console-gate" class="p-6 text-sm text-zinc-600 dark:text-zinc-400">
-    Cargando…
-  </div>
+  <!-- Gate: renders invisible (no text) on first paint so signed-in users
+       with roles never see a "Cargando…" flash. The script un-hides the
+       correct shell immediately after the session resolves, or sets an
+       error message if unauthenticated / no-roles. A 1500ms fallback
+       un-hides the gate in case JS fails to run at all. -->
+  <div id="console-gate" class="hidden p-6 text-sm text-zinc-600 dark:text-zinc-400"></div>
   <div id="console-shell-admin" class="hidden">
     <ConsoleOverviewView lang={lang} />
   </div>
@@ -28,20 +31,31 @@ const lang = 'es';
   import { getUserRoles } from '../../../lib/user-roles';
   import { rolePillsFor } from '../../../lib/console-tabs';
 
+  const gate = document.getElementById('console-gate')!;
+
+  // Fallback: if JS stalls for more than 1500ms, reveal the gate so the
+  // user sees something rather than a blank page.
+  const fallbackTimer = setTimeout(() => gate.classList.remove('hidden'), 1500);
+
   async function init() {
-    const gate = document.getElementById('console-gate')!;
     const supabase = getSupabase();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { gate.textContent = 'Se requiere iniciar sesión.'; return; }
+    if (!user) {
+      gate.textContent = 'Se requiere iniciar sesión.';
+      gate.classList.remove('hidden');
+      return;
+    }
     const roles = await getUserRoles(user.id);
     if (roles.size === 0) {
       gate.textContent = 'No tienes acceso a la consola.';
+      gate.classList.remove('hidden');
       return;
     }
+    clearTimeout(fallbackTimer);
+
     const pills = rolePillsFor(roles);
     const requestedRole = new URL(window.location.href).searchParams.get('role');
     const activeRole = (requestedRole && roles.has(requestedRole as never) ? requestedRole : pills[0]) as string;
-    gate.classList.add('hidden');
 
     if (activeRole === 'admin') {
       document.getElementById('console-shell-admin')!.classList.remove('hidden');
@@ -54,6 +68,7 @@ const lang = 'es';
     }
   }
   init().catch(err => {
-    document.getElementById('console-gate')!.textContent = 'Error: ' + (err as Error).message;
+    gate.textContent = 'Error: ' + (err as Error).message;
+    gate.classList.remove('hidden');
   });
 </script>
