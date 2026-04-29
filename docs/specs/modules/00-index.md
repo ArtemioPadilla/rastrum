@@ -84,6 +84,7 @@ narrative source.
 | 25 | Profile Privacy & Public Profile (per-facet matrix + `/u/<username>/`) | v1.2 | shipped (v1.2.0 + v1.2.1 merged 2026-04-28; v1.2.2 cleanup deferred) | [`25-profile-privacy.md`](25-profile-privacy.md) |
 | 26 | Social graph + reactions (follows, reactions, blocks, reports, notifications) | v1.3 | planned (spec v1.0) | [`26-social-graph.md`](26-social-graph.md) |
 | 27 | AI Sponsorships (share Anthropic credentials with beneficiaries) | v1.3 | in implementation (PR feat/ai-sponsorships) | [`27-ai-sponsorships.md`](27-ai-sponsorships.md) |
+| 28 | Community discovery (observers page, leaderboards, nearby, experts, country filter) | v1.3 | in implementation (PR1 — schema deltas) | [`28-community-discovery.md`](28-community-discovery.md) |
 
 ## v1.5 — Territory layer — planned
 
@@ -139,7 +140,7 @@ ML training pipeline) rather than waiting on engineering capacity.
 
 ## How to add a new module spec
 
-1. Claim the next free `NN-*.md` slot (currently `27-`).
+1. Claim the next free `NN-*.md` slot (currently `29-`).
 2. Copy the structure of an existing spec
    (`01-photo-id.md` is a good template).
 3. Include: **Overview → Data model → APIs / logic → Edge cases → Cost / risk
