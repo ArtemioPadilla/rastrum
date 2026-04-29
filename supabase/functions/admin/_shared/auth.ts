@@ -2,7 +2,7 @@
  * Verifies the caller's Supabase JWT and loads their active roles in one
  * round trip. Returns a typed actor or throws an HTTP-shaped error.
  */
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 
 export type UserRole = 'admin' | 'moderator' | 'expert' | 'researcher';
 
