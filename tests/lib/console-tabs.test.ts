@@ -3,8 +3,8 @@ import { CONSOLE_TABS, tabsForRoles, rolePillsFor } from '../../src/lib/console-
 import type { UserRole } from '../../src/lib/types';
 
 describe('console-tabs', () => {
-  it('declares 28 tabs total', () => {
-    expect(CONSOLE_TABS).toHaveLength(28);
+  it('declares 30 tabs total', () => {
+    expect(CONSOLE_TABS).toHaveLength(30);
   });
 
   it('every tab has a unique id', () => {
@@ -19,8 +19,8 @@ describe('console-tabs', () => {
     }
   });
 
-  it('admin role has 17 tabs', () => {
-    expect(CONSOLE_TABS.filter(t => t.role === 'admin')).toHaveLength(17);
+  it('admin role has 19 tabs', () => {
+    expect(CONSOLE_TABS.filter(t => t.role === 'admin')).toHaveLength(19);
   });
 
   it('moderator role has 6 tabs', () => {
@@ -39,7 +39,7 @@ describe('console-tabs', () => {
     const all = new Set<UserRole>(['admin', 'expert']);
     const adminTabs = tabsForRoles('admin', all);
     expect(adminTabs.every(t => t.role === 'admin')).toBe(true);
-    expect(adminTabs).toHaveLength(17);
+    expect(adminTabs).toHaveLength(19);
     const moderatorTabs = tabsForRoles('moderator', all);
     expect(moderatorTabs).toHaveLength(0);
   });

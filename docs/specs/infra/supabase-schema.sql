@@ -4907,3 +4907,420 @@ END $$;
 
 REVOKE ALL ON FUNCTION public.compute_admin_health_digest() FROM public;
 GRANT EXECUTE ON FUNCTION public.compute_admin_health_digest() TO service_role;
+
+-- ═════════════════════════════════════════════════════════════════════
+-- PR13 — Future-proofing primitives
+-- See docs/runbooks/admin-time-bounded-roles.md
+-- See docs/runbooks/admin-two-person-rule.md
+-- See docs/runbooks/admin-webhooks.md
+-- See docs/runbooks/admin-trust-scores.md
+-- ═════════════════════════════════════════════════════════════════════
+
+-- 1. Time-bounded role grants
+-- ─────────────────────────────────────────────────────────────────────
+-- Adds expires_at + auto_revoke_reason to user_roles. has_role() rewrites
+-- to also check (expires_at IS NULL OR expires_at > now()). A daily cron
+-- (auto-revoke-expired-roles-daily) runs auto_revoke_expired_roles() to
+-- soft-revoke any role rows past expiry and write an admin_audit row.
+
+ALTER TABLE public.user_roles
+  ADD COLUMN IF NOT EXISTS expires_at         timestamptz;
+ALTER TABLE public.user_roles
+  ADD COLUMN IF NOT EXISTS auto_revoke_reason text;
+
+CREATE INDEX IF NOT EXISTS user_roles_expires_at_idx
+  ON public.user_roles (expires_at)
+  WHERE expires_at IS NOT NULL AND revoked_at IS NULL;
+
+-- has_role() now treats expires_at the same as a future-dated revoked_at:
+-- both gate the role to "currently active". The original revoked_at clause
+-- is preserved for backwards compatibility (admin manual revocation path).
+CREATE OR REPLACE FUNCTION public.has_role(uid uuid, r public.user_role)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.user_roles
+    WHERE user_id = uid
+      AND role = r
+      AND (revoked_at IS NULL OR revoked_at > now())
+      AND (expires_at IS NULL OR expires_at > now())
+  );
+$$;
+REVOKE ALL ON FUNCTION public.has_role(uuid, public.user_role) FROM public;
+GRANT EXECUTE ON FUNCTION public.has_role(uuid, public.user_role) TO authenticated, service_role;
+
+CREATE OR REPLACE FUNCTION public.auto_revoke_expired_roles()
+RETURNS int
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_now timestamptz := now();
+  v_row record;
+  v_count int := 0;
+  v_actor uuid;
+BEGIN
+  -- The cron job has no actor_id; we record a fixed sentinel via a NULL
+  -- actor in details->>'auto'. admin_audit.actor_id is NOT NULL, so we
+  -- need a placeholder — we resolve to the granting admin so the audit
+  -- trail still ties back to a real human. If granted_by is NULL (rare,
+  -- legacy rows), we fall back to the user_id itself.
+  FOR v_row IN
+    SELECT user_id, role, granted_by, expires_at
+      FROM public.user_roles
+     WHERE revoked_at IS NULL
+       AND expires_at IS NOT NULL
+       AND expires_at <= v_now
+  LOOP
+    UPDATE public.user_roles
+       SET revoked_at         = v_now,
+           auto_revoke_reason = 'expired'
+     WHERE user_id = v_row.user_id
+       AND role    = v_row.role
+       AND revoked_at IS NULL;
+
+    v_actor := COALESCE(v_row.granted_by, v_row.user_id);
+    INSERT INTO public.admin_audit (actor_id, op, target_type, target_id, before, after, reason)
+    VALUES (
+      v_actor,
+      'role_revoke',
+      'user',
+      v_row.user_id::text,
+      jsonb_build_object('role', v_row.role, 'expires_at', v_row.expires_at),
+      jsonb_build_object('revoked_at', v_now, 'auto_revoke_reason', 'expired'),
+      'auto-revoke: role grant expired'
+    );
+
+    v_count := v_count + 1;
+  END LOOP;
+
+  RETURN v_count;
+END $$;
+
+REVOKE ALL ON FUNCTION public.auto_revoke_expired_roles() FROM public;
+GRANT EXECUTE ON FUNCTION public.auto_revoke_expired_roles() TO service_role;
+
+-- 2. Two-person rule on irreversible actions
+-- ─────────────────────────────────────────────────────────────────────
+-- New table admin_action_proposals stores pending irreversible actions.
+-- Approver MUST differ from proposer (handler-side check). Proposals
+-- expire after 24h; expire_stale_proposals() flips status to 'expired'.
+
+DO $$ BEGIN
+  ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'proposal_create';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'proposal_approve';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'proposal_reject';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS public.admin_action_proposals (
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  proposer_id         uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  op                  public.audit_op NOT NULL,
+  target_type         text NOT NULL,
+  target_id           text NOT NULL,
+  payload             jsonb NOT NULL,
+  reason              text NOT NULL,
+  status              text NOT NULL DEFAULT 'pending'
+                      CHECK (status IN ('pending', 'approved', 'rejected', 'expired', 'executed')),
+  approver_id         uuid REFERENCES auth.users(id),
+  approved_at         timestamptz,
+  rejected_at         timestamptz,
+  executed_at         timestamptz,
+  executed_audit_id   bigint REFERENCES public.admin_audit(id),
+  expires_at          timestamptz NOT NULL DEFAULT (now() + interval '24 hours'),
+  created_at          timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_action_proposals_status_created
+  ON public.admin_action_proposals (status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_admin_action_proposals_proposer
+  ON public.admin_action_proposals (proposer_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_admin_action_proposals_expires
+  ON public.admin_action_proposals (expires_at)
+  WHERE status = 'pending';
+
+ALTER TABLE public.admin_action_proposals ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS admin_action_proposals_admin_read ON public.admin_action_proposals;
+CREATE POLICY admin_action_proposals_admin_read ON public.admin_action_proposals
+  FOR SELECT TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'));
+
+DROP POLICY IF EXISTS admin_action_proposals_no_client_write ON public.admin_action_proposals;
+CREATE POLICY admin_action_proposals_no_client_write ON public.admin_action_proposals
+  FOR ALL TO authenticated
+  USING (false) WITH CHECK (false);
+
+GRANT SELECT                          ON public.admin_action_proposals TO authenticated;
+GRANT SELECT, INSERT, UPDATE          ON public.admin_action_proposals TO service_role;
+
+CREATE OR REPLACE FUNCTION public.expire_stale_proposals()
+RETURNS int
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_count int;
+BEGIN
+  WITH updated AS (
+    UPDATE public.admin_action_proposals
+       SET status = 'expired'
+     WHERE status = 'pending'
+       AND expires_at <= now()
+    RETURNING id
+  )
+  SELECT count(*)::int INTO v_count FROM updated;
+  RETURN v_count;
+END $$;
+
+REVOKE ALL ON FUNCTION public.expire_stale_proposals() FROM public;
+GRANT EXECUTE ON FUNCTION public.expire_stale_proposals() TO service_role;
+
+-- 3. Webhook subscriptions
+-- ─────────────────────────────────────────────────────────────────────
+-- admin_webhooks: per-subscription URL + event filter + HMAC secret.
+-- admin_webhook_deliveries: append-only delivery log (debugging + retry
+-- planning). dispatch_admin_webhooks(event, payload) is a SECURITY DEFINER
+-- helper that pg_net's a POST to every enabled, matching subscription
+-- and disables the subscription after 10 consecutive failures.
+
+DO $$ BEGIN
+  ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'webhook_create';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'webhook_update';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'webhook_delete';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'webhook_test';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS public.admin_webhooks (
+  id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  url                  text NOT NULL CHECK (url ~ '^https://'),
+  events               text[] NOT NULL,
+  secret               text NOT NULL,
+  enabled              boolean NOT NULL DEFAULT true,
+  created_by           uuid NOT NULL REFERENCES auth.users(id),
+  last_delivery_at     timestamptz,
+  last_delivery_status int,
+  consecutive_failures int NOT NULL DEFAULT 0,
+  created_at           timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_webhooks_enabled
+  ON public.admin_webhooks (enabled)
+  WHERE enabled = true;
+
+ALTER TABLE public.admin_webhooks ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS admin_webhooks_admin_read ON public.admin_webhooks;
+CREATE POLICY admin_webhooks_admin_read ON public.admin_webhooks
+  FOR SELECT TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'));
+
+DROP POLICY IF EXISTS admin_webhooks_no_client_write ON public.admin_webhooks;
+CREATE POLICY admin_webhooks_no_client_write ON public.admin_webhooks
+  FOR ALL TO authenticated
+  USING (false) WITH CHECK (false);
+
+GRANT SELECT                          ON public.admin_webhooks TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE  ON public.admin_webhooks TO service_role;
+
+CREATE TABLE IF NOT EXISTS public.admin_webhook_deliveries (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  webhook_id   uuid NOT NULL REFERENCES public.admin_webhooks(id) ON DELETE CASCADE,
+  event        text NOT NULL,
+  payload      jsonb NOT NULL,
+  attempted_at timestamptz NOT NULL DEFAULT now(),
+  status_code  int,
+  error        text
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_webhook_deliveries_webhook
+  ON public.admin_webhook_deliveries (webhook_id, attempted_at DESC);
+
+ALTER TABLE public.admin_webhook_deliveries ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS admin_webhook_deliveries_admin_read ON public.admin_webhook_deliveries;
+CREATE POLICY admin_webhook_deliveries_admin_read ON public.admin_webhook_deliveries
+  FOR SELECT TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'));
+
+DROP POLICY IF EXISTS admin_webhook_deliveries_no_client_write ON public.admin_webhook_deliveries;
+CREATE POLICY admin_webhook_deliveries_no_client_write ON public.admin_webhook_deliveries
+  FOR ALL TO authenticated
+  USING (false) WITH CHECK (false);
+
+GRANT SELECT                          ON public.admin_webhook_deliveries TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE  ON public.admin_webhook_deliveries TO service_role;
+
+-- HMAC-SHA256 signing helper. pgcrypto provides hmac() with the right
+-- semantics; we hex-encode the digest because it's slightly more
+-- ergonomic for verification on the receiver side than base64.
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+CREATE OR REPLACE FUNCTION public.dispatch_admin_webhooks(p_event text, p_payload jsonb)
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_row record;
+  v_body text;
+  v_sig  text;
+  v_request_id bigint;
+BEGIN
+  v_body := p_payload::text;
+
+  FOR v_row IN
+    SELECT id, url, secret
+      FROM public.admin_webhooks
+     WHERE enabled = true
+       AND p_event = ANY (events)
+  LOOP
+    v_sig := encode(
+      hmac(v_body::bytea, v_row.secret::bytea, 'sha256'),
+      'hex'
+    );
+
+    BEGIN
+      v_request_id := net.http_post(
+        url     := v_row.url,
+        headers := jsonb_build_object(
+          'Content-Type', 'application/json',
+          'X-Rastrum-Signature', 'sha256=' || v_sig,
+          'X-Rastrum-Event', p_event
+        ),
+        body    := p_payload
+      );
+
+      INSERT INTO public.admin_webhook_deliveries (webhook_id, event, payload)
+      VALUES (v_row.id, p_event, p_payload);
+
+      UPDATE public.admin_webhooks
+         SET last_delivery_at  = now(),
+             consecutive_failures = 0
+       WHERE id = v_row.id;
+    EXCEPTION WHEN OTHERS THEN
+      INSERT INTO public.admin_webhook_deliveries (webhook_id, event, payload, error)
+      VALUES (v_row.id, p_event, p_payload, SQLERRM);
+
+      UPDATE public.admin_webhooks
+         SET last_delivery_at     = now(),
+             consecutive_failures = consecutive_failures + 1,
+             enabled              = (consecutive_failures + 1 < 10)
+       WHERE id = v_row.id;
+    END;
+  END LOOP;
+END $$;
+
+REVOKE ALL ON FUNCTION public.dispatch_admin_webhooks(text, jsonb) FROM public;
+GRANT EXECUTE ON FUNCTION public.dispatch_admin_webhooks(text, jsonb) TO service_role;
+
+-- Triggers — fan out from anomaly creation + privileged audit ops to
+-- subscribed webhooks. AFTER INSERT keeps the dispatch out of the
+-- critical-path commit; failures inside dispatch_admin_webhooks() are
+-- swallowed and logged to admin_webhook_deliveries.
+CREATE OR REPLACE FUNCTION public.admin_anomalies_dispatch_trigger()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  PERFORM public.dispatch_admin_webhooks('anomaly_created', to_jsonb(NEW));
+  RETURN NEW;
+END $$;
+
+DROP TRIGGER IF EXISTS admin_anomalies_dispatch ON public.admin_anomalies;
+CREATE TRIGGER admin_anomalies_dispatch
+AFTER INSERT ON public.admin_anomalies
+FOR EACH ROW EXECUTE FUNCTION public.admin_anomalies_dispatch_trigger();
+
+CREATE OR REPLACE FUNCTION public.admin_audit_dispatch_trigger()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_event text;
+BEGIN
+  v_event := CASE NEW.op::text
+    WHEN 'user_ban'      THEN 'user_banned'
+    WHEN 'user_unban'    THEN 'user_unbanned'
+    WHEN 'role_grant'    THEN 'role_granted'
+    WHEN 'role_revoke'   THEN 'role_revoked'
+    ELSE NULL
+  END;
+  IF v_event IS NOT NULL THEN
+    PERFORM public.dispatch_admin_webhooks(v_event, to_jsonb(NEW));
+  END IF;
+  RETURN NEW;
+END $$;
+
+DROP TRIGGER IF EXISTS admin_audit_dispatch ON public.admin_audit;
+CREATE TRIGGER admin_audit_dispatch
+AFTER INSERT ON public.admin_audit
+FOR EACH ROW EXECUTE FUNCTION public.admin_audit_dispatch_trigger();
+
+-- 4. Moderator trust score (read-only v1 placeholder)
+-- ─────────────────────────────────────────────────────────────────────
+-- v1 returns a static formula based on (a) presence of unacknowledged
+-- anomalies attributed to the moderator and (b) raw action volume in
+-- the last 30 days. Future iterations should add overturn-rate signals
+-- (a moderator's report.dismiss reversed within 7 days = bad outcome).
+
+CREATE OR REPLACE FUNCTION public.compute_moderator_trust_score(p_user_id uuid)
+RETURNS numeric
+LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_unack int;
+  v_actions int;
+  v_score numeric := 100.0;
+BEGIN
+  IF NOT (public.has_role(p_user_id, 'moderator') OR public.has_role(p_user_id, 'admin')) THEN
+    RETURN NULL;
+  END IF;
+
+  SELECT count(*)::int INTO v_unack
+    FROM public.admin_anomalies
+   WHERE actor_id = p_user_id
+     AND acknowledged_at IS NULL;
+
+  SELECT count(*)::int INTO v_actions
+    FROM public.admin_audit
+   WHERE actor_id = p_user_id
+     AND created_at >= now() - interval '30 days';
+
+  -- v1 heuristic: 100 floor minus 8 per unacknowledged anomaly, clamped
+  -- at 0. New mods (no actions yet) get 100 by default.
+  v_score := greatest(0, 100 - (v_unack * 8));
+  RETURN v_score;
+END $$;
+
+REVOKE ALL ON FUNCTION public.compute_moderator_trust_score(uuid) FROM public;
+GRANT EXECUTE ON FUNCTION public.compute_moderator_trust_score(uuid) TO authenticated, service_role;
+
+CREATE OR REPLACE VIEW public.moderator_trust_scores AS
+SELECT u.id AS user_id,
+       u.username,
+       u.display_name,
+       public.compute_moderator_trust_score(u.id) AS trust_score
+  FROM public.users u
+ WHERE EXISTS (
+   SELECT 1 FROM public.user_roles ur
+    WHERE ur.user_id = u.id
+      AND ur.role IN ('moderator', 'admin')
+      AND (ur.revoked_at IS NULL OR ur.revoked_at > now())
+      AND (ur.expires_at IS NULL OR ur.expires_at > now())
+ );
+
+GRANT SELECT ON public.moderator_trust_scores TO authenticated;

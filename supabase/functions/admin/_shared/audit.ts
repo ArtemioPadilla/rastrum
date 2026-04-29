@@ -21,7 +21,16 @@ export type AuditOp =
   | 'token_list_read'
   | 'user_audit_read'
   | 'appeal_accepted'
-  | 'appeal_rejected';
+  | 'appeal_rejected'
+  | 'anomaly_acknowledge'
+  | 'audit_export'
+  | 'proposal_create'
+  | 'proposal_approve'
+  | 'proposal_reject'
+  | 'webhook_create'
+  | 'webhook_update'
+  | 'webhook_delete'
+  | 'webhook_test';
 
 export interface AuditRow {
   actor_id: string;

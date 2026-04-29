@@ -358,3 +358,68 @@ inserts an `admin_audit` row with `op = 'audit_export'`,
 `target_type = 'admin_audit'`, `target_id = 'export'`, and an
 `after` jsonb of `{ from, to, actorId, op, limit, returned }` so the
 filter context is recoverable from the audit log.
+
+## PR13 — Future-proofing handlers
+
+### `proposal.create`
+
+Files an admin_action_proposal for one of the four irreversible ops.
+Required role: `admin`. Returns `{ proposalId, expiresAt }`.
+
+```ts
+await adminClient.proposal.create(
+  {
+    targetOp: 'user.ban',
+    targetType: 'user',
+    targetId: '00000000-…',
+    payload: { target_user_id: '00000000-…', duration_hours: 24 },
+    reason: 'Spam dump in #flag-queue, three reports from different IPs',
+  },
+  'two-person rule on permanent-tier ban',
+  session!.access_token,
+);
+```
+
+### `proposal.approve`
+
+Executes the underlying action with the original proposer's payload
+and writes both a `proposal_approve` audit row and the underlying
+op's audit row (linked via `admin_action_proposals.executed_audit_id`).
+Required role: `admin`. **Throws `self_approval_forbidden` when the
+caller's id matches `proposer_id`.**
+
+### `proposal.reject`
+
+Marks status='rejected'; no underlying action runs.
+
+### `webhook.create`
+
+Generates a 256-bit HMAC secret, returns it **once** in the response.
+Persisted into `admin_webhooks`. Required role: `admin`.
+
+```ts
+const res = await adminClient.webhook.create(
+  {
+    url: 'https://siem.example.com/rastrum-events',
+    events: ['anomaly_created', 'user_banned'],
+  },
+  'wire SOC ingestion for PR13',
+  session!.access_token,
+);
+console.log('secret (copy now):', res.result?.secret);
+```
+
+### `webhook.update`
+
+Toggles enabled, edits url/events. Re-enabling resets
+`consecutive_failures = 0` so the circuit breaker has a fresh window.
+
+### `webhook.delete`
+
+Hard delete; CASCADE removes related `admin_webhook_deliveries` rows.
+
+### `webhook.test`
+
+POSTs `{test:true, webhook_id, sent_at}` to a single webhook with a
+proper signature header. Persists the response status_code in
+`admin_webhook_deliveries`. Returns `{ statusCode, error }`.

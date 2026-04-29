@@ -1,0 +1,365 @@
+---
+/**
+ * ConsoleWebhooksView — admin-only CRUD over admin_webhooks. Create
+ * form (URL + event checkboxes) returns the per-subscription HMAC secret
+ * once. The list shows last-delivery status, consecutive-failure count,
+ * and a Test button. Recent deliveries (last 20) are shown below.
+ */
+import { t } from '../i18n/utils';
+import ConsoleSlideOver from './ConsoleSlideOver.astro';
+
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+const c = tr.console as unknown as Record<string, string>;
+const wNs = (tr.console as unknown as Record<string, Record<string, unknown>>).webhooksView as
+  unknown as Record<string, Record<string, string> | string>;
+const wTitle = (wNs?.title as string) ?? 'Webhooks';
+const wDesc  = (wNs?.description as string) ?? '';
+const wCreate = (wNs?.create as Record<string, string>) ?? {};
+const wEvents = (wNs?.events as Record<string, string>) ?? {};
+const wCols   = (wNs?.columns as Record<string, string>) ?? {};
+const wActions = (wNs?.actions as Record<string, string>) ?? {};
+const wDeliv  = (wNs?.deliveries as Record<string, string>) ?? {};
+const wEmpty  = (wNs?.empty as string) ?? 'No webhooks configured.';
+const wDelivEmpty = (wNs?.deliveriesEmpty as string) ?? 'No deliveries yet.';
+const eventKeys: Array<keyof typeof wEvents> = [
+  'anomaly_created', 'user_banned', 'user_unbanned', 'role_granted', 'role_revoked',
+];
+---
+
+<section class="max-w-6xl space-y-6">
+  <header>
+    <h1 class="text-xl font-semibold mb-1">{wTitle}</h1>
+    <p class="text-sm text-zinc-500 dark:text-zinc-400">{wDesc}</p>
+  </header>
+
+  <div id="webhooks-not-auth" class="hidden rounded border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-900 dark:text-amber-100">
+    {tr.console.not_authorized}
+  </div>
+
+  <div id="webhooks-shell" class="hidden space-y-6">
+    <!-- Create form -->
+    <div class="rounded border border-zinc-200 dark:border-zinc-800 p-4">
+      <h2 class="text-sm font-semibold mb-3">{wCreate.heading ?? 'New webhook'}</h2>
+      <form id="webhook-create-form" class="space-y-3">
+        <label class="block text-sm">
+          <span class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{wCreate.url ?? 'URL'}</span>
+          <input
+            id="webhook-url"
+            type="url"
+            required
+            pattern="https://.*"
+            placeholder="https://your-service.example.com/hook"
+            class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm"
+          />
+        </label>
+        <fieldset class="space-y-1">
+          <legend class="text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{wCreate.events ?? 'Events'}</legend>
+          {eventKeys.map(k => (
+            <label class="flex items-center gap-2 text-xs">
+              <input type="checkbox" data-event-key={k} class="rounded" />
+              <span>{wEvents[k] ?? k}</span>
+            </label>
+          ))}
+        </fieldset>
+        <label class="block text-sm">
+          <span class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.console.slideover_reason_label}</span>
+          <input
+            id="webhook-create-reason"
+            type="text"
+            minlength="5"
+            placeholder={tr.console.slideover_reason_placeholder}
+            class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm"
+          />
+        </label>
+        <button type="submit" class="px-3 py-1.5 rounded bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium">
+          {wCreate.submit ?? 'Create webhook'}
+        </button>
+      </form>
+      <div id="webhook-secret-banner" class="hidden mt-3 rounded border border-amber-300 bg-amber-50 dark:border-amber-700/60 dark:bg-amber-900/20 p-2 text-xs text-amber-900 dark:text-amber-100">
+        <div class="font-medium mb-1">{wCreate.secretShown ?? 'Secret (shown once):'}</div>
+        <code id="webhook-secret-value" class="block break-all bg-white dark:bg-zinc-950 px-2 py-1 rounded text-[11px] font-mono"></code>
+      </div>
+      <p id="webhook-create-error" class="hidden mt-2 text-sm text-red-600 dark:text-red-400"></p>
+    </div>
+
+    <!-- List -->
+    <div>
+      <h2 class="text-sm font-semibold mb-2">Webhooks</h2>
+      <div id="webhooks-loading" class="text-sm text-zinc-500 italic">{c.loading}</div>
+      <div id="webhooks-empty" class="hidden rounded border border-dashed border-zinc-200 dark:border-zinc-700 p-6 text-center text-sm text-zinc-500">
+        {wEmpty}
+      </div>
+      <div id="webhooks-rows" class="hidden overflow-x-auto rounded border border-zinc-200 dark:border-zinc-800">
+        <table class="min-w-full text-sm">
+          <thead class="bg-zinc-50 dark:bg-zinc-900/40 text-left text-xs uppercase tracking-wide text-zinc-500">
+            <tr>
+              <th class="px-3 py-2">{wCols.url ?? 'URL'}</th>
+              <th class="px-3 py-2">{wCols.events ?? 'Events'}</th>
+              <th class="px-3 py-2">{wCols.enabled ?? 'Enabled'}</th>
+              <th class="px-3 py-2">{wCols.lastDelivery ?? 'Last delivery'}</th>
+              <th class="px-3 py-2 text-right">{wCols.consecutiveFailures ?? 'Failures'}</th>
+              <th class="px-3 py-2 text-right">{wCols.actions ?? 'Actions'}</th>
+            </tr>
+          </thead>
+          <tbody id="webhooks-tbody" class="divide-y divide-zinc-100 dark:divide-zinc-800"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Deliveries -->
+    <div>
+      <h2 class="text-sm font-semibold mb-2">{wDeliv.heading ?? 'Recent deliveries'}</h2>
+      <div id="deliveries-empty" class="hidden rounded border border-dashed border-zinc-200 dark:border-zinc-700 p-4 text-center text-xs text-zinc-500">
+        {wDelivEmpty}
+      </div>
+      <div id="deliveries-rows" class="hidden overflow-x-auto rounded border border-zinc-200 dark:border-zinc-800">
+        <table class="min-w-full text-xs">
+          <thead class="bg-zinc-50 dark:bg-zinc-900/40 text-left uppercase tracking-wide text-zinc-500">
+            <tr>
+              <th class="px-3 py-2">{wDeliv.event ?? 'Event'}</th>
+              <th class="px-3 py-2">{wDeliv.status ?? 'Status'}</th>
+              <th class="px-3 py-2">{wDeliv.time ?? 'Time'}</th>
+              <th class="px-3 py-2">{wDeliv.error ?? 'Error'}</th>
+            </tr>
+          </thead>
+          <tbody id="deliveries-tbody" class="divide-y divide-zinc-100 dark:divide-zinc-800"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <p id="webhooks-error" class="hidden text-sm text-red-600 dark:text-red-400"></p>
+  </div>
+</section>
+
+<ConsoleSlideOver
+  lang={lang}
+  id="console-slideover-webhook-action"
+  titleKey="Webhook action"
+/>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { getUserRoles } from '../lib/user-roles';
+  import { adminClient, AdminClientError } from '../lib/admin-client';
+
+  type WebhookRow = {
+    id: string;
+    url: string;
+    events: string[];
+    enabled: boolean;
+    last_delivery_at: string | null;
+    last_delivery_status: number | null;
+    consecutive_failures: number;
+    created_at: string;
+  };
+
+  type DeliveryRow = {
+    id: string;
+    webhook_id: string;
+    event: string;
+    status_code: number | null;
+    error: string | null;
+    attempted_at: string;
+  };
+
+  let allWebhooks: WebhookRow[] = [];
+  let allDeliveries: DeliveryRow[] = [];
+  let jwt: string | null = null;
+
+  function show(id: string) { document.getElementById(id)?.classList.remove('hidden'); }
+  function hide(id: string) { document.getElementById(id)?.classList.add('hidden'); }
+  function esc(s: string): string {
+    return s.replace(/[<>&'"]/g, ch => ({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&#39;','"':'&quot;'}[ch]!));
+  }
+
+  function fmtDate(iso: string | null): string {
+    if (!iso) return '—';
+    return new Date(iso).toISOString().replace('T', ' ').slice(0, 16);
+  }
+
+  function statusPill(code: number | null): string {
+    if (code === null) return '<span class="text-zinc-400">—</span>';
+    const cls = code >= 200 && code < 300
+      ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300'
+      : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300';
+    return `<span class="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-mono ${cls}">${code}</span>`;
+  }
+
+  function renderWebhooks() {
+    const tbody = document.getElementById('webhooks-tbody');
+    const empty = document.getElementById('webhooks-empty');
+    const wrap = document.getElementById('webhooks-rows');
+    if (!tbody || !empty || !wrap) return;
+    if (allWebhooks.length === 0) {
+      empty.classList.remove('hidden');
+      wrap.classList.add('hidden');
+      return;
+    }
+    empty.classList.add('hidden');
+    wrap.classList.remove('hidden');
+
+    tbody.innerHTML = allWebhooks.map(w => {
+      const eventsTxt = w.events.join(', ');
+      const enabledPill = w.enabled
+        ? '<span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300">on</span>'
+        : '<span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">off</span>';
+      return `
+        <tr>
+          <td class="px-3 py-2 font-mono text-xs break-all max-w-[260px]">${esc(w.url)}</td>
+          <td class="px-3 py-2 text-xs text-zinc-500">${esc(eventsTxt)}</td>
+          <td class="px-3 py-2">${enabledPill} ${statusPill(w.last_delivery_status)}</td>
+          <td class="px-3 py-2 text-xs text-zinc-500">${esc(fmtDate(w.last_delivery_at))}</td>
+          <td class="px-3 py-2 text-right tabular-nums text-zinc-700 dark:text-zinc-300">${w.consecutive_failures}</td>
+          <td class="px-3 py-2 text-right whitespace-nowrap">
+            <button data-test-id="${esc(w.id)}" class="px-2 py-1 rounded border border-zinc-300 dark:border-zinc-700 text-xs hover:bg-zinc-50 dark:hover:bg-zinc-800 mr-1">Test</button>
+            <button data-toggle-id="${esc(w.id)}" data-toggle-to="${w.enabled ? 'false' : 'true'}" class="px-2 py-1 rounded border border-zinc-300 dark:border-zinc-700 text-xs hover:bg-zinc-50 dark:hover:bg-zinc-800 mr-1">${w.enabled ? 'Disable' : 'Enable'}</button>
+            <button data-delete-id="${esc(w.id)}" class="px-2 py-1 rounded border border-red-500 text-xs text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">Delete</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function renderDeliveries() {
+    const tbody = document.getElementById('deliveries-tbody');
+    const empty = document.getElementById('deliveries-empty');
+    const wrap = document.getElementById('deliveries-rows');
+    if (!tbody || !empty || !wrap) return;
+    if (allDeliveries.length === 0) {
+      empty.classList.remove('hidden');
+      wrap.classList.add('hidden');
+      return;
+    }
+    empty.classList.add('hidden');
+    wrap.classList.remove('hidden');
+
+    tbody.innerHTML = allDeliveries.map(d => `
+      <tr>
+        <td class="px-3 py-2 font-mono">${esc(d.event)}</td>
+        <td class="px-3 py-2">${statusPill(d.status_code)}</td>
+        <td class="px-3 py-2 text-zinc-500">${esc(fmtDate(d.attempted_at))}</td>
+        <td class="px-3 py-2 text-zinc-500 max-w-[300px] truncate" title="${esc(d.error ?? '')}">${esc(d.error ?? '')}</td>
+      </tr>
+    `).join('');
+  }
+
+  async function loadAll() {
+    const supabase = getSupabase();
+    const [wh, dl] = await Promise.all([
+      supabase.from('admin_webhooks').select('*').order('created_at', { ascending: false }),
+      supabase.from('admin_webhook_deliveries').select('*').order('attempted_at', { ascending: false }).limit(20),
+    ]);
+    if (wh.error) throw new Error(wh.error.message);
+    if (dl.error) throw new Error(dl.error.message);
+    allWebhooks   = (wh.data ?? []) as WebhookRow[];
+    allDeliveries = (dl.data ?? []) as DeliveryRow[];
+    renderWebhooks();
+    renderDeliveries();
+  }
+
+  async function init() {
+    let supabase;
+    try { supabase = getSupabase(); } catch { show('webhooks-not-auth'); return; }
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { show('webhooks-not-auth'); return; }
+    const myRoles = await getUserRoles(session.user.id);
+    if (!myRoles.has('admin')) { show('webhooks-not-auth'); return; }
+    jwt = session.access_token;
+    show('webhooks-shell');
+    hide('webhooks-loading');
+    try {
+      await loadAll();
+    } catch (err) {
+      const e = document.getElementById('webhooks-error');
+      if (e) { e.textContent = (err as Error).message; e.classList.remove('hidden'); }
+    }
+  }
+
+  document.getElementById('webhook-create-form')?.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    if (!jwt) return;
+    const urlEl = document.getElementById('webhook-url') as HTMLInputElement;
+    const reasonEl = document.getElementById('webhook-create-reason') as HTMLInputElement;
+    const events: string[] = [];
+    document.querySelectorAll<HTMLInputElement>('[data-event-key]').forEach(cb => {
+      if (cb.checked) events.push(cb.dataset.eventKey!);
+    });
+    const errEl = document.getElementById('webhook-create-error');
+    if (events.length === 0) {
+      if (errEl) { errEl.textContent = 'Select at least one event.'; errEl.classList.remove('hidden'); }
+      return;
+    }
+    if (reasonEl.value.trim().length < 5) {
+      if (errEl) { errEl.textContent = 'Reason must be at least 5 characters.'; errEl.classList.remove('hidden'); }
+      return;
+    }
+    if (errEl) errEl.classList.add('hidden');
+    try {
+      const res = await adminClient.webhook.create(
+        { url: urlEl.value, events: events as Parameters<typeof adminClient.webhook.create>[0]['events'] },
+        reasonEl.value.trim(),
+        jwt,
+      );
+      const banner = document.getElementById('webhook-secret-banner');
+      const code = document.getElementById('webhook-secret-value');
+      if (banner && code && res.result) {
+        code.textContent = res.result.secret;
+        banner.classList.remove('hidden');
+      }
+      urlEl.value = '';
+      document.querySelectorAll<HTMLInputElement>('[data-event-key]').forEach(cb => { cb.checked = false; });
+      reasonEl.value = '';
+      await loadAll();
+    } catch (err) {
+      if (errEl) {
+        errEl.textContent = err instanceof AdminClientError ? err.message : (err as Error).message;
+        errEl.classList.remove('hidden');
+      }
+    }
+  });
+
+  document.getElementById('webhooks-tbody')?.addEventListener('click', async (ev) => {
+    if (!jwt) return;
+    const target = ev.target as HTMLElement;
+    const testId = target.closest<HTMLElement>('[data-test-id]')?.dataset.testId;
+    const toggleEl = target.closest<HTMLElement>('[data-toggle-id]');
+    const deleteId = target.closest<HTMLElement>('[data-delete-id]')?.dataset.deleteId;
+
+    try {
+      if (testId) {
+        const res = await adminClient.webhook.test({ webhookId: testId }, 'manual webhook test', jwt);
+        const code = res.result?.statusCode;
+        alert(code ? `Test delivery: HTTP ${code}` : `Test delivery failed: ${res.result?.error ?? 'unknown'}`);
+        await loadAll();
+        return;
+      }
+      if (toggleEl) {
+        const id = toggleEl.dataset.toggleId!;
+        const enabled = toggleEl.dataset.toggleTo === 'true';
+        const reason = prompt(`Reason for ${enabled ? 'enabling' : 'disabling'} this webhook?`);
+        if (!reason || reason.length < 5) return;
+        await adminClient.webhook.update({ webhookId: id, enabled }, reason, jwt);
+        await loadAll();
+        return;
+      }
+      if (deleteId) {
+        if (!confirm('Delete this webhook? This cannot be undone.')) return;
+        const reason = prompt('Reason for deletion?');
+        if (!reason || reason.length < 5) return;
+        await adminClient.webhook.delete({ webhookId: deleteId }, reason, jwt);
+        await loadAll();
+        return;
+      }
+    } catch (err) {
+      const e = document.getElementById('webhooks-error');
+      if (e) {
+        e.textContent = err instanceof AdminClientError ? err.message : (err as Error).message;
+        e.classList.remove('hidden');
+      }
+    }
+  });
+
+  init().catch(() => { show('webhooks-not-auth'); });
+</script>
