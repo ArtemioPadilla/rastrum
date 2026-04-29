@@ -24,7 +24,7 @@ on:
     paths:
       - 'docs/specs/infra/supabase-schema.sql'
       - 'docs/specs/infra/cron-schedules.sql'
-      - 'tests/pgtap/**'
+      - 'tests/sql/**'
       - '.github/workflows/db-validate.yml'
 
 concurrency:
@@ -256,22 +256,13 @@ jobs:
           fi
           echo "::notice::All public tables have RLS enabled ✓"
 
-      - name: Install pgTAP
-        # pgTAP is available as a package in the postgis/postgis image's
-        # underlying Debian distribution. We install the Postgres 17 build.
-        run: |
-          apt-get update -qq && apt-get install -y -qq postgresql-17-pgtap 2>/dev/null || true
-          # Fall back gracefully if apt isn't available (e.g. slim image variant):
-          # pgTAP ships a CREATE EXTENSION so the SQL still loads from the package
-          # even if the binary tools (pg_prove) are absent.
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "CREATE EXTENSION IF NOT EXISTS pgtap;" 2>/dev/null || true
-
-      - name: Run pgTAP RLS suite
+      - name: Run RLS regression suite
         # The test file runs inside a transaction and ROLLBACKs, so it is safe
         # to run against the same ephemeral DB used by the schema validate steps.
+        # Plain SQL DO blocks — no pgTAP extension required.
         run: |
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/pgtap/rls.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/sql/rls.sql
 
       - name: Summary
         run: |
-          echo "::notice::db-validate passed — schema applies cleanly, is idempotent (2× apply pass), all sentinels exist, every public table has RLS enabled, and the pgTAP RLS suite passed."
+          echo "::notice::db-validate passed — schema applies cleanly, is idempotent (2× apply pass), all sentinels exist, every public table has RLS enabled, and the RLS regression suite passed (21 assertions)."
