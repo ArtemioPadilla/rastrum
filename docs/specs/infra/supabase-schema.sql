@@ -4208,3 +4208,51 @@ CREATE TRIGGER observations_material_edit_check_trg
   EXECUTE FUNCTION public.observations_material_edit_check();
 
 NOTIFY pgrst, 'reload schema';
+-- ============================================================
+-- Module 27 — Sponsorship requests (beneficiary-initiated discovery)
+-- See docs/specs/modules/27-ai-sponsorships.md
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.sponsorship_requests (
+  id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  requester_id      uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  target_sponsor_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  message           text CHECK (message IS NULL OR length(message) <= 280),
+  status            text NOT NULL DEFAULT 'pending'
+                    CHECK (status IN ('pending','approved','rejected','withdrawn')),
+  created_at        timestamptz NOT NULL DEFAULT now(),
+  responded_at      timestamptz,
+  CHECK (requester_id <> target_sponsor_id),
+  UNIQUE (requester_id, target_sponsor_id)
+);
+
+CREATE INDEX IF NOT EXISTS sponsorship_requests_target_pending_idx
+  ON public.sponsorship_requests (target_sponsor_id, created_at DESC)
+  WHERE status = 'pending';
+
+CREATE INDEX IF NOT EXISTS sponsorship_requests_requester_idx
+  ON public.sponsorship_requests (requester_id, created_at DESC);
+
+ALTER TABLE public.sponsorship_requests ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS sponsorship_requests_party_read ON public.sponsorship_requests;
+CREATE POLICY sponsorship_requests_party_read ON public.sponsorship_requests
+  FOR SELECT TO authenticated
+  USING (requester_id = auth.uid() OR target_sponsor_id = auth.uid());
+
+-- Defense-in-depth: explicit RESTRICTIVE deny for client writes (writes go via Edge Function).
+DROP POLICY IF EXISTS sponsorship_requests_no_client_insert ON public.sponsorship_requests;
+CREATE POLICY sponsorship_requests_no_client_insert ON public.sponsorship_requests
+  AS RESTRICTIVE FOR INSERT TO authenticated, anon WITH CHECK (false);
+DROP POLICY IF EXISTS sponsorship_requests_no_client_update ON public.sponsorship_requests;
+CREATE POLICY sponsorship_requests_no_client_update ON public.sponsorship_requests
+  AS RESTRICTIVE FOR UPDATE TO authenticated, anon USING (false);
+DROP POLICY IF EXISTS sponsorship_requests_no_client_delete ON public.sponsorship_requests;
+CREATE POLICY sponsorship_requests_no_client_delete ON public.sponsorship_requests
+  AS RESTRICTIVE FOR DELETE TO authenticated, anon USING (false);
+
+-- Extend audit_op enum
+ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'sponsorship_request_create';
+ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'sponsorship_request_approve';
+ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'sponsorship_request_reject';
+ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'sponsorship_request_withdraw';

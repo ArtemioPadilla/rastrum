@@ -17,6 +17,19 @@ const i18nBag = {
   privacy_section: privacyHeading,
   cancel: tr.sponsoring.confirm_cancel,
   ok: tr.sponsoring.confirm_ok,
+  request_btn:                 tr.sponsoring.request_btn,
+  request_dialog_title:        tr.sponsoring.request_dialog_title,
+  request_sponsor_username:    tr.sponsoring.request_sponsor_username,
+  request_message:             tr.sponsoring.request_message,
+  request_send:                tr.sponsoring.request_send,
+  request_withdraw:            tr.sponsoring.request_withdraw,
+  my_requests_section:         tr.sponsoring.my_requests_section,
+  my_requests_empty:           tr.sponsoring.my_requests_empty,
+  request_status_pending:      tr.sponsoring.request_status_pending,
+  request_status_approved:     tr.sponsoring.request_status_approved,
+  request_status_rejected:     tr.sponsoring.request_status_rejected,
+  request_status_withdrawn:    tr.sponsoring.request_status_withdrawn,
+  confirm_withdraw_request:    lang === 'es' ? '¿Retirar esta solicitud?' : 'Withdraw this request?',
 };
 ---
 
@@ -37,6 +50,14 @@ const i18nBag = {
   </div>
 
   <section>
+    <div class="flex items-center justify-between mb-2">
+      <h2 class="text-lg font-semibold">{tr.sponsoring.my_requests_section}</h2>
+      <button id="request-btn" type="button" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-1.5 text-sm font-medium">{tr.sponsoring.request_btn}</button>
+    </div>
+    <ul id="my-requests-list" class="space-y-2 text-sm"></ul>
+  </section>
+
+  <section>
     <h2 class="text-lg font-semibold mb-2">{privacyHeading}</h2>
     <ul id="privacy-list" class="space-y-2 text-sm"></ul>
   </section>
@@ -49,6 +70,24 @@ const i18nBag = {
       <button type="button" id="sb-confirm-no" class="px-3 py-1.5 text-sm rounded border border-zinc-300 dark:border-zinc-700">{i18nBag.cancel}</button>
       <button type="button" id="sb-confirm-yes" class="px-3 py-1.5 text-sm rounded bg-red-600 text-white">{i18nBag.ok}</button>
     </div>
+  </dialog>
+
+  <dialog id="request-dialog" class="rounded-xl p-6 max-w-md backdrop:bg-black/50 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100">
+    <h3 class="text-lg font-semibold mb-2">{tr.sponsoring.request_dialog_title}</h3>
+    <form method="dialog" class="space-y-3">
+      <div>
+        <label class="block text-sm font-medium" for="req-username-input">{tr.sponsoring.request_sponsor_username}</label>
+        <input id="req-username-input" name="username" required class="mt-1 block w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm bg-white dark:bg-zinc-900" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium" for="req-message-input">{tr.sponsoring.request_message}</label>
+        <textarea id="req-message-input" name="message" maxlength="280" rows="3" class="mt-1 block w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm bg-white dark:bg-zinc-900"></textarea>
+      </div>
+      <div class="flex gap-2 justify-end">
+        <button type="button" id="req-cancel" class="px-3 py-1.5 text-sm rounded border border-zinc-300 dark:border-zinc-700">{tr.sponsoring.confirm_cancel}</button>
+        <button type="submit" class="px-3 py-1.5 text-sm rounded bg-emerald-700 text-white">{tr.sponsoring.request_send}</button>
+      </div>
+    </form>
   </dialog>
 </section>
 
@@ -75,6 +114,19 @@ const i18nBag = {
     privacy_section: string;
     cancel: string;
     ok: string;
+    request_btn: string;
+    request_dialog_title: string;
+    request_sponsor_username: string;
+    request_message: string;
+    request_send: string;
+    request_withdraw: string;
+    my_requests_section: string;
+    my_requests_empty: string;
+    request_status_pending: string;
+    request_status_approved: string;
+    request_status_rejected: string;
+    request_status_withdrawn: string;
+    confirm_withdraw_request: string;
   };
 
   function showConfirm(message: string): Promise<boolean> {
@@ -175,4 +227,80 @@ const i18nBag = {
   });
 
   refresh();
+
+  async function refreshMyRequests() {
+    const list = document.getElementById('my-requests-list');
+    if (!list) return;
+    const { listRequests } = await import('../lib/sponsorships');
+    let requests: Awaited<ReturnType<typeof listRequests>> = [];
+    try { requests = await listRequests('requester'); } catch { /* silent */ }
+    list.innerHTML = '';
+    if (requests.length === 0) {
+      list.innerHTML = `<li class="text-zinc-500">${escHtml(i18nBag.my_requests_empty ?? '')}</li>`;
+      return;
+    }
+    const supabase = (await import('../lib/supabase')).getSupabase();
+    const ids = Array.from(new Set(requests.map(r => r.target_sponsor_id)));
+    let usersMap: Record<string, { username: string; display_name?: string }> = {};
+    if (ids.length > 0) {
+      const { data: users } = await supabase.from('users').select('id,username,display_name').in('id', ids);
+      const userRows = (users ?? []) as Array<{ id: string; username: string; display_name?: string }>;
+      usersMap = Object.fromEntries(userRows.map(u => [u.id, u]));
+    }
+    const statusLabel: Record<string, string> = {
+      pending:   i18nBag.request_status_pending,
+      approved:  i18nBag.request_status_approved,
+      rejected:  i18nBag.request_status_rejected,
+      withdrawn: i18nBag.request_status_withdrawn,
+    };
+    for (const req of requests) {
+      const u = usersMap[req.target_sponsor_id];
+      const name = u?.display_name || u?.username || (req.target_sponsor_id.slice(0, 8) + '…');
+      const li = document.createElement('li');
+      li.className = 'flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2';
+      const withdrawBtn = req.status === 'pending'
+        ? `<button data-withdraw="${escHtml(req.id)}" class="text-xs text-red-600">${escHtml(i18nBag.request_withdraw)}</button>`
+        : '';
+      li.innerHTML = `
+        <span>
+          ${escHtml(name)}
+          <span class="ml-2 text-xs text-zinc-500">${escHtml(statusLabel[req.status] ?? req.status)}</span>
+        </span>
+        ${withdrawBtn}`;
+      list.appendChild(li);
+    }
+  }
+
+  document.getElementById('request-btn')?.addEventListener('click', () => {
+    (document.getElementById('request-dialog') as HTMLDialogElement | null)?.showModal();
+  });
+  document.getElementById('req-cancel')?.addEventListener('click', () => {
+    (document.getElementById('request-dialog') as HTMLDialogElement | null)?.close();
+  });
+  document.getElementById('request-dialog')?.querySelector('form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const sponsor_username = (document.getElementById('req-username-input') as HTMLInputElement).value.trim();
+    const message = (document.getElementById('req-message-input') as HTMLTextAreaElement).value.trim() || undefined;
+    if (!sponsor_username) return;
+    const { createRequest } = await import('../lib/sponsorships');
+    try {
+      await createRequest({ sponsor_username, message });
+      (document.getElementById('req-username-input') as HTMLInputElement).value = '';
+      (document.getElementById('req-message-input') as HTMLTextAreaElement).value = '';
+      (document.getElementById('request-dialog') as HTMLDialogElement | null)?.close();
+      await refreshMyRequests();
+    } catch (err) { alert((err as Error).message); }
+  });
+  document.getElementById('my-requests-list')?.addEventListener('click', async (e) => {
+    const target = e.target as HTMLElement;
+    if (target.dataset.withdraw) {
+      if (await showConfirm(i18nBag.confirm_withdraw_request ?? 'Withdraw this request?')) {
+        const { withdrawRequest } = await import('../lib/sponsorships');
+        await withdrawRequest(target.dataset.withdraw);
+        await refreshMyRequests();
+      }
+    }
+  });
+
+  refreshMyRequests();
 </script>

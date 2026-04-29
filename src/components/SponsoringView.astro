@@ -13,6 +13,10 @@ const i18nBag = {
   self_sponsorship_badge:     tr.sponsoring.self_sponsorship_badge,
   report_abuse:               tr.sponsoring.report_abuse,
   calls_last_Nd:              tr.sponsoring.calls_last_Nd,
+  requests_empty:             tr.sponsoring.requests_empty,
+  request_approve:            tr.sponsoring.request_approve,
+  request_reject:             tr.sponsoring.request_reject,
+  add_credential:             tr.sponsoring.add_credential,
   paused_reason: {
     rate_limit:         tr.sponsoring.paused_reason_rate_limit,
     cred_invalid:       tr.sponsoring.paused_reason_cred_invalid,
@@ -61,6 +65,12 @@ const i18nBag = {
       {tr.sponsoring.add_credential}
     </button>
     <ul id="creds-list" class="divide-y divide-zinc-200 dark:divide-zinc-800"></ul>
+  </section>
+
+  <!-- Section A.5: Pending requests from beneficiaries -->
+  <section id="requests-section" class="space-y-4">
+    <h2 class="text-lg font-semibold">{tr.sponsoring.requests_section}</h2>
+    <ul id="requests-list" class="divide-y divide-zinc-200 dark:divide-zinc-800"></ul>
   </section>
 
   <!-- Section B: Beneficiaries -->
