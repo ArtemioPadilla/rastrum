@@ -3873,3 +3873,24 @@ BEGIN
 END $$;
 REVOKE ALL ON FUNCTION public.delete_vault_secret(uuid) FROM public;
 GRANT EXECUTE ON FUNCTION public.delete_vault_secret(uuid) TO service_role;
+
+-- 17. upsert_vault_secret_by_name — used by CI to sync the cron token to
+--     Vault on every db-apply. We can't use psql's `:'var'` substitution
+--     inside dollar-quoted DO blocks (psql skips substitution there),
+--     so the workflow calls this function with a regular bind variable.
+--     EXECUTE keeps the body resolvable in CI Postgres without vault.
+CREATE OR REPLACE FUNCTION public.upsert_vault_secret_by_name(p_name text, p_secret text)
+RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE existing_id uuid; v_id uuid;
+BEGIN
+  EXECUTE 'SELECT id FROM vault.secrets WHERE name = $1' INTO existing_id USING p_name;
+  IF existing_id IS NOT NULL THEN
+    EXECUTE 'SELECT vault.update_secret($1, $2, $3)' USING existing_id, p_secret, p_name;
+    RETURN existing_id;
+  ELSE
+    EXECUTE 'SELECT vault.create_secret($1, $2)' INTO v_id USING p_secret, p_name;
+    RETURN v_id;
+  END IF;
+END $$;
+REVOKE ALL ON FUNCTION public.upsert_vault_secret_by_name(text, text) FROM public;
+GRANT EXECUTE ON FUNCTION public.upsert_vault_secret_by_name(text, text) TO service_role;
