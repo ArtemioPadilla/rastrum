@@ -126,6 +126,12 @@ export interface UserProfile {
   gamification_opt_in: boolean;
   streak_digest_opt_in: boolean;
   region_primary: string | null;
+  /** Module 28 community discovery: ISO-3166 alpha-2. NULL if undeclared. */
+  country_code?: string | null;
+  /** Module 28: 'auto' if last set by recompute_user_stats; 'user' once edited via Profile → Edit. */
+  country_code_source?: 'auto' | 'user';
+  /** Module 28: opt-out of leaderboards + community page. Defaults false. */
+  hide_from_leaderboards?: boolean;
   joined_at: string;
   last_observation_at: string | null;
   stats_cached_at: string | null;
