@@ -1,0 +1,101 @@
+---
+/**
+ * ProjectDetailView — single-project view loaded by slug from the URL
+ * query string (`?slug=`). Renders header + observation count + raw
+ * polygon GeoJSON. Hydrates client-side after auth + RLS resolution.
+ */
+import { t } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+
+const { lang } = Astro.props;
+const tr = t(lang);
+const proj = (tr as unknown as { projects: Record<string, string> }).projects;
+---
+
+<section class="max-w-5xl mx-auto px-4 py-8">
+  <div id="project-loading" class="text-sm text-zinc-500 dark:text-zinc-400">…</div>
+  <div id="project-not-found" class="hidden text-sm text-zinc-500 dark:text-zinc-400" data-i18n-not-found>
+    {lang === 'es' ? 'Proyecto no encontrado.' : 'Project not found.'}
+  </div>
+  <article id="project-body" class="hidden space-y-6">
+    <header>
+      <h1 id="project-name" class="text-2xl font-semibold text-zinc-900 dark:text-zinc-100"></h1>
+      <p id="project-slug" class="mt-1 text-xs text-zinc-500 dark:text-zinc-400 font-mono"></p>
+      <p id="project-description" class="mt-2 text-sm text-zinc-600 dark:text-zinc-400 max-w-2xl"></p>
+      <div class="mt-2 flex items-center gap-3 text-xs text-zinc-600 dark:text-zinc-400">
+        <span id="project-visibility" class="px-1.5 py-0.5 rounded uppercase tracking-wider bg-zinc-100 dark:bg-zinc-800"></span>
+        <span><span class="font-semibold">{proj.detail_polygon_area}:</span> <span id="project-area">—</span> km²</span>
+        <span><span class="font-semibold">{proj.detail_obs}:</span> <span id="project-obs-count">—</span></span>
+      </div>
+    </header>
+
+    <details class="rounded-lg border border-zinc-200 dark:border-zinc-800">
+      <summary class="cursor-pointer px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 select-none">
+        {proj.detail_polygon_geom}
+      </summary>
+      <pre id="project-geojson" class="px-4 py-3 text-[11px] leading-tight font-mono text-zinc-700 dark:text-zinc-300 whitespace-pre overflow-auto max-h-72"></pre>
+    </details>
+  </article>
+</section>
+
+<script>
+  import { getProjectBySlug, countProjectObservations } from '../lib/projects';
+
+  const params = new URLSearchParams(window.location.search);
+  const slug = params.get('slug') ?? '';
+  const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
+
+  const loading = document.getElementById('project-loading');
+  const notFound = document.getElementById('project-not-found');
+  const body     = document.getElementById('project-body');
+  const nameEl   = document.getElementById('project-name');
+  const slugEl   = document.getElementById('project-slug');
+  const descEl   = document.getElementById('project-description');
+  const visEl    = document.getElementById('project-visibility');
+  const areaEl   = document.getElementById('project-area');
+  const obsEl    = document.getElementById('project-obs-count');
+  const geoEl    = document.getElementById('project-geojson');
+
+  async function init() {
+    if (!slug) {
+      loading?.classList.add('hidden');
+      notFound?.classList.remove('hidden');
+      return;
+    }
+    let project;
+    try {
+      project = await getProjectBySlug(slug);
+    } catch (err) {
+      console.warn('[rastrum] project load failed', err);
+      project = null;
+    }
+    if (!project) {
+      loading?.classList.add('hidden');
+      notFound?.classList.remove('hidden');
+      return;
+    }
+    if (nameEl) nameEl.textContent = (lang === 'es' && project.name_es) ? project.name_es : project.name;
+    if (slugEl) slugEl.textContent = project.slug;
+    if (descEl) descEl.textContent = (lang === 'es' && project.description_es) ? project.description_es : (project.description ?? '');
+    if (visEl)  visEl.textContent  = project.visibility === 'public'
+      ? (lang === 'es' ? 'Público' : 'Public')
+      : (lang === 'es' ? 'Privado' : 'Private');
+    if (areaEl) areaEl.textContent = (project.area_km2 ?? 0).toFixed(2);
+    if (geoEl)  geoEl.textContent  = JSON.stringify(project.polygon_geojson, null, 2);
+
+    loading?.classList.add('hidden');
+    body?.classList.remove('hidden');
+
+    try {
+      const n = await countProjectObservations(project.id);
+      if (obsEl) obsEl.textContent = String(n);
+    } catch {
+      if (obsEl) obsEl.textContent = '—';
+    }
+  }
+
+  void init();
+</script>
