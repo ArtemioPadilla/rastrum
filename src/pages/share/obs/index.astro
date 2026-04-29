@@ -1,158 +1,20 @@
 ---
 import BaseLayout from '../../../layouts/BaseLayout.astro';
-import Comments from '../../../components/Comments.astro';
-import FollowButton from '../../../components/FollowButton.astro';
-import ShareButton from '../../../components/ShareButton.astro';
-import SuggestIdModal from '../../../components/SuggestIdModal.astro';
-import ReactionStrip from '../../../components/ReactionStrip.astro';
+import ShareObsView from '../../../components/ShareObsView.astro';
 
-// SSG: query string is unknown at build time. Comments component reads
-// observation_id from data attribute, which we set at runtime in the
-// load() script below.
+// SSG: query string is unknown at build time. Components read observation_id
+// from data attributes set by the load() script below. Page is locale-neutral
+// (CLAUDE.md regression note: there is no /en/share/obs/ or /es/share/obs/).
 const lang: 'en' | 'es' = 'en';
-const obsIdPlaceholder = '';
 ---
 
 <BaseLayout title="Observation — Rastrum" description="View a shared biodiversity observation from the Rastrum community — species identification, photo, audio, GPS location, and observer notes." lang={lang}>
-  <div class="max-w-3xl mx-auto">
-    <div id="loading" class="py-16 text-center text-zinc-500">Loading observation…</div>
-    <article id="obs" class="hidden space-y-6">
-      <header class="space-y-1 flex flex-wrap items-start justify-between gap-3">
-        <div class="min-w-0">
-          <h1 id="species" class="text-3xl md:text-4xl font-bold italic text-zinc-900 dark:text-zinc-100"></h1>
-          <p id="meta" class="text-sm text-zinc-500 dark:text-zinc-400"></p>
-        </div>
-        <div id="follow-mount">
-          <FollowButton lang={lang} />
-        </div>
-        <ShareButton lang={lang} id="obs-share-btn" />
-        <button
-          id="obs-report-btn"
-          type="button"
-          class="hidden inline-flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors"
-          aria-label="Report observation"
-          title="Report observation"
-        >
-          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22V4a2 2 0 0 1 2-2h11l4 6-4 6H6"/><line x1="4" y1="22" x2="4" y2="14"/></svg>
-        </button>
-      </header>
-
-      <img id="img" src="" alt="" class="w-full max-h-[500px] object-contain rounded-xl border border-zinc-200 dark:border-zinc-800 hidden" />
-
-      <div id="reactions-mount" class="flex items-center gap-3">
-        <ReactionStrip lang={lang} target="observation" targetId={obsIdPlaceholder} size="md" />
-        <span id="reactions-help" class="hidden text-xs text-zinc-500 dark:text-zinc-500">
-          Tap the heart to favorite this observation.
-        </span>
-      </div>
-
-      <dl class="grid grid-cols-2 gap-4 text-sm">
-        <div>
-          <dt class="text-zinc-500 dark:text-zinc-400">Date</dt>
-          <dd id="date" class="font-medium"></dd>
-        </div>
-        <div>
-          <dt class="text-zinc-500 dark:text-zinc-400">Region</dt>
-          <dd id="region" class="font-medium">—</dd>
-        </div>
-        <div>
-          <dt class="text-zinc-500 dark:text-zinc-400">Habitat</dt>
-          <dd id="habitat" class="font-medium">—</dd>
-        </div>
-        <div>
-          <dt class="text-zinc-500 dark:text-zinc-400">Observed by</dt>
-          <dd id="observer" class="font-medium">—</dd>
-        </div>
-      </dl>
-
-      <p id="sensitive" class="hidden text-sm text-amber-700 dark:text-amber-400 border-l-4 border-amber-500 pl-3">
-        This observation is of a sensitive species. Precise coordinates are obscured to protect it.
-      </p>
-
-      <!--
-        Community identifications + suggest CTA. Visible to ALL viewers
-        (so the public can see what experts and other observers have
-        proposed). The "Suggest identification" button is only enabled
-        for signed-in non-owners — owner uses the Manage panel below
-        instead, anonymous users see a sign-in prompt.
-      -->
-      <section id="community-ids" class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 space-y-3">
-        <div class="flex items-start justify-between gap-2 flex-wrap">
-          <div>
-            <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">Community suggestions</h2>
-            <p id="community-ids-empty" class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-              No one has suggested an identification yet. Be the first.
-            </p>
-          </div>
-          <button id="ci-suggest-btn" type="button" class="hidden rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 text-xs font-semibold text-white">
-            Suggest identification
-          </button>
-          <a id="ci-signin-link" href="/en/sign-in/" class="hidden rounded-lg border border-emerald-600/60 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20">
-            Sign in to suggest
-          </a>
-          <span id="ci-owner-note" class="hidden text-xs text-zinc-500 italic">Use the Manage panel below to update your own identification.</span>
-        </div>
-        <ul id="ci-list" class="space-y-1.5 text-sm"></ul>
-      </section>
-
-      <!--
-        Owner-only Manage panel. Visible only when the signed-in viewer
-        IS the observation's observer. Edit updates notes + scientific
-        name + obscure_level. Delete removes the observation row (FK
-        cascade on identifications + media_files; the R2 photo blobs
-        are left as orphans, acceptable for v1).
-      -->
-      <section id="manage-panel" class="hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 space-y-3">
-        <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">Manage your observation</h2>
-        <p class="text-xs text-zinc-500 dark:text-zinc-400">Only you see this. Other viewers won't.</p>
-        <form id="manage-form" class="space-y-3" novalidate>
-          <div>
-            <label for="m-sci" class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Scientific name (override)</label>
-            <input id="m-sci" type="text" autocomplete="off" placeholder="e.g. Quercus oleoides" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm font-mono italic" />
-            <p class="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">Replaces the primary identification with a manual one (you as validator). Leave blank to keep current.</p>
-          </div>
-          <div>
-            <label for="m-notes" class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Notes</label>
-            <textarea id="m-notes" rows="3" maxlength="2000" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm"></textarea>
-          </div>
-          <div>
-            <label for="m-obscure" class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Location privacy</label>
-            <select id="m-obscure" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
-              <option value="none">Show precise coordinates</option>
-              <option value="0.1deg">Coarsen to ~10 km</option>
-              <option value="0.2deg">Coarsen to ~20 km</option>
-              <option value="5km">Coarsen to ~5 km</option>
-              <option value="full">Hide location entirely</option>
-            </select>
-          </div>
-          <p id="m-error" class="hidden text-xs text-red-600 dark:text-red-400" role="alert"></p>
-          <p id="m-saved" class="hidden text-xs text-emerald-700 dark:text-emerald-400" aria-live="polite">Saved.</p>
-          <div class="flex flex-wrap items-center gap-2 pt-2">
-            <button type="submit" id="m-save" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Save changes</button>
-            <button type="button" id="m-delete" class="rounded-lg border border-red-300 dark:border-red-800 px-4 py-2 text-sm font-medium text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">Delete observation</button>
-          </div>
-        </form>
-      </section>
-
-      {/* TODO(local-contexts): when public.observations gains a
-          `local_contexts_notice_url` column (schema gap as of 2026-04-25 —
-          see docs/specs/modules/07-licensing.md and the local-contexts
-          roadmap item), render the BC/TK notice badge + link here.
-          Schema must NOT be modified from this UI; wait for the migration. */}
-    </article>
-
-    <div id="err" class="hidden py-16 text-center text-red-600 dark:text-red-400"></div>
-
-    <div id="social-mount" class="hidden">
-      <Comments lang={lang} observationId={obsIdPlaceholder} />
-    </div>
-  </div>
-
-  <!-- Suggest-identification modal — opened by the Suggest CTA above. -->
-  <SuggestIdModal lang={lang} />
+  <ShareObsView lang={lang} />
 
   <script>
     import { getSupabase } from '../../../lib/supabase';
+    import { labelFor } from '../../../lib/observation-enums';
+    import { t } from '../../../i18n/utils';
 
     const id = new URLSearchParams(window.location.search).get('id');
     if (!id) {
@@ -170,16 +32,13 @@ const obsIdPlaceholder = '';
     async function load(id: string) {
       const supabase = getSupabase();
       // LEFT join on identifications: observations that haven't been
-      // through the identify cascade yet (or whose cascade returned no
-      // result) still load, just with "Unidentified" as the species
-      // name. The earlier !inner version filtered them out entirely
-      // and surfaced as "Observation not found" — which made every
-      // newly-synced observation invisible until the cascade
-      // completed.
+      // through the identify cascade yet still load with "Unidentified" as
+      // the species name.
       const { data: obs, error } = await supabase
         .from('observations')
         .select(`
-          id, observed_at, obscure_level, state_province, habitat, observer_id,
+          id, observed_at, obscure_level, state_province, habitat, weather, establishment_means, observer_id, notes,
+          last_material_edit_at, location, location_obscured,
           identifications(scientific_name, is_primary, is_research_grade),
           users:observer_id(display_name, username, profile_public)
         `)
@@ -189,11 +48,6 @@ const obsIdPlaceholder = '';
       if (error) throw error;
       if (!obs) throw new Error('Observation not found.');
 
-      // Without the inner join, identifications may be empty, contain
-      // multiple rows (community votes — non-primary), or one primary.
-      // Prefer the primary; if there isn't one, take the first row;
-      // if there are no rows at all, ident stays undefined and the
-      // species line reads "Unidentified".
       const idArr = Array.isArray(obs.identifications) ? obs.identifications : (obs.identifications ? [obs.identifications] : []);
       const ident = idArr.find((x: { is_primary?: boolean }) => x?.is_primary) ?? idArr[0];
       const user  = Array.isArray(obs.users) ? obs.users[0] : obs.users;
@@ -202,7 +56,7 @@ const obsIdPlaceholder = '';
       document.getElementById('obs')?.classList.remove('hidden');
       const speciesName = ident?.scientific_name ?? 'Unknown species';
       document.getElementById('species')!.textContent = speciesName;
-      // Wire ShareButton title dynamically once species is known
+
       const shareBtn = document.getElementById('obs-share-btn');
       if (shareBtn) {
         shareBtn.dataset.shareTitle = speciesName + ' — Rastrum';
@@ -215,12 +69,18 @@ const obsIdPlaceholder = '';
       const date = new Date(obs.observed_at as string);
       document.getElementById('date')!.textContent = date.toLocaleDateString();
       document.getElementById('meta')!.textContent = `${date.toLocaleDateString()}${obs.state_province ? '  ·  ' + obs.state_province : ''}`;
-      if (obs.state_province)  document.getElementById('region')!.textContent  = obs.state_province as string;
-      if (obs.habitat)         document.getElementById('habitat')!.textContent = (obs.habitat as string).replace(/_/g, ' ');
+      if (obs.state_province)        document.getElementById('region')!.textContent        = obs.state_province as string;
+      const observeTree = (() => {
+        const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
+        const tree = t(lang) as { observe?: unknown };
+        return tree.observe;
+      })();
+      if (obs.habitat)               document.getElementById('habitat')!.textContent       = labelFor(observeTree, 'habitat_options',            obs.habitat as string);
+      if (obs.weather)               document.getElementById('weather')!.textContent       = labelFor(observeTree, 'weather_options',            obs.weather as string);
+      if (obs.establishment_means)   document.getElementById('establishment')!.textContent = labelFor(observeTree, 'establishment_means_options', obs.establishment_means as string);
+
       // Privacy rule: a private profile shows as "Anonymous" to everyone
-      // EXCEPT the observer themselves. The observer always sees their
-      // own name on their own observation — otherwise looking at your
-      // own list is bizarre. ("Why is my own photo by Anónimo?")
+      // EXCEPT the observer themselves.
       const isPublic = user?.profile_public;
       let viewerIsObserver = false;
       try {
@@ -231,25 +91,52 @@ const obsIdPlaceholder = '';
       const name = user?.display_name || user?.username || '—';
       document.getElementById('observer')!.textContent = (isPublic || viewerIsObserver) ? name : fallback;
 
-      // Pull the primary photo if we can read media_files (RLS gates this)
+      // Hydrate PhotoGallery with non-deleted photos (PR2 added deleted_at).
+      // The gallery's static SSR markup is empty; this dispatch fills it.
       const { data: media } = await supabase
         .from('media_files')
-        .select('url, is_primary')
+        .select('id, url, thumbnail_url, is_primary, sort_order, deleted_at')
         .eq('observation_id', id)
+        .is('deleted_at', null)
         .order('is_primary', { ascending: false })
-        .limit(1);
-      const photo = media?.[0]?.url;
-      const img = document.getElementById('img') as HTMLImageElement | null;
-      if (photo && img) {
-        img.src = photo;
-        img.classList.remove('hidden');
+        .order('sort_order', { ascending: true });
+      const photos = (media ?? []).map((m: { id: string; url: string; thumbnail_url: string | null }) => ({
+        id: m.id, url: m.url, thumbnail_url: m.thumbnail_url, caption: null,
+      }));
+      window.dispatchEvent(new CustomEvent('rastrum:photos-ready', {
+        detail: { photos, galleryId: 'obs-detail' },
+      }));
+
+      // Coords readout below the map. PostgREST returns `location` as a
+      // GeoJSON Point; for non-owner viewers we prefer `location_obscured`
+      // when present (sensitive species). The MapPicker mini-map itself
+      // SSRs with `initialCoords={null}` — its dynamic hydration via a
+      // `rastrum:mappicker-set` event lands in PR5; until then the host
+      // shows MapPicker's "Location not available" fallback for non-empty
+      // coords. The coords readout is independent of the MapLibre paint.
+      const obsLoc = (obs as { location?: { coordinates?: [number, number] } | null }).location;
+      const obscuredLoc = (obs as { location_obscured?: { coordinates?: [number, number] } | null }).location_obscured;
+      const usePoint = (!viewerIsObserver && obscuredLoc?.coordinates) ? obscuredLoc : obsLoc;
+      const coords = usePoint?.coordinates;
+      if (Array.isArray(coords) && coords.length >= 2) {
+        const lng = coords[0];
+        const lat = coords[1];
+        const coordsEl = document.querySelector('[data-obs-coords]');
+        if (coordsEl) {
+          const isEs = document.documentElement.lang === 'es';
+          const obscured = (obs as { obscure_level?: string }).obscure_level;
+          const isObscured = !!obscured && obscured !== 'none';
+          const formatted = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+          coordsEl.textContent = isObscured
+            ? (isEs ? `~${formatted} (aproximado)` : `~${formatted} (coarsened)`)
+            : formatted;
+        }
       }
 
       if (obs.obscure_level && obs.obscure_level !== 'none') {
         document.getElementById('sensitive')?.classList.remove('hidden');
       }
 
-      // Wire follow button + reveal comments now that we know who posted.
       const observerId = (obs as { observer_id?: string }).observer_id;
       if (observerId) {
         const followRoot = document.querySelector<HTMLElement>('#follow-mount .rastrum-follow-btn');
@@ -259,14 +146,12 @@ const obsIdPlaceholder = '';
         }
       }
 
-      // Wire reactions strip with the loaded observation id.
       const reactRoot = document.querySelector<HTMLElement>('#reactions-mount .rastrum-reactions');
       if (reactRoot) {
         reactRoot.dataset.reactionTargetId = id;
         document.dispatchEvent(new CustomEvent('rastrum:reactions-ready'));
       }
 
-      // Wire report button — only enabled for non-owner signed-in viewers.
       const reportBtn = document.getElementById('obs-report-btn');
       if (reportBtn && !viewerIsObserver) {
         reportBtn.classList.remove('hidden');
@@ -287,12 +172,33 @@ const obsIdPlaceholder = '';
         document.dispatchEvent(new CustomEvent('rastrum:comments-ready'));
       }
 
-      // Owner-only Manage panel.
-      if (viewerIsObserver) wireManagePanel(id, obs as Record<string, unknown>, ident);
+      if (viewerIsObserver) {
+        // PR3 leaves the existing inline manage panel in place; PR4 replaces
+        // it with ObsManagePanel. Owner-only "Edit location" placeholder
+        // surfaces too — PR5 wires its click to a MapPicker edit-mode modal.
+        const editLocBtn = document.getElementById('obs-edit-location-btn');
+        editLocBtn?.classList.remove('hidden');
+        wireManagePanel(id, obs as Record<string, unknown>, ident);
+      }
 
-      // Community suggestions list + Suggest CTA — visible to everyone,
-      // actionable for signed-in non-owners.
+      // Surface the "edited after IDs" badge (PR2 schema column).
+      const lastEdit = (obs as { last_material_edit_at?: string | null }).last_material_edit_at;
+      const editedBadge = document.querySelector('[data-edited-badge]');
+      if (lastEdit && editedBadge) {
+        // The badge is suppressed when there are no community IDs; we
+        // re-evaluate after wireCommunityIds resolves.
+        editedBadge.setAttribute('data-pending-show', '1');
+      }
+
       await wireCommunityIds(id, viewerIsObserver);
+
+      if (lastEdit && editedBadge?.getAttribute('data-pending-show') === '1') {
+        const list = document.getElementById('ci-list');
+        if (list && list.children.length > 0) {
+          editedBadge.classList.remove('hidden');
+        }
+        editedBadge.removeAttribute('data-pending-show');
+      }
     }
 
     /**
@@ -310,7 +216,6 @@ const obsIdPlaceholder = '';
       const ownerNote = document.getElementById('ci-owner-note');
       if (!section || !listEl) return;
 
-      // Pick the right CTA.
       const { data: { user } } = await supabase.auth.getUser();
       const isEs = document.documentElement.lang === 'es';
       if (viewerIsObserver) {
@@ -318,8 +223,6 @@ const obsIdPlaceholder = '';
       } else if (user) {
         suggestBtn?.classList.remove('hidden');
         suggestBtn?.addEventListener('click', () => {
-          // Look up observer username for the modal's target line
-          // (stored in the page's <h1 #observer> we already populated).
           const observerName = document.getElementById('observer')?.textContent ?? null;
           const opener = (window as unknown as { __rastrumOpenSuggestId?: (id: string, n: string | null) => void }).__rastrumOpenSuggestId;
           if (typeof opener === 'function') opener(obsId, observerName);
@@ -350,8 +253,6 @@ const obsIdPlaceholder = '';
         }
         emptyEl?.classList.add('hidden');
 
-        // Hydrate validator names. RLS lets us read the user's
-        // display_name when profile_public; otherwise fall back.
         const validatorIds = Array.from(new Set(arr.map(r => r.validated_by!).filter(Boolean)));
         const nameById = new Map<string, string>();
         if (validatorIds.length > 0) {
@@ -368,7 +269,6 @@ const obsIdPlaceholder = '';
           }
         }
 
-        // Group by scientific name to make consensus visible.
         const byName = new Map<string, number>();
         for (const r of arr) {
           if (!r.scientific_name) continue;
@@ -376,7 +276,8 @@ const obsIdPlaceholder = '';
         }
 
         function escAttr(s: string): string {
-          return s.replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' } as Record<string, string>)[c]);
+          const map: Record<string, string> = { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' };
+          return s.replace(/[&<>"']/g, c => map[c] ?? c);
         }
 
         listEl!.innerHTML = arr.map(r => {
@@ -396,21 +297,19 @@ const obsIdPlaceholder = '';
         }).join('');
       }
 
-      // Initial paint + refresh on every successful suggestion.
       window.addEventListener('rastrum:suggestion-submitted', () => { void refresh(); });
       await refresh();
     }
 
     /**
-     * Wire the owner-only Manage panel: pre-populate fields, handle
-     * save (UPDATE observations + UPSERT primary identification when
-     * the user types an override), and handle delete (DELETE observation
-     * with FK cascade to identifications + media_files).
+     * Owner-only Manage panel. PR3 leaves this inline implementation in
+     * place; PR4 replaces with ObsManagePanel.astro and moves the logic to
+     * src/lib/manage-panel.ts.
      */
     function wireManagePanel(
       obsId: string,
       obs: Record<string, unknown>,
-      ident: { scientific_name?: string; is_primary?: boolean } | undefined,
+      _ident: { scientific_name?: string; is_primary?: boolean } | undefined,
     ) {
       const supabase = getSupabase();
       const panel = document.getElementById('manage-panel');
@@ -426,8 +325,7 @@ const obsIdPlaceholder = '';
       const deleteBtn = document.getElementById('m-delete') as HTMLButtonElement | null;
       const form     = document.getElementById('manage-form') as HTMLFormElement | null;
 
-      // Pre-populate
-      if (sciInput) sciInput.value = '';                           // override field; blank = keep current
+      if (sciInput) sciInput.value = '';
       if (notesEl)  notesEl.value  = (obs.notes as string | null) ?? '';
       if (obsEl)    obsEl.value    = (obs.obscure_level as string) ?? 'none';
 
@@ -440,7 +338,6 @@ const obsIdPlaceholder = '';
         const origLabel = saveBtn.textContent ?? 'Save';
         saveBtn.textContent = 'Saving…';
         try {
-          // 1. Update the observation row (notes + obscure_level).
           const { error: obsErr } = await supabase
             .from('observations')
             .update({
@@ -451,10 +348,6 @@ const obsIdPlaceholder = '';
             .eq('id', obsId);
           if (obsErr) throw obsErr;
 
-          // 2. If the user typed a scientific-name override, upsert a
-          //    new primary identification with source='human'. Demote
-          //    the previous primary by setting is_primary=false on
-          //    everything else first.
           const sci = sciInput?.value.trim();
           if (sci) {
             await supabase.from('identifications')
@@ -468,7 +361,7 @@ const obsIdPlaceholder = '';
               confidence: 0.95,
               source: 'human',
               is_primary: true,
-              validated_by: null,                    // observer-set, not validator
+              validated_by: null,
               validated_at: new Date().toISOString(),
               raw_response: { manual_override: true, by: viewer?.id ?? null },
             });
@@ -476,7 +369,6 @@ const obsIdPlaceholder = '';
           }
 
           savedEl?.classList.remove('hidden');
-          // Reflect in the page header without a full reload.
           const speciesEl = document.getElementById('species');
           if (sci && speciesEl) speciesEl.textContent = sci;
         } catch (err) {
@@ -497,10 +389,6 @@ const obsIdPlaceholder = '';
         if (!confirmed) return;
         deleteBtn.disabled = true;
         try {
-          // Call the delete-observation Edge Function. It owns the
-          // atomic delete across R2 (photos + OG card) and the DB
-          // (cascades to identifications + media_files). Without
-          // this, a direct client-side DELETE leaves orphan R2 blobs.
           const { data, error: invokeErr } = await supabase.functions.invoke<{
             ok: boolean; r2_deleted?: number; r2_errors?: unknown[]; error?: string;
           }>('delete-observation', {
