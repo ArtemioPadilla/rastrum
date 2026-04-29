@@ -508,7 +508,7 @@ const pm = pmTree.privacy;
       const { count: idCount } = await supabase
         .from('identifications')
         .select('id', { count: 'exact', head: true })
-        .eq('user_id', profile.id);
+        .eq('validated_by', profile.id);
       show(root.querySelector('[data-pp-validation-section]'));
       const body = root.querySelector<HTMLElement>('[data-pp-validation-body]');
       if (body) {
@@ -533,10 +533,13 @@ const pm = pmTree.privacy;
       }
     }
 
-    // Pokédex link
-    if (showPokedex) {
+    // Pokédex link.
+    // The visitor-side route (/u/<handle>/dex/) is parked under v1.2.2;
+    // until it ships, surface the link only for the owner (who can use
+    // /profile/dex/) and hide it on visitor profiles to avoid 404s.
+    if (showPokedex && isOwner) {
       const link = root.querySelector<HTMLAnchorElement>('[data-pp-pokedex-link]');
-      if (link) link.href = `/${lang}/u/${profile.username}/dex/`;
+      if (link) link.href = `/${lang}/${lang === 'es' ? 'perfil/dex' : 'profile/dex'}/`;
       show(root.querySelector('[data-pp-pokedex-section]'));
       if (isOwner && facets.pokedex === false) {
         const badge = root.querySelector<HTMLElement>('[data-pp-pokedex-owner-only]');

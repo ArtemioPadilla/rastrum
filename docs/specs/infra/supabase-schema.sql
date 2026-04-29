@@ -2718,10 +2718,17 @@ ALTER TABLE public.users
   ADD COLUMN IF NOT EXISTS follower_count   integer NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS following_count  integer NOT NULL DEFAULT 0;
 
--- 3) Counter trigger
+-- 3) Counter trigger.
+-- SECURITY DEFINER is REQUIRED because the function UPDATEs
+-- public.users.{follower_count, following_count}, which the column-level
+-- REVOKE/GRANT pattern (`grants_locked_columns` block above) does NOT
+-- expose to invoker roles. Without this, the trigger fails with
+-- "permission denied for table users" and the parent INSERT into
+-- follows is rolled back — surfaces as a 400 from the follow Edge
+-- Function.
 CREATE OR REPLACE FUNCTION public.tg_follows_counter()
 RETURNS trigger
-LANGUAGE plpgsql AS $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
   IF (TG_OP = 'INSERT') THEN
     IF NEW.status = 'accepted' THEN
