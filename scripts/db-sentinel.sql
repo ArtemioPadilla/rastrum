@@ -43,6 +43,7 @@ BEGIN
 
   -- Expert track (module 22 + 23)
   IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'expert_applications')    THEN missing := array_append(missing, 'public.expert_applications'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'karma_events')          THEN missing := array_append(missing, 'public.karma_events'); END IF;
 
   -- Console (module 24 — admin/moderator/expert)
   IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'user_roles')             THEN missing := array_append(missing, 'public.user_roles'); END IF;
