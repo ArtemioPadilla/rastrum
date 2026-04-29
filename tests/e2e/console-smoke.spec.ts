@@ -70,4 +70,9 @@ test.describe('console — smoke', () => {
     await page.goto('/en/console/cron/');
     await expect(page.locator('#cron-not-auth')).toHaveText(/console access/i);
   });
+
+  test('/en/console/observations/ shows the not-auth banner for unauth visitor', async ({ page }) => {
+    await page.goto('/en/console/observations/');
+    await expect(page.locator('#obs-not-auth')).toHaveText(/console access/i);
+  });
 });
