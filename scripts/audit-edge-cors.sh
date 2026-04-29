@@ -29,6 +29,9 @@ FUNCTIONS=(
   mcp
   sync-error
   delete-observation
+  follow
+  react
+  report
 )
 
 failed=0

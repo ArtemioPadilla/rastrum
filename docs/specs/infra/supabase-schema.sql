@@ -2495,7 +2495,9 @@ WITH counted AS (
     i.taxon_id,
     i.scientific_name,
     COUNT(*)::int AS obs_count,
-    MIN(o.id) AS sample_obs_id
+    -- Postgres has no min(uuid); cast through text. Surgical fix; semantic
+    -- (smallest uuid lexicographically) is unchanged from the prior code.
+    MIN(o.id::text)::uuid AS sample_obs_id
   FROM public.observations o
   JOIN public.identifications i
     ON i.observation_id = o.id AND i.is_primary = true
