@@ -83,8 +83,10 @@ BEGIN
            (uid_user,  1,  'observation_synced');
 
   -- Ban row for banned user.
-  INSERT INTO public.user_bans (user_id, banned_by, reason, ban_type)
-    VALUES (uid_banned, uid_admin, 'spam', 'temporary')
+  -- Schema columns: id, user_id, banned_by, reason, expires_at, revoked_at, ...
+  -- (ban_type doesn't exist; duration is implicit via expires_at).
+  INSERT INTO public.user_bans (user_id, banned_by, reason, expires_at)
+    VALUES (uid_banned, uid_admin, 'spam', now() + interval '7 days')
   ON CONFLICT DO NOTHING;
 
   -- Observations: one public (uid_user), one hidden (uid_user).
