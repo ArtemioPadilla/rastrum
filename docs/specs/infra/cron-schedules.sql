@@ -20,6 +20,7 @@
 --   v3 (2026-04-27): added 'plantnet-quota-daily' (23:55 UTC) and
 --                    'streak-push-nightly' (01:55 UTC ≈ 19:55 America/Mexico_City).
 --   v4 (2026-04-27): added 'refresh-taxon-rarity-nightly' (03:00 UTC).
+--   v5 (2026-04-29): added 'recompute-user-stats-nightly' (08:00 UTC) for M28.
 -- ════════════════════════════════════════════════════════════════════════
 
 CREATE EXTENSION IF NOT EXISTS pg_cron;
@@ -85,13 +86,31 @@ BEGIN
     $$ SELECT public.refresh_taxon_rarity(); $$
   );
 
+  -- 6. recompute-user-stats-nightly — 08:00 UTC (M28)
+  --    Recomputes denormalized counters (species_count, obs_count_7d,
+  --    obs_count_30d), centroid_geog, and backfills country_code from
+  --    region_primary via normalize_country_code(). Scheduled at 08:00
+  --    UTC — after the 07:00/07:30 streaks/badges cluster so the per-user
+  --    fields they read aren't being rewritten mid-run.
+  PERFORM cron.unschedule('recompute-user-stats-nightly')
+    FROM cron.job WHERE jobname = 'recompute-user-stats-nightly';
+  PERFORM cron.schedule('recompute-user-stats-nightly', '0 8 * * *', format($body$
+    SELECT net.http_post(
+      url     := %L,
+      headers := '{"Content-Type":"application/json"}'::jsonb,
+      body    := '{}'::jsonb
+    );
+  $body$, v_base || '/recompute-user-stats'));
+
   RAISE NOTICE '✓ Cron schedules applied';
 END
 $migration$;
 
 SELECT jobid, jobname, schedule, active
 FROM cron.job
-WHERE jobname IN ('streaks-nightly', 'badges-nightly', 'plantnet-quota-daily', 'streak-push-nightly', 'refresh-taxon-rarity-nightly')
+WHERE jobname IN ('streaks-nightly', 'badges-nightly', 'plantnet-quota-daily',
+                  'streak-push-nightly', 'refresh-taxon-rarity-nightly',
+                  'recompute-user-stats-nightly')
 ORDER BY jobname;
 
 -- m26: prune read notifications older than 90 days, daily at 04:30 UTC.
