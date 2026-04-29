@@ -76,36 +76,37 @@ DECLARE
     meta->>'user_name',
     NULLIF(split_part(NEW.email, '@', 1), '')
   );
-  -- Adjectives (nature/character themed, Spanish)
+  -- Adjectives (nature/character themed, Spanish — ASCII only, no accents)
   adjectives text[] := ARRAY[
     'valiente','curioso','brillante','veloz','silencioso','audaz','sereno',
-    'ágil','fiero','noble','alerta','sagaz','vibrante','tenaz','libre'
+    'agil','fiero','noble','alerta','sagaz','vibrante','tenaz','libre'
   ];
-  -- Mexican/LATAM fauna & flora
+  -- Mexican/LATAM fauna & flora (ASCII only, no accents or hyphens)
   especies text[] := ARRAY[
-    'quetzal','ajolote','teporingo','coatí','cenzontle','ocelote','tapir',
-    'jaguar','manatí','vaquita','guacamaya','tlacuache','armadillo','tejon',
+    'quetzal','ajolote','teporingo','coati','cenzontle','ocelote','tapir',
+    'jaguar','manati','vaquita','guacamaya','tlacuache','armadillo','tejon',
     'coyote','puma','venado','iguana','boa','tortuga','pelicano','fragata',
-    'colibrí','tucán','flamenco','axolotl','cacomixtle','tlalcoyote'
+    'colibri','tucan','flamenco','axolotl','cacomixtle','tlalcoyote'
   ];
   gen_username text;
   attempts int := 0;
 BEGIN
-  -- Generate a unique <adjective>-<species> username, retry up to 10 times
+  -- Generate a unique <adjective>_<species>_<3digits> username
+  -- Format matches users_username_check: ^[a-zA-Z0-9_]{3,30}$
   LOOP
     gen_username := (adjectives)[1 + floor(random() * array_length(adjectives, 1))::int]
-                   || '-'
+                   || '_'
                    || (especies)[1 + floor(random() * array_length(especies, 1))::int]
-                   || '-'
-                   || floor(random() * 900 + 100)::text; -- 3-digit suffix for uniqueness
+                   || '_'
+                   || floor(random() * 900 + 100)::text;
     EXIT WHEN NOT EXISTS (SELECT 1 FROM public.users WHERE username = gen_username);
     attempts := attempts + 1;
     IF attempts >= 10 THEN
-      -- Fallback: timestamp-based suffix guarantees uniqueness
+      -- Fallback: timestamp suffix guarantees uniqueness
       gen_username := (adjectives)[1 + floor(random() * array_length(adjectives, 1))::int]
-                     || '-'
+                     || '_'
                      || (especies)[1 + floor(random() * array_length(especies, 1))::int]
-                     || '-'
+                     || '_'
                      || extract(epoch from now())::bigint % 1000000;
       EXIT;
     END IF;
@@ -3180,13 +3181,13 @@ DO $$
 DECLARE
   adjectives text[] := ARRAY[
     'valiente','curioso','brillante','veloz','silencioso','audaz','sereno',
-    'ágil','fiero','noble','alerta','sagaz','vibrante','tenaz','libre'
+    'agil','fiero','noble','alerta','sagaz','vibrante','tenaz','libre'
   ];
   especies text[] := ARRAY[
-    'quetzal','ajolote','teporingo','coatí','cenzontle','ocelote','tapir',
-    'jaguar','manatí','vaquita','guacamaya','tlacuache','armadillo','tejon',
+    'quetzal','ajolote','teporingo','coati','cenzontle','ocelote','tapir',
+    'jaguar','manati','vaquita','guacamaya','tlacuache','armadillo','tejon',
     'coyote','puma','venado','iguana','boa','tortuga','pelicano','fragata',
-    'colibrí','tucán','flamenco','axolotl','cacomixtle','tlalcoyote'
+    'colibri','tucan','flamenco','axolotl','cacomixtle','tlalcoyote'
   ];
   rec RECORD;
   gen_username text;
@@ -3196,17 +3197,17 @@ BEGIN
     attempts := 0;
     LOOP
       gen_username := (adjectives)[1 + floor(random() * array_length(adjectives, 1))::int]
-                     || '-'
+                     || '_'
                      || (especies)[1 + floor(random() * array_length(especies, 1))::int]
-                     || '-'
+                     || '_'
                      || floor(random() * 900 + 100)::text;
       EXIT WHEN NOT EXISTS (SELECT 1 FROM public.users WHERE username = gen_username);
       attempts := attempts + 1;
       IF attempts >= 10 THEN
         gen_username := (adjectives)[1 + floor(random() * array_length(adjectives, 1))::int]
-                       || '-'
+                       || '_'
                        || (especies)[1 + floor(random() * array_length(especies, 1))::int]
-                       || '-'
+                       || '_'
                        || extract(epoch from now())::bigint % 1000000;
         EXIT;
       END IF;
