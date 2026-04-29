@@ -1,0 +1,155 @@
+---
+import { t } from '../i18n/utils';
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+---
+
+<section class="max-w-5xl">
+  <h1 class="text-xl font-semibold mb-1">{tr.console.cron_heading}</h1>
+  <p class="mb-4 text-sm text-zinc-600 dark:text-zinc-400">{tr.console.cron_intro}</p>
+
+  <div id="cron-not-auth" class="hidden rounded border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-900 dark:text-amber-100">
+    {tr.console.not_authorized}
+  </div>
+
+  <div id="cron-shell" class="hidden space-y-4">
+    <div id="cron-loading" class="text-sm text-zinc-500 italic">{tr.console.loading}</div>
+
+    <div id="cron-empty" class="hidden rounded border border-dashed border-zinc-300 dark:border-zinc-700 p-4 text-sm text-zinc-500">
+      No cron jobs found. Check that pg_cron is enabled and rastrum jobs are scheduled.
+    </div>
+
+    <div id="cron-table-wrap" class="hidden overflow-x-auto">
+      <table class="min-w-full text-sm text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden">
+        <thead>
+          <tr class="text-left text-xs text-zinc-500 bg-zinc-50 dark:bg-zinc-900/60 border-b border-zinc-200 dark:border-zinc-800">
+            <th class="px-3 py-2 font-medium">{tr.console.cron_col_jobname}</th>
+            <th class="px-3 py-2 font-medium">{tr.console.cron_col_schedule}</th>
+            <th class="px-3 py-2 font-medium">{tr.console.cron_col_last_run}</th>
+            <th class="px-3 py-2 font-medium">{tr.console.cron_col_status}</th>
+            <th class="px-3 py-2 font-medium text-right">{tr.console.cron_col_duration}</th>
+            <th class="px-3 py-2 font-medium text-right">{tr.console.cron_col_runs_today}</th>
+            <th class="px-3 py-2 font-medium text-right">{tr.console.cron_col_success_rate}</th>
+            <th class="px-3 py-2 font-medium"></th>
+          </tr>
+        </thead>
+        <tbody id="cron-table-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <p id="cron-error" class="hidden mt-3 text-sm text-red-600 dark:text-red-400"></p>
+</section>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { getUserRoles } from '../lib/user-roles';
+
+  type CronRunRow = {
+    jobname: string;
+    schedule: string | null;
+    last_run_at: string | null;
+    last_status: string | null;
+    last_duration_ms: number | null;
+    return_message: string | null;
+    runs_today: number;
+    success_rate_24h: number;
+  };
+
+  function show(id: string) { document.getElementById(id)?.classList.remove('hidden'); }
+  function hide(id: string) { document.getElementById(id)?.classList.add('hidden'); }
+  function escHtml(s: string): string {
+    return s.replace(/[<>&'"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&#39;','"':'&quot;'}[c]!));
+  }
+
+  function statusBadge(status: string | null): string {
+    const s = status ?? 'unknown';
+    if (s === 'succeeded') {
+      return `<span class="inline-block rounded-full px-2 py-0.5 text-xs font-medium bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300">succeeded</span>`;
+    }
+    if (s === 'running') {
+      return `<span class="inline-block rounded-full px-2 py-0.5 text-xs font-medium bg-sky-100 dark:bg-sky-900/40 text-sky-800 dark:text-sky-300">running</span>`;
+    }
+    if (s === 'failed') {
+      return `<span class="inline-block rounded-full px-2 py-0.5 text-xs font-medium bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300">failed</span>`;
+    }
+    return `<span class="inline-block rounded-full px-2 py-0.5 text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">${escHtml(s)}</span>`;
+  }
+
+  function formatDuration(ms: number | null): string {
+    if (ms == null) return '—';
+    if (ms < 1000) return `${ms}ms`;
+    return `${(ms / 1000).toFixed(1)}s`;
+  }
+
+  const supabase = getSupabase();
+
+  async function init() {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) { show('cron-not-auth'); return; }
+    const myRoles = await getUserRoles(session.user.id);
+    if (!myRoles.has('admin')) { show('cron-not-auth'); return; }
+    show('cron-shell');
+    await loadRows();
+  }
+
+  async function loadRows() {
+    show('cron-loading');
+    hide('cron-empty');
+    hide('cron-table-wrap');
+
+    try {
+      const { data, error } = await supabase.rpc('list_admin_cron_runs_guarded', { p_limit: 50 });
+
+      hide('cron-loading');
+
+      if (error) {
+        const e = document.getElementById('cron-error')!;
+        e.textContent = error.message;
+        show('cron-error');
+        return;
+      }
+
+      const rows = (data ?? []) as CronRunRow[];
+
+      if (rows.length === 0) {
+        show('cron-empty');
+        return;
+      }
+
+      renderTable(rows);
+    } catch (err) {
+      hide('cron-loading');
+      const e = document.getElementById('cron-error')!;
+      e.textContent = (err as Error).message;
+      show('cron-error');
+    }
+  }
+
+  function renderTable(rows: CronRunRow[]) {
+    const tbody = document.getElementById('cron-table-body')!;
+    tbody.innerHTML = rows.map(r => `
+      <tr class="border-t border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/30">
+        <td class="px-3 py-2 text-xs font-mono">${escHtml(r.jobname)}</td>
+        <td class="px-3 py-2 text-xs font-mono text-zinc-500">${escHtml(r.schedule ?? '—')}</td>
+        <td class="px-3 py-2 text-xs font-mono text-zinc-500">${r.last_run_at ? escHtml(new Date(r.last_run_at).toISOString().replace('T', ' ').slice(0, 19)) : '—'}</td>
+        <td class="px-3 py-2">${statusBadge(r.last_status)}</td>
+        <td class="px-3 py-2 text-xs text-right font-mono">${escHtml(formatDuration(r.last_duration_ms))}</td>
+        <td class="px-3 py-2 text-xs text-right">${r.runs_today}</td>
+        <td class="px-3 py-2 text-xs text-right">${r.runs_today > 0 ? (r.success_rate_24h * 100).toFixed(0) + '%' : '—'}</td>
+        <td class="px-3 py-2">
+          <button disabled title="Force run — coming in PR4" class="rounded px-2 py-0.5 text-xs border border-zinc-300 dark:border-zinc-700 text-zinc-400 cursor-not-allowed">Force run</button>
+        </td>
+      </tr>
+    `).join('');
+    show('cron-table-wrap');
+  }
+
+  init().catch(err => {
+    hide('cron-loading');
+    const e = document.getElementById('cron-error')!;
+    e.textContent = (err as Error).message;
+    show('cron-error');
+  });
+</script>

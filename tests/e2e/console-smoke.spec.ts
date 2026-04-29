@@ -54,4 +54,20 @@ test.describe('console — smoke', () => {
     expect(page.url()).not.toContain('500');
     expect(await page.locator('body').textContent()).not.toContain('Internal Server Error');
   });
+
+  test('/en/console/sync/ shows the not-auth banner for unauth visitor', async ({ page }) => {
+    await page.goto('/en/console/sync/');
+    await expect(page.locator('#sync-not-auth')).toHaveText(/console access/i);
+    expect(await page.locator('body').textContent()).not.toContain('Internal Server Error');
+  });
+
+  test('/en/console/api/ shows the not-auth banner for unauth visitor', async ({ page }) => {
+    await page.goto('/en/console/api/');
+    await expect(page.locator('#api-not-auth')).toHaveText(/console access/i);
+  });
+
+  test('/en/console/cron/ shows the not-auth banner for unauth visitor', async ({ page }) => {
+    await page.goto('/en/console/cron/');
+    await expect(page.locator('#cron-not-auth')).toHaveText(/console access/i);
+  });
 });
