@@ -5326,7 +5326,7 @@ SELECT u.id AS user_id,
 GRANT SELECT ON public.moderator_trust_scores TO authenticated;
 
 -- ============================================================
--- CAMERA STATIONS (M31) — sampling-effort metadata for camera traps
+-- CAMERA STATIONS (M31, issue #112) — sampling-effort metadata for camera traps
 -- ============================================================
 -- A station is a fixed camera deployment. Active periods record
 -- when the camera was capturing — needed for trap-night counts +
