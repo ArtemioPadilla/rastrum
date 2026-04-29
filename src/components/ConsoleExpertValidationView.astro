@@ -57,9 +57,14 @@ const tr = t(lang);
       </table>
     </div>
 
-    <!-- Empty state -->
+    <!-- Empty state (unfiltered) -->
     <div id="exp-val-empty" class="hidden rounded-md border border-dashed border-zinc-300 dark:border-zinc-700 p-6 text-sm text-center text-zinc-500">
       {tr.console.exp_val_empty}
+    </div>
+
+    <!-- Empty state when "My taxa only" is active but matches nothing in a non-empty queue -->
+    <div id="exp-val-empty-filtered" class="hidden rounded-md border border-dashed border-zinc-300 dark:border-zinc-700 p-6 text-sm text-center text-zinc-500">
+      {tr.console.exp_val_empty_filtered}
     </div>
   </div>
 </section>
@@ -70,6 +75,10 @@ const tr = t(lang);
 
   function show(id: string) { document.getElementById(id)?.classList.remove('hidden'); }
   function hide(id: string) { document.getElementById(id)?.classList.add('hidden'); }
+
+  function escHtml(s: string): string {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
 
   const supabase = getSupabase();
 
@@ -133,6 +142,11 @@ const tr = t(lang);
 
   function filteredRows(): QueueRow[] {
     if (!myTaxaOnly || expertTaxa.length === 0) return allRows;
+    // users.expert_taxa stores capitalised kingdom names ('Aves', 'Plantae')
+    // matching taxa.kingdom convention (verified via the consensus function's
+    // `t.kingdom = ANY(u.expert_taxa)`). If a future migration introduces
+    // case-mismatch, this filter would silently drop everything — verify the
+    // data invariant if that path ever becomes possible.
     return allRows.filter(r => {
       const kingdom = kingdomMap.get(r.current_taxon_id ?? '');
       return kingdom && expertTaxa.includes(kingdom);
@@ -143,9 +157,17 @@ const tr = t(lang);
     const rows = filteredRows();
     const tbody = document.getElementById('exp-val-tbody')!;
 
+    hide('exp-val-empty');
+    hide('exp-val-empty-filtered');
+
     if (rows.length === 0) {
       hide('exp-val-table-wrap');
-      show('exp-val-empty');
+      // Distinguish: taxa-scoped filter active but unfiltered queue has items
+      if (myTaxaOnly && allRows.length > 0) {
+        show('exp-val-empty-filtered');
+      } else {
+        show('exp-val-empty');
+      }
       return;
     }
 
@@ -154,7 +176,8 @@ const tr = t(lang);
 
     tbody.innerHTML = rows.map(r => {
       const conf = r.current_confidence != null ? `${Math.round(r.current_confidence * 100)}%` : '—';
-      const obsUrl = `/explore/validate/?obs=${r.observation_id}`;
+      // uuid is structurally safe but escape for uniformity with the rest of the component
+      const obsUrl = `/explore/validate/?obs=${escHtml(r.observation_id)}`;
       const name = r.current_scientific_name ?? '—';
       const suggestions = r.suggestion_count ?? 0;
       const voters = r.distinct_voter_count ?? 0;
