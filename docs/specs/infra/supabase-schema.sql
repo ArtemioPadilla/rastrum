@@ -5667,12 +5667,28 @@ CREATE TRIGGER admin_audit_dispatch
 AFTER INSERT ON public.admin_audit
 FOR EACH ROW EXECUTE FUNCTION public.admin_audit_dispatch_trigger();
 
--- 4. Moderator trust score (read-only v1 placeholder)
+-- 4. Moderator trust score (v1.1 — PR14)
 -- ─────────────────────────────────────────────────────────────────────
--- v1 returns a static formula based on (a) presence of unacknowledged
--- anomalies attributed to the moderator and (b) raw action volume in
--- the last 30 days. Future iterations should add overturn-rate signals
--- (a moderator's report.dismiss reversed within 7 days = bad outcome).
+-- !! Any change to this function MUST bump the version comment in
+-- !! `docs/runbooks/admin-trust-scores.md` AND ship a runbook entry
+-- !! explaining the rationale. Trust scores are surfaced to admins;
+-- !! silent reformulations would be confusing and unfair.
+--
+-- Version: 1.1 (2026-04-29)
+--
+-- Formula (weighted sum, clamped to 0..100):
+--   base               = 70
+--   anomaly_factor     = -8 × unack_anomalies_last_30d  (older anomalies
+--                        decay to zero weight)
+--   overturn_penalty   = -25 × overturn_rate            (where overturn_rate
+--                        is the fraction of report.dismiss actions
+--                        reversed by a *different* moderator within 7 days)
+--   action_volume      = +30 × min(1, sqrt(active_days_last_90d / 30))
+--                        (rewards consistency without rewarding raw
+--                        bursts; capped at +30)
+--   recency_bonus      = +5 if the moderator acted in the last 7 days
+--
+-- Returns NULL when the user is neither moderator nor admin.
 
 CREATE OR REPLACE FUNCTION public.compute_moderator_trust_score(p_user_id uuid)
 RETURNS numeric
@@ -5680,28 +5696,78 @@ LANGUAGE plpgsql STABLE SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  v_unack int;
-  v_actions int;
-  v_score numeric := 100.0;
+  v_unack             int;
+  v_dismiss_total     int;
+  v_dismiss_overturned int;
+  v_overturn_rate     numeric := 0.0;
+  v_active_days       int;
+  v_recent_action     boolean;
+  v_score             numeric;
 BEGIN
   IF NOT (public.has_role(p_user_id, 'moderator') OR public.has_role(p_user_id, 'admin')) THEN
     RETURN NULL;
   END IF;
 
+  -- Anomaly factor: only the last 30 days at full weight; older
+  -- unacknowledged anomalies don't penalise indefinitely.
   SELECT count(*)::int INTO v_unack
     FROM public.admin_anomalies
    WHERE actor_id = p_user_id
-     AND acknowledged_at IS NULL;
-
-  SELECT count(*)::int INTO v_actions
-    FROM public.admin_audit
-   WHERE actor_id = p_user_id
+     AND acknowledged_at IS NULL
      AND created_at >= now() - interval '30 days';
 
-  -- v1 heuristic: 100 floor minus 8 per unacknowledged anomaly, clamped
-  -- at 0. New mods (no actions yet) get 100 by default.
-  v_score := greatest(0, 100 - (v_unack * 8));
-  RETURN v_score;
+  -- Overturn rate: report.dismiss actions taken by this moderator that
+  -- were subsequently re-opened or resolved by a *different*
+  -- moderator within 7 days. We approximate "overturned" as: the same
+  -- target_id received a later report_resolve audit row from a
+  -- different actor inside the 7-day window.
+  SELECT count(*)::int INTO v_dismiss_total
+    FROM public.admin_audit
+   WHERE actor_id = p_user_id
+     AND op::text = 'report_dismiss'
+     AND created_at >= now() - interval '90 days';
+
+  IF v_dismiss_total > 0 THEN
+    SELECT count(DISTINCT a.id)::int INTO v_dismiss_overturned
+      FROM public.admin_audit a
+     WHERE a.actor_id = p_user_id
+       AND a.op::text = 'report_dismiss'
+       AND a.created_at >= now() - interval '90 days'
+       AND EXISTS (
+         SELECT 1 FROM public.admin_audit b
+          WHERE b.target_id   = a.target_id
+            AND b.target_type = a.target_type
+            AND b.actor_id   <> p_user_id
+            AND b.op::text   = 'report_resolve'
+            AND b.created_at >  a.created_at
+            AND b.created_at <= a.created_at + interval '7 days'
+       );
+    v_overturn_rate := v_dismiss_overturned::numeric / v_dismiss_total::numeric;
+  END IF;
+
+  -- Action volume: count of distinct days the moderator wrote at least
+  -- one admin_audit row in the last 90. The sqrt-then-cap shape rewards
+  -- consistency (5 days → ~ +12, 30 days → +30) without giving infinite
+  -- credit for an admin who handled 1 ticket every day for years.
+  SELECT count(DISTINCT date_trunc('day', created_at))::int INTO v_active_days
+    FROM public.admin_audit
+   WHERE actor_id = p_user_id
+     AND created_at >= now() - interval '90 days';
+
+  -- Recency: did they act at all in the last 7 days?
+  SELECT EXISTS (
+    SELECT 1 FROM public.admin_audit
+     WHERE actor_id = p_user_id
+       AND created_at >= now() - interval '7 days'
+  ) INTO v_recent_action;
+
+  v_score :=  70.0
+            -  8.0 * v_unack
+            - 25.0 * v_overturn_rate
+            + 30.0 * least(1.0, sqrt(v_active_days::numeric / 30.0))
+            + (CASE WHEN v_recent_action THEN 5.0 ELSE 0.0 END);
+
+  RETURN greatest(0.0, least(100.0, v_score));
 END $$;
 
 REVOKE ALL ON FUNCTION public.compute_moderator_trust_score(uuid) FROM public;
