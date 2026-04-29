@@ -2663,18 +2663,28 @@ CREATE INDEX IF NOT EXISTS idx_obs_establishment_means
 -- =====================================================================
 
 -- 1) follows
-CREATE TABLE IF NOT EXISTS public.follows (
-  follower_id   uuid        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-  followee_id   uuid        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-  tier          text        NOT NULL DEFAULT 'follower'
-                            CHECK (tier IN ('follower', 'collaborator')),
-  status        text        NOT NULL DEFAULT 'accepted'
-                            CHECK (status IN ('pending', 'accepted')),
-  requested_at  timestamptz NOT NULL DEFAULT now(),
-  accepted_at   timestamptz,
-  PRIMARY KEY (follower_id, followee_id),
-  CHECK (follower_id <> followee_id)
-);
+-- Note: public.follows was first defined in v1.0 (module 08, line ~792)
+-- with only (follower_id, followee_id, created_at). Module 26 extends it
+-- with tier/status/requested_at/accepted_at + CHECK constraints. We use
+-- ALTER TABLE ADD COLUMN IF NOT EXISTS so existing prod DBs (where the
+-- v1.0 definition already created the table) get the new columns rather
+-- than silently no-op'ing on CREATE TABLE IF NOT EXISTS.
+ALTER TABLE public.follows
+  ADD COLUMN IF NOT EXISTS tier         text        NOT NULL DEFAULT 'follower',
+  ADD COLUMN IF NOT EXISTS status       text        NOT NULL DEFAULT 'accepted',
+  ADD COLUMN IF NOT EXISTS requested_at timestamptz NOT NULL DEFAULT now(),
+  ADD COLUMN IF NOT EXISTS accepted_at  timestamptz;
+
+DO $$ BEGIN
+  ALTER TABLE public.follows ADD CONSTRAINT follows_tier_check   CHECK (tier IN ('follower', 'collaborator'));
+EXCEPTION WHEN duplicate_object OR invalid_table_definition THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TABLE public.follows ADD CONSTRAINT follows_status_check CHECK (status IN ('pending', 'accepted'));
+EXCEPTION WHEN duplicate_object OR invalid_table_definition THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TABLE public.follows ADD CONSTRAINT follows_no_self      CHECK (follower_id <> followee_id);
+EXCEPTION WHEN duplicate_object OR invalid_table_definition THEN NULL; END $$;
+
 CREATE INDEX IF NOT EXISTS idx_follows_followee_status
   ON public.follows(followee_id, status);
 CREATE INDEX IF NOT EXISTS idx_follows_follower_status
@@ -2787,6 +2797,34 @@ CREATE POLICY obs_collaborator_read ON public.observations FOR SELECT
     obscure_level <> 'full'
     AND public.is_collaborator_of(auth.uid(), observer_id)
   );
+
+-- 7-pre) blocks (must exist before any reaction policy that references it)
+-- Originally defined as section 10 below — moved up because the reaction
+-- policies in sections 7/8/9 subquery public.blocks. Keeping CREATE TABLE
+-- here and policies further down would also work, but co-locating keeps
+-- the section coherent.
+CREATE TABLE IF NOT EXISTS public.blocks (
+  blocker_id  uuid        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  blocked_id  uuid        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (blocker_id, blocked_id),
+  CHECK (blocker_id <> blocked_id)
+);
+CREATE INDEX IF NOT EXISTS idx_blocks_blocked ON public.blocks(blocked_id);
+
+ALTER TABLE public.blocks ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS blocks_owner_read ON public.blocks;
+CREATE POLICY blocks_owner_read ON public.blocks FOR SELECT
+  USING (blocker_id = auth.uid());
+
+DROP POLICY IF EXISTS blocks_owner_write ON public.blocks;
+CREATE POLICY blocks_owner_write ON public.blocks FOR INSERT
+  WITH CHECK (blocker_id = auth.uid());
+
+DROP POLICY IF EXISTS blocks_owner_delete ON public.blocks;
+CREATE POLICY blocks_owner_delete ON public.blocks FOR DELETE
+  USING (blocker_id = auth.uid());
 
 -- 7) observation_reactions
 CREATE TABLE IF NOT EXISTS public.observation_reactions (
@@ -2925,29 +2963,9 @@ DROP POLICY IF EXISTS idreact_delete ON public.identification_reactions;
 CREATE POLICY idreact_delete ON public.identification_reactions FOR DELETE
   USING (user_id = auth.uid());
 
--- 10) blocks
-CREATE TABLE IF NOT EXISTS public.blocks (
-  blocker_id  uuid        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-  blocked_id  uuid        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-  created_at  timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (blocker_id, blocked_id),
-  CHECK (blocker_id <> blocked_id)
-);
-CREATE INDEX IF NOT EXISTS idx_blocks_blocked ON public.blocks(blocked_id);
-
-ALTER TABLE public.blocks ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS blocks_owner_read ON public.blocks;
-CREATE POLICY blocks_owner_read ON public.blocks FOR SELECT
-  USING (blocker_id = auth.uid());
-
-DROP POLICY IF EXISTS blocks_owner_write ON public.blocks;
-CREATE POLICY blocks_owner_write ON public.blocks FOR INSERT
-  WITH CHECK (blocker_id = auth.uid());
-
-DROP POLICY IF EXISTS blocks_owner_delete ON public.blocks;
-CREATE POLICY blocks_owner_delete ON public.blocks FOR DELETE
-  USING (blocker_id = auth.uid());
+-- 10) blocks — moved up to "7-pre" so reactions policies (sections 7/8/9)
+-- can reference public.blocks before it's referenced. Section number kept
+-- as a marker for the original module-26 ordering.
 
 -- 11) reports
 CREATE TABLE IF NOT EXISTS public.reports (

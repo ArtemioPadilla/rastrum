@@ -12,6 +12,18 @@ name: db-apply
 # All SQL in this repo is written to be idempotent (CREATE … IF NOT EXISTS,
 # DROP POLICY IF EXISTS … ; CREATE POLICY …, ON CONFLICT DO UPDATE).
 # Re-runs are safe.
+#
+# Hardening (post-2026-04-29):
+#   - actions/checkout@v4 with fetch-depth: 0 so `git diff <before> <sha>`
+#     can resolve the parent commit. The previous default depth=1 caused
+#     "fatal: bad object" which `|| true` tolerated, silently skipping
+#     the apply — that's how PR #42's schema didn't reach prod despite the
+#     workflow reporting "success".
+#   - Decision banner — every run prints "schema=… cron=…" so skips are
+#     visible at a glance.
+#   - Sentinel verify — after apply, assert that critical tables and
+#     functions exist. Catches partial-apply states (e.g., when the apply
+#     fails mid-file, leaving some objects created and others not).
 
 on:
   workflow_dispatch:
@@ -38,6 +50,8 @@ jobs:
       PGCONNECT_TIMEOUT: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Detect changed SQL files
         id: changes
@@ -46,21 +60,46 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "schema=true"  >> "$GITHUB_OUTPUT"
             echo "cron=true"    >> "$GITHUB_OUTPUT"
+            echo "::notice::workflow_dispatch — applying both schema and cron"
             exit 0
           fi
           # Force-push or first push to branch: github.event.before is 40 zeros.
-          # In that case there's no diff base; replay both files defensively
-          # since both are idempotent.
+          # Replay both files defensively (idempotent).
           before='${{ github.event.before }}'
           if [ "$before" = "0000000000000000000000000000000000000000" ] || [ -z "$before" ]; then
             echo "schema=true"  >> "$GITHUB_OUTPUT"
             echo "cron=true"    >> "$GITHUB_OUTPUT"
+            echo "::notice::no diff base (first/force push) — applying both"
             exit 0
           fi
-          changed=$(git diff --name-only "$before" "${{ github.sha }}" || true)
+          # If we cannot resolve `before` (shallow clone, force-push gone, etc.)
+          # we previously fell back to schema=false which silently skipped the
+          # apply step. That hid PR #42's schema for a day. Fail loud instead;
+          # operator can re-fire via workflow_dispatch which always applies.
+          if ! git cat-file -e "${before}^{commit}" 2>/dev/null; then
+            echo "::error::Cannot resolve before-SHA ${before} (shallow clone? rewritten history?). Refusing to silently skip — re-run via workflow_dispatch to apply unconditionally."
+            exit 1
+          fi
+          changed=$(git diff --name-only "$before" "${{ github.sha }}")
+          echo "Changed files between $before and ${{ github.sha }}:"
           echo "$changed"
-          echo "$changed" | grep -qx 'docs/specs/infra/supabase-schema.sql' && echo "schema=true"  >> "$GITHUB_OUTPUT" || echo "schema=false" >> "$GITHUB_OUTPUT"
-          echo "$changed" | grep -qx 'docs/specs/infra/cron-schedules.sql'  && echo "cron=true"    >> "$GITHUB_OUTPUT" || echo "cron=false"   >> "$GITHUB_OUTPUT"
+          if echo "$changed" | grep -qx 'docs/specs/infra/supabase-schema.sql'; then
+            echo "schema=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "schema=false" >> "$GITHUB_OUTPUT"
+          fi
+          if echo "$changed" | grep -qx 'docs/specs/infra/cron-schedules.sql'; then
+            echo "cron=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "cron=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Decision banner
+        run: |
+          echo "::notice::Apply plan — schema=${{ steps.changes.outputs.schema }} cron=${{ steps.changes.outputs.cron }}"
+          if [ "${{ steps.changes.outputs.schema }}" = "false" ] && [ "${{ steps.changes.outputs.cron }}" = "false" ]; then
+            echo "::warning::No SQL files changed — both apply steps will be skipped."
+          fi
 
       - name: Apply schema
         if: steps.changes.outputs.schema == 'true'
@@ -76,11 +115,41 @@ jobs:
         run: |
           psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f docs/specs/infra/cron-schedules.sql
 
-      - name: Smoke verify (table count + RLS coverage)
+      - name: Sentinel verify (critical tables and functions exist)
+        # Always runs when schema was applied — confirms the apply actually
+        # took effect. If the apply step fails mid-file (as the MIN(uuid) bug
+        # did), this catches the partial state where some objects exist and
+        # others don't. Sentinels span every major module.
+        if: always() && steps.changes.outputs.schema == 'true'
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          DECLARE
+            missing text[] := ARRAY[]::text[];
+          BEGIN
+            -- Tables every module depends on (auth, obs, social, console).
+            IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'users')           THEN missing := missing || 'public.users'; END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'observations')    THEN missing := missing || 'public.observations'; END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'taxa')            THEN missing := missing || 'public.taxa'; END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'identifications') THEN missing := missing || 'public.identifications'; END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'media_files')     THEN missing := missing || 'public.media_files'; END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'badges')          THEN missing := missing || 'public.badges'; END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'user_badges')     THEN missing := missing || 'public.user_badges'; END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'user_roles')      THEN missing := missing || 'public.user_roles'; END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'admin_audit')     THEN missing := missing || 'public.admin_audit'; END IF;
+
+            -- Functions used by RLS predicates and Edge Functions.
+            IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'has_role')              THEN missing := missing || 'public.has_role()'; END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'recompute_consensus')   THEN missing := missing || 'public.recompute_consensus()'; END IF;
+
+            IF array_length(missing, 1) IS NOT NULL THEN
+              RAISE EXCEPTION 'Sentinel verify failed — missing objects: %', missing;
+            END IF;
+          END $$;
+
+          -- RLS coverage summary (informational; spots tables that lost RLS).
           SELECT
             count(*) FILTER (WHERE rowsecurity)     AS tables_with_rls,
             count(*) FILTER (WHERE NOT rowsecurity) AS tables_without_rls,
