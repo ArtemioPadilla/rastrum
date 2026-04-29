@@ -38,7 +38,8 @@ export const CONSOLE_TABS: ConsoleTab[] = [
   { id: 'mod-flag-queue', role: 'moderator', routeKey: 'consoleModFlagQueue',     i18nKey: 'console.modFlagQueue',  icon: 'flag',       phase: 3 },
   { id: 'mod-comments',   role: 'moderator', routeKey: 'consoleModComments',      i18nKey: 'console.modComments',   icon: 'message',    phase: 3 },
   { id: 'mod-bans',       role: 'moderator', routeKey: 'consoleModBans',          i18nKey: 'console.modBans',       icon: 'user-x',     phase: 4 },
-  { id: 'mod-disputes',   role: 'moderator', routeKey: 'consoleModDisputes',      i18nKey: 'console.modDisputes',   icon: 'gavel',      phase: 4, stub: true },
+  { id: 'mod-appeals',    role: 'moderator', routeKey: 'consoleModAppeals',       i18nKey: 'console.modAppeals',    icon: 'gavel',      phase: 4 },
+  { id: 'mod-disputes',   role: 'moderator', routeKey: 'consoleModDisputes',      i18nKey: 'console.modDisputes',   icon: 'scale',      phase: 4, stub: true },
   // Expert (5)
   { id: 'exp-overview',   role: 'expert',    routeKey: 'console',                 i18nKey: 'console.expOverview',   icon: 'gauge',      phase: 2 },
   { id: 'exp-validation', role: 'expert',    routeKey: 'consoleExpertValidation', i18nKey: 'console.expValidation', icon: 'check-circle', phase: 2 },
