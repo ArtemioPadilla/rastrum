@@ -112,7 +112,14 @@ export const auditExportHandler: ActionHandler<Payload> = {
 
     return {
       before: null,
-      after: null,
+      after: {
+        from: payload.from ?? null,
+        to: payload.to ?? null,
+        actorId: payload.actorId ?? null,
+        op: payload.op ?? null,
+        limit,
+        returned: rows.length,
+      },
       result: { rows, csv },
       target: { type: 'admin_audit', id: 'export' },
     };
