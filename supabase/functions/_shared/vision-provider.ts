@@ -179,7 +179,12 @@ class BedrockProvider implements VisionProvider {
     const creds = parseBedrockSecret(this.cred.secret);
     if (!creds) return null;
     const region = this.cred.endpoint || creds.region || 'us-east-1';
-    const url = `https://bedrock-runtime.${region}.amazonaws.com/model/${encodeURIComponent(this.cred.model)}/invoke`;
+    // Auto-translate Anthropic-direct shorthand → Bedrock model ID.
+    // The shared `preferred_model` column defaults to
+    // `claude-haiku-4-5`; a Bedrock credential created without an
+    // explicit Bedrock model still routes correctly.
+    const modelId = bedrockModelId(this.cred.model);
+    const url = `https://bedrock-runtime.${region}.amazonaws.com/model/${encodeURIComponent(modelId)}/invoke`;
     const body = {
       anthropic_version: 'bedrock-2023-05-31',
       max_tokens: 512,
@@ -216,6 +221,26 @@ interface BedrockSecret {
   accessKeyId: string;
   secretAccessKey: string;
   sessionToken?: string;
+}
+
+/**
+ * Translate the Anthropic-direct model shorthand into a Bedrock
+ * model identifier. Pass-through for any string that already looks
+ * like a Bedrock ID (contains `:` or starts with `us.`/`eu.`/`apac.`).
+ *
+ * Pure helper — exported for unit testing.
+ */
+export function bedrockModelId(model: string): string {
+  if (!model) return 'us.anthropic.claude-haiku-4-5-v1:0';
+  if (model.includes(':')) return model;                   // already a Bedrock ID
+  if (/^(us|eu|apac)\./.test(model)) return model;         // already prefixed
+  // Map a small set of known Anthropic shorthands → Bedrock equivalents.
+  const map: Record<string, string> = {
+    'claude-haiku-4-5':  'us.anthropic.claude-haiku-4-5-v1:0',
+    'claude-sonnet-4-5': 'us.anthropic.claude-sonnet-4-5-v1:0',
+    'claude-opus-4':     'us.anthropic.claude-opus-4-v1:0',
+  };
+  return map[model] ?? model;
 }
 
 export function parseBedrockSecret(secret: string): BedrockSecret | null {

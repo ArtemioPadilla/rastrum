@@ -3622,6 +3622,19 @@ CREATE TABLE IF NOT EXISTS public.sponsor_credentials (
 );
 CREATE INDEX IF NOT EXISTS sponsor_credentials_user_active_idx
   ON public.sponsor_credentials (user_id) WHERE revoked_at IS NULL;
+
+-- M27.1 (#116) — additive columns for multi-provider routing. The
+-- `resolve_sponsorship` function below references these, so they must
+-- exist before the function's CREATE OR REPLACE runs in the same
+-- file. The full M27.1 block at the bottom of this file extends the
+-- enums + adds the pool tables; the column additions need to ride
+-- with the table they belong to.
+ALTER TABLE public.sponsor_credentials
+  ADD COLUMN IF NOT EXISTS preferred_model text NOT NULL DEFAULT 'claude-haiku-4-5'
+    CHECK (length(preferred_model) BETWEEN 1 AND 64),
+  ADD COLUMN IF NOT EXISTS endpoint        text
+    CHECK (endpoint IS NULL OR length(endpoint) <= 512);
+
 ALTER TABLE public.sponsor_credentials ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS sponsor_credentials_owner_read ON public.sponsor_credentials;
 CREATE POLICY sponsor_credentials_owner_read ON public.sponsor_credentials
@@ -5634,11 +5647,10 @@ DO $$ BEGIN
   ALTER TYPE public.ai_credential_kind ADD VALUE IF NOT EXISTS 'vertex_ai';
 EXCEPTION WHEN others THEN NULL; END $$;
 
-ALTER TABLE public.sponsor_credentials
-  ADD COLUMN IF NOT EXISTS preferred_model text NOT NULL DEFAULT 'claude-haiku-4-5'
-    CHECK (length(preferred_model) BETWEEN 1 AND 64),
-  ADD COLUMN IF NOT EXISTS endpoint        text  -- Azure deployment URL or Vertex region; NULL for direct providers
-    CHECK (endpoint IS NULL OR length(endpoint) <= 512);
+-- (sponsor_credentials.preferred_model + endpoint are added inline
+--  with the original CREATE TABLE near line 3625 — they're referenced
+--  by `resolve_sponsorship` below, which is itself defined before
+--  this M27.1 block runs in the same file.)
 
 -- ============================================================
 -- M27.2 — Platform-wide AI call pool (#115)

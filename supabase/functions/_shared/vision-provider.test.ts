@@ -1,5 +1,5 @@
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { buildProvider, parseModelJson, parseBedrockSecret, toVisionResult } from './vision-provider.ts';
+import { bedrockModelId, buildProvider, parseModelJson, parseBedrockSecret, toVisionResult } from './vision-provider.ts';
 import { defaultModelFor, detectKind } from './vision-validate.ts';
 
 Deno.test('buildProvider — exhaustive switch handles every kind without throwing', () => {
@@ -58,6 +58,20 @@ Deno.test('detectKind — matches Anthropic prefixes before OpenAI sk- ', () => 
   assertEquals(detectKind('sk-proj-' + 'X'), 'openai_api_key');
   assertEquals(detectKind('AIzaXYZ'), 'gemini_api_key');
   assertEquals(detectKind('{"accessKeyId":"x"}'), null);  // bedrock/vertex are not prefix-detected
+});
+
+Deno.test('bedrockModelId — translates Anthropic shorthand to Bedrock ID', () => {
+  assertEquals(bedrockModelId('claude-haiku-4-5'),  'us.anthropic.claude-haiku-4-5-v1:0');
+  assertEquals(bedrockModelId('claude-sonnet-4-5'), 'us.anthropic.claude-sonnet-4-5-v1:0');
+});
+
+Deno.test('bedrockModelId — passes through Bedrock-format IDs unchanged', () => {
+  assertEquals(bedrockModelId('us.anthropic.claude-haiku-4-5-v1:0'), 'us.anthropic.claude-haiku-4-5-v1:0');
+  assertEquals(bedrockModelId('eu.anthropic.claude-sonnet-4-5-v1:0'), 'eu.anthropic.claude-sonnet-4-5-v1:0');
+});
+
+Deno.test('bedrockModelId — empty input falls back to default Haiku', () => {
+  assertEquals(bedrockModelId(''), 'us.anthropic.claude-haiku-4-5-v1:0');
 });
 
 Deno.test('defaultModelFor — non-empty for every kind', () => {
