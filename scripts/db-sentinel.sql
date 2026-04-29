@@ -52,6 +52,8 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'has_role')             THEN missing := array_append(missing, 'public.has_role()'); END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'recompute_consensus')  THEN missing := array_append(missing, 'public.recompute_consensus()'); END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'handle_new_user')      THEN missing := array_append(missing, 'public.handle_new_user()'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'list_admin_cron_runs')         THEN missing := array_append(missing, 'public.list_admin_cron_runs()'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'list_admin_cron_runs_guarded') THEN missing := array_append(missing, 'public.list_admin_cron_runs_guarded()'); END IF;
 
   IF array_length(missing, 1) IS NOT NULL THEN
     RAISE EXCEPTION 'Sentinel verify failed — missing objects: %', missing;

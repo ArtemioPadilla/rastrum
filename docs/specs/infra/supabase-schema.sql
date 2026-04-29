@@ -3331,11 +3331,28 @@ AS $$
 $$;
 
 REVOKE ALL ON FUNCTION public.list_admin_cron_runs(int) FROM public;
-GRANT EXECUTE ON FUNCTION public.list_admin_cron_runs(int) TO authenticated;
+-- Intentionally NOT granted to authenticated — only the _guarded wrapper below
+-- should be callable by end users. Granting authenticated on the inner function
+-- would let any logged-in user bypass the has_role check entirely.
+GRANT EXECUTE ON FUNCTION public.list_admin_cron_runs(int) TO service_role;
 
--- Caller-side admin guard: runs as the schema owner so cron schema is
--- reachable; verifies the calling user holds the admin role before
--- returning any data.
+-- Why STABLE on list_admin_cron_runs_guarded:
+--   auth.uid() reads a session GUC (request.jwt.claims) that is set once
+--   per PostgREST request and does not change within a single query
+--   execution. STABLE is therefore correct — the function returns the same
+--   result for the same p_limit within one statement.
+--
+--   VOLATILE would be wrong: it suppresses inlining and forces a
+--   materialisation barrier, degrading query optimization for no benefit.
+--
+--   The has_role check runs once per call (not per row) because it lives in
+--   the BEGIN block before the RETURN QUERY — any admin check failure raises
+--   immediately, before any rows from the inner function are fetched.
+--
+--   The inner list_admin_cron_runs (unguarded) is SECURITY DEFINER so it
+--   can read the cron schema; it must NOT be granted to authenticated
+--   directly — only service_role. All authenticated callers must go through
+--   this _guarded wrapper.
 CREATE OR REPLACE FUNCTION public.list_admin_cron_runs_guarded(p_limit int DEFAULT 50)
 RETURNS TABLE (
   jobname          text,
