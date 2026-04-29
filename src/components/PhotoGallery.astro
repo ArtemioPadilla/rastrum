@@ -27,8 +27,11 @@ const labels = {
   share:    isEs ? 'Compartir' : 'Share',
   shareAria: isEs ? 'Compartir foto' : 'Share photo',
   open:     isEs ? 'Abrir foto en el visor' : 'Open photo in viewer',
+  viewer:   isEs ? 'Visor de fotos' : 'Photo viewer',
   noPhotos: isEs ? 'Aún no hay fotos.' : 'No photos yet.',
   deletePhoto: isEs ? 'Eliminar foto' : 'Delete photo',
+  // %{n} / %{total} are filled in at JS-time per gallery instance.
+  photoNofM:    isEs ? 'Foto %{n} de %{total}' : 'Photo %{n} of %{total}',
 };
 
 const hasPhotos = photos.length > 0;
@@ -56,7 +59,7 @@ const hasMany = photos.length > 1;
   <button
     type="button"
     data-photo-hero
-    aria-label={labels.open}
+    aria-label={hasPhotos ? labels.photoNofM.replace('%{n}', '1').replace('%{total}', String(photos.length)) : labels.open}
     class:list={[
       'block w-full aspect-[16/10] overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900',
       !hasPhotos && 'hidden',
@@ -85,7 +88,7 @@ const hasMany = photos.length > 1;
         data-photo-thumb
         data-photo-id={p.id}
         data-photo-index={i + 1}
-        aria-label={labels.open}
+        aria-label={labels.photoNofM.replace('%{n}', String(i + 2)).replace('%{total}', String(photos.length))}
         class="aspect-square overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-800 hover:border-emerald-500 dark:hover:border-emerald-400 transition-colors"
       >
         <img
@@ -102,10 +105,11 @@ const hasMany = photos.length > 1;
   {/* Native lightbox — keyboard nav + swipe + Esc + per-photo share + owner-mode delete stub */}
   <div
     data-photo-lightbox
+    data-photo-lightbox-tpl-photoNofM={labels.photoNofM}
     class="hidden fixed inset-0 z-50 bg-black/95 items-center justify-center"
     role="dialog"
     aria-modal="true"
-    aria-label={labels.open}
+    aria-label={labels.viewer}
   >
     <button
       type="button"
@@ -190,16 +194,24 @@ const hasMany = photos.length > 1;
       return out;
     }
 
+    const photoTpl = lb.dataset.photoLightboxTplPhotonofm
+      ?? lb.getAttribute('data-photo-lightbox-tpl-photoNofM')
+      ?? 'Photo %{n} of %{total}';
+    const fmtPhotoLabel = (n: number, total: number) =>
+      photoTpl.replace('%{n}', String(n)).replace('%{total}', String(total));
+
     function render(): void {
       const has = photos.length > 0;
       empty?.classList.toggle('hidden', has);
       heroBtn?.classList.toggle('hidden', !has);
       thumbs?.classList.toggle('hidden', photos.length < 2);
       if (has && heroImg) { heroImg.src = photos[0].url; heroImg.alt = photos[0].caption ?? ''; heroImg.dataset.photoId = photos[0].id; }
+      if (heroBtn && has) heroBtn.setAttribute('aria-label', fmtPhotoLabel(1, photos.length));
       if (thumbs) {
         thumbs.innerHTML = photos.slice(1).map((p, i) => {
           const src = p.thumbnail_url ?? p.url;
-          return `<button type="button" data-photo-thumb data-photo-id="${ESC(p.id)}" data-photo-index="${i + 1}" class="aspect-square overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-800 hover:border-emerald-500 dark:hover:border-emerald-400 transition-colors"><img src="${ESC(src)}" alt="${ESC(p.caption ?? '')}" class="w-full h-full object-cover" loading="lazy" decoding="async" /></button>`;
+          const aria = fmtPhotoLabel(i + 2, photos.length);
+          return `<button type="button" data-photo-thumb data-photo-id="${ESC(p.id)}" data-photo-index="${i + 1}" aria-label="${ESC(aria)}" class="aspect-square overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-800 hover:border-emerald-500 dark:hover:border-emerald-400 transition-colors"><img src="${ESC(src)}" alt="${ESC(p.caption ?? '')}" class="w-full h-full object-cover" loading="lazy" decoding="async" /></button>`;
         }).join('');
       }
     }
@@ -207,6 +219,11 @@ const hasMany = photos.length > 1;
     function paint(): void {
       lbImg!.src = photos[idx].url;
       lbImg!.alt = photos[idx].caption ?? '';
+      // Update the dialog's aria-label so screen readers announce the
+      // current photo on each ←/→ keystroke. Caption appended when present.
+      const base = fmtPhotoLabel(idx + 1, photos.length);
+      const cap  = photos[idx].caption ?? '';
+      lb!.setAttribute('aria-label', cap ? `${base} — ${cap}` : base);
       if (counter) { counter.textContent = `${idx + 1} / ${photos.length}`; counter.classList.toggle('hidden', photos.length < 2); }
     }
     function open(i: number): void {
@@ -246,8 +263,14 @@ const hasMany = photos.length > 1;
       const base = `${window.location.origin}${window.location.pathname}${obsId ? `?id=${obsId}` : ''}`;
       const url = `${base}#photo-${encodeURIComponent(photos[idx]?.id ?? '')}`;
       try {
-        if (navigator.share) await navigator.share({ url });
-        else if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(url);
+        // canShare is the defensive probe — some browsers expose `share`
+        // but throw on URL-only payloads. Fall back to clipboard otherwise.
+        const shareable = { url };
+        if (navigator.share && (!navigator.canShare || navigator.canShare(shareable))) {
+          await navigator.share(shareable);
+        } else if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(url);
+        }
       } catch { /* cancelled */ }
     });
     root.querySelector('[data-photo-lightbox-delete]')?.addEventListener('click', () => {
