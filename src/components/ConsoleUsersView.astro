@@ -1,0 +1,326 @@
+---
+/**
+ * ConsoleUsersView — master-detail user list with role grant/revoke.
+ * Left: searchable user list (50 at a time). Right: selected user detail
+ * with role chips and slide-over for grant/revoke actions.
+ */
+import { t } from '../i18n/utils';
+import ConsoleSlideOver from './ConsoleSlideOver.astro';
+
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+---
+
+<section class="max-w-6xl">
+  <div id="users-not-auth" class="hidden rounded border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-900 dark:text-amber-100">
+    {tr.console.not_authorized}
+  </div>
+
+  <div id="users-shell" class="hidden grid grid-cols-1 md:grid-cols-[280px_1fr] gap-4 h-[calc(100vh-140px)]">
+    <!-- Left: user list -->
+    <aside class="flex flex-col border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden">
+      <div class="p-2 border-b border-zinc-200 dark:border-zinc-800">
+        <input
+          id="users-search"
+          type="search"
+          placeholder={tr.console.users_search_placeholder}
+          class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm"
+        />
+      </div>
+      <div id="users-list-loading" class="p-3 text-sm text-zinc-500 italic">{tr.console.users_loading}</div>
+      <div id="users-list-empty" class="hidden p-3 text-sm text-zinc-500">{tr.console.users_empty}</div>
+      <ul id="users-list" class="hidden flex-1 overflow-y-auto divide-y divide-zinc-100 dark:divide-zinc-800"></ul>
+    </aside>
+
+    <!-- Right: user detail -->
+    <div id="users-detail-empty" class="flex items-center justify-center text-sm text-zinc-400 dark:text-zinc-600 border border-dashed border-zinc-200 dark:border-zinc-700 rounded-lg">
+      {tr.console.users_select_prompt}
+    </div>
+    <div id="users-detail" class="hidden border border-zinc-200 dark:border-zinc-800 rounded-lg p-4 overflow-y-auto space-y-5">
+      <div>
+        <div id="detail-name" class="text-lg font-semibold text-zinc-900 dark:text-zinc-100"></div>
+        <div id="detail-username" class="text-sm text-zinc-500"></div>
+        <div id="detail-email" class="text-xs text-zinc-400 mt-0.5"></div>
+      </div>
+
+      <div>
+        <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-2">{tr.console.users_roles_heading}</h3>
+        <div id="detail-roles" class="flex flex-wrap gap-2"></div>
+      </div>
+
+      <div>
+        <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-2">{tr.console.users_activity_heading}</h3>
+        <dl id="detail-activity" class="grid grid-cols-2 gap-2 text-sm text-zinc-700 dark:text-zinc-300"></dl>
+      </div>
+    </div>
+  </div>
+
+  <p id="users-error" class="hidden mt-3 text-sm text-red-600 dark:text-red-400"></p>
+</section>
+
+<ConsoleSlideOver lang={lang} id="console-slideover-users" titleKey={tr.console.users_grant_title}>
+  <div id="slideover-users-fields" class="space-y-3">
+    <label class="block">
+      <span class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.console.users_grant_role_label}</span>
+      <select id="slideover-role-select" class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm">
+        <option value="admin">Admin</option>
+        <option value="moderator">Moderator</option>
+        <option value="expert">Expert</option>
+        <option value="researcher">Researcher</option>
+      </select>
+    </label>
+    <label class="block">
+      <span class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.console.users_grant_expires_label}</span>
+      <input id="slideover-expires-at" type="date" class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm" />
+    </label>
+  </div>
+</ConsoleSlideOver>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { getUserRoles } from '../lib/user-roles';
+  import { adminClient, AdminClientError } from '../lib/admin-client';
+
+  type UserRow = {
+    id: string;
+    username: string | null;
+    display_name: string | null;
+    avatar_url: string | null;
+    email: string | null;
+  };
+
+  type RoleRow = {
+    user_id: string;
+    role: string;
+    granted_at: string;
+    expires_at: string | null;
+    revoked_at: string | null;
+  };
+
+  const ALL_ROLES = ['admin', 'moderator', 'expert', 'researcher'] as const;
+  type GrantableRole = (typeof ALL_ROLES)[number];
+
+  function show(id: string) { document.getElementById(id)?.classList.remove('hidden'); }
+  function hide(id: string) { document.getElementById(id)?.classList.add('hidden'); }
+  function escHtml(s: string): string {
+    return s.replace(/[<>&'"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&#39;','"':'&quot;'}[c]!));
+  }
+  function isActive(row: RoleRow): boolean {
+    if (row.revoked_at && new Date(row.revoked_at).getTime() <= Date.now()) return false;
+    if (row.expires_at && new Date(row.expires_at).getTime() <= Date.now()) return false;
+    return true;
+  }
+
+  let allUsers: UserRow[] = [];
+  let rolesByUser: Map<string, RoleRow[]> = new Map();
+  let selectedUserId: string | null = null;
+  let currentJwt = '';
+
+  const supabase = getSupabase();
+
+  async function init() {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) { show('users-not-auth'); return; }
+    currentJwt = session.access_token;
+    const myRoles = await getUserRoles(session.user.id);
+    if (!myRoles.has('admin')) { show('users-not-auth'); return; }
+    show('users-shell');
+    await loadUsers('');
+  }
+
+  async function loadUsers(q: string) {
+    hide('users-list-empty');
+    hide('users-list');
+    show('users-list-loading');
+
+    let query = supabase
+      .from('users')
+      .select('id, username, display_name, avatar_url, email')
+      .limit(50)
+      .order('username', { ascending: true });
+
+    if (q.trim()) {
+      query = query.or(`username.ilike.%${q}%,display_name.ilike.%${q}%`);
+    }
+
+    const { data: users, error } = await query;
+    hide('users-list-loading');
+
+    if (error) {
+      const e = document.getElementById('users-error')!;
+      e.textContent = error.message;
+      show('users-error');
+      return;
+    }
+    allUsers = (users ?? []) as UserRow[];
+
+    if (allUsers.length === 0) { show('users-list-empty'); return; }
+
+    const ids = allUsers.map(u => u.id);
+    const { data: roles } = await supabase
+      .from('user_roles')
+      .select('user_id, role, granted_at, expires_at, revoked_at')
+      .in('user_id', ids);
+
+    rolesByUser = new Map();
+    for (const r of (roles ?? []) as RoleRow[]) {
+      if (!rolesByUser.has(r.user_id)) rolesByUser.set(r.user_id, []);
+      rolesByUser.get(r.user_id)!.push(r);
+    }
+
+    renderList();
+    show('users-list');
+  }
+
+  function renderList() {
+    const ul = document.getElementById('users-list')!;
+    ul.innerHTML = allUsers.map(u => {
+      const activeRoles = (rolesByUser.get(u.id) ?? []).filter(isActive).map(r => r.role);
+      const chips = activeRoles.map(r => `<span class="inline-block text-[10px] rounded bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 px-1.5 py-0.5">${escHtml(r)}</span>`).join(' ');
+      const name = escHtml(u.display_name ?? u.username ?? u.id);
+      const uname = u.username ? `@${escHtml(u.username)}` : '';
+      const isSelected = u.id === selectedUserId ? 'bg-zinc-100 dark:bg-zinc-800/60' : '';
+      return `<li data-user-id="${escHtml(u.id)}" class="px-3 py-2 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/40 ${isSelected}">
+        <div class="font-medium text-sm text-zinc-900 dark:text-zinc-100">${name}</div>
+        <div class="text-xs text-zinc-500">${uname}</div>
+        <div class="mt-1 flex flex-wrap gap-1">${chips}</div>
+      </li>`;
+    }).join('');
+  }
+
+  function selectUser(userId: string) {
+    selectedUserId = userId;
+    const u = allUsers.find(x => x.id === userId);
+    if (!u) return;
+    renderList();
+    hide('users-detail-empty');
+    show('users-detail');
+    const nameEl = document.getElementById('detail-name')!;
+    const unameEl = document.getElementById('detail-username')!;
+    const emailEl = document.getElementById('detail-email')!;
+    nameEl.textContent = u.display_name ?? u.username ?? u.id;
+    unameEl.textContent = u.username ? `@${u.username}` : '';
+    emailEl.textContent = u.email ?? '';
+    renderRoleChips(userId);
+    loadActivity(userId);
+  }
+
+  function renderRoleChips(userId: string) {
+    const container = document.getElementById('detail-roles')!;
+    const userRoles = (rolesByUser.get(userId) ?? []).filter(isActive).map(r => r.role);
+
+    container.innerHTML = ALL_ROLES.map(role => {
+      const held = userRoles.includes(role);
+      if (held) {
+        return `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-700 text-white">
+          ${escHtml(role)}
+          <button data-revoke-role="${escHtml(role)}" data-revoke-uid="${escHtml(userId)}" class="hover:text-red-300 ml-1 leading-none" title="Revoke">&times;</button>
+        </span>`;
+      }
+      return `<button data-grant-role="${escHtml(role)}" data-grant-uid="${escHtml(userId)}" class="px-2.5 py-1 rounded-full text-xs border border-dashed border-zinc-400 dark:border-zinc-600 text-zinc-600 dark:text-zinc-400 hover:border-emerald-600 hover:text-emerald-700 dark:hover:text-emerald-400">
+        + ${escHtml(role)}
+      </button>`;
+    }).join('');
+  }
+
+  async function loadActivity(userId: string) {
+    const dl = document.getElementById('detail-activity')!;
+    dl.innerHTML = '<dt class="text-zinc-500 col-span-2 text-xs italic">Loading…</dt>';
+
+    const [obsResult, rgResult] = await Promise.all([
+      supabase.from('observations').select('id', { count: 'exact', head: true }).eq('observer_id', userId),
+      supabase.from('identifications').select('id', { count: 'exact', head: true }).eq('identifier_id', userId).eq('quality_grade', 'research'),
+    ]);
+
+    const obsCount = obsResult.count ?? 0;
+    const rgCount = rgResult.count ?? 0;
+
+    dl.innerHTML = `
+      <dt class="text-zinc-500">Observations</dt><dd class="font-medium">${obsCount}</dd>
+      <dt class="text-zinc-500">Research grade</dt><dd class="font-medium">${rgCount}</dd>
+    `;
+  }
+
+  document.addEventListener('click', (ev) => {
+    const li = (ev.target as HTMLElement).closest<HTMLElement>('li[data-user-id]');
+    if (li?.dataset.userId) { selectUser(li.dataset.userId); return; }
+
+    const grantBtn = (ev.target as HTMLElement).closest<HTMLElement>('[data-grant-role]');
+    if (grantBtn?.dataset.grantRole && grantBtn?.dataset.grantUid) {
+      const role = grantBtn.dataset.grantRole;
+      const uid = grantBtn.dataset.grantUid;
+      const select = document.getElementById('slideover-role-select') as HTMLSelectElement | null;
+      if (select) select.value = role;
+      const expiresInput = document.getElementById('slideover-expires-at') as HTMLInputElement | null;
+      if (expiresInput) expiresInput.value = '';
+      document.dispatchEvent(new CustomEvent('console:slideover-open', {
+        detail: { id: 'console-slideover-users', title: `Grant role to user`, action: 'role.grant', payload: { target_user_id: uid, role } },
+      }));
+      return;
+    }
+
+    const revokeBtn = (ev.target as HTMLElement).closest<HTMLElement>('[data-revoke-role]');
+    if (revokeBtn?.dataset.revokeRole && revokeBtn?.dataset.revokeUid) {
+      const role = revokeBtn.dataset.revokeRole;
+      const uid = revokeBtn.dataset.revokeUid;
+      document.dispatchEvent(new CustomEvent('console:slideover-open', {
+        detail: { id: 'console-slideover-users', title: `Revoke ${role}`, action: 'role.revoke', payload: { target_user_id: uid, role } },
+      }));
+    }
+  });
+
+  document.addEventListener('console:slideover-submit', async (ev) => {
+    const { id, action, payload, reason } = (ev as CustomEvent<{ id: string; action: string; payload: Record<string, string>; reason: string }>).detail;
+    if (id !== 'console-slideover-users') return;
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id, ok: false, error: 'Session expired.' } }));
+      return;
+    }
+
+    try {
+      let finalPayload = { ...payload };
+      if (action === 'role.grant') {
+        const select = document.getElementById('slideover-role-select') as HTMLSelectElement | null;
+        const expiresInput = document.getElementById('slideover-expires-at') as HTMLInputElement | null;
+        if (select) finalPayload.role = select.value;
+        if (expiresInput?.value) finalPayload.expires_at = new Date(expiresInput.value).toISOString();
+      }
+
+      if (action === 'role.grant') {
+        await adminClient.role.grant(finalPayload as Parameters<typeof adminClient.role.grant>[0], reason, session.access_token);
+      } else {
+        await adminClient.role.revoke(finalPayload as Parameters<typeof adminClient.role.revoke>[0], reason, session.access_token);
+      }
+      document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id, ok: true } }));
+      if (selectedUserId) {
+        const { data: roles } = await supabase
+          .from('user_roles')
+          .select('user_id, role, granted_at, expires_at, revoked_at')
+          .eq('user_id', selectedUserId);
+        rolesByUser.set(selectedUserId, (roles ?? []) as RoleRow[]);
+        renderRoleChips(selectedUserId);
+        renderList();
+      }
+    } catch (err) {
+      const msg = err instanceof AdminClientError ? err.message : (err as Error).message;
+      document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id, ok: false, error: msg } }));
+    }
+  });
+
+  let searchTimer: ReturnType<typeof setTimeout> | null = null;
+  document.getElementById('users-search')?.addEventListener('input', (ev) => {
+    if (searchTimer) clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      loadUsers((ev.target as HTMLInputElement).value);
+    }, 300);
+  });
+
+  init().catch(err => {
+    const e = document.getElementById('users-error')!;
+    e.textContent = (err as Error).message;
+    show('users-error');
+  });
+</script>

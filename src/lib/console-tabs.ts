@@ -19,8 +19,8 @@ export interface ConsoleTab {
 export const CONSOLE_TABS: ConsoleTab[] = [
   // Admin (15)
   { id: 'overview',       role: 'admin',     routeKey: 'console',                 i18nKey: 'console.overview',     icon: 'gauge',       phase: 1 },
-  { id: 'users',          role: 'admin',     routeKey: 'consoleUsers',            i18nKey: 'console.users',        icon: 'users',       phase: 2, stub: true },
-  { id: 'credentials',    role: 'admin',     routeKey: 'consoleCredentials',      i18nKey: 'console.credentials',  icon: 'shield-check',phase: 2, stub: true },
+  { id: 'users',          role: 'admin',     routeKey: 'consoleUsers',            i18nKey: 'console.users',        icon: 'users',       phase: 2 },
+  { id: 'credentials',    role: 'admin',     routeKey: 'consoleCredentials',      i18nKey: 'console.credentials',  icon: 'shield-check',phase: 2 },
   { id: 'experts',        role: 'admin',     routeKey: 'consoleExperts',          i18nKey: 'console.experts',      icon: 'award',       phase: 1 },
   { id: 'observations',   role: 'admin',     routeKey: 'consoleObservations',     i18nKey: 'console.observations', icon: 'leaf',        phase: 4, stub: true },
   { id: 'api',            role: 'admin',     routeKey: 'consoleApi',              i18nKey: 'console.api',          icon: 'plug',        phase: 3, stub: true },
