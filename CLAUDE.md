@@ -324,6 +324,71 @@ the nightly smoke run. It curls every operator-configured `PUBLIC_*_URL`
 + `access-control-allow-origin` + a sane minimum content-length.
 Failure modes + fixes in [`docs/runbooks/ci-smoke-checks.md`](docs/runbooks/ci-smoke-checks.md).
 
+### Community discovery (M28)
+
+The Explore MegaMenu is split into two columns: **Biodiversity** (the
+existing flat dropdown — Map / Recent / Watchlist / Species / Validate)
+and **Community** (Observers / Top / Nearby / Experts by taxon / By
+country). All Community items land on `/{en,es}/{community,comunidad}/observers/`
+with composable filter chips; the MegaMenu items just preset different
+URL params.
+
+Three load-bearing rules:
+
+1. **Privacy gate at the SQL layer.** Two views with the same
+   eligibility predicate (`profile_public AND NOT hide_from_leaderboards`):
+   `community_observers` (anon + authenticated, no centroid) and
+   `community_observers_with_centroid` (authenticated only, includes
+   centroid). The lack of `GRANT TO anon` on the centroid view is the
+   security gate — Nearby's UI sign-in requirement is mirrored at the
+   data layer.
+2. **`recompute-user-stats` cron writes via `SECURITY DEFINER` wrapper.**
+   `public.recompute_user_stats()` is `REVOKE ALL FROM PUBLIC` +
+   `GRANT EXECUTE TO service_role`. The cron-only Edge Function
+   (`--no-verify-jwt`, runs nightly 08:00 UTC) calls it via
+   `db.rpc('recompute_user_stats')`. Don't try to run the multi-statement
+   CTE+UPDATE directly from supabase-js — PostgREST won't accept it.
+3. **`country_code_source` distinguishes user-set from inferred.** The
+   cron sets `country_code` from `region_primary` only when NULL;
+   Profile → Edit save flips `country_code_source` to `'user'`. Badge
+   shows in the picker when `source='auto' AND country_code IS NOT NULL`.
+
+Cron + manual fire: [`docs/runbooks/community-discovery.md`](docs/runbooks/community-discovery.md).
+
+### Observation detail page (M03 redesign)
+
+`/share/obs/?id=<uuid>` was rebuilt as a two-column desktop / stacked
+mobile layout. Three reusable components fell out:
+
+1. **`MapPicker.astro`** — `mode='view'|'edit'`, `pickerId` per instance
+   (HTML IDs are suffixed `-${pickerId}` so multiple instances coexist).
+   Consumed by `ObservationForm.astro` (edit), `ShareObsView.astro` (view),
+   and `ObsManagePanel.Location` (edit; PR5).
+2. **`PhotoGallery.astro`** — native lightbox (~106 lines: keyboard ←/→/Esc
+   + swipe + per-photo share + `canShare` probe + dynamic "Photo N of M"
+   aria-labels). `mode='owner'` renders a delete button per photo whose
+   onClick dispatches `rastrum:photogallery-delete`; PR6's `delete-photo`
+   Edge Function wires the handler.
+3. **`ShareObsView.astro`** — extracted from `share/obs/index.astro`
+   (slimmed from 524 → ~15 LOC wrapper). All view-side strings under
+   `obs_detail.view.*` i18n.
+
+Material-edit semantics: a BEFORE UPDATE trigger on `observations` flags
+`last_material_edit_at` when `ST_Distance(NEW.location, OLD.location) > 1000`
+(1 km), `observed_at` moves > 24 h, or `primary_taxon_id` changes
+(propagated by the existing `sync_primary_id_trigger` on `identifications`
+that cascades into `observations.primary_taxon_id`). The "Edited after IDs"
+badge in the community-IDs section is shown only when both
+`last_material_edit_at IS NOT NULL` and at least one community ID exists.
+
+Photo deletion is **always atomic via the `delete-photo` Edge Function**
+(PR6): soft-delete + ID demote (`validated_by`/`validated_at`/`is_research_grade`
+all nulled/false) + `last_material_edit_at` bump in one transaction.
+Client-side two-call has a real race window. R2 blobs are left as
+orphans for v1; `gc-orphan-media` cron is a v1.1 follow-up.
+
+Full notes: [`docs/runbooks/obs-detail-redesign.md`](docs/runbooks/obs-detail-redesign.md).
+
 ---
 
 ## Known pitfalls (things that bit me)

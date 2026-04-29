@@ -135,3 +135,33 @@ Remaining:
 **1 item done.** Shipped via PRs #78 (core), #84 (UX polish — 9 gaps), #94 (cobertura completa — stubs activados, request flow, docs page).
 
 - `ai-sponsorships` — Permite a cualquier user compartir su credencial Anthropic (API key u OAuth long-lived token) con beneficiaries específicos. Cuota mensual por llamadas, auto-pause por rate-limit, karma híbrido, y removal del operator-key fallback en `identify`. Entregado: schema (5 tablas + RLS + Vault) + cron jobs + audit log; Edge Functions `sponsorships` (CRUD + heartbeat) e `identify` modificado; UI en `/profile/sponsoring/`, `/profile/sponsored-by/`, banner en `/identify`, discovery card, header dropdown, mobile drawer entries, badge de sponsor + recíproco en perfil público; Resend SMTP para threshold (80%/100%) + auto-pause emails; request-to-be-sponsored flow (5 endpoints + dialogs ambos lados); onboarding tour first-visit + replay; página `/docs/sponsorships` (EN+ES); time range selector 7/30/90 en analytics; report abuse button por beneficiary; CI guards (smoke + secret-leak). **Operator action única:** `gh secret set SPONSORSHIPS_CRON_TOKEN` (hecho). **Operator action opcional:** `gh secret delete ANTHROPIC_API_KEY` (no urgente; identify ya no la lee). _(✓ done)_
+
+### v1.2 in-flight (2026-04-29) — Module 28 + observation-detail redesign
+
+Both features are landing as 6-PR sequences. Plans at
+`docs/superpowers/plans/2026-04-29-{community-discovery,obs-detail-redesign}-plan.md`,
+specs at `docs/superpowers/specs/2026-04-29-*-design.md`.
+
+- `community-discovery-m28` — Walks back the shipped "no leaderboards" stance with
+  explicit consent. Explore MegaMenu split (Biodiversity / Community columns).
+  `/community/observers/` page with composable filter chips (sort, country, taxon,
+  experts-only, nearby) backed by denormalized counters refreshed nightly. Privacy
+  gate at the SQL layer via dual views: `community_observers` (anon-safe, no
+  centroid) and `community_observers_with_centroid` (authenticated only). Country
+  picker + `hide_from_leaderboards` opt-out + `country_code_source` 'auto'/'user'
+  badge on Profile → Edit. PR1 (#92) + PR2 (#96) + PR4 (#102) merged. PR3 manual
+  cron fire pending. PR5+PR6 (page + MegaMenu + atomic i18n rewrite of the two
+  shipped "no leaderboards" strings) remaining. _(in implementation — see
+  `docs/runbooks/community-discovery.md`)_
+
+- `obs-detail-redesign` — Rebuilds `/share/obs/?id=...` as two-column desktop /
+  stacked mobile layout. PR1 (#91) extracted reusable `MapPicker.astro` from
+  `ObservationForm.astro`. PR2 (#98) added schema deltas
+  (`last_material_edit_at` + `media_files.deleted_at` +
+  `observations_material_edit_check_trg` material-edit trigger),
+  `observation-enums.ts`, and `obs_detail.*` i18n. PR3 (#103) shipped
+  `PhotoGallery.astro` (native lightbox + keyboard + swipe + share) plus the new
+  two-column layout. PR4 (Details tab), PR5 (Location tab — coordinate edit), PR6
+  (Photos tab + atomic `delete-photo` Edge Function) remaining. Soft-delete only
+  for v1; R2 orphan GC is a v1.1 follow-up. _(in implementation — see
+  `docs/runbooks/obs-detail-redesign.md`)_
