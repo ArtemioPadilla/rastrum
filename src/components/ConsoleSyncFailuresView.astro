@@ -5,7 +5,12 @@ const { lang } = Astro.props;
 const tr = t(lang);
 ---
 
-<section class="max-w-5xl">
+<section
+  class="max-w-5xl"
+  data-view-user-label={tr.console.sync_view_user}
+  data-retry-label={tr.console.sync_retry_pr4}
+  data-summary-template={tr.console.sync_summary}
+>
   <h1 class="text-xl font-semibold mb-1">{tr.console.sync_heading}</h1>
   <p class="mb-4 text-sm text-zinc-600 dark:text-zinc-400">{tr.console.sync_intro}</p>
 
@@ -69,9 +74,10 @@ const tr = t(lang);
     return s.replace(/[<>&'"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&#39;','"':'&quot;'}[c]!));
   }
 
-  const notAuthEl = document.getElementById('sync-not-auth')!;
-  const viewUserLabel = notAuthEl.closest('section')?.querySelector<HTMLElement>('[data-view-user-label]')?.dataset.viewUserLabel ?? 'View user';
-  const retryLabel = notAuthEl.closest('section')?.querySelector<HTMLElement>('[data-retry-label]')?.dataset.retryLabel ?? 'Retry — coming in PR4';
+  const sectionEl = document.querySelector<HTMLElement>('section[data-view-user-label]')!;
+  const viewUserLabel = sectionEl.dataset.viewUserLabel ?? 'View user';
+  const retryLabel = sectionEl.dataset.retryLabel ?? 'Retry';
+  const summaryTemplate = sectionEl.dataset.summaryTemplate ?? '{n} failures across {m} unique error groups';
 
   const supabase = getSupabase();
   let allRows: SyncFailureRow[] = [];
@@ -134,8 +140,8 @@ const tr = t(lang);
 
     const banner = document.getElementById('sync-summary-banner')!;
     banner.textContent = filtered.length === 0
-      ? 'No failures in the selected window.'
-      : `${totalHits} failure${totalHits !== 1 ? 's' : ''} across ${uniqueGroups} unique error group${uniqueGroups !== 1 ? 's' : ''} in the last ${(document.getElementById('sync-days-filter') as HTMLSelectElement).value} days`;
+      ? ''
+      : summaryTemplate.replace('{n}', String(totalHits)).replace('{m}', String(uniqueGroups));
 
     if (filtered.length === 0) {
       show('sync-empty');
@@ -159,13 +165,13 @@ const tr = t(lang);
           <td class="px-3 py-2 text-xs text-zinc-500">${escHtml(r.app_version ?? '—')}</td>
           <td class="px-3 py-2 text-xs">
             ${r.user_id
-              ? `<a href="/console/users/?focus=${escHtml(r.user_id)}" class="text-emerald-700 dark:text-emerald-400 underline text-xs">View user</a>`
+              ? `<a href="/console/users/?focus=${escHtml(r.user_id)}" class="text-emerald-700 dark:text-emerald-400 underline text-xs">${escHtml(viewUserLabel)}</a>`
               : '<span class="text-zinc-400">—</span>'}
           </td>
           <td class="px-3 py-2 text-xs text-zinc-400">${r.blob_count ?? 0}</td>
           <td class="px-3 py-2 text-xs text-zinc-500 font-mono">${r.last_seen_at ? escHtml(new Date(r.last_seen_at).toISOString().replace('T', ' ').slice(0, 19)) : '—'}</td>
           <td class="px-3 py-2">
-            <button disabled title="Retry — coming in PR4" class="rounded px-2 py-0.5 text-xs border border-zinc-300 dark:border-zinc-700 text-zinc-400 cursor-not-allowed">Retry</button>
+            <button disabled title="${escHtml(retryLabel)}" class="rounded px-2 py-0.5 text-xs border border-zinc-300 dark:border-zinc-700 text-zinc-400 cursor-not-allowed">${escHtml(retryLabel)}</button>
           </td>
         </tr>
       `).join('');

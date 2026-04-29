@@ -5,7 +5,7 @@ const { lang } = Astro.props;
 const tr = t(lang);
 ---
 
-<section class="max-w-5xl">
+<section class="max-w-5xl" data-eta-none-label={tr.console.api_eta_none}>
   <h1 class="text-xl font-semibold mb-1">{tr.console.api_heading}</h1>
   <p class="mb-4 text-sm text-zinc-600 dark:text-zinc-400">{tr.console.api_intro}</p>
 
@@ -80,17 +80,19 @@ const tr = t(lang);
     return `M${pts.join(' L')}`;
   }
 
+  const etaNoneLabel = document.querySelector<HTMLElement>('section[data-eta-none-label]')?.dataset.etaNoneLabel ?? 'Not at current rate';
+
   function computeEta(todayUsed: number, quota: number): string {
-    if (todayUsed <= 0) return 'Not at current rate';
+    if (todayUsed <= 0) return etaNoneLabel;
     const nowUtc = new Date();
     const secondsSinceMidnight = nowUtc.getUTCHours() * 3600 + nowUtc.getUTCMinutes() * 60 + nowUtc.getUTCSeconds();
-    if (secondsSinceMidnight === 0) return 'Not at current rate';
+    if (secondsSinceMidnight === 0) return etaNoneLabel;
     const ratePerSecond = todayUsed / secondsSinceMidnight;
     const remaining = quota - todayUsed;
     if (remaining <= 0) return 'Exhausted';
     const secsUntilExhaustion = remaining / ratePerSecond;
     const exhaustAt = new Date(nowUtc.getTime() + secsUntilExhaustion * 1000);
-    if (exhaustAt.getUTCDate() !== nowUtc.getUTCDate()) return 'Not at current rate';
+    if (exhaustAt.getUTCDate() !== nowUtc.getUTCDate()) return etaNoneLabel;
     return `Will exhaust at ${String(exhaustAt.getUTCHours()).padStart(2,'0')}:${String(exhaustAt.getUTCMinutes()).padStart(2,'0')} UTC at current rate`;
   }
 

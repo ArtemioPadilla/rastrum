@@ -5,7 +5,7 @@ const { lang } = Astro.props;
 const tr = t(lang);
 ---
 
-<section class="max-w-5xl">
+<section class="max-w-5xl" data-load-failed-label={tr.console.cron_load_failed}>
   <h1 class="text-xl font-semibold mb-1">{tr.console.cron_heading}</h1>
   <p class="mb-4 text-sm text-zinc-600 dark:text-zinc-400">{tr.console.cron_intro}</p>
 
@@ -84,6 +84,7 @@ const tr = t(lang);
   }
 
   const supabase = getSupabase();
+  const loadFailedLabel = document.querySelector<HTMLElement>('section[data-load-failed-label]')?.dataset.loadFailedLabel ?? 'Could not load cron runs.';
 
   async function init() {
     const { data: { session } } = await supabase.auth.getSession();
@@ -120,9 +121,10 @@ const tr = t(lang);
 
       renderTable(rows);
     } catch (err) {
+      console.warn('cron loadRows threw:', err);
       hide('cron-loading');
       const e = document.getElementById('cron-error')!;
-      e.textContent = (err as Error).message;
+      e.textContent = loadFailedLabel;
       show('cron-error');
     }
   }
