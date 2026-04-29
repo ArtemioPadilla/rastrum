@@ -3236,3 +3236,95 @@ BEGIN
   END LOOP;
 END;
 $$;
+
+-- ═════════════════════════════════════════════════════════════════════
+-- ADMIN CONSOLE PR3 — read-only ops views (cron status)
+-- ═════════════════════════════════════════════════════════════════════
+
+-- Cron runs view — exposes pg_cron's job_run_details to admins via a
+-- SECURITY DEFINER function. Filtered to rastrum-relevant jobnames so
+-- the operator sees only their jobs, not Supabase internals.
+CREATE OR REPLACE FUNCTION public.list_admin_cron_runs(p_limit int DEFAULT 50)
+RETURNS TABLE (
+  jobname          text,
+  schedule         text,
+  last_run_at      timestamptz,
+  last_status      text,
+  last_duration_ms int,
+  return_message   text,
+  runs_today       int,
+  success_rate_24h numeric
+)
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public, cron
+AS $$
+  WITH relevant_jobs AS (
+    SELECT j.jobid, j.jobname, j.schedule
+    FROM cron.job j
+    WHERE j.jobname ~ '^(streak-|badges-|enrich-|plantnet-|recompute-|refresh-|nightly-)'
+  ),
+  last_runs AS (
+    SELECT DISTINCT ON (r.jobid)
+      r.jobid, r.status, r.start_time, r.end_time, r.return_message,
+      EXTRACT(EPOCH FROM (r.end_time - r.start_time)) * 1000 AS duration_ms
+    FROM cron.job_run_details r
+    WHERE r.jobid IN (SELECT jobid FROM relevant_jobs)
+    ORDER BY r.jobid, r.start_time DESC
+  ),
+  today_stats AS (
+    SELECT
+      r.jobid,
+      COUNT(*)::int AS runs_today,
+      (COUNT(*) FILTER (WHERE r.status = 'succeeded'))::numeric
+        / NULLIF(COUNT(*), 0) AS success_rate_24h
+    FROM cron.job_run_details r
+    WHERE r.jobid IN (SELECT jobid FROM relevant_jobs)
+      AND r.start_time > now() - interval '24 hours'
+    GROUP BY r.jobid
+  )
+  SELECT
+    j.jobname,
+    j.schedule,
+    l.start_time      AS last_run_at,
+    l.status::text    AS last_status,
+    l.duration_ms::int,
+    l.return_message,
+    COALESCE(t.runs_today, 0)       AS runs_today,
+    COALESCE(t.success_rate_24h, 0) AS success_rate_24h
+  FROM relevant_jobs j
+  LEFT JOIN last_runs l    ON l.jobid = j.jobid
+  LEFT JOIN today_stats t  ON t.jobid = j.jobid
+  ORDER BY j.jobname
+  LIMIT p_limit;
+$$;
+
+REVOKE ALL ON FUNCTION public.list_admin_cron_runs(int) FROM public;
+GRANT EXECUTE ON FUNCTION public.list_admin_cron_runs(int) TO authenticated;
+
+-- Caller-side admin guard: runs as the schema owner so cron schema is
+-- reachable; verifies the calling user holds the admin role before
+-- returning any data.
+CREATE OR REPLACE FUNCTION public.list_admin_cron_runs_guarded(p_limit int DEFAULT 50)
+RETURNS TABLE (
+  jobname          text,
+  schedule         text,
+  last_run_at      timestamptz,
+  last_status      text,
+  last_duration_ms int,
+  return_message   text,
+  runs_today       int,
+  success_rate_24h numeric
+)
+LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = public, cron
+AS $$
+BEGIN
+  IF NOT public.has_role(auth.uid(), 'admin') THEN
+    RAISE EXCEPTION 'requires admin role';
+  END IF;
+  RETURN QUERY SELECT * FROM public.list_admin_cron_runs(p_limit);
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.list_admin_cron_runs_guarded(int) FROM public;
+GRANT EXECUTE ON FUNCTION public.list_admin_cron_runs_guarded(int) TO authenticated;
