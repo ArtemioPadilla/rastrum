@@ -51,6 +51,16 @@ BEGIN
   -- Console PR5 — moderator surface
   IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'user_bans')              THEN missing := array_append(missing, 'public.user_bans'); END IF;
 
+  -- Module 26 — observation_comments.locked column added in PR #77
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'observation_comments'
+      AND column_name = 'locked'
+  ) THEN
+    missing := array_append(missing, 'public.observation_comments.locked');
+  END IF;
+
   -- Functions used by RLS predicates and Edge Functions
   IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'has_role')             THEN missing := array_append(missing, 'public.has_role()'); END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'recompute_consensus')  THEN missing := array_append(missing, 'public.recompute_consensus()'); END IF;
