@@ -275,7 +275,7 @@ const profilePath = getLocalizedPath(lang, routes.profile[lang] + '/');
 
     const { error: userErr } = await supabase
       .from('users')
-      .update({ is_expert: true, expert_taxa: merged, updated_at: new Date().toISOString() })
+      .update({ is_expert: true, expert_taxa: merged })
       .eq('id', userId);
     if (userErr) {
       btn.disabled = false; btn.textContent = labels.approve;
