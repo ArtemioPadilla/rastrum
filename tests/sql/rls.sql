@@ -69,10 +69,11 @@ BEGIN
     VALUES (uid_mod,   'report_triaged', 'report', gen_random_uuid()::text, 'triage-seed');
 
   -- Expert application by applicant; another by user (to test visibility).
-  INSERT INTO public.expert_applications (id, user_id, taxa_scope, justification, status)
+  -- Schema columns: id, user_id, taxa text[], credentials text, institution, orcid, status.
+  INSERT INTO public.expert_applications (id, user_id, taxa, credentials, status)
     VALUES (gen_random_uuid(), uid_applicant, ARRAY['Plantae'], 'I study plants', 'pending')
   ON CONFLICT DO NOTHING;
-  INSERT INTO public.expert_applications (id, user_id, taxa_scope, justification, status)
+  INSERT INTO public.expert_applications (id, user_id, taxa, credentials, status)
     VALUES (gen_random_uuid(), uid_user, ARRAY['Animalia'], 'I study animals', 'pending')
   ON CONFLICT DO NOTHING;
 
