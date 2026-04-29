@@ -30,6 +30,9 @@ const pmTree = tr as unknown as {
   privacy: {
     private_profile_empty_title: string;
     private_profile_empty_body: string;
+    not_found_title: string;
+    not_found_body: string;
+    not_found_cta: string;
     signed_in_required_title: string;
     signed_in_required_body: string;
     owner_only_badge: string;
@@ -63,6 +66,14 @@ const pm = pmTree.privacy;
   <div data-pp-private class="hidden py-12 text-center">
     <p class="text-base font-semibold text-zinc-900 dark:text-zinc-100">{pm.private_profile_empty_title}</p>
     <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{pm.private_profile_empty_body}</p>
+  </div>
+
+  <div data-pp-not-found class="hidden py-12 text-center">
+    <p class="text-base font-semibold text-zinc-900 dark:text-zinc-100">{pm.not_found_title}</p>
+    <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{pm.not_found_body}</p>
+    <a href={`/${lang}/${lang === 'es' ? 'explorar/recientes' : 'explore/recent'}/`} class="mt-3 inline-block text-emerald-700 dark:text-emerald-400 hover:underline">
+      {pm.not_found_cta}
+    </a>
   </div>
 
   <div data-pp-signed-in class="hidden py-12 text-center">
@@ -241,14 +252,14 @@ const pm = pmTree.privacy;
 
     if (!username || !/^[a-zA-Z0-9_]{3,30}$/.test(username)) {
       hide(root.querySelector('[data-pp-loading]'));
-      show(root.querySelector('[data-pp-private]'));
+      show(root.querySelector('[data-pp-not-found]'));
       return;
     }
 
     let supabase;
     try { supabase = getSupabase(); } catch {
       hide(root.querySelector('[data-pp-loading]'));
-      show(root.querySelector('[data-pp-private]'));
+      show(root.querySelector('[data-pp-not-found]'));
       return;
     }
 
@@ -262,7 +273,7 @@ const pm = pmTree.privacy;
 
     if (!profile) {
       hide(root.querySelector('[data-pp-loading]'));
-      show(root.querySelector('[data-pp-private]'));
+      show(root.querySelector('[data-pp-not-found]'));
       return;
     }
 
