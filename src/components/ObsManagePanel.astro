@@ -42,6 +42,9 @@ type ObsDetailTree = {
   manage_habitat_label: string;
   manage_weather_label: string;
   manage_establishment_label: string;
+  add_photo: string;
+  delete_photo: string;
+  gallery: { no_photos: string };
 };
 type ObserveTree = {
   habitat_options: Record<string, string>;
@@ -219,9 +222,44 @@ const observe = tr.observe;
     role="tabpanel"
     aria-labelledby="m-tab-photos"
     data-tab="photos"
-    class="hidden"
+    class="hidden space-y-3"
   >
-    <p class="text-xs text-zinc-500 dark:text-zinc-400">{od.manage_tab_photos_placeholder}</p>
+    <div
+      id="m-photos-grid"
+      data-photos-grid
+      class="grid grid-cols-3 sm:grid-cols-4 gap-2"
+    >
+      <!-- Hydrated by wireManagePanelPhotos at runtime. -->
+    </div>
+    <p
+      id="m-photos-empty"
+      class="hidden text-xs text-zinc-500 dark:text-zinc-400 italic"
+    >{tr.obs_detail.gallery.no_photos}</p>
+    <p
+      id="m-photos-error"
+      class="hidden text-xs text-red-600 dark:text-red-400"
+      role="alert"
+    ></p>
+    <input
+      id="m-photos-file-input"
+      type="file"
+      accept="image/*"
+      multiple
+      class="hidden"
+    />
+    <div class="flex items-center gap-2">
+      <button
+        type="button"
+        id="m-photos-add"
+        data-add-photo
+        class="rounded-lg border border-emerald-600/60 px-3 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+      >{od.add_photo}</button>
+      <span
+        id="m-photos-busy"
+        class="hidden text-xs text-zinc-500 dark:text-zinc-400"
+        aria-live="polite"
+      ></span>
+    </div>
   </div>
 </section>
 

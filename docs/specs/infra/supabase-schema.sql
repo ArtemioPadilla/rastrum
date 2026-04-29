@@ -4247,6 +4247,54 @@ CREATE TRIGGER observations_material_edit_check_trg
   FOR EACH ROW
   EXECUTE FUNCTION public.observations_material_edit_check();
 
+-- delete_photo_atomic — single transaction wrapper used by the
+-- delete-photo Edge Function (PR6 of obs-detail redesign). Wraps the
+-- three writes the spec requires:
+--   1. soft-delete media_files (deleted_at = now())
+--   2. when p_demote: clear validated_by / validated_at and flip
+--      is_research_grade = false on the primary identification
+--   3. when p_demote: bump observations.last_material_edit_at
+-- The Edge Function is responsible for the auth / ownership check; this
+-- function trusts its caller (SECURITY DEFINER, EXECUTE granted only to
+-- authenticated; service_role can call it via the EF as well).
+--
+-- Per PR #87 schema correction: identifications has no `verified` column —
+-- the demote uses validated_by/validated_at/is_research_grade.
+CREATE OR REPLACE FUNCTION public.delete_photo_atomic(
+  p_obs_id   uuid,
+  p_media_id uuid,
+  p_demote   boolean
+) RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  UPDATE public.media_files
+     SET deleted_at = now()
+   WHERE id = p_media_id
+     AND observation_id = p_obs_id
+     AND deleted_at IS NULL;
+
+  IF p_demote THEN
+    UPDATE public.identifications
+       SET validated_by      = NULL,
+           validated_at      = NULL,
+           is_research_grade = false
+     WHERE observation_id = p_obs_id
+       AND is_primary     = true;
+
+    UPDATE public.observations
+       SET last_material_edit_at = now()
+     WHERE id = p_obs_id;
+  END IF;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.delete_photo_atomic(uuid, uuid, boolean) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.delete_photo_atomic(uuid, uuid, boolean) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.delete_photo_atomic(uuid, uuid, boolean) TO service_role;
+
 NOTIFY pgrst, 'reload schema';
 -- ============================================================
 -- Module 27 — Sponsorship requests (beneficiary-initiated discovery)

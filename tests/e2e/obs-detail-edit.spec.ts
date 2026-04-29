@@ -116,3 +116,75 @@ test.describe('obs detail owner edit — Details tab', () => {
     });
   });
 });
+
+// PR6 — Photos tab DOM contract.
+//
+// Like the Details tab tests, we drive the Photos tab via its DOM
+// contract instead of depending on a real seeded observation. The
+// gated round-trip below covers add + delete against a real Supabase
+// session; that env var is unset in CI today.
+test.describe('obs detail owner edit — Photos tab', () => {
+  test('Photos tab exposes thumbnail grid, add-photo button, and a hidden file input', async ({ page }) => {
+    await page.goto(`/share/obs/?id=${SAMPLE_ID}`);
+    await forceShowManagePanel(page);
+
+    await page.locator('#m-tab-photos').click();
+    await expect(page.locator('#m-tab-photos')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('#m-panel-photos')).toBeVisible();
+
+    // Grid container, empty-state placeholder, add-photo button, file input.
+    await expect(page.locator('#m-photos-grid')).toBeVisible();
+    await expect(page.locator('#m-photos-add')).toBeVisible();
+    // Hidden file input is type=file accept=image/* multiple.
+    const fileInput = page.locator('#m-photos-file-input');
+    await expect(fileInput).toHaveAttribute('type', 'file');
+    await expect(fileInput).toHaveAttribute('accept', 'image/*');
+    await expect(fileInput).toHaveAttribute('multiple', '');
+  });
+
+  test('add-photo button click triggers the hidden file input picker', async ({ page }) => {
+    await page.goto(`/share/obs/?id=${SAMPLE_ID}`);
+    await forceShowManagePanel(page);
+
+    await page.locator('#m-tab-photos').click();
+
+    // Wire a chooser handler; clicking the visible add button should open
+    // the system picker (handled here by Playwright's filechooser).
+    const [chooser] = await Promise.all([
+      page.waitForEvent('filechooser'),
+      page.locator('#m-photos-add').click(),
+    ]);
+    expect(chooser).toBeTruthy();
+    expect(chooser.isMultiple()).toBe(true);
+  });
+
+  test.describe('signed-in owner round-trip (gated)', () => {
+    test.skip(!process.env.E2E_OWNER_SESSION, 'requires seeded owner session');
+
+    // Set E2E_OWNED_OBS_SINGLE_PHOTO to an obs uuid you own that has
+    // exactly one photo whose is_primary=true (the cascade source).
+    test('owner deletes the only photo → Edited badge surfaces after reload', async ({ page }) => {
+      await page.goto(`/share/obs/?id=${process.env.E2E_OWNED_OBS_SINGLE_PHOTO}`);
+      await expect(page.locator('[data-manage-panel]')).toBeVisible();
+
+      await page.locator('#m-tab-photos').click();
+      await expect(page.locator('#m-photos-grid [data-delete-photo]').first()).toBeVisible();
+
+      page.once('dialog', (d) => d.accept());
+      await page.locator('#m-photos-grid [data-delete-photo]').first().click();
+      await expect(page.locator('#m-photos-empty')).toBeVisible();
+
+      await page.reload();
+      await expect(page.locator('#edited-badge')).toBeVisible();
+    });
+
+    test('owner adds a photo → grid count grows by 1', async ({ page }) => {
+      await page.goto(`/share/obs/?id=${process.env.E2E_OWNED_OBS_ID}`);
+      await page.locator('#m-tab-photos').click();
+      const before = await page.locator('#m-photos-grid [data-delete-photo]').count();
+
+      await page.setInputFiles('#m-photos-file-input', process.env.E2E_PHOTO_FIXTURE!);
+      await expect(page.locator('#m-photos-grid [data-delete-photo]')).toHaveCount(before + 1);
+    });
+  });
+});

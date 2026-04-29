@@ -10,6 +10,8 @@
 // flagging is needed.
 
 import { getSupabase } from './supabase';
+import { willDemote, type PhotoForDeletion } from './photo-deletion';
+import { resizeImage, uploadMedia } from './upload';
 
 type Ident = { scientific_name?: string; is_primary?: boolean } | undefined;
 
@@ -204,4 +206,213 @@ export async function wireManagePanelDetails(
       deleteBtn.disabled = false;
     }
   });
+}
+
+type PhotoRow = PhotoForDeletion & {
+  url: string;
+  thumbnail_url: string | null;
+  sort_order: number | null;
+};
+
+const ESC_HTML_MAP: Record<string, string> = { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' };
+function escAttr(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => ESC_HTML_MAP[c] ?? c);
+}
+
+type PhotosCopy = {
+  delete_confirm_demote: string;
+  delete_confirm_simple: string;
+  upload_failed: string;
+  uploading: string;
+  delete_photo_aria: string;
+};
+
+/**
+ * Wire the Photos tab of `ObsManagePanel.astro`. Renders a thumbnail grid
+ * with per-photo delete buttons and an "Add photo" affordance that
+ * round-trips through the existing R2 upload flow.
+ *
+ * Delete flow:
+ *   1. Compute willDemote() locally to drive the confirm dialog copy.
+ *   2. Call the `delete-photo` Edge Function which wraps soft-delete +
+ *      ID demote + last_material_edit_at bump in one transaction.
+ *   3. Re-render grid + dispatch `rastrum:photos-ready` so the PhotoGallery
+ *      lightbox refreshes.
+ *
+ * Add-photo flow:
+ *   1. Hidden <input type="file"> click → resize → uploadMedia (R2 if
+ *      configured, else Supabase Storage).
+ *   2. INSERT a media_files row with sort_order = max+1, is_primary=false.
+ *   3. Re-render + dispatch `rastrum:photos-ready`.
+ *
+ * The lightbox's owner-mode "Delete photo" button dispatches
+ * `rastrum:photogallery-delete`; this function listens for that event
+ * and re-routes through the same delete pipeline.
+ */
+export async function wireManagePanelPhotos(obsId: string): Promise<void> {
+  const supabase = getSupabase();
+  const grid     = document.getElementById('m-photos-grid');
+  const empty    = document.getElementById('m-photos-empty');
+  const errEl    = document.getElementById('m-photos-error');
+  const addBtn   = document.getElementById('m-photos-add')        as HTMLButtonElement | null;
+  const fileIn   = document.getElementById('m-photos-file-input') as HTMLInputElement  | null;
+  const busyEl   = document.getElementById('m-photos-busy');
+  if (!grid || !addBtn || !fileIn) return;
+
+  const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
+  const copy: PhotosCopy = lang === 'es'
+    ? {
+        delete_confirm_demote: 'Esta foto fue la base de la identificación actual. Eliminarla marcará la observación como pendiente de revisión. ¿Continuar?',
+        delete_confirm_simple: '¿Eliminar esta foto?',
+        upload_failed:         'Subida de foto fallida. Intenta de nuevo.',
+        uploading:             'Subiendo…',
+        delete_photo_aria:     'Eliminar foto',
+      }
+    : {
+        delete_confirm_demote: 'This photo was the basis for the current identification. Deleting it will mark the observation as needing review. Continue?',
+        delete_confirm_simple: 'Delete this photo?',
+        upload_failed:         'Photo upload failed. Please try again.',
+        uploading:             'Uploading…',
+        delete_photo_aria:     'Delete photo',
+      };
+
+  let allPhotos: PhotoRow[] = [];
+
+  function setError(msg: string | null): void {
+    if (!errEl) return;
+    if (!msg) { errEl.classList.add('hidden'); errEl.textContent = ''; return; }
+    errEl.textContent = msg;
+    errEl.classList.remove('hidden');
+  }
+
+  function setBusy(msg: string | null): void {
+    if (!busyEl) return;
+    if (!msg) { busyEl.classList.add('hidden'); busyEl.textContent = ''; return; }
+    busyEl.textContent = msg;
+    busyEl.classList.remove('hidden');
+  }
+
+  function renderGrid(): void {
+    const active = allPhotos.filter((p) => p.deleted_at == null);
+    if (empty) empty.classList.toggle('hidden', active.length > 0);
+    grid!.innerHTML = active.map((p) => {
+      const src   = p.thumbnail_url ?? p.url;
+      const aria  = escAttr(copy.delete_photo_aria);
+      const idAt  = escAttr(p.id);
+      const srcAt = escAttr(src);
+      const cascadeBadge = p.is_primary
+        ? '<span class="absolute top-1 left-1 rounded bg-emerald-700/85 text-white text-[10px] font-semibold px-1.5 py-0.5 uppercase tracking-wide">★</span>'
+        : '';
+      return `<div class="relative group">
+        <img src="${srcAt}" alt="" class="aspect-square w-full object-cover rounded-md border border-zinc-200 dark:border-zinc-800" loading="lazy" decoding="async" />
+        ${cascadeBadge}
+        <button type="button" data-delete-photo="${idAt}" aria-label="${aria}" class="absolute top-1 right-1 rounded-full bg-black/60 hover:bg-red-600 text-white w-6 h-6 inline-flex items-center justify-center text-xs leading-none transition-colors">×</button>
+      </div>`;
+    }).join('');
+    grid!.querySelectorAll<HTMLButtonElement>('[data-delete-photo]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.deletePhoto;
+        if (id) void handleDelete(id);
+      });
+    });
+  }
+
+  function broadcastPhotos(): void {
+    const active = allPhotos.filter((p) => p.deleted_at == null);
+    window.dispatchEvent(new CustomEvent('rastrum:photos-ready', {
+      detail: {
+        photos: active.map((p) => ({
+          id: p.id, url: p.url, thumbnail_url: p.thumbnail_url, caption: null,
+        })),
+        galleryId: 'obs-detail',
+      },
+    }));
+  }
+
+  async function refresh(): Promise<void> {
+    const { data, error } = await supabase
+      .from('media_files')
+      .select('id, url, thumbnail_url, is_primary, sort_order, deleted_at')
+      .eq('observation_id', obsId)
+      .order('is_primary', { ascending: false })
+      .order('sort_order', { ascending: true });
+    if (error) {
+      setError(error.message);
+      allPhotos = [];
+    } else {
+      allPhotos = (data ?? []) as PhotoRow[];
+    }
+    renderGrid();
+    broadcastPhotos();
+  }
+
+  async function handleDelete(mediaId: string): Promise<void> {
+    setError(null);
+    const demote = willDemote(allPhotos, mediaId);
+    const msg = demote ? copy.delete_confirm_demote : copy.delete_confirm_simple;
+    if (!window.confirm(msg)) return;
+
+    const { data, error } = await supabase.functions.invoke<{ ok: boolean; error?: string }>(
+      'delete-photo',
+      { body: { observation_id: obsId, media_id: mediaId, will_demote: demote } },
+    );
+    if (error) { setError(error.message); return; }
+    if (data && !data.ok) { setError(data.error ?? 'Delete failed'); return; }
+    await refresh();
+  }
+
+  addBtn.addEventListener('click', () => fileIn.click());
+  fileIn.addEventListener('change', async () => {
+    const files = Array.from(fileIn.files ?? []);
+    if (files.length === 0) return;
+    setError(null);
+    setBusy(copy.uploading);
+    addBtn.disabled = true;
+    try {
+      // Determine starting sort_order so new photos append after existing ones.
+      const maxSort = allPhotos.reduce((acc, p) => {
+        const so = p.sort_order ?? 0;
+        return so > acc ? so : acc;
+      }, 0);
+
+      let nextSort = maxSort + 1;
+      for (const file of files) {
+        const blob   = await resizeImage(file);
+        const newId  = (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        const key    = `observations/${obsId}/${newId}.jpg`;
+        const url    = await uploadMedia(blob, key, 'image/jpeg');
+        const { error: insertErr } = await supabase.from('media_files').insert({
+          id:               newId,
+          observation_id:   obsId,
+          media_type:       'photo',
+          url,
+          mime_type:        'image/jpeg',
+          file_size_bytes:  blob.size,
+          sort_order:       nextSort,
+          is_primary:       false,
+        });
+        if (insertErr) throw insertErr;
+        nextSort += 1;
+      }
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : copy.upload_failed);
+    } finally {
+      addBtn.disabled = false;
+      setBusy(null);
+      fileIn.value = '';
+    }
+  });
+
+  // Lightbox owner-mode delete button dispatches this from PhotoGallery.
+  window.addEventListener('rastrum:photogallery-delete', (e) => {
+    const detail = (e as CustomEvent<{ photoId?: string; galleryId?: string }>).detail;
+    if (!detail || !detail.photoId) return;
+    if ((detail.galleryId ?? 'default') !== 'obs-detail') return;
+    void handleDelete(detail.photoId);
+  });
+
+  await refresh();
 }
