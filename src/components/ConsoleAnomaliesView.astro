@@ -20,10 +20,13 @@ const aDesc = (anomaliesNs?.description as string) ?? '';
 const aTabs = (anomaliesNs?.tabs as Record<string, string>) ?? {};
 const aCols = (anomaliesNs?.columns as Record<string, string>) ?? {};
 const aSlide = (anomaliesNs?.slideOver as Record<string, string>) ?? {};
+const aActions = (anomaliesNs?.actions as Record<string, string>) ?? {};
 const aEmpty = (anomaliesNs?.empty as string) ?? 'No anomalies.';
 const labelHighRate = kindLabels.high_rate ?? 'High rate';
 const labelBulkDelete = kindLabels.bulk_delete ?? 'Bulk destructive';
 const labelOffHours = kindLabels.off_hours ?? 'Off-hours';
+const labelAcknowledge = aActions.acknowledge ?? 'Acknowledge';
+const labelAcknowledged = aActions.acknowledged ?? 'acknowledged';
 ---
 
 <section
@@ -31,6 +34,8 @@ const labelOffHours = kindLabels.off_hours ?? 'Off-hours';
   data-label-kind-high-rate={labelHighRate}
   data-label-kind-bulk-delete={labelBulkDelete}
   data-label-kind-off-hours={labelOffHours}
+  data-label-acknowledge={labelAcknowledge}
+  data-label-acknowledged={labelAcknowledged}
 >
   <h1 class="text-xl font-semibold mb-1">{aTitle}</h1>
   <p class="mb-4 text-sm text-zinc-500 dark:text-zinc-400">{aDesc}</p>
@@ -115,6 +120,8 @@ const labelOffHours = kindLabels.off_hours ?? 'Off-hours';
     bulk_delete: sectionEl.dataset.labelKindBulkDelete ?? 'Bulk destructive',
     off_hours: sectionEl.dataset.labelKindOffHours ?? 'Off-hours',
   };
+  const labelAcknowledge = sectionEl.dataset.labelAcknowledge ?? 'Acknowledge';
+  const labelAcknowledged = sectionEl.dataset.labelAcknowledged ?? 'acknowledged';
 
   let allRows: AnomalyRow[] = [];
   let actors: Record<string, ActorMeta> = {};
@@ -179,8 +186,8 @@ const labelOffHours = kindLabels.off_hours ?? 'Off-hours';
           <td class="px-3 py-2 text-xs text-zinc-500 max-w-[260px] truncate" title="${esc(detailsJson)}">${esc(detailsJson || '')}</td>
           <td class="px-3 py-2 text-right">
             ${acked
-              ? `<span class="text-[11px] text-emerald-600 dark:text-emerald-400">acknowledged</span>`
-              : `<button data-ack-id="${esc(r.id)}" class="px-2 py-1 rounded border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800">Acknowledge</button>`}
+              ? `<span class="text-[11px] text-emerald-600 dark:text-emerald-400">${esc(labelAcknowledged)}</span>`
+              : `<button data-ack-id="${esc(r.id)}" class="px-2 py-1 rounded border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800">${esc(labelAcknowledge)}</button>`}
           </td>
         </tr>
       `;
