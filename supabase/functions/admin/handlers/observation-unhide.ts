@@ -10,7 +10,7 @@ export const observationUnhideHandler: ActionHandler<Payload> = {
   op: 'observation_unhide',
   requiredRole: 'admin',
   payloadSchema: Payload,
-  async execute(admin, payload, _actor) {
+  async execute(admin, payload, _actor, _reason) {
     const { data: before, error: beforeErr } = await admin
       .from('observations')
       .select('id, hidden, hidden_reason, hidden_at, hidden_by')

@@ -28,6 +28,18 @@ interface ObsUnhidePayload { observation_id: string }
 interface ObsObscurePayload { observation_id: string; obscure_level: ObscureLevel }
 interface ObsLicensePayload { observation_id: string; license: ObservationLicense }
 
+interface ReportTriagePayload { report_id: string }
+interface ReportResolvePayload { report_id: string }
+interface ReportDismissPayload { report_id: string }
+
+interface CommentHidePayload { comment_id: string }
+interface CommentUnhidePayload { comment_id: string }
+interface CommentLockPayload { comment_id: string }
+interface CommentUnlockPayload { comment_id: string }
+
+interface UserBanPayload { target_user_id: string; duration_hours: number | null }
+interface UserUnbanPayload { target_user_id: string; ban_id: string }
+
 interface DispatcherResponse<T = unknown> {
   ok: true;
   audit_id: number;
@@ -79,5 +91,29 @@ export const adminClient = {
       call('observation.obscure', payload, reason, jwt),
     licenseOverride: (payload: ObsLicensePayload, reason: string, jwt: string) =>
       call('observation.license_override', payload, reason, jwt),
+  },
+  report: {
+    triage: (payload: ReportTriagePayload, reason: string, jwt: string) =>
+      call('report.triage', payload, reason, jwt),
+    resolve: (payload: ReportResolvePayload, reason: string, jwt: string) =>
+      call('report.resolve', payload, reason, jwt),
+    dismiss: (payload: ReportDismissPayload, reason: string, jwt: string) =>
+      call('report.dismiss', payload, reason, jwt),
+  },
+  comment: {
+    hide: (payload: CommentHidePayload, reason: string, jwt: string) =>
+      call('comment.hide', payload, reason, jwt),
+    unhide: (payload: CommentUnhidePayload, reason: string, jwt: string) =>
+      call('comment.unhide', payload, reason, jwt),
+    lock: (payload: CommentLockPayload, reason: string, jwt: string) =>
+      call('comment.lock', payload, reason, jwt),
+    unlock: (payload: CommentUnlockPayload, reason: string, jwt: string) =>
+      call('comment.unlock', payload, reason, jwt),
+  },
+  user: {
+    ban: (payload: UserBanPayload, reason: string, jwt: string) =>
+      call('user.ban', payload, reason, jwt),
+    unban: (payload: UserUnbanPayload, reason: string, jwt: string) =>
+      call('user.unban', payload, reason, jwt),
   },
 };

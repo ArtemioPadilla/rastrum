@@ -1,0 +1,360 @@
+---
+/**
+ * ConsoleFlagQueueView — filterable report list (master) + detail panel with
+ * triage/resolve/dismiss action chips (detail). Gate: moderator OR admin.
+ */
+import { t } from '../i18n/utils';
+import ConsoleSlideOver from './ConsoleSlideOver.astro';
+
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+---
+
+<section class="max-w-6xl">
+  <div id="flagq-not-auth" class="hidden rounded border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-900 dark:text-amber-100">
+    {tr.console.not_authorized}
+  </div>
+
+  <div id="flagq-shell" class="hidden">
+    <p class="mb-4 text-sm text-zinc-500 dark:text-zinc-400">{tr.console.flagq_intro}</p>
+
+    <!-- Filter row -->
+    <div class="flex flex-wrap gap-2 mb-3">
+      <select id="flagq-filter-status" class="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm">
+        <option value="open,triaged">{tr.console.flagq_status_open} + {tr.console.flagq_status_triaged}</option>
+        <option value="">{tr.console.flagq_status_any}</option>
+        <option value="open">{tr.console.flagq_status_open}</option>
+        <option value="triaged">{tr.console.flagq_status_triaged}</option>
+        <option value="resolved">{tr.console.flagq_status_resolved}</option>
+        <option value="dismissed">{tr.console.flagq_status_dismissed}</option>
+      </select>
+
+      <select id="flagq-filter-type" class="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm">
+        <option value="">{tr.console.flagq_type_any}</option>
+        <option value="user">user</option>
+        <option value="observation">observation</option>
+        <option value="photo">photo</option>
+        <option value="identification">identification</option>
+        <option value="comment">comment</option>
+      </select>
+
+      <select id="flagq-filter-reason" class="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm">
+        <option value="">{tr.console.flagq_reason_any}</option>
+        <option value="spam">spam</option>
+        <option value="harassment">harassment</option>
+        <option value="wrong_id">wrong_id</option>
+        <option value="privacy_violation">privacy_violation</option>
+        <option value="copyright">copyright</option>
+        <option value="other">other</option>
+      </select>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-[320px_1fr] gap-4 h-[calc(100vh-220px)]">
+      <!-- Left: report list -->
+      <aside class="flex flex-col border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden">
+        <div id="flagq-list-loading" class="p-3 text-sm text-zinc-500 italic">{tr.console.flagq_loading}</div>
+        <div id="flagq-list-empty" class="hidden p-3 text-sm text-zinc-500">{tr.console.flagq_empty}</div>
+        <ul id="flagq-list" class="hidden flex-1 overflow-y-auto divide-y divide-zinc-100 dark:divide-zinc-800"></ul>
+      </aside>
+
+      <!-- Right: report detail -->
+      <div id="flagq-detail-empty" class="flex items-center justify-center text-sm text-zinc-400 dark:text-zinc-600 border border-dashed border-zinc-200 dark:border-zinc-700 rounded-lg">
+        {tr.console.flagq_select_prompt}
+      </div>
+      <div id="flagq-detail" class="hidden border border-zinc-200 dark:border-zinc-800 rounded-lg p-4 overflow-y-auto space-y-4">
+        <dl class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+          <dt class="text-zinc-500">{tr.console.flagq_col_type}</dt>
+          <dd id="flagq-detail-type" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
+
+          <dt class="text-zinc-500">{tr.console.flagq_col_reason}</dt>
+          <dd id="flagq-detail-reason" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
+
+          <dt class="text-zinc-500">{tr.console.flagq_col_status}</dt>
+          <dd id="flagq-detail-status" class="font-medium"></dd>
+
+          <dt class="text-zinc-500">{tr.console.flagq_col_created}</dt>
+          <dd id="flagq-detail-created" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
+
+          <dt class="text-zinc-500">{tr.console.flagq_reporter_label}</dt>
+          <dd id="flagq-detail-reporter" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
+
+          <dt class="text-zinc-500">{tr.console.flagq_target_label}</dt>
+          <dd id="flagq-detail-target" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
+        </dl>
+
+        <div id="flagq-detail-note-row" class="hidden text-sm">
+          <span class="text-zinc-500">{tr.console.flagq_note_label}: </span>
+          <span id="flagq-detail-note" class="text-zinc-700 dark:text-zinc-300 italic"></span>
+        </div>
+
+        <!-- Action chips -->
+        <div class="flex flex-wrap gap-2 pt-1">
+          <button id="flagq-action-triage" class="px-3 py-1.5 rounded text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 hover:bg-amber-200">
+            {tr.console.flagq_chip_triage}
+          </button>
+          <button id="flagq-action-resolve" class="px-3 py-1.5 rounded text-xs font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-200">
+            {tr.console.flagq_chip_resolve}
+          </button>
+          <button id="flagq-action-dismiss" class="px-3 py-1.5 rounded text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700">
+            {tr.console.flagq_chip_dismiss}
+          </button>
+        </div>
+
+        <a id="flagq-view-target" href="#" target="_blank" rel="noopener" class="hidden text-xs text-sky-600 dark:text-sky-400 underline">
+          {tr.console.flagq_view_target}
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <p id="flagq-error" class="hidden mt-3 text-sm text-red-600 dark:text-red-400"></p>
+</section>
+
+<ConsoleSlideOver lang={lang} id="console-slideover-flagq" titleKey={tr.console.flagq_action_triage} />
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { getUserRoles } from '../lib/user-roles';
+  import { adminClient, AdminClientError } from '../lib/admin-client';
+
+  type ReportRow = {
+    id: string;
+    reporter_id: string;
+    target_type: string;
+    target_id: string;
+    reason: string;
+    note: string | null;
+    status: string;
+    created_at: string;
+    users: { username: string | null; display_name: string | null } | null;
+  };
+
+  function show(id: string) { document.getElementById(id)?.classList.remove('hidden'); }
+  function hide(id: string) { document.getElementById(id)?.classList.add('hidden'); }
+  function escHtml(s: string): string {
+    return s.replace(/[<>&'"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&#39;','"':'&quot;'}[c]!));
+  }
+  function fmtDate(iso: string): string {
+    return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+
+  let allReports: ReportRow[] = [];
+  let selectedId: string | null = null;
+  let currentJwt = '';
+  let currentAction = '';
+
+  const supabase = getSupabase();
+
+  async function init() {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) { show('flagq-not-auth'); return; }
+    currentJwt = session.access_token;
+    const myRoles = await getUserRoles(session.user.id);
+    if (!myRoles.has('moderator') && !myRoles.has('admin')) { show('flagq-not-auth'); return; }
+    show('flagq-shell');
+    await loadReports();
+  }
+
+  function getFilters() {
+    const status = (document.getElementById('flagq-filter-status') as HTMLSelectElement).value;
+    const type = (document.getElementById('flagq-filter-type') as HTMLSelectElement).value;
+    const reason = (document.getElementById('flagq-filter-reason') as HTMLSelectElement).value;
+    return { status, type, reason };
+  }
+
+  async function loadReports() {
+    hide('flagq-list-empty');
+    hide('flagq-list');
+    show('flagq-list-loading');
+
+    const { status, type, reason } = getFilters();
+
+    let query = supabase
+      .from('reports')
+      .select('id, reporter_id, target_type, target_id, reason, note, status, created_at, users(username, display_name)')
+      .order('created_at', { ascending: true })
+      .limit(100);
+
+    if (status) {
+      const statuses = status.split(',');
+      if (statuses.length > 1) {
+        query = query.in('status', statuses);
+      } else {
+        query = query.eq('status', status);
+      }
+    }
+    if (type) query = query.eq('target_type', type);
+    if (reason) query = query.eq('reason', reason);
+
+    const { data, error } = await query;
+    hide('flagq-list-loading');
+
+    if (error) {
+      const e = document.getElementById('flagq-error')!;
+      e.textContent = error.message;
+      show('flagq-error');
+      return;
+    }
+
+    allReports = (data ?? []) as unknown as ReportRow[];
+    if (allReports.length === 0) { show('flagq-list-empty'); return; }
+    renderList();
+    show('flagq-list');
+  }
+
+  const STATUS_COLORS: Record<string, string> = {
+    open: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
+    triaged: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
+    resolved: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
+    dismissed: 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500',
+  };
+
+  function renderList() {
+    const ul = document.getElementById('flagq-list')!;
+    ul.innerHTML = allReports.map(r => {
+      const isSelected = r.id === selectedId ? 'bg-zinc-100 dark:bg-zinc-800/60' : '';
+      const statusCls = STATUS_COLORS[r.status] ?? 'bg-zinc-100 text-zinc-500';
+      return `<li data-report-id="${escHtml(r.id)}" class="px-3 py-2 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/40 ${isSelected}">
+        <div class="flex items-center gap-2 mb-0.5">
+          <span class="inline-block text-[9px] rounded px-1 py-0.5 ${statusCls}">${escHtml(r.status)}</span>
+          <span class="text-[10px] text-zinc-500">${escHtml(r.target_type)}</span>
+        </div>
+        <div class="text-sm text-zinc-800 dark:text-zinc-200 truncate">${escHtml(r.reason)}</div>
+        <div class="text-xs text-zinc-400">${escHtml(fmtDate(r.created_at))}</div>
+      </li>`;
+    }).join('');
+  }
+
+  function selectReport(id: string) {
+    selectedId = id;
+    const r = allReports.find(x => x.id === id);
+    if (!r) return;
+    renderList();
+
+    hide('flagq-detail-empty');
+    show('flagq-detail');
+
+    const set = (elId: string, val: string) => {
+      const el = document.getElementById(elId);
+      if (el) el.textContent = val;
+    };
+
+    set('flagq-detail-type', r.target_type);
+    set('flagq-detail-reason', r.reason);
+    set('flagq-detail-created', fmtDate(r.created_at));
+    set('flagq-detail-reporter', r.users?.username ? `@${r.users.username}` : r.reporter_id);
+    set('flagq-detail-target', `${r.target_type}:${r.target_id}`);
+
+    const statusEl = document.getElementById('flagq-detail-status')!;
+    statusEl.textContent = r.status;
+    const statusCls = STATUS_COLORS[r.status] ?? '';
+    statusEl.className = `font-medium inline-block px-1.5 py-0.5 rounded text-xs ${statusCls}`;
+
+    const noteRow = document.getElementById('flagq-detail-note-row')!;
+    if (r.note) {
+      document.getElementById('flagq-detail-note')!.textContent = r.note;
+      noteRow.classList.remove('hidden');
+    } else {
+      noteRow.classList.add('hidden');
+    }
+
+    const viewLink = document.getElementById('flagq-view-target') as HTMLAnchorElement | null;
+    if (viewLink && r.target_type === 'observation') {
+      viewLink.href = `/share/obs/?id=${r.target_id}`;
+      viewLink.classList.remove('hidden');
+    } else if (viewLink) {
+      viewLink.classList.add('hidden');
+    }
+
+    // Show/hide action chips based on current status
+    const triageBtn = document.getElementById('flagq-action-triage')!;
+    const resolveBtn = document.getElementById('flagq-action-resolve')!;
+    const dismissBtn = document.getElementById('flagq-action-dismiss')!;
+
+    triageBtn.classList.toggle('hidden', r.status !== 'open');
+    resolveBtn.classList.toggle('hidden', r.status === 'resolved' || r.status === 'dismissed');
+    dismissBtn.classList.toggle('hidden', r.status === 'resolved' || r.status === 'dismissed');
+  }
+
+  async function refreshSelected() {
+    if (!selectedId) return;
+    await loadReports();
+    const updated = allReports.find(x => x.id === selectedId);
+    if (updated) selectReport(selectedId);
+  }
+
+  document.addEventListener('click', (ev) => {
+    const li = (ev.target as HTMLElement).closest<HTMLElement>('li[data-report-id]');
+    if (li?.dataset.reportId) { selectReport(li.dataset.reportId); return; }
+
+    const triageBtn = (ev.target as HTMLElement).closest<HTMLElement>('#flagq-action-triage');
+    if (triageBtn && selectedId) {
+      currentAction = 'report.triage';
+      document.dispatchEvent(new CustomEvent('console:slideover-open', {
+        detail: { id: 'console-slideover-flagq', title: 'Mark as triaged', action: 'report.triage', payload: { report_id: selectedId } },
+      }));
+      return;
+    }
+
+    const resolveBtn = (ev.target as HTMLElement).closest<HTMLElement>('#flagq-action-resolve');
+    if (resolveBtn && selectedId) {
+      currentAction = 'report.resolve';
+      document.dispatchEvent(new CustomEvent('console:slideover-open', {
+        detail: { id: 'console-slideover-flagq', title: 'Resolve report', action: 'report.resolve', payload: { report_id: selectedId } },
+      }));
+      return;
+    }
+
+    const dismissBtn = (ev.target as HTMLElement).closest<HTMLElement>('#flagq-action-dismiss');
+    if (dismissBtn && selectedId) {
+      currentAction = 'report.dismiss';
+      document.dispatchEvent(new CustomEvent('console:slideover-open', {
+        detail: { id: 'console-slideover-flagq', title: 'Dismiss report', action: 'report.dismiss', payload: { report_id: selectedId } },
+      }));
+      return;
+    }
+  });
+
+  document.addEventListener('console:slideover-submit', async (ev) => {
+    const { id, action, payload, reason } = (ev as CustomEvent<{ id: string; action: string; payload: Record<string, string>; reason: string }>).detail;
+    if (id !== 'console-slideover-flagq') return;
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id, ok: false, error: 'Session expired.' } }));
+      return;
+    }
+
+    try {
+      if (action === 'report.triage') {
+        await adminClient.report.triage({ report_id: payload.report_id }, reason, session.access_token);
+      } else if (action === 'report.resolve') {
+        await adminClient.report.resolve({ report_id: payload.report_id }, reason, session.access_token);
+      } else if (action === 'report.dismiss') {
+        await adminClient.report.dismiss({ report_id: payload.report_id }, reason, session.access_token);
+      }
+      document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id, ok: true } }));
+      await refreshSelected();
+    } catch (err) {
+      const msg = err instanceof AdminClientError ? err.message : (err as Error).message;
+      document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id, ok: false, error: msg } }));
+    }
+  });
+
+  let filterTimer: ReturnType<typeof setTimeout> | null = null;
+  function onFilterChange() {
+    if (filterTimer) clearTimeout(filterTimer);
+    filterTimer = setTimeout(() => { loadReports(); }, 300);
+  }
+
+  ['flagq-filter-status', 'flagq-filter-type', 'flagq-filter-reason'].forEach(id => {
+    document.getElementById(id)?.addEventListener('change', onFilterChange);
+  });
+
+  init().catch(err => {
+    const e = document.getElementById('flagq-error')!;
+    e.textContent = (err as Error).message;
+    show('flagq-error');
+  });
+</script>

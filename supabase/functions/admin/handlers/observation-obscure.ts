@@ -11,7 +11,7 @@ export const observationObscureHandler: ActionHandler<Payload> = {
   op: 'observation_obscure',
   requiredRole: 'admin',
   payloadSchema: Payload,
-  async execute(admin, payload, _actor) {
+  async execute(admin, payload, _actor, _reason) {
     const { data: before } = await admin
       .from('observations')
       .select('id, obscure_level, location_obscured')

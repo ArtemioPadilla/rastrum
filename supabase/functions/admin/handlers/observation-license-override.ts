@@ -11,7 +11,7 @@ export const observationLicenseOverrideHandler: ActionHandler<Payload> = {
   op: 'observation_license_override',
   requiredRole: 'admin',
   payloadSchema: Payload,
-  async execute(admin, payload, _actor) {
+  async execute(admin, payload, _actor, _reason) {
     const { data: before } = await admin
       .from('observations')
       .select('id, observer_license')

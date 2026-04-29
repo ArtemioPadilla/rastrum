@@ -11,7 +11,7 @@ export const sensitiveReadUserAuditHandler: ActionHandler<Payload> = {
   op: 'user_audit_read',
   requiredRole: 'admin',
   payloadSchema: Payload,
-  async execute(admin, payload, _actor) {
+  async execute(admin, payload, _actor, _reason) {
     const { data, error } = await admin
       .from('admin_audit')
       .select('*')

@@ -1,5 +1,7 @@
 ---
 import BaseLayout from '../../../layouts/BaseLayout.astro';
+import ConsoleOverviewView from '../../../components/ConsoleOverviewView.astro';
+import ConsoleModOverviewView from '../../../components/ConsoleModOverviewView.astro';
 const lang = 'en';
 ---
 
@@ -7,7 +9,13 @@ const lang = 'en';
   <div id="console-gate" class="p-6 text-sm text-zinc-600 dark:text-zinc-400">
     Loading…
   </div>
-  <div id="console-shell" class="hidden">
+  <div id="console-shell-admin" class="hidden">
+    <ConsoleOverviewView lang={lang} />
+  </div>
+  <div id="console-shell-moderator" class="hidden">
+    <ConsoleModOverviewView lang={lang} />
+  </div>
+  <div id="console-shell-fallback" class="hidden">
   </div>
 </BaseLayout>
 
@@ -28,10 +36,16 @@ const lang = 'en';
     }
     const pills = rolePillsFor(roles);
     const requestedRole = new URL(window.location.href).searchParams.get('role');
-    const activeRole = (requestedRole && roles.has(requestedRole as never) ? requestedRole : pills[0]);
+    const activeRole = (requestedRole && roles.has(requestedRole as never) ? requestedRole : pills[0]) as string;
     gate.classList.add('hidden');
-    document.getElementById('console-shell')!.classList.remove('hidden');
-    void activeRole;
+
+    if (activeRole === 'admin') {
+      document.getElementById('console-shell-admin')!.classList.remove('hidden');
+    } else if (activeRole === 'moderator') {
+      document.getElementById('console-shell-moderator')!.classList.remove('hidden');
+    } else {
+      document.getElementById('console-shell-fallback')!.classList.remove('hidden');
+    }
   }
   init().catch(err => {
     document.getElementById('console-gate')!.textContent = 'Error: ' + (err as Error).message;

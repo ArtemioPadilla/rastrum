@@ -11,7 +11,7 @@ export const roleRevokeHandler: ActionHandler<RoleRevokePayload> = {
   op: 'role_revoke',
   requiredRole: 'admin',
   payloadSchema: RoleRevokePayload,
-  async execute(admin, payload, _actor) {
+  async execute(admin, payload, _actor, _reason) {
     const { data: before } = await admin
       .from('user_roles')
       .select('*')

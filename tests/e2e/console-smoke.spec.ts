@@ -75,4 +75,19 @@ test.describe('console — smoke', () => {
     await page.goto('/en/console/observations/');
     await expect(page.locator('#obs-not-auth')).toHaveText(/console access/i);
   });
+
+  test('/en/console/flag-queue/ shows not-auth banner for unauth visitor', async ({ page }) => {
+    await page.goto('/en/console/flag-queue/');
+    await expect(page.locator('#flagq-not-auth')).toHaveText(/console access/i);
+  });
+
+  test('/en/console/comments/ shows not-auth banner for unauth visitor', async ({ page }) => {
+    await page.goto('/en/console/comments/');
+    await expect(page.locator('#modcom-not-auth')).toHaveText(/console access/i);
+  });
+
+  test('/en/console/bans/ shows not-auth banner for unauth visitor', async ({ page }) => {
+    await page.goto('/en/console/bans/');
+    await expect(page.locator('#bans-not-auth')).toHaveText(/console access/i);
+  });
 });

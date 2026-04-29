@@ -59,7 +59,7 @@ serve(async (req) => {
     if (!parsed.success) return json({ error: 'invalid payload', issues: parsed.error.issues }, 400);
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
-    const result = await handler.execute(admin, parsed.data, actor);
+    const result = await handler.execute(admin, parsed.data, actor, reason);
 
     // x-forwarded-for can be comma-separated ("client, proxy1, proxy2")
     // when behind multiple proxies; the inet column only accepts a single

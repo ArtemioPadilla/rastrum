@@ -48,12 +48,16 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'user_roles')             THEN missing := array_append(missing, 'public.user_roles'); END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'admin_audit')            THEN missing := array_append(missing, 'public.admin_audit'); END IF;
 
+  -- Console PR5 — moderator surface
+  IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'user_bans')              THEN missing := array_append(missing, 'public.user_bans'); END IF;
+
   -- Functions used by RLS predicates and Edge Functions
   IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'has_role')             THEN missing := array_append(missing, 'public.has_role()'); END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'recompute_consensus')  THEN missing := array_append(missing, 'public.recompute_consensus()'); END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'handle_new_user')      THEN missing := array_append(missing, 'public.handle_new_user()'); END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'list_admin_cron_runs')         THEN missing := array_append(missing, 'public.list_admin_cron_runs()'); END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'list_admin_cron_runs_guarded') THEN missing := array_append(missing, 'public.list_admin_cron_runs_guarded()'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'is_user_banned')               THEN missing := array_append(missing, 'public.is_user_banned()'); END IF;
 
   IF array_length(missing, 1) IS NOT NULL THEN
     RAISE EXCEPTION 'Sentinel verify failed — missing objects: %', missing;

@@ -10,7 +10,7 @@ export const observationHideHandler: ActionHandler<Payload> = {
   op: 'observation_hide',
   requiredRole: 'admin',
   payloadSchema: Payload,
-  async execute(admin, payload, actor) {
+  async execute(admin, payload, actor, _reason) {
     const { data: before, error: beforeErr } = await admin
       .from('observations')
       .select('id, hidden, hidden_reason, hidden_at, hidden_by')
