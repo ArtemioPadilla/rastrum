@@ -1,3 +1,5 @@
+import { appealAcceptHandler } from './appeal-accept.ts';
+import { appealRejectHandler } from './appeal-reject.ts';
 import { roleGrantHandler } from './role-grant.ts';
 import { roleRevokeHandler } from './role-revoke.ts';
 import { sensitiveReadUserAuditHandler } from './sensitive-read-user-audit.ts';
@@ -43,4 +45,6 @@ export const HANDLERS: Record<string, ActionHandler<unknown>> = {
   'taxon.recompute_rarity': taxonRecomputeRarityHandler as unknown as ActionHandler<unknown>,
   'taxon.toggle_conservation': taxonToggleConservationHandler as unknown as ActionHandler<unknown>,
   'feature_flag.toggle': featureFlagToggleHandler as unknown as ActionHandler<unknown>,
+  'appeal.accept': appealAcceptHandler as unknown as ActionHandler<unknown>,
+  'appeal.reject': appealRejectHandler as unknown as ActionHandler<unknown>,
 };
