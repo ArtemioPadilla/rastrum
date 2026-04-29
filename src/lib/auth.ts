@@ -7,6 +7,13 @@
 import { getSupabase } from './supabase';
 import type { Provider } from '@supabase/supabase-js';
 
+// ─────────────────────────── Storage key constants ───────────────────────────
+// Centralised here so any change propagates automatically to Header,
+// MobileDrawer, PrivacyMatrix and any future consumer.
+export const SUPABASE_AUTH_STORAGE_KEY = 'rastrum-auth-v1';
+export const HEADER_AVATAR_CACHE_KEY   = 'rastrum.headerAvatar';
+export const HEADER_AVATAR_NAME_KEY    = 'rastrum.headerName';
+
 const callbackUrl = () =>
   (typeof window !== 'undefined' ? window.location.origin : '') + '/auth/callback/';
 
