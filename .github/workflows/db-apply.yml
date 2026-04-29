@@ -9,6 +9,17 @@ name: db-apply
 # Required secret: SUPABASE_DB_URL (postgres://… connection string from
 # Supabase dashboard → Settings → Database → Connection string).
 #
+# Optional secret: SPONSORSHIPS_CRON_TOKEN — GitHub secret used by the
+# ai_credentials_heartbeat pg_cron job to authenticate against the
+# sponsorships Edge Function. Generate once with `openssl rand -hex 32`,
+# store via:
+#   gh secret set SPONSORSHIPS_CRON_TOKEN
+# The Edge Function reads the same secret name from its env vars (synced
+# by deploy-functions.yml) to validate inbound heartbeat requests. When
+# present, the "Set app.cron_token" step below applies it as a database-
+# level setting via `ALTER DATABASE postgres SET app.cron_token = …`,
+# which the cron job reads with `current_setting('app.cron_token')`.
+#
 # All SQL in this repo is written to be idempotent (CREATE … IF NOT EXISTS,
 # DROP POLICY IF EXISTS … ; CREATE POLICY …, ON CONFLICT DO UPDATE).
 # Re-runs are safe.
@@ -107,6 +118,19 @@ jobs:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f docs/specs/infra/supabase-schema.sql
+
+      - name: Set app.cron_token (idempotent)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SPONSORSHIPS_CRON_TOKEN: ${{ secrets.SPONSORSHIPS_CRON_TOKEN }}
+        if: env.SPONSORSHIPS_CRON_TOKEN != ''
+        run: |
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 \
+            -v cron_token="$SPONSORSHIPS_CRON_TOKEN" \
+            -c "ALTER DATABASE postgres SET app.cron_token = :'cron_token';"
+          # ALTER DATABASE only takes effect on new connections. For currently-
+          # open cron job sessions, the next firing will see the new value.
+          echo "app.cron_token set."
 
       - name: Apply cron schedules
         if: steps.changes.outputs.cron == 'true'

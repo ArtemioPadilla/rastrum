@@ -37,3 +37,8 @@ Lets any Rastrum user share their Anthropic credential (API key or long-lived OA
 ## Cron jobs
 
 `ai_rate_limits_cleanup` (daily), `ai_usage_monthly_rollup` (nightly), `ai_credentials_heartbeat` (weekly), `ai_notifications_monthly_reset` (1st of month), `ai_errors_log_cleanup` (daily).
+
+## Operator notes
+
+- **`SPONSORSHIPS_CRON_TOKEN`** is set automatically via CI/CD (`.github/workflows/db-apply.yml`) on every push to `main` that touches `supabase-schema.sql` or `cron-schedules.sql`. The workflow runs `ALTER DATABASE postgres SET app.cron_token = …` after the schema apply so the `ai_credentials_heartbeat` pg_cron job can read it via `current_setting('app.cron_token')` to authenticate against the sponsorships Edge Function. The same secret is also synced to the Edge Function via `deploy-functions.yml`. To rotate: `gh secret set SPONSORSHIPS_CRON_TOKEN --body $(openssl rand -hex 32)`, then trigger both workflows manually (`gh workflow run db-apply.yml` and `gh workflow run deploy-functions.yml -f function=sponsorships`). No manual `psql` is ever required.
+- **`ANTHROPIC_API_KEY`** is **NOT** read by the `identify` Edge Function once this module ships. After cutover, remove the secret from Edge Function env if present (operator step, run via `gh secret delete ANTHROPIC_API_KEY` followed by `gh workflow run deploy-functions.yml -f function=identify` to redeploy without it).
