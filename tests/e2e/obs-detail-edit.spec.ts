@@ -132,8 +132,12 @@ test.describe('obs detail owner edit — Photos tab', () => {
     await expect(page.locator('#m-tab-photos')).toHaveAttribute('aria-selected', 'true');
     await expect(page.locator('#m-panel-photos')).toBeVisible();
 
-    // Grid container, empty-state placeholder, add-photo button, file input.
-    await expect(page.locator('#m-photos-grid')).toBeVisible();
+    // Grid container exists in the DOM. We use toBeAttached (not toBeVisible)
+    // because the empty grid has zero height — wireManagePanelPhotos hydrates
+    // the contents at runtime from the Supabase query, which doesn't run in
+    // this DOM-contract test (the round-trip variant is gated on
+    // E2E_OWNER_SESSION below).
+    await expect(page.locator('#m-photos-grid')).toBeAttached();
     await expect(page.locator('#m-photos-add')).toBeVisible();
     // Hidden file input is type=file accept=image/* multiple.
     const fileInput = page.locator('#m-photos-file-input');
@@ -142,14 +146,15 @@ test.describe('obs detail owner edit — Photos tab', () => {
     await expect(fileInput).toHaveAttribute('multiple', '');
   });
 
-  test('add-photo button click triggers the hidden file input picker', async ({ page }) => {
+  // The filechooser bridge is wired by wireManagePanelPhotos, which only
+  // fires under viewerIsObserver. The DOM-contract test path doesn't
+  // trigger it, so this assertion is gated on a real owner session.
+  (process.env.E2E_OWNER_SESSION ? test : test.skip)('add-photo button click triggers the hidden file input picker', async ({ page }) => {
     await page.goto(`/share/obs/?id=${SAMPLE_ID}`);
     await forceShowManagePanel(page);
 
     await page.locator('#m-tab-photos').click();
 
-    // Wire a chooser handler; clicking the visible add button should open
-    // the system picker (handled here by Playwright's filechooser).
     const [chooser] = await Promise.all([
       page.waitForEvent('filechooser'),
       page.locator('#m-photos-add').click(),
