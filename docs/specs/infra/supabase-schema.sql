@@ -3917,3 +3917,162 @@ BEGIN
 END $$;
 REVOKE ALL ON FUNCTION public.upsert_vault_secret_by_name(text, text) FROM public;
 GRANT EXECUTE ON FUNCTION public.upsert_vault_secret_by_name(text, text) TO service_role;
+
+-- =====================================================================
+-- Module 28 — community discovery (2026-04-29)
+--
+-- Schema deltas + dual views for the /community/observers/ page. See
+-- docs/specs/modules/28-community-discovery.md and
+-- docs/superpowers/specs/2026-04-29-community-discovery-design.md.
+--
+-- Counter columns are read-only from app code; the recompute-user-stats
+-- Edge Function (PR2) populates them nightly. country_code is the only
+-- column users can write directly (via Profile → Edit, PR4).
+-- =====================================================================
+
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+-- 1) Counter columns + privacy + geographic context on users
+ALTER TABLE public.users
+  ADD COLUMN IF NOT EXISTS species_count          int     NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS obs_count_7d           int     NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS obs_count_30d          int     NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS centroid_geog          geography(POINT, 4326),
+  ADD COLUMN IF NOT EXISTS country_code           text    CHECK (country_code ~ '^[A-Z]{2}$'),
+  ADD COLUMN IF NOT EXISTS hide_from_leaderboards boolean NOT NULL DEFAULT false;
+
+-- 2) Partial indexes — every list query operates on an already-filtered
+-- set, so opted-out / private users add zero cost to anyone's query plan.
+CREATE INDEX IF NOT EXISTS idx_users_lb_obs_count ON public.users (observation_count DESC)
+  WHERE NOT hide_from_leaderboards AND profile_public;
+
+CREATE INDEX IF NOT EXISTS idx_users_lb_species   ON public.users (species_count     DESC)
+  WHERE NOT hide_from_leaderboards AND profile_public;
+
+CREATE INDEX IF NOT EXISTS idx_users_lb_obs_7d    ON public.users (obs_count_7d      DESC)
+  WHERE NOT hide_from_leaderboards AND profile_public;
+
+CREATE INDEX IF NOT EXISTS idx_users_lb_obs_30d   ON public.users (obs_count_30d     DESC)
+  WHERE NOT hide_from_leaderboards AND profile_public;
+
+CREATE INDEX IF NOT EXISTS idx_users_lb_country   ON public.users (country_code)
+  WHERE country_code IS NOT NULL AND NOT hide_from_leaderboards AND profile_public;
+
+CREATE INDEX IF NOT EXISTS idx_users_lb_centroid  ON public.users USING GIST (centroid_geog)
+  WHERE centroid_geog IS NOT NULL AND NOT hide_from_leaderboards AND profile_public;
+
+CREATE INDEX IF NOT EXISTS idx_users_lb_expert_taxa ON public.users USING GIN (expert_taxa)
+  WHERE NOT hide_from_leaderboards AND profile_public;
+
+-- 3) ISO-3166 alpha-2 reference table — seeded once, never written from app code.
+CREATE TABLE IF NOT EXISTS public.iso_countries (
+  code    text PRIMARY KEY CHECK (code ~ '^[A-Z]{2}$'),
+  name_en text NOT NULL,
+  name_es text NOT NULL
+);
+
+ALTER TABLE public.iso_countries ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS iso_countries_read ON public.iso_countries;
+CREATE POLICY iso_countries_read ON public.iso_countries
+  FOR SELECT TO PUBLIC USING (true);
+
+GRANT SELECT ON public.iso_countries TO anon, authenticated;
+
+CREATE INDEX IF NOT EXISTS idx_iso_countries_name_en_trgm
+  ON public.iso_countries USING GIN (name_en gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_iso_countries_name_es_trgm
+  ON public.iso_countries USING GIN (name_es gin_trgm_ops);
+
+-- 4) Seed iso_countries. ON CONFLICT keeps this idempotent.
+INSERT INTO public.iso_countries (code, name_en, name_es) VALUES
+  ('AR', 'Argentina',           'Argentina'),
+  ('BO', 'Bolivia',              'Bolivia'),
+  ('BR', 'Brazil',               'Brasil'),
+  ('CA', 'Canada',               'Canadá'),
+  ('CL', 'Chile',                'Chile'),
+  ('CO', 'Colombia',             'Colombia'),
+  ('CR', 'Costa Rica',           'Costa Rica'),
+  ('CU', 'Cuba',                 'Cuba'),
+  ('DO', 'Dominican Republic',   'República Dominicana'),
+  ('EC', 'Ecuador',              'Ecuador'),
+  ('SV', 'El Salvador',          'El Salvador'),
+  ('GT', 'Guatemala',            'Guatemala'),
+  ('HN', 'Honduras',             'Honduras'),
+  ('MX', 'Mexico',               'México'),
+  ('NI', 'Nicaragua',            'Nicaragua'),
+  ('PA', 'Panama',                'Panamá'),
+  ('PY', 'Paraguay',              'Paraguay'),
+  ('PE', 'Peru',                  'Perú'),
+  ('PR', 'Puerto Rico',           'Puerto Rico'),
+  ('US', 'United States',         'Estados Unidos'),
+  ('UY', 'Uruguay',               'Uruguay'),
+  ('VE', 'Venezuela',             'Venezuela'),
+  ('ES', 'Spain',                 'España'),
+  ('PT', 'Portugal',              'Portugal'),
+  ('FR', 'France',                'Francia'),
+  ('DE', 'Germany',               'Alemania'),
+  ('IT', 'Italy',                 'Italia'),
+  ('GB', 'United Kingdom',        'Reino Unido')
+ON CONFLICT (code) DO UPDATE
+  SET name_en = EXCLUDED.name_en,
+      name_es = EXCLUDED.name_es;
+
+-- 5) Country-code normalizer. Case-insensitive exact match against
+-- name_en/name_es/code first; falls back to pg_trgm similarity > 0.6.
+-- Returns NULL on miss. The Edge Function (PR2) calls this only when
+-- country_code IS NULL, so user-set values are never overwritten.
+CREATE OR REPLACE FUNCTION public.normalize_country_code(p_input text)
+RETURNS text
+LANGUAGE sql STABLE PARALLEL SAFE AS $$
+  WITH input AS (SELECT lower(trim(coalesce(p_input, ''))) AS q)
+  SELECT code FROM (
+    SELECT code, 0 AS rank
+      FROM public.iso_countries, input
+     WHERE input.q <> ''
+       AND (lower(name_en) = input.q OR lower(name_es) = input.q OR lower(code) = input.q)
+    UNION ALL
+    SELECT code, 1 AS rank
+      FROM public.iso_countries, input
+     WHERE input.q <> ''
+       AND GREATEST(similarity(lower(name_en), input.q),
+                    similarity(lower(name_es), input.q)) > 0.6
+  ) t
+  ORDER BY rank, code
+  LIMIT 1;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.normalize_country_code(text) TO anon, authenticated;
+
+-- 6) Anon-safe view — discovery-safe columns only, NO centroid.
+-- The eligibility predicate lives in exactly one place per view; both
+-- views read profile_public live (no caching), so toggling private
+-- drops a user from the list on the next request.
+CREATE OR REPLACE VIEW public.community_observers AS
+SELECT
+  id, username, display_name, avatar_url, country_code,
+  expert_taxa, is_expert,
+  observation_count, species_count, obs_count_7d, obs_count_30d,
+  last_observation_at, joined_at
+FROM public.users
+WHERE profile_public = true
+  AND hide_from_leaderboards = false;
+
+GRANT SELECT ON public.community_observers TO anon, authenticated;
+
+-- 7) Authenticated-only view — adds centroid_geog for the Nearby
+-- feature. Anon callers cannot read centroid via any path; the lack of
+-- a GRANT to anon is the security gate (mirrored in UI by the sign-in
+-- requirement).
+CREATE OR REPLACE VIEW public.community_observers_with_centroid AS
+SELECT
+  id, username, display_name, avatar_url, country_code,
+  expert_taxa, is_expert,
+  observation_count, species_count, obs_count_7d, obs_count_30d,
+  centroid_geog, last_observation_at, joined_at
+FROM public.users
+WHERE profile_public = true
+  AND hide_from_leaderboards = false;
+
+GRANT SELECT ON public.community_observers_with_centroid TO authenticated;
+-- Explicitly NO grant to anon. Lack of grant is the security gate.
