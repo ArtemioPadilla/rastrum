@@ -1,5 +1,6 @@
 ---
 import ObservationForm from './ObservationForm.astro';
+import SponsorshipBanner from './SponsorshipBanner.astro';
 
 interface Props { lang: 'en' | 'es' }
 const { lang } = Astro.props;
@@ -11,4 +12,5 @@ const { lang } = Astro.props;
   habitat, evidence, notes are hidden behind a "Save as observation"
   reveal. See ObservationForm.astro for the mode-prop contract.
 -->
+<SponsorshipBanner lang={lang} />
 <ObservationForm lang={lang} mode="identify-only" />

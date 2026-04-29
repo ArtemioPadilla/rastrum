@@ -14,18 +14,31 @@
  *   the highest-confidence response we did get. (See the client mirror in
  *   `src/lib/identify-cascade-client.ts`.)
  *
- *   Key resolution rule (server-side): the regular `ANTHROPIC_API_KEY`
- *   secret is the only fallback when the client doesn't supply a BYO key.
- *   We deliberately ignore the project-wide `PUBLIC_ANTHROPIC_KEY` pattern
- *   here — that key is meant to ride along the static bundle, not the EF.
+ *   Key resolution rule (server-side, post-sponsorship migration):
+ *     1. BYO key from `client_keys.anthropic` / `client_anthropic_key` wins.
+ *     2. Otherwise, if a JWT user is present, resolve a sponsorship via
+ *        `_shared/sponsorship.ts` (rate-limit, decrypt vault, record usage).
+ *     3. Otherwise the Claude runner is skipped (returns null) — the
+ *        operator-key fallback (`Deno.env.get('ANTHROPIC_API_KEY')`) is
+ *        intentionally NOT consulted; sponsorships replace that path.
  *
  * Required env vars (set via `supabase secrets set`):
- *   ANTHROPIC_API_KEY       Claude Haiku 4.5 vision calls (optional — no-op if unset)
  *   PLANTNET_API_KEY        PlantNet v2 API (optional — no-op if unset)
- *   SUPABASE_SERVICE_ROLE_KEY  Write-path for identifications rows
+ *   SUPABASE_SERVICE_ROLE_KEY  Write-path for identifications rows + sponsorship lookups
  */
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import {
+  resolveSponsorship,
+  decryptCredential,
+  recordUsage,
+  checkAndBumpRateLimit,
+  autoPauseSponsorship,
+  maybeNotifyThreshold,
+  pickAuthHeader,
+  type ResolvedSponsorship,
+  type CredentialKind,
+} from '../_shared/sponsorship.ts';
 
 type IdentifyRequest = {
   observation_id: string;
@@ -35,8 +48,9 @@ type IdentifyRequest = {
   /**
    * Bring-your-own keys keyed by provider name. The function uses each
    * key only for this single call; nothing is logged or persisted
-   * server-side. Server env vars (ANTHROPIC_API_KEY, PLANTNET_API_KEY)
-   * are the fallback when a client key isn't provided.
+   * server-side. PLANTNET_API_KEY is the operator-side fallback for
+   * `plantnet`; for `anthropic` there is no env fallback — when the BYO
+   * key is missing the function resolves a sponsorship (see file header).
    *
    * Supported names today: 'anthropic', 'plantnet'.
    */
@@ -135,7 +149,12 @@ interface ClaudeContext {
   lat?: number;
   lng?: number;
   plantnet_candidates?: string[];
-  client_key?: string;
+  /**
+   * Pre-resolved Anthropic credential. Either the BYO key forwarded by the
+   * client, or a sponsor-supplied secret decrypted from Vault. The runner
+   * does NOT fall back to env vars — the caller decides credential source.
+   */
+  credential?: { secret: string; kind: CredentialKind };
   signal?: AbortSignal;
 }
 
@@ -144,11 +163,7 @@ async function callClaudeHaiku(
   mimeType: string,
   context: ClaudeContext,
 ): Promise<IDResult | null> {
-  // Server-side: the only fallback is the regular ANTHROPIC_API_KEY secret.
-  // We intentionally do NOT honour PUBLIC_ANTHROPIC_KEY here — that key
-  // pattern is for the static client bundle, not the EF.
-  const key = context.client_key || Deno.env.get('ANTHROPIC_API_KEY');
-  if (!key) return null;
+  if (!context.credential) return null;
 
   const b64 = bytesToBase64(imageBytes);
 
@@ -180,17 +195,16 @@ async function callClaudeHaiku(
 
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
-    headers: {
-      'x-api-key': key,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-    },
+    headers: pickAuthHeader(context.credential.kind, context.credential.secret),
     body: JSON.stringify(body),
     signal: context.signal,
   });
   if (!res.ok) return null;
 
-  const json = await res.json() as { content: Array<{ type: string; text?: string }> };
+  const json = await res.json() as {
+    content: Array<{ type: string; text?: string }>;
+    usage?: { input_tokens?: number; output_tokens?: number };
+  };
   const textBlock = json.content?.find(c => c.type === 'text');
   if (!textBlock?.text) return null;
 
@@ -368,6 +382,69 @@ serve(async (req) => {
   const byoPlantnet = body.client_keys?.plantnet;
   const byoAnthropic = body.client_keys?.anthropic ?? body.client_anthropic_key;
 
+  // Service-role client for sponsorship lookups, vault decryption, usage
+  // writes, and the eventual identifications insert. Created lazily so
+  // anonymous BYO calls (no JWT, no sponsorship) don't pay the round trip.
+  const serviceRole = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  let serviceDb: SupabaseClient | null = null;
+  function db(): SupabaseClient {
+    if (!serviceDb) {
+      if (!serviceRole || !supabaseUrl) {
+        throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+      }
+      serviceDb = createClient(supabaseUrl, serviceRole);
+    }
+    return serviceDb;
+  }
+
+  // Resolve the JWT-bearing user (if any). Used as the sponsorship beneficiary
+  // and as the rate-limit subject. Anonymous callers fall through to BYO-only.
+  let beneficiaryId: string | null = null;
+  if (hasAuth && serviceRole && supabaseUrl) {
+    const jwt = req.headers.get('authorization')!.slice('Bearer '.length).trim();
+    try {
+      const { data, error } = await db().auth.getUser(jwt);
+      if (!error && data.user) beneficiaryId = data.user.id;
+    } catch {
+      beneficiaryId = null;
+    }
+  }
+
+  // Decide what credential the Claude runner gets. Order:
+  //   1. BYO key forwarded by the client.
+  //   2. Sponsor-supplied credential resolved via _shared/sponsorship.ts.
+  //   3. Nothing — the Claude runner is skipped (no operator-key fallback).
+  let claudeCred: { secret: string; kind: CredentialKind } | null = null;
+  let sponsorshipCtx: ResolvedSponsorship | null = null;
+  let sponsorshipSkipReason: string | null = null;
+
+  if (byoAnthropic) {
+    claudeCred = { secret: byoAnthropic, kind: 'api_key' };
+  } else if (beneficiaryId) {
+    try {
+      const rl = await checkAndBumpRateLimit(db(), beneficiaryId, 'anthropic');
+      if (!rl.allowed) {
+        sponsorshipSkipReason = rl.reason ?? 'rate_limit';
+        if (rl.reason?.startsWith('rate_limit:')) {
+          const ctxNow = await resolveSponsorship(db(), beneficiaryId, 'anthropic');
+          if (ctxNow) await autoPauseSponsorship(db(), ctxNow.sponsorshipId, rl.reason, beneficiaryId);
+        }
+      } else {
+        // Sponsored users add ~3 DB round-trips vs BYO: resolve, decrypt vault, rate-limit bump.
+        // Acceptable at v1 scale; profile if /identify p95 latency regresses.
+        sponsorshipCtx = await resolveSponsorship(db(), beneficiaryId, 'anthropic');
+        if (sponsorshipCtx) {
+          const secret = await decryptCredential(db(), sponsorshipCtx.vaultSecretId);
+          claudeCred = { secret, kind: sponsorshipCtx.kind };
+        }
+      }
+    } catch (err) {
+      // allowed: log level + no secret
+      console.warn(`[identify] sponsorship resolution failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
   let result: IDResult | null = null;
 
   if (body.force_provider === 'plantnet') {
@@ -376,7 +453,7 @@ serve(async (req) => {
     result = await callClaudeHaiku(imageBytes, mimeType, {
       lat: body.location?.lat,
       lng: body.location?.lng,
-      client_key: byoAnthropic,
+      credential: claudeCred ?? undefined,
     });
   } else {
     // Default: race PlantNet, Claude Haiku, and (placeholder) ONNX-base in
@@ -391,7 +468,7 @@ serve(async (req) => {
     runners.claude_haiku = (signal) => callClaudeHaiku(imageBytes, mimeType, {
       lat: body.location?.lat,
       lng: body.location?.lng,
-      client_key: byoAnthropic,
+      credential: claudeCred ?? undefined,
       signal,
     });
     runners.onnx_base = (signal) => callOnnxBase(imageBytes, signal);
@@ -400,13 +477,39 @@ serve(async (req) => {
     result = cascaded.result;
   }
 
+  // If Claude won and a sponsorship paid for it, record usage + threshold notify.
+  if (
+    result
+    && result.source === 'claude_haiku'
+    && sponsorshipCtx
+    && beneficiaryId
+  ) {
+    try {
+      const usageBlock = (result.raw as { usage?: { input_tokens?: number; output_tokens?: number } }).usage;
+      const usage = await recordUsage(db(), {
+        sponsorshipId: sponsorshipCtx.sponsorshipId,
+        sponsorId:     sponsorshipCtx.sponsorId,
+        beneficiaryId,
+        provider:      'anthropic',
+        tokensIn:      usageBlock?.input_tokens,
+        tokensOut:     usageBlock?.output_tokens,
+      });
+      await maybeNotifyThreshold(db(), sponsorshipCtx.sponsorshipId, usage.pctUsed);
+    } catch (err) {
+      // allowed: log level + no secret
+      console.warn(`[identify] recordUsage failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
   if (!result) {
-    const hasAnyClaudeKey = !!(byoAnthropic || Deno.env.get('ANTHROPIC_API_KEY'));
+    const hasAnyClaudeCred = !!claudeCred;
     return corsResponse(JSON.stringify({
-      error: hasAnyClaudeKey ? 'identification_failed' : 'no_id_engine_available',
-      hint: hasAnyClaudeKey
+      error: hasAnyClaudeCred ? 'identification_failed' : 'no_id_engine_available',
+      hint: hasAnyClaudeCred
         ? 'PlantNet returned nothing and Claude failed to parse the response.'
-        : 'Configure ANTHROPIC_API_KEY (server) or supply client_anthropic_key, or enable on-device fallback.',
+        : sponsorshipSkipReason
+          ? `Claude skipped (${sponsorshipSkipReason}). Supply a BYO key, accept a sponsorship, or wait for the rate-limit window to reset.`
+          : 'No Claude credential available. Supply a BYO key (client_keys.anthropic) or accept a sponsorship; the operator no longer provides a fallback key.',
     }), {
       status: 200,
       headers: { 'content-type': 'application/json' },
@@ -414,11 +517,8 @@ serve(async (req) => {
   }
 
   if (body.observation_id !== 'cascade-only') {
-    const serviceRole = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
     if (serviceRole && supabaseUrl) {
-      const db = createClient(supabaseUrl, serviceRole);
-      await db.from('identifications').insert({
+      await db().from('identifications').insert({
         observation_id: body.observation_id,
         scientific_name: result.scientific_name,
         confidence: result.confidence,

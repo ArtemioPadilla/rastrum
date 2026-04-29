@@ -10,12 +10,28 @@ Implements docs/specs/modules/01-photo-id.md.
 supabase link --project-ref reppvlqejgoqvitturxp
 
 # Set secrets (not committed anywhere)
-supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
 supabase secrets set PLANTNET_API_KEY=2b10...
 
 # Deploy
 supabase functions deploy identify
 ```
+
+## Anthropic key resolution
+
+As of module 27 (AI Sponsorships), the function NO LONGER reads
+`ANTHROPIC_API_KEY` from env. The resolution order is:
+
+1. **BYO key** — the user supplies `client_keys.anthropic` in the request body.
+2. **Sponsorship** — if no BYO and the user is authenticated, the function
+   calls `resolve_sponsorship()` and decrypts the matching credential from
+   Supabase Vault.
+3. **No key** — Claude is skipped silently and the cascade continues to
+   PlantNet, on-device models, etc.
+
+Operators must NOT set `ANTHROPIC_API_KEY` after rollout. The Edge Function
+ignores it.
+
+PlantNet's `PLANTNET_API_KEY` env fallback is unchanged.
 
 ## Invoke
 

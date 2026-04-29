@@ -1,0 +1,61 @@
+---
+import { t } from '../i18n/utils';
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+---
+
+<div id="sponsorship-banner" class="hidden mb-4 rounded-lg border p-3 text-sm"></div>
+
+<script>
+  import { listSponsorships, getUsage } from '../lib/sponsorships';
+  import { getSupabase } from '../lib/supabase';
+
+  interface CachedUsage { pctUsed: number; cap: number; usedThisMonth: number; sponsorshipId: string; }
+  const CACHE_KEY = 'rastrum.sponsorshipBanner';
+  const CACHE_TTL_MS = 5 * 60_000;
+
+  async function paint() {
+    const banner = document.getElementById('sponsorship-banner') as HTMLElement | null;
+    if (!banner) return;
+
+    let supabaseSession;
+    try { supabaseSession = (await getSupabase().auth.getSession()).data.session; }
+    catch { return; }
+    if (!supabaseSession) return;
+
+    let usage: CachedUsage | null = null;
+    const cached = sessionStorage.getItem(CACHE_KEY);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached) as CachedUsage & { ts?: number };
+        if (parsed.ts && Date.now() - parsed.ts < CACHE_TTL_MS) usage = parsed;
+      } catch { /* ignore */ }
+    }
+
+    if (!usage) {
+      let sponsorships: Awaited<ReturnType<typeof listSponsorships>> = [];
+      try { sponsorships = await listSponsorships('beneficiary'); } catch { return; }
+      const active = sponsorships.filter(s => s.status === 'active').sort((a, b) => a.priority - b.priority);
+      if (active.length === 0) return;
+      let u: Awaited<ReturnType<typeof getUsage>> | null = null;
+      try { u = await getUsage(active[0].id); } catch { return; }
+      if (!u) return;
+      usage = { pctUsed: u.pctUsed, cap: u.cap, usedThisMonth: u.usedThisMonth, sponsorshipId: active[0].id };
+      sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ...usage, ts: Date.now() }));
+    }
+
+    if (usage.pctUsed < 0.80) return;
+
+    if (usage.pctUsed >= 1.0) {
+      banner.className = 'mb-4 rounded-lg border p-3 text-sm bg-red-50 dark:bg-red-900/30 text-red-900 dark:text-red-200 border-red-200';
+      banner.textContent = 'AI quota exhausted. Configure your own API key.';
+    } else {
+      banner.className = 'mb-4 rounded-lg border p-3 text-sm bg-amber-50 dark:bg-amber-900/30 text-amber-900 dark:text-amber-200 border-amber-200';
+      const remaining = usage.cap - usage.usedThisMonth;
+      banner.textContent = `${remaining} AI IDs left this month.`;
+    }
+    banner.classList.remove('hidden');
+  }
+  paint();
+</script>

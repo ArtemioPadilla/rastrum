@@ -83,6 +83,7 @@ narrative source.
 |---|---|---|---|---|
 | 25 | Profile Privacy & Public Profile (per-facet matrix + `/u/<username>/`) | v1.2 | shipped (v1.2.0 + v1.2.1 merged 2026-04-28; v1.2.2 cleanup deferred) | [`25-profile-privacy.md`](25-profile-privacy.md) |
 | 26 | Social graph + reactions (follows, reactions, blocks, reports, notifications) | v1.3 | planned (spec v1.0) | [`26-social-graph.md`](26-social-graph.md) |
+| 27 | AI Sponsorships (share Anthropic credentials with beneficiaries) | v1.3 | in implementation (PR feat/ai-sponsorships) | [`27-ai-sponsorships.md`](27-ai-sponsorships.md) |
 
 ## v1.5 — Territory layer — planned
 
