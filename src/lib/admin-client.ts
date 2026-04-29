@@ -20,6 +20,14 @@ interface SensitiveReadUserAuditPayload {
   limit?: number;
 }
 
+type ObscureLevel = 'none' | '0.1deg' | '0.2deg' | '5km' | 'full';
+type ObservationLicense = 'CC BY 4.0' | 'CC BY-NC 4.0' | 'CC0';
+
+interface ObsHidePayload { observation_id: string }
+interface ObsUnhidePayload { observation_id: string }
+interface ObsObscurePayload { observation_id: string; obscure_level: ObscureLevel }
+interface ObsLicensePayload { observation_id: string; license: ObservationLicense }
+
 interface DispatcherResponse<T = unknown> {
   ok: true;
   audit_id: number;
@@ -61,5 +69,15 @@ export const adminClient = {
   sensitiveRead: {
     userAudit: (payload: SensitiveReadUserAuditPayload, reason: string, jwt: string) =>
       call<unknown[]>('sensitive_read.user_audit', payload, reason, jwt),
+  },
+  observation: {
+    hide: (payload: ObsHidePayload, reason: string, jwt: string) =>
+      call('observation.hide', payload, reason, jwt),
+    unhide: (payload: ObsUnhidePayload, reason: string, jwt: string) =>
+      call('observation.unhide', payload, reason, jwt),
+    obscure: (payload: ObsObscurePayload, reason: string, jwt: string) =>
+      call('observation.obscure', payload, reason, jwt),
+    licenseOverride: (payload: ObsLicensePayload, reason: string, jwt: string) =>
+      call('observation.license_override', payload, reason, jwt),
   },
 };
