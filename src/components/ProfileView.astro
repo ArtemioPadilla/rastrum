@@ -249,8 +249,11 @@ const k = (tr as unknown as { karma: Record<string, string> }).karma;
 
     if (profile.username && viewPublicLink) {
       const lang = document.documentElement.lang || 'en';
-      const base = lang === 'es' ? `/${lang}/perfil/u/${profile.username}/` : `/${lang}/profile/u/${profile.username}/`;
-      viewPublicLink.href = base;
+      // Canonical visitor route is /{lang}/u/?username=<handle>; the
+      // path-segment form /{lang}/profile/u/<handle>/ is NOT a route
+      // (only the legacy /profile/u/ index exists, and it 301-redirects
+      // to /u/). Linking by path-segment 404s.
+      viewPublicLink.href = `/${lang}/u/?username=${encodeURIComponent(profile.username)}`;
       viewPublicLink.classList.remove('hidden');
     }
 
