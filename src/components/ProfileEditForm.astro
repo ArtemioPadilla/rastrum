@@ -76,6 +76,22 @@ const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } })
       </div>
     </div>
 
+    <div>
+      <label for="timezone" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.profile.timezone}</label>
+      <select id="timezone" name="timezone" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
+        <option value="">UTC</option>
+        <option value="America/Mexico_City">America/Mexico_City</option>
+        <option value="America/Bogota">America/Bogota</option>
+        <option value="America/Lima">America/Lima</option>
+        <option value="America/Buenos_Aires">America/Buenos_Aires</option>
+        <option value="America/Santiago">America/Santiago</option>
+        <option value="America/Sao_Paulo">America/Sao_Paulo</option>
+        <option value="Europe/Madrid">Europe/Madrid</option>
+        <option value="Europe/London">Europe/London</option>
+      </select>
+      <p class="mt-1 text-xs text-zinc-500">{tr.profile.timezone_description}</p>
+    </div>
+
     <fieldset class="space-y-3 border-t border-zinc-200 dark:border-zinc-800 pt-5">
       <p class="text-xs text-zinc-500 dark:text-zinc-400">
         <a href={`/${lang}/${lang === 'es' ? 'perfil/ajustes' : 'profile/settings'}/privacy/`}
@@ -444,7 +460,7 @@ const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } })
 
   type EditableKey =
     | 'username' | 'display_name' | 'bio' | 'region_primary' | 'avatar_url'
-    | 'preferred_lang' | 'observer_license' | 'country_code'
+    | 'preferred_lang' | 'observer_license' | 'country_code' | 'timezone'
     | 'gamification_opt_in' | 'streak_digest_opt_in';
 
   type IsoCountry = { code: string; name_en: string; name_es: string };
@@ -513,6 +529,8 @@ const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } })
     (form.elements.namedItem('avatar_url') as HTMLInputElement).value = profile.avatar_url ?? '';
     (form.elements.namedItem('preferred_lang') as HTMLSelectElement).value = profile.preferred_lang ?? 'es';
     (form.elements.namedItem('observer_license') as HTMLSelectElement).value = profile.observer_license ?? 'CC BY 4.0';
+    const tzSelect = form.elements.namedItem('timezone') as HTMLSelectElement | null;
+    if (tzSelect) tzSelect.value = profile.timezone ?? '';
     (form.elements.namedItem('gamification_opt_in') as HTMLInputElement).checked = profile.gamification_opt_in;
     (form.elements.namedItem('streak_digest_opt_in') as HTMLInputElement).checked = profile.streak_digest_opt_in;
     (form.elements.namedItem('community_visible') as HTMLInputElement).checked = !profile.hide_from_leaderboards;
@@ -560,6 +578,7 @@ const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } })
       avatar_url:           nullableText('avatar_url'),
       preferred_lang:       (data.get('preferred_lang') ?? 'es').toString(),
       observer_license:     (data.get('observer_license') ?? 'CC BY 4.0').toString(),
+      timezone:             nullableText('timezone'),
       gamification_opt_in:  data.get('gamification_opt_in') === 'on',
       streak_digest_opt_in: data.get('streak_digest_opt_in') === 'on',
       ...buildCommunityDiscoveryPayload({

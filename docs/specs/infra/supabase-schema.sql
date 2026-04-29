@@ -3979,6 +3979,14 @@ ALTER TABLE public.users
   ADD COLUMN IF NOT EXISTS country_code_source text NOT NULL DEFAULT 'auto'
     CHECK (country_code_source IN ('auto','user'));
 
+-- 1d) Per-user IANA timezone (PR14). NULL means treat as UTC. Currently
+-- consumed by detect_admin_anomalies() to evaluate the off_hours rule in
+-- the admin's local time rather than UTC. Wider use (push notifications,
+-- streak rollovers) is a v1.1 follow-up — keep the column nullable so
+-- consumers must defensively coalesce to 'UTC'.
+ALTER TABLE public.users
+  ADD COLUMN IF NOT EXISTS timezone text;
+
 -- 1c) Column-level UPDATE grants for the three M28-writable columns. Lives
 -- here (rather than in the consolidated REVOKE/GRANT block above) because
 -- those columns are added by the ALTER TABLE statements above; granting
@@ -3987,6 +3995,9 @@ ALTER TABLE public.users
 -- composes cleanly with the earlier GRANT UPDATE (...) block.
 GRANT UPDATE (country_code, country_code_source, hide_from_leaderboards)
   ON public.users TO authenticated;
+
+-- PR14: users.timezone is user-writable so Profile → Edit can persist it.
+GRANT UPDATE (timezone) ON public.users TO authenticated;
 
 -- 2) Partial indexes — every list query operates on an already-filtered
 -- set, so opted-out / private users add zero cost to anyone's query plan.
@@ -5038,7 +5049,9 @@ GRANT SELECT, INSERT                  ON public.function_errors TO service_role;
 --                     1-hour window in the last hour.
 --   * Bulk delete   — > 10 actions whose op text contains 'hide', 'revoke',
 --                     'ban', or 'delete' in the last hour from one actor.
---   * Off-hours     — >= 5 actions outside 06:00–22:00 UTC in the last hour.
+--   * Off-hours     — >= 5 actions outside 06:00–22:00 in the actor's
+--                     local time (PR14: respects users.timezone, falls
+--                     back to UTC when NULL).
 --
 -- Each detection is INSERTed into admin_anomalies with ON CONFLICT DO NOTHING
 -- on (kind, actor_id, window_start) so re-runs over an overlapping window
@@ -5093,20 +5106,30 @@ BEGIN
   HAVING count(*) > 10
   ON CONFLICT (kind, actor_id, window_start) DO NOTHING;
 
-  -- Off-hours: >= 5 actions outside 06:00–22:00 UTC in the window.
+  -- Off-hours: >= 5 actions outside 06:00–22:00 in the actor's local
+  -- timezone (PR14). users.timezone is consulted via LEFT JOIN so admins
+  -- without a configured tz fall back to UTC. The detail row records the
+  -- evaluated zone for forensics.
   INSERT INTO public.admin_anomalies (kind, actor_id, window_start, window_end, event_count, details)
   SELECT
     'off_hours',
-    actor_id,
+    a.actor_id,
     v_start,
     v_end,
     count(*),
-    jsonb_build_object('threshold', 5, 'allowed_hours_utc', '06:00-22:00')
-  FROM public.admin_audit
-  WHERE created_at >= v_start AND created_at < v_end
-    AND (EXTRACT(HOUR FROM created_at AT TIME ZONE 'UTC') < 6
-      OR EXTRACT(HOUR FROM created_at AT TIME ZONE 'UTC') >= 22)
-  GROUP BY actor_id
+    jsonb_build_object(
+      'threshold', 5,
+      'allowed_hours_local', '06:00-22:00',
+      'tz', COALESCE(u.timezone, 'UTC')
+    )
+  FROM public.admin_audit a
+  LEFT JOIN public.users u ON u.id = a.actor_id
+  WHERE a.created_at >= v_start AND a.created_at < v_end
+    AND (
+      EXTRACT(HOUR FROM a.created_at AT TIME ZONE COALESCE(u.timezone, 'UTC')) < 6
+      OR EXTRACT(HOUR FROM a.created_at AT TIME ZONE COALESCE(u.timezone, 'UTC')) >= 22
+    )
+  GROUP BY a.actor_id, u.timezone
   HAVING count(*) >= 5
   ON CONFLICT (kind, actor_id, window_start) DO NOTHING;
 END $$;
