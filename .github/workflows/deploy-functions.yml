@@ -143,7 +143,8 @@ jobs:
           CF_ACCOUNT_ID:        ${{ secrets.CF_ACCOUNT_ID }}
           PUBLIC_PLANTNET_KEY:  ${{ secrets.PUBLIC_PLANTNET_KEY }}
           PLANTNET_API_KEY:     ${{ secrets.PLANTNET_API_KEY }}
-          ANTHROPIC_API_KEY:    ${{ secrets.ANTHROPIC_API_KEY }}
+          # ANTHROPIC_API_KEY removed: identify Edge Function only accepts BYO
+          # keys or sponsorship-resolved credentials (module 27, PR #78).
           VAPID_PRIVATE_KEY:    ${{ secrets.VAPID_PRIVATE_KEY }}
           VAPID_PUBLIC_KEY:     ${{ secrets.VAPID_PUBLIC_KEY }}
           VAPID_SUBJECT:        ${{ secrets.VAPID_SUBJECT }}
@@ -183,7 +184,9 @@ jobs:
 
           PLANTNET="${PLANTNET_API_KEY:-${PUBLIC_PLANTNET_KEY:-}}"
           push_secret PLANTNET_API_KEY      "$PLANTNET"
-          push_secret ANTHROPIC_API_KEY     "${ANTHROPIC_API_KEY:-}"
+          # ANTHROPIC_API_KEY no longer synced — module 27 removed the
+          # operator-key fallback in identify; only BYO + sponsorship
+          # credentials reach Claude now.
 
           push_secret VAPID_PRIVATE_KEY     "${VAPID_PRIVATE_KEY:-}"
           push_secret VAPID_PUBLIC_KEY      "${VAPID_PUBLIC_KEY:-}"
