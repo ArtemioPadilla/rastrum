@@ -24,6 +24,7 @@ on:
     paths:
       - 'docs/specs/infra/supabase-schema.sql'
       - 'docs/specs/infra/cron-schedules.sql'
+      - 'tests/pgtap/**'
       - '.github/workflows/db-validate.yml'
 
 concurrency:
@@ -228,12 +229,6 @@ jobs:
         # surfaced by Supabase's `rls_disabled_in_public` lint after
         # PR #93: a new table shipped without an RLS line, leaving the
         # data world-writable for anyone with the project URL.
-        #
-        # Runs after the schema applies, so it sees the post-apply
-        # state including ALTER TABLE ... ENABLE ROW LEVEL SECURITY.
-        # Outputs the offending tables to the GitHub Actions log so the
-        # PR author can fix immediately — no need to wait for Supabase's
-        # post-merge lint email.
         run: |
           set -euo pipefail
           OFFENDERS=$(psql "$DATABASE_URL" -t -A -v ON_ERROR_STOP=1 <<'SQL'
@@ -241,16 +236,8 @@ jobs:
             FROM pg_class c
             JOIN pg_namespace n ON n.oid = c.relnamespace
            WHERE n.nspname = 'public'
-             -- 'r' = regular table, 'p' = partitioned table parent (RLS
-             -- is defined on the parent in Postgres; partition children
-             -- inherit it).
              AND c.relkind IN ('r', 'p')
              AND NOT c.relrowsecurity
-             -- Exclude tables owned by an extension (e.g. PostGIS's
-             -- spatial_ref_sys, pg_cron's job tables in some installs).
-             -- Extensions manage their own tables; we don't want to
-             -- police RLS on them, and Supabase's own lint excludes
-             -- them too.
              AND NOT EXISTS (
                SELECT 1 FROM pg_depend d
                 WHERE d.objid = c.oid
@@ -265,12 +252,26 @@ jobs:
             echo
             echo "Add 'ALTER TABLE <table> ENABLE ROW LEVEL SECURITY;' near the table"
             echo "definition or in the RLS POLICIES section of supabase-schema.sql."
-            echo "See docs/specs/infra/users-column-grants.md for the column-grant"
-            echo "pattern checklist when adding a new table that needs writes."
             exit 1
           fi
           echo "::notice::All public tables have RLS enabled ✓"
 
+      - name: Install pgTAP
+        # pgTAP is available as a package in the postgis/postgis image's
+        # underlying Debian distribution. We install the Postgres 17 build.
+        run: |
+          apt-get update -qq && apt-get install -y -qq postgresql-17-pgtap 2>/dev/null || true
+          # Fall back gracefully if apt isn't available (e.g. slim image variant):
+          # pgTAP ships a CREATE EXTENSION so the SQL still loads from the package
+          # even if the binary tools (pg_prove) are absent.
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "CREATE EXTENSION IF NOT EXISTS pgtap;" 2>/dev/null || true
+
+      - name: Run pgTAP RLS suite
+        # The test file runs inside a transaction and ROLLBACKs, so it is safe
+        # to run against the same ephemeral DB used by the schema validate steps.
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/pgtap/rls.sql
+
       - name: Summary
         run: |
-          echo "::notice::db-validate passed — schema applies cleanly to a fresh Postgres, is idempotent (2× apply pass), all sentinels exist, and every public table has RLS enabled."
+          echo "::notice::db-validate passed — schema applies cleanly, is idempotent (2× apply pass), all sentinels exist, every public table has RLS enabled, and the pgTAP RLS suite passed."
