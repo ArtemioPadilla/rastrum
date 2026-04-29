@@ -165,7 +165,10 @@ export async function checkAndBumpRateLimit(
 }
 
 export async function autoPauseSponsorship(
-  supabase: SupabaseClient, sponsorshipId: string, reason: string
+  supabase: SupabaseClient,
+  sponsorshipId: string,
+  reason: string,
+  beneficiaryId: string,
 ): Promise<void> {
   await supabase.from('sponsorships').update({
     status:        'paused',
@@ -175,9 +178,11 @@ export async function autoPauseSponsorship(
   }).eq('id', sponsorshipId);
 
   await supabase.from('admin_audit').insert({
-    actor_id: null,
-    op:       'ai_sponsorship_pause',
-    target:   sponsorshipId,
-    details:  { reason, source: 'edge_function:identify' },
+    actor_id:    beneficiaryId,
+    op:          'ai_sponsorship_pause',
+    target_type: 'sponsorship',
+    target_id:   sponsorshipId,
+    reason,
+    after:       { status: 'paused', source: 'edge_function:identify' },
   });
 }

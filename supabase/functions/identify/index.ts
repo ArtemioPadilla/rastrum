@@ -428,7 +428,7 @@ serve(async (req) => {
         sponsorshipSkipReason = rl.reason ?? 'rate_limit';
         if (rl.reason?.startsWith('rate_limit:')) {
           const ctxNow = await resolveSponsorship(db(), beneficiaryId, 'anthropic');
-          if (ctxNow) await autoPauseSponsorship(db(), ctxNow.sponsorshipId, rl.reason);
+          if (ctxNow) await autoPauseSponsorship(db(), ctxNow.sponsorshipId, rl.reason, beneficiaryId);
         }
       } else {
         sponsorshipCtx = await resolveSponsorship(db(), beneficiaryId, 'anthropic');

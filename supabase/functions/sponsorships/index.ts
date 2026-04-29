@@ -115,7 +115,12 @@ serve(async (req) => {
     }
 
     await supabase.from('admin_audit').insert({
-      actor_id: ctx.userId, op: 'ai_credential_create', target: cred?.id, details: { label, kind },
+      actor_id:    ctx.userId,
+      op:          'ai_credential_create',
+      target_type: 'sponsor_credential',
+      target_id:   cred?.id ?? null,
+      reason:      'user_created_credential',
+      after:       { label, kind },
     });
     return jsonResponse(201, cred);
   }
@@ -171,7 +176,13 @@ serve(async (req) => {
         .eq('status', 'paused')
         .eq('paused_reason', 'cred:invalid');
 
-      await supabase.from('admin_audit').insert({ actor_id: ctx.userId, op: 'ai_credential_rotate', target: credId });
+      await supabase.from('admin_audit').insert({
+        actor_id:    ctx.userId,
+        op:          'ai_credential_rotate',
+        target_type: 'sponsor_credential',
+        target_id:   credId,
+        reason:      'user_rotated_credential',
+      });
       return jsonResponse(200, { ok: true });
     }
   }
@@ -194,7 +205,13 @@ serve(async (req) => {
         .update({ revoked_at: new Date().toISOString() })
         .eq('id', credId);
       await supabase.rpc('delete_vault_secret', { p_secret_id: (cred as { vault_secret_id: string }).vault_secret_id });
-      await supabase.from('admin_audit').insert({ actor_id: ctx.userId, op: 'ai_credential_revoke', target: credId });
+      await supabase.from('admin_audit').insert({
+        actor_id:    ctx.userId,
+        op:          'ai_credential_revoke',
+        target_type: 'sponsor_credential',
+        target_id:   credId,
+        reason:      'user_revoked_credential',
+      });
       return jsonResponse(204, {});
     }
   }
@@ -245,8 +262,12 @@ serve(async (req) => {
     }
 
     await supabase.from('admin_audit').insert({
-      actor_id: ctx.userId, op: 'ai_sponsorship_create', target: sponsorship?.id,
-      details: { beneficiary_id: (beneficiary as { id: string }).id, monthly_call_cap, priority },
+      actor_id:    ctx.userId,
+      op:          'ai_sponsorship_create',
+      target_type: 'sponsorship',
+      target_id:   sponsorship?.id ?? null,
+      reason:      'user_created_sponsorship',
+      after:       { beneficiary_id: (beneficiary as { id: string }).id, monthly_call_cap, priority },
     });
     return jsonResponse(201, sponsorship);
   }
@@ -281,7 +302,7 @@ serve(async (req) => {
         .from('admin_audit')
         .select('id')
         .eq('op', 'ai_sponsorship_pause')
-        .eq('target', id)
+        .eq('target_id', id)
         .gte('created_at', sevenDaysAgo);
       if ((pauseRows?.length ?? 0) >= 3) {
         return jsonResponse(409, { error: 'three_strike', advice: 'revoke_and_recreate' });
@@ -290,7 +311,13 @@ serve(async (req) => {
       await supabase.from('sponsorships').update({
         status: 'active', paused_reason: null, paused_at: null, updated_at: new Date().toISOString(),
       }).eq('id', id);
-      await supabase.from('admin_audit').insert({ actor_id: ctx.userId, op: 'ai_sponsorship_unpause', target: id });
+      await supabase.from('admin_audit').insert({
+        actor_id:    ctx.userId,
+        op:          'ai_sponsorship_unpause',
+        target_type: 'sponsorship',
+        target_id:   id,
+        reason:      'sponsor_unpaused',
+      });
       return jsonResponse(200, { ok: true });
     }
   }
@@ -389,7 +416,13 @@ serve(async (req) => {
       await supabase.from('sponsorships').update({
         status: 'revoked', updated_at: new Date().toISOString(),
       }).eq('id', id);
-      await supabase.from('admin_audit').insert({ actor_id: ctx.userId, op: 'ai_sponsorship_revoke', target: id });
+      await supabase.from('admin_audit').insert({
+        actor_id:    ctx.userId,
+        op:          'ai_sponsorship_revoke',
+        target_type: 'sponsorship',
+        target_id:   id,
+        reason:      'party_revoked_sponsorship',
+      });
       return jsonResponse(204, {});
     }
   }
