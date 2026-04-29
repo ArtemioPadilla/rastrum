@@ -1,0 +1,294 @@
+---
+import { t } from '../i18n/utils';
+
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+---
+
+<section class="max-w-6xl">
+  <p class="mb-4 text-sm text-zinc-600 dark:text-zinc-400">{tr.console.badges_intro}</p>
+
+  <div id="badges-not-auth" class="hidden rounded border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-900 dark:text-amber-100">
+    {tr.console.not_authorized}
+  </div>
+
+  <div id="badges-shell" class="hidden grid grid-cols-1 md:grid-cols-[300px_1fr] gap-4" style="height:calc(100vh - 180px)">
+    <!-- Left: badge list -->
+    <aside class="flex flex-col border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden">
+      <div class="p-2 border-b border-zinc-200 dark:border-zinc-800 space-y-1.5">
+        <input
+          id="badges-search"
+          type="search"
+          placeholder={tr.console.badges_search_placeholder}
+          class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm"
+        />
+        <div class="flex gap-1.5">
+          <select id="badges-filter-category" class="flex-1 rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-xs">
+            <option value="">{tr.console.badges_all_categories}</option>
+            <option value="discovery">{tr.console.badges_cat_discovery}</option>
+            <option value="mastery">{tr.console.badges_cat_mastery}</option>
+            <option value="contribution">{tr.console.badges_cat_contribution}</option>
+            <option value="community">{tr.console.badges_cat_community}</option>
+            <option value="governance">{tr.console.badges_cat_governance}</option>
+          </select>
+          <select id="badges-filter-tier" class="flex-1 rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-xs">
+            <option value="">{tr.console.badges_all_tiers}</option>
+            <option value="bronze">{tr.console.badges_tier_bronze}</option>
+            <option value="silver">{tr.console.badges_tier_silver}</option>
+            <option value="gold">{tr.console.badges_tier_gold}</option>
+            <option value="platinum">{tr.console.badges_tier_platinum}</option>
+          </select>
+        </div>
+      </div>
+      <div id="badges-list-loading" class="p-3 text-sm text-zinc-500 italic">{tr.console.loading}</div>
+      <div id="badges-list-empty" class="hidden p-3 text-sm text-zinc-500">{tr.console.badges_empty}</div>
+      <ul id="badges-list" class="hidden flex-1 overflow-y-auto divide-y divide-zinc-100 dark:divide-zinc-800"></ul>
+    </aside>
+
+    <!-- Right: badge detail -->
+    <div id="badges-detail-empty" class="flex items-center justify-center text-sm text-zinc-400 dark:text-zinc-600 border border-dashed border-zinc-200 dark:border-zinc-700 rounded-lg">
+      {tr.console.badges_select_prompt}
+    </div>
+    <div id="badges-detail" class="hidden border border-zinc-200 dark:border-zinc-800 rounded-lg p-5 overflow-y-auto space-y-5">
+      <div class="flex items-start gap-4">
+        <div id="badges-detail-icon" class="text-4xl w-14 h-14 flex items-center justify-center rounded-xl bg-zinc-100 dark:bg-zinc-800 shrink-0"></div>
+        <div class="min-w-0">
+          <div id="badges-detail-name-en" class="text-lg font-semibold text-zinc-900 dark:text-zinc-100"></div>
+          <div id="badges-detail-name-es" class="text-sm text-zinc-500 dark:text-zinc-400"></div>
+          <div class="mt-1 flex gap-1.5" id="badges-detail-chips"></div>
+        </div>
+      </div>
+
+      <div>
+        <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-1">{tr.console.badges_desc_heading}</h3>
+        <p id="badges-detail-desc-en" class="text-sm text-zinc-700 dark:text-zinc-300 mb-1"></p>
+        <p id="badges-detail-desc-es" class="text-xs text-zinc-500 dark:text-zinc-500 italic"></p>
+      </div>
+
+      <div>
+        <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-1">{tr.console.badges_criteria_heading}</h3>
+        <pre id="badges-detail-criteria" class="text-xs bg-zinc-50 dark:bg-zinc-900 rounded p-3 overflow-x-auto text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap"></pre>
+      </div>
+
+      <div>
+        <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-2">{tr.console.badges_holders_heading}</h3>
+        <div id="badges-detail-holders" class="text-sm text-zinc-700 dark:text-zinc-300"></div>
+      </div>
+
+      <div class="pt-2 border-t border-zinc-100 dark:border-zinc-800">
+        <button
+          disabled
+          title={tr.console.badges_award_coming}
+          class="opacity-40 cursor-not-allowed inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-emerald-600 text-white text-sm font-medium"
+        >
+          {tr.console.badges_award_btn}
+        </button>
+        <span class="ml-2 text-xs text-zinc-400">{tr.console.badges_award_coming}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tier distribution bar chart -->
+  <div id="badges-chart" class="hidden mt-6">
+    <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-3">{tr.console.badges_tier_dist_heading}</h3>
+    <div id="badges-chart-bars" class="flex gap-3 items-end h-16"></div>
+  </div>
+
+  <p id="badges-error" class="hidden mt-3 text-sm text-red-600 dark:text-red-400"></p>
+</section>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { getUserRoles } from '../lib/user-roles';
+
+  type BadgeRow = {
+    key: string;
+    name_en: string;
+    name_es: string;
+    description_en: string;
+    description_es: string;
+    category: string;
+    tier: string;
+    art_url: string | null;
+    rule_json: unknown;
+    retired_at: string | null;
+    created_at: string;
+  };
+
+  const TIER_COLORS: Record<string, string> = {
+    bronze:   'bg-amber-700',
+    silver:   'bg-zinc-400',
+    gold:     'bg-yellow-400',
+    platinum: 'bg-sky-400',
+  };
+
+  const CAT_COLORS: Record<string, string> = {
+    discovery:    'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300',
+    mastery:      'bg-violet-100 dark:bg-violet-900/40 text-violet-800 dark:text-violet-300',
+    contribution: 'bg-sky-100 dark:bg-sky-900/40 text-sky-800 dark:text-sky-300',
+    community:    'bg-rose-100 dark:bg-rose-900/40 text-rose-800 dark:text-rose-300',
+    governance:   'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300',
+  };
+
+  function show(id: string) { document.getElementById(id)?.classList.remove('hidden'); }
+  function hide(id: string) { document.getElementById(id)?.classList.add('hidden'); }
+  function escHtml(s: string): string {
+    return s.replace(/[<>&'"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&#39;','"':'&quot;'}[c]!));
+  }
+
+  let allBadges: BadgeRow[] = [];
+  let filtered: BadgeRow[] = [];
+  let selectedKey: string | null = null;
+
+  const supabase = getSupabase();
+
+  async function init() {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) { show('badges-not-auth'); return; }
+    const myRoles = await getUserRoles(session.user.id);
+    if (!myRoles.has('admin')) { show('badges-not-auth'); return; }
+    show('badges-shell');
+    await loadBadges();
+    renderChart();
+    show('badges-chart');
+  }
+
+  async function loadBadges() {
+    hide('badges-list-empty');
+    hide('badges-list');
+    show('badges-list-loading');
+
+    const { data, error } = await supabase
+      .from('badges')
+      .select('*')
+      .order('tier', { ascending: false })
+      .order('category', { ascending: true })
+      .order('name_en', { ascending: true });
+
+    hide('badges-list-loading');
+
+    if (error) {
+      const e = document.getElementById('badges-error')!;
+      e.textContent = error.message;
+      show('badges-error');
+      return;
+    }
+
+    allBadges = (data ?? []) as BadgeRow[];
+    applyFilter();
+  }
+
+  function applyFilter() {
+    const q = (document.getElementById('badges-search') as HTMLInputElement)?.value.toLowerCase() ?? '';
+    const cat = (document.getElementById('badges-filter-category') as HTMLSelectElement)?.value ?? '';
+    const tier = (document.getElementById('badges-filter-tier') as HTMLSelectElement)?.value ?? '';
+
+    filtered = allBadges.filter(b => {
+      if (cat && b.category !== cat) return false;
+      if (tier && b.tier !== tier) return false;
+      if (q && !b.name_en.toLowerCase().includes(q) && !b.name_es.toLowerCase().includes(q)) return false;
+      return true;
+    });
+
+    if (filtered.length === 0) {
+      hide('badges-list');
+      show('badges-list-empty');
+      return;
+    }
+    renderList();
+    show('badges-list');
+    hide('badges-list-empty');
+  }
+
+  function renderList() {
+    const ul = document.getElementById('badges-list')!;
+    ul.innerHTML = filtered.map(b => {
+      const isSelected = b.key === selectedKey ? 'bg-zinc-100 dark:bg-zinc-800/60' : '';
+      const tierDot = `<span class="inline-block w-2 h-2 rounded-full ${TIER_COLORS[b.tier] ?? 'bg-zinc-400'} mr-1"></span>`;
+      const retired = b.retired_at ? '<span class="text-[10px] text-zinc-400 ml-1">(retired)</span>' : '';
+      return `<li data-badge-key="${escHtml(b.key)}" class="px-3 py-2 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/40 ${isSelected}">
+        <div class="flex items-center gap-1.5">
+          ${tierDot}
+          <span class="font-medium text-sm text-zinc-900 dark:text-zinc-100">${escHtml(b.name_en)}</span>
+          ${retired}
+        </div>
+        <div class="text-xs text-zinc-500 mt-0.5 capitalize">${escHtml(b.category)}</div>
+      </li>`;
+    }).join('');
+  }
+
+  async function selectBadge(key: string) {
+    selectedKey = key;
+    const b = allBadges.find(x => x.key === key);
+    if (!b) return;
+    renderList();
+    hide('badges-detail-empty');
+    show('badges-detail');
+
+    document.getElementById('badges-detail-icon')!.textContent = b.art_url ?? '🏅';
+    document.getElementById('badges-detail-name-en')!.textContent = b.name_en;
+    document.getElementById('badges-detail-name-es')!.textContent = b.name_es;
+    document.getElementById('badges-detail-desc-en')!.textContent = b.description_en;
+    document.getElementById('badges-detail-desc-es')!.textContent = b.description_es;
+    document.getElementById('badges-detail-criteria')!.textContent = JSON.stringify(b.rule_json, null, 2);
+
+    const chips = document.getElementById('badges-detail-chips')!;
+    const tierClass = TIER_COLORS[b.tier] ?? 'bg-zinc-400';
+    const catClass = CAT_COLORS[b.category] ?? 'bg-zinc-100 text-zinc-700';
+    chips.innerHTML = `
+      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold text-white ${tierClass}">${escHtml(b.tier)}</span>
+      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${catClass}">${escHtml(b.category)}</span>
+      ${b.retired_at ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400">retired</span>' : ''}
+    `;
+
+    const holdersDiv = document.getElementById('badges-detail-holders')!;
+    holdersDiv.textContent = '…';
+    try {
+      const { count, error } = await supabase
+        .from('user_badges')
+        .select('id', { count: 'exact', head: true })
+        .eq('badge_key', key)
+        .is('revoked_at', null);
+      if (error) throw error;
+      holdersDiv.textContent = String(count ?? 0);
+    } catch {
+      holdersDiv.textContent = '—';
+    }
+  }
+
+  function renderChart() {
+    const tiers = ['bronze', 'silver', 'gold', 'platinum'];
+    const counts = Object.fromEntries(tiers.map(t => [t, allBadges.filter(b => b.tier === t).length]));
+    const max = Math.max(1, ...Object.values(counts));
+    const bars = document.getElementById('badges-chart-bars')!;
+    bars.innerHTML = tiers.map(tier => {
+      const h = Math.round((counts[tier] / max) * 60);
+      const colorClass = TIER_COLORS[tier] ?? 'bg-zinc-400';
+      return `<div class="flex flex-col items-center gap-1">
+        <span class="text-xs text-zinc-500">${counts[tier]}</span>
+        <div class="w-10 rounded-t ${colorClass}" style="height:${h}px"></div>
+        <span class="text-xs text-zinc-500 capitalize">${tier}</span>
+      </div>`;
+    }).join('');
+  }
+
+  document.addEventListener('click', (ev) => {
+    const li = (ev.target as HTMLElement).closest<HTMLElement>('li[data-badge-key]');
+    if (li?.dataset.badgeKey) selectBadge(li.dataset.badgeKey);
+  });
+
+  let searchTimer: ReturnType<typeof setTimeout> | null = null;
+  document.getElementById('badges-search')?.addEventListener('input', () => {
+    if (searchTimer) clearTimeout(searchTimer);
+    searchTimer = setTimeout(applyFilter, 250);
+  });
+  document.getElementById('badges-filter-category')?.addEventListener('change', applyFilter);
+  document.getElementById('badges-filter-tier')?.addEventListener('change', applyFilter);
+
+  init().catch(err => {
+    const e = document.getElementById('badges-error')!;
+    e.textContent = (err as Error).message;
+    show('badges-error');
+  });
+</script>
