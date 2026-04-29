@@ -6,6 +6,19 @@ const tr = t(lang);
 const cancelLabel = lang === 'es' ? 'Cancelar' : 'Cancel';
 const okLabel = lang === 'es' ? 'Aceptar' : 'OK';
 const statusHeading = lang === 'es' ? 'Estado' : 'Status';
+const credentialLabel = lang === 'es' ? 'Credencial' : 'Credential';
+const i18nBag = {
+  below_engagement_threshold: tr.sponsoring.below_engagement_threshold,
+  covered_by_subscription:    tr.sponsoring.covered_by_subscription,
+  self_sponsorship_badge:     tr.sponsoring.self_sponsorship_badge,
+  paused_reason: {
+    rate_limit:         tr.sponsoring.paused_reason_rate_limit,
+    cred_invalid:       tr.sponsoring.paused_reason_cred_invalid,
+    credential_revoked: tr.sponsoring.paused_reason_credential_revoked,
+    sponsor_revoked:    tr.sponsoring.paused_reason_sponsor_revoked,
+    other:              tr.sponsoring.paused_reason_other,
+  },
+};
 ---
 
 <section class="max-w-4xl mx-auto p-6 space-y-10">
@@ -50,8 +63,27 @@ const statusHeading = lang === 'es' ? 'Estado' : 'Status';
   <!-- Section C: Analytics -->
   <section class="space-y-4">
     <h2 class="text-lg font-semibold">{tr.sponsoring.analytics_section}</h2>
-    <div id="analytics-content" class="space-y-2 text-sm text-zinc-600 dark:text-zinc-400">
-      <p>—</p>
+    <div id="analytics-content" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4">
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">{tr.sponsoring.calls_last_30d}</h3>
+        <svg id="sparkline" class="w-full h-16" viewBox="0 0 300 64" preserveAspectRatio="none">
+          <polyline id="sparkline-path" fill="none" stroke="currentColor" stroke-width="1.5" class="text-emerald-600" points="" />
+        </svg>
+        <p id="sparkline-total" class="mt-1 text-sm font-medium">—</p>
+      </div>
+      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4">
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">{tr.sponsoring.top_beneficiaries}</h3>
+        <ul id="top-bens" class="text-sm space-y-1"></ul>
+      </div>
+      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4">
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">{tr.sponsoring.karma_generated}</h3>
+        <p id="karma-this-month" class="text-2xl font-bold text-emerald-700 dark:text-emerald-400">—</p>
+      </div>
+      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4">
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">{tr.sponsoring.estimated_cost}</h3>
+        <p id="estimated-cost" class="text-2xl font-bold">—</p>
+        <p id="estimated-cost-note" class="text-xs text-zinc-500 mt-1"></p>
+      </div>
     </div>
   </section>
 
@@ -66,6 +98,7 @@ const statusHeading = lang === 'es' ? 'Estado' : 'Status';
       <div>
         <label class="block text-sm font-medium" for="cred-secret-input">{tr.sponsoring.credential_secret}</label>
         <input id="cred-secret-input" name="secret" type="password" autocomplete="off" required class="mt-1 block w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-mono bg-white dark:bg-zinc-900" />
+        <p id="cred-kind-preview" class="mt-1 text-xs text-zinc-500"></p>
         <p class="mt-1 text-xs text-zinc-500">{tr.sponsoring.secret_help}</p>
       </div>
       <div class="flex gap-2 justify-end">
@@ -98,6 +131,10 @@ const statusHeading = lang === 'es' ? 'Estado' : 'Status';
         <input id="ben-username-input" name="username" required class="mt-1 block w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm bg-white dark:bg-zinc-900" />
       </div>
       <div>
+        <label class="block text-sm font-medium" for="ben-cred-select">{credentialLabel}</label>
+        <select id="ben-cred-select" required class="mt-1 block w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm bg-white dark:bg-zinc-900"></select>
+      </div>
+      <div>
         <label class="block text-sm font-medium" for="ben-cap-input">{tr.sponsoring.monthly_cap}</label>
         <input id="ben-cap-input" name="cap" type="number" min="1" max="10000" value="200" required class="mt-1 block w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm bg-white dark:bg-zinc-900" />
       </div>
@@ -107,13 +144,43 @@ const statusHeading = lang === 'es' ? 'Estado' : 'Status';
       </div>
     </form>
   </dialog>
+
+  <dialog id="confirm-dialog" class="rounded-xl p-6 max-w-md backdrop:bg-black/50">
+    <p id="confirm-message" class="text-sm">—</p>
+    <div class="mt-4 flex gap-2 justify-end">
+      <button type="button" id="confirm-no" class="px-3 py-1.5 text-sm rounded border border-zinc-300 dark:border-zinc-700">{cancelLabel}</button>
+      <button type="submit" id="confirm-yes" class="px-3 py-1.5 text-sm rounded bg-red-600 text-white">{okLabel}</button>
+    </div>
+  </dialog>
 </section>
+
+<script type="application/json" id="sponsoring-i18n" set:html={JSON.stringify(i18nBag)} />
 
 <script>
   import {
     listCredentials, createCredential, rotateCredential, deleteCredential,
     listSponsorships, createSponsorship, unpauseSponsorship, revokeSponsorship,
+    detectKind,
   } from '../lib/sponsorships';
+
+  type I18nBag = {
+    below_engagement_threshold: string;
+    covered_by_subscription: string;
+    self_sponsorship_badge: string;
+    paused_reason: {
+      rate_limit: string;
+      cred_invalid: string;
+      credential_revoked: string;
+      sponsor_revoked: string;
+      other: string;
+    };
+  };
+  const tr: I18nBag = JSON.parse(
+    (document.getElementById('sponsoring-i18n') as HTMLScriptElement | null)?.textContent ?? '{}'
+  ) as I18nBag;
+
+  const HAIKU_45_INPUT_USD_PER_1K  = 0.001;
+  const HAIKU_45_OUTPUT_USD_PER_1K = 0.005;
 
   const escHtml = (s: string): string => s
     .replace(/&/g, '&amp;')
@@ -126,6 +193,30 @@ const statusHeading = lang === 'es' ? 'Estado' : 'Status';
     if (!s) return '';
     const d = new Date(s);
     return d.toLocaleDateString();
+  }
+
+  function friendlyPausedReason(raw: string | null): string {
+    if (!raw) return '';
+    if (raw.startsWith('rate_limit:'))    return tr.paused_reason.rate_limit;
+    if (raw === 'cred:invalid')           return tr.paused_reason.cred_invalid;
+    if (raw === 'credential_revoked')     return tr.paused_reason.credential_revoked;
+    if (raw === 'sponsor_revoked')        return tr.paused_reason.sponsor_revoked;
+    return tr.paused_reason.other;
+  }
+
+  function showConfirm(message: string): Promise<boolean> {
+    return new Promise((resolve) => {
+      const dlg = document.getElementById('confirm-dialog') as HTMLDialogElement | null;
+      const msgEl = document.getElementById('confirm-message');
+      const yes = document.getElementById('confirm-yes');
+      const no = document.getElementById('confirm-no');
+      if (!dlg || !msgEl || !yes || !no) { resolve(false); return; }
+      msgEl.textContent = message;
+      const cleanup = () => { yes.onclick = null; no.onclick = null; };
+      yes.onclick = () => { cleanup(); dlg.close(); resolve(true); };
+      no.onclick  = () => { cleanup(); dlg.close(); resolve(false); };
+      dlg.showModal();
+    });
   }
 
   async function refreshCreds() {
@@ -160,6 +251,16 @@ const statusHeading = lang === 'es' ? 'Estado' : 'Status';
   const addCredDialog = document.getElementById('add-cred-dialog') as HTMLDialogElement | null;
   document.getElementById('add-cred-btn')?.addEventListener('click', () => addCredDialog?.showModal());
   document.getElementById('cred-cancel')?.addEventListener('click', () => addCredDialog?.close());
+  document.getElementById('cred-secret-input')?.addEventListener('input', (e) => {
+    const val = (e.target as HTMLInputElement).value;
+    const kind = detectKind(val);
+    const preview = document.getElementById('cred-kind-preview');
+    if (!preview) return;
+    if (!val)                          preview.textContent = '';
+    else if (kind === 'api_key')       preview.textContent = '✓ API Key (sk-ant-api03-…)';
+    else if (kind === 'oauth_token')   preview.textContent = '✓ Long-lived token (sk-ant-oat01-…)';
+    else                               preview.textContent = '⚠ Unrecognized prefix (must start with sk-ant-api03- or sk-ant-oat01-)';
+  });
   addCredDialog?.querySelector('form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const label  = (document.getElementById('cred-label-input')  as HTMLInputElement).value.trim();
@@ -168,6 +269,8 @@ const statusHeading = lang === 'es' ? 'Estado' : 'Status';
     try {
       await createCredential({ label, secret });
       (document.getElementById('cred-secret-input') as HTMLInputElement).value = '';
+      const preview = document.getElementById('cred-kind-preview');
+      if (preview) preview.textContent = '';
       addCredDialog?.close();
       await refreshCreds();
     } catch (err) { alert(`Error: ${(err as Error).message}`); }
@@ -194,7 +297,7 @@ const statusHeading = lang === 'es' ? 'Estado' : 'Status';
       (document.getElementById('rotate-cred-id') as HTMLInputElement).value = target.dataset.rotate;
       rotateDialog?.showModal();
     } else if (target.dataset.revoke) {
-      if (confirm('Revoke this credential? Sponsorships using it will be paused.')) {
+      if (await showConfirm('Revoke this credential? Sponsorships using it will be paused.')) {
         await deleteCredential(target.dataset.revoke);
         await refreshCreds();
         await refreshBens();
@@ -208,17 +311,36 @@ const statusHeading = lang === 'es' ? 'Estado' : 'Status';
     let bens: Awaited<ReturnType<typeof listSponsorships>> = [];
     try { bens = await listSponsorships('sponsor'); } catch { /* silent */ }
     tbody.innerHTML = '';
+
+    const supabase = (await import('../lib/supabase')).getSupabase();
+    const { data: { user } } = await supabase.auth.getUser();
+    const myId = user?.id;
+
+    const ids = Array.from(new Set(bens.map(b => b.beneficiary_id)));
+    let usersMap: Record<string, { username: string; display_name?: string }> = {};
+    if (ids.length > 0) {
+      const { data: users } = await supabase.from('users').select('id,username,display_name').in('id', ids);
+      const userRows = (users ?? []) as Array<{ id: string; username: string; display_name?: string }>;
+      usersMap = Object.fromEntries(userRows.map(u => [u.id, u]));
+    }
+
     for (const b of bens) {
       const row = document.createElement('tr');
       row.className = 'border-t border-zinc-200 dark:border-zinc-800';
       const statusColor = b.status === 'active' ? 'text-emerald-600' :
                           b.status === 'paused' ? 'text-amber-600' : 'text-zinc-500';
-      const pausedExtra = b.paused_reason ? ` (${escHtml(b.paused_reason)})` : '';
+      const pausedExtra = b.paused_reason ? ` (${escHtml(friendlyPausedReason(b.paused_reason))})` : '';
       const unpauseBtn = b.status === 'paused'
         ? `<button data-unpause="${escHtml(b.id)}" class="text-sm text-emerald-700">Reactivate</button>`
         : '';
+      const u = usersMap[b.beneficiary_id];
+      const benName = u ? escHtml(u.display_name || u.username) : escHtml(b.beneficiary_id.slice(0, 8) + '…');
+      const benHandle = u ? `<span class="text-xs text-zinc-500">@${escHtml(u.username)}</span>` : '';
+      const selfBadge = b.beneficiary_id === myId
+        ? `<span class="ml-1 px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 text-xs">${escHtml(tr.self_sponsorship_badge)}</span>`
+        : '';
       row.innerHTML = `
-        <td class="py-2 pr-4">${escHtml(b.beneficiary_id.slice(0, 8))}…</td>
+        <td class="py-2 pr-4">${benName} ${benHandle}${selfBadge}</td>
         <td class="py-2 pr-4">${b.monthly_call_cap}</td>
         <td class="py-2 pr-4">${b.priority}</td>
         <td class="py-2 pr-4"><span class="${statusColor}">${escHtml(b.status)}${pausedExtra}</span></td>
@@ -235,6 +357,12 @@ const statusHeading = lang === 'es' ? 'Estado' : 'Status';
     let creds: Awaited<ReturnType<typeof listCredentials>> = [];
     try { creds = await listCredentials(); } catch { alert('Could not load credentials.'); return; }
     if (creds.length === 0) { alert('Add a credential first.'); return; }
+    const select = document.getElementById('ben-cred-select') as HTMLSelectElement | null;
+    if (select) {
+      select.innerHTML = creds.filter(c => !c.revoked_at).map(c =>
+        `<option value="${escHtml(c.id)}">${escHtml(c.label)} (${escHtml(c.kind)})</option>`
+      ).join('');
+    }
     addBenDialog?.showModal();
   });
   document.getElementById('ben-cancel')?.addEventListener('click', () => addBenDialog?.close());
@@ -243,10 +371,9 @@ const statusHeading = lang === 'es' ? 'Estado' : 'Status';
     const username = (document.getElementById('ben-username-input') as HTMLInputElement).value.trim();
     const cap = parseInt((document.getElementById('ben-cap-input') as HTMLInputElement).value || '200', 10);
     if (!username) return;
-    let creds: Awaited<ReturnType<typeof listCredentials>> = [];
-    try { creds = await listCredentials(); } catch { return; }
-    if (creds.length === 0) return;
-    const credential_id = creds[0].id;
+    const credSelect = document.getElementById('ben-cred-select') as HTMLSelectElement | null;
+    const credential_id = credSelect?.value;
+    if (!credential_id) return;
     try {
       await createSponsorship({ beneficiary_username: username, credential_id, monthly_call_cap: cap });
       (document.getElementById('ben-username-input') as HTMLInputElement).value = '';
@@ -262,10 +389,104 @@ const statusHeading = lang === 'es' ? 'Estado' : 'Status';
       if (r.error === 'three_strike') alert('Three-strike: revoke and recreate.');
       await refreshBens();
     } else if (target.dataset.revokeSpons) {
-      if (confirm('Revoke?')) { await revokeSponsorship(target.dataset.revokeSpons); await refreshBens(); }
+      if (await showConfirm('Revoke?')) {
+        await revokeSponsorship(target.dataset.revokeSpons);
+        await refreshBens();
+      }
     }
   });
 
+  async function refreshAnalytics() {
+    const supabase = (await import('../lib/supabase')).getSupabase();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60_000).toISOString();
+    const monthStart    = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+
+    const { data: usageRows } = await supabase
+      .from('ai_usage')
+      .select('occurred_at, beneficiary_id, tokens_in, tokens_out')
+      .eq('sponsor_id', user.id)
+      .gte('occurred_at', thirtyDaysAgo)
+      .order('occurred_at', { ascending: true });
+
+    const byDay: Record<string, number> = {};
+    let totalTokensIn = 0, totalTokensOut = 0;
+    let hasOauthOnly = true;
+    const benCounts: Record<string, number> = {};
+    type UsageRow = { occurred_at: string; beneficiary_id: string; tokens_in?: number | null; tokens_out?: number | null };
+    for (const row of (usageRows ?? []) as UsageRow[]) {
+      const d = row.occurred_at.slice(0, 10);
+      byDay[d] = (byDay[d] ?? 0) + 1;
+      benCounts[row.beneficiary_id] = (benCounts[row.beneficiary_id] ?? 0) + 1;
+      if (row.tokens_in != null || row.tokens_out != null) hasOauthOnly = false;
+      totalTokensIn  += row.tokens_in  ?? 0;
+      totalTokensOut += row.tokens_out ?? 0;
+    }
+
+    const days: string[] = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 24 * 60 * 60_000).toISOString().slice(0, 10);
+      days.push(d);
+    }
+    const counts = days.map(d => byDay[d] ?? 0);
+    const maxCount = Math.max(...counts, 1);
+    const points = counts.map((c, i) => `${(i / 29) * 300},${64 - (c / maxCount) * 60}`).join(' ');
+    const sparklineEl = document.getElementById('sparkline-path') as SVGPolylineElement | null;
+    if (sparklineEl) sparklineEl.setAttribute('points', points);
+    const totalEl = document.getElementById('sparkline-total');
+    if (totalEl) totalEl.textContent = `${counts.reduce((s, c) => s + c, 0)} total`;
+
+    const topIds = Object.entries(benCounts).sort((a, b) => b[1] - a[1]).slice(0, 3);
+    const topBensEl = document.getElementById('top-bens');
+    if (topBensEl) {
+      if (topIds.length === 0) {
+        topBensEl.innerHTML = `<li class="text-zinc-500">—</li>`;
+      } else {
+        const ids = topIds.map(([id]) => id);
+        const { data: users } = await supabase.from('users').select('id,username,display_name,karma_total').in('id', ids);
+        type UserRow = { id: string; username: string; display_name?: string; karma_total: number };
+        const userRows = (users ?? []) as UserRow[];
+        const usersMap: Record<string, UserRow> = Object.fromEntries(userRows.map(u => [u.id, u]));
+        topBensEl.innerHTML = topIds.map(([id, count]) => {
+          const u = usersMap[id];
+          const name = u?.display_name || u?.username || id.slice(0, 8) + '…';
+          const lowKarma = u && u.karma_total < 10;
+          const note = lowKarma
+            ? `<span class="block text-xs text-zinc-500 mt-0.5">${escHtml(tr.below_engagement_threshold.replace('{username}', u.username))}</span>`
+            : '';
+          return `<li><span class="font-medium">${escHtml(name)}</span> <span class="text-zinc-500">— ${count} calls</span>${note}</li>`;
+        }).join('');
+      }
+    }
+
+    const { data: karmaRows } = await supabase
+      .from('karma_events')
+      .select('delta')
+      .eq('user_id', user.id)
+      .eq('reason', 'ai_sponsor_call')
+      .gte('created_at', monthStart);
+    const karma = ((karmaRows ?? []) as Array<{ delta: number }>).reduce((s, r) => s + Number(r.delta), 0);
+    const karmaEl = document.getElementById('karma-this-month');
+    if (karmaEl) karmaEl.textContent = `+${karma}`;
+
+    const costEl = document.getElementById('estimated-cost');
+    const costNoteEl = document.getElementById('estimated-cost-note');
+    if (costEl && costNoteEl) {
+      if (hasOauthOnly && (totalTokensIn === 0 && totalTokensOut === 0)) {
+        costEl.textContent = '$0.00';
+        costNoteEl.textContent = tr.covered_by_subscription;
+      } else {
+        const usd = (totalTokensIn / 1000) * HAIKU_45_INPUT_USD_PER_1K
+                  + (totalTokensOut / 1000) * HAIKU_45_OUTPUT_USD_PER_1K;
+        costEl.textContent = `$${usd.toFixed(2)}`;
+        costNoteEl.textContent = `${totalTokensIn.toLocaleString()} in / ${totalTokensOut.toLocaleString()} out (last 30d)`;
+      }
+    }
+  }
+
   refreshCreds();
   refreshBens();
+  refreshAnalytics();
 </script>
