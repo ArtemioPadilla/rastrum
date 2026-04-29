@@ -853,6 +853,13 @@
           "label": "Visitor /u/<handle>/dex/ route — public pokedex page so the link on PublicProfileViewV2 doesn't have to be hidden for non-owners (PR #68 currently hides it). Was previously buried in tasks.md as v1.2.2 cleanup deferred; promoting to a real backlog entry",
           "label_es": "Ruta de Pokédex visitante /u/<handle>/dex/ — página de pokédex pública para que el enlace en PublicProfileViewV2 no tenga que esconderse a no-dueños (PR #68 lo esconde por ahora). Estaba enterrada en tasks.md como cleanup de v1.2.2 diferido; ahora promovida a backlog explícito",
           "done": false
+        },
+        {
+          "id": "ci-rls-presence-check",
+          "label": "CI gate — db-validate.yml fails if any public.* table lacks ENABLE ROW LEVEL SECURITY. Closes the loop on the Supabase rls_disabled_in_public lint by catching missing RLS at PR review time instead of via the after-the-fact security alert email",
+          "label_es": "Gate CI — db-validate.yml falla si cualquier tabla public.* no tiene ENABLE ROW LEVEL SECURITY. Cierra el ciclo del lint rls_disabled_in_public de Supabase atrapando RLS faltante en PR review en lugar de via el email de alerta de seguridad post-merge",
+          "done": true,
+          "done_at": "2026-04-29"
         }
       ]
     },

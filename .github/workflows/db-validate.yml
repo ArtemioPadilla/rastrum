@@ -11,10 +11,13 @@ name: db-validate
 #   - Forward references (function used before it's defined)
 #   - Missing extensions (postgis, pg_cron) — handled via image features
 #   - Missing IF NOT EXISTS / OR REPLACE on a real second-run pass
+#   - public.* tables that ship without ENABLE ROW LEVEL SECURITY
+#     (caught Supabase's `rls_disabled_in_public` lint case post-PR #93)
 #
 # What this does NOT catch:
 #   - Behavior under real user data (this is a smoke validate, not pgTAP)
-#   - RLS correctness (separate pgTAP suite would handle that — future PR)
+#   - RLS POLICY correctness (separate pgTAP suite would handle that —
+#     future PR; we only check the ENABLE flag here, not policy logic)
 
 on:
   pull_request:
@@ -219,6 +222,55 @@ jobs:
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f scripts/db-sentinel.sql
 
+      - name: RLS presence check on every public table
+        # Pre-merge gate that fails if ANY table in the public schema
+        # lacks ENABLE ROW LEVEL SECURITY. Catches the class of bug
+        # surfaced by Supabase's `rls_disabled_in_public` lint after
+        # PR #93: a new table shipped without an RLS line, leaving the
+        # data world-writable for anyone with the project URL.
+        #
+        # Runs after the schema applies, so it sees the post-apply
+        # state including ALTER TABLE ... ENABLE ROW LEVEL SECURITY.
+        # Outputs the offending tables to the GitHub Actions log so the
+        # PR author can fix immediately — no need to wait for Supabase's
+        # post-merge lint email.
+        run: |
+          set -euo pipefail
+          OFFENDERS=$(psql "$DATABASE_URL" -t -A -v ON_ERROR_STOP=1 <<'SQL'
+          SELECT n.nspname || '.' || c.relname
+            FROM pg_class c
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+           WHERE n.nspname = 'public'
+             -- 'r' = regular table, 'p' = partitioned table parent (RLS
+             -- is defined on the parent in Postgres; partition children
+             -- inherit it).
+             AND c.relkind IN ('r', 'p')
+             AND NOT c.relrowsecurity
+             -- Exclude tables owned by an extension (e.g. PostGIS's
+             -- spatial_ref_sys, pg_cron's job tables in some installs).
+             -- Extensions manage their own tables; we don't want to
+             -- police RLS on them, and Supabase's own lint excludes
+             -- them too.
+             AND NOT EXISTS (
+               SELECT 1 FROM pg_depend d
+                WHERE d.objid = c.oid
+                  AND d.deptype = 'e'
+             )
+           ORDER BY 1;
+          SQL
+          )
+          if [ -n "$OFFENDERS" ]; then
+            echo "::error::Tables in public schema without ENABLE ROW LEVEL SECURITY:"
+            echo "$OFFENDERS" | sed 's/^/::error::  - /'
+            echo
+            echo "Add 'ALTER TABLE <table> ENABLE ROW LEVEL SECURITY;' near the table"
+            echo "definition or in the RLS POLICIES section of supabase-schema.sql."
+            echo "See docs/specs/infra/users-column-grants.md for the column-grant"
+            echo "pattern checklist when adding a new table that needs writes."
+            exit 1
+          fi
+          echo "::notice::All public tables have RLS enabled ✓"
+
       - name: Summary
         run: |
-          echo "::notice::db-validate passed — schema applies cleanly to a fresh Postgres, is idempotent (2× apply pass), and all sentinels exist."
+          echo "::notice::db-validate passed — schema applies cleanly to a fresh Postgres, is idempotent (2× apply pass), all sentinels exist, and every public table has RLS enabled."
