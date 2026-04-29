@@ -181,7 +181,7 @@ const obsIdPlaceholder = '';
         .select(`
           id, observed_at, obscure_level, state_province, habitat, observer_id,
           identifications(scientific_name, is_primary, is_research_grade),
-          users(display_name, username, profile_public)
+          users:observer_id(display_name, username, profile_public)
         `)
         .eq('id', id)
         .maybeSingle();
