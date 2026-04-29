@@ -3619,6 +3619,22 @@ CREATE POLICY ai_usage_party_read ON public.ai_usage
   FOR SELECT TO authenticated
   USING (sponsor_id = auth.uid() OR beneficiary_id = auth.uid());
 
+-- Defense-in-depth: explicitly deny INSERT/UPDATE/DELETE from authenticated
+-- and anon clients via RESTRICTIVE policies. Without these, RLS already
+-- denies (no permissive policy = denied), but explicit RESTRICTIVE policies
+-- guarantee a future "auto-expose new tables" misconfig or an accidental
+-- permissive write policy can't open a write path. Service role bypasses
+-- RLS entirely, so the Edge Function continues to write normally.
+DROP POLICY IF EXISTS ai_usage_no_client_insert ON public.ai_usage;
+CREATE POLICY ai_usage_no_client_insert ON public.ai_usage
+  AS RESTRICTIVE FOR INSERT TO authenticated, anon WITH CHECK (false);
+DROP POLICY IF EXISTS ai_usage_no_client_update ON public.ai_usage;
+CREATE POLICY ai_usage_no_client_update ON public.ai_usage
+  AS RESTRICTIVE FOR UPDATE TO authenticated, anon USING (false);
+DROP POLICY IF EXISTS ai_usage_no_client_delete ON public.ai_usage;
+CREATE POLICY ai_usage_no_client_delete ON public.ai_usage
+  AS RESTRICTIVE FOR DELETE TO authenticated, anon USING (false);
+
 -- 5. ai_rate_limits — sliding-window por buckets de 1min para detectar
 --    >30 calls / 10min. Cleanup diario.
 CREATE TABLE IF NOT EXISTS public.ai_rate_limits (
@@ -3630,6 +3646,15 @@ CREATE TABLE IF NOT EXISTS public.ai_rate_limits (
 );
 ALTER TABLE public.ai_rate_limits ENABLE ROW LEVEL SECURITY;
 -- Service-role only.
+DROP POLICY IF EXISTS ai_rate_limits_no_client_insert ON public.ai_rate_limits;
+CREATE POLICY ai_rate_limits_no_client_insert ON public.ai_rate_limits
+  AS RESTRICTIVE FOR INSERT TO authenticated, anon WITH CHECK (false);
+DROP POLICY IF EXISTS ai_rate_limits_no_client_update ON public.ai_rate_limits;
+CREATE POLICY ai_rate_limits_no_client_update ON public.ai_rate_limits
+  AS RESTRICTIVE FOR UPDATE TO authenticated, anon USING (false);
+DROP POLICY IF EXISTS ai_rate_limits_no_client_delete ON public.ai_rate_limits;
+CREATE POLICY ai_rate_limits_no_client_delete ON public.ai_rate_limits
+  AS RESTRICTIVE FOR DELETE TO authenticated, anon USING (false);
 
 -- 6. ai_usage_monthly — denormalized rollup para queries de analytics rápidas.
 CREATE TABLE IF NOT EXISTS public.ai_usage_monthly (
@@ -3649,6 +3674,15 @@ CREATE POLICY ai_usage_monthly_party_read ON public.ai_usage_monthly
     WHERE s.id = ai_usage_monthly.sponsorship_id
       AND (s.sponsor_id = auth.uid() OR s.beneficiary_id = auth.uid())
   ));
+DROP POLICY IF EXISTS ai_usage_monthly_no_client_insert ON public.ai_usage_monthly;
+CREATE POLICY ai_usage_monthly_no_client_insert ON public.ai_usage_monthly
+  AS RESTRICTIVE FOR INSERT TO authenticated, anon WITH CHECK (false);
+DROP POLICY IF EXISTS ai_usage_monthly_no_client_update ON public.ai_usage_monthly;
+CREATE POLICY ai_usage_monthly_no_client_update ON public.ai_usage_monthly
+  AS RESTRICTIVE FOR UPDATE TO authenticated, anon USING (false);
+DROP POLICY IF EXISTS ai_usage_monthly_no_client_delete ON public.ai_usage_monthly;
+CREATE POLICY ai_usage_monthly_no_client_delete ON public.ai_usage_monthly
+  AS RESTRICTIVE FOR DELETE TO authenticated, anon USING (false);
 
 -- 7. ai_errors_log — transient log para errores transitorios. Retención 30 días.
 CREATE TABLE IF NOT EXISTS public.ai_errors_log (
@@ -3680,6 +3714,15 @@ CREATE TABLE IF NOT EXISTS public.notifications_sent (
 );
 ALTER TABLE public.notifications_sent ENABLE ROW LEVEL SECURITY;
 -- Service-role only.
+DROP POLICY IF EXISTS notifications_sent_no_client_insert ON public.notifications_sent;
+CREATE POLICY notifications_sent_no_client_insert ON public.notifications_sent
+  AS RESTRICTIVE FOR INSERT TO authenticated, anon WITH CHECK (false);
+DROP POLICY IF EXISTS notifications_sent_no_client_update ON public.notifications_sent;
+CREATE POLICY notifications_sent_no_client_update ON public.notifications_sent
+  AS RESTRICTIVE FOR UPDATE TO authenticated, anon USING (false);
+DROP POLICY IF EXISTS notifications_sent_no_client_delete ON public.notifications_sent;
+CREATE POLICY notifications_sent_no_client_delete ON public.notifications_sent
+  AS RESTRICTIVE FOR DELETE TO authenticated, anon USING (false);
 
 -- 9. resolve_sponsorship — devuelve la mejor credencial activa con cuota.
 CREATE OR REPLACE FUNCTION public.resolve_sponsorship(

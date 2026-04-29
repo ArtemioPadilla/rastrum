@@ -431,6 +431,8 @@ serve(async (req) => {
           if (ctxNow) await autoPauseSponsorship(db(), ctxNow.sponsorshipId, rl.reason, beneficiaryId);
         }
       } else {
+        // Sponsored users add ~3 DB round-trips vs BYO: resolve, decrypt vault, rate-limit bump.
+        // Acceptable at v1 scale; profile if /identify p95 latency regresses.
         sponsorshipCtx = await resolveSponsorship(db(), beneficiaryId, 'anthropic');
         if (sponsorshipCtx) {
           const secret = await decryptCredential(db(), sponsorshipCtx.vaultSecretId);

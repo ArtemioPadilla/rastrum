@@ -4,9 +4,9 @@ set -euo pipefail
 # Fails the build if any Anthropic secret format leaked into shipped code or logs.
 
 if grep -RIn "sk-ant-" dist/ supabase/functions/ 2>/dev/null \
-   | grep -v "anthropic-validate.ts" \
-   | grep -v "anthropic-validate.test.ts" \
-   | grep -v ".test.ts" \
+   | grep -v "_shared/anthropic-validate.ts" \
+   | grep -v "_shared/anthropic-validate.test.ts" \
+   | grep -v "_shared/sponsorship.test.ts" \
    | grep -v "README" ; then
   echo "FAIL: literal Anthropic key prefix found in shipped code."
   exit 1

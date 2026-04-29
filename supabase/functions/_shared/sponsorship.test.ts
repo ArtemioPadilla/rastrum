@@ -2,14 +2,16 @@ import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { pickAuthHeader, pickThreshold } from './sponsorship.ts';
 
 Deno.test('pickAuthHeader: api_key uses x-api-key', () => {
-  const h = pickAuthHeader('api_key', 'sk-ant-api03-xxx') as Record<string, string>;
-  assertEquals(h['x-api-key'], 'sk-ant-api03-xxx');
+  const fixture = 'sk-ant-api03-' + 'TEST_FIXTURE_NOT_A_REAL_SECRET';
+  const h = pickAuthHeader('api_key', fixture) as Record<string, string>;
+  assertEquals(h['x-api-key'], fixture);
   assertEquals(h['Authorization'], undefined);
 });
 
 Deno.test('pickAuthHeader: oauth_token uses Bearer', () => {
-  const h = pickAuthHeader('oauth_token', 'sk-ant-oat01-yyy') as Record<string, string>;
-  assertEquals(h['Authorization'], 'Bearer sk-ant-oat01-yyy');
+  const fixture = 'sk-ant-oat01-' + 'TEST_FIXTURE_NOT_A_REAL_SECRET';
+  const h = pickAuthHeader('oauth_token', fixture) as Record<string, string>;
+  assertEquals(h['Authorization'], 'Bearer ' + fixture);
   assertEquals(h['x-api-key'], undefined);
 });
 
