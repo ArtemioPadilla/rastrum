@@ -3,6 +3,18 @@ import { t } from '../i18n/utils';
 interface Props { lang: 'en' | 'es' }
 const { lang } = Astro.props;
 const tr = t(lang);
+const privacyHeading = lang === 'es' ? 'Privacidad' : 'Privacy';
+const noActiveText   = lang === 'es' ? 'No hay patrocinio activo' : 'No active sponsorship';
+const i18nBag = {
+  no_active: noActiveText,
+  this_month_template: tr.sponsoring.quota_card_unit,
+  exhausted: tr.sponsoring.quota_exhausted_red,
+  amber_template: tr.sponsoring.quota_remaining_amber,
+  sponsored_by: tr.sponsoring.quota_card_sponsors,
+  show_publicly_template: tr.sponsoring.show_sponsor_publicly,
+  decline: tr.sponsoring.decline_sponsorship,
+  privacy_section: privacyHeading,
+};
 ---
 
 <section class="max-w-3xl mx-auto p-6 space-y-8">
@@ -22,13 +34,34 @@ const tr = t(lang);
   </div>
 
   <section>
-    <h2 class="text-lg font-semibold mb-2">Privacidad</h2>
+    <h2 class="text-lg font-semibold mb-2">{privacyHeading}</h2>
     <ul id="privacy-list" class="space-y-2 text-sm"></ul>
   </section>
+
+  <script type="application/json" id="sponsored-by-i18n" set:html={JSON.stringify(i18nBag)} />
 </section>
 
 <script>
   import { listSponsorships, getUsage, patchSponsorship, revokeSponsorship } from '../lib/sponsorships';
+
+  const escHtml = (s: string): string => s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+  const i18nNode = document.getElementById('sponsored-by-i18n') as HTMLScriptElement | null;
+  const i18nBag = JSON.parse(i18nNode?.textContent ?? '{}') as {
+    no_active: string;
+    this_month_template: string;
+    exhausted: string;
+    amber_template: string;
+    sponsored_by: string;
+    show_publicly_template: string;
+    decline: string;
+    privacy_section: string;
+  };
 
   async function refresh() {
     let sponsorships: Awaited<ReturnType<typeof listSponsorships>> = [];
@@ -43,7 +76,7 @@ const tr = t(lang);
 
     const active = sponsorships.filter(s => s.status === 'active');
     if (active.length === 0) {
-      summary.textContent = 'No active sponsorship';
+      summary.textContent = i18nBag.no_active;
       sponsors.textContent = '';
       privList.innerHTML = '';
       return;
@@ -54,34 +87,42 @@ const tr = t(lang);
     try { usage = await getUsage(primary.id); } catch { /* ignore */ }
     if (!usage) return;
 
-    summary.textContent = `${usage.usedThisMonth} / ${usage.cap} this month`;
+    summary.textContent = i18nBag.this_month_template
+      .replace(/\{used\}/g, String(usage.usedThisMonth))
+      .replace(/\{cap\}/g, String(usage.cap));
     const pct = Math.min(100, Math.round(usage.pctUsed * 100));
     fill.style.width = `${pct}%`;
 
     banner.classList.add('hidden');
     if (usage.pctUsed >= 1.0) {
       banner.className = 'mt-3 text-sm rounded-lg p-3 bg-red-50 dark:bg-red-900/30 text-red-900 dark:text-red-200';
-      banner.textContent = 'Quota exhausted. Configure your own API key to continue.';
+      banner.textContent = i18nBag.exhausted;
       banner.classList.remove('hidden');
     } else if (usage.pctUsed >= 0.80) {
       banner.className = 'mt-3 text-sm rounded-lg p-3 bg-amber-50 dark:bg-amber-900/30 text-amber-900 dark:text-amber-200';
-      banner.textContent = `Only ${usage.cap - usage.usedThisMonth} IDs left this month.`;
+      const remaining = usage.cap - usage.usedThisMonth;
+      const sponsorLabel = `${primary.sponsor_id.slice(0, 8)}…`;
+      banner.textContent = i18nBag.amber_template
+        .replace(/\{remaining\}/g, String(remaining))
+        .replace(/\{sponsor\}/g, sponsorLabel);
       banner.classList.remove('hidden');
     }
 
-    sponsors.textContent = `Sponsored by ${active.length} sponsor${active.length === 1 ? '' : 's'}`;
+    sponsors.textContent = `${i18nBag.sponsored_by} ${active.length}`;
 
     privList.innerHTML = '';
     for (const s of active) {
       const li = document.createElement('li');
       li.className = 'flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2';
+      const sponsorLabel = `${s.sponsor_id.slice(0, 8)}…`;
+      const showPubliclyLabel = i18nBag.show_publicly_template.replace(/\{sponsor\}/g, sponsorLabel);
       li.innerHTML = `
-        <span>Sponsor ${s.sponsor_id.slice(0, 8)}…</span>
+        <span>${escHtml(sponsorLabel)}</span>
         <label class="flex items-center gap-2 text-xs">
-          <input type="checkbox" data-toggle-public="${s.id}" ${s.beneficiary_public ? 'checked' : ''} />
-          Show publicly
+          <input type="checkbox" data-toggle-public="${escHtml(s.id)}" ${s.beneficiary_public ? 'checked' : ''} />
+          ${escHtml(showPubliclyLabel)}
         </label>
-        <button data-decline="${s.id}" class="text-sm text-red-600">Decline</button>`;
+        <button data-decline="${escHtml(s.id)}" class="text-sm text-red-600">${escHtml(i18nBag.decline)}</button>`;
       privList.appendChild(li);
     }
   }
