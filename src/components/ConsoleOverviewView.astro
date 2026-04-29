@@ -199,6 +199,11 @@ const tr = t(lang);
     const openReportsCount = openReports.count ?? 0;
     const pendingExpertsCount = pendingExperts.count ?? 0;
 
+    // Approximation: rgCount counts research-grade primary identifications,
+    // not observations. An obs can have zero identifications, so the strict
+    // denominator would be `count(obs WHERE EXISTS (id WHERE primary))`. For
+    // a dashboard signal the simpler ratio is fine and stays cheap; don't
+    // "correct" this without changing the semantics intentionally.
     const rgPct = totalObsCount > 0 ? Math.round((rgCount / totalObsCount) * 100) : 0;
 
     setText('admin-kpi-total-users', String(totalUsersCount));

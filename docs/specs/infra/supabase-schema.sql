@@ -1148,13 +1148,8 @@ CREATE POLICY "expert_apps_insert_own" ON public.expert_applications
   FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
 
 -- Service-role bypasses RLS for admin ops; no UPDATE/DELETE policy for
--- regular users by design.
-
--- Admins can read all applications for the console overview KPI.
-DROP POLICY IF EXISTS "expert_apps_read_admin" ON public.expert_applications;
-CREATE POLICY "expert_apps_read_admin" ON public.expert_applications
-  FOR SELECT TO authenticated
-  USING (public.has_role(auth.uid(), 'admin'));
+-- regular users by design. The admin read policy lives in the admin-console
+-- foundation block at the bottom of this file (after has_role() is defined).
 
 GRANT SELECT, INSERT ON public.expert_applications TO authenticated;
 
@@ -2188,6 +2183,17 @@ DROP POLICY IF EXISTS "sync_failures_read_admin" ON public.sync_failures;
 DROP POLICY IF EXISTS sync_failures_expert_read   ON public.sync_failures;
 DROP POLICY IF EXISTS sync_failures_admin_read    ON public.sync_failures;
 CREATE POLICY sync_failures_admin_read ON public.sync_failures
+  FOR SELECT TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'));
+
+-- 8b. expert_applications admin-read (PR #83)
+-- Originally only had read_own RLS, so the admin overview's "pending expert
+-- apps" KPI couldn't read from the client (the Experts queue tab worked
+-- only because it queries via the service-role-bypassing AdminExpertsView).
+-- Lives in this block (post-has_role()) to avoid the forward reference
+-- bug that would happen if defined alongside the table at line ~1140.
+DROP POLICY IF EXISTS "expert_apps_read_admin" ON public.expert_applications;
+CREATE POLICY "expert_apps_read_admin" ON public.expert_applications
   FOR SELECT TO authenticated
   USING (public.has_role(auth.uid(), 'admin'));
 
