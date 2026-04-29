@@ -240,7 +240,7 @@ const rgTitle = validation.research_grade_title  ?? rgLabel;
           id, observed_at, state_province, observer_id,
           identifications(scientific_name, is_primary, is_research_grade, confidence, taxa(common_name_es, common_name_en)),
           media_files(url, is_primary),
-          users(id, username, display_name, profile_public, profile_privacy)
+          users:observer_id(id, username, display_name, profile_public, profile_privacy)
         `)
         .eq('sync_status', 'synced')
         .order('observed_at', { ascending: false })

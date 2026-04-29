@@ -216,7 +216,7 @@ const tr = t(lang);
 
     let query = supabase
       .from('observations')
-      .select('id, observer_id, observed_at, primary_taxon_id, obscure_level, location_obscured, observer_license, hidden, hidden_reason, hidden_at, hidden_by, sync_status, created_at, taxa(scientific_name), users(username, display_name)')
+      .select('id, observer_id, observed_at, primary_taxon_id, obscure_level, location_obscured, observer_license, hidden, hidden_reason, hidden_at, hidden_by, sync_status, created_at, taxa(scientific_name), users:observer_id(username, display_name)')
       .order('created_at', { ascending: false })
       .limit(50);
 
