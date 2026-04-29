@@ -12,6 +12,7 @@
 import { getSupabase } from './supabase';
 import { willDemote, type PhotoForDeletion } from './photo-deletion';
 import { resizeImage, uploadMedia } from './upload';
+import { escapeHtml as escAttr } from './escape';
 
 type Ident = { scientific_name?: string; is_primary?: boolean } | undefined;
 
@@ -213,11 +214,6 @@ type PhotoRow = PhotoForDeletion & {
   thumbnail_url: string | null;
   sort_order: number | null;
 };
-
-const ESC_HTML_MAP: Record<string, string> = { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' };
-function escAttr(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => ESC_HTML_MAP[c] ?? c);
-}
 
 type PhotosCopy = {
   delete_confirm_demote: string;
