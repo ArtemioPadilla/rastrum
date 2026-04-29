@@ -40,6 +40,18 @@ interface CommentUnlockPayload { comment_id: string }
 interface UserBanPayload { target_user_id: string; duration_hours: number | null }
 interface UserUnbanPayload { target_user_id: string; ban_id: string }
 
+interface BadgeAwardManualPayload { target_user_id: string; badge_key: string }
+interface BadgeRevokePayload { target_user_id: string; badge_key: string }
+
+type ConservationFlag = 'nom059_status' | 'cites_appendix' | 'iucn_category';
+interface TaxonToggleConservationPayload {
+  taxon_id: string;
+  flag: ConservationFlag;
+  value: string | null;
+}
+
+interface FeatureFlagTogglePayload { key: string; value: boolean }
+
 interface DispatcherResponse<T = unknown> {
   ok: true;
   audit_id: number;
@@ -115,5 +127,21 @@ export const adminClient = {
       call('user.ban', payload, reason, jwt),
     unban: (payload: UserUnbanPayload, reason: string, jwt: string) =>
       call('user.unban', payload, reason, jwt),
+  },
+  badge: {
+    awardManual: (payload: BadgeAwardManualPayload, reason: string, jwt: string) =>
+      call('badge.award_manual', payload, reason, jwt),
+    revoke: (payload: BadgeRevokePayload, reason: string, jwt: string) =>
+      call('badge.revoke', payload, reason, jwt),
+  },
+  taxon: {
+    recomputeRarity: (reason: string, jwt: string) =>
+      call('taxon.recompute_rarity', {}, reason, jwt),
+    toggleConservation: (payload: TaxonToggleConservationPayload, reason: string, jwt: string) =>
+      call('taxon.toggle_conservation', payload, reason, jwt),
+  },
+  featureFlag: {
+    toggle: (payload: FeatureFlagTogglePayload, reason: string, jwt: string) =>
+      call('feature_flag.toggle', payload, reason, jwt),
   },
 };
