@@ -114,6 +114,13 @@ const PAGES: PageSpec[] = [
     },
   },
   {
+    slug: 'profile-dex-visitor',
+    cards: {
+      en: { kind: 'static', title: 'Visitor Pokédex',               subtitle: 'A public species log — gated by the per-facet privacy matrix.',          accent: 'emerald' },
+      es: { kind: 'static', title: 'Pokédex de visitante',          subtitle: 'Un registro público de especies — controlado por la matriz de privacidad.', accent: 'emerald' },
+    },
+  },
+  {
     slug: 'profile-settings',
     cards: {
       en: { kind: 'static', title: 'Settings',                      subtitle: 'Profile, preferences, data, developer.',                                 accent: 'stone' },

@@ -619,12 +619,18 @@ const sponsoringI18n = {
     }
 
     // Pokédex link.
-    // The visitor-side route (/u/<handle>/dex/) is parked under v1.2.2;
-    // until it ships, surface the link only for the owner (who can use
-    // /profile/dex/) and hide it on visitor profiles to avoid 404s.
-    if (showPokedex && isOwner) {
+    // Owner self-view → /{lang}/profile/dex/ (auth-uid-scoped view).
+    // Visitor view → /{lang}/u/dex/?username=<handle> (visitor-mode page,
+    // gated by can_see_facet('pokedex', …) in PokedexView itself).
+    if (showPokedex) {
       const link = root.querySelector<HTMLAnchorElement>('[data-pp-pokedex-link]');
-      if (link) link.href = `/${lang}/${lang === 'es' ? 'perfil/dex' : 'profile/dex'}/`;
+      if (link) {
+        if (isOwner) {
+          link.href = `/${lang}/${lang === 'es' ? 'perfil/dex' : 'profile/dex'}/`;
+        } else if (profile.username) {
+          link.href = `/${lang}/u/dex/?username=${encodeURIComponent(profile.username)}`;
+        }
+      }
       show(root.querySelector('[data-pp-pokedex-section]'));
       if (isOwner && facets.pokedex === false) {
         const badge = root.querySelector<HTMLElement>('[data-pp-pokedex-owner-only]');

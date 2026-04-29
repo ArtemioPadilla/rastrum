@@ -1,0 +1,13 @@
+---
+import BaseLayout from '../../../../layouts/BaseLayout.astro';
+import PokedexView from '../../../../components/PokedexView.astro';
+const lang = 'en' as const;
+---
+<BaseLayout
+  title="Visitor Pokédex — Rastrum"
+  description="Public Pokédex of an observer's species — gated by the per-facet privacy matrix."
+  lang={lang}
+  robots="noindex,nofollow"
+>
+  <PokedexView lang={lang} visitor />
+</BaseLayout>
