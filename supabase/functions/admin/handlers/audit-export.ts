@@ -1,5 +1,6 @@
 import { z } from 'https://esm.sh/zod@3.23.8';
 import type { ActionHandler } from './role-grant.ts';
+import { buildAuditCsv, type AuditExportRow } from '../_shared/csv.ts';
 
 const Payload = z.object({
   from: z.string().datetime().optional(),
@@ -9,62 +10,6 @@ const Payload = z.object({
   limit: z.number().int().min(1).max(10000).optional(),
 });
 type Payload = z.infer<typeof Payload>;
-
-interface AuditRow {
-  id: number;
-  created_at: string;
-  actor_id: string;
-  op: string;
-  target_type: string | null;
-  target_id: string | null;
-  details: unknown;
-}
-
-const CSV_HEADERS = [
-  'id',
-  'created_at',
-  'actor_id',
-  'op',
-  'target_type',
-  'target_id',
-  'details',
-] as const;
-
-/**
- * Escape a single CSV field. Wraps in double quotes and doubles inner
- * quotes when the value contains a quote, comma, or newline. Empty / null
- * values become an empty unquoted field.
- */
-export function escapeCsvField(value: unknown): string {
-  if (value === null || value === undefined) return '';
-  const s = typeof value === 'string' ? value : String(value);
-  if (s === '') return '';
-  if (/[",\n\r]/.test(s)) {
-    return `"${s.replace(/"/g, '""')}"`;
-  }
-  return s;
-}
-
-export function buildAuditCsv(rows: AuditRow[]): string {
-  const lines: string[] = [CSV_HEADERS.join(',')];
-  for (const row of rows) {
-    const detailsJson =
-      row.details === null || row.details === undefined
-        ? ''
-        : JSON.stringify(row.details);
-    const cells = [
-      escapeCsvField(row.id),
-      escapeCsvField(row.created_at),
-      escapeCsvField(row.actor_id),
-      escapeCsvField(row.op),
-      escapeCsvField(row.target_type),
-      escapeCsvField(row.target_id),
-      escapeCsvField(detailsJson),
-    ];
-    lines.push(cells.join(','));
-  }
-  return lines.join('\n');
-}
 
 export const auditExportHandler: ActionHandler<Payload> = {
   op: 'audit_export',
@@ -99,7 +44,7 @@ export const auditExportHandler: ActionHandler<Payload> = {
       reason: string;
     };
     const raw = (data ?? []) as RawRow[];
-    const rows: AuditRow[] = raw.map((r) => ({
+    const rows: AuditExportRow[] = raw.map((r) => ({
       id: r.id,
       created_at: r.created_at,
       actor_id: r.actor_id,
