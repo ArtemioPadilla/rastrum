@@ -21,6 +21,22 @@ const settingsPath       = getLocalizedPath(lang, routes.profileSettings[locale]
 const sponsoringPath     = getLocalizedPath(lang, routes.sponsoring[locale] + '/');
 const sponsoredByPath    = getLocalizedPath(lang, routes.sponsoredBy[locale] + '/');
 
+// Explore (Biodiversity + Community subheadings) — M28
+const exploreMapPath        = getLocalizedPath(lang, routes.exploreMap[locale] + '/');
+const exploreRecentPath     = getLocalizedPath(lang, routes.exploreRecent[locale] + '/');
+const exploreSpeciesPath    = getLocalizedPath(lang, routes.exploreSpecies[locale] + '/');
+const communityObserversBase    = getLocalizedPath(lang, routes.communityObservers[locale] + '/');
+const communityObserversTopHref    = `${communityObserversBase}?sort=obs_count_30d`;
+const communityObserversNearbyHref = `${communityObserversBase}?nearby=true`;
+interface ExploreMegaMenu {
+  biodiversity: string;
+  community: string;
+  community_all: string;
+  community_top: string;
+  community_nearby: string;
+}
+const em = (tr as unknown as { nav: { explore_megamenu: ExploreMegaMenu } }).nav.explore_megamenu;
+
 const getDocLabel = (key: string) => (tr.docs.sections as Record<string, string>)[key] || key;
 ---
 
@@ -52,6 +68,22 @@ const getDocLabel = (key: string) => (tr.docs.sections as Record<string, string>
   </div>
 
   <div class="p-4 space-y-5 text-sm">
+    <!-- Explore (Biodiversity + Community) — M28 -->
+    <section>
+      <p class="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-2">{tr.nav.explore}</p>
+
+      <p class="text-[11px] uppercase tracking-wider text-zinc-500 mt-2 mb-1">{em.biodiversity}</p>
+      <a href={exploreMapPath}     class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{tr.nav.explore_dropdown.map}</a>
+      <a href={exploreRecentPath}  class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{tr.nav.explore_dropdown.recent}</a>
+      <a href={watchlistPath}      class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{tr.nav.explore_dropdown.watchlist}</a>
+      <a href={exploreSpeciesPath} class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{tr.nav.explore_dropdown.species}</a>
+
+      <p class="text-[11px] uppercase tracking-wider text-zinc-500 mt-3 mb-1">{em.community}</p>
+      <a href={communityObserversBase}       class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{em.community_all}</a>
+      <a href={communityObserversTopHref}    class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{em.community_top}</a>
+      <a href={communityObserversNearbyHref} class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{em.community_nearby}</a>
+    </section>
+
     <!-- Reference -->
     <section>
       <p class="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-2">{tr.nav.drawer.reference}</p>

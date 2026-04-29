@@ -71,6 +71,8 @@ function ogSlugForPath(path: string): string {
   // Validate queue lives under both /profile/ and /explore/ — same intent,
   // share one card. Keep this BEFORE the generic /explore match below.
   if (p.includes('/validate') || p.includes('/validar'))        return 'validate';
+  if (p.startsWith('/community/observers') || p.startsWith('/comunidad/observadores'))
+                                                                return 'community-observers';
   if (p.startsWith('/explore')  || p.startsWith('/explorar'))   return 'explore';
   if (p.startsWith('/chat'))                                    return 'chat';
   if (p.startsWith('/about')  || p.startsWith('/acerca'))       return 'about';

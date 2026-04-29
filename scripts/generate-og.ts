@@ -134,6 +134,13 @@ const PAGES: PageSpec[] = [
       es: { kind: 'static', title: 'Valida observaciones',          subtitle: 'Ayuda a confirmar identificaciones de la comunidad.',                    accent: 'teal' },
     },
   },
+  {
+    slug: 'community-observers',
+    cards: {
+      en: { kind: 'static', title: 'Community observers',           subtitle: 'Find observers by activity, expertise, location, or country.',           accent: 'teal' },
+      es: { kind: 'static', title: 'Observadores de la comunidad',  subtitle: 'Encuentra observadores por actividad, experiencia, ubicación o país.',   accent: 'teal' },
+    },
+  },
 ];
 
 async function renderOne(slug: string, lang: Lang, card: StaticCardInput, fontBold: ArrayBuffer, fontRegular: ArrayBuffer): Promise<Buffer> {

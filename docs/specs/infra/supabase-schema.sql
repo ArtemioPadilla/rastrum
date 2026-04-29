@@ -4189,6 +4189,39 @@ $$;
 REVOKE ALL ON FUNCTION public.recompute_user_stats() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.recompute_user_stats() TO service_role;
 
+-- 9) Nearby helper — authenticated only. Reads the centroid view
+-- (which is not granted to anon), so the SQL-layer privacy gate
+-- fires regardless of the UI sign-in check. SECURITY INVOKER:
+-- runs with the caller's privileges, so anon callers fail the
+-- view-level grant check before the function body even runs.
+CREATE OR REPLACE FUNCTION public.community_observers_nearby(
+  p_radius_m numeric  DEFAULT 200000,
+  p_limit    int      DEFAULT 20,
+  p_offset   int      DEFAULT 0,
+  p_country  text     DEFAULT NULL,
+  p_taxa     text[]   DEFAULT NULL,
+  p_experts  boolean  DEFAULT false
+)
+RETURNS SETOF public.community_observers_with_centroid
+LANGUAGE sql STABLE PARALLEL SAFE AS $$
+  WITH viewer AS (
+    SELECT centroid_geog FROM public.users WHERE id = auth.uid()
+  )
+  SELECT v.*
+    FROM public.community_observers_with_centroid v, viewer
+   WHERE v.id <> auth.uid()
+     AND viewer.centroid_geog IS NOT NULL
+     AND ST_DWithin(v.centroid_geog, viewer.centroid_geog, p_radius_m)
+     AND (p_country IS NULL OR v.country_code = p_country)
+     AND (p_taxa    IS NULL OR v.expert_taxa @> p_taxa)
+     AND (p_experts = false OR v.is_expert = true)
+   ORDER BY v.centroid_geog <-> viewer.centroid_geog
+   LIMIT p_limit OFFSET p_offset;
+$$;
+
+REVOKE ALL ON FUNCTION public.community_observers_nearby(numeric, int, int, text, text[], boolean) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.community_observers_nearby(numeric, int, int, text, text[], boolean) TO authenticated;
+
 -- ============================================================
 -- Observation detail redesign — material edit tracking + soft-delete
 -- (2026-04-29) — see docs/superpowers/specs/2026-04-29-obs-detail-redesign-design.md

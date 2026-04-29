@@ -84,7 +84,7 @@ narrative source.
 | 25 | Profile Privacy & Public Profile (per-facet matrix + `/u/<username>/`) | v1.2 | shipped (v1.2.0 + v1.2.1 merged 2026-04-28; v1.2.2 cleanup deferred) | [`25-profile-privacy.md`](25-profile-privacy.md) |
 | 26 | Social graph + reactions (follows, reactions, blocks, reports, notifications) | v1.3 | planned (spec v1.0) | [`26-social-graph.md`](26-social-graph.md) |
 | 27 | AI Sponsorships (share Anthropic credentials with beneficiaries) | v1.3 | in implementation (PR feat/ai-sponsorships) | [`27-ai-sponsorships.md`](27-ai-sponsorships.md) |
-| 28 | Community discovery (observers page, leaderboards, nearby, experts, country filter) | v1.3 | in implementation (PR1 — schema deltas) | [`28-community-discovery.md`](28-community-discovery.md) |
+| 28 | Community discovery (observers page, leaderboards, nearby, experts, country filter) | v1.2 | shipped 2026-04-29 (PR1 #92 + PR2 #96 + PR4 #102 + PR5+PR6 atomic landing; PR3 manual cron fire = operator action) | [`28-community-discovery.md`](28-community-discovery.md) |
 
 ## v1.5 — Territory layer — planned
 
