@@ -100,7 +100,15 @@ BEGIN
                    || floor(random() * 900 + 100)::text; -- 3-digit suffix for uniqueness
     EXIT WHEN NOT EXISTS (SELECT 1 FROM public.users WHERE username = gen_username);
     attempts := attempts + 1;
-    EXIT WHEN attempts >= 10;
+    IF attempts >= 10 THEN
+      -- Fallback: timestamp-based suffix guarantees uniqueness
+      gen_username := (adjectives)[1 + floor(random() * array_length(adjectives, 1))::int]
+                     || '-'
+                     || (especies)[1 + floor(random() * array_length(especies, 1))::int]
+                     || '-'
+                     || extract(epoch from now())::bigint % 1000000;
+      EXIT;
+    END IF;
   END LOOP;
 
   INSERT INTO public.users (id, avatar_url, display_name, username)
@@ -3194,7 +3202,14 @@ BEGIN
                      || floor(random() * 900 + 100)::text;
       EXIT WHEN NOT EXISTS (SELECT 1 FROM public.users WHERE username = gen_username);
       attempts := attempts + 1;
-      EXIT WHEN attempts >= 10;
+      IF attempts >= 10 THEN
+        gen_username := (adjectives)[1 + floor(random() * array_length(adjectives, 1))::int]
+                       || '-'
+                       || (especies)[1 + floor(random() * array_length(especies, 1))::int]
+                       || '-'
+                       || extract(epoch from now())::bigint % 1000000;
+        EXIT;
+      END IF;
     END LOOP;
     UPDATE public.users SET username = gen_username WHERE id = rec.id;
   END LOOP;
