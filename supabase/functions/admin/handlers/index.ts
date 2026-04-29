@@ -5,6 +5,15 @@ import { observationHideHandler } from './observation-hide.ts';
 import { observationUnhideHandler } from './observation-unhide.ts';
 import { observationObscureHandler } from './observation-obscure.ts';
 import { observationLicenseOverrideHandler } from './observation-license-override.ts';
+import { reportTriageHandler } from './report-triage.ts';
+import { reportResolveHandler } from './report-resolve.ts';
+import { reportDismissHandler } from './report-dismiss.ts';
+import { commentHideHandler } from './comment-hide.ts';
+import { commentUnhideHandler } from './comment-unhide.ts';
+import { commentLockHandler } from './comment-lock.ts';
+import { commentUnlockHandler } from './comment-unlock.ts';
+import { userBanHandler } from './user-ban.ts';
+import { userUnbanHandler } from './user-unban.ts';
 import type { ActionHandler } from './role-grant.ts';
 
 export const HANDLERS: Record<string, ActionHandler<unknown>> = {
@@ -15,4 +24,13 @@ export const HANDLERS: Record<string, ActionHandler<unknown>> = {
   'observation.unhide': observationUnhideHandler as unknown as ActionHandler<unknown>,
   'observation.obscure': observationObscureHandler as unknown as ActionHandler<unknown>,
   'observation.license_override': observationLicenseOverrideHandler as unknown as ActionHandler<unknown>,
+  'report.triage': reportTriageHandler as unknown as ActionHandler<unknown>,
+  'report.resolve': reportResolveHandler as unknown as ActionHandler<unknown>,
+  'report.dismiss': reportDismissHandler as unknown as ActionHandler<unknown>,
+  'comment.hide': commentHideHandler as unknown as ActionHandler<unknown>,
+  'comment.unhide': commentUnhideHandler as unknown as ActionHandler<unknown>,
+  'comment.lock': commentLockHandler as unknown as ActionHandler<unknown>,
+  'comment.unlock': commentUnlockHandler as unknown as ActionHandler<unknown>,
+  'user.ban': userBanHandler as unknown as ActionHandler<unknown>,
+  'user.unban': userUnbanHandler as unknown as ActionHandler<unknown>,
 };

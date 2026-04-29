@@ -14,7 +14,7 @@ export interface ActionHandler<TPayload = unknown> {
   op: AuditOp;
   requiredRole: UserRole;
   payloadSchema: z.ZodType<TPayload>;
-  execute: (admin: SupabaseClient, payload: TPayload, actor: Actor) => Promise<ActionResult>;
+  execute: (admin: SupabaseClient, payload: TPayload, actor: Actor, reason: string) => Promise<ActionResult>;
 }
 
 const RoleGrantPayload = z.object({
@@ -28,7 +28,7 @@ export const roleGrantHandler: ActionHandler<RoleGrantPayload> = {
   op: 'role_grant',
   requiredRole: 'admin',
   payloadSchema: RoleGrantPayload,
-  async execute(admin, payload, actor) {
+  async execute(admin, payload, actor, _reason) {
     const { data: before } = await admin
       .from('user_roles')
       .select('*')
