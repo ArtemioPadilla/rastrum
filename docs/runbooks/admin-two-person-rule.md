@@ -68,14 +68,48 @@ Every state change in the proposal lifecycle writes its own audit row:
 There is **no audit row for `expired`** — the cron's update is silent
 because the proposal was never executed.
 
-## Direct call path (still open)
+## Direct call path (gated by feature flag, PR14)
 
-The proposal flow is opt-in. An admin can still call `user.ban`
-directly without filing a proposal first; the dispatcher does not gate
-on this. The console UI surfaces a "Require approval" toggle (planned
-follow-up; v1 surfaces only the Proposals tab). To tighten enforcement,
-v2 should add a feature flag that rejects direct calls to the
-irreversible set unless the action is invoked from `proposal.approve`.
+The proposal flow is opt-in by default — admins can still call
+`user.ban` directly without filing a proposal first. The "Require
+approval (two-person rule)" checkbox in every irreversible
+slide-over (Users, Observations, Bans, Badges) makes filing a
+proposal a one-click choice rather than a separate workflow.
+
+### v1.1 enforcement gate
+
+A feature flag `enforce_two_person_irreversible` (in
+`app_feature_flags`, default OFF) tightens this from "opt-in" to
+"required" for the four irreversible ops. When the flag is ON the
+admin Edge Function dispatcher rejects any direct call to
+`role.revoke`, `user.ban`, `observation.hide`, or `badge.revoke`
+with HTTP 403 and the error code
+`direct_irreversible_call_forbidden`.
+
+`proposal.approve` calls the inner handler directly (not via the
+dispatcher), so the gate doesn't fire on the second leg of an
+approved proposal. As defense-in-depth against future refactors,
+`proposal.approve` also stamps an internal-only `_via_proposal: true`
+field on the inner payload — if a future change ever round-trips
+through the dispatcher, the gate would still let it through.
+
+### Rollout sequence (recommended)
+
+1. **Operator trains on the Proposals tab.** Use the
+   "Require approval" slide-over toggle on a small set of actions
+   for at least a week. Confirm both admins are reachable and the
+   queue doesn't pile up.
+2. **Toggle the flag ON via Console → Feature flags.** The flag
+   key is `enforce_two_person_irreversible`. The change is
+   audited (op = `feature_flag.toggle`).
+3. **Verify the gate.** From the console, attempt a `user.ban`
+   directly (without the toggle); the dispatcher should respond 403.
+4. **Document the policy change** in the operator handbook so a
+   second admin is always available within the proposal's 24-hour
+   expiry window.
+
+To roll back, toggle the flag OFF — the change takes effect on the
+next dispatcher request (no deploy required).
 
 ## Forensics
 

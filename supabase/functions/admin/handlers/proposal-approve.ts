@@ -45,7 +45,14 @@ export const proposalApproveHandler: ActionHandler<Payload> = {
       throw new Error(`proposal.approve: invalid stored payload: ${JSON.stringify(innerPayload.error.issues)}`);
     }
 
-    const innerResult = await inner.execute(admin, innerPayload.data, actor, before.reason);
+    // PR14: defense-in-depth. The current path calls inner.execute()
+    // directly (bypassing the dispatcher), so the dispatcher's
+    // enforce_two_person_irreversible gate doesn't fire here. If a
+    // future refactor ever round-trips this through the dispatcher,
+    // the _via_proposal marker tells the gate this is the second-leg
+    // of a proposal flow and not a direct call.
+    const innerData = { ...(innerPayload.data as Record<string, unknown>), _via_proposal: true };
+    const innerResult = await inner.execute(admin, innerData, actor, before.reason);
 
     const innerAuditId = await insertAuditRow(admin, {
       actor_id: actor.id,

@@ -19,9 +19,18 @@ interface Props {
   id: string;
   titleKey: string;
   reasonTemplates?: string[];
+  /**
+   * PR14: when true, the slide-over MAY render the "Require approval
+   * (two-person rule)" checkbox — dynamically gated on whether the
+   * action passed via console:slideover-open is in IRREVERSIBLE_OPS.
+   * Set this true on slide-overs that handle irreversible actions
+   * (Users, Observations, Bans, Badges); leave default (false) to
+   * suppress the toggle entirely.
+   */
+  irreversible?: boolean;
 }
 
-const { lang, id, titleKey, reasonTemplates } = Astro.props;
+const { lang, id, titleKey, reasonTemplates, irreversible = false } = Astro.props;
 const tr = t(lang);
 
 const defaultTemplates: string[] = [];
@@ -29,7 +38,14 @@ const templates = reasonTemplates ?? defaultTemplates;
 const customLabel = tr.console.quick_reason_custom;
 ---
 
-<div id={id} class="hidden fixed inset-0 z-50 pointer-events-none">
+<div
+  id={`${id}-proposal-toast`}
+  class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] rounded-md bg-emerald-700 text-white px-4 py-2 text-sm shadow-lg"
+  role="status"
+  aria-live="polite"
+  data-proposal-toast-template={tr.console.proposalCreated}
+></div>
+<div id={id} class="hidden fixed inset-0 z-50 pointer-events-none" data-irreversible={irreversible ? 'true' : 'false'}>
   <div class="absolute inset-0 bg-black/40 pointer-events-auto" data-slideover-backdrop></div>
   <aside class="absolute right-0 top-0 bottom-0 w-full md:w-[420px] bg-white dark:bg-zinc-950 border-l border-zinc-200 dark:border-zinc-800 shadow-xl pointer-events-auto flex flex-col">
     <!-- Scrollable content area -->
@@ -41,6 +57,12 @@ const customLabel = tr.console.quick_reason_custom;
       <div data-slideover-fields class="space-y-3 text-sm">
         <slot />
       </div>
+      {irreversible && (
+        <label class="hidden items-start gap-2 cursor-pointer rounded-md border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-2.5">
+          <input type="checkbox" data-slideover-require-approval class="mt-0.5" />
+          <span class="text-xs text-amber-900 dark:text-amber-100 leading-snug">{tr.console.requireApproval}</span>
+        </label>
+      )}
       <div class="space-y-2">
         <label class="block text-sm">
           <span class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.console.slideover_reason_label}</span>
@@ -76,6 +98,14 @@ const customLabel = tr.console.quick_reason_custom;
 <script>
   type OpenDetail = { id: string; title: string; action: string; payload: unknown };
 
+  // PR14: must mirror IRREVERSIBLE_OPS in supabase/functions/admin/_shared/irreversible.ts.
+  const IRREVERSIBLE_ACTIONS = new Set([
+    'role.revoke',
+    'user.ban',
+    'observation.hide',
+    'badge.revoke',
+  ]);
+
   document.addEventListener('console:slideover-open', (ev) => {
     const detail = (ev as CustomEvent<OpenDetail>).detail;
     const root = document.getElementById(detail.id);
@@ -86,8 +116,26 @@ const customLabel = tr.console.quick_reason_custom;
     if (reason) reason.value = '';
     const errorEl = root.querySelector<HTMLElement>('[data-slideover-error]');
     if (errorEl) errorEl.classList.add('hidden');
+    // Reset the require-approval toggle so each open starts at the
+    // default (direct dispatch). Otherwise an admin could toggle once
+    // and accidentally file a proposal on a later unrelated action.
+    const approvalEl = root.querySelector<HTMLInputElement>('[data-slideover-require-approval]');
+    if (approvalEl) approvalEl.checked = false;
+    // PR14: gate the require-approval row on the action — show only
+    // when the slide-over is mounted with `irreversible={true}` AND
+    // the inbound action is in IRREVERSIBLE_OPS. The container row's
+    // <label> wraps the checkbox and copy.
+    const approvalRow = approvalEl?.closest('label');
+    if (approvalRow) {
+      const slideOverIsIrreversible = root.dataset.irreversible === 'true';
+      const opIsIrreversible = IRREVERSIBLE_ACTIONS.has(detail.action);
+      const shouldShow = slideOverIsIrreversible && opIsIrreversible;
+      approvalRow.classList.toggle('hidden', !shouldShow);
+      approvalRow.classList.toggle('flex',   shouldShow);
+    }
     root.dataset.action = detail.action;
     root.dataset.payload = JSON.stringify(detail.payload);
+    root.dataset.irreversibleAction = IRREVERSIBLE_ACTIONS.has(detail.action) ? 'true' : 'false';
     root.classList.remove('hidden');
   });
 
@@ -136,6 +184,7 @@ const customLabel = tr.console.quick_reason_custom;
     if (!root) return;
     const reasonEl = root.querySelector<HTMLTextAreaElement>('[data-slideover-reason]');
     const errorEl = root.querySelector<HTMLElement>('[data-slideover-error]');
+    const approvalEl = root.querySelector<HTMLInputElement>('[data-slideover-require-approval]');
     const reason = (reasonEl?.value ?? '').trim();
     if (reason.length < 5) {
       if (errorEl) {
@@ -146,15 +195,94 @@ const customLabel = tr.console.quick_reason_custom;
     }
     if (errorEl) errorEl.classList.add('hidden');
     btn.disabled = true;
+    const action = String(root.dataset.action ?? '');
+    const payload = JSON.parse(root.dataset.payload ?? '{}') as Record<string, unknown>;
+
+    // PR14: when "Require approval" is checked AND both the slide-over
+    // and the action are flagged irreversible, route this to
+    // proposal.create instead of dispatching the underlying op. The
+    // existing consumer's slideover-submit listener is short-circuited
+    // — proposal flows are entirely handled here.
+    if (
+      approvalEl?.checked
+      && root.dataset.irreversible === 'true'
+      && root.dataset.irreversibleAction === 'true'
+    ) {
+      void submitAsProposal(root, action, payload, reason);
+      return;
+    }
+
     document.dispatchEvent(new CustomEvent('console:slideover-submit', {
-      detail: {
-        id: root.id,
-        action: root.dataset.action,
-        payload: JSON.parse(root.dataset.payload ?? '{}'),
-        reason,
-      },
+      detail: { id: root.id, action, payload, reason },
     }));
   });
+
+  async function submitAsProposal(
+    root: HTMLElement,
+    action: string,
+    payload: Record<string, unknown>,
+    reason: string,
+  ) {
+    const errorEl = root.querySelector<HTMLElement>('[data-slideover-error]');
+    try {
+      const { getSupabase } = await import('../lib/supabase');
+      const { adminClient, AdminClientError } = await import('../lib/admin-client');
+      const supabase = getSupabase();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id: root.id, ok: false, error: 'Session expired.' } }));
+        return;
+      }
+      // Resolve a stable target descriptor from the underlying payload.
+      // The four irreversible ops use different payload keys, so we
+      // probe in priority order. Any unmapped op falls back to a
+      // best-effort target_id of empty string — proposal.create will
+      // reject with a Zod error if it ends up empty.
+      const targetType = inferTargetType(action);
+      const targetId = String(
+        (payload.target_user_id as string | undefined) ??
+        (payload.observation_id as string | undefined) ??
+        (payload.badge_key as string | undefined) ??
+        '',
+      );
+      const result = await adminClient.proposal.create(
+        {
+          targetOp:   action,
+          targetType,
+          targetId,
+          payload,
+          reason,
+        },
+        reason,
+        session.access_token,
+      );
+      const proposalId = (result as { proposalId?: string }).proposalId ?? '';
+      const shortId = proposalId.slice(0, 8);
+      document.dispatchEvent(new CustomEvent('console:proposal-created', {
+        detail: { proposalId, shortId, root: root.id },
+      }));
+      document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id: root.id, ok: true } }));
+    } catch (err) {
+      const msg = (err && typeof err === 'object' && 'message' in err)
+        ? String((err as { message: unknown }).message)
+        : 'proposal.create failed';
+      if (errorEl) {
+        errorEl.textContent = msg;
+        errorEl.classList.remove('hidden');
+      }
+      document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id: root.id, ok: false, error: msg } }));
+    }
+  }
+
+  function inferTargetType(action: string): string {
+    switch (action) {
+      case 'role.revoke':      return 'user';
+      case 'user.ban':         return 'user';
+      case 'observation.hide': return 'observation';
+      case 'badge.revoke':     return 'badge';
+      default:                 return 'unknown';
+    }
+  }
 
   document.addEventListener('console:slideover-done', (ev) => {
     const { id, ok, error } = (ev as CustomEvent<{ id: string; ok: boolean; error?: string }>).detail;
@@ -171,5 +299,16 @@ const customLabel = tr.console.quick_reason_custom;
         errorEl.classList.remove('hidden');
       }
     }
+  });
+
+  // PR14: surface a non-blocking toast confirming proposal.create.
+  document.addEventListener('console:proposal-created', (ev) => {
+    const { shortId, root: rootId } = (ev as CustomEvent<{ shortId: string; root: string }>).detail;
+    const toast = document.getElementById(`${rootId}-proposal-toast`);
+    if (!toast) return;
+    const tmpl = toast.dataset.proposalToastTemplate ?? 'Proposal #{id} created. Awaiting approval from another admin.';
+    toast.textContent = tmpl.replace('{id}', shortId);
+    toast.classList.remove('hidden');
+    setTimeout(() => toast.classList.add('hidden'), 6000);
   });
 </script>

@@ -132,6 +132,8 @@ export interface UserProfile {
   country_code_source?: 'auto' | 'user';
   /** Module 28: opt-out of leaderboards + community page. Defaults false. */
   hide_from_leaderboards?: boolean;
+  /** PR14: IANA timezone (e.g. 'America/Mexico_City'). NULL = treat as UTC. */
+  timezone?: string | null;
   joined_at: string;
   last_observation_at: string | null;
   stats_cached_at: string | null;

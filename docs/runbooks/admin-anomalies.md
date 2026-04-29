@@ -12,7 +12,7 @@ exposes the queue to admins.
 |---------------|-------------------------------------------------------------------------------------------|-----------|
 | `high_rate`   | One actor produces too many `admin_audit` rows in any rolling 1-hour window               | > 50      |
 | `bulk_delete` | One actor produces too many destructive-shaped ops (`hide`/`revoke`/`ban`/`delete`) in 1h | > 10      |
-| `off_hours`   | One actor takes ≥ N actions outside 06:00–22:00 UTC in any 1-hour window                  | ≥ 5       |
+| `off_hours`   | One actor takes ≥ N actions outside 06:00–22:00 in their **local time** (PR14)            | ≥ 5       |
 
 The function lives in `docs/specs/infra/supabase-schema.sql`. It is
 `SECURITY DEFINER`, with `REVOKE ALL FROM PUBLIC` and `GRANT EXECUTE TO
@@ -88,10 +88,14 @@ is broken.
 * **Big import / bulk moderation event**: expected. Acknowledge with a
   note pointing to the operational context ("post-import cleanup",
   "spam-wave moderation 2026-04-29").
-* **Off-hours that are within an admin's local working hours**: the rule
-  uses UTC by design — there's no per-admin timezone column yet. For
-  now, acknowledge with a note. If this becomes a frequent annoyance,
-  add a `users.timezone` column and switch the rule to actor-local time.
+* **Off-hours that are within an admin's local working hours**: PR14
+  added per-admin timezone support. The rule reads `users.timezone`
+  (set via Profile → Edit) and falls back to UTC when NULL. The
+  evaluated zone is recorded in `admin_anomalies.details->>'tz'`. If a
+  flagged admin still doesn't have a timezone configured, ask them to
+  set one in Profile → Edit; subsequent runs will respect it. Each
+  detection's `details` payload now contains `allowed_hours_local` and
+  `tz` rather than `allowed_hours_utc`.
 * **Single false-positive `high_rate`**: acknowledge with a note. If
   the same actor trips it more than once a week, raise the threshold or
   open a discussion about whether the action they're taking should be

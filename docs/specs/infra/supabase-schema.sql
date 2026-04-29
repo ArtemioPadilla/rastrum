@@ -3979,6 +3979,14 @@ ALTER TABLE public.users
   ADD COLUMN IF NOT EXISTS country_code_source text NOT NULL DEFAULT 'auto'
     CHECK (country_code_source IN ('auto','user'));
 
+-- 1d) Per-user IANA timezone (PR14). NULL means treat as UTC. Currently
+-- consumed by detect_admin_anomalies() to evaluate the off_hours rule in
+-- the admin's local time rather than UTC. Wider use (push notifications,
+-- streak rollovers) is a v1.1 follow-up — keep the column nullable so
+-- consumers must defensively coalesce to 'UTC'.
+ALTER TABLE public.users
+  ADD COLUMN IF NOT EXISTS timezone text;
+
 -- 1c) Column-level UPDATE grants for the three M28-writable columns. Lives
 -- here (rather than in the consolidated REVOKE/GRANT block above) because
 -- those columns are added by the ALTER TABLE statements above; granting
@@ -3987,6 +3995,9 @@ ALTER TABLE public.users
 -- composes cleanly with the earlier GRANT UPDATE (...) block.
 GRANT UPDATE (country_code, country_code_source, hide_from_leaderboards)
   ON public.users TO authenticated;
+
+-- PR14: users.timezone is user-writable so Profile → Edit can persist it.
+GRANT UPDATE (timezone) ON public.users TO authenticated;
 
 -- 2) Partial indexes — every list query operates on an already-filtered
 -- set, so opted-out / private users add zero cost to anyone's query plan.
@@ -4425,7 +4436,8 @@ VALUES
   ('localAiIdentification',  'Local AI identification (WebLLM)',      'On-device Phi-3.5-vision identification via WebLLM. Downloads a ~2 GB model on first use. Off by default — gated on explicit user opt-in.',                            false, 'identification'),
   ('darwinCoreExport',       'Darwin Core Archive export',            'Allow authenticated users to download their observations as a DwC-A ZIP via the export-dwca Edge Function.',                                                            true,  'admin'),
   ('socialGraph',            'Social graph (follows / reactions)',    'Module 26 social surfaces: follow/unfollow, notification bell, reactions strip on observation cards.',                                                                     true,  'social'),
-  ('bioblitzEvents',         'Bioblitz events UI',                    'Public listing and participation UI for bioblitz events. Ships when the first organizer requests an event.',                                                              false, 'admin')
+  ('bioblitzEvents',         'Bioblitz events UI',                    'Public listing and participation UI for bioblitz events. Ships when the first organizer requests an event.',                                                              false, 'admin'),
+  ('enforce_two_person_irreversible', 'Enforce two-person rule on irreversible ops', 'When enabled, the admin dispatcher rejects direct calls to role.revoke / user.ban / observation.hide / badge.revoke unless the call is invoked from proposal.approve. Off by default; flip after operators trust the Proposals queue.', false, 'admin')
 ON CONFLICT (key) DO UPDATE
   SET name        = EXCLUDED.name,
       description = EXCLUDED.description,
@@ -5038,7 +5050,9 @@ GRANT SELECT, INSERT                  ON public.function_errors TO service_role;
 --                     1-hour window in the last hour.
 --   * Bulk delete   — > 10 actions whose op text contains 'hide', 'revoke',
 --                     'ban', or 'delete' in the last hour from one actor.
---   * Off-hours     — >= 5 actions outside 06:00–22:00 UTC in the last hour.
+--   * Off-hours     — >= 5 actions outside 06:00–22:00 in the actor's
+--                     local time (PR14: respects users.timezone, falls
+--                     back to UTC when NULL).
 --
 -- Each detection is INSERTed into admin_anomalies with ON CONFLICT DO NOTHING
 -- on (kind, actor_id, window_start) so re-runs over an overlapping window
@@ -5093,20 +5107,30 @@ BEGIN
   HAVING count(*) > 10
   ON CONFLICT (kind, actor_id, window_start) DO NOTHING;
 
-  -- Off-hours: >= 5 actions outside 06:00–22:00 UTC in the window.
+  -- Off-hours: >= 5 actions outside 06:00–22:00 in the actor's local
+  -- timezone (PR14). users.timezone is consulted via LEFT JOIN so admins
+  -- without a configured tz fall back to UTC. The detail row records the
+  -- evaluated zone for forensics.
   INSERT INTO public.admin_anomalies (kind, actor_id, window_start, window_end, event_count, details)
   SELECT
     'off_hours',
-    actor_id,
+    a.actor_id,
     v_start,
     v_end,
     count(*),
-    jsonb_build_object('threshold', 5, 'allowed_hours_utc', '06:00-22:00')
-  FROM public.admin_audit
-  WHERE created_at >= v_start AND created_at < v_end
-    AND (EXTRACT(HOUR FROM created_at AT TIME ZONE 'UTC') < 6
-      OR EXTRACT(HOUR FROM created_at AT TIME ZONE 'UTC') >= 22)
-  GROUP BY actor_id
+    jsonb_build_object(
+      'threshold', 5,
+      'allowed_hours_local', '06:00-22:00',
+      'tz', COALESCE(u.timezone, 'UTC')
+    )
+  FROM public.admin_audit a
+  LEFT JOIN public.users u ON u.id = a.actor_id
+  WHERE a.created_at >= v_start AND a.created_at < v_end
+    AND (
+      EXTRACT(HOUR FROM a.created_at AT TIME ZONE COALESCE(u.timezone, 'UTC')) < 6
+      OR EXTRACT(HOUR FROM a.created_at AT TIME ZONE COALESCE(u.timezone, 'UTC')) >= 22
+    )
+  GROUP BY a.actor_id, u.timezone
   HAVING count(*) >= 5
   ON CONFLICT (kind, actor_id, window_start) DO NOTHING;
 END $$;
@@ -5404,8 +5428,23 @@ CREATE TABLE IF NOT EXISTS public.admin_webhook_deliveries (
   error        text
 );
 
+-- PR14: replay protection columns. nonce is stamped into the signed body
+-- as _meta.nonce so receivers can dedupe; request_id is the bigint
+-- pg_net.http_post returns, persisted so reconcile_webhook_deliveries()
+-- can later JOIN against net._http_response and write back the resolved
+-- status_code (pg_net is fire-and-forget, so the synchronous INSERT into
+-- this table cannot capture the response).
+ALTER TABLE public.admin_webhook_deliveries
+  ADD COLUMN IF NOT EXISTS nonce      text NOT NULL DEFAULT gen_random_uuid()::text,
+  ADD COLUMN IF NOT EXISTS request_id bigint;
+
 CREATE INDEX IF NOT EXISTS idx_admin_webhook_deliveries_webhook
   ON public.admin_webhook_deliveries (webhook_id, attempted_at DESC);
+
+-- Partial index drives the reconcile cron's hot-path lookup.
+CREATE INDEX IF NOT EXISTS idx_admin_webhook_deliveries_pending
+  ON public.admin_webhook_deliveries (request_id)
+  WHERE status_code IS NULL AND request_id IS NOT NULL;
 
 ALTER TABLE public.admin_webhook_deliveries ENABLE ROW LEVEL SECURITY;
 
@@ -5434,11 +5473,21 @@ SET search_path = public
 AS $$
 DECLARE
   v_row record;
-  v_body text;
+  v_body          text;
+  v_signed_payload jsonb;
+  v_event_id       text;
+  v_nonce          text;
+  v_timestamp      text;
   v_sig  text;
   v_request_id bigint;
 BEGIN
-  v_body := p_payload::text;
+  -- PR14 replay protection: stamp _meta into the signed payload so the
+  -- HMAC commits to a specific (event_id, nonce, timestamp) tuple.
+  -- Receivers dedupe on event_id and reject when timestamp drifts more
+  -- than ~5 minutes. event_id is generated per dispatch so two webhooks
+  -- subscribed to the same trigger see the same event_id.
+  v_event_id  := gen_random_uuid()::text;
+  v_timestamp := to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"');
 
   FOR v_row IN
     SELECT id, url, secret
@@ -5446,6 +5495,19 @@ BEGIN
      WHERE enabled = true
        AND p_event = ANY (events)
   LOOP
+    -- Per-delivery nonce so a body signed for webhook A cannot be
+    -- replayed against webhook B and pass dedupe.
+    v_nonce := gen_random_uuid()::text;
+    v_signed_payload := p_payload || jsonb_build_object(
+      '_meta', jsonb_build_object(
+        'event_id',  v_event_id,
+        'event',     p_event,
+        'timestamp', v_timestamp,
+        'nonce',     v_nonce,
+        'version',   1
+      )
+    );
+    v_body := v_signed_payload::text;
     v_sig := encode(
       hmac(v_body::bytea, v_row.secret::bytea, 'sha256'),
       'hex'
@@ -5457,21 +5519,24 @@ BEGIN
         headers := jsonb_build_object(
           'Content-Type', 'application/json',
           'X-Rastrum-Signature', 'sha256=' || v_sig,
-          'X-Rastrum-Event', p_event
+          'X-Rastrum-Event',     p_event,
+          'X-Rastrum-Event-Id',  v_event_id,
+          'X-Rastrum-Timestamp', v_timestamp,
+          'X-Rastrum-Nonce',     v_nonce
         ),
-        body    := p_payload
+        body    := v_signed_payload
       );
 
-      INSERT INTO public.admin_webhook_deliveries (webhook_id, event, payload)
-      VALUES (v_row.id, p_event, p_payload);
+      INSERT INTO public.admin_webhook_deliveries (webhook_id, event, payload, nonce, request_id)
+      VALUES (v_row.id, p_event, v_signed_payload, v_nonce, v_request_id);
 
       UPDATE public.admin_webhooks
          SET last_delivery_at  = now(),
              consecutive_failures = 0
        WHERE id = v_row.id;
     EXCEPTION WHEN OTHERS THEN
-      INSERT INTO public.admin_webhook_deliveries (webhook_id, event, payload, error)
-      VALUES (v_row.id, p_event, p_payload, SQLERRM);
+      INSERT INTO public.admin_webhook_deliveries (webhook_id, event, payload, nonce, error)
+      VALUES (v_row.id, p_event, v_signed_payload, v_nonce, SQLERRM);
 
       UPDATE public.admin_webhooks
          SET last_delivery_at     = now(),
@@ -5484,6 +5549,81 @@ END $$;
 
 REVOKE ALL ON FUNCTION public.dispatch_admin_webhooks(text, jsonb) FROM public;
 GRANT EXECUTE ON FUNCTION public.dispatch_admin_webhooks(text, jsonb) TO service_role;
+
+-- PR14: reconcile webhook deliveries by joining the pending rows against
+-- pg_net's internal _http_response table. dispatch_admin_webhooks() is
+-- fire-and-forget by design (pg_net.http_post returns immediately with a
+-- bigint request id); the response lands later in net._http_response. A
+-- cron at every 2 minutes calls this function to write status_code +
+-- error back into admin_webhook_deliveries and bump the parent webhook's
+-- consecutive_failures counter / last_delivery_status. Idempotent —
+-- skips rows that already have a status_code.
+CREATE OR REPLACE FUNCTION public.reconcile_webhook_deliveries()
+RETURNS int
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, net
+AS $$
+DECLARE
+  v_updated int := 0;
+BEGIN
+  -- Resolve pending deliveries against net._http_response. Mark the
+  -- webhook's last_delivery_status from the freshest result; bump
+  -- consecutive_failures when status_code is in 4xx/5xx or NULL after
+  -- timeout. The cron's 2-minute cadence + pg_net's default 5s timeout
+  -- means a true unreachable receiver lands in the failure branch
+  -- within ~3 minutes.
+  WITH pending AS (
+    SELECT d.id           AS delivery_id,
+           d.webhook_id   AS webhook_id,
+           d.request_id   AS request_id,
+           r.status_code  AS resp_status,
+           r.error_msg    AS resp_error,
+           r.timed_out    AS resp_timed_out
+      FROM public.admin_webhook_deliveries d
+      JOIN net._http_response r ON r.id = d.request_id
+     WHERE d.status_code IS NULL
+       AND d.request_id IS NOT NULL
+  ),
+  upd AS (
+    UPDATE public.admin_webhook_deliveries d
+       SET status_code = p.resp_status,
+           error       = COALESCE(p.resp_error,
+                                  CASE WHEN p.resp_timed_out THEN 'timeout' END,
+                                  d.error)
+      FROM pending p
+     WHERE d.id = p.delivery_id
+    RETURNING d.id, d.webhook_id, d.status_code
+  )
+  SELECT count(*)::int INTO v_updated FROM upd;
+
+  -- Bump consecutive_failures on the parent webhook for any 4xx/5xx /
+  -- NULL status_code resolutions. 2xx/3xx resolutions reset the counter.
+  -- Done in a second pass so the WITH ... RETURNING above stays simple.
+  UPDATE public.admin_webhooks w
+     SET last_delivery_status = sub.status_code,
+         consecutive_failures = CASE
+           WHEN sub.status_code BETWEEN 200 AND 399 THEN 0
+           ELSE w.consecutive_failures + 1
+         END,
+         enabled = CASE
+           WHEN sub.status_code BETWEEN 200 AND 399 THEN w.enabled
+           ELSE (w.consecutive_failures + 1 < 10)
+         END
+    FROM (
+      SELECT DISTINCT ON (d.webhook_id)
+             d.webhook_id, d.status_code
+        FROM public.admin_webhook_deliveries d
+       WHERE d.status_code IS NOT NULL
+         AND d.attempted_at >= now() - interval '10 minutes'
+       ORDER BY d.webhook_id, d.attempted_at DESC
+    ) sub
+   WHERE w.id = sub.webhook_id;
+
+  RETURN v_updated;
+END $$;
+
+REVOKE ALL ON FUNCTION public.reconcile_webhook_deliveries() FROM public;
+GRANT EXECUTE ON FUNCTION public.reconcile_webhook_deliveries() TO service_role;
 
 -- Triggers — fan out from anomaly creation + privileged audit ops to
 -- subscribed webhooks. AFTER INSERT keeps the dispatch out of the
@@ -5528,12 +5668,28 @@ CREATE TRIGGER admin_audit_dispatch
 AFTER INSERT ON public.admin_audit
 FOR EACH ROW EXECUTE FUNCTION public.admin_audit_dispatch_trigger();
 
--- 4. Moderator trust score (read-only v1 placeholder)
+-- 4. Moderator trust score (v1.1 — PR14)
 -- ─────────────────────────────────────────────────────────────────────
--- v1 returns a static formula based on (a) presence of unacknowledged
--- anomalies attributed to the moderator and (b) raw action volume in
--- the last 30 days. Future iterations should add overturn-rate signals
--- (a moderator's report.dismiss reversed within 7 days = bad outcome).
+-- !! Any change to this function MUST bump the version comment in
+-- !! `docs/runbooks/admin-trust-scores.md` AND ship a runbook entry
+-- !! explaining the rationale. Trust scores are surfaced to admins;
+-- !! silent reformulations would be confusing and unfair.
+--
+-- Version: 1.1 (2026-04-29)
+--
+-- Formula (weighted sum, clamped to 0..100):
+--   base               = 70
+--   anomaly_factor     = -8 × unack_anomalies_last_30d  (older anomalies
+--                        decay to zero weight)
+--   overturn_penalty   = -25 × overturn_rate            (where overturn_rate
+--                        is the fraction of report.dismiss actions
+--                        reversed by a *different* moderator within 7 days)
+--   action_volume      = +30 × min(1, sqrt(active_days_last_90d / 30))
+--                        (rewards consistency without rewarding raw
+--                        bursts; capped at +30)
+--   recency_bonus      = +5 if the moderator acted in the last 7 days
+--
+-- Returns NULL when the user is neither moderator nor admin.
 
 CREATE OR REPLACE FUNCTION public.compute_moderator_trust_score(p_user_id uuid)
 RETURNS numeric
@@ -5541,28 +5697,78 @@ LANGUAGE plpgsql STABLE SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  v_unack int;
-  v_actions int;
-  v_score numeric := 100.0;
+  v_unack             int;
+  v_dismiss_total     int;
+  v_dismiss_overturned int;
+  v_overturn_rate     numeric := 0.0;
+  v_active_days       int;
+  v_recent_action     boolean;
+  v_score             numeric;
 BEGIN
   IF NOT (public.has_role(p_user_id, 'moderator') OR public.has_role(p_user_id, 'admin')) THEN
     RETURN NULL;
   END IF;
 
+  -- Anomaly factor: only the last 30 days at full weight; older
+  -- unacknowledged anomalies don't penalise indefinitely.
   SELECT count(*)::int INTO v_unack
     FROM public.admin_anomalies
    WHERE actor_id = p_user_id
-     AND acknowledged_at IS NULL;
-
-  SELECT count(*)::int INTO v_actions
-    FROM public.admin_audit
-   WHERE actor_id = p_user_id
+     AND acknowledged_at IS NULL
      AND created_at >= now() - interval '30 days';
 
-  -- v1 heuristic: 100 floor minus 8 per unacknowledged anomaly, clamped
-  -- at 0. New mods (no actions yet) get 100 by default.
-  v_score := greatest(0, 100 - (v_unack * 8));
-  RETURN v_score;
+  -- Overturn rate: report.dismiss actions taken by this moderator that
+  -- were subsequently re-opened or resolved by a *different*
+  -- moderator within 7 days. We approximate "overturned" as: the same
+  -- target_id received a later report_resolve audit row from a
+  -- different actor inside the 7-day window.
+  SELECT count(*)::int INTO v_dismiss_total
+    FROM public.admin_audit
+   WHERE actor_id = p_user_id
+     AND op::text = 'report_dismiss'
+     AND created_at >= now() - interval '90 days';
+
+  IF v_dismiss_total > 0 THEN
+    SELECT count(DISTINCT a.id)::int INTO v_dismiss_overturned
+      FROM public.admin_audit a
+     WHERE a.actor_id = p_user_id
+       AND a.op::text = 'report_dismiss'
+       AND a.created_at >= now() - interval '90 days'
+       AND EXISTS (
+         SELECT 1 FROM public.admin_audit b
+          WHERE b.target_id   = a.target_id
+            AND b.target_type = a.target_type
+            AND b.actor_id   <> p_user_id
+            AND b.op::text   = 'report_resolve'
+            AND b.created_at >  a.created_at
+            AND b.created_at <= a.created_at + interval '7 days'
+       );
+    v_overturn_rate := v_dismiss_overturned::numeric / v_dismiss_total::numeric;
+  END IF;
+
+  -- Action volume: count of distinct days the moderator wrote at least
+  -- one admin_audit row in the last 90. The sqrt-then-cap shape rewards
+  -- consistency (5 days → ~ +12, 30 days → +30) without giving infinite
+  -- credit for an admin who handled 1 ticket every day for years.
+  SELECT count(DISTINCT date_trunc('day', created_at))::int INTO v_active_days
+    FROM public.admin_audit
+   WHERE actor_id = p_user_id
+     AND created_at >= now() - interval '90 days';
+
+  -- Recency: did they act at all in the last 7 days?
+  SELECT EXISTS (
+    SELECT 1 FROM public.admin_audit
+     WHERE actor_id = p_user_id
+       AND created_at >= now() - interval '7 days'
+  ) INTO v_recent_action;
+
+  v_score :=  70.0
+            -  8.0 * v_unack
+            - 25.0 * v_overturn_rate
+            + 30.0 * least(1.0, sqrt(v_active_days::numeric / 30.0))
+            + (CASE WHEN v_recent_action THEN 5.0 ELSE 0.0 END);
+
+  RETURN greatest(0.0, least(100.0, v_score));
 END $$;
 
 REVOKE ALL ON FUNCTION public.compute_moderator_trust_score(uuid) FROM public;

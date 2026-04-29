@@ -16,6 +16,10 @@ import { verifyJwtAndLoadRoles, requireRole, HttpError } from './_shared/auth.ts
 import { insertAuditRow } from './_shared/audit.ts';
 import { checkRateLimit } from './_shared/rate-limit.ts';
 import { reportFunctionError } from './_shared/error-reporter.ts';
+import {
+  checkIrreversibleEnforcement,
+  stripViaProposal,
+} from './_shared/irreversible-enforcement.ts';
 import { HANDLERS } from './handlers/index.ts';
 
 const ALLOWED_ORIGINS = [
@@ -103,7 +107,24 @@ serve(async (req) => {
       );
     }
 
-    const parsed = handler.payloadSchema.safeParse(payload);
+    // PR14: irreversible-op enforcement gate. Off by default; flip via
+    // the enforce_two_person_irreversible feature flag once operators
+    // trust the proposals queue is being used.
+    const { data: flagRow } = await admin
+      .from('app_feature_flags')
+      .select('value')
+      .eq('key', 'enforce_two_person_irreversible')
+      .maybeSingle();
+    const flagEnabled = Boolean((flagRow as { value?: boolean } | null)?.value);
+    const enforcement = checkIrreversibleEnforcement(action, payload, flagEnabled);
+    if (!enforcement.allowed) {
+      return json({ error: enforcement.reason, code: enforcement.code }, 403, req);
+    }
+
+    // Strip the internal-only marker before validating against the
+    // handler's Zod schema — the schema may reject unknown keys.
+    const cleanPayload = stripViaProposal(payload);
+    const parsed = handler.payloadSchema.safeParse(cleanPayload);
     if (!parsed.success) return json({ error: 'invalid payload', issues: parsed.error.issues }, 400);
 
     const result = await handler.execute(admin, parsed.data, actor, reason);
