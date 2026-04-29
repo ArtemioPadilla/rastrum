@@ -1,8 +1,8 @@
 ---
 /**
- * ConsoleOverviewView — action-primary alerts on the left, slim KPI rail
- * on the right. PR1 renders an empty-state shell; queries land in PR3
- * (sync, api, cron) and PR4 (flags, expert apps badge).
+ * ConsoleOverviewView — real platform-state KPIs for admins.
+ * 8 KPI tiles (4×2), conditional "Needs your attention" section,
+ * and a recent admin activity feed. No right rail — grid is full-width.
  */
 import { t } from '../i18n/utils';
 
@@ -11,23 +11,309 @@ const { lang } = Astro.props;
 const tr = t(lang);
 ---
 
-<div class="grid grid-cols-1 md:grid-cols-[1fr_220px] gap-4 max-w-5xl">
-  <section>
-    <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-3">
-      {tr.console.overview_alerts_heading}
-    </h2>
-    <div id="console-overview-alerts" class="space-y-2">
-      <div class="rounded-md border border-dashed border-zinc-300 dark:border-zinc-700 p-4 text-sm text-zinc-500">
-        {tr.console.overview_no_alerts}
+<section
+  id="admin-overview-section"
+  class="max-w-5xl space-y-6"
+  data-lang={lang}
+  data-alert-reports={tr.console.admin_overview_alert_reports}
+  data-alert-experts={tr.console.admin_overview_alert_experts}
+  data-alert-sync={tr.console.admin_overview_alert_sync}
+  data-alert-quota={tr.console.admin_overview_alert_quota}
+  data-alert-view={tr.console.admin_overview_alert_view}
+  data-recent-empty={tr.console.admin_overview_recent_empty}
+  data-load-failed={tr.console.admin_overview_load_failed}
+>
+  <div id="admin-overview-not-auth" class="hidden rounded border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-900 dark:text-amber-100">
+    {tr.console.not_authorized}
+  </div>
+
+  <div id="admin-overview-shell" class="hidden space-y-6">
+    <!-- KPI grid: 4 tiles per row on md+ -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+        <p class="text-xs text-zinc-500 mb-1">{tr.console.admin_overview_kpi_total_users}</p>
+        <p id="admin-kpi-total-users" class="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">—</p>
+      </div>
+      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+        <p class="text-xs text-zinc-500 mb-1">{tr.console.admin_overview_kpi_new_users_week}</p>
+        <p id="admin-kpi-new-users" class="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">—</p>
+      </div>
+      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+        <p class="text-xs text-zinc-500 mb-1">{tr.console.admin_overview_kpi_total_observations}</p>
+        <p id="admin-kpi-total-obs" class="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">—</p>
+      </div>
+      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+        <p class="text-xs text-zinc-500 mb-1">{tr.console.admin_overview_kpi_research_grade_pct}</p>
+        <p id="admin-kpi-rg-pct" class="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">—</p>
+      </div>
+      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+        <p class="text-xs text-zinc-500 mb-1">{tr.console.admin_overview_kpi_sync_failures_24h}</p>
+        <p id="admin-kpi-sync-fail" class="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">—</p>
+      </div>
+      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+        <p class="text-xs text-zinc-500 mb-1">{tr.console.admin_overview_kpi_active_bans}</p>
+        <p id="admin-kpi-active-bans" class="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">—</p>
+      </div>
+      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+        <p class="text-xs text-zinc-500 mb-1">{tr.console.admin_overview_kpi_open_reports}</p>
+        <p id="admin-kpi-open-reports" class="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">—</p>
+      </div>
+      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+        <p class="text-xs text-zinc-500 mb-1">{tr.console.admin_overview_kpi_pending_experts}</p>
+        <p id="admin-kpi-pending-experts" class="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">—</p>
       </div>
     </div>
-  </section>
-  <aside class="md:border-l md:border-zinc-200 md:dark:border-zinc-800 md:pl-4">
-    <h2 class="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 mb-2">
-      {tr.console.overview_at_a_glance}
-    </h2>
-    <dl id="console-overview-kpis" class="space-y-1 text-xs text-zinc-700 dark:text-zinc-300">
-      <div class="flex justify-between"><dt class="text-zinc-500">—</dt><dd>—</dd></div>
-    </dl>
-  </aside>
-</div>
+
+    <!-- Needs your attention -->
+    <div>
+      <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-3">
+        {tr.console.overview_alerts_heading}
+      </h2>
+      <div id="admin-overview-alerts" class="space-y-2">
+        <div class="rounded-md border border-dashed border-zinc-300 dark:border-zinc-700 p-4 text-sm text-zinc-500">
+          {tr.console.overview_no_alerts}
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent admin activity -->
+    <div>
+      <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-3">
+        {tr.console.admin_overview_recent_heading}
+      </h2>
+      <div id="admin-overview-activity" class="space-y-1">
+        <p class="text-sm text-zinc-500">{tr.console.loading}</p>
+      </div>
+    </div>
+  </div>
+
+  <p id="admin-overview-error" class="hidden text-sm text-red-600 dark:text-red-400"></p>
+</section>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { getUserRoles } from '../lib/user-roles';
+
+  function show(id: string) { document.getElementById(id)?.classList.remove('hidden'); }
+
+  function escHtml(s: string): string {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  const section = document.getElementById('admin-overview-section')!;
+  const lang = (section.dataset.lang ?? 'en') as string;
+
+  const rtf = new Intl.RelativeTimeFormat(lang, { numeric: 'auto' });
+  function timeAgo(iso: string): string {
+    const ms = Date.now() - new Date(iso).getTime();
+    const s = Math.round(ms / 1000);
+    if (Math.abs(s) < 60) return rtf.format(-s, 'second');
+    const m = Math.round(s / 60);
+    if (Math.abs(m) < 60) return rtf.format(-m, 'minute');
+    const h = Math.round(m / 60);
+    if (Math.abs(h) < 24) return rtf.format(-h, 'hour');
+    const d = Math.round(h / 24);
+    return rtf.format(-d, 'day');
+  }
+
+  function setText(id: string, val: string) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val;
+  }
+
+  function setClass(id: string, cls: string) {
+    const el = document.getElementById(id);
+    if (el) el.className = cls;
+  }
+
+  // Op badge colour: ban/delete ops = red, sensitive_read = amber, write ops = emerald
+  function opBadgeCls(op: string): string {
+    if (op.includes('ban') || op.includes('delete') || op.includes('revoke')) {
+      return 'inline-block text-[10px] rounded px-1.5 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200';
+    }
+    if (op.includes('sensitive_read') || op.includes('_read')) {
+      return 'inline-block text-[10px] rounded px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200';
+    }
+    return 'inline-block text-[10px] rounded px-1.5 py-0.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-200';
+  }
+
+  const supabase = getSupabase();
+
+  async function init() {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) { show('admin-overview-not-auth'); return; }
+    const myRoles = await getUserRoles(session.user.id);
+    if (!myRoles.has('admin')) {
+      show('admin-overview-not-auth');
+      return;
+    }
+    show('admin-overview-shell');
+
+    const [kpiErr, actErr] = await Promise.all([
+      loadKpis().then(() => null).catch(e => e as Error),
+      loadRecentActivity().then(() => null).catch(e => e as Error),
+    ]);
+
+    if (kpiErr || actErr) {
+      const errEl = document.getElementById('admin-overview-error')!;
+      errEl.textContent = section.dataset.loadFailed ?? 'Could not load platform state.';
+      errEl.classList.remove('hidden');
+    }
+  }
+
+  async function loadKpis() {
+    const now = new Date();
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 86_400_000).toISOString();
+    const oneDayAgo = new Date(now.getTime() - 86_400_000).toISOString();
+    const todayDate = now.toISOString().slice(0, 10);
+
+    const [
+      totalUsers,
+      newUsers,
+      totalObs,
+      rgObs,
+      syncFails,
+      activeBans,
+      openReports,
+      pendingExperts,
+      quotaRow,
+    ] = await Promise.all([
+      supabase.from('users').select('id', { count: 'exact', head: true }),
+      supabase.from('users').select('id', { count: 'exact', head: true }).gte('created_at', sevenDaysAgo),
+      supabase.from('observations').select('id', { count: 'exact', head: true }),
+      // Research-grade count: identifications that are primary + research_grade
+      supabase.from('identifications').select('id', { count: 'exact', head: true }).eq('is_primary', true).eq('is_research_grade', true),
+      supabase.from('sync_failures').select('id', { count: 'exact', head: true }).gte('last_seen_at', oneDayAgo),
+      supabase.from('user_bans').select('id', { count: 'exact', head: true }).is('revoked_at', null).or(`expires_at.is.null,expires_at.gt.${now.toISOString()}`),
+      supabase.from('reports').select('id', { count: 'exact', head: true }).eq('status', 'open'),
+      supabase.from('expert_applications').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+      supabase.from('api_usage').select('used, quota').eq('provider', 'plantnet').eq('date', todayDate).order('date', { ascending: false }).limit(1).maybeSingle(),
+    ]);
+
+    const totalUsersCount = totalUsers.count ?? 0;
+    const newUsersCount = newUsers.count ?? 0;
+    const totalObsCount = totalObs.count ?? 0;
+    const rgCount = rgObs.count ?? 0;
+    const syncFailCount = syncFails.count ?? 0;
+    const activeBansCount = activeBans.count ?? 0;
+    const openReportsCount = openReports.count ?? 0;
+    const pendingExpertsCount = pendingExperts.count ?? 0;
+
+    const rgPct = totalObsCount > 0 ? Math.round((rgCount / totalObsCount) * 100) : 0;
+
+    setText('admin-kpi-total-users', String(totalUsersCount));
+    setText('admin-kpi-new-users', String(newUsersCount));
+    setText('admin-kpi-total-obs', String(totalObsCount));
+    setText('admin-kpi-sync-fail', String(syncFailCount));
+    setText('admin-kpi-active-bans', String(activeBansCount));
+    setText('admin-kpi-open-reports', String(openReportsCount));
+    setText('admin-kpi-pending-experts', String(pendingExpertsCount));
+    setText('admin-kpi-rg-pct', `${rgPct}%`);
+
+    const numBase = 'text-2xl font-semibold';
+    setClass('admin-kpi-total-users', `${numBase} text-zinc-900 dark:text-zinc-100`);
+    setClass('admin-kpi-new-users', `${numBase} text-zinc-900 dark:text-zinc-100`);
+    setClass('admin-kpi-total-obs', `${numBase} text-zinc-900 dark:text-zinc-100`);
+    setClass('admin-kpi-active-bans', `${numBase} text-zinc-900 dark:text-zinc-100`);
+    setClass('admin-kpi-sync-fail', `${numBase} ${syncFailCount > 0 ? 'text-red-600 dark:text-red-400' : 'text-zinc-900 dark:text-zinc-100'}`);
+    setClass('admin-kpi-open-reports', `${numBase} ${openReportsCount > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-zinc-900 dark:text-zinc-100'}`);
+    setClass('admin-kpi-pending-experts', `${numBase} ${pendingExpertsCount > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-zinc-900 dark:text-zinc-100'}`);
+    setClass('admin-kpi-rg-pct', `${numBase} ${rgPct >= 60 ? 'text-emerald-600 dark:text-emerald-400' : rgPct >= 40 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`);
+
+    // Build "Needs your attention" alerts
+    const alertReportsTpl = section.dataset.alertReports ?? '{n} open report(s) need attention';
+    const alertExpertsTpl = section.dataset.alertExperts ?? '{n} expert application(s) pending review';
+    const alertSyncTpl = section.dataset.alertSync ?? '{n} sync failure(s) in the last 24h';
+    const alertQuotaTpl = section.dataset.alertQuota ?? 'PlantNet quota at {pct}% — investigate';
+    const alertView = section.dataset.alertView ?? 'View →';
+
+    const quota = quotaRow.data;
+    const quotaPct = quota && quota.quota > 0 ? Math.round((quota.used / quota.quota) * 100) : 0;
+
+    type AlertEntry = { text: string; href: string; color: 'amber' | 'red' };
+    const alerts: AlertEntry[] = [];
+
+    if (openReportsCount > 0) {
+      alerts.push({ text: alertReportsTpl.replace('{n}', String(openReportsCount)), href: '../flag-queue/', color: 'amber' });
+    }
+    if (pendingExpertsCount > 0) {
+      alerts.push({ text: alertExpertsTpl.replace('{n}', String(pendingExpertsCount)), href: '../experts/', color: 'amber' });
+    }
+    if (syncFailCount > 0) {
+      alerts.push({ text: alertSyncTpl.replace('{n}', String(syncFailCount)), href: '../sync/', color: 'red' });
+    }
+    if (quotaPct >= 80) {
+      alerts.push({ text: alertQuotaTpl.replace('{pct}', String(quotaPct)), href: '../api/', color: 'amber' });
+    }
+
+    if (alerts.length === 0) return; // keep the default "nothing on fire" placeholder
+
+    const alertsEl = document.getElementById('admin-overview-alerts')!;
+    alertsEl.innerHTML = alerts.map(a => {
+      const borderCls = a.color === 'red'
+        ? 'border-red-200 dark:border-red-700/40 bg-red-50 dark:bg-red-900/10'
+        : 'border-amber-200 dark:border-amber-700/40 bg-amber-50 dark:bg-amber-900/10';
+      const textCls = a.color === 'red'
+        ? 'text-red-900 dark:text-red-100'
+        : 'text-amber-900 dark:text-amber-100';
+      const linkCls = a.color === 'red'
+        ? 'text-red-700 dark:text-red-300 underline text-xs'
+        : 'text-amber-700 dark:text-amber-300 underline text-xs';
+      return `<div class="flex items-center justify-between rounded-md border ${borderCls} px-3 py-2 text-sm">
+        <span class="${textCls}">${escHtml(a.text)}</span>
+        <a href="${escHtml(a.href)}" class="${linkCls}">${escHtml(alertView)}</a>
+      </div>`;
+    }).join('');
+  }
+
+  async function loadRecentActivity() {
+    const { data: auditRows, error: auditError } = await supabase
+      .from('admin_audit')
+      .select('id, actor_id, op, target_type, target_id, reason, created_at')
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    const activityEl = document.getElementById('admin-overview-activity')!;
+    const emptyText = section.dataset.recentEmpty ?? 'No admin actions logged yet.';
+
+    if (auditError || !auditRows || auditRows.length === 0) {
+      activityEl.innerHTML = `<p class="text-sm text-zinc-500">${escHtml(emptyText)}</p>`;
+      return;
+    }
+
+    // Batch username lookup for all actor_ids — one query, no N+1
+    const actorIds = [...new Set(auditRows.map(r => r.actor_id).filter(Boolean))] as string[];
+    const usernameMap = new Map<string, string>();
+    if (actorIds.length > 0) {
+      const { data: usersData } = await supabase.from('users').select('id, username').in('id', actorIds);
+      for (const u of usersData ?? []) {
+        usernameMap.set(u.id, u.username ?? u.id.slice(0, 8));
+      }
+    }
+
+    activityEl.innerHTML = auditRows.map(r => {
+      const ago = timeAgo(r.created_at);
+      const actor = usernameMap.get(r.actor_id) ?? (r.actor_id ? r.actor_id.slice(0, 8) + '…' : '—');
+      const opCls = opBadgeCls(r.op ?? '');
+      const targetLink = r.target_type && r.target_id
+        ? `<span class="text-zinc-400 font-mono text-[10px] ml-1">${escHtml(r.target_type)}:${escHtml(r.target_id.slice(0, 8))}…</span>`
+        : '';
+      const reasonSnip = r.reason
+        ? `<span class="text-zinc-400 text-[10px] ml-1 truncate max-w-xs inline-block" title="${escHtml(r.reason)}">"${escHtml(r.reason.slice(0, 40))}${r.reason.length > 40 ? '…' : ''}"</span>`
+        : '';
+      return `<div class="flex items-start gap-2 py-1.5 border-b border-zinc-100 dark:border-zinc-800/60 last:border-0">
+        <span class="text-[10px] text-zinc-400 whitespace-nowrap mt-0.5 min-w-[56px]">${escHtml(ago)}</span>
+        <span class="text-xs text-zinc-700 dark:text-zinc-300 font-medium">${escHtml(actor)}</span>
+        <span class="${opCls}">${escHtml(r.op ?? '—')}</span>
+        ${targetLink}
+        ${reasonSnip}
+      </div>`;
+    }).join('');
+  }
+
+  init().catch(() => {
+    const errEl = document.getElementById('admin-overview-error')!;
+    errEl.textContent = section.dataset.loadFailed ?? 'Could not load platform state.';
+    errEl.classList.remove('hidden');
+  });
+</script>

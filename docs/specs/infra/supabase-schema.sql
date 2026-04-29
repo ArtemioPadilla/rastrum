@@ -1150,6 +1150,12 @@ CREATE POLICY "expert_apps_insert_own" ON public.expert_applications
 -- Service-role bypasses RLS for admin ops; no UPDATE/DELETE policy for
 -- regular users by design.
 
+-- Admins can read all applications for the console overview KPI.
+DROP POLICY IF EXISTS "expert_apps_read_admin" ON public.expert_applications;
+CREATE POLICY "expert_apps_read_admin" ON public.expert_applications
+  FOR SELECT TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'));
+
 GRANT SELECT, INSERT ON public.expert_applications TO authenticated;
 
 -- ─────────────────────────────────────────────────────────────────────
