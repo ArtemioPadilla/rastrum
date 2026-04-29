@@ -14,6 +14,7 @@ const lang: 'en' | 'es' = 'en';
   <script>
     import { getSupabase } from '../../../lib/supabase';
     import { labelFor } from '../../../lib/observation-enums';
+    import { wireManagePanelDetails } from '../../../lib/manage-panel';
     import { t } from '../../../i18n/utils';
 
     const id = new URLSearchParams(window.location.search).get('id');
@@ -173,12 +174,13 @@ const lang: 'en' | 'es' = 'en';
       }
 
       if (viewerIsObserver) {
-        // PR3 leaves the existing inline manage panel in place; PR4 replaces
-        // it with ObsManagePanel. Owner-only "Edit location" placeholder
-        // surfaces too — PR5 wires its click to a MapPicker edit-mode modal.
+        // ObsManagePanel.astro renders Details / Location / Photos tabs.
+        // PR4 wires Details; PR5 wires Location, PR6 wires Photos.
+        // The "Edit location" button on the left aside is still a stub —
+        // PR5 wires its click to a MapPicker edit-mode modal.
         const editLocBtn = document.getElementById('obs-edit-location-btn');
         editLocBtn?.classList.remove('hidden');
-        wireManagePanel(id, obs as Record<string, unknown>, ident);
+        await wireManagePanelDetails(id, obs as Record<string, unknown>, ident);
       }
 
       // Surface the "edited after IDs" badge (PR2 schema column).
@@ -301,111 +303,5 @@ const lang: 'en' | 'es' = 'en';
       await refresh();
     }
 
-    /**
-     * Owner-only Manage panel. PR3 leaves this inline implementation in
-     * place; PR4 replaces with ObsManagePanel.astro and moves the logic to
-     * src/lib/manage-panel.ts.
-     */
-    function wireManagePanel(
-      obsId: string,
-      obs: Record<string, unknown>,
-      _ident: { scientific_name?: string; is_primary?: boolean } | undefined,
-    ) {
-      const supabase = getSupabase();
-      const panel = document.getElementById('manage-panel');
-      if (!panel) return;
-      panel.classList.remove('hidden');
-
-      const sciInput = document.getElementById('m-sci') as HTMLInputElement | null;
-      const notesEl  = document.getElementById('m-notes') as HTMLTextAreaElement | null;
-      const obsEl    = document.getElementById('m-obscure') as HTMLSelectElement | null;
-      const errEl    = document.getElementById('m-error');
-      const savedEl  = document.getElementById('m-saved');
-      const saveBtn  = document.getElementById('m-save') as HTMLButtonElement | null;
-      const deleteBtn = document.getElementById('m-delete') as HTMLButtonElement | null;
-      const form     = document.getElementById('manage-form') as HTMLFormElement | null;
-
-      if (sciInput) sciInput.value = '';
-      if (notesEl)  notesEl.value  = (obs.notes as string | null) ?? '';
-      if (obsEl)    obsEl.value    = (obs.obscure_level as string) ?? 'none';
-
-      form?.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        if (!saveBtn) return;
-        errEl?.classList.add('hidden');
-        savedEl?.classList.add('hidden');
-        saveBtn.disabled = true;
-        const origLabel = saveBtn.textContent ?? 'Save';
-        saveBtn.textContent = 'Saving…';
-        try {
-          const { error: obsErr } = await supabase
-            .from('observations')
-            .update({
-              notes: notesEl?.value.trim() || null,
-              obscure_level: obsEl?.value ?? 'none',
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', obsId);
-          if (obsErr) throw obsErr;
-
-          const sci = sciInput?.value.trim();
-          if (sci) {
-            await supabase.from('identifications')
-              .update({ is_primary: false })
-              .eq('observation_id', obsId)
-              .eq('is_primary', true);
-            const { data: { user: viewer } } = await supabase.auth.getUser();
-            const { error: idErr } = await supabase.from('identifications').insert({
-              observation_id: obsId,
-              scientific_name: sci,
-              confidence: 0.95,
-              source: 'human',
-              is_primary: true,
-              validated_by: null,
-              validated_at: new Date().toISOString(),
-              raw_response: { manual_override: true, by: viewer?.id ?? null },
-            });
-            if (idErr) throw idErr;
-          }
-
-          savedEl?.classList.remove('hidden');
-          const speciesEl = document.getElementById('species');
-          if (sci && speciesEl) speciesEl.textContent = sci;
-        } catch (err) {
-          if (errEl) {
-            errEl.textContent = err instanceof Error ? err.message : String(err);
-            errEl.classList.remove('hidden');
-          }
-        } finally {
-          saveBtn.disabled = false;
-          saveBtn.textContent = origLabel;
-        }
-      });
-
-      deleteBtn?.addEventListener('click', async () => {
-        const confirmed = window.confirm(
-          'Delete this observation? This cannot be undone. Photos, identifications, and metadata will all be removed.',
-        );
-        if (!confirmed) return;
-        deleteBtn.disabled = true;
-        try {
-          const { data, error: invokeErr } = await supabase.functions.invoke<{
-            ok: boolean; r2_deleted?: number; r2_errors?: unknown[]; error?: string;
-          }>('delete-observation', {
-            body: { observation_id: obsId },
-          });
-          if (invokeErr) throw invokeErr;
-          if (data && !data.ok) throw new Error(data.error ?? 'Delete failed');
-          const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
-          window.location.href = `/${lang}/${lang === 'es' ? 'perfil/observaciones' : 'profile/observations'}/`;
-        } catch (err) {
-          if (errEl) {
-            errEl.textContent = err instanceof Error ? err.message : String(err);
-            errEl.classList.remove('hidden');
-          }
-          deleteBtn.disabled = false;
-        }
-      });
-    }
   </script>
 </BaseLayout>
