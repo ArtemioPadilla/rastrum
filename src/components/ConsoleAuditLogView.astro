@@ -1,8 +1,9 @@
 ---
 /**
  * ConsoleAuditLogView — hybrid timeline + filter pills + JSONB diff drill-down.
- * PR1 ships a basic browse view: render the last 100 admin_audit rows grouped
- * by day with click-to-expand. Filter pills + URL-state + CSV export land in PR3.
+ * PR1: basic timeline + diff drill-down.
+ * PR9: filter pills (actor/op/target_type/since), active-filter removable pills,
+ *      CSV export of current filtered result, URL-state-driven filters.
  */
 import { t } from '../i18n/utils';
 interface Props { lang: 'en' | 'es' }
@@ -10,11 +11,73 @@ const { lang } = Astro.props;
 const tr = t(lang);
 ---
 
-<section class="max-w-5xl">
+<section
+  class="max-w-5xl"
+  data-label-actor={tr.console.audit_filter_actor}
+  data-label-op={tr.console.audit_filter_op}
+  data-label-target={tr.console.audit_filter_target_type}
+  data-label-since={tr.console.audit_filter_since}
+  data-label-any-actor={tr.console.audit_filter_any_actor}
+  data-label-any-op={tr.console.audit_filter_any_op}
+  data-label-any-target={tr.console.audit_filter_any_target}
+  data-label-7d={tr.console.audit_filter_7d}
+  data-label-30d={tr.console.audit_filter_30d}
+  data-label-90d={tr.console.audit_filter_90d}
+  data-label-all-time={tr.console.audit_filter_all_time}
+  data-label-active-filters={tr.console.audit_active_filters}
+  data-label-csv={tr.console.audit_csv_export}
+>
   <h1 class="text-xl font-semibold mb-4">{tr.console.audit}</h1>
   <div id="audit-not-auth" class="hidden rounded border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-900 dark:text-amber-100">
     {tr.console.not_authorized}
   </div>
+
+  <!-- Filter pill row -->
+  <div id="audit-filters" class="hidden mb-4 space-y-2">
+    <div class="flex flex-wrap gap-2 items-center">
+      <!-- Actor filter -->
+      <div class="relative">
+        <select id="audit-filter-actor" class="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm pr-7 appearance-none">
+          <option value="">{tr.console.audit_filter_actor}: {tr.console.audit_filter_any_actor}</option>
+        </select>
+      </div>
+
+      <!-- Op filter -->
+      <div class="relative">
+        <select id="audit-filter-op" class="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm pr-7 appearance-none">
+          <option value="">{tr.console.audit_filter_op}: {tr.console.audit_filter_any_op}</option>
+        </select>
+      </div>
+
+      <!-- Target type filter -->
+      <div class="relative">
+        <select id="audit-filter-target" class="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm pr-7 appearance-none">
+          <option value="">{tr.console.audit_filter_target_type}: {tr.console.audit_filter_any_target}</option>
+        </select>
+      </div>
+
+      <!-- Since filter -->
+      <div class="relative">
+        <select id="audit-filter-since" class="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm pr-7 appearance-none">
+          <option value="7d">{tr.console.audit_filter_since}: {tr.console.audit_filter_7d}</option>
+          <option value="30d">{tr.console.audit_filter_since}: {tr.console.audit_filter_30d}</option>
+          <option value="90d">{tr.console.audit_filter_since}: {tr.console.audit_filter_90d}</option>
+          <option value="">{tr.console.audit_filter_since}: {tr.console.audit_filter_all_time}</option>
+        </select>
+      </div>
+
+      <!-- CSV export -->
+      <button id="audit-csv-btn" class="ml-auto px-3 py-1.5 rounded border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800">
+        {tr.console.audit_csv_export}
+      </button>
+    </div>
+
+    <!-- Active filter pills -->
+    <div id="audit-active-pills" class="hidden flex flex-wrap gap-1.5 items-center">
+      <span class="text-xs text-zinc-500">{tr.console.audit_active_filters}</span>
+    </div>
+  </div>
+
   <div id="audit-loading" class="text-sm text-zinc-500 italic">{tr.console.loading}</div>
   <div id="audit-rows" class="hidden space-y-2"></div>
   <p id="audit-error" class="hidden mt-3 text-sm text-red-600 dark:text-red-400"></p>
@@ -22,6 +85,7 @@ const tr = t(lang);
 
 <script>
   import { getSupabase } from '../lib/supabase';
+  import { readFilterState, writeFilterState } from '../lib/console-filter-state';
 
   type Row = {
     id: number;
@@ -41,33 +105,126 @@ const tr = t(lang);
     return s.replace(/[<>&'"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&#39;','"':'&quot;'}[c]!));
   }
 
+  const sectionEl = document.querySelector<HTMLElement>('section[data-label-actor]')!;
+  const labelActor = sectionEl.dataset.labelActor ?? 'Actor';
+  const labelCsv = sectionEl.dataset.labelCsv ?? 'CSV export';
+  const labelActivePills = sectionEl.dataset.labelActiveFilters ?? 'Active filters:';
+
+  let allRows: Row[] = [];
+
   async function load() {
     const supabase = getSupabase();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { hide('audit-loading'); show('audit-not-auth'); return; }
 
-    const { data, error } = await supabase
+    show('audit-filters');
+
+    // Restore filters from URL
+    const saved = readFilterState();
+    const actorFilter = document.getElementById('audit-filter-actor') as HTMLSelectElement;
+    const opFilter = document.getElementById('audit-filter-op') as HTMLSelectElement;
+    const targetFilter = document.getElementById('audit-filter-target') as HTMLSelectElement;
+    const sinceFilter = document.getElementById('audit-filter-since') as HTMLSelectElement;
+
+    if (saved['since'] !== undefined) sinceFilter.value = saved['since'];
+
+    const sinceVal = sinceFilter.value;
+    let query = supabase
       .from('admin_audit')
       .select('*')
       .order('created_at', { ascending: false })
-      .limit(100);
+      .limit(500);
+
+    if (sinceVal) {
+      const days = sinceVal === '7d' ? 7 : sinceVal === '30d' ? 30 : 90;
+      const cutoff = new Date();
+      cutoff.setUTCDate(cutoff.getUTCDate() - days);
+      query = query.gte('created_at', cutoff.toISOString());
+    }
+
+    const { data, error } = await query;
+    hide('audit-loading');
 
     if (error) {
-      hide('audit-loading');
       const e = document.getElementById('audit-error')!;
       e.textContent = error.message; e.classList.remove('hidden');
       return;
     }
-    const rows = (data ?? []) as Row[];
+
+    allRows = (data ?? []) as Row[];
+
+    // Populate filter dropdowns from data
+    populateDropdowns();
+
+    // Restore remaining filter values after populating
+    if (saved['actor']) actorFilter.value = saved['actor'];
+    if (saved['op']) opFilter.value = saved['op'];
+    if (saved['target']) targetFilter.value = saved['target'];
+
+    renderRows();
+    renderActivePills();
+    wireFilters();
+  }
+
+  function populateDropdowns() {
+    const actors = [...new Set(allRows.map(r => r.actor_id))].sort();
+    const ops = [...new Set(allRows.map(r => r.op))].sort();
+    const targets = [...new Set(allRows.map(r => r.target_type).filter(Boolean) as string[])].sort();
+
+    const actorSel = document.getElementById('audit-filter-actor') as HTMLSelectElement;
+    const opSel = document.getElementById('audit-filter-op') as HTMLSelectElement;
+    const targetSel = document.getElementById('audit-filter-target') as HTMLSelectElement;
+
+    const anyActorLabel = sectionEl.dataset.labelAnyActor ?? 'any actor';
+    const anyOpLabel = sectionEl.dataset.labelAnyOp ?? 'any op';
+    const anyTargetLabel = sectionEl.dataset.labelAnyTarget ?? 'any type';
+    const actorLabel = sectionEl.dataset.labelActor ?? 'Actor';
+    const opLabel = sectionEl.dataset.labelOp ?? 'Op';
+    const targetLabel = sectionEl.dataset.labelTarget ?? 'Target type';
+
+    actorSel.innerHTML = `<option value="">${actorLabel}: ${anyActorLabel}</option>` +
+      actors.map(a => `<option value="${escapeHtml(a)}">${escapeHtml(a.slice(0, 12))}…</option>`).join('');
+
+    opSel.innerHTML = `<option value="">${opLabel}: ${anyOpLabel}</option>` +
+      ops.map(o => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join('');
+
+    targetSel.innerHTML = `<option value="">${targetLabel}: ${anyTargetLabel}</option>` +
+      targets.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+  }
+
+  function getActiveFilters(): { actor: string; op: string; target: string; since: string } {
+    const actorSel = document.getElementById('audit-filter-actor') as HTMLSelectElement;
+    const opSel = document.getElementById('audit-filter-op') as HTMLSelectElement;
+    const targetSel = document.getElementById('audit-filter-target') as HTMLSelectElement;
+    const sinceSel = document.getElementById('audit-filter-since') as HTMLSelectElement;
+    return {
+      actor: actorSel?.value ?? '',
+      op: opSel?.value ?? '',
+      target: targetSel?.value ?? '',
+      since: sinceSel?.value ?? '',
+    };
+  }
+
+  function filteredRows(): Row[] {
+    const { actor, op, target } = getActiveFilters();
+    return allRows.filter(r => {
+      if (actor && r.actor_id !== actor) return false;
+      if (op && r.op !== op) return false;
+      if (target && r.target_type !== target) return false;
+      return true;
+    });
+  }
+
+  function renderRows() {
+    const rows = filteredRows();
+    const wrap = document.getElementById('audit-rows')!;
+
     if (rows.length === 0) {
-      hide('audit-loading');
-      const wrap = document.getElementById('audit-rows')!;
-      wrap.innerHTML = '<div class="rounded border border-dashed border-zinc-300 dark:border-zinc-700 p-4 text-sm text-zinc-500">No audit entries yet.</div>';
-      wrap.classList.remove('hidden');
+      wrap.innerHTML = '<div class="rounded border border-dashed border-zinc-300 dark:border-zinc-700 p-4 text-sm text-zinc-500">No audit entries match the current filters.</div>';
+      show('audit-rows');
       return;
     }
 
-    const wrap = document.getElementById('audit-rows')!;
     wrap.innerHTML = rows.map(r => `
       <details class="rounded border border-zinc-200 dark:border-zinc-800 p-3 text-sm">
         <summary class="flex justify-between cursor-pointer">
@@ -85,9 +242,93 @@ const tr = t(lang);
         </div>
       </details>
     `).join('');
-    hide('audit-loading');
     show('audit-rows');
   }
+
+  function renderActivePills() {
+    const { actor, op, target } = getActiveFilters();
+    const pillsContainer = document.getElementById('audit-active-pills')!;
+    const pills: { key: string; label: string }[] = [];
+
+    if (actor) pills.push({ key: 'actor', label: `${labelActor}: ${actor.slice(0, 12)}…` });
+    if (op) pills.push({ key: 'op', label: `op: ${op}` });
+    if (target) pills.push({ key: 'target', label: `target: ${target}` });
+
+    if (pills.length === 0) {
+      pillsContainer.classList.add('hidden');
+      return;
+    }
+
+    pillsContainer.classList.remove('hidden');
+    const existingSpan = pillsContainer.querySelector('span');
+    const labelHtml = existingSpan ? existingSpan.outerHTML : '';
+
+    pillsContainer.innerHTML = `<span class="text-xs text-zinc-500">${escapeHtml(labelActivePills)}</span>` +
+      pills.map(p => `
+        <button data-remove-filter="${escapeHtml(p.key)}" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700/50">
+          ${escapeHtml(p.label)}
+          <span class="text-emerald-600 dark:text-emerald-400 font-bold leading-none">✕</span>
+        </button>
+      `).join('');
+  }
+
+  function onFilterChange() {
+    const { actor, op, target, since } = getActiveFilters();
+    writeFilterState({ actor, op, target, since });
+    renderRows();
+    renderActivePills();
+  }
+
+  function wireFilters() {
+    ['audit-filter-actor', 'audit-filter-op', 'audit-filter-target'].forEach(id => {
+      document.getElementById(id)?.addEventListener('change', onFilterChange);
+    });
+
+    document.getElementById('audit-filter-since')?.addEventListener('change', () => {
+      load().catch(err => {
+        const e = document.getElementById('audit-error')!;
+        e.textContent = (err as Error).message; e.classList.remove('hidden');
+      });
+    });
+
+    document.getElementById('audit-active-pills')?.addEventListener('click', (ev) => {
+      const btn = (ev.target as HTMLElement).closest<HTMLElement>('[data-remove-filter]');
+      if (!btn) return;
+      const key = btn.dataset.removeFilter!;
+      const elMap: Record<string, string> = {
+        actor: 'audit-filter-actor',
+        op: 'audit-filter-op',
+        target: 'audit-filter-target',
+      };
+      const elId = elMap[key];
+      if (elId) {
+        const sel = document.getElementById(elId) as HTMLSelectElement | null;
+        if (sel) sel.value = '';
+      }
+      onFilterChange();
+    });
+
+    document.getElementById('audit-csv-btn')?.addEventListener('click', () => {
+      const rows = filteredRows();
+      if (rows.length === 0) return;
+      const headers = ['id', 'created_at', 'actor_id', 'op', 'target_type', 'target_id', 'reason'];
+      const lines = [
+        headers.join(','),
+        ...rows.map(r => headers.map(h => {
+          const val = String((r as unknown as Record<string, unknown>)[h] ?? '');
+          return `"${val.replace(/"/g, '""')}"`;
+        }).join(',')),
+      ];
+      const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `audit-log-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  }
+
   load().catch(err => {
     hide('audit-loading');
     const e = document.getElementById('audit-error')!;
