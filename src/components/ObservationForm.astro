@@ -1262,12 +1262,30 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
       ? fileList
       : Array.from(fileList as FileList);
 
+    // Optional crop / rotate step before compression. Only the first
+    // photo opens the modal — multi-select keeps the rest as-is so a
+    // batch upload doesn't turn into N modal cycles.
+    let toProcess: File[] = files.slice();
+    if (toProcess.length > 0 && toProcess[0].type.startsWith('image/')) {
+      try {
+        const { openCropModal } = await import('../lib/photo-crop-controller');
+        const result = await openCropModal(toProcess[0]);
+        if (result.kind === 'cancel') {
+          toProcess = toProcess.slice(1);
+        } else {
+          toProcess[0] = result.file;
+        }
+      } catch (err) {
+        console.warn('[rastrum] crop modal failed; using original photo', err);
+      }
+    }
+
     // Auto-resize > 4 MP photos before they hit Dexie. Saves R2 bytes,
     // speeds sync on Latin America's mobile networks. PlantNet/Claude
     // downscale anyway; nothing above 1024 px improves top-1 accuracy.
     const { compressIfLarge } = await import('../lib/photo-compress');
     const compressed: File[] = [];
-    for (const f of files) {
+    for (const f of toProcess) {
       try {
         const out = await compressIfLarge(f);
         compressed.push(out.file);

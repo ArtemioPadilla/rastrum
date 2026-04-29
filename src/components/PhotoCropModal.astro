@@ -1,0 +1,414 @@
+---
+/**
+ * PhotoCropModal — single global modal for cropping + rotating an
+ * incoming photo before it hits the compression / upload pipeline.
+ *
+ * Other components open it by:
+ *   const result = await openCropModal(file);
+ *   // result is one of:
+ *   //   { kind: 'use',    file: File }    — confirmed crop
+ *   //   { kind: 'skip' }                  — user kept original
+ *   //   { kind: 'cancel' }                — user backed out (treat
+ *   //                                       like "remove this photo")
+ *
+ * The controller helper lives in `src/lib/photo-crop-controller.ts`
+ * and dispatches custom events that this modal listens to.
+ */
+import { t } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+
+const { lang } = Astro.props;
+const tr = t(lang);
+const obs = (tr as unknown as { observe: Record<string, string> }).observe;
+---
+
+<div
+  id="rastrum-crop-modal"
+  class="hidden fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/70 backdrop-blur-sm px-4 py-6"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="rastrum-crop-title"
+  data-lang={lang}
+>
+  <div class="w-full max-w-lg rounded-2xl bg-white dark:bg-zinc-900 ring-1 ring-zinc-200 dark:ring-zinc-800 shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200">
+    <header class="px-5 py-4 border-b border-zinc-100 dark:border-zinc-800">
+      <h2 id="rastrum-crop-title" class="text-base font-semibold text-zinc-900 dark:text-zinc-100">
+        {obs.crop_title}
+      </h2>
+      <p class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">{obs.crop_subtitle}</p>
+    </header>
+
+    <div class="px-5 py-4 space-y-3">
+      <div
+        id="rastrum-crop-stage"
+        class="relative w-full bg-zinc-100 dark:bg-zinc-950 rounded-lg overflow-hidden touch-none select-none"
+        style="aspect-ratio: 4/3;"
+      >
+        <canvas
+          id="rastrum-crop-canvas"
+          class="block w-full h-full object-contain"
+          aria-label={obs.crop_drag_hint}
+        ></canvas>
+      </div>
+
+      <p class="text-xs text-zinc-500 dark:text-zinc-400 text-center">{obs.crop_drag_hint}</p>
+
+      <div class="flex items-center justify-center gap-2">
+        <button
+          type="button"
+          id="rastrum-crop-rotate-left"
+          class="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 min-h-[36px]"
+          aria-label={obs.crop_rotate_left}
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 4L4 9l5 5M4 9h11a5 5 0 010 10h-3" />
+          </svg>
+          <span class="hidden sm:inline">{obs.crop_rotate_left}</span>
+        </button>
+        <button
+          type="button"
+          id="rastrum-crop-reset"
+          class="inline-flex items-center rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 min-h-[36px]"
+        >{obs.crop_reset}</button>
+        <button
+          type="button"
+          id="rastrum-crop-rotate-right"
+          class="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 min-h-[36px]"
+          aria-label={obs.crop_rotate_right}
+        >
+          <span class="hidden sm:inline">{obs.crop_rotate_right}</span>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 4l5 5-5 5M20 9H9a5 5 0 000 10h3" />
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <footer class="px-5 py-4 border-t border-zinc-100 dark:border-zinc-800 flex items-center gap-2 justify-end flex-wrap">
+      <button
+        type="button"
+        id="rastrum-crop-cancel"
+        class="rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 min-h-[40px]"
+      >{obs.crop_cancel}</button>
+      <button
+        type="button"
+        id="rastrum-crop-skip"
+        class="rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 min-h-[40px]"
+      >{obs.crop_skip}</button>
+      <button
+        type="button"
+        id="rastrum-crop-use"
+        class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-2 text-sm font-semibold text-white min-h-[40px]"
+      >{obs.crop_use}</button>
+    </footer>
+  </div>
+</div>
+
+<script>
+  import { cropAndRotate, normalizeCropRect, rotatedDims } from '../lib/photo-crop';
+  import type { Rotation } from '../lib/photo-crop';
+
+  const root = document.getElementById('rastrum-crop-modal') as HTMLElement | null;
+  if (root) {
+    const canvas = document.getElementById('rastrum-crop-canvas') as HTMLCanvasElement | null;
+    const stage  = document.getElementById('rastrum-crop-stage') as HTMLElement | null;
+    const useBtn    = document.getElementById('rastrum-crop-use')          as HTMLButtonElement | null;
+    const skipBtn   = document.getElementById('rastrum-crop-skip')         as HTMLButtonElement | null;
+    const cancelBtn = document.getElementById('rastrum-crop-cancel')       as HTMLButtonElement | null;
+    const rotLBtn   = document.getElementById('rastrum-crop-rotate-left')  as HTMLButtonElement | null;
+    const rotRBtn   = document.getElementById('rastrum-crop-rotate-right') as HTMLButtonElement | null;
+    const resetBtn  = document.getElementById('rastrum-crop-reset')        as HTMLButtonElement | null;
+
+    type State = {
+      file: File;
+      bitmap: ImageBitmap;
+      rotation: Rotation;
+      // Crop rect in *rotated source-image* pixel space.
+      crop: { x: number; y: number; w: number; h: number };
+      // The most recent display→source scale. Recomputed on each redraw.
+      scale: number;
+    };
+    let state: State | null = null;
+    let prevFocus: Element | null = null;
+
+    const HANDLE_RADIUS = 14;
+
+    function openModal(file: File) {
+      prevFocus = document.activeElement;
+      void prepare(file).catch((err) => {
+        console.warn('[rastrum] crop modal prepare failed', err);
+        emit('skip');
+        close();
+      });
+    }
+
+    async function prepare(file: File) {
+      let bitmap: ImageBitmap;
+      try {
+        bitmap = await createImageBitmap(file);
+      } catch {
+        emit('skip');
+        return;
+      }
+      state = {
+        file,
+        bitmap,
+        rotation: 0,
+        crop: { x: 0, y: 0, w: bitmap.width, h: bitmap.height },
+        scale: 1,
+      };
+      root?.classList.remove('hidden');
+      requestAnimationFrame(() => {
+        useBtn?.focus();
+        redraw();
+      });
+    }
+
+    function close() {
+      if (state) {
+        state.bitmap.close?.();
+        state = null;
+      }
+      root?.classList.add('hidden');
+      if (prevFocus instanceof HTMLElement) prevFocus.focus();
+    }
+
+    function emit(kind: 'use' | 'skip' | 'cancel', file?: File) {
+      const detail: Record<string, unknown> = { kind };
+      if (file) detail.file = file;
+      window.dispatchEvent(new CustomEvent('rastrum:cropmodal-result', { detail }));
+    }
+
+    function redraw() {
+      if (!state || !canvas || !stage) return;
+      const rd = rotatedDims(state.bitmap.width, state.bitmap.height, state.rotation);
+      const stageW = stage.clientWidth;
+      const stageH = stage.clientHeight;
+      const scale = Math.min(stageW / rd.w, stageH / rd.h);
+      state.scale = scale;
+      const dispW = Math.max(1, Math.round(rd.w * scale));
+      const dispH = Math.max(1, Math.round(rd.h * scale));
+      // Match canvas pixel buffer to its on-screen size to stay sharp.
+      canvas.width = dispW;
+      canvas.height = dispH;
+      canvas.style.width = dispW + 'px';
+      canvas.style.height = dispH + 'px';
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.clearRect(0, 0, dispW, dispH);
+      // Draw rotated source.
+      ctx.save();
+      switch (state.rotation) {
+        case 90:
+          ctx.translate(dispW, 0);
+          ctx.rotate(Math.PI / 2);
+          ctx.drawImage(state.bitmap, 0, 0, state.bitmap.width * scale, state.bitmap.height * scale);
+          break;
+        case 180:
+          ctx.translate(dispW, dispH);
+          ctx.rotate(Math.PI);
+          ctx.drawImage(state.bitmap, 0, 0, state.bitmap.width * scale, state.bitmap.height * scale);
+          break;
+        case 270:
+          ctx.translate(0, dispH);
+          ctx.rotate(-Math.PI / 2);
+          ctx.drawImage(state.bitmap, 0, 0, state.bitmap.width * scale, state.bitmap.height * scale);
+          break;
+        default:
+          ctx.drawImage(state.bitmap, 0, 0, dispW, dispH);
+      }
+      ctx.restore();
+
+      // Dim outside the crop rect.
+      const cx = state.crop.x * scale;
+      const cy = state.crop.y * scale;
+      const cw = state.crop.w * scale;
+      const ch = state.crop.h * scale;
+      ctx.fillStyle = 'rgba(9, 9, 11, 0.55)';
+      ctx.fillRect(0, 0, dispW, cy);
+      ctx.fillRect(0, cy + ch, dispW, dispH - (cy + ch));
+      ctx.fillRect(0, cy, cx, ch);
+      ctx.fillRect(cx + cw, cy, dispW - (cx + cw), ch);
+
+      // Crop border.
+      ctx.strokeStyle = 'rgba(16, 185, 129, 0.95)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(cx, cy, cw, ch);
+
+      // Corner handles.
+      ctx.fillStyle = 'rgba(16, 185, 129, 1)';
+      const r = 6;
+      for (const [hx, hy] of [
+        [cx, cy], [cx + cw, cy], [cx, cy + ch], [cx + cw, cy + ch],
+      ]) {
+        ctx.beginPath();
+        ctx.arc(hx, hy, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function reset() {
+      if (!state) return;
+      state.rotation = 0;
+      state.crop = { x: 0, y: 0, w: state.bitmap.width, h: state.bitmap.height };
+      redraw();
+    }
+
+    function rotate(direction: 'left' | 'right') {
+      if (!state) return;
+      const delta = direction === 'left' ? 270 : 90;
+      state.rotation = ((state.rotation + delta) % 360) as Rotation;
+      const rd = rotatedDims(state.bitmap.width, state.bitmap.height, state.rotation);
+      // After rotation the previous crop coords are no longer valid; reset
+      // the crop to the full rotated frame. Users can re-crop after rotating.
+      state.crop = { x: 0, y: 0, w: rd.w, h: rd.h };
+      redraw();
+    }
+
+    type DragMode = 'move' | 'tl' | 'tr' | 'bl' | 'br' | null;
+    let drag: { mode: DragMode; startX: number; startY: number; orig: { x: number; y: number; w: number; h: number } } | null = null;
+
+    function pointerToImage(ev: PointerEvent): { x: number; y: number } {
+      if (!canvas || !state) return { x: 0, y: 0 };
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: (ev.clientX - rect.left) / state.scale,
+        y: (ev.clientY - rect.top) / state.scale,
+      };
+    }
+
+    function hitTest(ev: PointerEvent): DragMode {
+      if (!state || !canvas) return null;
+      const rect = canvas.getBoundingClientRect();
+      const px = ev.clientX - rect.left;
+      const py = ev.clientY - rect.top;
+      const cx = state.crop.x * state.scale;
+      const cy = state.crop.y * state.scale;
+      const cw = state.crop.w * state.scale;
+      const ch = state.crop.h * state.scale;
+      const corners: Array<[number, number, DragMode]> = [
+        [cx, cy, 'tl'], [cx + cw, cy, 'tr'], [cx, cy + ch, 'bl'], [cx + cw, cy + ch, 'br'],
+      ];
+      for (const [hx, hy, mode] of corners) {
+        if (Math.hypot(px - hx, py - hy) <= HANDLE_RADIUS) return mode;
+      }
+      if (px >= cx && px <= cx + cw && py >= cy && py <= cy + ch) return 'move';
+      return null;
+    }
+
+    canvas?.addEventListener('pointerdown', (ev) => {
+      if (!state) return;
+      const mode = hitTest(ev);
+      if (!mode) return;
+      canvas.setPointerCapture(ev.pointerId);
+      const p = pointerToImage(ev);
+      drag = { mode, startX: p.x, startY: p.y, orig: { ...state.crop } };
+    });
+
+    canvas?.addEventListener('pointermove', (ev) => {
+      if (!drag || !state) return;
+      const p = pointerToImage(ev);
+      const dx = p.x - drag.startX;
+      const dy = p.y - drag.startY;
+      const rd = rotatedDims(state.bitmap.width, state.bitmap.height, state.rotation);
+      const o = drag.orig;
+      let next = { ...o };
+      switch (drag.mode) {
+        case 'move':
+          next.x = o.x + dx;
+          next.y = o.y + dy;
+          break;
+        case 'tl':
+          next.x = o.x + dx;
+          next.y = o.y + dy;
+          next.w = o.w - dx;
+          next.h = o.h - dy;
+          break;
+        case 'tr':
+          next.y = o.y + dy;
+          next.w = o.w + dx;
+          next.h = o.h - dy;
+          break;
+        case 'bl':
+          next.x = o.x + dx;
+          next.w = o.w - dx;
+          next.h = o.h + dy;
+          break;
+        case 'br':
+          next.w = o.w + dx;
+          next.h = o.h + dy;
+          break;
+      }
+      const r = normalizeCropRect({ x: next.x, y: next.y, width: next.w, height: next.h }, rd.w, rd.h);
+      state.crop = { x: r.x, y: r.y, w: r.width, h: r.height };
+      redraw();
+    });
+
+    function endDrag(ev: PointerEvent) {
+      if (drag) {
+        try { canvas?.releasePointerCapture(ev.pointerId); } catch { /* ignore */ }
+      }
+      drag = null;
+    }
+    canvas?.addEventListener('pointerup', endDrag);
+    canvas?.addEventListener('pointercancel', endDrag);
+
+    rotLBtn?.addEventListener('click', () => rotate('left'));
+    rotRBtn?.addEventListener('click', () => rotate('right'));
+    resetBtn?.addEventListener('click', reset);
+
+    cancelBtn?.addEventListener('click', () => {
+      emit('cancel');
+      close();
+    });
+    skipBtn?.addEventListener('click', () => {
+      const f = state?.file;
+      emit('skip');
+      close();
+      if (f) {
+        // re-emit with the file so listeners that want the original
+        // file (without crop) can pick it up uniformly.
+        window.dispatchEvent(new CustomEvent('rastrum:cropmodal-result', { detail: { kind: 'skip', file: f } }));
+      }
+    });
+    useBtn?.addEventListener('click', async () => {
+      if (!state) {
+        emit('cancel');
+        close();
+        return;
+      }
+      const { file, rotation, crop } = state;
+      try {
+        const out = await cropAndRotate(file, {
+          rect: { x: crop.x, y: crop.y, width: crop.w, height: crop.h },
+          rotation,
+        });
+        emit('use', out);
+      } catch (err) {
+        console.warn('[rastrum] crop failed, falling back to original', err);
+        emit('skip', file);
+      }
+      close();
+    });
+
+    document.addEventListener('keydown', (ev) => {
+      if (root?.classList.contains('hidden')) return;
+      if (ev.key === 'Escape') {
+        ev.preventDefault();
+        emit('cancel');
+        close();
+      }
+    });
+
+    window.addEventListener('rastrum:cropmodal-open', (ev) => {
+      const e = ev as CustomEvent<{ file: File }>;
+      if (!e.detail?.file) return;
+      openModal(e.detail.file);
+    });
+
+    window.addEventListener('resize', () => { if (state) redraw(); });
+  }
+</script>
