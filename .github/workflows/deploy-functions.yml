@@ -13,6 +13,12 @@ on:
   workflow_dispatch:
     inputs:
       function:
+        # NOTE: this enum is a UX nicety for the dropdown only. The actual
+        # "deploy all" path reads the function set from the filesystem
+        # (`ls supabase/functions/`) at runtime, so missing entries here
+        # don't block deploys — they just mean the dropdown won't list
+        # them. Add new function directories to keep the dropdown
+        # complete; the workflow won't drift if you forget.
         description: 'Function name to deploy (or "all")'
         required: true
         default: all
@@ -67,29 +73,36 @@ jobs:
         id: targets
         run: |
           set -e
+          # Single source of truth for "all functions": directory names under
+          # supabase/functions/. No hardcoded list to drift. The choice enum
+          # above is just a UX nicety for the dropdown; the actual deploy
+          # loop reads from the filesystem.
+          ALL_FNS=$(ls -d supabase/functions/*/ 2>/dev/null \
+            | xargs -n1 basename \
+            | sort -u \
+            | tr '\n' ' ')
+          ALL_FNS=$(echo "$ALL_FNS" | xargs)
+          echo "→ all functions on disk: $ALL_FNS"
+
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            # Manual dispatch: honor the input verbatim.
             INPUT="${{ inputs.function }}"
             if [ "$INPUT" = "all" ]; then
-              # Keep this list in sync with the `options:` enum above.
-              echo "fns=get-upload-url identify enrich-environment recompute-streaks award-badges share-card export-dwca mcp api plantnet-monitor streak-push sync-error delete-observation follow react report" >> "$GITHUB_OUTPUT"
+              FNS="$ALL_FNS"
             else
-              echo "fns=$INPUT" >> "$GITHUB_OUTPUT"
+              FNS="$INPUT"
             fi
             echo "sync_secrets=${{ inputs.sync_secrets }}" >> "$GITHUB_OUTPUT"
           else
             # Push event: derive the changed function set from the diff.
-            # Pick the second column ($3) of supabase/functions/<name>/...
-            # paths, dedupe, drop blanks. If the workflow file itself changed,
-            # default to "all" so a workflow refactor redeploys everything.
+            # If the workflow file itself changed, fall back to deploy-all so
+            # backfills work after a workflow refactor.
             BASE="${{ github.event.before }}"
             HEAD="${{ github.sha }}"
             CHANGED=$(git diff --name-only "$BASE" "$HEAD" 2>/dev/null || true)
             WORKFLOW_TOUCHED=$(echo "$CHANGED" | grep -E '^\.github/workflows/deploy-functions\.yml$' || true)
-            FNS=""
             if [ -n "$WORKFLOW_TOUCHED" ]; then
               echo "→ workflow file changed; deploying all functions"
-              FNS="get-upload-url identify enrich-environment recompute-streaks award-badges share-card export-dwca mcp api plantnet-monitor streak-push sync-error delete-observation follow react report"
+              FNS="$ALL_FNS"
             else
               FNS=$(echo "$CHANGED" \
                 | grep -E '^supabase/functions/' \
@@ -103,11 +116,11 @@ jobs:
             else
               echo "→ deploying: $FNS"
             fi
-            echo "fns=$FNS" >> "$GITHUB_OUTPUT"
             # On push, never resync secrets — that's a privileged op reserved
             # for explicit dispatch.
             echo "sync_secrets=false" >> "$GITHUB_OUTPUT"
           fi
+          echo "fns=$FNS" >> "$GITHUB_OUTPUT"
 
       - name: Sync GitHub secrets → Supabase
         if: ${{ steps.targets.outputs.sync_secrets == 'true' && steps.targets.outputs.fns != '' }}
