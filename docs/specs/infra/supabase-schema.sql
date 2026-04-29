@@ -4426,3 +4426,81 @@ ON CONFLICT (bucket) DO UPDATE
 DO $$ BEGIN
   ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'taxon_conservation_set';
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- PR10 — Subject UX: ban_appeals + audit_ops + notification kind extensions
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- 1. Extend notifications.kind CHECK to include ban lifecycle + appeal events.
+--    Postgres CHECK constraints cannot be altered in place; the idempotent
+--    approach is to drop and recreate with the extended list.
+ALTER TABLE public.notifications
+  DROP CONSTRAINT IF EXISTS notifications_kind_check;
+ALTER TABLE public.notifications
+  ADD CONSTRAINT notifications_kind_check
+  CHECK (kind IN (
+    'follow','follow_accepted','reaction','comment','mention',
+    'identification','badge','digest',
+    'ban_received','ban_lifted','appeal_rejected'
+  ));
+
+-- 2. Extend audit_op enum for appeal outcomes (IF NOT EXISTS = idempotent).
+DO $$ BEGIN
+  ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'appeal_accepted';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'appeal_rejected';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- 3. ban_appeals table.
+CREATE TABLE IF NOT EXISTS public.ban_appeals (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  ban_id          uuid NOT NULL REFERENCES public.user_bans(id) ON DELETE CASCADE,
+  appellant_id    uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  message         text NOT NULL CHECK (length(message) BETWEEN 20 AND 2000),
+  status          text NOT NULL DEFAULT 'pending'
+                  CHECK (status IN ('pending','accepted','rejected','withdrawn')),
+  reviewer_id     uuid REFERENCES public.users(id),
+  reviewer_note   text,
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  reviewed_at     timestamptz
+);
+
+CREATE INDEX IF NOT EXISTS idx_ban_appeals_ban ON public.ban_appeals(ban_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_ban_appeals_pending ON public.ban_appeals(status, created_at) WHERE status = 'pending';
+
+ALTER TABLE public.ban_appeals ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS ban_appeals_self_read ON public.ban_appeals;
+CREATE POLICY ban_appeals_self_read ON public.ban_appeals
+  FOR SELECT TO authenticated
+  USING (appellant_id = auth.uid());
+
+DROP POLICY IF EXISTS ban_appeals_mod_read ON public.ban_appeals;
+CREATE POLICY ban_appeals_mod_read ON public.ban_appeals
+  FOR SELECT TO authenticated
+  USING (public.has_role(auth.uid(), 'moderator') OR public.has_role(auth.uid(), 'admin'));
+
+DROP POLICY IF EXISTS ban_appeals_self_insert ON public.ban_appeals;
+CREATE POLICY ban_appeals_self_insert ON public.ban_appeals
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    appellant_id = auth.uid()
+    AND EXISTS (
+      SELECT 1 FROM public.user_bans
+      WHERE id = ban_id
+        AND user_id = auth.uid()
+        AND revoked_at IS NULL
+    )
+  );
+
+DROP POLICY IF EXISTS ban_appeals_no_client_update ON public.ban_appeals;
+CREATE POLICY ban_appeals_no_client_update ON public.ban_appeals
+  FOR UPDATE TO authenticated USING (false);
+
+DROP POLICY IF EXISTS ban_appeals_no_client_delete ON public.ban_appeals;
+CREATE POLICY ban_appeals_no_client_delete ON public.ban_appeals
+  FOR DELETE TO authenticated USING (false);
+
+GRANT SELECT, INSERT ON public.ban_appeals TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.ban_appeals TO service_role;
