@@ -53,3 +53,29 @@ If `RESEND_API_KEY` is unset, emails are skipped silently (logged via `console.w
 
 - **`validateAnthropicCredential` makes a live Anthropic API call on every credential registration AND on weekly heartbeat.** The probe sends `max_tokens: 1` to `claude-haiku-4-5-20251001` (~$0.0001 per call). Heartbeat processes up to 50 stale credentials per run = ≤50 probe calls per week. Counted against the user's own Anthropic quota (or covered by their Claude subscription for OAT credentials). The `monthly_call_cap` does NOT bound these probe calls.
 - **Sponsored `identify` calls add ~3 extra DB round-trips vs BYO**: `resolveSponsorship` (RPC), `decryptCredential` (vault.decrypted_secrets read), `increment_rate_limit_bucket` (RPC). Plus 1 `recordUsage` insert post-call. Acceptable at v1 scale; profile if the quota auto-pause feature ever feels sluggish.
+
+---
+
+## Roadmap — Multi-provider vision (issues #116, #118)
+
+The sponsorship schema and `identify` Edge Function are designed for provider extensibility. Planned providers in order of implementation priority:
+
+| Issue | Provider | Auth | Status |
+|---|---|---|---|
+| #116 | AWS Bedrock (Claude) | IAM / access keys | Planned |
+| #118 | OpenAI direct | `Bearer` API key | Planned |
+| #118 | Azure OpenAI | `api-key` + endpoint | Planned |
+| #118 | Google Gemini | `x-goog-api-key` | Planned |
+| #118 | Google Vertex AI | OAuth2 service account | Planned |
+
+### Provider abstraction target
+
+`supabase/functions/_shared/vision-provider.ts` will define a `VisionProvider` interface. All providers implement `identify(imageBase64, mimeType, prompt, signal?)` and return a normalized `IDResult`. The `identify` Edge Function becomes provider-agnostic.
+
+### Model selection per sponsor (#116)
+
+`sponsor_credentials.preferred_model` and `sponsor_pools.preferred_model` let each sponsor choose the cost/accuracy tradeoff independently. Platform pool defaults to cheapest model per provider. Personal sponsorships can upgrade.
+
+### Credential validation
+
+`anthropic-validate.ts` → `vision-validate.ts` with a per-provider validator. Each makes a 1-token call to verify auth before storing in Vault.
