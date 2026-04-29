@@ -24,6 +24,9 @@
 --   v6 (2026-04-29): added 'admin-anomaly-detect-hourly' (every hour at :05)
 --                    and 'admin-health-digest-weekly' (Mondays 09:00 UTC)
 --                    for PR12 admin observability.
+--   v7 (2026-04-29): added 'auto-revoke-expired-roles-daily' (08:15 UTC) and
+--                    'expire-stale-proposals-hourly' (every hour at :25)
+--                    for PR13 future-proofing.
 -- ════════════════════════════════════════════════════════════════════════
 
 CREATE EXTENSION IF NOT EXISTS pg_cron;
@@ -129,6 +132,30 @@ BEGIN
     $$ SELECT public.compute_admin_health_digest(); $$
   );
 
+  -- 9. auto-revoke-expired-roles-daily — 08:15 UTC (PR13)
+  --    Soft-revokes any user_roles row past its expires_at and writes
+  --    one admin_audit row per revoke (op='role_revoke',
+  --    auto_revoke_reason='expired'). Runs after the 07:30 badges and
+  --    08:00 user-stats jobs so denormalised flags don't churn mid-run.
+  PERFORM cron.unschedule('auto-revoke-expired-roles-daily')
+    FROM cron.job WHERE jobname = 'auto-revoke-expired-roles-daily';
+  PERFORM cron.schedule(
+    'auto-revoke-expired-roles-daily',
+    '15 8 * * *',
+    $$ SELECT public.auto_revoke_expired_roles(); $$
+  );
+
+  -- 10. expire-stale-proposals-hourly — every hour at :25 (PR13)
+  --     Flips admin_action_proposals rows to status='expired' once
+  --     their 24-hour window lapses without an approve/reject.
+  PERFORM cron.unschedule('expire-stale-proposals-hourly')
+    FROM cron.job WHERE jobname = 'expire-stale-proposals-hourly';
+  PERFORM cron.schedule(
+    'expire-stale-proposals-hourly',
+    '25 * * * *',
+    $$ SELECT public.expire_stale_proposals(); $$
+  );
+
   RAISE NOTICE '✓ Cron schedules applied';
 END
 $migration$;
@@ -138,7 +165,8 @@ FROM cron.job
 WHERE jobname IN ('streaks-nightly', 'badges-nightly', 'plantnet-quota-daily',
                   'streak-push-nightly', 'refresh-taxon-rarity-nightly',
                   'recompute-user-stats-nightly',
-                  'admin-anomaly-detect-hourly', 'admin-health-digest-weekly')
+                  'admin-anomaly-detect-hourly', 'admin-health-digest-weekly',
+                  'auto-revoke-expired-roles-daily', 'expire-stale-proposals-hourly')
 ORDER BY jobname;
 
 -- m26: prune read notifications older than 90 days, daily at 04:30 UTC.
