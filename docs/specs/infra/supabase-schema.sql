@@ -5427,8 +5427,23 @@ CREATE TABLE IF NOT EXISTS public.admin_webhook_deliveries (
   error        text
 );
 
+-- PR14: replay protection columns. nonce is stamped into the signed body
+-- as _meta.nonce so receivers can dedupe; request_id is the bigint
+-- pg_net.http_post returns, persisted so reconcile_webhook_deliveries()
+-- can later JOIN against net._http_response and write back the resolved
+-- status_code (pg_net is fire-and-forget, so the synchronous INSERT into
+-- this table cannot capture the response).
+ALTER TABLE public.admin_webhook_deliveries
+  ADD COLUMN IF NOT EXISTS nonce      text NOT NULL DEFAULT gen_random_uuid()::text,
+  ADD COLUMN IF NOT EXISTS request_id bigint;
+
 CREATE INDEX IF NOT EXISTS idx_admin_webhook_deliveries_webhook
   ON public.admin_webhook_deliveries (webhook_id, attempted_at DESC);
+
+-- Partial index drives the reconcile cron's hot-path lookup.
+CREATE INDEX IF NOT EXISTS idx_admin_webhook_deliveries_pending
+  ON public.admin_webhook_deliveries (request_id)
+  WHERE status_code IS NULL AND request_id IS NOT NULL;
 
 ALTER TABLE public.admin_webhook_deliveries ENABLE ROW LEVEL SECURITY;
 
@@ -5457,11 +5472,21 @@ SET search_path = public
 AS $$
 DECLARE
   v_row record;
-  v_body text;
+  v_body          text;
+  v_signed_payload jsonb;
+  v_event_id       text;
+  v_nonce          text;
+  v_timestamp      text;
   v_sig  text;
   v_request_id bigint;
 BEGIN
-  v_body := p_payload::text;
+  -- PR14 replay protection: stamp _meta into the signed payload so the
+  -- HMAC commits to a specific (event_id, nonce, timestamp) tuple.
+  -- Receivers dedupe on event_id and reject when timestamp drifts more
+  -- than ~5 minutes. event_id is generated per dispatch so two webhooks
+  -- subscribed to the same trigger see the same event_id.
+  v_event_id  := gen_random_uuid()::text;
+  v_timestamp := to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"');
 
   FOR v_row IN
     SELECT id, url, secret
@@ -5469,6 +5494,19 @@ BEGIN
      WHERE enabled = true
        AND p_event = ANY (events)
   LOOP
+    -- Per-delivery nonce so a body signed for webhook A cannot be
+    -- replayed against webhook B and pass dedupe.
+    v_nonce := gen_random_uuid()::text;
+    v_signed_payload := p_payload || jsonb_build_object(
+      '_meta', jsonb_build_object(
+        'event_id',  v_event_id,
+        'event',     p_event,
+        'timestamp', v_timestamp,
+        'nonce',     v_nonce,
+        'version',   1
+      )
+    );
+    v_body := v_signed_payload::text;
     v_sig := encode(
       hmac(v_body::bytea, v_row.secret::bytea, 'sha256'),
       'hex'
@@ -5480,21 +5518,24 @@ BEGIN
         headers := jsonb_build_object(
           'Content-Type', 'application/json',
           'X-Rastrum-Signature', 'sha256=' || v_sig,
-          'X-Rastrum-Event', p_event
+          'X-Rastrum-Event',     p_event,
+          'X-Rastrum-Event-Id',  v_event_id,
+          'X-Rastrum-Timestamp', v_timestamp,
+          'X-Rastrum-Nonce',     v_nonce
         ),
-        body    := p_payload
+        body    := v_signed_payload
       );
 
-      INSERT INTO public.admin_webhook_deliveries (webhook_id, event, payload)
-      VALUES (v_row.id, p_event, p_payload);
+      INSERT INTO public.admin_webhook_deliveries (webhook_id, event, payload, nonce, request_id)
+      VALUES (v_row.id, p_event, v_signed_payload, v_nonce, v_request_id);
 
       UPDATE public.admin_webhooks
          SET last_delivery_at  = now(),
              consecutive_failures = 0
        WHERE id = v_row.id;
     EXCEPTION WHEN OTHERS THEN
-      INSERT INTO public.admin_webhook_deliveries (webhook_id, event, payload, error)
-      VALUES (v_row.id, p_event, p_payload, SQLERRM);
+      INSERT INTO public.admin_webhook_deliveries (webhook_id, event, payload, nonce, error)
+      VALUES (v_row.id, p_event, v_signed_payload, v_nonce, SQLERRM);
 
       UPDATE public.admin_webhooks
          SET last_delivery_at     = now(),
@@ -5507,6 +5548,81 @@ END $$;
 
 REVOKE ALL ON FUNCTION public.dispatch_admin_webhooks(text, jsonb) FROM public;
 GRANT EXECUTE ON FUNCTION public.dispatch_admin_webhooks(text, jsonb) TO service_role;
+
+-- PR14: reconcile webhook deliveries by joining the pending rows against
+-- pg_net's internal _http_response table. dispatch_admin_webhooks() is
+-- fire-and-forget by design (pg_net.http_post returns immediately with a
+-- bigint request id); the response lands later in net._http_response. A
+-- cron at every 2 minutes calls this function to write status_code +
+-- error back into admin_webhook_deliveries and bump the parent webhook's
+-- consecutive_failures counter / last_delivery_status. Idempotent —
+-- skips rows that already have a status_code.
+CREATE OR REPLACE FUNCTION public.reconcile_webhook_deliveries()
+RETURNS int
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, net
+AS $$
+DECLARE
+  v_updated int := 0;
+BEGIN
+  -- Resolve pending deliveries against net._http_response. Mark the
+  -- webhook's last_delivery_status from the freshest result; bump
+  -- consecutive_failures when status_code is in 4xx/5xx or NULL after
+  -- timeout. The cron's 2-minute cadence + pg_net's default 5s timeout
+  -- means a true unreachable receiver lands in the failure branch
+  -- within ~3 minutes.
+  WITH pending AS (
+    SELECT d.id           AS delivery_id,
+           d.webhook_id   AS webhook_id,
+           d.request_id   AS request_id,
+           r.status_code  AS resp_status,
+           r.error_msg    AS resp_error,
+           r.timed_out    AS resp_timed_out
+      FROM public.admin_webhook_deliveries d
+      JOIN net._http_response r ON r.id = d.request_id
+     WHERE d.status_code IS NULL
+       AND d.request_id IS NOT NULL
+  ),
+  upd AS (
+    UPDATE public.admin_webhook_deliveries d
+       SET status_code = p.resp_status,
+           error       = COALESCE(p.resp_error,
+                                  CASE WHEN p.resp_timed_out THEN 'timeout' END,
+                                  d.error)
+      FROM pending p
+     WHERE d.id = p.delivery_id
+    RETURNING d.id, d.webhook_id, d.status_code
+  )
+  SELECT count(*)::int INTO v_updated FROM upd;
+
+  -- Bump consecutive_failures on the parent webhook for any 4xx/5xx /
+  -- NULL status_code resolutions. 2xx/3xx resolutions reset the counter.
+  -- Done in a second pass so the WITH ... RETURNING above stays simple.
+  UPDATE public.admin_webhooks w
+     SET last_delivery_status = sub.status_code,
+         consecutive_failures = CASE
+           WHEN sub.status_code BETWEEN 200 AND 399 THEN 0
+           ELSE w.consecutive_failures + 1
+         END,
+         enabled = CASE
+           WHEN sub.status_code BETWEEN 200 AND 399 THEN w.enabled
+           ELSE (w.consecutive_failures + 1 < 10)
+         END
+    FROM (
+      SELECT DISTINCT ON (d.webhook_id)
+             d.webhook_id, d.status_code
+        FROM public.admin_webhook_deliveries d
+       WHERE d.status_code IS NOT NULL
+         AND d.attempted_at >= now() - interval '10 minutes'
+       ORDER BY d.webhook_id, d.attempted_at DESC
+    ) sub
+   WHERE w.id = sub.webhook_id;
+
+  RETURN v_updated;
+END $$;
+
+REVOKE ALL ON FUNCTION public.reconcile_webhook_deliveries() FROM public;
+GRANT EXECUTE ON FUNCTION public.reconcile_webhook_deliveries() TO service_role;
 
 -- Triggers — fan out from anomaly creation + privileged audit ops to
 -- subscribed webhooks. AFTER INSERT keeps the dispatch out of the
