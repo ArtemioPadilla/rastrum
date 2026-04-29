@@ -125,3 +125,33 @@ Remaining:
 ### Bundled review follow-ups still planned
 
 - `m26-v1-1-review-followups` — Six small polish items flagged by ArtemIO/Nyx on PR #100 + #101 reviews: `?u=` alias documentation, `document.title` → i18n key, runVisitor error-vs-not-found split, `ConfirmDialog` component to replace `confirm()`/`alert()` in the Block flow (matches `ReportDialog` pattern), extract overflow-menu logic into `lib/overflow-menu.ts` (currently duplicated 3× across `PublicProfileViewV2`, `ExploreRecentView`, `Comments`), and `fave_count` data-attr naming standardization across feed views. All non-blocking; deferred for a deliberate v1.2 polish sweep. _(· planned)_
+
+### v1.2 in-flight (2026-04-29) — Module 28 + observation-detail redesign
+
+Both features are landing as 6-PR sequences. Plans at
+`docs/superpowers/plans/2026-04-29-{community-discovery,obs-detail-redesign}-plan.md`,
+specs at `docs/superpowers/specs/2026-04-29-*-design.md`.
+
+- `community-discovery-m28` — Walks back the shipped "no leaderboards" stance with
+  explicit consent. Explore MegaMenu split (Biodiversity / Community columns).
+  `/community/observers/` page with composable filter chips (sort, country, taxon,
+  experts-only, nearby) backed by denormalized counters refreshed nightly. Privacy
+  gate at the SQL layer via dual views: `community_observers` (anon-safe, no
+  centroid) and `community_observers_with_centroid` (authenticated only). Country
+  picker + `hide_from_leaderboards` opt-out + `country_code_source` 'auto'/'user'
+  badge on Profile → Edit. PR1 (#92) + PR2 (#96) merged. PR4 (#102) in review.
+  PR5+PR6 (page + MegaMenu + atomic i18n rewrite of the two shipped "no
+  leaderboards" strings) remaining. _(in implementation — see
+  `docs/runbooks/community-discovery.md`)_
+
+- `obs-detail-redesign` — Rebuilds `/share/obs/?id=...` as two-column desktop /
+  stacked mobile layout. PR1 (#91) extracted reusable `MapPicker.astro` from
+  `ObservationForm.astro`. PR2 (#98) added schema deltas
+  (`last_material_edit_at` + `media_files.deleted_at` +
+  `observations_material_edit_check_trg` material-edit trigger),
+  `observation-enums.ts`, and `obs_detail.*` i18n. PR3 (#103) ships
+  `PhotoGallery.astro` (native lightbox + keyboard + swipe + share) plus the new
+  two-column layout. PR4 (Details tab), PR5 (Location tab — coordinate edit), PR6
+  (Photos tab + atomic `delete-photo` Edge Function) remaining. Soft-delete only
+  for v1; R2 orphan GC is a v1.1 follow-up. _(in implementation — see
+  `docs/runbooks/obs-detail-redesign.md`)_

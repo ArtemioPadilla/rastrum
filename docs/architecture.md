@@ -407,6 +407,61 @@ Full spec + plan: [`docs/superpowers/specs/2026-04-28-social-features-design.md`
 
 ---
 
+## Community discovery (Module 28, v1.2 in-flight)
+
+Adds a Community surface to the Explore MegaMenu — Observers / Top / Nearby /
+Experts by taxon / By country — backed by denormalized counters refreshed
+nightly into 6 new `users` columns (`species_count`, `obs_count_7d`,
+`obs_count_30d`, `centroid_geog`, `country_code`, `hide_from_leaderboards`).
+Walks back the shipped "no leaderboards" stance with explicit, granular
+consent. Privacy gate at the SQL layer via two views with the same
+eligibility predicate (`profile_public AND NOT hide_from_leaderboards`):
+`community_observers` (anon-safe, no centroid) and
+`community_observers_with_centroid` (authenticated only — Nearby's UI
+sign-in requirement is mirrored at the data layer).
+
+The nightly `recompute-user-stats` Edge Function (08:00 UTC) calls a
+`SECURITY DEFINER` SQL wrapper because supabase-js can't run multi-statement
+CTE+UPDATE. Country backfill uses `normalize_country_code(region_primary)`
+with `pg_trgm` fuzzy matching against an in-DB ISO-3166 reference table;
+`country_code_source = 'auto'|'user'` distinguishes inferred values from
+user-set ones so Profile → Edit can show an "inferred from your region"
+badge.
+
+Full spec + plan: [`docs/superpowers/specs/2026-04-29-community-discovery-design.md`](superpowers/specs/2026-04-29-community-discovery-design.md),
+[`docs/superpowers/plans/2026-04-29-community-discovery-plan.md`](superpowers/plans/2026-04-29-community-discovery-plan.md).
+Operator runbook: [`docs/runbooks/community-discovery.md`](runbooks/community-discovery.md).
+
+---
+
+## Observation detail page redesign (M03 viewer + owner edit, v1.2 in-flight)
+
+`/share/obs/?id=<uuid>` rebuilt as a two-column desktop / stacked mobile
+layout. Three reusable components extracted: `MapPicker.astro` (mode='view'|'edit',
+per-instance HTML IDs, modal a11y preserved), `PhotoGallery.astro` (native
+lightbox — keyboard ←/→/Esc + swipe + per-photo share + dynamic "Photo N of M"
+aria-labels), and `ShareObsView.astro` (the new layout body, with all
+view-side strings under `obs_detail.view.*` i18n).
+
+Material-edit semantics: a BEFORE UPDATE trigger on `observations` flags
+`last_material_edit_at` when location moves > 1 km (PostGIS `ST_Distance`),
+`observed_at` moves > 24 h, or `primary_taxon_id` changes (propagated from
+`identifications` by the existing `sync_primary_id_trigger`). The "Edited
+after IDs" badge in the community-IDs section is shown only when both
+`last_material_edit_at IS NOT NULL` and at least one community ID exists.
+
+Photo deletion is always atomic via the `delete-photo` Edge Function (PR6 of
+the redesign): soft-delete (`media_files.deleted_at = now()`) + ID demote
+(`validated_by`/`validated_at`/`is_research_grade` cleared) + `last_material_edit_at`
+bump in one transaction. R2 blobs are left as orphans for v1; the
+`gc-orphan-media` cron is a v1.1 follow-up.
+
+Full spec + plan: [`docs/superpowers/specs/2026-04-29-obs-detail-redesign-design.md`](superpowers/specs/2026-04-29-obs-detail-redesign-design.md),
+[`docs/superpowers/plans/2026-04-29-obs-detail-redesign-plan.md`](superpowers/plans/2026-04-29-obs-detail-redesign-plan.md).
+Operator runbook: [`docs/runbooks/obs-detail-redesign.md`](runbooks/obs-detail-redesign.md).
+
+---
+
 ## Further reading
 
 - [`AGENTS.md`](../AGENTS.md) — conventions, pitfalls, pre-PR checklist.
