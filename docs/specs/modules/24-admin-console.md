@@ -71,12 +71,12 @@ See `docs/specs/infra/supabase-schema.sql` for canonical SQL. Tables:
 | Sync failures | admin | done | PR #70 |
 | Cron / Edge fns | admin | done | PR #70 |
 | Audit log | admin | done | PR #42 |
-| Badges | admin | stub | PR7 |
-| Taxa & rarity | admin | stub | PR7 |
-| Karma tuning | admin | stub | PR7 |
-| Flags (admin) | admin | stub | PR7 |
-| Feature flags | admin | stub | PR7 |
-| Bioblitz | admin | stub | PR7 (on demand) |
+| Badges | admin | done | PR #86 + PR8 write actions |
+| Taxa & rarity | admin | done | PR #86 + PR8 write actions |
+| Karma tuning | admin | done | PR #86 + PR8 DB-backed reads |
+| Flags (admin) | admin | done | PR #86 |
+| Feature flags | admin | done | PR #86 + PR8 DB-backed + live toggle |
+| Bioblitz | admin | stub | deferred (on demand) |
 | Overview (mod) | moderator | done | PR #77 |
 | Flag queue | moderator | done | PR #77 |
 | Comments | moderator | done | PR #77 |
@@ -85,12 +85,12 @@ See `docs/specs/infra/supabase-schema.sql` for canonical SQL. Tables:
 | Overview (expert) | expert | done | PR6 |
 | Validation queue | expert | done | PR6 |
 | Your expertise | expert | done | PR6 |
-| Identification overrides | expert | stub | PR7+ |
-| Taxon notes | expert | stub | PR7+ |
+| Identification overrides | expert | stub | deferred |
+| Taxon notes | expert | stub | deferred |
 
-**Functional: 17 of 25 console tabs after PR6 merges.**
+**Functional: 22 of 25 console tabs after PR8. Deferred stubs: Bioblitz, License disputes, Identification overrides, Taxon notes — no concrete users yet.**
 
-## Edge Function handlers (16 deployed after PR5)
+## Edge Function handlers (21 deployed after PR8)
 
 | Action verb | Required role | Audit op | Shipped in |
 |---|---|---|---|
@@ -110,3 +110,8 @@ See `docs/specs/infra/supabase-schema.sql` for canonical SQL. Tables:
 | comment.unlock | moderator | comment_unlock | PR #77 |
 | user.ban | moderator | user_ban | PR #77 |
 | user.unban | moderator | user_unban | PR #77 |
+| badge.award_manual | admin | badge_award_manual | PR8 |
+| badge.revoke | admin | badge_revoke | PR8 |
+| taxon.recompute_rarity | admin | cron_force_run | PR8 |
+| taxon.toggle_conservation | admin | taxon_conservation_set | PR8 |
+| feature_flag.toggle | admin | feature_flag_toggle | PR8 |

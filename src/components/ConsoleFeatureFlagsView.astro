@@ -1,16 +1,9 @@
 ---
 import { t } from '../i18n/utils';
-import { FEATURE_FLAGS } from '../lib/feature-flags';
 
 interface Props { lang: 'en' | 'es' }
 const { lang } = Astro.props;
 const tr = t(lang);
-
-const categoryOrder = ['identification', 'pwa', 'social', 'admin', 'media'] as const;
-const grouped = categoryOrder.map(cat => ({
-  cat,
-  flags: FEATURE_FLAGS.filter(f => f.category === cat),
-})).filter(g => g.flags.length > 0);
 ---
 
 <section class="max-w-4xl">
@@ -21,64 +14,150 @@ const grouped = categoryOrder.map(cat => ({
   </div>
 
   <div id="features-shell" class="hidden space-y-6">
-    <div class="rounded-lg border border-amber-200 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-3 text-xs text-amber-800 dark:text-amber-200">
-      {tr.console.features_static_notice}
-    </div>
-
-    {grouped.map(({ cat, flags }) => (
-      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
-        <div class="bg-zinc-50 dark:bg-zinc-900/60 px-4 py-2 border-b border-zinc-200 dark:border-zinc-800">
-          <h2 class="text-xs font-semibold uppercase tracking-wide text-zinc-500 capitalize">{cat}</h2>
-        </div>
-        <div class="divide-y divide-zinc-100 dark:divide-zinc-800">
-          {flags.map(flag => (
-            <div class="flex items-start gap-4 px-4 py-3">
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2">
-                  <span class="font-medium text-sm text-zinc-900 dark:text-zinc-100">{flag.name}</span>
-                  <code class="text-[10px] rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500 px-1.5 py-0.5">{flag.key}</code>
-                </div>
-                <p class="text-xs text-zinc-500 mt-0.5">{flag.description}</p>
-              </div>
-              <div class="flex items-center gap-2 shrink-0">
-                <span class:list={[
-                  'inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold',
-                  flag.value
-                    ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300'
-                    : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500',
-                ]}>
-                  {flag.value ? tr.console.features_on : tr.console.features_off}
-                </span>
-                <button
-                  disabled
-                  title={tr.console.features_toggle_coming}
-                  class="opacity-40 cursor-not-allowed inline-flex items-center px-2.5 py-1 rounded border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-600 dark:text-zinc-400"
-                >
-                  {tr.console.features_toggle_btn}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    ))}
+    <div id="features-loading" class="text-sm text-zinc-500 italic">{tr.console.loading}</div>
+    <div id="features-content" class="hidden space-y-6"></div>
   </div>
+
+  <p id="features-error" class="hidden mt-3 text-sm text-red-600 dark:text-red-400"></p>
+  <p id="features-success" class="hidden mt-3 text-sm text-emerald-600 dark:text-emerald-400"></p>
 </section>
 
 <script>
   import { getSupabase } from '../lib/supabase';
   import { getUserRoles } from '../lib/user-roles';
+  import { adminClient } from '../lib/admin-client';
+
+  type FlagRow = {
+    key: string;
+    name: string;
+    description: string | null;
+    value: boolean;
+    category: string | null;
+  };
+
+  const CATEGORY_ORDER = ['identification', 'pwa', 'social', 'admin', 'media'];
 
   function show(id: string) { document.getElementById(id)?.classList.remove('hidden'); }
+  function hide(id: string) { document.getElementById(id)?.classList.add('hidden'); }
+  function escHtml(s: string): string {
+    return s.replace(/[<>&'"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&#39;','"':'&quot;'}[c]!));
+  }
+
+  let session: { access_token: string } | null = null;
+  let allFlags: FlagRow[] = [];
+
+  const supabase = getSupabase();
 
   async function init() {
-    const supabase = getSupabase();
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) { show('features-not-auth'); return; }
-    const myRoles = await getUserRoles(session.user.id);
+    const { data: { session: s } } = await supabase.auth.getSession();
+    if (!s?.user) { show('features-not-auth'); return; }
+    session = s;
+    const myRoles = await getUserRoles(s.user.id);
     if (!myRoles.has('admin')) { show('features-not-auth'); return; }
     show('features-shell');
+    await loadFlags();
   }
+
+  async function loadFlags() {
+    show('features-loading');
+    hide('features-content');
+    const { data, error } = await supabase
+      .from('app_feature_flags')
+      .select('key, name, description, value, category')
+      .order('category', { ascending: true })
+      .order('key', { ascending: true });
+
+    hide('features-loading');
+
+    if (error) {
+      const e = document.getElementById('features-error')!;
+      e.textContent = error.message;
+      show('features-error');
+      return;
+    }
+
+    allFlags = (data ?? []) as FlagRow[];
+    renderFlags();
+    show('features-content');
+  }
+
+  function renderFlags() {
+    const container = document.getElementById('features-content')!;
+
+    const grouped = new Map<string, FlagRow[]>();
+    for (const f of allFlags) {
+      const cat = f.category ?? 'other';
+      if (!grouped.has(cat)) grouped.set(cat, []);
+      grouped.get(cat)!.push(f);
+    }
+
+    const orderedCats = [
+      ...CATEGORY_ORDER.filter(c => grouped.has(c)),
+      ...[...grouped.keys()].filter(c => !CATEGORY_ORDER.includes(c)),
+    ];
+
+    container.innerHTML = orderedCats.map(cat => {
+      const flags = grouped.get(cat) ?? [];
+      const rows = flags.map(flag => {
+        const valueClass = flag.value
+          ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300'
+          : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500';
+        const valueLabel = flag.value ? 'ON' : 'OFF';
+        return `<div class="flex items-start gap-4 px-4 py-3">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2">
+              <span class="font-medium text-sm text-zinc-900 dark:text-zinc-100">${escHtml(flag.name)}</span>
+              <code class="text-[10px] rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500 px-1.5 py-0.5">${escHtml(flag.key)}</code>
+            </div>
+            <p class="text-xs text-zinc-500 mt-0.5">${escHtml(flag.description ?? '')}</p>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${valueClass}">${valueLabel}</span>
+            <button
+              data-flag-key="${escHtml(flag.key)}"
+              data-flag-value="${flag.value}"
+              class="inline-flex items-center px-2.5 py-1 rounded border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-600 dark:text-zinc-400 hover:border-zinc-500 dark:hover:border-zinc-500"
+            >Toggle</button>
+          </div>
+        </div>`;
+      }).join('');
+      return `<div class="rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+        <div class="bg-zinc-50 dark:bg-zinc-900/60 px-4 py-2 border-b border-zinc-200 dark:border-zinc-800">
+          <h2 class="text-xs font-semibold uppercase tracking-wide text-zinc-500 capitalize">${escHtml(cat)}</h2>
+        </div>
+        <div class="divide-y divide-zinc-100 dark:divide-zinc-800">${rows}</div>
+      </div>`;
+    }).join('');
+  }
+
+  document.addEventListener('click', async (ev) => {
+    const btn = (ev.target as HTMLElement).closest<HTMLElement>('button[data-flag-key]');
+    if (!btn || !session) return;
+
+    const key = btn.dataset.flagKey!;
+    const currentValue = btn.dataset.flagValue === 'true';
+    const newValue = !currentValue;
+
+    btn.disabled = true;
+
+    const reason = `Admin toggled '${key}' from ${currentValue} to ${newValue} via console`;
+
+    hide('features-error');
+    hide('features-success');
+
+    try {
+      await adminClient.featureFlag.toggle({ key, value: newValue }, reason, session.access_token);
+      const s = document.getElementById('features-success')!;
+      s.textContent = 'Flag toggled successfully.';
+      show('features-success');
+      await loadFlags();
+    } catch (err) {
+      const e = document.getElementById('features-error')!;
+      e.textContent = 'Failed to toggle flag: ' + (err as Error).message;
+      show('features-error');
+      btn.disabled = false;
+    }
+  });
 
   init().catch(() => show('features-not-auth'));
 </script>

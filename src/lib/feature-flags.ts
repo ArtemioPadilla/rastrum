@@ -1,3 +1,11 @@
+/**
+ * Feature flags seed data. The canonical runtime source of truth is the
+ * `public.app_feature_flags` DB table (added in PR8). This module is the
+ * seed manifest — values here are inserted on first db-apply and preserved
+ * on replay (ON CONFLICT DO UPDATE skips the `value` column so live toggles
+ * survive schema replays). Do NOT read this module at runtime for flag state;
+ * query `app_feature_flags` from the DB instead.
+ */
 export interface FeatureFlag {
   key: string;
   name: string;

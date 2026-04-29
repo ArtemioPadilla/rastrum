@@ -14,6 +14,11 @@ import { commentLockHandler } from './comment-lock.ts';
 import { commentUnlockHandler } from './comment-unlock.ts';
 import { userBanHandler } from './user-ban.ts';
 import { userUnbanHandler } from './user-unban.ts';
+import { badgeAwardManualHandler } from './badge-award-manual.ts';
+import { badgeRevokeHandler } from './badge-revoke.ts';
+import { taxonRecomputeRarityHandler } from './taxon-recompute-rarity.ts';
+import { taxonToggleConservationHandler } from './taxon-toggle-conservation.ts';
+import { featureFlagToggleHandler } from './feature-flag-toggle.ts';
 import type { ActionHandler } from './role-grant.ts';
 
 export const HANDLERS: Record<string, ActionHandler<unknown>> = {
@@ -33,4 +38,9 @@ export const HANDLERS: Record<string, ActionHandler<unknown>> = {
   'comment.unlock': commentUnlockHandler as unknown as ActionHandler<unknown>,
   'user.ban': userBanHandler as unknown as ActionHandler<unknown>,
   'user.unban': userUnbanHandler as unknown as ActionHandler<unknown>,
+  'badge.award_manual': badgeAwardManualHandler as unknown as ActionHandler<unknown>,
+  'badge.revoke': badgeRevokeHandler as unknown as ActionHandler<unknown>,
+  'taxon.recompute_rarity': taxonRecomputeRarityHandler as unknown as ActionHandler<unknown>,
+  'taxon.toggle_conservation': taxonToggleConservationHandler as unknown as ActionHandler<unknown>,
+  'feature_flag.toggle': featureFlagToggleHandler as unknown as ActionHandler<unknown>,
 };

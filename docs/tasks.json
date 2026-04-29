@@ -3965,6 +3965,57 @@
         { "label_en": "E2E smoke for validation + expertise not-auth banners", "label_es": "E2E smoke para banners de no-auth en validación + experiencia", "status": "done" }
       ]
     },
+    "admin-overview-real-kpis": {
+      "phase": "v1.1",
+      "title_en": "Admin overview — real platform-state KPIs + alerts + recent activity",
+      "title_es": "Resumen admin — KPIs reales del estado de la plataforma + alertas + actividad reciente",
+      "modules": ["24-admin-console.md"],
+      "subtasks": [
+        { "label_en": "Real KPI cards (user count, obs count, sync failures, cron health)", "label_es": "Tarjetas KPI reales (usuarios, obs, fallos de sync, salud de cron)", "status": "done" },
+        { "label_en": "Alert panel (elevated sync failure rate, stale cron run)", "label_es": "Panel de alertas (tasa elevada de fallos, cron desactualizado)", "status": "done" },
+        { "label_en": "Recent activity feed from admin_audit", "label_es": "Feed de actividad reciente desde admin_audit", "status": "done" }
+      ]
+    },
+    "admin-console-pr7-remaining-admin": {
+      "phase": "v1.1",
+      "title_en": "Admin console PR7 — Badges + Taxa + Karma + Features + Bioblitz tabs",
+      "title_es": "Consola admin PR7 — Badges + Taxa + Karma + Funcionalidades + Bioblitz",
+      "modules": ["24-admin-console.md"],
+      "subtasks": [
+        { "label_en": "ConsoleBadgesView: list + detail + tier chart (stub write buttons)", "label_es": "ConsoleBadgesView: lista + detalle + gráfico de tiers (botones stub)", "status": "done" },
+        { "label_en": "ConsoleTaxaView: list + detail + rarity map (stub write buttons)", "label_es": "ConsoleTaxaView: lista + detalle + mapa de rareza (botones stub)", "status": "done" },
+        { "label_en": "ConsoleKarmaView: config table + rarity multipliers + recent events", "label_es": "ConsoleKarmaView: tabla de config + multiplicadores + eventos recientes", "status": "done" },
+        { "label_en": "ConsoleFeatureFlagsView: flag grid grouped by category (stub toggles)", "label_es": "ConsoleFeatureFlagsView: grilla de flags por categoría (toggles stub)", "status": "done" },
+        { "label_en": "ConsoleBioblitzView: stub with upcoming feature notice", "label_es": "ConsoleBioblitzView: stub con aviso de funcionalidad próxima", "status": "done" },
+        { "label_en": "karma_events admin RLS fix (PR #88)", "label_es": "Fix de RLS admin en karma_events (PR #88)", "status": "done" }
+      ]
+    },
+    "admin-console-pr8-hardening": {
+      "phase": "v1.1",
+      "title_en": "Admin console PR8 — CORS tighten + rate limit + pgTAP RLS suite + 5 write handlers + DB-backed config",
+      "title_es": "Consola admin PR8 — CORS estricto + rate limit + pgTAP RLS + 5 handlers + config en DB",
+      "modules": ["24-admin-console.md"],
+      "subtasks": [
+        { "label_en": "CORS: restrict Access-Control-Allow-Origin to rastrum.org + localhost dev/preview ports", "label_es": "CORS: restringir Access-Control-Allow-Origin a rastrum.org + puertos dev/preview localhost", "status": "done" },
+        { "label_en": "Token-bucket rate limiter (30 req/min/actor, cost 3 for writes) — in-memory per isolate", "label_es": "Rate limiter token-bucket (30 req/min/actor, costo 3 para escrituras) — en memoria por isolate", "status": "done" },
+        { "label_en": "tests/pgtap/rls.sql — 24 TAP assertions covering has_role + 6 table RLS policies", "label_es": "tests/pgtap/rls.sql — 24 aserciones TAP cubriendo has_role + 6 políticas RLS de tabla", "status": "done" },
+        { "label_en": "db-validate.yml: install pgTAP + run RLS suite step", "label_es": "db-validate.yml: instalar pgTAP + paso de ejecución de suite RLS", "status": "done" },
+        { "label_en": "badge.award_manual handler — upsert user_badges + audit row", "label_es": "Handler badge.award_manual — upsert user_badges + fila de auditoría", "status": "done" },
+        { "label_en": "badge.revoke handler — delete user_badges + audit row", "label_es": "Handler badge.revoke — borrar user_badges + fila de auditoría", "status": "done" },
+        { "label_en": "taxon.recompute_rarity handler — call refresh_taxon_rarity() RPC", "label_es": "Handler taxon.recompute_rarity — llamar RPC refresh_taxon_rarity()", "status": "done" },
+        { "label_en": "taxon.toggle_conservation handler — update nom059_status/cites_appendix/iucn_category with taxon_conservation_set audit op", "label_es": "Handler taxon.toggle_conservation — actualizar nom059_status/cites_appendix/iucn_category con audit op taxon_conservation_set", "status": "done" },
+        { "label_en": "feature_flag.toggle handler — update app_feature_flags.value + updated_by", "label_es": "Handler feature_flag.toggle — actualizar app_feature_flags.value + updated_by", "status": "done" },
+        { "label_en": "app_feature_flags table + RLS policies + seed from FEATURE_FLAGS", "label_es": "Tabla app_feature_flags + políticas RLS + seed desde FEATURE_FLAGS", "status": "done" },
+        { "label_en": "karma_config + karma_rarity_multipliers tables + RLS policies + seed from TS modules", "label_es": "Tablas karma_config + karma_rarity_multipliers + políticas RLS + seed desde módulos TS", "status": "done" },
+        { "label_en": "ConsoleFeatureFlagsView: DB-backed reads + live toggle wired to adminClient.featureFlag.toggle", "label_es": "ConsoleFeatureFlagsView: lecturas desde DB + toggle en vivo usando adminClient.featureFlag.toggle", "status": "done" },
+        { "label_en": "ConsoleBadgesView: Award + Revoke buttons live with slide-over forms", "label_es": "ConsoleBadgesView: botones Award + Revoke activos con formularios deslizantes", "status": "done" },
+        { "label_en": "ConsoleTaxaView: Recompute Rarity + Toggle Conservation buttons live", "label_es": "ConsoleTaxaView: botones Recompute Rarity + Toggle Conservation activos", "status": "done" },
+        { "label_en": "ConsoleKarmaView: DB-backed reads (karma_config + karma_rarity_multipliers)", "label_es": "ConsoleKarmaView: lecturas desde DB (karma_config + karma_rarity_multipliers)", "status": "done" },
+        { "label_en": "adminClient SDK: badge.{awardManual,revoke} + taxon.{recomputeRarity,toggleConservation} + featureFlag.toggle", "label_es": "SDK adminClient: badge.{awardManual,revoke} + taxon.{recomputeRarity,toggleConservation} + featureFlag.toggle", "status": "done" },
+        { "label_en": "4 new unit tests for badge + featureFlag SDK methods", "label_es": "4 nuevas pruebas unitarias para métodos SDK de badge + featureFlag", "status": "done" },
+        { "label_en": "Doc sync: progress.json + tasks.json + module 24 + admin-ops.md + CLAUDE.md", "label_es": "Sincronización de docs: progress.json + tasks.json + módulo 24 + admin-ops.md + CLAUDE.md", "status": "todo" }
+      ]
+    },
     "social-graph-m26": {
       "phase": "v1.2",
       "title_en": "Social graph + reactions (Module 26)",

@@ -4273,3 +4273,133 @@ ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'sponsorship_request_create';
 ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'sponsorship_request_approve';
 ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'sponsorship_request_reject';
 ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'sponsorship_request_withdraw';
+-- ════════════════════════════════════════════════════════════════════════════
+-- PR8 — admin console hardening
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- 1. app_feature_flags — DB-backed feature flags (kills TS/SQL duplication).
+--    Runtime source of truth replaces compile-time src/lib/feature-flags.ts
+--    which now serves only as seed data.
+
+CREATE TABLE IF NOT EXISTS public.app_feature_flags (
+  key         text PRIMARY KEY,
+  name        text NOT NULL,
+  description text,
+  value       boolean NOT NULL DEFAULT false,
+  category    text,
+  updated_at  timestamptz NOT NULL DEFAULT now(),
+  updated_by  uuid REFERENCES public.users(id)
+);
+
+ALTER TABLE public.app_feature_flags ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS feature_flags_public_read ON public.app_feature_flags;
+CREATE POLICY feature_flags_public_read ON public.app_feature_flags
+  FOR SELECT TO anon, authenticated USING (true);
+
+DROP POLICY IF EXISTS feature_flags_no_client_write ON public.app_feature_flags;
+CREATE POLICY feature_flags_no_client_write ON public.app_feature_flags
+  FOR INSERT TO authenticated WITH CHECK (false);
+
+DROP POLICY IF EXISTS feature_flags_no_client_update ON public.app_feature_flags;
+CREATE POLICY feature_flags_no_client_update ON public.app_feature_flags
+  FOR UPDATE TO authenticated USING (false);
+
+DROP POLICY IF EXISTS feature_flags_no_client_delete ON public.app_feature_flags;
+CREATE POLICY feature_flags_no_client_delete ON public.app_feature_flags
+  FOR DELETE TO authenticated USING (false);
+
+GRANT SELECT ON public.app_feature_flags TO anon, authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.app_feature_flags TO service_role;
+
+-- Seed from src/lib/feature-flags.ts (preserves value on replay).
+INSERT INTO public.app_feature_flags (key, name, description, value, category)
+VALUES
+  ('parallelCascade',        'Parallel cascade ID',                   'Run identifier plugins concurrently rather than sequentially. Reduces median latency at the cost of slightly higher API spend.',                                          true,  'identification'),
+  ('megadetectorPreflight',  'MegaDetector preflight',                'Run MegaDetector before PlantNet / iNaturalist to skip photos with no detectable animal or plant. Reduces wasted API calls on blank or human-only photos.',              false, 'identification'),
+  ('pushNotifications',      'Push notifications',                    'Web Push (VAPID) for follows, badge awards, and validation outcomes. Requires a service-worker registration and user permission grant.',                                   false, 'pwa'),
+  ('localAiIdentification',  'Local AI identification (WebLLM)',      'On-device Phi-3.5-vision identification via WebLLM. Downloads a ~2 GB model on first use. Off by default — gated on explicit user opt-in.',                            false, 'identification'),
+  ('darwinCoreExport',       'Darwin Core Archive export',            'Allow authenticated users to download their observations as a DwC-A ZIP via the export-dwca Edge Function.',                                                            true,  'admin'),
+  ('socialGraph',            'Social graph (follows / reactions)',    'Module 26 social surfaces: follow/unfollow, notification bell, reactions strip on observation cards.',                                                                     true,  'social'),
+  ('bioblitzEvents',         'Bioblitz events UI',                    'Public listing and participation UI for bioblitz events. Ships when the first organizer requests an event.',                                                              false, 'admin')
+ON CONFLICT (key) DO UPDATE
+  SET name        = EXCLUDED.name,
+      description = EXCLUDED.description,
+      category    = EXCLUDED.category;
+  -- value is intentionally NOT updated on conflict — preserves runtime toggles.
+
+-- 2. karma_config — DB-backed karma reason deltas (kills TS/SQL duplication).
+--    Display source for the admin console. The award_karma() SQL function
+--    remains the runtime write source; a future PR can migrate it to read
+--    from this table. For now this is the display source.
+
+CREATE TABLE IF NOT EXISTS public.karma_config (
+  reason         text PRIMARY KEY,
+  delta          numeric,
+  description_en text,
+  description_es text,
+  label_en       text,
+  label_es       text,
+  updated_at     timestamptz NOT NULL DEFAULT now(),
+  updated_by     uuid REFERENCES public.users(id)
+);
+
+ALTER TABLE public.karma_config ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS karma_config_public_read ON public.karma_config;
+CREATE POLICY karma_config_public_read ON public.karma_config FOR SELECT USING (true);
+
+GRANT SELECT ON public.karma_config TO anon, authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.karma_config TO service_role;
+
+-- Seed from src/lib/karma-config.ts (preserves delta on replay).
+INSERT INTO public.karma_config (reason, delta, label_en, label_es, description_en, description_es)
+VALUES
+  ('observation_synced', 1,    'Observation synced',    'Observación sincronizada',  'Awarded when a user syncs a new observation to the platform.',                     'Otorgado cuando el usuario sincroniza una observación nueva.'),
+  ('consensus_win',      5,    'Consensus win',         'Consenso ganador',          'Base delta before rarity/streak/expertise/confidence multipliers.',                'Delta base antes de multiplicadores.'),
+  ('consensus_loss',     -2,   'Consensus loss',        'Consenso perdido',          'Base penalty before rarity/confidence multipliers (capped at 2×).',               'Penalización base antes de multiplicadores (máx 2×).'),
+  ('first_in_rastrum',   10,   'First in Rastrum',      'Primero en Rastrum',        'Awarded for the first observation of a taxon ever recorded on the platform.',     'Otorgado por la primera observación de un taxón registrada en la plataforma.'),
+  ('comment_reaction',   0.5,  'Comment reaction',      'Reacción en comentario',    'Awarded when another user reacts positively to a comment.',                       'Otorgado cuando otro usuario reacciona positivamente a un comentario.'),
+  ('manual_adjust',      NULL, 'Manual adjustment',     'Ajuste manual',             'Admin-issued karma adjustment. Delta varies per case.',                           'Ajuste de karma emitido por un administrador. El delta varía por caso.')
+ON CONFLICT (reason) DO UPDATE
+  SET label_en       = EXCLUDED.label_en,
+      label_es       = EXCLUDED.label_es,
+      description_en = EXCLUDED.description_en,
+      description_es = EXCLUDED.description_es;
+  -- delta is intentionally NOT updated on conflict — preserves any future runtime edits.
+
+-- 3. karma_rarity_multipliers — DB-backed rarity multipliers.
+
+CREATE TABLE IF NOT EXISTS public.karma_rarity_multipliers (
+  bucket        text PRIMARY KEY,
+  multiplier    numeric NOT NULL,
+  label_en      text,
+  label_es      text,
+  display_order int NOT NULL DEFAULT 0
+);
+
+ALTER TABLE public.karma_rarity_multipliers ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS karma_rarity_multipliers_public_read ON public.karma_rarity_multipliers;
+CREATE POLICY karma_rarity_multipliers_public_read ON public.karma_rarity_multipliers FOR SELECT USING (true);
+
+GRANT SELECT ON public.karma_rarity_multipliers TO anon, authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.karma_rarity_multipliers TO service_role;
+
+-- Seed from src/lib/karma-config.ts RARITY_MULTIPLIERS.
+INSERT INTO public.karma_rarity_multipliers (bucket, multiplier, label_en, label_es, display_order)
+VALUES
+  ('1', 1.0, 'Very common (top 10%)',      'Muy común (top 10%)',          1),
+  ('2', 1.5, 'Common (50–90th pctile)',    'Común (percentil 50–90)',      2),
+  ('3', 2.5, 'Uncommon (10–50th pctile)',  'Poco común (percentil 10–50)', 3),
+  ('4', 4.0, 'Rare (bottom 10%)',          'Raro (10% inferior)',          4),
+  ('5', 5.0, 'Very rare (<5 obs)',         'Muy raro (<5 obs)',            5)
+ON CONFLICT (bucket) DO UPDATE
+  SET label_en = EXCLUDED.label_en,
+      label_es = EXCLUDED.label_es;
+  -- multiplier is intentionally NOT updated on conflict.
+
+-- 4. Extend audit_op for taxon conservation actions if not already present.
+DO $$ BEGIN
+  ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'taxon_conservation_set';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;

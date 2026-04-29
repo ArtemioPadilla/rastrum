@@ -230,6 +230,80 @@ await adminClient.user.unban(
 
 **Note:** Sets `user_bans.revoked_at = now()`. User is immediately unbanned. History is preserved.
 
-## Future actions (PR7+)
+## badge.award_manual
 
-Badge award/revoke, token force-revoke, feature-flag toggle, cron force-run, sensitive_read.precise_coords, sensitive_read.user_pii, sensitive_read.token_list. Each lands with its own runbook section.
+**Required role:** admin
+**Audit op:** `badge_award_manual`
+
+```ts
+await adminClient.badge.awardManual(
+  { target_user_id: '<uuid>', badge_key: 'first_obs' },
+  'User reached milestone manually outside the normal cron window',
+  session!.access_token,
+);
+```
+
+**Note:** Upserts a row in `user_badges` (ON CONFLICT DO NOTHING). If the badge is already present the call is a no-op and the audit row still records the attempt. The `badge_key` must match an existing row in `badges`.
+
+## badge.revoke
+
+**Required role:** admin
+**Audit op:** `badge_revoke`
+
+```ts
+await adminClient.badge.revoke(
+  { target_user_id: '<uuid>', badge_key: 'first_obs' },
+  'Badge awarded in error — obs was a test entry',
+  session!.access_token,
+);
+```
+
+**Note:** Hard-deletes the `user_badges` row. If the row does not exist the delete is a no-op; the audit row is still inserted. To temporarily suppress a badge without permanent removal, use `badge_award_manual` to overwrite `revoked_at` instead.
+
+## taxon.recompute_rarity
+
+**Required role:** admin
+**Audit op:** `cron_force_run`
+
+```ts
+await adminClient.taxon.recomputeRarity(
+  'Bulk observation import complete — refreshing rarity scores',
+  session!.access_token,
+);
+```
+
+**Note:** Calls `public.refresh_taxon_rarity()` synchronously inside the Edge Function. On large platforms this may take several seconds; the Edge Function has a 120 s timeout. The nightly pg_cron job runs the same function; this handler is for out-of-band refreshes after bulk imports or manual data corrections.
+
+## taxon.toggle_conservation
+
+**Required role:** admin
+**Audit op:** `taxon_conservation_set`
+
+```ts
+await adminClient.taxon.toggleConservation(
+  {
+    taxon_id: '<uuid>',
+    flag: 'nom059_status',   // 'nom059_status' | 'cites_appendix' | 'iucn_category'
+    value: 'P',              // null clears the flag
+  },
+  'Updated from 2024 NOM-059 revision — taxon reclassified from A to P',
+  session!.access_token,
+);
+```
+
+**Note:** Updates the specified column on `public.taxa`. Passing `value: null` clears the flag (sets the column to NULL). The `obscure_level` column is NOT automatically updated by this handler — run `taxon.recompute_rarity` or update `obscure_level` separately if the conservation change should affect coordinate obscuration.
+
+## feature_flag.toggle
+
+**Required role:** admin
+**Audit op:** `feature_flag_toggle`
+
+```ts
+await adminClient.featureFlag.toggle(
+  { key: 'parallelCascade', value: false },
+  'Disabling parallel cascade — API cost spike detected in CloudWatch',
+  session!.access_token,
+);
+```
+
+**Note:** Updates `app_feature_flags.value` and sets `updated_at` + `updated_by`. The `key` must match an existing row seeded from `src/lib/feature-flags.ts`; if the key is not found the handler throws HTTP 400. Runtime behaviour change is immediate on the next Edge Function cold start; warm isolates keep the previous value until they recycle (typically within a few minutes on the free tier).

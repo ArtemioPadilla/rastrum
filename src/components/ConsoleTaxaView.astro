@@ -70,22 +70,57 @@ const tr = t(lang);
         <dd id="taxa-detail-obscure" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
       </dl>
 
-      <div class="pt-2 border-t border-zinc-100 dark:border-zinc-800 flex gap-2">
+      <div class="pt-2 border-t border-zinc-100 dark:border-zinc-800 flex gap-2 flex-wrap">
         <button
-          disabled
+          id="taxa-btn-flag"
           title={tr.console.taxa_flag_coming}
-          class="opacity-40 cursor-not-allowed inline-flex items-center gap-1.5 px-3 py-1.5 rounded border border-zinc-300 dark:border-zinc-700 text-sm text-zinc-700 dark:text-zinc-300"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded border border-zinc-300 dark:border-zinc-700 hover:border-zinc-500 text-sm text-zinc-700 dark:text-zinc-300 transition-colors"
         >
           {tr.console.taxa_flag_btn}
         </button>
         <button
-          disabled
+          id="taxa-btn-recompute"
           title={tr.console.taxa_recompute_coming}
-          class="opacity-40 cursor-not-allowed inline-flex items-center gap-1.5 px-3 py-1.5 rounded border border-zinc-300 dark:border-zinc-700 text-sm text-zinc-700 dark:text-zinc-300"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded border border-zinc-300 dark:border-zinc-700 hover:border-zinc-500 text-sm text-zinc-700 dark:text-zinc-300 transition-colors"
         >
           {tr.console.taxa_recompute_btn}
         </button>
-        <span class="ml-2 text-xs text-zinc-400 self-center">{tr.console.taxa_actions_coming}</span>
+      </div>
+
+      <p id="taxa-action-success" class="hidden text-sm text-emerald-600 dark:text-emerald-400 mt-2"></p>
+      <p id="taxa-action-error" class="hidden text-sm text-red-600 dark:text-red-400 mt-2"></p>
+
+      <!-- Conservation flag slide-over form -->
+      <div id="taxa-flag-form" class="hidden mt-4 border-t border-zinc-100 dark:border-zinc-800 pt-4 space-y-3">
+        <h4 class="text-sm font-semibold text-zinc-800 dark:text-zinc-200">{tr.console.taxa_flag_slide_heading}</h4>
+        <div>
+          <label class="block text-xs text-zinc-500 mb-1">{tr.console.taxa_flag_flag_label}</label>
+          <select id="taxa-flag-type" class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm">
+            <option value="nom059_status">NOM-059 (E/P/A/Pr)</option>
+            <option value="cites_appendix">CITES Appendix (I/II/III)</option>
+            <option value="iucn_category">IUCN Category (EX/EW/CR/EN/VU/NT/LC/DD/NE)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs text-zinc-500 mb-1">{tr.console.taxa_flag_value_label}</label>
+          <input id="taxa-flag-value" type="text" placeholder=""
+            class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm" />
+        </div>
+        <div>
+          <label class="block text-xs text-zinc-500 mb-1">{tr.console.taxa_flag_reason_label}</label>
+          <textarea id="taxa-flag-reason" rows="2" placeholder={tr.console.taxa_flag_reason_placeholder}
+            class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm resize-none"></textarea>
+        </div>
+        <div class="flex gap-2">
+          <button id="taxa-flag-submit"
+            class="inline-flex items-center px-3 py-1.5 rounded bg-zinc-700 hover:bg-zinc-800 text-white text-sm transition-colors">
+            {tr.console.taxa_flag_submit}
+          </button>
+          <button id="taxa-flag-cancel"
+            class="inline-flex items-center px-3 py-1.5 rounded border border-zinc-300 dark:border-zinc-700 text-sm text-zinc-600 dark:text-zinc-400">
+            {tr.console.cancel}
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -96,6 +131,7 @@ const tr = t(lang);
 <script>
   import { getSupabase } from '../lib/supabase';
   import { getUserRoles } from '../lib/user-roles';
+  import { adminClient } from '../lib/admin-client';
 
   type TaxonRow = {
     id: string;
@@ -130,6 +166,7 @@ const tr = t(lang);
   let allTaxa: TaxonRow[] = [];
   let rarityMap: Map<string, RarityRow> = new Map();
   let selectedId: string | null = null;
+  let sessionToken: string | null = null;
 
   const supabase = getSupabase();
 
@@ -138,8 +175,10 @@ const tr = t(lang);
     if (!session?.user) { show('taxa-not-auth'); return; }
     const myRoles = await getUserRoles(session.user.id);
     if (!myRoles.has('admin')) { show('taxa-not-auth'); return; }
+    sessionToken = session.access_token;
     show('taxa-shell');
     await loadTaxa('', '');
+    wireActions();
   }
 
   async function loadTaxa(q: string, kingdom: string) {
@@ -250,6 +289,83 @@ const tr = t(lang);
 
   document.getElementById('taxa-search')?.addEventListener('input', onFilter);
   document.getElementById('taxa-filter-kingdom')?.addEventListener('change', onFilter);
+
+  function wireActions() {
+    function showActionMsg(msg: string, isError: boolean) {
+      const success = document.getElementById('taxa-action-success')!;
+      const error = document.getElementById('taxa-action-error')!;
+      if (isError) {
+        error.textContent = msg;
+        show('taxa-action-error');
+        hide('taxa-action-success');
+      } else {
+        success.textContent = msg;
+        show('taxa-action-success');
+        hide('taxa-action-error');
+      }
+    }
+
+    document.getElementById('taxa-btn-recompute')?.addEventListener('click', async () => {
+      if (!sessionToken) return;
+      if (!confirm('Recompute rarity scores for all taxa? This may take a moment.')) return;
+      const btn = document.getElementById('taxa-btn-recompute') as HTMLButtonElement;
+      btn.disabled = true;
+      try {
+        await adminClient.taxon.recomputeRarity('Admin triggered rarity recompute via console', sessionToken);
+        showActionMsg('Rarity recompute triggered successfully.', false);
+      } catch (err) {
+        showActionMsg('Failed to recompute rarity: ' + (err as Error).message, true);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    document.getElementById('taxa-btn-flag')?.addEventListener('click', () => {
+      if (!selectedId) return;
+      const form = document.getElementById('taxa-flag-form')!;
+      if (form.classList.contains('hidden')) {
+        show('taxa-flag-form');
+      } else {
+        hide('taxa-flag-form');
+      }
+    });
+
+    document.getElementById('taxa-flag-cancel')?.addEventListener('click', () => {
+      hide('taxa-flag-form');
+    });
+
+    document.getElementById('taxa-flag-submit')?.addEventListener('click', async () => {
+      if (!selectedId || !sessionToken) return;
+      const flag = (document.getElementById('taxa-flag-type') as HTMLSelectElement).value as 'nom059_status' | 'cites_appendix' | 'iucn_category';
+      const value = (document.getElementById('taxa-flag-value') as HTMLInputElement).value.trim() || null;
+      const reason = (document.getElementById('taxa-flag-reason') as HTMLTextAreaElement).value.trim();
+      if (reason.length < 5) {
+        showActionMsg('Please enter a reason (min 5 chars).', true);
+        return;
+      }
+      const btn = document.getElementById('taxa-flag-submit') as HTMLButtonElement;
+      btn.disabled = true;
+      try {
+        await adminClient.taxon.toggleConservation(
+          { taxon_id: selectedId, flag, value },
+          reason,
+          sessionToken,
+        );
+        showActionMsg('Conservation flag updated.', false);
+        hide('taxa-flag-form');
+        // Refresh the taxon in the local list
+        const tx = allTaxa.find(x => x.id === selectedId);
+        if (tx) {
+          (tx as Record<string, unknown>)[flag] = value;
+          selectTaxon(selectedId);
+        }
+      } catch (err) {
+        showActionMsg('Failed to update flag: ' + (err as Error).message, true);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  }
 
   init().catch(err => {
     const e = document.getElementById('taxa-error')!;
