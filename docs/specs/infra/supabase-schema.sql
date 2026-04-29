@@ -2798,6 +2798,34 @@ CREATE POLICY obs_collaborator_read ON public.observations FOR SELECT
     AND public.is_collaborator_of(auth.uid(), observer_id)
   );
 
+-- 7-pre) blocks (must exist before any reaction policy that references it)
+-- Originally defined as section 10 below — moved up because the reaction
+-- policies in sections 7/8/9 subquery public.blocks. Keeping CREATE TABLE
+-- here and policies further down would also work, but co-locating keeps
+-- the section coherent.
+CREATE TABLE IF NOT EXISTS public.blocks (
+  blocker_id  uuid        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  blocked_id  uuid        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (blocker_id, blocked_id),
+  CHECK (blocker_id <> blocked_id)
+);
+CREATE INDEX IF NOT EXISTS idx_blocks_blocked ON public.blocks(blocked_id);
+
+ALTER TABLE public.blocks ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS blocks_owner_read ON public.blocks;
+CREATE POLICY blocks_owner_read ON public.blocks FOR SELECT
+  USING (blocker_id = auth.uid());
+
+DROP POLICY IF EXISTS blocks_owner_write ON public.blocks;
+CREATE POLICY blocks_owner_write ON public.blocks FOR INSERT
+  WITH CHECK (blocker_id = auth.uid());
+
+DROP POLICY IF EXISTS blocks_owner_delete ON public.blocks;
+CREATE POLICY blocks_owner_delete ON public.blocks FOR DELETE
+  USING (blocker_id = auth.uid());
+
 -- 7) observation_reactions
 CREATE TABLE IF NOT EXISTS public.observation_reactions (
   id             uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -2935,29 +2963,9 @@ DROP POLICY IF EXISTS idreact_delete ON public.identification_reactions;
 CREATE POLICY idreact_delete ON public.identification_reactions FOR DELETE
   USING (user_id = auth.uid());
 
--- 10) blocks
-CREATE TABLE IF NOT EXISTS public.blocks (
-  blocker_id  uuid        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-  blocked_id  uuid        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-  created_at  timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (blocker_id, blocked_id),
-  CHECK (blocker_id <> blocked_id)
-);
-CREATE INDEX IF NOT EXISTS idx_blocks_blocked ON public.blocks(blocked_id);
-
-ALTER TABLE public.blocks ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS blocks_owner_read ON public.blocks;
-CREATE POLICY blocks_owner_read ON public.blocks FOR SELECT
-  USING (blocker_id = auth.uid());
-
-DROP POLICY IF EXISTS blocks_owner_write ON public.blocks;
-CREATE POLICY blocks_owner_write ON public.blocks FOR INSERT
-  WITH CHECK (blocker_id = auth.uid());
-
-DROP POLICY IF EXISTS blocks_owner_delete ON public.blocks;
-CREATE POLICY blocks_owner_delete ON public.blocks FOR DELETE
-  USING (blocker_id = auth.uid());
+-- 10) blocks — moved up to "7-pre" so reactions policies (sections 7/8/9)
+-- can reference public.blocks before it's referenced. Section number kept
+-- as a marker for the original module-26 ordering.
 
 -- 11) reports
 CREATE TABLE IF NOT EXISTS public.reports (
