@@ -10,6 +10,7 @@
 // flagging is needed.
 
 import { getSupabase } from './supabase';
+import { t } from '../i18n/utils';
 
 type Ident = { scientific_name?: string; is_primary?: boolean } | undefined;
 
@@ -263,9 +264,7 @@ export async function wireManagePanelLocation(
     }
   } else {
     const coordsEl = document.querySelector<HTMLElement>('[data-loc-coords]');
-    const tree = (await import('../i18n/utils')).t(lang) as {
-      obs_detail: { location: { no_location: string } };
-    };
+    const tree = t(lang) as { obs_detail: { location: { no_location: string } } };
     if (coordsEl) coordsEl.textContent = tree.obs_detail.location.no_location;
   }
 
