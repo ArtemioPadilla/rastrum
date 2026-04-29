@@ -90,4 +90,14 @@ test.describe('console — smoke', () => {
     await page.goto('/en/console/bans/');
     await expect(page.locator('#bans-not-auth')).toHaveText(/console access/i);
   });
+
+  test('/en/console/validation/ shows not-auth banner for unauth visitor', async ({ page }) => {
+    await page.goto('/en/console/validation/');
+    await expect(page.locator('#exp-val-not-auth')).toHaveText(/console access/i);
+  });
+
+  test('/en/console/expertise/ shows not-auth banner for unauth visitor', async ({ page }) => {
+    await page.goto('/en/console/expertise/');
+    await expect(page.locator('#exp-skill-not-auth')).toHaveText(/console access/i);
+  });
 });

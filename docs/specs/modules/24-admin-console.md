@@ -57,3 +57,56 @@ See `docs/specs/infra/supabase-schema.sql` for canonical SQL. Tables:
 - **PR2:** Users, Credentials, Expert console.
 - **PR3:** Sync, API, Cron, Moderator console.
 - **PR4+:** Badges editor, Karma tuning, Feature flags, etc. — on demand.
+
+## Implementation status
+
+| Tab | Role | Status | Shipped in |
+|---|---|---|---|
+| Overview (admin) | admin | done | PR #42 |
+| Users | admin | done | PR #66 |
+| Credentials | admin | done | PR #66 |
+| Experts | admin | done | PR #42 |
+| Observations | admin | done | PR #74 |
+| API & quotas | admin | done | PR #70 |
+| Sync failures | admin | done | PR #70 |
+| Cron / Edge fns | admin | done | PR #70 |
+| Audit log | admin | done | PR #42 |
+| Badges | admin | stub | PR7 |
+| Taxa & rarity | admin | stub | PR7 |
+| Karma tuning | admin | stub | PR7 |
+| Flags (admin) | admin | stub | PR7 |
+| Feature flags | admin | stub | PR7 |
+| Bioblitz | admin | stub | PR7 (on demand) |
+| Overview (mod) | moderator | done | PR #77 |
+| Flag queue | moderator | done | PR #77 |
+| Comments | moderator | done | PR #77 |
+| Soft-bans | moderator | done | PR #77 |
+| License disputes | moderator | stub | deferred |
+| Overview (expert) | expert | done | PR6 |
+| Validation queue | expert | done | PR6 |
+| Your expertise | expert | done | PR6 |
+| Identification overrides | expert | stub | PR7+ |
+| Taxon notes | expert | stub | PR7+ |
+
+**Functional: 17 of 25 console tabs after PR6 merges.**
+
+## Edge Function handlers (16 deployed after PR5)
+
+| Action verb | Required role | Audit op | Shipped in |
+|---|---|---|---|
+| role.grant | admin | role_grant | PR #42 |
+| role.revoke | admin | role_revoke | PR #42 |
+| sensitive_read.user_audit | admin | user_audit_read | PR #42 |
+| observation.hide | admin | observation_hide | PR #74 |
+| observation.unhide | admin | observation_unhide | PR #74 |
+| observation.obscure | admin | observation_obscure | PR #74 |
+| observation.license_override | admin | observation_license_override | PR #74 |
+| report.triage | moderator | report_triaged | PR #77 |
+| report.resolve | moderator | report_resolved | PR #77 |
+| report.dismiss | moderator | report_dismissed | PR #77 |
+| comment.hide | moderator | comment_hide | PR #77 |
+| comment.unhide | moderator | comment_unhide | PR #77 |
+| comment.lock | moderator | comment_lock | PR #77 |
+| comment.unlock | moderator | comment_unlock | PR #77 |
+| user.ban | moderator | user_ban | PR #77 |
+| user.unban | moderator | user_unban | PR #77 |

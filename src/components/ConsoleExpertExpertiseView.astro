@@ -1,0 +1,208 @@
+---
+/**
+ * ConsoleExpertExpertiseView — read-only per-taxon expertise scores for
+ * the current user with search/filter + inline SVG kingdom bar chart.
+ */
+import { t } from '../i18n/utils';
+
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+---
+
+<section class="max-w-5xl space-y-4">
+  <div id="exp-skill-not-auth" class="hidden rounded border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-900 dark:text-amber-100">
+    {tr.console.not_authorized}
+  </div>
+
+  <div id="exp-skill-shell" class="hidden space-y-5">
+    <p class="text-sm text-zinc-500 dark:text-zinc-400">{tr.console.exp_skill_intro}</p>
+
+    <!-- Filters -->
+    <div class="flex flex-wrap items-center gap-3">
+      <input
+        id="exp-skill-search"
+        type="search"
+        placeholder={tr.console.exp_skill_filter_search}
+        class="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-1.5 text-sm text-zinc-800 dark:text-zinc-200 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 w-64"
+      />
+      <label class="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 cursor-pointer">
+        <input id="exp-skill-verified-only" type="checkbox" class="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500" />
+        {tr.console.exp_skill_filter_verified}
+      </label>
+    </div>
+
+    <!-- Loading / error -->
+    <p id="exp-skill-loading" class="text-sm text-zinc-500 dark:text-zinc-400">{tr.console.exp_skill_loading}</p>
+    <p id="exp-skill-error" class="hidden text-sm text-red-600 dark:text-red-400"></p>
+
+    <!-- Kingdom chart -->
+    <div id="exp-skill-chart-section" class="hidden">
+      <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-2">{tr.console.exp_skill_kingdom_chart_heading}</h3>
+      <div id="exp-skill-chart" class="space-y-1.5"></div>
+    </div>
+
+    <!-- Table -->
+    <div id="exp-skill-table-wrap" class="hidden overflow-x-auto">
+      <table class="w-full text-sm border-collapse">
+        <thead>
+          <tr class="border-b border-zinc-200 dark:border-zinc-800 text-left text-xs text-zinc-500">
+            <th class="py-2 pr-3 font-medium">{tr.console.exp_skill_col_taxon}</th>
+            <th class="py-2 pr-3 font-medium">{tr.console.exp_skill_col_kingdom}</th>
+            <th class="py-2 pr-3 font-medium">{tr.console.exp_skill_col_score}</th>
+            <th class="py-2 pr-3 font-medium">{tr.console.exp_skill_col_verified}</th>
+            <th class="py-2 font-medium">{tr.console.exp_skill_col_updated}</th>
+          </tr>
+        </thead>
+        <tbody id="exp-skill-tbody" class="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Empty state -->
+    <div id="exp-skill-empty" class="hidden rounded-md border border-dashed border-zinc-300 dark:border-zinc-700 p-6 text-sm text-center text-zinc-500">
+      {tr.console.exp_skill_empty}
+    </div>
+  </div>
+</section>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { getUserRoles } from '../lib/user-roles';
+
+  function show(id: string) { document.getElementById(id)?.classList.remove('hidden'); }
+  function hide(id: string) { document.getElementById(id)?.classList.add('hidden'); }
+
+  const supabase = getSupabase();
+
+  type ExpertiseRow = {
+    taxon_id: string;
+    score: number;
+    verified_at: string | null;
+    updated_at: string | null;
+    taxa: { scientific_name: string; kingdom: string } | null;
+  };
+
+  let allRows: ExpertiseRow[] = [];
+
+  function scoreBadgeClass(score: number): string {
+    if (score > 100) return 'inline-block rounded px-1.5 py-0.5 text-xs font-semibold bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300';
+    if (score >= 30) return 'inline-block rounded px-1.5 py-0.5 text-xs font-semibold bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300';
+    return 'inline-block rounded px-1.5 py-0.5 text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400';
+  }
+
+  function renderChart(rows: ExpertiseRow[]) {
+    const byKingdom = new Map<string, number>();
+    for (const r of rows) {
+      const k = r.taxa?.kingdom ?? 'Unknown';
+      byKingdom.set(k, (byKingdom.get(k) ?? 0) + r.score);
+    }
+    if (byKingdom.size === 0) { hide('exp-skill-chart-section'); return; }
+
+    show('exp-skill-chart-section');
+    const maxScore = Math.max(...byKingdom.values());
+    const chartEl = document.getElementById('exp-skill-chart')!;
+    const sorted = [...byKingdom.entries()].sort((a, b) => b[1] - a[1]);
+    chartEl.innerHTML = sorted.map(([kingdom, score]) => {
+      const pct = maxScore > 0 ? Math.round((score / maxScore) * 100) : 0;
+      return `<div class="flex items-center gap-2 text-xs">
+        <span class="w-24 text-right text-zinc-500 dark:text-zinc-400 truncate">${kingdom}</span>
+        <div class="flex-1 bg-zinc-100 dark:bg-zinc-800 rounded h-4 overflow-hidden">
+          <div class="h-full bg-emerald-500 rounded" style="width:${pct}%"></div>
+        </div>
+        <span class="w-10 text-zinc-600 dark:text-zinc-400">${Math.round(score)}</span>
+      </div>`;
+    }).join('');
+  }
+
+  function getFilteredRows(): ExpertiseRow[] {
+    const searchEl = document.getElementById('exp-skill-search') as HTMLInputElement | null;
+    const verifiedEl = document.getElementById('exp-skill-verified-only') as HTMLInputElement | null;
+    const query = searchEl?.value.toLowerCase() ?? '';
+    const verifiedOnly = verifiedEl?.checked ?? false;
+
+    return allRows.filter(r => {
+      const name = r.taxa?.scientific_name ?? '';
+      if (query && !name.toLowerCase().includes(query)) return false;
+      if (verifiedOnly && !r.verified_at) return false;
+      return true;
+    });
+  }
+
+  function renderTable() {
+    const rows = getFilteredRows();
+    const tbody = document.getElementById('exp-skill-tbody')!;
+
+    if (rows.length === 0) {
+      hide('exp-skill-table-wrap');
+      show('exp-skill-empty');
+      return;
+    }
+
+    hide('exp-skill-empty');
+    show('exp-skill-table-wrap');
+
+    tbody.innerHTML = rows.map(r => {
+      const name = r.taxa?.scientific_name ?? r.taxon_id;
+      const kingdom = r.taxa?.kingdom ?? '—';
+      const score = Math.round(r.score);
+      const verified = r.verified_at ? `<span class="text-emerald-600 dark:text-emerald-400">✓</span>` : `<span class="text-zinc-400">—</span>`;
+      const updated = r.updated_at ? new Date(r.updated_at).toLocaleDateString() : '—';
+      return `<tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors">
+        <td class="py-2 pr-3 font-medium italic text-zinc-800 dark:text-zinc-200">${name}</td>
+        <td class="py-2 pr-3 text-zinc-500">${kingdom}</td>
+        <td class="py-2 pr-3"><span class="${scoreBadgeClass(r.score)}">${score}</span></td>
+        <td class="py-2 pr-3">${verified}</td>
+        <td class="py-2 text-zinc-500">${updated}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  async function init() {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) { show('exp-skill-not-auth'); return; }
+    const myRoles = await getUserRoles(session.user.id);
+    if (!myRoles.has('expert') && !myRoles.has('admin')) {
+      show('exp-skill-not-auth');
+      return;
+    }
+    show('exp-skill-shell');
+
+    const { data, error } = await supabase
+      .from('user_expertise')
+      .select('taxon_id, score, verified_at, updated_at, taxa(scientific_name, kingdom)')
+      .eq('user_id', session.user.id)
+      .order('score', { ascending: false });
+
+    hide('exp-skill-loading');
+
+    if (error) {
+      const errEl = document.getElementById('exp-skill-error')!;
+      errEl.textContent = error.message;
+      show('exp-skill-error');
+      return;
+    }
+
+    allRows = (data ?? []) as ExpertiseRow[];
+
+    if (allRows.length === 0) {
+      show('exp-skill-empty');
+      return;
+    }
+
+    renderChart(allRows);
+    renderTable();
+
+    const searchEl = document.getElementById('exp-skill-search');
+    const verifiedEl = document.getElementById('exp-skill-verified-only');
+    searchEl?.addEventListener('input', renderTable);
+    verifiedEl?.addEventListener('change', renderTable);
+  }
+
+  init().catch(err => {
+    hide('exp-skill-loading');
+    const errEl = document.getElementById('exp-skill-error')!;
+    errEl.textContent = (err as Error).message;
+    show('exp-skill-error');
+  });
+</script>
