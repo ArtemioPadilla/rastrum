@@ -94,6 +94,36 @@ jobs:
           DO $$ BEGIN CREATE ROLE service_role  NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
           GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role;
+
+          -- Storage stubs (Supabase manages these on real projects).
+          CREATE SCHEMA IF NOT EXISTS storage;
+
+          CREATE TABLE IF NOT EXISTS storage.buckets (
+            id                 text PRIMARY KEY,
+            name               text NOT NULL,
+            public             boolean DEFAULT false,
+            file_size_limit    bigint,
+            allowed_mime_types text[],
+            created_at         timestamptz DEFAULT now(),
+            updated_at         timestamptz DEFAULT now()
+          );
+
+          CREATE TABLE IF NOT EXISTS storage.objects (
+            id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            bucket_id   text REFERENCES storage.buckets(id),
+            name        text,
+            owner       uuid,
+            created_at  timestamptz DEFAULT now(),
+            updated_at  timestamptz DEFAULT now(),
+            metadata    jsonb,
+            path_tokens text[]
+          );
+
+          ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+
+          GRANT USAGE ON SCHEMA storage TO anon, authenticated, service_role;
+          GRANT ALL ON storage.buckets, storage.objects TO authenticated, service_role;
+          GRANT SELECT ON storage.buckets, storage.objects TO anon;
           SQL
 
       - name: Apply supabase-schema.sql (first pass)
