@@ -4102,3 +4102,20 @@ WHERE profile_public = true
 
 GRANT SELECT ON public.community_observers_with_centroid TO authenticated;
 -- Explicitly NO grant to anon. Lack of grant is the security gate.
+
+-- =====================================================================
+-- Module 26 v1.1 — observation_reaction_summary (2026-04-29)
+--
+-- Aggregate reaction counts per observation/kind, used by feed cards
+-- (ExploreRecent + MyObservations) to render a small "❤ N" chip without
+-- an N+1. Rows surface only when the underlying observation_reactions
+-- row is readable by the caller — `security_invoker = true` forces the
+-- view to evaluate RLS as the caller, not the view owner.
+-- =====================================================================
+CREATE OR REPLACE VIEW public.observation_reaction_summary
+  WITH (security_invoker = true) AS
+SELECT observation_id, kind, COUNT(*)::int AS count
+  FROM public.observation_reactions
+ GROUP BY observation_id, kind;
+
+GRANT SELECT ON public.observation_reaction_summary TO anon, authenticated;

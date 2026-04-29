@@ -89,7 +89,7 @@ const subtitleCopy = lang === 'es'
       <div class="h-16 rounded-xl bg-zinc-100 dark:bg-zinc-900 animate-pulse" style="animation-delay: 160ms"></div>
     </div>
 
-    <ul id="inbox-list" class="hidden space-y-2"></ul>
+    <ul id="inbox-list" class="hidden space-y-2" aria-label={inboxTr.title}></ul>
 
     <div
       id="inbox-empty"
@@ -264,9 +264,20 @@ const subtitleCopy = lang === 'es'
     const avatar = actorAvatar(actor);
     const thumb = thumbUrl ? targetThumb(thumbUrl) : '';
 
+    // Build a screen-reader-friendly label that summarises the row.
+    // Strips HTML from the templated text and appends the relative time
+    // and unread state. Without this, AT users hear only the time/avatar
+    // and have to dive into the row to learn what kind of notification it is.
+    const plainText = (tpl ? tpl.replace('{{actor}}', actorLabel(n, actor)) : '').replace(/\s+/g, ' ').trim();
+    const unreadSuffix = unread
+      ? (lang === 'es' ? ' — sin leer' : ' — unread')
+      : '';
+    const ariaLabel = `${plainText}, ${when}${unreadSuffix}`.trim();
+
     return `<li>
       <a href="${escapeText(href)}" data-id="${escapeText(n.id)}"
-         class="inbox-row group block rounded-xl ${stateClasses} px-3.5 py-3 transition-all hover:ring-emerald-300 dark:hover:ring-emerald-800/80 hover:shadow-sm">
+         class="inbox-row group block rounded-xl ${stateClasses} px-3.5 py-3 transition-all hover:ring-emerald-300 dark:hover:ring-emerald-800/80 hover:shadow-sm"
+         aria-label="${escapeText(ariaLabel)}">
         <div class="flex items-start gap-3">
           <div class="relative shrink-0">${icon}${avatar}</div>
           <div class="min-w-0 flex-1">
