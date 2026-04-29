@@ -1,0 +1,344 @@
+---
+// Owner-only Manage panel for /share/obs/?id=… — replaces the inline
+// 3-field manage form that lived in ShareObsView.astro through PR3.
+//
+// Three internal tabs:
+//   - Details  (PR4): scientific-name override, date/time, habitat,
+//                     weather, establishment_means, notes, location
+//                     privacy, save / delete buttons.
+//   - Location (this PR5): read-only `MapPicker mode='view'` showing the
+//                          current pin + an "Edit location" button that
+//                          opens `MapPicker mode='edit'` in modal mode.
+//                          Save dispatches `rastrum:mappicker-save` with
+//                          id `obs-detail-edit`; `wireManagePanelLocation`
+//                          listens, UPDATEs `observations.location`, and
+//                          relies on the existing
+//                          `observations_material_edit_check_trg` trigger
+//                          to recompute `last_material_edit_at` for moves
+//                          > 1 km.
+//   - Photos   (PR6): placeholder.
+//
+// Visibility is owner-only and is unhidden by `wireManagePanelDetails()`
+// in `src/lib/manage-panel.ts` after `viewerIsObserver` resolves.
+
+import MapPicker from './MapPicker.astro';
+import {
+  HABITATS,
+  WEATHERS,
+  ESTABLISHMENT_MEANS,
+  labelFor,
+} from '../lib/observation-enums';
+import { t } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+const { lang } = Astro.props;
+const isEs = lang === 'es';
+
+// Astro JSX fights with inline `Record<…>` casts — narrow once in
+// frontmatter and read off typed locals in the markup.
+type ObsDetailTree = {
+  tabs: { details: string; location: string; photos: string };
+  view: Record<string, string>;
+  edit_location: string;
+  save_changes: string;
+  saved: string;
+  edited_badge: string;
+  manage_tab_location_placeholder: string;
+  manage_tab_photos_placeholder: string;
+  manage_date_label: string;
+  manage_habitat_label: string;
+  manage_weather_label: string;
+  manage_establishment_label: string;
+  add_photo: string;
+  delete_photo: string;
+  gallery: { no_photos: string };
+  location: {
+    current_heading: string;
+    no_location: string;
+    edit_intro: string;
+    edit_button: string;
+    saving: string;
+  };
+  errors: { coords_invalid: string; save_failed: string; upload_failed: string };
+};
+type ObserveTree = {
+  habitat_options: Record<string, string>;
+  weather_options: Record<string, string>;
+  establishment_means_options: Record<string, string>;
+};
+
+const tr      = t(lang) as { obs_detail: ObsDetailTree; observe: ObserveTree };
+const od      = tr.obs_detail;
+const v       = od.view;
+const observe = tr.observe;
+---
+
+<section
+  id="manage-panel"
+  data-manage-panel
+  data-show-when="owner"
+  class="hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 space-y-3"
+>
+  <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
+    {v.manage_heading}
+  </h2>
+  <p class="text-xs text-zinc-500 dark:text-zinc-400">{v.manage_private}</p>
+
+  <div role="tablist" aria-label={v.manage_heading} class="flex gap-1 border-b border-zinc-200 dark:border-zinc-800">
+    <button
+      type="button"
+      role="tab"
+      id="m-tab-details"
+      aria-selected="true"
+      aria-controls="m-panel-details"
+      tabindex="0"
+      data-tab-button="details"
+      class="px-3 py-1.5 text-sm font-medium border-b-2 border-emerald-700 text-emerald-700 dark:text-emerald-400 -mb-px focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 rounded-t"
+    >{od.tabs.details}</button>
+    <button
+      type="button"
+      role="tab"
+      id="m-tab-location"
+      aria-selected="false"
+      aria-controls="m-panel-location"
+      tabindex="-1"
+      data-tab-button="location"
+      class="px-3 py-1.5 text-sm font-medium border-b-2 border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 -mb-px focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 rounded-t"
+    >{od.tabs.location}</button>
+    <button
+      type="button"
+      role="tab"
+      id="m-tab-photos"
+      aria-selected="false"
+      aria-controls="m-panel-photos"
+      tabindex="-1"
+      data-tab-button="photos"
+      class="px-3 py-1.5 text-sm font-medium border-b-2 border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 -mb-px focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 rounded-t"
+    >{od.tabs.photos}</button>
+  </div>
+
+  <div
+    id="m-panel-details"
+    role="tabpanel"
+    aria-labelledby="m-tab-details"
+    data-tab="details"
+    class="space-y-3"
+  >
+    <form id="manage-form" class="space-y-3" novalidate>
+      <div>
+        <label for="m-observed-at" class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{od.manage_date_label}</label>
+        <input
+          id="m-observed-at"
+          type="datetime-local"
+          class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm"
+        />
+      </div>
+
+      <div>
+        <label for="m-habitat" class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{od.manage_habitat_label}</label>
+        <select
+          id="m-habitat"
+          class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm"
+        >
+          <option value="">—</option>
+          {HABITATS.map((h) => <option value={h}>{labelFor(observe, 'habitat_options', h)}</option>)}
+        </select>
+      </div>
+
+      <div>
+        <label for="m-weather" class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{od.manage_weather_label}</label>
+        <select
+          id="m-weather"
+          class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm"
+        >
+          <option value="">—</option>
+          {WEATHERS.map((w) => <option value={w}>{labelFor(observe, 'weather_options', w)}</option>)}
+        </select>
+      </div>
+
+      <div>
+        <label for="m-establishment" class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{od.manage_establishment_label}</label>
+        <select
+          id="m-establishment"
+          class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm"
+        >
+          <option value="">—</option>
+          {ESTABLISHMENT_MEANS.map((e) => <option value={e}>{labelFor(observe, 'establishment_means_options', e)}</option>)}
+        </select>
+      </div>
+
+      <div>
+        <label for="m-sci" class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{v.scientific_name}</label>
+        <input
+          id="m-sci"
+          type="text"
+          autocomplete="off"
+          placeholder="e.g. Quercus oleoides"
+          class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm font-mono italic"
+        />
+        <p class="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">{v.scientific_help}</p>
+      </div>
+
+      <div>
+        <label for="m-notes" class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{v.notes}</label>
+        <textarea
+          id="m-notes"
+          rows="3"
+          maxlength="2000"
+          class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm"
+        ></textarea>
+      </div>
+
+      <div>
+        <label for="m-obscure" class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{v.location_privacy}</label>
+        <select
+          id="m-obscure"
+          class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm"
+        >
+          <option value="none">{v.privacy_show}</option>
+          <option value="0.1deg">{v.privacy_10km}</option>
+          <option value="0.2deg">{v.privacy_20km}</option>
+          <option value="5km">{v.privacy_5km}</option>
+          <option value="full">{v.privacy_hide}</option>
+        </select>
+      </div>
+
+      <p id="m-error" class="hidden text-xs text-red-600 dark:text-red-400" role="alert"></p>
+      <p id="m-saved" class="hidden text-xs text-emerald-700 dark:text-emerald-400" aria-live="polite">{od.saved}</p>
+
+      <div class="flex flex-wrap items-center gap-2 pt-2">
+        <button
+          type="submit"
+          id="m-save"
+          class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+        >{od.save_changes}</button>
+        <button
+          type="button"
+          id="m-delete"
+          class="rounded-lg border border-red-300 dark:border-red-800 px-4 py-2 text-sm font-medium text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+        >{v.delete_obs}</button>
+      </div>
+    </form>
+  </div>
+
+  <div
+    id="m-panel-location"
+    role="tabpanel"
+    aria-labelledby="m-tab-location"
+    data-tab="location"
+    class="hidden space-y-3"
+  >
+    <div class="space-y-2">
+      <h3 class="text-xs font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">{od.location.current_heading}</h3>
+      <MapPicker mode="view" lang={lang} pickerId="obs-detail-loc-view" initialCoords={null} />
+      <p data-loc-coords class="text-xs text-zinc-500 dark:text-zinc-400" aria-live="polite"></p>
+    </div>
+
+    <p class="text-xs text-zinc-500 dark:text-zinc-400">{od.location.edit_intro}</p>
+
+    <div class="flex flex-wrap items-center gap-2">
+      <MapPicker
+        mode="edit"
+        lang={lang}
+        pickerId="obs-detail-edit"
+        initialCoords={null}
+        openLabel={od.location.edit_button}
+      />
+      <span id="m-loc-saving" class="hidden text-xs text-zinc-500 dark:text-zinc-400" aria-live="polite">{od.location.saving}</span>
+      <span id="m-loc-saved"  class="hidden text-xs text-emerald-700 dark:text-emerald-400" aria-live="polite">{od.saved}</span>
+    </div>
+    <p id="m-loc-error" class="hidden text-xs text-red-600 dark:text-red-400" role="alert"></p>
+  </div>
+
+  <div
+    id="m-panel-photos"
+    role="tabpanel"
+    aria-labelledby="m-tab-photos"
+    data-tab="photos"
+    class="hidden space-y-3"
+  >
+    <div
+      id="m-photos-grid"
+      data-photos-grid
+      class="grid grid-cols-3 sm:grid-cols-4 gap-2"
+    >
+      <!-- Hydrated by wireManagePanelPhotos at runtime. -->
+    </div>
+    <p
+      id="m-photos-empty"
+      class="hidden text-xs text-zinc-500 dark:text-zinc-400 italic"
+    >{tr.obs_detail.gallery.no_photos}</p>
+    <p
+      id="m-photos-error"
+      class="hidden text-xs text-red-600 dark:text-red-400"
+      role="alert"
+    ></p>
+    <input
+      id="m-photos-file-input"
+      type="file"
+      accept="image/*"
+      multiple
+      class="hidden"
+    />
+    <div class="flex items-center gap-2">
+      <button
+        type="button"
+        id="m-photos-add"
+        data-add-photo
+        class="rounded-lg border border-emerald-600/60 px-3 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+      >{od.add_photo}</button>
+      <span
+        id="m-photos-busy"
+        class="hidden text-xs text-zinc-500 dark:text-zinc-400"
+        aria-live="polite"
+      ></span>
+    </div>
+  </div>
+</section>
+
+<script>
+  // Tab-switcher with arrow-key + Home/End keyboard navigation per
+  // WAI-ARIA tabs pattern.
+  // https://www.w3.org/WAI/ARIA/apg/patterns/tabs/
+  const root = document.querySelector('[data-manage-panel]');
+  if (root) {
+    const buttons = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-tab-button]'));
+    const panels  = Array.from(root.querySelectorAll<HTMLElement>('[data-tab]'));
+
+    function activate(target: string, focus: boolean): void {
+      for (const b of buttons) {
+        const active = b.dataset.tabButton === target;
+        b.setAttribute('aria-selected', String(active));
+        b.setAttribute('tabindex', active ? '0' : '-1');
+        b.classList.toggle('border-emerald-700', active);
+        b.classList.toggle('text-emerald-700', active);
+        b.classList.toggle('dark:text-emerald-400', active);
+        b.classList.toggle('border-transparent', !active);
+        b.classList.toggle('text-zinc-500', !active);
+        b.classList.toggle('dark:text-zinc-400', !active);
+        if (active && focus) b.focus();
+      }
+      for (const p of panels) {
+        p.classList.toggle('hidden', p.dataset.tab !== target);
+      }
+    }
+
+    buttons.forEach((btn, idx) => {
+      btn.addEventListener('click', () => activate(btn.dataset.tabButton ?? 'details', false));
+      btn.addEventListener('keydown', (ev: KeyboardEvent) => {
+        let nextIdx: number | null = null;
+        if (ev.key === 'ArrowRight')      nextIdx = (idx + 1) % buttons.length;
+        else if (ev.key === 'ArrowLeft')  nextIdx = (idx - 1 + buttons.length) % buttons.length;
+        else if (ev.key === 'Home')       nextIdx = 0;
+        else if (ev.key === 'End')        nextIdx = buttons.length - 1;
+        if (nextIdx !== null) {
+          ev.preventDefault();
+          const target = buttons[nextIdx]?.dataset.tabButton;
+          if (target) activate(target, true);
+        }
+      });
+    });
+  }
+</script>

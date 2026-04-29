@@ -1,0 +1,258 @@
+---
+/**
+ * AppealView — subject-facing appeal form for a banned user.
+ *
+ * Shows the user's current active ban, lets them submit an appeal,
+ * and lists their previous appeals below.
+ */
+import { t, getLocalizedPath, routes } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+
+const { lang } = Astro.props;
+const tr = t(lang);
+const profileTree = tr.profile as unknown as Record<string, string>;
+const profilePath = getLocalizedPath(lang, routes.profile[lang] + '/');
+---
+
+<div
+  class="rastrum-appeal max-w-xl mx-auto"
+  data-lang={lang}
+  data-profile-path={profilePath}
+  data-label-no-ban={profileTree.appeal_no_active_ban}
+  data-label-no-ban-detail={profileTree.appeal_no_active_ban_detail}
+  data-label-ban-expires={profileTree.appeal_ban_expires}
+  data-label-ban-permanent={profileTree.appeal_ban_permanent}
+  data-label-ban-reason-label={profileTree.appeal_ban_reason_label}
+  data-label-success={profileTree.appeal_success}
+  data-label-error={profileTree.appeal_error}
+  data-label-submit={profileTree.appeal_submit}
+  data-label-submitting={profileTree.appeal_submitting}
+  data-label-status-pending={profileTree.appeal_status_pending}
+  data-label-status-accepted={profileTree.appeal_status_accepted}
+  data-label-status-rejected={profileTree.appeal_status_rejected}
+  data-label-status-withdrawn={profileTree.appeal_status_withdrawn}
+  data-label-history-empty={profileTree.appeal_history_empty}
+>
+  <header class="mb-6">
+    <h1 class="text-2xl md:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+      {profileTree.appeal_heading}
+    </h1>
+    <a href={profilePath} class="text-sm text-zinc-600 dark:text-zinc-400 hover:underline">
+      ← {tr.profile.view_profile}
+    </a>
+  </header>
+
+  <div id="appeal-not-signed-in" class="hidden rounded-lg border border-zinc-300 dark:border-zinc-700 p-4 text-sm">
+    <p>{tr.profile.not_signed_in}</p>
+  </div>
+
+  <div id="appeal-shell" class="hidden space-y-6">
+    <!-- Current ban info -->
+    <div id="appeal-no-ban" class="hidden rounded-lg border border-zinc-300 dark:border-zinc-700 p-5 text-sm text-zinc-600 dark:text-zinc-400">
+      <p class="font-medium text-zinc-900 dark:text-zinc-100" id="appeal-no-ban-title"></p>
+      <p id="appeal-no-ban-detail" class="mt-1"></p>
+    </div>
+
+    <div id="appeal-ban-info" class="hidden rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 p-4 text-sm space-y-1">
+      <p id="appeal-ban-expires" class="font-medium text-amber-900 dark:text-amber-100"></p>
+      <p id="appeal-ban-reason" class="text-amber-800 dark:text-amber-200"></p>
+    </div>
+
+    <!-- Appeal form -->
+    <div id="appeal-form-wrap" class="hidden">
+      <p class="mb-4 text-sm text-zinc-600 dark:text-zinc-400">{profileTree.appeal_intro}</p>
+
+      <form id="appeal-form" class="space-y-4">
+        <div>
+          <label for="appeal-message" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+            {profileTree.appeal_message_label}
+          </label>
+          <textarea
+            id="appeal-message"
+            name="message"
+            rows="6"
+            minlength="20"
+            maxlength="2000"
+            required
+            class="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-3 text-base text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            placeholder={profileTree.appeal_message_placeholder}
+          ></textarea>
+          <p class="mt-1 text-xs text-zinc-500">{profileTree.appeal_message_hint}</p>
+        </div>
+
+        <button
+          type="submit"
+          id="appeal-submit"
+          class="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-emerald-700 hover:bg-emerald-800 px-5 py-2 text-sm font-semibold text-white disabled:opacity-60"
+        >
+          {profileTree.appeal_submit}
+        </button>
+
+        <p id="appeal-error" class="hidden text-sm text-red-600 dark:text-red-400"></p>
+        <div id="appeal-success" class="hidden rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 p-3 text-sm text-emerald-800 dark:text-emerald-200">
+          {profileTree.appeal_success}
+        </div>
+      </form>
+    </div>
+
+    <!-- Previous appeals -->
+    <section id="appeal-history-wrap" class="hidden">
+      <h2 class="text-base font-semibold text-zinc-900 dark:text-zinc-100 mb-3">
+        {profileTree.appeal_history_heading}
+      </h2>
+      <ul id="appeal-history-list" class="space-y-3"></ul>
+      <p id="appeal-history-empty" class="hidden text-sm text-zinc-500 dark:text-zinc-400">
+        {profileTree.appeal_history_empty}
+      </p>
+    </section>
+  </div>
+</div>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { getActiveBanForUser } from '../lib/check-ban-status';
+
+  const root = document.querySelector<HTMLElement>('.rastrum-appeal');
+  const lang: 'en' | 'es' = root?.dataset.lang === 'es' ? 'es' : 'en';
+
+  function escapeText(s: string) {
+    return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as Record<string, string>)[c]);
+  }
+
+  function statusPill(status: string): string {
+    if (!root) return '';
+    const map: Record<string, { label: string; cls: string }> = {
+      pending:   { label: root.dataset.labelStatusPending   ?? 'Pending',   cls: 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300' },
+      accepted:  { label: root.dataset.labelStatusAccepted  ?? 'Accepted',  cls: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300' },
+      rejected:  { label: root.dataset.labelStatusRejected  ?? 'Rejected',  cls: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300' },
+      withdrawn: { label: root.dataset.labelStatusWithdrawn ?? 'Withdrawn', cls: 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300' },
+    };
+    const s = map[status] ?? { label: status, cls: 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400' };
+    return `<span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${escapeText(s.cls)}">${escapeText(s.label)}</span>`;
+  }
+
+  async function init() {
+    if (!root) return;
+
+    let supabase;
+    try { supabase = getSupabase(); } catch {
+      document.getElementById('appeal-not-signed-in')?.classList.remove('hidden');
+      return;
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      document.getElementById('appeal-not-signed-in')?.classList.remove('hidden');
+      return;
+    }
+
+    document.getElementById('appeal-shell')?.classList.remove('hidden');
+
+    const ban = await getActiveBanForUser(user.id).catch(() => null);
+
+    if (!ban) {
+      const noban = document.getElementById('appeal-no-ban');
+      const title = document.getElementById('appeal-no-ban-title');
+      const detail = document.getElementById('appeal-no-ban-detail');
+      if (noban) noban.classList.remove('hidden');
+      if (title) title.textContent = root.dataset.labelNoBan ?? 'No active suspension.';
+      if (detail) detail.textContent = root.dataset.labelNoBanDetail ?? '';
+    } else {
+      const banInfo = document.getElementById('appeal-ban-info');
+      const expiresEl = document.getElementById('appeal-ban-expires');
+      const reasonEl = document.getElementById('appeal-ban-reason');
+      if (banInfo) banInfo.classList.remove('hidden');
+
+      if (expiresEl) {
+        if (ban.expires_at) {
+          const date = new Date(ban.expires_at).toLocaleDateString(
+            lang === 'es' ? 'es' : 'en',
+            { dateStyle: 'medium' },
+          );
+          expiresEl.textContent = (root.dataset.labelBanExpires ?? 'Suspended until: {date}').replace('{date}', date);
+        } else {
+          expiresEl.textContent = root.dataset.labelBanPermanent ?? 'Indefinite suspension.';
+        }
+      }
+      if (reasonEl && ban.reason) {
+        reasonEl.textContent = (root.dataset.labelBanReasonLabel ?? 'Reason:') + ' ' + ban.reason;
+      }
+
+      document.getElementById('appeal-form-wrap')?.classList.remove('hidden');
+    }
+
+    // Load previous appeals.
+    const { data: appeals } = await supabase
+      .from('ban_appeals')
+      .select('id, ban_id, message, status, reviewer_note, created_at, reviewed_at')
+      .eq('appellant_id', user.id)
+      .order('created_at', { ascending: false });
+
+    const historyWrap = document.getElementById('appeal-history-wrap');
+    const historyList = document.getElementById('appeal-history-list');
+    const historyEmpty = document.getElementById('appeal-history-empty');
+    if (historyWrap) historyWrap.classList.remove('hidden');
+
+    if (!appeals || appeals.length === 0) {
+      historyEmpty?.classList.remove('hidden');
+    } else {
+      const rows = appeals as { id: string; message: string; status: string; reviewer_note: string | null; created_at: string; reviewed_at: string | null }[];
+      if (historyList) {
+        historyList.innerHTML = rows.map(a => `
+          <li class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3 text-sm space-y-1">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-xs text-zinc-500">${escapeText(new Date(a.created_at).toLocaleDateString(lang === 'es' ? 'es' : 'en', { dateStyle: 'medium' }))}</span>
+              ${statusPill(a.status)}
+            </div>
+            <p class="text-zinc-800 dark:text-zinc-200 line-clamp-3">${escapeText(a.message)}</p>
+            ${a.reviewer_note ? `<p class="text-zinc-500 italic text-xs">${escapeText(a.reviewer_note)}</p>` : ''}
+          </li>
+        `).join('');
+      }
+    }
+
+    // Wire form.
+    if (!ban) return;
+    const form = document.getElementById('appeal-form') as HTMLFormElement | null;
+    const submitBtn = document.getElementById('appeal-submit') as HTMLButtonElement | null;
+    const errorEl = document.getElementById('appeal-error');
+    const successEl = document.getElementById('appeal-success');
+
+    form?.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      if (!submitBtn) return;
+      const textarea = form.querySelector<HTMLTextAreaElement>('#appeal-message');
+      const message = textarea?.value.trim() ?? '';
+      if (message.length < 20) return;
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = root.dataset.labelSubmitting ?? 'Submitting…';
+      errorEl?.classList.add('hidden');
+
+      const { error } = await supabase
+        .from('ban_appeals')
+        .insert({ ban_id: ban.id, appellant_id: user.id, message });
+
+      submitBtn.disabled = false;
+      submitBtn.textContent = root.dataset.labelSubmit ?? 'Submit appeal';
+
+      if (error) {
+        if (errorEl) {
+          errorEl.textContent = root.dataset.labelError ?? 'Could not submit. Try again.';
+          errorEl.classList.remove('hidden');
+        }
+        return;
+      }
+
+      form.classList.add('hidden');
+      successEl?.classList.remove('hidden');
+    });
+  }
+
+  init().catch(() => {
+    document.getElementById('appeal-not-signed-in')?.classList.remove('hidden');
+  });
+</script>

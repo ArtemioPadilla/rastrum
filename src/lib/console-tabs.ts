@@ -31,6 +31,8 @@ export const CONSOLE_TABS: ConsoleTab[] = [
   { id: 'karma',          role: 'admin',     routeKey: 'consoleKarma',            i18nKey: 'console.karma',        icon: 'sparkles',    phase: 4 },
   { id: 'flags',          role: 'admin',     routeKey: 'consoleFlags',            i18nKey: 'console.flags',        icon: 'flag',        phase: 4, stub: true },
   { id: 'audit',          role: 'admin',     routeKey: 'consoleAudit',            i18nKey: 'console.audit',        icon: 'scroll',      phase: 1 },
+  { id: 'anomalies',      role: 'admin',     routeKey: 'consoleAnomalies',        i18nKey: 'console.anomalies',    icon: 'alert',       phase: 1 },
+  { id: 'forensics',      role: 'admin',     routeKey: 'consoleForensics',        i18nKey: 'console.forensics',    icon: 'search',      phase: 1 },
   { id: 'features',       role: 'admin',     routeKey: 'consoleFeatureFlags',     i18nKey: 'console.features',     icon: 'toggle',      phase: 4 },
   { id: 'bioblitz',       role: 'admin',     routeKey: 'consoleBioblitz',         i18nKey: 'console.bioblitz',     icon: 'calendar',    phase: 4 },
   // Moderator (5)
@@ -38,7 +40,8 @@ export const CONSOLE_TABS: ConsoleTab[] = [
   { id: 'mod-flag-queue', role: 'moderator', routeKey: 'consoleModFlagQueue',     i18nKey: 'console.modFlagQueue',  icon: 'flag',       phase: 3 },
   { id: 'mod-comments',   role: 'moderator', routeKey: 'consoleModComments',      i18nKey: 'console.modComments',   icon: 'message',    phase: 3 },
   { id: 'mod-bans',       role: 'moderator', routeKey: 'consoleModBans',          i18nKey: 'console.modBans',       icon: 'user-x',     phase: 4 },
-  { id: 'mod-disputes',   role: 'moderator', routeKey: 'consoleModDisputes',      i18nKey: 'console.modDisputes',   icon: 'gavel',      phase: 4, stub: true },
+  { id: 'mod-appeals',    role: 'moderator', routeKey: 'consoleModAppeals',       i18nKey: 'console.modAppeals',    icon: 'gavel',      phase: 4 },
+  { id: 'mod-disputes',   role: 'moderator', routeKey: 'consoleModDisputes',      i18nKey: 'console.modDisputes',   icon: 'scale',      phase: 4, stub: true },
   // Expert (5)
   { id: 'exp-overview',   role: 'expert',    routeKey: 'console',                 i18nKey: 'console.expOverview',   icon: 'gauge',      phase: 2 },
   { id: 'exp-validation', role: 'expert',    routeKey: 'consoleExpertValidation', i18nKey: 'console.expValidation', icon: 'check-circle', phase: 2 },

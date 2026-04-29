@@ -18,6 +18,10 @@
  */
 export const DEFAULT_MAX_MP = 4;
 export const DEFAULT_QUALITY = 0.9;
+/** Hard byte cap after compression. R2 storage cost + mobile upload speed. */
+export const DEFAULT_MAX_BYTES = 4 * 1024 * 1024;
+/** Floor on JPEG quality when iteratively reducing to fit byte cap. */
+export const MIN_QUALITY = 0.6;
 
 export interface CompressResult {
   /** May be the same File reference if no resize was needed. */
@@ -59,6 +63,7 @@ export async function compressIfLarge(
   file: File,
   maxMP: number = DEFAULT_MAX_MP,
   quality: number = DEFAULT_QUALITY,
+  maxBytes: number = DEFAULT_MAX_BYTES,
 ): Promise<CompressResult> {
   if (!(file instanceof File)) {
     throw new TypeError('compressIfLarge: expected a File');
@@ -79,13 +84,28 @@ export async function compressIfLarge(
   const w = bitmap.width;
   const h = bitmap.height;
   const scale = computeScale(w, h, maxMP);
-  if (scale >= 1) {
+  const needsResize = scale < 1;
+  const overByteCap = file.size > maxBytes;
+
+  if (!needsResize && !overByteCap) {
     bitmap.close?.();
     return { file, resized: false, originalDims: { w, h } };
   }
-  const targetW = Math.max(1, Math.round(w * scale));
-  const targetH = Math.max(1, Math.round(h * scale));
-  const blob = await drawAndEncode(bitmap, targetW, targetH, quality);
+
+  const targetW = needsResize ? Math.max(1, Math.round(w * scale)) : w;
+  const targetH = needsResize ? Math.max(1, Math.round(h * scale)) : h;
+
+  // Iteratively drop quality until we're under the byte cap, but never
+  // below MIN_QUALITY (preserves visible detail for AI identification).
+  let q = quality;
+  let blob: Blob | null = null;
+  for (let i = 0; i < 5; i++) {
+    blob = await drawAndEncode(bitmap, targetW, targetH, q);
+    if (!blob) break;
+    if (blob.size <= maxBytes) break;
+    if (q <= MIN_QUALITY) break;
+    q = Math.max(MIN_QUALITY, q - 0.1);
+  }
   bitmap.close?.();
   if (!blob) return { file, resized: false, originalDims: { w, h } };
 

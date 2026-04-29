@@ -86,13 +86,21 @@ test.describe('navigation', () => {
     await expect(docsBtn).toHaveClass(/text-stone-600/);
   });
 
-  test('explore dropdown reveals 4 sub-items', async ({ page }) => {
+  test('explore mega-menu reveals biodiversity sub-items + community column (M28)', async ({ page }) => {
     await page.goto('/en/');
-    const expBtn = page.locator('#hdr-explore-btn');
+    // MegaMenu instance id is derived from the trigger label ("Explore" → "explore").
+    const expBtn = page.locator('#megamenu-explore-btn');
     await expBtn.click();
-    await expect(page.locator('#hdr-explore-menu a[href="/en/explore/recent/"]')).toBeVisible();
-    await expect(page.locator('#hdr-explore-menu a[href="/en/explore/watchlist/"]')).toBeVisible();
-    await expect(page.locator('#hdr-explore-menu a[href="/en/explore/species/"]')).toBeVisible();
+    const menu = page.locator('#megamenu-explore-menu');
+    // Biodiversity column items (existing behavior).
+    await expect(menu.locator('a[href="/en/explore/recent/"]')).toBeVisible();
+    await expect(menu.locator('a[href="/en/explore/watchlist/"]')).toBeVisible();
+    await expect(menu.locator('a[href="/en/explore/species/"]')).toBeVisible();
+    // Community column items (M28). The "Top observers" preset uses
+    // ?sort=obs_count_30d, "Nearby" uses ?nearby=true.
+    await expect(menu.locator('a[href="/en/community/observers/"]')).toBeVisible();
+    await expect(menu.locator('a[href="/en/community/observers/?sort=obs_count_30d"]')).toBeVisible();
+    await expect(menu.locator('a[href="/en/community/observers/?nearby=true"]')).toBeVisible();
   });
 
   test('legacy /profile/watchlist redirects to /explore/watchlist', async ({ page }) => {

@@ -19,6 +19,16 @@
       "watchlist": "Watchlist",
       "species": "Species"
     },
+    "explore_megamenu": {
+      "biodiversity": "Biodiversity",
+      "community": "Community",
+      "community_all": "Observers",
+      "community_top": "Top observers",
+      "community_nearby": "Nearby",
+      "community_experts": "Experts by taxon",
+      "community_country": "By country",
+      "nearby_signin_tooltip": "Sign in to find observers near you"
+    },
     "docs_groups": {
       "product": "Product",
       "progress": "Progress",
@@ -324,6 +334,49 @@
     "onnx_base_attribution": "Model: TensorFlow Model Garden (Apache-2.0). ImageNet labels are English common names — treat results as hints, not research-grade IDs.",
     "onnx_base_weights_url_missing": "Weights are not hosted yet — set PUBLIC_ONNX_BASE_URL to enable."
   },
+  "community": {
+    "page_title": "Community observers",
+    "page_subtitle": "Find observers by activity, expertise, location, or country.",
+    "loading": "Loading…",
+    "previous": "Previous",
+    "next": "Next",
+    "expert_pill": "expert",
+    "today": "today",
+    "yesterday": "yesterday",
+    "days_ago": "{n}d ago",
+    "months_ago": "{n}mo ago",
+    "years_ago": "{n}y ago",
+    "sort": {
+      "obs": "Most observations",
+      "species": "Most species",
+      "active_7d": "Most active this week",
+      "active_30d": "Most active this month",
+      "recent": "Recently active",
+      "newest": "Newest",
+      "distance": "Nearest to me"
+    },
+    "filter": {
+      "country": "Country",
+      "taxon": "Taxon",
+      "nearby": "Nearby",
+      "experts_only": "Experts only",
+      "any": "Any"
+    },
+    "card": {
+      "obs": "{n} obs",
+      "species": "{n} species",
+      "last_seen": "last seen {when}",
+      "follow": "Follow",
+      "following": "Following"
+    },
+    "empty": {
+      "no_match": "No observers match these filters. Try removing one.",
+      "nearby_no_centroid": "Log an observation to find observers near you.",
+      "nearby_anon": "Sign in to find observers near you."
+    },
+    "leaderboards_optout_link": "Hide me from community leaderboards",
+    "edit_profile_optout": "Profile → Edit"
+  },
   "profile": {
     "title": "Profile",
     "edit": "Edit profile",
@@ -346,7 +399,7 @@
     "public_profile": "Public profile",
     "public_profile_hint": "Others can view your profile page and public activity.",
     "gamification": "Badges & activity",
-    "gamification_hint": "Enable badges, streaks, and activity feed. Quality-gated. No leaderboards.",
+    "gamification_hint": "Enable badges, streaks, and activity feed. Quality-gated. Community leaderboards are opt-in.",
     "streak_digest": "Weekly digest email",
     "streak_digest_hint": "One summary email per week. No push notifications.",
     "total_observations": "Observations",
@@ -557,7 +610,35 @@
     "crop_rotate_left": "Rotate left",
     "crop_rotate_right": "Rotate right",
     "crop_reset": "Reset",
-    "crop_drag_hint": "Drag the corners to resize. Drag inside to move."
+    "crop_drag_hint": "Drag the corners to resize. Drag inside to move.",
+    "ban_banner_message": "Your account is suspended until {date}. Reason: {reason}.",
+    "ban_banner_message_permanent": "Your account is permanently suspended. Reason: {reason}.",
+    "ban_banner_appeal": "Appeal",
+    "ban_banner_no_reason": "No reason provided.",
+    "appeal_heading": "Appeal your suspension",
+    "appeal_intro": "Explain why you believe this suspension should be lifted. Be specific and respectful.",
+    "appeal_no_active_ban": "You don't have an active suspension.",
+    "appeal_no_active_ban_detail": "Appeals are only available for active suspensions.",
+    "appeal_ban_expires": "Suspended until: {date}",
+    "appeal_ban_permanent": "Suspension: indefinite",
+    "appeal_ban_reason_label": "Suspension reason:",
+    "appeal_message_label": "Your message",
+    "appeal_message_placeholder": "Explain why you believe this suspension should be lifted…",
+    "appeal_message_hint": "Between 20 and 2000 characters.",
+    "appeal_submit": "Submit appeal",
+    "appeal_submitting": "Submitting…",
+    "appeal_success": "Your appeal has been submitted. A moderator will review it shortly.",
+    "appeal_error": "Could not submit your appeal. Please try again.",
+    "appeal_history_heading": "Previous appeals",
+    "appeal_history_empty": "No previous appeals.",
+    "appeal_status_pending": "Under review",
+    "appeal_status_accepted": "Accepted",
+    "appeal_status_rejected": "Rejected",
+    "appeal_status_withdrawn": "Withdrawn",
+    "obs_hidden_by_mod_badge": "Hidden by moderation",
+    "obs_hidden_by_mod_reason_label": "Reason:",
+    "obs_hidden_by_mod_no_reason": "No reason provided.",
+    "obs_hidden_by_mod_appeal_link": "View reason / Appeal"
   },
   "obs_detail": {
     "tabs": {
@@ -614,6 +695,19 @@
     "delete_photo": "Delete photo",
     "save_changes": "Save changes",
     "saved": "Saved.",
+    "manage_date_label": "Date and time",
+    "manage_habitat_label": "Habitat",
+    "manage_weather_label": "Weather",
+    "manage_establishment_label": "Establishment",
+    "manage_tab_location_placeholder": "Location editing coming soon. The mini-map above shows the current pin.",
+    "manage_tab_photos_placeholder": "Photo management coming soon.",
+    "location": {
+      "current_heading": "Current location",
+      "no_location": "This observation has no coordinates set.",
+      "edit_intro": "Drag the pin or type coordinates. If the species is sensitive, the public map will still show only a coarsened area.",
+      "edit_button": "Edit location",
+      "saving": "Saving location…"
+    },
     "errors": {
       "coords_invalid": "Latitude must be between −90 and 90, longitude between −180 and 180.",
       "save_failed": "Save failed. Please try again.",
@@ -1019,6 +1113,7 @@
     "delete_confirm": "Delete this comment? This can't be undone.",
     "comment_deleted": "Comment deleted.",
     "empty_comments": "No comments yet — be the first to chime in.",
+    "thread_locked_banner": "This thread was locked by a moderator.",
     "load_more": "Load more comments",
     "watchlist_title": "Watchlist",
     "no_activity": "No new activity in the last 30 days.",
@@ -1035,7 +1130,7 @@
     "streak_state_broken": "Streak ended",
     "streak_state_none": "Start your first streak",
     "streak_enable_title": "Enable streaks",
-    "streak_enable_body": "Track your daily observation streak. Quality-gated, opt-in, no leaderboards.",
+    "streak_enable_body": "Track your daily observation streak. Quality-gated and opt-in. Community leaderboards are a separate opt-in.",
     "streak_enable_cta": "Enable streaks",
     "streak_enabling": "Enabling…",
     "streak_recompute_failed": "Couldn't enable streaks. Try again in a moment.",
@@ -1728,6 +1823,8 @@
     "karma": "Karma tuning",
     "flags": "Flags (admin)",
     "audit": "Audit log",
+    "anomalies": "Anomalies",
+    "forensics": "Forensics & export",
     "features": "Feature flags",
     "bioblitz": "Bioblitz events",
     "modOverview": "Overview",
@@ -2161,6 +2258,132 @@
     "kb_help_navigation": "Navigation",
     "kb_help_actions": "Actions",
     "kb_escape_close": "Close slide-over",
-    "kb_question_help": "Show this help"
+    "kb_question_help": "Show this help",
+
+    "modAppeals": "Appeals",
+    "mod_appeals_heading": "Ban appeals",
+    "mod_appeals_intro": "Review ban appeals submitted by suspended users.",
+    "mod_appeals_filter_pending": "Pending",
+    "mod_appeals_filter_all": "All",
+    "mod_appeals_loading": "Loading appeals…",
+    "mod_appeals_empty": "No appeals match.",
+    "mod_appeals_select_prompt": "Select an appeal to review.",
+    "mod_appeals_col_user": "User",
+    "mod_appeals_col_ban_reason": "Ban reason",
+    "mod_appeals_col_message": "Appeal message",
+    "mod_appeals_col_status": "Status",
+    "mod_appeals_col_created": "Submitted",
+    "mod_appeals_status_pending": "Pending",
+    "mod_appeals_status_accepted": "Accepted",
+    "mod_appeals_status_rejected": "Rejected",
+    "mod_appeals_status_withdrawn": "Withdrawn",
+    "mod_appeals_action_accept": "Accept appeal (lift ban)",
+    "mod_appeals_action_reject": "Reject appeal",
+    "mod_appeals_reviewer_note_label": "Note to user (optional)",
+    "mod_appeals_kb_nav": "Appeals",
+
+    "anomaliesView": {
+      "title": "Anomaly detections",
+      "description": "Automated rule-based detections from admin_audit. Acknowledged anomalies stay in the log so the audit trail is preserved.",
+      "tabs": {
+        "unacknowledged": "Unacknowledged",
+        "all": "All"
+      },
+      "columns": {
+        "kind": "Kind",
+        "actor": "Actor",
+        "window": "Window",
+        "events": "Events",
+        "details": "Details"
+      },
+      "actions": {
+        "acknowledge": "Acknowledge",
+        "acknowledged": "acknowledged"
+      },
+      "slideOver": {
+        "title": "Acknowledge anomaly",
+        "notes": "Notes (optional)",
+        "submit": "Acknowledge"
+      },
+      "kinds": {
+        "high_rate": "High rate",
+        "bulk_delete": "Bulk destructive",
+        "off_hours": "Off-hours"
+      },
+      "empty": "No anomalies match the current filter."
+    },
+
+    "forensicsView": {
+      "title": "Forensics export",
+      "description": "Filter and export admin_audit rows. CSV is built server-side and the call itself is logged via audit_export.",
+      "filters": {
+        "from": "From",
+        "to": "To",
+        "actor": "Actor (username or uuid)",
+        "op": "Operation",
+        "limit": "Limit"
+      },
+      "actions": {
+        "preview": "Preview",
+        "exportCsv": "Export CSV"
+      },
+      "columns": {
+        "id": "id",
+        "timestamp": "timestamp",
+        "actor": "actor",
+        "op": "op",
+        "target": "target",
+        "details": "details"
+      },
+      "empty": "No matches."
+    },
+
+    "audit_op": {
+      "role_grant": "Role granted",
+      "role_revoke": "Role revoked",
+      "user_ban": "User banned",
+      "user_unban": "User unbanned",
+      "user_delete": "User deleted",
+      "observation_hide": "Observation hidden",
+      "observation_unhide": "Observation unhidden",
+      "observation_obscure": "Observation obscured",
+      "observation_force_unobscure": "Observation force-unobscured",
+      "observation_license_override": "Observation license overridden",
+      "observation_hard_delete": "Observation hard-deleted",
+      "comment_hide": "Comment hidden",
+      "comment_unhide": "Comment unhidden",
+      "comment_lock": "Comment locked",
+      "comment_unlock": "Comment unlocked",
+      "report_triaged": "Report triaged",
+      "report_resolved": "Report resolved",
+      "report_dismissed": "Report dismissed",
+      "badge_award_manual": "Badge awarded (manual)",
+      "badge_revoke": "Badge revoked",
+      "token_force_revoke": "Token force-revoked",
+      "feature_flag_toggle": "Feature flag toggled",
+      "cron_force_run": "Cron force-run",
+      "precise_coords_read": "Precise coords read",
+      "user_pii_read": "User PII read",
+      "token_list_read": "Token list read",
+      "user_audit_read": "User audit read",
+      "appeal_accepted": "Appeal accepted",
+      "appeal_rejected": "Appeal rejected",
+      "taxon_conservation_set": "Taxon conservation set",
+      "ai_credential_create": "AI credential created",
+      "ai_credential_revoke": "AI credential revoked",
+      "ai_credential_rotate": "AI credential rotated",
+      "ai_sponsorship_create": "AI sponsorship created",
+      "ai_sponsorship_pause": "AI sponsorship paused",
+      "ai_sponsorship_unpause": "AI sponsorship unpaused",
+      "ai_sponsorship_revoke": "AI sponsorship revoked",
+      "ai_sponsorship_quota_hit": "AI sponsorship quota hit",
+      "sponsorship_request_create": "Sponsorship request created",
+      "sponsorship_request_approve": "Sponsorship request approved",
+      "sponsorship_request_reject": "Sponsorship request rejected",
+      "sponsorship_request_withdraw": "Sponsorship request withdrawn",
+      "vault_failure": "Vault failure",
+      "anomaly_acknowledge": "Anomaly acknowledged",
+      "audit_export": "Audit export"
+    }
   }
 }

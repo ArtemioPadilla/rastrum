@@ -1,8 +1,9 @@
 # Module 28 — Community discovery
 
-**Status:** v1.0 — implementation in progress (PR4 — Profile → Edit picker + opt-out)
+**Status:** v1.0 — shipped 2026-04-29 (PR1 #92 + PR2 #96 + PR4 #102 + PR5+PR6 atomic landing)
 **Spec source:** `docs/superpowers/specs/2026-04-29-community-discovery-design.md`
 **Plan:** `docs/superpowers/plans/2026-04-29-community-discovery-plan.md`
+**Runbook:** `docs/runbooks/community-discovery.md`
 **Sequenced after:** Module 26 (social graph — provides `follows` table and `FollowButton`).
 
 > **Numbering note.** The plan refers to this module as "Module 27", but
@@ -37,13 +38,13 @@
 
 ## PR sequence
 
-| PR | Scope |
-|---|---|
-| **PR1** | Schema deltas + views + indexes + ISO countries seed + `normalize_country_code` |
-| PR2 | Edge Function `recompute-user-stats` + cron schedule |
-| PR3 | Manual cron fire to backfill all users (operator action) |
-| PR4 | Profile → Edit: country picker + opt-out toggle |
-| PR5+PR6 | Community page + MegaMenu + Mobile drawer + atomic i18n rewrite + tests + roadmap |
+| PR | Status | Scope |
+|---|---|---|
+| **PR1** (#92) | shipped | Schema deltas + dual views + 7 partial indexes + ISO countries seed + `normalize_country_code` |
+| **PR2** (#96) | shipped | Edge Function `recompute-user-stats` + nightly cron + `recompute_user_stats()` SECURITY DEFINER wrapper |
+| PR3 | operator-pending | Manual cron fire to backfill all users (`make db-cron-test` or curl POST against the Edge Function) |
+| **PR4** (#102) | shipped | Profile → Edit: country picker + `hide_from_leaderboards` opt-out + `country_code_source` 'auto'/'user' badge |
+| **PR5+PR6** | shipped (this PR) | `/community/observers/` page (CSR) + filter chips + URL-state serializer + `community_observers_nearby` SQL RPC + MegaMenu split (Biodiversity / Community columns) + MobileDrawer subheading + atomic i18n rewrite of the two production "no leaderboards" strings + OG card + tests + roadmap flip |
 
 ## Risks
 

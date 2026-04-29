@@ -407,7 +407,7 @@ Full spec + plan: [`docs/superpowers/specs/2026-04-28-social-features-design.md`
 
 ---
 
-## Community discovery (Module 28, v1.2 in-flight)
+## Community discovery (Module 28, v1.2 shipped 2026-04-29)
 
 Adds a Community surface to the Explore MegaMenu — Observers / Top / Nearby /
 Experts by taxon / By country — backed by denormalized counters refreshed
@@ -434,7 +434,7 @@ Operator runbook: [`docs/runbooks/community-discovery.md`](runbooks/community-di
 
 ---
 
-## Observation detail page redesign (M03 viewer + owner edit, v1.2 in-flight)
+## Observation detail page redesign (M03 viewer + owner edit, v1.2 shipped 2026-04-29)
 
 `/share/obs/?id=<uuid>` rebuilt as a two-column desktop / stacked mobile
 layout. Three reusable components extracted: `MapPicker.astro` (mode='view'|'edit',

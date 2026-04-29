@@ -197,13 +197,16 @@ const pwa = (tr as unknown as { pwa: Record<string, string> }).pwa;
       }
     });
 
-    window.addEventListener('beforeinstallprompt', (ev) => {
+    window.addEventListener('beforeinstallprompt', async (ev) => {
       ev.preventDefault();
-      // Don't show if already installed (localStorage flag is the fastest check).
-      // This handles the case where the user opens the site in the browser
-      // after having installed the PWA from the home screen — Chrome still
-      // fires beforeinstallprompt in that context.
+      // Don't show if already installed. The fast path is the localStorage
+      // memo + display-mode standalone + android-app intent referrer; the
+      // slow path re-probes Chrome's getInstalledRelatedApps() to catch the
+      // race where beforeinstallprompt fires before the async probe lands
+      // (browser-tab visit after a prior install on the same device).
       if (isPwaInstalled() || isDismissed()) return;
+      await markInstalledIfRelatedAppsKnown();
+      if (isPwaInstalled()) return;
       savedPrompt = ev as InstallPromptEvent;
       cta?.classList.remove('hidden');
     });

@@ -1,0 +1,90 @@
+---
+/**
+ * BanBanner — sticky top banner shown to a currently-banned user.
+ *
+ * Hidden by default; the client-side script unhides it when
+ * getActiveBanForUser() returns a non-null result after auth state change.
+ * Always mounted in BaseLayout so it appears on every page.
+ */
+import { t, getLocalizedPath, routes } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+const { lang } = Astro.props;
+const tr = t(lang);
+const profileTree = tr.profile as unknown as Record<string, string>;
+const appealPath = getLocalizedPath(
+  lang,
+  lang === 'es' ? routes.profileAppeal?.es ?? '/perfil/apelar/' : routes.profileAppeal?.en ?? '/profile/appeal/',
+);
+---
+
+<div
+  id="ban-banner"
+  class="hidden bg-red-600 text-white text-sm py-2 px-4 sticky top-0 z-50 flex flex-wrap items-center gap-2"
+  data-lang={lang}
+  data-msg-tpl={profileTree.ban_banner_message}
+  data-msg-tpl-permanent={profileTree.ban_banner_message_permanent}
+  data-no-reason={profileTree.ban_banner_no_reason}
+  data-appeal-label={profileTree.ban_banner_appeal}
+  data-appeal-path={appealPath}
+  role="alert"
+  aria-live="polite"
+>
+  <span data-ban-message class="flex-1"></span>
+  <a
+    data-ban-appeal-link
+    href={appealPath}
+    class="underline font-semibold ml-2 shrink-0"
+  >{profileTree.ban_banner_appeal} →</a>
+</div>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { getActiveBanForUser } from '../lib/check-ban-status';
+
+  async function paintBanBanner() {
+    const banner = document.getElementById('ban-banner');
+    if (!banner) return;
+
+    let supabase;
+    try { supabase = getSupabase(); } catch { return; }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const ban = await getActiveBanForUser(user.id).catch(() => null);
+    if (!ban) return;
+
+    const msgEl = banner.querySelector<HTMLElement>('[data-ban-message]');
+    if (!msgEl) return;
+
+    const reason = ban.reason || (banner.dataset.noReason ?? '');
+    let msg: string;
+    if (ban.expires_at) {
+      const date = new Date(ban.expires_at).toLocaleDateString(
+        banner.dataset.lang === 'es' ? 'es' : 'en',
+        { dateStyle: 'medium' },
+      );
+      msg = (banner.dataset.msgTpl ?? 'Account suspended until {date}. Reason: {reason}.')
+        .replace('{date}', date)
+        .replace('{reason}', reason);
+    } else {
+      msg = (banner.dataset.msgTplPermanent ?? 'Account permanently suspended. Reason: {reason}.')
+        .replace('{reason}', reason);
+    }
+
+    msgEl.textContent = msg;
+    banner.classList.remove('hidden');
+  }
+
+  // Run on page load and on auth state changes.
+  paintBanBanner().catch(() => { /* env not configured */ });
+  try {
+    const supabase = getSupabase();
+    supabase.auth.onAuthStateChange(() => {
+      paintBanBanner().catch(() => { /* noop */ });
+    });
+  } catch { /* env not configured */ }
+</script>

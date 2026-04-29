@@ -1,0 +1,515 @@
+// Owner-only Manage panel logic for the obs detail page. Extracted from
+// the inline `wireManagePanel(...)` that lived in
+// `src/pages/share/obs/index.astro` so the Details tab fields can be
+// covered by unit tests and so PR5 / PR6 can extend with Location +
+// Photos handlers without bloating the page script.
+//
+// Material-edit detection happens server-side via the
+// `observations_material_edit_check` BEFORE UPDATE trigger (PR2). The
+// client only issues plain `update(...)` calls — no application-side
+// flagging is needed.
+
+import { getSupabase } from './supabase';
+import { willDemote, type PhotoForDeletion } from './photo-deletion';
+import { resizeImage, uploadMedia } from './upload';
+import { escapeHtml as escAttr } from './escape';
+import { t } from '../i18n/utils';
+
+type Ident = { scientific_name?: string; is_primary?: boolean } | undefined;
+
+type SaveCopy = {
+  saving: string;
+  delete_confirm: string;
+};
+
+/**
+ * Format an ISO timestamp ("2026-04-29T18:30:00Z") for an
+ * `<input type="datetime-local">` value in the browser's local TZ
+ * ("2026-04-29T11:30").
+ */
+export function isoToLocalDatetimeInput(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/**
+ * Convert a `<input type="datetime-local">` value (browser-local) to a
+ * UTC ISO string ready for a Postgres `timestamptz` column.
+ */
+export function localDatetimeInputToIso(local: string | null | undefined): string | null {
+  if (!local) return null;
+  const d = new Date(local);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString();
+}
+
+type DetailsFormPayload = {
+  notes: string | null;
+  obscure_level: string;
+  observed_at: string | null;
+  habitat: string | null;
+  weather: string | null;
+  establishment_means: string | null;
+};
+
+/**
+ * Build the partial `observations` row for an UPDATE. Empty strings
+ * collapse to `null` so the column clears rather than storing "". The
+ * `observed_at` field is omitted from the returned object when the
+ * input value is empty so the existing column value isn't nulled
+ * accidentally.
+ */
+export function buildDetailsUpdatePayload(form: {
+  notes: string;
+  obscure_level: string;
+  observed_at_local: string;
+  habitat: string;
+  weather: string;
+  establishment_means: string;
+}): Partial<DetailsFormPayload> & { updated_at: string } {
+  const out: Partial<DetailsFormPayload> & { updated_at: string } = {
+    notes: form.notes.trim() || null,
+    obscure_level: form.obscure_level || 'none',
+    habitat: form.habitat || null,
+    weather: form.weather || null,
+    establishment_means: form.establishment_means || null,
+    updated_at: new Date().toISOString(),
+  };
+  const iso = localDatetimeInputToIso(form.observed_at_local);
+  if (iso) out.observed_at = iso;
+  return out;
+}
+
+/**
+ * Wire the Details tab of `ObsManagePanel.astro`. Pre-populates every
+ * field from the loaded observation, then attaches submit / delete
+ * handlers that round-trip changes through Supabase.
+ */
+export async function wireManagePanelDetails(
+  obsId: string,
+  obs: Record<string, unknown>,
+  _ident: Ident,
+): Promise<void> {
+  const supabase = getSupabase();
+  const panel = document.getElementById('manage-panel');
+  if (!panel) return;
+  panel.classList.remove('hidden');
+
+  const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
+  const copy: SaveCopy = lang === 'es'
+    ? {
+        saving: 'Guardando…',
+        delete_confirm: '¿Eliminar esta observación? Esta acción no se puede deshacer. Las fotos, identificaciones y metadatos se eliminarán.',
+      }
+    : {
+        saving: 'Saving…',
+        delete_confirm: 'Delete this observation? This cannot be undone. Photos, identifications, and metadata will all be removed.',
+      };
+
+  const sciInput   = document.getElementById('m-sci')           as HTMLInputElement | null;
+  const notesEl    = document.getElementById('m-notes')         as HTMLTextAreaElement | null;
+  const obsEl      = document.getElementById('m-obscure')       as HTMLSelectElement | null;
+  const observedAt = document.getElementById('m-observed-at')   as HTMLInputElement | null;
+  const habitatEl  = document.getElementById('m-habitat')       as HTMLSelectElement | null;
+  const weatherEl  = document.getElementById('m-weather')       as HTMLSelectElement | null;
+  const estabEl    = document.getElementById('m-establishment') as HTMLSelectElement | null;
+  const errEl      = document.getElementById('m-error');
+  const savedEl    = document.getElementById('m-saved');
+  const saveBtn    = document.getElementById('m-save')          as HTMLButtonElement | null;
+  const deleteBtn  = document.getElementById('m-delete')        as HTMLButtonElement | null;
+  const form       = document.getElementById('manage-form')     as HTMLFormElement | null;
+
+  if (sciInput)   sciInput.value   = '';
+  if (notesEl)    notesEl.value    = (obs.notes as string | null) ?? '';
+  if (obsEl)      obsEl.value      = (obs.obscure_level as string) ?? 'none';
+  if (observedAt) observedAt.value = isoToLocalDatetimeInput(obs.observed_at as string | null | undefined);
+  if (habitatEl)  habitatEl.value  = (obs.habitat as string | null) ?? '';
+  if (weatherEl)  weatherEl.value  = (obs.weather as string | null) ?? '';
+  if (estabEl)    estabEl.value    = (obs.establishment_means as string | null) ?? '';
+
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!saveBtn) return;
+    errEl?.classList.add('hidden');
+    savedEl?.classList.add('hidden');
+    saveBtn.disabled = true;
+    const origLabel = saveBtn.textContent ?? 'Save';
+    saveBtn.textContent = copy.saving;
+    try {
+      const payload = buildDetailsUpdatePayload({
+        notes: notesEl?.value ?? '',
+        obscure_level: obsEl?.value ?? 'none',
+        observed_at_local: observedAt?.value ?? '',
+        habitat: habitatEl?.value ?? '',
+        weather: weatherEl?.value ?? '',
+        establishment_means: estabEl?.value ?? '',
+      });
+      const { error: obsErr } = await supabase
+        .from('observations')
+        .update(payload)
+        .eq('id', obsId);
+      if (obsErr) throw obsErr;
+
+      const sci = sciInput?.value.trim();
+      if (sci) {
+        await supabase.from('identifications')
+          .update({ is_primary: false })
+          .eq('observation_id', obsId)
+          .eq('is_primary', true);
+        const { data: { user: viewer } } = await supabase.auth.getUser();
+        const { error: idErr } = await supabase.from('identifications').insert({
+          observation_id: obsId,
+          scientific_name: sci,
+          confidence: 0.95,
+          source: 'human',
+          is_primary: true,
+          validated_by: null,
+          validated_at: new Date().toISOString(),
+          raw_response: { manual_override: true, by: viewer?.id ?? null },
+        });
+        if (idErr) throw idErr;
+      }
+
+      savedEl?.classList.remove('hidden');
+      const speciesEl = document.getElementById('species');
+      if (sci && speciesEl) speciesEl.textContent = sci;
+    } catch (err) {
+      if (errEl) {
+        errEl.textContent = err instanceof Error ? err.message : String(err);
+        errEl.classList.remove('hidden');
+      }
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = origLabel;
+    }
+  });
+
+  deleteBtn?.addEventListener('click', async () => {
+    const confirmed = window.confirm(copy.delete_confirm);
+    if (!confirmed) return;
+    deleteBtn.disabled = true;
+    try {
+      const { data, error: invokeErr } = await supabase.functions.invoke<{
+        ok: boolean; r2_deleted?: number; r2_errors?: unknown[]; error?: string;
+      }>('delete-observation', {
+        body: { observation_id: obsId },
+      });
+      if (invokeErr) throw invokeErr;
+      if (data && !data.ok) throw new Error(data.error ?? 'Delete failed');
+      window.location.href = `/${lang}/${lang === 'es' ? 'perfil/observaciones' : 'profile/observations'}/`;
+    } catch (err) {
+      if (errEl) {
+        errEl.textContent = err instanceof Error ? err.message : String(err);
+        errEl.classList.remove('hidden');
+      }
+      deleteBtn.disabled = false;
+    }
+  });
+}
+
+type PhotoRow = PhotoForDeletion & {
+  url: string;
+  thumbnail_url: string | null;
+  sort_order: number | null;
+};
+
+type PhotosCopy = {
+  delete_confirm_demote: string;
+  delete_confirm_simple: string;
+  upload_failed: string;
+  uploading: string;
+  delete_photo_aria: string;
+};
+
+/**
+ * Wire the Photos tab of `ObsManagePanel.astro`. Renders a thumbnail grid
+ * with per-photo delete buttons and an "Add photo" affordance that
+ * round-trips through the existing R2 upload flow.
+ *
+ * Delete flow:
+ *   1. Compute willDemote() locally to drive the confirm dialog copy.
+ *   2. Call the `delete-photo` Edge Function which wraps soft-delete +
+ *      ID demote + last_material_edit_at bump in one transaction.
+ *   3. Re-render grid + dispatch `rastrum:photos-ready` so the PhotoGallery
+ *      lightbox refreshes.
+ *
+ * Add-photo flow:
+ *   1. Hidden <input type="file"> click → resize → uploadMedia (R2 if
+ *      configured, else Supabase Storage).
+ *   2. INSERT a media_files row with sort_order = max+1, is_primary=false.
+ *   3. Re-render + dispatch `rastrum:photos-ready`.
+ *
+ * The lightbox's owner-mode "Delete photo" button dispatches
+ * `rastrum:photogallery-delete`; this function listens for that event
+ * and re-routes through the same delete pipeline.
+ */
+export async function wireManagePanelPhotos(obsId: string): Promise<void> {
+  const supabase = getSupabase();
+  const grid     = document.getElementById('m-photos-grid');
+  const empty    = document.getElementById('m-photos-empty');
+  const errEl    = document.getElementById('m-photos-error');
+  const addBtn   = document.getElementById('m-photos-add')        as HTMLButtonElement | null;
+  const fileIn   = document.getElementById('m-photos-file-input') as HTMLInputElement  | null;
+  const busyEl   = document.getElementById('m-photos-busy');
+  if (!grid || !addBtn || !fileIn) return;
+
+  const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
+  const copy: PhotosCopy = lang === 'es'
+    ? {
+        delete_confirm_demote: 'Esta foto fue la base de la identificación actual. Eliminarla marcará la observación como pendiente de revisión. ¿Continuar?',
+        delete_confirm_simple: '¿Eliminar esta foto?',
+        upload_failed:         'Subida de foto fallida. Intenta de nuevo.',
+        uploading:             'Subiendo…',
+        delete_photo_aria:     'Eliminar foto',
+      }
+    : {
+        delete_confirm_demote: 'This photo was the basis for the current identification. Deleting it will mark the observation as needing review. Continue?',
+        delete_confirm_simple: 'Delete this photo?',
+        upload_failed:         'Photo upload failed. Please try again.',
+        uploading:             'Uploading…',
+        delete_photo_aria:     'Delete photo',
+      };
+
+  let allPhotos: PhotoRow[] = [];
+
+  function setError(msg: string | null): void {
+    if (!errEl) return;
+    if (!msg) { errEl.classList.add('hidden'); errEl.textContent = ''; return; }
+    errEl.textContent = msg;
+    errEl.classList.remove('hidden');
+  }
+
+  function setBusy(msg: string | null): void {
+    if (!busyEl) return;
+    if (!msg) { busyEl.classList.add('hidden'); busyEl.textContent = ''; return; }
+    busyEl.textContent = msg;
+    busyEl.classList.remove('hidden');
+  }
+
+  function renderGrid(): void {
+    const active = allPhotos.filter((p) => p.deleted_at == null);
+    if (empty) empty.classList.toggle('hidden', active.length > 0);
+    grid!.innerHTML = active.map((p) => {
+      const src   = p.thumbnail_url ?? p.url;
+      const aria  = escAttr(copy.delete_photo_aria);
+      const idAt  = escAttr(p.id);
+      const srcAt = escAttr(src);
+      const cascadeBadge = p.is_primary
+        ? '<span class="absolute top-1 left-1 rounded bg-emerald-700/85 text-white text-[10px] font-semibold px-1.5 py-0.5 uppercase tracking-wide">★</span>'
+        : '';
+      return `<div class="relative group">
+        <img src="${srcAt}" alt="" class="aspect-square w-full object-cover rounded-md border border-zinc-200 dark:border-zinc-800" loading="lazy" decoding="async" />
+        ${cascadeBadge}
+        <button type="button" data-delete-photo="${idAt}" aria-label="${aria}" class="absolute top-1 right-1 rounded-full bg-black/60 hover:bg-red-600 text-white w-6 h-6 inline-flex items-center justify-center text-xs leading-none transition-colors">×</button>
+      </div>`;
+    }).join('');
+    grid!.querySelectorAll<HTMLButtonElement>('[data-delete-photo]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.deletePhoto;
+        if (id) void handleDelete(id);
+      });
+    });
+  }
+
+  function broadcastPhotos(): void {
+    const active = allPhotos.filter((p) => p.deleted_at == null);
+    window.dispatchEvent(new CustomEvent('rastrum:photos-ready', {
+      detail: {
+        photos: active.map((p) => ({
+          id: p.id, url: p.url, thumbnail_url: p.thumbnail_url, caption: null,
+        })),
+        galleryId: 'obs-detail',
+      },
+    }));
+  }
+
+  async function refresh(): Promise<void> {
+    const { data, error } = await supabase
+      .from('media_files')
+      .select('id, url, thumbnail_url, is_primary, sort_order, deleted_at')
+      .eq('observation_id', obsId)
+      .order('is_primary', { ascending: false })
+      .order('sort_order', { ascending: true });
+    if (error) {
+      setError(error.message);
+      allPhotos = [];
+    } else {
+      allPhotos = (data ?? []) as PhotoRow[];
+    }
+    renderGrid();
+    broadcastPhotos();
+  }
+
+  async function handleDelete(mediaId: string): Promise<void> {
+    setError(null);
+    const demote = willDemote(allPhotos, mediaId);
+    const msg = demote ? copy.delete_confirm_demote : copy.delete_confirm_simple;
+    if (!window.confirm(msg)) return;
+
+    const { data, error } = await supabase.functions.invoke<{ ok: boolean; error?: string }>(
+      'delete-photo',
+      { body: { observation_id: obsId, media_id: mediaId, will_demote: demote } },
+    );
+    if (error) { setError(error.message); return; }
+    if (data && !data.ok) { setError(data.error ?? 'Delete failed'); return; }
+    await refresh();
+  }
+
+  addBtn.addEventListener('click', () => fileIn.click());
+  fileIn.addEventListener('change', async () => {
+    const files = Array.from(fileIn.files ?? []);
+    if (files.length === 0) return;
+    setError(null);
+    setBusy(copy.uploading);
+    addBtn.disabled = true;
+    try {
+      // Determine starting sort_order so new photos append after existing ones.
+      const maxSort = allPhotos.reduce((acc, p) => {
+        const so = p.sort_order ?? 0;
+        return so > acc ? so : acc;
+      }, 0);
+
+      let nextSort = maxSort + 1;
+      for (const file of files) {
+        const blob   = await resizeImage(file);
+        const newId  = (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        const key    = `observations/${obsId}/${newId}.jpg`;
+        const url    = await uploadMedia(blob, key, 'image/jpeg');
+        const { error: insertErr } = await supabase.from('media_files').insert({
+          id:               newId,
+          observation_id:   obsId,
+          media_type:       'photo',
+          url,
+          mime_type:        'image/jpeg',
+          file_size_bytes:  blob.size,
+          sort_order:       nextSort,
+          is_primary:       false,
+        });
+        if (insertErr) throw insertErr;
+        nextSort += 1;
+      }
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : copy.upload_failed);
+    } finally {
+      addBtn.disabled = false;
+      setBusy(null);
+      fileIn.value = '';
+    }
+  });
+
+  // Lightbox owner-mode delete button dispatches this from PhotoGallery.
+  window.addEventListener('rastrum:photogallery-delete', (e) => {
+    const detail = (e as CustomEvent<{ photoId?: string; galleryId?: string }>).detail;
+    if (!detail || !detail.photoId) return;
+    if ((detail.galleryId ?? 'default') !== 'obs-detail') return;
+    void handleDelete(detail.photoId);
+  });
+
+  await refresh();
+}
+
+/**
+ * Build the WKT geography literal Postgres expects for a `geography(POINT,4326)`
+ * column. Note longitude precedes latitude per PostGIS / GeoJSON convention,
+ * matching how `src/lib/sync.ts` and `ObservationForm.astro` write coords.
+ */
+export function pointGeographyLiteral(lat: number, lng: number): string {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    throw new Error('coords_invalid');
+  }
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    throw new Error('coords_invalid');
+  }
+  return `SRID=4326;POINT(${lng} ${lat})`;
+}
+
+/**
+ * Wire the Location tab of `ObsManagePanel.astro`. Listens for the
+ * `rastrum:mappicker-save` event with `detail.id === 'obs-detail-edit'`,
+ * UPDATEs `observations.location`, and lets the existing
+ * `observations_material_edit_check_trg` trigger flag
+ * `last_material_edit_at` for moves > 1 km. The trigger is server-side,
+ * so no application flag is set here.
+ *
+ * RLS gates the UPDATE on `auth.uid() = observer_id`, so non-owners can't
+ * land here even if they spoof the event.
+ */
+export async function wireManagePanelLocation(
+  obsId: string,
+  obs: Record<string, unknown>,
+): Promise<void> {
+  const supabase = getSupabase();
+  const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
+  const isEs = lang === 'es';
+  const errCopy = isEs
+    ? { saveFailed: 'No se pudo guardar la ubicación.', invalidCoords: 'Coordenadas no válidas.' }
+    : { saveFailed: 'Failed to save location.',         invalidCoords: 'Invalid coordinates.' };
+
+  // Pre-populate both pickers (view + edit modal) with the current coords
+  // pulled off the loaded observation. The location is a GeoJSON Point;
+  // PostgREST returns it as { coordinates: [lng, lat] }.
+  const loc = obs.location as { coordinates?: [number, number] } | null | undefined;
+  const coords = loc?.coordinates;
+  if (Array.isArray(coords) && coords.length >= 2) {
+    const lng = coords[0];
+    const lat = coords[1];
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      window.dispatchEvent(new CustomEvent('rastrum:mappicker-set', {
+        detail: { id: 'obs-detail-loc-view', coords: { lat, lng } },
+      }));
+      window.dispatchEvent(new CustomEvent('rastrum:mappicker-set-initial', {
+        detail: { id: 'obs-detail-edit', coords: { lat, lng } },
+      }));
+      const coordsEl = document.querySelector<HTMLElement>('[data-loc-coords]');
+      if (coordsEl) coordsEl.textContent = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    }
+  } else {
+    const coordsEl = document.querySelector<HTMLElement>('[data-loc-coords]');
+    const tree = t(lang) as { obs_detail: { location: { no_location: string } } };
+    if (coordsEl) coordsEl.textContent = tree.obs_detail.location.no_location;
+  }
+
+  const savingEl = document.getElementById('m-loc-saving');
+  const savedEl  = document.getElementById('m-loc-saved');
+  const errEl    = document.getElementById('m-loc-error');
+
+  window.addEventListener('rastrum:mappicker-save', async (ev) => {
+    const e = ev as CustomEvent<{ id: string; coords: { lat: number; lng: number } }>;
+    if (e.detail.id !== 'obs-detail-edit') return;
+    errEl?.classList.add('hidden');
+    savedEl?.classList.add('hidden');
+    savingEl?.classList.remove('hidden');
+    try {
+      const literal = pointGeographyLiteral(e.detail.coords.lat, e.detail.coords.lng);
+      const { error } = await supabase
+        .from('observations')
+        .update({ location: literal, updated_at: new Date().toISOString() })
+        .eq('id', obsId);
+      if (error) throw error;
+
+      window.dispatchEvent(new CustomEvent('rastrum:mappicker-set', {
+        detail: { id: 'obs-detail-loc-view', coords: e.detail.coords },
+      }));
+      window.dispatchEvent(new CustomEvent('rastrum:mappicker-set-initial', {
+        detail: { id: 'obs-detail-edit', coords: e.detail.coords },
+      }));
+      const coordsEl = document.querySelector<HTMLElement>('[data-loc-coords]');
+      if (coordsEl) coordsEl.textContent = `${e.detail.coords.lat.toFixed(4)}, ${e.detail.coords.lng.toFixed(4)}`;
+      savedEl?.classList.remove('hidden');
+    } catch (err) {
+      const code = err instanceof Error ? err.message : String(err);
+      if (errEl) {
+        errEl.textContent = code === 'coords_invalid' ? errCopy.invalidCoords : errCopy.saveFailed;
+        errEl.classList.remove('hidden');
+      }
+    } finally {
+      savingEl?.classList.add('hidden');
+    }
+  });
+}
