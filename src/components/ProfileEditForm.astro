@@ -44,7 +44,8 @@ const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } })
       <select id="country_code" name="country_code" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
         <option value="">{tr.profile.country_any}</option>
       </select>
-      <p class="mt-1 text-xs text-zinc-500">{tr.profile.country_hint}</p>
+      <p class="mt-1 text-xs text-zinc-500" data-country-hint>{tr.profile.country_hint}</p>
+      <p class="mt-1 hidden text-xs text-amber-700 dark:text-amber-400" data-country-load-error>{tr.profile.country_load_error}</p>
     </div>
     <div>
       <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.profile.avatar_url}</label>
@@ -462,13 +463,22 @@ const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } })
   async function populateCountryOptions(supabase: ReturnType<typeof getSupabase>, selectedCode: string | null) {
     const select = form?.elements.namedItem('country_code') as HTMLSelectElement | null;
     if (!select) return;
+    const errEl  = document.querySelector<HTMLElement>('[data-country-load-error]');
+    const hintEl = document.querySelector<HTMLElement>('[data-country-hint]');
     const isEs = document.documentElement.lang === 'es';
     const nameCol: 'name_es' | 'name_en' = isEs ? 'name_es' : 'name_en';
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('iso_countries')
       .select('code, name_en, name_es')
       .order(nameCol, { ascending: true });
-    const rows = (data ?? []) as IsoCountry[];
+    if (error || !data || data.length === 0) {
+      // Network/RLS failure or empty seed — surface a load-error hint so the
+      // user doesn't see an empty select and assume there are no options.
+      errEl?.classList.remove('hidden');
+      hintEl?.classList.add('hidden');
+      return;
+    }
+    const rows = data as IsoCountry[];
     const frag = document.createDocumentFragment();
     for (const row of rows) {
       const opt = document.createElement('option');
@@ -514,6 +524,17 @@ const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } })
       inferredBadge.classList.toggle('hidden', !shouldShowInferredCountryBadge(profile));
     }
 
+    // The inferred-country badge is meaningful only when a country is set.
+    // If the user clears the picker, hide the badge optimistically — saving
+    // will flip country_code_source to 'user' regardless, but this gives
+    // immediate UI feedback so they don't see "inferred" pinned to an empty
+    // field while editing.
+    const countrySelect = form.elements.namedItem('country_code') as HTMLSelectElement | null;
+    countrySelect?.addEventListener('change', () => {
+      if (!inferredBadge) return;
+      if (!countrySelect.value) inferredBadge.classList.add('hidden');
+    });
+
     syncCommunityVisibleEnabled(Boolean(profile.profile_public));
   }
 
@@ -543,6 +564,8 @@ const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } })
       streak_digest_opt_in: data.get('streak_digest_opt_in') === 'on',
       ...buildCommunityDiscoveryPayload({
         country_code:       ((data.get('country_code') as string) ?? '').trim(),
+        // UI-true ("Show me…") inverts to DB-false (hide_from_leaderboards).
+        // Inversion happens inside buildCommunityDiscoveryPayload.
         community_visible:  data.get('community_visible') === 'on',
       }),
       // updated_at is bumped server-side by the users_touch_updated_at
