@@ -6,6 +6,7 @@ import SuggestIdModal from './SuggestIdModal.astro';
 import ReactionStrip from './ReactionStrip.astro';
 import PhotoGallery from './PhotoGallery.astro';
 import MapPicker from './MapPicker.astro';
+import ObsManagePanel from './ObsManagePanel.astro';
 import { t } from '../i18n/utils';
 
 interface Props {
@@ -27,6 +28,8 @@ type ObsDetailTree = {
 const tr = t(lang) as { obs_detail: ObsDetailTree };
 const v  = tr.obs_detail.view;
 
+// Labels still consumed by ShareObsView itself. Manage-panel labels
+// moved into ObsManagePanel.astro in PR4.
 const labels = {
   loading:           v.loading,
   region:            v.region,
@@ -43,20 +46,6 @@ const labels = {
   suggestBtn:        v.suggest_btn,
   signInToSuggest:   v.signin_to_suggest,
   ownerNote:         v.owner_note,
-  manageHeading:     v.manage_heading,
-  managePrivate:     v.manage_private,
-  scientificName:    v.scientific_name,
-  scientificHelp:    v.scientific_help,
-  notes:             v.notes,
-  locationPrivacy:   v.location_privacy,
-  privacyShow:       v.privacy_show,
-  privacy10km:       v.privacy_10km,
-  privacy20km:       v.privacy_20km,
-  privacy5km:        v.privacy_5km,
-  privacyHide:       v.privacy_hide,
-  deleteObs:         v.delete_obs,
-  saveChanges:       tr.obs_detail.save_changes,
-  saved:             tr.obs_detail.saved,
   editLocation:      tr.obs_detail.edit_location,
   editedBadge:       tr.obs_detail.edited_badge,
 };
@@ -173,42 +162,7 @@ const labels = {
           <ul id="ci-list" class="space-y-1.5 text-sm"></ul>
         </section>
 
-        {/*
-          Manage panel placeholder — PR4 fills in the Details tab. For PR3
-          the existing inline 3-field form below is preserved unchanged so
-          owner edit continues to work; PR4 replaces it with ObsManagePanel.
-        */}
-        <section id="manage-panel" class="hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 space-y-3">
-          <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">{labels.manageHeading}</h2>
-          <p class="text-xs text-zinc-500 dark:text-zinc-400">{labels.managePrivate}</p>
-          <form id="manage-form" class="space-y-3" novalidate>
-            <div>
-              <label for="m-sci" class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{labels.scientificName}</label>
-              <input id="m-sci" type="text" autocomplete="off" placeholder="e.g. Quercus oleoides" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm font-mono italic" />
-              <p class="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">{labels.scientificHelp}</p>
-            </div>
-            <div>
-              <label for="m-notes" class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{labels.notes}</label>
-              <textarea id="m-notes" rows="3" maxlength="2000" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm"></textarea>
-            </div>
-            <div>
-              <label for="m-obscure" class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{labels.locationPrivacy}</label>
-              <select id="m-obscure" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
-                <option value="none">{labels.privacyShow}</option>
-                <option value="0.1deg">{labels.privacy10km}</option>
-                <option value="0.2deg">{labels.privacy20km}</option>
-                <option value="5km">{labels.privacy5km}</option>
-                <option value="full">{labels.privacyHide}</option>
-              </select>
-            </div>
-            <p id="m-error" class="hidden text-xs text-red-600 dark:text-red-400" role="alert"></p>
-            <p id="m-saved" class="hidden text-xs text-emerald-700 dark:text-emerald-400" aria-live="polite">{labels.saved}</p>
-            <div class="flex flex-wrap items-center gap-2 pt-2">
-              <button type="submit" id="m-save" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{labels.saveChanges}</button>
-              <button type="button" id="m-delete" class="rounded-lg border border-red-300 dark:border-red-800 px-4 py-2 text-sm font-medium text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">{labels.deleteObs}</button>
-            </div>
-          </form>
-        </section>
+        <ObsManagePanel lang={lang} />
 
         <div id="social-mount" class="hidden">
           <Comments lang={lang} observationId={obsIdPlaceholder} />
