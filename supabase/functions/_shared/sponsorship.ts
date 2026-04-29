@@ -1,7 +1,13 @@
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { sendEmail } from './email.ts';
 
 export type Provider = 'anthropic';
 export type CredentialKind = 'api_key' | 'oauth_token';
+
+function escHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
 
 export interface ResolvedSponsorship {
   sponsorshipId: string;
@@ -125,20 +131,38 @@ export async function maybeNotifyThreshold(
   if (!ctx) return;
   const sCtx = ctx as { sponsor_id: string; beneficiary_id: string; monthly_call_cap: number };
 
-  const { data: sponsor }     = await supabase.from('users').select('id,display_name,username').eq('id', sCtx.sponsor_id).single();
-  const { data: beneficiary } = await supabase.from('users').select('username').eq('id', sCtx.beneficiary_id).single();
+  const { data: sponsor }     = await supabase.from('users').select('id,email,display_name,username').eq('id', sCtx.sponsor_id).single();
+  const { data: beneficiary } = await supabase.from('users').select('username,display_name').eq('id', sCtx.beneficiary_id).single();
   if (!sponsor || !beneficiary) return;
 
-  const sponsorDisplay = (sponsor as { display_name?: string | null; username: string }).display_name
-                       ?? (sponsor as { username: string }).username;
-  const beneficiaryUsername = (beneficiary as { username: string }).username;
+  const sponsorEmail = (sponsor as { email?: string | null }).email;
+  if (!sponsorEmail) return;
 
-  // For v1, log the event at warn level. The existing Resend SMTP worker can
-  // pick this up later; auth's email infra is the next iteration.
-  // allowed: log level + no secret
-  console.warn(
-    `[sponsorships] threshold ${threshold}% — notify ${sponsorDisplay} re @${beneficiaryUsername} (sponsorship ${sponsorshipId})`
-  );
+  const sponsorDisplay     = (sponsor as { display_name?: string | null; username: string }).display_name
+                          ?? (sponsor as { username: string }).username;
+  const beneficiaryHandle  = (beneficiary as { username: string }).username;
+  const beneficiaryDisplay = (beneficiary as { display_name?: string | null; username: string }).display_name
+                          ?? beneficiaryHandle;
+
+  const subject = threshold === 100
+    ? `Rastrum: @${beneficiaryHandle} reached 100% of their AI quota this month`
+    : `Rastrum: @${beneficiaryHandle} is at ${threshold}% of their AI quota this month`;
+
+  const html = `<!doctype html>
+<html><body style="font-family:system-ui,sans-serif;max-width:560px;margin:auto;padding:24px;color:#18181b">
+  <h2 style="color:#10b981">Rastrum — AI sponsorship threshold</h2>
+  <p>Hi ${escHtml(sponsorDisplay)},</p>
+  <p><strong>${escHtml(beneficiaryDisplay)} (@${escHtml(beneficiaryHandle)})</strong> has used <strong>${threshold}%</strong> of the ${sCtx.monthly_call_cap} AI calls you sponsored this month.</p>
+  ${threshold === 100
+    ? `<p>Their access to Claude is now <strong>cut off</strong> until the 1st of next month. They'll fall back to PlantNet (free) and on-device models.</p>`
+    : `<p>You'll get one more email when they hit 100%.</p>`}
+  <p>Manage their cap or revoke at <a href="https://rastrum.org/en/profile/sponsoring/" style="color:#10b981">rastrum.org/profile/sponsoring</a>.</p>
+  <p style="color:#71717a;font-size:12px;margin-top:24px">You receive this because you patrocinate @${escHtml(beneficiaryHandle)} on Rastrum.</p>
+</body></html>`;
+
+  const text = `${sponsorDisplay},\n\n@${beneficiaryHandle} has used ${threshold}% of the ${sCtx.monthly_call_cap} AI calls you sponsored this month.\n\nManage at https://rastrum.org/en/profile/sponsoring/`;
+
+  await sendEmail({ to: sponsorEmail, subject, html, text });
 }
 
 export async function checkAndBumpRateLimit(
@@ -185,4 +209,32 @@ export async function autoPauseSponsorship(
     reason,
     after:       { status: 'paused', source: 'edge_function:identify' },
   });
+
+  try {
+    const { data: spons } = await supabase
+      .from('sponsorships').select('sponsor_id, beneficiary_id').eq('id', sponsorshipId).single();
+    if (!spons) return;
+    const s = spons as { sponsor_id: string; beneficiary_id: string };
+    const { data: sponsor }     = await supabase.from('users').select('email,display_name,username').eq('id', s.sponsor_id).single();
+    const { data: beneficiary } = await supabase.from('users').select('username,display_name').eq('id', s.beneficiary_id).single();
+    if (!sponsor || !beneficiary) return;
+    const sponsorEmail = (sponsor as { email?: string | null }).email;
+    if (!sponsorEmail) return;
+    const sponsorDisplay     = (sponsor as { display_name?: string | null; username: string }).display_name ?? (sponsor as { username: string }).username;
+    const beneficiaryHandle  = (beneficiary as { username: string }).username;
+    const beneficiaryDisplay = (beneficiary as { display_name?: string | null; username: string }).display_name ?? beneficiaryHandle;
+
+    const subject = `Rastrum: auto-paused @${beneficiaryHandle} for "${reason}"`;
+    const html = `<!doctype html>
+<html><body style="font-family:system-ui,sans-serif;max-width:560px;margin:auto;padding:24px;color:#18181b">
+  <h2 style="color:#f59e0b">Rastrum — sponsorship auto-paused</h2>
+  <p>Hi ${escHtml(sponsorDisplay)},</p>
+  <p>We auto-paused your sponsorship of <strong>${escHtml(beneficiaryDisplay)} (@${escHtml(beneficiaryHandle)})</strong> because of: <code>${escHtml(reason)}</code></p>
+  <p>Most common cause: rate-limit (more than 30 calls in 10 minutes). The sponsorship stays paused until you reactivate it.</p>
+  <p><a href="https://rastrum.org/en/profile/sponsoring/" style="color:#10b981">Review and reactivate at rastrum.org/profile/sponsoring</a></p>
+  <p style="color:#71717a;font-size:12px;margin-top:24px">You can also revoke the sponsorship from that page.</p>
+</body></html>`;
+    const text = `${sponsorDisplay},\n\nWe auto-paused your sponsorship of @${beneficiaryHandle} because of: ${reason}\n\nReactivate or revoke at https://rastrum.org/en/profile/sponsoring/`;
+    await sendEmail({ to: sponsorEmail, subject, html, text });
+  } catch { /* best-effort */ }
 }

@@ -37,3 +37,15 @@ export interface SponsorshipUsage {
   currentMonthByDay: Record<string, { calls: number; tokens_in: number; tokens_out: number }>;
   pastMonths: Array<{ year_month: string; calls: number; tokens_in: number | null; tokens_out: number | null }>;
 }
+
+export type SponsorshipRequestStatus = 'pending' | 'approved' | 'rejected' | 'withdrawn';
+
+export interface SponsorshipRequest {
+  id:                string;
+  requester_id:      string;
+  target_sponsor_id: string;
+  message:           string | null;
+  status:            SponsorshipRequestStatus;
+  created_at:        string;
+  responded_at:      string | null;
+}

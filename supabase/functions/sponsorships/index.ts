@@ -427,5 +427,148 @@ serve(async (req) => {
     }
   }
 
+  // POST /requests — beneficiary creates a request to a sponsor by username
+  if (req.method === 'POST' && path === '/requests') {
+    const body = await req.json().catch(() => ({}));
+    const { sponsor_username, message } = body as { sponsor_username?: string; message?: string };
+    if (!sponsor_username) return jsonResponse(400, { error: 'sponsor_username_required' });
+    if (message && message.length > 280) return jsonResponse(400, { error: 'message_too_long' });
+
+    const { data: target } = await supabase.from('users').select('id').eq('username', sponsor_username).single();
+    if (!target) return jsonResponse(404, { error: 'sponsor_not_found' });
+    const targetId = (target as { id: string }).id;
+    if (targetId === ctx.userId) return jsonResponse(400, { error: 'cannot_request_self' });
+
+    const { data: request, error: insErr } = await supabase
+      .from('sponsorship_requests')
+      .insert({ requester_id: ctx.userId, target_sponsor_id: targetId, message: message ?? null })
+      .select('*')
+      .single();
+    if (insErr) {
+      if ((insErr as { code?: string }).code === '23505') return jsonResponse(409, { error: 'request_exists' });
+      return jsonResponse(500, { error: 'insert_failed', detail: insErr.message });
+    }
+    await supabase.from('admin_audit').insert({
+      actor_id: ctx.userId, op: 'sponsorship_request_create',
+      target_type: 'sponsorship_request', target_id: request?.id ?? null,
+      reason: 'user_requested_sponsorship', after: { sponsor: sponsor_username, message },
+    });
+    return jsonResponse(201, request);
+  }
+
+  // GET /requests?role=requester|sponsor
+  if (req.method === 'GET' && path === '/requests') {
+    const role = url.searchParams.get('role') ?? 'requester';
+    const col = role === 'sponsor' ? 'target_sponsor_id' : 'requester_id';
+    const { data, error } = await supabase
+      .from('sponsorship_requests').select('*').eq(col, ctx.userId)
+      .order('created_at', { ascending: false })
+      .limit(100);
+    if (error) return jsonResponse(500, { error: 'list_failed', detail: error.message });
+    return jsonResponse(200, data ?? []);
+  }
+
+  // POST /requests/:id/approve — sponsor approves; creates a sponsorship row
+  {
+    const m = path.match(/^\/requests\/([0-9a-f-]{36})\/approve$/);
+    if (m && req.method === 'POST') {
+      const id = m[1];
+      const body = await req.json().catch(() => ({}));
+      const { credential_id, monthly_call_cap = 200, priority = 100 } = body as { credential_id?: string; monthly_call_cap?: number; priority?: number };
+      if (!credential_id) return jsonResponse(400, { error: 'credential_id_required' });
+      if (monthly_call_cap < 1 || monthly_call_cap > 10000) return jsonResponse(400, { error: 'cap_out_of_range' });
+
+      const { data: request } = await supabase
+        .from('sponsorship_requests').select('requester_id, target_sponsor_id, status').eq('id', id).single();
+      if (!request) return jsonResponse(404, { error: 'not_found' });
+      const r = request as { requester_id: string; target_sponsor_id: string; status: string };
+      if (r.target_sponsor_id !== ctx.userId) return jsonResponse(403, { error: 'sponsor_only' });
+      if (r.status !== 'pending') return jsonResponse(400, { error: 'not_pending' });
+
+      const { data: cred } = await supabase
+        .from('sponsor_credentials').select('user_id, provider, revoked_at').eq('id', credential_id).single();
+      if (!cred || (cred as { user_id: string }).user_id !== ctx.userId) return jsonResponse(404, { error: 'credential_not_found' });
+      if ((cred as { revoked_at: string | null }).revoked_at) return jsonResponse(400, { error: 'credential_revoked' });
+
+      // Create sponsorship
+      const { data: sponsorship, error: insErr } = await supabase
+        .from('sponsorships').insert({
+          sponsor_id:       ctx.userId,
+          beneficiary_id:   r.requester_id,
+          credential_id,
+          provider:         (cred as { provider: string }).provider,
+          monthly_call_cap,
+          priority,
+        }).select('*').single();
+      let resolvedSponsorship = sponsorship;
+      if (insErr && (insErr as { code?: string }).code === '23505') {
+        // Sponsorship already exists between this sponsor + beneficiary; fetch it.
+        const { data: existing } = await supabase
+          .from('sponsorships')
+          .select('*')
+          .eq('sponsor_id', ctx.userId)
+          .eq('beneficiary_id', r.requester_id)
+          .single();
+        resolvedSponsorship = existing;
+      } else if (insErr) {
+        return jsonResponse(500, { error: 'sponsorship_insert_failed', detail: insErr.message });
+      }
+      // Update request status
+      await supabase.from('sponsorship_requests')
+        .update({ status: 'approved', responded_at: new Date().toISOString() })
+        .eq('id', id);
+      await supabase.from('admin_audit').insert({
+        actor_id: ctx.userId, op: 'sponsorship_request_approve',
+        target_type: 'sponsorship_request', target_id: id,
+        reason: 'sponsor_approved', after: { sponsorship_id: resolvedSponsorship?.id ?? null, monthly_call_cap, priority },
+      });
+      return jsonResponse(200, { ok: true, sponsorship: resolvedSponsorship });
+    }
+  }
+
+  // POST /requests/:id/reject
+  {
+    const m = path.match(/^\/requests\/([0-9a-f-]{36})\/reject$/);
+    if (m && req.method === 'POST') {
+      const id = m[1];
+      const { data: request } = await supabase
+        .from('sponsorship_requests').select('target_sponsor_id, status').eq('id', id).single();
+      if (!request) return jsonResponse(404, { error: 'not_found' });
+      const r = request as { target_sponsor_id: string; status: string };
+      if (r.target_sponsor_id !== ctx.userId) return jsonResponse(403, { error: 'sponsor_only' });
+      if (r.status !== 'pending') return jsonResponse(400, { error: 'not_pending' });
+      await supabase.from('sponsorship_requests')
+        .update({ status: 'rejected', responded_at: new Date().toISOString() })
+        .eq('id', id);
+      await supabase.from('admin_audit').insert({
+        actor_id: ctx.userId, op: 'sponsorship_request_reject',
+        target_type: 'sponsorship_request', target_id: id, reason: 'sponsor_rejected',
+      });
+      return jsonResponse(200, { ok: true });
+    }
+  }
+
+  // DELETE /requests/:id — requester withdraws
+  {
+    const m = path.match(/^\/requests\/([0-9a-f-]{36})$/);
+    if (m && req.method === 'DELETE') {
+      const id = m[1];
+      const { data: request } = await supabase
+        .from('sponsorship_requests').select('requester_id, status').eq('id', id).single();
+      if (!request) return jsonResponse(404, { error: 'not_found' });
+      const r = request as { requester_id: string; status: string };
+      if (r.requester_id !== ctx.userId) return jsonResponse(403, { error: 'requester_only' });
+      if (r.status !== 'pending') return jsonResponse(400, { error: 'not_pending' });
+      await supabase.from('sponsorship_requests')
+        .update({ status: 'withdrawn', responded_at: new Date().toISOString() })
+        .eq('id', id);
+      await supabase.from('admin_audit').insert({
+        actor_id: ctx.userId, op: 'sponsorship_request_withdraw',
+        target_type: 'sponsorship_request', target_id: id, reason: 'requester_withdrew',
+      });
+      return jsonResponse(204, {});
+    }
+  }
+
   return jsonResponse(404, { error: 'not_found', path, method: req.method });
 });

@@ -9,6 +9,14 @@ CRUD for AI sponsorship credentials and beneficiaries. JWT-gated except `/heartb
 | `SUPABASE_URL` | Project default |
 | `SUPABASE_SERVICE_ROLE_KEY` | Project default |
 | `SPONSORSHIPS_CRON_TOKEN` | `gh secret set SPONSORSHIPS_CRON_TOKEN` (matches `app.cron_token` PG setting) |
+| `RESEND_API_KEY` | Used to send threshold + auto-pause emails to sponsors. Already synced by `deploy-functions.yml`. |
+| `OPERATOR_EMAIL` | `From:` address for outbound emails (e.g. `hello@rastrum.org`). Already synced by `deploy-functions.yml`. |
+
+## Email notifications
+
+When a sponsorship hits 80% or 100% of its monthly cap, the sponsor receives an HTML+text email via Resend (idempotent — once per (sponsorship, threshold, year_month) row in `notifications_sent`). Auto-pauses also trigger a separate email.
+
+If `RESEND_API_KEY` isn't configured, emails fall back to `console.warn` log lines (no exception thrown — feature degrades gracefully).
 
 ## Deploy
 
@@ -32,4 +40,9 @@ gh workflow run deploy-functions.yml --ref main -f function=sponsorships
 | POST   | `/sponsorships/:id/unpause` | Reactivate after auto-pause; 409 on 3-strike | JWT (sponsor) |
 | DELETE | `/sponsorships/:id` | Revoke (either party) | JWT |
 | GET    | `/sponsorships/:id/usage` | Analytics | JWT (party) |
+| POST   | `/requests` | Beneficiary requests sponsorship by `sponsor_username` (+ optional 280-char message) | JWT (requester) |
+| GET    | `/requests?role=requester\|sponsor` | List own requests (sent or received) | JWT |
+| POST   | `/requests/:id/approve` | Sponsor approves; creates `sponsorships` row inline (`credential_id` + cap) | JWT (sponsor) |
+| POST   | `/requests/:id/reject` | Sponsor rejects pending request | JWT (sponsor) |
+| DELETE | `/requests/:id` | Requester withdraws own pending request | JWT (requester) |
 | POST   | `/heartbeat` | Cron-only credential probe | Bearer cron token |
