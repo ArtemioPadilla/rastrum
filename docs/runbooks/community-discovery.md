@@ -96,10 +96,9 @@ Profile → Edit toggle.
 |---|---|---|
 | #92 | merged 2026-04-29 | PR1 — schema deltas + dual views + iso_countries seed + `normalize_country_code` |
 | #96 | merged 2026-04-29 | PR2 — `recompute-user-stats` Edge Function + cron + `SECURITY DEFINER` wrapper |
-| (operator) | planned | PR3 — manual cron fire to backfill (see "Manual cron fire" above) |
+| (operator) | pending | PR3 — manual cron fire to backfill (see "Manual cron fire" above) |
 | #102 | merged 2026-04-29 | PR4 — Profile → Edit country picker + `hide_from_leaderboards` toggle + `country_code_source` |
-| TBD | planned | PR5 — `/community/observers/` page + filter chips + URL-state serializer + tests |
-| TBD | planned | PR6 — MegaMenu split + atomic i18n rewrite + roadmap entry + module status flip to "shipped" |
+| PR5+PR6 | merged 2026-04-29 | Atomic landing — `/community/observers/` page (CSR) + composable filter chips + URL-state serializer + `community_observers_nearby` SQL RPC + MegaMenu split (Biodiversity / Community columns) + MobileDrawer subheading + atomic i18n rewrite of the two production "no leaderboards" strings + OG card + Vitest + Playwright e2e + module status flip to "shipped" |
 
 ## Future work (v1.1)
 

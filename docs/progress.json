@@ -892,9 +892,10 @@
           "id": "community-discovery-m28",
           "label": "Community discovery (Module 28) — Explore MegaMenu split into Biodiversity / Community columns; /community/observers/ page with composable filter chips (sort, country, taxon, experts-only, nearby); denormalized counters (species_count, obs_count_7d/30d, centroid_geog, country_code) refreshed nightly by recompute-user-stats Edge Function; ISO-3166 reference table + normalize_country_code(); dual views (anon-safe + authenticated-only with centroid); opt-out toggle + country picker on Profile → Edit; rewrites the shipped 'no leaderboards' i18n strings",
           "label_es": "Descubrimiento comunitario (Módulo 28) — MegaMenu de Explorar dividido en columnas Biodiversidad / Comunidad; página /community/observers/ con chips de filtros componibles (orden, país, taxón, sólo expertos, cercanos); contadores denormalizados (species_count, obs_count_7d/30d, centroid_geog, country_code) refrescados cada noche por la Edge Function recompute-user-stats; tabla de referencia ISO-3166 + normalize_country_code(); vistas duales (anon-safe + authenticated-only con centroide); toggle de opt-out + selector de país en Perfil → Editar; reescribe los strings 'no leaderboards' que estaban en producción",
-          "done": false,
-          "status": "in implementation (PR1+PR2+PR4 merged on main; PR5+PR6 = page + MegaMenu + atomic i18n rewrite remaining)",
-          "status_es": "en implementación (PR1+PR2+PR4 mergeados en main; PR5+PR6 = página + MegaMenu + reescritura atómica de i18n pendientes)"
+          "done": true,
+          "done_at": "2026-04-29",
+          "status": "shipped — PR1 (#92) + PR2 (#96) + PR4 (#102) on main; PR5+PR6 lands page + MegaMenu split + atomic i18n rewrite of the two production 'no leaderboards' strings; operator manual cron fire (PR3) is the only remaining backfill task",
+          "status_es": "lanzado — PR1 (#92) + PR2 (#96) + PR4 (#102) en main; PR5+PR6 aterriza la página + split del MegaMenu + reescritura atómica i18n de los dos strings 'no leaderboards' en producción; el disparo manual del cron (PR3) por el operador es la única tarea de backfill restante"
         },
         {
           "id": "obs-detail-redesign",
