@@ -86,10 +86,57 @@ const pm = pmTree.privacy;
         <p data-pp-bio class="mt-2 text-sm text-zinc-700 dark:text-zinc-300 hidden"></p>
         <p data-pp-since class="mt-2 text-xs text-zinc-500"></p>
         <p data-pp-name-owner-only data-owner-only-badge class="hidden mt-1 text-[10px] uppercase tracking-wider text-amber-700 dark:text-amber-400"></p>
+        <div data-pp-social-pills class="hidden mt-3 flex items-center gap-4 text-sm">
+          <a data-pp-followers-link href="#" class="group inline-flex items-baseline gap-1.5 text-zinc-700 dark:text-zinc-300 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors">
+            <span data-pp-followers-count class="font-semibold tabular-nums text-zinc-900 dark:text-zinc-100 group-hover:text-emerald-700 dark:group-hover:text-emerald-400">0</span>
+            <span class="text-xs uppercase tracking-wider text-zinc-500 dark:text-zinc-400">{lang === 'es' ? 'seguidores' : 'followers'}</span>
+          </a>
+          <span class="h-3 w-px bg-zinc-300 dark:bg-zinc-700" aria-hidden="true"></span>
+          <a data-pp-following-link href="#" class="group inline-flex items-baseline gap-1.5 text-zinc-700 dark:text-zinc-300 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors">
+            <span data-pp-following-count class="font-semibold tabular-nums text-zinc-900 dark:text-zinc-100 group-hover:text-emerald-700 dark:group-hover:text-emerald-400">0</span>
+            <span class="text-xs uppercase tracking-wider text-zinc-500 dark:text-zinc-400">{lang === 'es' ? 'siguiendo' : 'following'}</span>
+          </a>
+        </div>
       </div>
       <div class="shrink-0 flex flex-col gap-2 items-end">
         <FollowButton lang={lang} />
         <ShareButton lang={lang} id="profile-share-btn" />
+        <div data-pp-overflow class="hidden relative">
+          <button
+            type="button"
+            data-pp-overflow-trigger
+            class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors"
+            aria-label={lang === 'es' ? 'Más opciones' : 'More options'}
+            aria-haspopup="menu"
+            aria-expanded="false"
+          >
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+          </button>
+          <div
+            data-pp-overflow-menu
+            class="hidden absolute right-0 top-11 z-30 min-w-[180px] rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-lg overflow-hidden"
+            role="menu"
+          >
+            <button
+              type="button"
+              data-pp-action="block"
+              class="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-sm text-zinc-800 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+              role="menuitem"
+            >
+              <svg class="h-4 w-4 text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+              <span data-pp-action-block-label>{tr.socialgraph.block.button}</span>
+            </button>
+            <button
+              type="button"
+              data-pp-action="report"
+              class="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-sm text-zinc-800 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors border-t border-zinc-100 dark:border-zinc-800"
+              role="menuitem"
+            >
+              <svg class="h-4 w-4 text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22V4a2 2 0 0 1 2-2h11l4 6-4 6H6"/><line x1="4" y1="22" x2="4" y2="14"/></svg>
+              <span data-pp-action-report-label>{tr.socialgraph.report.button}</span>
+            </button>
+          </div>
+        </div>
       </div>
     </header>
 
@@ -161,6 +208,8 @@ const pm = pmTree.privacy;
     joined_at: string | null;
     karma_total: number | null;
     credentialed_researcher: boolean | null;
+    follower_count: number | null;
+    following_count: number | null;
   };
 
   type FacetMap = Partial<Record<string, boolean>>;
@@ -207,7 +256,7 @@ const pm = pmTree.privacy;
 
     const { data: profile } = await supabase
       .from('users')
-      .select('id, username, display_name, bio, avatar_url, region_primary, joined_at, karma_total, credentialed_researcher')
+      .select('id, username, display_name, bio, avatar_url, region_primary, joined_at, karma_total, credentialed_researcher, follower_count, following_count')
       .eq('username', username)
       .maybeSingle<PublicUser>();
 
@@ -329,6 +378,87 @@ const pm = pmTree.privacy;
       const lab = root.dataset.labelMemberSince ?? '';
       const sEl = root.querySelector<HTMLElement>('[data-pp-since]');
       if (sEl) sEl.textContent = `${lab}: ${new Date(profile.joined_at).toLocaleDateString(lang)}`;
+    }
+
+    // Followers / following pills — visible on every public profile,
+    // independent of the privacy facet matrix. Counts come from the
+    // denormalised columns maintained by tg_follows_counter.
+    if (profile.username) {
+      const pillsEl = root.querySelector<HTMLElement>('[data-pp-social-pills]');
+      const fwLink = root.querySelector<HTMLAnchorElement>('[data-pp-followers-link]');
+      const fwCount = root.querySelector<HTMLElement>('[data-pp-followers-count]');
+      const fgLink = root.querySelector<HTMLAnchorElement>('[data-pp-following-link]');
+      const fgCount = root.querySelector<HTMLElement>('[data-pp-following-count]');
+      const handle = profile.username;
+      const followersPath = `/${lang}/${lang === 'es' ? 'perfil' : 'profile'}/u/${lang === 'es' ? 'seguidores' : 'followers'}/?username=${encodeURIComponent(handle)}`;
+      const followingPath = `/${lang}/${lang === 'es' ? 'perfil' : 'profile'}/u/${lang === 'es' ? 'siguiendo' : 'following'}/?username=${encodeURIComponent(handle)}`;
+      if (fwLink) fwLink.href = followersPath;
+      if (fgLink) fgLink.href = followingPath;
+      if (fwCount) fwCount.textContent = String(profile.follower_count ?? 0);
+      if (fgCount) fgCount.textContent = String(profile.following_count ?? 0);
+      pillsEl?.classList.remove('hidden');
+    }
+
+    // Overflow menu (Block / Report) — only shown for non-self viewers
+    // who are signed in. Self-view never sees these affordances.
+    if (!isOwner && viewer) {
+      const ovWrap = root.querySelector<HTMLElement>('[data-pp-overflow]');
+      const trigger = root.querySelector<HTMLButtonElement>('[data-pp-overflow-trigger]');
+      const menu = root.querySelector<HTMLElement>('[data-pp-overflow-menu]');
+      ovWrap?.classList.remove('hidden');
+      const closeMenu = () => {
+        menu?.classList.add('hidden');
+        trigger?.setAttribute('aria-expanded', 'false');
+      };
+      const openMenu = () => {
+        menu?.classList.remove('hidden');
+        trigger?.setAttribute('aria-expanded', 'true');
+      };
+      trigger?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (menu?.classList.contains('hidden')) openMenu(); else closeMenu();
+      });
+      document.addEventListener('click', (e) => {
+        if (!ovWrap?.contains(e.target as Node)) closeMenu();
+      });
+      document.addEventListener('keydown', (e) => {
+        if ((e as KeyboardEvent).key === 'Escape') closeMenu();
+      });
+
+      const blockBtn = menu?.querySelector<HTMLButtonElement>('[data-pp-action="block"]');
+      const reportBtn = menu?.querySelector<HTMLButtonElement>('[data-pp-action="report"]');
+      const handleStr = profile.username ?? '';
+
+      blockBtn?.addEventListener('click', async () => {
+        closeMenu();
+        const confirmCopy = lang === 'es'
+          ? `¿Bloquear a @${handleStr}?\n\nNo verán tus reacciones ni tú las suyas. Puedes deshacerlo en Ajustes → Privacidad.`
+          : `Block @${handleStr}?\n\nThey won't see your reactions and you won't see theirs. You can undo this in Settings → Privacy.`;
+        if (!confirm(confirmCopy)) return;
+        blockBtn.disabled = true;
+        try {
+          const { blockUser } = await import('../lib/social');
+          await blockUser(profile.id);
+          alert(lang === 'es' ? 'Usuario bloqueado.' : 'User blocked.');
+        } catch (err) {
+          alert(lang === 'es' ? 'No se pudo bloquear.' : 'Could not block.');
+          // eslint-disable-next-line no-console
+          console.warn('[profile.block]', err);
+        } finally {
+          blockBtn.disabled = false;
+        }
+      });
+
+      reportBtn?.addEventListener('click', () => {
+        closeMenu();
+        const dialog = document.getElementById('rastrum-report-dialog');
+        if (dialog) {
+          (dialog as HTMLElement).dataset.target = 'user';
+          (dialog as HTMLElement).dataset.targetId = profile.id;
+          (dialog as HTMLElement).dataset.targetLabel = '@' + handleStr;
+          dialog.classList.remove('hidden');
+        }
+      });
     }
 
     // Stats

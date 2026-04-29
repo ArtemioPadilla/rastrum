@@ -1,15 +1,22 @@
 ---
 /**
- * ReactionStrip — target-aware reaction buttons (observation / photo / identification).
+ * ReactionStrip — target-aware reaction pills.
  *
- * Server props seed counts and the current user's prior reactions; client
- * script toggles via the `react` Edge Function (see src/lib/social.ts).
+ * Self-hydrating: the component renders an empty shell, then on mount
+ * queries `<target>_reactions` for counts + the viewer's prior
+ * reactions. Toggling fires `react()` (src/lib/social.ts) which calls
+ * the m26 `react` Edge Function (rate-limited, idempotent).
  *
- * Optimistic UI: flip pressed state + count immediately, roll back on error.
+ * Optimistic UI: flip pressed state + count immediately, roll back
+ * on error.
  *
- * NOTE: card wiring deferred — call sites that render this need a
- * `reaction_counts` aggregate + `my_reactions` array; the SQL/RPC for
- * that lands in a follow-up task.
+ * Surface (v1):
+ *   observation     → ❤ Fave
+ *   photo           → ❤ Fave  · ✓ Helpful
+ *   identification  → ✓ Agree · ✕ Disagree
+ *
+ * The schema permits more reaction kinds; surfacing more here is a
+ * UX change, not a migration.
  */
 import { t } from '../i18n/utils';
 
@@ -17,77 +24,182 @@ interface Props {
   lang: 'en' | 'es';
   target: 'observation' | 'photo' | 'identification';
   targetId: string;
-  initialCounts: Record<string, number>;
-  myReactions: string[];
+  /** Visual size: `sm` for inline cards, `md` for detail views. */
+  size?: 'sm' | 'md';
 }
 
-const { lang, target, targetId, initialCounts, myReactions } = Astro.props;
+const { lang, target, targetId, size = 'sm' } = Astro.props;
 const tr = t(lang).socialgraph.reactions;
+const labels = tr as unknown as Record<string, string>;
 
-const KIND_BY_TARGET = {
+const KINDS_BY_TARGET = {
   observation: ['fave'] as const,
   photo: ['fave', 'helpful'] as const,
   identification: ['agree_id', 'disagree_id'] as const,
-} as const;
-const kinds = KIND_BY_TARGET[target];
-
-const ICONS: Record<string, string> = {
-  fave: '❤',
-  helpful: '✓',
-  agree_id: '✓',
-  disagree_id: '✕',
 };
+const kinds = KINDS_BY_TARGET[target];
 
-const labels = tr as unknown as Record<string, string>;
+const sizeClasses = size === 'md'
+  ? 'h-9 gap-1.5 px-3 text-sm'
+  : 'h-7 gap-1 px-2.5 text-[12px]';
 ---
 <div
-  class="flex items-center gap-2"
+  class="rastrum-reactions inline-flex items-center gap-1.5"
   data-reaction-target={target}
   data-reaction-target-id={targetId}
+  data-rs-size={size}
 >
   {kinds.map((kind) => (
     <button
       type="button"
-      class={`reaction-btn rounded-full border px-2 py-1 text-xs ${myReactions.includes(kind) ? 'bg-emerald-100 border-emerald-400' : 'border-stone-300 hover:bg-stone-100'}`}
+      class={`reaction-btn group inline-flex items-center justify-center rounded-full border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:border-emerald-300 dark:hover:border-emerald-800 hover:text-emerald-700 dark:hover:text-emerald-400 hover:bg-emerald-50/60 dark:hover:bg-emerald-950/30 transition-colors disabled:opacity-50 ${sizeClasses}`}
       data-kind={kind}
       aria-label={labels[kind]}
-      aria-pressed={myReactions.includes(kind) ? 'true' : 'false'}
+      aria-pressed="false"
+      title={labels[kind]}
     >
-      <span aria-hidden="true">{ICONS[kind]}</span>
-      <span class="count">{initialCounts[kind] ?? 0}</span>
+      <span class="reaction-glyph" aria-hidden="true">
+        {kind === 'fave' && (
+          <svg class={`${size === 'md' ? 'h-4 w-4' : 'h-3.5 w-3.5'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 1 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"/>
+          </svg>
+        )}
+        {kind === 'helpful' && (
+          <svg class={`${size === 'md' ? 'h-4 w-4' : 'h-3.5 w-3.5'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+        )}
+        {kind === 'agree_id' && (
+          <svg class={`${size === 'md' ? 'h-4 w-4' : 'h-3.5 w-3.5'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+        )}
+        {kind === 'disagree_id' && (
+          <svg class={`${size === 'md' ? 'h-4 w-4' : 'h-3.5 w-3.5'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        )}
+      </span>
+      <span class="reaction-count tabular-nums font-medium">0</span>
     </button>
   ))}
 </div>
 
 <script>
+  import { getSupabase } from '../lib/supabase';
   import { react } from '../lib/social';
 
-  for (const root of document.querySelectorAll<HTMLDivElement>('[data-reaction-target]')) {
-    const targetType = root.dataset.reactionTarget as 'observation' | 'photo' | 'identification';
-    const targetId = root.dataset.reactionTargetId!;
-    for (const btn of root.querySelectorAll<HTMLButtonElement>('.reaction-btn')) {
+  type ReactTarget = 'observation' | 'photo' | 'identification';
+
+  const TABLE_BY_TARGET: Record<ReactTarget, { table: string; col: string }> = {
+    observation:    { table: 'observation_reactions',    col: 'observation_id' },
+    photo:          { table: 'photo_reactions',          col: 'media_file_id' },
+    identification: { table: 'identification_reactions', col: 'identification_id' },
+  };
+
+  const PRESSED_CLASSES = [
+    'bg-emerald-100', 'dark:bg-emerald-950/40',
+    'border-emerald-400', 'dark:border-emerald-700',
+    'text-emerald-800', 'dark:text-emerald-300',
+  ];
+  const IDLE_CLASSES = [
+    'bg-white', 'dark:bg-zinc-900',
+    'border-zinc-200', 'dark:border-zinc-800',
+    'text-zinc-600', 'dark:text-zinc-400',
+  ];
+
+  function paint(btn: HTMLButtonElement, pressed: boolean) {
+    btn.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+    if (pressed) {
+      btn.classList.remove(...IDLE_CLASSES);
+      btn.classList.add(...PRESSED_CLASSES);
+    } else {
+      btn.classList.remove(...PRESSED_CLASSES);
+      btn.classList.add(...IDLE_CLASSES);
+    }
+  }
+
+  async function hydrate(root: HTMLElement) {
+    const target = root.dataset.reactionTarget as ReactTarget | undefined;
+    const targetId = root.dataset.reactionTargetId;
+    if (!target || !targetId) return;
+
+    let supabase;
+    try { supabase = getSupabase(); } catch { return; }
+
+    const { table, col } = TABLE_BY_TARGET[target];
+    const buttons = Array.from(root.querySelectorAll<HTMLButtonElement>('.reaction-btn'));
+
+    // Counts (any user can read aggregates; RLS gates per-row but
+    // count(*) over a permitted scope works the same).
+    const { data: rows } = await supabase
+      .from(table)
+      .select('kind')
+      .eq(col, targetId);
+    const counts: Record<string, number> = {};
+    for (const r of (rows ?? []) as { kind: string }[]) {
+      counts[r.kind] = (counts[r.kind] ?? 0) + 1;
+    }
+
+    // My reactions
+    const { data: { user } } = await supabase.auth.getUser();
+    const mine = new Set<string>();
+    if (user) {
+      const { data: myRows } = await supabase
+        .from(table)
+        .select('kind')
+        .eq(col, targetId)
+        .eq('user_id', user.id);
+      for (const r of (myRows ?? []) as { kind: string }[]) mine.add(r.kind);
+    }
+
+    for (const btn of buttons) {
+      const kind = btn.dataset.kind ?? '';
+      const countEl = btn.querySelector<HTMLElement>('.reaction-count');
+      if (countEl) countEl.textContent = String(counts[kind] ?? 0);
+      paint(btn, mine.has(kind));
+
       btn.addEventListener('click', async () => {
-        btn.disabled = true;
-        const kind = btn.dataset.kind! as Parameters<typeof react>[0]['kind'];
-        const countEl = btn.querySelector('.count')!;
+        if (!user) {
+          // Redirect to sign-in; preserve URL on return.
+          const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
+          location.href = lang === 'es' ? '/es/ingresar/?next=' + encodeURIComponent(location.pathname) : '/en/sign-in/?next=' + encodeURIComponent(location.pathname);
+          return;
+        }
         const wasOn = btn.getAttribute('aria-pressed') === 'true';
+        // Optimistic update.
+        paint(btn, !wasOn);
+        if (countEl) {
+          const cur = Number(countEl.textContent ?? '0');
+          countEl.textContent = String(Math.max(0, wasOn ? cur - 1 : cur + 1));
+        }
+        btn.disabled = true;
         try {
-          const r = await react({ target: targetType, target_id: targetId, kind });
-          if (r.action === 'inserted') {
-            btn.setAttribute('aria-pressed', 'true');
-            btn.classList.add('bg-emerald-100', 'border-emerald-400');
-            countEl.textContent = String(Number(countEl.textContent ?? '0') + 1);
-          } else if (r.action === 'deleted') {
-            btn.setAttribute('aria-pressed', 'false');
-            btn.classList.remove('bg-emerald-100', 'border-emerald-400');
-            countEl.textContent = String(Math.max(0, Number(countEl.textContent ?? '0') - 1));
+          await react({ target, target_id: targetId, kind: kind as 'fave' | 'helpful' | 'agree_id' | 'disagree_id' | 'needs_id' | 'confirm_id' });
+        } catch (err) {
+          // Rollback.
+          paint(btn, wasOn);
+          if (countEl) {
+            const cur = Number(countEl.textContent ?? '0');
+            countEl.textContent = String(Math.max(0, wasOn ? cur + 1 : cur - 1));
           }
-        } catch {
-          btn.setAttribute('aria-pressed', wasOn ? 'true' : 'false');
+          // eslint-disable-next-line no-console
+          console.warn('[react]', err);
         } finally {
           btn.disabled = false;
         }
       });
     }
   }
+
+  function tryHydrateAll() {
+    for (const root of document.querySelectorAll<HTMLElement>('.rastrum-reactions')) {
+      if (root.dataset.rsHydrated === '1') continue;
+      if (!root.dataset.reactionTargetId) continue;
+      root.dataset.rsHydrated = '1';
+      hydrate(root).catch(() => { /* env not configured */ });
+    }
+  }
+  tryHydrateAll();
+  document.addEventListener('rastrum:reactions-ready', tryHydrateAll);
 </script>

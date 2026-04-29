@@ -9,6 +9,7 @@ import ReportIssueButton from '../components/ReportIssueButton.astro';
 import GlobalShareFab from '../components/GlobalShareFab.astro';
 import SwUpdateToast from '../components/SwUpdateToast.astro';
 import OfflineBanner from '../components/OfflineBanner.astro';
+import ReportDialog from '../components/ReportDialog.astro';
 import { getAlternateUrl } from '../i18n/utils';
 import StructuredData from '../components/StructuredData.astro';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
@@ -160,5 +161,6 @@ const resolvedOgImage = ogImage ?? `${SITE_URL}/og/${ogLang}/${ogSlugForPath(cur
     <GlobalShareFab lang={lang} currentPath={currentPath} />
     <OnboardingTour lang={installLang} />
     <SwUpdateToast lang={lang} />
+    <ReportDialog lang={installLang} />
   </body>
 </html>

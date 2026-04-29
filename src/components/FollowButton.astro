@@ -1,6 +1,12 @@
 ---
 /**
- * FollowButton — toggles a follow on `public.follows`.
+ * FollowButton — opt-in follow / unfollow against a target user.
+ *
+ * Calls the m26 `follow` Edge Function via `followUser()` /
+ * `unfollowUser()` (see src/lib/social.ts) so rate-limits and
+ * profile-privacy gating fire server-side. The function returns
+ * `{ status: 'pending' | 'accepted' }` so we can paint a 3rd
+ * "Requested" state for private profiles.
  *
  * Usage: <FollowButton lang="en" targetUserId={observerId} />
  *
@@ -32,6 +38,7 @@ const signInPath = getLocalizedPath(lang, routes.signIn[lang] + '/');
   data-sign-in-path={signInPath}
   data-label-follow={tr.social.follow}
   data-label-following={tr.social.following}
+  data-label-requested={tr.socialgraph.follow.requested}
   data-label-signin={tr.social.signin_to_follow}
   data-label-loading={tr.social.loading}
 >
@@ -46,28 +53,54 @@ const signInPath = getLocalizedPath(lang, routes.signIn[lang] + '/');
 
 <script>
   import { getSupabase } from '../lib/supabase';
+  import { followUser, unfollowUser } from '../lib/social';
 
   type FollowEl = HTMLElement & { __wired?: boolean };
+  type ButtonState = 'follow' | 'following' | 'requested' | 'signin';
 
-  function paint(btn: HTMLButtonElement, state: 'follow' | 'following' | 'signin', root: HTMLElement) {
+  const STATE_CLASSES: Record<ButtonState, string[]> = {
+    follow: [
+      'border-emerald-600/60', 'text-emerald-700', 'dark:text-emerald-400',
+      'hover:bg-emerald-50', 'dark:hover:bg-emerald-900/20',
+    ],
+    following: [
+      'bg-emerald-700', 'text-white', 'hover:bg-emerald-800', 'border-emerald-700',
+    ],
+    requested: [
+      'bg-amber-100', 'text-amber-800', 'border-amber-300',
+      'dark:bg-amber-950/30', 'dark:text-amber-300', 'dark:border-amber-900/60',
+      'hover:bg-amber-200', 'dark:hover:bg-amber-950/50',
+    ],
+    signin: [
+      'border-zinc-300', 'dark:border-zinc-700', 'text-zinc-700', 'dark:text-zinc-300',
+      'hover:bg-zinc-50', 'dark:hover:bg-zinc-800/40',
+    ],
+  };
+  const ALL_CLASSES = Array.from(new Set(Object.values(STATE_CLASSES).flat()));
+
+  function paint(btn: HTMLButtonElement, state: ButtonState, root: HTMLElement) {
     btn.dataset.state = state;
     btn.classList.remove('hidden');
-    btn.classList.remove(
-      'border-emerald-600/60', 'text-emerald-700', 'dark:text-emerald-400', 'hover:bg-emerald-50', 'dark:hover:bg-emerald-900/20',
-      'bg-emerald-700', 'text-white', 'hover:bg-emerald-800', 'border-emerald-700',
-      'border-zinc-300', 'dark:border-zinc-700', 'text-zinc-700', 'dark:text-zinc-300', 'hover:bg-zinc-50', 'dark:hover:bg-zinc-800/40',
-    );
+    btn.classList.remove(...ALL_CLASSES);
+    btn.classList.add(...STATE_CLASSES[state]);
     const labelEl = btn.querySelector('.follow-label') as HTMLSpanElement | null;
-    if (state === 'following') {
-      btn.classList.add('bg-emerald-700', 'text-white', 'hover:bg-emerald-800', 'border-emerald-700');
-      if (labelEl) labelEl.textContent = root.dataset.labelFollowing ?? '';
-    } else if (state === 'follow') {
-      btn.classList.add('border-emerald-600/60', 'text-emerald-700', 'dark:text-emerald-400', 'hover:bg-emerald-50', 'dark:hover:bg-emerald-900/20');
-      if (labelEl) labelEl.textContent = root.dataset.labelFollow ?? '';
-    } else {
-      btn.classList.add('border-zinc-300', 'dark:border-zinc-700', 'text-zinc-700', 'dark:text-zinc-300', 'hover:bg-zinc-50', 'dark:hover:bg-zinc-800/40');
-      if (labelEl) labelEl.textContent = root.dataset.labelSignin ?? '';
-    }
+    if (!labelEl) return;
+    if (state === 'following') labelEl.textContent = root.dataset.labelFollowing ?? '';
+    else if (state === 'requested') labelEl.textContent = root.dataset.labelRequested ?? '';
+    else if (state === 'follow') labelEl.textContent = root.dataset.labelFollow ?? '';
+    else labelEl.textContent = root.dataset.labelSignin ?? '';
+  }
+
+  async function readExisting(supabase: ReturnType<typeof getSupabase>, follower: string, followee: string): Promise<'none' | 'pending' | 'accepted'> {
+    const { data } = await supabase
+      .from('follows')
+      .select('status')
+      .eq('follower_id', follower)
+      .eq('followee_id', followee)
+      .maybeSingle<{ status?: string | null }>();
+    if (!data) return 'none';
+    if (data.status === 'pending') return 'pending';
+    return 'accepted';
   }
 
   async function wire(root: FollowEl) {
@@ -79,11 +112,7 @@ const signInPath = getLocalizedPath(lang, routes.signIn[lang] + '/');
     if (!btn) return;
 
     let supabase;
-    try {
-      supabase = getSupabase();
-    } catch {
-      return;
-    }
+    try { supabase = getSupabase(); } catch { return; }
 
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -101,38 +130,34 @@ const signInPath = getLocalizedPath(lang, routes.signIn[lang] + '/');
       return;
     }
 
-    const { data: existing } = await supabase
-      .from('follows')
-      .select('follower_id')
-      .eq('follower_id', user.id)
-      .eq('followee_id', targetId)
-      .maybeSingle();
-
-    let following = !!existing;
-    paint(btn, following ? 'following' : 'follow', root);
+    let dbState: 'none' | 'pending' | 'accepted' = await readExisting(supabase, user.id, targetId);
+    let visible: ButtonState = dbState === 'accepted' ? 'following' : dbState === 'pending' ? 'requested' : 'follow';
+    paint(btn, visible, root);
 
     btn.addEventListener('click', async () => {
-      const prev = following;
-      following = !following;
-      paint(btn, following ? 'following' : 'follow', root);
+      const prev = { dbState, visible };
       btn.disabled = true;
       try {
-        if (following) {
-          const { error } = await supabase
-            .from('follows')
-            .insert({ follower_id: user.id, followee_id: targetId });
-          if (error && !/duplicate/i.test(error.message)) throw error;
-        } else {
-          const { error } = await supabase
-            .from('follows')
-            .delete()
-            .eq('follower_id', user.id)
-            .eq('followee_id', targetId);
-          if (error) throw error;
+        if (dbState === 'none') {
+          // Optimistic — assume it'll be accepted; correct after the call.
+          visible = 'following';
+          paint(btn, 'following', root);
+          const out = await followUser(targetId, 'follower');
+          dbState = out.status === 'accepted' ? 'accepted' : 'pending';
+          visible = dbState === 'accepted' ? 'following' : 'requested';
+          paint(btn, visible, root);
+        } else if (dbState === 'pending' || dbState === 'accepted') {
+          visible = 'follow';
+          paint(btn, 'follow', root);
+          await unfollowUser(targetId);
+          dbState = 'none';
         }
-      } catch {
-        following = prev;
-        paint(btn, following ? 'following' : 'follow', root);
+      } catch (err) {
+        dbState = prev.dbState;
+        visible = prev.visible;
+        paint(btn, visible, root);
+        // eslint-disable-next-line no-console
+        console.warn('[follow]', err);
       } finally {
         btn.disabled = false;
       }

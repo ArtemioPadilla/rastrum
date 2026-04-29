@@ -1,0 +1,175 @@
+---
+/**
+ * ReportDialog — shared modal for reporting any user / observation /
+ * photo / identification. Other components open it by setting
+ * `dataset.target` + `dataset.targetId` (+ `dataset.targetLabel`) on
+ * `#rastrum-report-dialog` and removing the `hidden` class.
+ *
+ * Submit calls `reportTarget()` from `src/lib/social.ts` which posts
+ * to the `report` Edge Function. Best-effort operator email goes from
+ * the function side; the user just sees a toast.
+ */
+import { t } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+
+const { lang } = Astro.props;
+const tr = t(lang);
+const reportTr = tr.socialgraph.report;
+---
+
+<div
+  id="rastrum-report-dialog"
+  class="hidden fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 backdrop-blur-sm px-4"
+  data-lang={lang}
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="rastrum-report-title"
+>
+  <div class="w-full max-w-md rounded-2xl bg-white dark:bg-zinc-900 ring-1 ring-zinc-200 dark:ring-zinc-800 shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200">
+    <header class="px-5 py-4 border-b border-zinc-100 dark:border-zinc-800">
+      <h2 id="rastrum-report-title" class="text-base font-semibold text-zinc-900 dark:text-zinc-100">
+        <span data-rd-title-text>{reportTr.title.replace('{{target}}', '')}</span>
+        <span data-rd-target-label class="ml-1 text-zinc-500 dark:text-zinc-400 font-normal"></span>
+      </h2>
+    </header>
+
+    <form id="rastrum-report-form" class="px-5 py-4 space-y-4">
+      <fieldset class="space-y-1.5">
+        <legend class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+          {lang === 'es' ? 'Motivo' : 'Reason'}
+        </legend>
+        {[
+          ['spam',              reportTr.reasons.spam],
+          ['harassment',        reportTr.reasons.harassment],
+          ['wrong_id',          reportTr.reasons.wrong_id],
+          ['privacy_violation', reportTr.reasons.privacy_violation],
+          ['copyright',         reportTr.reasons.copyright],
+          ['other',             reportTr.reasons.other],
+        ].map(([value, label]) => (
+          <label class="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800/60 cursor-pointer transition-colors">
+            <input
+              type="radio"
+              name="reason"
+              value={value}
+              required
+              class="h-4 w-4 text-emerald-700 focus:ring-emerald-500 border-zinc-300 dark:border-zinc-700"
+            />
+            <span class="text-sm text-zinc-800 dark:text-zinc-200">{label}</span>
+          </label>
+        ))}
+      </fieldset>
+
+      <div class="space-y-1.5">
+        <label for="rastrum-report-note" class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+          {lang === 'es' ? 'Nota (opcional)' : 'Note (optional)'}
+        </label>
+        <textarea
+          id="rastrum-report-note"
+          name="note"
+          rows="3"
+          maxlength="1000"
+          placeholder={reportTr.note_placeholder}
+          class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-600 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+        ></textarea>
+      </div>
+
+      <p data-rd-error class="hidden text-sm text-rose-600 dark:text-rose-400"></p>
+      <p data-rd-thanks class="hidden rounded-lg bg-emerald-50 dark:bg-emerald-950/40 px-3 py-2 text-sm text-emerald-800 dark:text-emerald-300 ring-1 ring-emerald-200 dark:ring-emerald-900/60">
+        {reportTr.thanks}
+      </p>
+
+      <footer class="flex items-center justify-end gap-2 pt-2">
+        <button
+          type="button"
+          data-rd-cancel
+          class="px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+        >
+          {lang === 'es' ? 'Cancelar' : 'Cancel'}
+        </button>
+        <button
+          type="submit"
+          data-rd-submit
+          class="inline-flex min-h-[40px] items-center justify-center rounded-lg bg-emerald-700 hover:bg-emerald-800 px-5 py-2 text-sm font-semibold text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {reportTr.submit}
+        </button>
+      </footer>
+    </form>
+  </div>
+</div>
+
+<script>
+  import { reportTarget } from '../lib/social';
+
+  type ReportTarget = 'user' | 'observation' | 'photo' | 'identification' | 'comment';
+  type ReportReason = 'spam' | 'harassment' | 'wrong_id' | 'privacy_violation' | 'copyright' | 'other';
+
+  const dialog = document.getElementById('rastrum-report-dialog');
+  if (dialog) {
+    const form = dialog.querySelector<HTMLFormElement>('#rastrum-report-form');
+    const submit = dialog.querySelector<HTMLButtonElement>('[data-rd-submit]');
+    const cancel = dialog.querySelector<HTMLButtonElement>('[data-rd-cancel]');
+    const targetLabelEl = dialog.querySelector<HTMLElement>('[data-rd-target-label]');
+    const errorEl = dialog.querySelector<HTMLElement>('[data-rd-error]');
+    const thanksEl = dialog.querySelector<HTMLElement>('[data-rd-thanks]');
+
+    function close() {
+      dialog?.classList.add('hidden');
+      form?.reset();
+      errorEl?.classList.add('hidden');
+      thanksEl?.classList.add('hidden');
+      if (submit) submit.disabled = false;
+    }
+
+    cancel?.addEventListener('click', close);
+    dialog.addEventListener('click', (e) => {
+      if (e.target === dialog) close();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (!dialog.classList.contains('hidden') && (e as KeyboardEvent).key === 'Escape') close();
+    });
+
+    // Update the target-label whenever the dialog is opened.
+    const observer = new MutationObserver(() => {
+      if (!dialog.classList.contains('hidden') && targetLabelEl) {
+        targetLabelEl.textContent = dialog.dataset.targetLabel ?? '';
+      }
+    });
+    observer.observe(dialog, { attributes: true, attributeFilter: ['class', 'data-target', 'data-target-id', 'data-target-label'] });
+
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!submit || !form) return;
+      const target = (dialog.dataset.target as ReportTarget | undefined) ?? 'user';
+      const targetId = dialog.dataset.targetId ?? '';
+      if (!targetId) return;
+
+      const fd = new FormData(form);
+      const reason = (fd.get('reason') ?? '') as ReportReason;
+      const note = (fd.get('note') ?? '').toString().trim().slice(0, 1000) || undefined;
+      if (!reason) return;
+
+      submit.disabled = true;
+      errorEl?.classList.add('hidden');
+      try {
+        await reportTarget({ target, target_id: targetId, reason, note });
+        thanksEl?.classList.remove('hidden');
+        setTimeout(close, 1400);
+      } catch (err) {
+        if (errorEl) {
+          const lang = dialog.dataset.lang ?? 'en';
+          errorEl.textContent = lang === 'es'
+            ? 'No se pudo enviar el reporte. Intenta de nuevo.'
+            : "Couldn't submit the report. Try again.";
+          errorEl.classList.remove('hidden');
+        }
+        // eslint-disable-next-line no-console
+        console.warn('[report.submit]', err);
+        submit.disabled = false;
+      }
+    });
+  }
+</script>

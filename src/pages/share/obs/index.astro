@@ -4,6 +4,7 @@ import Comments from '../../../components/Comments.astro';
 import FollowButton from '../../../components/FollowButton.astro';
 import ShareButton from '../../../components/ShareButton.astro';
 import SuggestIdModal from '../../../components/SuggestIdModal.astro';
+import ReactionStrip from '../../../components/ReactionStrip.astro';
 
 // SSG: query string is unknown at build time. Comments component reads
 // observation_id from data attribute, which we set at runtime in the
@@ -25,9 +26,25 @@ const obsIdPlaceholder = '';
           <FollowButton lang={lang} />
         </div>
         <ShareButton lang={lang} id="obs-share-btn" />
+        <button
+          id="obs-report-btn"
+          type="button"
+          class="hidden inline-flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors"
+          aria-label="Report observation"
+          title="Report observation"
+        >
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22V4a2 2 0 0 1 2-2h11l4 6-4 6H6"/><line x1="4" y1="22" x2="4" y2="14"/></svg>
+        </button>
       </header>
 
       <img id="img" src="" alt="" class="w-full max-h-[500px] object-contain rounded-xl border border-zinc-200 dark:border-zinc-800 hidden" />
+
+      <div id="reactions-mount" class="flex items-center gap-3">
+        <ReactionStrip lang={lang} target="observation" targetId={obsIdPlaceholder} size="md" />
+        <span id="reactions-help" class="hidden text-xs text-zinc-500 dark:text-zinc-500">
+          Tap the heart to favorite this observation.
+        </span>
+      </div>
 
       <dl class="grid grid-cols-2 gap-4 text-sm">
         <div>
@@ -240,6 +257,27 @@ const obsIdPlaceholder = '';
           followRoot.dataset.targetId = observerId;
           document.dispatchEvent(new CustomEvent('rastrum:follow-ready'));
         }
+      }
+
+      // Wire reactions strip with the loaded observation id.
+      const reactRoot = document.querySelector<HTMLElement>('#reactions-mount .rastrum-reactions');
+      if (reactRoot) {
+        reactRoot.dataset.reactionTargetId = id;
+        document.dispatchEvent(new CustomEvent('rastrum:reactions-ready'));
+      }
+
+      // Wire report button — only enabled for non-owner signed-in viewers.
+      const reportBtn = document.getElementById('obs-report-btn');
+      if (reportBtn && !viewerIsObserver) {
+        reportBtn.classList.remove('hidden');
+        reportBtn.addEventListener('click', () => {
+          const dialog = document.getElementById('rastrum-report-dialog');
+          if (!dialog) return;
+          (dialog as HTMLElement).dataset.target = 'observation';
+          (dialog as HTMLElement).dataset.targetId = id;
+          (dialog as HTMLElement).dataset.targetLabel = speciesName;
+          dialog.classList.remove('hidden');
+        });
       }
       const social = document.getElementById('social-mount');
       social?.classList.remove('hidden');
