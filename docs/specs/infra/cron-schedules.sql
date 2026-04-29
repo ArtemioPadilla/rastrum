@@ -102,3 +102,40 @@ SELECT cron.schedule(
   '30 4 * * *',
   $$ SELECT public.prune_old_notifications(); $$
 );
+
+-- ============================================================
+-- Module 20 — AI Sponsorships cron jobs
+-- ============================================================
+
+SELECT cron.unschedule('ai_rate_limits_cleanup');
+SELECT cron.schedule('ai_rate_limits_cleanup', '17 3 * * *',
+  $$DELETE FROM public.ai_rate_limits WHERE bucket < now() - interval '24 hours'$$);
+
+SELECT cron.unschedule('ai_usage_monthly_rollup');
+SELECT cron.schedule('ai_usage_monthly_rollup', '23 0 * * *',
+  $$INSERT INTO public.ai_usage_monthly (sponsorship_id, year_month, calls, tokens_in, tokens_out)
+    SELECT sponsorship_id, date_trunc('month', occurred_at)::date,
+           count(*), sum(tokens_in), sum(tokens_out)
+    FROM   public.ai_usage
+    WHERE  occurred_at >= date_trunc('day', now() - interval '1 day')
+      AND  occurred_at <  date_trunc('day', now())
+    GROUP  BY 1, 2
+    ON CONFLICT (sponsorship_id, year_month) DO UPDATE
+      SET calls      = ai_usage_monthly.calls      + EXCLUDED.calls,
+          tokens_in  = COALESCE(ai_usage_monthly.tokens_in,  0) + COALESCE(EXCLUDED.tokens_in,  0),
+          tokens_out = COALESCE(ai_usage_monthly.tokens_out, 0) + COALESCE(EXCLUDED.tokens_out, 0)$$);
+
+SELECT cron.unschedule('ai_credentials_heartbeat');
+SELECT cron.schedule('ai_credentials_heartbeat', '0 4 * * 0',
+  $$SELECT net.http_post(
+    url := 'https://reppvlqejgoqvitturxp.supabase.co/functions/v1/sponsorships/heartbeat',
+    headers := jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.cron_token'))
+  )$$);
+
+SELECT cron.unschedule('ai_notifications_monthly_reset');
+SELECT cron.schedule('ai_notifications_monthly_reset', '5 0 1 * *',
+  $$DELETE FROM public.notifications_sent WHERE year_month < date_trunc('month', now())::date$$);
+
+SELECT cron.unschedule('ai_errors_log_cleanup');
+SELECT cron.schedule('ai_errors_log_cleanup', '23 3 * * *',
+  $$DELETE FROM public.ai_errors_log WHERE occurred_at < now() - interval '30 days'$$);
