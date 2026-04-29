@@ -6,6 +6,8 @@ interface Props {
   lang: 'en' | 'es';
   /** Stable id suffix so multiple MapPicker instances on one page don't collide. */
   pickerId?: string;
+  /** Optional override for the "Pick on map" / "Edit location" open-modal button label. */
+  openLabel?: string;
 }
 const {
   mode,
@@ -13,11 +15,12 @@ const {
   obscureLevel = 'none',
   lang,
   pickerId = 'default',
+  openLabel,
 } = Astro.props;
 const isEs = lang === 'es';
 
 const labels = {
-  open:      isEs ? 'Elegir en el mapa' : 'Pick on map',
+  open:      openLabel ?? (isEs ? 'Elegir en el mapa' : 'Pick on map'),
   title:     isEs ? 'Elige una ubicación' : 'Pick a location',
   hint:      isEs ? 'Toca o arrastra el alfiler para fijar la ubicación.' : 'Tap or drag the pin to set the location.',
   use:       isEs ? 'Usar esta ubicación' : 'Use this location',
@@ -314,6 +317,10 @@ const initialLng  = initialCoords?.lng ?? '';
     });
   }
 
+  // View-mode pickers track their MapLibre instance so a later
+  // `rastrum:mappicker-set` event can recenter without re-creating the map.
+  const viewPickerMaps = new Map<string, { map: MapLibreMap; marker: MapLibreMarker }>();
+
   async function initViewPicker(el: HTMLElement) {
     const lat = parseFloat(el.dataset.mappickerInitialLat ?? '');
     const lng = parseFloat(el.dataset.mappickerInitialLng ?? '');
@@ -328,10 +335,31 @@ const initialLng  = initialCoords?.lng ?? '';
         interactive: false,
         attributionControl: { compact: true },
       });
-      new maplibre.Marker({ color: '#047857' }).setLngLat([lng, lat]).addTo(map);
+      const marker = new maplibre.Marker({ color: '#047857' }).setLngLat([lng, lat]).addTo(map);
+      const id = el.dataset.mappickerId ?? '';
+      if (id) viewPickerMaps.set(id, { map, marker });
     } catch {
       /* non-fatal — caller can show fallback UI */
     }
+  }
+
+  async function hydrateViewPicker(id: string, coords: Coords) {
+    if (!Number.isFinite(coords.lat) || !Number.isFinite(coords.lng)) return;
+    const el = document.querySelector<HTMLElement>(
+      `[data-mappicker-mode="view"][data-mappicker-id="${id}"]`,
+    );
+    if (!el) return;
+    const fallback = document.querySelector<HTMLElement>(`[data-mappicker-fallback="${id}"]`);
+    fallback?.remove();
+    el.dataset.mappickerInitialLat = String(coords.lat);
+    el.dataset.mappickerInitialLng = String(coords.lng);
+    const existing = viewPickerMaps.get(id);
+    if (existing) {
+      existing.map.setCenter([coords.lng, coords.lat]);
+      existing.marker.setLngLat([coords.lng, coords.lat]);
+      return;
+    }
+    await initViewPicker(el);
   }
 
   document.querySelectorAll<HTMLElement>('[data-mappicker-mode="edit"]').forEach((el) => initEditPicker(el));
@@ -354,5 +382,15 @@ const initialLng  = initialCoords?.lng ?? '';
       modal.dataset.mappickerInitialLat = '';
       modal.dataset.mappickerInitialLng = '';
     }
+  });
+
+  // Hydrate view-mode pickers after the host page loads coords from the
+  // database. SSR happens before the obs is fetched, so view-mode pickers
+  // SSR with `initialCoords={null}` and the host dispatches this event once
+  // it has the real lat/lng. View-mode pickers are read-only — for edit
+  // pickers, use `rastrum:mappicker-set-initial` instead.
+  window.addEventListener('rastrum:mappicker-set', (ev) => {
+    const e = ev as CustomEvent<{ id: string; coords: Coords }>;
+    void hydrateViewPicker(e.detail.id, e.detail.coords);
   });
 </script>

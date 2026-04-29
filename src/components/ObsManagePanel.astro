@@ -3,10 +3,19 @@
 // 3-field manage form that lived in ShareObsView.astro through PR3.
 //
 // Three internal tabs:
-//   - Details  (this PR4): scientific-name override, date/time, habitat,
-//                          weather, establishment_means, notes, location
-//                          privacy, save / delete buttons.
-//   - Location (PR5): placeholder + read-only mini-map preview.
+//   - Details  (PR4): scientific-name override, date/time, habitat,
+//                     weather, establishment_means, notes, location
+//                     privacy, save / delete buttons.
+//   - Location (this PR5): read-only `MapPicker mode='view'` showing the
+//                          current pin + an "Edit location" button that
+//                          opens `MapPicker mode='edit'` in modal mode.
+//                          Save dispatches `rastrum:mappicker-save` with
+//                          id `obs-detail-edit`; `wireManagePanelLocation`
+//                          listens, UPDATEs `observations.location`, and
+//                          relies on the existing
+//                          `observations_material_edit_check_trg` trigger
+//                          to recompute `last_material_edit_at` for moves
+//                          > 1 km.
 //   - Photos   (PR6): placeholder.
 //
 // Visibility is owner-only and is unhidden by `wireManagePanelDetails()`
@@ -42,6 +51,14 @@ type ObsDetailTree = {
   manage_habitat_label: string;
   manage_weather_label: string;
   manage_establishment_label: string;
+  location: {
+    current_heading: string;
+    no_location: string;
+    edit_intro: string;
+    edit_button: string;
+    saving: string;
+  };
+  errors: { coords_invalid: string; save_failed: string; upload_failed: string };
 };
 type ObserveTree = {
   habitat_options: Record<string, string>;
@@ -210,8 +227,26 @@ const observe = tr.observe;
     data-tab="location"
     class="hidden space-y-3"
   >
-    <MapPicker mode="view" lang={lang} pickerId="manage-loc-view" initialCoords={null} />
-    <p class="text-xs text-zinc-500 dark:text-zinc-400">{od.manage_tab_location_placeholder}</p>
+    <div class="space-y-2">
+      <h3 class="text-xs font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">{od.location.current_heading}</h3>
+      <MapPicker mode="view" lang={lang} pickerId="obs-detail-loc-view" initialCoords={null} />
+      <p data-loc-coords class="text-xs text-zinc-500 dark:text-zinc-400" aria-live="polite"></p>
+    </div>
+
+    <p class="text-xs text-zinc-500 dark:text-zinc-400">{od.location.edit_intro}</p>
+
+    <div class="flex flex-wrap items-center gap-2">
+      <MapPicker
+        mode="edit"
+        lang={lang}
+        pickerId="obs-detail-edit"
+        initialCoords={null}
+        openLabel={od.location.edit_button}
+      />
+      <span id="m-loc-saving" class="hidden text-xs text-zinc-500 dark:text-zinc-400" aria-live="polite">{od.location.saving}</span>
+      <span id="m-loc-saved"  class="hidden text-xs text-emerald-700 dark:text-emerald-400" aria-live="polite">{od.saved}</span>
+    </div>
+    <p id="m-loc-error" class="hidden text-xs text-red-600 dark:text-red-400" role="alert"></p>
   </div>
 
   <div
