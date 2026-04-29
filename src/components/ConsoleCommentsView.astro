@@ -1,0 +1,354 @@
+---
+/**
+ * ConsoleCommentsView — filterable comment list (master) + detail panel with
+ * hide/unhide/lock/unlock action chips. Gate: moderator OR admin.
+ */
+import { t } from '../i18n/utils';
+import ConsoleSlideOver from './ConsoleSlideOver.astro';
+
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+---
+
+<section class="max-w-6xl">
+  <div id="modcom-not-auth" class="hidden rounded border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-900 dark:text-amber-100">
+    {tr.console.not_authorized}
+  </div>
+
+  <div id="modcom-shell" class="hidden">
+    <p class="mb-4 text-sm text-zinc-500 dark:text-zinc-400">{tr.console.modcom_intro}</p>
+
+    <!-- Filter row -->
+    <div class="flex flex-wrap gap-2 mb-3">
+      <select id="modcom-filter-status" class="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm">
+        <option value="">{tr.console.modcom_filter_status_all}</option>
+        <option value="hidden">{tr.console.modcom_filter_status_hidden}</option>
+        <option value="locked">{tr.console.modcom_filter_status_locked}</option>
+      </select>
+
+      <input
+        id="modcom-filter-obs"
+        type="search"
+        placeholder={tr.console.modcom_filter_obs}
+        class="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm w-64"
+      />
+
+      <input
+        id="modcom-filter-body"
+        type="search"
+        placeholder={tr.console.modcom_filter_body}
+        class="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm w-48"
+      />
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-[320px_1fr] gap-4 h-[calc(100vh-220px)]">
+      <!-- Left: comment list -->
+      <aside class="flex flex-col border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden">
+        <div id="modcom-list-loading" class="p-3 text-sm text-zinc-500 italic">{tr.console.modcom_loading}</div>
+        <div id="modcom-list-empty" class="hidden p-3 text-sm text-zinc-500">{tr.console.modcom_empty}</div>
+        <ul id="modcom-list" class="hidden flex-1 overflow-y-auto divide-y divide-zinc-100 dark:divide-zinc-800"></ul>
+      </aside>
+
+      <!-- Right: comment detail -->
+      <div id="modcom-detail-empty" class="flex items-center justify-center text-sm text-zinc-400 dark:text-zinc-600 border border-dashed border-zinc-200 dark:border-zinc-700 rounded-lg">
+        {tr.console.modcom_select_prompt}
+      </div>
+      <div id="modcom-detail" class="hidden border border-zinc-200 dark:border-zinc-800 rounded-lg p-4 overflow-y-auto space-y-4">
+        <div id="modcom-detail-body" class="text-sm text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap border-l-2 border-zinc-300 dark:border-zinc-600 pl-3 italic"></div>
+
+        <dl class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+          <dt class="text-zinc-500">{tr.console.modcom_col_author}</dt>
+          <dd id="modcom-detail-author" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
+
+          <dt class="text-zinc-500">{tr.console.modcom_col_created}</dt>
+          <dd id="modcom-detail-created" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
+
+          <dt class="text-zinc-500">{tr.console.modcom_col_status}</dt>
+          <dd id="modcom-detail-status" class="font-medium"></dd>
+
+          <dt class="text-zinc-500">{tr.console.modcom_obs_label}</dt>
+          <dd id="modcom-detail-obs" class="font-medium text-zinc-800 dark:text-zinc-200 text-xs break-all"></dd>
+        </dl>
+
+        <div id="modcom-detail-parent-row" class="hidden text-sm">
+          <p class="text-xs text-zinc-500 mb-1">{tr.console.modcom_parent_label}:</p>
+          <p id="modcom-detail-parent" class="text-zinc-700 dark:text-zinc-300 italic text-xs border-l-2 border-zinc-200 pl-2"></p>
+        </div>
+
+        <!-- Action chips -->
+        <div class="flex flex-wrap gap-2 pt-1">
+          <button id="modcom-action-hide" class="px-3 py-1.5 rounded text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 hover:bg-red-200">
+            {tr.console.modcom_chip_hide}
+          </button>
+          <button id="modcom-action-unhide" class="hidden px-3 py-1.5 rounded text-xs font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-200">
+            {tr.console.modcom_chip_unhide}
+          </button>
+          <button id="modcom-action-lock" class="px-3 py-1.5 rounded text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 hover:bg-amber-200">
+            {tr.console.modcom_chip_lock}
+          </button>
+          <button id="modcom-action-unlock" class="hidden px-3 py-1.5 rounded text-xs font-medium bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 hover:bg-sky-200">
+            {tr.console.modcom_chip_unlock}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p id="modcom-error" class="hidden mt-3 text-sm text-red-600 dark:text-red-400"></p>
+</section>
+
+<ConsoleSlideOver lang={lang} id="console-slideover-modcom" titleKey={tr.console.modcom_action_hide} />
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { getUserRoles } from '../lib/user-roles';
+  import { adminClient, AdminClientError } from '../lib/admin-client';
+
+  type CommentRow = {
+    id: string;
+    observation_id: string;
+    author_id: string;
+    body: string;
+    locked: boolean;
+    parent_id: string | null;
+    created_at: string;
+    deleted_at: string | null;
+    users: { username: string | null; display_name: string | null } | null;
+    parent: { body: string } | null;
+  };
+
+  function show(id: string) { document.getElementById(id)?.classList.remove('hidden'); }
+  function hide(id: string) { document.getElementById(id)?.classList.add('hidden'); }
+  function escHtml(s: string): string {
+    return s.replace(/[<>&'"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&#39;','"':'&quot;'}[c]!));
+  }
+  function fmtDate(iso: string): string {
+    return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+
+  let allComments: CommentRow[] = [];
+  let selectedId: string | null = null;
+
+  const supabase = getSupabase();
+
+  async function init() {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) { show('modcom-not-auth'); return; }
+    const myRoles = await getUserRoles(session.user.id);
+    if (!myRoles.has('moderator') && !myRoles.has('admin')) { show('modcom-not-auth'); return; }
+    show('modcom-shell');
+    await loadComments();
+  }
+
+  function getFilters() {
+    const status = (document.getElementById('modcom-filter-status') as HTMLSelectElement).value;
+    const obsId = (document.getElementById('modcom-filter-obs') as HTMLInputElement).value.trim();
+    const bodySearch = (document.getElementById('modcom-filter-body') as HTMLInputElement).value.trim();
+    return { status, obsId, bodySearch };
+  }
+
+  async function loadComments() {
+    hide('modcom-list-empty');
+    hide('modcom-list');
+    show('modcom-list-loading');
+
+    const { status, obsId, bodySearch } = getFilters();
+
+    let query = supabase
+      .from('observation_comments')
+      .select('id, observation_id, author_id, body, locked, parent_id, created_at, deleted_at, users(username, display_name)')
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    if (status === 'hidden') query = query.not('deleted_at', 'is', null);
+    if (status === 'locked') query = query.eq('locked', true);
+    if (obsId) query = query.eq('observation_id', obsId);
+    if (bodySearch) query = query.ilike('body', `%${bodySearch}%`);
+
+    const { data, error } = await query;
+    hide('modcom-list-loading');
+
+    if (error) {
+      const e = document.getElementById('modcom-error')!;
+      e.textContent = error.message;
+      show('modcom-error');
+      return;
+    }
+
+    allComments = (data ?? []) as unknown as CommentRow[];
+    if (allComments.length === 0) { show('modcom-list-empty'); return; }
+    renderList();
+    show('modcom-list');
+  }
+
+  function renderList() {
+    const ul = document.getElementById('modcom-list')!;
+    ul.innerHTML = allComments.map(c => {
+      const isSelected = c.id === selectedId ? 'bg-zinc-100 dark:bg-zinc-800/60' : '';
+      const author = c.users?.username ? `@${c.users.username}` : c.author_id.slice(0, 8);
+      const hiddenChip = c.deleted_at ? `<span class="inline-block text-[9px] rounded bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 px-1 py-0.5">hidden</span>` : '';
+      const lockedChip = c.locked ? `<span class="inline-block text-[9px] rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 px-1 py-0.5">locked</span>` : '';
+      const bodyPreview = c.body.length > 80 ? c.body.slice(0, 80) + '…' : c.body;
+      return `<li data-comment-id="${escHtml(c.id)}" class="px-3 py-2 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/40 ${isSelected}">
+        <div class="flex items-center gap-1 mb-0.5">${hiddenChip}${lockedChip}<span class="text-[10px] text-zinc-500">${escHtml(author)}</span></div>
+        <div class="text-sm text-zinc-700 dark:text-zinc-300 truncate italic">${escHtml(bodyPreview)}</div>
+        <div class="text-xs text-zinc-400">${escHtml(fmtDate(c.created_at))}</div>
+      </li>`;
+    }).join('');
+  }
+
+  function selectComment(id: string) {
+    selectedId = id;
+    const c = allComments.find(x => x.id === id);
+    if (!c) return;
+    renderList();
+
+    hide('modcom-detail-empty');
+    show('modcom-detail');
+
+    const bodyEl = document.getElementById('modcom-detail-body')!;
+    bodyEl.textContent = c.body;
+
+    const set = (elId: string, val: string) => {
+      const el = document.getElementById(elId);
+      if (el) el.textContent = val;
+    };
+
+    set('modcom-detail-author', c.users?.display_name
+      ? `${c.users.display_name}${c.users.username ? ` (@${c.users.username})` : ''}`
+      : c.author_id);
+    set('modcom-detail-created', fmtDate(c.created_at));
+    set('modcom-detail-obs', c.observation_id);
+
+    const statusEl = document.getElementById('modcom-detail-status')!;
+    if (c.deleted_at) {
+      statusEl.textContent = 'Hidden';
+      statusEl.className = 'font-medium text-red-600 dark:text-red-400';
+    } else if (c.locked) {
+      statusEl.textContent = 'Locked';
+      statusEl.className = 'font-medium text-amber-600 dark:text-amber-400';
+    } else {
+      statusEl.textContent = 'Visible';
+      statusEl.className = 'font-medium text-emerald-600 dark:text-emerald-400';
+    }
+
+    const hideBtn = document.getElementById('modcom-action-hide')!;
+    const unhideBtn = document.getElementById('modcom-action-unhide')!;
+    const lockBtn = document.getElementById('modcom-action-lock')!;
+    const unlockBtn = document.getElementById('modcom-action-unlock')!;
+
+    if (c.deleted_at) {
+      hideBtn.classList.add('hidden');
+      unhideBtn.classList.remove('hidden');
+    } else {
+      hideBtn.classList.remove('hidden');
+      unhideBtn.classList.add('hidden');
+    }
+
+    if (c.locked) {
+      lockBtn.classList.add('hidden');
+      unlockBtn.classList.remove('hidden');
+    } else {
+      lockBtn.classList.remove('hidden');
+      unlockBtn.classList.add('hidden');
+    }
+
+    const parentRow = document.getElementById('modcom-detail-parent-row')!;
+    const parentEl = document.getElementById('modcom-detail-parent')!;
+    if (c.parent_id) {
+      parentEl.textContent = c.parent_id;
+      parentRow.classList.remove('hidden');
+    } else {
+      parentRow.classList.add('hidden');
+    }
+  }
+
+  async function refreshSelected() {
+    if (!selectedId) return;
+    await loadComments();
+    const updated = allComments.find(x => x.id === selectedId);
+    if (updated) selectComment(selectedId);
+  }
+
+  document.addEventListener('click', (ev) => {
+    const li = (ev.target as HTMLElement).closest<HTMLElement>('li[data-comment-id]');
+    if (li?.dataset.commentId) { selectComment(li.dataset.commentId); return; }
+
+    const hideBtn = (ev.target as HTMLElement).closest<HTMLElement>('#modcom-action-hide');
+    if (hideBtn && selectedId) {
+      document.dispatchEvent(new CustomEvent('console:slideover-open', {
+        detail: { id: 'console-slideover-modcom', title: 'Hide comment', action: 'comment.hide', payload: { comment_id: selectedId } },
+      }));
+      return;
+    }
+
+    const unhideBtn = (ev.target as HTMLElement).closest<HTMLElement>('#modcom-action-unhide');
+    if (unhideBtn && selectedId) {
+      document.dispatchEvent(new CustomEvent('console:slideover-open', {
+        detail: { id: 'console-slideover-modcom', title: 'Unhide comment', action: 'comment.unhide', payload: { comment_id: selectedId } },
+      }));
+      return;
+    }
+
+    const lockBtn = (ev.target as HTMLElement).closest<HTMLElement>('#modcom-action-lock');
+    if (lockBtn && selectedId) {
+      document.dispatchEvent(new CustomEvent('console:slideover-open', {
+        detail: { id: 'console-slideover-modcom', title: 'Lock thread', action: 'comment.lock', payload: { comment_id: selectedId } },
+      }));
+      return;
+    }
+
+    const unlockBtn = (ev.target as HTMLElement).closest<HTMLElement>('#modcom-action-unlock');
+    if (unlockBtn && selectedId) {
+      document.dispatchEvent(new CustomEvent('console:slideover-open', {
+        detail: { id: 'console-slideover-modcom', title: 'Unlock thread', action: 'comment.unlock', payload: { comment_id: selectedId } },
+      }));
+      return;
+    }
+  });
+
+  document.addEventListener('console:slideover-submit', async (ev) => {
+    const { id, action, payload, reason } = (ev as CustomEvent<{ id: string; action: string; payload: Record<string, string>; reason: string }>).detail;
+    if (id !== 'console-slideover-modcom') return;
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id, ok: false, error: 'Session expired.' } }));
+      return;
+    }
+
+    try {
+      if (action === 'comment.hide') {
+        await adminClient.comment.hide({ comment_id: payload.comment_id }, reason, session.access_token);
+      } else if (action === 'comment.unhide') {
+        await adminClient.comment.unhide({ comment_id: payload.comment_id }, reason, session.access_token);
+      } else if (action === 'comment.lock') {
+        await adminClient.comment.lock({ comment_id: payload.comment_id }, reason, session.access_token);
+      } else if (action === 'comment.unlock') {
+        await adminClient.comment.unlock({ comment_id: payload.comment_id }, reason, session.access_token);
+      }
+      document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id, ok: true } }));
+      await refreshSelected();
+    } catch (err) {
+      const msg = err instanceof AdminClientError ? err.message : (err as Error).message;
+      document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id, ok: false, error: msg } }));
+    }
+  });
+
+  let filterTimer: ReturnType<typeof setTimeout> | null = null;
+  function onFilterChange() {
+    if (filterTimer) clearTimeout(filterTimer);
+    filterTimer = setTimeout(() => { loadComments(); }, 300);
+  }
+
+  document.getElementById('modcom-filter-status')?.addEventListener('change', onFilterChange);
+  document.getElementById('modcom-filter-obs')?.addEventListener('input', onFilterChange);
+  document.getElementById('modcom-filter-body')?.addEventListener('input', onFilterChange);
+
+  init().catch(err => {
+    const e = document.getElementById('modcom-error')!;
+    e.textContent = (err as Error).message;
+    show('modcom-error');
+  });
+</script>

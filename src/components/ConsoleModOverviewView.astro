@@ -1,0 +1,125 @@
+---
+/**
+ * ConsoleModOverviewView — KPI counters + action items for the moderator role.
+ * Gate: moderator OR admin. The /console/ root picks this view when the active
+ * role pill is 'moderator'.
+ */
+import { t } from '../i18n/utils';
+
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+---
+
+<section class="max-w-5xl">
+  <div id="mod-overview-not-auth" class="hidden rounded border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-900 dark:text-amber-100">
+    {tr.console.not_authorized}
+  </div>
+
+  <div id="mod-overview-shell" class="hidden space-y-6">
+    <p class="text-sm text-zinc-500 dark:text-zinc-400">{tr.console.mod_overview_intro}</p>
+
+    <!-- KPI counters -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+        <p class="text-xs text-zinc-500 mb-1">{tr.console.mod_overview_open_reports}</p>
+        <p id="mod-kpi-open-reports" class="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">—</p>
+      </div>
+      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+        <p class="text-xs text-zinc-500 mb-1">{tr.console.mod_overview_hidden_24h}</p>
+        <p id="mod-kpi-hidden-24h" class="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">—</p>
+      </div>
+      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+        <p class="text-xs text-zinc-500 mb-1">{tr.console.mod_overview_active_bans}</p>
+        <p id="mod-kpi-active-bans" class="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">—</p>
+      </div>
+      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+        <p class="text-xs text-zinc-500 mb-1">{tr.console.mod_overview_mean_response}</p>
+        <p id="mod-kpi-response-time" class="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">—</p>
+      </div>
+    </div>
+
+    <!-- Action items -->
+    <div>
+      <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-3">
+        {tr.console.overview_alerts_heading}
+      </h2>
+      <div id="mod-overview-items" class="space-y-2">
+        <div class="rounded-md border border-dashed border-zinc-300 dark:border-zinc-700 p-4 text-sm text-zinc-500">
+          {tr.console.mod_overview_no_items}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p id="mod-overview-error" class="hidden mt-3 text-sm text-red-600 dark:text-red-400"></p>
+</section>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { getUserRoles } from '../lib/user-roles';
+
+  function show(id: string) { document.getElementById(id)?.classList.remove('hidden'); }
+
+  const supabase = getSupabase();
+
+  async function init() {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) { show('mod-overview-not-auth'); return; }
+    const myRoles = await getUserRoles(session.user.id);
+    if (!myRoles.has('moderator') && !myRoles.has('admin')) {
+      show('mod-overview-not-auth');
+      return;
+    }
+    show('mod-overview-shell');
+    await loadKpis();
+  }
+
+  async function loadKpis() {
+    const now = new Date();
+    const yesterday = new Date(now.getTime() - 86_400_000).toISOString();
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 86_400_000).toISOString();
+
+    const [openReports, hidden24h, activeBans, resolvedAudit] = await Promise.all([
+      supabase.from('reports').select('id', { count: 'exact', head: true }).in('status', ['open', 'triaged']),
+      supabase.from('admin_audit').select('id', { count: 'exact', head: true }).eq('op', 'comment_hide').gte('created_at', yesterday),
+      supabase.from('user_bans').select('id', { count: 'exact', head: true }).is('revoked_at', null).or(`expires_at.is.null,expires_at.gt.${now.toISOString()}`),
+      supabase.from('admin_audit').select('created_at').in('op', ['report_resolved', 'report_dismissed']).gte('created_at', sevenDaysAgo).limit(200),
+    ]);
+
+    const kpiEl = (id: string, val: string) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = val;
+    };
+
+    kpiEl('mod-kpi-open-reports', String(openReports.count ?? '—'));
+    kpiEl('mod-kpi-hidden-24h', String(hidden24h.count ?? '—'));
+    kpiEl('mod-kpi-active-bans', String(activeBans.count ?? '—'));
+
+    const resolved = resolvedAudit.data ?? [];
+    if (resolved.length > 0) {
+      // Mean time between created_at pairs (not meaningful but shows activity)
+      kpiEl('mod-kpi-response-time', `${resolved.length} resolved`);
+    }
+
+    // Action items — show oldest open report if any
+    const openCount = openReports.count ?? 0;
+    if (openCount > 0) {
+      const itemsEl = document.getElementById('mod-overview-items');
+      if (itemsEl) {
+        itemsEl.innerHTML = `
+          <div class="flex items-center justify-between rounded-md border border-amber-200 dark:border-amber-700/40 bg-amber-50 dark:bg-amber-900/10 px-3 py-2 text-sm">
+            <span class="text-amber-900 dark:text-amber-100">${openCount} open report(s) need attention</span>
+            <a href="../flag-queue/" class="text-amber-700 dark:text-amber-300 underline text-xs">View queue →</a>
+          </div>
+        `;
+      }
+    }
+  }
+
+  init().catch(err => {
+    const e = document.getElementById('mod-overview-error')!;
+    e.textContent = (err as Error).message;
+    e.classList.remove('hidden');
+  });
+</script>
