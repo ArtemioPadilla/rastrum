@@ -1,4 +1,4 @@
-import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { z } from 'https://esm.sh/zod@3.23.8';
 import type { Actor, UserRole } from '../_shared/auth.ts';
 import type { AuditOp } from '../_shared/audit.ts';

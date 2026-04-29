@@ -2,29 +2,72 @@
 import type { Locale } from '../i18n/utils';
 import { t } from '../i18n/utils';
 
-interface Props { lang: Locale }
-const { lang } = Astro.props;
+interface Props {
+  lang: Locale;
+  /**
+   * Visitor mode — when set, the view resolves the username from
+   * `?username=` in the URL at script time, looks up the target user,
+   * gates on `can_see_facet(target, 'pokedex', viewer)`, and renders
+   * that user's pokedex. When unset, the view falls back to the
+   * signed-in viewer's own pokedex (owner self-view).
+   */
+  visitor?: boolean;
+}
+const { lang, visitor = false } = Astro.props;
 const tr = t(lang);
 const px = (tr as unknown as { pokedex: Record<string, unknown> }).pokedex;
 const title       = px?.title       as string;
 const subtitle    = px?.subtitle    as string;
 const subheading  = px?.subheading  as string | undefined;
 const empty       = px?.empty       as string;
+const visitorTitle    = px?.visitor_title    as string | undefined;
+const visitorSubtitle = px?.visitor_subtitle as string | undefined;
+const visitorEmpty    = px?.visitor_empty    as string | undefined;
+const visitorPrivate  = px?.visitor_private  as string | undefined;
+const visitorNotFound = px?.visitor_not_found as string | undefined;
+const visitorNotFoundCta = px?.visitor_not_found_cta as string | undefined;
+const visitorBack     = px?.visitor_back_to_profile as string | undefined;
 const bucketMap   = (px?.bucket as Record<string, string> | undefined) ?? {};
 const bucketLabels = JSON.stringify(bucketMap);
+const exploreRecentHref = `/${lang}/${lang === 'es' ? 'explorar/recientes' : 'explore/recent'}/`;
 ---
 
-<section class="max-w-5xl mx-auto px-4 py-6">
+<section
+  class="max-w-5xl mx-auto px-4 py-6"
+  data-pokedex-root
+  data-mode={visitor ? 'visitor' : 'owner'}
+  data-lang={lang}
+  data-label-visitor-title={visitorTitle ?? ''}
+  data-label-visitor-subtitle={visitorSubtitle ?? ''}
+  data-label-visitor-empty={visitorEmpty ?? ''}
+  data-label-visitor-private={visitorPrivate ?? ''}
+  data-label-visitor-not-found={visitorNotFound ?? ''}
+  data-label-empty-owner={empty}
+>
   <header class="mb-5">
-    <h1 class="text-2xl md:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+    <h1 data-pokedex-title class="text-2xl md:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
       {title}
     </h1>
-    <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-1">{subtitle}</p>
-    {subheading && <p class="text-xs text-zinc-500 dark:text-zinc-500 mt-1">{subheading}</p>}
+    <p data-pokedex-subtitle class="text-sm text-zinc-600 dark:text-zinc-400 mt-1">{subtitle}</p>
+    {subheading && !visitor && <p class="text-xs text-zinc-500 dark:text-zinc-500 mt-1">{subheading}</p>}
+    {visitor && (
+      <p class="mt-2 text-xs">
+        <a data-pokedex-back-link href="#" class="text-emerald-700 dark:text-emerald-400 hover:underline">{visitorBack}</a>
+      </p>
+    )}
   </header>
 
   <p id="pokedex-loading" class="text-sm text-zinc-500 text-center py-8">…</p>
   <p id="pokedex-empty"   class="hidden text-sm text-zinc-500 text-center py-8 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700">{empty}</p>
+  {visitor && (
+    <div id="pokedex-not-found" class="hidden py-8 text-center">
+      <p class="text-base font-semibold text-zinc-900 dark:text-zinc-100">{visitorNotFound}</p>
+      <a href={exploreRecentHref} class="mt-2 inline-block text-sm text-emerald-700 dark:text-emerald-400 hover:underline">{visitorNotFoundCta}</a>
+    </div>
+  )}
+  {visitor && (
+    <p id="pokedex-private" class="hidden text-sm text-zinc-500 text-center py-8 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700">{visitorPrivate}</p>
+  )}
 
   <div id="pokedex-groups" class="space-y-6" data-bucket-labels={bucketLabels}></div>
 </section>
@@ -33,10 +76,18 @@ const bucketLabels = JSON.stringify(bucketMap);
   import { getSupabase } from '../lib/supabase';
   import { rarityTier, escAttr, type Bucket } from '../lib/karma';
 
-  const groupsEl = document.getElementById('pokedex-groups');
-  const loading  = document.getElementById('pokedex-loading');
-  const emptyEl  = document.getElementById('pokedex-empty');
+  const root      = document.querySelector<HTMLElement>('[data-pokedex-root]');
+  const groupsEl  = document.getElementById('pokedex-groups');
+  const loading   = document.getElementById('pokedex-loading');
+  const emptyEl   = document.getElementById('pokedex-empty');
+  const notFound  = document.getElementById('pokedex-not-found');
+  const privateEl = document.getElementById('pokedex-private');
+  const titleEl    = root?.querySelector<HTMLElement>('[data-pokedex-title]');
+  const subtitleEl = root?.querySelector<HTMLElement>('[data-pokedex-subtitle]');
+  const backLink   = root?.querySelector<HTMLAnchorElement>('[data-pokedex-back-link]');
   const isEs     = document.documentElement.lang === 'es';
+  const mode     = root?.dataset.mode ?? 'owner';
+  const lang     = (root?.dataset.lang === 'es' ? 'es' : 'en') as 'en' | 'es';
 
   type DexRow = {
     taxon_id: string;
@@ -55,6 +106,23 @@ const bucketLabels = JSON.stringify(bucketMap);
     } catch { /* noop */ }
     const key = String(Math.max(1, Math.min(5, bucket ?? 1)));
     return labels[key] ?? '';
+  }
+
+  function readUsername(): string {
+    const params = new URLSearchParams(window.location.search);
+    const fromQuery = params.get('username') || params.get('u') || '';
+    return (fromQuery || '').trim();
+  }
+
+  function applyVisitorChrome(handle: string) {
+    const tplTitle    = root?.dataset.labelVisitorTitle ?? '';
+    const tplSubtitle = root?.dataset.labelVisitorSubtitle ?? '';
+    if (titleEl && tplTitle) titleEl.textContent = tplTitle.replaceAll('{handle}', handle);
+    if (subtitleEl && tplSubtitle) subtitleEl.textContent = tplSubtitle.replaceAll('{handle}', handle);
+    if (backLink) {
+      backLink.href = `/${lang}/u/?username=${encodeURIComponent(handle)}`;
+    }
+    document.title = (lang === 'es' ? `Pokédex de @${handle}` : `@${handle}'s Pokédex`) + ' — Rastrum';
   }
 
   async function loadFromView(supabase: ReturnType<typeof getSupabase>, userId: string): Promise<DexRow[] | null> {
@@ -106,6 +174,11 @@ const bucketLabels = JSON.stringify(bucketMap);
   function render(rows: DexRow[]) {
     if (!groupsEl) return;
     if (!rows.length) {
+      if (mode === 'visitor' && emptyEl) {
+        const tpl = root?.dataset.labelVisitorEmpty ?? '';
+        // fallback to owner-empty copy if visitor copy missing
+        emptyEl.textContent = tpl || (root?.dataset.labelEmptyOwner ?? '');
+      }
       emptyEl?.classList.remove('hidden');
       loading?.classList.add('hidden');
       return;
@@ -141,7 +214,7 @@ const bucketLabels = JSON.stringify(bucketMap);
     loading?.classList.add('hidden');
   }
 
-  (async function () {
+  async function runOwner() {
     if (!groupsEl) return;
     let supabase;
     try { supabase = getSupabase(); } catch {
@@ -158,5 +231,62 @@ const bucketLabels = JSON.stringify(bucketMap);
     let rows = await loadFromView(supabase, user.id);
     if (rows === null) rows = await loadFallback(supabase, user.id);
     render(rows);
-  })();
+  }
+
+  async function runVisitor() {
+    if (!groupsEl) return;
+    const username = readUsername();
+    if (!username || !/^[a-zA-Z0-9_]{3,30}$/.test(username)) {
+      loading?.classList.add('hidden');
+      notFound?.classList.remove('hidden');
+      return;
+    }
+    let supabase;
+    try { supabase = getSupabase(); } catch {
+      loading?.classList.add('hidden');
+      notFound?.classList.remove('hidden');
+      return;
+    }
+    const { data: { user: viewer } } = await supabase.auth.getUser();
+    const { data: profile } = await supabase
+      .from('users')
+      .select('id, username')
+      .eq('username', username)
+      .maybeSingle<{ id: string; username: string | null }>();
+    if (!profile) {
+      loading?.classList.add('hidden');
+      notFound?.classList.remove('hidden');
+      return;
+    }
+    applyVisitorChrome(profile.username ?? username);
+    const isOwner = viewer?.id === profile.id;
+    if (!isOwner) {
+      const { data: facetData } = await supabase.rpc('can_see_facet', {
+        target: profile.id,
+        facet: 'pokedex',
+        viewer: viewer?.id ?? null,
+      });
+      const canSee = facetData === true;
+      if (!canSee) {
+        loading?.classList.add('hidden');
+        privateEl?.classList.remove('hidden');
+        return;
+      }
+    }
+    let rows = await loadFromView(supabase, profile.id);
+    if (rows === null) rows = await loadFallback(supabase, profile.id);
+    render(rows);
+  }
+
+  if (mode === 'visitor') {
+    runVisitor().catch(() => {
+      loading?.classList.add('hidden');
+      notFound?.classList.remove('hidden');
+    });
+  } else {
+    runOwner().catch(() => {
+      loading?.classList.add('hidden');
+      emptyEl?.classList.remove('hidden');
+    });
+  }
 </script>

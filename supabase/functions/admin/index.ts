@@ -11,7 +11,7 @@
  * Reason field is mandatory; minimum 5 chars enforced here.
  */
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { verifyJwtAndLoadRoles, requireRole, HttpError } from './_shared/auth.ts';
 import { insertAuditRow } from './_shared/audit.ts';
 import { HANDLERS } from './handlers/index.ts';

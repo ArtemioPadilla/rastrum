@@ -37,8 +37,16 @@ const pmTree = tr as unknown as {
     signed_in_required_body: string;
     owner_only_badge: string;
   };
+  sponsoring: {
+    sponsored_by_label: string;
+    sponsored_by_multi: string;
+  };
 };
 const pm = pmTree.privacy;
+const sponsoringI18n = {
+  sponsored_by_label: pmTree.sponsoring.sponsored_by_label,
+  sponsored_by_multi: pmTree.sponsoring.sponsored_by_multi,
+};
 ---
 
 <div
@@ -112,6 +120,10 @@ const pm = pmTree.privacy;
             <span id="sponsor-badge-count" data-pp-sponsor-count>0</span>
             <span>{lang === 'es' ? 'patrocina' : 'sponsors'}</span>
           </a>
+          <span id="sponsored-by-badge" class="hidden inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
+            <span aria-hidden="true">💚</span>
+            <span id="sponsored-by-text">—</span>
+          </span>
         </div>
       </div>
       <div class="shrink-0 flex flex-col gap-2 items-end">
@@ -209,6 +221,8 @@ const pm = pmTree.privacy;
   </article>
 </div>
 
+<script type="application/json" id="public-profile-i18n" set:html={JSON.stringify(sponsoringI18n)}></script>
+
 <script>
   import { getSupabase } from '../lib/supabase';
 
@@ -248,6 +262,12 @@ const pm = pmTree.privacy;
     if (last && last !== 'u') return last;
     return '';
   }
+
+  type SponsoringI18n = { sponsored_by_label: string; sponsored_by_multi: string };
+  const i18nBag: SponsoringI18n = (() => {
+    const raw = (document.getElementById('public-profile-i18n') as HTMLScriptElement | null)?.textContent ?? '{}';
+    try { return JSON.parse(raw) as SponsoringI18n; } catch { return { sponsored_by_label: 'Sponsored by', sponsored_by_multi: 'Sponsored by {first} +{rest} more' }; }
+  })();
 
   async function init() {
     const root = document.querySelector<HTMLElement>('.rastrum-public-profile-v2');
@@ -429,6 +449,39 @@ const pm = pmTree.privacy;
           badge?.classList.remove('hidden');
         }
       } catch { /* not reachable or RLS blocks — silent */ }
+
+      try {
+        const { data: sponsorships } = await supabase
+          .from('sponsorships')
+          .select('sponsor_id')
+          .eq('beneficiary_id', profile.id)
+          .eq('status', 'active')
+          .eq('sponsor_public', true)
+          .eq('beneficiary_public', true)
+          .limit(5);
+
+        if (sponsorships && sponsorships.length > 0) {
+          const sponsorIds = (sponsorships as Array<{ sponsor_id: string }>).map(s => s.sponsor_id);
+          const { data: sponsors } = await supabase
+            .from('users')
+            .select('id, username, display_name')
+            .in('id', sponsorIds);
+          if (sponsors && sponsors.length > 0) {
+            const list = sponsors as Array<{ id: string; username: string; display_name?: string }>;
+            const text = list.length === 1
+              ? `${i18nBag.sponsored_by_label} @${list[0].username}`
+              : i18nBag.sponsored_by_multi
+                  .replace('{first}', `@${list[0].username}`)
+                  .replace('{rest}', String(list.length - 1));
+            const badge = document.getElementById('sponsored-by-badge');
+            const textEl = document.getElementById('sponsored-by-text');
+            if (badge && textEl) {
+              textEl.textContent = text;
+              badge.classList.remove('hidden');
+            }
+          }
+        }
+      } catch { /* RLS or network — silent */ }
     }
 
     // Overflow menu (Block / Report) — only shown for non-self viewers
@@ -566,12 +619,18 @@ const pm = pmTree.privacy;
     }
 
     // Pokédex link.
-    // The visitor-side route (/u/<handle>/dex/) is parked under v1.2.2;
-    // until it ships, surface the link only for the owner (who can use
-    // /profile/dex/) and hide it on visitor profiles to avoid 404s.
-    if (showPokedex && isOwner) {
+    // Owner self-view → /{lang}/profile/dex/ (auth-uid-scoped view).
+    // Visitor view → /{lang}/u/dex/?username=<handle> (visitor-mode page,
+    // gated by can_see_facet('pokedex', …) in PokedexView itself).
+    if (showPokedex) {
       const link = root.querySelector<HTMLAnchorElement>('[data-pp-pokedex-link]');
-      if (link) link.href = `/${lang}/${lang === 'es' ? 'perfil/dex' : 'profile/dex'}/`;
+      if (link) {
+        if (isOwner) {
+          link.href = `/${lang}/${lang === 'es' ? 'perfil/dex' : 'profile/dex'}/`;
+        } else if (profile.username) {
+          link.href = `/${lang}/u/dex/?username=${encodeURIComponent(profile.username)}`;
+        }
+      }
       show(root.querySelector('[data-pp-pokedex-section]'));
       if (isOwner && facets.pokedex === false) {
         const badge = root.querySelector<HTMLElement>('[data-pp-pokedex-owner-only]');

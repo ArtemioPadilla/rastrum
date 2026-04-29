@@ -4119,3 +4119,157 @@ SELECT observation_id, kind, COUNT(*)::int AS count
  GROUP BY observation_id, kind;
 
 GRANT SELECT ON public.observation_reaction_summary TO anon, authenticated;
+
+-- 8) recompute_user_stats() — called by the nightly Edge Function.
+-- supabase-js cannot execute multi-statement CTE+UPDATE, so the aggregate
+-- lives in a SECURITY DEFINER function. Restricted to service_role to keep
+-- it off the public surface; the cron-only Edge Function uses the
+-- auto-injected SUPABASE_SERVICE_ROLE_KEY to invoke it via db.rpc(...).
+CREATE OR REPLACE FUNCTION public.recompute_user_stats()
+RETURNS integer
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public AS $$
+DECLARE
+  v_count integer;
+BEGIN
+  WITH stats AS (
+    SELECT
+      o.observer_id AS uid,
+      COUNT(*)::int                                                            AS obs_total,
+      COUNT(DISTINCT i.taxon_id)::int                                          AS species_total,
+      COUNT(*) FILTER (WHERE o.observed_at >= now() - interval '7 days')::int  AS obs_7d,
+      COUNT(*) FILTER (WHERE o.observed_at >= now() - interval '30 days')::int AS obs_30d,
+      ST_Centroid(ST_Collect(o.location::geometry))::geography                 AS centroid
+    FROM public.observations o
+    LEFT JOIN public.identifications i
+      ON i.observation_id = o.id AND i.is_primary = true
+    WHERE o.sync_status = 'synced'
+      AND o.location IS NOT NULL
+    GROUP BY o.observer_id
+  )
+  UPDATE public.users u
+  SET
+    observation_count = COALESCE(s.obs_total, 0),
+    species_count     = COALESCE(s.species_total, 0),
+    obs_count_7d      = COALESCE(s.obs_7d, 0),
+    obs_count_30d     = COALESCE(s.obs_30d, 0),
+    centroid_geog     = s.centroid,
+    country_code      = COALESCE(u.country_code, public.normalize_country_code(u.region_primary))
+  FROM stats s
+  WHERE u.id = s.uid;
+
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  RETURN v_count;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.recompute_user_stats() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.recompute_user_stats() TO service_role;
+
+-- ============================================================
+-- Observation detail redesign — material edit tracking + soft-delete
+-- (2026-04-29) — see docs/superpowers/specs/2026-04-29-obs-detail-redesign-design.md
+-- ============================================================
+
+ALTER TABLE public.observations
+  ADD COLUMN IF NOT EXISTS last_material_edit_at timestamptz;
+
+ALTER TABLE public.media_files
+  ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
+
+CREATE INDEX IF NOT EXISTS idx_media_files_active
+  ON public.media_files (observation_id) WHERE deleted_at IS NULL;
+
+COMMENT ON COLUMN public.observations.last_material_edit_at IS
+  'Set by observations_material_edit_check_trg when the owner makes a material edit (location > 1 km, observed_at > 24 h, primary_taxon_id change, or photo soft-delete). NULL means no material edits since creation.';
+
+COMMENT ON COLUMN public.media_files.deleted_at IS
+  'Soft-delete sentinel. Non-NULL means the owner removed this photo via the obs detail Photos tab. R2 blob is NOT removed in v1; gc-orphan-media cron is a v1.1 follow-up.';
+
+CREATE OR REPLACE FUNCTION public.observations_material_edit_check()
+RETURNS trigger AS $$
+DECLARE
+  is_material boolean := false;
+BEGIN
+  -- Location moved more than 1 km
+  IF NEW.location IS DISTINCT FROM OLD.location AND OLD.location IS NOT NULL THEN
+    IF ST_Distance(NEW.location, OLD.location) > 1000 THEN
+      is_material := true;
+    END IF;
+  END IF;
+
+  -- observed_at moved more than 24 hours
+  IF NEW.observed_at IS DISTINCT FROM OLD.observed_at AND OLD.observed_at IS NOT NULL THEN
+    IF abs(extract(epoch FROM (NEW.observed_at - OLD.observed_at))) > 86400 THEN
+      is_material := true;
+    END IF;
+  END IF;
+
+  -- primary taxon changed (denormalized from identifications by sync_primary_id_trigger)
+  IF NEW.primary_taxon_id IS DISTINCT FROM OLD.primary_taxon_id THEN
+    is_material := true;
+  END IF;
+
+  IF is_material THEN
+    NEW.last_material_edit_at := now();
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS observations_material_edit_check_trg ON public.observations;
+CREATE TRIGGER observations_material_edit_check_trg
+  BEFORE UPDATE ON public.observations
+  FOR EACH ROW
+  EXECUTE FUNCTION public.observations_material_edit_check();
+
+NOTIFY pgrst, 'reload schema';
+-- ============================================================
+-- Module 27 — Sponsorship requests (beneficiary-initiated discovery)
+-- See docs/specs/modules/27-ai-sponsorships.md
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.sponsorship_requests (
+  id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  requester_id      uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  target_sponsor_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  message           text CHECK (message IS NULL OR length(message) <= 280),
+  status            text NOT NULL DEFAULT 'pending'
+                    CHECK (status IN ('pending','approved','rejected','withdrawn')),
+  created_at        timestamptz NOT NULL DEFAULT now(),
+  responded_at      timestamptz,
+  CHECK (requester_id <> target_sponsor_id),
+  UNIQUE (requester_id, target_sponsor_id)
+);
+
+CREATE INDEX IF NOT EXISTS sponsorship_requests_target_pending_idx
+  ON public.sponsorship_requests (target_sponsor_id, created_at DESC)
+  WHERE status = 'pending';
+
+CREATE INDEX IF NOT EXISTS sponsorship_requests_requester_idx
+  ON public.sponsorship_requests (requester_id, created_at DESC);
+
+ALTER TABLE public.sponsorship_requests ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS sponsorship_requests_party_read ON public.sponsorship_requests;
+CREATE POLICY sponsorship_requests_party_read ON public.sponsorship_requests
+  FOR SELECT TO authenticated
+  USING (requester_id = auth.uid() OR target_sponsor_id = auth.uid());
+
+-- Defense-in-depth: explicit RESTRICTIVE deny for client writes (writes go via Edge Function).
+DROP POLICY IF EXISTS sponsorship_requests_no_client_insert ON public.sponsorship_requests;
+CREATE POLICY sponsorship_requests_no_client_insert ON public.sponsorship_requests
+  AS RESTRICTIVE FOR INSERT TO authenticated, anon WITH CHECK (false);
+DROP POLICY IF EXISTS sponsorship_requests_no_client_update ON public.sponsorship_requests;
+CREATE POLICY sponsorship_requests_no_client_update ON public.sponsorship_requests
+  AS RESTRICTIVE FOR UPDATE TO authenticated, anon USING (false);
+DROP POLICY IF EXISTS sponsorship_requests_no_client_delete ON public.sponsorship_requests;
+CREATE POLICY sponsorship_requests_no_client_delete ON public.sponsorship_requests
+  AS RESTRICTIVE FOR DELETE TO authenticated, anon USING (false);
+
+-- Extend audit_op enum
+ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'sponsorship_request_create';
+ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'sponsorship_request_approve';
+ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'sponsorship_request_reject';
+ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'sponsorship_request_withdraw';
