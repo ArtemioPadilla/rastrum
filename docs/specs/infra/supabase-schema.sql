@@ -4103,6 +4103,52 @@ WHERE profile_public = true
 GRANT SELECT ON public.community_observers_with_centroid TO authenticated;
 -- Explicitly NO grant to anon. Lack of grant is the security gate.
 
+-- 8) recompute_user_stats() — called by the nightly Edge Function.
+-- supabase-js cannot execute multi-statement CTE+UPDATE, so the aggregate
+-- lives in a SECURITY DEFINER function. Restricted to service_role to keep
+-- it off the public surface; the cron-only Edge Function uses the
+-- auto-injected SUPABASE_SERVICE_ROLE_KEY to invoke it via db.rpc(...).
+CREATE OR REPLACE FUNCTION public.recompute_user_stats()
+RETURNS integer
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public AS $$
+DECLARE
+  v_count integer;
+BEGIN
+  WITH stats AS (
+    SELECT
+      o.observer_id AS uid,
+      COUNT(*)::int                                                            AS obs_total,
+      COUNT(DISTINCT i.taxon_id)::int                                          AS species_total,
+      COUNT(*) FILTER (WHERE o.observed_at >= now() - interval '7 days')::int  AS obs_7d,
+      COUNT(*) FILTER (WHERE o.observed_at >= now() - interval '30 days')::int AS obs_30d,
+      ST_Centroid(ST_Collect(o.location::geometry))::geography                 AS centroid
+    FROM public.observations o
+    LEFT JOIN public.identifications i
+      ON i.observation_id = o.id AND i.is_primary = true
+    WHERE o.sync_status = 'synced'
+      AND o.location IS NOT NULL
+    GROUP BY o.observer_id
+  )
+  UPDATE public.users u
+  SET
+    observation_count = COALESCE(s.obs_total, 0),
+    species_count     = COALESCE(s.species_total, 0),
+    obs_count_7d      = COALESCE(s.obs_7d, 0),
+    obs_count_30d     = COALESCE(s.obs_30d, 0),
+    centroid_geog     = s.centroid,
+    country_code      = COALESCE(u.country_code, public.normalize_country_code(u.region_primary))
+  FROM stats s
+  WHERE u.id = s.uid;
+
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  RETURN v_count;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.recompute_user_stats() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.recompute_user_stats() TO service_role;
+
 -- ============================================================
 -- Observation detail redesign — material edit tracking + soft-delete
 -- (2026-04-29) — see docs/superpowers/specs/2026-04-29-obs-detail-redesign-design.md
