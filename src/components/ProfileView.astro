@@ -41,6 +41,14 @@ const k = (tr as unknown as { karma: Record<string, string> }).karma;
   <!-- Signed-in state -->
   <div id="signed-in" class="hidden">
     <PrivacyIntroBanner lang={lang} />
+
+    <aside id="sponsoring-discovery" class="hidden rounded-lg border border-emerald-300 dark:border-emerald-700 p-4 bg-emerald-50 dark:bg-emerald-900/20 mb-6">
+      <p class="text-sm">{tr.sponsoring.discovery_card_title}</p>
+      <a href={getLocalizedPath(lang, routes.sponsoring[locale] + '/')} class="mt-2 inline-block text-emerald-700 hover:text-emerald-900 font-medium text-sm">
+        {tr.sponsoring.discovery_card_cta} →
+      </a>
+    </aside>
+
     <!-- Identity strip -->
     <header class="mb-8">
       <div class="flex items-start gap-4">
@@ -192,6 +200,7 @@ const k = (tr as unknown as { karma: Record<string, string> }).karma;
   import { getSupabase } from '../lib/supabase';
   import { escAttr } from '../lib/karma';
   import type { UserProfile } from '../lib/types';
+  import { listCredentials } from '../lib/sponsorships';
 
   const signedOut    = document.getElementById('signed-out') as HTMLDivElement | null;
   const signedIn     = document.getElementById('signed-in') as HTMLDivElement | null;
@@ -376,6 +385,15 @@ const k = (tr as unknown as { karma: Record<string, string> }).karma;
   }
 
   run().catch(console.error);
+
+  (async () => {
+    try {
+      const creds = await listCredentials();
+      if (creds.length === 0) {
+        document.getElementById('sponsoring-discovery')?.classList.remove('hidden');
+      }
+    } catch { /* not authed or fn unavailable — silent */ }
+  })();
 </script>
 
 <script>
