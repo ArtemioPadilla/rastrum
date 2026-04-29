@@ -59,7 +59,17 @@ const tr = t(lang);
   <p id="users-error" class="hidden mt-3 text-sm text-red-600 dark:text-red-400"></p>
 </section>
 
-<ConsoleSlideOver lang={lang} id="console-slideover-users" titleKey={tr.console.users_grant_title}>
+<ConsoleSlideOver
+  lang={lang}
+  id="console-slideover-users"
+  titleKey={tr.console.users_grant_title}
+  reasonTemplates={[
+    tr.console.reason_promotion_after_participation,
+    tr.console.reason_policy_violation,
+    tr.console.reason_test_grant,
+    tr.console.quick_reason_custom,
+  ]}
+>
   <div id="slideover-users-fields" class="space-y-3">
     <label class="block">
       <span class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.console.users_grant_role_label}</span>
@@ -81,6 +91,7 @@ const tr = t(lang);
   import { getSupabase } from '../lib/supabase';
   import { getUserRoles } from '../lib/user-roles';
   import { adminClient, AdminClientError } from '../lib/admin-client';
+  import { readFilterState, writeFilterState } from '../lib/console-filter-state';
 
   type UserRow = {
     id: string;
@@ -126,7 +137,10 @@ const tr = t(lang);
     const myRoles = await getUserRoles(session.user.id);
     if (!myRoles.has('admin')) { show('users-not-auth'); return; }
     show('users-shell');
-    await loadUsers('');
+    const savedQ = readFilterState()['q'] ?? '';
+    const searchEl = document.getElementById('users-search') as HTMLInputElement | null;
+    if (searchEl && savedQ) searchEl.value = savedQ;
+    await loadUsers(savedQ);
   }
 
   async function loadUsers(q: string) {
@@ -323,7 +337,9 @@ const tr = t(lang);
   document.getElementById('users-search')?.addEventListener('input', (ev) => {
     if (searchTimer) clearTimeout(searchTimer);
     searchTimer = setTimeout(() => {
-      loadUsers((ev.target as HTMLInputElement).value);
+      const q = (ev.target as HTMLInputElement).value;
+      writeFilterState({ q });
+      loadUsers(q);
     }, 300);
   });
 

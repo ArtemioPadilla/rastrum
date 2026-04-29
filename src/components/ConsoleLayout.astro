@@ -84,3 +84,49 @@ const labelKey: Record<UserRole, string> = {
     </main>
   </div>
 </div>
+
+<div
+  id="console-kb-labels"
+  class="hidden"
+  data-kb-help-title={tr.console.kb_help_title}
+  data-kb-help-close={tr.console.kb_help_close}
+  data-kb-nav-audit={tr.console.kb_nav_audit}
+  data-kb-nav-users={tr.console.kb_nav_users}
+  data-kb-nav-observations={tr.console.kb_nav_observations}
+  data-kb-nav-flag-queue={tr.console.kb_nav_flag_queue}
+  data-kb-nav-comments={tr.console.kb_nav_comments}
+  data-kb-nav-bans={tr.console.kb_nav_bans}
+  data-kb-nav-experts={tr.console.kb_nav_experts}
+  data-kb-nav-sync={tr.console.kb_nav_sync}
+  data-kb-nav-api={tr.console.kb_nav_api}
+  data-kb-help-navigation={tr.console.kb_help_navigation}
+  data-kb-help-actions={tr.console.kb_help_actions}
+  data-kb-escape-close={tr.console.kb_escape_close}
+  data-kb-question-help={tr.console.kb_question_help}
+></div>
+
+<script>
+  import { installConsoleKeybindings } from '../lib/console-keybindings';
+
+  const labelsEl = document.getElementById('console-kb-labels');
+  if (labelsEl) {
+    const labels: Record<string, string> = {
+      kb_help_title:       labelsEl.dataset.kbHelpTitle ?? '',
+      kb_help_close:       labelsEl.dataset.kbHelpClose ?? '',
+      kb_nav_audit:        labelsEl.dataset.kbNavAudit ?? '',
+      kb_nav_users:        labelsEl.dataset.kbNavUsers ?? '',
+      kb_nav_observations: labelsEl.dataset.kbNavObservations ?? '',
+      kb_nav_flag_queue:   labelsEl.dataset.kbNavFlagQueue ?? '',
+      kb_nav_comments:     labelsEl.dataset.kbNavComments ?? '',
+      kb_nav_bans:         labelsEl.dataset.kbNavBans ?? '',
+      kb_nav_experts:      labelsEl.dataset.kbNavExperts ?? '',
+      kb_nav_sync:         labelsEl.dataset.kbNavSync ?? '',
+      kb_nav_api:          labelsEl.dataset.kbNavApi ?? '',
+      kb_help_navigation:  labelsEl.dataset.kbHelpNavigation ?? '',
+      kb_help_actions:     labelsEl.dataset.kbHelpActions ?? '',
+      kb_escape_close:     labelsEl.dataset.kbEscapeClose ?? '',
+      kb_question_help:    labelsEl.dataset.kbQuestionHelp ?? '',
+    };
+    installConsoleKeybindings(labels);
+  }
+</script>

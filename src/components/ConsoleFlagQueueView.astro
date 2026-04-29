@@ -111,12 +111,24 @@ const tr = t(lang);
   <p id="flagq-error" class="hidden mt-3 text-sm text-red-600 dark:text-red-400"></p>
 </section>
 
-<ConsoleSlideOver lang={lang} id="console-slideover-flagq" titleKey={tr.console.flagq_action_triage} />
+<ConsoleSlideOver
+  lang={lang}
+  id="console-slideover-flagq"
+  titleKey={tr.console.flagq_action_triage}
+  reasonTemplates={[
+    tr.console.reason_spam_confirmed,
+    tr.console.reason_not_a_violation,
+    tr.console.reason_resolved_by_hide,
+    tr.console.reason_resolved_by_comment_lock,
+    tr.console.quick_reason_custom,
+  ]}
+/>
 
 <script>
   import { getSupabase } from '../lib/supabase';
   import { getUserRoles } from '../lib/user-roles';
   import { adminClient, AdminClientError } from '../lib/admin-client';
+  import { readFilterState, writeFilterState, applyFilterStateToForm } from '../lib/console-filter-state';
 
   type ReportRow = {
     id: string;
@@ -146,6 +158,12 @@ const tr = t(lang);
 
   const supabase = getSupabase();
 
+  const FILTER_MAP = {
+    status: 'flagq-filter-status',
+    type: 'flagq-filter-type',
+    reason: 'flagq-filter-reason',
+  };
+
   async function init() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) { show('flagq-not-auth'); return; }
@@ -153,6 +171,7 @@ const tr = t(lang);
     const myRoles = await getUserRoles(session.user.id);
     if (!myRoles.has('moderator') && !myRoles.has('admin')) { show('flagq-not-auth'); return; }
     show('flagq-shell');
+    applyFilterStateToForm(readFilterState(), FILTER_MAP);
     await loadReports();
   }
 
@@ -345,7 +364,17 @@ const tr = t(lang);
   let filterTimer: ReturnType<typeof setTimeout> | null = null;
   function onFilterChange() {
     if (filterTimer) clearTimeout(filterTimer);
-    filterTimer = setTimeout(() => { loadReports(); }, 300);
+    filterTimer = setTimeout(() => {
+      const statusEl = document.getElementById('flagq-filter-status') as HTMLSelectElement | null;
+      const typeEl = document.getElementById('flagq-filter-type') as HTMLSelectElement | null;
+      const reasonEl = document.getElementById('flagq-filter-reason') as HTMLSelectElement | null;
+      writeFilterState({
+        status: statusEl?.value ?? '',
+        type: typeEl?.value ?? '',
+        reason: reasonEl?.value ?? '',
+      });
+      loadReports();
+    }, 300);
   }
 
   ['flagq-filter-status', 'flagq-filter-type', 'flagq-filter-reason'].forEach(id => {

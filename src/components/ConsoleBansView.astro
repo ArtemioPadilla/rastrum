@@ -84,7 +84,18 @@ const tr = t(lang);
 </section>
 
 <!-- Unban slide-over -->
-<ConsoleSlideOver lang={lang} id="console-slideover-bans" titleKey={tr.console.bans_action_unban} />
+<ConsoleSlideOver
+  lang={lang}
+  id="console-slideover-bans"
+  titleKey={tr.console.bans_action_unban}
+  reasonTemplates={[
+    tr.console.reason_spam,
+    tr.console.reason_harassment,
+    tr.console.reason_multiple_policy_violations,
+    tr.console.reason_nom059_breach,
+    tr.console.quick_reason_custom,
+  ]}
+/>
 
 <!-- Issue ban slide-over (custom, not using ConsoleSlideOver because it needs extra fields) -->
 <div id="bans-issue-panel" class="hidden fixed inset-0 z-50 pointer-events-none">
@@ -125,6 +136,7 @@ const tr = t(lang);
   import { getSupabase } from '../lib/supabase';
   import { getUserRoles } from '../lib/user-roles';
   import { adminClient, AdminClientError } from '../lib/admin-client';
+  import { readFilterState, writeFilterState } from '../lib/console-filter-state';
 
   type BanRow = {
     id: string;
@@ -159,6 +171,12 @@ const tr = t(lang);
     const myRoles = await getUserRoles(session.user.id);
     if (!myRoles.has('moderator') && !myRoles.has('admin')) { show('bans-not-auth'); return; }
     show('bans-shell');
+    const saved = readFilterState();
+    if (saved['filter'] === 'all') {
+      showActiveOnly = false;
+      document.getElementById('bans-toggle-all')!.className = 'px-3 py-1.5 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-medium';
+      document.getElementById('bans-toggle-active')!.className = 'px-3 py-1.5 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300';
+    }
     await loadBans();
   }
 
@@ -273,6 +291,7 @@ const tr = t(lang);
       showActiveOnly = true;
       document.getElementById('bans-toggle-active')!.className = 'px-3 py-1.5 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-medium';
       document.getElementById('bans-toggle-all')!.className = 'px-3 py-1.5 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300';
+      writeFilterState({ filter: 'active' });
       loadBans();
       return;
     }
@@ -281,6 +300,7 @@ const tr = t(lang);
       showActiveOnly = false;
       document.getElementById('bans-toggle-all')!.className = 'px-3 py-1.5 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-medium';
       document.getElementById('bans-toggle-active')!.className = 'px-3 py-1.5 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300';
+      writeFilterState({ filter: 'all' });
       loadBans();
       return;
     }
