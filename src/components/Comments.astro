@@ -21,6 +21,16 @@ interface Props {
 const { lang, observationId } = Astro.props;
 const tr = t(lang);
 const signInPath = getLocalizedPath(lang, routes.signIn[lang] + '/');
+const sgTree = tr as unknown as {
+  socialgraph: {
+    cards: Record<string, string>;
+    block: { button: string };
+    report: { button: string };
+  };
+};
+const sgCards = sgTree.socialgraph.cards;
+const sgBlockLabel  = sgTree.socialgraph.block.button;
+const sgReportLabel = sgTree.socialgraph.report.button;
 ---
 
 <section
@@ -37,6 +47,14 @@ const signInPath = getLocalizedPath(lang, routes.signIn[lang] + '/');
   data-label-edited={tr.social.edited}
   data-label-deleted={tr.social.comment_deleted}
   data-label-confirm-delete={tr.social.delete_confirm}
+  data-label-more-actions={sgCards.more_actions}
+  data-label-block={sgBlockLabel}
+  data-label-report={sgReportLabel}
+  data-label-block-confirm={sgCards.block_user_confirm}
+  data-label-block-success={sgCards.block_user_success}
+  data-label-block-error={sgCards.block_user_error}
+  data-label-report-comment-aria={sgCards.report_comment_aria}
+  data-label-block-commenter-aria={sgCards.block_commenter_aria}
 >
   <h2 class="text-lg md:text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
     {tr.social.comments_title}
@@ -121,6 +139,7 @@ const signInPath = getLocalizedPath(lang, routes.signIn[lang] + '/');
   ): string {
     const author = authors[node.author_id];
     const name = author?.display_name || author?.username || (lang === 'es' ? 'Observador' : 'Observer');
+    const handle = author?.username ?? '';
     const avatar = author?.avatar_url || avatarSvg(name);
     const ago = formatTimeAgo(node.created_at, lang);
     const editedBadge = node.edited_at ? `<span class="text-xs text-zinc-400 ml-1">(${labels.edited})</span>` : '';
@@ -132,6 +151,24 @@ const signInPath = getLocalizedPath(lang, routes.signIn[lang] + '/');
     const replyAction = !isReply && currentUserId
       ? `<button type="button" class="action-reply text-xs text-emerald-700 dark:text-emerald-400 underline-offset-2 hover:underline mt-1" data-id="${node.id}">${labels.reply}</button>`
       : '';
+    // Overflow ⋮ — only for signed-in viewers, not on their own comments.
+    const overflowHtml = (currentUserId && !isOwner)
+      ? `<div class="comment-overflow relative shrink-0" data-author-id="${escapeText(node.author_id)}" data-author-handle="${escapeText(handle)}" data-comment-id="${escapeText(node.id)}">
+          <button type="button" class="comment-overflow-trigger inline-flex h-7 w-7 items-center justify-center rounded-full text-zinc-400 dark:text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors" aria-label="${escapeText(labels.moreActions)}" aria-haspopup="menu" aria-expanded="false">
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+          </button>
+          <div class="comment-overflow-menu hidden absolute right-0 top-8 z-30 min-w-[180px] rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-lg overflow-hidden" role="menu">
+            <button type="button" class="comment-action-block flex w-full items-center gap-2.5 px-3.5 py-2.5 text-sm text-zinc-800 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors" role="menuitem" aria-label="${escapeText(labels.blockCommenterAria)}">
+              <svg class="h-4 w-4 text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+              <span>${escapeText(labels.block)}</span>
+            </button>
+            <button type="button" class="comment-action-report flex w-full items-center gap-2.5 px-3.5 py-2.5 text-sm text-zinc-800 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors border-t border-zinc-100 dark:border-zinc-800" role="menuitem" aria-label="${escapeText(labels.reportCommentAria)}">
+              <svg class="h-4 w-4 text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22V4a2 2 0 0 1 2-2h11l4 6-4 6H6"/><line x1="4" y1="22" x2="4" y2="14"/></svg>
+              <span>${escapeText(labels.report)}</span>
+            </button>
+          </div>
+        </div>`
+      : '';
     const repliesMarkup = (node.replies || [])
       .map(r => nodeMarkup(r, authors, currentUserId, lang, labels, true))
       .join('');
@@ -140,10 +177,13 @@ const signInPath = getLocalizedPath(lang, routes.signIn[lang] + '/');
         <article class="flex gap-3">
           <img src="${avatar}" alt="" class="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 shrink-0" />
           <div class="flex-1 min-w-0">
-            <header class="text-sm">
-              <span class="font-semibold text-zinc-900 dark:text-zinc-100">${escapeText(name)}</span>
-              <span class="text-zinc-500 ml-1">${ago}</span>
-              ${editedBadge}
+            <header class="flex items-start gap-2 text-sm">
+              <div class="flex-1 min-w-0">
+                <span class="font-semibold text-zinc-900 dark:text-zinc-100">${escapeText(name)}</span>
+                <span class="text-zinc-500 ml-1">${ago}</span>
+                ${editedBadge}
+              </div>
+              ${overflowHtml}
             </header>
             <div class="comment-body mt-1 text-sm text-zinc-800 dark:text-zinc-200 break-words"></div>
             ${replyAction}
@@ -176,6 +216,14 @@ const signInPath = getLocalizedPath(lang, routes.signIn[lang] + '/');
       deleted: root.dataset.labelDeleted ?? 'deleted',
       confirmDelete: root.dataset.labelConfirmDelete ?? 'Delete this comment?',
       empty: root.dataset.labelEmpty ?? 'No comments yet.',
+      moreActions: root.dataset.labelMoreActions ?? 'More actions',
+      block: root.dataset.labelBlock ?? 'Block',
+      report: root.dataset.labelReport ?? 'Report',
+      blockConfirm: root.dataset.labelBlockConfirm ?? 'Block @{{handle}}?',
+      blockSuccess: root.dataset.labelBlockSuccess ?? 'User blocked.',
+      blockError: root.dataset.labelBlockError ?? 'Could not block.',
+      reportCommentAria: root.dataset.labelReportCommentAria ?? 'Report this comment',
+      blockCommenterAria: root.dataset.labelBlockCommenterAria ?? 'Block this commenter',
     };
 
     const listEl = root.querySelector('.comments-list') as HTMLUListElement | null;
@@ -262,7 +310,85 @@ const signInPath = getLocalizedPath(lang, routes.signIn[lang] + '/');
       listEl?.querySelectorAll<HTMLButtonElement>('.action-reply').forEach(btn => {
         btn.addEventListener('click', () => beginReply(btn.dataset.id ?? ''));
       });
+      // Wire each per-comment overflow ⋮ menu (Block + Report).
+      listEl?.querySelectorAll<HTMLElement>('.comment-overflow:not([data-bound])').forEach(wrap => {
+        wrap.dataset.bound = '1';
+        const trigger = wrap.querySelector<HTMLButtonElement>('.comment-overflow-trigger');
+        const menu = wrap.querySelector<HTMLElement>('.comment-overflow-menu');
+        const blockBtn = wrap.querySelector<HTMLButtonElement>('.comment-action-block');
+        const reportBtn = wrap.querySelector<HTMLButtonElement>('.comment-action-report');
+
+        const closeMenu = () => {
+          menu?.classList.add('hidden');
+          trigger?.setAttribute('aria-expanded', 'false');
+        };
+        const openMenu = () => {
+          menu?.classList.remove('hidden');
+          trigger?.setAttribute('aria-expanded', 'true');
+        };
+
+        trigger?.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (menu?.classList.contains('hidden')) openMenu(); else closeMenu();
+        });
+
+        blockBtn?.addEventListener('click', async () => {
+          closeMenu();
+          const authorId = wrap.dataset.authorId ?? '';
+          const handle = wrap.dataset.authorHandle ?? '';
+          if (!authorId) return;
+          if (!confirm(labels.blockConfirm.replace('{{handle}}', handle || '?'))) return;
+          if (blockBtn) blockBtn.disabled = true;
+          try {
+            const { blockUser } = await import('../lib/social');
+            await blockUser(authorId);
+            alert(labels.blockSuccess);
+            // Remove that author's comments from this thread immediately.
+            listEl?.querySelectorAll<HTMLElement>(`.comment-overflow[data-author-id="${CSS.escape(authorId)}"]`).forEach(w => {
+              w.closest('.comment-item')?.remove();
+            });
+          } catch (err) {
+            alert(labels.blockError);
+            // eslint-disable-next-line no-console
+            console.warn('[comments.block]', err);
+          } finally {
+            if (blockBtn) blockBtn.disabled = false;
+          }
+        });
+
+        reportBtn?.addEventListener('click', () => {
+          closeMenu();
+          const commentId = wrap.dataset.commentId ?? '';
+          const handle = wrap.dataset.authorHandle ?? '';
+          if (!commentId) return;
+          const dialog = document.getElementById('rastrum-report-dialog');
+          if (dialog) {
+            (dialog as HTMLElement).dataset.target = 'comment';
+            (dialog as HTMLElement).dataset.targetId = commentId;
+            (dialog as HTMLElement).dataset.targetLabel = handle ? '@' + handle : '';
+            dialog.classList.remove('hidden');
+          }
+        });
+      });
     }
+
+    // Click-outside / Esc closes any open comment overflow menu.
+    document.addEventListener('click', (e) => {
+      const tgt = e.target as Node;
+      listEl?.querySelectorAll<HTMLElement>('.comment-overflow').forEach((wrap) => {
+        if (wrap.contains(tgt)) return;
+        wrap.querySelector('.comment-overflow-menu')?.classList.add('hidden');
+        wrap.querySelector('.comment-overflow-trigger')?.setAttribute('aria-expanded', 'false');
+      });
+    });
+    document.addEventListener('keydown', (e) => {
+      if ((e as KeyboardEvent).key !== 'Escape') return;
+      listEl?.querySelectorAll<HTMLElement>('.comment-overflow').forEach((wrap) => {
+        wrap.querySelector('.comment-overflow-menu')?.classList.add('hidden');
+        wrap.querySelector('.comment-overflow-trigger')?.setAttribute('aria-expanded', 'false');
+      });
+    });
 
     function beginEdit(id: string) {
       const row = allRows.find(r => r.id === id);

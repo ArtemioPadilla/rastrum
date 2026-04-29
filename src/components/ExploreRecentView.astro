@@ -25,6 +25,16 @@ const shareBase = `/share/obs/`;
 const validation = (tr as unknown as { validation?: Record<string, string> }).validation ?? {};
 const rgLabel = validation.research_grade        ?? (lang === 'es' ? 'Grado investigación' : 'Research grade');
 const rgTitle = validation.research_grade_title  ?? rgLabel;
+const sgTree = tr as unknown as {
+  socialgraph: {
+    cards: Record<string, string>;
+    block: { button: string };
+    report: { button: string };
+  };
+};
+const sgCards  = sgTree.socialgraph.cards;
+const sgBlock  = sgTree.socialgraph.block.button;
+const sgReport = sgTree.socialgraph.report.button;
 ---
 
 <section
@@ -38,6 +48,16 @@ const rgTitle = validation.research_grade_title  ?? rgLabel;
   data-label-loading={page.loading}
   data-label-research-grade={rgLabel}
   data-label-research-grade-title={rgTitle}
+  data-label-more-actions={sgCards.more_actions}
+  data-label-block={sgBlock}
+  data-label-report={sgReport}
+  data-label-block-confirm={sgCards.block_user_confirm}
+  data-label-block-success={sgCards.block_user_success}
+  data-label-block-error={sgCards.block_user_error}
+  data-label-report-aria={sgCards.report_observation_aria}
+  data-label-block-observer-aria={sgCards.block_observer_aria}
+  data-label-fave-count-one={(tr as unknown as { socialgraph: { reactions: Record<string, string> } }).socialgraph.reactions.fave_count_aria_one}
+  data-label-fave-count-other={(tr as unknown as { socialgraph: { reactions: Record<string, string> } }).socialgraph.reactions.fave_count_aria_other}
 >
   <header class="space-y-3 py-6">
     <h1 class="text-3xl font-bold tracking-tight">{page.title}</h1>
@@ -142,7 +162,7 @@ const rgTitle = validation.research_grade_title  ?? rgLabel;
     return !!observer.profile_public;
   }
 
-  function rowMarkup(r: Row, lang: Lang, anonLabel: string, unknownLabel: string, shareBase: string, profileBase: string, rgLabel: string, rgTitle: string, viewerAuthed: boolean): string {
+  function rowMarkup(r: Row, lang: Lang, anonLabel: string, unknownLabel: string, shareBase: string, profileBase: string, rgLabel: string, rgTitle: string, viewerAuthed: boolean, viewerId: string | null, labels: Record<string, string>): string {
     const ident = pickIdent(r);
     const observer = pickObserver(r);
     const sci = ident?.scientific_name ?? unknownLabel;
@@ -169,7 +189,38 @@ const rgTitle = validation.research_grade_title  ?? rgLabel;
 
     const commonHtml = common ? `<p class="text-sm text-zinc-600 dark:text-zinc-300 truncate">${escapeText(common)}</p>` : '';
 
-    return `<li>
+    // Overflow menu (Block + Report) — only for signed-in viewers, not on
+    // their own observations. Lifted from PublicProfileViewV2.
+    const isOwn = !!viewerId && viewerId === r.observer_id;
+    const overflowHtml = (viewerAuthed && !isOwn)
+      ? `<div class="er-overflow absolute right-2 top-2 z-10" data-observer-id="${escapeText(r.observer_id)}" data-observer-handle="${escapeText(observer?.username ?? '')}" data-obs-id="${escapeText(r.id)}" data-obs-label="${escapeText(sci)}">
+          <button
+            type="button"
+            class="er-overflow-trigger inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/90 dark:bg-zinc-900/90 text-zinc-700 dark:text-zinc-300 ring-1 ring-zinc-200 dark:ring-zinc-800 hover:bg-white dark:hover:bg-zinc-900 shadow-sm transition-colors"
+            aria-label="${escapeText(labels.moreActions)}"
+            aria-haspopup="menu"
+            aria-expanded="false"
+          >
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+          </button>
+          <div class="er-overflow-menu hidden absolute right-0 top-10 min-w-[180px] rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-lg overflow-hidden" role="menu">
+            <button type="button" class="er-action-block flex w-full items-center gap-2.5 px-3.5 py-2.5 text-sm text-zinc-800 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors" role="menuitem" aria-label="${escapeText(labels.blockObserverAria)}">
+              <svg class="h-4 w-4 text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+              <span>${escapeText(labels.block)}</span>
+            </button>
+            <button type="button" class="er-action-report flex w-full items-center gap-2.5 px-3.5 py-2.5 text-sm text-zinc-800 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors border-t border-zinc-100 dark:border-zinc-800" role="menuitem" aria-label="${escapeText(labels.reportAria)}">
+              <svg class="h-4 w-4 text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22V4a2 2 0 0 1 2-2h11l4 6-4 6H6"/><line x1="4" y1="22" x2="4" y2="14"/></svg>
+              <span>${escapeText(labels.report)}</span>
+            </button>
+          </div>
+        </div>`
+      : '';
+
+    // Reaction count chip placeholder — populated after batched fetch.
+    const faveChipHtml = `<span class="er-fave-chip hidden inline-flex items-center gap-1 rounded-full bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 px-2 py-0.5 text-[11px] font-semibold text-rose-700 dark:text-rose-300" data-fave-target="${escapeText(r.id)}"><svg class="w-3 h-3" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21s-7-4.5-9.5-9A5.5 5.5 0 0 1 12 6a5.5 5.5 0 0 1 9.5 6c-2.5 4.5-9.5 9-9.5 9Z"/></svg><span class="er-fave-count tabular-nums">0</span></span>`;
+
+    return `<li class="relative">
+      ${overflowHtml}
       <a
         href="${shareBase}?id=${encodeURIComponent(r.id)}"
         class="er-card block overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 hover:border-emerald-400 dark:hover:border-emerald-700 transition-colors"
@@ -185,6 +236,7 @@ const rgTitle = validation.research_grade_title  ?? rgLabel;
           <div class="flex items-center gap-2 flex-wrap text-xs text-zinc-500 dark:text-zinc-400">
             ${researchGradePill}
             ${confidencePill}
+            ${faveChipHtml}
             <span>${escapeText(ago)}</span>
           </div>
           <p class="text-xs text-zinc-500 dark:text-zinc-400 truncate">${observerHtml}</p>
@@ -201,6 +253,18 @@ const rgTitle = validation.research_grade_title  ?? rgLabel;
     const unknownLabel = root.dataset.labelUnknownSpecies ?? 'Unknown species';
     const rgLabel = root.dataset.labelResearchGrade ?? 'Research grade';
     const rgTitle = root.dataset.labelResearchGradeTitle ?? rgLabel;
+    const labels = {
+      moreActions: root.dataset.labelMoreActions ?? 'More actions',
+      block: root.dataset.labelBlock ?? 'Block',
+      report: root.dataset.labelReport ?? 'Report',
+      blockConfirm: root.dataset.labelBlockConfirm ?? 'Block @{{handle}}?',
+      blockSuccess: root.dataset.labelBlockSuccess ?? 'Blocked.',
+      blockError: root.dataset.labelBlockError ?? 'Could not block.',
+      reportAria: root.dataset.labelReportAria ?? 'Report this observation',
+      blockObserverAria: root.dataset.labelBlockObserverAria ?? 'Block this observer',
+      faveCountOne: root.dataset.labelFaveCountOne ?? '{{count}} person favorited this',
+      faveCountOther: root.dataset.labelFaveCountOther ?? '{{count}} people favorited this',
+    };
 
     const listEl = root.querySelector('.er-list') as HTMLUListElement | null;
     const skeletonEl = root.querySelector('.er-skeleton') as HTMLElement | null;
@@ -228,10 +292,12 @@ const rgTitle = validation.research_grade_title  ?? rgLabel;
     }
 
     let viewerAuthed = false;
+    let viewerId: string | null = null;
     try {
       const { data } = await supabase.auth.getUser();
       viewerAuthed = !!data.user;
-    } catch { viewerAuthed = false; }
+      viewerId = data.user?.id ?? null;
+    } catch { viewerAuthed = false; viewerId = null; }
 
     async function fetchPage(): Promise<Row[]> {
       const { data, error } = await supabase
@@ -249,6 +315,125 @@ const rgTitle = validation.research_grade_title  ?? rgLabel;
       return ((data ?? []) as unknown) as Row[];
     }
 
+    // Batched fetch of reaction counts for the just-rendered ids. Uses
+    // the observation_reaction_summary view to avoid an N+1.
+    async function paintReactionCounts(ids: string[]) {
+      if (ids.length === 0) return;
+      try {
+        const { data } = await supabase
+          .from('observation_reaction_summary')
+          .select('observation_id, kind, count')
+          .in('observation_id', ids)
+          .eq('kind', 'fave');
+        const byId = new Map<string, number>();
+        for (const row of (data ?? []) as { observation_id: string; kind: string; count: number }[]) {
+          byId.set(row.observation_id, row.count);
+        }
+        for (const id of ids) {
+          const n = byId.get(id) ?? 0;
+          if (n <= 0) continue;
+          const chip = root.querySelector<HTMLElement>(`.er-fave-chip[data-fave-target="${CSS.escape(id)}"]`);
+          if (!chip) continue;
+          const countEl = chip.querySelector<HTMLElement>('.er-fave-count');
+          if (countEl) countEl.textContent = String(n);
+          const tpl = n === 1 ? labels.faveCountOne : labels.faveCountOther;
+          chip.setAttribute('aria-label', tpl.replace('{{count}}', String(n)));
+          chip.classList.remove('hidden');
+        }
+      } catch { /* aggregate fetch failures shouldn't break the feed */ }
+    }
+
+    function wireOverflowMenus(scope: ParentNode) {
+      const wraps = scope.querySelectorAll<HTMLElement>('.er-overflow:not([data-bound])');
+      wraps.forEach((wrap) => {
+        wrap.dataset.bound = '1';
+        const trigger = wrap.querySelector<HTMLButtonElement>('.er-overflow-trigger');
+        const menu = wrap.querySelector<HTMLElement>('.er-overflow-menu');
+        const blockBtn = wrap.querySelector<HTMLButtonElement>('.er-action-block');
+        const reportBtn = wrap.querySelector<HTMLButtonElement>('.er-action-report');
+
+        const closeMenu = () => {
+          menu?.classList.add('hidden');
+          trigger?.setAttribute('aria-expanded', 'false');
+        };
+        const openMenu = () => {
+          menu?.classList.remove('hidden');
+          trigger?.setAttribute('aria-expanded', 'true');
+        };
+
+        trigger?.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (menu?.classList.contains('hidden')) openMenu(); else closeMenu();
+        });
+
+        blockBtn?.addEventListener('click', async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          closeMenu();
+          const handle = wrap.dataset.observerHandle ?? '';
+          const observerId = wrap.dataset.observerId ?? '';
+          if (!observerId) return;
+          const confirmCopy = labels.blockConfirm.replace('{{handle}}', handle || '?');
+          if (!confirm(confirmCopy)) return;
+          if (blockBtn) blockBtn.disabled = true;
+          try {
+            const { blockUser } = await import('../lib/social');
+            await blockUser(observerId);
+            alert(labels.blockSuccess);
+            // Hide all cards by this observer in the current list.
+            root.querySelectorAll<HTMLElement>(`.er-overflow[data-observer-id="${CSS.escape(observerId)}"]`).forEach((w) => {
+              const li = w.closest('li');
+              li?.classList.add('hidden');
+            });
+          } catch (err) {
+            alert(labels.blockError);
+            // eslint-disable-next-line no-console
+            console.warn('[er.block]', err);
+          } finally {
+            if (blockBtn) blockBtn.disabled = false;
+          }
+        });
+
+        reportBtn?.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          closeMenu();
+          const obsId = wrap.dataset.obsId ?? '';
+          const obsLabel = wrap.dataset.obsLabel ?? '';
+          if (!obsId) return;
+          const dialog = document.getElementById('rastrum-report-dialog');
+          if (dialog) {
+            (dialog as HTMLElement).dataset.target = 'observation';
+            (dialog as HTMLElement).dataset.targetId = obsId;
+            (dialog as HTMLElement).dataset.targetLabel = obsLabel;
+            dialog.classList.remove('hidden');
+          }
+        });
+      });
+    }
+
+    // Click outside / Esc closes any open overflow menu in this list.
+    document.addEventListener('click', (e) => {
+      const tgt = e.target as Node;
+      root.querySelectorAll<HTMLElement>('.er-overflow').forEach((wrap) => {
+        if (wrap.contains(tgt)) return;
+        const menu = wrap.querySelector<HTMLElement>('.er-overflow-menu');
+        const trigger = wrap.querySelector<HTMLButtonElement>('.er-overflow-trigger');
+        menu?.classList.add('hidden');
+        trigger?.setAttribute('aria-expanded', 'false');
+      });
+    });
+    document.addEventListener('keydown', (e) => {
+      if ((e as KeyboardEvent).key !== 'Escape') return;
+      root.querySelectorAll<HTMLElement>('.er-overflow').forEach((wrap) => {
+        const menu = wrap.querySelector<HTMLElement>('.er-overflow-menu');
+        const trigger = wrap.querySelector<HTMLButtonElement>('.er-overflow-trigger');
+        menu?.classList.add('hidden');
+        trigger?.setAttribute('aria-expanded', 'false');
+      });
+    });
+
     async function loadMore() {
       if (busy || exhausted) return;
       busy = true;
@@ -256,11 +441,16 @@ const rgTitle = validation.research_grade_title  ?? rgLabel;
       try {
         const page = await fetchPage();
         hideSkeleton();
+        const renderedIds: string[] = [];
         if (listEl) {
           listEl.insertAdjacentHTML(
             'beforeend',
-            page.map(r => rowMarkup(r, lang, anonLabel, unknownLabel, shareBase, profileBase, rgLabel, rgTitle, viewerAuthed)).join(''),
+            page.map(r => {
+              renderedIds.push(r.id);
+              return rowMarkup(r, lang, anonLabel, unknownLabel, shareBase, profileBase, rgLabel, rgTitle, viewerAuthed, viewerId, labels);
+            }).join(''),
           );
+          wireOverflowMenus(listEl);
         }
         offset += page.length;
         if (page.length < PAGE_SIZE) exhausted = true;
@@ -275,6 +465,8 @@ const rgTitle = validation.research_grade_title  ?? rgLabel;
         } else {
           loadMoreWrap?.classList.remove('hidden');
         }
+        // Fire-and-forget reaction-count fetch for the rows just rendered.
+        paintReactionCounts(renderedIds).catch(() => { /* silent */ });
       } catch (e) {
         hideSkeleton();
         if (errEl) {

@@ -31,6 +31,8 @@ interface Props {
 const { lang, target, targetId, size = 'sm' } = Astro.props;
 const tr = t(lang).socialgraph.reactions;
 const labels = tr as unknown as Record<string, string>;
+const liveAdded = labels.live_added ?? (lang === 'es' ? 'Añadido a favoritos' : 'Favorited');
+const liveRemoved = labels.live_removed ?? (lang === 'es' ? 'Quitado de favoritos' : 'Removed favorite');
 
 const KINDS_BY_TARGET = {
   observation: ['fave'] as const,
@@ -48,6 +50,10 @@ const sizeClasses = size === 'md'
   data-reaction-target={target}
   data-reaction-target-id={targetId}
   data-rs-size={size}
+  data-label-live-added={liveAdded}
+  data-label-live-removed={liveRemoved}
+  role="group"
+  aria-label={labels.fave}
 >
   {kinds.map((kind) => (
     <button
@@ -83,6 +89,7 @@ const sizeClasses = size === 'md'
       <span class="reaction-count tabular-nums font-medium">0</span>
     </button>
   ))}
+  <span class="reaction-live-region sr-only" aria-live="polite" aria-atomic="true"></span>
 </div>
 
 <script>
@@ -173,6 +180,13 @@ const sizeClasses = size === 'md'
           const cur = Number(countEl.textContent ?? '0');
           countEl.textContent = String(Math.max(0, wasOn ? cur - 1 : cur + 1));
         }
+        // Announce the toggle to screen readers via the polite live region.
+        const liveEl = root.querySelector<HTMLElement>('.reaction-live-region');
+        if (liveEl) {
+          const addedMsg = root.dataset.labelLiveAdded ?? 'Favorited';
+          const removedMsg = root.dataset.labelLiveRemoved ?? 'Removed favorite';
+          liveEl.textContent = wasOn ? removedMsg : addedMsg;
+        }
         btn.disabled = true;
         try {
           await react({ target, target_id: targetId, kind: kind as 'fave' | 'helpful' | 'agree_id' | 'disagree_id' | 'needs_id' | 'confirm_id' });
@@ -183,6 +197,7 @@ const sizeClasses = size === 'md'
             const cur = Number(countEl.textContent ?? '0');
             countEl.textContent = String(Math.max(0, wasOn ? cur + 1 : cur - 1));
           }
+          if (liveEl) liveEl.textContent = '';
           // eslint-disable-next-line no-console
           console.warn('[react]', err);
         } finally {
