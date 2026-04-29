@@ -76,12 +76,47 @@ DECLARE
     meta->>'user_name',
     NULLIF(split_part(NEW.email, '@', 1), '')
   );
+  -- Adjectives (nature/character themed, Spanish)
+  adjectives text[] := ARRAY[
+    'valiente','curioso','brillante','veloz','silencioso','audaz','sereno',
+    'ágil','fiero','noble','alerta','sagaz','vibrante','tenaz','libre'
+  ];
+  -- Mexican/LATAM fauna & flora
+  especies text[] := ARRAY[
+    'quetzal','ajolote','teporingo','coatí','cenzontle','ocelote','tapir',
+    'jaguar','manatí','vaquita','guacamaya','tlacuache','armadillo','tejon',
+    'coyote','puma','venado','iguana','boa','tortuga','pelicano','fragata',
+    'colibrí','tucán','flamenco','axolotl','cacomixtle','tlalcoyote'
+  ];
+  gen_username text;
+  attempts int := 0;
 BEGIN
-  INSERT INTO public.users (id, avatar_url, display_name)
-  VALUES (NEW.id, picked_avatar, picked_name)
+  -- Generate a unique <adjective>-<species> username, retry up to 10 times
+  LOOP
+    gen_username := (adjectives)[1 + floor(random() * array_length(adjectives, 1))::int]
+                   || '-'
+                   || (especies)[1 + floor(random() * array_length(especies, 1))::int]
+                   || '-'
+                   || floor(random() * 900 + 100)::text; -- 3-digit suffix for uniqueness
+    EXIT WHEN NOT EXISTS (SELECT 1 FROM public.users WHERE username = gen_username);
+    attempts := attempts + 1;
+    IF attempts >= 10 THEN
+      -- Fallback: timestamp-based suffix guarantees uniqueness
+      gen_username := (adjectives)[1 + floor(random() * array_length(adjectives, 1))::int]
+                     || '-'
+                     || (especies)[1 + floor(random() * array_length(especies, 1))::int]
+                     || '-'
+                     || extract(epoch from now())::bigint % 1000000;
+      EXIT;
+    END IF;
+  END LOOP;
+
+  INSERT INTO public.users (id, avatar_url, display_name, username)
+  VALUES (NEW.id, picked_avatar, picked_name, gen_username)
   ON CONFLICT (id) DO UPDATE SET
     avatar_url   = COALESCE(public.users.avatar_url,   EXCLUDED.avatar_url),
-    display_name = COALESCE(public.users.display_name, EXCLUDED.display_name);
+    display_name = COALESCE(public.users.display_name, EXCLUDED.display_name),
+    username     = COALESCE(public.users.username,     EXCLUDED.username);
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -3136,3 +3171,47 @@ LANGUAGE sql STABLE SECURITY INVOKER AS $$
 $$;
 
 GRANT EXECUTE ON FUNCTION public.top_expertise_legend(uuid) TO anon, authenticated;
+
+-- ═════════════════════════════════════════════════════════════════════
+-- Backfill: assign default usernames to existing users without one
+-- Run once after deploying handle_new_user() update.
+-- ═════════════════════════════════════════════════════════════════════
+DO $$
+DECLARE
+  adjectives text[] := ARRAY[
+    'valiente','curioso','brillante','veloz','silencioso','audaz','sereno',
+    'ágil','fiero','noble','alerta','sagaz','vibrante','tenaz','libre'
+  ];
+  especies text[] := ARRAY[
+    'quetzal','ajolote','teporingo','coatí','cenzontle','ocelote','tapir',
+    'jaguar','manatí','vaquita','guacamaya','tlacuache','armadillo','tejon',
+    'coyote','puma','venado','iguana','boa','tortuga','pelicano','fragata',
+    'colibrí','tucán','flamenco','axolotl','cacomixtle','tlalcoyote'
+  ];
+  rec RECORD;
+  gen_username text;
+  attempts int;
+BEGIN
+  FOR rec IN SELECT id FROM public.users WHERE username IS NULL OR username = '' LOOP
+    attempts := 0;
+    LOOP
+      gen_username := (adjectives)[1 + floor(random() * array_length(adjectives, 1))::int]
+                     || '-'
+                     || (especies)[1 + floor(random() * array_length(especies, 1))::int]
+                     || '-'
+                     || floor(random() * 900 + 100)::text;
+      EXIT WHEN NOT EXISTS (SELECT 1 FROM public.users WHERE username = gen_username);
+      attempts := attempts + 1;
+      IF attempts >= 10 THEN
+        gen_username := (adjectives)[1 + floor(random() * array_length(adjectives, 1))::int]
+                       || '-'
+                       || (especies)[1 + floor(random() * array_length(especies, 1))::int]
+                       || '-'
+                       || extract(epoch from now())::bigint % 1000000;
+        EXIT;
+      END IF;
+    END LOOP;
+    UPDATE public.users SET username = gen_username WHERE id = rec.id;
+  END LOOP;
+END;
+$$;
