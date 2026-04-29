@@ -1,5 +1,6 @@
 ---
 import { t } from '../i18n/utils';
+import { KARMA_REASONS, RARITY_MULTIPLIERS } from '../lib/karma-config';
 
 interface Props { lang: 'en' | 'es' }
 const { lang } = Astro.props;
@@ -29,36 +30,22 @@ const tr = t(lang);
           <span>{tr.console.karma_col_base_delta}</span>
           <span>{tr.console.karma_col_notes}</span>
         </div>
-        <div class="grid grid-cols-3 gap-4 px-4 py-2.5 text-sm">
-          <span class="font-mono text-zinc-700 dark:text-zinc-300">observation_synced</span>
-          <span class="font-semibold text-emerald-700 dark:text-emerald-400">+1</span>
-          <span class="text-zinc-500 text-xs">{tr.console.karma_note_obs_synced}</span>
-        </div>
-        <div class="grid grid-cols-3 gap-4 px-4 py-2.5 text-sm">
-          <span class="font-mono text-zinc-700 dark:text-zinc-300">consensus_win</span>
-          <span class="font-semibold text-emerald-700 dark:text-emerald-400">+5</span>
-          <span class="text-zinc-500 text-xs">{tr.console.karma_note_consensus_win}</span>
-        </div>
-        <div class="grid grid-cols-3 gap-4 px-4 py-2.5 text-sm">
-          <span class="font-mono text-zinc-700 dark:text-zinc-300">consensus_loss</span>
-          <span class="font-semibold text-red-600 dark:text-red-400">-2</span>
-          <span class="text-zinc-500 text-xs">{tr.console.karma_note_consensus_loss}</span>
-        </div>
-        <div class="grid grid-cols-3 gap-4 px-4 py-2.5 text-sm">
-          <span class="font-mono text-zinc-700 dark:text-zinc-300">first_in_rastrum</span>
-          <span class="font-semibold text-emerald-700 dark:text-emerald-400">+10</span>
-          <span class="text-zinc-500 text-xs">{tr.console.karma_note_first_in_rastrum}</span>
-        </div>
-        <div class="grid grid-cols-3 gap-4 px-4 py-2.5 text-sm">
-          <span class="font-mono text-zinc-700 dark:text-zinc-300">comment_reaction</span>
-          <span class="font-semibold text-emerald-700 dark:text-emerald-400">+0.5</span>
-          <span class="text-zinc-500 text-xs">{tr.console.karma_note_comment_reaction}</span>
-        </div>
-        <div class="grid grid-cols-3 gap-4 px-4 py-2.5 text-sm">
-          <span class="font-mono text-zinc-700 dark:text-zinc-300">manual_adjust</span>
-          <span class="text-zinc-500">±</span>
-          <span class="text-zinc-500 text-xs">{tr.console.karma_note_manual_adjust}</span>
-        </div>
+        {KARMA_REASONS.map(reason => {
+          const deltaLabel = reason.delta === null ? '±' : (reason.delta >= 0 ? `+${reason.delta}` : `${reason.delta}`);
+          const deltaClass = reason.delta === null
+            ? 'text-zinc-500'
+            : reason.delta >= 0
+              ? 'font-semibold text-emerald-700 dark:text-emerald-400'
+              : 'font-semibold text-red-600 dark:text-red-400';
+          const description = lang === 'es' ? reason.description_es : reason.description_en;
+          return (
+            <div class="grid grid-cols-3 gap-4 px-4 py-2.5 text-sm">
+              <span class="font-mono text-zinc-700 dark:text-zinc-300">{reason.id}</span>
+              <span class={deltaClass}>{deltaLabel}</span>
+              <span class="text-zinc-500 text-xs">{description}</span>
+            </div>
+          );
+        })}
       </div>
     </div>
 
@@ -66,12 +53,16 @@ const tr = t(lang);
     <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 text-sm">
       <h3 class="font-semibold text-zinc-800 dark:text-zinc-200 mb-2">{tr.console.karma_rarity_heading}</h3>
       <div class="grid grid-cols-5 gap-2">
-        {[1, 2, 3, 4, 5].map(bucket => (
-          <div class="rounded border border-zinc-200 dark:border-zinc-700 p-2 text-center">
-            <div class="text-xs text-zinc-500 mb-1">{tr.console.karma_bucket} {bucket}</div>
-            <div class="font-semibold text-zinc-800 dark:text-zinc-200">{bucket === 1 ? '1.0×' : bucket === 2 ? '1.2×' : bucket === 3 ? '1.5×' : bucket === 4 ? '2.0×' : '3.0×'}</div>
-          </div>
-        ))}
+        {RARITY_MULTIPLIERS.map(rm => {
+          const label = lang === 'es' ? rm.label_es : rm.label_en;
+          return (
+            <div class="rounded border border-zinc-200 dark:border-zinc-700 p-2 text-center">
+              <div class="text-xs text-zinc-500 mb-1">{tr.console.karma_bucket} {rm.bucket}</div>
+              <div class="font-semibold text-zinc-800 dark:text-zinc-200">{rm.multiplier}×</div>
+              <div class="text-xs text-zinc-400 mt-0.5 leading-tight">{label}</div>
+            </div>
+          );
+        })}
       </div>
       <p class="mt-2 text-xs text-zinc-500">{tr.console.karma_rarity_note}</p>
     </div>

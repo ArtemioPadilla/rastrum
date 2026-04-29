@@ -2197,6 +2197,17 @@ CREATE POLICY "expert_apps_read_admin" ON public.expert_applications
   FOR SELECT TO authenticated
   USING (public.has_role(auth.uid(), 'admin'));
 
+-- 8c. karma_events admin-read (PR #86 review)
+-- Originally only had self_read RLS, so the admin karma view's
+-- "last 50 events" panel filtered down to the admin's own events.
+-- This policy lets admins see platform-wide karma activity.
+-- Lives in this block (post-has_role()) to avoid the forward reference
+-- bug that would happen if defined alongside the table at line ~1592.
+DROP POLICY IF EXISTS "karma_events_admin_read" ON public.karma_events;
+CREATE POLICY "karma_events_admin_read" ON public.karma_events
+  FOR SELECT TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'));
+
 -- 9. Grants
 GRANT SELECT                          ON public.user_roles  TO authenticated;
 GRANT SELECT                          ON public.admin_audit TO authenticated;
