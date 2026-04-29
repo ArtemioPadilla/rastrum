@@ -34,6 +34,11 @@ jobs:
 
     services:
       postgres:
+        # Pinned to Postgres 17 + PostGIS 3.4 to match Supabase's hosted
+        # default (verified via `SELECT version()` on prod returning
+        # "PostgreSQL 17.6 ..."). When Supabase rolls forward the major
+        # version on prod, bump this image tag in the same PR so the
+        # validate gate stays calibrated to production behavior.
         image: postgis/postgis:17-3.4
         env:
           POSTGRES_PASSWORD: postgres
@@ -195,32 +200,11 @@ jobs:
           fi
 
       - name: Sentinel verify on the ephemeral DB
-        # Same sentinel set the production db-apply workflow uses. Catches
-        # the partial-apply case where the file errored mid-stream and only
-        # some tables / functions ended up created.
+        # Single source of truth in scripts/db-sentinel.sql — same script
+        # the production db-apply workflow runs. Adding a new module's
+        # load-bearing tables there propagates to both gates automatically.
         run: |
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
-          DO $$
-          DECLARE
-            missing text[] := ARRAY[]::text[];
-          BEGIN
-            IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'users')           THEN missing := missing || 'public.users'; END IF;
-            IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'observations')    THEN missing := missing || 'public.observations'; END IF;
-            IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'taxa')            THEN missing := missing || 'public.taxa'; END IF;
-            IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'identifications') THEN missing := missing || 'public.identifications'; END IF;
-            IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'media_files')     THEN missing := missing || 'public.media_files'; END IF;
-            IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'badges')          THEN missing := missing || 'public.badges'; END IF;
-            IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'user_badges')     THEN missing := missing || 'public.user_badges'; END IF;
-            IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'user_roles')      THEN missing := missing || 'public.user_roles'; END IF;
-            IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'admin_audit')     THEN missing := missing || 'public.admin_audit'; END IF;
-            IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'has_role')              THEN missing := missing || 'public.has_role()'; END IF;
-            IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'recompute_consensus')   THEN missing := missing || 'public.recompute_consensus()'; END IF;
-            IF array_length(missing, 1) IS NOT NULL THEN
-              RAISE EXCEPTION 'Sentinel verify failed — missing objects: %', missing;
-            END IF;
-          END $$;
-          SELECT 'sentinel ok' AS status;
-          SQL
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f scripts/db-sentinel.sql
 
       - name: Summary
         run: |
