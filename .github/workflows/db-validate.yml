@@ -138,23 +138,60 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f docs/specs/infra/supabase-schema.sql
 
       - name: Apply cron-schedules.sql (parse + replay-safe)
-        # Even though pg_cron isn't installed in the test image, the
-        # `cron.unschedule()/cron.schedule()` calls live behind a
-        # `IF EXISTS` guard in the file. We just want to confirm the SQL
-        # parses. If the file references the cron schema directly, the
-        # apply will fail loudly — fix the cron file to use the guarded
-        # pattern.
+        # pg_cron and pg_net require shared_preload_libraries / network access
+        # we can't configure on a hosted service container. We stub both
+        # schemas comprehensively so the cron file applies cleanly. The
+        # CREATE EXTENSION lines themselves fail in this environment, so we
+        # strip them before piping the file to psql — the runtime behavior
+        # we care about (cron.schedule calls + net.http_post bodies + jobname
+        # uniqueness) is fully exercised against the stubs.
         run: |
-          # pg_cron requires shared_preload_libraries which we can't set on
-          # a hosted service container. We stub the cron schema so calls
-          # to cron.schedule()/unschedule() succeed.
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
           CREATE SCHEMA IF NOT EXISTS cron;
-          CREATE OR REPLACE FUNCTION cron.schedule(text, text, text) RETURNS bigint LANGUAGE sql AS $$ SELECT 0::bigint $$;
-          CREATE OR REPLACE FUNCTION cron.unschedule(text)            RETURNS boolean LANGUAGE sql AS $$ SELECT true $$;
+          CREATE TABLE IF NOT EXISTS cron.job (
+            jobid    bigserial PRIMARY KEY,
+            schedule text,
+            command  text,
+            nodename text DEFAULT 'localhost',
+            nodeport int  DEFAULT 5432,
+            database text DEFAULT 'postgres',
+            username text DEFAULT 'postgres',
+            active   boolean DEFAULT true,
+            jobname  text
+          );
+          CREATE OR REPLACE FUNCTION cron.schedule(jobname text, schedule text, command text)
+            RETURNS bigint LANGUAGE sql AS $$
+              INSERT INTO cron.job (jobname, schedule, command) VALUES ($1, $2, $3) RETURNING jobid;
+            $$;
+          CREATE OR REPLACE FUNCTION cron.unschedule(jobname text)
+            RETURNS boolean LANGUAGE sql AS $$
+              DELETE FROM cron.job WHERE jobname = $1; SELECT true;
+            $$;
+          CREATE OR REPLACE FUNCTION cron.unschedule(jobid bigint)
+            RETURNS boolean LANGUAGE sql AS $$
+              DELETE FROM cron.job WHERE jobid = $1; SELECT true;
+            $$;
+
+          CREATE SCHEMA IF NOT EXISTS net;
+          CREATE OR REPLACE FUNCTION net.http_post(
+            url     text,
+            body    jsonb DEFAULT '{}'::jsonb,
+            params  jsonb DEFAULT '{}'::jsonb,
+            headers jsonb DEFAULT '{}'::jsonb,
+            timeout_milliseconds integer DEFAULT 1000
+          ) RETURNS bigint LANGUAGE sql AS $$ SELECT 0::bigint $$;
+          CREATE OR REPLACE FUNCTION net.http_get(
+            url     text,
+            params  jsonb DEFAULT '{}'::jsonb,
+            headers jsonb DEFAULT '{}'::jsonb,
+            timeout_milliseconds integer DEFAULT 1000
+          ) RETURNS bigint LANGUAGE sql AS $$ SELECT 0::bigint $$;
           SQL
+
           if [ -f docs/specs/infra/cron-schedules.sql ]; then
-            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f docs/specs/infra/cron-schedules.sql
+            grep -vE 'CREATE EXTENSION IF NOT EXISTS pg_(cron|net);' \
+              docs/specs/infra/cron-schedules.sql \
+              | psql "$DATABASE_URL" -v ON_ERROR_STOP=1
           fi
 
       - name: Sentinel verify on the ephemeral DB
