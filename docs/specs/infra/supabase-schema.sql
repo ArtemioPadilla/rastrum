@@ -2361,11 +2361,12 @@ GRANT UPDATE (
   streak_digest_opt_in,
   profile_privacy,
   dismissed_privacy_intro_at,
-  expert_taxa,
-  country_code,
-  country_code_source,
-  hide_from_leaderboards
+  expert_taxa
 ) ON public.users TO authenticated;
+-- M28 columns (country_code, country_code_source, hide_from_leaderboards)
+-- are GRANTed separately in the M28 block far below, after their ALTER
+-- TABLE … ADD COLUMN runs. Don't list them here — would forward-reference
+-- columns that don't exist yet on a fresh apply.
 
 -- Observation pins for the public observation_map facet. Honours
 -- obscure_level + location_obscured: sensitive species → coarsened to
@@ -3977,6 +3978,15 @@ ALTER TABLE public.users
 ALTER TABLE public.users
   ADD COLUMN IF NOT EXISTS country_code_source text NOT NULL DEFAULT 'auto'
     CHECK (country_code_source IN ('auto','user'));
+
+-- 1c) Column-level UPDATE grants for the three M28-writable columns. Lives
+-- here (rather than in the consolidated REVOKE/GRANT block above) because
+-- those columns are added by the ALTER TABLE statements above; granting
+-- on them at file head would forward-reference a non-existent column on a
+-- fresh apply. Column-level GRANTs are additive in Postgres, so this
+-- composes cleanly with the earlier GRANT UPDATE (...) block.
+GRANT UPDATE (country_code, country_code_source, hide_from_leaderboards)
+  ON public.users TO authenticated;
 
 -- 2) Partial indexes — every list query operates on an already-filtered
 -- set, so opted-out / private users add zero cost to anyone's query plan.
