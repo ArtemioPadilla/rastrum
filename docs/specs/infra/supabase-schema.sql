@@ -2361,7 +2361,10 @@ GRANT UPDATE (
   streak_digest_opt_in,
   profile_privacy,
   dismissed_privacy_intro_at,
-  expert_taxa
+  expert_taxa,
+  country_code,
+  country_code_source,
+  hide_from_leaderboards
 ) ON public.users TO authenticated;
 
 -- Observation pins for the public observation_map facet. Honours
@@ -3964,6 +3967,16 @@ ALTER TABLE public.users
   ADD COLUMN IF NOT EXISTS centroid_geog          geography(POINT, 4326),
   ADD COLUMN IF NOT EXISTS country_code           text    CHECK (country_code ~ '^[A-Z]{2}$'),
   ADD COLUMN IF NOT EXISTS hide_from_leaderboards boolean NOT NULL DEFAULT false;
+
+-- 1b) Track whether country_code was set by the user or inferred by the
+-- nightly recompute_user_stats() job. PR4 carry-forward from PR #92 review:
+-- the Profile → Edit "inferred from your region" badge only renders when
+-- source = 'auto'. recompute_user_stats() does NOT touch this column —
+-- the DEFAULT 'auto' applies to existing rows and to any auto-fill via
+-- normalize_country_code(). Profile → Edit save flips it to 'user'.
+ALTER TABLE public.users
+  ADD COLUMN IF NOT EXISTS country_code_source text NOT NULL DEFAULT 'auto'
+    CHECK (country_code_source IN ('auto','user'));
 
 -- 2) Partial indexes — every list query operates on an already-filtered
 -- set, so opted-out / private users add zero cost to anyone's query plan.

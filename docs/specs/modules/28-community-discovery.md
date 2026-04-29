@@ -1,6 +1,6 @@
 # Module 28 — Community discovery
 
-**Status:** v1.0 — implementation in progress (PR1 — schema deltas)
+**Status:** v1.0 — implementation in progress (PR4 — Profile → Edit picker + opt-out)
 **Spec source:** `docs/superpowers/specs/2026-04-29-community-discovery-design.md`
 **Plan:** `docs/superpowers/plans/2026-04-29-community-discovery-plan.md`
 **Sequenced after:** Module 26 (social graph — provides `follows` table and `FollowButton`).
@@ -13,7 +13,7 @@
 ## Scope
 
 - Discovery page at `/{en,es}/community/observers/` with composable filters: sort, country, taxon, experts-only, nearby.
-- Schema deltas on `public.users`: `species_count`, `obs_count_7d`, `obs_count_30d`, `centroid_geog`, `country_code`, `hide_from_leaderboards`.
+- Schema deltas on `public.users`: `species_count`, `obs_count_7d`, `obs_count_30d`, `centroid_geog`, `country_code`, `country_code_source`, `hide_from_leaderboards`.
 - Two views: `community_observers` (anon-safe) and `community_observers_with_centroid` (authenticated only, gates the Nearby feature at the SQL layer).
 - New Edge Function `recompute-user-stats`, scheduled nightly (deferred to PR2).
 - ISO-3166 reference table `iso_countries`, seeded with the Latin American countries plus common observer locales (US, CA, ES, PT, FR, GB, DE, IT). The seed is idempotent — additional codes can be appended later.
@@ -33,6 +33,7 @@
 - Centroid is exposed only via the authenticated view; anon callers cannot read it via any path. The lack of a `GRANT SELECT … TO anon` on `community_observers_with_centroid` is the security gate.
 - The Nearby feature is sign-in gated in the UI; the SQL gate is enforced regardless.
 - `country_code` setter never overwrites a user-set value (the cron only writes when `country_code IS NULL`).
+- `country_code_source` distinguishes auto-inferred from user-set values: defaults to `'auto'`; Profile → Edit save flips it to `'user'`. Used by the "inferred from your region" badge so the user can see when the country wasn't their choice and override it.
 
 ## PR sequence
 
