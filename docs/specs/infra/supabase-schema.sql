@@ -3524,8 +3524,8 @@ CREATE POLICY comments_mod_read ON public.observation_comments
     OR (deleted_at IS NULL AND EXISTS (SELECT 1 FROM public.observations o WHERE o.id = observation_id AND o.hidden = false))
   );
 -- ============================================================
--- Module 20 — AI Sponsorships
--- See docs/specs/modules/20-ai-sponsorships.md and
+-- Module 27 — AI Sponsorships
+-- See docs/specs/modules/27-ai-sponsorships.md and
 -- docs/superpowers/specs/2026-04-28-ai-sponsorships-design.md
 -- ============================================================
 

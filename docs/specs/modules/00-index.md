@@ -72,7 +72,6 @@ narrative source.
 | 18 | Onboarding Flow | v1.0 | shipped | [`18-onboarding.md`](18-onboarding.md) |
 | 19 | Batch Photo Importer (Google Photos / Drive / file upload) | v1.0 | shipped | [`19-batch-photo-importer.md`](19-batch-photo-importer.md) |
 | 20 | Conversational Chat (cascade interpreter + vision fallback) | v1.0 | shipped | [`20-chat.md`](20-chat.md) |
-| 20 | AI Sponsorships (share Anthropic credentials with beneficiaries) | v1.3 | in implementation (PR feat/ai-sponsorships) | [`20-ai-sponsorships.md`](20-ai-sponsorships.md) |
 | 21 | Identify (no-save quick PlantNet probe) | v1.0 | shipped | [`21-identify.md`](21-identify.md) |
 | 22 | Community Validation (expert ID queue + research-grade auto-promotion) | v1.1 | shipped (spec v1.3 + impl) | [`22-community-validation.md`](22-community-validation.md) |
 | 23 | Karma + per-taxon expertise + rarity-weighted rewards | v1.1 | partial (Phase 1 shipped; Phases 2–3 deferred) | [`23-karma-expertise-rarity.md`](23-karma-expertise-rarity.md) |
@@ -84,6 +83,7 @@ narrative source.
 |---|---|---|---|---|
 | 25 | Profile Privacy & Public Profile (per-facet matrix + `/u/<username>/`) | v1.2 | shipped (v1.2.0 + v1.2.1 merged 2026-04-28; v1.2.2 cleanup deferred) | [`25-profile-privacy.md`](25-profile-privacy.md) |
 | 26 | Social graph + reactions (follows, reactions, blocks, reports, notifications) | v1.3 | planned (spec v1.0) | [`26-social-graph.md`](26-social-graph.md) |
+| 27 | AI Sponsorships (share Anthropic credentials with beneficiaries) | v1.3 | in implementation (PR feat/ai-sponsorships) | [`27-ai-sponsorships.md`](27-ai-sponsorships.md) |
 
 ## v1.5 — Territory layer — planned
 

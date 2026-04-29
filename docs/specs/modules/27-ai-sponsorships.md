@@ -1,4 +1,4 @@
-# Module 20 — AI Sponsorships
+# Module 27 — AI Sponsorships
 
 **Status:** in implementation (PR feat/ai-sponsorships)
 **Related modules:** 04 (auth), 13 (identifier registry), 14 (BYO keys), karma module.

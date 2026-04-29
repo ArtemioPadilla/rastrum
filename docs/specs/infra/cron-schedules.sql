@@ -104,7 +104,7 @@ SELECT cron.schedule(
 );
 
 -- ============================================================
--- Module 20 — AI Sponsorships cron jobs
+-- Module 27 — AI Sponsorships cron jobs
 -- ============================================================
 
 SELECT cron.unschedule('ai_rate_limits_cleanup');
