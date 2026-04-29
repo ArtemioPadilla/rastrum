@@ -602,12 +602,117 @@ END $$;
 RESET ROLE;
 
 -- ────────────────────────────────────────────────────────────────────────────
+-- admin_action_proposals RLS (PR13)
+-- ────────────────────────────────────────────────────────────────────────────
+
+INSERT INTO public.admin_action_proposals (proposer_id, op, target_type, target_id, payload, reason)
+VALUES (
+  '00000000-0000-0000-0000-000000000001',
+  'user_ban',
+  'user',
+  '00000000-0000-0000-0000-000000000004',
+  '{"target_user_id":"00000000-0000-0000-0000-000000000004"}'::jsonb,
+  'rls suite seed'
+)
+ON CONFLICT DO NOTHING;
+
+-- Anon cannot read.
+SET LOCAL "request.jwt.claim.sub" = '';
+SET LOCAL ROLE anon;
+
+-- Test 28 of 31: admin_action_proposals: anon sees 0 rows (admin-only read)
+DO $$
+DECLARE
+  cnt int;
+BEGIN
+  SELECT count(*)::int INTO cnt FROM public.admin_action_proposals;
+  IF cnt IS DISTINCT FROM 0 THEN
+    RAISE EXCEPTION 'FAIL [Test 28 of 31: admin_action_proposals: anon sees 0 rows (admin-only read)]: expected %, got %', 0, cnt;
+  END IF;
+END $$;
+
+RESET ROLE;
+
+-- Authenticated non-admin cannot read.
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000003';
+
+-- Test 29 of 31: admin_action_proposals: non-admin authenticated sees 0 rows
+DO $$
+DECLARE
+  cnt int;
+BEGIN
+  SELECT count(*)::int INTO cnt FROM public.admin_action_proposals;
+  IF cnt IS DISTINCT FROM 0 THEN
+    RAISE EXCEPTION 'FAIL [Test 29 of 31: admin_action_proposals: non-admin authenticated sees 0 rows]: expected %, got %', 0, cnt;
+  END IF;
+END $$;
+
+-- Admin CAN read.
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000001';
+
+-- Test 30 of 31: admin_action_proposals: admin sees the seeded row (>= 1)
+DO $$
+DECLARE
+  cnt bigint;
+BEGIN
+  SELECT count(*) INTO cnt FROM public.admin_action_proposals;
+  IF cnt < 1 THEN
+    RAISE EXCEPTION 'FAIL [Test 30 of 31: admin_action_proposals: admin sees the seeded row (>= 1)]: condition false (count = %)', cnt;
+  END IF;
+END $$;
+
+RESET ROLE;
+
+-- ────────────────────────────────────────────────────────────────────────────
+-- admin_webhooks + admin_webhook_deliveries RLS (PR13)
+-- ────────────────────────────────────────────────────────────────────────────
+
+INSERT INTO public.admin_webhooks (url, events, secret, created_by)
+VALUES (
+  'https://example.test/webhook',
+  ARRAY['anomaly_created'],
+  'whsec_rls_test_seed_value',
+  '00000000-0000-0000-0000-000000000001'
+)
+ON CONFLICT DO NOTHING;
+
+-- Anon cannot read either webhook table.
+SET LOCAL "request.jwt.claim.sub" = '';
+SET LOCAL ROLE anon;
+
+-- Test 31 of 31: admin_webhooks + deliveries: anon sees 0 rows; admin sees >= 1
+DO $$
+DECLARE
+  cnt_anon int;
+  cnt_admin bigint;
+BEGIN
+  SELECT count(*)::int INTO cnt_anon FROM public.admin_webhooks;
+  IF cnt_anon IS DISTINCT FROM 0 THEN
+    RAISE EXCEPTION 'FAIL [Test 31 of 31] (anon webhooks path): expected %, got %', 0, cnt_anon;
+  END IF;
+  SELECT count(*)::int INTO cnt_anon FROM public.admin_webhook_deliveries;
+  IF cnt_anon IS DISTINCT FROM 0 THEN
+    RAISE EXCEPTION 'FAIL [Test 31 of 31] (anon deliveries path): expected %, got %', 0, cnt_anon;
+  END IF;
+  RESET ROLE;
+  SET LOCAL ROLE authenticated;
+  SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000001';
+  SELECT count(*) INTO cnt_admin FROM public.admin_webhooks;
+  IF cnt_admin < 1 THEN
+    RAISE EXCEPTION 'FAIL [Test 31 of 31] (admin webhooks path): condition false (count = %)', cnt_admin;
+  END IF;
+END $$;
+
+RESET ROLE;
+
+-- ────────────────────────────────────────────────────────────────────────────
 -- Summary
 -- ────────────────────────────────────────────────────────────────────────────
 
 DO $$
 BEGIN
-  RAISE NOTICE 'RLS suite: 27 of 27 assertions passed';
+  RAISE NOTICE 'RLS suite: 31 of 31 assertions passed';
 END $$;
 
 ROLLBACK;

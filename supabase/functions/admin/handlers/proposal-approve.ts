@@ -1,6 +1,7 @@
 import { z } from 'https://esm.sh/zod@3.23.8';
 import type { ActionHandler } from './role-grant.ts';
 import { insertAuditRow } from '../_shared/audit.ts';
+import { assertProposalApprovable } from '../_shared/proposal-guards.ts';
 
 const Payload = z.object({
   proposalId: z.string().uuid(),
@@ -17,11 +18,6 @@ const ACTION_BY_AUDIT_OP: Record<string, string> = {
   badge_revoke:     'badge.revoke',
 };
 
-export class SelfApprovalForbidden extends Error {
-  code = 'self_approval_forbidden';
-  constructor() { super('proposer cannot approve their own proposal'); }
-}
-
 export const proposalApproveHandler: ActionHandler<Payload> = {
   op: 'proposal_approve',
   requiredRole: 'admin',
@@ -34,15 +30,7 @@ export const proposalApproveHandler: ActionHandler<Payload> = {
       .single();
     if (fetchErr) throw new Error(`proposal.approve fetch: ${fetchErr.message}`);
     if (!before) throw new Error('proposal.approve: proposal not found');
-    if (before.proposer_id === actor.id) {
-      throw new SelfApprovalForbidden();
-    }
-    if (before.status !== 'pending') {
-      throw new Error(`proposal.approve: proposal is ${before.status}, not pending`);
-    }
-    if (new Date(before.expires_at).getTime() <= Date.now()) {
-      throw new Error('proposal.approve: proposal has expired');
-    }
+    assertProposalApprovable(before, actor.id);
 
     // Lazy-import the registry to dodge the circular dependency
     // (handlers/index.ts imports this file).
