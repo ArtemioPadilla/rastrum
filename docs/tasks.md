@@ -119,3 +119,5 @@ Remaining:
 Remaining:
 
 - `social-graph-m26-v11` — Follow-ups: ReactionStrip count overlay on feed cards (needs an aggregate RPC to avoid N+1), Block/Report on observation cards + comments, "Block this user" affordance on profile cards in lists, additional ARIA refinements. _(· planned)_
+- `deploy-functions-resilience` — Pin esm.sh imports to versioned URLs across `supabase/functions/*/index.ts` so a transient esm.sh 522 doesn't permanently park the auto-deploy. Surfaced when PR #66's auto-deploy 522'd on a Cloudflare hiccup. _(· planned)_
+- `visitor-pokedex-route` — Public `/u/<handle>/dex/` page so the Pokédex link on PublicProfileViewV2 doesn't have to be hidden for non-owners (PR #68 currently hides it as a workaround). _(· planned)_
