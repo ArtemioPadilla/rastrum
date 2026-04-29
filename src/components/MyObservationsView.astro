@@ -630,6 +630,10 @@ const tabs = [
           const result = await syncOutbox();
           if (result.synced > 0) await resetAndLoad();
           paintLastSync();
+          // Toast: si todo se saltó (upgrade guest falló silenciosamente)
+          if (result.synced === 0 && result.skipped_guest > 0) {
+            showToast(lang === 'es' ? 'No se pudo subir — intenta cerrar y abrir la app' : 'Upload failed — try closing and reopening the app', 'err');
+          }
         } catch { /* silent */ } finally {
           syncNowBtn.disabled = false;
           await refreshSyncNowBtn();
