@@ -1,6 +1,6 @@
 # Module 27 — AI Sponsorships
 
-**Status:** in implementation (PR feat/ai-sponsorships)
+**Status:** shipped (v1.3 — PRs #78, #84, #94)
 **Related modules:** 04 (auth), 13 (identifier registry), 14 (BYO keys), karma module.
 **Design doc:** `docs/superpowers/specs/2026-04-28-ai-sponsorships-design.md`
 
