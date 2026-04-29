@@ -22,7 +22,7 @@ export const CONSOLE_TABS: ConsoleTab[] = [
   { id: 'users',          role: 'admin',     routeKey: 'consoleUsers',            i18nKey: 'console.users',        icon: 'users',       phase: 2 },
   { id: 'credentials',    role: 'admin',     routeKey: 'consoleCredentials',      i18nKey: 'console.credentials',  icon: 'shield-check',phase: 2 },
   { id: 'experts',        role: 'admin',     routeKey: 'consoleExperts',          i18nKey: 'console.experts',      icon: 'award',       phase: 1 },
-  { id: 'observations',   role: 'admin',     routeKey: 'consoleObservations',     i18nKey: 'console.observations', icon: 'leaf',        phase: 4, stub: true },
+  { id: 'observations',   role: 'admin',     routeKey: 'consoleObservations',     i18nKey: 'console.observations', icon: 'leaf',        phase: 4 },
   { id: 'api',            role: 'admin',     routeKey: 'consoleApi',              i18nKey: 'console.api',          icon: 'plug',        phase: 3 },
   { id: 'sync',           role: 'admin',     routeKey: 'consoleSync',             i18nKey: 'console.sync',         icon: 'refresh',     phase: 3 },
   { id: 'cron',           role: 'admin',     routeKey: 'consoleCron',             i18nKey: 'console.cron',         icon: 'clock',       phase: 3 },

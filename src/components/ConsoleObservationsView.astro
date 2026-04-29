@@ -1,0 +1,457 @@
+---
+/**
+ * ConsoleObservationsView — master-detail observation list with moderation actions.
+ * Left: filterable observation list (50 at a time). Right: selected observation
+ * detail with hide/unhide, obscure, and license-override chips and slide-over.
+ */
+import { t } from '../i18n/utils';
+import ConsoleSlideOver from './ConsoleSlideOver.astro';
+
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+---
+
+<section class="max-w-6xl">
+  <div id="obs-not-auth" class="hidden rounded border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-900 dark:text-amber-100">
+    {tr.console.not_authorized}
+  </div>
+
+  <div id="obs-shell" class="hidden">
+    <p class="mb-4 text-sm text-zinc-500 dark:text-zinc-400">{tr.console.obs_intro}</p>
+
+    <!-- Filter row -->
+    <div class="flex flex-wrap gap-2 mb-3">
+      <select id="obs-filter-status" class="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm">
+        <option value="">{tr.console.obs_status_all}</option>
+        <option value="pending">{tr.console.obs_status_draft}</option>
+        <option value="synced">{tr.console.obs_status_synced}</option>
+      </select>
+
+      <select id="obs-filter-obscure" class="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm">
+        <option value="">{tr.console.obs_obscure_any}</option>
+        <option value="none">{tr.console.obs_obscure_none}</option>
+        <option value="0.1deg">{tr.console.obs_obscure_01deg}</option>
+        <option value="0.2deg">{tr.console.obs_obscure_02deg}</option>
+        <option value="5km">{tr.console.obs_obscure_5km}</option>
+        <option value="full">{tr.console.obs_obscure_full}</option>
+      </select>
+
+      <select id="obs-filter-license" class="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm">
+        <option value="">{tr.console.obs_license_any}</option>
+        <option value="CC BY 4.0">CC BY 4.0</option>
+        <option value="CC BY-NC 4.0">CC BY-NC 4.0</option>
+        <option value="CC0">CC0</option>
+      </select>
+
+      <select id="obs-filter-hidden" class="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm">
+        <option value="">{tr.console.obs_hidden_all}</option>
+        <option value="false">{tr.console.obs_hidden_visible}</option>
+        <option value="true">{tr.console.obs_hidden_hidden}</option>
+      </select>
+
+      <input
+        id="obs-filter-owner"
+        type="search"
+        placeholder={tr.console.obs_filter_owner}
+        class="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm w-48"
+      />
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-[320px_1fr] gap-4 h-[calc(100vh-220px)]">
+      <!-- Left: observation list -->
+      <aside class="flex flex-col border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden">
+        <div id="obs-list-loading" class="p-3 text-sm text-zinc-500 italic">{tr.console.obs_loading}</div>
+        <div id="obs-list-empty" class="hidden p-3 text-sm text-zinc-500">{tr.console.obs_load_failed}</div>
+        <ul id="obs-list" class="hidden flex-1 overflow-y-auto divide-y divide-zinc-100 dark:divide-zinc-800"></ul>
+      </aside>
+
+      <!-- Right: observation detail -->
+      <div id="obs-detail-empty" class="flex items-center justify-center text-sm text-zinc-400 dark:text-zinc-600 border border-dashed border-zinc-200 dark:border-zinc-700 rounded-lg">
+        {tr.console.obs_select_prompt}
+      </div>
+      <div id="obs-detail" class="hidden border border-zinc-200 dark:border-zinc-800 rounded-lg p-4 overflow-y-auto space-y-4">
+        <div id="obs-detail-photo" class="hidden">
+          <img id="obs-detail-img" src="" alt="" loading="lazy" class="max-h-48 rounded object-cover" />
+        </div>
+
+        <div>
+          <div id="obs-detail-taxon" class="text-base font-semibold italic text-zinc-900 dark:text-zinc-100"></div>
+          <div id="obs-detail-observer" class="text-sm text-zinc-500 mt-0.5"></div>
+          <div id="obs-detail-created" class="text-xs text-zinc-400 mt-0.5"></div>
+        </div>
+
+        <dl class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+          <dt class="text-zinc-500">{tr.console.obs_filter_status}</dt>
+          <dd id="obs-detail-status" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
+
+          <dt class="text-zinc-500">{tr.console.obs_col_obscure}</dt>
+          <dd id="obs-detail-obscure" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
+
+          <dt class="text-zinc-500">{tr.console.obs_col_license}</dt>
+          <dd id="obs-detail-license" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
+
+          <dt class="text-zinc-500">{tr.console.obs_col_hidden}</dt>
+          <dd id="obs-detail-hidden" class="font-medium"></dd>
+        </dl>
+
+        <div id="obs-detail-hidden-reason-row" class="hidden text-sm">
+          <span class="text-zinc-500">{tr.console.obs_hidden_reason_label}: </span>
+          <span id="obs-detail-hidden-reason" class="text-zinc-700 dark:text-zinc-300"></span>
+        </div>
+
+        <!-- Action chips -->
+        <div class="flex flex-wrap gap-2 pt-1">
+          <button id="obs-action-hide" class="px-3 py-1.5 rounded text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/50">
+            {tr.console.obs_chip_hide}
+          </button>
+          <button id="obs-action-unhide" class="hidden px-3 py-1.5 rounded text-xs font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-200 dark:hover:bg-emerald-900/50">
+            {tr.console.obs_chip_unhide}
+          </button>
+          <button id="obs-action-obscure" class="px-3 py-1.5 rounded text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/50">
+            {tr.console.obs_chip_obscure}
+          </button>
+          <button id="obs-action-license" class="px-3 py-1.5 rounded text-xs font-medium bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 hover:bg-sky-200 dark:hover:bg-sky-900/50">
+            {tr.console.obs_chip_license}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p id="obs-error" class="hidden mt-3 text-sm text-red-600 dark:text-red-400"></p>
+</section>
+
+<ConsoleSlideOver lang={lang} id="console-slideover-obs" titleKey={tr.console.obs_action_title}>
+  <!-- Obscure fields (shown for obscure action) -->
+  <div id="slideover-obs-obscure-fields" class="hidden space-y-2">
+    <label class="block">
+      <span class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.console.obs_obscure_level_label}</span>
+      <select id="slideover-obs-obscure-select" class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm">
+        <option value="none">{tr.console.obs_obscure_none}</option>
+        <option value="0.1deg">{tr.console.obs_obscure_01deg}</option>
+        <option value="0.2deg">{tr.console.obs_obscure_02deg}</option>
+        <option value="5km">{tr.console.obs_obscure_5km}</option>
+        <option value="full">{tr.console.obs_obscure_full}</option>
+      </select>
+    </label>
+  </div>
+
+  <!-- License fields (shown for license action) -->
+  <div id="slideover-obs-license-fields" class="hidden space-y-2">
+    <label class="block">
+      <span class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.console.obs_license_label}</span>
+      <select id="slideover-obs-license-select" class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm">
+        <option value="CC BY 4.0">CC BY 4.0</option>
+        <option value="CC BY-NC 4.0">CC BY-NC 4.0</option>
+        <option value="CC0">CC0</option>
+      </select>
+    </label>
+  </div>
+</ConsoleSlideOver>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { getUserRoles } from '../lib/user-roles';
+  import { adminClient, AdminClientError } from '../lib/admin-client';
+
+  type ObsRow = {
+    id: string;
+    observer_id: string;
+    observed_at: string;
+    primary_taxon_id: string | null;
+    obscure_level: string;
+    location_obscured: unknown;
+    observer_license: string;
+    hidden: boolean;
+    hidden_reason: string | null;
+    hidden_at: string | null;
+    hidden_by: string | null;
+    sync_status: string;
+    created_at: string;
+    taxa: { scientific_name: string } | null;
+    users: { username: string | null; display_name: string | null } | null;
+  };
+
+  function show(id: string) { document.getElementById(id)?.classList.remove('hidden'); }
+  function hide(id: string) { document.getElementById(id)?.classList.add('hidden'); }
+  function escHtml(s: string): string {
+    return s.replace(/[<>&'"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&#39;','"':'&quot;'}[c]!));
+  }
+  function fmtDate(iso: string): string {
+    return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+
+  let allObs: ObsRow[] = [];
+  let selectedId: string | null = null;
+  let currentJwt = '';
+
+  const supabase = getSupabase();
+
+  async function init() {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) { show('obs-not-auth'); return; }
+    currentJwt = session.access_token;
+    const myRoles = await getUserRoles(session.user.id);
+    if (!myRoles.has('admin')) { show('obs-not-auth'); return; }
+    show('obs-shell');
+    await loadObs();
+  }
+
+  function getFilters() {
+    const status = (document.getElementById('obs-filter-status') as HTMLSelectElement).value;
+    const obscure = (document.getElementById('obs-filter-obscure') as HTMLSelectElement).value;
+    const license = (document.getElementById('obs-filter-license') as HTMLSelectElement).value;
+    const hiddenVal = (document.getElementById('obs-filter-hidden') as HTMLSelectElement).value;
+    const owner = (document.getElementById('obs-filter-owner') as HTMLInputElement).value.trim();
+    return { status, obscure, license, hiddenVal, owner };
+  }
+
+  async function loadObs() {
+    hide('obs-list-empty');
+    hide('obs-list');
+    show('obs-list-loading');
+
+    const { status, obscure, license, hiddenVal, owner } = getFilters();
+
+    let query = supabase
+      .from('observations')
+      .select('id, observer_id, observed_at, primary_taxon_id, obscure_level, location_obscured, observer_license, hidden, hidden_reason, hidden_at, hidden_by, sync_status, created_at, taxa(scientific_name), users(username, display_name)')
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (status) query = query.eq('sync_status', status);
+    if (obscure) query = query.eq('obscure_level', obscure);
+    if (license) query = query.eq('observer_license', license);
+    if (hiddenVal === 'true') query = query.eq('hidden', true);
+    if (hiddenVal === 'false') query = query.eq('hidden', false);
+    if (owner) {
+      // Filter via users subquery — approximate with a join search
+      const { data: matchedUsers } = await supabase
+        .from('users')
+        .select('id')
+        .or(`username.ilike.%${owner}%,display_name.ilike.%${owner}%`)
+        .limit(20);
+      const ids = (matchedUsers ?? []).map((u: { id: string }) => u.id);
+      if (ids.length === 0) {
+        hide('obs-list-loading');
+        show('obs-list-empty');
+        return;
+      }
+      query = query.in('observer_id', ids);
+    }
+
+    const { data, error } = await query;
+    hide('obs-list-loading');
+
+    if (error) {
+      const e = document.getElementById('obs-error')!;
+      e.textContent = error.message;
+      show('obs-error');
+      return;
+    }
+
+    allObs = (data ?? []) as unknown as ObsRow[];
+    if (allObs.length === 0) { show('obs-list-empty'); return; }
+    renderList();
+    show('obs-list');
+  }
+
+  function renderList() {
+    const ul = document.getElementById('obs-list')!;
+    ul.innerHTML = allObs.map(o => {
+      const taxon = o.taxa?.scientific_name ?? o.id;
+      const uname = o.users?.username ? `@${o.users.username}` : (o.users?.display_name ?? '');
+      const isSelected = o.id === selectedId ? 'bg-zinc-100 dark:bg-zinc-800/60' : '';
+      const hiddenChip = o.hidden
+        ? `<span class="inline-block text-[9px] rounded bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 px-1 py-0.5">hidden</span>`
+        : '';
+      const obscureChip = o.obscure_level !== 'none'
+        ? `<span class="inline-block text-[9px] rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 px-1 py-0.5">${escHtml(o.obscure_level)}</span>`
+        : '';
+      return `<li data-obs-id="${escHtml(o.id)}" class="px-3 py-2 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/40 ${isSelected}">
+        <div class="font-medium text-sm italic text-zinc-900 dark:text-zinc-100 truncate">${escHtml(taxon)}</div>
+        <div class="text-xs text-zinc-500 truncate">${escHtml(uname)} · ${escHtml(fmtDate(o.created_at))}</div>
+        <div class="mt-1 flex flex-wrap gap-1">${hiddenChip}${obscureChip}<span class="inline-block text-[9px] rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 px-1 py-0.5">${escHtml(o.observer_license)}</span></div>
+      </li>`;
+    }).join('');
+  }
+
+  function selectObs(id: string) {
+    selectedId = id;
+    const o = allObs.find(x => x.id === id);
+    if (!o) return;
+    renderList();
+
+    hide('obs-detail-empty');
+    show('obs-detail');
+
+    const taxonEl = document.getElementById('obs-detail-taxon')!;
+    const obsEl = document.getElementById('obs-detail-observer')!;
+    const createdEl = document.getElementById('obs-detail-created')!;
+    const statusEl = document.getElementById('obs-detail-status')!;
+    const obscureEl = document.getElementById('obs-detail-obscure')!;
+    const licenseEl = document.getElementById('obs-detail-license')!;
+    const hiddenEl = document.getElementById('obs-detail-hidden')!;
+    const hiddenReasonRow = document.getElementById('obs-detail-hidden-reason-row')!;
+    const hiddenReasonEl = document.getElementById('obs-detail-hidden-reason')!;
+    const hideBtn = document.getElementById('obs-action-hide')!;
+    const unhideBtn = document.getElementById('obs-action-unhide')!;
+
+    taxonEl.textContent = o.taxa?.scientific_name ?? o.id;
+    obsEl.textContent = o.users?.display_name
+      ? `${o.users.display_name}${o.users.username ? ` (@${o.users.username})` : ''}`
+      : (o.users?.username ?? o.observer_id);
+    createdEl.textContent = fmtDate(o.created_at);
+    statusEl.textContent = o.sync_status;
+    obscureEl.textContent = o.obscure_level;
+    licenseEl.textContent = o.observer_license;
+
+    if (o.hidden) {
+      hiddenEl.textContent = 'Hidden by admin';
+      hiddenEl.className = 'font-medium text-red-600 dark:text-red-400';
+      hideBtn.classList.add('hidden');
+      unhideBtn.classList.remove('hidden');
+      if (o.hidden_reason) {
+        hiddenReasonEl.textContent = o.hidden_reason;
+        hiddenReasonRow.classList.remove('hidden');
+      } else {
+        hiddenReasonRow.classList.add('hidden');
+      }
+    } else {
+      hiddenEl.textContent = 'Visible to public';
+      hiddenEl.className = 'font-medium text-emerald-600 dark:text-emerald-400';
+      hideBtn.classList.remove('hidden');
+      unhideBtn.classList.add('hidden');
+      hiddenReasonRow.classList.add('hidden');
+    }
+  }
+
+  async function refreshSelected() {
+    if (!selectedId) return;
+    await loadObs();
+    const updated = allObs.find(x => x.id === selectedId);
+    if (updated) selectObs(selectedId);
+  }
+
+  document.addEventListener('click', (ev) => {
+    const li = (ev.target as HTMLElement).closest<HTMLElement>('li[data-obs-id]');
+    if (li?.dataset.obsId) { selectObs(li.dataset.obsId); return; }
+
+    const hideBtn = (ev.target as HTMLElement).closest<HTMLElement>('#obs-action-hide');
+    if (hideBtn && selectedId) {
+      document.dispatchEvent(new CustomEvent('console:slideover-open', {
+        detail: {
+          id: 'console-slideover-obs',
+          title: 'Hide observation',
+          action: 'observation.hide',
+          payload: { observation_id: selectedId },
+        },
+      }));
+      hide('slideover-obs-obscure-fields');
+      hide('slideover-obs-license-fields');
+      return;
+    }
+
+    const unhideBtn = (ev.target as HTMLElement).closest<HTMLElement>('#obs-action-unhide');
+    if (unhideBtn && selectedId) {
+      document.dispatchEvent(new CustomEvent('console:slideover-open', {
+        detail: {
+          id: 'console-slideover-obs',
+          title: 'Unhide observation',
+          action: 'observation.unhide',
+          payload: { observation_id: selectedId },
+        },
+      }));
+      hide('slideover-obs-obscure-fields');
+      hide('slideover-obs-license-fields');
+      return;
+    }
+
+    const obscureBtn = (ev.target as HTMLElement).closest<HTMLElement>('#obs-action-obscure');
+    if (obscureBtn && selectedId) {
+      const current = allObs.find(x => x.id === selectedId)?.obscure_level ?? 'none';
+      const sel = document.getElementById('slideover-obs-obscure-select') as HTMLSelectElement | null;
+      if (sel) sel.value = current;
+      document.dispatchEvent(new CustomEvent('console:slideover-open', {
+        detail: {
+          id: 'console-slideover-obs',
+          title: 'Change privacy level',
+          action: 'observation.obscure',
+          payload: { observation_id: selectedId, obscure_level: current },
+        },
+      }));
+      show('slideover-obs-obscure-fields');
+      hide('slideover-obs-license-fields');
+      return;
+    }
+
+    const licenseBtn = (ev.target as HTMLElement).closest<HTMLElement>('#obs-action-license');
+    if (licenseBtn && selectedId) {
+      const current = allObs.find(x => x.id === selectedId)?.observer_license ?? 'CC BY 4.0';
+      const sel = document.getElementById('slideover-obs-license-select') as HTMLSelectElement | null;
+      if (sel) sel.value = current;
+      document.dispatchEvent(new CustomEvent('console:slideover-open', {
+        detail: {
+          id: 'console-slideover-obs',
+          title: 'Override license',
+          action: 'observation.license_override',
+          payload: { observation_id: selectedId, license: current },
+        },
+      }));
+      hide('slideover-obs-obscure-fields');
+      show('slideover-obs-license-fields');
+      return;
+    }
+  });
+
+  document.addEventListener('console:slideover-submit', async (ev) => {
+    const { id, action, payload, reason } = (ev as CustomEvent<{ id: string; action: string; payload: Record<string, string>; reason: string }>).detail;
+    if (id !== 'console-slideover-obs') return;
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id, ok: false, error: 'Session expired.' } }));
+      return;
+    }
+
+    try {
+      if (action === 'observation.hide') {
+        await adminClient.observation.hide({ observation_id: payload.observation_id }, reason, session.access_token);
+      } else if (action === 'observation.unhide') {
+        await adminClient.observation.unhide({ observation_id: payload.observation_id }, reason, session.access_token);
+      } else if (action === 'observation.obscure') {
+        const sel = document.getElementById('slideover-obs-obscure-select') as HTMLSelectElement | null;
+        const level = (sel?.value ?? payload.obscure_level) as 'none' | '0.1deg' | '0.2deg' | '5km' | 'full';
+        await adminClient.observation.obscure({ observation_id: payload.observation_id, obscure_level: level }, reason, session.access_token);
+      } else if (action === 'observation.license_override') {
+        const sel = document.getElementById('slideover-obs-license-select') as HTMLSelectElement | null;
+        const lic = (sel?.value ?? payload.license) as 'CC BY 4.0' | 'CC BY-NC 4.0' | 'CC0';
+        await adminClient.observation.licenseOverride({ observation_id: payload.observation_id, license: lic }, reason, session.access_token);
+      }
+
+      document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id, ok: true } }));
+      await refreshSelected();
+    } catch (err) {
+      const msg = err instanceof AdminClientError ? err.message : (err as Error).message;
+      document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id, ok: false, error: msg } }));
+    }
+  });
+
+  let filterTimer: ReturnType<typeof setTimeout> | null = null;
+  function onFilterChange() {
+    if (filterTimer) clearTimeout(filterTimer);
+    filterTimer = setTimeout(() => { loadObs(); }, 300);
+  }
+
+  ['obs-filter-status', 'obs-filter-obscure', 'obs-filter-license', 'obs-filter-hidden'].forEach(id => {
+    document.getElementById(id)?.addEventListener('change', onFilterChange);
+  });
+  document.getElementById('obs-filter-owner')?.addEventListener('input', onFilterChange);
+
+  init().catch(err => {
+    const e = document.getElementById('obs-error')!;
+    e.textContent = (err as Error).message;
+    show('obs-error');
+  });
+</script>

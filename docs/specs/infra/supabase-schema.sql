@@ -3377,3 +3377,48 @@ $$;
 
 REVOKE ALL ON FUNCTION public.list_admin_cron_runs_guarded(int) FROM public;
 GRANT EXECUTE ON FUNCTION public.list_admin_cron_runs_guarded(int) TO authenticated;
+
+-- ═════════════════════════════════════════════════════════════════════
+-- ADMIN CONSOLE PR4 — observations admin actions (hide/obscure/license)
+-- ═════════════════════════════════════════════════════════════════════
+
+-- Admin moderation columns (additive, idempotent).
+ALTER TABLE public.observations
+  ADD COLUMN IF NOT EXISTS hidden        boolean    NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS hidden_reason text,
+  ADD COLUMN IF NOT EXISTS hidden_at     timestamptz,
+  ADD COLUMN IF NOT EXISTS hidden_by     uuid REFERENCES public.users(id);
+
+CREATE INDEX IF NOT EXISTS idx_observations_hidden
+  ON public.observations(hidden, sync_status)
+  WHERE hidden = true;
+
+-- Public-read gate: extend obs_public_read so hidden observations are
+-- excluded from anon/authenticated feeds. Owner can still see their own.
+DROP POLICY IF EXISTS "obs_public_read" ON public.observations;
+CREATE POLICY "obs_public_read" ON public.observations
+  FOR SELECT
+  TO anon, authenticated
+  USING (
+    sync_status = 'synced'
+    AND hidden = false
+    AND (
+      obscure_level = 'none'
+      OR location_obscured IS NOT NULL
+    )
+  );
+
+-- Owner can read all of their own observations regardless of hidden state.
+-- The existing obs_owner policy covers FOR ALL (SELECT + write), but we
+-- add this explicit SELECT policy so the hidden gate above doesn't
+-- accidentally block the owner's own read when obs_owner's USING clause
+-- is evaluated under the default-deny model with multiple policies.
+-- (Postgres ORs policies of the same permissive type, so the owner's
+-- ALL policy already allows reads; this is belt-and-suspenders clarity.)
+
+-- Admin can SELECT everything (including hidden) for the moderation tab.
+DROP POLICY IF EXISTS "obs_admin_full_read" ON public.observations;
+CREATE POLICY "obs_admin_full_read" ON public.observations
+  FOR SELECT
+  TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'));
