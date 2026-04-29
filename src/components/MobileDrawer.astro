@@ -18,6 +18,8 @@ const profilePath        = getLocalizedPath(lang, routes.profile[locale] + '/');
 const myObsPath          = getLocalizedPath(lang, routes.profileObservations[locale] + '/');
 const watchlistPath      = getLocalizedPath(lang, routes.exploreWatchlist[locale] + '/');
 const settingsPath       = getLocalizedPath(lang, routes.profileSettings[locale] + '/profile/');
+const sponsoringPath     = getLocalizedPath(lang, routes.sponsoring[locale] + '/');
+const sponsoredByPath    = getLocalizedPath(lang, routes.sponsoredBy[locale] + '/');
 
 const getDocLabel = (key: string) => (tr.docs.sections as Record<string, string>)[key] || key;
 ---
@@ -82,6 +84,8 @@ const getDocLabel = (key: string) => (tr.docs.sections as Record<string, string>
       <a href={myObsPath}     class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{tr.profile.my_observations_title}</a>
       <a href={watchlistPath} class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{tr.nav.explore_dropdown.watchlist}</a>
       <a href={settingsPath}  class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{tr.profile.settings_link} ▸</a>
+      <a href={sponsoringPath}  class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{tr.sponsoring.page_title}</a>
+      <a href={sponsoredByPath} class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{tr.sponsoring.quota_card_title}</a>
       <a id="mobile-console-link"
          href={getLocalizedPath(lang, routes.console[locale] + '/')}
          class="hidden block px-3 py-2 text-sm rounded hover:bg-zinc-100 dark:hover:bg-zinc-900">
