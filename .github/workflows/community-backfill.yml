@@ -1,0 +1,77 @@
+name: Community discovery — manual backfill
+
+# One-time / on-demand fire of the deployed `recompute-user-stats` Edge
+# Function. Computes counters (species_count, obs_count_7d, obs_count_30d),
+# centroid_geog, and country_code (where currently NULL) for every user.
+#
+# Why this exists: the nightly cron (08:00 UTC) only sees users who are
+# active. Until each user posts a new observation, their counters stay at
+# zero and they don't appear on /{en,es}/community/observers/. Firing this
+# once after Module 28 ships gives the page useful data on day 1.
+#
+# This replaces the previous "operator runs curl" instruction in
+# docs/runbooks/community-discovery.md (PR3 — backfill).
+#
+# Safe to run repeatedly: the EF is idempotent (UPDATE … FROM stats CTE
+# rewrites the same fields each call). At v1 scale runs in under 2 seconds.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'If true, only checks the EF responds; does not record output as a backfill run.'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+permissions:
+  contents: read
+
+jobs:
+  backfill:
+    name: Fire recompute-user-stats once
+    runs-on: ubuntu-latest
+    env:
+      PROJECT_REF: reppvlqejgoqvitturxp
+    steps:
+      - name: Invoke recompute-user-stats Edge Function
+        run: |
+          set -euo pipefail
+          url="https://${PROJECT_REF}.supabase.co/functions/v1/recompute-user-stats"
+          echo "POST $url"
+          # The EF is deployed --no-verify-jwt (cron-only contract); no Auth
+          # header needed. Internal access control happens inside via the
+          # auto-injected SUPABASE_SERVICE_ROLE_KEY.
+          response=$(curl -sS -X POST \
+            -H "Content-Type: application/json" \
+            -d '{}' \
+            -w '\n%{http_code}' \
+            "$url")
+          body="${response%$'\n'*}"
+          status="${response##*$'\n'}"
+
+          echo "::group::Response"
+          echo "HTTP $status"
+          echo "$body"
+          echo "::endgroup::"
+
+          if [ "$status" != "200" ]; then
+            echo "::error::Edge Function returned HTTP $status"
+            exit 1
+          fi
+
+          # Surface the rows_updated count so the operator can sanity-check
+          # in the Actions UI. The EF returns { ok, elapsed_ms, rows_updated }.
+          rows=$(echo "$body" | grep -oE '"rows_updated"[[:space:]]*:[[:space:]]*[0-9]+' | grep -oE '[0-9]+' || echo '?')
+          elapsed=$(echo "$body" | grep -oE '"elapsed_ms"[[:space:]]*:[[:space:]]*[0-9]+' | grep -oE '[0-9]+' || echo '?')
+          echo "::notice::Backfilled $rows users in ${elapsed}ms"
+
+      - name: Annotate run
+        if: ${{ inputs.dry_run != 'true' }}
+        run: |
+          echo "## Community discovery — backfill complete" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Fired \`recompute-user-stats\` against project \`${PROJECT_REF}\`. The nightly cron at 08:00 UTC will continue to refresh counters going forward." >> "$GITHUB_STEP_SUMMARY"
