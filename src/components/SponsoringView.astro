@@ -16,6 +16,7 @@ const i18nBag = {
     cred_invalid:       tr.sponsoring.paused_reason_cred_invalid,
     credential_revoked: tr.sponsoring.paused_reason_credential_revoked,
     sponsor_revoked:    tr.sponsoring.paused_reason_sponsor_revoked,
+    other:              tr.sponsoring.paused_reason_other,
   },
 };
 ---
@@ -171,6 +172,7 @@ const i18nBag = {
       cred_invalid: string;
       credential_revoked: string;
       sponsor_revoked: string;
+      other: string;
     };
   };
   const tr: I18nBag = JSON.parse(
@@ -199,7 +201,7 @@ const i18nBag = {
     if (raw === 'cred:invalid')           return tr.paused_reason.cred_invalid;
     if (raw === 'credential_revoked')     return tr.paused_reason.credential_revoked;
     if (raw === 'sponsor_revoked')        return tr.paused_reason.sponsor_revoked;
-    return raw;
+    return tr.paused_reason.other;
   }
 
   function showConfirm(message: string): Promise<boolean> {
