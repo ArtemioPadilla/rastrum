@@ -164,6 +164,7 @@ const tr = t(lang);
   import { getSupabase } from '../lib/supabase';
   import { getUserRoles } from '../lib/user-roles';
   import { adminClient, AdminClientError } from '../lib/admin-client';
+  import { readFilterState, writeFilterState, applyFilterStateToForm } from '../lib/console-filter-state';
 
   type ObsRow = {
     id: string;
@@ -198,6 +199,14 @@ const tr = t(lang);
 
   const supabase = getSupabase();
 
+  const OBS_FILTER_MAP = {
+    status: 'obs-filter-status',
+    obscure: 'obs-filter-obscure',
+    license: 'obs-filter-license',
+    hidden: 'obs-filter-hidden',
+    q: 'obs-filter-owner',
+  };
+
   async function init() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) { show('obs-not-auth'); return; }
@@ -205,6 +214,7 @@ const tr = t(lang);
     const myRoles = await getUserRoles(session.user.id);
     if (!myRoles.has('admin')) { show('obs-not-auth'); return; }
     show('obs-shell');
+    applyFilterStateToForm(readFilterState(), OBS_FILTER_MAP);
     await loadObs();
   }
 
@@ -451,7 +461,21 @@ const tr = t(lang);
   let filterTimer: ReturnType<typeof setTimeout> | null = null;
   function onFilterChange() {
     if (filterTimer) clearTimeout(filterTimer);
-    filterTimer = setTimeout(() => { loadObs(); }, 300);
+    filterTimer = setTimeout(() => {
+      const statusEl = document.getElementById('obs-filter-status') as HTMLSelectElement | null;
+      const obscureEl = document.getElementById('obs-filter-obscure') as HTMLSelectElement | null;
+      const licenseEl = document.getElementById('obs-filter-license') as HTMLSelectElement | null;
+      const hiddenEl = document.getElementById('obs-filter-hidden') as HTMLSelectElement | null;
+      const ownerEl = document.getElementById('obs-filter-owner') as HTMLInputElement | null;
+      writeFilterState({
+        status: statusEl?.value ?? '',
+        obscure: obscureEl?.value ?? '',
+        license: licenseEl?.value ?? '',
+        hidden: hiddenEl?.value ?? '',
+        q: ownerEl?.value ?? '',
+      });
+      loadObs();
+    }, 300);
   }
 
   ['obs-filter-status', 'obs-filter-obscure', 'obs-filter-license', 'obs-filter-hidden'].forEach(id => {

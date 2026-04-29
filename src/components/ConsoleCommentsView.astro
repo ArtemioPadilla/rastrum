@@ -115,6 +115,7 @@ const tr = t(lang);
   import { getSupabase } from '../lib/supabase';
   import { getUserRoles } from '../lib/user-roles';
   import { adminClient, AdminClientError } from '../lib/admin-client';
+  import { readFilterState, writeFilterState, applyFilterStateToForm } from '../lib/console-filter-state';
 
   type CommentRow = {
     id: string;
@@ -143,12 +144,19 @@ const tr = t(lang);
 
   const supabase = getSupabase();
 
+  const FILTER_MAP = {
+    status: 'modcom-filter-status',
+    obs: 'modcom-filter-obs',
+    q: 'modcom-filter-body',
+  };
+
   async function init() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) { show('modcom-not-auth'); return; }
     const myRoles = await getUserRoles(session.user.id);
     if (!myRoles.has('moderator') && !myRoles.has('admin')) { show('modcom-not-auth'); return; }
     show('modcom-shell');
+    applyFilterStateToForm(readFilterState(), FILTER_MAP);
     await loadComments();
   }
 
@@ -350,7 +358,17 @@ const tr = t(lang);
   let filterTimer: ReturnType<typeof setTimeout> | null = null;
   function onFilterChange() {
     if (filterTimer) clearTimeout(filterTimer);
-    filterTimer = setTimeout(() => { loadComments(); }, 300);
+    filterTimer = setTimeout(() => {
+      const statusEl = document.getElementById('modcom-filter-status') as HTMLSelectElement | null;
+      const obsEl = document.getElementById('modcom-filter-obs') as HTMLInputElement | null;
+      const bodyEl = document.getElementById('modcom-filter-body') as HTMLInputElement | null;
+      writeFilterState({
+        status: statusEl?.value ?? '',
+        obs: obsEl?.value ?? '',
+        q: bodyEl?.value ?? '',
+      });
+      loadComments();
+    }, 300);
   }
 
   document.getElementById('modcom-filter-status')?.addEventListener('change', onFilterChange);

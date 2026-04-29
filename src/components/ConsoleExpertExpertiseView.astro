@@ -69,6 +69,7 @@ const tr = t(lang);
 <script>
   import { getSupabase } from '../lib/supabase';
   import { getUserRoles } from '../lib/user-roles';
+  import { readFilterState, writeFilterState, applyFilterStateToForm } from '../lib/console-filter-state';
 
   function show(id: string) { document.getElementById(id)?.classList.remove('hidden'); }
   function hide(id: string) { document.getElementById(id)?.classList.add('hidden'); }
@@ -190,13 +191,24 @@ const tr = t(lang);
       return;
     }
 
+    applyFilterStateToForm(readFilterState(), {
+      q: 'exp-skill-search',
+      verified: 'exp-skill-verified-only',
+    });
+
     renderChart(allRows);
     renderTable();
 
     const searchEl = document.getElementById('exp-skill-search');
     const verifiedEl = document.getElementById('exp-skill-verified-only');
-    searchEl?.addEventListener('input', renderTable);
-    verifiedEl?.addEventListener('change', renderTable);
+    searchEl?.addEventListener('input', () => {
+      writeFilterState({ q: (searchEl as HTMLInputElement).value });
+      renderTable();
+    });
+    verifiedEl?.addEventListener('change', () => {
+      writeFilterState({ verified: (verifiedEl as HTMLInputElement).checked ? 'true' : '' });
+      renderTable();
+    });
   }
 
   init().catch(err => {

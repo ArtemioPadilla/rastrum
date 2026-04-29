@@ -72,6 +72,7 @@ const tr = t(lang);
 <script>
   import { getSupabase } from '../lib/supabase';
   import { getUserRoles } from '../lib/user-roles';
+  import { readFilterState, writeFilterState } from '../lib/console-filter-state';
 
   function show(id: string) { document.getElementById(id)?.classList.remove('hidden'); }
   function hide(id: string) { document.getElementById(id)?.classList.add('hidden'); }
@@ -106,6 +107,8 @@ const tr = t(lang);
       return;
     }
     show('exp-val-shell');
+    const saved = readFilterState();
+    if (saved['scope'] === 'all') myTaxaOnly = false;
 
     // Fetch expert_taxa
     const { data: userData } = await supabase.from('users').select('expert_taxa').eq('id', session.user.id).single();
@@ -200,6 +203,7 @@ const tr = t(lang);
       myTaxaOnly = true;
       myBtn.className = 'rounded px-3 py-1.5 text-xs font-medium bg-emerald-600 text-white';
       allBtn.className = 'rounded px-3 py-1.5 text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300';
+      writeFilterState({ scope: 'my' });
       renderTable();
     });
 
@@ -207,6 +211,7 @@ const tr = t(lang);
       myTaxaOnly = false;
       allBtn.className = 'rounded px-3 py-1.5 text-xs font-medium bg-emerald-600 text-white';
       myBtn.className = 'rounded px-3 py-1.5 text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300';
+      writeFilterState({ scope: 'all' });
       renderTable();
     });
   }

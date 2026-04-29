@@ -53,6 +53,7 @@ const tr = t(lang);
 <script>
   import { getSupabase } from '../lib/supabase';
   import { getUserRoles } from '../lib/user-roles';
+  import { readFilterState, writeFilterState, applyFilterStateToForm } from '../lib/console-filter-state';
 
   type SyncFailureRow = {
     id: string;
@@ -88,6 +89,10 @@ const tr = t(lang);
     const myRoles = await getUserRoles(session.user.id);
     if (!myRoles.has('admin')) { show('sync-not-auth'); return; }
     show('sync-shell');
+    applyFilterStateToForm(readFilterState(), {
+      days: 'sync-days-filter',
+      q: 'sync-error-filter',
+    });
     await loadRows();
   }
 
@@ -208,8 +213,16 @@ const tr = t(lang);
     show('sync-rows');
   }
 
-  document.getElementById('sync-days-filter')?.addEventListener('change', () => loadRows());
-  document.getElementById('sync-error-filter')?.addEventListener('input', () => renderRows());
+  document.getElementById('sync-days-filter')?.addEventListener('change', () => {
+    const daysEl = document.getElementById('sync-days-filter') as HTMLSelectElement | null;
+    writeFilterState({ days: daysEl?.value ?? '' });
+    loadRows();
+  });
+  document.getElementById('sync-error-filter')?.addEventListener('input', () => {
+    const qEl = document.getElementById('sync-error-filter') as HTMLInputElement | null;
+    writeFilterState({ q: qEl?.value ?? '' });
+    renderRows();
+  });
 
   init().catch(err => {
     hide('sync-loading');
