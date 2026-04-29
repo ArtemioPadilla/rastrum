@@ -50,7 +50,7 @@ const obs = (tr as unknown as { observe: Record<string, string> }).observe;
         <canvas
           id="rastrum-crop-canvas"
           class="block w-full h-full object-contain"
-          aria-label={obs.crop_drag_hint}
+          aria-hidden="true"
         ></canvas>
       </div>
 
@@ -394,12 +394,36 @@ const obs = (tr as unknown as { observe: Record<string, string> }).observe;
       close();
     });
 
+    function focusableEls(): HTMLElement[] {
+      if (!root) return [];
+      const sel = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+      return Array.from(root.querySelectorAll<HTMLElement>(sel))
+        .filter((el) => el.offsetParent !== null);
+    }
+
     document.addEventListener('keydown', (ev) => {
       if (root?.classList.contains('hidden')) return;
       if (ev.key === 'Escape') {
         ev.preventDefault();
         emit('cancel');
         close();
+        return;
+      }
+      // Focus trap — keep Tab navigation inside the modal so screen-reader
+      // / keyboard users don't fall through to content behind the dialog.
+      if (ev.key === 'Tab') {
+        const els = focusableEls();
+        if (els.length === 0) return;
+        const first = els[0];
+        const last = els[els.length - 1];
+        const active = document.activeElement as HTMLElement | null;
+        if (ev.shiftKey && active === first) {
+          ev.preventDefault();
+          last.focus();
+        } else if (!ev.shiftKey && active === last) {
+          ev.preventDefault();
+          first.focus();
+        }
       }
     });
 
