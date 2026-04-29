@@ -4658,3 +4658,252 @@ END $$;
 
 REVOKE ALL ON FUNCTION public.consume_rate_limit_token(uuid, numeric, numeric, numeric) FROM public;
 GRANT EXECUTE ON FUNCTION public.consume_rate_limit_token(uuid, numeric, numeric, numeric) TO service_role;
+
+-- ============================================================
+-- ADMIN OBSERVABILITY (PR12 — Section C-2)
+-- ============================================================
+-- Three admin-only sinks fed by the dispatcher and a pair of cron jobs:
+--   * admin_anomalies        — automated anomaly detections from admin_audit
+--   * admin_health_digests   — weekly platform-health snapshots
+--   * function_errors        — Edge Function structured error sink
+--
+-- Read access is gated by has_role(auth.uid(),'admin'); writes happen via
+-- service_role only (cron / SECURITY DEFINER functions / Edge Functions).
+
+-- 1. audit_op enum extensions for the new actions
+DO $$ BEGIN
+  ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'anomaly_acknowledge';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'audit_export';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- 2. admin_anomalies — captures detections from admin_audit scans
+CREATE TABLE IF NOT EXISTS public.admin_anomalies (
+  id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  kind             text NOT NULL,
+  actor_id         uuid REFERENCES auth.users(id),
+  window_start     timestamptz NOT NULL,
+  window_end       timestamptz NOT NULL,
+  event_count      int NOT NULL,
+  details          jsonb NOT NULL DEFAULT '{}'::jsonb,
+  acknowledged_at  timestamptz,
+  acknowledged_by  uuid REFERENCES auth.users(id),
+  ack_notes        text,
+  created_at       timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT admin_anomalies_unique_window UNIQUE (kind, actor_id, window_start)
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_anomalies_actor
+  ON public.admin_anomalies (actor_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_admin_anomalies_unack
+  ON public.admin_anomalies (acknowledged_at NULLS FIRST, created_at DESC);
+
+ALTER TABLE public.admin_anomalies ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS admin_anomalies_admin_read ON public.admin_anomalies;
+CREATE POLICY admin_anomalies_admin_read ON public.admin_anomalies
+  FOR SELECT TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'));
+
+DROP POLICY IF EXISTS admin_anomalies_no_client_write ON public.admin_anomalies;
+CREATE POLICY admin_anomalies_no_client_write ON public.admin_anomalies
+  FOR ALL TO authenticated
+  USING (false) WITH CHECK (false);
+
+GRANT SELECT                          ON public.admin_anomalies TO authenticated;
+GRANT SELECT, INSERT, UPDATE          ON public.admin_anomalies TO service_role;
+
+-- 3. admin_health_digests — weekly snapshots
+CREATE TABLE IF NOT EXISTS public.admin_health_digests (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  period_start  timestamptz NOT NULL,
+  period_end    timestamptz NOT NULL,
+  metrics       jsonb NOT NULL,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT admin_health_digests_unique_period UNIQUE (period_start, period_end)
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_health_digests_period
+  ON public.admin_health_digests (period_end DESC);
+
+ALTER TABLE public.admin_health_digests ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS admin_health_digests_admin_read ON public.admin_health_digests;
+CREATE POLICY admin_health_digests_admin_read ON public.admin_health_digests
+  FOR SELECT TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'));
+
+DROP POLICY IF EXISTS admin_health_digests_no_client_write ON public.admin_health_digests;
+CREATE POLICY admin_health_digests_no_client_write ON public.admin_health_digests
+  FOR ALL TO authenticated
+  USING (false) WITH CHECK (false);
+
+GRANT SELECT                          ON public.admin_health_digests TO authenticated;
+GRANT SELECT, INSERT                  ON public.admin_health_digests TO service_role;
+
+-- 4. function_errors — Edge Function structured error sink
+CREATE TABLE IF NOT EXISTS public.function_errors (
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  function_name  text NOT NULL,
+  code           text NOT NULL,
+  actor_id       uuid,
+  context        jsonb NOT NULL DEFAULT '{}'::jsonb,
+  error_message  text,
+  created_at     timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_function_errors_fn
+  ON public.function_errors (function_name, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_function_errors_code
+  ON public.function_errors (code, created_at DESC);
+
+ALTER TABLE public.function_errors ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS function_errors_admin_read ON public.function_errors;
+CREATE POLICY function_errors_admin_read ON public.function_errors
+  FOR SELECT TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'));
+
+DROP POLICY IF EXISTS function_errors_no_client_write ON public.function_errors;
+CREATE POLICY function_errors_no_client_write ON public.function_errors
+  FOR ALL TO authenticated
+  USING (false) WITH CHECK (false);
+
+GRANT SELECT                          ON public.function_errors TO authenticated;
+GRANT SELECT, INSERT                  ON public.function_errors TO service_role;
+
+-- 5. detect_admin_anomalies — runs hourly via pg_cron, surfaces three rules.
+--
+--   * High rate     — > 50 admin_audit rows from one actor in any rolling
+--                     1-hour window in the last hour.
+--   * Bulk delete   — > 10 actions whose op text contains 'hide', 'revoke',
+--                     'ban', or 'delete' in the last hour from one actor.
+--   * Off-hours     — >= 5 actions outside 06:00–22:00 UTC in the last hour.
+--
+-- Each detection is INSERTed into admin_anomalies with ON CONFLICT DO NOTHING
+-- on (kind, actor_id, window_start) so re-runs over an overlapping window
+-- are idempotent. The window_start is truncated to the hour so a single
+-- detection per actor+kind+hour is the natural deduplication key.
+CREATE OR REPLACE FUNCTION public.detect_admin_anomalies()
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_now     timestamptz := now();
+  v_start   timestamptz := date_trunc('hour', v_now) - interval '1 hour';
+  v_end     timestamptz := date_trunc('hour', v_now);
+BEGIN
+  -- High rate: > 50 rows in [v_start, v_end) from one actor.
+  INSERT INTO public.admin_anomalies (kind, actor_id, window_start, window_end, event_count, details)
+  SELECT
+    'high_rate',
+    actor_id,
+    v_start,
+    v_end,
+    count(*),
+    jsonb_build_object('threshold', 50)
+  FROM public.admin_audit
+  WHERE created_at >= v_start AND created_at < v_end
+  GROUP BY actor_id
+  HAVING count(*) > 50
+  ON CONFLICT (kind, actor_id, window_start) DO NOTHING;
+
+  -- Bulk delete: > 10 destructive-ish ops from one actor in the window.
+  INSERT INTO public.admin_anomalies (kind, actor_id, window_start, window_end, event_count, details)
+  SELECT
+    'bulk_delete',
+    actor_id,
+    v_start,
+    v_end,
+    count(*),
+    jsonb_build_object(
+      'threshold', 10,
+      'ops_seen', array_agg(DISTINCT op::text)
+    )
+  FROM public.admin_audit
+  WHERE created_at >= v_start AND created_at < v_end
+    AND (
+      op::text LIKE '%hide%'   OR
+      op::text LIKE '%revoke%' OR
+      op::text LIKE '%ban%'    OR
+      op::text LIKE '%delete%'
+    )
+  GROUP BY actor_id
+  HAVING count(*) > 10
+  ON CONFLICT (kind, actor_id, window_start) DO NOTHING;
+
+  -- Off-hours: >= 5 actions outside 06:00–22:00 UTC in the window.
+  INSERT INTO public.admin_anomalies (kind, actor_id, window_start, window_end, event_count, details)
+  SELECT
+    'off_hours',
+    actor_id,
+    v_start,
+    v_end,
+    count(*),
+    jsonb_build_object('threshold', 5, 'allowed_hours_utc', '06:00-22:00')
+  FROM public.admin_audit
+  WHERE created_at >= v_start AND created_at < v_end
+    AND (EXTRACT(HOUR FROM created_at AT TIME ZONE 'UTC') < 6
+      OR EXTRACT(HOUR FROM created_at AT TIME ZONE 'UTC') >= 22)
+  GROUP BY actor_id
+  HAVING count(*) >= 5
+  ON CONFLICT (kind, actor_id, window_start) DO NOTHING;
+END $$;
+
+REVOKE ALL ON FUNCTION public.detect_admin_anomalies() FROM public;
+GRANT EXECUTE ON FUNCTION public.detect_admin_anomalies() TO service_role;
+
+-- 6. compute_admin_health_digest — runs weekly via pg_cron. Aggregates a set
+-- of platform metrics for the previous 7 days and inserts one row into
+-- admin_health_digests. ON CONFLICT DO NOTHING keeps re-runs idempotent.
+CREATE OR REPLACE FUNCTION public.compute_admin_health_digest()
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_period_end   timestamptz := now();
+  v_period_start timestamptz := v_period_end - interval '7 days';
+  v_metrics      jsonb;
+BEGIN
+  SELECT jsonb_build_object(
+    'admin_actions',     COALESCE((
+      SELECT count(*)::bigint FROM public.admin_audit
+      WHERE created_at >= v_period_start AND created_at < v_period_end
+    ), 0),
+    'bans_issued',       COALESCE((
+      SELECT count(*)::bigint FROM public.user_bans
+      WHERE created_at >= v_period_start AND created_at < v_period_end
+    ), 0),
+    'bans_lifted',       COALESCE((
+      SELECT count(*)::bigint FROM public.user_bans
+      WHERE revoked_at IS NOT NULL
+        AND revoked_at >= v_period_start AND revoked_at < v_period_end
+    ), 0),
+    'appeals_open',      COALESCE((
+      SELECT count(*)::bigint FROM public.ban_appeals
+      WHERE status = 'pending'
+    ), 0),
+    'reports_open',      COALESCE((
+      SELECT count(*)::bigint FROM public.reports
+      WHERE status IN ('open', 'triaged')
+    ), 0),
+    'anomalies_unack',   COALESCE((
+      SELECT count(*)::bigint FROM public.admin_anomalies
+      WHERE acknowledged_at IS NULL
+    ), 0),
+    'function_errors_7d', COALESCE((
+      SELECT count(*)::bigint FROM public.function_errors
+      WHERE created_at >= v_period_start AND created_at < v_period_end
+    ), 0)
+  ) INTO v_metrics;
+
+  INSERT INTO public.admin_health_digests (period_start, period_end, metrics)
+  VALUES (v_period_start, v_period_end, v_metrics)
+  ON CONFLICT (period_start, period_end) DO NOTHING;
+END $$;
+
+REVOKE ALL ON FUNCTION public.compute_admin_health_digest() FROM public;
+GRANT EXECUTE ON FUNCTION public.compute_admin_health_digest() TO service_role;

@@ -58,6 +58,11 @@ BEGIN
   -- PR11 — durable admin rate limit buckets (admin Edge Function dispatcher)
   IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'rate_limit_buckets')     THEN missing := array_append(missing, 'public.rate_limit_buckets'); END IF;
 
+  -- PR12 — admin observability (anomalies, weekly health digest, function-error sink)
+  IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'admin_anomalies')        THEN missing := array_append(missing, 'public.admin_anomalies'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'admin_health_digests')   THEN missing := array_append(missing, 'public.admin_health_digests'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'function_errors')        THEN missing := array_append(missing, 'public.function_errors'); END IF;
+
   -- Console PR8 — feature flags + karma config DB tables
   IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'app_feature_flags')      THEN missing := array_append(missing, 'public.app_feature_flags'); END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'karma_config')           THEN missing := array_append(missing, 'public.karma_config'); END IF;
@@ -81,6 +86,8 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'list_admin_cron_runs_guarded') THEN missing := array_append(missing, 'public.list_admin_cron_runs_guarded()'); END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'is_user_banned')               THEN missing := array_append(missing, 'public.is_user_banned()'); END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'consume_rate_limit_token')    THEN missing := array_append(missing, 'public.consume_rate_limit_token()'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'detect_admin_anomalies')      THEN missing := array_append(missing, 'public.detect_admin_anomalies()'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'compute_admin_health_digest') THEN missing := array_append(missing, 'public.compute_admin_health_digest()'); END IF;
 
   IF array_length(missing, 1) IS NOT NULL THEN
     RAISE EXCEPTION 'Sentinel verify failed — missing objects: %', missing;

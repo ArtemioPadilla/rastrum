@@ -21,6 +21,9 @@
 --                    'streak-push-nightly' (01:55 UTC ≈ 19:55 America/Mexico_City).
 --   v4 (2026-04-27): added 'refresh-taxon-rarity-nightly' (03:00 UTC).
 --   v5 (2026-04-29): added 'recompute-user-stats-nightly' (08:00 UTC) for M28.
+--   v6 (2026-04-29): added 'admin-anomaly-detect-hourly' (every hour at :05)
+--                    and 'admin-health-digest-weekly' (Mondays 09:00 UTC)
+--                    for PR12 admin observability.
 -- ════════════════════════════════════════════════════════════════════════
 
 CREATE EXTENSION IF NOT EXISTS pg_cron;
@@ -102,6 +105,30 @@ BEGIN
     );
   $body$, v_base || '/recompute-user-stats'));
 
+  -- 7. admin-anomaly-detect-hourly — every hour at :05 (PR12)
+  --    Scans the prior hour's admin_audit rows for high-rate / bulk-delete /
+  --    off-hours signals and inserts into admin_anomalies. Idempotent on
+  --    (kind, actor_id, window_start) so re-firing the same hour is a no-op.
+  PERFORM cron.unschedule('admin-anomaly-detect-hourly')
+    FROM cron.job WHERE jobname = 'admin-anomaly-detect-hourly';
+  PERFORM cron.schedule(
+    'admin-anomaly-detect-hourly',
+    '5 * * * *',
+    $$ SELECT public.detect_admin_anomalies(); $$
+  );
+
+  -- 8. admin-health-digest-weekly — Mondays at 09:00 UTC (PR12)
+  --    Aggregates a 7-day platform-health snapshot into admin_health_digests.
+  --    ON CONFLICT DO NOTHING on (period_start, period_end) makes manual
+  --    re-runs safe.
+  PERFORM cron.unschedule('admin-health-digest-weekly')
+    FROM cron.job WHERE jobname = 'admin-health-digest-weekly';
+  PERFORM cron.schedule(
+    'admin-health-digest-weekly',
+    '0 9 * * 1',
+    $$ SELECT public.compute_admin_health_digest(); $$
+  );
+
   RAISE NOTICE '✓ Cron schedules applied';
 END
 $migration$;
@@ -110,7 +137,8 @@ SELECT jobid, jobname, schedule, active
 FROM cron.job
 WHERE jobname IN ('streaks-nightly', 'badges-nightly', 'plantnet-quota-daily',
                   'streak-push-nightly', 'refresh-taxon-rarity-nightly',
-                  'recompute-user-stats-nightly')
+                  'recompute-user-stats-nightly',
+                  'admin-anomaly-detect-hourly', 'admin-health-digest-weekly')
 ORDER BY jobname;
 
 -- m26: prune read notifications older than 90 days, daily at 04:30 UTC.

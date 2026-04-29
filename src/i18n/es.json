@@ -1814,6 +1814,8 @@
     "karma": "Ajuste de karma",
     "flags": "Banderas (admin)",
     "audit": "Auditoría",
+    "anomalies": "Anomalías",
+    "forensics": "Forenses y exportación",
     "features": "Banderas de funcionalidad",
     "bioblitz": "Eventos bioblitz",
     "modOverview": "Resumen",
@@ -2279,6 +2281,109 @@
     "mod_appeals_action_accept": "Aceptar apelación (levantar suspensión)",
     "mod_appeals_action_reject": "Rechazar apelación",
     "mod_appeals_reviewer_note_label": "Nota para el usuario (opcional)",
-    "mod_appeals_kb_nav": "Apelaciones"
+    "mod_appeals_kb_nav": "Apelaciones",
+
+    "anomaliesView": {
+      "title": "Detecciones de anomalías",
+      "description": "Detecciones automáticas basadas en reglas sobre admin_audit. Las anomalías reconocidas permanecen en el registro para preservar la trazabilidad.",
+      "tabs": {
+        "unacknowledged": "Sin reconocer",
+        "all": "Todas"
+      },
+      "columns": {
+        "kind": "Tipo",
+        "actor": "Actor",
+        "window": "Ventana",
+        "events": "Eventos",
+        "details": "Detalles"
+      },
+      "actions": {
+        "acknowledge": "Reconocer"
+      },
+      "slideOver": {
+        "title": "Reconocer anomalía",
+        "notes": "Notas (opcional)",
+        "submit": "Reconocer"
+      },
+      "kinds": {
+        "high_rate": "Tasa alta",
+        "bulk_delete": "Acción destructiva masiva",
+        "off_hours": "Fuera de horario"
+      },
+      "empty": "No hay anomalías que coincidan con el filtro."
+    },
+
+    "forensicsView": {
+      "title": "Exportación forense",
+      "description": "Filtra y exporta filas de admin_audit. El CSV se construye en el servidor y la llamada queda registrada vía audit_export.",
+      "filters": {
+        "from": "Desde",
+        "to": "Hasta",
+        "actor": "Actor (usuario o uuid)",
+        "op": "Operación",
+        "limit": "Límite"
+      },
+      "actions": {
+        "preview": "Vista previa",
+        "exportCsv": "Exportar CSV"
+      },
+      "columns": {
+        "id": "id",
+        "timestamp": "fecha",
+        "actor": "actor",
+        "op": "operación",
+        "target": "objetivo",
+        "details": "detalles"
+      },
+      "empty": "Sin coincidencias."
+    },
+
+    "audit_op": {
+      "role_grant": "Rol otorgado",
+      "role_revoke": "Rol revocado",
+      "user_ban": "Usuario suspendido",
+      "user_unban": "Usuario rehabilitado",
+      "user_delete": "Usuario eliminado",
+      "observation_hide": "Observación oculta",
+      "observation_unhide": "Observación reexpuesta",
+      "observation_obscure": "Observación oscurecida",
+      "observation_force_unobscure": "Observación forzada a no oscurecida",
+      "observation_license_override": "Licencia de observación sobrescrita",
+      "observation_hard_delete": "Observación borrada",
+      "comment_hide": "Comentario oculto",
+      "comment_unhide": "Comentario reexpuesto",
+      "comment_lock": "Comentario bloqueado",
+      "comment_unlock": "Comentario desbloqueado",
+      "report_triaged": "Reporte triado",
+      "report_resolved": "Reporte resuelto",
+      "report_dismissed": "Reporte descartado",
+      "badge_award_manual": "Insignia otorgada (manual)",
+      "badge_revoke": "Insignia revocada",
+      "token_force_revoke": "Token revocado a la fuerza",
+      "feature_flag_toggle": "Bandera de funcionalidad cambiada",
+      "cron_force_run": "Cron ejecutado a la fuerza",
+      "precise_coords_read": "Lectura de coords precisas",
+      "user_pii_read": "Lectura de PII de usuario",
+      "token_list_read": "Lectura de lista de tokens",
+      "user_audit_read": "Lectura de auditoría de usuario",
+      "appeal_accepted": "Apelación aceptada",
+      "appeal_rejected": "Apelación rechazada",
+      "taxon_conservation_set": "Estado de conservación de taxón",
+      "ai_credential_create": "Credencial IA creada",
+      "ai_credential_revoke": "Credencial IA revocada",
+      "ai_credential_rotate": "Credencial IA rotada",
+      "ai_sponsorship_create": "Patrocinio IA creado",
+      "ai_sponsorship_pause": "Patrocinio IA pausado",
+      "ai_sponsorship_unpause": "Patrocinio IA reanudado",
+      "ai_sponsorship_revoke": "Patrocinio IA revocado",
+      "ai_sponsorship_quota_hit": "Cuota de patrocinio IA alcanzada",
+      "sponsorship_request_create": "Solicitud de patrocinio creada",
+      "sponsorship_request_approve": "Solicitud de patrocinio aprobada",
+      "sponsorship_request_reject": "Solicitud de patrocinio rechazada",
+      "sponsorship_request_withdraw": "Solicitud de patrocinio retirada",
+      "vault_failure": "Fallo de bóveda",
+      "anomaly_acknowledge": "Anomalía reconocida",
+      "audit_export": "Exportación de auditoría"
+    }
   }
 }
