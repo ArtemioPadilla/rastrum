@@ -3668,3 +3668,23 @@ Plan complete and saved to `docs/superpowers/plans/2026-04-28-m20-ai-sponsorship
 **2. Inline Execution** — Execute tasks in this session using executing-plans, batch execution with checkpoints. Faster end-to-end if you want me to drive everything but uses more context per turn.
 
 Which approach?
+
+---
+
+## Execution outcome
+
+This plan executed via subagent-driven development with the following deviations from the original 42-task structure:
+
+- **Tasks bundled** for parallel dispatch where files didn't conflict. The original plan had 42 individual tasks; actual execution used 6 waves of 1-6 parallel subagents each.
+- **Module renumber 20 → 27** — collision with existing `20-chat.md`. Schema + spec + plan adapted.
+- **Three follow-up PRs** beyond the original plan:
+  - PR #84 closed 9 UX gaps not covered by the initial implementation.
+  - PR #94 closed 8 items the user requested as "complete coverage" (stubs activated, out-of-spec features added: request flow, real Resend, docs page, onboarding tour, time selector, reciprocal badge, report button).
+- **Final state shipped on:** see `docs/tasks.md` for the user-facing summary.
+
+### Lessons (for future plans)
+
+- Schema-conflict-prone files (e.g. `supabase-schema.sql`, large i18n JSONs) need to be in their own atomic-task — parallel subagents committing to the same file in a worktree race on git index.
+- `:'var'` psql substitution does NOT work inside `$$ ... $$` dollar-quoted blocks — use a SQL helper function with regular bind variables instead.
+- Supabase managed Postgres restricts `ALTER DATABASE … SET` to superuser — Vault is the right place for runtime secrets that pg_cron needs to reach.
+- GitGuardian flags `sk-ant-` prefix as "Generic High Entropy Secret" even when the actual string is a fixture — use string concatenation + `.gitguardian.yml` to handle.
