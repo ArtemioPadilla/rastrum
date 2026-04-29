@@ -1,0 +1,315 @@
+---
+/**
+ * ConsoleForensicsView — admin-only audit-export tool.
+ * Wraps the audit.export Edge Function action: filter form, in-page preview
+ * table, and a "Download CSV" button that pulls server-built CSV via the
+ * dispatcher (so it lives in admin_audit, just like every other privileged
+ * read).
+ */
+import { t } from '../i18n/utils';
+
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+const c = tr.console as unknown as Record<string, string>;
+const forensicsNs = (tr.console as unknown as Record<string, Record<string, unknown>>).forensicsView as
+  unknown as Record<string, Record<string, string> | string>;
+
+const fTitle = (forensicsNs?.title as string) ?? 'Forensics';
+const fDesc = (forensicsNs?.description as string) ?? '';
+const fEmpty = (forensicsNs?.empty as string) ?? 'No matches.';
+const fFilters = (forensicsNs?.filters as Record<string, string>) ?? {};
+const fActions = (forensicsNs?.actions as Record<string, string>) ?? {};
+const fCols = (forensicsNs?.columns as Record<string, string>) ?? {};
+---
+
+<section class="max-w-6xl">
+  <h1 class="text-xl font-semibold mb-1">{fTitle}</h1>
+  <p class="mb-4 text-sm text-zinc-500 dark:text-zinc-400">{fDesc}</p>
+
+  <div id="forensics-not-auth" class="hidden rounded border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-900 dark:text-amber-100">
+    {tr.console.not_authorized}
+  </div>
+
+  <div id="forensics-shell" class="hidden space-y-4">
+    <form id="forensics-filters" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end rounded border border-zinc-200 dark:border-zinc-800 p-3">
+      <label class="block text-sm">
+        <span class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+          {fFilters.from ?? 'From'}
+        </span>
+        <input id="forensics-from" type="datetime-local" class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm" />
+      </label>
+      <label class="block text-sm">
+        <span class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+          {fFilters.to ?? 'To'}
+        </span>
+        <input id="forensics-to" type="datetime-local" class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm" />
+      </label>
+      <label class="block text-sm">
+        <span class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+          {fFilters.actor ?? 'Actor'}
+        </span>
+        <input id="forensics-actor" type="text" placeholder="username or uuid" class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm" />
+      </label>
+      <label class="block text-sm">
+        <span class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+          {fFilters.op ?? 'Operation'}
+        </span>
+        <select id="forensics-op" class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm">
+          <option value="">— any —</option>
+        </select>
+      </label>
+      <label class="block text-sm">
+        <span class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+          {fFilters.limit ?? 'Limit'}
+        </span>
+        <input id="forensics-limit" type="number" min="1" max="10000" value="1000" class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm" />
+      </label>
+      <div class="sm:col-span-2 lg:col-span-5 flex flex-wrap gap-2 justify-end">
+        <button id="forensics-preview" type="button" class="px-3 py-1.5 rounded border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800">
+          {fActions.preview ?? 'Preview'}
+        </button>
+        <button id="forensics-export" type="button" class="px-3 py-1.5 rounded bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium">
+          {fActions.exportCsv ?? 'Export CSV'}
+        </button>
+      </div>
+    </form>
+
+    <div id="forensics-loading" class="hidden text-sm text-zinc-500 italic">{c.loading}</div>
+    <div id="forensics-empty" class="hidden rounded border border-dashed border-zinc-200 dark:border-zinc-700 p-6 text-center text-sm text-zinc-500">
+      {fEmpty}
+    </div>
+    <div id="forensics-results" class="hidden overflow-x-auto rounded border border-zinc-200 dark:border-zinc-800">
+      <table class="min-w-full text-sm">
+        <thead class="bg-zinc-50 dark:bg-zinc-900/40 text-left text-xs uppercase tracking-wide text-zinc-500">
+          <tr>
+            <th class="px-3 py-2">{fCols.id ?? 'id'}</th>
+            <th class="px-3 py-2">{fCols.timestamp ?? 'timestamp'}</th>
+            <th class="px-3 py-2">{fCols.actor ?? 'actor'}</th>
+            <th class="px-3 py-2">{fCols.op ?? 'op'}</th>
+            <th class="px-3 py-2">{fCols.target ?? 'target'}</th>
+            <th class="px-3 py-2">{fCols.details ?? 'details'}</th>
+          </tr>
+        </thead>
+        <tbody id="forensics-tbody" class="divide-y divide-zinc-100 dark:divide-zinc-800"></tbody>
+      </table>
+    </div>
+
+    <p id="forensics-error" class="hidden text-sm text-red-600 dark:text-red-400"></p>
+  </div>
+</section>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { getUserRoles } from '../lib/user-roles';
+  import { adminClient, AdminClientError, type AdminAuditRow, type AuditExportResult } from '../lib/admin-client';
+  import { readFilterState, writeFilterState } from '../lib/console-filter-state';
+
+  const AUDIT_OPS = [
+    'role_grant', 'role_revoke',
+    'user_ban', 'user_unban', 'user_delete',
+    'observation_hide', 'observation_unhide',
+    'observation_obscure', 'observation_force_unobscure',
+    'observation_license_override', 'observation_hard_delete',
+    'comment_hide', 'comment_unhide', 'comment_lock', 'comment_unlock',
+    'report_triaged', 'report_resolved', 'report_dismissed',
+    'badge_award_manual', 'badge_revoke',
+    'token_force_revoke',
+    'feature_flag_toggle',
+    'cron_force_run',
+    'precise_coords_read',
+    'user_pii_read',
+    'token_list_read',
+    'user_audit_read',
+    'appeal_accepted',
+    'appeal_rejected',
+    'taxon_conservation_set',
+    'ai_credential_create', 'ai_credential_revoke', 'ai_credential_rotate',
+    'ai_sponsorship_create', 'ai_sponsorship_pause', 'ai_sponsorship_unpause',
+    'ai_sponsorship_revoke', 'ai_sponsorship_quota_hit',
+    'sponsorship_request_create', 'sponsorship_request_approve',
+    'sponsorship_request_reject', 'sponsorship_request_withdraw',
+    'vault_failure',
+    'anomaly_acknowledge',
+    'audit_export',
+  ];
+
+  let jwt: string | null = null;
+
+  function show(id: string) { document.getElementById(id)?.classList.remove('hidden'); }
+  function hide(id: string) { document.getElementById(id)?.classList.add('hidden'); }
+  function esc(s: string): string {
+    return s.replace(/[<>&'"]/g, ch => ({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&#39;','"':'&quot;'}[ch]!));
+  }
+
+  function isUuid(s: string): boolean {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+  }
+
+  async function resolveActorId(input: string, supabase: ReturnType<typeof getSupabase>): Promise<string | undefined> {
+    const trimmed = input.trim();
+    if (!trimmed) return undefined;
+    if (isUuid(trimmed)) return trimmed;
+    const { data } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', trimmed)
+      .maybeSingle();
+    return (data as { id: string } | null)?.id;
+  }
+
+  function readForm(): { from?: string; to?: string; actor: string; op?: string; limit: number } {
+    const fromInput = (document.getElementById('forensics-from') as HTMLInputElement | null)?.value;
+    const toInput = (document.getElementById('forensics-to') as HTMLInputElement | null)?.value;
+    const actor = (document.getElementById('forensics-actor') as HTMLInputElement | null)?.value ?? '';
+    const op = (document.getElementById('forensics-op') as HTMLSelectElement | null)?.value;
+    const limitStr = (document.getElementById('forensics-limit') as HTMLInputElement | null)?.value ?? '1000';
+    let limit = Math.max(1, Math.min(10000, parseInt(limitStr, 10) || 1000));
+    return {
+      from: fromInput ? new Date(fromInput).toISOString() : undefined,
+      to: toInput ? new Date(toInput).toISOString() : undefined,
+      actor,
+      op: op || undefined,
+      limit,
+    };
+  }
+
+  function persistFilters() {
+    const state = readForm();
+    writeFilterState({
+      from: state.from ?? '',
+      to: state.to ?? '',
+      actor: state.actor ?? '',
+      op: state.op ?? '',
+      limit: String(state.limit),
+    });
+  }
+
+  function restoreFilters() {
+    const saved = readFilterState();
+    const fromEl = document.getElementById('forensics-from') as HTMLInputElement | null;
+    const toEl = document.getElementById('forensics-to') as HTMLInputElement | null;
+    const actorEl = document.getElementById('forensics-actor') as HTMLInputElement | null;
+    const opEl = document.getElementById('forensics-op') as HTMLSelectElement | null;
+    const limitEl = document.getElementById('forensics-limit') as HTMLInputElement | null;
+    if (fromEl && saved.from) fromEl.value = saved.from.slice(0, 16);
+    if (toEl && saved.to) toEl.value = saved.to.slice(0, 16);
+    if (actorEl && saved.actor) actorEl.value = saved.actor;
+    if (opEl && saved.op) opEl.value = saved.op;
+    if (limitEl && saved.limit) limitEl.value = saved.limit;
+  }
+
+  function renderRows(rows: AdminAuditRow[]) {
+    const empty = document.getElementById('forensics-empty');
+    const wrap = document.getElementById('forensics-results');
+    const tbody = document.getElementById('forensics-tbody');
+    if (!empty || !wrap || !tbody) return;
+    if (rows.length === 0) {
+      wrap.classList.add('hidden');
+      empty.classList.remove('hidden');
+      return;
+    }
+    empty.classList.add('hidden');
+    wrap.classList.remove('hidden');
+    tbody.innerHTML = rows.map(r => {
+      const detailsJson = r.details ? JSON.stringify(r.details) : '';
+      return `
+        <tr>
+          <td class="px-3 py-2 font-mono text-xs text-zinc-500">${r.id}</td>
+          <td class="px-3 py-2 font-mono text-xs text-zinc-500">${esc(r.created_at)}</td>
+          <td class="px-3 py-2 font-mono text-xs text-zinc-500">${esc((r.actor_id ?? '').slice(0, 8))}…</td>
+          <td class="px-3 py-2"><code class="text-xs">${esc(r.op)}</code></td>
+          <td class="px-3 py-2 text-xs text-zinc-700 dark:text-zinc-300">${esc(r.target_type ?? '')}/${esc(r.target_id ?? '')}</td>
+          <td class="px-3 py-2 text-xs text-zinc-500 max-w-[320px] truncate" title="${esc(detailsJson)}">${esc(detailsJson)}</td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  async function runQuery(): Promise<AuditExportResult | null> {
+    if (!jwt) return null;
+    const form = readForm();
+    const supabase = getSupabase();
+    const actorId = await resolveActorId(form.actor, supabase);
+    persistFilters();
+
+    show('forensics-loading');
+    hide('forensics-error');
+
+    try {
+      const res = await adminClient.auditExport(
+        {
+          from: form.from,
+          to: form.to,
+          actorId,
+          op: form.op,
+          limit: form.limit,
+        },
+        'forensics export from console',
+        jwt,
+      );
+      hide('forensics-loading');
+      return res.result ?? null;
+    } catch (err) {
+      hide('forensics-loading');
+      const errEl = document.getElementById('forensics-error');
+      if (errEl) {
+        errEl.textContent = err instanceof AdminClientError ? err.message : String(err);
+        errEl.classList.remove('hidden');
+      }
+      return null;
+    }
+  }
+
+  function downloadCsv(csv: string) {
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `audit-export-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function init() {
+    let supabase;
+    try { supabase = getSupabase(); } catch {
+      show('forensics-not-auth');
+      return;
+    }
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { show('forensics-not-auth'); return; }
+    const myRoles = await getUserRoles(session.user.id);
+    if (!myRoles.has('admin')) { show('forensics-not-auth'); return; }
+    jwt = session.access_token;
+
+    show('forensics-shell');
+
+    // Populate op dropdown.
+    const opSel = document.getElementById('forensics-op') as HTMLSelectElement | null;
+    if (opSel) {
+      for (const op of AUDIT_OPS) {
+        const opt = document.createElement('option');
+        opt.value = op;
+        opt.textContent = op;
+        opSel.appendChild(opt);
+      }
+    }
+
+    restoreFilters();
+
+    document.getElementById('forensics-preview')?.addEventListener('click', async () => {
+      const result = await runQuery();
+      if (result) renderRows(result.rows);
+    });
+    document.getElementById('forensics-export')?.addEventListener('click', async () => {
+      const result = await runQuery();
+      if (result) {
+        renderRows(result.rows);
+        downloadCsv(result.csv);
+      }
+    });
+  }
+
+  init().catch(() => { show('forensics-not-auth'); });
+</script>
