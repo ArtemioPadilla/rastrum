@@ -126,8 +126,9 @@ jobs:
         if: env.SPONSORSHIPS_CRON_TOKEN != ''
         run: |
           psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 \
-            -v cron_token="$SPONSORSHIPS_CRON_TOKEN" \
-            -c "ALTER DATABASE postgres SET app.cron_token = :'cron_token';"
+            -v cron_token="$SPONSORSHIPS_CRON_TOKEN" <<'EOF'
+          ALTER DATABASE postgres SET app.cron_token = :'cron_token';
+          EOF
           # ALTER DATABASE only takes effect on new connections. For currently-
           # open cron job sessions, the next firing will see the new value.
           echo "app.cron_token set."

@@ -79,8 +79,12 @@ jobs:
           # supabase/functions/. No hardcoded list to drift. The choice enum
           # above is just a UX nicety for the dropdown; the actual deploy
           # loop reads from the filesystem.
+          # Filter out directories starting with `_` (e.g. `_shared` — shared
+          # libs, not deployable functions). Supabase rejects function names
+          # that don't match ^[A-Za-z][A-Za-z0-9_-]*$.
           ALL_FNS=$(ls -d supabase/functions/*/ 2>/dev/null \
             | xargs -n1 basename \
+            | grep -v '^_' \
             | sort -u \
             | tr '\n' ' ')
           ALL_FNS=$(echo "$ALL_FNS" | xargs)
@@ -102,13 +106,17 @@ jobs:
             HEAD="${{ github.sha }}"
             CHANGED=$(git diff --name-only "$BASE" "$HEAD" 2>/dev/null || true)
             WORKFLOW_TOUCHED=$(echo "$CHANGED" | grep -E '^\.github/workflows/deploy-functions\.yml$' || true)
-            if [ -n "$WORKFLOW_TOUCHED" ]; then
-              echo "→ workflow file changed; deploying all functions"
+            SHARED_TOUCHED=$(echo "$CHANGED" | grep -E '^supabase/functions/_' || true)
+            if [ -n "$WORKFLOW_TOUCHED" ] || [ -n "$SHARED_TOUCHED" ]; then
+              echo "→ workflow or _shared changed; deploying all functions"
               FNS="$ALL_FNS"
             else
+              # Same _-prefix filter as ALL_FNS — _shared/ changes don't
+              # produce a deployable function on their own.
               FNS=$(echo "$CHANGED" \
                 | grep -E '^supabase/functions/' \
                 | awk -F/ 'NF>=3 && $3!="" {print $3}' \
+                | grep -v '^_' \
                 | sort -u \
                 | tr '\n' ' ')
             fi
