@@ -3854,8 +3854,12 @@
       ]
     },
     "social-graph-m26": {
-      "label_en": "Social graph + reactions (Module 26)",
-      "label_es": "Grafo social + reacciones (Módulo 26)",
+      "phase": "v1.2",
+      "title_en": "Social graph + reactions (Module 26)",
+      "title_es": "Grafo social + reacciones (Módulo 26)",
+      "modules": [
+        "26-social-graph.md"
+      ],
       "subtasks": [
         {
           "label_en": "follows table + counters trigger + privacy helpers (social_visible_to, is_collaborator_of) + collaborator coord-precision unlock",
@@ -3903,9 +3907,24 @@
           "status": "done"
         },
         {
-          "label_en": "deferred to operator: make db-apply (schema + cron) + gh workflow run deploy-functions.yml -f function={follow,react,report}",
-          "label_es": "diferido al operador: make db-apply (esquema + cron) + gh workflow run deploy-functions.yml -f function={follow,react,report}",
-          "status": "todo"
+          "label_en": "schema applied to prod (auto-fired by db-apply.yml on merge of #43); MIN(uuid) view bug fixed in #62",
+          "label_es": "esquema aplicado en producción (auto-disparado por db-apply.yml al mergear #43); bug MIN(uuid) corregido en #62",
+          "status": "done"
+        },
+        {
+          "label_en": "Edge Functions deployed (follow/react/report) — auto-deployed by deploy-functions.yml after CI/CD revamp in #62",
+          "label_es": "Edge Functions desplegadas (follow/react/report) — auto-desplegadas por deploy-functions.yml tras la revamp CI/CD en #62",
+          "status": "done"
+        },
+        {
+          "label_en": "UI integration (#63 + #64): BellIcon→/inbox + unread badge, rich notification cards (avatars + thumbnails + type-coded icons + skeletons + empty state), profile follower/following pills, profile overflow ⋮ menu (Block + Report), shared ReportDialog modal in BaseLayout (focus trap + Esc + backdrop close), FollowButton swapped to follow Edge Function with Requested state, ReactionStrip wired interactive on /share/obs/",
+          "label_es": "Integración UI (#63 + #64): BellIcon→/inbox + badge no leídos, tarjetas ricas (avatares + thumbs + iconos por tipo + skeletons + vacío), pills de seguidores/siguiendo en perfil, menú ⋮ en perfil (Bloquear + Reportar), ReportDialog compartido en BaseLayout (focus trap + Esc + click fuera), FollowButton usa Edge Function con estado Solicitado, ReactionStrip activo en /share/obs/",
+          "status": "done"
+        },
+        {
+          "label_en": "v1.1 follow-ups: ReactionStrip count overlay on feed cards (needs RPC), Block/Report on observation cards + comments, real-time push for inbox (M28), 'Block this user' affordance on profile cards in lists",
+          "label_es": "Seguimientos v1.1: superposición de conteos ReactionStrip en tarjetas del feed (requiere RPC), Bloquear/Reportar en tarjetas de observación + comentarios, push en tiempo real para bandeja (M28), 'Bloquear usuario' en tarjetas de listas",
+          "status": "planned"
         }
       ]
     }

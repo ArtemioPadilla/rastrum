@@ -27,7 +27,7 @@ Bilingual EN/ES from day one.
 |---|---|
 | [`docs/progress.json`](docs/progress.json)              | Source of truth for the roadmap. Bilingual labels (`_es` suffix). |
 | [`docs/tasks.json`](docs/tasks.json) + [`docs/tasks.md`](docs/tasks.md) | Per-roadmap-item subtask breakdown. Check current status before starting work. |
-| [`docs/specs/modules/00-index.md`](docs/specs/modules/00-index.md) | Catalog of 20 module specs (numbers `01`–`19`, with two `15-` files). Each module has its own design doc. |
+| [`docs/specs/modules/00-index.md`](docs/specs/modules/00-index.md) | Catalog of ~29 module specs. Each module has its own design doc. |
 | [`docs/architecture.md`](docs/architecture.md)            | High-level architecture diagram + critical-path flows. |
 | [`docs/specs/infra/supabase-schema.sql`](docs/specs/infra/supabase-schema.sql) | Idempotent SQL — apply with `make db-apply`. |
 | `Makefile`                                                | Run `make help` to see every dev workflow. |
@@ -41,7 +41,7 @@ make help                     # list every target with descriptions
 make install                  # npm ci
 make dev                      # astro dev — http://localhost:4321
 make build                    # static build into dist/
-make test                     # vitest run (225 tests today)
+make test                     # vitest run (~454 tests today)
 make typecheck                # tsc --noEmit
 make db-apply                 # apply supabase-schema.sql (idempotent)
 make db-verify                # show tables, RLS, triggers, extensions
@@ -51,12 +51,20 @@ make db-cron-test             # fire both cron jobs once + show responses
 make db-psql                  # interactive psql shell
 ```
 
-Edge Function deploys go through CI because the local `supabase` CLI
-(2.90.0) is broken on this project's config:
+Edge Function deploys go through CI (the local `supabase` CLI 2.90.0
+is broken on this project's config). **As of PR #62 this is automatic**
+on push to `main` when any file under `supabase/functions/**` changes —
+the workflow detects the changed function set via `git diff` and only
+redeploys those (mirrors the `db-apply.yml` symmetry). The workflow's
+"all functions" list is derived from `ls supabase/functions/` at
+runtime so it can't drift from disk.
+
+Manual dispatch is still available for surgical rollback / redeploy /
+secrets resync:
 
 ```bash
 gh workflow run deploy-functions.yml --ref main \
-  -f function=identify   # or all / get-upload-url / etc.
+  -f function=identify       # or all / follow / react / report / etc.
 gh run watch <run-id>
 ```
 
@@ -220,6 +228,49 @@ colour requires extending that safelist or the classes will be purged in
 production builds.
 
 Full design rationale: `docs/superpowers/specs/2026-04-26-ux-revamp-design.md`.
+
+### Social surfaces (M26)
+
+The header bell (`BellIcon.astro`) is the entry to the social inbox at
+`/{en,es}/{inbox,bandeja}/`. It polls `notifications` every 60s while
+visible, uses `getSession()` (no server round-trip) to decide whether
+to render itself, and shows a numeric badge capped at "9+". The legacy
+m08 watchlist activity remains accessible from the profile page; a
+unified inbox is a v1.1 follow-up.
+
+Reports use `ReportDialog.astro` — a single global modal mounted in
+`BaseLayout.astro`. Other surfaces open it by setting
+`#rastrum-report-dialog` dataset (`target` / `targetId` /
+`targetLabel`) and removing `.hidden`. Submit calls `reportTarget()`
+from `src/lib/social.ts`. The dialog has a focus trap, restores
+previous focus on close, and closes on Esc / backdrop click.
+
+Public profile (`PublicProfileViewV2.astro`) renders follower/following
+pills under the bio and an overflow ⋮ menu (Block + Report) for non-self
+signed-in viewers. Block uses `confirm()` for v1; Report opens
+`ReportDialog`. The follower/following pages live at
+`/{en,es}/{profile,perfil}/u/{followers,following | seguidores,siguiendo}/`.
+
+`FollowButton.astro` calls the `follow` Edge Function via
+`followUser()` / `unfollowUser()` from `src/lib/social.ts` so
+rate-limits and profile-privacy gating fire server-side. It paints
+4 states: `signin` / `follow` / `following` / `requested` (amber
+pill for follows in `pending` against private profiles).
+
+`ReactionStrip.astro` is self-hydrating: it queries the relevant
+`<target>_reactions` table on mount and listens for the
+`rastrum:reactions-ready` event so dynamic surfaces (e.g.
+`/share/obs/`) can set `data-reaction-target-id` after the
+observation loads. Wired interactive on `/share/obs/`; feed-card
+overlays are a v1.1 follow-up gated on an aggregate RPC to avoid
+N+1 fetches.
+
+i18n: m26 strings live under the `socialgraph.*` namespace —
+`social.*` was already taken by the m08 flat namespace consumed by
+six shipping components, so we added a parallel namespace rather than
+rewriting consumers.
+
+Full design rationale: `docs/superpowers/specs/2026-04-28-social-features-design.md`.
 
 ### Console / privileged surfaces
 

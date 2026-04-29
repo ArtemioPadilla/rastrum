@@ -107,3 +107,15 @@ Remaining:
 - `profile-widgets-richer` — Calendar heatmap, taxonomic donut, streak ring, top species grid, observation mini-map, badges grid, activity timeline, Pokédex page, intro banner; reused on `/profile/` (owner). _(✓ done)_
 
 **v1.2.2 cleanup deferred:** visitor `/u/<username>/dex/` route, `Person` JSON-LD on PublicProfileViewV2, wire widgets into visitor `/u/<username>/`, migrate `share/obs/index.astro` off `profile_public`, drop legacy `profile_public` boolean (one-release safety net runs out at v1.3).
+
+## v1.2 — Module 26: Social graph + reactions — shipped 2026-04-28/29
+
+**3 items done, 1 follow-up todo.** Shipped via PRs #43 (foundation), #62 (CI/CD revamp + MIN(uuid) fix), #63 + #64 (UI integration + polish).
+
+- `social-graph-m26` — Asymmetric follow + opt-in close-collaborator tier; per-target reaction tables (`observation_reactions`, `photo_reactions`, `identification_reactions`); blocks (read-symmetric); reports queue; in-app inbox with 90-day prune cron; `social_visible_to()` + `is_collaborator_of()` STABLE SQL helpers; fan-out triggers (follow → notification, observation_reactions → notification, with block-aware skip); three Edge Functions (`follow`, `react`, `report`) with inline windowed `count(*)` rate-limits. _(✓ done)_
+- `ci-cd-edge-auto-deploy` — Path-filtered auto-deploy of Edge Functions on push to `main` (mirrors `db-apply.yml`). Filesystem-derived "all functions" list eliminates drift between the UI dropdown enum and the deploy loop. Manual `workflow_dispatch` preserved for surgical rollback. Same PR fixed a `MIN(uuid)` schema bug in `profile_top_species` that was blocking subsequent `db-apply` reruns. _(✓ done)_
+- `social-graph-m26-ui` — UI integration so the M26 surfaces are discoverable from the chrome: BellIcon repointed to `/inbox` with unread badge from `notifications`; rich notification cards (avatars + thumbnails + type-coded icons + skeletons + wildlife empty state); profile follower/following pills + ⋮ overflow menu (Block + Report); shared `ReportDialog` modal mounted globally in `BaseLayout` (focus trap, Esc, backdrop close, reason radio + optional note); `FollowButton` swapped to call the m26 `follow` Edge Function with a 4th "Requested" state for private profiles; `ReactionStrip` rewritten to self-hydrate and wired interactive on `/share/obs/`. _(✓ done)_
+
+Remaining:
+
+- `social-graph-m26-v11` — Follow-ups: ReactionStrip count overlay on feed cards (needs an aggregate RPC to avoid N+1), Block/Report on observation cards + comments, "Block this user" affordance on profile cards in lists, additional ARIA refinements. _(· planned)_
