@@ -4048,7 +4048,95 @@
         { "label_en": "ConsoleKarmaView: DB-backed reads (karma_config + karma_rarity_multipliers)", "label_es": "ConsoleKarmaView: lecturas desde DB (karma_config + karma_rarity_multipliers)", "status": "done" },
         { "label_en": "adminClient SDK: badge.{awardManual,revoke} + taxon.{recomputeRarity,toggleConservation} + featureFlag.toggle", "label_es": "SDK adminClient: badge.{awardManual,revoke} + taxon.{recomputeRarity,toggleConservation} + featureFlag.toggle", "status": "done" },
         { "label_en": "4 new unit tests for badge + featureFlag SDK methods", "label_es": "4 nuevas pruebas unitarias para métodos SDK de badge + featureFlag", "status": "done" },
-        { "label_en": "Doc sync: progress.json + tasks.json + module 24 + admin-ops.md + CLAUDE.md", "label_es": "Sincronización de docs: progress.json + tasks.json + módulo 24 + admin-ops.md + CLAUDE.md", "status": "todo" }
+        { "label_en": "Doc sync: progress.json + tasks.json + module 24 + admin-ops.md + CLAUDE.md", "label_es": "Sincronización de docs: progress.json + tasks.json + módulo 24 + admin-ops.md + CLAUDE.md", "status": "done" }
+      ]
+    },
+    "admin-console-pr9-quick-actions": {
+      "phase": "v1.1",
+      "title_en": "Admin console PR9 — admin/mod UX (reason templates + URL filters + g-prefix keybindings + mobile sticky bottom-sheet)",
+      "title_es": "Consola admin PR9 — UX admin/moderador (plantillas de motivo + filtros URL + atajos g- + bottom-sheet móvil)",
+      "modules": ["24-admin-console.md"],
+      "subtasks": [
+        { "label_en": "ConsoleSlideOver: pre-translated quick reason pills via data attributes", "label_es": "ConsoleSlideOver: pills de motivos pre-traducidos via data attributes", "status": "done" },
+        { "label_en": "console-filter-state.ts: read/write/applyFilterState helpers (URLSearchParams + history.replaceState)", "label_es": "console-filter-state.ts: helpers read/write/applyFilterState (URLSearchParams + history.replaceState)", "status": "done" },
+        { "label_en": "console-keybindings.ts: g-prefix Vim chord (g a / g u / g r…) + ? help overlay + Escape close", "label_es": "console-keybindings.ts: chord Vim con prefijo g (g a / g u / g r…) + overlay ? + cierre con Escape", "status": "done" },
+        { "label_en": "ConsoleSlideOver: sticky bottom-sheet on mobile (env(safe-area-inset-bottom))", "label_es": "ConsoleSlideOver: bottom-sheet adherente en móvil (env(safe-area-inset-bottom))", "status": "done" },
+        { "label_en": "i18n parity for all reason templates (EN/ES)", "label_es": "Paridad i18n para todas las plantillas de motivo (EN/ES)", "status": "done" }
+      ]
+    },
+    "admin-console-pr10-subject-ux": {
+      "phase": "v1.1",
+      "title_en": "Admin console PR10 — subject UX (ban banner + appeals workflow + comment lock + hidden-obs owner badge)",
+      "title_es": "Consola admin PR10 — UX del afectado (banner de baneo + apelaciones + bloqueo de comentarios + insignia)",
+      "modules": ["24-admin-console.md"],
+      "subtasks": [
+        { "label_en": "BanBanner.astro mounted in BaseLayout for active bans", "label_es": "BanBanner.astro montado en BaseLayout para baneos activos", "status": "done" },
+        { "label_en": "ban_appeals table + RLS + appeal.accept/reject handlers", "label_es": "tabla ban_appeals + RLS + handlers appeal.accept/reject", "status": "done" },
+        { "label_en": "AppealView.astro + /profile/appeal/ pages (EN/ES)", "label_es": "AppealView.astro + páginas /profile/appeal/ (EN/ES)", "status": "done" },
+        { "label_en": "ConsoleAppealsView moderator queue + appeal lifecycle UI", "label_es": "Cola de apelaciones del moderador en ConsoleAppealsView + UI del ciclo de vida", "status": "done" },
+        { "label_en": "Comments.astro: locked-thread banner + read-only mode", "label_es": "Comments.astro: banner de hilo bloqueado + modo de solo lectura", "status": "done" },
+        { "label_en": "MyObservationsView: hidden-obs owner badge", "label_es": "MyObservationsView: insignia para el dueño de obs ocultas", "status": "done" }
+      ]
+    },
+    "admin-console-pr11-engineering": {
+      "phase": "v1.1",
+      "title_en": "Admin console PR11 — engineering hygiene (Postgres rate-limit RPC + flash polish + handler-registry test)",
+      "title_es": "Consola admin PR11 — higiene de ingeniería (RPC de rate-limit en Postgres + pulido de flash + test del registro)",
+      "modules": ["24-admin-console.md"],
+      "subtasks": [
+        { "label_en": "rate_limit_buckets table + consume_rate_limit_token() SECURITY DEFINER RPC", "label_es": "Tabla rate_limit_buckets + RPC consume_rate_limit_token() SECURITY DEFINER", "status": "done" },
+        { "label_en": "_shared/rate-limit.ts: replace in-memory Map with async RPC call (fail-open)", "label_es": "_shared/rate-limit.ts: reemplazar Map en memoria con llamada RPC async (fail-open)", "status": "done" },
+        { "label_en": "/console/* flash polish: hidden gate div + 1500ms fallback (static-only mode)", "label_es": "Pulido de flash en /console/*: div oculto + fallback de 1500ms (modo static-only)", "status": "done" },
+        { "label_en": "tests/unit/admin-handlers-registry.test.ts: regex-based consistency check", "label_es": "tests/unit/admin-handlers-registry.test.ts: verificación basada en regex", "status": "done" }
+      ]
+    },
+    "admin-console-pr12-observability": {
+      "phase": "v1.1",
+      "title_en": "Admin console PR12 — observability (anomaly detection + weekly health digest + forensics CSV + function_errors sink)",
+      "title_es": "Consola admin PR12 — observabilidad (detección de anomalías + resumen semanal + CSV forense + sink de errores)",
+      "modules": ["24-admin-console.md"],
+      "subtasks": [
+        { "label_en": "admin_anomalies + admin_health_digests + function_errors tables + RLS", "label_es": "Tablas admin_anomalies + admin_health_digests + function_errors + RLS", "status": "done" },
+        { "label_en": "detect_admin_anomalies() — high_rate / bulk_delete / off_hours rules + hourly cron", "label_es": "detect_admin_anomalies() — reglas high_rate / bulk_delete / off_hours + cron horario", "status": "done" },
+        { "label_en": "compute_admin_health_digest() weekly Mondays 09:00 UTC", "label_es": "compute_admin_health_digest() semanalmente lunes 09:00 UTC", "status": "done" },
+        { "label_en": "anomaly.acknowledge + audit.export Edge Function handlers", "label_es": "Handlers anomaly.acknowledge + audit.export de Edge Function", "status": "done" },
+        { "label_en": "_shared/csv.ts pure helper + 17 unit tests for CSV escape edge cases", "label_es": "Helper puro _shared/csv.ts + 17 pruebas unitarias para casos de escape CSV", "status": "done" },
+        { "label_en": "_shared/error-reporter.ts wired into admin dispatcher catch", "label_es": "_shared/error-reporter.ts conectado al catch del dispatcher admin", "status": "done" },
+        { "label_en": "ConsoleAnomaliesView + ConsoleForensicsView admin tabs (EN/ES)", "label_es": "Tabs admin ConsoleAnomaliesView + ConsoleForensicsView (EN/ES)", "status": "done" }
+      ]
+    },
+    "admin-console-pr13-future-proofing": {
+      "phase": "v1.1",
+      "title_en": "Admin console PR13 — future-proofing (time-bounded roles + two-person rule + webhooks + trust score primitive)",
+      "title_es": "Consola admin PR13 — future-proofing (roles con expiración + regla de dos personas + webhooks + puntaje de confianza)",
+      "modules": ["24-admin-console.md"],
+      "subtasks": [
+        { "label_en": "user_roles.expires_at + auto_revoke_expired_roles() daily 08:15 UTC cron", "label_es": "user_roles.expires_at + cron diario auto_revoke_expired_roles() 08:15 UTC", "status": "done" },
+        { "label_en": "admin_action_proposals state machine + expire_stale_proposals() hourly cron", "label_es": "Máquina de estados admin_action_proposals + cron horario expire_stale_proposals()", "status": "done" },
+        { "label_en": "proposal.create / approve / reject handlers + IRREVERSIBLE_OPS registry", "label_es": "Handlers proposal.create / approve / reject + registro IRREVERSIBLE_OPS", "status": "done" },
+        { "label_en": "Self-approval guard in _shared/proposal-guards.ts (testable)", "label_es": "Guardia anti auto-aprobación en _shared/proposal-guards.ts (testeable)", "status": "done" },
+        { "label_en": "admin_webhooks + admin_webhook_deliveries tables + dispatch_admin_webhooks() trigger", "label_es": "Tablas admin_webhooks + admin_webhook_deliveries + trigger dispatch_admin_webhooks()", "status": "done" },
+        { "label_en": "HMAC-SHA256 signing helper + webhook.create/update/delete/test handlers", "label_es": "Helper de firma HMAC-SHA256 + handlers webhook.create/update/delete/test", "status": "done" },
+        { "label_en": "compute_moderator_trust_score() v1 placeholder + moderator_trust_scores view", "label_es": "Placeholder v1 compute_moderator_trust_score() + vista moderator_trust_scores", "status": "done" },
+        { "label_en": "ConsoleProposalsView + ConsoleWebhooksView admin tabs (EN/ES)", "label_es": "Tabs admin ConsoleProposalsView + ConsoleWebhooksView (EN/ES)", "status": "done" },
+        { "label_en": "4 new runbooks: admin-time-bounded-roles, admin-two-person-rule, admin-webhooks, admin-trust-scores", "label_es": "4 nuevos runbooks: admin-time-bounded-roles, admin-two-person-rule, admin-webhooks, admin-trust-scores", "status": "done" }
+      ]
+    },
+    "admin-console-pr14-deferred-cleanup": {
+      "phase": "v1.1",
+      "title_en": "Admin console PR14 — close v1.1 deferred items (per-admin tz + webhook _meta replay + reconcile cron + real trust formula + irreversible enforcement gate + durable observability dry-run)",
+      "title_es": "Consola admin PR14 — cierre de pendientes v1.1 (zona por admin + replay de webhooks + cron reconcile + fórmula real de confianza + gate de cumplimiento + dry-run durable de observabilidad)",
+      "modules": ["24-admin-console.md"],
+      "subtasks": [
+        { "label_en": "users.timezone column + per-admin off_hours rule (LEFT JOIN + COALESCE → UTC)", "label_es": "Columna users.timezone + regla off_hours por admin (LEFT JOIN + COALESCE → UTC)", "status": "done" },
+        { "label_en": "Profile → Edit timezone picker (9 IANA zones, canonical America/Argentina/Buenos_Aires)", "label_es": "Selector de zona en Profile → Edit (9 zonas IANA, America/Argentina/Buenos_Aires canónica)", "status": "done" },
+        { "label_en": "admin_webhook_deliveries.nonce + .request_id columns + signed _meta envelope", "label_es": "Columnas admin_webhook_deliveries.nonce + .request_id + envelope _meta firmado", "status": "done" },
+        { "label_en": "reconcile_webhook_deliveries() SECURITY DEFINER + 2-min cron (writes back async pg_net status)", "label_es": "reconcile_webhook_deliveries() SECURITY DEFINER + cron 2-min (escribe estado async pg_net)", "status": "done" },
+        { "label_en": "compute_moderator_trust_score() v1.1 formula (anomaly + overturn + active_days + recency, clamped 0-100)", "label_es": "Fórmula v1.1 de compute_moderator_trust_score() (anomalía + overturn + active_days + recencia, 0-100)", "status": "done" },
+        { "label_en": "checkIrreversibleEnforcement() pure function + enforce_two_person_irreversible feature flag (default off)", "label_es": "Función pura checkIrreversibleEnforcement() + feature flag enforce_two_person_irreversible (off por defecto)", "status": "done" },
+        { "label_en": "ConsoleSlideOver irreversible prop + 'Require approval' toggle on Users + Observations slide-overs", "label_es": "Prop irreversible en ConsoleSlideOver + toggle 'Requerir aprobación' en slide-overs de Usuarios + Observaciones", "status": "done" },
+        { "label_en": ".github/workflows/admin-observability-dryrun.yml — one-shot 2026-05-06 + weekly Mondays + red badge if reconcile stuck", "label_es": ".github/workflows/admin-observability-dryrun.yml — one-shot 2026-05-06 + lunes semanal + badge rojo si reconcile atascado", "status": "done" },
+        { "label_en": "Doc sync: 4 runbooks updated, CLAUDE.md status line bumped, sentinel asserts +4", "label_es": "Sincronización de docs: 4 runbooks actualizados, status line de CLAUDE.md actualizado, +4 asserts en sentinel", "status": "done" }
       ]
     },
     "social-graph-m26": {
