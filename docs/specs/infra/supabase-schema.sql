@@ -3125,6 +3125,27 @@ CREATE TRIGGER obsreact_notify_trigger
   AFTER INSERT ON public.observation_reactions
   FOR EACH ROW EXECUTE FUNCTION public.tg_obsreact_notify();
 
+-- 15) Audit columns. The column-level GRANT on `public.users`
+-- intentionally does NOT include `updated_at` (it's an audit column
+-- — clients shouldn't dictate it). Without this BEFORE UPDATE trigger
+-- the column would silently rot. The trigger sets NEW.updated_at on
+-- every row update so the DB owns the timestamp.
+--
+-- See docs/specs/infra/users-column-grants.md for the column inventory.
+CREATE OR REPLACE FUNCTION public.tg_users_touch_updated_at()
+RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  NEW.updated_at := now();
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS users_touch_updated_at ON public.users;
+CREATE TRIGGER users_touch_updated_at
+  BEFORE UPDATE ON public.users
+  FOR EACH ROW EXECUTE FUNCTION public.tg_users_touch_updated_at();
+
 -- ═════════════════════════════════════════════════════════════════════
 -- Module 27 — Expertise Legends (regional rankings)
 -- Issue #47 — "Top identificador de Fabaceae en Oaxaca"

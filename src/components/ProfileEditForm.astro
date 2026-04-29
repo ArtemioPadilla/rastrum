@@ -474,7 +474,8 @@ const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } })
       observer_license:     (data.get('observer_license') ?? 'CC BY 4.0').toString(),
       gamification_opt_in:  data.get('gamification_opt_in') === 'on',
       streak_digest_opt_in: data.get('streak_digest_opt_in') === 'on',
-      updated_at:           new Date().toISOString(),
+      // updated_at is bumped server-side by the users_touch_updated_at
+      // trigger; clients can't write to it (column-level GRANT).
     };
 
     const supabase = getSupabase();

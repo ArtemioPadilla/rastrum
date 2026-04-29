@@ -50,7 +50,8 @@ from `authenticated` is denied.
 | Column | Writer | Why locked |
 |---|---|---|
 | `id` | `auth.users` FK | Primary key, immutable |
-| `created_at` / `updated_at` / `joined_at` | trigger / default | Audit columns |
+| `created_at` / `joined_at` | column DEFAULT now() on INSERT | Audit columns; immutable after creation |
+| `updated_at` | `tg_users_touch_updated_at` BEFORE UPDATE trigger | Audit column; trigger sets `NEW.updated_at = now()` so clients shouldn't touch it (and the GRANT prevents it). Bug surfaced when ProfileEditForm was setting it from the client → 403. |
 | `is_expert` | `expert_applications` admin flow + `is_expert_in()` SQL | Self-elevation would let anyone weight their votes |
 | `credentialed_researcher` / `credentialed_at` / `credentialed_by` | admin grant | Unlocks precise coords on sensitive species |
 | `karma_total` / `karma_updated_at` / `vote_count` | karma engine triggers (SECURITY DEFINER) | Self-bump would game leaderboards + vote weighting |

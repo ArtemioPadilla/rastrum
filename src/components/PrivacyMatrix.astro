@@ -226,7 +226,7 @@ const levels: Array<{ key: 'public' | 'signed_in' | 'private'; label: string }> 
         .update({
           profile_privacy: next,
           profile_public: next.profile === 'public',
-          updated_at: new Date().toISOString(),
+          // updated_at is bumped server-side by the users_touch_updated_at trigger; clients can't write to it (column-level GRANT).
         })
         .eq('id', user.id);
       if (error) throw error;
@@ -394,7 +394,7 @@ const levels: Array<{ key: 'public' | 'signed_in' | 'private'; label: string }> 
       const body = JSON.stringify({
         profile_privacy: matrix,
         profile_public: matrix.profile === 'public',
-        updated_at: new Date().toISOString(),
+        // updated_at is bumped server-side by the users_touch_updated_at trigger; clients can't write to it (column-level GRANT).
       });
       // navigator.sendBeacon cannot set Authorization, so we PATCH with
       // keepalive: true. This survives `beforeunload` and we drop the
