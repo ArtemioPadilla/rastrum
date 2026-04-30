@@ -573,11 +573,65 @@ Runbooks: [`multi-provider-vision.md`](runbooks/multi-provider-vision.md),
 
 ---
 
+## Karma + expertise + rarity (Module 23, v1.1 shipped)
+
+Karma is a per-user reputation primitive used for ranking, badging, and
+moderation weight. It's not a leaderboard surface — it's an input to
+other modules' decisions:
+
+- `compute_user_karma(uid)` SECURITY DEFINER returns a 0–1000 number
+  derived from observation count, ID accuracy on community-validated
+  records, validator track record, and rarity-weighted contributions.
+- `users.karma_cache` is the denormalised hot-path column refreshed
+  nightly by `recompute-karma` (cron 09:00 UTC).
+- Phase 1 (foundation) is shipped — schema + recompute + cache. Phase 2
+  (engagement bonuses) and Phase 3 (conservation bonuses) are tracked
+  in `progress.json` as v1.1 follow-ups.
+
+Spec: [`docs/specs/modules/23-karma-expertise-rarity.md`](specs/modules/23-karma-expertise-rarity.md).
+Runbook: [`docs/runbooks/karma-phase-1-post-merge-verification.md`](runbooks/karma-phase-1-post-merge-verification.md).
+
+---
+
+## AI sponsorships (Module 27, v1.1 shipped — extended by M32)
+
+Any user can share their Anthropic credential (API key OR long-lived
+OAuth token) with a specific list of beneficiaries. The `identify`
+Edge Function resolves the call in this order: BYO key → personal
+sponsorship → platform pool → skip Claude (PlantNet-only). The original
+operator-key fallback was removed in PR #78.
+
+Three load-bearing rules:
+
+1. **Credentials live in Supabase Vault**, never in `users` columns.
+   `sponsor_credentials.vault_secret_id` is the FK; the Edge Function
+   reads via `vault.read_secret()` SECURITY DEFINER wrapper.
+2. **Caps are enforced atomically.** `consume_sponsor_slot()` SECURITY
+   DEFINER uses `FOR UPDATE SKIP LOCKED` to claim a slot, increments
+   `monthly_calls`, and flips `paused=true` when the cap is hit. Resend
+   email fires at 80% and 100% thresholds.
+3. **Heartbeat probes catch revoked credentials.** A daily cron pings
+   each active credential with `max_tokens:1`; failures auto-pause the
+   sponsorship and email the sponsor.
+
+UI: `/profile/sponsoring/`, `/profile/sponsored-by/`, banner on
+`/identify`, header dropdown entry, mobile drawer entry, sponsor +
+reciprocal badges on public profile, request-to-be-sponsored flow
+(5 endpoints + dialogs), abuse-report button per beneficiary.
+
+Spec: [`docs/specs/modules/27-ai-sponsorships.md`](specs/modules/27-ai-sponsorships.md).
+M32 (multi-provider vision + platform pool) is the natural extension —
+see the section above.
+
+---
+
 ## Further reading
 
 - [`AGENTS.md`](../AGENTS.md) — conventions, pitfalls, pre-PR checklist.
 - [`docs/specs/modules/00-index.md`](specs/modules/00-index.md) — module
   catalog with shipped status.
+- [`docs/runbooks/00-index.md`](runbooks/00-index.md) — operator runbook
+  index (admin console, research workflow, observation flow, ops hygiene).
 - [`docs/specs/infra/supabase-schema.sql`](specs/infra/supabase-schema.sql)
   — the canonical schema. Apply with `make db-apply`.
 - [`docs/gbif-ipt.md`](gbif-ipt.md) — GBIF publishing flow.
