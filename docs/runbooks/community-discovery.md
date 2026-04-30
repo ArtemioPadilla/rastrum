@@ -98,6 +98,53 @@ Profile → Edit toggle.
 | #102 | merged 2026-04-29 | PR4 — Profile → Edit country picker + `hide_from_leaderboards` toggle + `country_code_source` |
 | PR5+PR6 | merged 2026-04-29 | Atomic landing — `/community/observers/` page (CSR) + composable filter chips + URL-state serializer + `community_observers_nearby` SQL RPC + MegaMenu split (Biodiversity / Community columns) + MobileDrawer subheading + atomic i18n rewrite of the two production "no leaderboards" strings + OG card + Vitest + Playwright e2e + module status flip to "shipped" |
 
+## UX clarifications (PR17, 2026-04-30)
+
+### Why am I the only one I see? — privacy-default explainer
+
+`users.profile_public` defaults to **false**. Both community views filter
+on `profile_public = true AND hide_from_leaderboards = false`, so a brand-new
+user looking at `/community/observers/` sees only themselves until others
+opt in.
+
+This used to look like a broken page. As of PR17 the page renders an explicit
+amber explainer banner whenever the filter combo returns 0 rows AND the
+viewer is signed in:
+
+- **Profile is also private** → "Your profile is also private — flip the toggle…"
+- **Profile is public** → "Most observers haven't enabled their public profile yet…"
+
+A "Configure your own profile →" link points to `/profile/edit/`. Anon users
+already get the existing sign-in CTAs and don't need a second nudge.
+
+### GPS vs centroid Nearby modes
+
+The Nearby filter (`?nearby=true`) has two underlying paths:
+
+1. **Centroid mode (default)** — calls `community_observers_nearby()`,
+   which reads the viewer's stored `centroid_geog` (recomputed nightly
+   from their observations). Brand-new users with zero observations see
+   the empty-state CTA "Log an observation to find observers near you."
+2. **GPS mode (PR17)** — clicking the "📍 Use my location" pill triggers
+   `navigator.geolocation.getCurrentPosition()`, then calls
+   `community_observers_nearby_at(lat, lng, …)` with caller-supplied
+   coords. This unlocks Nearby for new users. On geolocation deny / not
+   available, the page falls back to centroid mode and shows a friendly
+   notice.
+
+**Privacy: coords NEVER touch the URL.** Putting `?lat=…&lng=…` in the
+querystring would leak via the `Referer` header on every outbound link
+and bake into the user's browser history. Instead, coords live in
+`sessionStorage` (key `rastrum.community.gps`), cleared automatically
+when the tab closes. Regression guarded by `tests/unit/community-url.test.ts`
+("NEVER serializes GPS coords into the URL").
+
+The new RPC `community_observers_nearby_at(lat, lng, …)` is a sibling
+of the existing centroid RPC: same `community_observers_with_centroid`
+view, same `authenticated`-only `GRANT EXECUTE`, same SECURITY INVOKER.
+The lack of `GRANT TO anon` is the security gate; the function body is
+unreachable for anon callers regardless of the UI sign-in check.
+
 ## Future work (v1.1)
 
 - Observer heatmap / community map view.

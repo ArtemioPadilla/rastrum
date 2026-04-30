@@ -146,6 +146,10 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'dispatch_admin_webhooks')     THEN missing := array_append(missing, 'public.dispatch_admin_webhooks()'); END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'compute_moderator_trust_score') THEN missing := array_append(missing, 'public.compute_moderator_trust_score()'); END IF;
 
+  -- Module 28 — Community discovery (Nearby RPCs, both centroid- and GPS-based)
+  IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'community_observers_nearby')    THEN missing := array_append(missing, 'public.community_observers_nearby()'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'community_observers_nearby_at') THEN missing := array_append(missing, 'public.community_observers_nearby_at()'); END IF;
+
   -- PR16 — admin entity browser hot-path indexes. If a future schema
   -- change drops one of these the corresponding admin browser tab silently
   -- regresses to a sequential scan. Sentinel keeps that observable.

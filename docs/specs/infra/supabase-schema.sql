@@ -4254,6 +4254,42 @@ $$;
 REVOKE ALL ON FUNCTION public.community_observers_nearby(numeric, int, int, text, text[], boolean) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.community_observers_nearby(numeric, int, int, text, text[], boolean) TO authenticated;
 
+-- 10) Nearby helper at an arbitrary point — authenticated only. Same
+-- privacy gate as community_observers_nearby (reads the centroid view,
+-- which is not granted to anon), but uses caller-supplied coords
+-- instead of the viewer's stored centroid. Lets a brand-new user with
+-- no observations still discover nearby observers via GPS. Coords
+-- never persist server-side; the client passes them per-call.
+CREATE OR REPLACE FUNCTION public.community_observers_nearby_at(
+  p_lat      double precision,
+  p_lng      double precision,
+  p_radius_m numeric  DEFAULT 200000,
+  p_limit    int      DEFAULT 20,
+  p_offset   int      DEFAULT 0,
+  p_country  text     DEFAULT NULL,
+  p_taxa     text[]   DEFAULT NULL,
+  p_experts  boolean  DEFAULT false
+)
+RETURNS SETOF public.community_observers_with_centroid
+LANGUAGE sql STABLE PARALLEL SAFE AS $$
+  SELECT v.*
+    FROM public.community_observers_with_centroid v
+   WHERE v.centroid_geog IS NOT NULL
+     AND ST_DWithin(
+       v.centroid_geog,
+       ST_SetSRID(ST_MakePoint(p_lng, p_lat), 4326)::geography,
+       p_radius_m
+     )
+     AND (p_country IS NULL OR v.country_code = p_country)
+     AND (p_taxa    IS NULL OR v.expert_taxa @> p_taxa)
+     AND (p_experts = false OR v.is_expert = true)
+   ORDER BY v.centroid_geog <-> ST_SetSRID(ST_MakePoint(p_lng, p_lat), 4326)::geography
+   LIMIT p_limit OFFSET p_offset;
+$$;
+
+REVOKE ALL ON FUNCTION public.community_observers_nearby_at(double precision, double precision, numeric, int, int, text, text[], boolean) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.community_observers_nearby_at(double precision, double precision, numeric, int, int, text, text[], boolean) TO authenticated;
+
 -- ============================================================
 -- Observation detail redesign — material edit tracking + soft-delete
 -- (2026-04-29) — see docs/superpowers/specs/2026-04-29-obs-detail-redesign-design.md

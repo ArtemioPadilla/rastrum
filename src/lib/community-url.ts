@@ -85,3 +85,69 @@ export function serializeFilters(f: CommunityFilters): string {
   const out = sp.toString();
   return out ? `?${out}` : '';
 }
+
+/**
+ * GPS coords used by the "Use my location" Nearby flow.
+ *
+ * Privacy invariant: coords NEVER appear in the URL querystring (which
+ * would leak via `Referer` and browser history). They live in
+ * `sessionStorage` only — cleared when the tab closes.
+ *
+ * The serializer / parser are intentionally unaware of these coords; the
+ * only path to them is through these explicit helpers.
+ */
+export interface CommunityGps {
+  lat: number;
+  lng: number;
+}
+
+const GPS_STORAGE_KEY = 'rastrum.community.gps';
+
+interface SessionStorageLike {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+}
+
+function getSessionStorage(): SessionStorageLike | null {
+  try {
+    if (typeof globalThis === 'undefined') return null;
+    const ss = (globalThis as unknown as { sessionStorage?: SessionStorageLike }).sessionStorage;
+    return ss ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function loadGps(storage: SessionStorageLike | null = getSessionStorage()): CommunityGps | null {
+  if (!storage) return null;
+  try {
+    const raw = storage.getItem(GPS_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { lat?: unknown; lng?: unknown };
+    if (typeof parsed.lat !== 'number' || typeof parsed.lng !== 'number') return null;
+    if (!Number.isFinite(parsed.lat) || !Number.isFinite(parsed.lng)) return null;
+    if (Math.abs(parsed.lat) > 90 || Math.abs(parsed.lng) > 180) return null;
+    return { lat: parsed.lat, lng: parsed.lng };
+  } catch {
+    return null;
+  }
+}
+
+export function saveGps(gps: CommunityGps, storage: SessionStorageLike | null = getSessionStorage()): void {
+  if (!storage) return;
+  try {
+    storage.setItem(GPS_STORAGE_KEY, JSON.stringify({ lat: gps.lat, lng: gps.lng }));
+  } catch {
+    // non-fatal — storage may be full or unavailable
+  }
+}
+
+export function clearGps(storage: SessionStorageLike | null = getSessionStorage()): void {
+  if (!storage) return;
+  try {
+    storage.removeItem(GPS_STORAGE_KEY);
+  } catch {
+    // non-fatal
+  }
+}

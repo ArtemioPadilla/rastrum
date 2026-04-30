@@ -363,6 +363,14 @@ Three load-bearing rules:
    cron sets `country_code` from `region_primary` only when NULL;
    Profile → Edit save flips `country_code_source` to `'user'`. Badge
    shows in the picker when `source='auto' AND country_code IS NOT NULL`.
+4. **GPS coords for "Use my location" Nearby live in `sessionStorage`
+   only — NEVER the URL querystring.** Putting them in `?lat=…&lng=…`
+   would leak via the `Referer` header and the browser's history. The
+   storage key is `rastrum.community.gps`; cleared on tab close. The
+   `community_observers_nearby_at(lat, lng, …)` RPC takes coords
+   per-call, never persisting server-side. Regression guard:
+   `tests/unit/community-url.test.ts` asserts the serializer drops
+   any `lat`/`lng`/`gps` keys.
 
 Cron + manual fire: [`docs/runbooks/community-discovery.md`](docs/runbooks/community-discovery.md).
 
