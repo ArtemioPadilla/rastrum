@@ -707,12 +707,63 @@ END $$;
 RESET ROLE;
 
 -- ────────────────────────────────────────────────────────────────────────────
+-- PR15 — function_errors with new ack columns: anon cannot read; admin can.
+-- ────────────────────────────────────────────────────────────────────────────
+
+INSERT INTO public.function_errors (function_name, code, actor_id, context, error_message)
+VALUES ('admin', 'handler_exception', '00000000-0000-0000-0000-000000000001', '{}'::jsonb, 'rls test seed')
+ON CONFLICT DO NOTHING;
+
+SET LOCAL "request.jwt.claim.sub" = '';
+SET LOCAL ROLE anon;
+
+-- Test 32 of 32: function_errors visible to admin only; ack columns exist.
+DO $$
+DECLARE
+  cnt_anon int;
+  cnt_admin bigint;
+  has_ack_at boolean;
+  has_ack_by boolean;
+  has_ack_notes boolean;
+BEGIN
+  SELECT count(*)::int INTO cnt_anon FROM public.function_errors;
+  IF cnt_anon IS DISTINCT FROM 0 THEN
+    RAISE EXCEPTION 'FAIL [Test 32 of 32] (anon function_errors path): expected %, got %', 0, cnt_anon;
+  END IF;
+  RESET ROLE;
+  SET LOCAL ROLE authenticated;
+  SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000001';
+  SELECT count(*) INTO cnt_admin FROM public.function_errors;
+  IF cnt_admin < 1 THEN
+    RAISE EXCEPTION 'FAIL [Test 32 of 32] (admin function_errors path): condition false (count = %)', cnt_admin;
+  END IF;
+  -- Ack columns must be present on the row (PR15 schema migration).
+  SELECT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'function_errors' AND column_name = 'acknowledged_at'
+  ) INTO has_ack_at;
+  SELECT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'function_errors' AND column_name = 'acknowledged_by'
+  ) INTO has_ack_by;
+  SELECT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'function_errors' AND column_name = 'ack_notes'
+  ) INTO has_ack_notes;
+  IF NOT (has_ack_at AND has_ack_by AND has_ack_notes) THEN
+    RAISE EXCEPTION 'FAIL [Test 32 of 32] (function_errors ack columns missing): at=%, by=%, notes=%', has_ack_at, has_ack_by, has_ack_notes;
+  END IF;
+END $$;
+
+RESET ROLE;
+
+-- ────────────────────────────────────────────────────────────────────────────
 -- Summary
 -- ────────────────────────────────────────────────────────────────────────────
 
 DO $$
 BEGIN
-  RAISE NOTICE 'RLS suite: 31 of 31 assertions passed';
+  RAISE NOTICE 'RLS suite: 32 of 32 assertions passed';
 END $$;
 
 ROLLBACK;

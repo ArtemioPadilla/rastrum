@@ -83,10 +83,50 @@ If the digest grows beyond ~20 keys, split it into a normalised
 `admin_health_metrics(digest_id, metric_key, metric_value)` table — the
 denormalised jsonb is fine for v1.
 
+## UI surface (PR15)
+
+`/console/health/` is the admin-only view at `/{en,es}/{console,consola}/{health,salud}/`.
+
+The page renders the **last 12 weekly digests** ordered DESC by
+`period_end`. Layout is two cards stacked:
+
+1. **Hero card** — the latest week. 2-column metric grid; each cell
+   shows the absolute value plus a delta pill ("vs prev") with a
+   directional arrow + raw delta + percent. Pill color is
+   metric-aware:
+   * **lower-is-better** metrics (`bans_issued`, `reports_open`,
+     `appeals_open`, `anomalies_unack`, `function_errors_7d`,
+     `mod_queue_depth`, `expert_queue_depth`) → green when going down,
+     red when going up.
+   * **higher-is-better** metrics (`bans_lifted`) → green when going
+     up, red when going down.
+   * other metrics → zinc/flat.
+2. **Sparkline strip** — 12-week trend per metric. Each metric is one
+   tile with a tiny inline-SVG bar chart. Bars are tooltipped via
+   `<title>` so hover reveals "Week of YYYY-MM-DD: <value>".
+
+The classification lives in `src/lib/health-delta.ts` as a pair of
+pure helpers (`computeMetricDelta`, `trendColorClass`, `trendArrow`)
+backed by 10 unit tests.
+
+### Manual recompute
+
+The header has a **Refresh now** button. It calls the admin
+`health.recompute` action, which invokes
+`compute_admin_health_digest()`. Because the underlying RPC is
+`ON CONFLICT DO NOTHING` on `(period_start, period_end)`, multi-fires
+within the same week are no-ops on the digest row itself — but they
+still emit an `admin_audit` row with `op = 'health_recompute'` so the
+intent is traced.
+
 ## Related
 
 * Schema: `docs/specs/infra/supabase-schema.sql` — `admin_health_digests`
   + `compute_admin_health_digest()`.
 * Cron: `docs/specs/infra/cron-schedules.sql` —
   `admin-health-digest-weekly`.
+* UI: `src/components/ConsoleHealthView.astro`.
+* Edge Function: `supabase/functions/admin/handlers/health-recompute.ts`.
+* Audit log enum: `audit_op = 'health_recompute'`.
+* Pure helpers: `src/lib/health-delta.ts` + `tests/unit/health-delta.test.ts`.
 * Anomaly counterpart: `docs/runbooks/admin-anomalies.md`.

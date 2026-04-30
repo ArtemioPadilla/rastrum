@@ -1,0 +1,643 @@
+---
+/**
+ * ConsoleErrorsView — admin-only browser over public.function_errors.
+ *
+ * Filters via console-filter-state (URL-driven): function, code, from, to,
+ * actor (uuid or username, resolved via users.username), state (Unack/All).
+ * Top-of-table mini-bar surfaces the 5 most-frequent codes with click-to-
+ * filter. Each row's error_message gets a severity-coloured pill (red for
+ * handler_exception, amber for rate_limit_*, zinc otherwise — see
+ * lib/error-severity.ts).
+ *
+ * Single-row Acknowledge opens ConsoleSlideOver → error.acknowledge.
+ * Bulk Acknowledge ("Acknowledge all matching") fires error.acknowledge_bulk
+ * with the current filter set, capped server-side at 1000 rows.
+ *
+ * Auto-refresh toggle (every 30s) is OFF by default. Useful when actively
+ * investigating an outage; deliberately off otherwise so we don't burn
+ * Supabase requests in the background.
+ */
+import { t } from '../i18n/utils';
+import ConsoleSlideOver from './ConsoleSlideOver.astro';
+
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+
+const c = tr.console as unknown as Record<string, string>;
+const errorsNs = (tr.console as unknown as Record<string, Record<string, unknown>>).errorsView as
+  unknown as Record<string, Record<string, string> | string>;
+
+const eTitle = (errorsNs?.title as string) ?? 'Function errors';
+const eDesc = (errorsNs?.description as string) ?? '';
+const eEmpty = (errorsNs?.empty as string) ?? "No errors. That's the good outcome 🎉";
+const eLoading = (errorsNs?.loading as string) ?? 'Loading…';
+const eFilters = (errorsNs?.filters as Record<string, string>) ?? {};
+const eCols = (errorsNs?.columns as Record<string, string>) ?? {};
+const eActions = (errorsNs?.actions as Record<string, string>) ?? {};
+const eSlide = (errorsNs?.slideOver as Record<string, string>) ?? {};
+const eBulk = (errorsNs?.bulk as Record<string, string>) ?? {};
+const eTopCodes = (errorsNs?.topCodes as string) ?? 'Top codes';
+const eFilterByCode = (errorsNs?.filterByCode as string) ?? 'Filter by code';
+---
+
+<section
+  class="max-w-6xl space-y-4"
+  data-label-acknowledge={eActions.acknowledge ?? 'Acknowledge'}
+  data-label-acknowledged={eActions.acknowledged ?? 'acknowledged'}
+  data-label-acknowledge-all={eActions.acknowledgeAll ?? 'Acknowledge all matching'}
+  data-label-expand={eActions.expandContext ?? 'Expand'}
+  data-label-collapse={eActions.collapseContext ?? 'Collapse'}
+  data-label-bulk-confirm={eSlide.bulkConfirm ?? 'This will acknowledge up to 1000 unacknowledged rows.'}
+  data-label-bulk-title={eSlide.bulkTitle ?? 'Acknowledge all matching errors'}
+  data-label-single-title={eSlide.title ?? 'Acknowledge error'}
+  data-label-bulk-done-tmpl={eBulk.doneCount ?? 'Acknowledged {count} rows.'}
+  data-label-bulk-cap-hit={eBulk.capHit ?? 'Hit the 1000-row cap.'}
+  data-label-state-pending="pending"
+  data-label-filter-by-code={eFilterByCode}
+>
+  <header class="flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <h1 class="text-xl font-semibold mb-1">{eTitle}</h1>
+      <p class="text-sm text-zinc-500 dark:text-zinc-400 max-w-3xl">{eDesc}</p>
+    </div>
+    <label class="inline-flex items-center gap-2 text-xs text-zinc-700 dark:text-zinc-300 cursor-pointer select-none">
+      <input id="errors-auto-refresh" type="checkbox" class="rounded" />
+      <span>{eActions.autoRefresh ?? 'Auto-refresh (30s)'}</span>
+    </label>
+  </header>
+
+  <div id="errors-not-auth" class="hidden rounded border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-900 dark:text-amber-100">
+    {tr.console.not_authorized}
+  </div>
+
+  <div id="errors-shell" class="hidden space-y-4">
+    <!-- Filters -->
+    <form id="errors-filters" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 items-end rounded border border-zinc-200 dark:border-zinc-800 p-3 bg-white dark:bg-zinc-950" role="search">
+      <label class="block text-sm">
+        <span class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{eFilters.function ?? 'Function'}</span>
+        <select id="errors-fn" class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm">
+          <option value="">{eFilters.any ?? '— any —'}</option>
+        </select>
+      </label>
+      <label class="block text-sm">
+        <span class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{eFilters.code ?? 'Code'}</span>
+        <select id="errors-code" class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm">
+          <option value="">{eFilters.any ?? '— any —'}</option>
+        </select>
+      </label>
+      <label class="block text-sm">
+        <span class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{eFilters.from ?? 'From'}</span>
+        <input id="errors-from" type="datetime-local" class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm" />
+      </label>
+      <label class="block text-sm">
+        <span class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{eFilters.to ?? 'To'}</span>
+        <input id="errors-to" type="datetime-local" class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm" />
+      </label>
+      <label class="block text-sm">
+        <span class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{eFilters.actor ?? 'Actor'}</span>
+        <input id="errors-actor" type="text" placeholder="uuid or username" class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm" />
+      </label>
+      <div class="flex flex-col gap-1 text-sm">
+        <span class="block text-xs font-medium text-zinc-700 dark:text-zinc-300">{eFilters.state ?? 'State'}</span>
+        <div class="flex rounded border border-zinc-300 dark:border-zinc-700 overflow-hidden text-xs" role="tablist">
+          <button id="errors-state-unack" type="button" role="tab" aria-selected="true" class="px-2.5 py-1.5 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-medium">{eFilters.stateUnack ?? 'Unacknowledged'}</button>
+          <button id="errors-state-all" type="button" role="tab" aria-selected="false" class="px-2.5 py-1.5 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300">{eFilters.stateAll ?? 'All'}</button>
+        </div>
+      </div>
+      <div class="sm:col-span-2 lg:col-span-6 flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-zinc-100 dark:border-zinc-800">
+        <button id="errors-clear" type="reset" class="px-2.5 py-1 rounded text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800">Clear filters</button>
+        <button id="errors-bulk-ack" type="button" class="px-3 py-1.5 rounded bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+          {eActions.acknowledgeAll ?? 'Acknowledge all matching'}
+        </button>
+      </div>
+    </form>
+
+    <!-- Top codes mini-bar -->
+    <div id="errors-top-codes" class="hidden rounded border border-zinc-200 dark:border-zinc-800 p-3 bg-zinc-50/50 dark:bg-zinc-900/30">
+      <p class="text-[11px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400 font-medium mb-2">{eTopCodes}</p>
+      <div id="errors-top-codes-list" class="flex flex-wrap gap-1.5"></div>
+    </div>
+
+    <p id="errors-toast" class="hidden rounded border border-emerald-300 dark:border-emerald-700/60 bg-emerald-50 dark:bg-emerald-900/20 p-2 text-xs text-emerald-900 dark:text-emerald-100" role="status" aria-live="polite"></p>
+    <p id="errors-error" class="hidden rounded border border-red-300 dark:border-red-700/60 bg-red-50 dark:bg-red-900/20 p-2 text-sm text-red-700 dark:text-red-300" role="alert"></p>
+
+    <!-- Loading skeleton -->
+    <div id="errors-skeleton" class="space-y-2" aria-busy="true" aria-label={eLoading}>
+      <div class="h-9 rounded bg-zinc-100 dark:bg-zinc-900 animate-pulse"></div>
+      <div class="h-9 rounded bg-zinc-100 dark:bg-zinc-900 animate-pulse"></div>
+      <div class="h-9 rounded bg-zinc-100 dark:bg-zinc-900 animate-pulse"></div>
+      <div class="h-9 rounded bg-zinc-100 dark:bg-zinc-900 animate-pulse"></div>
+      <div class="h-9 rounded bg-zinc-100 dark:bg-zinc-900 animate-pulse"></div>
+    </div>
+
+    <!-- Empty state -->
+    <div id="errors-empty" class="hidden rounded-lg border border-dashed border-emerald-300 dark:border-emerald-700/60 bg-emerald-50/40 dark:bg-emerald-900/10 p-8 text-center">
+      <p class="text-sm text-emerald-900 dark:text-emerald-100">{eEmpty}</p>
+    </div>
+
+    <!-- Results table -->
+    <div id="errors-rows" class="hidden overflow-x-auto rounded border border-zinc-200 dark:border-zinc-800">
+      <table class="min-w-full text-sm">
+        <thead class="sticky top-0 z-10 bg-zinc-50 dark:bg-zinc-900/40 text-left text-xs uppercase tracking-wide text-zinc-500 backdrop-blur">
+          <tr>
+            <th class="px-3 py-2">{eCols.timestamp ?? 'Timestamp'}</th>
+            <th class="px-3 py-2">{eCols.function ?? 'Function / code'}</th>
+            <th class="px-3 py-2">{eCols.actor ?? 'Actor'}</th>
+            <th class="px-3 py-2">{eCols.message ?? 'Message'}</th>
+            <th class="px-3 py-2">{eCols.context ?? 'Context'}</th>
+            <th class="px-3 py-2">{eCols.state ?? 'State'}</th>
+            <th class="px-3 py-2 text-right">{eCols.actions ?? 'Actions'}</th>
+          </tr>
+        </thead>
+        <tbody id="errors-tbody" class="divide-y divide-zinc-100 dark:divide-zinc-800"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<ConsoleSlideOver
+  lang={lang}
+  id="console-slideover-error-ack"
+  titleKey={eSlide.title ?? 'Acknowledge error'}
+>
+  <label class="block text-sm">
+    <span class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+      {eSlide.notes ?? 'Notes (optional)'}
+    </span>
+    <textarea id="error-ack-notes" rows="3" maxlength="2000" class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-2 text-sm"></textarea>
+  </label>
+</ConsoleSlideOver>
+
+<ConsoleSlideOver
+  lang={lang}
+  id="console-slideover-error-ack-bulk"
+  titleKey={eSlide.bulkTitle ?? 'Acknowledge all matching errors'}
+>
+  <p class="text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed">{eSlide.bulkConfirm ?? 'This will acknowledge up to 1000 unacknowledged rows matching the current filters.'}</p>
+  <p id="error-ack-bulk-summary" class="text-[11px] text-zinc-500 dark:text-zinc-400"></p>
+  <label class="block text-sm">
+    <span class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+      {eSlide.notes ?? 'Notes (optional)'}
+    </span>
+    <textarea id="error-ack-bulk-notes" rows="3" maxlength="2000" class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-2 text-sm"></textarea>
+  </label>
+</ConsoleSlideOver>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { getUserRoles } from '../lib/user-roles';
+  import { adminClient, AdminClientError, type ErrorAcknowledgeBulkFilters } from '../lib/admin-client';
+  import { errorSeverity, severityColorClass } from '../lib/error-severity';
+  import { readFilterState, writeFilterState } from '../lib/console-filter-state';
+
+  type ErrorRow = {
+    id: string;
+    function_name: string;
+    code: string;
+    actor_id: string | null;
+    context: Record<string, unknown> | null;
+    error_message: string | null;
+    acknowledged_at: string | null;
+    acknowledged_by: string | null;
+    ack_notes: string | null;
+    created_at: string;
+  };
+  type ActorMeta = { username: string | null; display_name: string | null };
+
+  const sectionEl = document.querySelector<HTMLElement>('section[data-label-acknowledge]')!;
+  const labelAck = sectionEl.dataset.labelAcknowledge ?? 'Acknowledge';
+  const labelAcked = sectionEl.dataset.labelAcknowledged ?? 'acknowledged';
+  const labelExpand = sectionEl.dataset.labelExpand ?? 'Expand';
+  const labelCollapse = sectionEl.dataset.labelCollapse ?? 'Collapse';
+  const bulkDoneTmpl = sectionEl.dataset.labelBulkDoneTmpl ?? 'Acknowledged {count} rows.';
+  const bulkCapHit = sectionEl.dataset.labelBulkCapHit ?? 'Hit the 1000-row cap.';
+  const labelStatePending = sectionEl.dataset.labelStatePending ?? 'pending';
+  const labelFilterByCode = sectionEl.dataset.labelFilterByCode ?? 'Filter by code';
+
+  let jwt: string | null = null;
+  let allRows: ErrorRow[] = [];
+  let actors: Record<string, ActorMeta> = {};
+  let stateUnackOnly = true;
+  let autoRefreshHandle: number | null = null;
+  let autoRefreshOn = false;
+
+  function show(id: string) { document.getElementById(id)?.classList.remove('hidden'); }
+  function hide(id: string) { document.getElementById(id)?.classList.add('hidden'); }
+  function esc(s: string): string {
+    return s.replace(/[<>&'"]/g, ch => ({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&#39;','"':'&quot;'}[ch]!));
+  }
+  function showToast(msg: string, ok = true) {
+    const tEl = document.getElementById('errors-toast');
+    const eEl = document.getElementById('errors-error');
+    if (ok) {
+      if (tEl) { tEl.textContent = msg; tEl.classList.remove('hidden'); }
+      if (eEl) eEl.classList.add('hidden');
+      setTimeout(() => tEl?.classList.add('hidden'), 4000);
+    } else {
+      if (eEl) { eEl.textContent = msg; eEl.classList.remove('hidden'); }
+      if (tEl) tEl.classList.add('hidden');
+    }
+  }
+  function isUuid(s: string): boolean {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+  }
+  function fmtTs(iso: string): string {
+    return iso.replace('T', ' ').slice(0, 19);
+  }
+  function fmtIsoLocal(s: string | undefined): string | undefined {
+    if (!s) return undefined;
+    return new Date(s).toISOString();
+  }
+  function actorLabel(id: string | null): string {
+    if (!id) return '—';
+    const meta = actors[id];
+    if (meta?.username) return meta.username;
+    if (meta?.display_name) return meta.display_name;
+    return id.slice(0, 8) + '…';
+  }
+  function getInputValue(id: string): string {
+    return (document.getElementById(id) as HTMLInputElement | HTMLSelectElement | null)?.value ?? '';
+  }
+
+  async function resolveActorId(input: string): Promise<string | undefined> {
+    const trimmed = input.trim();
+    if (!trimmed) return undefined;
+    if (isUuid(trimmed)) return trimmed;
+    const supabase = getSupabase();
+    const { data } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', trimmed)
+      .maybeSingle();
+    return (data as { id: string } | null)?.id;
+  }
+
+  function readFilters(): {
+    fn?: string; code?: string; from?: string; to?: string; actor?: string;
+  } {
+    return {
+      fn: getInputValue('errors-fn') || undefined,
+      code: getInputValue('errors-code') || undefined,
+      from: fmtIsoLocal(getInputValue('errors-from')),
+      to: fmtIsoLocal(getInputValue('errors-to')),
+      actor: getInputValue('errors-actor') || undefined,
+    };
+  }
+
+  function persistFilters() {
+    const f = readFilters();
+    writeFilterState({
+      fn: f.fn ?? '',
+      code: f.code ?? '',
+      from: f.from ?? '',
+      to: f.to ?? '',
+      actor: f.actor ?? '',
+      state: stateUnackOnly ? 'unack' : 'all',
+    });
+  }
+  function restoreFilters() {
+    const saved = readFilterState();
+    const setVal = (id: string, v: string | undefined) => {
+      const el = document.getElementById(id) as HTMLInputElement | HTMLSelectElement | null;
+      if (el && v !== undefined) el.value = v;
+    };
+    setVal('errors-fn', saved.fn);
+    setVal('errors-code', saved.code);
+    setVal('errors-actor', saved.actor);
+    if (saved.from) setVal('errors-from', saved.from.slice(0, 16));
+    if (saved.to) setVal('errors-to', saved.to.slice(0, 16));
+    if (saved.state === 'all') {
+      stateUnackOnly = false;
+      paintStateToggle();
+    }
+  }
+
+  function paintStateToggle() {
+    const u = document.getElementById('errors-state-unack');
+    const a = document.getElementById('errors-state-all');
+    if (!u || !a) return;
+    const activeCls = ['bg-zinc-900', 'dark:bg-zinc-100', 'text-white', 'dark:text-zinc-900', 'font-medium'];
+    const inactiveCls = ['bg-white', 'dark:bg-zinc-900', 'text-zinc-700', 'dark:text-zinc-300'];
+    if (stateUnackOnly) {
+      u.classList.add(...activeCls); u.classList.remove(...inactiveCls); u.setAttribute('aria-selected', 'true');
+      a.classList.add(...inactiveCls); a.classList.remove(...activeCls); a.setAttribute('aria-selected', 'false');
+    } else {
+      a.classList.add(...activeCls); a.classList.remove(...inactiveCls); a.setAttribute('aria-selected', 'true');
+      u.classList.add(...inactiveCls); u.classList.remove(...activeCls); u.setAttribute('aria-selected', 'false');
+    }
+  }
+
+  async function populateDistincts() {
+    const supabase = getSupabase();
+    // last 30 days for the dropdowns — keeps the option list manageable
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const { data } = await supabase
+      .from('function_errors')
+      .select('function_name, code')
+      .gte('created_at', since)
+      .order('created_at', { ascending: false })
+      .limit(2000);
+    const fns = new Set<string>();
+    const codes = new Set<string>();
+    for (const r of (data ?? []) as Array<{ function_name: string; code: string }>) {
+      fns.add(r.function_name);
+      codes.add(r.code);
+    }
+    const fnSel = document.getElementById('errors-fn') as HTMLSelectElement | null;
+    const codeSel = document.getElementById('errors-code') as HTMLSelectElement | null;
+    if (fnSel) {
+      [...fns].sort().forEach(v => {
+        const opt = document.createElement('option'); opt.value = v; opt.textContent = v; fnSel.appendChild(opt);
+      });
+    }
+    if (codeSel) {
+      [...codes].sort().forEach(v => {
+        const opt = document.createElement('option'); opt.value = v; opt.textContent = v; codeSel.appendChild(opt);
+      });
+    }
+  }
+
+  async function loadRows(): Promise<ErrorRow[]> {
+    const supabase = getSupabase();
+    const f = readFilters();
+    let q = supabase
+      .from('function_errors')
+      .select('id, function_name, code, actor_id, context, error_message, acknowledged_at, acknowledged_by, ack_notes, created_at')
+      .order('created_at', { ascending: false })
+      .limit(500);
+    if (f.fn) q = q.eq('function_name', f.fn);
+    if (f.code) q = q.eq('code', f.code);
+    if (f.from) q = q.gte('created_at', f.from);
+    if (f.to) q = q.lte('created_at', f.to);
+    if (f.actor) {
+      const actorId = await resolveActorId(f.actor);
+      if (actorId) q = q.eq('actor_id', actorId);
+      else return [];
+    }
+    if (stateUnackOnly) q = q.is('acknowledged_at', null);
+    const { data, error } = await q;
+    if (error) throw new Error(error.message);
+    return ((data ?? []) as unknown) as ErrorRow[];
+  }
+
+  async function resolveActors(rows: ErrorRow[]) {
+    const ids = [...new Set(rows.map(r => r.actor_id).filter((x): x is string => Boolean(x) && !actors[x!]))];
+    if (ids.length === 0) return;
+    const supabase = getSupabase();
+    const { data } = await supabase
+      .from('users')
+      .select('id, username, display_name')
+      .in('id', ids);
+    for (const u of (data ?? []) as Array<{ id: string; username: string | null; display_name: string | null }>) {
+      actors[u.id] = { username: u.username, display_name: u.display_name };
+    }
+  }
+
+  function renderTopCodes(rows: ErrorRow[]) {
+    const wrap = document.getElementById('errors-top-codes');
+    const list = document.getElementById('errors-top-codes-list');
+    if (!wrap || !list) return;
+    const counts = new Map<string, number>();
+    for (const r of rows) counts.set(r.code, (counts.get(r.code) ?? 0) + 1);
+    const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+    if (sorted.length === 0) { wrap.classList.add('hidden'); return; }
+    wrap.classList.remove('hidden');
+    list.innerHTML = sorted.map(([code, n]) =>
+      `<button type="button" data-filter-code="${esc(code)}" aria-label="${esc(labelFilterByCode)}: ${esc(code)}" class="inline-flex items-center gap-1.5 rounded-full border border-zinc-300 dark:border-zinc-700 px-2.5 py-0.5 text-[11px] hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors">
+        <code class="font-mono">${esc(code)}</code>
+        <span class="text-zinc-500 dark:text-zinc-400">×${n}</span>
+      </button>`,
+    ).join('');
+    list.querySelectorAll<HTMLElement>('[data-filter-code]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const codeSel = document.getElementById('errors-code') as HTMLSelectElement | null;
+        if (codeSel) codeSel.value = btn.dataset.filterCode!;
+        void refresh();
+      });
+    });
+  }
+
+  function renderRows() {
+    const tbody = document.getElementById('errors-tbody');
+    const wrap = document.getElementById('errors-rows');
+    const empty = document.getElementById('errors-empty');
+    const bulkBtn = document.getElementById('errors-bulk-ack') as HTMLButtonElement | null;
+    if (!tbody || !wrap || !empty) return;
+
+    const rows = allRows;
+    if (bulkBtn) bulkBtn.disabled = rows.filter(r => !r.acknowledged_at).length === 0;
+
+    if (rows.length === 0) {
+      wrap.classList.add('hidden');
+      empty.classList.remove('hidden');
+      hide('errors-top-codes');
+      return;
+    }
+    empty.classList.add('hidden');
+    wrap.classList.remove('hidden');
+    renderTopCodes(rows);
+
+    tbody.innerHTML = rows.map(r => {
+      const acked = r.acknowledged_at !== null;
+      const sev = errorSeverity(r.error_message);
+      const sevCls = severityColorClass(sev);
+      const ctxJson = r.context ? JSON.stringify(r.context) : '';
+      const messageShort = (r.error_message ?? '').length > 80
+        ? esc((r.error_message ?? '').slice(0, 78)) + '…'
+        : esc(r.error_message ?? '');
+      return `
+        <tr id="errow-${esc(r.id)}" class="${acked ? 'opacity-60' : ''}" data-row-id="${esc(r.id)}">
+          <td class="px-3 py-2 whitespace-nowrap font-mono text-[11px] text-zinc-500">${esc(fmtTs(r.created_at))}</td>
+          <td class="px-3 py-2">
+            <div class="flex flex-col gap-0.5">
+              <span class="text-zinc-800 dark:text-zinc-200 font-medium">${esc(r.function_name)}</span>
+              <code class="inline-flex items-center self-start rounded px-1.5 py-0.5 text-[10px] font-mono ${sevCls}">${esc(r.code)}</code>
+            </div>
+          </td>
+          <td class="px-3 py-2 text-xs text-zinc-700 dark:text-zinc-300">${esc(actorLabel(r.actor_id))}</td>
+          <td class="px-3 py-2 text-xs max-w-[260px]">
+            <span class="text-zinc-700 dark:text-zinc-300 break-words" title="${esc(r.error_message ?? '')}">${messageShort || '—'}</span>
+          </td>
+          <td class="px-3 py-2 text-xs text-zinc-500 max-w-[260px]">
+            ${ctxJson
+              ? `<button type="button" data-toggle-ctx="${esc(r.id)}" aria-expanded="false" class="text-emerald-700 dark:text-emerald-400 hover:underline">${esc(labelExpand)}</button>
+                 <pre id="ctx-${esc(r.id)}" class="hidden mt-1 whitespace-pre-wrap break-all rounded bg-zinc-50 dark:bg-zinc-900 px-2 py-1 text-[10px] text-zinc-600 dark:text-zinc-400">${esc(ctxJson)}</pre>`
+              : '—'}
+          </td>
+          <td class="px-3 py-2 text-xs">
+            ${acked
+              ? `<span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300">${esc(labelAcked)}</span>`
+              : `<span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300">${esc(labelStatePending)}</span>`}
+          </td>
+          <td class="px-3 py-2 text-right whitespace-nowrap">
+            ${acked
+              ? ''
+              : `<button type="button" data-ack-id="${esc(r.id)}" class="px-2 py-1 rounded border border-zinc-300 dark:border-zinc-700 text-xs hover:bg-zinc-50 dark:hover:bg-zinc-800">${esc(labelAck)}</button>`}
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    tbody.querySelectorAll<HTMLElement>('[data-toggle-ctx]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.toggleCtx!;
+        const pre = document.getElementById(`ctx-${id}`);
+        if (!pre) return;
+        const wasHidden = pre.classList.contains('hidden');
+        pre.classList.toggle('hidden');
+        btn.textContent = wasHidden ? labelCollapse : labelExpand;
+        btn.setAttribute('aria-expanded', wasHidden ? 'true' : 'false');
+      });
+    });
+
+    tbody.querySelectorAll<HTMLElement>('[data-ack-id]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.ackId!;
+        const row = allRows.find(r => r.id === id);
+        if (!row) return;
+        const notesEl = document.getElementById('error-ack-notes') as HTMLTextAreaElement | null;
+        if (notesEl) notesEl.value = '';
+        document.dispatchEvent(new CustomEvent('console:slideover-open', {
+          detail: {
+            id: 'console-slideover-error-ack',
+            title: `${row.function_name} — ${row.code}`,
+            action: 'error.acknowledge',
+            payload: { errorId: row.id },
+          },
+        }));
+      });
+    });
+  }
+
+  async function refresh() {
+    persistFilters();
+    show('errors-skeleton');
+    hide('errors-error');
+    try {
+      allRows = await loadRows();
+      await resolveActors(allRows);
+      hide('errors-skeleton');
+      renderRows();
+    } catch (err) {
+      hide('errors-skeleton');
+      showToast((err as Error).message, false);
+    }
+  }
+
+  function setAutoRefresh(on: boolean) {
+    if (on === autoRefreshOn) return;
+    autoRefreshOn = on;
+    if (autoRefreshHandle !== null) {
+      clearInterval(autoRefreshHandle);
+      autoRefreshHandle = null;
+    }
+    if (on) {
+      autoRefreshHandle = window.setInterval(() => { void refresh(); }, 30000);
+    }
+  }
+
+  async function init() {
+    let supabase;
+    try { supabase = getSupabase(); } catch { hide('errors-skeleton'); show('errors-not-auth'); return; }
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { hide('errors-skeleton'); show('errors-not-auth'); return; }
+    const myRoles = await getUserRoles(session.user.id);
+    if (!myRoles.has('admin')) { hide('errors-skeleton'); show('errors-not-auth'); return; }
+    jwt = session.access_token;
+
+    show('errors-shell');
+
+    await populateDistincts();
+    restoreFilters();
+    await refresh();
+
+    document.getElementById('errors-state-unack')?.addEventListener('click', () => {
+      stateUnackOnly = true; paintStateToggle(); void refresh();
+    });
+    document.getElementById('errors-state-all')?.addEventListener('click', () => {
+      stateUnackOnly = false; paintStateToggle(); void refresh();
+    });
+    ['errors-fn', 'errors-code', 'errors-from', 'errors-to', 'errors-actor'].forEach(id => {
+      document.getElementById(id)?.addEventListener('change', () => { void refresh(); });
+    });
+    document.getElementById('errors-clear')?.addEventListener('click', (ev) => {
+      // reset is the form's job; we just refresh after it.
+      setTimeout(() => { void refresh(); }, 0);
+    });
+    document.getElementById('errors-auto-refresh')?.addEventListener('change', (ev) => {
+      setAutoRefresh((ev.target as HTMLInputElement).checked);
+    });
+    document.getElementById('errors-bulk-ack')?.addEventListener('click', () => {
+      const f = readFilters();
+      const summary = document.getElementById('error-ack-bulk-summary');
+      const notesEl = document.getElementById('error-ack-bulk-notes') as HTMLTextAreaElement | null;
+      if (notesEl) notesEl.value = '';
+      const pieces: string[] = [];
+      if (f.fn) pieces.push(`fn=${f.fn}`);
+      if (f.code) pieces.push(`code=${f.code}`);
+      if (f.from) pieces.push(`from=${f.from}`);
+      if (f.to) pieces.push(`to=${f.to}`);
+      if (summary) summary.textContent = pieces.length ? `Filters: ${pieces.join(' · ')}` : 'No filters set — will scope to ALL unacknowledged rows.';
+      document.dispatchEvent(new CustomEvent('console:slideover-open', {
+        detail: {
+          id: 'console-slideover-error-ack-bulk',
+          title: 'Acknowledge all matching errors',
+          action: 'error.acknowledge_bulk',
+          payload: { filters: { functionName: f.fn, code: f.code, from: f.from, to: f.to } },
+        },
+      }));
+    });
+  }
+
+  // Single-row ack submit handler
+  document.addEventListener('console:slideover-submit', async (ev) => {
+    const detail = (ev as CustomEvent<{ id: string; action: string; payload: { errorId?: string; filters?: ErrorAcknowledgeBulkFilters }; reason: string }>).detail;
+    if (detail.id !== 'console-slideover-error-ack' && detail.id !== 'console-slideover-error-ack-bulk') return;
+    if (!jwt) {
+      document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id: detail.id, ok: false, error: 'Not signed in' } }));
+      return;
+    }
+
+    try {
+      if (detail.id === 'console-slideover-error-ack' && detail.payload.errorId) {
+        const notesEl = document.getElementById('error-ack-notes') as HTMLTextAreaElement | null;
+        const notes = notesEl?.value.trim() || undefined;
+        const errorId = detail.payload.errorId;
+        // Optimistic: dim the row immediately.
+        const tr = document.getElementById(`errow-${errorId}`);
+        tr?.classList.add('opacity-60');
+        const btn = tr?.querySelector<HTMLButtonElement>('[data-ack-id]');
+        if (btn) btn.disabled = true;
+        await adminClient.error.acknowledge({ errorId, notes }, detail.reason, jwt);
+        const row = allRows.find(r => r.id === errorId);
+        if (row) {
+          row.acknowledged_at = new Date().toISOString();
+          row.ack_notes = notes ?? null;
+        }
+        renderRows();
+        document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id: detail.id, ok: true } }));
+        return;
+      }
+
+      if (detail.id === 'console-slideover-error-ack-bulk') {
+        const notesEl = document.getElementById('error-ack-bulk-notes') as HTMLTextAreaElement | null;
+        const notes = notesEl?.value.trim() || undefined;
+        const filters = detail.payload.filters ?? {};
+        const res = await adminClient.error.acknowledgeBulk({ filters, notes }, detail.reason, jwt);
+        const count = res.result?.count ?? 0;
+        const capHit = res.result?.capHit ?? false;
+        await refresh();
+        const msg = bulkDoneTmpl.replace('{count}', String(count)) + (capHit ? ' ' + bulkCapHit : '');
+        showToast(msg, true);
+        document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id: detail.id, ok: true } }));
+        return;
+      }
+    } catch (err) {
+      const msg = err instanceof AdminClientError ? err.message : (err as Error).message;
+      document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id: detail.id, ok: false, error: msg } }));
+    }
+  });
+
+  init().catch(() => { hide('errors-skeleton'); show('errors-not-auth'); });
+</script>
