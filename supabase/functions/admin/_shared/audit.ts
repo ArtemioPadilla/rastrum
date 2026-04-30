@@ -30,7 +30,11 @@ export type AuditOp =
   | 'webhook_create'
   | 'webhook_update'
   | 'webhook_delete'
-  | 'webhook_test';
+  | 'webhook_test'
+  | 'webhook_replay'
+  | 'health_recompute'
+  | 'error_acknowledge'
+  | 'error_acknowledge_bulk';
 
 export interface AuditRow {
   actor_id: string;

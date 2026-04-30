@@ -81,6 +81,24 @@ interface WebhookUpdatePayload {
   enabled?: boolean;
 }
 interface WebhookIdPayload { webhookId: string }
+interface WebhookReplayPayload { deliveryId: string }
+
+interface ErrorAcknowledgePayload { errorId: string; notes?: string }
+export interface ErrorAcknowledgeBulkFilters {
+  functionName?: string;
+  code?: string;
+  from?: string;
+  to?: string;
+}
+interface ErrorAcknowledgeBulkPayload {
+  filters: ErrorAcknowledgeBulkFilters;
+  notes?: string;
+}
+export interface ErrorAcknowledgeBulkResult {
+  count: number;
+  capHit: boolean;
+  filters: ErrorAcknowledgeBulkFilters;
+}
 interface AuditExportFilters {
   from?: string;
   to?: string;
@@ -223,5 +241,17 @@ export const adminClient = {
       call('webhook.delete', payload, reason, jwt),
     test: (payload: WebhookIdPayload, reason: string, jwt: string) =>
       call<{ statusCode: number | null; error: string | null }>('webhook.test', payload, reason, jwt),
+    replayDelivery: (payload: WebhookReplayPayload, reason: string, jwt: string) =>
+      call<{ statusCode: number | null; error: string | null; newDeliveryId: string; newEventId: string }>('webhook.replay_delivery', payload, reason, jwt),
+  },
+  health: {
+    recompute: (reason: string, jwt: string) =>
+      call<{ digestId: string | null }>('health.recompute', {}, reason, jwt),
+  },
+  error: {
+    acknowledge: (payload: ErrorAcknowledgePayload, reason: string, jwt: string) =>
+      call('error.acknowledge', payload, reason, jwt),
+    acknowledgeBulk: (payload: ErrorAcknowledgeBulkPayload, reason: string, jwt: string) =>
+      call<ErrorAcknowledgeBulkResult>('error.acknowledge_bulk', payload, reason, jwt),
   },
 };
