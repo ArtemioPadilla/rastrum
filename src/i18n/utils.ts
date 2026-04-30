@@ -24,7 +24,7 @@ export type Locale = (typeof locales)[number];
 
 export const routes: Record<string, Record<Locale, string>> = {
   home: { en: '', es: '' },
-  identify: { en: '/identify', es: '/identificar' },
+  identify: { en: '/observe', es: '/observar' },   // consolidated: identify → observe (issue #273)
   explore: { en: '/explore', es: '/explorar' },
   exploreMap: { en: '/explore/map', es: '/explorar/mapa' },
   exploreRecent: { en: '/explore/recent', es: '/explorar/recientes' },

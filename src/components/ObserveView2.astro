@@ -145,6 +145,18 @@ const weathers = WEATHERS;
     <!-- Error box -->
     <div id="obs2-error" class="hidden rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 px-4 py-3 text-sm text-red-700 dark:text-red-300"></div>
 
+    <!-- Contribution nudge (shown in identify mode) -->
+    <div id="obs2-contribute-nudge" class="hidden rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 p-4 space-y-2">
+      <p class="text-sm font-medium text-emerald-800 dark:text-emerald-300">
+        {isEs ? "¿Contribuir a la ciencia?" : "Want to contribute to science?"}
+      </p>
+      <p class="text-xs text-zinc-600 dark:text-zinc-400">
+        {isEs
+          ? "Guardar esta observación en Rastrum ayuda a los científicos a monitorear la biodiversidad de América Latina."
+          : "Saving this observation to Rastrum helps scientists monitor biodiversity across Latin America."}
+      </p>
+    </div>
+
     <!-- Save button -->
     <button
       type="submit"
@@ -153,7 +165,35 @@ const weathers = WEATHERS;
     >
       {isEs ? "Guardar observación" : "Save observation"}
     </button>
+
+    <!-- Identify-only skip (secondary action) -->
+    <button type="button" id="obs2-skip-save-btn" class="hidden w-full text-center text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 py-1 underline">
+      {isEs ? "Solo identificar, no guardar" : "Just identify, don't save"}
+    </button>
   </form>
+
+  <!-- Identify-only result (shown when ?mode=identify, pipeline done, user skips save) -->
+  <div id="obs2-identify-result" class="hidden rounded-xl border border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 p-5 space-y-3">
+    <p class="font-semibold text-emerald-800 dark:text-emerald-300 text-center">
+      {isEs ? "Identificación completa" : "Identification complete"}
+    </p>
+    <div id="obs2-identify-species-card" class="space-y-1 text-center"></div>
+    <div class="border-t border-emerald-200 dark:border-emerald-800 pt-3 space-y-2">
+      <p class="text-xs text-zinc-500 dark:text-zinc-400 text-center">
+        {isEs
+          ? "¿Quieres que esta observación ayude a la ciencia?"
+          : "Want this sighting to help science?"}
+      </p>
+      <button type="button" id="obs2-contribute-btn"
+        class="w-full min-h-[44px] rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-sm transition-colors">
+        {isEs ? "Sí, guardar en Rastrum" : "Yes, save to Rastrum"}
+      </button>
+      <button type="button" id="obs2-identify-done-btn"
+        class="w-full text-xs text-zinc-400 hover:text-zinc-600 underline py-1">
+        {isEs ? "No gracias" : "No thanks"}
+      </button>
+    </div>
+  </div>
 
   <!-- Success state -->
   <div id="obs2-success" class="hidden rounded-xl border border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 p-6 text-center space-y-3">
@@ -193,6 +233,19 @@ const errorEl         = document.getElementById('obs2-error');
 const saveBtn         = document.getElementById('obs2-save-btn') as HTMLButtonElement | null;
 const resumeBanner    = document.getElementById('obs2-resume-banner');
 const gpsStatus       = document.getElementById('obs2-gps-status');
+const contributeNudge = document.getElementById('obs2-contribute-nudge');
+const skipSaveBtn     = document.getElementById('obs2-skip-save-btn') as HTMLButtonElement | null;
+const identifyResult  = document.getElementById('obs2-identify-result');
+const identifySpeciesCard = document.getElementById('obs2-identify-species-card');
+const contributeBtn   = document.getElementById('obs2-contribute-btn');
+const identifyDoneBtn = document.getElementById('obs2-identify-done-btn');
+
+// ── Identify mode detection ────────────────────────────────────────────────
+const identifyMode = new URLSearchParams(window.location.search).get('mode') === 'identify';
+if (identifyMode) {
+  contributeNudge?.classList.remove('hidden');
+  skipSaveBtn?.classList.remove('hidden');
+}
 const idCard          = document.getElementById('obs2-id-card');
 const speciesEl       = document.getElementById('obs2-species');
 const commonEl        = document.getElementById('obs2-common');
@@ -445,6 +498,32 @@ function showPostForm() {
     document.getElementById('obs2-id-manual')?.classList.toggle('hidden');
   });
 }
+
+// ── Identify mode: skip save ──────────────────────────────────────────────
+skipSaveBtn?.addEventListener('click', () => {
+  postForm?.classList.add('hidden');
+  identifyResult?.classList.remove('hidden');
+  if (bestResult && identifySpeciesCard) {
+    identifySpeciesCard.innerHTML = `
+      <p class="font-semibold italic text-zinc-900 dark:text-zinc-100 text-lg">${bestResult.scientific_name}</p>
+      ${bestResult.common_name_en ? `<p class="text-sm text-zinc-500 dark:text-zinc-400">${bestResult.common_name_en}</p>` : ''}
+      <p class="text-sm font-mono text-emerald-600 dark:text-emerald-400">${Math.round(bestResult.confidence * 100)}% confidence · ${bestResult.source}</p>
+    `;
+  }
+});
+
+contributeBtn?.addEventListener('click', () => {
+  identifyResult?.classList.add('hidden');
+  postForm?.classList.remove('hidden');
+  if (saveBtn) saveBtn.textContent = isEs ? 'Guardar en Rastrum' : 'Save to Rastrum';
+});
+
+identifyDoneBtn?.addEventListener('click', () => {
+  identifyResult?.classList.add('hidden');
+  successEl?.classList.remove('hidden');
+  const successTitle = successEl?.querySelector('p');
+  if (successTitle) successTitle.textContent = isEs ? '¡Identificación completa!' : 'Identification complete!';
+});
 
 // ── Skip location ──────────────────────────────────────────────────────────
 document.getElementById('obs2-skip-location')?.addEventListener('click', () => {
