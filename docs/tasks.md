@@ -4,7 +4,7 @@
 > Source of truth for both surfaces; renders the live page at
 > [/docs/tasks/](https://rastrum.org/en/docs/tasks/).
 > 
-> **Updated:** 2026-04-27 (post-launch + v1.1 cross-cutting shipments + on-device MegaDetector cascade).
+> **Updated:** 2026-04-30 (v1.2 research workflow — M28 community discovery, M29 projects, M30 CLI batch import, M31 camera stations, M32 multi-provider vision, obs-detail redesign, admin console PR16 entity browsers).
 
 ---
 
@@ -17,9 +17,8 @@
 | v0.5 | Beta | shipped (partial) | 11 / 13 |
 | v1.0 | Public Launch | shipped (partial) | 18 / 21 |
 | v1.0.x | Post-launch polish | in_progress | 8 / 24 |
-| v1.1 | UX polish (post-launch brainstorm) | shipped (mostly) | 35 / 37 |
-| v1.2 | Profile privacy & public profile | shipped 2026-04-28 | 3 / 3 |
-| v1.3 | Module 27: AI Sponsorships | shipped 2026-04-28 | 1 / 1 |
+| v1.1 | UX polish + admin console + M22/M26/M27 | shipped (mostly) | 37 / 42 |
+| v1.2 | Research workflow (M28-M32 + obs-detail + privacy) | shipped 2026-04-30 | 17 / 17 |
 | **v0.1 → v1.0** | **Public launch** | **shipped 2026-04-26** | **54 / 59** |
 
 Phases v1.5, v2.0, v2.5 are tracked in [`progress.json`](progress.json) but have no shipped code yet — they are planned scope only.

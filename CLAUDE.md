@@ -27,7 +27,7 @@ Bilingual EN/ES from day one.
 |---|---|
 | [`docs/progress.json`](docs/progress.json)              | Source of truth for the roadmap. Bilingual labels (`_es` suffix). |
 | [`docs/tasks.json`](docs/tasks.json) + [`docs/tasks.md`](docs/tasks.md) | Per-roadmap-item subtask breakdown. Check current status before starting work. |
-| [`docs/specs/modules/00-index.md`](docs/specs/modules/00-index.md) | Catalog of ~29 module specs. Each module has its own design doc. |
+| [`docs/specs/modules/00-index.md`](docs/specs/modules/00-index.md) | Catalog of ~33 module specs. Each module has its own design doc. |
 | [`docs/architecture.md`](docs/architecture.md)            | High-level architecture diagram + critical-path flows. |
 | [`docs/specs/infra/supabase-schema.sql`](docs/specs/infra/supabase-schema.sql) | Idempotent SQL — apply with `make db-apply`. |
 | `Makefile`                                                | Run `make help` to see every dev workflow. |
