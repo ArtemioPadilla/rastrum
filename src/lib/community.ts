@@ -31,6 +31,19 @@ export interface CommunityObserver {
 
 export const COMMUNITY_PAGE_SIZE = 20;
 
+/**
+ * Build a public-profile URL for a community observer card.
+ *
+ * The canonical public profile route is `/{lang}/u/?username=<handle>`
+ * (querystring), NOT `/{lang}/u/<handle>/` (path segment) — the
+ * path-segment form 404s in production. See PR #72 for the prior
+ * regression on PublicProfileViewV2; this regressed in CommunityCard
+ * + CommunityView's renderRow before being caught by user feedback.
+ */
+export function publicProfileHref(profileBase: string, handle: string): string {
+  return `${profileBase}/?username=${encodeURIComponent(handle)}`;
+}
+
 function sortColumn(s: CommunitySort): string {
   // Nearby uses ORDER BY distance in SQL; the view query falls back
   // to observation_count for the (rare) case the caller asks for
