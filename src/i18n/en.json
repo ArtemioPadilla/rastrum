@@ -2313,7 +2313,6 @@
     "mod_appeals_action_reject": "Reject appeal",
     "mod_appeals_reviewer_note_label": "Note to user (optional)",
     "mod_appeals_kb_nav": "Appeals",
-
     "anomaliesView": {
       "title": "Anomaly detections",
       "description": "Automated rule-based detections from admin_audit. Acknowledged anomalies stay in the log so the audit trail is preserved.",
@@ -2344,7 +2343,6 @@
       },
       "empty": "No anomalies match the current filter."
     },
-
     "forensicsView": {
       "title": "Forensics export",
       "description": "Filter and export admin_audit rows. CSV is built server-side and the call itself is logged via audit_export.",
@@ -2369,7 +2367,6 @@
       },
       "empty": "No matches."
     },
-
     "proposalsView": {
       "title": "Action proposals",
       "description": "Two-person rule for irreversible actions. A proposal expires after 24 hours; the approver must differ from the proposer.",
@@ -2404,7 +2401,6 @@
       "selfApprovalForbidden": "You cannot approve your own proposal.",
       "empty": "No proposals match the current filter."
     },
-
     "webhooksView": {
       "title": "Webhook subscriptions",
       "description": "Outbound HMAC-SHA256-signed webhooks. Auto-disabled after 10 consecutive failures.",
@@ -2461,7 +2457,6 @@
       "empty": "No webhooks configured.",
       "deliveriesEmpty": "No deliveries yet."
     },
-
     "healthView": {
       "title": "Platform health digest",
       "description": "Weekly snapshot of platform-health metrics. Cron fires Mondays 09:00 UTC; manual refresh is idempotent on the current week.",
@@ -2479,15 +2474,15 @@
       "noPrevious": "—",
       "deltaLabel": "Δ",
       "metrics": {
-        "admin_actions":       "Admin actions",
-        "bans_issued":         "Bans issued",
-        "bans_lifted":         "Bans lifted",
-        "appeals_open":        "Appeals open",
-        "reports_open":        "Reports open",
-        "anomalies_unack":     "Anomalies unack.",
-        "function_errors_7d":  "Function errors (7d)",
-        "mod_queue_depth":     "Mod queue depth",
-        "expert_queue_depth":  "Expert queue depth"
+        "admin_actions": "Admin actions",
+        "bans_issued": "Bans issued",
+        "bans_lifted": "Bans lifted",
+        "appeals_open": "Appeals open",
+        "reports_open": "Reports open",
+        "anomalies_unack": "Anomalies unack.",
+        "function_errors_7d": "Function errors (7d)",
+        "mod_queue_depth": "Mod queue depth",
+        "expert_queue_depth": "Expert queue depth"
       },
       "trend": {
         "up": "up",
@@ -2499,7 +2494,6 @@
         "weekN": "Week of {date}"
       }
     },
-
     "errorsView": {
       "title": "Function errors",
       "description": "Structured error sink fed by every Edge Function dispatcher. Triage operationally-handled rows by acknowledging — they stay in the table for post-mortem.",
@@ -2780,7 +2774,36 @@
     "form_signin_required": "Sign in to create a project.",
     "error_invalid_polygon": "GeoJSON must be a Polygon or MultiPolygon with valid coordinates.",
     "error_slug_taken": "That slug is already taken.",
-    "error_save_failed": "Could not save the project."
+    "error_save_failed": "Could not save the project.",
+    "stations_title": "Camera stations",
+    "stations_empty": "No camera stations registered for this project yet.",
+    "stations_owner_only": "Only the project owner can add or edit stations.",
+    "stations_add": "Add station",
+    "stations_col_key": "Key",
+    "stations_col_name": "Name",
+    "stations_col_coords": "Coords",
+    "stations_col_periods": "Active periods",
+    "stations_col_trapn": "Trap-nights",
+    "stations_form_title": "New camera station",
+    "stations_form_key": "Station key (researcher code, e.g. SJ-CAM-01)",
+    "stations_form_name": "Display name (English)",
+    "stations_form_name_es": "Display name (Spanish)",
+    "stations_form_lat": "Latitude",
+    "stations_form_lng": "Longitude",
+    "stations_form_habitat": "Habitat",
+    "stations_form_model": "Camera model",
+    "stations_form_notes": "Notes",
+    "stations_form_save": "Save station",
+    "stations_form_cancel": "Cancel",
+    "stations_period_open": "Open period",
+    "stations_period_close": "Close period",
+    "stations_period_start": "Start date",
+    "stations_period_end": "End date (leave empty for \"still active\")",
+    "stations_period_active": "still active",
+    "stations_error_key_taken": "A station with that key already exists in this project.",
+    "stations_error_invalid_key": "Station key must be 1–64 alphanumerics, hyphens, or underscores.",
+    "stations_error_invalid_coords": "Coords must be valid latitude/longitude in WGS84.",
+    "stations_error_save_failed": "Could not save the station."
   },
   "confirm_dialog": {
     "default_confirm": "Confirm",

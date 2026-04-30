@@ -2313,7 +2313,6 @@
     "mod_appeals_action_reject": "Rechazar apelación",
     "mod_appeals_reviewer_note_label": "Nota para el usuario (opcional)",
     "mod_appeals_kb_nav": "Apelaciones",
-
     "anomaliesView": {
       "title": "Detecciones de anomalías",
       "description": "Detecciones automáticas basadas en reglas sobre admin_audit. Las anomalías reconocidas permanecen en el registro para preservar la trazabilidad.",
@@ -2344,7 +2343,6 @@
       },
       "empty": "No hay anomalías que coincidan con el filtro."
     },
-
     "forensicsView": {
       "title": "Exportación forense",
       "description": "Filtra y exporta filas de admin_audit. El CSV se construye en el servidor y la llamada queda registrada vía audit_export.",
@@ -2369,7 +2367,6 @@
       },
       "empty": "Sin coincidencias."
     },
-
     "proposalsView": {
       "title": "Propuestas de acción",
       "description": "Regla de doble persona para acciones irreversibles. Una propuesta expira en 24 horas; quien aprueba debe ser distinto de quien propone.",
@@ -2404,7 +2401,6 @@
       "selfApprovalForbidden": "No puedes aprobar tu propia propuesta.",
       "empty": "Ninguna propuesta coincide con el filtro actual."
     },
-
     "webhooksView": {
       "title": "Suscripciones de webhooks",
       "description": "Webhooks salientes firmados con HMAC-SHA256. Se desactivan automáticamente tras 10 fallos consecutivos.",
@@ -2461,7 +2457,6 @@
       "empty": "No hay webhooks configurados.",
       "deliveriesEmpty": "Aún no hay entregas."
     },
-
     "healthView": {
       "title": "Resumen de salud de la plataforma",
       "description": "Captura semanal de métricas de salud. El cron corre los lunes 09:00 UTC; el refresco manual es idempotente sobre la semana actual.",
@@ -2479,15 +2474,15 @@
       "noPrevious": "—",
       "deltaLabel": "Δ",
       "metrics": {
-        "admin_actions":       "Acciones admin",
-        "bans_issued":         "Suspensiones emitidas",
-        "bans_lifted":         "Suspensiones levantadas",
-        "appeals_open":        "Apelaciones abiertas",
-        "reports_open":        "Reportes abiertos",
-        "anomalies_unack":     "Anomalías sin reconocer",
-        "function_errors_7d":  "Errores de funciones (7d)",
-        "mod_queue_depth":     "Profundidad cola moderación",
-        "expert_queue_depth":  "Profundidad cola experto"
+        "admin_actions": "Acciones admin",
+        "bans_issued": "Suspensiones emitidas",
+        "bans_lifted": "Suspensiones levantadas",
+        "appeals_open": "Apelaciones abiertas",
+        "reports_open": "Reportes abiertos",
+        "anomalies_unack": "Anomalías sin reconocer",
+        "function_errors_7d": "Errores de funciones (7d)",
+        "mod_queue_depth": "Profundidad cola moderación",
+        "expert_queue_depth": "Profundidad cola experto"
       },
       "trend": {
         "up": "sube",
@@ -2499,7 +2494,6 @@
         "weekN": "Semana del {date}"
       }
     },
-
     "errorsView": {
       "title": "Errores de funciones",
       "description": "Sumidero estructurado alimentado por todo dispatcher de Edge Function. Triaja los reconocidos operacionalmente — quedan en la tabla para el post-mortem.",
@@ -2780,7 +2774,36 @@
     "form_signin_required": "Inicia sesión para crear un proyecto.",
     "error_invalid_polygon": "El GeoJSON debe ser un Polygon o MultiPolygon con coordenadas válidas.",
     "error_slug_taken": "Ese slug ya está en uso.",
-    "error_save_failed": "No se pudo guardar el proyecto."
+    "error_save_failed": "No se pudo guardar el proyecto.",
+    "stations_title": "Estaciones de cámara",
+    "stations_empty": "Aún no hay estaciones de cámara registradas para este proyecto.",
+    "stations_owner_only": "Sólo el dueño del proyecto puede agregar o editar estaciones.",
+    "stations_add": "Agregar estación",
+    "stations_col_key": "Clave",
+    "stations_col_name": "Nombre",
+    "stations_col_coords": "Coords",
+    "stations_col_periods": "Periodos activos",
+    "stations_col_trapn": "Noches-trampa",
+    "stations_form_title": "Nueva estación de cámara",
+    "stations_form_key": "Clave de estación (código del investigador, ej. SJ-CAM-01)",
+    "stations_form_name": "Nombre visible (inglés)",
+    "stations_form_name_es": "Nombre visible (español)",
+    "stations_form_lat": "Latitud",
+    "stations_form_lng": "Longitud",
+    "stations_form_habitat": "Hábitat",
+    "stations_form_model": "Modelo de cámara",
+    "stations_form_notes": "Notas",
+    "stations_form_save": "Guardar estación",
+    "stations_form_cancel": "Cancelar",
+    "stations_period_open": "Abrir periodo",
+    "stations_period_close": "Cerrar periodo",
+    "stations_period_start": "Fecha inicio",
+    "stations_period_end": "Fecha fin (vacío para \"aún activa\")",
+    "stations_period_active": "aún activa",
+    "stations_error_key_taken": "Ya existe una estación con esa clave en este proyecto.",
+    "stations_error_invalid_key": "La clave debe tener 1–64 caracteres alfanuméricos, guiones o guiones bajos.",
+    "stations_error_invalid_coords": "Las coordenadas deben ser latitud/longitud válidas en WGS84.",
+    "stations_error_save_failed": "No se pudo guardar la estación."
   },
   "confirm_dialog": {
     "default_confirm": "Confirmar",
