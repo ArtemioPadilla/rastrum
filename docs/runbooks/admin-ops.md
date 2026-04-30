@@ -307,3 +307,119 @@ await adminClient.featureFlag.toggle(
 ```
 
 **Note:** Updates `app_feature_flags.value` and sets `updated_at` + `updated_by`. The `key` must match an existing row seeded from `src/lib/feature-flags.ts`; if the key is not found the handler throws HTTP 400. Runtime behaviour change is immediate on the next Edge Function cold start; warm isolates keep the previous value until they recycle (typically within a few minutes on the free tier).
+
+## anomaly.acknowledge
+
+**Required role:** admin
+**Audit op:** `anomaly_acknowledge`
+**Payload:** `{ anomalyId: string (uuid), notes?: string }`
+
+```ts
+await adminClient.anomaly.acknowledge(
+  { anomalyId: '<uuid>', notes: 'False positive — bulk import context' },
+  'reviewed and dismissed — not a real anomaly',
+  session!.access_token,
+);
+```
+
+**Note:** Sets `admin_anomalies.acknowledged_at = now()`,
+`acknowledged_by = actor.id`, `ack_notes = notes`. Throws HTTP 400 if the
+anomaly is already acknowledged. Read-side the row stays in
+`admin_anomalies`; the audit trail is preserved. See
+`docs/runbooks/admin-anomalies.md` for tuning + manual SQL fallback.
+
+## audit.export
+
+**Required role:** admin
+**Audit op:** `audit_export`
+**Payload:** `{ from?: ISO timestamp, to?: ISO timestamp, actorId?: uuid, op?: text, limit?: int (default 1000, max 10000) }`
+
+```ts
+await adminClient.auditExport(
+  {
+    from: '2026-04-01T00:00:00Z',
+    to: '2026-04-29T00:00:00Z',
+    op: 'observation_hide',
+    limit: 5000,
+  },
+  'monthly compliance review export',
+  session!.access_token,
+);
+// → { result: { rows: AdminAuditRow[], csv: string } }
+```
+
+**Note:** The CSV is built **server-side** (header
+`id,created_at,actor_id,op,target_type,target_id,details`) so the client
+just needs to wrap it in a Blob + download. Each row's `details` cell is
+a single-line JSON string of `{ before, after, reason }`. Quote escape
+follows RFC 4180 — fields containing `,`, `"`, or `\n` are wrapped in
+double quotes and inner quotes are doubled. The export call itself
+inserts an `admin_audit` row with `op = 'audit_export'`,
+`target_type = 'admin_audit'`, `target_id = 'export'`, and an
+`after` jsonb of `{ from, to, actorId, op, limit, returned }` so the
+filter context is recoverable from the audit log.
+
+## PR13 — Future-proofing handlers
+
+### `proposal.create`
+
+Files an admin_action_proposal for one of the four irreversible ops.
+Required role: `admin`. Returns `{ proposalId, expiresAt }`.
+
+```ts
+await adminClient.proposal.create(
+  {
+    targetOp: 'user.ban',
+    targetType: 'user',
+    targetId: '00000000-…',
+    payload: { target_user_id: '00000000-…', duration_hours: 24 },
+    reason: 'Spam dump in #flag-queue, three reports from different IPs',
+  },
+  'two-person rule on permanent-tier ban',
+  session!.access_token,
+);
+```
+
+### `proposal.approve`
+
+Executes the underlying action with the original proposer's payload
+and writes both a `proposal_approve` audit row and the underlying
+op's audit row (linked via `admin_action_proposals.executed_audit_id`).
+Required role: `admin`. **Throws `self_approval_forbidden` when the
+caller's id matches `proposer_id`.**
+
+### `proposal.reject`
+
+Marks status='rejected'; no underlying action runs.
+
+### `webhook.create`
+
+Generates a 256-bit HMAC secret, returns it **once** in the response.
+Persisted into `admin_webhooks`. Required role: `admin`.
+
+```ts
+const res = await adminClient.webhook.create(
+  {
+    url: 'https://siem.example.com/rastrum-events',
+    events: ['anomaly_created', 'user_banned'],
+  },
+  'wire SOC ingestion for PR13',
+  session!.access_token,
+);
+console.log('secret (copy now):', res.result?.secret);
+```
+
+### `webhook.update`
+
+Toggles enabled, edits url/events. Re-enabling resets
+`consecutive_failures = 0` so the circuit breaker has a fresh window.
+
+### `webhook.delete`
+
+Hard delete; CASCADE removes related `admin_webhook_deliveries` rows.
+
+### `webhook.test`
+
+POSTs `{test:true, webhook_id, sent_at}` to a single webhook with a
+proper signature header. Persists the response status_code in
+`admin_webhook_deliveries`. Returns `{ statusCode, error }`.

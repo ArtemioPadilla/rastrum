@@ -396,6 +396,8 @@
     "preferred_lang": "Preferred language",
     "license": "Default license for your observations",
     "license_hint": "Applies to new observations. See docs for details.",
+    "timezone": "Timezone",
+    "timezone_description": "Used for off-hours admin anomaly detection. Default: UTC.",
     "public_profile": "Public profile",
     "public_profile_hint": "Others can view your profile page and public activity.",
     "gamification": "Badges & activity",
@@ -602,6 +604,15 @@
       "scrubland": "Scrubland",
       "cave": "Cave"
     },
+    "crop_title": "Crop & rotate",
+    "crop_subtitle": "Adjust the frame to focus the subject. Better framing helps the AI identifier.",
+    "crop_use": "Use this crop",
+    "crop_skip": "Skip cropping",
+    "crop_cancel": "Cancel",
+    "crop_rotate_left": "Rotate left",
+    "crop_rotate_right": "Rotate right",
+    "crop_reset": "Reset",
+    "crop_drag_hint": "Drag the corners to resize. Drag inside to move.",
     "ban_banner_message": "Your account is suspended until {date}. Reason: {reason}.",
     "ban_banner_message_permanent": "Your account is permanently suspended. Reason: {reason}.",
     "ban_banner_appeal": "Appeal",
@@ -1814,7 +1825,11 @@
     "karma": "Karma tuning",
     "flags": "Flags (admin)",
     "audit": "Audit log",
+    "anomalies": "Anomalies",
+    "forensics": "Forensics & export",
     "features": "Feature flags",
+    "proposals": "Proposals",
+    "webhooks": "Webhooks",
     "bioblitz": "Bioblitz events",
     "modOverview": "Overview",
     "modFlagQueue": "Flag queue",
@@ -1836,6 +1851,8 @@
     "slideover_cancel": "Cancel",
     "slideover_submit": "Apply",
     "slideover_audit_note": "This action will be logged to admin_audit.",
+    "requireApproval": "Require approval (two-person rule)",
+    "proposalCreated": "Proposal #{id} created. Awaiting approval from another admin.",
     "users_search_placeholder": "Search by username or display name…",
     "users_loading": "Loading users…",
     "users_empty": "No users match.",
@@ -2080,7 +2097,6 @@
     "admin_overview_recent_empty": "No admin actions logged yet.",
     "admin_overview_load_failed": "Could not load platform state.",
     "exp_val_empty_filtered": "No pending validations in your taxa right now.",
-
     "badges_intro": "Browse the 39-badge catalogue. View criteria, tier distribution, and holder counts.",
     "badges_search_placeholder": "Search by name…",
     "badges_all_categories": "All categories",
@@ -2113,7 +2129,6 @@
     "badges_revoke_success": "Badge revoked successfully.",
     "badges_revoke_error": "Failed to revoke badge: ",
     "badges_tier_dist_heading": "Distribution by tier",
-
     "taxa_intro": "Browse taxa with their rarity buckets, conservation status, and obscuration level.",
     "taxa_search_placeholder": "Search scientific name…",
     "taxa_all_kingdoms": "All kingdoms",
@@ -2144,9 +2159,8 @@
     "taxa_flag_submit": "Save flag",
     "taxa_flag_success": "Conservation flag updated.",
     "taxa_flag_error": "Failed to update flag: ",
-
     "karma_intro": "View the current karma configuration and recent ledger events. The multiplier editor ships in PR8.",
-    "karma_config_heading": "Current karma config (hardcoded)",
+    "karma_config_heading": "Karma event deltas",
     "karma_config_hardcoded_badge": "hardcoded · DB editor in PR8",
     "karma_col_event": "Event",
     "karma_col_base_delta": "Base Δ",
@@ -2168,13 +2182,11 @@
     "karma_recent_heading": "Recent karma events (last 50)",
     "karma_recent_empty": "No karma events yet.",
     "karma_intro_db": "Karma config is now DB-backed. View and manage reason deltas and rarity multipliers below.",
-    "karma_config_heading": "Karma event deltas",
     "karma_config_db_badge": "DB-backed",
     "karma_editor_heading": "Karma config editor",
     "karma_editor_desc": "View karma reason deltas and rarity multipliers from the live DB.",
     "karma_editor_btn": "Reload",
     "karma_editor_coming": "",
-
     "features_intro": "Feature flags backed by DB. Toggle values are persisted and survive deploys.",
     "features_static_notice": "",
     "features_on": "ON",
@@ -2184,7 +2196,6 @@
     "features_toggle_reason_placeholder": "Reason for toggling this flag…",
     "features_toggle_success": "Flag toggled successfully.",
     "features_toggle_error": "Failed to toggle flag: ",
-
     "bioblitz_intro": "View and manage bioblitz events. Create-event flow ships when the first community organizer requests one.",
     "bioblitz_filter_upcoming": "Upcoming",
     "bioblitz_filter_active": "Active",
@@ -2204,10 +2215,8 @@
     "bioblitz_create_coming": "Create-event flow — coming when an organizer requests it",
     "bioblitz_edit_btn": "Edit event",
     "bioblitz_edit_coming": "Event editing — coming in PR8",
-
     "quick_reasons_label": "Quick reasons:",
     "quick_reason_custom": "Custom…",
-
     "reason_spam": "Spam",
     "reason_harassment": "Harassment",
     "reason_off_topic": "Off-topic",
@@ -2227,7 +2236,6 @@
     "reason_stock_photo": "Stock photo / not own work",
     "reason_privacy_violation": "Privacy violation",
     "reason_hate_speech": "Hate speech",
-
     "audit_filter_actor": "Actor",
     "audit_filter_op": "Operation",
     "audit_filter_target_type": "Target type",
@@ -2242,7 +2250,6 @@
     "audit_active_filters": "Active filters:",
     "audit_remove_filter": "Remove filter",
     "audit_csv_export": "CSV export",
-
     "kb_help_title": "Keyboard shortcuts",
     "kb_help_close": "Close",
     "kb_nav_audit": "Audit log",
@@ -2258,7 +2265,6 @@
     "kb_help_actions": "Actions",
     "kb_escape_close": "Close slide-over",
     "kb_question_help": "Show this help",
-
     "modAppeals": "Appeals",
     "mod_appeals_heading": "Ban appeals",
     "mod_appeals_intro": "Review ban appeals submitted by suspended users.",
@@ -2279,6 +2285,227 @@
     "mod_appeals_action_accept": "Accept appeal (lift ban)",
     "mod_appeals_action_reject": "Reject appeal",
     "mod_appeals_reviewer_note_label": "Note to user (optional)",
-    "mod_appeals_kb_nav": "Appeals"
+    "mod_appeals_kb_nav": "Appeals",
+
+    "anomaliesView": {
+      "title": "Anomaly detections",
+      "description": "Automated rule-based detections from admin_audit. Acknowledged anomalies stay in the log so the audit trail is preserved.",
+      "tabs": {
+        "unacknowledged": "Unacknowledged",
+        "all": "All"
+      },
+      "columns": {
+        "kind": "Kind",
+        "actor": "Actor",
+        "window": "Window",
+        "events": "Events",
+        "details": "Details"
+      },
+      "actions": {
+        "acknowledge": "Acknowledge",
+        "acknowledged": "acknowledged"
+      },
+      "slideOver": {
+        "title": "Acknowledge anomaly",
+        "notes": "Notes (optional)",
+        "submit": "Acknowledge"
+      },
+      "kinds": {
+        "high_rate": "High rate",
+        "bulk_delete": "Bulk destructive",
+        "off_hours": "Off-hours"
+      },
+      "empty": "No anomalies match the current filter."
+    },
+
+    "forensicsView": {
+      "title": "Forensics export",
+      "description": "Filter and export admin_audit rows. CSV is built server-side and the call itself is logged via audit_export.",
+      "filters": {
+        "from": "From",
+        "to": "To",
+        "actor": "Actor (username or uuid)",
+        "op": "Operation",
+        "limit": "Limit"
+      },
+      "actions": {
+        "preview": "Preview",
+        "exportCsv": "Export CSV"
+      },
+      "columns": {
+        "id": "id",
+        "timestamp": "timestamp",
+        "actor": "actor",
+        "op": "op",
+        "target": "target",
+        "details": "details"
+      },
+      "empty": "No matches."
+    },
+
+    "proposalsView": {
+      "title": "Action proposals",
+      "description": "Two-person rule for irreversible actions. A proposal expires after 24 hours; the approver must differ from the proposer.",
+      "tabs": {
+        "pending": "Pending",
+        "all": "All"
+      },
+      "columns": {
+        "op": "Action",
+        "target": "Target",
+        "proposer": "Proposer",
+        "status": "Status",
+        "created": "Created",
+        "expires": "Expires"
+      },
+      "status": {
+        "pending": "Pending",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "expired": "Expired",
+        "executed": "Executed"
+      },
+      "actions": {
+        "approve": "Approve",
+        "reject": "Reject"
+      },
+      "slideOver": {
+        "approveTitle": "Approve proposal",
+        "rejectTitle": "Reject proposal",
+        "notes": "Notes (optional)"
+      },
+      "selfApprovalForbidden": "You cannot approve your own proposal.",
+      "empty": "No proposals match the current filter."
+    },
+
+    "webhooksView": {
+      "title": "Webhook subscriptions",
+      "description": "Outbound HMAC-SHA256-signed webhooks. Auto-disabled after 10 consecutive failures.",
+      "create": {
+        "heading": "New webhook",
+        "url": "URL (https://… required)",
+        "events": "Events",
+        "submit": "Create webhook",
+        "secretShown": "Secret (shown once — copy now):"
+      },
+      "events": {
+        "anomaly_created": "Anomaly created",
+        "user_banned": "User banned",
+        "user_unbanned": "User unbanned",
+        "role_granted": "Role granted",
+        "role_revoked": "Role revoked"
+      },
+      "columns": {
+        "url": "URL",
+        "events": "Events",
+        "enabled": "Enabled",
+        "lastDelivery": "Last delivery",
+        "consecutiveFailures": "Failures",
+        "actions": "Actions"
+      },
+      "actions": {
+        "test": "Test",
+        "disable": "Disable",
+        "enable": "Enable",
+        "delete": "Delete"
+      },
+      "deliveries": {
+        "heading": "Recent deliveries (last 20)",
+        "event": "Event",
+        "status": "Status",
+        "time": "Time",
+        "error": "Error"
+      },
+      "empty": "No webhooks configured.",
+      "deliveriesEmpty": "No deliveries yet."
+    },
+
+    "audit_op": {
+      "role_grant": "Role granted",
+      "role_revoke": "Role revoked",
+      "user_ban": "User banned",
+      "user_unban": "User unbanned",
+      "user_delete": "User deleted",
+      "observation_hide": "Observation hidden",
+      "observation_unhide": "Observation unhidden",
+      "observation_obscure": "Observation obscured",
+      "observation_force_unobscure": "Observation force-unobscured",
+      "observation_license_override": "Observation license overridden",
+      "observation_hard_delete": "Observation hard-deleted",
+      "comment_hide": "Comment hidden",
+      "comment_unhide": "Comment unhidden",
+      "comment_lock": "Comment locked",
+      "comment_unlock": "Comment unlocked",
+      "report_triaged": "Report triaged",
+      "report_resolved": "Report resolved",
+      "report_dismissed": "Report dismissed",
+      "badge_award_manual": "Badge awarded (manual)",
+      "badge_revoke": "Badge revoked",
+      "token_force_revoke": "Token force-revoked",
+      "feature_flag_toggle": "Feature flag toggled",
+      "cron_force_run": "Cron force-run",
+      "precise_coords_read": "Precise coords read",
+      "user_pii_read": "User PII read",
+      "token_list_read": "Token list read",
+      "user_audit_read": "User audit read",
+      "appeal_accepted": "Appeal accepted",
+      "appeal_rejected": "Appeal rejected",
+      "taxon_conservation_set": "Taxon conservation set",
+      "ai_credential_create": "AI credential created",
+      "ai_credential_revoke": "AI credential revoked",
+      "ai_credential_rotate": "AI credential rotated",
+      "ai_sponsorship_create": "AI sponsorship created",
+      "ai_sponsorship_pause": "AI sponsorship paused",
+      "ai_sponsorship_unpause": "AI sponsorship unpaused",
+      "ai_sponsorship_revoke": "AI sponsorship revoked",
+      "ai_sponsorship_quota_hit": "AI sponsorship quota hit",
+      "sponsorship_request_create": "Sponsorship request created",
+      "sponsorship_request_approve": "Sponsorship request approved",
+      "sponsorship_request_reject": "Sponsorship request rejected",
+      "sponsorship_request_withdraw": "Sponsorship request withdrawn",
+      "vault_failure": "Vault failure",
+      "anomaly_acknowledge": "Anomaly acknowledged",
+      "audit_export": "Audit export"
+    }
+  },
+  "projects": {
+    "title": "Projects",
+    "subtitle": "Define a polygon (ANP, reserve, sampling grid) and observations inside it are auto-tagged.",
+    "create_cta": "New project",
+    "empty_public": "No public projects yet.",
+    "empty_mine": "You haven’t created any projects.",
+    "list_my": "My projects",
+    "list_public": "Public projects",
+    "visibility_public": "Public",
+    "visibility_private": "Private",
+    "col_name": "Name",
+    "col_owner": "Owner",
+    "col_obs": "Observations",
+    "col_visibility": "Visibility",
+    "col_updated": "Updated",
+    "detail_obs": "Observations",
+    "detail_species": "Species",
+    "detail_members": "Members",
+    "detail_polygon_area": "Polygon area",
+    "detail_polygon_geom": "Polygon (GeoJSON)",
+    "no_obs": "No observations have been auto-tagged to this project yet.",
+    "form_title_new": "New project",
+    "form_title_edit": "Edit project",
+    "form_slug": "Slug",
+    "form_slug_hint": "URL-safe identifier. Lowercase, digits, hyphens. 2–64 chars.",
+    "form_name": "Name (English)",
+    "form_name_es": "Name (Spanish)",
+    "form_description": "Description (English)",
+    "form_description_es": "Description (Spanish)",
+    "form_visibility": "Visibility",
+    "form_polygon": "Polygon (GeoJSON)",
+    "form_polygon_hint": "Paste a GeoJSON Polygon or MultiPolygon, or upload a .geojson file. Coordinates in WGS84.",
+    "form_polygon_upload": "Upload .geojson",
+    "form_save": "Save project",
+    "form_cancel": "Cancel",
+    "form_signin_required": "Sign in to create a project.",
+    "error_invalid_polygon": "GeoJSON must be a Polygon or MultiPolygon with valid coordinates.",
+    "error_slug_taken": "That slug is already taken.",
+    "error_save_failed": "Could not save the project."
   }
 }

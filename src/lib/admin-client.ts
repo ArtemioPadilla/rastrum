@@ -55,6 +55,53 @@ interface FeatureFlagTogglePayload { key: string; value: boolean }
 interface AppealAcceptPayload { appeal_id: string }
 interface AppealRejectPayload { appeal_id: string; reviewer_note?: string }
 
+interface AnomalyAcknowledgePayload { anomalyId: string; notes?: string }
+
+interface ProposalCreatePayload {
+  targetOp: string;
+  targetType: string;
+  targetId: string;
+  payload: Record<string, unknown>;
+  reason: string;
+}
+interface ProposalApprovePayload { proposalId: string; notes?: string }
+interface ProposalRejectPayload { proposalId: string; reason: string }
+
+type WebhookEvent =
+  | 'anomaly_created'
+  | 'user_banned'
+  | 'user_unbanned'
+  | 'role_granted'
+  | 'role_revoked';
+interface WebhookCreatePayload { url: string; events: WebhookEvent[] }
+interface WebhookUpdatePayload {
+  webhookId: string;
+  url?: string;
+  events?: WebhookEvent[];
+  enabled?: boolean;
+}
+interface WebhookIdPayload { webhookId: string }
+interface AuditExportFilters {
+  from?: string;
+  to?: string;
+  actorId?: string;
+  op?: string;
+  limit?: number;
+}
+export interface AdminAuditRow {
+  id: number;
+  created_at: string;
+  actor_id: string;
+  op: string;
+  target_type: string | null;
+  target_id: string | null;
+  details: unknown;
+}
+export interface AuditExportResult {
+  rows: AdminAuditRow[];
+  csv: string;
+}
+
 interface DispatcherResponse<T = unknown> {
   ok: true;
   audit_id: number;
@@ -152,5 +199,29 @@ export const adminClient = {
       call('appeal.accept', payload, reason, jwt),
     reject: (payload: AppealRejectPayload, reason: string, jwt: string) =>
       call('appeal.reject', payload, reason, jwt),
+  },
+  anomaly: {
+    acknowledge: (payload: AnomalyAcknowledgePayload, reason: string, jwt: string) =>
+      call('anomaly.acknowledge', payload, reason, jwt),
+  },
+  auditExport: (filters: AuditExportFilters, reason: string, jwt: string) =>
+    call<AuditExportResult>('audit.export', filters, reason, jwt),
+  proposal: {
+    create: (payload: ProposalCreatePayload, reason: string, jwt: string) =>
+      call<{ proposalId: string; expiresAt: string }>('proposal.create', payload, reason, jwt),
+    approve: (payload: ProposalApprovePayload, reason: string, jwt: string) =>
+      call<{ executedAuditId: number }>('proposal.approve', payload, reason, jwt),
+    reject: (payload: ProposalRejectPayload, reason: string, jwt: string) =>
+      call('proposal.reject', payload, reason, jwt),
+  },
+  webhook: {
+    create: (payload: WebhookCreatePayload, reason: string, jwt: string) =>
+      call<{ id: string; secret: string }>('webhook.create', payload, reason, jwt),
+    update: (payload: WebhookUpdatePayload, reason: string, jwt: string) =>
+      call('webhook.update', payload, reason, jwt),
+    delete: (payload: WebhookIdPayload, reason: string, jwt: string) =>
+      call('webhook.delete', payload, reason, jwt),
+    test: (payload: WebhookIdPayload, reason: string, jwt: string) =>
+      call<{ statusCode: number | null; error: string | null }>('webhook.test', payload, reason, jwt),
   },
 };

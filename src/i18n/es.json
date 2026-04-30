@@ -396,6 +396,8 @@
     "preferred_lang": "Idioma preferido",
     "license": "Licencia por defecto para tus observaciones",
     "license_hint": "Se aplica a nuevas observaciones. Ver docs.",
+    "timezone": "Zona horaria",
+    "timezone_description": "Usado para detección de anomalías fuera de horario. Predeterminado: UTC.",
     "public_profile": "Perfil público",
     "public_profile_hint": "Otros pueden ver tu página y actividad pública.",
     "gamification": "Insignias y actividad",
@@ -602,6 +604,15 @@
       "scrubland": "Matorral",
       "cave": "Cueva"
     },
+    "crop_title": "Recortar y rotar",
+    "crop_subtitle": "Ajusta el encuadre para enfocar al sujeto. Un mejor encuadre ayuda al identificador con IA.",
+    "crop_use": "Usar este recorte",
+    "crop_skip": "Omitir recorte",
+    "crop_cancel": "Cancelar",
+    "crop_rotate_left": "Rotar a la izquierda",
+    "crop_rotate_right": "Rotar a la derecha",
+    "crop_reset": "Restablecer",
+    "crop_drag_hint": "Arrastra las esquinas para redimensionar. Arrastra dentro para mover.",
     "ban_banner_message": "Tu cuenta está suspendida hasta {date}. Razón: {reason}.",
     "ban_banner_message_permanent": "Tu cuenta está suspendida indefinidamente. Razón: {reason}.",
     "ban_banner_appeal": "Apelar",
@@ -1814,7 +1825,11 @@
     "karma": "Ajuste de karma",
     "flags": "Banderas (admin)",
     "audit": "Auditoría",
+    "anomalies": "Anomalías",
+    "forensics": "Forenses y exportación",
     "features": "Banderas de funcionalidad",
+    "proposals": "Propuestas",
+    "webhooks": "Webhooks",
     "bioblitz": "Eventos bioblitz",
     "modOverview": "Resumen",
     "modFlagQueue": "Cola de banderas",
@@ -1836,6 +1851,8 @@
     "slideover_cancel": "Cancelar",
     "slideover_submit": "Aplicar",
     "slideover_audit_note": "Esta acción se registra en admin_audit.",
+    "requireApproval": "Requerir aprobación (regla de dos personas)",
+    "proposalCreated": "Propuesta #{id} creada. Esperando aprobación de otro admin.",
     "users_search_placeholder": "Buscar por usuario o nombre…",
     "users_loading": "Cargando usuarios…",
     "users_empty": "No hay usuarios que coincidan.",
@@ -2080,7 +2097,6 @@
     "admin_overview_recent_empty": "Sin acciones de admin registradas todavía.",
     "admin_overview_load_failed": "No se pudo cargar el estado de la plataforma.",
     "exp_val_empty_filtered": "Sin validaciones pendientes en tus taxa ahora mismo.",
-
     "badges_intro": "Explora el catálogo de 39 insignias. Consulta criterios, distribución por nivel y conteo de portadores.",
     "badges_search_placeholder": "Buscar por nombre…",
     "badges_all_categories": "Todas las categorías",
@@ -2113,7 +2129,6 @@
     "badges_revoke_success": "Insignia revocada correctamente.",
     "badges_revoke_error": "Error al revocar insignia: ",
     "badges_tier_dist_heading": "Distribución por nivel",
-
     "taxa_intro": "Explora los taxa con sus cubos de rareza, estado de conservación y nivel de oscuración.",
     "taxa_search_placeholder": "Buscar nombre científico…",
     "taxa_all_kingdoms": "Todos los reinos",
@@ -2144,9 +2159,8 @@
     "taxa_flag_submit": "Guardar bandera",
     "taxa_flag_success": "Bandera de conservación actualizada.",
     "taxa_flag_error": "Error al actualizar bandera: ",
-
     "karma_intro": "Consulta la configuración de karma actual y los eventos recientes del ledger. El editor de multiplicadores llega en PR8.",
-    "karma_config_heading": "Config. karma actual (hardcoded)",
+    "karma_config_heading": "Deltas por evento de karma",
     "karma_config_hardcoded_badge": "hardcoded · editor BD en PR8",
     "karma_col_event": "Evento",
     "karma_col_base_delta": "Δ base",
@@ -2168,13 +2182,11 @@
     "karma_recent_heading": "Eventos de karma recientes (últimos 50)",
     "karma_recent_empty": "Aún no hay eventos de karma.",
     "karma_intro_db": "La configuración de karma ahora está respaldada por BD. Consulta y gestiona los deltas y multiplicadores abajo.",
-    "karma_config_heading": "Deltas por evento de karma",
     "karma_config_db_badge": "respaldado por BD",
     "karma_editor_heading": "Editor de configuración de karma",
     "karma_editor_desc": "Consulta los deltas de razones de karma y multiplicadores de rareza desde la BD.",
     "karma_editor_btn": "Recargar",
     "karma_editor_coming": "",
-
     "features_intro": "Banderas de funcionalidad respaldadas por BD. Los valores de alternancia se persisten y sobreviven a los despliegues.",
     "features_static_notice": "",
     "features_on": "ACTIVO",
@@ -2184,7 +2196,6 @@
     "features_toggle_reason_placeholder": "Razón para alternar esta bandera…",
     "features_toggle_success": "Bandera alternada correctamente.",
     "features_toggle_error": "Error al alternar bandera: ",
-
     "bioblitz_intro": "Ve y gestiona eventos bioblitz. El flujo de creación llega cuando el primer organizador comunitario lo solicite.",
     "bioblitz_filter_upcoming": "Próximos",
     "bioblitz_filter_active": "Activos",
@@ -2204,10 +2215,8 @@
     "bioblitz_create_coming": "Flujo de creación — disponible cuando un organizador lo solicite",
     "bioblitz_edit_btn": "Editar evento",
     "bioblitz_edit_coming": "Edición de eventos — próximamente en PR8",
-
     "quick_reasons_label": "Razones rápidas:",
     "quick_reason_custom": "Personalizar…",
-
     "reason_spam": "Spam",
     "reason_harassment": "Acoso",
     "reason_off_topic": "Fuera de tema",
@@ -2227,7 +2236,6 @@
     "reason_stock_photo": "Foto de stock / no es obra propia",
     "reason_privacy_violation": "Violación de privacidad",
     "reason_hate_speech": "Discurso de odio",
-
     "audit_filter_actor": "Actor",
     "audit_filter_op": "Operación",
     "audit_filter_target_type": "Tipo de objetivo",
@@ -2242,7 +2250,6 @@
     "audit_active_filters": "Filtros activos:",
     "audit_remove_filter": "Quitar filtro",
     "audit_csv_export": "Exportar CSV",
-
     "kb_help_title": "Atajos de teclado",
     "kb_help_close": "Cerrar",
     "kb_nav_audit": "Auditoría",
@@ -2258,7 +2265,6 @@
     "kb_help_actions": "Acciones",
     "kb_escape_close": "Cerrar panel lateral",
     "kb_question_help": "Mostrar este ayuda",
-
     "modAppeals": "Apelaciones",
     "mod_appeals_heading": "Apelaciones de suspensión",
     "mod_appeals_intro": "Revisa las apelaciones enviadas por usuarios suspendidos.",
@@ -2279,6 +2285,227 @@
     "mod_appeals_action_accept": "Aceptar apelación (levantar suspensión)",
     "mod_appeals_action_reject": "Rechazar apelación",
     "mod_appeals_reviewer_note_label": "Nota para el usuario (opcional)",
-    "mod_appeals_kb_nav": "Apelaciones"
+    "mod_appeals_kb_nav": "Apelaciones",
+
+    "anomaliesView": {
+      "title": "Detecciones de anomalías",
+      "description": "Detecciones automáticas basadas en reglas sobre admin_audit. Las anomalías reconocidas permanecen en el registro para preservar la trazabilidad.",
+      "tabs": {
+        "unacknowledged": "Sin reconocer",
+        "all": "Todas"
+      },
+      "columns": {
+        "kind": "Tipo",
+        "actor": "Actor",
+        "window": "Ventana",
+        "events": "Eventos",
+        "details": "Detalles"
+      },
+      "actions": {
+        "acknowledge": "Reconocer",
+        "acknowledged": "reconocida"
+      },
+      "slideOver": {
+        "title": "Reconocer anomalía",
+        "notes": "Notas (opcional)",
+        "submit": "Reconocer"
+      },
+      "kinds": {
+        "high_rate": "Tasa alta",
+        "bulk_delete": "Acción destructiva masiva",
+        "off_hours": "Fuera de horario"
+      },
+      "empty": "No hay anomalías que coincidan con el filtro."
+    },
+
+    "forensicsView": {
+      "title": "Exportación forense",
+      "description": "Filtra y exporta filas de admin_audit. El CSV se construye en el servidor y la llamada queda registrada vía audit_export.",
+      "filters": {
+        "from": "Desde",
+        "to": "Hasta",
+        "actor": "Actor (usuario o uuid)",
+        "op": "Operación",
+        "limit": "Límite"
+      },
+      "actions": {
+        "preview": "Vista previa",
+        "exportCsv": "Exportar CSV"
+      },
+      "columns": {
+        "id": "id",
+        "timestamp": "fecha",
+        "actor": "actor",
+        "op": "operación",
+        "target": "objetivo",
+        "details": "detalles"
+      },
+      "empty": "Sin coincidencias."
+    },
+
+    "proposalsView": {
+      "title": "Propuestas de acción",
+      "description": "Regla de doble persona para acciones irreversibles. Una propuesta expira en 24 horas; quien aprueba debe ser distinto de quien propone.",
+      "tabs": {
+        "pending": "Pendientes",
+        "all": "Todas"
+      },
+      "columns": {
+        "op": "Acción",
+        "target": "Objetivo",
+        "proposer": "Propone",
+        "status": "Estado",
+        "created": "Creada",
+        "expires": "Expira"
+      },
+      "status": {
+        "pending": "Pendiente",
+        "approved": "Aprobada",
+        "rejected": "Rechazada",
+        "expired": "Expirada",
+        "executed": "Ejecutada"
+      },
+      "actions": {
+        "approve": "Aprobar",
+        "reject": "Rechazar"
+      },
+      "slideOver": {
+        "approveTitle": "Aprobar propuesta",
+        "rejectTitle": "Rechazar propuesta",
+        "notes": "Notas (opcional)"
+      },
+      "selfApprovalForbidden": "No puedes aprobar tu propia propuesta.",
+      "empty": "Ninguna propuesta coincide con el filtro actual."
+    },
+
+    "webhooksView": {
+      "title": "Suscripciones de webhooks",
+      "description": "Webhooks salientes firmados con HMAC-SHA256. Se desactivan automáticamente tras 10 fallos consecutivos.",
+      "create": {
+        "heading": "Nuevo webhook",
+        "url": "URL (se requiere https://…)",
+        "events": "Eventos",
+        "submit": "Crear webhook",
+        "secretShown": "Secreto (se muestra una sola vez — cópialo ahora):"
+      },
+      "events": {
+        "anomaly_created": "Anomalía creada",
+        "user_banned": "Usuario suspendido",
+        "user_unbanned": "Usuario rehabilitado",
+        "role_granted": "Rol otorgado",
+        "role_revoked": "Rol revocado"
+      },
+      "columns": {
+        "url": "URL",
+        "events": "Eventos",
+        "enabled": "Activo",
+        "lastDelivery": "Última entrega",
+        "consecutiveFailures": "Fallos",
+        "actions": "Acciones"
+      },
+      "actions": {
+        "test": "Probar",
+        "disable": "Desactivar",
+        "enable": "Activar",
+        "delete": "Eliminar"
+      },
+      "deliveries": {
+        "heading": "Entregas recientes (últimas 20)",
+        "event": "Evento",
+        "status": "Estado",
+        "time": "Hora",
+        "error": "Error"
+      },
+      "empty": "No hay webhooks configurados.",
+      "deliveriesEmpty": "Aún no hay entregas."
+    },
+
+    "audit_op": {
+      "role_grant": "Rol otorgado",
+      "role_revoke": "Rol revocado",
+      "user_ban": "Usuario suspendido",
+      "user_unban": "Usuario rehabilitado",
+      "user_delete": "Usuario eliminado",
+      "observation_hide": "Observación oculta",
+      "observation_unhide": "Observación reexpuesta",
+      "observation_obscure": "Observación oscurecida",
+      "observation_force_unobscure": "Observación forzada a no oscurecida",
+      "observation_license_override": "Licencia de observación sobrescrita",
+      "observation_hard_delete": "Observación borrada",
+      "comment_hide": "Comentario oculto",
+      "comment_unhide": "Comentario reexpuesto",
+      "comment_lock": "Comentario bloqueado",
+      "comment_unlock": "Comentario desbloqueado",
+      "report_triaged": "Reporte triado",
+      "report_resolved": "Reporte resuelto",
+      "report_dismissed": "Reporte descartado",
+      "badge_award_manual": "Insignia otorgada (manual)",
+      "badge_revoke": "Insignia revocada",
+      "token_force_revoke": "Token revocado a la fuerza",
+      "feature_flag_toggle": "Bandera de funcionalidad cambiada",
+      "cron_force_run": "Cron ejecutado a la fuerza",
+      "precise_coords_read": "Lectura de coords precisas",
+      "user_pii_read": "Lectura de PII de usuario",
+      "token_list_read": "Lectura de lista de tokens",
+      "user_audit_read": "Lectura de auditoría de usuario",
+      "appeal_accepted": "Apelación aceptada",
+      "appeal_rejected": "Apelación rechazada",
+      "taxon_conservation_set": "Estado de conservación de taxón",
+      "ai_credential_create": "Credencial IA creada",
+      "ai_credential_revoke": "Credencial IA revocada",
+      "ai_credential_rotate": "Credencial IA rotada",
+      "ai_sponsorship_create": "Patrocinio IA creado",
+      "ai_sponsorship_pause": "Patrocinio IA pausado",
+      "ai_sponsorship_unpause": "Patrocinio IA reanudado",
+      "ai_sponsorship_revoke": "Patrocinio IA revocado",
+      "ai_sponsorship_quota_hit": "Cuota de patrocinio IA alcanzada",
+      "sponsorship_request_create": "Solicitud de patrocinio creada",
+      "sponsorship_request_approve": "Solicitud de patrocinio aprobada",
+      "sponsorship_request_reject": "Solicitud de patrocinio rechazada",
+      "sponsorship_request_withdraw": "Solicitud de patrocinio retirada",
+      "vault_failure": "Fallo de bóveda",
+      "anomaly_acknowledge": "Anomalía reconocida",
+      "audit_export": "Exportación de auditoría"
+    }
+  },
+  "projects": {
+    "title": "Proyectos",
+    "subtitle": "Define un polígono (ANP, reserva, malla de muestreo) y las observaciones dentro se etiquetan automáticamente.",
+    "create_cta": "Nuevo proyecto",
+    "empty_public": "Aún no hay proyectos públicos.",
+    "empty_mine": "No has creado ningún proyecto.",
+    "list_my": "Mis proyectos",
+    "list_public": "Proyectos públicos",
+    "visibility_public": "Público",
+    "visibility_private": "Privado",
+    "col_name": "Nombre",
+    "col_owner": "Dueño",
+    "col_obs": "Observaciones",
+    "col_visibility": "Visibilidad",
+    "col_updated": "Actualizado",
+    "detail_obs": "Observaciones",
+    "detail_species": "Especies",
+    "detail_members": "Miembros",
+    "detail_polygon_area": "Superficie del polígono",
+    "detail_polygon_geom": "Polígono (GeoJSON)",
+    "no_obs": "Aún no se han auto-etiquetado observaciones a este proyecto.",
+    "form_title_new": "Nuevo proyecto",
+    "form_title_edit": "Editar proyecto",
+    "form_slug": "Slug",
+    "form_slug_hint": "Identificador para la URL. Minúsculas, dígitos, guiones. 2–64 caracteres.",
+    "form_name": "Nombre (inglés)",
+    "form_name_es": "Nombre (español)",
+    "form_description": "Descripción (inglés)",
+    "form_description_es": "Descripción (español)",
+    "form_visibility": "Visibilidad",
+    "form_polygon": "Polígono (GeoJSON)",
+    "form_polygon_hint": "Pega un GeoJSON Polygon o MultiPolygon, o sube un archivo .geojson. Coordenadas en WGS84.",
+    "form_polygon_upload": "Subir .geojson",
+    "form_save": "Guardar proyecto",
+    "form_cancel": "Cancelar",
+    "form_signin_required": "Inicia sesión para crear un proyecto.",
+    "error_invalid_polygon": "El GeoJSON debe ser un Polygon o MultiPolygon con coordenadas válidas.",
+    "error_slug_taken": "Ese slug ya está en uso.",
+    "error_save_failed": "No se pudo guardar el proyecto."
   }
 }

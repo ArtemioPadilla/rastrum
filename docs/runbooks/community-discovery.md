@@ -35,32 +35,30 @@
 `docs/specs/infra/cron-schedules.sql`. The 30-minute gap after badges-nightly is
 adequate for typical scale; the recompute job is read-mostly with one bulk UPDATE.
 
-## Manual cron fire (PR3 backfill — operator action)
+## One-time backfill (formerly PR3 operator action — now CI/CD)
 
-After PR2 merges and the Edge Function auto-deploys, the cron will start
-populating counters and centroids for users who post new observations. To
-backfill **all existing users** (including those who haven't posted recently) so
-the page shows useful data on day 1:
+After all six PRs ship, the cron will start populating counters and centroids
+for users who post new observations. To backfill **all existing users**
+(including those who haven't posted recently) so the page shows useful data
+on day 1, fire the CI workflow once:
 
-```bash
-# Local — uses SUPABASE_SERVICE_ROLE_KEY from .env.local
-make db-cron-test
-# That fires recompute-streaks + award-badges + recompute-user-stats.
-
-# Or hit the Edge Function directly (CI / remote operator):
-curl -X POST \
-  -H "Content-Type: application/json" \
-  -d '{}' \
-  "https://reppvlqejgoqvitturxp.supabase.co/functions/v1/recompute-user-stats"
+```
+GitHub Actions → Community discovery — manual backfill → Run workflow
 ```
 
-The function returns `{ ok, elapsed_ms, rows_updated }`. At the v1 scale this is
-under 2 seconds; expect a few minutes once the table grows past 100k users.
+The workflow is at `.github/workflows/community-backfill.yml`. It posts to the
+deployed `recompute-user-stats` Edge Function (no shell needed) and surfaces
+`{ rows_updated, elapsed_ms }` in the Actions UI as a notice annotation. At
+v1 scale the run completes in under 2 seconds.
 
-**Sequencing:** Run this **before** the Profile → Edit country picker is
-exposed (PR4) so users see the inferred country *and* the "inferred from your
-region" badge from the start, instead of a NULL field that gets backfilled days
-later.
+The workflow is idempotent — fire it again any time you want a fresh recompute
+without waiting for the nightly 08:00 UTC tick.
+
+**For local debugging** (developer machine, not the production backfill):
+
+```bash
+make db-cron-test   # fires streaks + badges + recompute-user-stats locally
+```
 
 ## Privacy invariants — do NOT break
 
@@ -96,7 +94,7 @@ Profile → Edit toggle.
 |---|---|---|
 | #92 | merged 2026-04-29 | PR1 — schema deltas + dual views + iso_countries seed + `normalize_country_code` |
 | #96 | merged 2026-04-29 | PR2 — `recompute-user-stats` Edge Function + cron + `SECURITY DEFINER` wrapper |
-| (operator) | pending | PR3 — manual cron fire to backfill (see "Manual cron fire" above) |
+| `community-backfill.yml` | shipped 2026-04-29 | PR3 — one-time backfill, automated as a GitHub Actions workflow_dispatch (formerly an operator curl) |
 | #102 | merged 2026-04-29 | PR4 — Profile → Edit country picker + `hide_from_leaderboards` toggle + `country_code_source` |
 | PR5+PR6 | merged 2026-04-29 | Atomic landing — `/community/observers/` page (CSR) + composable filter chips + URL-state serializer + `community_observers_nearby` SQL RPC + MegaMenu split (Biodiversity / Community columns) + MobileDrawer subheading + atomic i18n rewrite of the two production "no leaderboards" strings + OG card + Vitest + Playwright e2e + module status flip to "shipped" |
 

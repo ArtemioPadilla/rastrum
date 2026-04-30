@@ -21,6 +21,16 @@
 --                    'streak-push-nightly' (01:55 UTC ≈ 19:55 America/Mexico_City).
 --   v4 (2026-04-27): added 'refresh-taxon-rarity-nightly' (03:00 UTC).
 --   v5 (2026-04-29): added 'recompute-user-stats-nightly' (08:00 UTC) for M28.
+--   v6 (2026-04-29): added 'admin-anomaly-detect-hourly' (every hour at :05)
+--                    and 'admin-health-digest-weekly' (Mondays 09:00 UTC)
+--                    for PR12 admin observability.
+--   v7 (2026-04-29): added 'auto-revoke-expired-roles-daily' (08:15 UTC) and
+--                    'expire-stale-proposals-hourly' (every hour at :25)
+--                    for PR13 future-proofing.
+--   v8 (2026-04-29): added 'reconcile-webhook-deliveries' (every 2 min) for
+--                    PR14 — writes back async pg_net status_code into
+--                    admin_webhook_deliveries and recomputes
+--                    consecutive_failures.
 -- ════════════════════════════════════════════════════════════════════════
 
 CREATE EXTENSION IF NOT EXISTS pg_cron;
@@ -102,6 +112,69 @@ BEGIN
     );
   $body$, v_base || '/recompute-user-stats'));
 
+  -- 7. admin-anomaly-detect-hourly — every hour at :05 (PR12)
+  --    Scans the prior hour's admin_audit rows for high-rate / bulk-delete /
+  --    off-hours signals and inserts into admin_anomalies. Idempotent on
+  --    (kind, actor_id, window_start) so re-firing the same hour is a no-op.
+  PERFORM cron.unschedule('admin-anomaly-detect-hourly')
+    FROM cron.job WHERE jobname = 'admin-anomaly-detect-hourly';
+  PERFORM cron.schedule(
+    'admin-anomaly-detect-hourly',
+    '5 * * * *',
+    $$ SELECT public.detect_admin_anomalies(); $$
+  );
+
+  -- 8. admin-health-digest-weekly — Mondays at 09:00 UTC (PR12)
+  --    Aggregates a 7-day platform-health snapshot into admin_health_digests.
+  --    ON CONFLICT DO NOTHING on (period_start, period_end) makes manual
+  --    re-runs safe.
+  PERFORM cron.unschedule('admin-health-digest-weekly')
+    FROM cron.job WHERE jobname = 'admin-health-digest-weekly';
+  PERFORM cron.schedule(
+    'admin-health-digest-weekly',
+    '0 9 * * 1',
+    $$ SELECT public.compute_admin_health_digest(); $$
+  );
+
+  -- 9. auto-revoke-expired-roles-daily — 08:15 UTC (PR13)
+  --    Soft-revokes any user_roles row past its expires_at and writes
+  --    one admin_audit row per revoke (op='role_revoke',
+  --    auto_revoke_reason='expired'). Runs after the 07:30 badges and
+  --    08:00 user-stats jobs so denormalised flags don't churn mid-run.
+  PERFORM cron.unschedule('auto-revoke-expired-roles-daily')
+    FROM cron.job WHERE jobname = 'auto-revoke-expired-roles-daily';
+  PERFORM cron.schedule(
+    'auto-revoke-expired-roles-daily',
+    '15 8 * * *',
+    $$ SELECT public.auto_revoke_expired_roles(); $$
+  );
+
+  -- 10. expire-stale-proposals-hourly — every hour at :25 (PR13)
+  --     Flips admin_action_proposals rows to status='expired' once
+  --     their 24-hour window lapses without an approve/reject.
+  PERFORM cron.unschedule('expire-stale-proposals-hourly')
+    FROM cron.job WHERE jobname = 'expire-stale-proposals-hourly';
+  PERFORM cron.schedule(
+    'expire-stale-proposals-hourly',
+    '25 * * * *',
+    $$ SELECT public.expire_stale_proposals(); $$
+  );
+
+  -- 11. reconcile-webhook-deliveries — every 2 minutes (PR14)
+  --     pg_net.http_post is fire-and-forget; the response lands in
+  --     net._http_response asynchronously. This cron writes the
+  --     resolved status_code back into admin_webhook_deliveries and
+  --     recomputes the parent webhook's consecutive_failures counter
+  --     so the circuit breaker can do its job. Idempotent — rows
+  --     with a non-NULL status_code are skipped.
+  PERFORM cron.unschedule('reconcile-webhook-deliveries')
+    FROM cron.job WHERE jobname = 'reconcile-webhook-deliveries';
+  PERFORM cron.schedule(
+    'reconcile-webhook-deliveries',
+    '*/2 * * * *',
+    $$ SELECT public.reconcile_webhook_deliveries(); $$
+  );
+
   RAISE NOTICE '✓ Cron schedules applied';
 END
 $migration$;
@@ -110,7 +183,10 @@ SELECT jobid, jobname, schedule, active
 FROM cron.job
 WHERE jobname IN ('streaks-nightly', 'badges-nightly', 'plantnet-quota-daily',
                   'streak-push-nightly', 'refresh-taxon-rarity-nightly',
-                  'recompute-user-stats-nightly')
+                  'recompute-user-stats-nightly',
+                  'admin-anomaly-detect-hourly', 'admin-health-digest-weekly',
+                  'auto-revoke-expired-roles-daily', 'expire-stale-proposals-hourly',
+                  'reconcile-webhook-deliveries')
 ORDER BY jobname;
 
 -- m26: prune read notifications older than 90 days, daily at 04:30 UTC.

@@ -79,7 +79,11 @@ export const routes: Record<string, Record<Locale, string>> = {
   consoleKarma:             { en: '/console/karma',            es: '/consola/karma' },
   consoleFlags:             { en: '/console/flags',            es: '/consola/banderas' },
   consoleAudit:             { en: '/console/audit',            es: '/consola/auditoria' },
+  consoleAnomalies:         { en: '/console/anomalies',        es: '/consola/anomalias' },
+  consoleForensics:         { en: '/console/forensics',        es: '/consola/forenses' },
   consoleFeatureFlags:      { en: '/console/features',         es: '/consola/caracteristicas' },
+  consoleProposals:         { en: '/console/proposals',        es: '/consola/propuestas' },
+  consoleWebhooks:          { en: '/console/webhooks',         es: '/consola/webhooks' },
   consoleBioblitz:          { en: '/console/bioblitz',         es: '/consola/bioblitz' },
   consoleModFlagQueue:      { en: '/console/flag-queue',       es: '/consola/cola-banderas' },
   consoleModComments:       { en: '/console/comments',         es: '/consola/comentarios' },
@@ -95,6 +99,9 @@ export const routes: Record<string, Record<Locale, string>> = {
   inbox:            { en: '/inbox',     es: '/bandeja' },
   profileFollowers: { en: '/profile/u', es: '/perfil/u' },
   profileFollowing: { en: '/profile/u', es: '/perfil/u' },
+  // Projects (M29)
+  projects:     { en: '/projects',     es: '/proyectos' },
+  projectNew:   { en: '/projects/new', es: '/proyectos/nuevo' },
 };
 
 export const docPages = [
@@ -182,7 +189,11 @@ export const routeTree: Record<string, RouteNode> = {
   consoleKarma:            { labels: { en: 'Karma',            es: 'Karma' },             parent: 'console' },
   consoleFlags:            { labels: { en: 'Flags',            es: 'Banderas' },          parent: 'console' },
   consoleAudit:            { labels: { en: 'Audit',            es: 'Auditoría' },         parent: 'console' },
+  consoleAnomalies:        { labels: { en: 'Anomalies',        es: 'Anomalías' },         parent: 'console' },
+  consoleForensics:        { labels: { en: 'Forensics',        es: 'Forenses' },          parent: 'console' },
   consoleFeatureFlags:     { labels: { en: 'Features',         es: 'Características' },   parent: 'console' },
+  consoleProposals:        { labels: { en: 'Proposals',        es: 'Propuestas' },        parent: 'console' },
+  consoleWebhooks:         { labels: { en: 'Webhooks',         es: 'Webhooks' },          parent: 'console' },
   consoleBioblitz:         { labels: { en: 'Bioblitz',         es: 'Bioblitz' },          parent: 'console' },
   consoleModFlagQueue:     { labels: { en: 'Flag queue',       es: 'Cola de banderas' },  parent: 'console' },
   consoleModComments:      { labels: { en: 'Comments',         es: 'Comentarios' },       parent: 'console' },
@@ -193,6 +204,10 @@ export const routeTree: Record<string, RouteNode> = {
   consoleExpertOverrides:  { labels: { en: 'Overrides',        es: 'Correcciones' },      parent: 'console' },
   consoleExpertExpertise:  { labels: { en: 'Expertise',        es: 'Experiencia' },       parent: 'console' },
   consoleExpertTaxonNotes: { labels: { en: 'Taxon notes',      es: 'Notas de taxón' },    parent: 'console' },
+  // Projects (M29)
+  projects:          { labels: { en: 'Projects', es: 'Proyectos' } },
+  projectDetail:     { labels: { en: 'Project',  es: 'Proyecto' }, parent: 'projects' },
+  projectNew:        { labels: { en: 'New project', es: 'Nuevo proyecto' }, parent: 'projects' },
   // Social graph (M26)
   inbox:             { labels: { en: 'Inbox',     es: 'Bandeja' } },
   profileFollowers:  { labels: { en: 'Followers', es: 'Seguidores' }, parent: 'profileUser' },

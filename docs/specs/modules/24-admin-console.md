@@ -88,9 +88,30 @@ See `docs/specs/infra/supabase-schema.sql` for canonical SQL. Tables:
 | Identification overrides | expert | stub | deferred |
 | Taxon notes | expert | stub | deferred |
 
-**Functional: 22 of 25 console tabs after PR8. Deferred stubs: Bioblitz, License disputes, Identification overrides, Taxon notes — no concrete users yet.**
+**Functional: 28 of 30 console tabs after PR14. Deferred stubs: License disputes, Identification overrides, Taxon notes — no concrete users yet.**
 
-## Edge Function handlers (21 deployed after PR8)
+### Tabs added in PR9-PR14
+
+| Tab | Role | Status | Shipped in |
+|---|---|---|---|
+| Appeals | moderator | done | PR10 |
+| Anomalies | admin | done | PR12 |
+| Forensics | admin | done | PR12 |
+| Proposals | admin | done | PR13 |
+| Webhooks | admin | done | PR13 |
+
+## Cron jobs added in PR12-PR14
+
+| Job name | Schedule (UTC) | Function | Shipped in |
+|---|---|---|---|
+| `admin-anomaly-detect-hourly` | `5 * * * *` | `detect_admin_anomalies()` | PR12 |
+| `admin-health-digest-weekly` | `0 9 * * 1` | `compute_admin_health_digest()` | PR12 |
+| `auto-revoke-expired-roles-daily` | `15 8 * * *` | `auto_revoke_expired_roles()` | PR13 |
+| `expire-stale-proposals-hourly` | `25 * * * *` | `expire_stale_proposals()` | PR13 |
+| `reconcile-webhook-deliveries` | `*/2 * * * *` | `reconcile_webhook_deliveries()` | PR14 |
+| `admin-observability-dryrun` (GH Actions) | `13 9 * * 1` (+ one-shot 2026-05-06) | psql query suite | PR14 |
+
+## Edge Function handlers (32 deployed after PR14)
 
 | Action verb | Required role | Audit op | Shipped in |
 |---|---|---|---|
@@ -115,3 +136,34 @@ See `docs/specs/infra/supabase-schema.sql` for canonical SQL. Tables:
 | taxon.recompute_rarity | admin | cron_force_run | PR8 |
 | taxon.toggle_conservation | admin | taxon_conservation_set | PR8 |
 | feature_flag.toggle | admin | feature_flag_toggle | PR8 |
+| appeal.accept | moderator | appeal_accepted | PR10 |
+| appeal.reject | moderator | appeal_rejected | PR10 |
+| anomaly.acknowledge | admin | anomaly_acknowledge | PR12 |
+| audit.export | admin | audit_export | PR12 |
+| proposal.create | admin | proposal_create | PR13 |
+| proposal.approve | admin | proposal_approve | PR13 |
+| proposal.reject | admin | proposal_reject | PR13 |
+| webhook.create | admin | webhook_create | PR13 |
+| webhook.update | admin | webhook_update | PR13 |
+| webhook.delete | admin | webhook_delete | PR13 |
+| webhook.test | admin | webhook_test | PR13 |
+
+## v1.1 deferred-cleanup primitives (PR14)
+
+The dispatcher gained a server-side enforcement gate, the webhook
+pipeline closed its async-status loop, and the trust score moved from
+placeholder to real formula:
+
+- **`enforce_two_person_irreversible` feature flag** — when enabled, the
+  dispatcher rejects direct calls to ops in `IRREVERSIBLE_OPS` unless
+  they originated from `proposal.approve` (which stamps an internal
+  `_via_proposal: true` on its inner dispatch). Default off; flip via
+  `feature_flag.toggle` once the proposals queue is in active use.
+- **Webhook `_meta` envelope + reconcile cron** — every outbound body
+  carries `_meta: { event_id, event, timestamp, nonce, version }` (HMAC
+  covers it). The reconcile cron joins `admin_webhook_deliveries` against
+  `net._http_response` every 2 min so `status_code` flows back into the
+  Webhooks tab UI.
+- **`compute_moderator_trust_score()` v1.1** — `70 - 8·unack_30d - 25·overturn_rate + 30·min(1, sqrt(active_days_90d/30)) + 5·acted_in_last_7_days`, clamped 0-100. Bumping the formula requires bumping the in-function version comment AND shipping a runbook entry.
+- **Per-admin timezone for off_hours** — `users.timezone` (nullable IANA, defaults to UTC). Profile → Edit picker covers UTC + 8 LATAM/EU zones.
+- **Durable observability dry-run** — `.github/workflows/admin-observability-dryrun.yml` runs once on 2026-05-06 09:13 UTC and weekly Mondays thereafter. Fails red if any webhook delivery has been pending > 5 minutes — that's the silent-failure tripwire for the whole console subsystem.

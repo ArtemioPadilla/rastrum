@@ -63,6 +63,7 @@ const tr = t(lang);
   lang={lang}
   id="console-slideover-users"
   titleKey={tr.console.users_grant_title}
+  irreversible={true}
   reasonTemplates={[
     tr.console.reason_promotion_after_participation,
     tr.console.reason_policy_violation,
@@ -243,9 +244,10 @@ const tr = t(lang);
     dl.innerHTML = '<dt class="text-zinc-500 col-span-2 text-xs italic">Loading…</dt>';
 
     try {
-      const [obsResult, rgResult] = await Promise.all([
+      const [obsResult, rgResult, trustResult] = await Promise.all([
         supabase.from('observations').select('id', { count: 'exact', head: true }).eq('observer_id', userId),
         supabase.from('identifications').select('id', { count: 'exact', head: true }).eq('identifier_id', userId).eq('quality_grade', 'research'),
+        supabase.rpc('compute_moderator_trust_score', { p_user_id: userId }),
       ]);
 
       if (obsResult.error) throw obsResult.error;
@@ -253,10 +255,13 @@ const tr = t(lang);
 
       const obsCount = obsResult.count ?? 0;
       const rgCount = rgResult.count ?? 0;
+      // trust_score returns NULL for users without moderator/admin role.
+      const trust = trustResult.error ? null : (trustResult.data as number | null);
 
       dl.innerHTML = `
         <dt class="text-zinc-500">Observations</dt><dd class="font-medium">${obsCount}</dd>
         <dt class="text-zinc-500">Research grade</dt><dd class="font-medium">${rgCount}</dd>
+        ${trust !== null ? `<dt class="text-zinc-500">Trust score</dt><dd class="font-medium tabular-nums">${Number(trust).toFixed(0)}</dd>` : ''}
       `;
     } catch (err) {
       console.warn('console: loadActivity failed', err);

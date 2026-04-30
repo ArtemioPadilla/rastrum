@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeScale, isImageFile, compressIfLarge, DEFAULT_MAX_MP } from './photo-compress';
+import { computeScale, isImageFile, compressIfLarge, DEFAULT_MAX_MP, DEFAULT_MAX_BYTES, MIN_QUALITY } from './photo-compress';
 
 describe('computeScale', () => {
   it('returns 1 when pixels exactly equal the maxMP budget (no resize)', () => {
@@ -64,5 +64,14 @@ describe('compressIfLarge', () => {
     const out = await compressIfLarge(f);
     expect(out.file).toBe(f);
     expect(out.resized).toBe(false);
+  });
+});
+
+describe('byte-cap defaults', () => {
+  it('exposes DEFAULT_MAX_BYTES at 4 MB', () => {
+    expect(DEFAULT_MAX_BYTES).toBe(4 * 1024 * 1024);
+  });
+  it('exposes MIN_QUALITY floor at 0.6 to preserve AI-id detail', () => {
+    expect(MIN_QUALITY).toBe(0.6);
   });
 });

@@ -37,15 +37,20 @@ export const roleGrantHandler: ActionHandler<RoleGrantPayload> = {
     // Existing row dictates whether this is a fresh grant, a re-grant after
     // a soft-revoke, or an extension of an active grant. We preserve the
     // original granted_at / granted_by on every conflict so audit history
-    // is intact; only revoked_at moves on the conflict path. Fresh grants
-    // get the new timestamps.
+    // is intact. expires_at NULL = permanent; a future timestamp = bounded
+    // grant that auto_revoke_expired_roles() will sweep daily. The grant
+    // also clears revoked_at so a re-grant after a soft-revoke is supported.
     const existing = (before ?? []).find(r => r.role === payload.role);
     const expiresAt = payload.expires_at ?? null;
 
     if (existing) {
       const { error } = await admin
         .from('user_roles')
-        .update({ revoked_at: expiresAt })
+        .update({
+          expires_at:         expiresAt,
+          revoked_at:         null,
+          auto_revoke_reason: null,
+        })
         .eq('user_id', payload.target_user_id)
         .eq('role', payload.role);
       if (error) throw new Error(`role.grant (extend): ${error.message}`);
@@ -53,11 +58,11 @@ export const roleGrantHandler: ActionHandler<RoleGrantPayload> = {
       const { error } = await admin
         .from('user_roles')
         .insert({
-          user_id: payload.target_user_id,
-          role: payload.role,
+          user_id:    payload.target_user_id,
+          role:       payload.role,
           granted_at: new Date().toISOString(),
           granted_by: actor.id,
-          revoked_at: expiresAt,
+          expires_at: expiresAt,
         });
       if (error) throw new Error(`role.grant (insert): ${error.message}`);
     }

@@ -35,7 +35,7 @@ export async function verifyJwtAndLoadRoles(req: Request): Promise<Actor> {
   const serviceClient = createClient(SUPABASE_URL, SERVICE_KEY);
   const { data: rows, error: rolesErr } = await serviceClient
     .from('user_roles')
-    .select('role, revoked_at')
+    .select('role, revoked_at, expires_at')
     .eq('user_id', userRes.user.id);
   if (rolesErr) throw new HttpError(500, rolesErr.message);
 
@@ -43,6 +43,7 @@ export async function verifyJwtAndLoadRoles(req: Request): Promise<Actor> {
   const roles = new Set<UserRole>(
     (rows ?? [])
       .filter(r => !r.revoked_at || new Date(r.revoked_at).getTime() > now)
+      .filter(r => !r.expires_at || new Date(r.expires_at).getTime() > now)
       .map(r => r.role as UserRole),
   );
 

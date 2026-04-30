@@ -3979,6 +3979,14 @@ ALTER TABLE public.users
   ADD COLUMN IF NOT EXISTS country_code_source text NOT NULL DEFAULT 'auto'
     CHECK (country_code_source IN ('auto','user'));
 
+-- 1d) Per-user IANA timezone (PR14). NULL means treat as UTC. Currently
+-- consumed by detect_admin_anomalies() to evaluate the off_hours rule in
+-- the admin's local time rather than UTC. Wider use (push notifications,
+-- streak rollovers) is a v1.1 follow-up — keep the column nullable so
+-- consumers must defensively coalesce to 'UTC'.
+ALTER TABLE public.users
+  ADD COLUMN IF NOT EXISTS timezone text;
+
 -- 1c) Column-level UPDATE grants for the three M28-writable columns. Lives
 -- here (rather than in the consolidated REVOKE/GRANT block above) because
 -- those columns are added by the ALTER TABLE statements above; granting
@@ -3987,6 +3995,9 @@ ALTER TABLE public.users
 -- composes cleanly with the earlier GRANT UPDATE (...) block.
 GRANT UPDATE (country_code, country_code_source, hide_from_leaderboards)
   ON public.users TO authenticated;
+
+-- PR14: users.timezone is user-writable so Profile → Edit can persist it.
+GRANT UPDATE (timezone) ON public.users TO authenticated;
 
 -- 2) Partial indexes — every list query operates on an already-filtered
 -- set, so opted-out / private users add zero cost to anyone's query plan.
@@ -4425,7 +4436,8 @@ VALUES
   ('localAiIdentification',  'Local AI identification (WebLLM)',      'On-device Phi-3.5-vision identification via WebLLM. Downloads a ~2 GB model on first use. Off by default — gated on explicit user opt-in.',                            false, 'identification'),
   ('darwinCoreExport',       'Darwin Core Archive export',            'Allow authenticated users to download their observations as a DwC-A ZIP via the export-dwca Edge Function.',                                                            true,  'admin'),
   ('socialGraph',            'Social graph (follows / reactions)',    'Module 26 social surfaces: follow/unfollow, notification bell, reactions strip on observation cards.',                                                                     true,  'social'),
-  ('bioblitzEvents',         'Bioblitz events UI',                    'Public listing and participation UI for bioblitz events. Ships when the first organizer requests an event.',                                                              false, 'admin')
+  ('bioblitzEvents',         'Bioblitz events UI',                    'Public listing and participation UI for bioblitz events. Ships when the first organizer requests an event.',                                                              false, 'admin'),
+  ('enforce_two_person_irreversible', 'Enforce two-person rule on irreversible ops', 'When enabled, the admin dispatcher rejects direct calls to role.revoke / user.ban / observation.hide / badge.revoke unless the call is invoked from proposal.approve. Off by default; flip after operators trust the Proposals queue.', false, 'admin')
 ON CONFLICT (key) DO UPDATE
   SET name        = EXCLUDED.name,
       description = EXCLUDED.description,
@@ -4587,6 +4599,265 @@ GRANT SELECT, INSERT ON public.ban_appeals TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.ban_appeals TO service_role;
 
 -- ============================================================
+-- PROJECTS (M29) — ANP / monitoring-protocol polygons
+-- ============================================================
+-- A project is a named polygon (typically an ANP, reserve, or sampling
+-- grid) that observations are auto-tagged into when their location
+-- falls inside the polygon. Used by professional monitoring workflows
+-- (PROREST 2026, DRFSIPS) to filter / export per-protocol data.
+--
+-- Auto-tagging happens via a BEFORE INSERT/UPDATE trigger on
+-- observations: if location is set and project_id is null, find the
+-- first project whose polygon contains the point and assign it.
+--
+-- Privacy: project polygons are public by default but visibility=
+-- 'private' restricts membership-only. Observation→project linkage
+-- gates the same way (a public project's tagged observations remain
+-- subject to the existing obs_public_read predicate; private projects
+-- only expose their tagged observations to project_members rows).
+
+CREATE TABLE IF NOT EXISTS public.projects (
+  id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  slug            text NOT NULL UNIQUE
+                  CHECK (slug ~ '^[a-z0-9][a-z0-9-]{1,63}$'),
+  name            text NOT NULL CHECK (length(name) BETWEEN 1 AND 200),
+  name_es         text CHECK (length(name_es) BETWEEN 1 AND 200),
+  description     text CHECK (length(description) <= 4000),
+  description_es  text CHECK (length(description_es) <= 4000),
+  polygon         geography(MultiPolygon, 4326) NOT NULL,
+  visibility      text NOT NULL DEFAULT 'public'
+                  CHECK (visibility IN ('public','private')),
+  owner_user_id   uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  species_list    jsonb,                 -- optional whitelist (PROREST taxon IDs)
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  updated_at      timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_projects_polygon ON public.projects USING GIST(polygon);
+CREATE INDEX IF NOT EXISTS idx_projects_owner   ON public.projects(owner_user_id);
+CREATE INDEX IF NOT EXISTS idx_projects_visible ON public.projects(visibility);
+
+CREATE TABLE IF NOT EXISTS public.project_members (
+  project_id  uuid NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
+  user_id     uuid NOT NULL REFERENCES public.users(id)    ON DELETE CASCADE,
+  role        text NOT NULL DEFAULT 'member'
+              CHECK (role IN ('owner','validator','member')),
+  added_at    timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (project_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_project_members_user ON public.project_members(user_id);
+
+-- Denormalised project_id on observations. Auto-assigned by trigger
+-- when location is provided. Manual override allowed for cases where
+-- the GPS is fuzzy / outside the polygon by mistake.
+ALTER TABLE public.observations
+  ADD COLUMN IF NOT EXISTS project_id uuid REFERENCES public.projects(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_obs_project ON public.observations(project_id)
+  WHERE project_id IS NOT NULL;
+
+-- ── Auto-assign trigger ────────────────────────────────────────────
+-- Picks the first project whose polygon contains NEW.location.
+-- "First" is ordered by `created_at ASC` so the longest-lived project
+-- wins on overlap (operators with overlapping polygons should resolve
+-- by editing one or the other).
+CREATE OR REPLACE FUNCTION public.assign_observation_to_project()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  -- Honour explicit assignments (or unassignments) from the client.
+  IF NEW.project_id IS NOT NULL THEN
+    RETURN NEW;
+  END IF;
+  IF NEW.location IS NULL THEN
+    RETURN NEW;
+  END IF;
+  SELECT id INTO NEW.project_id
+    FROM public.projects
+   WHERE ST_Covers(polygon, NEW.location)
+   ORDER BY created_at ASC
+   LIMIT 1;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS assign_observation_to_project_trigger ON public.observations;
+CREATE TRIGGER assign_observation_to_project_trigger
+  BEFORE INSERT OR UPDATE OF location ON public.observations
+  FOR EACH ROW
+  EXECUTE FUNCTION public.assign_observation_to_project();
+
+-- ── RLS ──────────────────────────────────────────────────────────────
+ALTER TABLE public.projects        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.project_members ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS projects_public_read ON public.projects;
+CREATE POLICY projects_public_read ON public.projects
+  FOR SELECT
+  USING (
+    visibility = 'public'
+    OR owner_user_id = auth.uid()
+    OR EXISTS (
+      SELECT 1 FROM public.project_members
+       WHERE project_id = projects.id
+         AND user_id    = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS projects_owner_insert ON public.projects;
+CREATE POLICY projects_owner_insert ON public.projects
+  FOR INSERT TO authenticated
+  WITH CHECK (owner_user_id = auth.uid());
+
+DROP POLICY IF EXISTS projects_owner_update ON public.projects;
+CREATE POLICY projects_owner_update ON public.projects
+  FOR UPDATE TO authenticated
+  USING (owner_user_id = auth.uid())
+  WITH CHECK (owner_user_id = auth.uid());
+
+DROP POLICY IF EXISTS projects_owner_delete ON public.projects;
+CREATE POLICY projects_owner_delete ON public.projects
+  FOR DELETE TO authenticated
+  USING (owner_user_id = auth.uid());
+
+DROP POLICY IF EXISTS project_members_read ON public.project_members;
+CREATE POLICY project_members_read ON public.project_members
+  FOR SELECT
+  USING (
+    user_id = auth.uid()
+    OR EXISTS (
+      SELECT 1 FROM public.projects p
+       WHERE p.id = project_members.project_id
+         AND (p.visibility = 'public' OR p.owner_user_id = auth.uid())
+    )
+  );
+
+DROP POLICY IF EXISTS project_members_owner_write ON public.project_members;
+CREATE POLICY project_members_owner_write ON public.project_members
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.projects p
+       WHERE p.id = project_members.project_id
+         AND p.owner_user_id = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS project_members_owner_delete ON public.project_members;
+CREATE POLICY project_members_owner_delete ON public.project_members
+  FOR DELETE TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.projects p
+       WHERE p.id = project_members.project_id
+         AND p.owner_user_id = auth.uid()
+    )
+  );
+
+GRANT SELECT                        ON public.projects        TO anon, authenticated;
+GRANT INSERT, UPDATE, DELETE        ON public.projects        TO authenticated;
+GRANT SELECT                        ON public.project_members TO anon, authenticated;
+GRANT INSERT, DELETE                ON public.project_members TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.projects        TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.project_members TO service_role;
+
+-- ── Read view (RLS-respecting) with polygon as GeoJSON ──────────────
+-- A SECURITY INVOKER view: queries inherit the caller's RLS, so anon
+-- gets only public rows; owners + members see private + public; service
+-- role sees all. supabase-js consumers use this instead of selecting
+-- `polygon` directly (PostgREST returns geography as base64 WKB).
+CREATE OR REPLACE VIEW public.projects_with_geojson
+  WITH (security_invoker = true) AS
+SELECT
+  p.id,
+  p.slug,
+  p.name,
+  p.name_es,
+  p.description,
+  p.description_es,
+  p.visibility,
+  p.owner_user_id,
+  p.species_list,
+  p.created_at,
+  p.updated_at,
+  ST_AsGeoJSON(p.polygon)::jsonb           AS polygon_geojson,
+  ST_Area(p.polygon) / 1e6                 AS area_km2
+FROM public.projects p;
+
+GRANT SELECT ON public.projects_with_geojson TO anon, authenticated, service_role;
+
+-- ── Owner-scoped upsert RPC accepting GeoJSON text ──────────────────
+-- supabase-js can't write geography columns directly (PostgREST has no
+-- WKB encoder). The client passes GeoJSON; this RPC parses it and
+-- enforces owner_user_id = auth.uid() before INSERT/UPDATE. RLS still
+-- guards the underlying table — this just makes the write ergonomic.
+CREATE OR REPLACE FUNCTION public.upsert_project(
+  p_slug             text,
+  p_name             text,
+  p_name_es          text,
+  p_description      text,
+  p_description_es   text,
+  p_visibility       text,
+  p_polygon_geojson  jsonb
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_geom    geometry;
+  v_geog    geography;
+  v_uid     uuid := auth.uid();
+  v_owner   uuid;
+  v_id      uuid;
+BEGIN
+  IF v_uid IS NULL THEN
+    RAISE EXCEPTION 'auth required' USING ERRCODE = '42501';
+  END IF;
+  IF p_visibility NOT IN ('public','private') THEN
+    RAISE EXCEPTION 'visibility must be public|private' USING ERRCODE = '22023';
+  END IF;
+  v_geom := ST_SetSRID(ST_GeomFromGeoJSON(p_polygon_geojson::text), 4326);
+  -- Promote a Polygon to MultiPolygon so the column type is uniform.
+  IF GeometryType(v_geom) = 'POLYGON' THEN
+    v_geom := ST_Multi(v_geom);
+  END IF;
+  IF GeometryType(v_geom) <> 'MULTIPOLYGON' THEN
+    RAISE EXCEPTION 'GeoJSON must be Polygon or MultiPolygon' USING ERRCODE = '22023';
+  END IF;
+  v_geog := v_geom::geography;
+
+  -- Reject if the slug exists and isn't owned by the caller.
+  SELECT owner_user_id INTO v_owner
+    FROM public.projects WHERE slug = p_slug;
+  IF v_owner IS NOT NULL AND v_owner <> v_uid THEN
+    RAISE EXCEPTION 'slug taken' USING ERRCODE = '23505';
+  END IF;
+
+  INSERT INTO public.projects (
+    slug, name, name_es, description, description_es, visibility, owner_user_id, polygon
+  ) VALUES (
+    p_slug, p_name, p_name_es, p_description, p_description_es, p_visibility, v_uid, v_geog
+  )
+  ON CONFLICT (slug) DO UPDATE SET
+    name           = EXCLUDED.name,
+    name_es        = EXCLUDED.name_es,
+    description    = EXCLUDED.description,
+    description_es = EXCLUDED.description_es,
+    visibility     = EXCLUDED.visibility,
+    polygon        = EXCLUDED.polygon,
+    updated_at     = now()
+  RETURNING id INTO v_id;
+  RETURN v_id;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.upsert_project(text,text,text,text,text,text,jsonb) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.upsert_project(text,text,text,text,text,text,jsonb)
+  TO authenticated, service_role;
 -- ADMIN RATE LIMIT BUCKETS (PR11 — durable across isolates)
 -- ============================================================
 -- Token-bucket state for the admin Edge Function dispatcher.
@@ -4658,3 +4929,863 @@ END $$;
 
 REVOKE ALL ON FUNCTION public.consume_rate_limit_token(uuid, numeric, numeric, numeric) FROM public;
 GRANT EXECUTE ON FUNCTION public.consume_rate_limit_token(uuid, numeric, numeric, numeric) TO service_role;
+
+-- ============================================================
+-- ADMIN OBSERVABILITY (PR12 — Section C-2)
+-- ============================================================
+-- Three admin-only sinks fed by the dispatcher and a pair of cron jobs:
+--   * admin_anomalies        — automated anomaly detections from admin_audit
+--   * admin_health_digests   — weekly platform-health snapshots
+--   * function_errors        — Edge Function structured error sink
+--
+-- Read access is gated by has_role(auth.uid(),'admin'); writes happen via
+-- service_role only (cron / SECURITY DEFINER functions / Edge Functions).
+
+-- 1. audit_op enum extensions for the new actions
+DO $$ BEGIN
+  ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'anomaly_acknowledge';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'audit_export';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- 2. admin_anomalies — captures detections from admin_audit scans
+CREATE TABLE IF NOT EXISTS public.admin_anomalies (
+  id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  kind             text NOT NULL,
+  actor_id         uuid REFERENCES auth.users(id),
+  window_start     timestamptz NOT NULL,
+  window_end       timestamptz NOT NULL,
+  event_count      int NOT NULL,
+  details          jsonb NOT NULL DEFAULT '{}'::jsonb,
+  acknowledged_at  timestamptz,
+  acknowledged_by  uuid REFERENCES auth.users(id),
+  ack_notes        text,
+  created_at       timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT admin_anomalies_unique_window UNIQUE (kind, actor_id, window_start)
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_anomalies_actor
+  ON public.admin_anomalies (actor_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_admin_anomalies_unack
+  ON public.admin_anomalies (acknowledged_at NULLS FIRST, created_at DESC);
+
+ALTER TABLE public.admin_anomalies ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS admin_anomalies_admin_read ON public.admin_anomalies;
+CREATE POLICY admin_anomalies_admin_read ON public.admin_anomalies
+  FOR SELECT TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'));
+
+DROP POLICY IF EXISTS admin_anomalies_no_client_write ON public.admin_anomalies;
+CREATE POLICY admin_anomalies_no_client_write ON public.admin_anomalies
+  FOR ALL TO authenticated
+  USING (false) WITH CHECK (false);
+
+GRANT SELECT                          ON public.admin_anomalies TO authenticated;
+GRANT SELECT, INSERT, UPDATE          ON public.admin_anomalies TO service_role;
+
+-- 3. admin_health_digests — weekly snapshots
+CREATE TABLE IF NOT EXISTS public.admin_health_digests (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  period_start  timestamptz NOT NULL,
+  period_end    timestamptz NOT NULL,
+  metrics       jsonb NOT NULL,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT admin_health_digests_unique_period UNIQUE (period_start, period_end)
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_health_digests_period
+  ON public.admin_health_digests (period_end DESC);
+
+ALTER TABLE public.admin_health_digests ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS admin_health_digests_admin_read ON public.admin_health_digests;
+CREATE POLICY admin_health_digests_admin_read ON public.admin_health_digests
+  FOR SELECT TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'));
+
+DROP POLICY IF EXISTS admin_health_digests_no_client_write ON public.admin_health_digests;
+CREATE POLICY admin_health_digests_no_client_write ON public.admin_health_digests
+  FOR ALL TO authenticated
+  USING (false) WITH CHECK (false);
+
+GRANT SELECT                          ON public.admin_health_digests TO authenticated;
+GRANT SELECT, INSERT                  ON public.admin_health_digests TO service_role;
+
+-- 4. function_errors — Edge Function structured error sink
+CREATE TABLE IF NOT EXISTS public.function_errors (
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  function_name  text NOT NULL,
+  code           text NOT NULL,
+  actor_id       uuid,
+  context        jsonb NOT NULL DEFAULT '{}'::jsonb,
+  error_message  text,
+  created_at     timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_function_errors_fn
+  ON public.function_errors (function_name, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_function_errors_code
+  ON public.function_errors (code, created_at DESC);
+
+ALTER TABLE public.function_errors ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS function_errors_admin_read ON public.function_errors;
+CREATE POLICY function_errors_admin_read ON public.function_errors
+  FOR SELECT TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'));
+
+DROP POLICY IF EXISTS function_errors_no_client_write ON public.function_errors;
+CREATE POLICY function_errors_no_client_write ON public.function_errors
+  FOR ALL TO authenticated
+  USING (false) WITH CHECK (false);
+
+GRANT SELECT                          ON public.function_errors TO authenticated;
+GRANT SELECT, INSERT                  ON public.function_errors TO service_role;
+
+-- 5. detect_admin_anomalies — runs hourly via pg_cron, surfaces three rules.
+--
+--   * High rate     — > 50 admin_audit rows from one actor in any rolling
+--                     1-hour window in the last hour.
+--   * Bulk delete   — > 10 actions whose op text contains 'hide', 'revoke',
+--                     'ban', or 'delete' in the last hour from one actor.
+--   * Off-hours     — >= 5 actions outside 06:00–22:00 in the actor's
+--                     local time (PR14: respects users.timezone, falls
+--                     back to UTC when NULL).
+--
+-- Each detection is INSERTed into admin_anomalies with ON CONFLICT DO NOTHING
+-- on (kind, actor_id, window_start) so re-runs over an overlapping window
+-- are idempotent. The window_start is truncated to the hour so a single
+-- detection per actor+kind+hour is the natural deduplication key.
+CREATE OR REPLACE FUNCTION public.detect_admin_anomalies()
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_now     timestamptz := now();
+  v_start   timestamptz := date_trunc('hour', v_now) - interval '1 hour';
+  v_end     timestamptz := date_trunc('hour', v_now);
+BEGIN
+  -- High rate: > 50 rows in [v_start, v_end) from one actor.
+  INSERT INTO public.admin_anomalies (kind, actor_id, window_start, window_end, event_count, details)
+  SELECT
+    'high_rate',
+    actor_id,
+    v_start,
+    v_end,
+    count(*),
+    jsonb_build_object('threshold', 50)
+  FROM public.admin_audit
+  WHERE created_at >= v_start AND created_at < v_end
+  GROUP BY actor_id
+  HAVING count(*) > 50
+  ON CONFLICT (kind, actor_id, window_start) DO NOTHING;
+
+  -- Bulk delete: > 10 destructive-ish ops from one actor in the window.
+  INSERT INTO public.admin_anomalies (kind, actor_id, window_start, window_end, event_count, details)
+  SELECT
+    'bulk_delete',
+    actor_id,
+    v_start,
+    v_end,
+    count(*),
+    jsonb_build_object(
+      'threshold', 10,
+      'ops_seen', array_agg(DISTINCT op::text)
+    )
+  FROM public.admin_audit
+  WHERE created_at >= v_start AND created_at < v_end
+    AND (
+      op::text LIKE '%hide%'   OR
+      op::text LIKE '%revoke%' OR
+      op::text LIKE '%ban%'    OR
+      op::text LIKE '%delete%'
+    )
+  GROUP BY actor_id
+  HAVING count(*) > 10
+  ON CONFLICT (kind, actor_id, window_start) DO NOTHING;
+
+  -- Off-hours: >= 5 actions outside 06:00–22:00 in the actor's local
+  -- timezone (PR14). users.timezone is consulted via LEFT JOIN so admins
+  -- without a configured tz fall back to UTC. The detail row records the
+  -- evaluated zone for forensics.
+  INSERT INTO public.admin_anomalies (kind, actor_id, window_start, window_end, event_count, details)
+  SELECT
+    'off_hours',
+    a.actor_id,
+    v_start,
+    v_end,
+    count(*),
+    jsonb_build_object(
+      'threshold', 5,
+      'allowed_hours_local', '06:00-22:00',
+      'tz', COALESCE(u.timezone, 'UTC')
+    )
+  FROM public.admin_audit a
+  LEFT JOIN public.users u ON u.id = a.actor_id
+  WHERE a.created_at >= v_start AND a.created_at < v_end
+    AND (
+      EXTRACT(HOUR FROM a.created_at AT TIME ZONE COALESCE(u.timezone, 'UTC')) < 6
+      OR EXTRACT(HOUR FROM a.created_at AT TIME ZONE COALESCE(u.timezone, 'UTC')) >= 22
+    )
+  GROUP BY a.actor_id, u.timezone
+  HAVING count(*) >= 5
+  ON CONFLICT (kind, actor_id, window_start) DO NOTHING;
+END $$;
+
+REVOKE ALL ON FUNCTION public.detect_admin_anomalies() FROM public;
+GRANT EXECUTE ON FUNCTION public.detect_admin_anomalies() TO service_role;
+
+-- 6. compute_admin_health_digest — runs weekly via pg_cron. Aggregates a set
+-- of platform metrics for the previous 7 days and inserts one row into
+-- admin_health_digests. ON CONFLICT DO NOTHING keeps re-runs idempotent.
+CREATE OR REPLACE FUNCTION public.compute_admin_health_digest()
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_period_end   timestamptz := now();
+  v_period_start timestamptz := v_period_end - interval '7 days';
+  v_metrics      jsonb;
+BEGIN
+  SELECT jsonb_build_object(
+    'admin_actions',     COALESCE((
+      SELECT count(*)::bigint FROM public.admin_audit
+      WHERE created_at >= v_period_start AND created_at < v_period_end
+    ), 0),
+    'bans_issued',       COALESCE((
+      SELECT count(*)::bigint FROM public.user_bans
+      WHERE created_at >= v_period_start AND created_at < v_period_end
+    ), 0),
+    'bans_lifted',       COALESCE((
+      SELECT count(*)::bigint FROM public.user_bans
+      WHERE revoked_at IS NOT NULL
+        AND revoked_at >= v_period_start AND revoked_at < v_period_end
+    ), 0),
+    'appeals_open',      COALESCE((
+      SELECT count(*)::bigint FROM public.ban_appeals
+      WHERE status = 'pending'
+    ), 0),
+    'reports_open',      COALESCE((
+      SELECT count(*)::bigint FROM public.reports
+      WHERE status IN ('open', 'triaged')
+    ), 0),
+    'anomalies_unack',   COALESCE((
+      SELECT count(*)::bigint FROM public.admin_anomalies
+      WHERE acknowledged_at IS NULL
+    ), 0),
+    'function_errors_7d', COALESCE((
+      SELECT count(*)::bigint FROM public.function_errors
+      WHERE created_at >= v_period_start AND created_at < v_period_end
+    ), 0)
+  ) INTO v_metrics;
+
+  INSERT INTO public.admin_health_digests (period_start, period_end, metrics)
+  VALUES (v_period_start, v_period_end, v_metrics)
+  ON CONFLICT (period_start, period_end) DO NOTHING;
+END $$;
+
+REVOKE ALL ON FUNCTION public.compute_admin_health_digest() FROM public;
+GRANT EXECUTE ON FUNCTION public.compute_admin_health_digest() TO service_role;
+
+-- ═════════════════════════════════════════════════════════════════════
+-- PR13 — Future-proofing primitives
+-- See docs/runbooks/admin-time-bounded-roles.md
+-- See docs/runbooks/admin-two-person-rule.md
+-- See docs/runbooks/admin-webhooks.md
+-- See docs/runbooks/admin-trust-scores.md
+-- ═════════════════════════════════════════════════════════════════════
+
+-- 1. Time-bounded role grants
+-- ─────────────────────────────────────────────────────────────────────
+-- Adds expires_at + auto_revoke_reason to user_roles. has_role() rewrites
+-- to also check (expires_at IS NULL OR expires_at > now()). A daily cron
+-- (auto-revoke-expired-roles-daily) runs auto_revoke_expired_roles() to
+-- soft-revoke any role rows past expiry and write an admin_audit row.
+
+ALTER TABLE public.user_roles
+  ADD COLUMN IF NOT EXISTS expires_at         timestamptz;
+ALTER TABLE public.user_roles
+  ADD COLUMN IF NOT EXISTS auto_revoke_reason text;
+
+CREATE INDEX IF NOT EXISTS user_roles_expires_at_idx
+  ON public.user_roles (expires_at)
+  WHERE expires_at IS NOT NULL AND revoked_at IS NULL;
+
+-- has_role() now treats expires_at the same as a future-dated revoked_at:
+-- both gate the role to "currently active". The original revoked_at clause
+-- is preserved for backwards compatibility (admin manual revocation path).
+CREATE OR REPLACE FUNCTION public.has_role(uid uuid, r public.user_role)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.user_roles
+    WHERE user_id = uid
+      AND role = r
+      AND (revoked_at IS NULL OR revoked_at > now())
+      AND (expires_at IS NULL OR expires_at > now())
+  );
+$$;
+REVOKE ALL ON FUNCTION public.has_role(uuid, public.user_role) FROM public;
+GRANT EXECUTE ON FUNCTION public.has_role(uuid, public.user_role) TO authenticated, service_role;
+
+CREATE OR REPLACE FUNCTION public.auto_revoke_expired_roles()
+RETURNS int
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_now timestamptz := now();
+  v_row record;
+  v_count int := 0;
+  v_actor uuid;
+BEGIN
+  -- The cron job has no actor_id; we record a fixed sentinel via a NULL
+  -- actor in details->>'auto'. admin_audit.actor_id is NOT NULL, so we
+  -- need a placeholder — we resolve to the granting admin so the audit
+  -- trail still ties back to a real human. If granted_by is NULL (rare,
+  -- legacy rows), we fall back to the user_id itself.
+  FOR v_row IN
+    SELECT user_id, role, granted_by, expires_at
+      FROM public.user_roles
+     WHERE revoked_at IS NULL
+       AND expires_at IS NOT NULL
+       AND expires_at <= v_now
+  LOOP
+    UPDATE public.user_roles
+       SET revoked_at         = v_now,
+           auto_revoke_reason = 'expired'
+     WHERE user_id = v_row.user_id
+       AND role    = v_row.role
+       AND revoked_at IS NULL;
+
+    v_actor := COALESCE(v_row.granted_by, v_row.user_id);
+    INSERT INTO public.admin_audit (actor_id, op, target_type, target_id, before, after, reason)
+    VALUES (
+      v_actor,
+      'role_revoke',
+      'user',
+      v_row.user_id::text,
+      jsonb_build_object('role', v_row.role, 'expires_at', v_row.expires_at),
+      jsonb_build_object('revoked_at', v_now, 'auto_revoke_reason', 'expired'),
+      'auto-revoke: role grant expired'
+    );
+
+    v_count := v_count + 1;
+  END LOOP;
+
+  RETURN v_count;
+END $$;
+
+REVOKE ALL ON FUNCTION public.auto_revoke_expired_roles() FROM public;
+GRANT EXECUTE ON FUNCTION public.auto_revoke_expired_roles() TO service_role;
+
+-- 2. Two-person rule on irreversible actions
+-- ─────────────────────────────────────────────────────────────────────
+-- New table admin_action_proposals stores pending irreversible actions.
+-- Approver MUST differ from proposer (handler-side check). Proposals
+-- expire after 24h; expire_stale_proposals() flips status to 'expired'.
+
+DO $$ BEGIN
+  ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'proposal_create';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'proposal_approve';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'proposal_reject';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS public.admin_action_proposals (
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  proposer_id         uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  op                  public.audit_op NOT NULL,
+  target_type         text NOT NULL,
+  target_id           text NOT NULL,
+  payload             jsonb NOT NULL,
+  reason              text NOT NULL,
+  status              text NOT NULL DEFAULT 'pending'
+                      CHECK (status IN ('pending', 'approved', 'rejected', 'expired', 'executed')),
+  approver_id         uuid REFERENCES auth.users(id),
+  approved_at         timestamptz,
+  rejected_at         timestamptz,
+  executed_at         timestamptz,
+  executed_audit_id   bigint REFERENCES public.admin_audit(id),
+  expires_at          timestamptz NOT NULL DEFAULT (now() + interval '24 hours'),
+  created_at          timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_action_proposals_status_created
+  ON public.admin_action_proposals (status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_admin_action_proposals_proposer
+  ON public.admin_action_proposals (proposer_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_admin_action_proposals_expires
+  ON public.admin_action_proposals (expires_at)
+  WHERE status = 'pending';
+
+ALTER TABLE public.admin_action_proposals ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS admin_action_proposals_admin_read ON public.admin_action_proposals;
+CREATE POLICY admin_action_proposals_admin_read ON public.admin_action_proposals
+  FOR SELECT TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'));
+
+DROP POLICY IF EXISTS admin_action_proposals_no_client_write ON public.admin_action_proposals;
+CREATE POLICY admin_action_proposals_no_client_write ON public.admin_action_proposals
+  FOR ALL TO authenticated
+  USING (false) WITH CHECK (false);
+
+GRANT SELECT                          ON public.admin_action_proposals TO authenticated;
+GRANT SELECT, INSERT, UPDATE          ON public.admin_action_proposals TO service_role;
+
+CREATE OR REPLACE FUNCTION public.expire_stale_proposals()
+RETURNS int
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_count int;
+BEGIN
+  WITH updated AS (
+    UPDATE public.admin_action_proposals
+       SET status = 'expired'
+     WHERE status = 'pending'
+       AND expires_at <= now()
+    RETURNING id
+  )
+  SELECT count(*)::int INTO v_count FROM updated;
+  RETURN v_count;
+END $$;
+
+REVOKE ALL ON FUNCTION public.expire_stale_proposals() FROM public;
+GRANT EXECUTE ON FUNCTION public.expire_stale_proposals() TO service_role;
+
+-- 3. Webhook subscriptions
+-- ─────────────────────────────────────────────────────────────────────
+-- admin_webhooks: per-subscription URL + event filter + HMAC secret.
+-- admin_webhook_deliveries: append-only delivery log (debugging + retry
+-- planning). dispatch_admin_webhooks(event, payload) is a SECURITY DEFINER
+-- helper that pg_net's a POST to every enabled, matching subscription
+-- and disables the subscription after 10 consecutive failures.
+
+DO $$ BEGIN
+  ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'webhook_create';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'webhook_update';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'webhook_delete';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'webhook_test';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS public.admin_webhooks (
+  id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  url                  text NOT NULL CHECK (url ~ '^https://'),
+  events               text[] NOT NULL,
+  secret               text NOT NULL,
+  enabled              boolean NOT NULL DEFAULT true,
+  created_by           uuid NOT NULL REFERENCES auth.users(id),
+  last_delivery_at     timestamptz,
+  last_delivery_status int,
+  consecutive_failures int NOT NULL DEFAULT 0,
+  created_at           timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_webhooks_enabled
+  ON public.admin_webhooks (enabled)
+  WHERE enabled = true;
+
+ALTER TABLE public.admin_webhooks ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS admin_webhooks_admin_read ON public.admin_webhooks;
+CREATE POLICY admin_webhooks_admin_read ON public.admin_webhooks
+  FOR SELECT TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'));
+
+DROP POLICY IF EXISTS admin_webhooks_no_client_write ON public.admin_webhooks;
+CREATE POLICY admin_webhooks_no_client_write ON public.admin_webhooks
+  FOR ALL TO authenticated
+  USING (false) WITH CHECK (false);
+
+GRANT SELECT                          ON public.admin_webhooks TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE  ON public.admin_webhooks TO service_role;
+
+CREATE TABLE IF NOT EXISTS public.admin_webhook_deliveries (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  webhook_id   uuid NOT NULL REFERENCES public.admin_webhooks(id) ON DELETE CASCADE,
+  event        text NOT NULL,
+  payload      jsonb NOT NULL,
+  attempted_at timestamptz NOT NULL DEFAULT now(),
+  status_code  int,
+  error        text
+);
+
+-- PR14: replay protection columns. nonce is stamped into the signed body
+-- as _meta.nonce so receivers can dedupe; request_id is the bigint
+-- pg_net.http_post returns, persisted so reconcile_webhook_deliveries()
+-- can later JOIN against net._http_response and write back the resolved
+-- status_code (pg_net is fire-and-forget, so the synchronous INSERT into
+-- this table cannot capture the response).
+ALTER TABLE public.admin_webhook_deliveries
+  ADD COLUMN IF NOT EXISTS nonce      text NOT NULL DEFAULT gen_random_uuid()::text,
+  ADD COLUMN IF NOT EXISTS request_id bigint;
+
+CREATE INDEX IF NOT EXISTS idx_admin_webhook_deliveries_webhook
+  ON public.admin_webhook_deliveries (webhook_id, attempted_at DESC);
+
+-- Partial index drives the reconcile cron's hot-path lookup.
+CREATE INDEX IF NOT EXISTS idx_admin_webhook_deliveries_pending
+  ON public.admin_webhook_deliveries (request_id)
+  WHERE status_code IS NULL AND request_id IS NOT NULL;
+
+ALTER TABLE public.admin_webhook_deliveries ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS admin_webhook_deliveries_admin_read ON public.admin_webhook_deliveries;
+CREATE POLICY admin_webhook_deliveries_admin_read ON public.admin_webhook_deliveries
+  FOR SELECT TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'));
+
+DROP POLICY IF EXISTS admin_webhook_deliveries_no_client_write ON public.admin_webhook_deliveries;
+CREATE POLICY admin_webhook_deliveries_no_client_write ON public.admin_webhook_deliveries
+  FOR ALL TO authenticated
+  USING (false) WITH CHECK (false);
+
+GRANT SELECT                          ON public.admin_webhook_deliveries TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE  ON public.admin_webhook_deliveries TO service_role;
+
+-- HMAC-SHA256 signing helper. pgcrypto provides hmac() with the right
+-- semantics; we hex-encode the digest because it's slightly more
+-- ergonomic for verification on the receiver side than base64.
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+CREATE OR REPLACE FUNCTION public.dispatch_admin_webhooks(p_event text, p_payload jsonb)
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_row record;
+  v_body          text;
+  v_signed_payload jsonb;
+  v_event_id       text;
+  v_nonce          text;
+  v_timestamp      text;
+  v_sig  text;
+  v_request_id bigint;
+BEGIN
+  -- PR14 replay protection: stamp _meta into the signed payload so the
+  -- HMAC commits to a specific (event_id, nonce, timestamp) tuple.
+  -- Receivers dedupe on event_id and reject when timestamp drifts more
+  -- than ~5 minutes. event_id is generated per dispatch so two webhooks
+  -- subscribed to the same trigger see the same event_id.
+  v_event_id  := gen_random_uuid()::text;
+  v_timestamp := to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"');
+
+  FOR v_row IN
+    SELECT id, url, secret
+      FROM public.admin_webhooks
+     WHERE enabled = true
+       AND p_event = ANY (events)
+  LOOP
+    -- Per-delivery nonce so a body signed for webhook A cannot be
+    -- replayed against webhook B and pass dedupe.
+    v_nonce := gen_random_uuid()::text;
+    v_signed_payload := p_payload || jsonb_build_object(
+      '_meta', jsonb_build_object(
+        'event_id',  v_event_id,
+        'event',     p_event,
+        'timestamp', v_timestamp,
+        'nonce',     v_nonce,
+        'version',   1
+      )
+    );
+    v_body := v_signed_payload::text;
+    v_sig := encode(
+      hmac(v_body::bytea, v_row.secret::bytea, 'sha256'),
+      'hex'
+    );
+
+    BEGIN
+      v_request_id := net.http_post(
+        url     := v_row.url,
+        headers := jsonb_build_object(
+          'Content-Type', 'application/json',
+          'X-Rastrum-Signature', 'sha256=' || v_sig,
+          'X-Rastrum-Event',     p_event,
+          'X-Rastrum-Event-Id',  v_event_id,
+          'X-Rastrum-Timestamp', v_timestamp,
+          'X-Rastrum-Nonce',     v_nonce
+        ),
+        body    := v_signed_payload
+      );
+
+      INSERT INTO public.admin_webhook_deliveries (webhook_id, event, payload, nonce, request_id)
+      VALUES (v_row.id, p_event, v_signed_payload, v_nonce, v_request_id);
+
+      UPDATE public.admin_webhooks
+         SET last_delivery_at  = now(),
+             consecutive_failures = 0
+       WHERE id = v_row.id;
+    EXCEPTION WHEN OTHERS THEN
+      INSERT INTO public.admin_webhook_deliveries (webhook_id, event, payload, nonce, error)
+      VALUES (v_row.id, p_event, v_signed_payload, v_nonce, SQLERRM);
+
+      UPDATE public.admin_webhooks
+         SET last_delivery_at     = now(),
+             consecutive_failures = consecutive_failures + 1,
+             enabled              = (consecutive_failures + 1 < 10)
+       WHERE id = v_row.id;
+    END;
+  END LOOP;
+END $$;
+
+REVOKE ALL ON FUNCTION public.dispatch_admin_webhooks(text, jsonb) FROM public;
+GRANT EXECUTE ON FUNCTION public.dispatch_admin_webhooks(text, jsonb) TO service_role;
+
+-- PR14: reconcile webhook deliveries by joining the pending rows against
+-- pg_net's internal _http_response table. dispatch_admin_webhooks() is
+-- fire-and-forget by design (pg_net.http_post returns immediately with a
+-- bigint request id); the response lands later in net._http_response. A
+-- cron at every 2 minutes calls this function to write status_code +
+-- error back into admin_webhook_deliveries and bump the parent webhook's
+-- consecutive_failures counter / last_delivery_status. Idempotent —
+-- skips rows that already have a status_code.
+CREATE OR REPLACE FUNCTION public.reconcile_webhook_deliveries()
+RETURNS int
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, net
+AS $$
+DECLARE
+  v_updated int := 0;
+BEGIN
+  -- Resolve pending deliveries against net._http_response. Mark the
+  -- webhook's last_delivery_status from the freshest result; bump
+  -- consecutive_failures when status_code is in 4xx/5xx or NULL after
+  -- timeout. The cron's 2-minute cadence + pg_net's default 5s timeout
+  -- means a true unreachable receiver lands in the failure branch
+  -- within ~3 minutes.
+  WITH pending AS (
+    SELECT d.id           AS delivery_id,
+           d.webhook_id   AS webhook_id,
+           d.request_id   AS request_id,
+           r.status_code  AS resp_status,
+           r.error_msg    AS resp_error,
+           r.timed_out    AS resp_timed_out
+      FROM public.admin_webhook_deliveries d
+      JOIN net._http_response r ON r.id = d.request_id
+     WHERE d.status_code IS NULL
+       AND d.request_id IS NOT NULL
+  ),
+  upd AS (
+    UPDATE public.admin_webhook_deliveries d
+       SET status_code = p.resp_status,
+           error       = COALESCE(p.resp_error,
+                                  CASE WHEN p.resp_timed_out THEN 'timeout' END,
+                                  d.error)
+      FROM pending p
+     WHERE d.id = p.delivery_id
+    RETURNING d.id, d.webhook_id, d.status_code
+  )
+  SELECT count(*)::int INTO v_updated FROM upd;
+
+  -- Bump consecutive_failures on the parent webhook for any 4xx/5xx /
+  -- NULL status_code resolutions. 2xx/3xx resolutions reset the counter.
+  -- Done in a second pass so the WITH ... RETURNING above stays simple.
+  UPDATE public.admin_webhooks w
+     SET last_delivery_status = sub.status_code,
+         consecutive_failures = CASE
+           WHEN sub.status_code BETWEEN 200 AND 399 THEN 0
+           ELSE w.consecutive_failures + 1
+         END,
+         enabled = CASE
+           WHEN sub.status_code BETWEEN 200 AND 399 THEN w.enabled
+           ELSE (w.consecutive_failures + 1 < 10)
+         END
+    FROM (
+      SELECT DISTINCT ON (d.webhook_id)
+             d.webhook_id, d.status_code
+        FROM public.admin_webhook_deliveries d
+       WHERE d.status_code IS NOT NULL
+         AND d.attempted_at >= now() - interval '10 minutes'
+       ORDER BY d.webhook_id, d.attempted_at DESC
+    ) sub
+   WHERE w.id = sub.webhook_id;
+
+  RETURN v_updated;
+END $$;
+
+REVOKE ALL ON FUNCTION public.reconcile_webhook_deliveries() FROM public;
+GRANT EXECUTE ON FUNCTION public.reconcile_webhook_deliveries() TO service_role;
+
+-- Triggers — fan out from anomaly creation + privileged audit ops to
+-- subscribed webhooks. AFTER INSERT keeps the dispatch out of the
+-- critical-path commit; failures inside dispatch_admin_webhooks() are
+-- swallowed and logged to admin_webhook_deliveries.
+CREATE OR REPLACE FUNCTION public.admin_anomalies_dispatch_trigger()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  PERFORM public.dispatch_admin_webhooks('anomaly_created', to_jsonb(NEW));
+  RETURN NEW;
+END $$;
+
+DROP TRIGGER IF EXISTS admin_anomalies_dispatch ON public.admin_anomalies;
+CREATE TRIGGER admin_anomalies_dispatch
+AFTER INSERT ON public.admin_anomalies
+FOR EACH ROW EXECUTE FUNCTION public.admin_anomalies_dispatch_trigger();
+
+CREATE OR REPLACE FUNCTION public.admin_audit_dispatch_trigger()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_event text;
+BEGIN
+  v_event := CASE NEW.op::text
+    WHEN 'user_ban'      THEN 'user_banned'
+    WHEN 'user_unban'    THEN 'user_unbanned'
+    WHEN 'role_grant'    THEN 'role_granted'
+    WHEN 'role_revoke'   THEN 'role_revoked'
+    ELSE NULL
+  END;
+  IF v_event IS NOT NULL THEN
+    PERFORM public.dispatch_admin_webhooks(v_event, to_jsonb(NEW));
+  END IF;
+  RETURN NEW;
+END $$;
+
+DROP TRIGGER IF EXISTS admin_audit_dispatch ON public.admin_audit;
+CREATE TRIGGER admin_audit_dispatch
+AFTER INSERT ON public.admin_audit
+FOR EACH ROW EXECUTE FUNCTION public.admin_audit_dispatch_trigger();
+
+-- 4. Moderator trust score (v1.1 — PR14)
+-- ─────────────────────────────────────────────────────────────────────
+-- !! Any change to this function MUST bump the version comment in
+-- !! `docs/runbooks/admin-trust-scores.md` AND ship a runbook entry
+-- !! explaining the rationale. Trust scores are surfaced to admins;
+-- !! silent reformulations would be confusing and unfair.
+--
+-- Version: 1.1 (2026-04-29)
+--
+-- Formula (weighted sum, clamped to 0..100):
+--   base               = 70
+--   anomaly_factor     = -8 × unack_anomalies_last_30d  (older anomalies
+--                        decay to zero weight)
+--   overturn_penalty   = -25 × overturn_rate            (where overturn_rate
+--                        is the fraction of report.dismiss actions
+--                        reversed by a *different* moderator within 7 days)
+--   action_volume      = +30 × min(1, sqrt(active_days_last_90d / 30))
+--                        (rewards consistency without rewarding raw
+--                        bursts; capped at +30)
+--   recency_bonus      = +5 if the moderator acted in the last 7 days
+--
+-- Returns NULL when the user is neither moderator nor admin.
+
+CREATE OR REPLACE FUNCTION public.compute_moderator_trust_score(p_user_id uuid)
+RETURNS numeric
+LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_unack             int;
+  v_dismiss_total     int;
+  v_dismiss_overturned int;
+  v_overturn_rate     numeric := 0.0;
+  v_active_days       int;
+  v_recent_action     boolean;
+  v_score             numeric;
+BEGIN
+  IF NOT (public.has_role(p_user_id, 'moderator') OR public.has_role(p_user_id, 'admin')) THEN
+    RETURN NULL;
+  END IF;
+
+  -- Anomaly factor: only the last 30 days at full weight; older
+  -- unacknowledged anomalies don't penalise indefinitely.
+  SELECT count(*)::int INTO v_unack
+    FROM public.admin_anomalies
+   WHERE actor_id = p_user_id
+     AND acknowledged_at IS NULL
+     AND created_at >= now() - interval '30 days';
+
+  -- Overturn rate: report.dismiss actions taken by this moderator that
+  -- were subsequently re-opened or resolved by a *different*
+  -- moderator within 7 days. We approximate "overturned" as: the same
+  -- target_id received a later report_resolve audit row from a
+  -- different actor inside the 7-day window.
+  SELECT count(*)::int INTO v_dismiss_total
+    FROM public.admin_audit
+   WHERE actor_id = p_user_id
+     AND op::text = 'report_dismiss'
+     AND created_at >= now() - interval '90 days';
+
+  IF v_dismiss_total > 0 THEN
+    SELECT count(DISTINCT a.id)::int INTO v_dismiss_overturned
+      FROM public.admin_audit a
+     WHERE a.actor_id = p_user_id
+       AND a.op::text = 'report_dismiss'
+       AND a.created_at >= now() - interval '90 days'
+       AND EXISTS (
+         SELECT 1 FROM public.admin_audit b
+          WHERE b.target_id   = a.target_id
+            AND b.target_type = a.target_type
+            AND b.actor_id   <> p_user_id
+            AND b.op::text   = 'report_resolve'
+            AND b.created_at >  a.created_at
+            AND b.created_at <= a.created_at + interval '7 days'
+       );
+    v_overturn_rate := v_dismiss_overturned::numeric / v_dismiss_total::numeric;
+  END IF;
+
+  -- Action volume: count of distinct days the moderator wrote at least
+  -- one admin_audit row in the last 90. The sqrt-then-cap shape rewards
+  -- consistency (5 days → ~ +12, 30 days → +30) without giving infinite
+  -- credit for an admin who handled 1 ticket every day for years.
+  SELECT count(DISTINCT date_trunc('day', created_at))::int INTO v_active_days
+    FROM public.admin_audit
+   WHERE actor_id = p_user_id
+     AND created_at >= now() - interval '90 days';
+
+  -- Recency: did they act at all in the last 7 days?
+  SELECT EXISTS (
+    SELECT 1 FROM public.admin_audit
+     WHERE actor_id = p_user_id
+       AND created_at >= now() - interval '7 days'
+  ) INTO v_recent_action;
+
+  v_score :=  70.0
+            -  8.0 * v_unack
+            - 25.0 * v_overturn_rate
+            + 30.0 * least(1.0, sqrt(v_active_days::numeric / 30.0))
+            + (CASE WHEN v_recent_action THEN 5.0 ELSE 0.0 END);
+
+  RETURN greatest(0.0, least(100.0, v_score));
+END $$;
+
+REVOKE ALL ON FUNCTION public.compute_moderator_trust_score(uuid) FROM public;
+GRANT EXECUTE ON FUNCTION public.compute_moderator_trust_score(uuid) TO authenticated, service_role;
+
+CREATE OR REPLACE VIEW public.moderator_trust_scores AS
+SELECT u.id AS user_id,
+       u.username,
+       u.display_name,
+       public.compute_moderator_trust_score(u.id) AS trust_score
+  FROM public.users u
+ WHERE EXISTS (
+   SELECT 1 FROM public.user_roles ur
+    WHERE ur.user_id = u.id
+      AND ur.role IN ('moderator', 'admin')
+      AND (ur.revoked_at IS NULL OR ur.revoked_at > now())
+      AND (ur.expires_at IS NULL OR ur.expires_at > now())
+ );
+
+GRANT SELECT ON public.moderator_trust_scores TO authenticated;

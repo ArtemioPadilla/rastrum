@@ -746,7 +746,7 @@
           "id": "admin-console-foundation",
           "label": "Admin/Moderator/Expert console — PR1 foundation (schema + chrome + Edge Function + Overview/Experts/Audit tabs)",
           "label_es": "Consola Admin/Moderador/Experto — PR1 base (esquema + chrome + Edge Function + tabs Resumen/Expertos/Auditoría)",
-          "done": false
+          "done": true
         },
         {
           "id": "ai-sponsorships",
@@ -782,7 +782,7 @@
           "id": "admin-console-pr6-expert",
           "label": "Console — PR6 (Expert console: Overview, Validation queue, Your expertise)",
           "label_es": "Consola — PR6 (Consola de experto: Resumen, Cola de validación, Tu experiencia)",
-          "done": false
+          "done": true
         },
         {
           "id": "admin-overview-real-kpis",
@@ -800,7 +800,43 @@
           "id": "admin-console-pr8-hardening",
           "label": "Admin console PR8 — CORS tighten + token-bucket rate limit + pgTAP RLS suite + 5 write handlers + DB-backed feature flags + karma config tables",
           "label_es": "Consola admin PR8 — CORS estricto + rate limit token-bucket + pgTAP RLS + 5 handlers de escritura + feature flags en DB + tablas de config de karma",
-          "done": false
+          "done": true
+        },
+        {
+          "id": "admin-console-pr9-quick-actions",
+          "label": "Admin console PR9 — admin/mod UX (reason templates + URL filter state + g-prefix keybindings + mobile sticky bottom-sheet)",
+          "label_es": "Consola admin PR9 — UX admin/moderador (plantillas de motivo + filtros en URL + atajos g- + bottom-sheet móvil)",
+          "done": true
+        },
+        {
+          "id": "admin-console-pr10-subject-ux",
+          "label": "Admin console PR10 — subject UX (ban banner + appeals workflow + comment lock + hidden-obs owner badge)",
+          "label_es": "Consola admin PR10 — UX del afectado (banner de baneo + apelaciones + bloqueo de comentarios + insignia de obs oculta)",
+          "done": true
+        },
+        {
+          "id": "admin-console-pr11-engineering",
+          "label": "Admin console PR11 — engineering hygiene (Postgres-backed token bucket RPC + /console flash polish + handler-registry consistency test)",
+          "label_es": "Consola admin PR11 — higiene de ingeniería (RPC token bucket en Postgres + pulido de flash en /console + test de consistencia del registro)",
+          "done": true
+        },
+        {
+          "id": "admin-console-pr12-observability",
+          "label": "Admin console PR12 — observability (anomaly detection cron + weekly health digest + forensics CSV export + structured function_errors sink)",
+          "label_es": "Consola admin PR12 — observabilidad (cron de anomalías + resumen semanal + exportación forense CSV + sink estructurado de errores)",
+          "done": true
+        },
+        {
+          "id": "admin-console-pr13-future-proofing",
+          "label": "Admin console PR13 — future-proofing (time-bounded role grants + admin_action_proposals two-person rule + HMAC webhook subscriptions + moderator trust score primitive)",
+          "label_es": "Consola admin PR13 — future-proofing (concesiones de rol con expiración + propuestas dos-personas + webhooks HMAC + puntaje de confianza de moderador)",
+          "done": true
+        },
+        {
+          "id": "admin-console-pr14-deferred-cleanup",
+          "label": "Admin console PR14 — close v1.1 deferreds (per-admin tz for off_hours + webhook _meta replay + reconcile cron + real trust formula + irreversible enforcement gate + durable observability dry-run workflow)",
+          "label_es": "Consola admin PR14 — cierre de pendientes v1.1 (zona horaria por admin + replay de webhooks + cron reconcile + fórmula real de confianza + gate de cumplimiento irreversible + workflow durable de dry-run)",
+          "done": true
         }
       ]
     },
@@ -894,8 +930,8 @@
           "label_es": "Descubrimiento comunitario (Módulo 28) — MegaMenu de Explorar dividido en columnas Biodiversidad / Comunidad; página /community/observers/ con chips de filtros componibles (orden, país, taxón, sólo expertos, cercanos); contadores denormalizados (species_count, obs_count_7d/30d, centroid_geog, country_code) refrescados cada noche por la Edge Function recompute-user-stats; tabla de referencia ISO-3166 + normalize_country_code(); vistas duales (anon-safe + authenticated-only con centroide); toggle de opt-out + selector de país en Perfil → Editar; reescribe los strings 'no leaderboards' que estaban en producción",
           "done": true,
           "done_at": "2026-04-29",
-          "status": "shipped — PR1 (#92) + PR2 (#96) + PR4 (#102) on main; PR5+PR6 lands page + MegaMenu split + atomic i18n rewrite of the two production 'no leaderboards' strings; operator manual cron fire (PR3) is the only remaining backfill task",
-          "status_es": "lanzado — PR1 (#92) + PR2 (#96) + PR4 (#102) en main; PR5+PR6 aterriza la página + split del MegaMenu + reescritura atómica i18n de los dos strings 'no leaderboards' en producción; el disparo manual del cron (PR3) por el operador es la única tarea de backfill restante"
+          "status": "shipped — PR1 (#92) + PR2 (#96) + PR4 (#102) + PR5+PR6 (#122) on main. Backfill (formerly PR3 operator action) is now automated via the .github/workflows/community-backfill.yml workflow_dispatch button — fire once after deploy",
+          "status_es": "lanzado — PR1 (#92) + PR2 (#96) + PR4 (#102) + PR5+PR6 (#122) en main. El backfill (antes acción manual del operador PR3) está automatizado vía el workflow_dispatch en .github/workflows/community-backfill.yml — disparar una vez tras el deploy"
         },
         {
           "id": "obs-detail-redesign",

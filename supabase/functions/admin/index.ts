@@ -15,6 +15,11 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { verifyJwtAndLoadRoles, requireRole, HttpError } from './_shared/auth.ts';
 import { insertAuditRow } from './_shared/audit.ts';
 import { checkRateLimit } from './_shared/rate-limit.ts';
+import { reportFunctionError } from './_shared/error-reporter.ts';
+import {
+  checkIrreversibleEnforcement,
+  stripViaProposal,
+} from './_shared/irreversible-enforcement.ts';
 import { HANDLERS } from './handlers/index.ts';
 
 const ALLOWED_ORIGINS = [
@@ -47,6 +52,9 @@ const WRITE_ACTIONS = new Set([
   'badge.award_manual', 'badge.revoke',
   'taxon.recompute_rarity', 'taxon.toggle_conservation',
   'feature_flag.toggle',
+  'anomaly.acknowledge',
+  'proposal.create', 'proposal.approve', 'proposal.reject',
+  'webhook.create', 'webhook.update', 'webhook.delete', 'webhook.test',
 ]);
 
 function json(body: unknown, status = 200, req: Request): Response {
@@ -75,11 +83,14 @@ serve(async (req) => {
   const handler = HANDLERS[action];
   if (!handler) return json({ error: `unknown action: ${action}` }, 400, req);
 
+  const admin = createClient(SUPABASE_URL, SERVICE_KEY);
+  let actorId: string | null = null;
+
   try {
     const actor = await verifyJwtAndLoadRoles(req);
+    actorId = actor.id;
     requireRole(actor, handler.requiredRole);
 
-    const admin = createClient(SUPABASE_URL, SERVICE_KEY);
     const rateCost = WRITE_ACTIONS.has(action) ? 3 : 1;
     const rateResult = await checkRateLimit(admin, actor.id, rateCost);
     if (!rateResult.allowed) {
@@ -96,7 +107,24 @@ serve(async (req) => {
       );
     }
 
-    const parsed = handler.payloadSchema.safeParse(payload);
+    // PR14: irreversible-op enforcement gate. Off by default; flip via
+    // the enforce_two_person_irreversible feature flag once operators
+    // trust the proposals queue is being used.
+    const { data: flagRow } = await admin
+      .from('app_feature_flags')
+      .select('value')
+      .eq('key', 'enforce_two_person_irreversible')
+      .maybeSingle();
+    const flagEnabled = Boolean((flagRow as { value?: boolean } | null)?.value);
+    const enforcement = checkIrreversibleEnforcement(action, payload, flagEnabled);
+    if (!enforcement.allowed) {
+      return json({ error: enforcement.reason, code: enforcement.code }, 403, req);
+    }
+
+    // Strip the internal-only marker before validating against the
+    // handler's Zod schema — the schema may reject unknown keys.
+    const cleanPayload = stripViaProposal(payload);
+    const parsed = handler.payloadSchema.safeParse(cleanPayload);
     if (!parsed.success) return json({ error: 'invalid payload', issues: parsed.error.issues }, 400);
 
     const result = await handler.execute(admin, parsed.data, actor, reason);
@@ -122,6 +150,8 @@ serve(async (req) => {
     return json({ ok: true, audit_id: auditId, result: result.result, after: result.after }, 200, req);
   } catch (err) {
     if (err instanceof HttpError) return json({ error: err.message }, err.status, req);
+    // Best-effort error sink — never throw from inside the reporter.
+    await reportFunctionError(admin, 'admin', 'handler_exception', actorId, { op: action }, err);
     return json({ error: (err as Error).message }, 500, req);
   }
 });

@@ -58,6 +58,44 @@ BEGIN
   -- PR11 — durable admin rate limit buckets (admin Edge Function dispatcher)
   IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'rate_limit_buckets')     THEN missing := array_append(missing, 'public.rate_limit_buckets'); END IF;
 
+  -- PR12 — admin observability (anomalies, weekly health digest, function-error sink)
+  IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'admin_anomalies')        THEN missing := array_append(missing, 'public.admin_anomalies'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'admin_health_digests')   THEN missing := array_append(missing, 'public.admin_health_digests'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'function_errors')        THEN missing := array_append(missing, 'public.function_errors'); END IF;
+
+  -- PR13 — future-proofing (expiring roles, two-person rule, webhooks, trust scores)
+  IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'admin_action_proposals')    THEN missing := array_append(missing, 'public.admin_action_proposals'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'admin_webhooks')            THEN missing := array_append(missing, 'public.admin_webhooks'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'admin_webhook_deliveries')  THEN missing := array_append(missing, 'public.admin_webhook_deliveries'); END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name   = 'user_roles'
+      AND column_name  = 'expires_at'
+  ) THEN missing := array_append(missing, 'public.user_roles.expires_at'); END IF;
+
+  -- PR14 — deferred cleanups (per-admin tz, webhook replay protection)
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name   = 'users'
+      AND column_name  = 'timezone'
+  ) THEN missing := array_append(missing, 'public.users.timezone'); END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name   = 'admin_webhook_deliveries'
+      AND column_name  = 'nonce'
+  ) THEN missing := array_append(missing, 'public.admin_webhook_deliveries.nonce'); END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name   = 'admin_webhook_deliveries'
+      AND column_name  = 'request_id'
+  ) THEN missing := array_append(missing, 'public.admin_webhook_deliveries.request_id'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'reconcile_webhook_deliveries')
+    THEN missing := array_append(missing, 'public.reconcile_webhook_deliveries()'); END IF;
+
   -- Console PR8 — feature flags + karma config DB tables
   IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'app_feature_flags')      THEN missing := array_append(missing, 'public.app_feature_flags'); END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'karma_config')           THEN missing := array_append(missing, 'public.karma_config'); END IF;
@@ -81,6 +119,12 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'list_admin_cron_runs_guarded') THEN missing := array_append(missing, 'public.list_admin_cron_runs_guarded()'); END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'is_user_banned')               THEN missing := array_append(missing, 'public.is_user_banned()'); END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'consume_rate_limit_token')    THEN missing := array_append(missing, 'public.consume_rate_limit_token()'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'detect_admin_anomalies')      THEN missing := array_append(missing, 'public.detect_admin_anomalies()'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'compute_admin_health_digest') THEN missing := array_append(missing, 'public.compute_admin_health_digest()'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'auto_revoke_expired_roles')   THEN missing := array_append(missing, 'public.auto_revoke_expired_roles()'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'expire_stale_proposals')      THEN missing := array_append(missing, 'public.expire_stale_proposals()'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'dispatch_admin_webhooks')     THEN missing := array_append(missing, 'public.dispatch_admin_webhooks()'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'compute_moderator_trust_score') THEN missing := array_append(missing, 'public.compute_moderator_trust_score()'); END IF;
 
   IF array_length(missing, 1) IS NOT NULL THEN
     RAISE EXCEPTION 'Sentinel verify failed — missing objects: %', missing;

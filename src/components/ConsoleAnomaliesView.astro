@@ -1,0 +1,321 @@
+---
+/**
+ * ConsoleAnomaliesView — admin-only view of admin_anomalies rows.
+ * Two filters: Unacknowledged (default) vs All. Each row exposes an
+ * Acknowledge action that opens the shared ConsoleSlideOver to capture
+ * notes + a reason; submission goes through the admin Edge Function.
+ */
+import { t } from '../i18n/utils';
+import ConsoleSlideOver from './ConsoleSlideOver.astro';
+
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+const c = tr.console as unknown as Record<string, string>;
+const anomaliesNs = (tr.console as unknown as Record<string, Record<string, unknown>>).anomaliesView as
+  unknown as Record<string, Record<string, string> | string>;
+const kindLabels = (anomaliesNs?.kinds as Record<string, string>) ?? {};
+const aTitle = (anomaliesNs?.title as string) ?? 'Anomalies';
+const aDesc = (anomaliesNs?.description as string) ?? '';
+const aTabs = (anomaliesNs?.tabs as Record<string, string>) ?? {};
+const aCols = (anomaliesNs?.columns as Record<string, string>) ?? {};
+const aSlide = (anomaliesNs?.slideOver as Record<string, string>) ?? {};
+const aActions = (anomaliesNs?.actions as Record<string, string>) ?? {};
+const aEmpty = (anomaliesNs?.empty as string) ?? 'No anomalies.';
+const labelHighRate = kindLabels.high_rate ?? 'High rate';
+const labelBulkDelete = kindLabels.bulk_delete ?? 'Bulk destructive';
+const labelOffHours = kindLabels.off_hours ?? 'Off-hours';
+const labelAcknowledge = aActions.acknowledge ?? 'Acknowledge';
+const labelAcknowledged = aActions.acknowledged ?? 'acknowledged';
+---
+
+<section
+  class="max-w-6xl"
+  data-label-kind-high-rate={labelHighRate}
+  data-label-kind-bulk-delete={labelBulkDelete}
+  data-label-kind-off-hours={labelOffHours}
+  data-label-acknowledge={labelAcknowledge}
+  data-label-acknowledged={labelAcknowledged}
+>
+  <h1 class="text-xl font-semibold mb-1">{aTitle}</h1>
+  <p class="mb-4 text-sm text-zinc-500 dark:text-zinc-400">{aDesc}</p>
+
+  <div id="anomalies-not-auth" class="hidden rounded border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-900 dark:text-amber-100">
+    {tr.console.not_authorized}
+  </div>
+
+  <div id="anomalies-shell" class="hidden space-y-3">
+    <div class="flex flex-wrap items-center gap-2">
+      <div class="flex rounded border border-zinc-300 dark:border-zinc-700 overflow-hidden text-sm">
+        <button id="anomalies-toggle-unack" class="px-3 py-1.5 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-medium">
+          {aTabs.unacknowledged ?? 'Unacknowledged'}
+        </button>
+        <button id="anomalies-toggle-all" class="px-3 py-1.5 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300">
+          {aTabs.all ?? 'All'}
+        </button>
+      </div>
+    </div>
+
+    <div id="anomalies-loading" class="text-sm text-zinc-500 italic">{c.loading}</div>
+    <div id="anomalies-empty" class="hidden rounded border border-dashed border-zinc-200 dark:border-zinc-700 p-6 text-center text-sm text-zinc-500">
+      {aEmpty}
+    </div>
+    <div id="anomalies-rows" class="hidden overflow-x-auto rounded border border-zinc-200 dark:border-zinc-800">
+      <table class="min-w-full text-sm">
+        <thead class="bg-zinc-50 dark:bg-zinc-900/40 text-left text-xs uppercase tracking-wide text-zinc-500">
+          <tr>
+            <th class="px-3 py-2">{aCols.kind ?? 'Kind'}</th>
+            <th class="px-3 py-2">{aCols.actor ?? 'Actor'}</th>
+            <th class="px-3 py-2">{aCols.window ?? 'Window'}</th>
+            <th class="px-3 py-2 text-right">{aCols.events ?? 'Events'}</th>
+            <th class="px-3 py-2">{aCols.details ?? 'Details'}</th>
+            <th class="px-3 py-2"></th>
+          </tr>
+        </thead>
+        <tbody id="anomalies-tbody" class="divide-y divide-zinc-100 dark:divide-zinc-800"></tbody>
+      </table>
+    </div>
+
+    <p id="anomalies-error" class="hidden text-sm text-red-600 dark:text-red-400"></p>
+  </div>
+</section>
+
+<ConsoleSlideOver
+  lang={lang}
+  id="console-slideover-anomaly-ack"
+  titleKey={aSlide.title ?? 'Acknowledge anomaly'}
+>
+  <label class="block text-sm">
+    <span class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+      {aSlide.notes ?? 'Notes (optional)'}
+    </span>
+    <textarea id="anomaly-ack-notes" rows="3" maxlength="2000" class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-2 text-sm"></textarea>
+  </label>
+</ConsoleSlideOver>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { getUserRoles } from '../lib/user-roles';
+  import { adminClient, AdminClientError } from '../lib/admin-client';
+
+  type AnomalyRow = {
+    id: string;
+    kind: string;
+    actor_id: string | null;
+    window_start: string;
+    window_end: string;
+    event_count: number;
+    details: Record<string, unknown> | null;
+    acknowledged_at: string | null;
+    acknowledged_by: string | null;
+    ack_notes: string | null;
+    created_at: string;
+  };
+
+  type ActorMeta = { username: string | null; display_name: string | null };
+
+  const sectionEl = document.querySelector<HTMLElement>('section[data-label-kind-high-rate]')!;
+  const kindLabelMap: Record<string, string> = {
+    high_rate: sectionEl.dataset.labelKindHighRate ?? 'High rate',
+    bulk_delete: sectionEl.dataset.labelKindBulkDelete ?? 'Bulk destructive',
+    off_hours: sectionEl.dataset.labelKindOffHours ?? 'Off-hours',
+  };
+  const labelAcknowledge = sectionEl.dataset.labelAcknowledge ?? 'Acknowledge';
+  const labelAcknowledged = sectionEl.dataset.labelAcknowledged ?? 'acknowledged';
+
+  let allRows: AnomalyRow[] = [];
+  let actors: Record<string, ActorMeta> = {};
+  let filterUnack = true;
+  let jwt: string | null = null;
+
+  function show(id: string) { document.getElementById(id)?.classList.remove('hidden'); }
+  function hide(id: string) { document.getElementById(id)?.classList.add('hidden'); }
+  function esc(s: string): string {
+    return s.replace(/[<>&'"]/g, ch => ({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&#39;','"':'&quot;'}[ch]!));
+  }
+
+  function actorLabel(id: string | null): string {
+    if (!id) return '—';
+    const meta = actors[id];
+    if (meta?.username) return meta.username;
+    if (meta?.display_name) return meta.display_name;
+    return id.slice(0, 8) + '…';
+  }
+
+  function kindPill(kind: string): string {
+    const palette: Record<string, string> = {
+      high_rate:   'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300',
+      bulk_delete: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300',
+      off_hours:   'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300',
+    };
+    const cls = palette[kind] ?? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300';
+    const label = kindLabelMap[kind] ?? kind;
+    return `<span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${cls}">${esc(label)}</span>`;
+  }
+
+  function fmtRange(start: string, end: string): string {
+    const s = new Date(start);
+    const e = new Date(end);
+    return `${s.toISOString().slice(11, 16)}–${e.toISOString().slice(11, 16)} UTC ${s.toISOString().slice(0, 10)}`;
+  }
+
+  function renderRows() {
+    const rows = filterUnack ? allRows.filter(r => !r.acknowledged_at) : allRows;
+    const empty = document.getElementById('anomalies-empty');
+    const wrap = document.getElementById('anomalies-rows');
+    const tbody = document.getElementById('anomalies-tbody');
+    if (!tbody || !wrap || !empty) return;
+
+    if (rows.length === 0) {
+      wrap.classList.add('hidden');
+      empty.classList.remove('hidden');
+      return;
+    }
+    empty.classList.add('hidden');
+    wrap.classList.remove('hidden');
+
+    tbody.innerHTML = rows.map(r => {
+      const acked = r.acknowledged_at !== null;
+      const detailsJson = r.details ? JSON.stringify(r.details) : '';
+      return `
+        <tr class="${acked ? 'opacity-60' : ''}">
+          <td class="px-3 py-2">${kindPill(r.kind)}</td>
+          <td class="px-3 py-2 text-zinc-700 dark:text-zinc-300">${esc(actorLabel(r.actor_id))}</td>
+          <td class="px-3 py-2 text-xs text-zinc-500">${esc(fmtRange(r.window_start, r.window_end))}</td>
+          <td class="px-3 py-2 text-right tabular-nums">${r.event_count}</td>
+          <td class="px-3 py-2 text-xs text-zinc-500 max-w-[260px] truncate" title="${esc(detailsJson)}">${esc(detailsJson || '')}</td>
+          <td class="px-3 py-2 text-right">
+            ${acked
+              ? `<span class="text-[11px] text-emerald-600 dark:text-emerald-400">${esc(labelAcknowledged)}</span>`
+              : `<button data-ack-id="${esc(r.id)}" class="px-2 py-1 rounded border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800">${esc(labelAcknowledge)}</button>`}
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    tbody.querySelectorAll<HTMLElement>('[data-ack-id]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.ackId!;
+        const row = allRows.find(r => r.id === id);
+        if (!row) return;
+        const notesEl = document.getElementById('anomaly-ack-notes') as HTMLTextAreaElement | null;
+        if (notesEl) notesEl.value = '';
+        document.dispatchEvent(new CustomEvent('console:slideover-open', {
+          detail: {
+            id: 'console-slideover-anomaly-ack',
+            title: `${kindLabelMap[row.kind] ?? row.kind} — ${actorLabel(row.actor_id)}`,
+            action: 'anomaly.acknowledge',
+            payload: { anomalyId: row.id },
+          },
+        }));
+      });
+    });
+  }
+
+  async function init() {
+    let supabase;
+    try { supabase = getSupabase(); } catch {
+      show('anomalies-not-auth');
+      return;
+    }
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { show('anomalies-not-auth'); return; }
+    const myRoles = await getUserRoles(session.user.id);
+    if (!myRoles.has('admin')) { show('anomalies-not-auth'); return; }
+    jwt = session.access_token;
+
+    show('anomalies-shell');
+
+    const { data, error } = await supabase
+      .from('admin_anomalies')
+      .select('id, kind, actor_id, window_start, window_end, event_count, details, acknowledged_at, acknowledged_by, ack_notes, created_at')
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    hide('anomalies-loading');
+
+    if (error) {
+      const e = document.getElementById('anomalies-error');
+      if (e) { e.textContent = error.message; e.classList.remove('hidden'); }
+      return;
+    }
+
+    allRows = (data ?? []) as AnomalyRow[];
+
+    // Resolve actor labels in one round trip.
+    const ids = [...new Set(allRows.map(r => r.actor_id).filter((x): x is string => Boolean(x)))];
+    if (ids.length > 0) {
+      const { data: users } = await supabase
+        .from('users')
+        .select('id, username, display_name')
+        .in('id', ids);
+      for (const u of (users ?? []) as Array<{ id: string; username: string | null; display_name: string | null }>) {
+        actors[u.id] = { username: u.username, display_name: u.display_name };
+      }
+    }
+
+    renderRows();
+
+    // Toggle filter buttons.
+    document.getElementById('anomalies-toggle-unack')?.addEventListener('click', () => {
+      filterUnack = true;
+      const a = document.getElementById('anomalies-toggle-unack');
+      const b = document.getElementById('anomalies-toggle-all');
+      a?.classList.add('bg-zinc-900', 'dark:bg-zinc-100', 'text-white', 'dark:text-zinc-900');
+      a?.classList.remove('bg-white', 'dark:bg-zinc-900', 'text-zinc-700', 'dark:text-zinc-300');
+      b?.classList.remove('bg-zinc-900', 'dark:bg-zinc-100', 'text-white', 'dark:text-zinc-900');
+      b?.classList.add('bg-white', 'dark:bg-zinc-900', 'text-zinc-700', 'dark:text-zinc-300');
+      renderRows();
+    });
+    document.getElementById('anomalies-toggle-all')?.addEventListener('click', () => {
+      filterUnack = false;
+      const a = document.getElementById('anomalies-toggle-unack');
+      const b = document.getElementById('anomalies-toggle-all');
+      b?.classList.add('bg-zinc-900', 'dark:bg-zinc-100', 'text-white', 'dark:text-zinc-900');
+      b?.classList.remove('bg-white', 'dark:bg-zinc-900', 'text-zinc-700', 'dark:text-zinc-300');
+      a?.classList.remove('bg-zinc-900', 'dark:bg-zinc-100', 'text-white', 'dark:text-zinc-900');
+      a?.classList.add('bg-white', 'dark:bg-zinc-900', 'text-zinc-700', 'dark:text-zinc-300');
+      renderRows();
+    });
+  }
+
+  // Submit handler bound to the slide-over.
+  document.addEventListener('console:slideover-submit', async (ev) => {
+    const detail = (ev as CustomEvent<{ id: string; action: string; payload: { anomalyId: string }; reason: string }>).detail;
+    if (detail.id !== 'console-slideover-anomaly-ack') return;
+    if (!jwt) {
+      document.dispatchEvent(new CustomEvent('console:slideover-done', {
+        detail: { id: detail.id, ok: false, error: 'Not signed in' },
+      }));
+      return;
+    }
+    const notesEl = document.getElementById('anomaly-ack-notes') as HTMLTextAreaElement | null;
+    const notes = notesEl?.value.trim() || undefined;
+    try {
+      await adminClient.anomaly.acknowledge(
+        { anomalyId: detail.payload.anomalyId, notes },
+        detail.reason,
+        jwt,
+      );
+      const row = allRows.find(r => r.id === detail.payload.anomalyId);
+      if (row) {
+        row.acknowledged_at = new Date().toISOString();
+        row.ack_notes = notes ?? null;
+      }
+      renderRows();
+      document.dispatchEvent(new CustomEvent('console:slideover-done', {
+        detail: { id: detail.id, ok: true },
+      }));
+    } catch (err) {
+      document.dispatchEvent(new CustomEvent('console:slideover-done', {
+        detail: {
+          id: detail.id,
+          ok: false,
+          error: err instanceof AdminClientError ? err.message : String(err),
+        },
+      }));
+    }
+  });
+
+  init().catch(() => { show('anomalies-not-auth'); });
+</script>

@@ -17,7 +17,7 @@
 | v0.5 | Beta | shipped (partial) | 11 / 13 |
 | v1.0 | Public Launch | shipped (partial) | 18 / 21 |
 | v1.0.x | Post-launch polish | in_progress | 8 / 24 |
-| v1.1 | UX polish (post-launch brainstorm) | shipped (mostly) | 19 / 21 |
+| v1.1 | UX polish (post-launch brainstorm) | shipped (mostly) | 33 / 35 |
 | v1.2 | Profile privacy & public profile | shipped 2026-04-28 | 3 / 3 |
 | v1.3 | Module 27: AI Sponsorships | shipped 2026-04-28 | 1 / 1 |
 | **v0.1 → v1.0** | **Public launch** | **shipped 2026-04-26** | **54 / 59** |
@@ -84,9 +84,15 @@ Remaining:
 
 ## v1.1 — UX polish (post-launch brainstorm) — shipped (mostly)
 
-**19 of 21 items done.** (Originally 15; added 6 cross-cutting items
+**33 of 35 items done.** (Originally 15; added 6 cross-cutting items
 shipped 2026-04-27/28: M22, owner CRUD, atomic delete-observation,
-suggest-from-share-page, OG pipeline, onboarding v2.)
+suggest-from-share-page, OG pipeline, onboarding v2; then the 14-PR
+admin-console series shipped 2026-04-26 → 2026-04-29: PR1-PR14 covering
+foundation → engineering hygiene → observability → future-proofing →
+deferred cleanup.)
+
+Admin console "do all" series (2026-04-26 → 2026-04-29):
+- `admin-console-foundation` (PR1) → `admin-console-pr14-deferred-cleanup` (PR14) — schema + chrome + 32 Edge Function handlers + 8 crons across 14 PRs. Full primitives now live: time-bounded role grants, two-person rule with `enforce_two_person_irreversible` feature-flag gate, HMAC-SHA256 webhook subscriptions with `_meta` replay protection + reconcile cron, hourly anomaly detection, weekly health digest, forensics CSV export, structured `function_errors` sink, real moderator trust score, durable observability dry-run workflow. _(✓ all 14 done)_
 
 Cross-cutting shipments (2026-04-27/28):
 - `community-validation` — Module 22 implementation: `validation_queue` view, 3 RLS policies, 4 routes, suggest modal + dashboard, research-grade chip on existing views, suggest CTA on `/share/obs`.  _(✓ done)_
@@ -136,9 +142,9 @@ Remaining:
 
 - `ai-sponsorships` — Permite a cualquier user compartir su credencial Anthropic (API key u OAuth long-lived token) con beneficiaries específicos. Cuota mensual por llamadas, auto-pause por rate-limit, karma híbrido, y removal del operator-key fallback en `identify`. Entregado: schema (5 tablas + RLS + Vault) + cron jobs + audit log; Edge Functions `sponsorships` (CRUD + heartbeat) e `identify` modificado; UI en `/profile/sponsoring/`, `/profile/sponsored-by/`, banner en `/identify`, discovery card, header dropdown, mobile drawer entries, badge de sponsor + recíproco en perfil público; Resend SMTP para threshold (80%/100%) + auto-pause emails; request-to-be-sponsored flow (5 endpoints + dialogs ambos lados); onboarding tour first-visit + replay; página `/docs/sponsorships` (EN+ES); time range selector 7/30/90 en analytics; report abuse button por beneficiary; CI guards (smoke + secret-leak). **Operator action única:** `gh secret set SPONSORSHIPS_CRON_TOKEN` (hecho). **Operator action opcional:** `gh secret delete ANTHROPIC_API_KEY` (no urgente; identify ya no la lee). _(✓ done)_
 
-### v1.2 in-flight (2026-04-29) — Module 28 + observation-detail redesign
+### v1.2 shipped 2026-04-29 — Module 28 + observation-detail redesign
 
-Both features are landing as 6-PR sequences. Plans at
+Both features landed as 6-PR sequences each. Plans at
 `docs/superpowers/plans/2026-04-29-{community-discovery,obs-detail-redesign}-plan.md`,
 specs at `docs/superpowers/specs/2026-04-29-*-design.md`.
 
@@ -150,24 +156,24 @@ specs at `docs/superpowers/specs/2026-04-29-*-design.md`.
   centroid) and `community_observers_with_centroid` (authenticated only) plus the
   authenticated-only `community_observers_nearby(...)` SQL RPC for the Nearby
   filter. Country picker + `hide_from_leaderboards` opt-out + `country_code_source`
-  'auto'/'user' badge on Profile → Edit. PR1 (#92) + PR2 (#96) + PR4 (#102) merged.
-  PR5+PR6 (this PR) atomically lands the page + MegaMenu split + i18n rewrite of
-  the two shipped "no leaderboards" strings + OG card + roadmap flip. PR3 manual
-  cron fire is the only remaining backfill task (operator action). _(✓ done)_
+  'auto'/'user' badge on Profile → Edit. PRs #92 (PR1 schema), #96 (PR2 EF + cron),
+  #102 (PR4 Profile → Edit), #122 (PR5+PR6 atomic — page + MegaMenu split + i18n
+  rewrite + OG card + roadmap flip). The one-time backfill (formerly PR3 operator
+  action) is now automated via the `community-backfill.yml` workflow_dispatch
+  button. _(✓ shipped — see `docs/runbooks/community-discovery.md`)_
 
 - `obs-detail-redesign` — Rebuilt `/share/obs/?id=...` as two-column desktop /
-  stacked mobile layout. PR1 (#91) extracted reusable `MapPicker.astro` from
-  `ObservationForm.astro`. PR2 (#98) added schema deltas
-  (`last_material_edit_at` + `media_files.deleted_at` +
-  `observations_material_edit_check_trg` material-edit trigger),
-  `observation-enums.ts`, and `obs_detail.*` i18n. PR3 (#103) shipped
-  `PhotoGallery.astro` (native lightbox + keyboard + swipe + share) plus the new
-  two-column layout. PR4 (#120) wired the Details tab (date/time + habitat +
-  weather + establishment + scientific-name override + notes + obscure-level).
-  PR6 wired the Photos tab + the atomic `delete-photo` Edge Function (soft-delete
-  + ID demote clearing validated_by/validated_at/is_research_grade +
+  stacked mobile layout. PRs #91 (PR1 — extract reusable `MapPicker.astro` from
+  `ObservationForm.astro`), #98 (PR2 — schema deltas: `last_material_edit_at` +
+  `media_files.deleted_at` + `observations_material_edit_check_trg` material-edit
+  trigger + `observation-enums.ts` + `obs_detail.*` i18n), #103 (PR3 —
+  `PhotoGallery.astro` native lightbox + new two-column layout + `ShareObsView`
+  i18n migration), #120 (PR4 — `ObsManagePanel.Details` tab: date/time + habitat
+  + weather + establishment + sci-name override + notes + obscure-level), #124
+  (PR5 — Location tab with coordinate-edit modal via `MapPicker mode='edit'`,
+  `pickerId='obs-detail-edit'`, `wireManagePanelLocation` + `pointGeographyLiteral`
+  helper), #125 (PR6 — Photos tab + atomic `delete-photo` Edge Function:
+  soft-delete + ID demote clearing validated_by/validated_at/is_research_grade +
   last_material_edit_at bump in one transaction via `delete_photo_atomic`
-  SECURITY DEFINER RPC). PR5 (Location tab — coordinate edit modal) is the only
-  remaining slice and is tracked as a v1.1 follow-up under the spec. Soft-delete
-  only for v1; R2 orphan GC is a v1.1 follow-up. _(✓ shipped — see
-  `docs/runbooks/obs-detail-redesign.md`)_
+  SECURITY DEFINER RPC). Soft-delete only for v1; R2 orphan GC (`gc-orphan-media`
+  cron) is a v1.1 follow-up. _(✓ shipped — see `docs/runbooks/obs-detail-redesign.md`)_
