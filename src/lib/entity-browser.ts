@@ -148,11 +148,11 @@ export const filterPredicates = {
       q.lte(column, v),
   isNull:
     (column: string) =>
-    (q: SupabaseQuery): SupabaseQuery =>
+    (q: SupabaseQuery, _v?: string): SupabaseQuery =>
       q.is(column, null),
   isNotNull:
     (column: string) =>
-    (q: SupabaseQuery): SupabaseQuery =>
+    (q: SupabaseQuery, _v?: string): SupabaseQuery =>
       q.not(column, 'is', null),
 };
 
@@ -372,7 +372,7 @@ export class EntityBrowser<Row extends { id?: string; [k: string]: unknown }> {
         .limit(2000);
 
       const distinct = new Set<string>();
-      for (const r of (data ?? []) as Array<Record<string, unknown>>) {
+      for (const r of (data ?? []) as unknown as Array<Record<string, unknown>>) {
         const v = r[col];
         if (typeof v === 'string' && v) distinct.add(v);
       }
