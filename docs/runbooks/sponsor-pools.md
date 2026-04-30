@@ -2,7 +2,7 @@
 
 > **Spec:** [`docs/specs/modules/32-multi-provider-vision.md`](../specs/modules/32-multi-provider-vision.md) (M32 includes both multi-provider + the pool).
 > **Schema:** `sponsor_pools`, `pool_consumption`, `consume_pool_slot()` RPC.
-> **Status:** backend complete; UI for sponsor controls is v1.1.
+> **Status:** backend + UI shipped 2026-04-30 (PRs #143 + #215). Crons for monthly reset + ledger vacuum shipped (PR #207).
 
 A sponsor donates N calls to a shared pool that any user of the
 platform can draw from — without a 1-to-1 sponsorship. Pool
@@ -23,10 +23,20 @@ LOCKED`, atomically picks an active pool with capacity AND the
 caller is under their `daily_user_cap`. Returns NULL if either
 check fails — no error thrown, the cascade falls through.
 
-## Create a pool (no UI yet)
+## Create a pool from the UI (PR #215)
 
-The "Donate to platform pool" tab in `SponsoringView` is v1.1.
-Until then, create pools via SQL while signed in as the sponsor:
+Navigate to `/{en,es}/profile/sponsoring/`, scroll to the
+**Platform pool** section, click **Donate to pool**. Pick a
+credential, set total cap + preferred model + per-user daily cap,
+optionally tick **Reset `used` on the 1st of every month**.
+
+The pool appears in the inline list with a progress bar. Use the
+inline **Pause** / **Resume** buttons to toggle its status without
+revoking the credential.
+
+## Create a pool via SQL (alternative)
+
+For batch operations or scripted setup:
 
 ```sql
 INSERT INTO public.sponsor_pools (
@@ -36,15 +46,16 @@ INSERT INTO public.sponsor_pools (
 SELECT auth.uid(),
        (SELECT id FROM public.sponsor_credentials WHERE label = 'My Anthropic key'),
        1000,                       -- total_cap: donate 1000 calls
-       true,                       -- monthly_reset: HONORIFIC in v1; cron is v1.1
+       true,                       -- monthly_reset: cron auto-resets `used` on the 1st (PR #207)
        'claude-haiku-4-5',         -- preferred_model
        10,                         -- daily_user_cap per beneficiary
        'active';
 ```
 
-Note: `monthly_reset = true` does NOT auto-reset `used` to 0 in v1
-(the cron is a v1.1 follow-up). Setting it now is forward-compat;
-the field is honoured the day the cron lands.
+`monthly_reset = true` is now honoured by the
+`sponsor_pools_monthly_reset` cron (00:05 UTC on the 1st of each
+month). The cron resets `used = 0` and flips `exhausted` →
+`active` for any pool with the flag.
 
 ## Read aggregate stats (sponsor view)
 
@@ -136,10 +147,14 @@ deliberately doesn't support this.
 | Sponsor-side dashboard shows `used` not incrementing | `consume_pool_slot()` raised an exception inside the EF — check `[identify] consume_pool_slot failed` warnings in EF logs | Ensure `service_role` has EXECUTE on the RPC; check Vault decryption isn't failing |
 | Pool exhausted but `status` still `active` | The "mark exhausted" UPDATE inside the RPC is best-effort and races with the `used + 1` UPDATE in pathological concurrency | Run the manual exhaust UPDATE above |
 
-## v1.1 follow-ups
+## Shipped 2026-04-30 (v1.1 follow-ups)
 
-- UI for "Donate to platform pool" + sponsor dashboard
-- `monthly_reset` cron — first-of-month resets `used` to 0 where flag is true
-- `pool_consumption` vacuum cron — drop rows > 90 days old
+- UI for "Donate to platform pool" + inline progress bar + Pause/Resume (PR #215 / issue #152)
+- `sponsor_pools_monthly_reset` cron — 1st of month at 00:05 UTC, resets `used` to 0 + flips `exhausted` → `active` (PR #207 / issue #153)
+- `pool_consumption_vacuum` cron — daily at 03:30 UTC, drops rows > 90 days (PR #207 / issue #154)
+
+## v1.1 follow-ups (still open)
+
+- Sponsor dashboard with top-detected-taxa breakdown — needs `ai_usage.pool_id` column
 - Pool karma incentives (donate calls → earn karma)
 - `ai_usage.pool_id` column so per-pool taxon stats can join cleanly
