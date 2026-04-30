@@ -13,6 +13,8 @@ export type KMLValidationResult =
   | { ok: false; error: 'no_polygon' | 'too_large' | 'invalid_xml' };
 
 const MAX_KML_BYTES = 500_000;
+/** Maximum size for KMZ files (ZIP-compressed KML). 5MB = MAX_KML_BYTES * 10. */
+const MAX_KMZ_BYTES = 5_000_000;
 
 /**
  * Parse the first (or largest) polygon found in a KML string into GeoJSON.
@@ -117,12 +119,16 @@ export async function extractKMLFromKMZ(file: File | Blob): Promise<string | nul
   return kmlFile.async('string');
 }
 
-/** Returns true if the file is a KMZ (by extension or MIME type). */
+/** Returns true if the file is a KMZ (by extension or MIME type).
+ * Note: `application/zip` is guarded by extension check to avoid false positives
+ * (iOS/Android sometimes report .kmz files as application/zip). */
 export function isKMZ(file: File): boolean {
+  const name = file.name.toLowerCase();
   return (
-    file.name.toLowerCase().endsWith('.kmz') ||
+    name.endsWith('.kmz') ||
     file.type === 'application/vnd.google-earth.kmz' ||
-    file.type === 'application/zip'
+    // application/zip only counts if the extension is .kmz (iOS/Android quirk)
+    (file.type === 'application/zip' && name.endsWith('.kmz'))
   );
 }
 
@@ -131,7 +137,7 @@ export function isKMZ(file: File): boolean {
  * For KMZ, extracts doc.kml first, then validates the KML content.
  */
 export async function validateKMLOrKMZ(file: File): Promise<KMLValidationResult> {
-  if (file.size > MAX_KML_BYTES * 10) {
+  if (file.size > MAX_KMZ_BYTES) {
     // KMZ can be larger than 500KB when compressed; limit to 5MB for KMZ
     return { ok: false, error: 'too_large' };
   }
