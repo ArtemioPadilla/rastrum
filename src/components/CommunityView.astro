@@ -344,7 +344,7 @@ const stringsJson = JSON.stringify({
   function renderRow(row: CommunityObserver): HTMLElement {
     const handle = row.username ?? row.id.slice(0, 8);
     const displayName = row.display_name ?? handle;
-    const profileHref = `${STRINGS.profileBase}/${encodeURIComponent(handle)}/`;
+    const profileHref = `${STRINGS.profileBase}/?username=${encodeURIComponent(handle)}`;
     const taxaList = (row.expert_taxa ?? []).join(', ');
     const obsLabel = STRINGS.obsTpl.replace('{n}', String(row.observation_count));
     const speciesLabel = STRINGS.speciesTpl.replace('{n}', String(row.species_count));
