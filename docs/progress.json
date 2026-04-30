@@ -855,6 +855,12 @@
           "label": "Community observers UX fixes — privacy-default explainer banner (with viewer-state-aware copy), set-country inline CTA, GPS-based Nearby (community_observers_nearby_at SECURITY INVOKER RPC, sessionStorage-only coords for Referer-leak prevention), regression guard test",
           "label_es": "Fixes de UX en observadores comunidad — banner explicativo de privacidad por defecto (copy según estado del viewer), CTA inline para fijar país, modo Cercanos con GPS real (RPC community_observers_nearby_at SECURITY INVOKER, coords solo en sessionStorage para prevenir filtración por Referer), test de regresión",
           "done": true
+        },
+        {
+          "id": "console-chrome-rendering-fix",
+          "label": "Console chrome rendering fix — all 70 /console + /consola pages were using BaseLayout instead of ConsoleLayout, so admins saw page content with no sidebar / role pills / keybindings; ConsoleLayout was dead code. Refactored ConsoleLayout for static SSG (optional auth props, server-renders all 3 role tab lists hidden, client script reveals based on getUserRoles()), wrapped all 70 pages, added build-time console.warn in BaseLayout to prevent regression",
+          "label_es": "Fix del chrome de la consola — las 70 páginas /console + /consola usaban BaseLayout en vez de ConsoleLayout, así que los admins veían el contenido sin sidebar / role pills / keybindings; ConsoleLayout era código muerto. Se refactorizó ConsoleLayout para SSG estático (props de auth opcionales, renderiza las 3 listas de rol ocultas, script cliente las revela según getUserRoles()), se envolvieron las 70 páginas, se añadió console.warn en BaseLayout para prevenir regresiones",
+          "done": true
         }
       ]
     },

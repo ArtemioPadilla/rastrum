@@ -4704,6 +4704,24 @@
         { "label_en": "CLAUDE.md M28 4th load-bearing rule + docs/runbooks/community-discovery.md UX clarifications section", "label_es": "Regla 4 del M28 en CLAUDE.md + sección de aclaraciones UX en docs/runbooks/community-discovery.md", "status": "done" }
       ]
     },
+    "console-chrome-rendering-fix": {
+      "phase": "v1.1",
+      "title_en": "Console chrome rendering fix — restore sidebar + role pills (70 console pages were using BaseLayout, ConsoleLayout was dead code)",
+      "title_es": "Fix del chrome de la consola — restaurar sidebar + role pills (70 páginas usaban BaseLayout, ConsoleLayout era código muerto)",
+      "modules": ["24-admin-console.md"],
+      "subtasks": [
+        { "label_en": "Diagnose: ConsoleLayout existed but unused; all 70 /console + /consola pages imported BaseLayout, leaving the chrome unrendered", "label_es": "Diagnóstico: ConsoleLayout existía pero sin uso; las 70 páginas /console + /consola importaban BaseLayout dejando el chrome sin renderizar", "status": "done" },
+        { "label_en": "Refactor ConsoleLayout to be SSG-safe: props (allRoles, activeRole, currentPath, identity) made optional with sensible defaults", "label_es": "Refactor de ConsoleLayout para SSG: props (allRoles, activeRole, currentPath, identity) ahora opcionales con defaults sensatos", "status": "done" },
+        { "label_en": "Server-render all 3 role tab lists with data-role attributes, all initially hidden; client script reveals based on getUserRoles()", "label_es": "Renderiza en server las 3 listas de tabs por rol con data-role, todas ocultas; script cliente las revela según getUserRoles()", "status": "done" },
+        { "label_en": "Same pattern for role pills: all 3 ship hidden, JS reveals only those held by the viewer; active role styled with role accent", "label_es": "Mismo patrón para los role pills: las 3 ocultas, JS revela las del viewer; rol activo con acento de su rol", "status": "done" },
+        { "label_en": "Active tab highlighting via currentPath = Astro.url.pathname (works at build time since each route has its own static HTML)", "label_es": "Resaltado del tab activo via currentPath = Astro.url.pathname (funciona en build estático porque cada ruta tiene su propio HTML)", "status": "done" },
+        { "label_en": "Swap BaseLayout → ConsoleLayout in all 35 EN console pages + 35 ES consola pages (70 total)", "label_es": "Reemplazar BaseLayout → ConsoleLayout en las 35 páginas EN console + 35 ES consola (70 total)", "status": "done" },
+        { "label_en": "BaseLayout: console.warn at build time if a /console/* or /consola/* path slips through using BaseLayout (regression guard)", "label_es": "BaseLayout: console.warn en build si una ruta /console/* o /consola/* pasa por BaseLayout (guard de regresión)", "status": "done" },
+        { "label_en": "Verification: grep dist/ confirms <aside + data-console-pill + data-role admin/moderator/expert present on all sampled pages", "label_es": "Verificación: grep en dist/ confirma <aside + data-console-pill + data-role admin/moderator/expert en todas las páginas muestreadas", "status": "done" },
+        { "label_en": "New runbook: docs/runbooks/admin-chrome-rendering.md (the ConsoleLayout-only invariant)", "label_es": "Nuevo runbook: docs/runbooks/admin-chrome-rendering.md (la invariante 'sólo ConsoleLayout')", "status": "done" },
+        { "label_en": "CLAUDE.md Console section: 4th load-bearing rule documenting the ConsoleLayout-only contract + chrome-rendering runbook cross-link", "label_es": "Sección Console de CLAUDE.md: 4ª regla load-bearing documentando el contrato 'sólo ConsoleLayout' + cross-link al runbook de chrome rendering", "status": "done" }
+      ]
+    },
     "social-graph-m26": {
       "phase": "v1.2",
       "title_en": "Social graph + reactions (Module 26)",
