@@ -37,9 +37,9 @@ const pasteHint      = isEs ? 'También puedes pegar (Ctrl+V)' : 'You can also p
   role="region"
 >
   <!-- Hidden file inputs -->
-  <input id="dz-capture-input" type="file" accept="image/*,audio/*,video/*" capture="environment" multiple class="sr-only" />
-  <input id="dz-gallery-input" type="file" accept="image/*,audio/*,video/*" multiple class="sr-only" />
-  <input id="dz-audio-input"   type="file" accept="audio/*" class="sr-only" />
+  <input id="dz-capture-input" type="file" accept="image/*,audio/*,video/*" capture="environment" multiple class="sr-only" aria-label={captureLabel} />
+  <input id="dz-gallery-input" type="file" accept="image/*,audio/*,video/*" multiple class="sr-only" aria-label={galleryLabel} />
+  <input id="dz-audio-input"   type="file" accept="audio/*" class="sr-only" aria-label={audioLabel} />
 
   <!-- Default state -->
   <div id="dz-default" class="flex flex-col items-center justify-center gap-3 px-6 py-10 text-center">

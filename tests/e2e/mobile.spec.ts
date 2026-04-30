@@ -57,10 +57,12 @@ test('mobile bottom bar — FAB target defaults to /observe', async ({ page }) =
   await expect(fab).toHaveAttribute('href', '/en/observe/');
 });
 
-test('FAB on /observe targets /identify (quick id) with ⚡ badge', async ({ page }) => {
+test('FAB on /observe targets quick-id mode with ⚡ badge', async ({ page }) => {
   await page.goto('/en/observe/');
   const fab = page.locator('#mobile-bottom-bar a[data-tour="fab"]');
-  await expect(fab).toHaveAttribute('href', '/en/identify/');
+  // routes.identify now points to /observe (consolidated #273), so the FAB href
+  // resolves to /en/observe/ in quick-id mode.
+  await expect(fab).toHaveAttribute('href', '/en/observe/');
   // The ⚡ badge is inside the FAB; assert it's present in the markup.
   await expect(fab.locator('span:has-text("⚡")')).toHaveCount(1);
 });
