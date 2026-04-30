@@ -13,9 +13,11 @@
  *   g r → /console/flag-queue/
  *   g c → /console/comments/
  *   g b → /console/bans/
- *   g e → /console/experts/
+ *   g x → /console/experts/  (x because PR15 reclaimed `e` for errors)
  *   g s → /console/sync/
  *   g k → /console/api/   (k for "kuotas" — q is reserved for search)
+ *   g h → /console/health/
+ *   g e → /console/errors/
  *
  *   ?   → opens help overlay
  *   Esc → closes any open slide-over (already handled in ConsoleSlideOver;
@@ -37,9 +39,11 @@ const BINDINGS: Binding[] = [
   { key: 'r', path: 'flag-queue',  labelKey: 'kb_nav_flag_queue'  },
   { key: 'c', path: 'comments',    labelKey: 'kb_nav_comments'    },
   { key: 'b', path: 'bans',        labelKey: 'kb_nav_bans'        },
-  { key: 'e', path: 'experts',     labelKey: 'kb_nav_experts'     },
+  { key: 'x', path: 'experts',     labelKey: 'kb_nav_experts'     },
   { key: 's', path: 'sync',        labelKey: 'kb_nav_sync'        },
   { key: 'k', path: 'api',         labelKey: 'kb_nav_api'         },
+  { key: 'h', path: 'health',      labelKey: 'kb_nav_health'      },
+  { key: 'e', path: 'errors',      labelKey: 'kb_nav_errors'      },
 ];
 
 function isInTextInput(el: Element | null): boolean {

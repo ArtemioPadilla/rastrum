@@ -1,0 +1,359 @@
+---
+/**
+ * ConsoleHealthView — admin-only weekly health digest.
+ *
+ * Layout: hero card for the latest digest (2-col metric grid with delta
+ * pills vs. the previous week) + a 12-week sparkline strip below.
+ * Sparkline bars are inline SVG rects; no chart library so the bundle
+ * stays slim. Refresh button fires `health.recompute` (idempotent on
+ * (period_start, period_end) — same week → same row).
+ */
+import { t } from '../i18n/utils';
+
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+
+const c = tr.console as unknown as Record<string, string>;
+const healthNs = (tr.console as unknown as Record<string, Record<string, unknown>>).healthView as
+  unknown as Record<string, Record<string, string> | string>;
+
+const hTitle = (healthNs?.title as string) ?? 'Platform health digest';
+const hDesc = (healthNs?.description as string) ?? '';
+const hRefresh = (healthNs?.refresh as string) ?? 'Refresh now';
+const hRefreshing = (healthNs?.refreshing as string) ?? 'Refreshing…';
+const hEmpty = (healthNs?.empty as string) ?? 'No digests yet.';
+const hLoading = (healthNs?.loading as string) ?? 'Loading…';
+const hHeroLabel = (healthNs?.heroLabel as string) ?? 'Latest week';
+const hWeekRange = (healthNs?.weekRange as string) ?? '{from} → {to}';
+const hTrendsHeading = (healthNs?.trendsHeading as string) ?? '12-week trend';
+const hTrendBucketLabel = (healthNs?.trendBucketLabel as string) ?? 'Week of {date}';
+const hVsPrevious = (healthNs?.vsPrevious as string) ?? 'vs prev';
+const hNoPrevious = (healthNs?.noPrevious as string) ?? '—';
+const hDeltaLabel = (healthNs?.deltaLabel as string) ?? 'Δ';
+const metricLabels = (healthNs?.metrics as Record<string, string>) ?? {};
+
+const METRIC_KEYS: string[] = [
+  'admin_actions',
+  'bans_issued',
+  'bans_lifted',
+  'appeals_open',
+  'reports_open',
+  'anomalies_unack',
+  'function_errors_7d',
+  'mod_queue_depth',
+  'expert_queue_depth',
+];
+
+const metricLabelMap: Record<string, string> = {};
+for (const k of METRIC_KEYS) metricLabelMap[k] = metricLabels[k] ?? k;
+---
+
+<section
+  class="max-w-6xl space-y-5"
+  data-hero-label={hHeroLabel}
+  data-week-range-tmpl={hWeekRange}
+  data-vs-prev={hVsPrevious}
+  data-no-prev={hNoPrevious}
+  data-delta-label={hDeltaLabel}
+  data-trend-bucket-label={hTrendBucketLabel}
+  data-metric-labels={JSON.stringify(metricLabelMap)}
+  data-metric-keys={JSON.stringify(METRIC_KEYS)}
+  data-refresh-label={hRefresh}
+  data-refreshing-label={hRefreshing}
+  data-refreshed-label={(healthNs?.refreshed as string) ?? 'Recomputed.'}
+  data-refresh-failed-tmpl={(healthNs?.refreshFailed as string) ?? 'Recompute failed: {error}'}
+>
+  <header class="flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <h1 class="text-xl font-semibold mb-1">{hTitle}</h1>
+      <p class="text-sm text-zinc-500 dark:text-zinc-400 max-w-3xl">{hDesc}</p>
+    </div>
+    <button
+      id="health-refresh-btn"
+      type="button"
+      disabled
+      class="inline-flex items-center gap-2 px-3 py-1.5 rounded border border-zinc-300 dark:border-zinc-700 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed"
+      aria-label={hRefresh}
+    >
+      <svg id="health-refresh-icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 12a9 9 0 1 1-3.51-7.13"></path>
+        <path d="M21 4v5h-5"></path>
+      </svg>
+      <span id="health-refresh-label">{hRefresh}</span>
+    </button>
+  </header>
+
+  <div id="health-not-auth" class="hidden rounded border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-900 dark:text-amber-100">
+    {tr.console.not_authorized}
+  </div>
+
+  <p id="health-toast" class="hidden rounded border border-emerald-300 dark:border-emerald-700/60 bg-emerald-50 dark:bg-emerald-900/20 p-2 text-xs text-emerald-900 dark:text-emerald-100" role="status" aria-live="polite"></p>
+  <p id="health-error" class="hidden rounded border border-red-300 dark:border-red-700/60 bg-red-50 dark:bg-red-900/20 p-2 text-sm text-red-700 dark:text-red-300" role="alert"></p>
+
+  <!-- Loading skeleton -->
+  <div id="health-skeleton" class="space-y-4" aria-busy="true" aria-label={hLoading}>
+    <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-5 space-y-3">
+      <div class="h-4 w-32 rounded bg-zinc-200 dark:bg-zinc-800 animate-pulse"></div>
+      <div class="h-3 w-48 rounded bg-zinc-200 dark:bg-zinc-800 animate-pulse"></div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+        <div class="h-16 rounded bg-zinc-100 dark:bg-zinc-900 animate-pulse"></div>
+        <div class="h-16 rounded bg-zinc-100 dark:bg-zinc-900 animate-pulse"></div>
+        <div class="h-16 rounded bg-zinc-100 dark:bg-zinc-900 animate-pulse"></div>
+        <div class="h-16 rounded bg-zinc-100 dark:bg-zinc-900 animate-pulse"></div>
+      </div>
+    </div>
+    <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-5">
+      <div class="h-4 w-40 rounded bg-zinc-200 dark:bg-zinc-800 animate-pulse mb-3"></div>
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        <div class="h-24 rounded bg-zinc-100 dark:bg-zinc-900 animate-pulse"></div>
+        <div class="h-24 rounded bg-zinc-100 dark:bg-zinc-900 animate-pulse"></div>
+        <div class="h-24 rounded bg-zinc-100 dark:bg-zinc-900 animate-pulse"></div>
+        <div class="h-24 rounded bg-zinc-100 dark:bg-zinc-900 animate-pulse"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Empty state -->
+  <div id="health-empty" class="hidden rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-8 text-center">
+    <p class="text-sm text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto">{hEmpty}</p>
+  </div>
+
+  <!-- Hero card (latest digest) -->
+  <article id="health-hero" class="hidden rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-5 shadow-sm">
+    <header class="flex flex-wrap items-baseline justify-between gap-2 mb-4">
+      <div>
+        <p class="text-[11px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400 font-semibold">{hHeroLabel}</p>
+        <h2 id="health-hero-week" class="text-lg font-semibold text-zinc-900 dark:text-zinc-100"></h2>
+      </div>
+      <div class="text-xs text-zinc-500 dark:text-zinc-400">
+        <span class="font-mono" id="health-hero-id"></span>
+      </div>
+    </header>
+    <dl id="health-hero-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></dl>
+  </article>
+
+  <!-- Sparkline strip -->
+  <article id="health-trends" class="hidden rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-5 shadow-sm">
+    <header class="flex items-baseline justify-between gap-2 mb-3">
+      <h2 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{hTrendsHeading}</h2>
+      <p class="text-[11px] text-zinc-500 dark:text-zinc-400" id="health-trends-range"></p>
+    </header>
+    <div id="health-trends-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3"></div>
+  </article>
+</section>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { getUserRoles } from '../lib/user-roles';
+  import { adminClient, AdminClientError } from '../lib/admin-client';
+  import {
+    computeMetricDelta,
+    trendArrow,
+    trendColorClass,
+  } from '../lib/health-delta';
+
+  type DigestRow = {
+    id: string;
+    period_start: string;
+    period_end: string;
+    metrics: Record<string, number>;
+    created_at: string;
+  };
+
+  const sectionEl = document.querySelector<HTMLElement>('section[data-hero-label]')!;
+  const heroLabel = sectionEl.dataset.heroLabel ?? 'Latest week';
+  const weekRangeTmpl = sectionEl.dataset.weekRangeTmpl ?? '{from} → {to}';
+  const vsPrevText = sectionEl.dataset.vsPrev ?? 'vs prev';
+  const noPrev = sectionEl.dataset.noPrev ?? '—';
+  const deltaLabel = sectionEl.dataset.deltaLabel ?? 'Δ';
+  const trendBucketLabelTmpl = sectionEl.dataset.trendBucketLabel ?? 'Week of {date}';
+  const refreshLabel = sectionEl.dataset.refreshLabel ?? 'Refresh now';
+  const refreshingLabel = sectionEl.dataset.refreshingLabel ?? 'Refreshing…';
+  const refreshedLabel = sectionEl.dataset.refreshedLabel ?? 'Recomputed.';
+  const refreshFailedTmpl = sectionEl.dataset.refreshFailedTmpl ?? 'Recompute failed: {error}';
+
+  const metricLabels: Record<string, string> = JSON.parse(sectionEl.dataset.metricLabels ?? '{}');
+  const metricKeys: string[] = JSON.parse(sectionEl.dataset.metricKeys ?? '[]');
+
+  let jwt: string | null = null;
+  let allDigests: DigestRow[] = [];
+
+  function show(id: string) { document.getElementById(id)?.classList.remove('hidden'); }
+  function hide(id: string) { document.getElementById(id)?.classList.add('hidden'); }
+  function esc(s: string): string {
+    return s.replace(/[<>&'"]/g, ch => ({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&#39;','"':'&quot;'}[ch]!));
+  }
+  function fmtDate(iso: string): string {
+    return iso.slice(0, 10);
+  }
+
+  function renderHero(latest: DigestRow, prev: DigestRow | null) {
+    const heroWeek = document.getElementById('health-hero-week');
+    const heroId = document.getElementById('health-hero-id');
+    const grid = document.getElementById('health-hero-grid');
+    if (!heroWeek || !heroId || !grid) return;
+
+    heroWeek.textContent = weekRangeTmpl
+      .replace('{from}', fmtDate(latest.period_start))
+      .replace('{to}', fmtDate(latest.period_end));
+    heroId.textContent = `id ${latest.id.slice(0, 8)}…`;
+
+    const cards: string[] = [];
+    for (const key of metricKeys) {
+      const cur = Number(latest.metrics?.[key] ?? 0);
+      const prevVal = prev ? Number(prev.metrics?.[key] ?? 0) : null;
+      const delta = prevVal === null ? null : computeMetricDelta(cur, prevVal, key);
+      const deltaPill = delta === null
+        ? `<span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] bg-zinc-100 dark:bg-zinc-800 text-zinc-500">${esc(noPrev)}</span>`
+        : `<span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-mono ${trendColorClass(delta.trend)}" aria-label="${esc(deltaLabel)} ${delta.absolute > 0 ? '+' : ''}${delta.absolute} (${delta.percent}%)">
+              ${trendArrow(delta.trend)} ${delta.absolute > 0 ? '+' : ''}${delta.absolute}
+              <span class="ml-1 opacity-70">${delta.percent > 0 ? '+' : ''}${delta.percent}%</span>
+           </span>`;
+      cards.push(`
+        <div class="rounded border border-zinc-200 dark:border-zinc-800 px-3 py-2.5 bg-zinc-50/50 dark:bg-zinc-900/40">
+          <dt class="text-[11px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400 font-medium">${esc(metricLabels[key] ?? key)}</dt>
+          <dd class="mt-1 flex items-baseline justify-between gap-2">
+            <span class="text-2xl font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">${cur.toLocaleString()}</span>
+            <span class="flex items-center gap-1 text-[11px] text-zinc-500 dark:text-zinc-400">${deltaPill}<span class="ml-1">${esc(vsPrevText)}</span></span>
+          </dd>
+        </div>
+      `);
+    }
+    grid.innerHTML = cards.join('');
+  }
+
+  function renderTrends(digests: DigestRow[]) {
+    const grid = document.getElementById('health-trends-grid');
+    const range = document.getElementById('health-trends-range');
+    if (!grid || !range) return;
+    if (digests.length === 0) {
+      grid.innerHTML = '';
+      range.textContent = '';
+      return;
+    }
+    // digests are DESC by period_end; sparkline reads chronologically.
+    const chrono = [...digests].reverse();
+    const oldest = chrono[0];
+    const newest = chrono[chrono.length - 1];
+    range.textContent = weekRangeTmpl
+      .replace('{from}', fmtDate(oldest.period_start))
+      .replace('{to}', fmtDate(newest.period_end));
+
+    const tiles: string[] = [];
+    for (const key of metricKeys) {
+      const series = chrono.map(d => Number(d.metrics?.[key] ?? 0));
+      const max = Math.max(1, ...series);
+      const total = series.reduce((a, b) => a + b, 0);
+      const w = 8;
+      const gap = 2;
+      const widthPx = chrono.length * (w + gap);
+      const bars = series.map((v, i) => {
+        const h = Math.max(2, Math.round((v / max) * 40));
+        const x = i * (w + gap);
+        const y = 40 - h;
+        const tooltip = trendBucketLabelTmpl.replace('{date}', fmtDate(chrono[i].period_start));
+        return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="1" class="fill-emerald-500 dark:fill-emerald-400"><title>${esc(tooltip)}: ${v.toLocaleString()}</title></rect>`;
+      }).join('');
+      tiles.push(`
+        <div class="rounded border border-zinc-200 dark:border-zinc-800 px-3 py-2.5 bg-zinc-50/50 dark:bg-zinc-900/40">
+          <p class="text-[11px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400 font-medium">${esc(metricLabels[key] ?? key)}</p>
+          <div class="mt-1 flex items-end justify-between gap-2">
+            <span class="text-base font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">${total.toLocaleString()}</span>
+            <svg width="${widthPx}" height="40" viewBox="0 0 ${widthPx} 40" aria-hidden="true">${bars}</svg>
+          </div>
+        </div>
+      `);
+    }
+    grid.innerHTML = tiles.join('');
+  }
+
+  function showToast(msg: string, ok = true) {
+    const t = document.getElementById('health-toast');
+    const e = document.getElementById('health-error');
+    if (ok) {
+      if (t) { t.textContent = msg; t.classList.remove('hidden'); }
+      if (e) e.classList.add('hidden');
+      setTimeout(() => t?.classList.add('hidden'), 4000);
+    } else {
+      if (e) { e.textContent = msg; e.classList.remove('hidden'); }
+      if (t) t.classList.add('hidden');
+    }
+  }
+
+  async function loadDigests() {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('admin_health_digests')
+      .select('id, period_start, period_end, metrics, created_at')
+      .order('period_end', { ascending: false })
+      .limit(12);
+    if (error) throw new Error(error.message);
+    return ((data ?? []) as unknown) as DigestRow[];
+  }
+
+  function paint() {
+    hide('health-skeleton');
+    if (allDigests.length === 0) {
+      hide('health-hero');
+      hide('health-trends');
+      show('health-empty');
+      return;
+    }
+    hide('health-empty');
+    show('health-hero');
+    show('health-trends');
+    renderHero(allDigests[0], allDigests[1] ?? null);
+    renderTrends(allDigests);
+  }
+
+  async function init() {
+    let supabase;
+    try { supabase = getSupabase(); } catch {
+      hide('health-skeleton');
+      show('health-not-auth');
+      return;
+    }
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { hide('health-skeleton'); show('health-not-auth'); return; }
+    const myRoles = await getUserRoles(session.user.id);
+    if (!myRoles.has('admin')) { hide('health-skeleton'); show('health-not-auth'); return; }
+    jwt = session.access_token;
+
+    const refreshBtn = document.getElementById('health-refresh-btn') as HTMLButtonElement | null;
+    if (refreshBtn) refreshBtn.disabled = false;
+
+    try {
+      allDigests = await loadDigests();
+      paint();
+    } catch (err) {
+      hide('health-skeleton');
+      showToast((err as Error).message, false);
+    }
+  }
+
+  document.getElementById('health-refresh-btn')?.addEventListener('click', async () => {
+    if (!jwt) return;
+    const btn = document.getElementById('health-refresh-btn') as HTMLButtonElement;
+    const label = document.getElementById('health-refresh-label');
+    const icon = document.getElementById('health-refresh-icon');
+    btn.disabled = true;
+    if (label) label.textContent = refreshingLabel;
+    icon?.classList.add('animate-spin');
+    try {
+      await adminClient.health.recompute('manual recompute from console', jwt);
+      allDigests = await loadDigests();
+      paint();
+      showToast(refreshedLabel, true);
+    } catch (err) {
+      const msg = err instanceof AdminClientError ? err.message : (err as Error).message;
+      showToast(refreshFailedTmpl.replace('{error}', msg), false);
+    } finally {
+      btn.disabled = false;
+      if (label) label.textContent = refreshLabel;
+      icon?.classList.remove('animate-spin');
+    }
+  });
+
+  init().catch(() => { hide('health-skeleton'); show('health-not-auth'); });
+</script>

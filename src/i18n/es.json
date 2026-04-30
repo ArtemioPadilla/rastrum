@@ -1827,6 +1827,8 @@
     "audit": "Auditoría",
     "anomalies": "Anomalías",
     "forensics": "Forenses y exportación",
+    "health": "Resumen de salud",
+    "errors": "Errores de funciones",
     "features": "Banderas de funcionalidad",
     "proposals": "Propuestas",
     "webhooks": "Webhooks",
@@ -2261,6 +2263,8 @@
     "kb_nav_experts": "Solicitudes de experto",
     "kb_nav_sync": "Fallos de sync",
     "kb_nav_api": "API y cuotas",
+    "kb_nav_health": "Resumen de salud",
+    "kb_nav_errors": "Errores de funciones",
     "kb_help_navigation": "Navegación",
     "kb_help_actions": "Acciones",
     "kb_escape_close": "Cerrar panel lateral",
@@ -2407,17 +2411,119 @@
         "test": "Probar",
         "disable": "Desactivar",
         "enable": "Activar",
-        "delete": "Eliminar"
+        "delete": "Eliminar",
+        "deliveries": "Entregas",
+        "hideDeliveries": "Ocultar entregas"
       },
       "deliveries": {
         "heading": "Entregas recientes (últimas 20)",
         "event": "Evento",
         "status": "Estado",
         "time": "Hora",
-        "error": "Error"
+        "error": "Error",
+        "perWebhookHeading": "Últimas 50 entregas",
+        "filterAll": "Todas",
+        "filterSuccess": "Exitosas",
+        "filterFailed": "Fallidas",
+        "filterPending": "Pendientes",
+        "statusPending": "pendiente",
+        "replayLast": "Reenviar última entrega",
+        "replayConfirmReason": "¿Razón para reenviar esta entrega?",
+        "replayDone": "Reenvío realizado (HTTP {status}).",
+        "replayFailed": "Reenvío falló: {error}",
+        "nonceCopied": "Nonce copiado.",
+        "loadFailed": "No se pudieron cargar las entregas: {error}",
+        "perWebhookEmpty": "Aún no hay entregas para este webhook."
       },
       "empty": "No hay webhooks configurados.",
       "deliveriesEmpty": "Aún no hay entregas."
+    },
+
+    "healthView": {
+      "title": "Resumen de salud de la plataforma",
+      "description": "Captura semanal de métricas de salud. El cron corre los lunes 09:00 UTC; el refresco manual es idempotente sobre la semana actual.",
+      "refresh": "Refrescar ahora",
+      "refreshing": "Refrescando…",
+      "refreshed": "Recalculado.",
+      "refreshFailed": "Falló el recálculo: {error}",
+      "empty": "El resumen semanal corre los lunes 09:00 UTC — aún no hay registros. Usa Refrescar ahora para sembrar el primero.",
+      "loading": "Cargando resumen…",
+      "heroLabel": "Última semana",
+      "weekRange": "{from} → {to}",
+      "trendsHeading": "Tendencia de 12 semanas",
+      "trendBucketLabel": "Semana del {date}",
+      "vsPrevious": "vs anterior",
+      "noPrevious": "—",
+      "deltaLabel": "Δ",
+      "metrics": {
+        "admin_actions":       "Acciones admin",
+        "bans_issued":         "Suspensiones emitidas",
+        "bans_lifted":         "Suspensiones levantadas",
+        "appeals_open":        "Apelaciones abiertas",
+        "reports_open":        "Reportes abiertos",
+        "anomalies_unack":     "Anomalías sin reconocer",
+        "function_errors_7d":  "Errores de funciones (7d)",
+        "mod_queue_depth":     "Profundidad cola moderación",
+        "expert_queue_depth":  "Profundidad cola experto"
+      },
+      "trend": {
+        "up": "sube",
+        "down": "baja",
+        "flat": "estable"
+      },
+      "sparkline": {
+        "value": "{value}",
+        "weekN": "Semana del {date}"
+      }
+    },
+
+    "errorsView": {
+      "title": "Errores de funciones",
+      "description": "Sumidero estructurado alimentado por todo dispatcher de Edge Function. Triaja los reconocidos operacionalmente — quedan en la tabla para el post-mortem.",
+      "empty": "Sin errores en la ventana seleccionada — ese es el buen resultado 🎉",
+      "loading": "Cargando errores…",
+      "filters": {
+        "function": "Función",
+        "code": "Código",
+        "from": "Desde",
+        "to": "Hasta",
+        "actor": "Actor (uuid o usuario)",
+        "state": "Estado",
+        "stateUnack": "Sin reconocer",
+        "stateAll": "Todos",
+        "any": "— cualquiera —"
+      },
+      "columns": {
+        "timestamp": "Fecha y hora",
+        "function": "Función / código",
+        "actor": "Actor",
+        "message": "Mensaje",
+        "context": "Contexto",
+        "state": "Estado",
+        "actions": "Acciones"
+      },
+      "actions": {
+        "acknowledge": "Reconocer",
+        "acknowledged": "reconocido",
+        "acknowledgeAll": "Reconocer todos los que coincidan",
+        "expandContext": "Expandir",
+        "collapseContext": "Colapsar",
+        "autoRefresh": "Auto-refresco (30s)",
+        "autoRefreshOn": "Auto-refresco activado",
+        "autoRefreshOff": "Auto-refresco desactivado"
+      },
+      "slideOver": {
+        "title": "Reconocer error",
+        "notes": "Notas (opcional)",
+        "bulkTitle": "Reconocer todos los errores que coincidan",
+        "bulkConfirm": "Esto reconocerá hasta 1000 filas sin reconocer que coincidan con los filtros actuales. La razón es obligatoria."
+      },
+      "bulk": {
+        "doneCount": "Reconocidos {count} registros.",
+        "capHit": "Llegaste al límite de 1000. Vuelve a ejecutar para reconocer más."
+      },
+      "topCodes": "Códigos más frecuentes",
+      "filterByCode": "Filtrar por código"
     },
 
     "audit_op": {
@@ -2465,7 +2571,11 @@
       "sponsorship_request_withdraw": "Solicitud de patrocinio retirada",
       "vault_failure": "Fallo de bóveda",
       "anomaly_acknowledge": "Anomalía reconocida",
-      "audit_export": "Exportación de auditoría"
+      "audit_export": "Exportación de auditoría",
+      "health_recompute": "Resumen de salud recalculado",
+      "error_acknowledge": "Error de función reconocido",
+      "error_acknowledge_bulk": "Errores de función reconocidos en lote",
+      "webhook_replay": "Entrega de webhook reenviada"
     }
   },
   "projects": {
