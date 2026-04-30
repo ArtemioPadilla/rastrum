@@ -81,6 +81,33 @@ const weathers = WEATHERS;
     <PipelineGraph lang={lang} />
   </div>
 
+  <!-- Audio-skipped warning (#278) — shown when audio node skipped due to BirdNET not downloaded -->
+  <div id="obs2-audio-skip-warn" class="hidden rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 p-4 space-y-3">
+    <div class="flex items-start gap-3">
+      <span class="text-2xl shrink-0">🎵</span>
+      <div class="space-y-1">
+        <p class="font-semibold text-amber-800 dark:text-amber-300 text-sm">
+          {isEs ? "Audio sin identificar — BirdNET no descargado" : "Audio not identified — BirdNET not downloaded"}
+        </p>
+        <p class="text-xs text-zinc-600 dark:text-zinc-400">
+          {isEs
+            ? "Tu grabación de audio no pudo ser identificada porque BirdNET no está instalado. Descárgalo gratis (~50 MB) para identificar cantos de ave en tu dispositivo."
+            : "Your audio recording couldn't be identified because BirdNET isn't installed. Download it free (~50 MB) to identify bird calls on your device."}
+        </p>
+      </div>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <a href={isEs ? "/es/perfil/editar#ai" : "/en/profile/edit#ai"}
+        class="min-h-[40px] rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-xs px-4 flex items-center transition-colors">
+        {isEs ? "Descargar BirdNET" : "Download BirdNET"}
+      </a>
+      <button type="button" id="obs2-audio-skip-continue"
+        class="min-h-[40px] rounded-xl border border-zinc-300 dark:border-zinc-700 text-xs px-4 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors">
+        {isEs ? "Guardar sin identificar" : "Save without identification"}
+      </button>
+    </div>
+  </div>
+
   <!-- Post-process form (hidden until pipeline done) -->
   <form id="obs2-post-form" class="hidden space-y-5" novalidate>
     <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
@@ -552,19 +579,38 @@ async function runPipeline(state: PipelineState) {
   state.status = 'done';
   await savePipelineState(state).catch(() => {});
 
-  // Check if all identify nodes were skipped (no runners) 
-  const noRunnersEl = document.getElementById('obs2-no-runners');
+  // Check pipeline completion states
+  const noRunnersEl   = document.getElementById('obs2-no-runners');
+  const audioWarnEl   = document.getElementById('obs2-audio-skip-warn');
   const identifyNodes = state.nodes.filter(n => n.kind === 'identify');
-  const allSkipped = identifyNodes.length > 0 && identifyNodes.every(n => n.state === 'skipped');
+  const allSkipped    = identifyNodes.length > 0 && identifyNodes.every(n => n.state === 'skipped');
+
+  // Detect audio-specific skip: has audio files, audio identify node was skipped, but not ALL skipped
+  const hasAudioFiles    = state.files.some(f => f.kind === 'audio');
+  const audioSkipped     = identifyNodes.some(n =>
+    n.state === 'skipped' &&
+    state.files.find(f => f.id === n.fileId && f.kind === 'audio')
+  );
+  const partialAudioSkip = hasAudioFiles && audioSkipped && !allSkipped;
 
   if (allSkipped) {
     noRunnersEl?.classList.remove('hidden');
+    audioWarnEl?.classList.add('hidden');
     document.getElementById('obs2-no-runners-continue')?.addEventListener('click', () => {
       noRunnersEl?.classList.add('hidden');
       showPostForm();
     }, { once: true });
+  } else if (partialAudioSkip) {
+    // Audio was uploaded but BirdNET not available — warn before post-form
+    audioWarnEl?.classList.remove('hidden');
+    noRunnersEl?.classList.add('hidden');
+    document.getElementById('obs2-audio-skip-continue')?.addEventListener('click', () => {
+      audioWarnEl?.classList.add('hidden');
+      showPostForm();
+    }, { once: true });
   } else {
     noRunnersEl?.classList.add('hidden');
+    audioWarnEl?.classList.add('hidden');
     showPostForm();
   }
 }
