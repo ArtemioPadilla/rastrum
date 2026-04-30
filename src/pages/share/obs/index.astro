@@ -164,18 +164,76 @@ const lang: 'en' | 'es' = 'en';
                   ${spectroLabel}
                 </button>
               </div>
-              <div id="ws-spec-${obsIdAttr}" class="hidden px-3 pb-3">
-                <div class="flex items-end justify-between mb-1 text-[10px] text-zinc-400 dark:text-zinc-500 select-none">
-                  <span>12 kHz</span><span class="italic">${freqLabel}</span><span>0 Hz</span>
+              <div id="ws-spec-${obsIdAttr}" class="hidden px-3 pb-2">
+                <div class="flex items-center gap-2 mb-2">
+                  <span class="text-[10px] text-zinc-500">${isEs ? 'Rango:' : 'Range:'}</span>
+                  <select id="ws-freq-range-${obsIdAttr}" class="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[10px] px-1 py-0.5">
+                    <option value="12000">0 – 12 kHz</option>
+                    <option value="8000">0 – 8 kHz</option>
+                    <option value="4000">0 – 4 kHz</option>
+                    <option value="2000">0 – 2 kHz</option>
+                  </select>
+                  <div style="flex:1"></div>
+                  <button id="ws-export-${obsIdAttr}" type="button" class="flex items-center gap-1 text-[10px] text-zinc-500 hover:text-zinc-200 transition-colors">
+                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                    ${isEs ? 'Exportar PNG' : 'Export PNG'}
+                  </button>
+                  <button id="ws-info-btn-${obsIdAttr}" type="button" class="w-5 h-5 rounded-full border border-zinc-700 text-[10px] text-zinc-400 hover:border-emerald-500 hover:text-emerald-500 flex items-center justify-center font-bold">?</button>
                 </div>
-                <div class="ws-spectrogram-host w-full rounded overflow-hidden bg-zinc-950" style="height:140px;" aria-hidden="true"></div>
-                <div class="mt-1 text-[10px] text-zinc-400 dark:text-zinc-500 text-right select-none italic">${timeLabel}</div>
+                <div id="ws-info-panel-${obsIdAttr}" class="hidden mb-2 rounded-lg border border-emerald-900/40 bg-emerald-950/30 p-3 text-xs text-zinc-300 space-y-1.5">
+                  <p class="font-semibold text-emerald-300">${isEs ? '¿Qué es un espectrograma?' : 'What is a spectrogram?'}</p>
+                  <p>${isEs ? 'Muestra cómo cambian las frecuencias del sonido a lo largo del tiempo. Horizontal = tiempo, vertical = frecuencia, color = intensidad (más brillante = más fuerte).' : 'Shows how sound frequencies change over time. Horizontal = time, vertical = frequency (pitch), color = intensity — brighter = louder.'}</p>
+                  <p>${isEs ? '🌈 Inferno: negro=silencio, morado=débil, naranja=moderado, amarillo=fuerte.' : '🌈 Inferno: black=silence, purple=faint, orange=moderate, yellow=loud.'}</p>
+                  <p>${isEs ? '🐦 Cantos de aves: 1–8 kHz. Líneas horizontales = tonos sostenidos; verticales = clics.' : '🐦 Bird songs: 1–8 kHz. Horizontal streaks = sustained tones; vertical = clicks.'}</p>
+                  <p id="ws-birdnet-info-${obsIdAttr}" class="hidden font-medium text-emerald-400">${isEs ? '✅ Bandas coloreadas = detecciones BirdNET. Toca para ver detalles.' : '✅ Colored bands = BirdNET detections. Tap for details.'}</p>
+                </div>
+                <div class="flex items-end justify-between mb-1 text-[10px] text-zinc-500 select-none">
+                  <span id="ws-freq-top-${obsIdAttr}">12 kHz</span><span class="italic">${freqLabel}</span><span>0 Hz</span>
+                </div>
+                <div class="relative">
+                  <div id="ws-spec-host-${obsIdAttr}" class="ws-spectrogram-host w-full rounded overflow-hidden bg-zinc-950" style="height:140px;" aria-hidden="true"></div>
+                  <div id="ws-detections-${obsIdAttr}" class="absolute inset-0 pointer-events-none" aria-hidden="true"></div>
+                  <div id="ws-tooltip-${obsIdAttr}" class="hidden absolute z-10 rounded-lg border border-emerald-700 bg-zinc-900/95 shadow-lg p-2.5 text-xs max-w-[200px] pointer-events-none" role="tooltip"></div>
+                </div>
+                <div class="mt-1 text-[10px] text-zinc-500 text-right select-none italic">${timeLabel}</div>
+                <div id="ws-legend-${obsIdAttr}" class="hidden mt-2 space-y-1"></div>
               </div>
             </div>`;
           }).join('');
 
           // Re-run AudioPlayer init for the new DOM nodes
           document.dispatchEvent(new CustomEvent('rastrum:audio-players-ready'));
+
+          // ── Fetch BirdNET detections from the identifications table ──
+          // Query the primary identification for this observation to get
+          // raw_response.segments (sliding-window detections with timestamps).
+          const { data: ident } = await supabase
+            .from('identifications')
+            .select('raw_response, source')
+            .eq('observation_id', id)
+            .eq('is_primary', true)
+            .eq('source', 'birdnet_lite')
+            .maybeSingle();
+
+          if (ident?.raw_response) {
+            type RawResponse = {
+              segments?: Array<{ startSec: number; endSec: number; top: Array<{ scientific_name: string; common_name_en: string | null; score: number }> }>;
+              durationSec?: number;
+            };
+            const raw = ident.raw_response as RawResponse;
+            if (raw.segments && raw.segments.length > 0) {
+              audioFiles.forEach((_af: unknown, idx: number) => {
+                const obsIdAttr = `obs-detail-audio-${idx}`;
+                document.dispatchEvent(new CustomEvent('rastrum:audio-birdnet-ready', {
+                  detail: {
+                    obsId: obsIdAttr,
+                    segments: raw.segments,
+                    durationSec: raw.durationSec ?? (raw.segments[raw.segments.length - 1]?.endSec ?? 0),
+                  },
+                }));
+              });
+            }
+          }
         }
       }
 
