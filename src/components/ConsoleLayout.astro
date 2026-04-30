@@ -178,6 +178,9 @@ const knownPills: Set<UserRole> | null = allRoles ?? null;
       </header>
 
       <div class="flex flex-1 min-h-0">
+        <!-- Desktop sidebar — md:block. Tab markup below is mirrored in
+             the mobile <aside data-console-mobile-sidebar> further down.
+             Edit BOTH copies when adding/removing tabs (see comment there). -->
         <aside
           class="hidden md:block w-56 shrink-0 border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50/40 dark:bg-zinc-950 p-3 overflow-y-auto"
           data-console-sidebar
@@ -215,7 +218,26 @@ const knownPills: Set<UserRole> | null = allRoles ?? null;
         </main>
       </div>
 
-      <!-- Mobile drawer (md:hidden) — same content as desktop aside, slides in from the left -->
+      <!--
+        Mobile drawer (md:hidden) — same content as desktop aside, slides in from the left.
+
+        IMPORTANT: this drawer's tab list is INTENTIONALLY DUPLICATED from
+        the desktop <aside data-console-sidebar> above (~3 KB of compressed
+        HTML). If you edit/add/remove tabs, update BOTH copies — or better,
+        extract the per-role <ul data-role="..."> blocks into a shared
+        Astro snippet/component. The hydrate script at the bottom of this
+        file targets both via the combined selector
+          [data-console-sidebar] ul[data-role], [data-console-mobile-sidebar] ul[data-role]
+        so role-pill flips reveal the right list in whichever copy is
+        currently visible. Any future edit that adds new tab markup needs
+        to land in BOTH spots or the mobile drawer silently goes stale.
+
+        Why duplicated rather than lazy-rendered: the alternative is a
+        blank-sidebar flash on every navigation while the drawer hydrates
+        from the role state. The duplication cost (a few KB) buys
+        byte-stable HTML across viewports and zero hydration delay.
+        Decision rationale: docs/runbooks/admin-chrome-rendering.md.
+      -->
       <div
         id="console-mobile-backdrop"
         class="hidden md:hidden fixed inset-0 z-40 bg-black/60"

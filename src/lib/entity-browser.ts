@@ -449,6 +449,15 @@ export class EntityBrowser<Row extends { id?: string; [k: string]: unknown }> {
       // Defensive: a buggy FilterSpec.apply that doesn't return the running
       // query will silently strip .range() off `q`. Detect it loudly here
       // instead of throwing the cryptic minified `r.range is not a function`.
+      // TODO(#260): this is a defensive guard, NOT a root-cause fix. PR #258
+      // hit this in production but static analysis of every FilterSpec.apply
+      // showed each one returning the query (or null) correctly. When this
+      // warn fires in production, capture the offending filter keys + the
+      // active view's prefix from the log and trace which apply mutates `q`
+      // into a non-builder shape. Prime suspects: autocomplete-resolved
+      // filters that swap to a different supabase-js builder type, or any
+      // future filter that does an inline `await q.from(...)` (which kills
+      // the chain).
       if (typeof (q as { range?: unknown }).range !== 'function') {
         const offendingKeys = Object.keys(values).filter(k => values[k]);
         console.warn(
