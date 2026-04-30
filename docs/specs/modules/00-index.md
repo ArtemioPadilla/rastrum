@@ -87,8 +87,8 @@ narrative source.
 | 28 | Community discovery (observers page, leaderboards, nearby, experts, country filter) | v1.2 | shipped 2026-04-29 (PR1 #92 + PR2 #96 + PR4 #102 + PR5+PR6 atomic landing; PR3 manual cron fire = operator action) | [`28-community-discovery.md`](28-community-discovery.md) |
 | 29 | Projects (ANP polygon protocols + auto-tagging) | v1.3 | shipped 2026-04-29 (PR #132 — schema + RLS + `upsert_project` SECURITY DEFINER + auto-tagging trigger + UI) | [`29-projects-anp.md`](29-projects-anp.md) |
 | 30 | CLI batch import for camera-trap memory cards | v1.3 | shipped 2026-04-29 (PR #134 — `rastrum-import` Node CLI + `/api/upload-url` Edge Function endpoint + EXIF GPS/timestamp walker; depends on M29) | [`30-cli-batch-import.md`](30-cli-batch-import.md) |
-| 31 | Camera stations + sampling-effort tracking | v1.3 | shipped 2026-04-29 (PR #141 — schema only; UI is v1.1 follow-up; depends on M29) | [`31-camera-stations.md`](31-camera-stations.md) |
-| 32 | Multi-provider vision + per-sponsor model + platform pool | v1.3 | shipped 2026-04-29 (PR #143 — closes #115/#116/#118; bundles AWS Bedrock + OpenAI/Azure/Gemini providers + platform-wide `sponsor_pools` call pool atop `_shared/vision-provider.ts`) | [`32-multi-provider-vision.md`](32-multi-provider-vision.md) |
+| 31 | Camera stations + sampling-effort tracking | v1.3 | shipped 2026-04-29 schema (PR #141) + 2026-04-30 v1.1 follow-ups (create-station UI #213, `/api/observe` + CLI `--station-key` #208). Period management + detection-rate dashboard tracked in #224. | [`31-camera-stations.md`](31-camera-stations.md) |
+| 32 | Multi-provider vision + per-sponsor model + platform pool | v1.3 | shipped 2026-04-29 backend (PR #143 closes #115/#116/#118) + 2026-04-30 v1.1 follow-ups (sponsor UI #215, Vertex auto-rotation #209, ops crons #207, smoke probe workflow #210). Pool dashboard with top-taxa + cost-per-100 picker + pool karma incentives tracked in #226/#227/#228. | [`32-multi-provider-vision.md`](32-multi-provider-vision.md) |
 
 ## v1.5 — Territory layer — planned
 
