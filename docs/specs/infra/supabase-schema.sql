@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS public.users (
 -- Profile / gamification additive columns (module 08 v0.1 slice).
 -- See docs/specs/modules/08-profile-activity-gamification.md.
 ALTER TABLE public.users
-  ADD COLUMN IF NOT EXISTS profile_public        boolean  NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS profile_public        boolean  NOT NULL DEFAULT true,
   ADD COLUMN IF NOT EXISTS gamification_opt_in   boolean  NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS streak_digest_opt_in  boolean  NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS region_primary        text,
@@ -4136,8 +4136,13 @@ SELECT
   observation_count, species_count, obs_count_7d, obs_count_30d,
   last_observation_at, joined_at
 FROM public.users
-WHERE profile_public = true
-  AND hide_from_leaderboards = false;
+WHERE hide_from_leaderboards = false;
+-- 2026-04-30: dropped `profile_public = true AND` — M28 visibility is now
+-- governed solely by its dedicated opt-out (hide_from_leaderboards). The
+-- belt-and-suspenders gate on profile_public was inherited from the M08
+-- binary privacy model, which is being deprecated in favor of M25's
+-- profile_privacy matrix. /community/observers/ is now default-discoverable;
+-- users wanting to hide flip the toggle in Profile → Edit.
 
 GRANT SELECT ON public.community_observers TO anon, authenticated;
 
@@ -4152,11 +4157,31 @@ SELECT
   observation_count, species_count, obs_count_7d, obs_count_30d,
   centroid_geog, last_observation_at, joined_at
 FROM public.users
-WHERE profile_public = true
-  AND hide_from_leaderboards = false;
+WHERE hide_from_leaderboards = false;
+-- 2026-04-30: same change as community_observers above — M28-only opt-out.
 
 GRANT SELECT ON public.community_observers_with_centroid TO authenticated;
 -- Explicitly NO grant to anon. Lack of grant is the security gate.
+
+-- =====================================================================
+-- M28 default visibility (2026-04-30) — A + B + C combined
+--
+-- Goal: by default, users see all members on /community/observers/.
+--   A) New users default to profile_public=true (was false from M08).
+--   B) M28 views drop the profile_public requirement (above).
+--   C) Backfill existing profile_public=false users to true so they
+--      appear immediately. Users who explicitly want privacy can flip
+--      profile_public=false (hides /u/ profile page) AND/OR
+--      hide_from_leaderboards=true (hides M28 card specifically).
+--
+-- Idempotent: ALTER COLUMN DEFAULT is no-op on second run; the UPDATE
+-- only touches rows that haven't already been backfilled.
+-- =====================================================================
+ALTER TABLE public.users ALTER COLUMN profile_public SET DEFAULT true;
+
+UPDATE public.users
+   SET profile_public = true
+ WHERE profile_public = false;
 
 -- =====================================================================
 -- Module 26 v1.1 — observation_reaction_summary (2026-04-29)

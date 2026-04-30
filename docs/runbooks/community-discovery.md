@@ -12,12 +12,13 @@
   plus `country_code_source` `'auto'|'user'` (PR4 #102) tracking whether
   `country_code` was set by the user or inferred from `region_primary`.
 - 7 partial indexes scoped to `WHERE NOT hide_from_leaderboards AND profile_public`.
-  Opted-out / private users add zero cost to anyone's query plan.
+  Opted-out users add zero cost to anyone's query plan. (Indexes still gate on
+  `profile_public` for legacy reasons; harmless under the new default-true model.)
 - `iso_countries` reference table seeded with 30 LatAm + common observer locales
   (idempotent `INSERT … ON CONFLICT DO UPDATE`). `pg_trgm` GIN indexes on
   `name_en` / `name_es` for fuzzy matching by `normalize_country_code(text)`.
 - Two views with the same eligibility predicate
-  (`profile_public = true AND hide_from_leaderboards = false`):
+  (`hide_from_leaderboards = false`):
   - `community_observers` — anon + authenticated. **No centroid.** All discovery
     surfaces except Nearby read from this view.
   - `community_observers_with_centroid` — authenticated only. **Lack of GRANT to
@@ -62,9 +63,11 @@ make db-cron-test   # fires streaks + badges + recompute-user-stats locally
 
 ## Privacy invariants — do NOT break
 
-1. The eligibility predicate (`profile_public AND NOT hide_from_leaderboards`)
-   lives in **one place per view**. Don't duplicate it elsewhere — adding new
-   community queries should consume the views, not `users` directly.
+1. The eligibility predicate (`NOT hide_from_leaderboards`) lives in **one place
+   per view**. Don't duplicate it elsewhere — adding new community queries should
+   consume the views, not `users` directly. As of 2026-04-30 the predicate no
+   longer references `profile_public`; M28 visibility is governed solely by its
+   dedicated opt-out (`hide_from_leaderboards`).
 2. `community_observers_with_centroid` is **never** granted to `anon`. Adding a
    `GRANT SELECT … TO anon` on it would break the privacy gate.
 3. `country_code_source` is set to `'user'` only by the Profile → Edit save
@@ -100,22 +103,24 @@ Profile → Edit toggle.
 
 ## UX clarifications (PR17, 2026-04-30)
 
-### Why am I the only one I see? — privacy-default explainer
+### Why am I the only one I see? — historical context
 
-`users.profile_public` defaults to **false**. Both community views filter
-on `profile_public = true AND hide_from_leaderboards = false`, so a brand-new
-user looking at `/community/observers/` sees only themselves until others
-opt in.
+**As of 2026-04-30 (PR after #229), this should no longer happen.** `users.profile_public`
+default flipped from `false` → `true`, the M28 views dropped the
+`profile_public = true AND` clause, and a one-time backfill flipped existing
+`profile_public = false` users to `true`. /community/observers/ is now
+default-discoverable; users are visible unless they explicitly toggle
+`hide_from_leaderboards = true` from Profile → Edit.
 
-This used to look like a broken page. As of PR17 the page renders an explicit
-amber explainer banner whenever the filter combo returns 0 rows AND the
-viewer is signed in:
+The PR17 amber explainer banner still renders when the filtered query returns
+0 rows (e.g., a country picker selecting an empty country, or expert-only with
+no experts in the result), but the historical "everyone is private by default"
+case no longer applies.
 
-- **Profile is also private** → "Your profile is also private — flip the toggle…"
-- **Profile is public** → "Most observers haven't enabled their public profile yet…"
-
-A "Configure your own profile →" link points to `/profile/edit/`. Anon users
-already get the existing sign-in CTAs and don't need a second nudge.
+If you ever DO see only yourself unexpectedly, check:
+1. Did the schema migration apply? `SELECT column_default FROM information_schema.columns WHERE table_name='users' AND column_name='profile_public';` should return `true`.
+2. Did the backfill run? `SELECT count(*) FROM users WHERE profile_public = false;` should be 0 or near-0.
+3. Did counters compute? `SELECT count(*) FROM users WHERE observation_count > 0 AND last_observation_at IS NOT NULL;` should match your active-user count.
 
 ### GPS vs centroid Nearby modes
 

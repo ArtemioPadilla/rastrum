@@ -348,7 +348,7 @@ URL params.
 Three load-bearing rules:
 
 1. **Privacy gate at the SQL layer.** Two views with the same
-   eligibility predicate (`profile_public AND NOT hide_from_leaderboards`):
+   eligibility predicate (`hide_from_leaderboards = false`):
    `community_observers` (anon + authenticated, no centroid) and
    `community_observers_with_centroid` (authenticated only, includes
    centroid). The lack of `GRANT TO anon` on the centroid view is the
