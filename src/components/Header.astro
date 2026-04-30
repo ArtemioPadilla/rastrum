@@ -44,6 +44,7 @@ const exploreRecentPath = getLocalizedPath(lang, routes.exploreRecent[locale] + 
 const exploreWatchlistPath = getLocalizedPath(lang, routes.exploreWatchlist[locale] + '/');
 const exploreSpeciesPath = getLocalizedPath(lang, routes.exploreSpecies[locale] + '/');
 const exploreValidatePath = getLocalizedPath(lang, routes.exploreValidate[locale] + '/');
+const projectsPath = getLocalizedPath(lang, routes.projects[locale] + '/');
 
 // Community discovery (M28) — preset-filtered links into /community/observers/.
 const communityObserversBase = getLocalizedPath(lang, routes.communityObservers[locale] + '/');
@@ -63,6 +64,7 @@ interface ExploreMegaMenu {
   community_nearby: string;
   community_experts: string;
   community_country: string;
+  projects?: string;
 }
 const em = (tr as unknown as { nav: { explore_megamenu: ExploreMegaMenu } }).nav.explore_megamenu;
 
@@ -75,6 +77,7 @@ const exploreColumns = [
       { key: 'exploreWatchlist', label: tr.nav.explore_dropdown.watchlist, href: exploreWatchlistPath },
       { key: 'exploreSpecies',   label: tr.nav.explore_dropdown.species,   href: exploreSpeciesPath },
       { key: 'exploreValidate',  label: validateLabel,                     href: exploreValidatePath },
+      { key: 'projects',         label: em.projects ?? (lang === 'es' ? 'Proyectos' : 'Projects'), href: projectsPath },
     ],
   },
   {
