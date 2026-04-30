@@ -9,7 +9,7 @@
 //   - Manifest, favicon, sw.js itself: network-first so updates land fast.
 //
 // Bump VERSION to invalidate every cached entry on the next visit.
-const VERSION = 'rastrum-shell-v7-2026-04-29-sync-fix';
+const VERSION = 'rastrum-shell-v8-2026-04-30-share-target';
 const SHELL = [
   '/',
   '/en/',
@@ -98,14 +98,46 @@ function isHtmlNavigation(req, url) {
   return url.pathname.endsWith('/') || url.pathname.endsWith('.html');
 }
 
+// ── Web Share Target ──
+// When the OS share sheet POSTs to /share-target, stash the file in Cache
+// Storage and redirect to the /share-target page (GET) where the client
+// retrieves it and hands it off to the observation form.
+const SHARE_TARGET_CACHE = 'rastrum-share-target-v1';
+const SHARE_TARGET_PATH  = '/share-target';
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
-  if (req.method !== 'GET') return;
-
   const url = new URL(req.url);
 
-  // Never intercept third-party API calls — Supabase, Anthropic, PlantNet,
-  // OpenFreeMap tiles. Failures should surface so the outbox kicks in.
+  // ── Share Target: intercept POST /share-target ──
+  if (req.method === 'POST' && url.pathname === SHARE_TARGET_PATH) {
+    event.respondWith((async () => {
+      try {
+        const formData = await req.formData();
+        const file = formData.get('audio') || formData.get('image') || formData.get('video');
+        const sharedTitle = String(formData.get('title') ?? '');
+        const sharedText  = String(formData.get('text')  ?? '');
+        const sharedUrl   = String(formData.get('url')   ?? '');
+        if (file instanceof File && file.size > 0) {
+          const meta = JSON.stringify({ filename: file.name, title: sharedTitle, text: sharedText, url: sharedUrl });
+          const stashRes = new Response(file, {
+            headers: {
+              'Content-Type': file.type || 'application/octet-stream',
+              'X-Rastrum-Share-Meta': meta,
+            },
+          });
+          const shareCache = await caches.open(SHARE_TARGET_CACHE);
+          await shareCache.put(SHARE_TARGET_PATH + '-stash', stashRes);
+        }
+      } catch (swErr) {
+        console.warn('[rastrum-sw] share-target stash error:', swErr);
+      }
+      return Response.redirect(SHARE_TARGET_PATH, 303);
+    })());
+    return;
+  }
+
+  if (req.method !== 'GET') return;
   if (url.hostname.includes('supabase.co')
    || url.hostname.includes('anthropic.com')
    || url.hostname.includes('plantnet.org')

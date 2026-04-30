@@ -136,3 +136,65 @@ export function buildInputTensor(channelData: Float32Array[], sampleRate: number
   const windowed = windowSamples(resampled, BIRDNET_WINDOW_SAMPLES);
   return normalise(windowed);
 }
+
+export interface AudioSegment {
+  /** Start time in seconds (relative to original audio). */
+  startSec: number;
+  /** End time in seconds. */
+  endSec: number;
+  /** Preprocessed tensor ready for ONNX inference, shape [BIRDNET_WINDOW_SAMPLES]. */
+  tensor: Float32Array;
+}
+
+/**
+ * Slice a full audio recording into overlapping 3-second segments using a
+ * sliding window with `hopSec` step (default 1.5 s = 50% overlap).
+ *
+ * BirdNET-Analyzer uses 3-s windows with 0-s or 1.5-s hop. We default to
+ * 1.5 s for better temporal resolution on longer recordings.
+ *
+ * Each segment is independently resampled, windowed, and normalised so it
+ * can be passed directly to the ONNX session.
+ *
+ * If the audio is shorter than one window it returns a single segment
+ * spanning the full duration (same behaviour as `buildInputTensor`).
+ */
+export function buildSegmentTensors(
+  channelData: Float32Array[],
+  sampleRate: number,
+  hopSec = 1.5,
+): AudioSegment[] {
+  const mono = toMono(channelData);
+  const resampled = resampleNearest(mono, sampleRate, BIRDNET_SAMPLE_RATE);
+  const totalSamples = resampled.length;
+  const hopSamples = Math.round(hopSec * BIRDNET_SAMPLE_RATE);
+
+  // If audio is shorter than one window, return a single segment
+  if (totalSamples <= BIRDNET_WINDOW_SAMPLES) {
+    return [{
+      startSec: 0,
+      endSec: totalSamples / BIRDNET_SAMPLE_RATE,
+      tensor: normalise(windowSamples(resampled, BIRDNET_WINDOW_SAMPLES)),
+    }];
+  }
+
+  const segments: AudioSegment[] = [];
+  let offset = 0;
+
+  while (offset < totalSamples) {
+    const end = Math.min(offset + BIRDNET_WINDOW_SAMPLES, totalSamples);
+    const slice = resampled.subarray(offset, end);
+    const windowed = windowSamples(slice, BIRDNET_WINDOW_SAMPLES);
+    segments.push({
+      startSec: offset / BIRDNET_SAMPLE_RATE,
+      endSec: end / BIRDNET_SAMPLE_RATE,
+      tensor: normalise(windowed),
+    });
+    // Stop if we've covered the whole audio
+    if (end >= totalSamples) break;
+    offset += hopSamples;
+  }
+
+  return segments;
+}
+
