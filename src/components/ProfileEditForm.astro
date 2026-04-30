@@ -5,6 +5,7 @@ interface Props {
   lang: 'en' | 'es';
 }
 const { lang } = Astro.props;
+const isEs = lang === 'es';
 const tr = t(lang);
 const pip = (tr as unknown as { pipeline: Record<string, string> }).pipeline;
 const onb = (tr as unknown as { onboarding: Record<string, string> }).onboarding;

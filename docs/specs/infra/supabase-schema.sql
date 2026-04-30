@@ -419,10 +419,16 @@ CREATE POLICY "obs_public_read" ON public.observations FOR SELECT
 -- Same dataset shape, just no obscuration. Admin sets credentialed_researcher
 -- after ID verification (no self-serve toggle).
 DROP POLICY IF EXISTS "obs_credentialed_read" ON public.observations;
+-- Fixed 2026-04-30: replaced correlated subquery with EXISTS to prevent 42P17 infinite
+-- recursion when Postgres evaluates ALL permissive policies during INSERT (Marcela bug).
 CREATE POLICY "obs_credentialed_read" ON public.observations FOR SELECT
   USING (
     sync_status = 'synced'
-    AND (SELECT credentialed_researcher FROM public.users WHERE id = auth.uid()) = true
+    AND EXISTS (
+      SELECT 1 FROM public.users
+      WHERE id = auth.uid()
+        AND credentialed_researcher = true
+    )
   );
 
 -- Identifications: tied to observation access
