@@ -141,6 +141,41 @@ const PAGES: PageSpec[] = [
       es: { kind: 'static', title: 'Observadores de la comunidad',  subtitle: 'Encuentra observadores por actividad, experiencia, ubicación o país.',   accent: 'teal' },
     },
   },
+  {
+    slug: 'inbox',
+    cards: {
+      en: { kind: 'static', title: 'Activity inbox',                subtitle: 'Follows, reactions, comments, and identifications on your work.',         accent: 'sky' },
+      es: { kind: 'static', title: 'Bandeja de actividad',          subtitle: 'Follows, reacciones, comentarios e identificaciones de tu trabajo.',     accent: 'sky' },
+    },
+  },
+  {
+    slug: 'projects',
+    cards: {
+      en: { kind: 'static', title: 'Projects (ANP polygons)',       subtitle: 'Define a polygon, then observations inside auto-tag into your project.',   accent: 'orange' },
+      es: { kind: 'static', title: 'Proyectos (polígonos ANP)',     subtitle: 'Define un polígono y las observaciones dentro se auto-etiquetan.',         accent: 'orange' },
+    },
+  },
+  {
+    slug: 'sponsoring',
+    cards: {
+      en: { kind: 'static', title: 'AI sponsorships',               subtitle: 'Share your Anthropic credential with specific beneficiaries. Caps + auto-pause.', accent: 'amber' },
+      es: { kind: 'static', title: 'Patrocinios de IA',             subtitle: 'Comparte tu credencial Anthropic con beneficiarios. Topes + auto-pausa.',  accent: 'amber' },
+    },
+  },
+  {
+    slug: 'sponsored-by',
+    cards: {
+      en: { kind: 'static', title: 'Sponsored by',                  subtitle: 'See who is sharing AI capacity with you.',                                 accent: 'amber' },
+      es: { kind: 'static', title: 'Patrocinado por',               subtitle: 'Quién comparte capacidad de IA contigo.',                                  accent: 'amber' },
+    },
+  },
+  {
+    slug: 'console',
+    cards: {
+      en: { kind: 'static', title: 'Admin console',                 subtitle: 'Operator + moderator + expert dashboard. 36 handlers, 7 entity browsers.', accent: 'slate' },
+      es: { kind: 'static', title: 'Consola de administración',     subtitle: 'Dashboard de operador, moderador y experto. 36 handlers, 7 navegadores.',  accent: 'slate' },
+    },
+  },
 ];
 
 async function renderOne(slug: string, lang: Lang, card: StaticCardInput, fontBold: ArrayBuffer, fontRegular: ArrayBuffer): Promise<Buffer> {

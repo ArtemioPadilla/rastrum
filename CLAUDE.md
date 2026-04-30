@@ -27,7 +27,8 @@ Bilingual EN/ES from day one.
 |---|---|
 | [`docs/progress.json`](docs/progress.json)              | Source of truth for the roadmap. Bilingual labels (`_es` suffix). |
 | [`docs/tasks.json`](docs/tasks.json) + [`docs/tasks.md`](docs/tasks.md) | Per-roadmap-item subtask breakdown. Check current status before starting work. |
-| [`docs/specs/modules/00-index.md`](docs/specs/modules/00-index.md) | Catalog of ~33 module specs. Each module has its own design doc. |
+| [`docs/specs/modules/00-index.md`](docs/specs/modules/00-index.md) | Catalog of ~34 module specs. Each module has its own design doc. |
+| [`docs/runbooks/00-index.md`](docs/runbooks/00-index.md) | Operator runbook index (admin console, research workflow, ops hygiene). |
 | [`docs/architecture.md`](docs/architecture.md)            | High-level architecture diagram + critical-path flows. |
 | [`docs/specs/infra/supabase-schema.sql`](docs/specs/infra/supabase-schema.sql) | Idempotent SQL — apply with `make db-apply`. |
 | `Makefile`                                                | Run `make help` to see every dev workflow. |
@@ -41,7 +42,7 @@ make help                     # list every target with descriptions
 make install                  # npm ci
 make dev                      # astro dev — http://localhost:4321
 make build                    # static build into dist/
-make test                     # vitest run (~465 tests today)
+make test                     # vitest run (~680 tests today)
 make typecheck                # tsc --noEmit
 make db-apply                 # apply supabase-schema.sql (idempotent)
 make db-verify                # show tables, RLS, triggers, extensions
@@ -633,8 +634,8 @@ The validate gate is the fix.
 
 ```bash
 npm run typecheck   # tsc --noEmit, zero errors
-npm run test        # vitest run — ~465 tests today, all green
-npm run build       # zero errors, 57 pages today, EN/ES paired
+npm run test        # vitest run — ~680 tests today, all green
+npm run build       # zero errors, ~186 pages today, EN/ES paired
 git status -s       # nothing untracked except .claude/ or .env.local
 ```
 

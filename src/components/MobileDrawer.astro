@@ -25,6 +25,8 @@ const sponsoredByPath    = getLocalizedPath(lang, routes.sponsoredBy[locale] + '
 const exploreMapPath        = getLocalizedPath(lang, routes.exploreMap[locale] + '/');
 const exploreRecentPath     = getLocalizedPath(lang, routes.exploreRecent[locale] + '/');
 const exploreSpeciesPath    = getLocalizedPath(lang, routes.exploreSpecies[locale] + '/');
+const exploreValidatePath   = getLocalizedPath(lang, routes.exploreValidate[locale] + '/');
+const projectsPath          = getLocalizedPath(lang, routes.projects[locale] + '/');
 const communityObserversBase    = getLocalizedPath(lang, routes.communityObservers[locale] + '/');
 const communityObserversTopHref    = `${communityObserversBase}?sort=obs_count_30d`;
 const communityObserversNearbyHref = `${communityObserversBase}?nearby=true`;
@@ -34,8 +36,12 @@ interface ExploreMegaMenu {
   community_all: string;
   community_top: string;
   community_nearby: string;
+  projects?: string;
 }
 const em = (tr as unknown as { nav: { explore_megamenu: ExploreMegaMenu } }).nav.explore_megamenu;
+const validateLabel =
+  ((tr as unknown as { validation?: { nav_validate_label?: string } }).validation?.nav_validate_label) ?? 'Validate';
+const projectsLabel = em.projects ?? (lang === 'es' ? 'Proyectos' : 'Projects');
 
 const getDocLabel = (key: string) => (tr.docs.sections as Record<string, string>)[key] || key;
 ---
@@ -77,6 +83,8 @@ const getDocLabel = (key: string) => (tr.docs.sections as Record<string, string>
       <a href={exploreRecentPath}  class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{tr.nav.explore_dropdown.recent}</a>
       <a href={watchlistPath}      class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{tr.nav.explore_dropdown.watchlist}</a>
       <a href={exploreSpeciesPath} class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{tr.nav.explore_dropdown.species}</a>
+      <a href={exploreValidatePath} class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{validateLabel}</a>
+      <a href={projectsPath}        class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{projectsLabel}</a>
 
       <p class="text-[11px] uppercase tracking-wider text-zinc-500 mt-3 mb-1">{em.community}</p>
       <a href={communityObserversBase}       class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{em.community_all}</a>

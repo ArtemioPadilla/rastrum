@@ -76,6 +76,13 @@ function ogSlugForPath(path: string): string {
   if (p.includes('/validate') || p.includes('/validar'))        return 'validate';
   if (p.startsWith('/community/observers') || p.startsWith('/comunidad/observadores'))
                                                                 return 'community-observers';
+  if (p.startsWith('/inbox')    || p.startsWith('/bandeja'))    return 'inbox';
+  if (p.startsWith('/projects') || p.startsWith('/proyectos'))  return 'projects';
+  if (p.startsWith('/profile/sponsored-by') || p.startsWith('/perfil/patrocinado-por'))
+                                                                return 'sponsored-by';
+  if (p.startsWith('/profile/sponsoring') || p.startsWith('/perfil/patrocinando'))
+                                                                return 'sponsoring';
+  if (p.startsWith('/console')  || p.startsWith('/consola'))    return 'console';
   if (p.startsWith('/explore')  || p.startsWith('/explorar'))   return 'explore';
   if (p.startsWith('/chat'))                                    return 'chat';
   if (p.startsWith('/about')  || p.startsWith('/acerca'))       return 'about';

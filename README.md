@@ -4,7 +4,7 @@
 
 [![CI](https://img.shields.io/github/actions/workflow/status/ArtemioPadilla/rastrum/ci.yml?branch=main&label=ci)](https://github.com/ArtemioPadilla/rastrum/actions/workflows/ci.yml)
 [![Deploy](https://img.shields.io/github/actions/workflow/status/ArtemioPadilla/rastrum/deploy.yml?branch=main&label=deploy)](https://github.com/ArtemioPadilla/rastrum/actions/workflows/deploy.yml)
-[![Tests](https://img.shields.io/badge/tests-225%20passing-brightgreen.svg)](https://github.com/ArtemioPadilla/rastrum/actions)
+[![Tests](https://img.shields.io/badge/tests-680%20passing-brightgreen.svg)](https://github.com/ArtemioPadilla/rastrum/actions)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/ArtemioPadilla/rastrum/pulls)
 
@@ -126,7 +126,7 @@ npm run preview   # preview the build locally
 
 ```bash
 npm run typecheck   # tsc --noEmit
-npm run test        # vitest run (225 tests today)
+npm run test        # vitest run (~680 tests today)
 npm run test:e2e    # Playwright on chromium + mobile-chrome
 npm run test:lhci   # Lighthouse CI against ./dist
 npm run test:audit  # build + e2e + lhci
@@ -203,7 +203,7 @@ documented for any LLM coding agent working on the codebase:
 
 The roadmap below mirrors [`docs/progress.json`](docs/progress.json).
 Phase status reflects what's actually shipped to `https://rastrum.org`
-as of 2026-04-26.
+as of 2026-04-30.
 
 | Version | Period | Status | Highlights |
 | --- | --- | --- | --- |
@@ -211,9 +211,11 @@ as of 2026-04-26.
 | v0.3 | Months 4–5 | shipped (2 blocked) | Activity feed + unread badge; NOM-059 obscuration; WebLLM Llama-3.2-1B; WebLLM as default fallback; visible identification block in form; two-pass GPS; sensitive privacy notice |
 | v0.5 | Months 6–8 | shipped (3 blocked) | Multi-image obs; ecological evidence types; 39 seed badges + nightly evaluator; WebLLM Phi-3.5-vision; quality gates ≥ 0.4; consensus 2 / 3 weighted; per-plugin BYO API keys; user API tokens (`rst_*`) + REST API + token UI |
 | v1.0 | Months 9–14 | shipped (3 open) | Streaks; share OG cards; follows / comments / watchlists schema + UI; expert weighting; events; institutional CSV presets; credentialed-researcher RLS; environmental enrichment (lunar + OpenMeteo); BirdNET-Lite + EfficientNet-Lite0 + pmtiles MX + MegaDetector all hosted on R2; MCP server; map location picker; my observations page; in-app camera; batch photo importer; **domain migration to `rastrum.org`** |
-| v1.5 | Months 12–16 (parallel) | planned | Biodiversity Trails; PITs + QR/NFC anchors; ANP/INEGI/INAH GeoJSON; diversity indices (S, H′, D, Chao1, Pielou J); trail PDF export |
-| v2.0 | Months 17–22 | planned | Camera-trap occupancy modelling; GBIF publisher + DOI; regional ML training; B2G dashboard for CONANP / state agencies; iNaturalist bridge |
-| v2.5 | Months 23–32 | planned | Rastrum Scout (RAG); AR species overlay; indigenous-language voice I/O; CONABIO/CONANP/INAH partnership APIs |
+| v1.1 | Months 14–15 | shipped (mostly) | Module 22 community validation (suggest modal + research-grade chip + `/validate` queue); Module 23 karma phase 1; Module 24 admin console (16 PRs, 36 EF handlers, 7 entity browsers, anomalies + health digest + webhooks + two-person rule + time-bounded roles + moderator trust score); Module 26 social graph + reactions + inbox + reports; Module 27 AI sponsorships (per-user Anthropic credentials shared with beneficiaries) |
+| v1.2 | Months 15–16 | shipped 2026-04-30 | Profile privacy matrix (19 facets × 3 levels); public profile route `/u/?username=`; Module 28 community discovery (`/community/observers/` + country picker + privacy-gated dual views); observation detail page redesign (two-column + manage panel + atomic delete-photo + native lightbox); Module 29 projects (ANP polygons + auto-tag trigger); Module 30 CLI batch import (`rastrum-import`); Module 31 camera stations (sampling-effort schema); Module 32 multi-provider vision (6 providers + platform pool) |
+| v1.5 | Months 16–20 (parallel) | planned | Biodiversity Trails; PITs + QR/NFC anchors; ANP/INEGI/INAH GeoJSON; diversity indices (S, H′, D, Chao1, Pielou J); trail PDF export |
+| v2.0 | Months 20–26 | planned | Camera-trap occupancy modelling; GBIF publisher + DOI; regional ML training; B2G dashboard for CONANP / state agencies; iNaturalist bridge |
+| v2.5 | Months 26–32 | planned | Rastrum Scout (RAG); AR species overlay; indigenous-language voice I/O; CONABIO/CONANP/INAH partnership APIs |
 
 Open per-phase blockers (license, weights, governance) are tracked in
 [`docs/tasks.md`](docs/tasks.md) and live at
