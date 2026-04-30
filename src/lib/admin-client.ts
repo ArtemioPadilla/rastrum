@@ -40,6 +40,24 @@ interface CommentUnlockPayload { comment_id: string }
 interface UserBanPayload { target_user_id: string; duration_hours: number | null }
 interface UserUnbanPayload { target_user_id: string; ban_id: string }
 
+interface UserDetailPayload {
+  user_id?: string;
+  email?: string;
+}
+export interface UserDetailResult {
+  id: string;
+  email: string | null;
+  email_confirmed_at: string | null;
+  created_at: string | null;
+  last_sign_in_at: string | null;
+  identities: Array<{
+    provider: string;
+    email: string | null;
+    created_at: string | null;
+    last_sign_in_at: string | null;
+  }>;
+}
+
 interface BadgeAwardManualPayload { target_user_id: string; badge_key: string }
 interface BadgeRevokePayload { target_user_id: string; badge_key: string }
 
@@ -195,6 +213,8 @@ export const adminClient = {
       call('user.ban', payload, reason, jwt),
     unban: (payload: UserUnbanPayload, reason: string, jwt: string) =>
       call('user.unban', payload, reason, jwt),
+    detail: (payload: UserDetailPayload, reason: string, jwt: string) =>
+      call<UserDetailResult>('user.detail', payload, reason, jwt),
   },
   badge: {
     awardManual: (payload: BadgeAwardManualPayload, reason: string, jwt: string) =>
