@@ -17,7 +17,7 @@
 | v0.5 | Beta | shipped (partial) | 11 / 13 |
 | v1.0 | Public Launch | shipped (partial) | 18 / 21 |
 | v1.0.x | Post-launch polish | in_progress | 8 / 24 |
-| v1.1 | UX polish (post-launch brainstorm) | shipped (mostly) | 34 / 36 |
+| v1.1 | UX polish (post-launch brainstorm) | shipped (mostly) | 35 / 37 |
 | v1.2 | Profile privacy & public profile | shipped 2026-04-28 | 3 / 3 |
 | v1.3 | Module 27: AI Sponsorships | shipped 2026-04-28 | 1 / 1 |
 | **v0.1 → v1.0** | **Public launch** | **shipped 2026-04-26** | **54 / 59** |
@@ -84,15 +84,15 @@ Remaining:
 
 ## v1.1 — UX polish (post-launch brainstorm) — shipped (mostly)
 
-**34 of 36 items done.** (Originally 15; added 6 cross-cutting items
+**35 of 37 items done.** (Originally 15; added 6 cross-cutting items
 shipped 2026-04-27/28: M22, owner CRUD, atomic delete-observation,
-suggest-from-share-page, OG pipeline, onboarding v2; then the 15-PR
-admin-console series shipped 2026-04-26 → 2026-04-29: PR1-PR15 covering
+suggest-from-share-page, OG pipeline, onboarding v2; then the 16-PR
+admin-console series shipped 2026-04-26 → 2026-04-29: PR1-PR16 covering
 foundation → engineering hygiene → observability → future-proofing →
-deferred cleanup → observability UI surface.)
+deferred cleanup → observability UI surface → entity browsers.)
 
 Admin console "do all" series (2026-04-26 → 2026-04-29):
-- `admin-console-foundation` (PR1) → `admin-console-pr15-observability-ui` (PR15) — schema + chrome + 36 Edge Function handlers + 8 crons across 15 PRs. Full primitives now live: time-bounded role grants, two-person rule with `enforce_two_person_irreversible` feature-flag gate, HMAC-SHA256 webhook subscriptions with `_meta` replay protection + reconcile cron + per-delivery drilldown UI + click-to-replay, hourly anomaly detection, weekly health digest with 12-week sparkline UI + manual recompute, forensics CSV export, structured `function_errors` sink with admin browser tab + single + bulk ack, real moderator trust score, durable observability dry-run workflow. _(✓ all 15 done)_
+- `admin-console-foundation` (PR1) → `admin-console-pr16-entity-browsers` (PR16) — schema + chrome + 36 Edge Function handlers + 8 crons + 7 read-only entity browsers across 16 PRs. Full primitives now live: time-bounded role grants, two-person rule with `enforce_two_person_irreversible` feature-flag gate, HMAC-SHA256 webhook subscriptions with `_meta` replay protection + reconcile cron + per-delivery drilldown UI + click-to-replay, hourly anomaly detection, weekly health digest with 12-week sparkline UI + manual recompute, forensics CSV export, structured `function_errors` sink with admin browser tab + single + bulk ack, real moderator trust score, durable observability dry-run workflow, and PR16's read-only browsers over Identifications / Notifications / Media / Follows / Watchlists / Projects / Taxon changes (shared `ConsoleEntityBrowser` template + `entity-browser.ts` runtime, server-side paginated, URL-driven filter state). _(✓ all 16 done)_
 
 Cross-cutting shipments (2026-04-27/28):
 - `community-validation` — Module 22 implementation: `validation_queue` view, 3 RLS policies, 4 routes, suggest modal + dashboard, research-grade chip on existing views, suggest CTA on `/share/obs`.  _(✓ done)_

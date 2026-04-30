@@ -1,0 +1,284 @@
+---
+/**
+ * ConsoleIdentificationsView — admin entity browser over public.identifications.
+ *
+ * Read-only by design (admins act on identifications via Expert Validation
+ * or the existing Audit/Forensics tabs). Filters: identifier (uuid or
+ * username, autocomplete-resolved), taxon (uuid or scientific name),
+ * source (auto-populated dropdown), validated (yes/no), research-grade
+ * (yes/no). Drill-down expands the full row payload incl. raw_response.
+ */
+import { t } from '../i18n/utils';
+import ConsoleEntityBrowser from './ConsoleEntityBrowser.astro';
+
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+const v = (tr.console as unknown as Record<string, Record<string, string> | string>).identificationsView as
+  unknown as Record<string, string>;
+const eb = (tr.console as unknown as Record<string, Record<string, unknown> | string>).entityBrowser as
+  unknown as Record<string, string>;
+
+const labels = {
+  title: v?.title ?? 'Identifications',
+  description: v?.description ?? '',
+  filterIdentifier: v?.filterIdentifier ?? 'Identifier',
+  filterTaxon: v?.filterTaxon ?? 'Taxon',
+  filterSource: v?.filterSource ?? 'Source',
+  filterValidated: v?.filterValidated ?? 'Validated',
+  filterRG: v?.filterRG ?? 'Research grade',
+  valYes: v?.valYes ?? 'Yes',
+  valNo: v?.valNo ?? 'No',
+  colCreated: v?.colCreated ?? 'Created',
+  colIdentifier: v?.colIdentifier ?? 'Identifier',
+  colTaxon: v?.colTaxon ?? 'Taxon',
+  colConfidence: v?.colConfidence ?? 'Confidence',
+  colSource: v?.colSource ?? 'Source',
+  colValidated: v?.colValidated ?? 'Validated',
+  colObservation: v?.colObservation ?? 'Observation',
+  drillObs: v?.drillObs ?? 'Open observation',
+  emptyAny: eb?.anyOption ?? '— any —',
+};
+---
+
+<ConsoleEntityBrowser
+  lang={lang}
+  prefix="ids"
+  title={labels.title}
+  description={labels.description}
+  filters={[
+    { key: 'identifier', kind: 'text', label: labels.filterIdentifier, placeholder: 'uuid or @username' },
+    { key: 'taxon',      kind: 'text', label: labels.filterTaxon,      placeholder: 'uuid or scientific name' },
+    { key: 'source',     kind: 'select', label: labels.filterSource },
+    { key: 'validated',  kind: 'select', label: labels.filterValidated, options: [
+      { value: 'yes', label: labels.valYes },
+      { value: 'no',  label: labels.valNo  },
+    ] },
+    { key: 'rg',         kind: 'select', label: labels.filterRG, options: [
+      { value: 'yes', label: labels.valYes },
+      { value: 'no',  label: labels.valNo  },
+    ] },
+  ]}
+  columns={[
+    { key: 'created_at',  label: labels.colCreated },
+    { key: 'identifier',  label: labels.colIdentifier },
+    { key: 'taxon',       label: labels.colTaxon },
+    { key: 'confidence',  label: labels.colConfidence, align: 'right' },
+    { key: 'source',      label: labels.colSource },
+    { key: 'validated',   label: labels.colValidated },
+    { key: 'observation', label: labels.colObservation },
+  ]}
+/>
+
+<div id="ids-config" class="hidden" data-lang={lang} data-drill-obs={labels.drillObs}></div>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { getUserRoles } from '../lib/user-roles';
+  import {
+    EntityBrowser,
+    filterPredicates,
+    fmtTs,
+    confidencePill,
+    renderUserPill,
+    renderTaxonPill,
+    type FilterSpec,
+    type ColumnSpec,
+    type SupabaseQuery,
+    type RenderContext,
+  } from '../lib/entity-browser';
+  import { escapeHtml } from '../lib/escape';
+
+  type Row = {
+    id: string;
+    created_at: string;
+    observation_id: string;
+    taxon_id: string | null;
+    scientific_name: string | null;
+    confidence: number | null;
+    source: string;
+    is_research_grade: boolean | null;
+    validated_at: string | null;
+    validated_by: string | null;
+    raw_response: Record<string, unknown> | null;
+  };
+
+  const cfgEl = document.getElementById('ids-config');
+  const langAttr = (cfgEl?.dataset.lang === 'es' ? 'es' : 'en') as 'en' | 'es';
+  const labelDrillObs = cfgEl?.dataset.drillObs ?? 'Open observation';
+
+  function isUuid(s: string): boolean {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+  }
+
+  async function resolveUserId(input: string): Promise<string | undefined> {
+    const trimmed = input.replace(/^@/, '').trim();
+    if (!trimmed) return undefined;
+    if (isUuid(trimmed)) return trimmed;
+    const supabase = getSupabase();
+    const { data } = await supabase.from('users').select('id').eq('username', trimmed).maybeSingle();
+    return (data as { id: string } | null)?.id;
+  }
+
+  async function resolveTaxonId(input: string): Promise<string | undefined> {
+    const trimmed = input.trim();
+    if (!trimmed) return undefined;
+    if (isUuid(trimmed)) return trimmed;
+    const supabase = getSupabase();
+    const { data } = await supabase
+      .from('taxa')
+      .select('id')
+      .eq('scientific_name', trimmed)
+      .maybeSingle();
+    return (data as { id: string } | null)?.id;
+  }
+
+  const filters: FilterSpec[] = [
+    {
+      key: 'identifier',
+      label: 'Identifier',
+      kind: 'autocomplete',
+      apply: async (q: SupabaseQuery, v: string): Promise<SupabaseQuery | null> => {
+        const id = await resolveUserId(v);
+        return id ? q.eq('validated_by', id) : null;
+      },
+    },
+    {
+      key: 'taxon',
+      label: 'Taxon',
+      kind: 'autocomplete',
+      apply: async (q: SupabaseQuery, v: string): Promise<SupabaseQuery | null> => {
+        const id = await resolveTaxonId(v);
+        return id ? q.eq('taxon_id', id) : null;
+      },
+    },
+    {
+      key: 'source',
+      label: 'Source',
+      kind: 'select',
+      autoPopulateColumn: 'source',
+      apply: filterPredicates.eq('source'),
+    },
+    {
+      key: 'validated',
+      label: 'Validated',
+      kind: 'select',
+      apply: (q: SupabaseQuery, v: string) =>
+        v === 'yes' ? q.not('validated_at', 'is', null) : q.is('validated_at', null),
+    },
+    {
+      key: 'rg',
+      label: 'Research grade',
+      kind: 'select',
+      apply: (q: SupabaseQuery, v: string) => q.eq('is_research_grade', v === 'yes'),
+    },
+  ];
+
+  const columns: ColumnSpec<Row>[] = [
+    {
+      key: 'created_at',
+      label: 'Created',
+      cellClass: 'whitespace-nowrap font-mono text-[11px] text-zinc-500',
+      render: r => escapeHtml(fmtTs(r.created_at)),
+    },
+    {
+      key: 'identifier',
+      label: 'Identifier',
+      render: (r, ctx: RenderContext) => renderUserPill(r.validated_by, ctx),
+    },
+    {
+      key: 'taxon',
+      label: 'Taxon',
+      render: (r, ctx: RenderContext) => renderTaxonPill(r.taxon_id, r.scientific_name, ctx),
+    },
+    {
+      key: 'confidence',
+      label: 'Confidence',
+      align: 'right',
+      render: r => confidencePill(r.confidence),
+    },
+    {
+      key: 'source',
+      label: 'Source',
+      render: r => `<code class="text-[10px] rounded bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5">${escapeHtml(r.source)}</code>`,
+    },
+    {
+      key: 'validated',
+      label: 'Validated',
+      render: r =>
+        r.validated_at
+          ? '<span class="inline-flex items-center rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 px-2 py-0.5 text-[11px]">✓</span>'
+          : '<span class="inline-flex items-center rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 px-2 py-0.5 text-[11px]">—</span>',
+    },
+    {
+      key: 'observation',
+      label: 'Observation',
+      render: r =>
+        `<a href="/share/obs/?id=${encodeURIComponent(r.observation_id)}" class="text-emerald-700 dark:text-emerald-400 hover:underline font-mono text-[10px]" target="_blank" rel="noopener">${escapeHtml(r.observation_id.slice(0, 8))}…</a>`,
+    },
+  ];
+
+  function renderDrilldown(r: Row): string {
+    const json = JSON.stringify(
+      {
+        id: r.id,
+        observation_id: r.observation_id,
+        taxon_id: r.taxon_id,
+        scientific_name: r.scientific_name,
+        source: r.source,
+        confidence: r.confidence,
+        is_research_grade: r.is_research_grade,
+        validated_at: r.validated_at,
+        validated_by: r.validated_by,
+        raw_response: r.raw_response,
+      },
+      null,
+      2,
+    );
+    return `<pre class="whitespace-pre-wrap break-all rounded bg-white dark:bg-zinc-950 px-2 py-1 text-[10px] text-zinc-600 dark:text-zinc-400 max-h-80 overflow-y-auto">${escapeHtml(json)}</pre>
+      <p class="mt-2"><a href="/share/obs/?id=${encodeURIComponent(r.observation_id)}" class="text-emerald-700 dark:text-emerald-400 hover:underline" target="_blank" rel="noopener">${escapeHtml(labelDrillObs)} →</a></p>`;
+  }
+
+  async function init(): Promise<void> {
+    const supabase = getSupabase();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      document.getElementById('ids-skeleton')?.classList.add('hidden');
+      document.getElementById('ids-not-auth')?.classList.remove('hidden');
+      return;
+    }
+    const myRoles = await getUserRoles(session.user.id);
+    if (!myRoles.has('admin')) {
+      document.getElementById('ids-skeleton')?.classList.add('hidden');
+      document.getElementById('ids-not-auth')?.classList.remove('hidden');
+      return;
+    }
+    document.getElementById('ids-shell')?.classList.remove('hidden');
+
+    const browser = new EntityBrowser<Row>({
+      prefix: 'ids',
+      tableName: 'identifications',
+      selectClause:
+        'id, created_at, observation_id, taxon_id, scientific_name, confidence, source, is_research_grade, validated_at, validated_by, raw_response',
+      orderBy: 'created_at',
+      columns,
+      filters,
+      resolveUsersFromRow: r => (r.validated_by ? [r.validated_by] : []),
+      resolveTaxaFromRow: r => (r.taxon_id ? [r.taxon_id] : []),
+      renderDrilldown,
+      emptyText: '',
+      loadingText: '',
+      lang: langAttr,
+    });
+    await browser.init();
+  }
+
+  init().catch(err => {
+    document.getElementById('ids-skeleton')?.classList.add('hidden');
+    const errEl = document.getElementById('ids-error');
+    if (errEl) {
+      errEl.textContent = (err as Error).message;
+      errEl.classList.remove('hidden');
+    }
+  });
+</script>

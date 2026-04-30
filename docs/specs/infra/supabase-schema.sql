@@ -6210,3 +6210,72 @@ AS $$
 $$;
 
 GRANT EXECUTE ON FUNCTION public.station_trap_nights(uuid, date, date) TO anon, authenticated, service_role;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- PR16 — Hot-path indexes for admin entity browsers (Identifications,
+-- Notifications, Media, Follows, Watchlists, Projects). Each backs a
+-- (filter_field, created_at DESC) lookup pattern in the browser tabs.
+-- All idempotent (CREATE INDEX IF NOT EXISTS) and additive only — no
+-- write penalty beyond the index keys themselves.
+-- ════════════════════════════════════════════════════════════════════════
+
+-- Identifications — admin time-ordered list, validator filter, RG filter
+CREATE INDEX IF NOT EXISTS idx_id_created_desc
+  ON public.identifications (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_id_validator_created
+  ON public.identifications (validated_by, created_at DESC)
+  WHERE validated_by IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_id_rg_created
+  ON public.identifications (is_research_grade, created_at DESC);
+
+-- Notifications — kind-filtered admin browse (per-user is already covered)
+CREATE INDEX IF NOT EXISTS idx_notifications_kind_created
+  ON public.notifications (kind, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notifications_created_desc
+  ON public.notifications (created_at DESC);
+
+-- Media files — type-filter + active browse
+CREATE INDEX IF NOT EXISTS idx_media_type_created
+  ON public.media_files (media_type, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_media_active_created
+  ON public.media_files (created_at DESC)
+  WHERE deleted_at IS NULL;
+
+-- Watchlists — taxon-filtered browse
+CREATE INDEX IF NOT EXISTS idx_watchlists_taxon_created
+  ON public.watchlists (taxon_id, created_at DESC)
+  WHERE taxon_id IS NOT NULL;
+
+-- Follows — time-ordered admin spam-audit
+CREATE INDEX IF NOT EXISTS idx_follows_created_desc
+  ON public.follows (created_at DESC);
+
+-- Projects — time-ordered admin browse
+CREATE INDEX IF NOT EXISTS idx_projects_created_desc
+  ON public.projects (created_at DESC);
+
+-- Observation comments — author timeline (existing comments view + future
+-- author drill-downs from the user browser)
+CREATE INDEX IF NOT EXISTS idx_comments_author_created
+  ON public.observation_comments (author_id, created_at DESC);
+
+-- ════════════════════════════════════════════════════════════════════════
+-- PR16 — Admin SELECT policies on owner-scoped tables (notifications,
+-- watchlists). These tables previously had only owner-scoped RLS; admin
+-- already has equivalent service-role visibility for ops. These policies
+-- expose the same audit visibility through the console using the
+-- has_role() predicate that is the canonical privilege gate.
+-- Privacy-neutral: admin can already read these via Supabase Studio /
+-- service-role; this just plumbs them through anon/authenticated so the
+-- console can render them. No write privilege is granted.
+-- ════════════════════════════════════════════════════════════════════════
+
+DROP POLICY IF EXISTS notif_admin_read ON public.notifications;
+CREATE POLICY notif_admin_read ON public.notifications
+  FOR SELECT TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'));
+
+DROP POLICY IF EXISTS watchlists_admin_read ON public.watchlists;
+CREATE POLICY watchlists_admin_read ON public.watchlists
+  FOR SELECT TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'));

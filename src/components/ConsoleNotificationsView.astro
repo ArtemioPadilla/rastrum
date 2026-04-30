@@ -1,0 +1,231 @@
+---
+/**
+ * ConsoleNotificationsView — admin entity browser over public.notifications.
+ *
+ * Read-only. Filters: recipient (uuid or username), kind (auto-populated
+ * dropdown), read state (read/unread/any), date range. Drill-down expands
+ * the full payload jsonb.
+ */
+import { t } from '../i18n/utils';
+import ConsoleEntityBrowser from './ConsoleEntityBrowser.astro';
+
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+const v = (tr.console as unknown as Record<string, Record<string, string> | string>).notificationsView as
+  unknown as Record<string, string>;
+
+const labels = {
+  title: v?.title ?? 'Notifications',
+  description: v?.description ?? '',
+  filterRecipient: v?.filterRecipient ?? 'Recipient',
+  filterKind: v?.filterKind ?? 'Kind',
+  filterRead: v?.filterRead ?? 'Read state',
+  filterFrom: v?.filterFrom ?? 'From',
+  filterTo: v?.filterTo ?? 'To',
+  stateAny: v?.stateAny ?? 'Any state',
+  stateRead: v?.stateRead ?? 'Read',
+  stateUnread: v?.stateUnread ?? 'Unread',
+  colCreated: v?.colCreated ?? 'Created',
+  colRecipient: v?.colRecipient ?? 'Recipient',
+  colKind: v?.colKind ?? 'Kind',
+  colPayload: v?.colPayload ?? 'Payload',
+  colRead: v?.colRead ?? 'Read',
+  drillFull: v?.drillFull ?? 'Full payload',
+};
+---
+
+<ConsoleEntityBrowser
+  lang={lang}
+  prefix="ntf"
+  title={labels.title}
+  description={labels.description}
+  filters={[
+    { key: 'recipient', kind: 'text',   label: labels.filterRecipient, placeholder: 'uuid or @username' },
+    { key: 'kind',      kind: 'select', label: labels.filterKind },
+    { key: 'read',      kind: 'select', label: labels.filterRead, options: [
+      { value: 'read',   label: labels.stateRead },
+      { value: 'unread', label: labels.stateUnread },
+    ] },
+    { key: 'from',      kind: 'date',   label: labels.filterFrom },
+  ]}
+  columns={[
+    { key: 'created_at', label: labels.colCreated },
+    { key: 'recipient',  label: labels.colRecipient },
+    { key: 'kind',       label: labels.colKind },
+    { key: 'payload',    label: labels.colPayload },
+    { key: 'read',       label: labels.colRead },
+  ]}
+/>
+
+<div id="ntf-config" class="hidden" data-lang={lang}></div>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { getUserRoles } from '../lib/user-roles';
+  import {
+    EntityBrowser,
+    filterPredicates,
+    fmtTs,
+    renderUserPill,
+    type FilterSpec,
+    type ColumnSpec,
+    type SupabaseQuery,
+    type RenderContext,
+  } from '../lib/entity-browser';
+  import { escapeHtml } from '../lib/escape';
+
+  type Row = {
+    id: string;
+    created_at: string;
+    user_id: string;
+    kind: string;
+    payload: Record<string, unknown> | null;
+    read_at: string | null;
+  };
+
+  const cfgEl = document.getElementById('ntf-config');
+  const langAttr = (cfgEl?.dataset.lang === 'es' ? 'es' : 'en') as 'en' | 'es';
+
+  function isUuid(s: string): boolean {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+  }
+  async function resolveUserId(input: string): Promise<string | undefined> {
+    const trimmed = input.replace(/^@/, '').trim();
+    if (!trimmed) return undefined;
+    if (isUuid(trimmed)) return trimmed;
+    const supabase = getSupabase();
+    const { data } = await supabase.from('users').select('id').eq('username', trimmed).maybeSingle();
+    return (data as { id: string } | null)?.id;
+  }
+
+  const KIND_PILL_COLOURS: Record<string, string> = {
+    follow: 'bg-sky-100 dark:bg-sky-900/30 text-sky-800 dark:text-sky-300',
+    follow_accepted: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300',
+    reaction: 'bg-pink-100 dark:bg-pink-900/30 text-pink-800 dark:text-pink-300',
+    comment: 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300',
+    mention: 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300',
+    identification: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300',
+    badge: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300',
+    digest: 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300',
+  };
+
+  const filters: FilterSpec[] = [
+    {
+      key: 'recipient',
+      label: 'Recipient',
+      kind: 'autocomplete',
+      apply: async (q: SupabaseQuery, v: string): Promise<SupabaseQuery | null> => {
+        const id = await resolveUserId(v);
+        return id ? q.eq('user_id', id) : null;
+      },
+    },
+    {
+      key: 'kind',
+      label: 'Kind',
+      kind: 'select',
+      autoPopulateColumn: 'kind',
+      apply: filterPredicates.eq('kind'),
+    },
+    {
+      key: 'read',
+      label: 'Read state',
+      kind: 'select',
+      apply: (q: SupabaseQuery, v: string) =>
+        v === 'read' ? q.not('read_at', 'is', null) : q.is('read_at', null),
+    },
+    {
+      key: 'from',
+      label: 'From',
+      kind: 'date',
+      apply: filterPredicates.gteDate('created_at'),
+    },
+  ];
+
+  const columns: ColumnSpec<Row>[] = [
+    {
+      key: 'created_at',
+      label: 'Created',
+      cellClass: 'whitespace-nowrap font-mono text-[11px] text-zinc-500',
+      render: r => escapeHtml(fmtTs(r.created_at)),
+    },
+    {
+      key: 'recipient',
+      label: 'Recipient',
+      render: (r, ctx: RenderContext) => renderUserPill(r.user_id, ctx),
+    },
+    {
+      key: 'kind',
+      label: 'Kind',
+      render: r => {
+        const cls = KIND_PILL_COLOURS[r.kind] ?? KIND_PILL_COLOURS.digest;
+        return `<span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${cls}">${escapeHtml(r.kind)}</span>`;
+      },
+    },
+    {
+      key: 'payload',
+      label: 'Payload',
+      cellClass: 'max-w-[260px]',
+      render: r => {
+        if (!r.payload) return '<span class="text-zinc-400">—</span>';
+        const json = JSON.stringify(r.payload);
+        const trimmed = json.length > 80 ? json.slice(0, 78) + '…' : json;
+        return `<code class="text-[10px] font-mono text-zinc-600 dark:text-zinc-400 break-words">${escapeHtml(trimmed)}</code>`;
+      },
+    },
+    {
+      key: 'read',
+      label: 'Read',
+      render: r =>
+        r.read_at
+          ? '<span class="inline-flex items-center rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 px-2 py-0.5 text-[11px]">✓</span>'
+          : '<span class="inline-flex items-center rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 px-2 py-0.5 text-[11px]">·</span>',
+    },
+  ];
+
+  function renderDrilldown(r: Row): string {
+    const json = JSON.stringify(r, null, 2);
+    return `<pre class="whitespace-pre-wrap break-all rounded bg-white dark:bg-zinc-950 px-2 py-1 text-[10px] text-zinc-600 dark:text-zinc-400 max-h-80 overflow-y-auto">${escapeHtml(json)}</pre>`;
+  }
+
+  async function init(): Promise<void> {
+    const supabase = getSupabase();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      document.getElementById('ntf-skeleton')?.classList.add('hidden');
+      document.getElementById('ntf-not-auth')?.classList.remove('hidden');
+      return;
+    }
+    const myRoles = await getUserRoles(session.user.id);
+    if (!myRoles.has('admin')) {
+      document.getElementById('ntf-skeleton')?.classList.add('hidden');
+      document.getElementById('ntf-not-auth')?.classList.remove('hidden');
+      return;
+    }
+    document.getElementById('ntf-shell')?.classList.remove('hidden');
+
+    const browser = new EntityBrowser<Row>({
+      prefix: 'ntf',
+      tableName: 'notifications',
+      selectClause: 'id, created_at, user_id, kind, payload, read_at',
+      orderBy: 'created_at',
+      columns,
+      filters,
+      resolveUsersFromRow: r => [r.user_id],
+      renderDrilldown,
+      emptyText: '',
+      loadingText: '',
+      lang: langAttr,
+    });
+    await browser.init();
+  }
+
+  init().catch(err => {
+    document.getElementById('ntf-skeleton')?.classList.add('hidden');
+    const errEl = document.getElementById('ntf-error');
+    if (errEl) {
+      errEl.textContent = (err as Error).message;
+      errEl.classList.remove('hidden');
+    }
+  });
+</script>
