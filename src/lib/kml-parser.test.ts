@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseKML, extractKMLName, validateKML } from './kml-parser';
+import { parseKML, extractKMLName, validateKML, isKMZ } from './kml-parser';
 
 const SIMPLE_KML = `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
@@ -173,5 +173,16 @@ describe('validateKML', () => {
     const result = validateKML(FEW_COORDS_KML);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toBe('no_polygon');
+  });
+});
+
+describe('isKMZ', () => {
+  it('detects .kmz extension', () => {
+    expect(isKMZ({ name: 'zona.kmz', type: '', size: 100 } as unknown as File)).toBe(true);
+    expect(isKMZ({ name: 'zona.kml', type: '', size: 100 } as unknown as File)).toBe(false);
+  });
+
+  it('detects kmz MIME type', () => {
+    expect(isKMZ({ name: 'f', type: 'application/vnd.google-earth.kmz', size: 100 } as unknown as File)).toBe(true);
   });
 });

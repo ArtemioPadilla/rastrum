@@ -83,7 +83,7 @@ const projectsBase = routes.projects[lang];
           <span>{proj.form_polygon_upload}</span>
         </label>
         <label class="inline-flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-400 cursor-pointer hover:underline" title={proj.kml_upload_label}>
-          <input type="file" id="project-kml-file" accept=".kml,application/vnd.google-earth.kml+xml" class="sr-only" aria-label={proj.kml_upload_label} />
+          <input type="file" id="project-kml-file" accept=".kml,.kmz,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz,application/zip" class="sr-only" aria-label={proj.kml_upload_label} />
           <svg class="h-3.5 w-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
           <span>{proj.kml_upload_button}</span>
         </label>
@@ -103,7 +103,7 @@ const projectsBase = routes.projects[lang];
 
 <script>
   import { upsertProject, validatePolygonGeoJSON, isValidSlug } from '../lib/projects';
-  import { validateKML } from '../lib/kml-parser';
+  import { validateKMLOrKMZ } from '../lib/kml-parser';
   import { getSupabase } from '../lib/supabase';
 
   const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
@@ -140,12 +140,11 @@ const projectsBase = routes.projects[lang];
     kmlFileEl?.addEventListener('change', async () => {
       const f = kmlFileEl.files?.[0];
       if (!f) return;
-      const text = await f.text();
-      const result = validateKML(text);
+      const result = await validateKMLOrKMZ(f);
       if (!kmlStatus) return;
       const proj = (await import('../i18n/' + lang + '.json')).default.projects;
       if (result.ok) {
-        const displayName = result.name ?? f.name.replace(/\.kml$/i, '');
+        const displayName = result.name ?? f.name.replace(/\.(kml|kmz)$/i, '');
         const msg = proj.kml_parse_success
           .replace('{name}', displayName)
           .replace('{n}', String(result.vertexCount));

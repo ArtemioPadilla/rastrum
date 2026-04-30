@@ -94,3 +94,56 @@ export function validateKML(text: string): KMLValidationResult {
     return { ok: false, error: 'invalid_xml' };
   }
 }
+
+// ── KMZ support ────────────────────────────────────────────────────────────
+
+/**
+ * Extract the KML text from a KMZ file (ZIP archive containing doc.kml).
+ * Uses JSZip (dynamically imported to keep the bundle lazy).
+ *
+ * @param file - A File or Blob with .kmz extension or application/vnd.google-earth.kmz MIME type
+ * @returns The KML text content, or null if no .kml file found inside the archive
+ */
+export async function extractKMLFromKMZ(file: File | Blob): Promise<string | null> {
+  // Dynamic import so JSZip is only loaded when a KMZ is actually uploaded
+  const JSZip = (await import('jszip')).default;
+  const zip = await JSZip.loadAsync(file);
+
+  // KMZ spec: primary document is doc.kml; fall back to first .kml file found
+  const docKml = zip.file('doc.kml');
+  const kmlFile = docKml ?? Object.values(zip.files).find(f => f.name.endsWith('.kml') && !f.dir);
+
+  if (!kmlFile) return null;
+  return kmlFile.async('string');
+}
+
+/** Returns true if the file is a KMZ (by extension or MIME type). */
+export function isKMZ(file: File): boolean {
+  return (
+    file.name.toLowerCase().endsWith('.kmz') ||
+    file.type === 'application/vnd.google-earth.kmz' ||
+    file.type === 'application/zip'
+  );
+}
+
+/**
+ * Validate a KML or KMZ file. Handles both formats transparently.
+ * For KMZ, extracts doc.kml first, then validates the KML content.
+ */
+export async function validateKMLOrKMZ(file: File): Promise<KMLValidationResult> {
+  if (file.size > MAX_KML_BYTES * 10) {
+    // KMZ can be larger than 500KB when compressed; limit to 5MB for KMZ
+    return { ok: false, error: 'too_large' };
+  }
+
+  let text: string;
+  if (isKMZ(file)) {
+    const extracted = await extractKMLFromKMZ(file);
+    if (!extracted) return { ok: false, error: 'no_polygon' };
+    text = extracted;
+  } else {
+    text = await file.text();
+  }
+
+  return validateKML(text);
+}
