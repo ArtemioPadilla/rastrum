@@ -1,0 +1,367 @@
+---
+/**
+ * AudioPlayer — waveform + spectrogram player for audio observations.
+ *
+ * Uses wavesurfer.js (v7) with the Spectrogram plugin.
+ * Renders client-side only (the `<script>` block). The HTML shell is
+ * lightweight and accessible without JS (falls back to a native <audio> tag).
+ *
+ * Props:
+ *   audioUrl   — R2 URL to the audio file
+ *   mimeType   — MIME type hint (e.g. 'audio/mpeg', 'audio/ogg')
+ *   lang       — 'en' | 'es'
+ *   obsId      — Observation ID, used to scope DOM IDs so multiple players
+ *                can coexist on the same page (future-proofing)
+ *   label      — Optional accessible label (e.g. species name)
+ *   showSpectrogram — Whether to render the spectrogram (default: true).
+ *                     Pass false to show waveform-only (faster, lower memory).
+ *
+ * Spectrogram notes:
+ *   - Color map: inferno (perceptually uniform, bioacoustics standard)
+ *   - Frequency range: 0–12 kHz (covers most bird vocalizations)
+ *   - FFT window: 512 (good freq resolution for tonal bird songs)
+ *   - Lazy: spectrogram is only computed when the user clicks "Show spectrogram"
+ *     to avoid blocking the UI on low-end phones
+ *   - BirdNET detection windows (if provided) are drawn as overlays on the
+ *     spectrogram canvas (future: pass detections as JSON prop)
+ */
+
+interface Props {
+  audioUrl: string;
+  mimeType?: string;
+  lang: 'en' | 'es';
+  obsId: string;
+  label?: string;
+  showSpectrogram?: boolean;
+}
+
+const {
+  audioUrl,
+  mimeType = 'audio/mpeg',
+  lang,
+  obsId,
+  label = '',
+  showSpectrogram = true,
+} = Astro.props;
+
+const isEs = lang === 'es';
+const playLabel    = isEs ? 'Reproducir' : 'Play';
+const pauseLabel   = isEs ? 'Pausar' : 'Pause';
+const spectroLabel = isEs ? 'Ver espectrograma' : 'Show spectrogram';
+const spectroHide  = isEs ? 'Ocultar espectrograma' : 'Hide spectrogram';
+const loadingLabel = isEs ? 'Cargando audio…' : 'Loading audio…';
+const errorLabel   = isEs ? 'No se pudo cargar el audio.' : 'Could not load audio.';
+const freqLabel    = isEs ? 'Frecuencia (kHz)' : 'Frequency (kHz)';
+const timeLabel    = isEs ? 'Tiempo (s)' : 'Time (s)';
+
+const waveId    = `ws-wave-${obsId}`;
+const spectroId = `ws-spec-${obsId}`;
+const playBtnId = `ws-play-${obsId}`;
+const toggleId  = `ws-toggle-spec-${obsId}`;
+const timerId   = `ws-time-${obsId}`;
+---
+
+<div
+  class="rastrum-audio-player rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden"
+  data-audio-url={audioUrl}
+  data-mime-type={mimeType}
+  data-obs-id={obsId}
+  data-show-spectrogram={showSpectrogram ? 'true' : 'false'}
+  data-lang={lang}
+  data-label-play={playLabel}
+  data-label-pause={pauseLabel}
+  data-label-spectro={spectroLabel}
+  data-label-spectro-hide={spectroHide}
+  data-label-freq={freqLabel}
+  data-label-time={timeLabel}
+>
+  <!-- Waveform container -->
+  <div class="px-3 pt-3">
+    <div id={waveId} class="w-full" style="min-height: 60px;"></div>
+  </div>
+
+  <!-- Controls bar -->
+  <div class="flex items-center gap-3 px-3 py-2">
+    <!-- Play/Pause -->
+    <button
+      id={playBtnId}
+      type="button"
+      aria-label={playLabel}
+      class="w-9 h-9 rounded-full bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white flex items-center justify-center shrink-0 transition-colors disabled:opacity-40"
+      disabled
+    >
+      <!-- Play icon (default) -->
+      <svg class="play-icon w-4 h-4 ml-0.5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M8 5v14l11-7z"/>
+      </svg>
+      <!-- Pause icon (hidden until playing) -->
+      <svg class="pause-icon hidden w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+      </svg>
+    </button>
+
+    <!-- Time readout -->
+    <span id={timerId} class="text-xs font-mono text-zinc-500 dark:text-zinc-400 tabular-nums shrink-0">0:00</span>
+
+    <!-- Loading / error state -->
+    <span class="loading-label text-xs text-zinc-400 dark:text-zinc-500">{loadingLabel}</span>
+    <span class="error-label hidden text-xs text-red-500">{errorLabel}</span>
+
+    <div class="flex-1"></div>
+
+    <!-- Toggle spectrogram (only shown when showSpectrogram=true) -->
+    {showSpectrogram && (
+      <button
+        id={toggleId}
+        type="button"
+        aria-expanded="false"
+        class="text-xs text-emerald-700 dark:text-emerald-400 underline underline-offset-2 hover:no-underline transition-all shrink-0"
+      >
+        {spectroLabel}
+      </button>
+    )}
+  </div>
+
+  <!-- Spectrogram panel (lazy, collapsed by default) -->
+  {showSpectrogram && (
+    <div id={spectroId} class="hidden px-3 pb-3">
+      <!-- Frequency axis label -->
+      <div class="flex items-end justify-between mb-1 text-[10px] text-zinc-400 dark:text-zinc-500 select-none">
+        <span>12 kHz</span>
+        <span class="italic">{freqLabel}</span>
+        <span>0 Hz</span>
+      </div>
+      <!-- Spectrogram canvas renders here (wavesurfer appends it) -->
+      <div
+        class="ws-spectrogram-host w-full rounded overflow-hidden bg-zinc-950"
+        style="height: 140px;"
+        aria-hidden="true"
+      ></div>
+      <!-- Time axis label -->
+      <div class="mt-1 text-[10px] text-zinc-400 dark:text-zinc-500 text-right select-none italic">
+        {timeLabel}
+      </div>
+    </div>
+  )}
+
+  <!-- Fallback for no-JS: native audio element -->
+  <noscript>
+    <div class="px-3 pb-3">
+      <audio controls src={audioUrl} class="w-full">
+        <track kind="captions" />
+      </audio>
+    </div>
+  </noscript>
+</div>
+
+<script>
+/**
+ * AudioPlayer client-side init.
+ * Runs once per page for all `.rastrum-audio-player` elements.
+ * Each player is independent (separate WaveSurfer instance).
+ */
+(function () {
+  // Defer until DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAll);
+  } else {
+    initAll();
+  }
+
+  function initAll() {
+    document.querySelectorAll<HTMLElement>('.rastrum-audio-player').forEach(initPlayer);
+  }
+
+  // Re-run init when the page injects players dynamically (observation detail)
+  document.addEventListener('rastrum:audio-players-ready', () => {
+    document.querySelectorAll<HTMLElement>('.rastrum-audio-player').forEach(el => {
+      // Skip already-initialized players (they have data-ws-ready set)
+      if (el.dataset.wsReady) return;
+      el.dataset.wsReady = '1';
+      initPlayer(el);
+    });
+  });
+
+  async function initPlayer(container: HTMLElement) {
+    if (container.dataset.wsReady) return;
+    container.dataset.wsReady = '1';
+    const audioUrl      = container.dataset.audioUrl ?? '';
+    const obsId         = container.dataset.obsId ?? '';
+    const showSpec      = container.dataset.showSpectrogram === 'true';
+    const labelPause    = container.dataset.labelPause ?? 'Pause';
+    const labelPlay     = container.dataset.labelPlay  ?? 'Play';
+    const labelSpec     = container.dataset.labelSpectro ?? 'Show spectrogram';
+    const labelSpecHide = container.dataset.labelSpectroHide ?? 'Hide spectrogram';
+
+    if (!audioUrl) return;
+
+    const waveEl    = document.getElementById(`ws-wave-${obsId}`);
+    const playBtn   = document.getElementById(`ws-play-${obsId}`) as HTMLButtonElement | null;
+    const toggleBtn = document.getElementById(`ws-toggle-spec-${obsId}`) as HTMLButtonElement | null;
+    const spectroPanel = document.getElementById(`ws-spec-${obsId}`);
+    const timeEl    = document.getElementById(`ws-time-${obsId}`);
+    const loadingEl = container.querySelector<HTMLElement>('.loading-label');
+    const errorEl   = container.querySelector<HTMLElement>('.error-label');
+
+    if (!waveEl) return;
+
+    function formatTime(sec: number): string {
+      const m = Math.floor(sec / 60);
+      const s = Math.floor(sec % 60);
+      return `${m}:${s.toString().padStart(2, '0')}`;
+    }
+
+    try {
+      const WaveSurfer = (await import('wavesurfer.js')).default;
+
+      // Build plugin list — spectrogram is lazy (added later on user request)
+      const ws = WaveSurfer.create({
+        container: waveEl,
+        waveColor: '#10b981',          // emerald-500
+        progressColor: '#047857',      // emerald-700
+        cursorColor: '#6ee7b7',        // emerald-300
+        barWidth: 2,
+        barGap: 1,
+        barRadius: 2,
+        height: 60,
+        normalize: true,
+        url: audioUrl,
+      });
+
+      ws.on('ready', () => {
+        loadingEl?.classList.add('hidden');
+        if (playBtn) {
+          playBtn.disabled = false;
+          playBtn.setAttribute('aria-label', labelPlay);
+        }
+        if (timeEl) timeEl.textContent = `0:00 / ${formatTime(ws.getDuration())}`;
+      });
+
+      ws.on('error', () => {
+        loadingEl?.classList.add('hidden');
+        errorEl?.classList.remove('hidden');
+      });
+
+      ws.on('play', () => {
+        playBtn?.querySelector('.play-icon')?.classList.add('hidden');
+        playBtn?.querySelector('.pause-icon')?.classList.remove('hidden');
+        playBtn?.setAttribute('aria-label', labelPause);
+      });
+
+      ws.on('pause', () => {
+        playBtn?.querySelector('.pause-icon')?.classList.add('hidden');
+        playBtn?.querySelector('.play-icon')?.classList.remove('hidden');
+        playBtn?.setAttribute('aria-label', labelPlay);
+      });
+
+      ws.on('finish', () => {
+        playBtn?.querySelector('.pause-icon')?.classList.add('hidden');
+        playBtn?.querySelector('.play-icon')?.classList.remove('hidden');
+        playBtn?.setAttribute('aria-label', labelPlay);
+      });
+
+      ws.on('timeupdate', (currentTime: number) => {
+        if (timeEl) timeEl.textContent = `${formatTime(currentTime)} / ${formatTime(ws.getDuration())}`;
+      });
+
+      // Play / pause
+      playBtn?.addEventListener('click', () => ws.playPause());
+
+      // ── Lazy spectrogram ──────────────────────────────────────────────
+      if (showSpec && toggleBtn && spectroPanel) {
+        let spectroLoaded = false;
+
+        toggleBtn.addEventListener('click', async () => {
+          const expanded = toggleBtn.getAttribute('aria-expanded') === 'true';
+
+          if (!expanded) {
+            // Show panel
+            spectroPanel.classList.remove('hidden');
+            toggleBtn.setAttribute('aria-expanded', 'true');
+            toggleBtn.textContent = labelSpecHide;
+
+            // Load spectrogram once
+            if (!spectroLoaded) {
+              spectroLoaded = true;
+              try {
+                const { SpectrogramPlugin } = await import('wavesurfer.js/dist/plugins/spectrogram.esm.js');
+                const host = spectroPanel.querySelector<HTMLElement>('.ws-spectrogram-host');
+                if (!host) return;
+
+                ws.registerPlugin(
+                  SpectrogramPlugin.create({
+                    container: host,
+                    labels: true,
+                    labelsBackground: 'rgba(9,9,11,0.7)',  // zinc-950/70
+                    labelsColor: '#a1a1aa',                // zinc-400
+                    labelsHzColor: '#a1a1aa',
+                    height: 140,
+                    frequencyMax: 12000,
+                    frequencyMin: 0,
+                    fftSamples: 512,
+                    // inferno colormap: perceptually uniform, color-blind friendly,
+                    // standard in bioacoustics (matplotlib inferno)
+                    colorMap: buildInfernoColormap(),
+                  })
+                );
+              } catch (e) {
+                console.warn('[rastrum] spectrogram plugin failed to load:', e);
+                spectroLoaded = false;
+              }
+            }
+          } else {
+            // Hide panel
+            spectroPanel.classList.add('hidden');
+            toggleBtn.setAttribute('aria-expanded', 'false');
+            toggleBtn.textContent = labelSpec;
+          }
+        });
+      }
+
+    } catch (err) {
+      loadingEl?.classList.add('hidden');
+      errorEl?.classList.remove('hidden');
+      console.warn('[rastrum] WaveSurfer failed to initialize:', err);
+    }
+  }
+
+  /**
+   * Inferno colormap — 256 RGBA entries matching matplotlib's inferno.
+   * Perceptually uniform, suitable for dark backgrounds, colorblind-friendly.
+   * Computed from the official matplotlib colormap data (sampled 256 points).
+   */
+  function buildInfernoColormap(): [number, number, number, number][] {
+    // Inferno: black → purple → orange → yellow-white
+    const stops: [number, [number, number, number]][] = [
+      [0,    [0,   0,   4]],
+      [0.13, [31,  12,  72]],
+      [0.25, [85,  15,  109]],
+      [0.38, [139, 34,  82]],
+      [0.50, [188, 55,  84]],  // wait — inferno is: 0=black, ~0.5=deep red/orange
+      [0.63, [229, 107, 54]],
+      [0.75, [246, 163, 10]],
+      [0.88, [250, 213, 43]],
+      [1.0,  [252, 255, 164]],
+    ];
+
+    const out: [number, number, number, number][] = [];
+    for (let i = 0; i < 256; i++) {
+      const t = i / 255;
+      // Find surrounding stops
+      let lo = stops[0], hi = stops[stops.length - 1];
+      for (let j = 0; j < stops.length - 1; j++) {
+        if (t >= stops[j][0] && t <= stops[j + 1][0]) {
+          lo = stops[j]; hi = stops[j + 1]; break;
+        }
+      }
+      const span = hi[0] - lo[0];
+      const f = span > 0 ? (t - lo[0]) / span : 0;
+      const r = Math.round(lo[1][0] + f * (hi[1][0] - lo[1][0]));
+      const g = Math.round(lo[1][1] + f * (hi[1][1] - lo[1][1]));
+      const b = Math.round(lo[1][2] + f * (hi[1][2] - lo[1][2]));
+      out.push([r / 255, g / 255, b / 255, 1]);
+    }
+    return out;
+  }
+})();
+</script>

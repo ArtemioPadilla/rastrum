@@ -96,17 +96,88 @@ const lang: 'en' | 'es' = 'en';
       // The gallery's static SSR markup is empty; this dispatch fills it.
       const { data: media } = await supabase
         .from('media_files')
-        .select('id, url, thumbnail_url, is_primary, sort_order, deleted_at')
+        .select('id, url, thumbnail_url, is_primary, sort_order, deleted_at, media_type, mime_type')
         .eq('observation_id', id)
         .is('deleted_at', null)
         .order('is_primary', { ascending: false })
         .order('sort_order', { ascending: true });
-      const photos = (media ?? []).map((m: { id: string; url: string; thumbnail_url: string | null }) => ({
+
+      type MediaRow = { id: string; url: string; thumbnail_url: string | null; media_type?: string; mime_type?: string | null };
+
+      const photos = (media ?? []).filter((m: MediaRow) => !m.media_type || m.media_type === 'photo').map((m: MediaRow) => ({
         id: m.id, url: m.url, thumbnail_url: m.thumbnail_url, caption: null,
       }));
       window.dispatchEvent(new CustomEvent('rastrum:photos-ready', {
         detail: { photos, galleryId: 'obs-detail' },
       }));
+
+      // ── Audio players (spectrogram) ──
+      const audioFiles = (media ?? []).filter((m: MediaRow) => m.media_type === 'audio');
+      if (audioFiles.length > 0) {
+        const playersEl = document.getElementById('obs-audio-players');
+        if (playersEl) {
+          const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
+          const isEs = lang === 'es';
+          playersEl.classList.remove('hidden');
+          playersEl.innerHTML = audioFiles.map((af: MediaRow, idx: number) => {
+            const obsIdAttr    = `obs-detail-audio-${idx}`;
+            const mimeType     = af.mime_type ?? 'audio/mpeg';
+            const playLabel    = isEs ? 'Reproducir' : 'Play';
+            const pauseLabel   = isEs ? 'Pausar' : 'Pause';
+            const spectroLabel = isEs ? 'Ver espectrograma' : 'Show spectrogram';
+            const spectroHide  = isEs ? 'Ocultar espectrograma' : 'Hide spectrogram';
+            const freqLabel    = isEs ? 'Frecuencia (kHz)' : 'Frequency (kHz)';
+            const timeLabel    = isEs ? 'Tiempo (s)' : 'Time (s)';
+            const loadLabel    = isEs ? 'Cargando audio…' : 'Loading audio…';
+            const errLabel     = isEs ? 'No se pudo cargar el audio.' : 'Could not load audio.';
+            return `
+            <div
+              class="rastrum-audio-player rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden"
+              data-audio-url="${af.url}"
+              data-mime-type="${mimeType}"
+              data-obs-id="${obsIdAttr}"
+              data-show-spectrogram="true"
+              data-lang="${lang}"
+              data-label-play="${playLabel}"
+              data-label-pause="${pauseLabel}"
+              data-label-spectro="${spectroLabel}"
+              data-label-spectro-hide="${spectroHide}"
+              data-label-freq="${freqLabel}"
+              data-label-time="${timeLabel}"
+            >
+              <div class="px-3 pt-3">
+                <div id="ws-wave-${obsIdAttr}" style="min-height:60px;"></div>
+              </div>
+              <div class="flex items-center gap-3 px-3 py-2">
+                <button id="ws-play-${obsIdAttr}" type="button" aria-label="${playLabel}"
+                  class="w-9 h-9 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center shrink-0 transition-colors disabled:opacity-40"
+                  disabled>
+                  <svg class="play-icon w-4 h-4 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                  <svg class="pause-icon hidden w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                </button>
+                <span id="ws-time-${obsIdAttr}" class="text-xs font-mono text-zinc-500 dark:text-zinc-400 tabular-nums shrink-0">0:00</span>
+                <span class="loading-label text-xs text-zinc-400 dark:text-zinc-500">${loadLabel}</span>
+                <span class="error-label hidden text-xs text-red-500">${errLabel}</span>
+                <div class="flex-1"></div>
+                <button id="ws-toggle-spec-${obsIdAttr}" type="button" aria-expanded="false"
+                  class="text-xs text-emerald-700 dark:text-emerald-400 underline underline-offset-2 hover:no-underline shrink-0">
+                  ${spectroLabel}
+                </button>
+              </div>
+              <div id="ws-spec-${obsIdAttr}" class="hidden px-3 pb-3">
+                <div class="flex items-end justify-between mb-1 text-[10px] text-zinc-400 dark:text-zinc-500 select-none">
+                  <span>12 kHz</span><span class="italic">${freqLabel}</span><span>0 Hz</span>
+                </div>
+                <div class="ws-spectrogram-host w-full rounded overflow-hidden bg-zinc-950" style="height:140px;" aria-hidden="true"></div>
+                <div class="mt-1 text-[10px] text-zinc-400 dark:text-zinc-500 text-right select-none italic">${timeLabel}</div>
+              </div>
+            </div>`;
+          }).join('');
+
+          // Re-run AudioPlayer init for the new DOM nodes
+          document.dispatchEvent(new CustomEvent('rastrum:audio-players-ready'));
+        }
+      }
 
       // Coords readout + view-mode mini-map hydration. PostgREST returns
       // `location` as a GeoJSON Point; for non-owner viewers we prefer
