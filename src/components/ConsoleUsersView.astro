@@ -242,7 +242,9 @@ const tr = t(lang);
     try {
       const [obsResult, rgResult, trustResult] = await Promise.all([
         supabase.from('observations').select('id', { count: 'exact', head: true }).eq('observer_id', userId),
-        supabase.from('identifications').select('id', { count: 'exact', head: true }).eq('identifier_id', userId).eq('quality_grade', 'research'),
+        // identifications table uses validated_by (uuid) and is_research_grade (boolean)
+        // identifier_id and quality_grade do not exist in this schema
+        supabase.from('identifications').select('id', { count: 'exact', head: true }).eq('validated_by', userId).eq('is_research_grade', true),
         supabase.rpc('compute_moderator_trust_score', { p_user_id: userId }),
       ]);
 
