@@ -63,6 +63,10 @@ const cameraStarting    = observeStrings.camera_starting     ?? (isEs ? 'Inician
 const videoRecord       = observeStrings.video_record        ?? (isEs ? 'Grabar video' : 'Record video');
 const videoLabel        = observeStrings.video_label         ?? 'Video';
 const videoMaxDuration  = observeStrings.video_max_duration  ?? (isEs ? 'Máximo 30 segundos' : 'Maximum 30 seconds');
+const videoUpload       = observeStrings.video_upload        ?? (isEs ? 'Subir video' : 'Upload video');
+const videoUploadAccepted = observeStrings.video_upload_accepted ?? 'mp4, mov, webm';
+const audioUpload       = observeStrings.audio_upload        ?? (isEs ? 'Subir archivo de audio' : 'Upload audio file');
+const audioUploadAccepted = observeStrings.audio_upload_accepted ?? 'mp3, ogg, wav, m4a';
 const gpsErrPermission  = observeStrings.gps_error_permission_denied ?? (isEs ? 'Permiso de ubicación denegado. Actívalo en ajustes.' : 'Location permission denied. Enable it in settings.');
 const gpsErrUnavailable = observeStrings.gps_error_unavailable       ?? (isEs ? 'Ubicación no disponible.' : 'Location unavailable.');
 const gpsErrTimeout     = observeStrings.gps_error_timeout           ?? (isEs ? 'Tiempo de espera agotado.' : 'Location timed out.');
@@ -224,14 +228,19 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
     <div>
       <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">{videoLabel}</label>
       <div id="video-grid" class="hidden mb-3 space-y-2"></div>
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2 flex-wrap">
         <button id="video-record-btn" type="button" class="min-h-11 rounded-lg border border-emerald-600/60 px-3 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 disabled:opacity-50">
           <span data-video-label>{videoRecord}</span>
         </button>
+        <button id="video-upload-btn" type="button" class="min-h-11 rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 flex items-center justify-center gap-2">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+          {videoUpload}
+        </button>
+        <input id="video-upload-input" type="file" accept="video/mp4,video/quicktime,video/webm,video/*" class="sr-only" aria-label={videoUpload} />
         <span id="video-elapsed" class="hidden text-xs text-zinc-500 font-mono"></span>
         <span id="video-error" class="hidden text-xs text-red-600 dark:text-red-400"></span>
       </div>
-      <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{videoMaxDuration}</p>
+      <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{videoMaxDuration} · <span class="opacity-70">{videoUploadAccepted}</span></p>
     </div>
 
     <!-- Identification block (overhauled: parallel cascade + progressive disclosure + tooltip) -->
@@ -345,14 +354,19 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
     <div>
       <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">{tr.observe.audio_label}</label>
       <div id="audio-grid" class="hidden mb-3 space-y-2"></div>
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2 flex-wrap">
         <button id="audio-record-btn" type="button" class="rounded-lg border border-emerald-600/60 px-3 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 disabled:opacity-50">
           <span data-audio-label>{tr.observe.audio_record}</span>
         </button>
+        <button id="audio-upload-btn" type="button" class="min-h-11 rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 flex items-center justify-center gap-2">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+          {audioUpload}
+        </button>
+        <input id="audio-upload-input" type="file" accept="audio/mpeg,audio/ogg,audio/wav,audio/x-m4a,audio/mp4,audio/*" class="sr-only" aria-label={audioUpload} />
         <span id="audio-elapsed" class="hidden text-xs text-zinc-500 font-mono"></span>
         <span id="audio-error" class="hidden text-xs text-red-600 dark:text-red-400"></span>
       </div>
-      <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{tr.observe.audio_max_duration} · {tr.observe.audio_pending_id}</p>
+      <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{tr.observe.audio_max_duration} · {tr.observe.audio_pending_id} · <span class="opacity-70">{audioUploadAccepted}</span></p>
     </div>
 
     <!-- Evidence type -->
@@ -1635,6 +1649,31 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
     else                                                       startRecording();
   });
 
+  // ── Audio file upload ──────────────────────────────────────────────────
+  const audioUploadBtn   = document.getElementById('audio-upload-btn') as HTMLButtonElement | null;
+  const audioUploadInput = document.getElementById('audio-upload-input') as HTMLInputElement | null;
+
+  audioUploadBtn?.addEventListener('click', () => {
+    audioUploadInput?.click();
+  });
+
+  audioUploadInput?.addEventListener('change', async () => {
+    if (!audioUploadInput.files?.length) return;
+    const files = Array.from(audioUploadInput.files);
+    for (const file of files) {
+      const mimeType = file.type || 'audio/mpeg';
+      audios.push({
+        blob: file,
+        blobId: crypto.randomUUID(),
+        mimeType,
+        durationSec: 0,  // unknown until decoded
+      });
+    }
+    repaintAudioGrid();
+    // Reset so the same file can be re-selected if removed
+    audioUploadInput.value = '';
+  });
+
   // ── In-app camera (getUserMedia) ──────────────────────────────────────
   const cameraOpenBtn   = document.getElementById('camera-open-btn') as HTMLButtonElement | null;
   const cameraModal     = document.getElementById('camera-modal');
@@ -1908,6 +1947,33 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
   videoRecBtn?.addEventListener('click', () => {
     if (videoRecorder && videoRecorder.state === 'recording') stopVideoRecording();
     else                                                      startVideoRecording();
+  });
+
+  // ── Video file upload ──────────────────────────────────────────────────
+  const videoUploadBtn   = document.getElementById('video-upload-btn') as HTMLButtonElement | null;
+  const videoUploadInput = document.getElementById('video-upload-input') as HTMLInputElement | null;
+
+  videoUploadBtn?.addEventListener('click', () => {
+    videoUploadInput?.click();
+  });
+
+  videoUploadInput?.addEventListener('change', async () => {
+    if (!videoUploadInput.files?.length) return;
+    const files = Array.from(videoUploadInput.files);
+    for (const file of files) {
+      const mimeType = file.type || 'video/mp4';
+      const thumbnailUrl = await extractVideoThumbnail(file).catch(() => null);
+      videos.push({
+        blob: file,
+        blobId: crypto.randomUUID(),
+        mimeType,
+        durationSec: 0,  // unknown until decoded
+        thumbnailUrl,
+      });
+    }
+    repaintVideoGrid();
+    // Reset so the same file can be re-selected if removed
+    videoUploadInput.value = '';
   });
 
   // ── Map picker bridge ─────────────────────────────────────────────────
