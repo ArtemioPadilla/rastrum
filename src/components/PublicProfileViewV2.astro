@@ -225,6 +225,7 @@ const sponsoringI18n = {
 
 <script>
   import { getSupabase } from '../lib/supabase';
+  import { openConfirmDialog } from '../lib/confirm-dialog';
 
   type Lang = 'en' | 'es';
 
@@ -516,10 +517,13 @@ const sponsoringI18n = {
 
       blockBtn?.addEventListener('click', async () => {
         closeMenu();
-        const confirmCopy = lang === 'es'
-          ? `¿Bloquear a @${handleStr}?\n\nNo verán tus reacciones ni tú las suyas. Puedes deshacerlo en Ajustes → Privacidad.`
-          : `Block @${handleStr}?\n\nThey won't see your reactions and you won't see theirs. You can undo this in Settings → Privacy.`;
-        if (!confirm(confirmCopy)) return;
+        const title = lang === 'es' ? `¿Bloquear a @${handleStr}?` : `Block @${handleStr}?`;
+        const message = lang === 'es'
+          ? 'No verán tus reacciones ni tú las suyas. Puedes deshacerlo en Ajustes → Privacidad.'
+          : "They won't see your reactions and you won't see theirs. You can undo this in Settings → Privacy.";
+        const confirmLabel = lang === 'es' ? 'Bloquear' : 'Block';
+        const ok = await openConfirmDialog({ title, message, confirmLabel, variant: 'danger' });
+        if (!ok) return;
         blockBtn.disabled = true;
         try {
           const { blockUser } = await import('../lib/social');

@@ -1,0 +1,128 @@
+---
+/**
+ * ConfirmDialog — shared promise-based replacement for `window.confirm()`.
+ * Mounted once in `BaseLayout.astro`; opened by callers via
+ * `openConfirmDialog({...})` from `src/lib/confirm-dialog.ts`.
+ *
+ * Mirrors the `ReportDialog` pattern: focus trap, Esc + backdrop close,
+ * restores prior focus on close. Promise resolves true on confirm,
+ * false on cancel / Esc / backdrop.
+ */
+import { t } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+
+const { lang } = Astro.props;
+const tr = t(lang);
+const cdTr = tr.confirm_dialog;
+---
+
+<div
+  id="rastrum-confirm-dialog"
+  class="hidden fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 backdrop-blur-sm px-4"
+  data-lang={lang}
+  data-default-confirm={cdTr.default_confirm}
+  data-default-cancel={cdTr.default_cancel}
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="rastrum-confirm-title"
+  aria-label={cdTr.aria_dialog_label}
+>
+  <div class="w-full max-w-md rounded-2xl bg-white dark:bg-zinc-900 ring-1 ring-zinc-200 dark:ring-zinc-800 shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200">
+    <header class="px-5 py-4 border-b border-zinc-100 dark:border-zinc-800">
+      <h2 id="rastrum-confirm-title" data-cd-title class="text-base font-semibold text-zinc-900 dark:text-zinc-100"></h2>
+    </header>
+
+    <div class="px-5 py-4">
+      <p data-cd-message class="text-sm text-zinc-700 dark:text-zinc-300 whitespace-pre-line"></p>
+    </div>
+
+    <footer class="flex items-center justify-end gap-2 px-5 py-3 border-t border-zinc-100 dark:border-zinc-800">
+      <button
+        type="button"
+        data-cd-cancel
+        class="px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-zinc-400"
+      >
+        {cdTr.default_cancel}
+      </button>
+      <button
+        type="button"
+        data-cd-confirm
+        class="inline-flex min-h-[40px] items-center justify-center rounded-lg bg-emerald-700 hover:bg-emerald-800 px-5 py-2 text-sm font-semibold text-white transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {cdTr.default_confirm}
+      </button>
+    </footer>
+  </div>
+</div>
+
+<script>
+  import { CONFIRM_DIALOG_ID, CONFIRM_DIALOG_EVENT } from '../lib/confirm-dialog';
+
+  const dialog = document.getElementById(CONFIRM_DIALOG_ID);
+  if (dialog) {
+    const confirmBtn = dialog.querySelector<HTMLButtonElement>('[data-cd-confirm]');
+    const cancelBtn = dialog.querySelector<HTMLButtonElement>('[data-cd-cancel]');
+
+    let lastFocused: HTMLElement | null = null;
+
+    const FOCUSABLE_SEL = 'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+    function focusableEls(): HTMLElement[] {
+      return Array.from(dialog!.querySelectorAll<HTMLElement>(FOCUSABLE_SEL))
+        .filter((el) => el.offsetParent !== null || el === document.activeElement);
+    }
+
+    function resolve(result: boolean) {
+      if (dialog!.classList.contains('hidden')) return;
+      dialog!.classList.add('hidden');
+      dialog!.dispatchEvent(new CustomEvent(CONFIRM_DIALOG_EVENT, { detail: { result } }));
+      lastFocused?.focus();
+      lastFocused = null;
+    }
+
+    function onOpen() {
+      lastFocused = (document.activeElement as HTMLElement | null) ?? null;
+      const first = (cancelBtn as HTMLElement | null) ?? focusableEls()[0];
+      first?.focus();
+    }
+
+    confirmBtn?.addEventListener('click', () => resolve(true));
+    cancelBtn?.addEventListener('click', () => resolve(false));
+
+    dialog.addEventListener('click', (e) => {
+      if (e.target === dialog) resolve(false);
+    });
+
+    document.addEventListener('keydown', (e) => {
+      const ev = e as KeyboardEvent;
+      if (dialog.classList.contains('hidden')) return;
+      if (ev.key === 'Escape') {
+        ev.preventDefault();
+        resolve(false);
+        return;
+      }
+      if (ev.key === 'Tab') {
+        const els = focusableEls();
+        if (els.length === 0) return;
+        const first = els[0];
+        const last = els[els.length - 1];
+        const active = document.activeElement as HTMLElement | null;
+        if (ev.shiftKey && active === first) {
+          ev.preventDefault();
+          last.focus();
+        } else if (!ev.shiftKey && active === last) {
+          ev.preventDefault();
+          first.focus();
+        }
+      }
+    });
+
+    const observer = new MutationObserver(() => {
+      if (!dialog.classList.contains('hidden')) onOpen();
+    });
+    observer.observe(dialog, { attributes: true, attributeFilter: ['class'] });
+  }
+</script>
