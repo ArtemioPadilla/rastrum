@@ -446,6 +446,17 @@ export class EntityBrowser<Row extends { id?: string; [k: string]: unknown }> {
         this.renderPagination();
         return;
       }
+      // Defensive: a buggy FilterSpec.apply that doesn't return the running
+      // query will silently strip .range() off `q`. Detect it loudly here
+      // instead of throwing the cryptic minified `r.range is not a function`.
+      if (typeof (q as { range?: unknown }).range !== 'function') {
+        const offendingKeys = Object.keys(values).filter(k => values[k]);
+        console.warn(
+          `entity-browser[${this.cfg.prefix}]: a filter.apply returned a non-query value (likely missing return). Active filters:`,
+          offendingKeys,
+        );
+        throw new Error('Filter chain produced an invalid query. Clear filters and retry.');
+      }
       q = q.range(start, end);
       const result = (await (q as unknown as Promise<{
         data: Row[] | null;
