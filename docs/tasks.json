@@ -4686,6 +4686,24 @@
         }
       ]
     },
+    "community-observers-pr17-ux-fixes": {
+      "phase": "v1.1",
+      "title_en": "Community observers UX fixes — privacy explainer + country CTA + GPS-based Nearby",
+      "title_es": "Fixes UX en observadores comunidad — explicador de privacidad + CTA país + Cercanos con GPS",
+      "modules": ["28-community-discovery.md"],
+      "subtasks": [
+        { "label_en": "Privacy-default explainer banner — viewer-state-aware copy (private vs public profile); renders on 0 rows + signed in", "label_es": "Banner explicativo de privacidad por defecto — copy según el viewer (privado vs público); aparece con 0 filas + sesión iniciada", "status": "done" },
+        { "label_en": "Set-country inline CTA — only when viewer is signed in AND country_code IS NULL; links to /profile/edit/", "label_es": "CTA inline para fijar país — sólo si viewer en sesión y country_code IS NULL; enlaza a /profile/edit/", "status": "done" },
+        { "label_en": "community_observers_nearby_at(lat, lng, radius_m, …) SECURITY INVOKER RPC; granted to authenticated only; reuses GiST index on centroid_geog", "label_es": "RPC community_observers_nearby_at(lat, lng, radius_m, …) SECURITY INVOKER; sólo a authenticated; reutiliza índice GiST en centroid_geog", "status": "done" },
+        { "label_en": "📍 Use my location pill via navigator.geolocation; coords stored in sessionStorage (key rastrum.community.gps), NEVER URL — Referer-leak prevention", "label_es": "📍 Botón Usar mi ubicación con navigator.geolocation; coords en sessionStorage (clave rastrum.community.gps), NUNCA en la URL — prevención de filtración por Referer", "status": "done" },
+        { "label_en": "Fallback to centroid Nearby on geolocation deny; friendly toast", "label_es": "Fallback a Cercanos por centroide al denegar geolocalización; toast amigable", "status": "done" },
+        { "label_en": "loadGps / saveGps / clearGps helpers in community-url.ts (testable, dependency-injected)", "label_es": "Helpers loadGps / saveGps / clearGps en community-url.ts (testeable, inyección de dependencias)", "status": "done" },
+        { "label_en": "Regression-guard test: 'NEVER serializes GPS coords into the URL' + 9 sessionStorage round-trip / malformed / out-of-range cases", "label_es": "Test de regresión: 'NUNCA serializa coords GPS en la URL' + 9 casos de round-trip / malformado / fuera de rango", "status": "done" },
+        { "label_en": "loadViewerCommunityMeta() — single query for {signedIn, profilePublic, countryCode}; no N+1", "label_es": "loadViewerCommunityMeta() — una sola consulta para {signedIn, profilePublic, countryCode}; sin N+1", "status": "done" },
+        { "label_en": "Sentinel verify entries for both nearby RPCs", "label_es": "Entradas en sentinel verify para los dos RPCs de Cercanos", "status": "done" },
+        { "label_en": "CLAUDE.md M28 4th load-bearing rule + docs/runbooks/community-discovery.md UX clarifications section", "label_es": "Regla 4 del M28 en CLAUDE.md + sección de aclaraciones UX en docs/runbooks/community-discovery.md", "status": "done" }
+      ]
+    },
     "social-graph-m26": {
       "phase": "v1.2",
       "title_en": "Social graph + reactions (Module 26)",
