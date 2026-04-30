@@ -1,12 +1,12 @@
 ---
-import BaseLayout from '../../../layouts/BaseLayout.astro';
+import ConsoleLayout from '../../../components/ConsoleLayout.astro';
 import ConsoleOverviewView from '../../../components/ConsoleOverviewView.astro';
 import ConsoleModOverviewView from '../../../components/ConsoleModOverviewView.astro';
 import ConsoleExpertOverviewView from '../../../components/ConsoleExpertOverviewView.astro';
 const lang = 'es';
 ---
 
-<BaseLayout lang={lang} title="Consola">
+<ConsoleLayout lang={lang} title="Consola — Rastrum">
   <!-- Gate: renders invisible (no text) on first paint so signed-in users
        with roles never see a "Cargando…" flash. The script un-hides the
        correct shell immediately after the session resolves, or sets an
@@ -24,7 +24,7 @@ const lang = 'es';
   </div>
   <div id="console-shell-fallback" class="hidden">
   </div>
-</BaseLayout>
+</ConsoleLayout>
 
 <script>
   import { getSupabase } from '../../../lib/supabase';

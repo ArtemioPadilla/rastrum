@@ -1,34 +1,50 @@
 ---
 /**
  * ConsoleLayout — privileged-actions chrome. No public Header/Footer.
- * Top bar: wordmark + role pills + identity + Exit.
- * Body: ConsoleSidebar + slot.
  *
- * Role pills only show for roles the signed-in user holds. The active
- * role is read from URL ?role=… or defaulted to the first held role.
+ * Static-output friendly: roles cannot be known at build time, so the
+ * layout server-renders all three role pills + all three role tab
+ * lists, each wrapped with `data-role="..."` and initially hidden.
+ * A client script reads the live session and reveals the right pieces.
+ *
+ * Pages may still pass props (`allRoles`, `activeRole`, `identity`) for
+ * tests / future SSR. When omitted, defaults trigger the client-hydrate
+ * path.
  */
 import type { UserRole } from '../lib/types';
-import { rolePillsFor } from '../lib/console-tabs';
+import { CONSOLE_TABS } from '../lib/console-tabs';
 import { t, getLocalizedPath, routes } from '../i18n/utils';
-import ConsoleSidebar from './ConsoleSidebar.astro';
 
 interface Props {
   lang: 'en' | 'es';
-  allRoles: Set<UserRole>;
-  activeRole: UserRole;
-  currentPath: string;
-  identity: { username: string | null; avatar?: string };
+  title?: string;
+  allRoles?: Set<UserRole>;
+  activeRole?: UserRole | null;
+  currentPath?: string;
+  identity?: { username: string | null; avatar?: string };
 }
 
-const { lang, allRoles, activeRole, currentPath, identity } = Astro.props;
+const {
+  lang,
+  title,
+  allRoles,
+  activeRole = null,
+  currentPath = Astro.url.pathname,
+  identity = { username: null },
+} = Astro.props;
+
 const tr = t(lang);
-const pills = rolePillsFor(allRoles);
 const exitHref = getLocalizedPath(lang, '/');
 const dashboardHref = getLocalizedPath(lang, routes.console[lang] + '/');
 
-function pillHref(role: UserRole): string {
-  return `${dashboardHref}?role=${role}`;
-}
+const ALL_ROLES_ORDERED: UserRole[] = ['admin', 'moderator', 'expert'];
+
+const labelKey: Record<UserRole, string> = {
+  admin: tr.console.role_admin_pill,
+  moderator: tr.console.role_moderator_pill,
+  expert: tr.console.role_expert_pill,
+  researcher: '',
+};
 
 const railColour = (role: UserRole): string => {
   switch (role) {
@@ -39,98 +55,266 @@ const railColour = (role: UserRole): string => {
   }
 };
 
-const labelKey: Record<UserRole, string> = {
-  admin: tr.console.role_admin_pill,
-  moderator: tr.console.role_moderator_pill,
-  expert: tr.console.role_expert_pill,
-  researcher: '',
+const PAGE_TITLE = title ?? (lang === 'es' ? 'Consola — Rastrum' : 'Console — Rastrum');
+
+function trAt(path: string): string {
+  const parts = path.split('.');
+  let cursor: unknown = tr;
+  for (const p of parts) {
+    if (cursor && typeof cursor === 'object' && p in (cursor as Record<string, unknown>)) {
+      cursor = (cursor as Record<string, unknown>)[p];
+    } else {
+      return path;
+    }
+  }
+  return typeof cursor === 'string' ? cursor : path;
+}
+
+function pillHref(role: UserRole): string {
+  return `${dashboardHref}?role=${role}`;
+}
+
+interface SidebarEntry {
+  href: string;
+  label: string;
+  stub: boolean;
+  isActive: boolean;
+}
+
+function entriesForRole(role: UserRole): SidebarEntry[] {
+  return CONSOLE_TABS.filter(t => t.role === role).map(tab => {
+    const href = getLocalizedPath(lang, routes[tab.routeKey][lang] + '/');
+    const isActive = currentPath === href || currentPath === href.replace(/\/$/, '');
+    return {
+      href,
+      label: trAt(tab.i18nKey),
+      stub: !!tab.stub,
+      isActive,
+    };
+  });
+}
+
+const tabsByRole: Record<UserRole, SidebarEntry[]> = {
+  admin:      entriesForRole('admin'),
+  moderator:  entriesForRole('moderator'),
+  expert:     entriesForRole('expert'),
+  researcher: [],
 };
+
+// If the page passed a known activeRole, we still emit all three lists
+// so the client can switch via ?role=… without a reload — but mark which
+// one to start visible via `data-initial-active`.
+const serverInitialRole: UserRole | null = activeRole ?? null;
+
+// Server-known roles let us pre-resolve pill visibility (for tests / future
+// SSR). Otherwise the client script flips visibility after auth resolves.
+const knownPills: Set<UserRole> | null = allRoles ?? null;
 ---
 
-<div class="min-h-screen flex flex-col bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
-  <header class="flex items-center gap-3 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-4 py-2.5">
-    <a href={exitHref} class="font-bold tracking-tight text-emerald-700 dark:text-emerald-400">
-      Rastrum
-    </a>
-    <span class="ml-1 hidden sm:inline-block text-xs text-zinc-500 uppercase tracking-wide">
-      {tr.console.nav}
-    </span>
-    <nav class="ml-3 flex gap-1.5">
-      {pills.map(role => {
-        const isActive = role === activeRole;
-        const cls = isActive
-          ? `${railColour(role)} px-2.5 py-1 rounded-full text-xs font-semibold`
-          : 'px-2.5 py-1 rounded-full text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900';
-        return (
-          <a href={pillHref(role)} class={cls}>{labelKey[role]}</a>
-        );
-      })}
-    </nav>
-    <div class="ml-auto flex items-center gap-3 text-xs text-zinc-600 dark:text-zinc-400">
-      <span>{identity.username ?? ''}</span>
-      <a href={exitHref} class="hover:underline">↩ {tr.console.exit}</a>
+<!doctype html>
+<html lang={lang} class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>{PAGE_TITLE}</title>
+    <link rel="icon" type="image/svg+xml" href={`${import.meta.env.BASE_URL}favicon.svg`} />
+    <script is:inline>
+      (function() {
+        const theme = localStorage.getItem('theme');
+        if (theme === 'light') {
+          document.documentElement.classList.remove('dark');
+        } else {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
+  </head>
+  <body class="min-h-screen bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 transition-colors">
+    <div class="min-h-screen flex flex-col" data-console-shell data-lang={lang} data-initial-role={serverInitialRole ?? ''}>
+      <header class="flex items-center gap-3 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-4 py-2.5">
+        <a href={exitHref} class="font-bold tracking-tight text-emerald-700 dark:text-emerald-400">
+          Rastrum
+        </a>
+        <span class="ml-1 hidden sm:inline-block text-xs text-zinc-500 uppercase tracking-wide">
+          {tr.console.nav}
+        </span>
+        <nav class="ml-3 flex gap-1.5" data-console-pills>
+          {ALL_ROLES_ORDERED.map(role => {
+            const isActive = serverInitialRole === role;
+            const heldByServer = knownPills?.has(role) ?? false;
+            const baseCls = isActive
+              ? `${railColour(role)} px-2.5 py-1 rounded-full text-xs font-semibold`
+              : 'px-2.5 py-1 rounded-full text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900';
+            const visibilityCls = knownPills ? (heldByServer ? '' : 'hidden') : 'hidden';
+            const activeCls = railColour(role);
+            return (
+              <a
+                href={pillHref(role)}
+                class={[baseCls, visibilityCls].filter(Boolean).join(' ')}
+                data-console-pill={role}
+                data-active-cls={activeCls}
+                data-inactive-cls="text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900"
+              >
+                {labelKey[role]}
+              </a>
+            );
+          })}
+        </nav>
+        <div class="ml-auto flex items-center gap-3 text-xs text-zinc-600 dark:text-zinc-400">
+          <span data-console-username>{identity.username ?? ''}</span>
+          <a href={exitHref} class="hover:underline">↩ {tr.console.exit}</a>
+        </div>
+      </header>
+
+      <div class="flex flex-1 min-h-0">
+        <aside
+          class="hidden md:block w-56 shrink-0 border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50/40 dark:bg-zinc-950 p-3 overflow-y-auto"
+          data-console-sidebar
+        >
+          {ALL_ROLES_ORDERED.map(role => {
+            const visibleNow = serverInitialRole === role;
+            const ulCls = visibleNow ? 'space-y-0.5 text-sm' : 'space-y-0.5 text-sm hidden';
+            return (
+              <ul class={ulCls} data-role={role}>
+                {tabsByRole[role].map(entry => {
+                  const cls = [
+                    'flex items-center justify-between rounded px-2.5 py-1.5',
+                    entry.isActive
+                      ? 'bg-zinc-200/70 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium'
+                      : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-900',
+                    entry.stub ? 'opacity-60' : '',
+                  ].filter(Boolean).join(' ');
+                  return (
+                    <li>
+                      <a href={entry.href} class={cls}>
+                        <span>{entry.label}</span>
+                        {entry.stub && (
+                          <span class="text-[10px] uppercase tracking-wide text-zinc-500">soon</span>
+                        )}
+                      </a>
+                    </li>
+                  );
+                })}
+              </ul>
+            );
+          })}
+        </aside>
+        <main class="flex-1 overflow-y-auto p-4 md:p-6">
+          <slot />
+        </main>
+      </div>
     </div>
-  </header>
 
-  <div class="flex flex-1 min-h-0">
-    <ConsoleSidebar
-      lang={lang}
-      activeRole={activeRole}
-      allRoles={allRoles}
-      currentPath={currentPath}
-    />
-    <main class="flex-1 overflow-y-auto p-4 md:p-6">
-      <slot />
-    </main>
-  </div>
-</div>
+    <div
+      id="console-kb-labels"
+      class="hidden"
+      data-kb-help-title={tr.console.kb_help_title}
+      data-kb-help-close={tr.console.kb_help_close}
+      data-kb-nav-audit={tr.console.kb_nav_audit}
+      data-kb-nav-users={tr.console.kb_nav_users}
+      data-kb-nav-observations={tr.console.kb_nav_observations}
+      data-kb-nav-flag-queue={tr.console.kb_nav_flag_queue}
+      data-kb-nav-comments={tr.console.kb_nav_comments}
+      data-kb-nav-bans={tr.console.kb_nav_bans}
+      data-kb-nav-experts={tr.console.kb_nav_experts}
+      data-kb-nav-sync={tr.console.kb_nav_sync}
+      data-kb-nav-api={tr.console.kb_nav_api}
+      data-kb-nav-health={tr.console.kb_nav_health}
+      data-kb-nav-errors={tr.console.kb_nav_errors}
+      data-kb-help-navigation={tr.console.kb_help_navigation}
+      data-kb-help-actions={tr.console.kb_help_actions}
+      data-kb-escape-close={tr.console.kb_escape_close}
+      data-kb-question-help={tr.console.kb_question_help}
+    ></div>
 
-<div
-  id="console-kb-labels"
-  class="hidden"
-  data-kb-help-title={tr.console.kb_help_title}
-  data-kb-help-close={tr.console.kb_help_close}
-  data-kb-nav-audit={tr.console.kb_nav_audit}
-  data-kb-nav-users={tr.console.kb_nav_users}
-  data-kb-nav-observations={tr.console.kb_nav_observations}
-  data-kb-nav-flag-queue={tr.console.kb_nav_flag_queue}
-  data-kb-nav-comments={tr.console.kb_nav_comments}
-  data-kb-nav-bans={tr.console.kb_nav_bans}
-  data-kb-nav-experts={tr.console.kb_nav_experts}
-  data-kb-nav-sync={tr.console.kb_nav_sync}
-  data-kb-nav-api={tr.console.kb_nav_api}
-  data-kb-nav-health={tr.console.kb_nav_health}
-  data-kb-nav-errors={tr.console.kb_nav_errors}
-  data-kb-help-navigation={tr.console.kb_help_navigation}
-  data-kb-help-actions={tr.console.kb_help_actions}
-  data-kb-escape-close={tr.console.kb_escape_close}
-  data-kb-question-help={tr.console.kb_question_help}
-></div>
+    <script>
+      import { installConsoleKeybindings } from '../lib/console-keybindings';
+      import { getSupabase } from '../lib/supabase';
+      import { getUserRoles } from '../lib/user-roles';
+      import { rolePillsFor } from '../lib/console-tabs';
+      import type { UserRole } from '../lib/types';
 
-<script>
-  import { installConsoleKeybindings } from '../lib/console-keybindings';
+      const labelsEl = document.getElementById('console-kb-labels');
+      if (labelsEl) {
+        const labels: Record<string, string> = {
+          kb_help_title:       labelsEl.dataset.kbHelpTitle ?? '',
+          kb_help_close:       labelsEl.dataset.kbHelpClose ?? '',
+          kb_nav_audit:        labelsEl.dataset.kbNavAudit ?? '',
+          kb_nav_users:        labelsEl.dataset.kbNavUsers ?? '',
+          kb_nav_observations: labelsEl.dataset.kbNavObservations ?? '',
+          kb_nav_flag_queue:   labelsEl.dataset.kbNavFlagQueue ?? '',
+          kb_nav_comments:     labelsEl.dataset.kbNavComments ?? '',
+          kb_nav_bans:         labelsEl.dataset.kbNavBans ?? '',
+          kb_nav_experts:      labelsEl.dataset.kbNavExperts ?? '',
+          kb_nav_sync:         labelsEl.dataset.kbNavSync ?? '',
+          kb_nav_api:          labelsEl.dataset.kbNavApi ?? '',
+          kb_nav_health:       labelsEl.dataset.kbNavHealth ?? '',
+          kb_nav_errors:       labelsEl.dataset.kbNavErrors ?? '',
+          kb_help_navigation:  labelsEl.dataset.kbHelpNavigation ?? '',
+          kb_help_actions:     labelsEl.dataset.kbHelpActions ?? '',
+          kb_escape_close:     labelsEl.dataset.kbEscapeClose ?? '',
+          kb_question_help:    labelsEl.dataset.kbQuestionHelp ?? '',
+        };
+        installConsoleKeybindings(labels);
+      }
 
-  const labelsEl = document.getElementById('console-kb-labels');
-  if (labelsEl) {
-    const labels: Record<string, string> = {
-      kb_help_title:       labelsEl.dataset.kbHelpTitle ?? '',
-      kb_help_close:       labelsEl.dataset.kbHelpClose ?? '',
-      kb_nav_audit:        labelsEl.dataset.kbNavAudit ?? '',
-      kb_nav_users:        labelsEl.dataset.kbNavUsers ?? '',
-      kb_nav_observations: labelsEl.dataset.kbNavObservations ?? '',
-      kb_nav_flag_queue:   labelsEl.dataset.kbNavFlagQueue ?? '',
-      kb_nav_comments:     labelsEl.dataset.kbNavComments ?? '',
-      kb_nav_bans:         labelsEl.dataset.kbNavBans ?? '',
-      kb_nav_experts:      labelsEl.dataset.kbNavExperts ?? '',
-      kb_nav_sync:         labelsEl.dataset.kbNavSync ?? '',
-      kb_nav_api:          labelsEl.dataset.kbNavApi ?? '',
-      kb_nav_health:       labelsEl.dataset.kbNavHealth ?? '',
-      kb_nav_errors:       labelsEl.dataset.kbNavErrors ?? '',
-      kb_help_navigation:  labelsEl.dataset.kbHelpNavigation ?? '',
-      kb_help_actions:     labelsEl.dataset.kbHelpActions ?? '',
-      kb_escape_close:     labelsEl.dataset.kbEscapeClose ?? '',
-      kb_question_help:    labelsEl.dataset.kbQuestionHelp ?? '',
-    };
-    installConsoleKeybindings(labels);
-  }
-</script>
+      // Hydrate role pills + sidebar once we know the user's roles.
+      // No-op for unauth visitors (their pill set is empty); the inner
+      // page's own gate (#console-gate, #*-not-auth) handles messaging.
+      async function hydrateConsoleChrome() {
+        const shell = document.querySelector('[data-console-shell]') as HTMLElement | null;
+        if (!shell) return;
+
+        const supabase = getSupabase();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const usernameEl = shell.querySelector('[data-console-username]') as HTMLElement | null;
+        if (usernameEl) {
+          const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
+          const display = (typeof meta.username === 'string' && meta.username) ||
+                          (typeof meta.user_name === 'string' && meta.user_name) ||
+                          user.email || '';
+          usernameEl.textContent = String(display);
+        }
+
+        const roles = await getUserRoles(user.id);
+        if (roles.size === 0) return;
+
+        const pillOrder = rolePillsFor(roles);
+        const requestedRole = new URL(window.location.href).searchParams.get('role') as UserRole | null;
+        const activeRole: UserRole = (
+          requestedRole && roles.has(requestedRole) ? requestedRole : pillOrder[0]
+        );
+
+        // Reveal pills for held roles + style the active one.
+        const pillBaseInactive = 'px-2.5 py-1 rounded-full text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900';
+        const pillBaseActive   = 'px-2.5 py-1 rounded-full text-xs font-semibold';
+        shell.querySelectorAll<HTMLAnchorElement>('[data-console-pill]').forEach(pill => {
+          const role = pill.dataset.consolePill as UserRole;
+          if (!roles.has(role)) {
+            pill.classList.add('hidden');
+            return;
+          }
+          pill.classList.remove('hidden');
+          pill.className = '';
+          if (role === activeRole) {
+            pill.className = `${pillBaseActive} ${pill.dataset.activeCls ?? ''}`.trim();
+          } else {
+            pill.className = pillBaseInactive;
+          }
+        });
+
+        // Reveal the active-role tab list, hide the others.
+        shell.querySelectorAll<HTMLUListElement>('[data-console-sidebar] ul[data-role]').forEach(ul => {
+          const role = ul.dataset.role as UserRole;
+          if (role === activeRole) ul.classList.remove('hidden');
+          else                     ul.classList.add('hidden');
+        });
+      }
+
+      hydrateConsoleChrome().catch(() => { /* swallow — gate UI shows error */ });
+    </script>
+  </body>
+</html>

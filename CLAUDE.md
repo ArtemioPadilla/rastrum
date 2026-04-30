@@ -288,7 +288,7 @@ Full design rationale: `docs/superpowers/specs/2026-04-28-social-features-design
 
 The `'console'` chrome mode (third value of `ChromeMode`) renders the
 admin / moderator / expert dashboard at `/{en,es}/{console,consola}/*`.
-Three load-bearing rules:
+Four load-bearing rules:
 
 1. **`console-tabs.ts` is the single source of truth.** Sidebar, role
    pills, and the route table are pure projections. Adding a tab = one
@@ -301,6 +301,17 @@ Three load-bearing rules:
    `users.is_expert` for new privilege checks — that's a denormalised
    cache for the consensus hot-path. Use `has_role()` in any new
    policy that gates console-relevant data.
+4. **Every `/console/*` and `/consola/*` page MUST be wrapped in
+   `ConsoleLayout`, never `BaseLayout` directly.** The chrome (sidebar +
+   role pills + keybindings) is part of the console contract; without
+   it the page renders as orphaned content with the public site
+   header/footer. ConsoleLayout server-renders all three role tab lists
+   (under `<ul data-role="admin|moderator|expert">`) and pills (with
+   `data-console-pill`) initially hidden; a client script in the layout
+   reads `getUserRoles(user.id)` and reveals the right ones after auth
+   resolves. BaseLayout emits a `console.warn` at build time if a
+   console-prefixed path slips through to it — treat any such warning
+   as a regression.
 
 The `console` accent rail uses slate-500 (top header pill, sidebar active
 state). The classes are safelisted in `tailwind.config.mjs`; adding a
@@ -309,7 +320,9 @@ production builds will purge it.
 
 Bootstrap docs: `docs/runbooks/admin-bootstrap.md`. Role model:
 `docs/runbooks/role-model.md`. Audit log: `docs/runbooks/admin-audit.md`.
-Per-action runbook: `docs/runbooks/admin-ops.md`.
+Per-action runbook: `docs/runbooks/admin-ops.md`. Chrome-rendering
+invariant (sidebar / role pills / `ConsoleLayout`):
+`docs/runbooks/admin-chrome-rendering.md`.
 
 **Status:** 36 of 39 console tabs functional, 36 admin Edge Function handlers deployed, all admin write affordances live, CORS tightened to rastrum.org + dev/preview ports, token-bucket rate limit + pgTAP RLS suite enforced in CI. PR12 (observability) added Anomalies + Forensics tabs backed by hourly `detect_admin_anomalies()` cron, weekly `compute_admin_health_digest()` snapshot, and a structured `function_errors` sink wired into the dispatcher. PR13 (future-proofing) added Proposals + Webhooks tabs, time-bounded role grants (`expires_at` + daily `auto_revoke_expired_roles()` cron), a two-person-rule `admin_action_proposals` table with hourly expiry sweep, HMAC-SHA256 outbound webhook signing (`dispatch_admin_webhooks()`), and a v1 placeholder `compute_moderator_trust_score()` primitive. PR14 (deferred cleanup) closed the v1.1 follow-ups: per-admin timezone for the off_hours rule (`users.timezone`), webhook replay protection (`_meta` envelope + nonce + reconcile cron writing back async `pg_net` status_code), the real moderator trust score formula (anomaly + overturn + active-days + recency, clamped 0–100), the dispatcher-level `enforce_two_person_irreversible` enforcement gate (feature flag-gated), and the "Require approval (two-person rule)" toggle on irreversible slide-overs. PR15 (observability UI) shipped `/console/health/` (weekly-digest hero card with directional Δ pills + 12-week sparklines, manual `health.recompute`), `/console/errors/` (function_errors browser with severity-coloured pills + URL-driven filters + auto-refresh + single + bulk ack via `error.acknowledge[_bulk]`), and per-webhook deliveries drilldown on `/console/webhooks/` with click-to-replay (`webhook.replay_delivery`) + nonce copy. PR16 (entity browsers) shipped seven read-only paginated browsers — Identifications, Notifications, Media, Follows, Watchlists, Projects, Taxon changes — built on a shared `ConsoleEntityBrowser.astro` template + `src/lib/entity-browser.ts` runtime. Server-side paginated (50/page), URL-driven filter state, lazy FK lookups, auto-populated dropdown facets; runbook at `docs/runbooks/admin-entity-browsers.md`. Deferred stubs (no concrete users): License disputes, Identification overrides, Taxon notes, Bioblitz.
 
