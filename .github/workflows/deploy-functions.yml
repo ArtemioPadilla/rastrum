@@ -40,6 +40,7 @@ on:
           - streak-push
           - sync-error
           - delete-observation
+          - gc-orphan-media
           - follow
           - react
           - report
@@ -212,7 +213,7 @@ jobs:
           #   streak-push           — cron-only; gates internally on service-role
           #   mcp / api             — gate internally on rst_ tokens (not JWTs)
           # Module 26 functions (follow / react / report) DO verify JWT.
-          NO_JWT="share-card recompute-streaks award-badges recompute-user-stats plantnet-monitor streak-push mcp api"
+          NO_JWT="share-card recompute-streaks award-badges recompute-user-stats plantnet-monitor streak-push mcp api gc-orphan-media"
           deploy_one() {
             local fn="$1"
             local flag=""

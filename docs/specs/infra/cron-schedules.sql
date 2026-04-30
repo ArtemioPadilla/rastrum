@@ -298,3 +298,23 @@ SELECT cron.schedule('vertex_token_expiry_monitor', '*/10 * * * *',
             AND n.payload->>'credential_id' = c.id::text
             AND n.created_at > now() - interval '15 minutes'
        )$$);
+
+-- ─────────────────────────────────────────────────────────────────
+-- v9 (2026-04-30): added 'gc-orphan-media' (Sundays 04:30 UTC)
+--   for #285 — nightly R2 orphan blob GC.
+--   Token stored in vault under 'gc_orphan_media_cron_token'.
+-- ─────────────────────────────────────────────────────────────────
+SELECT cron.unschedule('gc_orphan_media')
+  WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'gc_orphan_media');
+SELECT cron.schedule('gc_orphan_media', '30 4 * * 0',
+  $$SELECT net.http_post(
+    url := 'https://reppvlqejgoqvitturxp.supabase.co/functions/v1/gc-orphan-media',
+    headers := jsonb_build_object(
+      'Authorization', 'Bearer ' || (
+        SELECT decrypted_secret
+          FROM vault.decrypted_secrets
+         WHERE name = 'gc_orphan_media_cron_token'
+         LIMIT 1
+      )
+    )
+  )$$);

@@ -6379,3 +6379,31 @@ DROP POLICY IF EXISTS watchlists_admin_read ON public.watchlists;
 CREATE POLICY watchlists_admin_read ON public.watchlists
   FOR SELECT TO authenticated
   USING (public.has_role(auth.uid(), 'admin'));
+
+-- ════════════════════════════════════════════════════════════════════════
+-- gc_orphan_media_log — audit log for the gc-orphan-media cron (#285)
+-- ════════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS public.gc_orphan_media_log (
+  id            uuid        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  run_at        timestamptz NOT NULL DEFAULT now(),
+  prefix        text        NOT NULL,
+  scanned       int         NOT NULL,
+  deleted       int         NOT NULL DEFAULT 0,
+  bytes_freed   bigint      NOT NULL DEFAULT 0,
+  errors        int         NOT NULL DEFAULT 0,
+  duration_ms   int         NOT NULL DEFAULT 0,
+  notes         text
+);
+
+CREATE INDEX IF NOT EXISTS idx_gc_orphan_media_log_run_at
+  ON public.gc_orphan_media_log(run_at DESC);
+
+ALTER TABLE public.gc_orphan_media_log ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS gc_orphan_media_log_admin_read ON public.gc_orphan_media_log;
+CREATE POLICY gc_orphan_media_log_admin_read ON public.gc_orphan_media_log
+  FOR SELECT TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'));
+
+GRANT SELECT, INSERT ON public.gc_orphan_media_log TO service_role;
