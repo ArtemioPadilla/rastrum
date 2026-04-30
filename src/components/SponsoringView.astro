@@ -68,6 +68,56 @@ const i18nBag = {
     <ul id="creds-list" class="divide-y divide-zinc-200 dark:divide-zinc-800"></ul>
   </section>
 
+  <!-- M32 (#152): donate to platform pool -->
+  <section id="pools-section" class="space-y-4">
+    <div class="flex items-center justify-between gap-2 flex-wrap">
+      <h2 class="text-lg font-semibold">{lang === 'es' ? 'Pool de la plataforma' : 'Platform pool'}</h2>
+      <button id="pool-add-btn" type="button"
+        class="rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-1.5 text-sm font-medium min-h-[36px]">
+        {lang === 'es' ? 'Donar al pool' : 'Donate to pool'}
+      </button>
+    </div>
+    <p class="text-xs text-zinc-500 dark:text-zinc-400 max-w-2xl">
+      {lang === 'es'
+        ? 'Dona N llamadas a un pool compartido. Cualquier usuario puede consumirlo (con un cap diario por persona). Tú sólo ves estadísticas agregadas — los beneficiarios son anónimos.'
+        : 'Donate N calls to a shared pool. Any user can consume it (with a per-person daily cap). You only see aggregate stats — beneficiaries stay anonymous.'}
+    </p>
+    <ul id="pools-list" class="divide-y divide-zinc-200 dark:divide-zinc-800"></ul>
+    <p id="pools-empty" class="hidden text-sm text-zinc-500 dark:text-zinc-400">
+      {lang === 'es' ? 'Aún no has donado al pool.' : 'You haven’t donated to the pool yet.'}
+    </p>
+  </section>
+
+  <dialog id="add-pool-dialog" class="rounded-xl p-6 max-w-md backdrop:bg-black/50">
+    <h3 class="text-lg font-semibold mb-2">{lang === 'es' ? 'Donar al pool' : 'Donate to pool'}</h3>
+    <form method="dialog" class="space-y-3">
+      <div>
+        <label class="block text-sm font-medium" for="pool-cred-select">{lang === 'es' ? 'Credencial' : 'Credential'}</label>
+        <select id="pool-cred-select" required class="mt-1 block w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm bg-white dark:bg-zinc-900"></select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium" for="pool-cap-input">{lang === 'es' ? 'Llamadas a donar' : 'Calls to donate'}</label>
+        <input id="pool-cap-input" type="number" min="1" max="1000000" required class="mt-1 block w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm bg-white dark:bg-zinc-900" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium" for="pool-model-input">{lang === 'es' ? 'Modelo' : 'Model'}</label>
+        <input id="pool-model-input" type="text" required value="claude-haiku-4-5" class="mt-1 block w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-mono bg-white dark:bg-zinc-900" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium" for="pool-daily-input">{lang === 'es' ? 'Cap diario por usuario' : 'Daily cap per user'}</label>
+        <input id="pool-daily-input" type="number" min="1" max="1000" value="10" required class="mt-1 block w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm bg-white dark:bg-zinc-900" />
+      </div>
+      <label class="flex items-center gap-2 text-sm">
+        <input id="pool-monthly-reset" type="checkbox" />
+        <span>{lang === 'es' ? 'Resetear `used` el primer día de cada mes' : 'Reset `used` on the 1st of every month'}</span>
+      </label>
+      <div class="flex gap-2 justify-end">
+        <button type="button" id="pool-cancel" class="px-3 py-1.5 text-sm rounded border border-zinc-300 dark:border-zinc-700">{cancelLabel}</button>
+        <button type="submit" id="pool-submit" class="px-3 py-1.5 text-sm rounded bg-emerald-700 text-white">{lang === 'es' ? 'Crear pool' : 'Create pool'}</button>
+      </div>
+    </form>
+  </dialog>
+
   <!-- Section A.5: Pending requests from beneficiaries -->
   <section id="requests-section" class="space-y-4">
     <h2 class="text-lg font-semibold">{tr.sponsoring.requests_section}</h2>
@@ -143,6 +193,34 @@ const i18nBag = {
         <p id="cred-kind-preview" class="mt-1 text-xs text-zinc-500"></p>
         <p class="mt-1 text-xs text-zinc-500">{tr.sponsoring.secret_help}</p>
       </div>
+
+      <!-- M32 (#152): provider + model selection. The secret-prefix
+           detector picks an initial value; the operator can override
+           (required for Bedrock / Azure / Vertex JSON envelopes that
+           share no recognisable prefix). -->
+      <div>
+        <label class="block text-sm font-medium" for="cred-kind-select">{lang === 'es' ? 'Proveedor' : 'Provider'}</label>
+        <select id="cred-kind-select" name="kind" class="mt-1 block w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm bg-white dark:bg-zinc-900">
+          <option value="api_key">Anthropic — API key (sk-ant-api03-…)</option>
+          <option value="oauth_token">Anthropic — OAuth token (sk-ant-oat01-…)</option>
+          <option value="bedrock">AWS Bedrock — IAM JSON envelope</option>
+          <option value="openai_api_key">OpenAI — API key (sk-…)</option>
+          <option value="azure_openai">Azure OpenAI — deployment URL</option>
+          <option value="gemini_api_key">Google Gemini — API key (AIza…)</option>
+          <option value="vertex_ai">Google Vertex AI — service-account JSON</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium" for="cred-model-input">{lang === 'es' ? 'Modelo preferido' : 'Preferred model'}</label>
+        <input id="cred-model-input" name="preferred_model" type="text" class="mt-1 block w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-mono bg-white dark:bg-zinc-900" placeholder="claude-haiku-4-5" />
+        <p class="mt-1 text-xs text-zinc-500">{lang === 'es' ? 'Defaults: claude-haiku-4-5 (Anthropic/Bedrock), gpt-4o-mini (OpenAI/Azure), gemini-2.0-flash-exp (Gemini/Vertex). Bedrock auto-traduce el shorthand de Anthropic.' : 'Defaults: claude-haiku-4-5 (Anthropic/Bedrock), gpt-4o-mini (OpenAI/Azure), gemini-2.0-flash-exp (Gemini/Vertex). Bedrock auto-translates Anthropic shorthand.'}</p>
+      </div>
+      <div id="cred-endpoint-row" class="hidden">
+        <label class="block text-sm font-medium" for="cred-endpoint-input">{lang === 'es' ? 'Endpoint' : 'Endpoint'}</label>
+        <input id="cred-endpoint-input" name="endpoint" type="text" class="mt-1 block w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-mono bg-white dark:bg-zinc-900" />
+        <p id="cred-endpoint-help" class="mt-1 text-xs text-zinc-500"></p>
+      </div>
+
       <div class="flex gap-2 justify-end">
         <button type="button" id="cred-cancel" class="px-3 py-1.5 text-sm rounded border border-zinc-300 dark:border-zinc-700">{cancelLabel}</button>
         <button type="submit" id="cred-submit" class="px-3 py-1.5 text-sm rounded bg-emerald-700 text-white">{tr.sponsoring.validate_btn}</button>
@@ -203,6 +281,7 @@ const i18nBag = {
     listCredentials, createCredential, rotateCredential, deleteCredential,
     listSponsorships, createSponsorship, unpauseSponsorship, revokeSponsorship,
     detectKind,
+    listMyPools, createPool, setPoolStatus,
   } from '../lib/sponsorships';
 
   type I18nBag = {
@@ -318,24 +397,63 @@ const i18nBag = {
   const addCredDialog = document.getElementById('add-cred-dialog') as HTMLDialogElement | null;
   document.getElementById('add-cred-btn')?.addEventListener('click', () => addCredDialog?.showModal());
   document.getElementById('cred-cancel')?.addEventListener('click', () => addCredDialog?.close());
-  document.getElementById('cred-secret-input')?.addEventListener('input', (e) => {
+  // M32 (#152): auto-detect kind from secret prefix; fall back to
+  // user-selected dropdown for Bedrock / Azure / Vertex (JSON envelopes
+  // share no prefix). The endpoint row only shows for kinds that need it.
+  function syncEndpointRow() {
+    const kindSel = document.getElementById('cred-kind-select') as HTMLSelectElement | null;
+    const row     = document.getElementById('cred-endpoint-row');
+    const help    = document.getElementById('cred-endpoint-help');
+    const endpointKinds: Record<string, string> = {
+      azure_openai: 'Full deployment URL (e.g. https://<resource>.openai.azure.com/openai/deployments/<dep>/chat/completions?api-version=2024-02-01)',
+      bedrock:      'Optional region override (defaults to us-east-1 or the JSON envelope value)',
+      vertex_ai:    'GCP region (defaults to us-central1)',
+    };
+    const kind = kindSel?.value ?? 'api_key';
+    if (kind in endpointKinds) {
+      row?.classList.remove('hidden');
+      if (help) help.textContent = endpointKinds[kind];
+    } else {
+      row?.classList.add('hidden');
+    }
+  }
+  document.getElementById('cred-kind-select')?.addEventListener('change', syncEndpointRow);
+  syncEndpointRow();
+
+  document.getElementById('cred-secret-input')?.addEventListener('input', async (e) => {
     const val = (e.target as HTMLInputElement).value;
-    const kind = detectKind(val);
+    const { detectAnyKind } = await import('../lib/sponsorships');
+    const kind = detectAnyKind(val);
     const preview = document.getElementById('cred-kind-preview');
-    if (!preview) return;
-    if (!val)                          preview.textContent = '';
-    else if (kind === 'api_key')       preview.textContent = '✓ API Key (sk-ant-api03-…)';
-    else if (kind === 'oauth_token')   preview.textContent = '✓ Long-lived token (sk-ant-oat01-…)';
-    else                               preview.textContent = '⚠ Unrecognized prefix (must start with sk-ant-api03- or sk-ant-oat01-)';
+    const kindSel = document.getElementById('cred-kind-select') as HTMLSelectElement | null;
+    if (preview) {
+      if (!val)        preview.textContent = '';
+      else if (kind)   preview.textContent = `✓ Detected kind: ${kind}`;
+      else             preview.textContent = '⚠ Unrecognized prefix — pick the provider above (Bedrock / Azure / Vertex use JSON envelopes)';
+    }
+    if (kind && kindSel && (kindSel.value === 'api_key' || !kindSel.dataset.touched)) {
+      kindSel.value = kind;
+      syncEndpointRow();
+    }
+  });
+  document.getElementById('cred-kind-select')?.addEventListener('change', () => {
+    const sel = document.getElementById('cred-kind-select') as HTMLSelectElement;
+    if (sel) sel.dataset.touched = 'true';
   });
   addCredDialog?.querySelector('form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const label  = (document.getElementById('cred-label-input')  as HTMLInputElement).value.trim();
     const secret = (document.getElementById('cred-secret-input') as HTMLInputElement).value.trim();
+    const kind   = (document.getElementById('cred-kind-select')  as HTMLSelectElement).value as
+      'api_key'|'oauth_token'|'bedrock'|'openai_api_key'|'azure_openai'|'gemini_api_key'|'vertex_ai';
+    const preferred_model = (document.getElementById('cred-model-input') as HTMLInputElement).value.trim() || undefined;
+    const endpoint        = (document.getElementById('cred-endpoint-input') as HTMLInputElement).value.trim() || null;
     if (!label || !secret) return;
     try {
-      await createCredential({ label, secret });
+      await createCredential({ label, secret, kind, preferred_model, endpoint });
       (document.getElementById('cred-secret-input') as HTMLInputElement).value = '';
+      (document.getElementById('cred-model-input') as HTMLInputElement).value = '';
+      (document.getElementById('cred-endpoint-input') as HTMLInputElement).value = '';
       const preview = document.getElementById('cred-kind-preview');
       if (preview) preview.textContent = '';
       addCredDialog?.close();
@@ -357,6 +475,91 @@ const i18nBag = {
       await refreshCreds();
     } catch (err) { alert(`Error: ${(err as Error).message}`); }
   });
+
+  // ── M32 (#152): platform pool wiring ───────────────────────────────
+  const poolDialog = document.getElementById('add-pool-dialog') as HTMLDialogElement | null;
+  document.getElementById('pool-add-btn')?.addEventListener('click', async () => {
+    // Populate the credential dropdown with the sponsor's active creds.
+    let creds: Awaited<ReturnType<typeof listCredentials>> = [];
+    try { creds = await listCredentials(); } catch { alert('Could not load credentials.'); return; }
+    const sel = document.getElementById('pool-cred-select') as HTMLSelectElement | null;
+    if (!sel) return;
+    sel.innerHTML = creds.map((c) => `<option value="${c.id}">${escHtml(c.label)}</option>`).join('');
+    poolDialog?.showModal();
+  });
+  document.getElementById('pool-cancel')?.addEventListener('click', () => poolDialog?.close());
+  poolDialog?.querySelector('form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const credentialId = (document.getElementById('pool-cred-select') as HTMLSelectElement).value;
+    const totalCap     = Number((document.getElementById('pool-cap-input')   as HTMLInputElement).value);
+    const model        = (document.getElementById('pool-model-input') as HTMLInputElement).value.trim();
+    const dailyCap     = Number((document.getElementById('pool-daily-input') as HTMLInputElement).value);
+    const monthlyReset = (document.getElementById('pool-monthly-reset') as HTMLInputElement).checked;
+    if (!credentialId || !Number.isFinite(totalCap) || !model) return;
+    try {
+      await createPool({ credential_id: credentialId, total_cap: totalCap, preferred_model: model, daily_user_cap: dailyCap, monthly_reset: monthlyReset });
+      poolDialog?.close();
+      await refreshPools();
+    } catch (err) { alert(`Error: ${(err as Error).message}`); }
+  });
+
+  async function refreshPools() {
+    const list = document.getElementById('pools-list');
+    const empty = document.getElementById('pools-empty');
+    if (!list) return;
+    let pools: Awaited<ReturnType<typeof listMyPools>> = [];
+    try { pools = await listMyPools(); } catch { /* not authed yet */ }
+    if (pools.length === 0) {
+      empty?.classList.remove('hidden');
+      list.innerHTML = '';
+      return;
+    }
+    empty?.classList.add('hidden');
+    list.innerHTML = pools.map((p) => {
+      const pct = Math.min(100, Math.round((p.used / Math.max(1, p.total_cap)) * 100));
+      const statusClass = p.status === 'active'    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'
+                        : p.status === 'paused'    ? 'bg-amber-100   text-amber-800   dark:bg-amber-900/40   dark:text-amber-300'
+                        :                             'bg-zinc-200    text-zinc-700    dark:bg-zinc-800/60    dark:text-zinc-300';
+      return `
+        <li class="py-3 flex items-center gap-3 flex-wrap" data-pool-id="${escHtml(p.id)}">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2">
+              <span class="text-sm font-mono text-zinc-700 dark:text-zinc-300">${escHtml(p.preferred_model)}</span>
+              <span class="text-[10px] px-1.5 py-0.5 rounded uppercase tracking-wider ${statusClass}">${escHtml(p.status)}</span>
+            </div>
+            <div class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+              ${p.used} / ${p.total_cap} (${pct}%) · daily-user-cap ${p.daily_user_cap}${p.monthly_reset ? ' · monthly-reset' : ''}
+            </div>
+            <div class="mt-1 h-1.5 w-full rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
+              <div class="h-full bg-emerald-600" style="width: ${pct}%"></div>
+            </div>
+          </div>
+          <div class="flex items-center gap-1">
+            ${p.status === 'active'
+              ? `<button data-pool-pause="${escHtml(p.id)}" class="text-xs text-amber-700 hover:text-amber-900 px-2 py-1">Pause</button>`
+              : p.status === 'paused'
+                ? `<button data-pool-resume="${escHtml(p.id)}" class="text-xs text-emerald-700 hover:text-emerald-900 px-2 py-1">Resume</button>`
+                : ''}
+          </div>
+        </li>
+      `;
+    }).join('');
+  }
+
+  document.getElementById('pools-list')?.addEventListener('click', async (e) => {
+    const target = e.target as HTMLElement;
+    try {
+      if (target.dataset.poolPause) {
+        await setPoolStatus(target.dataset.poolPause, 'paused');
+        await refreshPools();
+      } else if (target.dataset.poolResume) {
+        await setPoolStatus(target.dataset.poolResume, 'active');
+        await refreshPools();
+      }
+    } catch (err) { alert(`Error: ${(err as Error).message}`); }
+  });
+
+  void refreshPools();
 
   document.getElementById('creds-list')?.addEventListener('click', async (e) => {
     const target = e.target as HTMLElement;

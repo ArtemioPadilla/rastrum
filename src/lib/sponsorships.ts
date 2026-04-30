@@ -3,10 +3,43 @@ import type { SponsorCredential, Sponsorship, SponsorshipRequest, SponsorshipUsa
 
 const FN_BASE = `${import.meta.env.PUBLIC_SUPABASE_URL}/functions/v1/sponsorships`;
 
+// M32 (#152): credential kinds + provider variants for the
+// multi-provider abstraction. The legacy `detectKind` returns just
+// the two Anthropic-direct values; richer detection lives in
+// `detectAnyKind` for the new sponsorship UI.
+export type CredentialKind =
+  | 'api_key' | 'oauth_token'
+  | 'bedrock' | 'openai_api_key' | 'azure_openai' | 'gemini_api_key' | 'vertex_ai';
+
 export function detectKind(secret: string): 'api_key' | 'oauth_token' | null {
   if (secret.startsWith('sk-ant-api03-')) return 'api_key';
   if (secret.startsWith('sk-ant-oat01-')) return 'oauth_token';
   return null;
+}
+
+/** Best-effort prefix detection across all 7 supported credential
+ *  kinds. Returns null when the prefix is ambiguous (the operator
+ *  must pick from the dropdown for Bedrock / Azure / Vertex JSON
+ *  envelopes). Pure helper — exported for tests. */
+export function detectAnyKind(secret: string): CredentialKind | null {
+  if (secret.startsWith('sk-ant-api03-')) return 'api_key';
+  if (secret.startsWith('sk-ant-oat01-')) return 'oauth_token';
+  if (secret.startsWith('sk-'))           return 'openai_api_key';
+  if (secret.startsWith('AIza'))          return 'gemini_api_key';
+  // Bedrock + Vertex are JSON envelopes; can't disambiguate by prefix.
+  return null;
+}
+
+export interface CreateCredentialArgs {
+  label: string;
+  secret: string;
+  /** New in M32: provider kind. Optional for back-compat — server falls
+   *  back to detectKind() if absent. */
+  kind?: CredentialKind;
+  /** Per-credential model. Defaults to 'claude-haiku-4-5' server-side. */
+  preferred_model?: string;
+  /** Azure deployment URL or Vertex region; NULL for direct providers. */
+  endpoint?: string | null;
 }
 
 async function authedFetch(path: string, init?: RequestInit): Promise<Response> {
@@ -28,13 +61,69 @@ export async function listCredentials(): Promise<SponsorCredential[]> {
   return r.json();
 }
 
-export async function createCredential(args: { label: string; secret: string }): Promise<SponsorCredential> {
+export async function createCredential(args: CreateCredentialArgs): Promise<SponsorCredential> {
   const r = await authedFetch('/credentials', { method: 'POST', body: JSON.stringify(args) });
   if (!r.ok) {
     const body = await r.json().catch(() => ({}));
     throw new Error(`createCredential: ${(body as { error?: string }).error ?? r.status}`);
   }
   return r.json();
+}
+
+// ── M32 #115: platform-pool donations ────────────────────────────
+export interface SponsorPool {
+  id: string;
+  credential_id: string;
+  total_cap: number;
+  used: number;
+  monthly_reset: boolean;
+  status: 'active' | 'paused' | 'exhausted';
+  preferred_model: string;
+  daily_user_cap: number;
+  created_at: string;
+}
+
+export async function listMyPools(): Promise<SponsorPool[]> {
+  const sb = getSupabase();
+  const { data, error } = await sb
+    .from('sponsor_pools')
+    .select('id, credential_id, total_cap, used, monthly_reset, status, preferred_model, daily_user_cap, created_at')
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as SponsorPool[];
+}
+
+export async function createPool(input: {
+  credential_id: string;
+  total_cap: number;
+  preferred_model: string;
+  daily_user_cap?: number;
+  monthly_reset?: boolean;
+}): Promise<string> {
+  const sb = getSupabase();
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session?.user) throw new Error('not_authenticated');
+  const { data, error } = await sb
+    .from('sponsor_pools')
+    .insert({
+      sponsor_id:      session.user.id,
+      credential_id:   input.credential_id,
+      total_cap:       input.total_cap,
+      preferred_model: input.preferred_model,
+      daily_user_cap:  input.daily_user_cap  ?? 10,
+      monthly_reset:   input.monthly_reset   ?? false,
+      status:          'active',
+    })
+    .select('id')
+    .single();
+  if (error) throw new Error(error.message);
+  return (data as { id: string }).id;
+}
+
+export async function setPoolStatus(poolId: string, status: 'active' | 'paused' | 'exhausted'): Promise<void> {
+  const sb = getSupabase();
+  const { error } = await sb.from('sponsor_pools').update({ status }).eq('id', poolId);
+  if (error) throw new Error(error.message);
 }
 
 export async function rotateCredential(id: string, secret: string): Promise<void> {
