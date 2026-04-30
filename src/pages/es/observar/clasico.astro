@@ -1,0 +1,17 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import ObservationForm from '../../../components/ObservationForm.astro';
+import { t } from '../../../i18n/utils';
+
+const lang = 'es';
+const tr = t(lang);
+---
+
+<BaseLayout title={`${tr.observe.title} (Clásico) — Rastrum`} description="Formulario clásico de observación con todos los campos." lang={lang}>
+  <div class="mb-4">
+    <a href="/es/observar" class="text-sm text-emerald-600 dark:text-emerald-400 hover:underline">
+      ← Probar el nuevo formulario Drop &amp; Discover
+    </a>
+  </div>
+  <ObservationForm lang={lang} />
+</BaseLayout>

@@ -1,0 +1,342 @@
+---
+import DropZone from "./DropZone.astro";
+import { t } from "../i18n/utils";
+
+interface Props { lang: "en" | "es"; }
+const { lang } = Astro.props;
+const isEs = lang === "es";
+---
+
+<!-- FAB -->
+<button
+  id="quick-fab"
+  type="button"
+  aria-label={isEs ? "Captura rápida" : "Quick capture"}
+  class="fixed bottom-6 right-4 z-30 w-14 h-14 rounded-full bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white shadow-lg flex items-center justify-center transition-colors"
+  style="bottom: calc(5rem + env(safe-area-inset-bottom))"
+>
+  <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+    <path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+  </svg>
+</button>
+
+<!-- Backdrop -->
+<div
+  id="quick-backdrop"
+  class="hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+  aria-hidden="true"
+></div>
+
+<!-- Bottom sheet -->
+<div
+  id="quick-sheet"
+  role="dialog"
+  aria-modal="true"
+  aria-label={isEs ? "Captura rápida" : "Quick capture"}
+  class="hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-zinc-900 rounded-t-2xl shadow-xl max-h-[90svh] overflow-y-auto transition-transform duration-300 translate-y-full"
+  style="padding-bottom: env(safe-area-inset-bottom)"
+>
+  <!-- Handle -->
+  <div class="flex justify-center pt-3 pb-1 cursor-grab active:cursor-grabbing" id="quick-handle">
+    <div class="w-10 h-1 rounded-full bg-zinc-300 dark:bg-zinc-600"></div>
+  </div>
+
+  <div class="px-4 pb-6 space-y-4">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+      <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+        {isEs ? "Captura rápida" : "Quick capture"}
+      </h2>
+      <button id="quick-close" type="button" aria-label={isEs ? "Cerrar" : "Close"}
+        class="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+      >
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Direct camera button -->
+    <button
+      id="quick-camera-btn"
+      type="button"
+      class="w-full min-h-[56px] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-base flex items-center justify-center gap-2 transition-colors"
+    >
+      <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+      </svg>
+      {isEs ? "Abrir cámara" : "Open camera"}
+    </button>
+    <input id="quick-camera-input" type="file" accept="image/*" capture="environment" class="sr-only" />
+
+    <!-- Or drop other files -->
+    <div class="relative flex items-center">
+      <div class="flex-1 border-t border-zinc-200 dark:border-zinc-700"></div>
+      <span class="mx-3 text-xs text-zinc-400">{isEs ? "o sube otro archivo" : "or upload a file"}</span>
+      <div class="flex-1 border-t border-zinc-200 dark:border-zinc-700"></div>
+    </div>
+    <DropZone lang={lang} />
+
+    <!-- Processing status (mini) -->
+    <div id="quick-status" class="hidden flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+      <span class="inline-block w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></span>
+      <span id="quick-status-text">{isEs ? "Identificando..." : "Identifying..."}</span>
+    </div>
+
+    <!-- Confirmation card (hidden until done) -->
+    <div id="quick-confirm-card" class="hidden rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 p-4 space-y-3">
+      <div>
+        <p id="quick-species" class="font-semibold italic text-zinc-900 dark:text-zinc-100"></p>
+        <p id="quick-common" class="text-sm text-zinc-500 dark:text-zinc-400"></p>
+        <p id="quick-conf" class="text-xs font-mono text-emerald-600 dark:text-emerald-400 mt-0.5"></p>
+      </div>
+      <p id="quick-loc" class="text-xs text-zinc-500 dark:text-zinc-400">
+        {isEs ? "Obteniendo ubicación..." : "Acquiring location..."}
+      </p>
+      <div class="flex flex-col gap-2">
+        <button id="quick-save-btn" type="button"
+          class="w-full min-h-[44px] rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-sm transition-colors disabled:opacity-50"
+        >
+          {isEs ? "Confirmar y guardar" : "Confirm \u0026 save"}
+        </button>
+        <button id="quick-edit-btn" type="button"
+          class="w-full min-h-[40px] rounded-xl border border-zinc-300 dark:border-zinc-700 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors"
+        >
+          {isEs ? "Editar en formulario completo" : "Edit in full form"}
+        </button>
+        <button id="quick-discard-btn" type="button"
+          class="text-xs text-zinc-400 hover:text-zinc-600 underline mx-auto"
+        >
+          {isEs ? "Descartar" : "Discard"}
+        </button>
+      </div>
+    </div>
+
+    <!-- Success -->
+    <div id="quick-success" class="hidden text-center py-4 space-y-2">
+      <div class="text-3xl">✅</div>
+      <p class="font-semibold text-emerald-700 dark:text-emerald-300">
+        {isEs ? "¡Guardada!" : "Saved!"}
+      </p>
+    </div>
+  </div>
+</div>
+
+<script>
+import { triageFile, buildGraph, savePipelineState } from '../lib/pipeline-engine';
+import type { PipelineFile, PipelineState } from '../lib/pipeline-engine';
+import { saveObservationToOutbox, resolveObserverRef } from '../lib/observe';
+import { syncOutbox } from '../lib/sync';
+import { PENDING_OBSERVATION_KEY } from '../lib/chat-attachment-helpers';
+
+const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
+const isEs = lang === 'es';
+
+// DOM
+const fab        = document.getElementById('quick-fab');
+const backdrop   = document.getElementById('quick-backdrop');
+const sheet      = document.getElementById('quick-sheet');
+const closeBtn   = document.getElementById('quick-close');
+const camBtn     = document.getElementById('quick-camera-btn');
+const camInput   = document.getElementById('quick-camera-input') as HTMLInputElement | null;
+const statusEl   = document.getElementById('quick-status');
+const statusText = document.getElementById('quick-status-text');
+const confirmCard= document.getElementById('quick-confirm-card');
+const speciesEl  = document.getElementById('quick-species');
+const commonEl   = document.getElementById('quick-common');
+const confEl     = document.getElementById('quick-conf');
+const locEl      = document.getElementById('quick-loc');
+const saveBtn    = document.getElementById('quick-save-btn') as HTMLButtonElement | null;
+const editBtn    = document.getElementById('quick-edit-btn');
+const discardBtn = document.getElementById('quick-discard-btn');
+const successEl  = document.getElementById('quick-success');
+
+let pipelineState: PipelineState | null = null;
+let location: { lat: number; lng: number; accuracyM: number; altitudeM: number | null } | null = null;
+let bestResult: { scientific_name: string; common_name_en: string | null; confidence: number; source: string; blobUrl: string; mimeType: string } | null = null;
+
+// ── Open / Close ───────────────────────────────────────────────────────────
+function openSheet() {
+  backdrop?.classList.remove('hidden');
+  sheet?.classList.remove('hidden');
+  requestAnimationFrame(() => sheet?.classList.remove('translate-y-full'));
+  document.addEventListener('keydown', onEsc);
+  startGPS();
+}
+
+function closeSheet() {
+  sheet?.classList.add('translate-y-full');
+  setTimeout(() => {
+    backdrop?.classList.add('hidden');
+    sheet?.classList.add('hidden');
+    resetSheet();
+  }, 300);
+  document.removeEventListener('keydown', onEsc);
+}
+
+function onEsc(e: KeyboardEvent) {
+  if (e.key === 'Escape') closeSheet();
+}
+
+fab?.addEventListener('click', openSheet);
+closeBtn?.addEventListener('click', closeSheet);
+backdrop?.addEventListener('click', closeSheet);
+
+// ── Camera ─────────────────────────────────────────────────────────────────
+camBtn?.addEventListener('click', () => camInput?.click());
+camInput?.addEventListener('change', () => {
+  const files = Array.from(camInput.files ?? []);
+  if (files.length > 0) handleFiles(files);
+  camInput.value = '';
+});
+
+// ── Files from DropZone ────────────────────────────────────────────────────
+document.addEventListener('rastrum:files-dropped', (e: Event) => {
+  const ev = e as CustomEvent<{ files: File[] }>;
+  if (!sheet?.contains(document.activeElement) && sheet?.classList.contains('hidden')) return;
+  handleFiles(ev.detail.files);
+});
+
+// ── Handle files ───────────────────────────────────────────────────────────
+async function handleFiles(files: File[]) {
+  if (!files.length) return;
+  const pf: PipelineFile[] = files.map(f => ({
+    id: crypto.randomUUID(),
+    file: f,
+    kind: triageFile(f),
+    blobUrl: URL.createObjectURL(f),
+  }));
+
+  statusEl?.classList.remove('hidden');
+  confirmCard?.classList.add('hidden');
+
+  // Simple pipeline — no full graph UI in quick mode
+  for (const file of pf) {
+    if (statusText) statusText.textContent = isEs ? 'Identificando...' : 'Identifying...';
+    try {
+      if (file.kind === 'photo') {
+        const { runParallelIdentify } = await import('../lib/identify-cascade-client');
+        const { makePlantNetRunner, makeClaudeRunner, resolvePlantNetKey } = await import('../lib/identify-runners');
+        const { hasAnthropicKey } = await import('../lib/anthropic-key');
+        const runners: Record<string, import('../lib/identify-cascade-client').IdentifierRunner> = {};
+        if (await resolvePlantNetKey()) runners.plantnet = makePlantNetRunner(lang as 'en' | 'es');
+        if (await hasAnthropicKey()) runners.claude_haiku = makeClaudeRunner(lang as 'en' | 'es');
+        if (Object.keys(runners).length > 0) {
+          const out = await runParallelIdentify(file.file as File, { runners }, new AbortController().signal);
+          if (out.kind === 'winner' || out.kind === 'uncertain') {
+            const r = out.result;
+            bestResult = { scientific_name: r.scientific_name, common_name_en: r.common_name_en ?? null, confidence: r.confidence, source: r.source, blobUrl: file.blobUrl, mimeType: file.file.type };
+          }
+        }
+      } else if (file.kind === 'audio') {
+        const { birdnetIdentifier } = await import('../lib/identifiers/birdnet');
+        const av = await birdnetIdentifier.isAvailable();
+        if (av.ready) {
+          const r = await birdnetIdentifier.identify({ media: { kind: 'blob', blob: file.file as Blob }, mediaKind: 'audio', locale: lang as 'en' | 'es' });
+          bestResult = { scientific_name: r.scientific_name, common_name_en: r.common_name_en ?? null, confidence: r.confidence, source: r.source, blobUrl: file.blobUrl, mimeType: file.file.type };
+        }
+      }
+    } catch { /* silent — show confirm card anyway */ }
+  }
+
+  statusEl?.classList.add('hidden');
+  confirmCard?.classList.remove('hidden');
+
+  if (bestResult) {
+    if (speciesEl) speciesEl.textContent = bestResult.scientific_name;
+    if (commonEl)  commonEl.textContent  = bestResult.common_name_en ?? '';
+    if (confEl)    confEl.textContent    = `${Math.round(bestResult.confidence * 100)}%`;
+  } else {
+    if (speciesEl) speciesEl.textContent = isEs ? 'Sin identificar' : 'Unidentified';
+  }
+
+  // Store pipelineFiles for save
+  pipelineState = {
+    id: crypto.randomUUID(),
+    createdAt: Date.now(),
+    files: pf,
+    nodes: [],
+    mode: 'quick',
+    status: 'processing',
+  };
+}
+
+// ── GPS ────────────────────────────────────────────────────────────────────
+function startGPS() {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      location = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracyM: pos.coords.accuracy, altitudeM: pos.coords.altitude };
+      if (locEl) locEl.textContent = `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`;
+    },
+    () => { if (locEl) locEl.textContent = isEs ? 'Ubicaci\u00f3n no disponible' : 'Location unavailable'; },
+    { enableHighAccuracy: true, timeout: 20000 },
+  );
+}
+
+// ── Save ───────────────────────────────────────────────────────────────────
+saveBtn?.addEventListener('click', async () => {
+  if (!pipelineState) return;
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = isEs ? 'Guardando...' : 'Saving...'; }
+  try {
+    const observerRef = await resolveObserverRef();
+    const mediaInputs = pipelineState.files.map(pf => ({
+      blob: pf.file,
+      blobId: pf.id,
+      mimeType: pf.file.type || 'application/octet-stream',
+      sizeBytes: pf.file.size,
+      mediaType: pf.kind === 'audio' ? 'audio' as const : pf.kind === 'video' ? 'video' as const : 'photo' as const,
+    }));
+    await saveObservationToOutbox({
+      observerRef,
+      media: mediaInputs,
+      location: location ?? { lat: 0, lng: 0, accuracyM: 0, altitudeM: null, capturedFrom: 'gps' },
+      identification: bestResult ? { scientificName: bestResult.scientific_name, confidence: bestResult.confidence, source: bestResult.source as never, status: 'accepted' } : undefined,
+      asDraft: !location,
+    });
+    await syncOutbox().catch(() => {});
+    confirmCard?.classList.add('hidden');
+    successEl?.classList.remove('hidden');
+    document.dispatchEvent(new CustomEvent('rastrum:quick-saved'));
+    setTimeout(closeSheet, 1800);
+  } catch (err) {
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = isEs ? 'Confirmar y guardar' : 'Confirm & save'; }
+    alert((err as Error).message);
+  }
+});
+
+// ── Edit in full form ──────────────────────────────────────────────────────
+editBtn?.addEventListener('click', () => {
+  if (!bestResult) return;
+  const pending = JSON.stringify({
+    blob_url: bestResult.blobUrl,
+    mime_type: bestResult.mimeType,
+    scientific_name: bestResult.scientific_name,
+    confidence: bestResult.confidence,
+    source: bestResult.source,
+    common_name: bestResult.common_name_en,
+    kind: bestResult.mimeType.startsWith('audio/') ? 'audio' : 'photo',
+  });
+  try { sessionStorage.setItem(PENDING_OBSERVATION_KEY, pending); } catch { /* private mode */ }
+  closeSheet();
+  window.location.href = isEs ? '/es/observar' : '/en/observe';
+});
+
+// ── Discard ────────────────────────────────────────────────────────────────
+discardBtn?.addEventListener('click', () => {
+  pipelineState?.files.forEach(pf => URL.revokeObjectURL(pf.blobUrl));
+  closeSheet();
+});
+
+// ── Reset ──────────────────────────────────────────────────────────────────
+function resetSheet() {
+  pipelineState = null;
+  bestResult = null;
+  location = null;
+  statusEl?.classList.add('hidden');
+  confirmCard?.classList.add('hidden');
+  successEl?.classList.add('hidden');
+}
+</script>

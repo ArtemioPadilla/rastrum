@@ -1,0 +1,17 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import ObservationForm from '../../../components/ObservationForm.astro';
+import { t } from '../../../i18n/utils';
+
+const lang = 'en';
+const tr = t(lang);
+---
+
+<BaseLayout title={`${tr.observe.title} (Classic) — Rastrum`} description="Classic observation form with all fields." lang={lang}>
+  <div class="mb-4">
+    <a href="/en/observe" class="text-sm text-emerald-600 dark:text-emerald-400 hover:underline">
+      ← Try the new Drop &amp; Discover form
+    </a>
+  </div>
+  <ObservationForm lang={lang} />
+</BaseLayout>
