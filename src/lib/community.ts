@@ -86,6 +86,32 @@ async function loadCommunityNearby(filters: CommunityFilters): Promise<{
 }
 
 /**
+ * GPS-based Nearby — calls community_observers_nearby_at(lat, lng).
+ * Coords come from navigator.geolocation; never persisted server-side.
+ * Same auth gate as the centroid path (RPC reads the auth-only view).
+ */
+export async function loadCommunityNearbyAt(
+  filters: CommunityFilters,
+  lat: number,
+  lng: number,
+): Promise<{ rows: CommunityObserver[]; total: number }> {
+  const supabase = getSupabase();
+  const { data, error } = await supabase.rpc('community_observers_nearby_at', {
+    p_lat: lat,
+    p_lng: lng,
+    p_radius_m: 200_000,
+    p_limit: COMMUNITY_PAGE_SIZE,
+    p_offset: (filters.page - 1) * COMMUNITY_PAGE_SIZE,
+    p_country: filters.country,
+    p_taxa: filters.taxa.length > 0 ? filters.taxa : null,
+    p_experts: filters.experts,
+  });
+  if (error) throw error;
+  const rows = (data ?? []) as CommunityObserver[];
+  return { rows, total: rows.length };
+}
+
+/**
  * Fetch the viewer's own centroid from the auth-only view, used to
  * decide whether to render the "log an observation" empty state vs
  * a meaningful Nearby list.
@@ -103,6 +129,36 @@ export async function viewerHasCentroid(): Promise<boolean> {
     .eq('id', user.id)
     .maybeSingle();
   return data != null;
+}
+
+/**
+ * Viewer metadata used by the empty-state explainer + country CTA.
+ * Returns nulls in unconfigured / anon envs — non-fatal.
+ */
+export interface ViewerCommunityMeta {
+  signedIn: boolean;
+  profilePublic: boolean | null;
+  countryCode: string | null;
+}
+
+export async function loadViewerCommunityMeta(): Promise<ViewerCommunityMeta> {
+  try {
+    const supabase = getSupabase();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { signedIn: false, profilePublic: null, countryCode: null };
+    const { data } = await supabase
+      .from('users')
+      .select('profile_public, country_code')
+      .eq('id', user.id)
+      .maybeSingle();
+    return {
+      signedIn: true,
+      profilePublic: (data?.profile_public as boolean | undefined) ?? null,
+      countryCode: (data?.country_code as string | null | undefined) ?? null,
+    };
+  } catch {
+    return { signedIn: false, profilePublic: null, countryCode: null };
+  }
 }
 
 export interface IsoCountry {
