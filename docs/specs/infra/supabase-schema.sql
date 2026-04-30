@@ -399,7 +399,11 @@ CREATE POLICY "taxa_public_read" ON public.taxa FOR SELECT USING (true);
 -- policy can stay single-table and inexpensive.
 DROP POLICY IF EXISTS "obs_owner" ON public.observations;
 CREATE POLICY "obs_owner" ON public.observations FOR ALL
-  USING ((SELECT auth.uid()) = observer_id);
+  USING    ((SELECT auth.uid()) = observer_id)
+  -- Explicit WITH CHECK prevents Postgres from falling back to the USING clause
+  -- on INSERT/UPDATE, which in complex policy environments can trigger 42P17
+  -- infinite recursion when other permissive policies subquery this table.
+  WITH CHECK ((SELECT auth.uid()) = observer_id);
 
 DROP POLICY IF EXISTS "obs_public_read" ON public.observations;
 CREATE POLICY "obs_public_read" ON public.observations FOR SELECT
