@@ -35,6 +35,7 @@ import { healthRecomputeHandler } from './health-recompute.ts';
 import { errorAcknowledgeHandler } from './error-acknowledge.ts';
 import { errorAcknowledgeBulkHandler } from './error-acknowledge-bulk.ts';
 import { userDetailHandler } from './user-detail.ts';
+import { userMergeHandler } from './user-merge.ts';
 import type { ActionHandler } from './role-grant.ts';
 
 export const HANDLERS: Record<string, ActionHandler<unknown>> = {
@@ -75,4 +76,5 @@ export const HANDLERS: Record<string, ActionHandler<unknown>> = {
   'error.acknowledge': errorAcknowledgeHandler as unknown as ActionHandler<unknown>,
   'error.acknowledge_bulk': errorAcknowledgeBulkHandler as unknown as ActionHandler<unknown>,
   'user.detail': userDetailHandler as unknown as ActionHandler<unknown>,
+  'user.merge': userMergeHandler as unknown as ActionHandler<unknown>,
 };
