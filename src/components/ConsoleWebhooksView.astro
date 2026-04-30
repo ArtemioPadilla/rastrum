@@ -23,6 +23,23 @@ const wActions = (wNs?.actions as Record<string, string>) ?? {};
 const wDeliv  = (wNs?.deliveries as Record<string, string>) ?? {};
 const wEmpty  = (wNs?.empty as string) ?? 'No webhooks configured.';
 const wDelivEmpty = (wNs?.deliveriesEmpty as string) ?? 'No deliveries yet.';
+const wDelivPerWebhookHeading = (wDeliv?.perWebhookHeading as string) ?? 'Last 50 deliveries';
+const wDelivPerWebhookEmpty = (wDeliv?.perWebhookEmpty as string) ?? 'No deliveries for this webhook yet.';
+const wDelivFilters = {
+  all: (wDeliv?.filterAll as string) ?? 'All',
+  success: (wDeliv?.filterSuccess as string) ?? 'Successful',
+  failed: (wDeliv?.filterFailed as string) ?? 'Failed',
+  pending: (wDeliv?.filterPending as string) ?? 'Pending',
+};
+const wDelivStatusPending = (wDeliv?.statusPending as string) ?? 'pending';
+const wDelivReplayLast = (wDeliv?.replayLast as string) ?? 'Replay last delivery';
+const wDelivReplayConfirmReason = (wDeliv?.replayConfirmReason as string) ?? 'Reason for replaying this delivery?';
+const wDelivReplayDoneTmpl = (wDeliv?.replayDone as string) ?? 'Replay sent (HTTP {status}).';
+const wDelivReplayFailedTmpl = (wDeliv?.replayFailed as string) ?? 'Replay failed: {error}';
+const wDelivNonceCopied = (wDeliv?.nonceCopied as string) ?? 'Nonce copied.';
+const wDelivLoadFailedTmpl = (wDeliv?.loadFailed as string) ?? 'Could not load deliveries: {error}';
+const labelDeliveriesBtn = (wActions?.deliveries as string) ?? 'Deliveries';
+const labelHideDeliveriesBtn = (wActions?.hideDeliveries as string) ?? 'Hide deliveries';
 const eventKeys: Array<keyof typeof wEvents> = [
   'anomaly_created', 'user_banned', 'user_unbanned', 'role_granted', 'role_revoked',
 ];
@@ -34,6 +51,26 @@ const eventKeys: Array<keyof typeof wEvents> = [
   data-label-action-enable={wActions.enable ?? 'Enable'}
   data-label-action-disable={wActions.disable ?? 'Disable'}
   data-label-action-delete={wActions.delete ?? 'Delete'}
+  data-label-action-deliveries={labelDeliveriesBtn}
+  data-label-action-hide-deliveries={labelHideDeliveriesBtn}
+  data-label-deliv-heading={wDelivPerWebhookHeading}
+  data-label-deliv-empty={wDelivPerWebhookEmpty}
+  data-label-deliv-filter-all={wDelivFilters.all}
+  data-label-deliv-filter-success={wDelivFilters.success}
+  data-label-deliv-filter-failed={wDelivFilters.failed}
+  data-label-deliv-filter-pending={wDelivFilters.pending}
+  data-label-deliv-status-pending={wDelivStatusPending}
+  data-label-deliv-replay-last={wDelivReplayLast}
+  data-label-deliv-replay-confirm={wDelivReplayConfirmReason}
+  data-label-deliv-replay-done-tmpl={wDelivReplayDoneTmpl}
+  data-label-deliv-replay-failed-tmpl={wDelivReplayFailedTmpl}
+  data-label-deliv-nonce-copied={wDelivNonceCopied}
+  data-label-deliv-load-failed-tmpl={wDelivLoadFailedTmpl}
+  data-label-col-event={wDeliv.event ?? 'Event'}
+  data-label-col-status={wDeliv.status ?? 'Status'}
+  data-label-col-time={wDeliv.time ?? 'Time'}
+  data-label-col-error={wDeliv.error ?? 'Error'}
+  data-label-col-nonce="Nonce"
 >
   <header>
     <h1 class="text-xl font-semibold mb-1">{wTitle}</h1>
@@ -168,6 +205,7 @@ const eventKeys: Array<keyof typeof wEvents> = [
     status_code: number | null;
     error: string | null;
     attempted_at: string;
+    nonce?: string | null;
   };
 
   const sectionEl = document.querySelector<HTMLElement>('section[data-label-action-test]');
@@ -175,10 +213,34 @@ const eventKeys: Array<keyof typeof wEvents> = [
   const labelEnable = sectionEl?.dataset.labelActionEnable ?? 'Enable';
   const labelDisable = sectionEl?.dataset.labelActionDisable ?? 'Disable';
   const labelDelete = sectionEl?.dataset.labelActionDelete ?? 'Delete';
+  const labelDeliveries = sectionEl?.dataset.labelActionDeliveries ?? 'Deliveries';
+  const labelHideDeliveries = sectionEl?.dataset.labelActionHideDeliveries ?? 'Hide deliveries';
+  const labelDelivHeading = sectionEl?.dataset.labelDelivHeading ?? 'Last 50 deliveries';
+  const labelDelivEmpty = sectionEl?.dataset.labelDelivEmpty ?? 'No deliveries for this webhook yet.';
+  const labelDelivFilterAll = sectionEl?.dataset.labelDelivFilterAll ?? 'All';
+  const labelDelivFilterSuccess = sectionEl?.dataset.labelDelivFilterSuccess ?? 'Successful';
+  const labelDelivFilterFailed = sectionEl?.dataset.labelDelivFilterFailed ?? 'Failed';
+  const labelDelivFilterPending = sectionEl?.dataset.labelDelivFilterPending ?? 'Pending';
+  const labelDelivStatusPending = sectionEl?.dataset.labelDelivStatusPending ?? 'pending';
+  const labelDelivReplayLast = sectionEl?.dataset.labelDelivReplayLast ?? 'Replay last delivery';
+  const labelDelivReplayConfirm = sectionEl?.dataset.labelDelivReplayConfirm ?? 'Reason for replaying this delivery?';
+  const labelDelivReplayDoneTmpl = sectionEl?.dataset.labelDelivReplayDoneTmpl ?? 'Replay sent (HTTP {status}).';
+  const labelDelivReplayFailedTmpl = sectionEl?.dataset.labelDelivReplayFailedTmpl ?? 'Replay failed: {error}';
+  const labelDelivNonceCopied = sectionEl?.dataset.labelDelivNonceCopied ?? 'Nonce copied.';
+  const labelDelivLoadFailedTmpl = sectionEl?.dataset.labelDelivLoadFailedTmpl ?? 'Could not load deliveries: {error}';
+  const labelColEvent = sectionEl?.dataset.labelColEvent ?? 'Event';
+  const labelColStatus = sectionEl?.dataset.labelColStatus ?? 'Status';
+  const labelColTime = sectionEl?.dataset.labelColTime ?? 'Time';
+  const labelColError = sectionEl?.dataset.labelColError ?? 'Error';
+  const labelColNonce = sectionEl?.dataset.labelColNonce ?? 'Nonce';
 
   let allWebhooks: WebhookRow[] = [];
   let allDeliveries: DeliveryRow[] = [];
   let jwt: string | null = null;
+
+  type DrillState = { perWebhookRows: DeliveryRow[]; filter: 'all' | 'success' | 'failed' | 'pending' };
+  const drilldown = new Map<string, DrillState>();
+  const expanded = new Set<string>();
 
   function show(id: string) { document.getElementById(id)?.classList.remove('hidden'); }
   function hide(id: string) { document.getElementById(id)?.classList.add('hidden'); }
@@ -192,11 +254,90 @@ const eventKeys: Array<keyof typeof wEvents> = [
   }
 
   function statusPill(code: number | null): string {
-    if (code === null) return '<span class="text-zinc-400">—</span>';
-    const cls = code >= 200 && code < 300
-      ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300'
-      : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300';
+    if (code === null) return `<span class="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">${esc(labelDelivStatusPending)}</span>`;
+    let cls: string;
+    if (code >= 200 && code < 300) {
+      cls = 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300';
+    } else if (code >= 400 && code < 500) {
+      cls = 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300';
+    } else {
+      cls = 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300';
+    }
     return `<span class="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-mono ${cls}">${code}</span>`;
+  }
+
+  function deliveryMatchesFilter(d: DeliveryRow, f: DrillState['filter']): boolean {
+    if (f === 'all') return true;
+    if (f === 'pending') return d.status_code === null;
+    if (f === 'success') return d.status_code !== null && d.status_code >= 200 && d.status_code < 300;
+    if (f === 'failed') return d.status_code !== null && (d.status_code < 200 || d.status_code >= 300);
+    return true;
+  }
+
+  function renderDrilldown(webhookId: string): string {
+    const state = drilldown.get(webhookId);
+    if (!state) {
+      return `<tr id="drilldown-${esc(webhookId)}"><td colspan="6" class="px-3 py-3 bg-zinc-50/60 dark:bg-zinc-900/40 text-xs text-zinc-500 italic">Loading deliveries…</td></tr>`;
+    }
+    const filtered = state.perWebhookRows.filter(d => deliveryMatchesFilter(d, state.filter));
+    const hasReplayable = state.perWebhookRows.length > 0;
+
+    const filterButton = (key: DrillState['filter'], label: string) => {
+      const active = state.filter === key;
+      return `<button type="button" data-deliv-filter="${esc(webhookId)}" data-deliv-filter-key="${key}" aria-pressed="${active ? 'true' : 'false'}" class="px-2.5 py-1 text-[11px] ${active ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-medium' : 'bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300'}">${esc(label)}</button>`;
+    };
+
+    const tableBody = filtered.length === 0
+      ? `<tr><td colspan="5" class="px-3 py-4 text-center text-xs text-zinc-500 italic">${esc(labelDelivEmpty)}</td></tr>`
+      : filtered.map(d => {
+          const noncePart = d.nonce ? d.nonce.slice(0, 10) + '…' : '—';
+          return `
+            <tr>
+              <td class="px-3 py-2 font-mono text-[11px]">${esc(d.event)}</td>
+              <td class="px-3 py-2">${statusPill(d.status_code)}</td>
+              <td class="px-3 py-2 text-zinc-500 text-[11px]">${esc(fmtDate(d.attempted_at))}</td>
+              <td class="px-3 py-2 text-zinc-500 text-[11px] font-mono">
+                ${d.nonce
+                  ? `<button type="button" data-copy-nonce="${esc(d.nonce)}" title="${esc(d.nonce)}" class="hover:underline">${esc(noncePart)}</button>`
+                  : '—'}
+              </td>
+              <td class="px-3 py-2 text-zinc-500 text-[11px] max-w-[260px] truncate" title="${esc(d.error ?? '')}">${esc(d.error ?? '')}</td>
+            </tr>
+          `;
+        }).join('');
+
+    return `
+      <tr id="drilldown-${esc(webhookId)}">
+        <td colspan="6" class="px-3 py-3 bg-zinc-50/60 dark:bg-zinc-900/40">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <p class="text-xs font-semibold text-zinc-700 dark:text-zinc-300">${esc(labelDelivHeading)}</p>
+            <div class="flex flex-wrap items-center gap-2">
+              <div class="flex rounded border border-zinc-300 dark:border-zinc-700 overflow-hidden">
+                ${filterButton('all', labelDelivFilterAll)}
+                ${filterButton('success', labelDelivFilterSuccess)}
+                ${filterButton('failed', labelDelivFilterFailed)}
+                ${filterButton('pending', labelDelivFilterPending)}
+              </div>
+              <button type="button" data-replay-last="${esc(webhookId)}" class="px-2.5 py-1 rounded border border-emerald-500 text-[11px] text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 disabled:opacity-50" ${hasReplayable ? '' : 'disabled'}>${esc(labelDelivReplayLast)}</button>
+            </div>
+          </div>
+          <div class="overflow-x-auto rounded border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
+            <table class="min-w-full text-xs">
+              <thead class="bg-zinc-50 dark:bg-zinc-900/40 text-left uppercase tracking-wide text-zinc-500">
+                <tr>
+                  <th class="px-3 py-2">${esc(labelColEvent)}</th>
+                  <th class="px-3 py-2">${esc(labelColStatus)}</th>
+                  <th class="px-3 py-2">${esc(labelColTime)}</th>
+                  <th class="px-3 py-2">${esc(labelColNonce)}</th>
+                  <th class="px-3 py-2">${esc(labelColError)}</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800">${tableBody}</tbody>
+            </table>
+          </div>
+        </td>
+      </tr>
+    `;
   }
 
   function renderWebhooks() {
@@ -217,7 +358,9 @@ const eventKeys: Array<keyof typeof wEvents> = [
       const enabledPill = w.enabled
         ? '<span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300">on</span>'
         : '<span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">off</span>';
-      return `
+      const isExpanded = expanded.has(w.id);
+      const deliveriesLabel = isExpanded ? labelHideDeliveries : labelDeliveries;
+      const mainRow = `
         <tr>
           <td class="px-3 py-2 font-mono text-xs break-all max-w-[260px]">${esc(w.url)}</td>
           <td class="px-3 py-2 text-xs text-zinc-500">${esc(eventsTxt)}</td>
@@ -227,11 +370,43 @@ const eventKeys: Array<keyof typeof wEvents> = [
           <td class="px-3 py-2 text-right whitespace-nowrap">
             <button data-test-id="${esc(w.id)}" class="px-2 py-1 rounded border border-zinc-300 dark:border-zinc-700 text-xs hover:bg-zinc-50 dark:hover:bg-zinc-800 mr-1">${esc(labelTest)}</button>
             <button data-toggle-id="${esc(w.id)}" data-toggle-to="${w.enabled ? 'false' : 'true'}" class="px-2 py-1 rounded border border-zinc-300 dark:border-zinc-700 text-xs hover:bg-zinc-50 dark:hover:bg-zinc-800 mr-1">${esc(w.enabled ? labelDisable : labelEnable)}</button>
+            <button data-deliveries-id="${esc(w.id)}" aria-expanded="${isExpanded ? 'true' : 'false'}" class="px-2 py-1 rounded border border-zinc-300 dark:border-zinc-700 text-xs hover:bg-zinc-50 dark:hover:bg-zinc-800 mr-1 ${isExpanded ? 'bg-zinc-100 dark:bg-zinc-800' : ''}">${esc(deliveriesLabel)}</button>
             <button data-delete-id="${esc(w.id)}" class="px-2 py-1 rounded border border-red-500 text-xs text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">${esc(labelDelete)}</button>
           </td>
         </tr>
       `;
+      const drillRow = isExpanded ? renderDrilldown(w.id) : '';
+      return mainRow + drillRow;
     }).join('');
+  }
+
+  async function loadDrilldown(webhookId: string) {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('admin_webhook_deliveries')
+      .select('id, webhook_id, event, status_code, error, attempted_at, nonce')
+      .eq('webhook_id', webhookId)
+      .order('attempted_at', { ascending: false })
+      .limit(50);
+    if (error) throw new Error(error.message);
+    const rows = ((data ?? []) as unknown) as DeliveryRow[];
+    const existing = drilldown.get(webhookId);
+    drilldown.set(webhookId, {
+      perWebhookRows: rows,
+      filter: existing?.filter ?? 'all',
+    });
+  }
+
+  function showActionToast(msg: string, ok = true) {
+    const eEl = document.getElementById('webhooks-error');
+    if (!eEl) return;
+    eEl.textContent = msg;
+    eEl.classList.remove('hidden');
+    eEl.classList.toggle('text-emerald-700', ok);
+    eEl.classList.toggle('dark:text-emerald-400', ok);
+    eEl.classList.toggle('text-red-600', !ok);
+    eEl.classList.toggle('dark:text-red-400', !ok);
+    setTimeout(() => eEl.classList.add('hidden'), 4000);
   }
 
   function renderDeliveries() {
@@ -338,6 +513,10 @@ const eventKeys: Array<keyof typeof wEvents> = [
     const testId = target.closest<HTMLElement>('[data-test-id]')?.dataset.testId;
     const toggleEl = target.closest<HTMLElement>('[data-toggle-id]');
     const deleteId = target.closest<HTMLElement>('[data-delete-id]')?.dataset.deleteId;
+    const deliveriesId = target.closest<HTMLElement>('[data-deliveries-id]')?.dataset.deliveriesId;
+    const filterEl = target.closest<HTMLElement>('[data-deliv-filter]');
+    const replayLastId = target.closest<HTMLElement>('[data-replay-last]')?.dataset.replayLast;
+    const copyNonce = target.closest<HTMLElement>('[data-copy-nonce]')?.dataset.copyNonce;
 
     try {
       if (testId) {
@@ -362,6 +541,66 @@ const eventKeys: Array<keyof typeof wEvents> = [
         if (!reason || reason.length < 5) return;
         await adminClient.webhook.delete({ webhookId: deleteId }, reason, jwt);
         await loadAll();
+        return;
+      }
+      if (deliveriesId) {
+        if (expanded.has(deliveriesId)) {
+          expanded.delete(deliveriesId);
+          renderWebhooks();
+        } else {
+          expanded.add(deliveriesId);
+          renderWebhooks();
+          try {
+            await loadDrilldown(deliveriesId);
+            renderWebhooks();
+          } catch (err) {
+            showActionToast(labelDelivLoadFailedTmpl.replace('{error}', (err as Error).message), false);
+            expanded.delete(deliveriesId);
+            renderWebhooks();
+          }
+        }
+        return;
+      }
+      if (filterEl) {
+        const id = filterEl.dataset.delivFilter!;
+        const key = filterEl.dataset.delivFilterKey as ('all' | 'success' | 'failed' | 'pending');
+        const state = drilldown.get(id);
+        if (state) {
+          state.filter = key;
+          renderWebhooks();
+        }
+        return;
+      }
+      if (replayLastId) {
+        const state = drilldown.get(replayLastId);
+        const last = state?.perWebhookRows[0];
+        if (!last) return;
+        const reason = prompt(labelDelivReplayConfirm);
+        if (!reason || reason.length < 5) return;
+        try {
+          const res = await adminClient.webhook.replayDelivery({ deliveryId: last.id }, reason, jwt);
+          const code = res.result?.statusCode;
+          if (code !== null && code !== undefined) {
+            showActionToast(labelDelivReplayDoneTmpl.replace('{status}', String(code)), true);
+          } else {
+            showActionToast(labelDelivReplayFailedTmpl.replace('{error}', res.result?.error ?? 'unknown'), false);
+          }
+          await loadDrilldown(replayLastId);
+          await loadAll();
+          renderWebhooks();
+        } catch (err) {
+          const msg = err instanceof AdminClientError ? err.message : (err as Error).message;
+          showActionToast(labelDelivReplayFailedTmpl.replace('{error}', msg), false);
+        }
+        return;
+      }
+      if (copyNonce) {
+        try {
+          await navigator.clipboard.writeText(copyNonce);
+          showActionToast(labelDelivNonceCopied, true);
+        } catch {
+          // Clipboard API gates on https/secure context — fall back silently.
+        }
         return;
       }
     } catch (err) {
