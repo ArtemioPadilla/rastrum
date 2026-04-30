@@ -5789,3 +5789,41 @@ SELECT u.id AS user_id,
  );
 
 GRANT SELECT ON public.moderator_trust_scores TO authenticated;
+
+-- ============================================================
+-- PR15 — Observability UI surface (Health + Errors + Webhook drill-down)
+-- See docs/runbooks/admin-health-digest.md
+-- See docs/runbooks/admin-function-errors.md
+-- See docs/runbooks/admin-webhooks.md
+-- ============================================================
+
+-- 1. audit_op enum extensions for the new actions.
+DO $$ BEGIN
+  ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'health_recompute';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'error_acknowledge';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'error_acknowledge_bulk';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'webhook_replay';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- 2. function_errors — acknowledge audit fields.
+-- The Errors tab (/console/errors/) lets admins triage and acknowledge
+-- operationally-handled rows. Acknowledged rows stay in the table so the
+-- audit trail and post-mortem queries are preserved.
+ALTER TABLE public.function_errors
+  ADD COLUMN IF NOT EXISTS acknowledged_at timestamptz;
+ALTER TABLE public.function_errors
+  ADD COLUMN IF NOT EXISTS acknowledged_by uuid REFERENCES auth.users(id);
+ALTER TABLE public.function_errors
+  ADD COLUMN IF NOT EXISTS ack_notes text;
+
+-- Drives the default Unacknowledged tab — partial index keeps writes cheap
+-- (most acknowledged rows aren't read again outside forensics queries).
+CREATE INDEX IF NOT EXISTS function_errors_unack_idx
+  ON public.function_errors (created_at DESC)
+  WHERE acknowledged_at IS NULL;
