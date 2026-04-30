@@ -133,6 +133,16 @@ const knownPills: Set<UserRole> | null = allRoles ?? null;
   <body class="min-h-screen bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 transition-colors">
     <div class="min-h-screen flex flex-col" data-console-shell data-lang={lang} data-initial-role={serverInitialRole ?? ''}>
       <header class="flex items-center gap-3 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-4 py-2.5">
+        <button
+          type="button"
+          id="console-mobile-toggle"
+          class="md:hidden -ml-1 p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"
+          aria-label={tr.console.mobile_menu_open}
+          aria-controls="console-mobile-drawer"
+          aria-expanded="false"
+        >
+          <svg aria-hidden="true" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
         <a href={exitHref} class="font-bold tracking-tight text-emerald-700 dark:text-emerald-400">
           Rastrum
         </a>
@@ -204,6 +214,64 @@ const knownPills: Set<UserRole> | null = allRoles ?? null;
           <slot />
         </main>
       </div>
+
+      <!-- Mobile drawer (md:hidden) — same content as desktop aside, slides in from the left -->
+      <div
+        id="console-mobile-backdrop"
+        class="hidden md:hidden fixed inset-0 z-40 bg-black/60"
+        aria-hidden="true"
+      ></div>
+      <aside
+        id="console-mobile-drawer"
+        class="hidden md:hidden fixed top-0 left-0 bottom-0 z-50 w-64 bg-white dark:bg-zinc-950 border-r border-zinc-200 dark:border-zinc-800 overflow-y-auto"
+        role="dialog"
+        aria-modal="true"
+        aria-label={tr.console.mobile_menu_label}
+        data-console-mobile-sidebar
+      >
+        <div class="flex items-center justify-between p-3 border-b border-zinc-200 dark:border-zinc-800">
+          <span class="font-bold tracking-tight text-emerald-700 dark:text-emerald-400">
+            Rastrum
+          </span>
+          <button
+            type="button"
+            id="console-mobile-close"
+            class="p-2 -mr-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"
+            aria-label={tr.console.mobile_menu_close}
+          >
+            <svg aria-hidden="true" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <nav class="p-3">
+          {ALL_ROLES_ORDERED.map(role => {
+            const visibleNow = serverInitialRole === role;
+            const ulCls = visibleNow ? 'space-y-0.5 text-sm' : 'space-y-0.5 text-sm hidden';
+            return (
+              <ul class={ulCls} data-role={role}>
+                {tabsByRole[role].map(entry => {
+                  const cls = [
+                    'flex items-center justify-between rounded px-2.5 py-1.5',
+                    entry.isActive
+                      ? 'bg-zinc-200/70 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium'
+                      : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-900',
+                    entry.stub ? 'opacity-60' : '',
+                  ].filter(Boolean).join(' ');
+                  return (
+                    <li>
+                      <a href={entry.href} class={cls}>
+                        <span>{entry.label}</span>
+                        {entry.stub && (
+                          <span class="text-[10px] uppercase tracking-wide text-zinc-500">soon</span>
+                        )}
+                      </a>
+                    </li>
+                  );
+                })}
+              </ul>
+            );
+          })}
+        </nav>
+      </aside>
     </div>
 
     <div
@@ -306,8 +374,10 @@ const knownPills: Set<UserRole> | null = allRoles ?? null;
           }
         });
 
-        // Reveal the active-role tab list, hide the others.
-        shell.querySelectorAll<HTMLUListElement>('[data-console-sidebar] ul[data-role]').forEach(ul => {
+        // Reveal the active-role tab list, hide the others. Applied to both
+        // the desktop aside and the mobile drawer's role-scoped uls.
+        const sidebarSelector = '[data-console-sidebar] ul[data-role], [data-console-mobile-sidebar] ul[data-role]';
+        shell.querySelectorAll<HTMLUListElement>(sidebarSelector).forEach(ul => {
           const role = ul.dataset.role as UserRole;
           if (role === activeRole) ul.classList.remove('hidden');
           else                     ul.classList.add('hidden');
@@ -315,6 +385,49 @@ const knownPills: Set<UserRole> | null = allRoles ?? null;
       }
 
       hydrateConsoleChrome().catch(() => { /* swallow — gate UI shows error */ });
+
+      // Mobile drawer open/close. Uses the same Esc / backdrop / nav-close
+      // pattern as MobileDrawer.astro. Body scroll is locked while open.
+      (function installMobileDrawer() {
+        const toggle   = document.getElementById('console-mobile-toggle');
+        const closeBtn = document.getElementById('console-mobile-close');
+        const drawer   = document.getElementById('console-mobile-drawer');
+        const backdrop = document.getElementById('console-mobile-backdrop');
+        if (!toggle || !drawer || !backdrop) return;
+
+        let lastFocused: HTMLElement | null = null;
+        function open() {
+          lastFocused = document.activeElement as HTMLElement | null;
+          drawer!.classList.remove('hidden');
+          backdrop!.classList.remove('hidden');
+          document.body.style.overflow = 'hidden';
+          toggle!.setAttribute('aria-expanded', 'true');
+          // Focus the close button so screen readers land in the dialog.
+          (closeBtn as HTMLButtonElement | null)?.focus();
+        }
+        function close() {
+          drawer!.classList.add('hidden');
+          backdrop!.classList.add('hidden');
+          document.body.style.overflow = '';
+          toggle!.setAttribute('aria-expanded', 'false');
+          lastFocused?.focus();
+        }
+
+        toggle.addEventListener('click', () => {
+          if (drawer.classList.contains('hidden')) open();
+          else close();
+        });
+        closeBtn?.addEventListener('click', close);
+        backdrop.addEventListener('click', close);
+        document.addEventListener('keydown', ev => {
+          if (ev.key === 'Escape' && !drawer.classList.contains('hidden')) close();
+        });
+        // Any in-drawer nav click closes the drawer (post-navigation).
+        drawer.addEventListener('click', ev => {
+          const link = (ev.target as HTMLElement | null)?.closest('a');
+          if (link) close();
+        });
+      })();
     </script>
   </body>
 </html>

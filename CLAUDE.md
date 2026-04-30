@@ -318,10 +318,19 @@ state). The classes are safelisted in `tailwind.config.mjs`; adding a
 new console-related accent class requires extending the safelist or
 production builds will purge it.
 
+**Mobile chrome.** Below the `md` breakpoint the desktop sidebar is
+hidden and a hamburger button (`md:hidden`) in the header opens a
+left-side off-canvas drawer that mirrors the same role-scoped tab
+lists. The hydrate script targets both copies via
+`[data-console-sidebar] ul[data-role], [data-console-mobile-sidebar]
+ul[data-role]` so pill-driven role flips reveal the right list in
+whichever copy is currently visible. Esc / backdrop / in-drawer link
+all close it; body scroll locked while open.
+
 Bootstrap docs: `docs/runbooks/admin-bootstrap.md`. Role model:
 `docs/runbooks/role-model.md`. Audit log: `docs/runbooks/admin-audit.md`.
 Per-action runbook: `docs/runbooks/admin-ops.md`. Chrome-rendering
-invariant (sidebar / role pills / `ConsoleLayout`):
+invariant (sidebar / role pills / `ConsoleLayout` / mobile drawer):
 `docs/runbooks/admin-chrome-rendering.md`.
 
 **Status:** 36 of 39 console tabs functional, 36 admin Edge Function handlers deployed, all admin write affordances live, CORS tightened to rastrum.org + dev/preview ports, token-bucket rate limit + pgTAP RLS suite enforced in CI. PR12 (observability) added Anomalies + Forensics tabs backed by hourly `detect_admin_anomalies()` cron, weekly `compute_admin_health_digest()` snapshot, and a structured `function_errors` sink wired into the dispatcher. PR13 (future-proofing) added Proposals + Webhooks tabs, time-bounded role grants (`expires_at` + daily `auto_revoke_expired_roles()` cron), a two-person-rule `admin_action_proposals` table with hourly expiry sweep, HMAC-SHA256 outbound webhook signing (`dispatch_admin_webhooks()`), and a v1 placeholder `compute_moderator_trust_score()` primitive. PR14 (deferred cleanup) closed the v1.1 follow-ups: per-admin timezone for the off_hours rule (`users.timezone`), webhook replay protection (`_meta` envelope + nonce + reconcile cron writing back async `pg_net` status_code), the real moderator trust score formula (anomaly + overturn + active-days + recency, clamped 0–100), the dispatcher-level `enforce_two_person_irreversible` enforcement gate (feature flag-gated), and the "Require approval (two-person rule)" toggle on irreversible slide-overs. PR15 (observability UI) shipped `/console/health/` (weekly-digest hero card with directional Δ pills + 12-week sparklines, manual `health.recompute`), `/console/errors/` (function_errors browser with severity-coloured pills + URL-driven filters + auto-refresh + single + bulk ack via `error.acknowledge[_bulk]`), and per-webhook deliveries drilldown on `/console/webhooks/` with click-to-replay (`webhook.replay_delivery`) + nonce copy. PR16 (entity browsers) shipped seven read-only paginated browsers — Identifications, Notifications, Media, Follows, Watchlists, Projects, Taxon changes — built on a shared `ConsoleEntityBrowser.astro` template + `src/lib/entity-browser.ts` runtime. Server-side paginated (50/page), URL-driven filter state, lazy FK lookups, auto-populated dropdown facets; runbook at `docs/runbooks/admin-entity-browsers.md`. Deferred stubs (no concrete users): License disputes, Identification overrides, Taxon notes, Bioblitz.
