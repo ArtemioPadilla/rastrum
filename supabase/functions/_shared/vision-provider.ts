@@ -16,6 +16,8 @@
  * downstream parser sees the same shape regardless of vendor.
  */
 
+import { parseServiceAccount, getAccessToken } from './vertex-token.ts';
+
 export type CredentialKind =
   | 'api_key'              // Anthropic direct
   | 'oauth_token'          // Anthropic direct (OAT)
@@ -407,19 +409,38 @@ class GeminiProvider implements VisionProvider {
 class VertexAIProvider implements VisionProvider {
   constructor(private readonly cred: ResolvedCredential) {}
 
-  // Vertex AI requires an OAuth2 access token derived from a service-
-  // account JSON. Deriving the JWT inside an Edge Function is non-
-  // trivial; v1 expects the operator to mint the access token offline
-  // and store it as `secret`. We bump validity in the validator (see
-  // vision-validate.ts).
+  // Vertex AI auto-rotation (#155): when the secret is a
+  // service-account JSON envelope, the provider mints an OAuth2
+  // access token via JWT-bearer flow and caches it for ~50 min in
+  // the EF instance. When the secret is a literal `ya29.…` access
+  // token (legacy v1 path), we use it directly — operators on the
+  // legacy path are responsible for rotation themselves until they
+  // migrate to the JSON envelope.
   async identify(input: VisionInput): Promise<VisionResult | null> {
     const region = this.cred.endpoint || 'us-central1';
     const url = `https://${region}-aiplatform.googleapis.com/v1/${this.cred.model}:streamGenerateContent`;
+    const accessToken = await this.resolveAccessToken();
+    if (!accessToken) return null;
     const headers: Record<string, string> = {
-      'Authorization': `Bearer ${this.cred.secret}`,
+      'Authorization': `Bearer ${accessToken}`,
       'Content-Type':  'application/json',
     };
     return await callGeminiCompatible(url, headers, input, 'vertex_ai');
+  }
+
+  private async resolveAccessToken(): Promise<string | null> {
+    const sa = parseServiceAccount(this.cred.secret);
+    if (sa) {
+      try {
+        const t = await getAccessToken(sa);
+        return t.access_token;
+      } catch (err) {
+        console.warn(`[vertex] auto-rotation failed: ${(err as Error).message}`);
+        return null;
+      }
+    }
+    // Legacy: secret is a literal access token.
+    return this.cred.secret.trim().length > 0 ? this.cred.secret : null;
   }
 }
 
