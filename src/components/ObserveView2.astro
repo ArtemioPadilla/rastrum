@@ -52,7 +52,7 @@ const weathers = WEATHERS;
         <button id="obs2-banner-collapse" type="button" class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors text-[10px] underline">
           {isEs ? "Ocultar" : "Hide"}
         </button>
-        <a id="obs2-setup-link" href={isEs ? "/es/perfil/editar#ai" : "/en/profile/edit#ai"}
+        <a id="obs2-setup-link" href={isEs ? "/es/perfil/editar#on-device-ai-section" : "/en/profile/edit#on-device-ai-section"}
           class="text-emerald-600 dark:text-emerald-400 underline hover:no-underline">
           {isEs ? "Configurar →" : "Set up →"}
         </a>
@@ -97,7 +97,7 @@ const weathers = WEATHERS;
       </div>
     </div>
     <div class="flex flex-wrap gap-2">
-      <a href={isEs ? "/es/perfil/editar#ai" : "/en/profile/edit#ai"}
+      <a href={isEs ? "/es/perfil/editar#on-device-ai-section" : "/en/profile/edit#on-device-ai-section"}
         class="min-h-[40px] rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-xs px-4 flex items-center transition-colors">
         {isEs ? "Descargar BirdNET" : "Download BirdNET"}
       </a>
@@ -261,7 +261,7 @@ const weathers = WEATHERS;
       </ul>
     </div>
     <div class="flex gap-3 flex-wrap">
-      <a href={isEs ? "/es/perfil/editar#ai" : "/en/profile/edit#ai"}
+      <a href={isEs ? "/es/perfil/editar#on-device-ai-section" : "/en/profile/edit#on-device-ai-section"}
         class="min-h-[40px] rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-xs px-4 flex items-center transition-colors">
         {isEs ? "Configurar IA →" : "Set up AI →"}
       </a>
@@ -589,11 +589,20 @@ async function runPipeline(state: PipelineState) {
   const hasAudioFiles    = state.files.some(f => f.kind === 'audio');
   const audioSkipped     = identifyNodes.some(n =>
     n.state === 'skipped' &&
+    n.fileId != null &&
     state.files.find(f => f.id === n.fileId && f.kind === 'audio')
   );
   const partialAudioSkip = hasAudioFiles && audioSkipped && !allSkipped;
 
-  if (allSkipped) {
+  if (allSkipped && hasAudioFiles) {
+    // All nodes skipped AND user uploaded audio — BirdNET-specific warning is more helpful
+    audioWarnEl?.classList.remove('hidden');
+    noRunnersEl?.classList.add('hidden');
+    document.getElementById('obs2-audio-skip-continue')?.addEventListener('click', () => {
+      audioWarnEl?.classList.add('hidden');
+      showPostForm();
+    }, { once: true });
+  } else if (allSkipped) {
     noRunnersEl?.classList.remove('hidden');
     audioWarnEl?.classList.add('hidden');
     document.getElementById('obs2-no-runners-continue')?.addEventListener('click', () => {
