@@ -419,10 +419,15 @@ CREATE POLICY "obs_public_read" ON public.observations FOR SELECT
 -- Same dataset shape, just no obscuration. Admin sets credentialed_researcher
 -- after ID verification (no self-serve toggle).
 DROP POLICY IF EXISTS "obs_credentialed_read" ON public.observations;
+-- Fixed 2026-04-30: replaced correlated subquery with EXISTS (42P17 prevention)
 CREATE POLICY "obs_credentialed_read" ON public.observations FOR SELECT
   USING (
     sync_status = 'synced'
-    AND (SELECT credentialed_researcher FROM public.users WHERE id = auth.uid()) = true
+    AND EXISTS (
+      SELECT 1 FROM public.users
+      WHERE id = auth.uid()
+        AND credentialed_researcher = true
+    )
   );
 
 -- Identifications: tied to observation access
@@ -447,9 +452,14 @@ CREATE POLICY "id_owner" ON public.identifications FOR ALL
   );
 
 DROP POLICY IF EXISTS "id_public_read" ON public.identifications;
+-- Fixed 2026-04-30: IN (SELECT) → EXISTS to prevent 42P17 chain
 CREATE POLICY "id_public_read" ON public.identifications FOR SELECT
   USING (
-    observation_id IN (SELECT id FROM observations WHERE sync_status = 'synced')
+    EXISTS (
+      SELECT 1 FROM public.observations o
+      WHERE o.id = observation_id
+        AND o.sync_status = 'synced'
+    )
   );
 
 -- Media: same as observations
@@ -472,10 +482,15 @@ CREATE POLICY "media_owner" ON public.media_files FOR ALL
   );
 
 DROP POLICY IF EXISTS "media_public_read" ON public.media_files;
+-- Fixed 2026-04-30: IN (SELECT) → EXISTS to prevent 42P17 chain
 CREATE POLICY "media_public_read" ON public.media_files FOR SELECT
   USING (
-    observation_id IN (SELECT id FROM observations WHERE sync_status = 'synced')
-    AND metadata_redacted = false
+    metadata_redacted = false
+    AND EXISTS (
+      SELECT 1 FROM public.observations o
+      WHERE o.id = observation_id
+        AND o.sync_status = 'synced'
+    )
   );
 
 -- Taxon usage history (taxonomy renames/synonyms bookkeeping). Read
@@ -885,10 +900,15 @@ CREATE POLICY comments_self_update ON public.observation_comments FOR UPDATE
   USING ((SELECT auth.uid()) = author_id);
 
 DROP POLICY IF EXISTS comments_public_read ON public.observation_comments;
+-- Fixed 2026-04-30: IN (SELECT) → EXISTS to prevent 42P17 chain
 CREATE POLICY comments_public_read ON public.observation_comments FOR SELECT
   USING (
     deleted_at IS NULL
-    AND observation_id IN (SELECT id FROM public.observations WHERE sync_status = 'synced')
+    AND EXISTS (
+      SELECT 1 FROM public.observations o
+      WHERE o.id = observation_id
+        AND o.sync_status = 'synced'
+    )
   );
 
 CREATE TABLE IF NOT EXISTS public.watchlists (
