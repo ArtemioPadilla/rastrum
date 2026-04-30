@@ -1342,6 +1342,14 @@ GRANT SELECT ON public.sync_failures TO authenticated;
 --   (primary ID is not research-grade AND its confidence is < 0.5)
 -- The two-clause "needs help" test avoids re-queueing already-promoted
 -- rows whose confidence happens to sit between 0.4 and 0.5.
+--
+-- DROP VIEW first because the column shape evolved (PR #258 reordered
+-- columns to add `current_taxon_id` before `current_scientific_name`)
+-- and Postgres CREATE OR REPLACE VIEW does not permit column renames /
+-- reordering. Without this DROP, db-apply.yml fails on existing DBs
+-- with "cannot change name of view column …". Idempotent: IF EXISTS
+-- makes the DROP safe on first apply.
+DROP VIEW IF EXISTS public.validation_queue CASCADE;
 CREATE OR REPLACE VIEW public.validation_queue AS
 SELECT
   o.id                               AS observation_id,
