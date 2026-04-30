@@ -8,11 +8,14 @@
  * y muestra un toast de confirmación.
  *
  * Props:
- *   title  — título para el share sheet (ej. nombre de especie)
- *   text   — descripción opcional
- *   url    — URL a compartir (default: window.location.href)
- *   label  — texto del botón (default: "Compartir" / "Share")
- *   size   — 'sm' | 'md' (default: 'sm')
+ *   title      — título para el share sheet (ej. nombre de especie)
+ *   text       — descripción opcional
+ *   url        — URL a compartir (default: window.location.href)
+ *   label      — texto del botón (default: "Compartir" / "Share")
+ *   size       — 'sm' | 'md' (default: 'sm')
+ *   mediaUrls  — lista de URLs de archivos a adjuntar al share (audio/imagen/video).
+ *                Se fetch-ea cada archivo, se pasa como File[] si navigator.canShare({ files })
+ *                lo permite. Si no, solo se comparte la URL.
  */
 import { t } from '../i18n/utils';
 
@@ -24,9 +27,11 @@ interface Props {
   label?: string;
   size?: 'sm' | 'md';
   id?: string;
+  /** Optional list of media URLs (photo/audio/video) to include in the share. */
+  mediaUrls?: string[];
 }
 
-const { lang, title = '', text = '', url = '', label, size = 'sm', id = 'share-btn' } = Astro.props;
+const { lang, title = '', text = '', url = '', label, size = 'sm', id = 'share-btn', mediaUrls = [] } = Astro.props;
 const tr = t(lang);
 const defaultLabel = lang === 'es' ? 'Compartir' : 'Share';
 const btnLabel = label ?? defaultLabel;
@@ -43,6 +48,7 @@ const sizeClass = size === 'md'
   data-share-text={text}
   data-share-url={url}
   data-toast-copied={toastCopied}
+  data-media-urls={mediaUrls.length > 0 ? JSON.stringify(mediaUrls) : ''}
   class={`rastrum-share-btn inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors ${sizeClass}`}
   aria-label={btnLabel}
 >
@@ -75,10 +81,35 @@ const sizeClass = size === 'md'
         setTimeout(() => toastEl.classList.add('hidden'), 2500);
       }
 
+      // Attempt to build File[] from optional media URLs
+      let files: File[] = [];
+      const rawMediaUrls = btn.dataset.mediaUrls;
+      if (rawMediaUrls && navigator.share && navigator.canShare) {
+        try {
+          const mediaUrls: string[] = JSON.parse(rawMediaUrls);
+          const fetched = await Promise.all(
+            mediaUrls.slice(0, 5).map(async (u) => {
+              const res = await fetch(u);
+              const blob = await res.blob();
+              const filename = u.split('/').pop()?.split('?')[0] ?? 'media';
+              return new File([blob], filename, { type: blob.type });
+            })
+          );
+          files = fetched.filter(f => f.size > 0);
+        } catch {
+          // File fetch failed — share URL only
+          files = [];
+        }
+      }
+
       // Web Share API — Android/iOS native sheet
       if (navigator.share) {
         try {
-          await navigator.share({ title: shareTitle, text: shareText, url: shareUrl });
+          const shareData: ShareData = { title: shareTitle, text: shareText, url: shareUrl };
+          if (files.length > 0 && navigator.canShare({ files })) {
+            shareData.files = files;
+          }
+          await navigator.share(shareData);
           return;
         } catch (e) {
           // User cancelled or error — fall through to clipboard

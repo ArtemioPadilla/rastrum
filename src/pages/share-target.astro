@@ -1,0 +1,183 @@
+---
+/**
+ * /share-target — Web Share Target API receiver.
+ *
+ * This page is the `action` endpoint registered in manifest.webmanifest.
+ * The browser POSTs multipart/form-data here when the user picks Rastrum
+ * from the OS share sheet.
+ *
+ * Because Rastrum is a fully static site (Astro SSG), we can't handle the
+ * POST server-side. Instead the Service Worker intercepts the POST, stashes
+ * the file in Cache Storage, and redirects to this page. The client-side
+ * script below retrieves the stashed entry, writes it to sessionStorage
+ * (reusing the same `PENDING_OBSERVATION_KEY` contract as the chat→observe
+ * flow), and then navigates to /en/observe or /es/observar.
+ *
+ * Supported incoming fields (set in manifest share_target params):
+ *   audio — audio file (audio/*)
+ *   image — image file (image/*)
+ *   video — video file (video/*)
+ *   title, text, url — optional text metadata
+ *
+ * Flow:
+ *   Other app → Share → OS sheet → Rastrum (installed PWA)
+ *   → POST /share-target (SW intercepts)
+ *   → SW stashes file in Cache Storage under SHARE_TARGET_CACHE_KEY
+ *   → SW redirects to /share-target (GET)
+ *   → This page retrieves stash → writes sessionStorage → navigate to /observe
+ */
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Opening in Rastrum…</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100svh;
+      margin: 0;
+      background: #09090b;
+      color: #e4e4e7;
+      text-align: center;
+      padding: 1rem;
+    }
+    .card {
+      max-width: 320px;
+    }
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid #27272a;
+      border-top-color: #10b981;
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+      margin: 0 auto 1rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    p { margin: 0.5rem 0; color: #a1a1aa; font-size: 0.875rem; }
+    .err { color: #f87171; }
+    a { color: #10b981; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="spinner" id="spinner"></div>
+    <p id="status">Loading shared file…</p>
+    <p id="err" class="err" style="display:none"></p>
+    <p id="fallback" style="display:none">
+      <a href="/en/observe">Open observation form</a>
+    </p>
+  </div>
+
+  <script>
+    /**
+     * SHARE_TARGET_STASH_KEY — must match sw.js.
+     * The SW stores the incoming file blob in Cache Storage under this URL.
+     */
+    const SHARE_TARGET_STASH_KEY = '/share-target-stash';
+    const PENDING_OBSERVATION_KEY = 'rastrum.pendingObservation';
+
+    const statusEl   = document.getElementById('status')!;
+    const errEl      = document.getElementById('err')!;
+    const spinnerEl  = document.getElementById('spinner')!;
+    const fallbackEl = document.getElementById('fallback')!;
+
+    function fail(msg: string) {
+      spinnerEl.style.display = 'none';
+      errEl.textContent = msg;
+      errEl.style.display = '';
+      fallbackEl.style.display = '';
+    }
+
+    /** Determine the locale for redirect based on browser language. */
+    function observeUrl(): string {
+      const lang = navigator.language?.toLowerCase() ?? '';
+      return lang.startsWith('es') ? '/es/observar' : '/en/observe';
+    }
+
+    /** Detect MIME type category */
+    function detectKind(mime: string): 'photo' | 'audio' | 'video' | null {
+      if (mime.startsWith('image/')) return 'photo';
+      if (mime.startsWith('audio/')) return 'audio';
+      if (mime.startsWith('video/')) return 'video';
+      return null;
+    }
+
+    async function run() {
+      // Retrieve the stashed blob from the SW cache
+      if (!('caches' in self)) {
+        fail('Cache API not available — try opening Rastrum directly.');
+        return;
+      }
+
+      const cache  = await caches.open('rastrum-share-target-v1');
+      const stash  = await cache.match(SHARE_TARGET_STASH_KEY);
+
+      if (!stash) {
+        // No stash — maybe user navigated here directly
+        statusEl.textContent = 'No shared file found.';
+        spinnerEl.style.display = 'none';
+        fallbackEl.style.display = '';
+        return;
+      }
+
+      const metaHeader = stash.headers.get('X-Rastrum-Share-Meta');
+      let meta: { filename?: string; title?: string; text?: string; url?: string } = {};
+      try { if (metaHeader) meta = JSON.parse(metaHeader); } catch { /* ignore */ }
+
+      const blob = await stash.blob();
+
+      // Clean up cache immediately
+      await cache.delete(SHARE_TARGET_STASH_KEY);
+
+      if (!blob || blob.size === 0) {
+        fail('Received an empty file. Please try again.');
+        return;
+      }
+
+      const mime = blob.type || 'application/octet-stream';
+      const kind = detectKind(mime);
+
+      if (!kind) {
+        fail(`Unsupported file type: ${mime}. Rastrum accepts audio, images, and video.`);
+        return;
+      }
+
+      // Build an object URL and store pending observation in sessionStorage
+      // using the same contract as the chat→observe flow.
+      const blobUrl = URL.createObjectURL(blob);
+
+      const pending = {
+        blob_url: blobUrl,
+        mime_type: mime,
+        scientific_name: '',
+        confidence: 0,
+        source: 'human',
+        common_name: null,
+        // Treat video as photo for now (observation form accepts both in photo slot)
+        kind: kind === 'video' ? 'photo' : kind,
+        // Extra metadata for the observe form banner
+        share_source_title: meta.title ?? '',
+        share_source_text:  meta.text  ?? '',
+      };
+
+      try {
+        sessionStorage.setItem(PENDING_OBSERVATION_KEY, JSON.stringify(pending));
+      } catch (e) {
+        fail('Could not store file (private mode?). Continuing without pre-fill.');
+      }
+
+      statusEl.textContent = 'Opening observation form…';
+      window.location.replace(observeUrl());
+    }
+
+    run().catch((e) => fail(e?.message ?? 'Unknown error'));
+  </script>
+</body>
+</html>

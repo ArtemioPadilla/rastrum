@@ -97,6 +97,11 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
       {tr.chat.prefilled_from_chat_banner}
     </div>
 
+    <!-- Pre-filled from share-target (revealed by consumeShareTargetIfAny) -->
+    <div id="share-target-banner" class="hidden rounded-lg border border-blue-300 dark:border-blue-800/40 bg-blue-50 dark:bg-blue-900/10 px-3 py-2 text-sm text-blue-900 dark:text-blue-200">
+      {lang === 'es' ? '📤 Archivo recibido por Compartir — completa la ubicación y guarda.' : '📤 File received via Share — add location and save.'}
+    </div>
+
     <!-- WebLLM download warning — shown once before first local AI use -->
     <div id="webllm-warning" class="hidden rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 p-3">
       <p class="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-1">🧠 {isEs ? 'IA local — primera descarga' : 'Local AI — first download'}</p>
@@ -1516,6 +1521,30 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
     }
   }
   void consumeChatPrefillIfAny();
+
+  /**
+   * If the user arrived from /share-target (Web Share Target API),
+   * the share-target page stores the file in sessionStorage under
+   * PENDING_OBSERVATION_KEY with share_source_* extras. We handle it
+   * here (same key, same flow) but show the share-target banner instead.
+   */
+  async function consumeShareTargetIfAny(): Promise<void> {
+    const raw = (() => { try { return sessionStorage.getItem('rastrum.pendingObservation'); } catch { return null; } })();
+    if (!raw) return;
+    let parsed: Record<string, unknown>;
+    try { parsed = JSON.parse(raw); } catch { return; }
+    // Distinguish share-target entries from chat prefills by the extra key
+    if (!('share_source_title' in parsed) && !('share_source_text' in parsed)) return;
+    // Already handled by consumeChatPrefillIfAny above, but that function
+    // removes the item from sessionStorage first. If we get here the item
+    // is still present — means chat prefill didn't claim it (no scientific_name
+    // check mismatch). Show the share-target banner instead of the chat banner.
+    const shareBanner = document.getElementById('share-target-banner');
+    const chatBanner  = document.getElementById('chat-prefill-banner');
+    chatBanner?.classList.add('hidden');
+    shareBanner?.classList.remove('hidden');
+  }
+  void consumeShareTargetIfAny();
 
   // ── Audio recording (MediaRecorder, ≤30 s) ──
   const audioGrid     = document.getElementById('audio-grid');
