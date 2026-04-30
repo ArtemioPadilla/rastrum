@@ -146,6 +146,16 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'dispatch_admin_webhooks')     THEN missing := array_append(missing, 'public.dispatch_admin_webhooks()'); END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'compute_moderator_trust_score') THEN missing := array_append(missing, 'public.compute_moderator_trust_score()'); END IF;
 
+  -- PR16 — admin entity browser hot-path indexes. If a future schema
+  -- change drops one of these the corresponding admin browser tab silently
+  -- regresses to a sequential scan. Sentinel keeps that observable.
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_id_created_desc')              THEN missing := array_append(missing, 'public.idx_id_created_desc'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_notifications_kind_created')   THEN missing := array_append(missing, 'public.idx_notifications_kind_created'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_media_active_created')         THEN missing := array_append(missing, 'public.idx_media_active_created'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_follows_created_desc')         THEN missing := array_append(missing, 'public.idx_follows_created_desc'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_projects_created_desc')        THEN missing := array_append(missing, 'public.idx_projects_created_desc'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_comments_author_created')      THEN missing := array_append(missing, 'public.idx_comments_author_created'); END IF;
+
   IF array_length(missing, 1) IS NOT NULL THEN
     RAISE EXCEPTION 'Sentinel verify failed — missing objects: %', missing;
   END IF;
