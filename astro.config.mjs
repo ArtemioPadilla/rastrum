@@ -35,16 +35,14 @@ export default defineConfig({
   redirects: {
     '/en/profile/watchlist':      { status: 301, destination: '/en/explore/watchlist/' },
     '/es/perfil/seguimiento':     { status: 301, destination: '/es/explorar/seguimiento/' },
-    // PR-2: account hub + settings shell — legacy routes → new settings tabs
+    // PR-2 (settings shell): only `/profile/edit` has actually been consolidated
+    // into the settings tabs. The other "legacy" pages (tokens, import, export,
+    // expert-apply) still ship as standalone routes — settings tabs link to
+    // them rather than inlining their UI. Redirecting back to /settings/<tab>/
+    // here would create an infinite loop because the settings-tab buttons
+    // point at these URLs. If/when their UI gets inlined into the tabs,
+    // re-add the redirects in the same PR that does the inlining.
     '/en/profile/edit':           { status: 301, destination: '/en/profile/settings/profile/' },
     '/es/perfil/editar':          { status: 301, destination: '/es/perfil/ajustes/profile/' },
-    '/en/profile/tokens':         { status: 301, destination: '/en/profile/settings/developer/' },
-    '/es/perfil/tokens':          { status: 301, destination: '/es/perfil/ajustes/developer/' },
-    '/en/profile/export':         { status: 301, destination: '/en/profile/settings/data/' },
-    '/es/perfil/exportar':        { status: 301, destination: '/es/perfil/ajustes/data/' },
-    '/en/profile/import':         { status: 301, destination: '/en/profile/settings/data/' },
-    '/es/perfil/importar':        { status: 301, destination: '/es/perfil/ajustes/data/' },
-    '/en/profile/expert-apply':   { status: 301, destination: '/en/profile/settings/developer/' },
-    '/es/perfil/aplicar-experto': { status: 301, destination: '/es/perfil/ajustes/developer/' },
   },
 });
