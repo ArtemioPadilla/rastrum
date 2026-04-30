@@ -222,6 +222,11 @@ const lang: 'en' | 'es' = 'en';
             };
             const raw = ident.raw_response as RawResponse;
             if (raw.segments && raw.segments.length > 0) {
+              // Known limitation (v1): the BirdNET identification is stored once
+              // per observation, not per audio file. If an observation has multiple
+              // audio files, all players show the same segment detections from the
+              // primary identification. Fix in a future PR by storing a media_file_id
+              // FK on the identifications row.
               audioFiles.forEach((_af: unknown, idx: number) => {
                 const obsIdAttr = `obs-detail-audio-${idx}`;
                 document.dispatchEvent(new CustomEvent('rastrum:audio-birdnet-ready', {
