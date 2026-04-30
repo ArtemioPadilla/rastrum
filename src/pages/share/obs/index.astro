@@ -112,28 +112,21 @@ const lang: 'en' | 'es' = 'en';
       }));
 
       // ── Audio players (spectrogram) ──
-      const audioFiles = (media ?? []).filter((m: MediaRow) => m.media_type === 'audio');
-      if (audioFiles.length > 0) {
-        const playersEl = document.getElementById('obs-audio-players');
-        if (playersEl) {
-          const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
-          const isEs = lang === 'es';
-          playersEl.classList.remove('hidden');
-          playersEl.innerHTML = audioFiles.map((af: MediaRow, idx: number) => {
-            const obsIdAttr    = `obs-detail-audio-${idx}`;
-            const mimeType     = af.mime_type ?? 'audio/mpeg';
-            const playLabel    = isEs ? 'Reproducir' : 'Play';
-            const pauseLabel   = isEs ? 'Pausar' : 'Pause';
-            const spectroLabel = isEs ? 'Ver espectrograma' : 'Show spectrogram';
-            const spectroHide  = isEs ? 'Ocultar espectrograma' : 'Hide spectrogram';
-            const freqLabel    = isEs ? 'Frecuencia (kHz)' : 'Frequency (kHz)';
-            const timeLabel    = isEs ? 'Tiempo (s)' : 'Time (s)';
-            const loadLabel    = isEs ? 'Cargando audio…' : 'Loading audio…';
-            const errLabel     = isEs ? 'No se pudo cargar el audio.' : 'Could not load audio.';
-            return `
+      // TODO: when Astro supports SSR hydration in this context, use AudioPlayer.astro directly
+      function buildAudioPlayerHTML(audioUrl: string, mimeType: string, obsIdAttr: string, lang: string): string {
+        const isEs = lang === 'es';
+        const playLabel    = isEs ? 'Reproducir' : 'Play';
+        const pauseLabel   = isEs ? 'Pausar' : 'Pause';
+        const spectroLabel = isEs ? 'Ver espectrograma' : 'Show spectrogram';
+        const spectroHide  = isEs ? 'Ocultar espectrograma' : 'Hide spectrogram';
+        const freqLabel    = isEs ? 'Frecuencia (kHz)' : 'Frequency (kHz)';
+        const timeLabel    = isEs ? 'Tiempo (s)' : 'Time (s)';
+        const loadLabel    = isEs ? 'Cargando audio…' : 'Loading audio…';
+        const errLabel     = isEs ? 'No se pudo cargar el audio.' : 'Could not load audio.';
+        return `
             <div
               class="rastrum-audio-player rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden"
-              data-audio-url="${af.url}"
+              data-audio-url="${audioUrl}"
               data-mime-type="${mimeType}"
               data-obs-id="${obsIdAttr}"
               data-show-spectrogram="true"
@@ -199,6 +192,18 @@ const lang: 'en' | 'es' = 'en';
                 <div id="ws-legend-${obsIdAttr}" class="hidden mt-2 space-y-1"></div>
               </div>
             </div>`;
+      }
+
+      const audioFiles = (media ?? []).filter((m: MediaRow) => m.media_type === 'audio');
+      if (audioFiles.length > 0) {
+        const playersEl = document.getElementById('obs-audio-players');
+        if (playersEl) {
+          const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
+          playersEl.classList.remove('hidden');
+          playersEl.innerHTML = audioFiles.map((af: MediaRow, idx: number) => {
+            const obsIdAttr = `obs-detail-audio-${idx}`;
+            const mimeType  = af.mime_type ?? 'audio/mpeg';
+            return buildAudioPlayerHTML(af.url, mimeType, obsIdAttr, lang);
           }).join('');
 
           // Re-run AudioPlayer init for the new DOM nodes

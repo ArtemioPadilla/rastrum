@@ -1572,7 +1572,7 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
   let durationCutoffTimer: number | null = null;
 
   const AUDIO_MAX_SECS = 30;
-  const isEs2 = (typeof document !== 'undefined') && document.documentElement.lang === 'es';
+  
 
   function repaintAudioGrid() {
     if (!audioGrid) return;
@@ -1607,7 +1607,7 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
   if (!audioSupported()) {
     if (audioRecBtn) audioRecBtn.disabled = true;
     if (audioErrEl) {
-      audioErrEl.textContent = isEs2 ? 'La grabación de audio no está disponible en este navegador.' : "Audio recording isn't supported on this browser.";
+      audioErrEl.textContent = isEs ? 'La grabación de audio no está disponible en este navegador.' : "Audio recording isn't supported on this browser.";
       audioErrEl.classList.remove('hidden');
     }
   }
@@ -1628,7 +1628,7 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch {
       if (audioErrEl) {
-        audioErrEl.textContent = isEs2
+        audioErrEl.textContent = isEs
           ? 'Acceso al micrófono denegado. Habilítalo en la configuración del navegador para grabar.'
           : 'Microphone access denied. Allow it in your browser settings to record.';
         audioErrEl.classList.remove('hidden');
@@ -1647,7 +1647,7 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
       const durationSec = Math.min((Date.now() - recordStartedAt) / 1000, AUDIO_MAX_SECS);
       audios.push({ blob, blobId: crypto.randomUUID(), mimeType: mime, durationSec });
       repaintAudioGrid();
-      setAudioBtnLabel(isEs2 ? 'Grabar audio' : 'Record audio');
+      setAudioBtnLabel(isEs ? 'Grabar audio' : 'Record audio');
       audioElapsed?.classList.add('hidden');
       if (elapsedTimer != null) { clearInterval(elapsedTimer); elapsedTimer = null; }
       if (durationCutoffTimer != null) { clearTimeout(durationCutoffTimer); durationCutoffTimer = null; }
@@ -1655,7 +1655,7 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
 
     recordStartedAt = Date.now();
     mediaRecorder.start();
-    setAudioBtnLabel(isEs2 ? 'Detener' : 'Stop');
+    setAudioBtnLabel(isEs ? 'Detener' : 'Stop');
     audioElapsed?.classList.remove('hidden');
     if (audioElapsed) audioElapsed.textContent = '0.0s / ' + AUDIO_MAX_SECS + 's';
     elapsedTimer = window.setInterval(() => {
@@ -1688,7 +1688,7 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
     for (const file of Array.from(files)) {
       if (!file.type.startsWith('audio/') && !file.name.match(/\.(mp3|wav|ogg|m4a|aac|flac|opus|weba)$/i)) {
         if (audioErrEl) {
-          audioErrEl.textContent = isEs2
+          audioErrEl.textContent = isEs
             ? `Formato no soportado: ${file.name}. Acepta MP3, WAV, OGG, M4A, AAC, FLAC.`
             : `Unsupported format: ${file.name}. Accepts MP3, WAV, OGG, M4A, AAC, FLAC.`;
           audioErrEl.classList.remove('hidden');
