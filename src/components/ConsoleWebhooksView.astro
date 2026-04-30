@@ -546,6 +546,7 @@ const eventKeys: Array<keyof typeof wEvents> = [
       if (deliveriesId) {
         if (expanded.has(deliveriesId)) {
           expanded.delete(deliveriesId);
+          drilldown.delete(deliveriesId);
           renderWebhooks();
         } else {
           expanded.add(deliveriesId);
