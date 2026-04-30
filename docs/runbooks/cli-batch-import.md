@@ -95,10 +95,28 @@ UPDATE public.observations o
 
 (Same SQL as the M29 runbook. Idempotent.)
 
-## v1.1 follow-ups
+## Camera-station tagging at import time (#156, shipped 2026-04-30)
+
+Pass `--project-slug <slug> --station-key <key>` and the EF looks
+up the station by the (slug, key) pair under RLS, populating
+`observations.camera_station_id` for every photo. Both flags must
+be supplied together.
+
+```bash
+rastrum-import \
+  --dir          /Volumes/SD_CARD/DCIM \
+  --baseUrl      "$RASTRUM_BASE_URL" \
+  --token        "$RASTRUM_TOKEN" \
+  --project-slug anp-sierra-juarez \
+  --station-key  SJ-CAM-01
+```
+
+Pre-#156 you had to UPDATE rows manually after the import; that
+step is no longer needed.
+
+## v1.1 follow-ups (still open)
 
 - Frame extraction for `.mp4`/`.mov` (currently `status: 'skipped'`)
-- `--station-key <key>` flag to populate `observations.camera_station_id` for M31
 - Web UI drag-and-drop ZIP upload using the same pipeline server-side
 - Concurrent uploads (sequential in v1)
 - HEIC → JPEG conversion (R2 stores any blob; PWA viewer falls back gracefully)

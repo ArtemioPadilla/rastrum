@@ -10,7 +10,7 @@
  */
 import FollowButton from './FollowButton.astro';
 import { t, getLocalizedPath, routes } from '../i18n/utils';
-import type { CommunityObserver } from '../lib/community';
+import { publicProfileHref, type CommunityObserver } from '../lib/community';
 
 interface Props {
   lang: 'en' | 'es';
@@ -32,7 +32,7 @@ const cm = (tr as unknown as { community: CommunityCopy }).community;
 
 const handle = observer.username ?? observer.id.slice(0, 8);
 const displayName = observer.display_name ?? handle;
-const profileHref = getLocalizedPath(lang, routes.publicProfile[lang] + '/' + handle + '/');
+const profileHref = publicProfileHref(getLocalizedPath(lang, routes.publicProfile[lang]), handle);
 
 function relativeTime(iso: string | null): string {
   if (!iso) return '—';

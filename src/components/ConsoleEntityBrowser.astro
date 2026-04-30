@@ -1,0 +1,124 @@
+---
+/**
+ * ConsoleEntityBrowser — shared static skeleton consumed by every PR16
+ * entity browser tab (Identifications, Notifications, Media, Follows,
+ * Watchlists, Projects). The runtime (src/lib/entity-browser.ts) wires
+ * filter form → server-side query → paginated table → drill-down.
+ *
+ * Each per-entity view emits this skeleton with a unique `prefix`,
+ * declares its column + filter set, and instantiates EntityBrowser in
+ * its own <script>. See the per-entity *View.astro files for the
+ * canonical pattern.
+ *
+ * IDs in the skeleton are suffixed `${prefix}-…` so two browsers can
+ * coexist on a single page (e.g. for v1.1 split-views).
+ */
+import { t } from '../i18n/utils';
+
+interface FilterDef {
+  key: string;
+  kind: 'text' | 'select' | 'date' | 'autocomplete' | 'segmented';
+  label: string;
+  placeholder?: string;
+  options?: Array<{ value: string; label: string }>;
+}
+
+interface ColumnDef {
+  key: string;
+  label: string;
+  align?: 'left' | 'right';
+}
+
+interface Props {
+  lang: 'en' | 'es';
+  prefix: string;
+  /** Heading + subtitle for the page */
+  title: string;
+  description: string;
+  filters: FilterDef[];
+  columns: ColumnDef[];
+  /** Whether to render the drill-down toggle column */
+  hasDrilldown?: boolean;
+}
+
+const { lang, prefix, title, description, filters, columns, hasDrilldown = true } = Astro.props;
+const tr = t(lang);
+const eb = (tr.console as unknown as Record<string, Record<string, unknown> | string>).entityBrowser as
+  unknown as Record<string, string>;
+const labelClear = (eb?.clearFilters as string) ?? 'Clear filters';
+const labelEmpty = (eb?.empty as string) ?? 'No rows match the current filter set.';
+const labelLoading = (eb?.loading as string) ?? 'Loading…';
+const labelPrev = (eb?.prev as string) ?? 'Prev';
+const labelNext = (eb?.next as string) ?? 'Next';
+const labelDrill = (eb?.expand as string) ?? 'Expand row';
+const labelAny = (eb?.anyOption as string) ?? '— any —';
+---
+
+<section class="max-w-6xl space-y-4">
+  <header class="flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <h1 class="text-xl font-semibold mb-1">{title}</h1>
+      <p class="text-sm text-zinc-500 dark:text-zinc-400 max-w-3xl">{description}</p>
+    </div>
+  </header>
+
+  <div id={`${prefix}-not-auth`} class="hidden rounded border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-900 dark:text-amber-100">
+    {tr.console.not_authorized}
+  </div>
+
+  <div id={`${prefix}-shell`} class="hidden space-y-4">
+    <form id={`${prefix}-filters`} class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end rounded border border-zinc-200 dark:border-zinc-800 p-3 bg-white dark:bg-zinc-950" role="search" onsubmit="return false">
+      {filters.map(f => (
+        <label class="block text-sm">
+          <span class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{f.label}</span>
+          {f.kind === 'select' ? (
+            <select id={`${prefix}-f-${f.key}`} class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm">
+              <option value="">{labelAny}</option>
+              {(f.options ?? []).map(o => <option value={o.value}>{o.label}</option>)}
+            </select>
+          ) : f.kind === 'date' ? (
+            <input id={`${prefix}-f-${f.key}`} type="date" class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm" />
+          ) : (
+            <input id={`${prefix}-f-${f.key}`} type="search" placeholder={f.placeholder ?? ''} class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm" />
+          )}
+        </label>
+      ))}
+      <div class="sm:col-span-2 lg:col-span-4 flex items-center justify-between gap-2 pt-1 border-t border-zinc-100 dark:border-zinc-800">
+        <button id={`${prefix}-clear`} type="reset" class="px-2.5 py-1 rounded text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800">{labelClear}</button>
+        <div class="flex items-center gap-2">
+          <span id={`${prefix}-pagination-summary`} class="text-xs text-zinc-500 dark:text-zinc-400" aria-live="polite"></span>
+          <button id={`${prefix}-prev`} type="button" class="px-2.5 py-1 rounded text-xs border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed" disabled>{labelPrev}</button>
+          <button id={`${prefix}-next`} type="button" class="px-2.5 py-1 rounded text-xs border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed" disabled>{labelNext}</button>
+        </div>
+      </div>
+    </form>
+
+    <p id={`${prefix}-error`} class="hidden rounded border border-red-300 dark:border-red-700/60 bg-red-50 dark:bg-red-900/20 p-2 text-sm text-red-700 dark:text-red-300" role="alert"></p>
+
+    <div id={`${prefix}-skeleton`} class="space-y-2" aria-busy="true" aria-label={labelLoading}>
+      <div class="h-9 rounded bg-zinc-100 dark:bg-zinc-900 animate-pulse"></div>
+      <div class="h-9 rounded bg-zinc-100 dark:bg-zinc-900 animate-pulse"></div>
+      <div class="h-9 rounded bg-zinc-100 dark:bg-zinc-900 animate-pulse"></div>
+      <div class="h-9 rounded bg-zinc-100 dark:bg-zinc-900 animate-pulse"></div>
+      <div class="h-9 rounded bg-zinc-100 dark:bg-zinc-900 animate-pulse"></div>
+    </div>
+
+    <div id={`${prefix}-empty`} class="hidden rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700/60 bg-zinc-50/40 dark:bg-zinc-900/10 p-8 text-center">
+      <p class="text-sm text-zinc-700 dark:text-zinc-200">{labelEmpty}</p>
+    </div>
+
+    <div id={`${prefix}-rows`} class="hidden overflow-x-auto rounded border border-zinc-200 dark:border-zinc-800">
+      <table class="min-w-full text-sm">
+        <thead class="sticky top-0 z-10 bg-zinc-50 dark:bg-zinc-900/40 text-left text-xs uppercase tracking-wide text-zinc-500 backdrop-blur">
+          <tr>
+            {columns.map(c => (
+              <th class={`px-3 py-2 ${c.align === 'right' ? 'text-right' : ''}`}>{c.label}</th>
+            ))}
+            {hasDrilldown && <th class="px-3 py-2 text-right" aria-label={labelDrill}>·</th>}
+          </tr>
+        </thead>
+        <tbody id={`${prefix}-tbody`} class="divide-y divide-zinc-100 dark:divide-zinc-800"></tbody>
+      </table>
+    </div>
+  </div>
+</section>

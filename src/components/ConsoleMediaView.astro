@@ -1,0 +1,225 @@
+---
+/**
+ * ConsoleMediaView — admin entity browser over public.media_files.
+ *
+ * Read-only. Filters: media type, deletion state, observation_id. Drill-down
+ * shows full preview + R2 URL + EXIF if present. Thumbnails use loading="lazy"
+ * (CLAUDE.md hard rule for below-fold images).
+ */
+import { t } from '../i18n/utils';
+import ConsoleEntityBrowser from './ConsoleEntityBrowser.astro';
+
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+const v = (tr.console as unknown as Record<string, Record<string, string> | string>).mediaView as
+  unknown as Record<string, string>;
+
+const labels = {
+  title: v?.title ?? 'Media',
+  description: v?.description ?? '',
+  filterType: v?.filterType ?? 'Type',
+  filterState: v?.filterState ?? 'State',
+  filterObservation: v?.filterObservation ?? 'Observation',
+  stateActive: v?.stateActive ?? 'Active',
+  stateDeleted: v?.stateDeleted ?? 'Deleted',
+  stateAll: v?.stateAll ?? 'All',
+  typePhoto: v?.typePhoto ?? 'Photo',
+  typeAudio: v?.typeAudio ?? 'Audio',
+  typeVideo: v?.typeVideo ?? 'Video',
+  colCreated: v?.colCreated ?? 'Created',
+  colThumb: v?.colThumb ?? 'Thumb',
+  colObservation: v?.colObservation ?? 'Observation',
+  colMime: v?.colMime ?? 'MIME',
+  colSize: v?.colSize ?? 'Size',
+  colState: v?.colState ?? 'State',
+  drillR2Url: v?.drillR2Url ?? 'R2 URL',
+};
+---
+
+<ConsoleEntityBrowser
+  lang={lang}
+  prefix="med"
+  title={labels.title}
+  description={labels.description}
+  filters={[
+    { key: 'type',  kind: 'select', label: labels.filterType, options: [
+      { value: 'photo', label: labels.typePhoto },
+      { value: 'audio', label: labels.typeAudio },
+      { value: 'video', label: labels.typeVideo },
+    ] },
+    { key: 'state', kind: 'select', label: labels.filterState, options: [
+      { value: 'active',  label: labels.stateActive },
+      { value: 'deleted', label: labels.stateDeleted },
+    ] },
+    { key: 'obs',   kind: 'text',   label: labels.filterObservation, placeholder: 'uuid' },
+  ]}
+  columns={[
+    { key: 'created_at',  label: labels.colCreated },
+    { key: 'thumb',       label: labels.colThumb },
+    { key: 'observation', label: labels.colObservation },
+    { key: 'mime',        label: labels.colMime },
+    { key: 'size',        label: labels.colSize, align: 'right' },
+    { key: 'state',       label: labels.colState },
+  ]}
+/>
+
+<div id="med-config" class="hidden" data-lang={lang} data-r2={labels.drillR2Url}></div>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { getUserRoles } from '../lib/user-roles';
+  import {
+    EntityBrowser,
+    filterPredicates,
+    fmtTs,
+    fmtBytes,
+    type FilterSpec,
+    type ColumnSpec,
+    type SupabaseQuery,
+  } from '../lib/entity-browser';
+  import { escapeHtml } from '../lib/escape';
+
+  type Row = {
+    id: string;
+    created_at: string;
+    observation_id: string;
+    media_type: 'photo' | 'audio' | 'video';
+    url: string;
+    thumbnail_url: string | null;
+    mime_type: string | null;
+    file_size_bytes: number | null;
+    deleted_at: string | null;
+    exif_data: Record<string, unknown> | null;
+  };
+
+  const cfgEl = document.getElementById('med-config');
+  const langAttr = (cfgEl?.dataset.lang === 'es' ? 'es' : 'en') as 'en' | 'es';
+  const labelR2 = cfgEl?.dataset.r2 ?? 'R2 URL';
+
+  const filters: FilterSpec[] = [
+    {
+      key: 'type',
+      label: 'Type',
+      kind: 'select',
+      apply: filterPredicates.eq('media_type'),
+    },
+    {
+      key: 'state',
+      label: 'State',
+      kind: 'select',
+      apply: (q: SupabaseQuery, v: string) =>
+        v === 'active' ? q.is('deleted_at', null) : q.not('deleted_at', 'is', null),
+    },
+    {
+      key: 'obs',
+      label: 'Observation',
+      kind: 'text',
+      apply: filterPredicates.eq('observation_id'),
+    },
+  ];
+
+  const columns: ColumnSpec<Row>[] = [
+    {
+      key: 'created_at',
+      label: 'Created',
+      cellClass: 'whitespace-nowrap font-mono text-[11px] text-zinc-500',
+      render: r => escapeHtml(fmtTs(r.created_at)),
+    },
+    {
+      key: 'thumb',
+      label: 'Thumb',
+      render: r => {
+        if (r.media_type !== 'photo') {
+          const icon = r.media_type === 'audio' ? '🎵' : '🎞️';
+          return `<span class="inline-flex items-center justify-center w-12 h-12 rounded bg-zinc-100 dark:bg-zinc-800 text-base">${icon}</span>`;
+        }
+        const src = r.thumbnail_url ?? r.url;
+        return `<img src="${escapeHtml(src)}" alt="" loading="lazy" decoding="async" class="w-12 h-12 rounded object-cover bg-zinc-100 dark:bg-zinc-800" onerror="this.style.opacity=0.3;this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2248%22 height=%2248%22><rect width=%2248%22 height=%2248%22 fill=%22%23ddd%22/></svg>'" />`;
+      },
+    },
+    {
+      key: 'observation',
+      label: 'Observation',
+      render: r =>
+        `<a href="/share/obs/?id=${encodeURIComponent(r.observation_id)}" class="text-emerald-700 dark:text-emerald-400 hover:underline font-mono text-[10px]" target="_blank" rel="noopener">${escapeHtml(r.observation_id.slice(0, 8))}…</a>`,
+    },
+    {
+      key: 'mime',
+      label: 'MIME',
+      render: r =>
+        r.mime_type
+          ? `<code class="text-[10px] rounded bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5">${escapeHtml(r.mime_type)}</code>`
+          : '<span class="text-zinc-400">—</span>',
+    },
+    {
+      key: 'size',
+      label: 'Size',
+      align: 'right',
+      cellClass: 'whitespace-nowrap font-mono text-[11px] text-zinc-700 dark:text-zinc-300',
+      render: r => escapeHtml(fmtBytes(r.file_size_bytes)),
+    },
+    {
+      key: 'state',
+      label: 'State',
+      render: r =>
+        r.deleted_at
+          ? '<span class="inline-flex items-center rounded-full bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 px-2 py-0.5 text-[11px]">deleted</span>'
+          : '<span class="inline-flex items-center rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 px-2 py-0.5 text-[11px]">active</span>',
+    },
+  ];
+
+  function renderDrilldown(r: Row): string {
+    const json = JSON.stringify(r, null, 2);
+    const previewBlock =
+      r.media_type === 'photo'
+        ? `<img src="${escapeHtml(r.url)}" alt="" loading="lazy" decoding="async" class="max-w-md max-h-64 rounded border border-zinc-200 dark:border-zinc-800 mb-2" />`
+        : '';
+    return `<div class="space-y-2">
+      ${previewBlock}
+      <p class="text-[11px]"><span class="font-medium text-zinc-700 dark:text-zinc-300">${escapeHtml(labelR2)}:</span> <a href="${escapeHtml(r.url)}" target="_blank" rel="noopener" class="text-emerald-700 dark:text-emerald-400 hover:underline break-all font-mono text-[10px]">${escapeHtml(r.url)}</a></p>
+      <pre class="whitespace-pre-wrap break-all rounded bg-white dark:bg-zinc-950 px-2 py-1 text-[10px] text-zinc-600 dark:text-zinc-400 max-h-60 overflow-y-auto">${escapeHtml(json)}</pre>
+    </div>`;
+  }
+
+  async function init(): Promise<void> {
+    const supabase = getSupabase();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      document.getElementById('med-skeleton')?.classList.add('hidden');
+      document.getElementById('med-not-auth')?.classList.remove('hidden');
+      return;
+    }
+    const myRoles = await getUserRoles(session.user.id);
+    if (!myRoles.has('admin')) {
+      document.getElementById('med-skeleton')?.classList.add('hidden');
+      document.getElementById('med-not-auth')?.classList.remove('hidden');
+      return;
+    }
+    document.getElementById('med-shell')?.classList.remove('hidden');
+
+    const browser = new EntityBrowser<Row>({
+      prefix: 'med',
+      tableName: 'media_files',
+      selectClause:
+        'id, created_at, observation_id, media_type, url, thumbnail_url, mime_type, file_size_bytes, deleted_at, exif_data',
+      orderBy: 'created_at',
+      columns,
+      filters,
+      renderDrilldown,
+      emptyText: '',
+      loadingText: '',
+      lang: langAttr,
+    });
+    await browser.init();
+  }
+
+  init().catch(err => {
+    document.getElementById('med-skeleton')?.classList.add('hidden');
+    const errEl = document.getElementById('med-error');
+    if (errEl) {
+      errEl.textContent = (err as Error).message;
+      errEl.classList.remove('hidden');
+    }
+  });
+</script>

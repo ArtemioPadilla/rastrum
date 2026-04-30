@@ -3,7 +3,7 @@
 > Briefing for AI coding agents (Claude Code, Copilot, Cursor, Codex, …)
 > working in this repo. Read this before making changes.
 >
-> **Last full doc sync:** 2026-04-30 (v1.2 — research workflow M29/M30/M31, multi-provider vision + pool M32).
+> **Last full doc sync:** 2026-04-30 (v1.2 — research workflow M29/M30/M31, multi-provider vision + pool M32, plus all v1.1 follow-ups #152/#153/#154/#155/#156/#157/#158/#159).
 
 ---
 
@@ -27,7 +27,8 @@ Bilingual EN/ES from day one.
 |---|---|
 | [`docs/progress.json`](docs/progress.json)              | Source of truth for the roadmap. Bilingual labels (`_es` suffix). |
 | [`docs/tasks.json`](docs/tasks.json) + [`docs/tasks.md`](docs/tasks.md) | Per-roadmap-item subtask breakdown. Check current status before starting work. |
-| [`docs/specs/modules/00-index.md`](docs/specs/modules/00-index.md) | Catalog of ~29 module specs. Each module has its own design doc. |
+| [`docs/specs/modules/00-index.md`](docs/specs/modules/00-index.md) | Catalog of ~34 module specs. Each module has its own design doc. |
+| [`docs/runbooks/00-index.md`](docs/runbooks/00-index.md) | Operator runbook index (admin console, research workflow, ops hygiene). |
 | [`docs/architecture.md`](docs/architecture.md)            | High-level architecture diagram + critical-path flows. |
 | [`docs/specs/infra/supabase-schema.sql`](docs/specs/infra/supabase-schema.sql) | Idempotent SQL — apply with `make db-apply`. |
 | `Makefile`                                                | Run `make help` to see every dev workflow. |
@@ -41,7 +42,7 @@ make help                     # list every target with descriptions
 make install                  # npm ci
 make dev                      # astro dev — http://localhost:4321
 make build                    # static build into dist/
-make test                     # vitest run (~465 tests today)
+make test                     # vitest run (~680 tests today)
 make typecheck                # tsc --noEmit
 make db-apply                 # apply supabase-schema.sql (idempotent)
 make db-verify                # show tables, RLS, triggers, extensions
@@ -287,7 +288,7 @@ Full design rationale: `docs/superpowers/specs/2026-04-28-social-features-design
 
 The `'console'` chrome mode (third value of `ChromeMode`) renders the
 admin / moderator / expert dashboard at `/{en,es}/{console,consola}/*`.
-Three load-bearing rules:
+Four load-bearing rules:
 
 1. **`console-tabs.ts` is the single source of truth.** Sidebar, role
    pills, and the route table are pure projections. Adding a tab = one
@@ -300,6 +301,17 @@ Three load-bearing rules:
    `users.is_expert` for new privilege checks — that's a denormalised
    cache for the consensus hot-path. Use `has_role()` in any new
    policy that gates console-relevant data.
+4. **Every `/console/*` and `/consola/*` page MUST be wrapped in
+   `ConsoleLayout`, never `BaseLayout` directly.** The chrome (sidebar +
+   role pills + keybindings) is part of the console contract; without
+   it the page renders as orphaned content with the public site
+   header/footer. ConsoleLayout server-renders all three role tab lists
+   (under `<ul data-role="admin|moderator|expert">`) and pills (with
+   `data-console-pill`) initially hidden; a client script in the layout
+   reads `getUserRoles(user.id)` and reveals the right ones after auth
+   resolves. BaseLayout emits a `console.warn` at build time if a
+   console-prefixed path slips through to it — treat any such warning
+   as a regression.
 
 The `console` accent rail uses slate-500 (top header pill, sidebar active
 state). The classes are safelisted in `tailwind.config.mjs`; adding a
@@ -308,9 +320,11 @@ production builds will purge it.
 
 Bootstrap docs: `docs/runbooks/admin-bootstrap.md`. Role model:
 `docs/runbooks/role-model.md`. Audit log: `docs/runbooks/admin-audit.md`.
-Per-action runbook: `docs/runbooks/admin-ops.md`.
+Per-action runbook: `docs/runbooks/admin-ops.md`. Chrome-rendering
+invariant (sidebar / role pills / `ConsoleLayout`):
+`docs/runbooks/admin-chrome-rendering.md`.
 
-**Status:** 28 of 32 console tabs functional, 36 admin Edge Function handlers deployed, all admin write affordances live, CORS tightened to rastrum.org + dev/preview ports, token-bucket rate limit + pgTAP RLS suite enforced in CI. PR12 (observability) added Anomalies + Forensics tabs backed by hourly `detect_admin_anomalies()` cron, weekly `compute_admin_health_digest()` snapshot, and a structured `function_errors` sink wired into the dispatcher. PR13 (future-proofing) added Proposals + Webhooks tabs, time-bounded role grants (`expires_at` + daily `auto_revoke_expired_roles()` cron), a two-person-rule `admin_action_proposals` table with hourly expiry sweep, HMAC-SHA256 outbound webhook signing (`dispatch_admin_webhooks()`), and a v1 placeholder `compute_moderator_trust_score()` primitive. PR14 (deferred cleanup) closed the v1.1 follow-ups: per-admin timezone for the off_hours rule (`users.timezone`), webhook replay protection (`_meta` envelope + nonce + reconcile cron writing back async `pg_net` status_code), the real moderator trust score formula (anomaly + overturn + active-days + recency, clamped 0–100), the dispatcher-level `enforce_two_person_irreversible` enforcement gate (feature flag-gated), and the "Require approval (two-person rule)" toggle on irreversible slide-overs. PR15 (observability UI) shipped `/console/health/` (weekly-digest hero card with directional Δ pills + 12-week sparklines, manual `health.recompute`), `/console/errors/` (function_errors browser with severity-coloured pills + URL-driven filters + auto-refresh + single + bulk ack via `error.acknowledge[_bulk]`), and per-webhook deliveries drilldown on `/console/webhooks/` with click-to-replay (`webhook.replay_delivery`) + nonce copy. Deferred stubs (no concrete users): License disputes, Identification overrides, Taxon notes, Bioblitz.
+**Status:** 36 of 39 console tabs functional, 36 admin Edge Function handlers deployed, all admin write affordances live, CORS tightened to rastrum.org + dev/preview ports, token-bucket rate limit + pgTAP RLS suite enforced in CI. PR12 (observability) added Anomalies + Forensics tabs backed by hourly `detect_admin_anomalies()` cron, weekly `compute_admin_health_digest()` snapshot, and a structured `function_errors` sink wired into the dispatcher. PR13 (future-proofing) added Proposals + Webhooks tabs, time-bounded role grants (`expires_at` + daily `auto_revoke_expired_roles()` cron), a two-person-rule `admin_action_proposals` table with hourly expiry sweep, HMAC-SHA256 outbound webhook signing (`dispatch_admin_webhooks()`), and a v1 placeholder `compute_moderator_trust_score()` primitive. PR14 (deferred cleanup) closed the v1.1 follow-ups: per-admin timezone for the off_hours rule (`users.timezone`), webhook replay protection (`_meta` envelope + nonce + reconcile cron writing back async `pg_net` status_code), the real moderator trust score formula (anomaly + overturn + active-days + recency, clamped 0–100), the dispatcher-level `enforce_two_person_irreversible` enforcement gate (feature flag-gated), and the "Require approval (two-person rule)" toggle on irreversible slide-overs. PR15 (observability UI) shipped `/console/health/` (weekly-digest hero card with directional Δ pills + 12-week sparklines, manual `health.recompute`), `/console/errors/` (function_errors browser with severity-coloured pills + URL-driven filters + auto-refresh + single + bulk ack via `error.acknowledge[_bulk]`), and per-webhook deliveries drilldown on `/console/webhooks/` with click-to-replay (`webhook.replay_delivery`) + nonce copy. PR16 (entity browsers) shipped seven read-only paginated browsers — Identifications, Notifications, Media, Follows, Watchlists, Projects, Taxon changes — built on a shared `ConsoleEntityBrowser.astro` template + `src/lib/entity-browser.ts` runtime. Server-side paginated (50/page), URL-driven filter state, lazy FK lookups, auto-populated dropdown facets; runbook at `docs/runbooks/admin-entity-browsers.md`. Deferred stubs (no concrete users): License disputes, Identification overrides, Taxon notes, Bioblitz.
 
 ### Onboarding events + CI smoke
 
@@ -347,7 +361,7 @@ URL params.
 Three load-bearing rules:
 
 1. **Privacy gate at the SQL layer.** Two views with the same
-   eligibility predicate (`profile_public AND NOT hide_from_leaderboards`):
+   eligibility predicate (`hide_from_leaderboards = false`):
    `community_observers` (anon + authenticated, no centroid) and
    `community_observers_with_centroid` (authenticated only, includes
    centroid). The lack of `GRANT TO anon` on the centroid view is the
@@ -363,6 +377,14 @@ Three load-bearing rules:
    cron sets `country_code` from `region_primary` only when NULL;
    Profile → Edit save flips `country_code_source` to `'user'`. Badge
    shows in the picker when `source='auto' AND country_code IS NOT NULL`.
+4. **GPS coords for "Use my location" Nearby live in `sessionStorage`
+   only — NEVER the URL querystring.** Putting them in `?lat=…&lng=…`
+   would leak via the `Referer` header and the browser's history. The
+   storage key is `rastrum.community.gps`; cleared on tab close. The
+   `community_observers_nearby_at(lat, lng, …)` RPC takes coords
+   per-call, never persisting server-side. Regression guard:
+   `tests/unit/community-url.test.ts` asserts the serializer drops
+   any `lat`/`lng`/`gps` keys.
 
 Cron + manual fire: [`docs/runbooks/community-discovery.md`](docs/runbooks/community-discovery.md).
 
@@ -461,8 +483,12 @@ indices like RAI / detection-rate-per-100-trap-nights need to know
   counts. NULL `end_date` is counted up to `current_date` (or
   `p_to`).
 
-UI is a v1.1 follow-up; until then, create stations via SQL (see
-runbook).
+Create-station UI shipped on the project-detail page (PR #213) —
+`/{en,es}/projects/detail/?slug=<slug>` shows a Camera stations
+section with Add station + inline trap-night counts. CLI also
+takes `--project-slug --station-key` for batch tagging at import
+time (PR #208 / issue #156). Period editor + per-station
+detection-rate dashboard remain v1.1 follow-ups.
 
 Spec: [`docs/specs/modules/31-camera-stations.md`](docs/specs/modules/31-camera-stations.md).
 Runbook: [`docs/runbooks/camera-stations.md`](docs/runbooks/camera-stations.md).
@@ -496,8 +522,12 @@ Three load-bearing rules:
 Resolution order: BYO key → personal sponsorship → platform pool →
 skip Claude (PlantNet only).
 
-UI for credential creation + pool donation is a v1.1 follow-up;
-until then, register credentials via Supabase Vault + SQL.
+UI shipped 2026-04-30 in `SponsoringView` (PR #215 / issue #152) —
+provider radio (7 kinds, auto-detected from secret prefix) + model
+field + conditional endpoint field for Azure/Bedrock/Vertex, plus
+a "Donate to platform pool" section with progress bar +
+Pause/Resume. Vertex AI tokens auto-rotate via service-account JWT
+(PR #209 / issue #155). Pool maintenance crons live (#207).
 
 Spec: [`docs/specs/modules/32-multi-provider-vision.md`](docs/specs/modules/32-multi-provider-vision.md).
 Runbooks: [`docs/runbooks/multi-provider-vision.md`](docs/runbooks/multi-provider-vision.md),
@@ -625,8 +655,8 @@ The validate gate is the fix.
 
 ```bash
 npm run typecheck   # tsc --noEmit, zero errors
-npm run test        # vitest run — ~465 tests today, all green
-npm run build       # zero errors, 57 pages today, EN/ES paired
+npm run test        # vitest run — ~680 tests today, all green
+npm run build       # zero errors, ~186 pages today, EN/ES paired
 git status -s       # nothing untracked except .claude/ or .env.local
 ```
 

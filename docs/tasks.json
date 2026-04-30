@@ -1220,7 +1220,7 @@
         }
       ]
     },
-    "bioblitz-events": {
+    "bioblitz-events-schema": {
       "phase": "v1.0",
       "title_en": "Events table + RLS (schema)",
       "title_es": "Tabla de eventos + RLS (esquema)",
@@ -3935,226 +3935,773 @@
       "phase": "v1.1",
       "title_en": "Admin/Moderator/Expert console — PR2 (Users + Credentials tabs, role grants UI)",
       "title_es": "Consola — PR2 (Usuarios + Credenciales, UI de roles)",
-      "modules": ["24-admin-console.md"],
+      "modules": [
+        "24-admin-console.md"
+      ],
       "subtasks": [
-        { "label_en": "ConsoleUsersView: search, role chips, grant/revoke slide-over", "label_es": "ConsoleUsersView: búsqueda, chips de rol, slide-over conceder/revocar", "status": "done" },
-        { "label_en": "ConsoleCredentialsView: researcher role grants with notes field", "label_es": "ConsoleCredentialsView: conceder rol de investigador con notas", "status": "done" },
-        { "label_en": "Expert console tabs declared (5 tabs, all stub initially)", "label_es": "Tabs de experto declarados (5 tabs, todos stub inicialmente)", "status": "done" },
-        { "label_en": "Role pill + sidebar routing for moderator + expert", "label_es": "Pill de rol + enrutamiento de sidebar para moderador + experto", "status": "done" },
-        { "label_en": "E2E smoke for users + credentials not-auth banners", "label_es": "E2E smoke para banners de no-auth en usuarios + credenciales", "status": "done" }
+        {
+          "label_en": "ConsoleUsersView: search, role chips, grant/revoke slide-over",
+          "label_es": "ConsoleUsersView: búsqueda, chips de rol, slide-over conceder/revocar",
+          "status": "done"
+        },
+        {
+          "label_en": "ConsoleCredentialsView: researcher role grants with notes field",
+          "label_es": "ConsoleCredentialsView: conceder rol de investigador con notas",
+          "status": "done"
+        },
+        {
+          "label_en": "Expert console tabs declared (5 tabs, all stub initially)",
+          "label_es": "Tabs de experto declarados (5 tabs, todos stub inicialmente)",
+          "status": "done"
+        },
+        {
+          "label_en": "Role pill + sidebar routing for moderator + expert",
+          "label_es": "Pill de rol + enrutamiento de sidebar para moderador + experto",
+          "status": "done"
+        },
+        {
+          "label_en": "E2E smoke for users + credentials not-auth banners",
+          "label_es": "E2E smoke para banners de no-auth en usuarios + credenciales",
+          "status": "done"
+        }
       ]
     },
     "admin-console-pr3-ops-tabs": {
       "phase": "v1.1",
       "title_en": "Admin console — PR3 (Sync + API + Cron read-only ops tabs)",
       "title_es": "Consola admin — PR3 (Sync + API + Cron, ops read-only)",
-      "modules": ["24-admin-console.md"],
+      "modules": [
+        "24-admin-console.md"
+      ],
       "subtasks": [
-        { "label_en": "ConsoleSyncFailuresView: error groups table with 7-day filter", "label_es": "ConsoleSyncFailuresView: tabla de grupos de error con filtro de 7 días", "status": "done" },
-        { "label_en": "ConsoleApiQuotasView: daily quota burn-down + 30-day chart", "label_es": "ConsoleApiQuotasView: consumo de cuota diaria + gráfico 30 días", "status": "done" },
-        { "label_en": "ConsoleCronRunsView: pg_cron job status table", "label_es": "ConsoleCronRunsView: tabla de estado de jobs pg_cron", "status": "done" },
-        { "label_en": "Moderator console foundation: ConsoleModOverviewView + 4 tabs", "label_es": "Base de consola moderador: ConsoleModOverviewView + 4 tabs", "status": "done" },
-        { "label_en": "E2E smoke for sync + api + cron not-auth banners", "label_es": "E2E smoke para banners de no-auth en sync + api + cron", "status": "done" }
+        {
+          "label_en": "ConsoleSyncFailuresView: error groups table with 7-day filter",
+          "label_es": "ConsoleSyncFailuresView: tabla de grupos de error con filtro de 7 días",
+          "status": "done"
+        },
+        {
+          "label_en": "ConsoleApiQuotasView: daily quota burn-down + 30-day chart",
+          "label_es": "ConsoleApiQuotasView: consumo de cuota diaria + gráfico 30 días",
+          "status": "done"
+        },
+        {
+          "label_en": "ConsoleCronRunsView: pg_cron job status table",
+          "label_es": "ConsoleCronRunsView: tabla de estado de jobs pg_cron",
+          "status": "done"
+        },
+        {
+          "label_en": "Moderator console foundation: ConsoleModOverviewView + 4 tabs",
+          "label_es": "Base de consola moderador: ConsoleModOverviewView + 4 tabs",
+          "status": "done"
+        },
+        {
+          "label_en": "E2E smoke for sync + api + cron not-auth banners",
+          "label_es": "E2E smoke para banners de no-auth en sync + api + cron",
+          "status": "done"
+        }
       ]
     },
     "admin-console-pr4-observations": {
       "phase": "v1.1",
       "title_en": "Admin console — PR4 (Observations admin tab + 4 obs handlers)",
       "title_es": "Consola admin — PR4 (Observaciones + 4 handlers)",
-      "modules": ["24-admin-console.md"],
+      "modules": [
+        "24-admin-console.md"
+      ],
       "subtasks": [
-        { "label_en": "ConsoleObservationsView: global obs table with hide/obscure/license chips", "label_es": "ConsoleObservationsView: tabla global de obs con chips ocultar/obscurecer/licencia", "status": "done" },
-        { "label_en": "Handler: observation.hide + observation.unhide", "label_es": "Handler: observation.hide + observation.unhide", "status": "done" },
-        { "label_en": "Handler: observation.obscure + observation.license_override", "label_es": "Handler: observation.obscure + observation.license_override", "status": "done" },
-        { "label_en": "obs_public_read RLS excludes hidden observations", "label_es": "RLS obs_public_read excluye observaciones ocultas", "status": "done" },
-        { "label_en": "E2E smoke for observations not-auth banner", "label_es": "E2E smoke para banner de no-auth en observaciones", "status": "done" }
+        {
+          "label_en": "ConsoleObservationsView: global obs table with hide/obscure/license chips",
+          "label_es": "ConsoleObservationsView: tabla global de obs con chips ocultar/obscurecer/licencia",
+          "status": "done"
+        },
+        {
+          "label_en": "Handler: observation.hide + observation.unhide",
+          "label_es": "Handler: observation.hide + observation.unhide",
+          "status": "done"
+        },
+        {
+          "label_en": "Handler: observation.obscure + observation.license_override",
+          "label_es": "Handler: observation.obscure + observation.license_override",
+          "status": "done"
+        },
+        {
+          "label_en": "obs_public_read RLS excludes hidden observations",
+          "label_es": "RLS obs_public_read excluye observaciones ocultas",
+          "status": "done"
+        },
+        {
+          "label_en": "E2E smoke for observations not-auth banner",
+          "label_es": "E2E smoke para banner de no-auth en observaciones",
+          "status": "done"
+        }
       ]
     },
     "admin-console-pr5-moderator": {
       "phase": "v1.1",
       "title_en": "Console — PR5 (Moderator console: Flag queue, Comments, Soft-bans + 9 handlers)",
       "title_es": "Consola — PR5 (Consola de moderador: Cola, Comentarios, Suspensiones + 9 handlers)",
-      "modules": ["24-admin-console.md"],
+      "modules": [
+        "24-admin-console.md"
+      ],
       "subtasks": [
-        { "label_en": "ConsoleFlagQueueView: report triage/resolve/dismiss with slide-over", "label_es": "ConsoleFlagQueueView: triage/resolver/desestimar reportes con slide-over", "status": "done" },
-        { "label_en": "ConsoleCommentsView: hide/unhide/lock/unlock comments", "label_es": "ConsoleCommentsView: ocultar/mostrar/bloquear/desbloquear comentarios", "status": "done" },
-        { "label_en": "ConsoleBansView: issue + lift soft-bans", "label_es": "ConsoleBansView: emitir + levantar suspensiones", "status": "done" },
-        { "label_en": "Handlers: report.triage/resolve/dismiss (3)", "label_es": "Handlers: report.triage/resolve/dismiss (3)", "status": "done" },
-        { "label_en": "Handlers: comment.hide/unhide/lock/unlock (4)", "label_es": "Handlers: comment.hide/unhide/lock/unlock (4)", "status": "done" },
-        { "label_en": "Handlers: user.ban + user.unban (2)", "label_es": "Handlers: user.ban + user.unban (2)", "status": "done" },
-        { "label_en": "E2E smoke for flag-queue + comments + bans not-auth banners", "label_es": "E2E smoke para banners de no-auth en cola + comentarios + suspensiones", "status": "done" }
+        {
+          "label_en": "ConsoleFlagQueueView: report triage/resolve/dismiss with slide-over",
+          "label_es": "ConsoleFlagQueueView: triage/resolver/desestimar reportes con slide-over",
+          "status": "done"
+        },
+        {
+          "label_en": "ConsoleCommentsView: hide/unhide/lock/unlock comments",
+          "label_es": "ConsoleCommentsView: ocultar/mostrar/bloquear/desbloquear comentarios",
+          "status": "done"
+        },
+        {
+          "label_en": "ConsoleBansView: issue + lift soft-bans",
+          "label_es": "ConsoleBansView: emitir + levantar suspensiones",
+          "status": "done"
+        },
+        {
+          "label_en": "Handlers: report.triage/resolve/dismiss (3)",
+          "label_es": "Handlers: report.triage/resolve/dismiss (3)",
+          "status": "done"
+        },
+        {
+          "label_en": "Handlers: comment.hide/unhide/lock/unlock (4)",
+          "label_es": "Handlers: comment.hide/unhide/lock/unlock (4)",
+          "status": "done"
+        },
+        {
+          "label_en": "Handlers: user.ban + user.unban (2)",
+          "label_es": "Handlers: user.ban + user.unban (2)",
+          "status": "done"
+        },
+        {
+          "label_en": "E2E smoke for flag-queue + comments + bans not-auth banners",
+          "label_es": "E2E smoke para banners de no-auth en cola + comentarios + suspensiones",
+          "status": "done"
+        }
       ]
     },
     "admin-console-pr6-expert": {
       "phase": "v1.1",
       "title_en": "Console — PR6 (Expert console: Overview, Validation queue, Your expertise)",
       "title_es": "Consola — PR6 (Consola de experto: Resumen, Cola de validación, Tu experiencia)",
-      "modules": ["24-admin-console.md"],
+      "modules": [
+        "24-admin-console.md"
+      ],
       "subtasks": [
-        { "label_en": "ConsoleExpertOverviewView: KPI counters + action items + recent contributions", "label_es": "ConsoleExpertOverviewView: contadores KPI + items de acción + contribuciones recientes", "status": "done" },
-        { "label_en": "ConsoleExpertValidationView: queue table filtered to expert_taxa + all-taxa toggle", "label_es": "ConsoleExpertValidationView: tabla de cola filtrada a expert_taxa + toggle todos los taxa", "status": "done" },
-        { "label_en": "ConsoleExpertExpertiseView: per-taxon scores + search/filter + SVG kingdom chart", "label_es": "ConsoleExpertExpertiseView: puntajes por taxón + búsqueda/filtro + gráfico SVG por reino", "status": "done" },
-        { "label_en": "Stub: ConsoleExpertOverridesView + ConsoleExpertTaxonNotesView", "label_es": "Stub: ConsoleExpertOverridesView + ConsoleExpertTaxonNotesView", "status": "done" },
-        { "label_en": "8 new EN/ES route pages + expert dispatch on /console/ root", "label_es": "8 nuevas páginas de ruta EN/ES + dispatch de experto en raíz /consola/", "status": "done" },
-        { "label_en": "Remove stub flag from 3 functional expert tabs in console-tabs.ts", "label_es": "Eliminar flag stub de 3 tabs funcionales de experto en console-tabs.ts", "status": "done" },
-        { "label_en": "E2E smoke for validation + expertise not-auth banners", "label_es": "E2E smoke para banners de no-auth en validación + experiencia", "status": "done" }
+        {
+          "label_en": "ConsoleExpertOverviewView: KPI counters + action items + recent contributions",
+          "label_es": "ConsoleExpertOverviewView: contadores KPI + items de acción + contribuciones recientes",
+          "status": "done"
+        },
+        {
+          "label_en": "ConsoleExpertValidationView: queue table filtered to expert_taxa + all-taxa toggle",
+          "label_es": "ConsoleExpertValidationView: tabla de cola filtrada a expert_taxa + toggle todos los taxa",
+          "status": "done"
+        },
+        {
+          "label_en": "ConsoleExpertExpertiseView: per-taxon scores + search/filter + SVG kingdom chart",
+          "label_es": "ConsoleExpertExpertiseView: puntajes por taxón + búsqueda/filtro + gráfico SVG por reino",
+          "status": "done"
+        },
+        {
+          "label_en": "Stub: ConsoleExpertOverridesView + ConsoleExpertTaxonNotesView",
+          "label_es": "Stub: ConsoleExpertOverridesView + ConsoleExpertTaxonNotesView",
+          "status": "done"
+        },
+        {
+          "label_en": "8 new EN/ES route pages + expert dispatch on /console/ root",
+          "label_es": "8 nuevas páginas de ruta EN/ES + dispatch de experto en raíz /consola/",
+          "status": "done"
+        },
+        {
+          "label_en": "Remove stub flag from 3 functional expert tabs in console-tabs.ts",
+          "label_es": "Eliminar flag stub de 3 tabs funcionales de experto en console-tabs.ts",
+          "status": "done"
+        },
+        {
+          "label_en": "E2E smoke for validation + expertise not-auth banners",
+          "label_es": "E2E smoke para banners de no-auth en validación + experiencia",
+          "status": "done"
+        }
       ]
     },
     "admin-overview-real-kpis": {
       "phase": "v1.1",
       "title_en": "Admin overview — real platform-state KPIs + alerts + recent activity",
       "title_es": "Resumen admin — KPIs reales del estado de la plataforma + alertas + actividad reciente",
-      "modules": ["24-admin-console.md"],
+      "modules": [
+        "24-admin-console.md"
+      ],
       "subtasks": [
-        { "label_en": "Real KPI cards (user count, obs count, sync failures, cron health)", "label_es": "Tarjetas KPI reales (usuarios, obs, fallos de sync, salud de cron)", "status": "done" },
-        { "label_en": "Alert panel (elevated sync failure rate, stale cron run)", "label_es": "Panel de alertas (tasa elevada de fallos, cron desactualizado)", "status": "done" },
-        { "label_en": "Recent activity feed from admin_audit", "label_es": "Feed de actividad reciente desde admin_audit", "status": "done" }
+        {
+          "label_en": "Real KPI cards (user count, obs count, sync failures, cron health)",
+          "label_es": "Tarjetas KPI reales (usuarios, obs, fallos de sync, salud de cron)",
+          "status": "done"
+        },
+        {
+          "label_en": "Alert panel (elevated sync failure rate, stale cron run)",
+          "label_es": "Panel de alertas (tasa elevada de fallos, cron desactualizado)",
+          "status": "done"
+        },
+        {
+          "label_en": "Recent activity feed from admin_audit",
+          "label_es": "Feed de actividad reciente desde admin_audit",
+          "status": "done"
+        }
       ]
     },
     "admin-console-pr7-remaining-admin": {
       "phase": "v1.1",
       "title_en": "Admin console PR7 — Badges + Taxa + Karma + Features + Bioblitz tabs",
       "title_es": "Consola admin PR7 — Badges + Taxa + Karma + Funcionalidades + Bioblitz",
-      "modules": ["24-admin-console.md"],
+      "modules": [
+        "24-admin-console.md"
+      ],
       "subtasks": [
-        { "label_en": "ConsoleBadgesView: list + detail + tier chart (stub write buttons)", "label_es": "ConsoleBadgesView: lista + detalle + gráfico de tiers (botones stub)", "status": "done" },
-        { "label_en": "ConsoleTaxaView: list + detail + rarity map (stub write buttons)", "label_es": "ConsoleTaxaView: lista + detalle + mapa de rareza (botones stub)", "status": "done" },
-        { "label_en": "ConsoleKarmaView: config table + rarity multipliers + recent events", "label_es": "ConsoleKarmaView: tabla de config + multiplicadores + eventos recientes", "status": "done" },
-        { "label_en": "ConsoleFeatureFlagsView: flag grid grouped by category (stub toggles)", "label_es": "ConsoleFeatureFlagsView: grilla de flags por categoría (toggles stub)", "status": "done" },
-        { "label_en": "ConsoleBioblitzView: stub with upcoming feature notice", "label_es": "ConsoleBioblitzView: stub con aviso de funcionalidad próxima", "status": "done" },
-        { "label_en": "karma_events admin RLS fix (PR #88)", "label_es": "Fix de RLS admin en karma_events (PR #88)", "status": "done" }
+        {
+          "label_en": "ConsoleBadgesView: list + detail + tier chart (stub write buttons)",
+          "label_es": "ConsoleBadgesView: lista + detalle + gráfico de tiers (botones stub)",
+          "status": "done"
+        },
+        {
+          "label_en": "ConsoleTaxaView: list + detail + rarity map (stub write buttons)",
+          "label_es": "ConsoleTaxaView: lista + detalle + mapa de rareza (botones stub)",
+          "status": "done"
+        },
+        {
+          "label_en": "ConsoleKarmaView: config table + rarity multipliers + recent events",
+          "label_es": "ConsoleKarmaView: tabla de config + multiplicadores + eventos recientes",
+          "status": "done"
+        },
+        {
+          "label_en": "ConsoleFeatureFlagsView: flag grid grouped by category (stub toggles)",
+          "label_es": "ConsoleFeatureFlagsView: grilla de flags por categoría (toggles stub)",
+          "status": "done"
+        },
+        {
+          "label_en": "ConsoleBioblitzView: stub with upcoming feature notice",
+          "label_es": "ConsoleBioblitzView: stub con aviso de funcionalidad próxima",
+          "status": "done"
+        },
+        {
+          "label_en": "karma_events admin RLS fix (PR #88)",
+          "label_es": "Fix de RLS admin en karma_events (PR #88)",
+          "status": "done"
+        }
       ]
     },
     "admin-console-pr8-hardening": {
       "phase": "v1.1",
       "title_en": "Admin console PR8 — CORS tighten + rate limit + pgTAP RLS suite + 5 write handlers + DB-backed config",
       "title_es": "Consola admin PR8 — CORS estricto + rate limit + pgTAP RLS + 5 handlers + config en DB",
-      "modules": ["24-admin-console.md"],
+      "modules": [
+        "24-admin-console.md"
+      ],
       "subtasks": [
-        { "label_en": "CORS: restrict Access-Control-Allow-Origin to rastrum.org + localhost dev/preview ports", "label_es": "CORS: restringir Access-Control-Allow-Origin a rastrum.org + puertos dev/preview localhost", "status": "done" },
-        { "label_en": "Token-bucket rate limiter (30 req/min/actor, cost 3 for writes) — in-memory per isolate", "label_es": "Rate limiter token-bucket (30 req/min/actor, costo 3 para escrituras) — en memoria por isolate", "status": "done" },
-        { "label_en": "tests/pgtap/rls.sql — 24 TAP assertions covering has_role + 6 table RLS policies", "label_es": "tests/pgtap/rls.sql — 24 aserciones TAP cubriendo has_role + 6 políticas RLS de tabla", "status": "done" },
-        { "label_en": "db-validate.yml: install pgTAP + run RLS suite step", "label_es": "db-validate.yml: instalar pgTAP + paso de ejecución de suite RLS", "status": "done" },
-        { "label_en": "badge.award_manual handler — upsert user_badges + audit row", "label_es": "Handler badge.award_manual — upsert user_badges + fila de auditoría", "status": "done" },
-        { "label_en": "badge.revoke handler — delete user_badges + audit row", "label_es": "Handler badge.revoke — borrar user_badges + fila de auditoría", "status": "done" },
-        { "label_en": "taxon.recompute_rarity handler — call refresh_taxon_rarity() RPC", "label_es": "Handler taxon.recompute_rarity — llamar RPC refresh_taxon_rarity()", "status": "done" },
-        { "label_en": "taxon.toggle_conservation handler — update nom059_status/cites_appendix/iucn_category with taxon_conservation_set audit op", "label_es": "Handler taxon.toggle_conservation — actualizar nom059_status/cites_appendix/iucn_category con audit op taxon_conservation_set", "status": "done" },
-        { "label_en": "feature_flag.toggle handler — update app_feature_flags.value + updated_by", "label_es": "Handler feature_flag.toggle — actualizar app_feature_flags.value + updated_by", "status": "done" },
-        { "label_en": "app_feature_flags table + RLS policies + seed from FEATURE_FLAGS", "label_es": "Tabla app_feature_flags + políticas RLS + seed desde FEATURE_FLAGS", "status": "done" },
-        { "label_en": "karma_config + karma_rarity_multipliers tables + RLS policies + seed from TS modules", "label_es": "Tablas karma_config + karma_rarity_multipliers + políticas RLS + seed desde módulos TS", "status": "done" },
-        { "label_en": "ConsoleFeatureFlagsView: DB-backed reads + live toggle wired to adminClient.featureFlag.toggle", "label_es": "ConsoleFeatureFlagsView: lecturas desde DB + toggle en vivo usando adminClient.featureFlag.toggle", "status": "done" },
-        { "label_en": "ConsoleBadgesView: Award + Revoke buttons live with slide-over forms", "label_es": "ConsoleBadgesView: botones Award + Revoke activos con formularios deslizantes", "status": "done" },
-        { "label_en": "ConsoleTaxaView: Recompute Rarity + Toggle Conservation buttons live", "label_es": "ConsoleTaxaView: botones Recompute Rarity + Toggle Conservation activos", "status": "done" },
-        { "label_en": "ConsoleKarmaView: DB-backed reads (karma_config + karma_rarity_multipliers)", "label_es": "ConsoleKarmaView: lecturas desde DB (karma_config + karma_rarity_multipliers)", "status": "done" },
-        { "label_en": "adminClient SDK: badge.{awardManual,revoke} + taxon.{recomputeRarity,toggleConservation} + featureFlag.toggle", "label_es": "SDK adminClient: badge.{awardManual,revoke} + taxon.{recomputeRarity,toggleConservation} + featureFlag.toggle", "status": "done" },
-        { "label_en": "4 new unit tests for badge + featureFlag SDK methods", "label_es": "4 nuevas pruebas unitarias para métodos SDK de badge + featureFlag", "status": "done" },
-        { "label_en": "Doc sync: progress.json + tasks.json + module 24 + admin-ops.md + CLAUDE.md", "label_es": "Sincronización de docs: progress.json + tasks.json + módulo 24 + admin-ops.md + CLAUDE.md", "status": "done" }
+        {
+          "label_en": "CORS: restrict Access-Control-Allow-Origin to rastrum.org + localhost dev/preview ports",
+          "label_es": "CORS: restringir Access-Control-Allow-Origin a rastrum.org + puertos dev/preview localhost",
+          "status": "done"
+        },
+        {
+          "label_en": "Token-bucket rate limiter (30 req/min/actor, cost 3 for writes) — in-memory per isolate",
+          "label_es": "Rate limiter token-bucket (30 req/min/actor, costo 3 para escrituras) — en memoria por isolate",
+          "status": "done"
+        },
+        {
+          "label_en": "tests/pgtap/rls.sql — 24 TAP assertions covering has_role + 6 table RLS policies",
+          "label_es": "tests/pgtap/rls.sql — 24 aserciones TAP cubriendo has_role + 6 políticas RLS de tabla",
+          "status": "done"
+        },
+        {
+          "label_en": "db-validate.yml: install pgTAP + run RLS suite step",
+          "label_es": "db-validate.yml: instalar pgTAP + paso de ejecución de suite RLS",
+          "status": "done"
+        },
+        {
+          "label_en": "badge.award_manual handler — upsert user_badges + audit row",
+          "label_es": "Handler badge.award_manual — upsert user_badges + fila de auditoría",
+          "status": "done"
+        },
+        {
+          "label_en": "badge.revoke handler — delete user_badges + audit row",
+          "label_es": "Handler badge.revoke — borrar user_badges + fila de auditoría",
+          "status": "done"
+        },
+        {
+          "label_en": "taxon.recompute_rarity handler — call refresh_taxon_rarity() RPC",
+          "label_es": "Handler taxon.recompute_rarity — llamar RPC refresh_taxon_rarity()",
+          "status": "done"
+        },
+        {
+          "label_en": "taxon.toggle_conservation handler — update nom059_status/cites_appendix/iucn_category with taxon_conservation_set audit op",
+          "label_es": "Handler taxon.toggle_conservation — actualizar nom059_status/cites_appendix/iucn_category con audit op taxon_conservation_set",
+          "status": "done"
+        },
+        {
+          "label_en": "feature_flag.toggle handler — update app_feature_flags.value + updated_by",
+          "label_es": "Handler feature_flag.toggle — actualizar app_feature_flags.value + updated_by",
+          "status": "done"
+        },
+        {
+          "label_en": "app_feature_flags table + RLS policies + seed from FEATURE_FLAGS",
+          "label_es": "Tabla app_feature_flags + políticas RLS + seed desde FEATURE_FLAGS",
+          "status": "done"
+        },
+        {
+          "label_en": "karma_config + karma_rarity_multipliers tables + RLS policies + seed from TS modules",
+          "label_es": "Tablas karma_config + karma_rarity_multipliers + políticas RLS + seed desde módulos TS",
+          "status": "done"
+        },
+        {
+          "label_en": "ConsoleFeatureFlagsView: DB-backed reads + live toggle wired to adminClient.featureFlag.toggle",
+          "label_es": "ConsoleFeatureFlagsView: lecturas desde DB + toggle en vivo usando adminClient.featureFlag.toggle",
+          "status": "done"
+        },
+        {
+          "label_en": "ConsoleBadgesView: Award + Revoke buttons live with slide-over forms",
+          "label_es": "ConsoleBadgesView: botones Award + Revoke activos con formularios deslizantes",
+          "status": "done"
+        },
+        {
+          "label_en": "ConsoleTaxaView: Recompute Rarity + Toggle Conservation buttons live",
+          "label_es": "ConsoleTaxaView: botones Recompute Rarity + Toggle Conservation activos",
+          "status": "done"
+        },
+        {
+          "label_en": "ConsoleKarmaView: DB-backed reads (karma_config + karma_rarity_multipliers)",
+          "label_es": "ConsoleKarmaView: lecturas desde DB (karma_config + karma_rarity_multipliers)",
+          "status": "done"
+        },
+        {
+          "label_en": "adminClient SDK: badge.{awardManual,revoke} + taxon.{recomputeRarity,toggleConservation} + featureFlag.toggle",
+          "label_es": "SDK adminClient: badge.{awardManual,revoke} + taxon.{recomputeRarity,toggleConservation} + featureFlag.toggle",
+          "status": "done"
+        },
+        {
+          "label_en": "4 new unit tests for badge + featureFlag SDK methods",
+          "label_es": "4 nuevas pruebas unitarias para métodos SDK de badge + featureFlag",
+          "status": "done"
+        },
+        {
+          "label_en": "Doc sync: progress.json + tasks.json + module 24 + admin-ops.md + CLAUDE.md",
+          "label_es": "Sincronización de docs: progress.json + tasks.json + módulo 24 + admin-ops.md + CLAUDE.md",
+          "status": "done"
+        }
       ]
     },
     "admin-console-pr9-quick-actions": {
       "phase": "v1.1",
       "title_en": "Admin console PR9 — admin/mod UX (reason templates + URL filters + g-prefix keybindings + mobile sticky bottom-sheet)",
       "title_es": "Consola admin PR9 — UX admin/moderador (plantillas de motivo + filtros URL + atajos g- + bottom-sheet móvil)",
-      "modules": ["24-admin-console.md"],
+      "modules": [
+        "24-admin-console.md"
+      ],
       "subtasks": [
-        { "label_en": "ConsoleSlideOver: pre-translated quick reason pills via data attributes", "label_es": "ConsoleSlideOver: pills de motivos pre-traducidos via data attributes", "status": "done" },
-        { "label_en": "console-filter-state.ts: read/write/applyFilterState helpers (URLSearchParams + history.replaceState)", "label_es": "console-filter-state.ts: helpers read/write/applyFilterState (URLSearchParams + history.replaceState)", "status": "done" },
-        { "label_en": "console-keybindings.ts: g-prefix Vim chord (g a / g u / g r…) + ? help overlay + Escape close", "label_es": "console-keybindings.ts: chord Vim con prefijo g (g a / g u / g r…) + overlay ? + cierre con Escape", "status": "done" },
-        { "label_en": "ConsoleSlideOver: sticky bottom-sheet on mobile (env(safe-area-inset-bottom))", "label_es": "ConsoleSlideOver: bottom-sheet adherente en móvil (env(safe-area-inset-bottom))", "status": "done" },
-        { "label_en": "i18n parity for all reason templates (EN/ES)", "label_es": "Paridad i18n para todas las plantillas de motivo (EN/ES)", "status": "done" }
+        {
+          "label_en": "ConsoleSlideOver: pre-translated quick reason pills via data attributes",
+          "label_es": "ConsoleSlideOver: pills de motivos pre-traducidos via data attributes",
+          "status": "done"
+        },
+        {
+          "label_en": "console-filter-state.ts: read/write/applyFilterState helpers (URLSearchParams + history.replaceState)",
+          "label_es": "console-filter-state.ts: helpers read/write/applyFilterState (URLSearchParams + history.replaceState)",
+          "status": "done"
+        },
+        {
+          "label_en": "console-keybindings.ts: g-prefix Vim chord (g a / g u / g r…) + ? help overlay + Escape close",
+          "label_es": "console-keybindings.ts: chord Vim con prefijo g (g a / g u / g r…) + overlay ? + cierre con Escape",
+          "status": "done"
+        },
+        {
+          "label_en": "ConsoleSlideOver: sticky bottom-sheet on mobile (env(safe-area-inset-bottom))",
+          "label_es": "ConsoleSlideOver: bottom-sheet adherente en móvil (env(safe-area-inset-bottom))",
+          "status": "done"
+        },
+        {
+          "label_en": "i18n parity for all reason templates (EN/ES)",
+          "label_es": "Paridad i18n para todas las plantillas de motivo (EN/ES)",
+          "status": "done"
+        }
       ]
     },
     "admin-console-pr10-subject-ux": {
       "phase": "v1.1",
       "title_en": "Admin console PR10 — subject UX (ban banner + appeals workflow + comment lock + hidden-obs owner badge)",
       "title_es": "Consola admin PR10 — UX del afectado (banner de baneo + apelaciones + bloqueo de comentarios + insignia)",
-      "modules": ["24-admin-console.md"],
+      "modules": [
+        "24-admin-console.md"
+      ],
       "subtasks": [
-        { "label_en": "BanBanner.astro mounted in BaseLayout for active bans", "label_es": "BanBanner.astro montado en BaseLayout para baneos activos", "status": "done" },
-        { "label_en": "ban_appeals table + RLS + appeal.accept/reject handlers", "label_es": "tabla ban_appeals + RLS + handlers appeal.accept/reject", "status": "done" },
-        { "label_en": "AppealView.astro + /profile/appeal/ pages (EN/ES)", "label_es": "AppealView.astro + páginas /profile/appeal/ (EN/ES)", "status": "done" },
-        { "label_en": "ConsoleAppealsView moderator queue + appeal lifecycle UI", "label_es": "Cola de apelaciones del moderador en ConsoleAppealsView + UI del ciclo de vida", "status": "done" },
-        { "label_en": "Comments.astro: locked-thread banner + read-only mode", "label_es": "Comments.astro: banner de hilo bloqueado + modo de solo lectura", "status": "done" },
-        { "label_en": "MyObservationsView: hidden-obs owner badge", "label_es": "MyObservationsView: insignia para el dueño de obs ocultas", "status": "done" }
+        {
+          "label_en": "BanBanner.astro mounted in BaseLayout for active bans",
+          "label_es": "BanBanner.astro montado en BaseLayout para baneos activos",
+          "status": "done"
+        },
+        {
+          "label_en": "ban_appeals table + RLS + appeal.accept/reject handlers",
+          "label_es": "tabla ban_appeals + RLS + handlers appeal.accept/reject",
+          "status": "done"
+        },
+        {
+          "label_en": "AppealView.astro + /profile/appeal/ pages (EN/ES)",
+          "label_es": "AppealView.astro + páginas /profile/appeal/ (EN/ES)",
+          "status": "done"
+        },
+        {
+          "label_en": "ConsoleAppealsView moderator queue + appeal lifecycle UI",
+          "label_es": "Cola de apelaciones del moderador en ConsoleAppealsView + UI del ciclo de vida",
+          "status": "done"
+        },
+        {
+          "label_en": "Comments.astro: locked-thread banner + read-only mode",
+          "label_es": "Comments.astro: banner de hilo bloqueado + modo de solo lectura",
+          "status": "done"
+        },
+        {
+          "label_en": "MyObservationsView: hidden-obs owner badge",
+          "label_es": "MyObservationsView: insignia para el dueño de obs ocultas",
+          "status": "done"
+        }
       ]
     },
     "admin-console-pr11-engineering": {
       "phase": "v1.1",
       "title_en": "Admin console PR11 — engineering hygiene (Postgres rate-limit RPC + flash polish + handler-registry test)",
       "title_es": "Consola admin PR11 — higiene de ingeniería (RPC de rate-limit en Postgres + pulido de flash + test del registro)",
-      "modules": ["24-admin-console.md"],
+      "modules": [
+        "24-admin-console.md"
+      ],
       "subtasks": [
-        { "label_en": "rate_limit_buckets table + consume_rate_limit_token() SECURITY DEFINER RPC", "label_es": "Tabla rate_limit_buckets + RPC consume_rate_limit_token() SECURITY DEFINER", "status": "done" },
-        { "label_en": "_shared/rate-limit.ts: replace in-memory Map with async RPC call (fail-open)", "label_es": "_shared/rate-limit.ts: reemplazar Map en memoria con llamada RPC async (fail-open)", "status": "done" },
-        { "label_en": "/console/* flash polish: hidden gate div + 1500ms fallback (static-only mode)", "label_es": "Pulido de flash en /console/*: div oculto + fallback de 1500ms (modo static-only)", "status": "done" },
-        { "label_en": "tests/unit/admin-handlers-registry.test.ts: regex-based consistency check", "label_es": "tests/unit/admin-handlers-registry.test.ts: verificación basada en regex", "status": "done" }
+        {
+          "label_en": "rate_limit_buckets table + consume_rate_limit_token() SECURITY DEFINER RPC",
+          "label_es": "Tabla rate_limit_buckets + RPC consume_rate_limit_token() SECURITY DEFINER",
+          "status": "done"
+        },
+        {
+          "label_en": "_shared/rate-limit.ts: replace in-memory Map with async RPC call (fail-open)",
+          "label_es": "_shared/rate-limit.ts: reemplazar Map en memoria con llamada RPC async (fail-open)",
+          "status": "done"
+        },
+        {
+          "label_en": "/console/* flash polish: hidden gate div + 1500ms fallback (static-only mode)",
+          "label_es": "Pulido de flash en /console/*: div oculto + fallback de 1500ms (modo static-only)",
+          "status": "done"
+        },
+        {
+          "label_en": "tests/unit/admin-handlers-registry.test.ts: regex-based consistency check",
+          "label_es": "tests/unit/admin-handlers-registry.test.ts: verificación basada en regex",
+          "status": "done"
+        }
       ]
     },
     "admin-console-pr12-observability": {
       "phase": "v1.1",
       "title_en": "Admin console PR12 — observability (anomaly detection + weekly health digest + forensics CSV + function_errors sink)",
       "title_es": "Consola admin PR12 — observabilidad (detección de anomalías + resumen semanal + CSV forense + sink de errores)",
-      "modules": ["24-admin-console.md"],
+      "modules": [
+        "24-admin-console.md"
+      ],
       "subtasks": [
-        { "label_en": "admin_anomalies + admin_health_digests + function_errors tables + RLS", "label_es": "Tablas admin_anomalies + admin_health_digests + function_errors + RLS", "status": "done" },
-        { "label_en": "detect_admin_anomalies() — high_rate / bulk_delete / off_hours rules + hourly cron", "label_es": "detect_admin_anomalies() — reglas high_rate / bulk_delete / off_hours + cron horario", "status": "done" },
-        { "label_en": "compute_admin_health_digest() weekly Mondays 09:00 UTC", "label_es": "compute_admin_health_digest() semanalmente lunes 09:00 UTC", "status": "done" },
-        { "label_en": "anomaly.acknowledge + audit.export Edge Function handlers", "label_es": "Handlers anomaly.acknowledge + audit.export de Edge Function", "status": "done" },
-        { "label_en": "_shared/csv.ts pure helper + 17 unit tests for CSV escape edge cases", "label_es": "Helper puro _shared/csv.ts + 17 pruebas unitarias para casos de escape CSV", "status": "done" },
-        { "label_en": "_shared/error-reporter.ts wired into admin dispatcher catch", "label_es": "_shared/error-reporter.ts conectado al catch del dispatcher admin", "status": "done" },
-        { "label_en": "ConsoleAnomaliesView + ConsoleForensicsView admin tabs (EN/ES)", "label_es": "Tabs admin ConsoleAnomaliesView + ConsoleForensicsView (EN/ES)", "status": "done" }
+        {
+          "label_en": "admin_anomalies + admin_health_digests + function_errors tables + RLS",
+          "label_es": "Tablas admin_anomalies + admin_health_digests + function_errors + RLS",
+          "status": "done"
+        },
+        {
+          "label_en": "detect_admin_anomalies() — high_rate / bulk_delete / off_hours rules + hourly cron",
+          "label_es": "detect_admin_anomalies() — reglas high_rate / bulk_delete / off_hours + cron horario",
+          "status": "done"
+        },
+        {
+          "label_en": "compute_admin_health_digest() weekly Mondays 09:00 UTC",
+          "label_es": "compute_admin_health_digest() semanalmente lunes 09:00 UTC",
+          "status": "done"
+        },
+        {
+          "label_en": "anomaly.acknowledge + audit.export Edge Function handlers",
+          "label_es": "Handlers anomaly.acknowledge + audit.export de Edge Function",
+          "status": "done"
+        },
+        {
+          "label_en": "_shared/csv.ts pure helper + 17 unit tests for CSV escape edge cases",
+          "label_es": "Helper puro _shared/csv.ts + 17 pruebas unitarias para casos de escape CSV",
+          "status": "done"
+        },
+        {
+          "label_en": "_shared/error-reporter.ts wired into admin dispatcher catch",
+          "label_es": "_shared/error-reporter.ts conectado al catch del dispatcher admin",
+          "status": "done"
+        },
+        {
+          "label_en": "ConsoleAnomaliesView + ConsoleForensicsView admin tabs (EN/ES)",
+          "label_es": "Tabs admin ConsoleAnomaliesView + ConsoleForensicsView (EN/ES)",
+          "status": "done"
+        }
       ]
     },
     "admin-console-pr13-future-proofing": {
       "phase": "v1.1",
       "title_en": "Admin console PR13 — future-proofing (time-bounded roles + two-person rule + webhooks + trust score primitive)",
       "title_es": "Consola admin PR13 — future-proofing (roles con expiración + regla de dos personas + webhooks + puntaje de confianza)",
-      "modules": ["24-admin-console.md"],
+      "modules": [
+        "24-admin-console.md"
+      ],
       "subtasks": [
-        { "label_en": "user_roles.expires_at + auto_revoke_expired_roles() daily 08:15 UTC cron", "label_es": "user_roles.expires_at + cron diario auto_revoke_expired_roles() 08:15 UTC", "status": "done" },
-        { "label_en": "admin_action_proposals state machine + expire_stale_proposals() hourly cron", "label_es": "Máquina de estados admin_action_proposals + cron horario expire_stale_proposals()", "status": "done" },
-        { "label_en": "proposal.create / approve / reject handlers + IRREVERSIBLE_OPS registry", "label_es": "Handlers proposal.create / approve / reject + registro IRREVERSIBLE_OPS", "status": "done" },
-        { "label_en": "Self-approval guard in _shared/proposal-guards.ts (testable)", "label_es": "Guardia anti auto-aprobación en _shared/proposal-guards.ts (testeable)", "status": "done" },
-        { "label_en": "admin_webhooks + admin_webhook_deliveries tables + dispatch_admin_webhooks() trigger", "label_es": "Tablas admin_webhooks + admin_webhook_deliveries + trigger dispatch_admin_webhooks()", "status": "done" },
-        { "label_en": "HMAC-SHA256 signing helper + webhook.create/update/delete/test handlers", "label_es": "Helper de firma HMAC-SHA256 + handlers webhook.create/update/delete/test", "status": "done" },
-        { "label_en": "compute_moderator_trust_score() v1 placeholder + moderator_trust_scores view", "label_es": "Placeholder v1 compute_moderator_trust_score() + vista moderator_trust_scores", "status": "done" },
-        { "label_en": "ConsoleProposalsView + ConsoleWebhooksView admin tabs (EN/ES)", "label_es": "Tabs admin ConsoleProposalsView + ConsoleWebhooksView (EN/ES)", "status": "done" },
-        { "label_en": "4 new runbooks: admin-time-bounded-roles, admin-two-person-rule, admin-webhooks, admin-trust-scores", "label_es": "4 nuevos runbooks: admin-time-bounded-roles, admin-two-person-rule, admin-webhooks, admin-trust-scores", "status": "done" }
+        {
+          "label_en": "user_roles.expires_at + auto_revoke_expired_roles() daily 08:15 UTC cron",
+          "label_es": "user_roles.expires_at + cron diario auto_revoke_expired_roles() 08:15 UTC",
+          "status": "done"
+        },
+        {
+          "label_en": "admin_action_proposals state machine + expire_stale_proposals() hourly cron",
+          "label_es": "Máquina de estados admin_action_proposals + cron horario expire_stale_proposals()",
+          "status": "done"
+        },
+        {
+          "label_en": "proposal.create / approve / reject handlers + IRREVERSIBLE_OPS registry",
+          "label_es": "Handlers proposal.create / approve / reject + registro IRREVERSIBLE_OPS",
+          "status": "done"
+        },
+        {
+          "label_en": "Self-approval guard in _shared/proposal-guards.ts (testable)",
+          "label_es": "Guardia anti auto-aprobación en _shared/proposal-guards.ts (testeable)",
+          "status": "done"
+        },
+        {
+          "label_en": "admin_webhooks + admin_webhook_deliveries tables + dispatch_admin_webhooks() trigger",
+          "label_es": "Tablas admin_webhooks + admin_webhook_deliveries + trigger dispatch_admin_webhooks()",
+          "status": "done"
+        },
+        {
+          "label_en": "HMAC-SHA256 signing helper + webhook.create/update/delete/test handlers",
+          "label_es": "Helper de firma HMAC-SHA256 + handlers webhook.create/update/delete/test",
+          "status": "done"
+        },
+        {
+          "label_en": "compute_moderator_trust_score() v1 placeholder + moderator_trust_scores view",
+          "label_es": "Placeholder v1 compute_moderator_trust_score() + vista moderator_trust_scores",
+          "status": "done"
+        },
+        {
+          "label_en": "ConsoleProposalsView + ConsoleWebhooksView admin tabs (EN/ES)",
+          "label_es": "Tabs admin ConsoleProposalsView + ConsoleWebhooksView (EN/ES)",
+          "status": "done"
+        },
+        {
+          "label_en": "4 new runbooks: admin-time-bounded-roles, admin-two-person-rule, admin-webhooks, admin-trust-scores",
+          "label_es": "4 nuevos runbooks: admin-time-bounded-roles, admin-two-person-rule, admin-webhooks, admin-trust-scores",
+          "status": "done"
+        }
       ]
     },
     "admin-console-pr14-deferred-cleanup": {
       "phase": "v1.1",
       "title_en": "Admin console PR14 — close v1.1 deferred items (per-admin tz + webhook _meta replay + reconcile cron + real trust formula + irreversible enforcement gate + durable observability dry-run)",
       "title_es": "Consola admin PR14 — cierre de pendientes v1.1 (zona por admin + replay de webhooks + cron reconcile + fórmula real de confianza + gate de cumplimiento + dry-run durable de observabilidad)",
-      "modules": ["24-admin-console.md"],
+      "modules": [
+        "24-admin-console.md"
+      ],
       "subtasks": [
-        { "label_en": "users.timezone column + per-admin off_hours rule (LEFT JOIN + COALESCE → UTC)", "label_es": "Columna users.timezone + regla off_hours por admin (LEFT JOIN + COALESCE → UTC)", "status": "done" },
-        { "label_en": "Profile → Edit timezone picker (9 IANA zones, canonical America/Argentina/Buenos_Aires)", "label_es": "Selector de zona en Profile → Edit (9 zonas IANA, America/Argentina/Buenos_Aires canónica)", "status": "done" },
-        { "label_en": "admin_webhook_deliveries.nonce + .request_id columns + signed _meta envelope", "label_es": "Columnas admin_webhook_deliveries.nonce + .request_id + envelope _meta firmado", "status": "done" },
-        { "label_en": "reconcile_webhook_deliveries() SECURITY DEFINER + 2-min cron (writes back async pg_net status)", "label_es": "reconcile_webhook_deliveries() SECURITY DEFINER + cron 2-min (escribe estado async pg_net)", "status": "done" },
-        { "label_en": "compute_moderator_trust_score() v1.1 formula (anomaly + overturn + active_days + recency, clamped 0-100)", "label_es": "Fórmula v1.1 de compute_moderator_trust_score() (anomalía + overturn + active_days + recencia, 0-100)", "status": "done" },
-        { "label_en": "checkIrreversibleEnforcement() pure function + enforce_two_person_irreversible feature flag (default off)", "label_es": "Función pura checkIrreversibleEnforcement() + feature flag enforce_two_person_irreversible (off por defecto)", "status": "done" },
-        { "label_en": "ConsoleSlideOver irreversible prop + 'Require approval' toggle on Users + Observations slide-overs", "label_es": "Prop irreversible en ConsoleSlideOver + toggle 'Requerir aprobación' en slide-overs de Usuarios + Observaciones", "status": "done" },
-        { "label_en": ".github/workflows/admin-observability-dryrun.yml — one-shot 2026-05-06 + weekly Mondays + red badge if reconcile stuck", "label_es": ".github/workflows/admin-observability-dryrun.yml — one-shot 2026-05-06 + lunes semanal + badge rojo si reconcile atascado", "status": "done" },
-        { "label_en": "Doc sync: 4 runbooks updated, CLAUDE.md status line bumped, sentinel asserts +4", "label_es": "Sincronización de docs: 4 runbooks actualizados, status line de CLAUDE.md actualizado, +4 asserts en sentinel", "status": "done" }
+        {
+          "label_en": "users.timezone column + per-admin off_hours rule (LEFT JOIN + COALESCE → UTC)",
+          "label_es": "Columna users.timezone + regla off_hours por admin (LEFT JOIN + COALESCE → UTC)",
+          "status": "done"
+        },
+        {
+          "label_en": "Profile → Edit timezone picker (9 IANA zones, canonical America/Argentina/Buenos_Aires)",
+          "label_es": "Selector de zona en Profile → Edit (9 zonas IANA, America/Argentina/Buenos_Aires canónica)",
+          "status": "done"
+        },
+        {
+          "label_en": "admin_webhook_deliveries.nonce + .request_id columns + signed _meta envelope",
+          "label_es": "Columnas admin_webhook_deliveries.nonce + .request_id + envelope _meta firmado",
+          "status": "done"
+        },
+        {
+          "label_en": "reconcile_webhook_deliveries() SECURITY DEFINER + 2-min cron (writes back async pg_net status)",
+          "label_es": "reconcile_webhook_deliveries() SECURITY DEFINER + cron 2-min (escribe estado async pg_net)",
+          "status": "done"
+        },
+        {
+          "label_en": "compute_moderator_trust_score() v1.1 formula (anomaly + overturn + active_days + recency, clamped 0-100)",
+          "label_es": "Fórmula v1.1 de compute_moderator_trust_score() (anomalía + overturn + active_days + recencia, 0-100)",
+          "status": "done"
+        },
+        {
+          "label_en": "checkIrreversibleEnforcement() pure function + enforce_two_person_irreversible feature flag (default off)",
+          "label_es": "Función pura checkIrreversibleEnforcement() + feature flag enforce_two_person_irreversible (off por defecto)",
+          "status": "done"
+        },
+        {
+          "label_en": "ConsoleSlideOver irreversible prop + 'Require approval' toggle on Users + Observations slide-overs",
+          "label_es": "Prop irreversible en ConsoleSlideOver + toggle 'Requerir aprobación' en slide-overs de Usuarios + Observaciones",
+          "status": "done"
+        },
+        {
+          "label_en": ".github/workflows/admin-observability-dryrun.yml — one-shot 2026-05-06 + weekly Mondays + red badge if reconcile stuck",
+          "label_es": ".github/workflows/admin-observability-dryrun.yml — one-shot 2026-05-06 + lunes semanal + badge rojo si reconcile atascado",
+          "status": "done"
+        },
+        {
+          "label_en": "Doc sync: 4 runbooks updated, CLAUDE.md status line bumped, sentinel asserts +4",
+          "label_es": "Sincronización de docs: 4 runbooks actualizados, status line de CLAUDE.md actualizado, +4 asserts en sentinel",
+          "status": "done"
+        }
       ]
     },
     "admin-console-pr15-observability-ui": {
       "phase": "v1.1",
       "title_en": "Admin console PR15 — observability UI (Health digest cards + sparklines + Errors browser with bulk ack + per-webhook deliveries drilldown + replay)",
       "title_es": "Consola admin PR15 — UI de observabilidad (tarjetas + sparklines del resumen de salud + navegador de errores con ack en lote + drilldown de entregas por webhook + reenvío)",
-      "modules": ["24-admin-console.md"],
+      "modules": [
+        "24-admin-console.md"
+      ],
       "subtasks": [
-        { "label_en": "function_errors.acknowledged_at + acknowledged_by + ack_notes columns + partial unack index", "label_es": "Columnas function_errors.acknowledged_at + acknowledged_by + ack_notes + índice parcial sobre no reconocidos", "status": "done" },
-        { "label_en": "audit_op enum +4: health_recompute, error_acknowledge, error_acknowledge_bulk, webhook_replay", "label_es": "Enum audit_op +4: health_recompute, error_acknowledge, error_acknowledge_bulk, webhook_replay", "status": "done" },
-        { "label_en": "Edge Function handlers: health.recompute + error.acknowledge[_bulk] + webhook.replay_delivery", "label_es": "Handlers de Edge Function: health.recompute + error.acknowledge[_bulk] + webhook.replay_delivery", "status": "done" },
-        { "label_en": "ConsoleHealthView — hero card + 12-week sparklines + manual recompute (EN/ES)", "label_es": "ConsoleHealthView — tarjeta hero + sparklines de 12 semanas + recálculo manual (EN/ES)", "status": "done" },
-        { "label_en": "ConsoleErrorsView — function_errors browser with URL filters + severity pills + auto-refresh + single + bulk ack (EN/ES)", "label_es": "ConsoleErrorsView — navegador function_errors con filtros URL + pills de severidad + auto-refresco + ack simple y en lote (EN/ES)", "status": "done" },
-        { "label_en": "ConsoleWebhooksView — per-webhook deliveries drilldown + filter chips + replay last + nonce copy", "label_es": "ConsoleWebhooksView — drilldown de entregas por webhook + chips de filtro + reenviar última + copiar nonce", "status": "done" },
-        { "label_en": "Pure helpers: src/lib/health-delta.ts + src/lib/error-severity.ts (10 + 8 unit assertions)", "label_es": "Helpers puros: src/lib/health-delta.ts + src/lib/error-severity.ts (10 + 8 aserciones unitarias)", "status": "done" },
-        { "label_en": "Console keybindings: g h → health, g e → errors (g x reclaimed for experts), help overlay updated", "label_es": "Atajos de consola: g h → salud, g e → errores (g x reasignado a expertos), overlay de ayuda actualizado", "status": "done" },
-        { "label_en": "rls.sql 32nd assertion + sentinel +3 columns; admin-handlers-registry test bumps to 36 actions", "label_es": "32ª aserción de rls.sql + sentinel +3 columnas; test de registro de handlers admin sube a 36 acciones", "status": "done" },
-        { "label_en": "Runbooks: admin-function-errors.md (new) + admin-health-digest UI section + admin-webhooks PR15 section + admin-ops 4 new entries", "label_es": "Runbooks: admin-function-errors.md (nuevo) + sección UI de admin-health-digest + sección PR15 de admin-webhooks + 4 entradas nuevas en admin-ops", "status": "done" }
+        {
+          "label_en": "function_errors.acknowledged_at + acknowledged_by + ack_notes columns + partial unack index",
+          "label_es": "Columnas function_errors.acknowledged_at + acknowledged_by + ack_notes + índice parcial sobre no reconocidos",
+          "status": "done"
+        },
+        {
+          "label_en": "audit_op enum +4: health_recompute, error_acknowledge, error_acknowledge_bulk, webhook_replay",
+          "label_es": "Enum audit_op +4: health_recompute, error_acknowledge, error_acknowledge_bulk, webhook_replay",
+          "status": "done"
+        },
+        {
+          "label_en": "Edge Function handlers: health.recompute + error.acknowledge[_bulk] + webhook.replay_delivery",
+          "label_es": "Handlers de Edge Function: health.recompute + error.acknowledge[_bulk] + webhook.replay_delivery",
+          "status": "done"
+        },
+        {
+          "label_en": "ConsoleHealthView — hero card + 12-week sparklines + manual recompute (EN/ES)",
+          "label_es": "ConsoleHealthView — tarjeta hero + sparklines de 12 semanas + recálculo manual (EN/ES)",
+          "status": "done"
+        },
+        {
+          "label_en": "ConsoleErrorsView — function_errors browser with URL filters + severity pills + auto-refresh + single + bulk ack (EN/ES)",
+          "label_es": "ConsoleErrorsView — navegador function_errors con filtros URL + pills de severidad + auto-refresco + ack simple y en lote (EN/ES)",
+          "status": "done"
+        },
+        {
+          "label_en": "ConsoleWebhooksView — per-webhook deliveries drilldown + filter chips + replay last + nonce copy",
+          "label_es": "ConsoleWebhooksView — drilldown de entregas por webhook + chips de filtro + reenviar última + copiar nonce",
+          "status": "done"
+        },
+        {
+          "label_en": "Pure helpers: src/lib/health-delta.ts + src/lib/error-severity.ts (10 + 8 unit assertions)",
+          "label_es": "Helpers puros: src/lib/health-delta.ts + src/lib/error-severity.ts (10 + 8 aserciones unitarias)",
+          "status": "done"
+        },
+        {
+          "label_en": "Console keybindings: g h → health, g e → errors (g x reclaimed for experts), help overlay updated",
+          "label_es": "Atajos de consola: g h → salud, g e → errores (g x reasignado a expertos), overlay de ayuda actualizado",
+          "status": "done"
+        },
+        {
+          "label_en": "rls.sql 32nd assertion + sentinel +3 columns; admin-handlers-registry test bumps to 36 actions",
+          "label_es": "32ª aserción de rls.sql + sentinel +3 columnas; test de registro de handlers admin sube a 36 acciones",
+          "status": "done"
+        },
+        {
+          "label_en": "Runbooks: admin-function-errors.md (new) + admin-health-digest UI section + admin-webhooks PR15 section + admin-ops 4 new entries",
+          "label_es": "Runbooks: admin-function-errors.md (nuevo) + sección UI de admin-health-digest + sección PR15 de admin-webhooks + 4 entradas nuevas en admin-ops",
+          "status": "done"
+        }
+      ]
+    },
+    "admin-console-pr16-entity-browsers": {
+      "phase": "v1.1",
+      "title_en": "Admin console PR16 — read-only entity browsers (Identifications, Notifications, Media, Follows, Watchlists, Projects, Taxon changes) on shared template + runtime",
+      "title_es": "Consola admin PR16 — navegadores de entidades de solo lectura (Identificaciones, Notificaciones, Medios, Seguimientos, Listas de vigilancia, Proyectos, Cambios de taxón) sobre plantilla compartida + runtime",
+      "modules": [
+        "24-admin-console.md"
+      ],
+      "subtasks": [
+        {
+          "label_en": "Hot-path indexes (filter_field, created_at DESC) on identifications, notifications, media_files, follows, projects, watchlists + admin-SELECT policies on notifications + watchlists",
+          "label_es": "Índices hot-path (filter_field, created_at DESC) en identifications, notifications, media_files, follows, projects, watchlists + políticas admin-SELECT en notifications + watchlists",
+          "status": "done"
+        },
+        {
+          "label_en": "ConsoleEntityBrowser.astro shared template + entity-browser.ts runtime (server-side pagination, URL-driven filters, FK lookups, auto-populated dropdowns, drilldown expansion, rowIdFromRow for composite-PK tables)",
+          "label_es": "Plantilla compartida ConsoleEntityBrowser.astro + runtime entity-browser.ts (paginación servidor, filtros via URL, lookups de claves foráneas, dropdowns auto-poblados, expansión de drilldown, rowIdFromRow para tablas con PK compuesta)",
+          "status": "done"
+        },
+        {
+          "label_en": "ConsoleIdentificationsView — filter by identifier/taxon/source/validated/research-grade; drill-down full row + raw_response + obs deep-link",
+          "label_es": "ConsoleIdentificationsView — filtra por identificador/taxón/fuente/validado/calidad de investigación; drilldown completo + raw_response + deep-link a la observación",
+          "status": "done"
+        },
+        {
+          "label_en": "ConsoleNotificationsView — filter by recipient/kind (auto-populated)/read state/from-date; drill-down full payload jsonb",
+          "label_es": "ConsoleNotificationsView — filtra por destinatario/tipo (auto-poblado)/estado de lectura/fecha desde; drilldown completo del payload jsonb",
+          "status": "done"
+        },
+        {
+          "label_en": "ConsoleMediaView — filter by type/state/observation; thumbnail with loading=lazy; drill-down full preview + R2 URL + EXIF",
+          "label_es": "ConsoleMediaView — filtra por tipo/estado/observación; miniatura con loading=lazy; drilldown completo + URL R2 + EXIF",
+          "status": "done"
+        },
+        {
+          "label_en": "ConsoleFollowsView — filter by follower/followee (autocomplete)/status/tier; rowIdFromRow synthesises stable id from (follower_id, followee_id)",
+          "label_es": "ConsoleFollowsView — filtra por seguidor/seguido (autocompletado)/estado/nivel; rowIdFromRow sintetiza id estable desde (follower_id, followee_id)",
+          "status": "done"
+        },
+        {
+          "label_en": "ConsoleWatchlistsView — filter by user/taxon/scientific_name (ilike); drill-down full row JSON. Schema note: no `region` column in v1; uses radius_km + digest_only as visible facets",
+          "label_es": "ConsoleWatchlistsView — filtra por usuario/taxón/nombre científico (ilike); drilldown completo. Nota de esquema: no hay columna `region` en v1; usa radius_km + digest_only como facetas visibles",
+          "status": "done"
+        },
+        {
+          "label_en": "ConsoleProjectsView — backed by projects_with_geojson view (security_invoker); filter by owner/visibility/name; drill-down GeoJSON + species_list + lazy obs count via head:true count(*)",
+          "label_es": "ConsoleProjectsView — respaldado por la vista projects_with_geojson (security_invoker); filtra por propietario/visibilidad/nombre; drilldown GeoJSON + species_list + conteo lazy de observaciones via head:true count(*)",
+          "status": "done"
+        },
+        {
+          "label_en": "ConsoleTaxonChangesView — backed by admin_audit filtered to taxon_* ops via baseline-filter sentinel; filter by taxon/action/actor/date; drill-down before/after diff JSON",
+          "label_es": "ConsoleTaxonChangesView — respaldado por admin_audit filtrado a operaciones taxon_* mediante sentinel de filtro base; filtra por taxón/acción/actor/fecha; drilldown diff before/after en JSON",
+          "status": "done"
+        },
+        {
+          "label_en": "EN+ES page wrappers for all 7 entity browsers (14 pages); console-tabs.ts registers taxon-changes; routes.consoleTaxonChanges + routeTree label pair",
+          "label_es": "Wrappers de página EN+ES para los 7 navegadores (14 páginas); console-tabs.ts registra taxon-changes; routes.consoleTaxonChanges + par de etiquetas en routeTree",
+          "status": "done"
+        },
+        {
+          "label_en": "i18n: console.{identifications,notifications,media,follows,watchlists,projects,taxonChanges}View namespaces EN+ES + tab labels + entityBrowser shared strings",
+          "label_es": "i18n: namespaces console.{identifications,notifications,media,follows,watchlists,projects,taxonChanges}View EN+ES + etiquetas de tabs + cadenas compartidas de entityBrowser",
+          "status": "done"
+        },
+        {
+          "label_en": "Tests: console-tabs.test.ts bumped to 39 tabs (32 + 7 PR16); entity-browser.test.ts (212 LOC: filter predicates + applyFilters + render helpers); 681 tests pass",
+          "label_es": "Pruebas: console-tabs.test.ts actualizado a 39 tabs (32 + 7 PR16); entity-browser.test.ts (212 LOC: predicados de filtros + applyFilters + helpers de render); 681 pruebas pasan",
+          "status": "done"
+        },
+        {
+          "label_en": "Runbook: docs/runbooks/admin-entity-browsers.md (template pattern, performance characteristics, recipe for adding a new entity browser, composite-PK handling, lazy aggregate facets)",
+          "label_es": "Runbook: docs/runbooks/admin-entity-browsers.md (patrón de plantilla, características de rendimiento, receta para añadir un nuevo navegador, manejo de PK compuestas, facetas lazy)",
+          "status": "done"
+        }
+      ]
+    },
+    "community-observers-pr17-ux-fixes": {
+      "phase": "v1.1",
+      "title_en": "Community observers UX fixes — privacy explainer + country CTA + GPS-based Nearby",
+      "title_es": "Fixes UX en observadores comunidad — explicador de privacidad + CTA país + Cercanos con GPS",
+      "modules": ["28-community-discovery.md"],
+      "subtasks": [
+        { "label_en": "Privacy-default explainer banner — viewer-state-aware copy (private vs public profile); renders on 0 rows + signed in", "label_es": "Banner explicativo de privacidad por defecto — copy según el viewer (privado vs público); aparece con 0 filas + sesión iniciada", "status": "done" },
+        { "label_en": "Set-country inline CTA — only when viewer is signed in AND country_code IS NULL; links to /profile/edit/", "label_es": "CTA inline para fijar país — sólo si viewer en sesión y country_code IS NULL; enlaza a /profile/edit/", "status": "done" },
+        { "label_en": "community_observers_nearby_at(lat, lng, radius_m, …) SECURITY INVOKER RPC; granted to authenticated only; reuses GiST index on centroid_geog", "label_es": "RPC community_observers_nearby_at(lat, lng, radius_m, …) SECURITY INVOKER; sólo a authenticated; reutiliza índice GiST en centroid_geog", "status": "done" },
+        { "label_en": "📍 Use my location pill via navigator.geolocation; coords stored in sessionStorage (key rastrum.community.gps), NEVER URL — Referer-leak prevention", "label_es": "📍 Botón Usar mi ubicación con navigator.geolocation; coords en sessionStorage (clave rastrum.community.gps), NUNCA en la URL — prevención de filtración por Referer", "status": "done" },
+        { "label_en": "Fallback to centroid Nearby on geolocation deny; friendly toast", "label_es": "Fallback a Cercanos por centroide al denegar geolocalización; toast amigable", "status": "done" },
+        { "label_en": "loadGps / saveGps / clearGps helpers in community-url.ts (testable, dependency-injected)", "label_es": "Helpers loadGps / saveGps / clearGps en community-url.ts (testeable, inyección de dependencias)", "status": "done" },
+        { "label_en": "Regression-guard test: 'NEVER serializes GPS coords into the URL' + 9 sessionStorage round-trip / malformed / out-of-range cases", "label_es": "Test de regresión: 'NUNCA serializa coords GPS en la URL' + 9 casos de round-trip / malformado / fuera de rango", "status": "done" },
+        { "label_en": "loadViewerCommunityMeta() — single query for {signedIn, profilePublic, countryCode}; no N+1", "label_es": "loadViewerCommunityMeta() — una sola consulta para {signedIn, profilePublic, countryCode}; sin N+1", "status": "done" },
+        { "label_en": "Sentinel verify entries for both nearby RPCs", "label_es": "Entradas en sentinel verify para los dos RPCs de Cercanos", "status": "done" },
+        { "label_en": "CLAUDE.md M28 4th load-bearing rule + docs/runbooks/community-discovery.md UX clarifications section", "label_es": "Regla 4 del M28 en CLAUDE.md + sección de aclaraciones UX en docs/runbooks/community-discovery.md", "status": "done" }
       ]
     },
     "social-graph-m26": {
@@ -4236,67 +4783,190 @@
       "phase": "v1.2",
       "title_en": "M26 v1.1 polish — reactions on feed + Block/Report on cards/comments + ARIA",
       "title_es": "Pulido M26 v1.1 — reacciones en feed + Bloquear/Reportar en tarjetas/comentarios + ARIA",
-      "modules": ["26-social-graph.md"],
+      "modules": [
+        "26-social-graph.md"
+      ],
       "subtasks": [
-        { "label_en": "observation_reaction_summary view (security_invoker = true) for batched reaction counts without N+1", "label_es": "Vista observation_reaction_summary (security_invoker = true) para conteos por batch sin N+1", "status": "done" },
-        { "label_en": "❤ N reaction count chip on ExploreRecentView + MyObservationsView feed cards", "label_es": "Chip de conteo ❤ N en tarjetas ExploreRecentView + MyObservationsView", "status": "done" },
-        { "label_en": "Overflow ⋮ menu on observation cards (Block + Report) — same pattern as PublicProfileViewV2; hidden on owner cards", "label_es": "Menú ⋮ en tarjetas de observación (Bloquear + Reportar) — mismo patrón que PublicProfileViewV2; oculto en tarjetas propias", "status": "done" },
-        { "label_en": "Block/Report per-comment in Comments.astro (lazy import of blockUser, ReportDialog with target='comment')", "label_es": "Bloquear/Reportar por comentario en Comments.astro (lazy import de blockUser, ReportDialog con target='comment')", "status": "done" },
-        { "label_en": "ARIA: aria-live region on ReactionStrip toggle, role=menu/menuitem on overflows, aria-label per InboxView row", "label_es": "ARIA: región aria-live en toggle de ReactionStrip, role=menu/menuitem en overflows, aria-label por fila en InboxView", "status": "done" },
-        { "label_en": "i18n EN/ES under socialgraph.cards.* + socialgraph.reactions.* (12 new keys)", "label_es": "i18n EN/ES bajo socialgraph.cards.* + socialgraph.reactions.* (12 keys nuevas)", "status": "done" }
+        {
+          "label_en": "observation_reaction_summary view (security_invoker = true) for batched reaction counts without N+1",
+          "label_es": "Vista observation_reaction_summary (security_invoker = true) para conteos por batch sin N+1",
+          "status": "done"
+        },
+        {
+          "label_en": "❤ N reaction count chip on ExploreRecentView + MyObservationsView feed cards",
+          "label_es": "Chip de conteo ❤ N en tarjetas ExploreRecentView + MyObservationsView",
+          "status": "done"
+        },
+        {
+          "label_en": "Overflow ⋮ menu on observation cards (Block + Report) — same pattern as PublicProfileViewV2; hidden on owner cards",
+          "label_es": "Menú ⋮ en tarjetas de observación (Bloquear + Reportar) — mismo patrón que PublicProfileViewV2; oculto en tarjetas propias",
+          "status": "done"
+        },
+        {
+          "label_en": "Block/Report per-comment in Comments.astro (lazy import of blockUser, ReportDialog with target='comment')",
+          "label_es": "Bloquear/Reportar por comentario en Comments.astro (lazy import de blockUser, ReportDialog con target='comment')",
+          "status": "done"
+        },
+        {
+          "label_en": "ARIA: aria-live region on ReactionStrip toggle, role=menu/menuitem on overflows, aria-label per InboxView row",
+          "label_es": "ARIA: región aria-live en toggle de ReactionStrip, role=menu/menuitem en overflows, aria-label por fila en InboxView",
+          "status": "done"
+        },
+        {
+          "label_en": "i18n EN/ES under socialgraph.cards.* + socialgraph.reactions.* (12 new keys)",
+          "label_es": "i18n EN/ES bajo socialgraph.cards.* + socialgraph.reactions.* (12 keys nuevas)",
+          "status": "done"
+        }
       ]
     },
     "visitor-pokedex-route": {
       "phase": "v1.2",
       "title_en": "Public visitor Pokédex route /u/dex/?username=",
       "title_es": "Ruta pública de Pokédex visitante /u/dex/?username=",
-      "modules": ["25-profile-privacy.md"],
+      "modules": [
+        "25-profile-privacy.md"
+      ],
       "subtasks": [
-        { "label_en": "Parametrize PokedexView.astro with visitor mode prop (owner self-view fallback when prop absent)", "label_es": "Parametrizar PokedexView.astro con prop visitor (fallback a vista del dueño cuando ausente)", "status": "done" },
-        { "label_en": "Privacy gate via can_see_facet(target, 'pokedex', viewer) RPC; private fallback when false", "label_es": "Gate de privacidad vía RPC can_see_facet(target, 'pokedex', viewer); fallback privado cuando false", "status": "done" },
-        { "label_en": "EN + ES paired pages at /u/dex/ with noindex,nofollow", "label_es": "Páginas EN + ES emparejadas en /u/dex/ con noindex,nofollow", "status": "done" },
-        { "label_en": "PublicProfileViewV2.astro — un-hide Pokédex link for visitors (owner → /profile/dex/, visitor → /u/dex/?username=)", "label_es": "PublicProfileViewV2.astro — re-mostrar link Pokédex para visitantes (dueño → /profile/dex/, visitante → /u/dex/?username=)", "status": "done" },
-        { "label_en": "OG card: profile-dex-visitor slug in generate-og.ts + ogSlugForPath() in BaseLayout (EN + ES)", "label_es": "OG card: slug profile-dex-visitor en generate-og.ts + ogSlugForPath() en BaseLayout (EN + ES)", "status": "done" },
-        { "label_en": "i18n: pokedex.visitor_* keys (title, subtitle, empty, private, not_found, not_found_cta, back_to_profile)", "label_es": "i18n: keys pokedex.visitor_* (title, subtitle, empty, private, not_found, not_found_cta, back_to_profile)", "status": "done" }
+        {
+          "label_en": "Parametrize PokedexView.astro with visitor mode prop (owner self-view fallback when prop absent)",
+          "label_es": "Parametrizar PokedexView.astro con prop visitor (fallback a vista del dueño cuando ausente)",
+          "status": "done"
+        },
+        {
+          "label_en": "Privacy gate via can_see_facet(target, 'pokedex', viewer) RPC; private fallback when false",
+          "label_es": "Gate de privacidad vía RPC can_see_facet(target, 'pokedex', viewer); fallback privado cuando false",
+          "status": "done"
+        },
+        {
+          "label_en": "EN + ES paired pages at /u/dex/ with noindex,nofollow",
+          "label_es": "Páginas EN + ES emparejadas en /u/dex/ con noindex,nofollow",
+          "status": "done"
+        },
+        {
+          "label_en": "PublicProfileViewV2.astro — un-hide Pokédex link for visitors (owner → /profile/dex/, visitor → /u/dex/?username=)",
+          "label_es": "PublicProfileViewV2.astro — re-mostrar link Pokédex para visitantes (dueño → /profile/dex/, visitante → /u/dex/?username=)",
+          "status": "done"
+        },
+        {
+          "label_en": "OG card: profile-dex-visitor slug in generate-og.ts + ogSlugForPath() in BaseLayout (EN + ES)",
+          "label_es": "OG card: slug profile-dex-visitor en generate-og.ts + ogSlugForPath() en BaseLayout (EN + ES)",
+          "status": "done"
+        },
+        {
+          "label_en": "i18n: pokedex.visitor_* keys (title, subtitle, empty, private, not_found, not_found_cta, back_to_profile)",
+          "label_es": "i18n: keys pokedex.visitor_* (title, subtitle, empty, private, not_found, not_found_cta, back_to_profile)",
+          "status": "done"
+        }
       ]
     },
     "deploy-functions-resilience": {
       "phase": "v1.2",
       "title_en": "Pin esm.sh imports across Edge Functions for deploy resilience",
       "title_es": "Fijar imports esm.sh en Edge Functions para resiliencia de deploy",
-      "modules": ["13-identifier-registry.md"],
+      "modules": [
+        "13-identifier-registry.md"
+      ],
       "subtasks": [
-        { "label_en": "Pin @supabase/supabase-js@2 → @2.39.7 across 24 Edge Function files", "label_es": "Fijar @supabase/supabase-js@2 → @2.39.7 en 24 archivos Edge Function", "status": "done" },
-        { "label_en": "Verify all other esm.sh imports already pinned (aws-sdk@3.658.1, jszip@3.10.1, zod@3.23.8)", "label_es": "Verificar que otros imports esm.sh ya estaban fijados (aws-sdk@3.658.1, jszip@3.10.1, zod@3.23.8)", "status": "done" },
-        { "label_en": "Inline pin during merge cascade for new file recompute-user-stats/index.ts that landed mid-PR", "label_es": "Pin inline durante cascada de merge para recompute-user-stats/index.ts que llegó a mid-PR", "status": "done" },
-        { "label_en": "Follow-up: pin imports in PR #99's 5 new admin handlers once #99 merges (~5 LOC patch)", "label_es": "Seguimiento: fijar imports en los 5 nuevos handlers admin de PR #99 cuando #99 mergee (~5 LOC patch)", "status": "planned" }
+        {
+          "label_en": "Pin @supabase/supabase-js@2 → @2.39.7 across 24 Edge Function files",
+          "label_es": "Fijar @supabase/supabase-js@2 → @2.39.7 en 24 archivos Edge Function",
+          "status": "done"
+        },
+        {
+          "label_en": "Verify all other esm.sh imports already pinned (aws-sdk@3.658.1, jszip@3.10.1, zod@3.23.8)",
+          "label_es": "Verificar que otros imports esm.sh ya estaban fijados (aws-sdk@3.658.1, jszip@3.10.1, zod@3.23.8)",
+          "status": "done"
+        },
+        {
+          "label_en": "Inline pin during merge cascade for new file recompute-user-stats/index.ts that landed mid-PR",
+          "label_es": "Pin inline durante cascada de merge para recompute-user-stats/index.ts que llegó a mid-PR",
+          "status": "done"
+        },
+        {
+          "label_en": "Follow-up: pin imports in PR #99's 5 new admin handlers once #99 merges (~5 LOC patch)",
+          "label_es": "Seguimiento: fijar imports en los 5 nuevos handlers admin de PR #99 cuando #99 mergee (~5 LOC patch)",
+          "status": "planned"
+        }
       ]
     },
     "m26-v1-1-review-followups": {
       "phase": "v1.2",
       "title_en": "M26 v1.1 review follow-ups — minor polish from PR #100/#101 reviewer notes",
       "title_es": "Seguimientos de review M26 v1.1 — pulido menor de los notes en PR #100/#101",
-      "modules": ["26-social-graph.md"],
+      "modules": [
+        "26-social-graph.md"
+      ],
       "subtasks": [
-        { "label_en": "?u= alias on readUsername() — removed (audit showed zero references outside docs across PublicProfileViewV2, FollowingView, FollowersView, PokedexView)", "label_es": "Alias ?u= en readUsername() — eliminado (audit no encontró referencias fuera de docs en PublicProfileViewV2, FollowingView, FollowersView, PokedexView)", "status": "done" },
-        { "label_en": "document.title in JS → use i18n key for consistency (PublicProfileViewV2, ExploreSpeciesView, PokedexView)", "label_es": "document.title en JS → usar key i18n por consistencia (PublicProfileViewV2, ExploreSpeciesView, PokedexView)", "status": "done" },
-        { "label_en": "runVisitor catch-all → distinguish error vs not-found state (Pokedex visitor mode now shows visitor_load_error for network/RPC errors, visitor_not_found only for 0-row PGRST116)", "label_es": "runVisitor catch-all → distinguir estado error vs not-found (modo visitante Pokedex ahora muestra visitor_load_error para errores de red/RPC, visitor_not_found solo para PGRST116 0-rows)", "status": "done" },
-        { "label_en": "ConfirmDialog component — replace confirm()/alert() in Block flow (matches ReportDialog pattern, PR #101 review)", "label_es": "Componente ConfirmDialog — reemplazar confirm()/alert() en flujo Block (patrón ReportDialog, review de PR #101)", "status": "planned" },
-        { "label_en": "Extract overflow-menu logic into lib/overflow-menu.ts (replaces 3× duplication across PublicProfileViewV2, ExploreRecentView, Comments — wireOverflowMenu(wrap, trigger, menu) returns teardown)", "label_es": "Extraer lógica de overflow-menu a lib/overflow-menu.ts (reemplaza duplicación 3× en PublicProfileViewV2, ExploreRecentView, Comments — wireOverflowMenu(wrap, trigger, menu) regresa teardown)", "status": "done" },
-        { "label_en": "Standardize fave_count_one vs fave_aria_one data-attr naming — both consumers now use data-label-fave-aria-one/other", "label_es": "Estandarizar naming de data-attrs fave_count_one vs fave_aria_one — ambos consumidores ahora usan data-label-fave-aria-one/other", "status": "done" }
+        {
+          "label_en": "?u= alias on readUsername() — removed (audit showed zero references outside docs across PublicProfileViewV2, FollowingView, FollowersView, PokedexView)",
+          "label_es": "Alias ?u= en readUsername() — eliminado (audit no encontró referencias fuera de docs en PublicProfileViewV2, FollowingView, FollowersView, PokedexView)",
+          "status": "done"
+        },
+        {
+          "label_en": "document.title in JS → use i18n key for consistency (PublicProfileViewV2, ExploreSpeciesView, PokedexView)",
+          "label_es": "document.title en JS → usar key i18n por consistencia (PublicProfileViewV2, ExploreSpeciesView, PokedexView)",
+          "status": "done"
+        },
+        {
+          "label_en": "runVisitor catch-all → distinguish error vs not-found state (Pokedex visitor mode now shows visitor_load_error for network/RPC errors, visitor_not_found only for 0-row PGRST116)",
+          "label_es": "runVisitor catch-all → distinguir estado error vs not-found (modo visitante Pokedex ahora muestra visitor_load_error para errores de red/RPC, visitor_not_found solo para PGRST116 0-rows)",
+          "status": "done"
+        },
+        {
+          "label_en": "ConfirmDialog component — replaces confirm()/alert() in Block flow + delete-photo flow (matches ReportDialog pattern; closes notes from PR #101 + #125 reviews)",
+          "label_es": "Componente ConfirmDialog — reemplaza confirm()/alert() en flujo Block + delete-photo (patrón ReportDialog; cierra notas de reviews PR #101 + #125)",
+          "status": "done",
+          "pr": 149
+        },
+        {
+          "label_en": "Extract overflow-menu logic into lib/overflow-menu.ts (replaces 3× duplication across PublicProfileViewV2, ExploreRecentView, Comments — wireOverflowMenu(wrap, trigger, menu) returns teardown)",
+          "label_es": "Extraer lógica de overflow-menu a lib/overflow-menu.ts (reemplaza duplicación 3× en PublicProfileViewV2, ExploreRecentView, Comments — wireOverflowMenu(wrap, trigger, menu) regresa teardown)",
+          "status": "done"
+        },
+        {
+          "label_en": "Standardize fave_count_one vs fave_aria_one data-attr naming — both consumers now use data-label-fave-aria-one/other",
+          "label_es": "Estandarizar naming de data-attrs fave_count_one vs fave_aria_one — ambos consumidores ahora usan data-label-fave-aria-one/other",
+          "status": "done"
+        }
       ]
     },
     "community-discovery-m28": {
       "phase": "v1.2",
       "title_en": "Community discovery (Module 28)",
       "title_es": "Descubrimiento comunitario (Módulo 28)",
-      "modules": ["28-community-discovery.md"],
+      "modules": [
+        "28-community-discovery.md"
+      ],
       "subtasks": [
-        { "label_en": "PR1 — schema deltas: 6 new users columns + 7 partial indexes scoped to (NOT hide_from_leaderboards AND profile_public) + iso_countries reference table + 28-country bilingual seed + normalize_country_code() + dual views (community_observers anon-safe / community_observers_with_centroid auth-only)", "label_es": "PR1 — deltas de schema: 6 columnas nuevas en users + 7 índices parciales filtrados a (NOT hide_from_leaderboards AND profile_public) + tabla iso_countries + seed bilingüe de 28 países + normalize_country_code() + vistas duales", "status": "done", "pr": 92 },
-        { "label_en": "PR2 — recompute-user-stats Edge Function + nightly cron at 08:00 UTC + SECURITY DEFINER recompute_user_stats() wrapper", "label_es": "PR2 — Edge Function recompute-user-stats + cron nocturno 08:00 UTC + wrapper recompute_user_stats() SECURITY DEFINER", "status": "done", "pr": 96 },
-        { "label_en": "PR3 — manual operator action: fire recompute-user-stats once to backfill counters/centroids before any opt-in surface goes live (not a code PR)", "label_es": "PR3 — acción manual del operador: disparar recompute-user-stats una vez para llenar contadores/centroides antes de la superficie opt-in (no es un PR)", "status": "planned" },
-        { "label_en": "PR4 — Profile → Edit: country picker + 'Show me in community discovery' toggle (UI-true → DB-false hide_from_leaderboards) + country_code_source 'auto'/'user' for the 'inferred from your region' badge + buildCommunityDiscoveryPayload() pure helper + 9 unit tests", "label_es": "PR4 — Perfil → Editar: selector de país + toggle 'Mostrarme en descubrimiento comunitario' (UI-true → DB-false hide_from_leaderboards) + country_code_source 'auto'/'user' para badge 'inferido por tu región' + helper puro buildCommunityDiscoveryPayload() + 9 tests unitarios", "status": "done", "pr": 102 },
-        { "label_en": "PR5+PR6 — atomic landing: /community/observers/ CSR page + composable filter chips (sort, country, taxon, experts-only, nearby) + sign-in gate on Nearby + URL-state serializer + community_observers_nearby RPC + MegaMenu split (Biodiversity / Community columns) + MobileDrawer subheading + i18n rewrite of the two shipped 'no leaderboards' strings + OG card + roadmap + module spec status → 'shipped'", "label_es": "PR5+PR6 — aterrizaje atómico: página CSR /community/observers/ + chips componibles + sign-in en Nearby + serializador URL + RPC community_observers_nearby + split del MegaMenu + subheading en MobileDrawer + reescritura i18n + OG card + roadmap + módulo → 'shipped'", "status": "done" }
+        {
+          "label_en": "PR1 — schema deltas: 6 new users columns + 7 partial indexes scoped to (NOT hide_from_leaderboards AND profile_public) + iso_countries reference table + 28-country bilingual seed + normalize_country_code() + dual views (community_observers anon-safe / community_observers_with_centroid auth-only)",
+          "label_es": "PR1 — deltas de schema: 6 columnas nuevas en users + 7 índices parciales filtrados a (NOT hide_from_leaderboards AND profile_public) + tabla iso_countries + seed bilingüe de 28 países + normalize_country_code() + vistas duales",
+          "status": "done",
+          "pr": 92
+        },
+        {
+          "label_en": "PR2 — recompute-user-stats Edge Function + nightly cron at 08:00 UTC + SECURITY DEFINER recompute_user_stats() wrapper",
+          "label_es": "PR2 — Edge Function recompute-user-stats + cron nocturno 08:00 UTC + wrapper recompute_user_stats() SECURITY DEFINER",
+          "status": "done",
+          "pr": 96
+        },
+        {
+          "label_en": "PR3 — backfill recompute-user-stats once after deploy to seed counters/centroids/country_code for existing users. Automated as a workflow_dispatch button at .github/workflows/community-backfill.yml (POSTs the EF, surfaces rows_updated/elapsed_ms in the Actions UI, idempotent)",
+          "label_es": "PR3 — backfill de recompute-user-stats tras deploy para sembrar counters/centroides/country_code de usuarios existentes. Automatizado como workflow_dispatch en .github/workflows/community-backfill.yml (POST a la EF, surfacea rows_updated/elapsed_ms en la Actions UI, idempotente)",
+          "status": "done",
+          "pr": 129
+        },
+        {
+          "label_en": "PR4 — Profile → Edit: country picker + 'Show me in community discovery' toggle (UI-true → DB-false hide_from_leaderboards) + country_code_source 'auto'/'user' for the 'inferred from your region' badge + buildCommunityDiscoveryPayload() pure helper + 9 unit tests",
+          "label_es": "PR4 — Perfil → Editar: selector de país + toggle 'Mostrarme en descubrimiento comunitario' (UI-true → DB-false hide_from_leaderboards) + country_code_source 'auto'/'user' para badge 'inferido por tu región' + helper puro buildCommunityDiscoveryPayload() + 9 tests unitarios",
+          "status": "done",
+          "pr": 102
+        },
+        {
+          "label_en": "PR5+PR6 — atomic landing: /community/observers/ CSR page + composable filter chips (sort, country, taxon, experts-only, nearby) + sign-in gate on Nearby + URL-state serializer + community_observers_nearby RPC + MegaMenu split (Biodiversity / Community columns) + MobileDrawer subheading + i18n rewrite of the two shipped 'no leaderboards' strings + OG card + roadmap + module spec status → 'shipped'",
+          "label_es": "PR5+PR6 — aterrizaje atómico: página CSR /community/observers/ + chips componibles + sign-in en Nearby + serializador URL + RPC community_observers_nearby + split del MegaMenu + subheading en MobileDrawer + reescritura i18n + OG card + roadmap + módulo → 'shipped'",
+          "status": "done"
+        }
       ]
     },
     "obs-detail-redesign": {
@@ -4305,61 +4975,516 @@
       "title_es": "Rediseño de la página de detalle de observación — viewer + edición de dueño",
       "modules": [],
       "subtasks": [
-        { "label_en": "PR1 — extract reusable MapPicker.astro from ObservationForm. Per-instance HTML IDs (-${pickerId} suffix). Native modal a11y preserved. Playwright regression test for the observe-form flow", "label_es": "PR1 — extraer MapPicker.astro reutilizable de ObservationForm. IDs HTML por instancia (sufijo -${pickerId}). A11y del modal nativo preservada. Regresión Playwright para el flujo del observe form", "status": "done", "pr": 91 },
-        { "label_en": "PR2 — schema: observations.last_material_edit_at + media_files.deleted_at + idx_media_files_active + observations_material_edit_check_trg trigger (location > 1 km, observed_at > 24 h, primary_taxon_id change). Extract observation-enums.ts + obs_detail.* i18n namespace EN+ES", "label_es": "PR2 — schema: observations.last_material_edit_at + media_files.deleted_at + idx_media_files_active + trigger observations_material_edit_check_trg. Extraer observation-enums.ts + namespace i18n obs_detail.* EN+ES", "status": "done", "pr": 98 },
-        { "label_en": "PR3 — PhotoGallery.astro (native lightbox + keyboard + swipe + canShare probe + dynamic 'Photo N of M' aria-labels) + ShareObsView.astro extraction to two-column desktop / stacked mobile + share/obs/index.astro slimmed to ~15 LOC + coords readout + 'Edited after IDs' badge + Playwright e2e (5 cases) + ShareObsView ternary strings migrated to obs_detail.view.*", "label_es": "PR3 — PhotoGallery.astro (lightbox nativo + teclado + swipe + probe canShare + aria-labels dinámicos 'Foto N de M') + extracción de ShareObsView.astro a layout dos columnas / apilado móvil + share/obs/index.astro adelgazado + lectura de coordenadas + badge 'Editado tras IDs' + Playwright e2e (5 casos) + strings ternarios de ShareObsView migrados a obs_detail.view.*", "status": "done", "pr": 103 },
-        { "label_en": "PR4 — ObsManagePanel.astro Details tab: editable date/time + habitat + weather + establishment_means + scientific-name override + notes + obscure-level. Material-edit trigger fires automatically on save", "label_es": "PR4 — ObsManagePanel.astro tab Detalles: edición de fecha/hora + hábitat + clima + establishment_means + override científico + notas + obscure-level. Trigger material-edit dispara al guardar", "status": "done", "pr": 120 },
-        { "label_en": "PR5 — ObsManagePanel.astro Location tab: drop-in MapPicker mode='edit' modal for coordinate edit; saves location + recomputes obscure_level via existing trigger", "label_es": "PR5 — ObsManagePanel.astro tab Ubicación: modal MapPicker mode='edit' para editar coordenadas; guarda location + recomputa obscure_level via trigger existente", "status": "planned" },
-        { "label_en": "PR6 — Photos tab + delete-photo Edge Function (atomic transaction via delete_photo_atomic SECURITY DEFINER RPC: media_files.deleted_at + identifications demote clearing validated_by/validated_at/is_research_grade + observations.last_material_edit_at). Photo add via R2 upload flow. Cascade-photo confirm dialog driven by willDemote() helper (covered by vitest)", "label_es": "PR6 — Tab Fotos + Edge Function delete-photo (transacción atómica via RPC delete_photo_atomic SECURITY DEFINER: media_files.deleted_at + degradar identifications limpiando validated_by/validated_at/is_research_grade + observations.last_material_edit_at). Subir fotos via R2 + diálogo confirm cascade-photo dirigido por helper willDemote() (cubierto por vitest)", "status": "done", "pr": 125 },
-        { "label_en": "v1.1 follow-ups: gc-orphan-media cron (R2 GC of soft-deleted blobs); native vs PhotoSwipe lightbox decision (was native ≤150 lines per spec)", "label_es": "Seguimientos v1.1: cron gc-orphan-media (GC R2 de blobs soft-deleted); decisión nativo vs PhotoSwipe del lightbox", "status": "planned" }
+        {
+          "label_en": "PR1 — extract reusable MapPicker.astro from ObservationForm. Per-instance HTML IDs (-${pickerId} suffix). Native modal a11y preserved. Playwright regression test for the observe-form flow",
+          "label_es": "PR1 — extraer MapPicker.astro reutilizable de ObservationForm. IDs HTML por instancia (sufijo -${pickerId}). A11y del modal nativo preservada. Regresión Playwright para el flujo del observe form",
+          "status": "done",
+          "pr": 91
+        },
+        {
+          "label_en": "PR2 — schema: observations.last_material_edit_at + media_files.deleted_at + idx_media_files_active + observations_material_edit_check_trg trigger (location > 1 km, observed_at > 24 h, primary_taxon_id change). Extract observation-enums.ts + obs_detail.* i18n namespace EN+ES",
+          "label_es": "PR2 — schema: observations.last_material_edit_at + media_files.deleted_at + idx_media_files_active + trigger observations_material_edit_check_trg. Extraer observation-enums.ts + namespace i18n obs_detail.* EN+ES",
+          "status": "done",
+          "pr": 98
+        },
+        {
+          "label_en": "PR3 — PhotoGallery.astro (native lightbox + keyboard + swipe + canShare probe + dynamic 'Photo N of M' aria-labels) + ShareObsView.astro extraction to two-column desktop / stacked mobile + share/obs/index.astro slimmed to ~15 LOC + coords readout + 'Edited after IDs' badge + Playwright e2e (5 cases) + ShareObsView ternary strings migrated to obs_detail.view.*",
+          "label_es": "PR3 — PhotoGallery.astro (lightbox nativo + teclado + swipe + probe canShare + aria-labels dinámicos 'Foto N de M') + extracción de ShareObsView.astro a layout dos columnas / apilado móvil + share/obs/index.astro adelgazado + lectura de coordenadas + badge 'Editado tras IDs' + Playwright e2e (5 casos) + strings ternarios de ShareObsView migrados a obs_detail.view.*",
+          "status": "done",
+          "pr": 103
+        },
+        {
+          "label_en": "PR4 — ObsManagePanel.astro Details tab: editable date/time + habitat + weather + establishment_means + scientific-name override + notes + obscure-level. Material-edit trigger fires automatically on save",
+          "label_es": "PR4 — ObsManagePanel.astro tab Detalles: edición de fecha/hora + hábitat + clima + establishment_means + override científico + notas + obscure-level. Trigger material-edit dispara al guardar",
+          "status": "done",
+          "pr": 120
+        },
+        {
+          "label_en": "PR5 — ObsManagePanel.astro Location tab: read-only view picker (pickerId='obs-detail-loc-view') + edit-modal picker (pickerId='obs-detail-edit') wired by wireManagePanelLocation; pointGeographyLiteral helper + 5 vitest cases + 5 Playwright e2e cases",
+          "label_es": "PR5 — ObsManagePanel.astro tab Ubicación: picker view sólo-lectura (pickerId='obs-detail-loc-view') + picker edit-modal (pickerId='obs-detail-edit') conectados por wireManagePanelLocation; helper pointGeographyLiteral + 5 casos vitest + 5 casos Playwright e2e",
+          "status": "done",
+          "pr": 124
+        },
+        {
+          "label_en": "PR6 — Photos tab + delete-photo Edge Function (atomic transaction via delete_photo_atomic SECURITY DEFINER RPC: media_files.deleted_at + identifications demote clearing validated_by/validated_at/is_research_grade + observations.last_material_edit_at). Photo add via R2 upload flow. Cascade-photo confirm dialog driven by willDemote() helper (covered by vitest)",
+          "label_es": "PR6 — Tab Fotos + Edge Function delete-photo (transacción atómica via RPC delete_photo_atomic SECURITY DEFINER: media_files.deleted_at + degradar identifications limpiando validated_by/validated_at/is_research_grade + observations.last_material_edit_at). Subir fotos via R2 + diálogo confirm cascade-photo dirigido por helper willDemote() (cubierto por vitest)",
+          "status": "done",
+          "pr": 125
+        },
+        {
+          "label_en": "v1.1 follow-ups: gc-orphan-media cron (R2 GC of soft-deleted blobs); native vs PhotoSwipe lightbox decision (was native ≤150 lines per spec)",
+          "label_es": "Seguimientos v1.1: cron gc-orphan-media (GC R2 de blobs soft-deleted); decisión nativo vs PhotoSwipe del lightbox",
+          "status": "planned"
+        }
       ]
     },
     "projects-anp-m29": {
       "phase": "v1.2",
       "title_en": "Projects (Module 29) — ANP polygon protocols",
       "title_es": "Proyectos (Módulo 29) — protocolos de polígono ANP",
-      "modules": ["29-projects-anp.md"],
+      "modules": [
+        "29-projects-anp.md"
+      ],
       "subtasks": [
-        { "label_en": "Schema: projects (slug UNIQUE, polygon geography(MultiPolygon, 4326), visibility public/private) + project_members + RLS + GIST index", "label_es": "Schema: projects (slug UNIQUE, polygon geography(MultiPolygon, 4326), visibility público/privado) + project_members + RLS + índice GIST", "status": "done", "pr": 132 },
-        { "label_en": "BEFORE INSERT/UPDATE OF location trigger on observations: ST_Covers(polygon, NEW.location) → auto-tag NEW.project_id (manual override respected, ORDER BY created_at ASC tiebreaker)", "label_es": "Trigger BEFORE INSERT/UPDATE OF location: ST_Covers(polygon, NEW.location) → auto-etiqueta NEW.project_id (respeta override manual, desempate ORDER BY created_at ASC)", "status": "done", "pr": 132 },
-        { "label_en": "upsert_project SECURITY DEFINER RPC + projects_with_geojson view WITH (security_invoker = true) + UI (List/New/Detail) at /{en,es}/{projects,proyectos}/", "label_es": "RPC upsert_project SECURITY DEFINER + vista projects_with_geojson WITH (security_invoker = true) + UI (List/New/Detail) en /{en,es}/{projects,proyectos}/", "status": "done", "pr": 132 },
-        { "label_en": "v1.1 follow-up: surface Projects link from chrome (Header MegaMenu Biodiversity column) — currently only reachable via direct URL", "label_es": "Seguimiento v1.1: exponer link de Projects desde el chrome (columna Biodiversidad del Explore MegaMenu) — actualmente sólo accesible via URL directa", "status": "planned" }
+        {
+          "label_en": "Schema: projects (slug UNIQUE, polygon geography(MultiPolygon, 4326), visibility public/private) + project_members + RLS + GIST index",
+          "label_es": "Schema: projects (slug UNIQUE, polygon geography(MultiPolygon, 4326), visibility público/privado) + project_members + RLS + índice GIST",
+          "status": "done",
+          "pr": 132
+        },
+        {
+          "label_en": "BEFORE INSERT/UPDATE OF location trigger on observations: ST_Covers(polygon, NEW.location) → auto-tag NEW.project_id (manual override respected, ORDER BY created_at ASC tiebreaker)",
+          "label_es": "Trigger BEFORE INSERT/UPDATE OF location: ST_Covers(polygon, NEW.location) → auto-etiqueta NEW.project_id (respeta override manual, desempate ORDER BY created_at ASC)",
+          "status": "done",
+          "pr": 132
+        },
+        {
+          "label_en": "upsert_project SECURITY DEFINER RPC + projects_with_geojson view WITH (security_invoker = true) + UI (List/New/Detail) at /{en,es}/{projects,proyectos}/",
+          "label_es": "RPC upsert_project SECURITY DEFINER + vista projects_with_geojson WITH (security_invoker = true) + UI (List/New/Detail) en /{en,es}/{projects,proyectos}/",
+          "status": "done",
+          "pr": 132
+        },
+        {
+          "label_en": "v1.1 follow-up: surface Projects link from chrome (Header MegaMenu Biodiversity column) — currently only reachable via direct URL",
+          "label_es": "Seguimiento v1.1: exponer link de Projects desde el chrome (columna Biodiversidad del Explore MegaMenu) — actualmente sólo accesible via URL directa",
+          "status": "planned"
+        }
       ]
     },
     "cli-batch-import-m30": {
       "phase": "v1.2",
       "title_en": "CLI batch import for camera-trap memory cards (Module 30)",
       "title_es": "CLI de importación masiva para tarjetas de cámaras trampa (Módulo 30)",
-      "modules": ["30-cli-batch-import.md"],
+      "modules": [
+        "30-cli-batch-import.md"
+      ],
       "subtasks": [
-        { "label_en": "cli/ Node 20+ TypeScript package (rastrum-import) — walker + EXIF reader + orchestrator", "label_es": "Paquete cli/ Node 20+ TypeScript (rastrum-import) — walker + lector EXIF + orquestador", "status": "done", "pr": 134 },
-        { "label_en": "POST /api/upload-url Edge Function endpoint — issues presigned R2 PUT URLs scoped by rst_* token", "label_es": "Endpoint Edge Function POST /api/upload-url — emite URLs presignadas R2 PUT con scope por token rst_*", "status": "done", "pr": 134 },
-        { "label_en": "--project-slug flag auto-tags every observation into the M29 polygon. State file makes the import resumable across SD recoveries", "label_es": "Flag --project-slug auto-etiqueta cada observación en el polígono M29. El archivo de estado vuelve la importación reanudable entre recuperaciones de SD", "status": "done", "pr": 134 },
-        { "label_en": "Built for the CONANP-Oaxaca / DRFSIPS / PROREST 2026 workflow (500–2000 images per camera deployment)", "label_es": "Construido para el flujo CONANP-Oaxaca / DRFSIPS / PROREST 2026 (500–2000 imágenes por deployment)", "status": "done", "pr": 134 }
+        {
+          "label_en": "cli/ Node 20+ TypeScript package (rastrum-import) — walker + EXIF reader + orchestrator",
+          "label_es": "Paquete cli/ Node 20+ TypeScript (rastrum-import) — walker + lector EXIF + orquestador",
+          "status": "done",
+          "pr": 134
+        },
+        {
+          "label_en": "POST /api/upload-url Edge Function endpoint — issues presigned R2 PUT URLs scoped by rst_* token",
+          "label_es": "Endpoint Edge Function POST /api/upload-url — emite URLs presignadas R2 PUT con scope por token rst_*",
+          "status": "done",
+          "pr": 134
+        },
+        {
+          "label_en": "--project-slug flag auto-tags every observation into the M29 polygon. State file makes the import resumable across SD recoveries",
+          "label_es": "Flag --project-slug auto-etiqueta cada observación en el polígono M29. El archivo de estado vuelve la importación reanudable entre recuperaciones de SD",
+          "status": "done",
+          "pr": 134
+        },
+        {
+          "label_en": "Built for the CONANP-Oaxaca / DRFSIPS / PROREST 2026 workflow (500–2000 images per camera deployment)",
+          "label_es": "Construido para el flujo CONANP-Oaxaca / DRFSIPS / PROREST 2026 (500–2000 imágenes por deployment)",
+          "status": "done",
+          "pr": 134
+        }
       ]
     },
     "camera-stations-m31": {
       "phase": "v1.2",
       "title_en": "Camera stations + sampling-effort tracking (Module 31)",
       "title_es": "Estaciones de cámara + seguimiento de esfuerzo de muestreo (Módulo 31)",
-      "modules": ["31-camera-stations.md"],
+      "modules": [
+        "31-camera-stations.md"
+      ],
       "subtasks": [
-        { "label_en": "Schema: camera_stations (project_id FK + station_key + coords + camera_model)", "label_es": "Schema: camera_stations (FK project_id + station_key + coords + camera_model)", "status": "done", "pr": 141 },
-        { "label_en": "Schema: camera_station_active_periods (start/end) — multiple per station for redeployments across a year", "label_es": "Schema: camera_station_active_periods (inicio/fin) — múltiples por estación para redespliegues a lo largo del año", "status": "done", "pr": 141 },
-        { "label_en": "Foundation for downstream wildlife indices: Relative Abundance Index (RAI), detection rate per 100 trap-nights, species richness — all blocked on knowing how long the camera was sampling", "label_es": "Base para índices de fauna futuros: Índice de Abundancia Relativa (RAI), tasa de detección por 100 noches-trampa, riqueza de especies — todos dependen de saber cuánto tiempo estuvo muestreando la cámara", "status": "done", "pr": 141 },
-        { "label_en": "v1.1 follow-up: UI to capture active periods (CRUD form + station picker on observations + station map layer)", "label_es": "Seguimiento v1.1: UI para capturar periodos activos (formulario CRUD + selector de estación en observaciones + capa de mapa de estaciones)", "status": "planned" }
+        {
+          "label_en": "Schema: camera_stations (project_id FK + station_key + coords + camera_model)",
+          "label_es": "Schema: camera_stations (FK project_id + station_key + coords + camera_model)",
+          "status": "done",
+          "pr": 141
+        },
+        {
+          "label_en": "Schema: camera_station_active_periods (start/end) — multiple per station for redeployments across a year",
+          "label_es": "Schema: camera_station_active_periods (inicio/fin) — múltiples por estación para redespliegues a lo largo del año",
+          "status": "done",
+          "pr": 141
+        },
+        {
+          "label_en": "Foundation for downstream wildlife indices: Relative Abundance Index (RAI), detection rate per 100 trap-nights, species richness — all blocked on knowing how long the camera was sampling",
+          "label_es": "Base para índices de fauna futuros: Índice de Abundancia Relativa (RAI), tasa de detección por 100 noches-trampa, riqueza de especies — todos dependen de saber cuánto tiempo estuvo muestreando la cámara",
+          "status": "done",
+          "pr": 141
+        },
+        {
+          "label_en": "v1.1 follow-up: UI to capture active periods (CRUD form + station picker on observations + station map layer)",
+          "label_es": "Seguimiento v1.1: UI para capturar periodos activos (formulario CRUD + selector de estación en observaciones + capa de mapa de estaciones)",
+          "status": "planned"
+        }
       ]
     },
     "multi-provider-vision-m32": {
       "phase": "v1.2",
       "title_en": "Multi-provider vision + per-sponsor model + platform pool (Module 32)",
       "title_es": "Visión multi-proveedor + modelo por patrocinador + pool de plataforma (Módulo 32)",
-      "modules": ["32-multi-provider-vision.md"],
+      "modules": [
+        "32-multi-provider-vision.md"
+      ],
       "subtasks": [
-        { "label_en": "_shared/vision-provider.ts — VisionProvider interface implemented by 6 providers (Anthropic api_key + oauth_token, Bedrock with AWS Sig V4, OpenAI, Azure OpenAI, Gemini)", "label_es": "_shared/vision-provider.ts — interfaz VisionProvider implementada por 6 proveedores (Anthropic api_key + oauth_token, Bedrock con AWS Sig V4, OpenAI, Azure OpenAI, Gemini)", "status": "done", "pr": 143 },
-        { "label_en": "Per-sponsor preferred_model column on ai_credentials — beneficiaries can request Haiku/Sonnet/Opus or Bedrock equivalents (closes #116)", "label_es": "Columna preferred_model por patrocinador en ai_credentials — beneficiarios pueden pedir Haiku/Sonnet/Opus o equivalentes Bedrock (cierra #116)", "status": "done", "pr": 143 },
-        { "label_en": "OpenAI / Azure OpenAI / Google Gemini / Vertex AI providers (closes #118)", "label_es": "Proveedores OpenAI / Azure OpenAI / Google Gemini / Vertex AI (cierra #118)", "status": "done", "pr": 143 },
-        { "label_en": "Platform-wide call pool: sponsor_pools table + consume_pool_slot RPC (closes #115)", "label_es": "Pool de llamadas a nivel plataforma: tabla sponsor_pools + RPC consume_pool_slot (cierra #115)", "status": "done", "pr": 143 }
+        {
+          "label_en": "_shared/vision-provider.ts — VisionProvider interface implemented by 6 providers (Anthropic api_key + oauth_token, Bedrock with AWS Sig V4, OpenAI, Azure OpenAI, Gemini)",
+          "label_es": "_shared/vision-provider.ts — interfaz VisionProvider implementada por 6 proveedores (Anthropic api_key + oauth_token, Bedrock con AWS Sig V4, OpenAI, Azure OpenAI, Gemini)",
+          "status": "done",
+          "pr": 143
+        },
+        {
+          "label_en": "Per-sponsor preferred_model column on ai_credentials — beneficiaries can request Haiku/Sonnet/Opus or Bedrock equivalents (closes #116)",
+          "label_es": "Columna preferred_model por patrocinador en ai_credentials — beneficiarios pueden pedir Haiku/Sonnet/Opus o equivalentes Bedrock (cierra #116)",
+          "status": "done",
+          "pr": 143
+        },
+        {
+          "label_en": "OpenAI / Azure OpenAI / Google Gemini / Vertex AI providers (closes #118)",
+          "label_es": "Proveedores OpenAI / Azure OpenAI / Google Gemini / Vertex AI (cierra #118)",
+          "status": "done",
+          "pr": 143
+        },
+        {
+          "label_en": "Platform-wide call pool: sponsor_pools table + consume_pool_slot RPC (closes #115)",
+          "label_es": "Pool de llamadas a nivel plataforma: tabla sponsor_pools + RPC consume_pool_slot (cierra #115)",
+          "status": "done",
+          "pr": 143
+        }
+      ]
+    },
+    "bioblitz-events-ui": {
+      "phase": "v1.0",
+      "title_en": "Bioblitz events",
+      "title_es": "Eventos bioblitz",
+      "modules": [
+        "08-profile-activity-gamification.md"
+      ],
+      "subtasks": [
+        {
+          "label_en": "Bioblitz events — UI (event detail page, live aggregates, participation badges)",
+          "label_es": "Eventos bioblitz — UI (página de detalle, agregados en vivo, insignias de participación)",
+          "status": "planned"
+        }
+      ]
+    },
+    "ux-confidence-ring": {
+      "phase": "v1.1",
+      "title_en": "Confidence ring (SVG arc graded emerald→amber→red) instead of percentage pill",
+      "title_es": "Anillo de confianza (arco SVG en emerald→ámbar→rojo) en lugar de pastilla con porcentaje",
+      "modules": [
+        "13-identifier-registry.md"
+      ],
+      "subtasks": [
+        {
+          "label_en": "Confidence ring (SVG arc graded emerald→amber→red) instead of percentage pill — faster comprehension for non-technical users",
+          "label_es": "Anillo de confianza (arco SVG en emerald→ámbar→rojo) en lugar de pastilla con porcentaje — más fácil de leer para no-técnicos",
+          "status": "done"
+        }
+      ]
+    },
+    "ux-quick-taxon-chips": {
+      "phase": "v1.1",
+      "title_en": "Quick-taxon icons under photo upload (🌿 plant · 🐦 bird · 🐾 mammal · 🐛 insect · 🍄 fungus)",
+      "title_es": "Íconos rápidos de taxón bajo el subidor de fotos (🌿 planta · 🐦 ave · 🐾 mamífero · 🐛 insect",
+      "modules": [
+        "02-observation-form.md"
+      ],
+      "subtasks": [
+        {
+          "label_en": "Quick-taxon icons under photo upload (🌿 plant · 🐦 bird · 🐾 mammal · 🐛 insect · 🍄 fungus) — primes the cascade and sets honest user expectations",
+          "label_es": "Íconos rápidos de taxón bajo el subidor de fotos (🌿 planta · 🐦 ave · 🐾 mamífero · 🐛 insecto · 🍄 hongo) — orienta la cascada y fija expectativas honestas",
+          "status": "done"
+        }
+      ]
+    },
+    "ux-photo-compression": {
+      "phase": "v1.1",
+      "title_en": "Auto-compress photos > 4 MP to 4 MP via canvas before upload",
+      "title_es": "Compresión automática de fotos > 4 MP a 4 MP vía canvas antes de subir",
+      "modules": [
+        "02-observation-form.md"
+      ],
+      "subtasks": [
+        {
+          "label_en": "Auto-compress photos > 4 MP to 4 MP via canvas before upload — cuts R2 footprint 4×, speeds sync on slow networks, no ID quality loss",
+          "label_es": "Compresión automática de fotos > 4 MP a 4 MP vía canvas antes de subir — reduce R2 4×, acelera la sincronización en redes lentas, sin pérdida de calidad de ID",
+          "status": "done"
+        }
+      ]
+    },
+    "ux-share-button": {
+      "phase": "v1.1",
+      "title_en": "Share button on result card → /share/obs/<id> with existing OG card; critical for viral pi",
+      "title_es": "Botón de compartir en la tarjeta de resultado → /share/obs/<id> con la OG card existente;",
+      "modules": [
+        "03-observation-detail.md"
+      ],
+      "subtasks": [
+        {
+          "label_en": "Share button on result card → /share/obs/<id> with existing OG card; critical for viral pickup during family launch",
+          "label_es": "Botón de compartir en la tarjeta de resultado → /share/obs/<id> con la OG card existente; clave para difusión viral durante el lanzamiento familiar",
+          "status": "done"
+        }
+      ]
+    },
+    "ux-save-as-draft": {
+      "phase": "v1.1",
+      "title_en": "Save observation as draft without GPS",
+      "title_es": "Guardar observación como borrador sin GPS",
+      "modules": [
+        "02-observation-form.md"
+      ],
+      "subtasks": [
+        {
+          "label_en": "Save observation as draft without GPS — current form blocks submit on missing location, breaking the flow for users in cell-dead zones",
+          "label_es": "Guardar observación como borrador sin GPS — el formulario actual bloquea el submit si falta ubicación, lo que rompe el flujo en zonas sin señal",
+          "status": "done"
+        }
+      ]
+    },
+    "ux-onboarding-tour": {
+      "phase": "v1.1",
+      "title_en": "First-signup onboarding",
+      "title_es": "Onboarding al primer registro",
+      "modules": [],
+      "subtasks": [
+        {
+          "label_en": "First-signup onboarding — 3 dismissible cards (install PWA → take a photo → see your profile); skippable; never repeats",
+          "label_es": "Onboarding al primer registro — 3 tarjetas descartables (instala la PWA → toma una foto → mira tu perfil); saltable; sin repeticiones",
+          "status": "done"
+        }
+      ]
+    },
+    "ux-chat-suggestions": {
+      "phase": "v1.1",
+      "title_en": "Chat follow-up suggestion chips below each AI reply (¿Es venenosa?, ¿Cómo distingo de X?,",
+      "title_es": "Chips de sugerencia de seguimiento bajo cada respuesta de IA en chat (¿Es venenosa?, ¿Cómo",
+      "modules": [
+        "13-identifier-registry.md"
+      ],
+      "subtasks": [
+        {
+          "label_en": "Chat follow-up suggestion chips below each AI reply (¿Es venenosa?, ¿Cómo distingo de X?, Hábitat) — reduce cold-start friction",
+          "label_es": "Chips de sugerencia de seguimiento bajo cada respuesta de IA en chat (¿Es venenosa?, ¿Cómo distinguir de X?, Hábitat) — reduce fricción de arranque",
+          "status": "done"
+        }
+      ]
+    },
+    "ux-chat-persistence": {
+      "phase": "v1.1",
+      "title_en": "Persist chat conversation history per device in Dexie",
+      "title_es": "Persistir historial de chat por dispositivo en Dexie",
+      "modules": [],
+      "subtasks": [
+        {
+          "label_en": "Persist chat conversation history per device in Dexie — currently lost on reload",
+          "label_es": "Persistir historial de chat por dispositivo en Dexie — actualmente se pierde al recargar",
+          "status": "done"
+        }
+      ]
+    },
+    "ux-explore-time-slider": {
+      "phase": "v1.1",
+      "title_en": "Time-slider on /explore map",
+      "title_es": "Deslizador temporal en el mapa /explore",
+      "modules": [
+        "12-explore-map.md"
+      ],
+      "subtasks": [
+        {
+          "label_en": "Time-slider on /explore map — drag months to see phenological patterns; visually striking for first-time visitors",
+          "label_es": "Deslizador temporal en el mapa /explore — arrastra meses para ver patrones fenológicos; impacta visualmente a nuevos visitantes",
+          "status": "done"
+        }
+      ]
+    },
+    "ux-skeleton-screens": {
+      "phase": "v1.1",
+      "title_en": "Replace bare spinners with skeleton screens on /observations, /explore, profile",
+      "title_es": "Reemplazar spinners desnudos con esqueletos en /observations, /explore y perfil",
+      "modules": [],
+      "subtasks": [
+        {
+          "label_en": "Replace bare spinners with skeleton screens on /observations, /explore, profile — cumulatively makes the platform feel snappier",
+          "label_es": "Reemplazar spinners desnudos con esqueletos en /observations, /explore y perfil — la plataforma se siente más ágil en su conjunto",
+          "status": "done"
+        }
+      ]
+    },
+    "ux-voice-chat-input": {
+      "phase": "v1.1",
+      "title_en": "SpeechRecognition voice input in /chat",
+      "title_es": "Entrada de voz vía SpeechRecognition en /chat",
+      "modules": [
+        "13-identifier-registry.md"
+      ],
+      "subtasks": [
+        {
+          "label_en": "SpeechRecognition voice input in /chat — accessibility win, especially for indigenous-language native speakers",
+          "label_es": "Entrada de voz vía SpeechRecognition en /chat — accesibilidad, sobre todo para hablantes nativos de lenguas indígenas",
+          "status": "done"
+        }
+      ]
+    },
+    "ux-first-observation-celebration": {
+      "phase": "v1.1",
+      "title_en": "First-observation confetti + 'Bienvenido a Rastrum 🌱' banner on the user's literal first s",
+      "title_es": "Confetti + banner 'Bienvenido a Rastrum 🌱' en la primera observación sincronizada del usua",
+      "modules": [
+        "08-profile-activity-gamification.md"
+      ],
+      "subtasks": [
+        {
+          "label_en": "First-observation confetti + 'Bienvenido a Rastrum 🌱' banner on the user's literal first synced observation",
+          "label_es": "Confetti + banner 'Bienvenido a Rastrum 🌱' en la primera observación sincronizada del usuario",
+          "status": "done"
+        }
+      ]
+    },
+    "ux-indigenous-taxa-search": {
+      "phase": "v1.1",
+      "title_en": "Indigenous-language taxon search (Zapoteco / Náhuatl / Maya / Mixteco / Tseltal → scientif",
+      "title_es": "Búsqueda de taxón en lenguas indígenas (Zapoteco / Náhuatl / Maya / Mixteco / Tseltal → no",
+      "modules": [
+        "07-licensing.md"
+      ],
+      "subtasks": [
+        {
+          "label_en": "Indigenous-language taxon search (Zapoteco / Náhuatl / Maya / Mixteco / Tseltal → scientific name); requires corpus + governance per local-contexts",
+          "label_es": "Búsqueda de taxón en lenguas indígenas (Zapoteco / Náhuatl / Maya / Mixteco / Tseltal → nombre científico); requiere corpus + gobernanza per local-contexts",
+          "status": "planned"
+        }
+      ]
+    },
+    "ux-photo-dedupe": {
+      "phase": "v1.1",
+      "title_en": "Image deduplication on submit",
+      "title_es": "Deduplicación de imágenes al enviar",
+      "modules": [
+        "02-observation-form.md"
+      ],
+      "subtasks": [
+        {
+          "label_en": "Image deduplication on submit — perceptual hash warns when the same photo is being re-uploaded",
+          "label_es": "Deduplicación de imágenes al enviar — hash perceptual avisa cuando se re-sube la misma foto",
+          "status": "done"
+        }
+      ]
+    },
+    "ux-streak-push": {
+      "phase": "v1.1",
+      "title_en": "Web Push notification at 8 PM local when a streak is 1 day from breaking",
+      "title_es": "Notificación push a las 20:00 hora local cuando una racha está a 1 día de romperse",
+      "modules": [
+        "08-profile-activity-gamification.md"
+      ],
+      "subtasks": [
+        {
+          "label_en": "Web Push notification at 8 PM local when a streak is 1 day from breaking — opt-in only, single nightly notification",
+          "label_es": "Notificación push a las 20:00 hora local cuando una racha está a 1 día de romperse — opcional, una notificación nocturna",
+          "status": "planned"
+        }
+      ]
+    },
+    "delete-observation-atomic": {
+      "phase": "v1.1",
+      "title_en": "Atomic delete-observation Edge Function",
+      "title_es": "Función Edge atómica delete-observation",
+      "modules": [
+        "03-observation-detail.md"
+      ],
+      "subtasks": [
+        {
+          "label_en": "Atomic delete-observation Edge Function — wipes R2 photos + OG card alongside DB rows; no orphan blobs",
+          "label_es": "Función Edge atómica delete-observation — borra fotos en R2 + tarjeta OG además de filas DB; sin blobs huérfanos",
+          "status": "done"
+        }
+      ]
+    },
+    "suggest-from-share-page": {
+      "phase": "v1.1",
+      "title_en": "Suggest identification from any /share/obs page",
+      "title_es": "Sugerir identificación desde cualquier página /share/obs",
+      "modules": [
+        "22-community-validation.md"
+      ],
+      "subtasks": [
+        {
+          "label_en": "Suggest identification from any /share/obs page — community-suggestions list visible to all viewers",
+          "label_es": "Sugerir identificación desde cualquier página /share/obs — lista de sugerencias comunitarias visible para todos",
+          "status": "done"
+        }
+      ]
+    },
+    "karma-phase-2-engagement": {
+      "phase": "v1.1",
+      "title_en": "Karma engagement layers",
+      "title_es": "Capas de engagement",
+      "modules": [
+        "23-karma.md"
+      ],
+      "subtasks": [
+        {
+          "label_en": "Karma engagement layers — toast, digest, leaderboards (Phase 2)",
+          "label_es": "Capas de engagement — notificaciones, resumen, leaderboards (Fase 2)",
+          "status": "planned"
+        }
+      ]
+    },
+    "karma-phase-3-conservation-bonuses": {
+      "phase": "v1.1",
+      "title_en": "Karma conservation bonuses",
+      "title_es": "Karma",
+      "modules": [
+        "23-karma.md"
+      ],
+      "subtasks": [
+        {
+          "label_en": "Karma conservation bonuses — IUCN/NOM-059 multipliers (Phase 3)",
+          "label_es": "Karma — bonos de conservación IUCN/NOM-059 (Fase 3)",
+          "status": "planned"
+        }
+      ]
+    },
+    "social-graph-m26-ui": {
+      "phase": "v1.2",
+      "title_en": "M26 UI integration",
+      "title_es": "Integración UI de M26",
+      "modules": [
+        "26-social-graph.md"
+      ],
+      "subtasks": [
+        {
+          "label_en": "M26 UI integration — bell→inbox + unread badge, rich notification cards, profile follower/following pills + Block/Report overflow, shared ReportDialog with focus trap, ReactionStrip on /share/obs/, FollowButton on the new follow Edge Function (Requested state for private profiles)",
+          "label_es": "Integración UI de M26 — campana→bandeja + badge no leídos, tarjetas ricas, pills de seguidores/siguiendo + menú ⋮ Bloquear/Reportar, ReportDialog compartido con focus trap, ReactionStrip en /share/obs/, FollowButton sobre la nueva Edge Function (estado Solicitado en perfiles privados)",
+          "status": "done"
+        }
+      ]
+    },
+    "ci-cd-edge-auto-deploy": {
+      "phase": "v1.2",
+      "title_en": "CI/CD",
+      "title_es": "CI/CD",
+      "modules": [],
+      "subtasks": [
+        {
+          "label_en": "CI/CD — auto-deploy Edge Functions on path-filtered push (mirrors db-apply.yml). Filesystem-derived function list eliminates drift; manual workflow_dispatch preserved for surgical rollback",
+          "label_es": "CI/CD — auto-deploy de Edge Functions en push con filtro de ruta (refleja db-apply.yml). Lista derivada del filesystem elimina drift; workflow_dispatch manual preservado para rollback quirúrgico",
+          "status": "done"
+        }
+      ]
+    },
+    "ci-rls-presence-check": {
+      "phase": "v1.2",
+      "title_en": "CI gate",
+      "title_es": "Gate CI",
+      "modules": [],
+      "subtasks": [
+        {
+          "label_en": "CI gate — db-validate.yml fails if any public.* table lacks ENABLE ROW LEVEL SECURITY. Closes the loop on the Supabase rls_disabled_in_public lint by catching missing RLS at PR review time instead of via the after-the-fact security alert email",
+          "label_es": "Gate CI — db-validate.yml falla si cualquier tabla public.* no tiene ENABLE ROW LEVEL SECURITY. Cierra el ciclo del lint rls_disabled_in_public de Supabase atrapando RLS faltante en PR review en lugar de via el email de alerta de seguridad post-merge",
+          "status": "done"
+        }
       ]
     }
   }

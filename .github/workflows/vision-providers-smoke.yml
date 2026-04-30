@@ -1,0 +1,79 @@
+name: vision-providers-smoke
+
+# End-to-end probe of every M32 vision provider against its real API
+# (issue #158). The goal is to catch silent breakage in any provider's
+# auth-header / request-shape / response-shape handling — the unit
+# tests in `_shared/vision-provider.test.ts` only cover pure helpers.
+#
+# Triggers:
+#   - Manual workflow_dispatch (any time)
+#   - Nightly cron at 04:00 UTC (after the daily db-apply settles)
+#
+# Required secrets (per-provider, set under VISION_PROVIDERS_TEST_*):
+#   ANTHROPIC_API_KEY     — sk-ant-api03-…
+#   ANTHROPIC_OAT         — sk-ant-oat01-…  (optional; falls back to api key path)
+#   BEDROCK_JSON          — {"region":"us-east-1","accessKeyId":"…","secretAccessKey":"…"}
+#   OPENAI_API_KEY        — sk-…
+#   AZURE_OPENAI_KEY + AZURE_OPENAI_ENDPOINT
+#   GEMINI_API_KEY        — AIza…
+#   VERTEX_SA_JSON        — service-account JSON envelope
+#
+# Each probe is allowed to fail independently — the workflow reports
+# per-provider PASS / FAIL but doesn't fail the whole job unless ALL
+# providers fail (catching a regression in the abstraction itself).
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 4 * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v1.x
+
+      - name: Run per-provider probe
+        env:
+          ANTHROPIC_API_KEY:    ${{ secrets.VISION_PROVIDERS_TEST_ANTHROPIC_API_KEY }}
+          ANTHROPIC_OAT:        ${{ secrets.VISION_PROVIDERS_TEST_ANTHROPIC_OAT }}
+          BEDROCK_JSON:         ${{ secrets.VISION_PROVIDERS_TEST_BEDROCK_JSON }}
+          OPENAI_API_KEY:       ${{ secrets.VISION_PROVIDERS_TEST_OPENAI_API_KEY }}
+          AZURE_OPENAI_KEY:     ${{ secrets.VISION_PROVIDERS_TEST_AZURE_OPENAI_KEY }}
+          AZURE_OPENAI_ENDPOINT: ${{ secrets.VISION_PROVIDERS_TEST_AZURE_OPENAI_ENDPOINT }}
+          GEMINI_API_KEY:       ${{ secrets.VISION_PROVIDERS_TEST_GEMINI_API_KEY }}
+          VERTEX_SA_JSON:       ${{ secrets.VISION_PROVIDERS_TEST_VERTEX_SA_JSON }}
+        run: deno run --allow-net --allow-env scripts/vision-providers-smoke.ts | tee smoke-results.txt
+
+      - name: Summarize
+        if: always()
+        run: |
+          {
+            echo '## Vision providers smoke test'
+            echo ''
+            echo '```'
+            cat smoke-results.txt 2>/dev/null || echo '(no results)'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail when ALL providers failed
+        if: always()
+        run: |
+          if [ ! -f smoke-results.txt ]; then
+            echo "no results file — failing"
+            exit 1
+          fi
+          # The script writes one line per provider: PASS|FAIL <provider> <message>
+          if ! grep -q '^PASS' smoke-results.txt; then
+            echo "all providers failed — abstraction-level regression"
+            exit 1
+          fi

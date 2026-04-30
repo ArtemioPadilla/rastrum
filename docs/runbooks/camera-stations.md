@@ -1,7 +1,7 @@
 # Camera stations (M31) — runbook
 
 > **Spec:** [`docs/specs/modules/31-camera-stations.md`](../specs/modules/31-camera-stations.md).
-> **Status:** schema only in v1; UI is a v1.1 follow-up.
+> **Status:** schema + create-station UI shipped 2026-04-30 (PRs #141 + #213); period management + per-station detection-rate dashboard remain v1.1 follow-ups.
 > **Depends on:** M29 (Projects).
 
 ## Apply schema
@@ -24,11 +24,25 @@ make db-psql
 SELECT public.station_trap_nights('00000000-0000-0000-0000-000000000000'::uuid);
 ```
 
-## Create a station + active period (no UI in v1)
+## Create a station via the UI (PR #213)
 
-The UI lands in v1.1. Until then, use SQL via `make db-psql` while
-signed in as the project owner (RLS gates writes by
-`project.owner_user_id = auth.uid()`):
+Sign in as the project owner, navigate to
+`/{en,es}/projects/detail/?slug=<your-slug>`, scroll to the
+**Camera stations** section, click **Add station**, fill in the
+station_key + name + lat/lng + (optional) habitat / camera model /
+notes, and **Save**. The station appears in the inline list with
+its trap-night count (computed live via the
+`station_trap_nights()` RPC).
+
+Non-owners see the section read-only with a "Only the project
+owner can add stations" notice — RLS enforces the same gate
+server-side.
+
+## Create a station + active period via SQL
+
+For batch operations, scripted setup, or operators preparing
+deployments ahead of time, use SQL via `make db-psql` while signed
+in as the project owner:
 
 ```sql
 -- 1. Create the station, anchored to an existing M29 project
@@ -114,11 +128,15 @@ SELECT t.scientific_name,
  ORDER BY rate_per_100_tn DESC;
 ```
 
-## v1.1 follow-ups
+## Shipped 2026-04-30
 
-- UI under `/{en,es}/projects/[slug]/stations/` — list + create + period editor
-- CLI `--station-key <key>` flag for batch tagging at import time (M30)
+- Create-station UI on `/{en,es}/projects/detail/?slug=<slug>` (PR #213)
+- CLI `--project-slug` + `--station-key` flags for batch tagging at import time (PR #208 / issue #156)
+- `/api/observe` accepts `camera_station_id` (or the slug+key pair) (PR #208)
+
+## v1.1 follow-ups (still open)
+
+- Period management UI (open / close periods) — embedded inline in the same project page
 - Per-station detection-rate dashboard (RAI per species per period)
 - DwC-A export filter for "stations only" (vs the full project)
 - Multi-point / sampling-grid stations (current schema is one Point per station)
-- `/api/observe` accepts `camera_station_id` parameter

@@ -361,7 +361,12 @@
       "taxon": "Taxon",
       "nearby": "Nearby",
       "experts_only": "Experts only",
-      "any": "Any"
+      "any": "Any",
+      "country_unset_cta": "Your country isn't set yet — set it in Profile → Edit so others can find you by country.",
+      "use_location": "Use my location",
+      "location_granted": "Using your current location",
+      "location_denied": "Location access denied — using your observation centroid instead",
+      "location_unavailable": "Location not available on this device"
     },
     "card": {
       "obs": "{n} obs",
@@ -373,7 +378,13 @@
     "empty": {
       "no_match": "No observers match these filters. Try removing one.",
       "nearby_no_centroid": "Log an observation to find observers near you.",
-      "nearby_anon": "Sign in to find observers near you."
+      "nearby_anon": "Sign in to find observers near you.",
+      "privacy_explainer": {
+        "heading": "Most observers haven't enabled their public profile yet.",
+        "body_public": "Profiles are private by default. Other observers show up here once they turn on their public profile in Profile → Edit.",
+        "body_anon": "Profiles are private by default. Your profile is also private — flip the toggle in Profile → Edit to be discoverable, and others will appear once they do the same.",
+        "cta_edit_profile": "Configure your own profile →"
+      }
     },
     "leaderboards_optout_link": "Hide me from community leaderboards",
     "edit_profile_optout": "Profile → Edit"
@@ -1838,6 +1849,13 @@
     "proposals": "Proposals",
     "webhooks": "Webhooks",
     "bioblitz": "Bioblitz events",
+    "identifications": "Identifications",
+    "notifications": "Notifications",
+    "media": "Media",
+    "follows": "Follows",
+    "watchlists": "Watchlists",
+    "projects": "Projects",
+    "taxonChanges": "Taxon changes",
     "modOverview": "Overview",
     "modFlagQueue": "Flag queue",
     "modComments": "Comments",
@@ -2524,6 +2542,148 @@
       "topCodes": "Top codes",
       "filterByCode": "Filter by code"
     },
+
+    "entityBrowser": {
+      "clearFilters": "Clear filters",
+      "empty": "No rows match the current filter set.",
+      "loading": "Loading…",
+      "prev": "Prev",
+      "next": "Next",
+      "expand": "Expand row",
+      "anyOption": "— any —"
+    },
+
+    "identificationsView": {
+      "title": "Identifications",
+      "description": "Every identification ever recorded — AI cascade picks, human IDs, validations. Filter by identifier, taxon, validation state, or research-grade status.",
+      "filterIdentifier": "Identifier (uuid or username)",
+      "filterTaxon": "Taxon (uuid or scientific name)",
+      "filterSource": "Source",
+      "filterValidated": "Validated",
+      "filterRG": "Research grade",
+      "anyOption": "— any —",
+      "valYes": "Yes",
+      "valNo": "No",
+      "colCreated": "Created",
+      "colIdentifier": "Identifier",
+      "colTaxon": "Taxon",
+      "colConfidence": "Confidence",
+      "colSource": "Source",
+      "colValidated": "Validated",
+      "colObservation": "Observation",
+      "drillObs": "Open observation"
+    },
+
+    "notificationsView": {
+      "title": "Notifications",
+      "description": "All notifications fanned out by social-graph triggers (follow, reaction, comment, identification, badge, digest). Filter by recipient, kind, or read state.",
+      "filterRecipient": "Recipient (uuid or username)",
+      "filterKind": "Kind",
+      "filterRead": "Read state",
+      "filterFrom": "From",
+      "filterTo": "To",
+      "stateAny": "Any state",
+      "stateRead": "Read",
+      "stateUnread": "Unread",
+      "colCreated": "Created",
+      "colRecipient": "Recipient",
+      "colKind": "Kind",
+      "colPayload": "Payload",
+      "colRead": "Read",
+      "drillFull": "Full payload"
+    },
+
+    "mediaView": {
+      "title": "Media",
+      "description": "All photos, audio and video files registered against observations. Filter by media type, deletion state, or owner.",
+      "filterType": "Type",
+      "filterState": "State",
+      "filterObservation": "Observation (uuid)",
+      "stateActive": "Active",
+      "stateDeleted": "Deleted",
+      "stateAll": "All",
+      "typePhoto": "Photo",
+      "typeAudio": "Audio",
+      "typeVideo": "Video",
+      "colCreated": "Created",
+      "colThumb": "Thumb",
+      "colObservation": "Observation",
+      "colMime": "MIME",
+      "colSize": "Size",
+      "colState": "State",
+      "drillR2Url": "R2 URL"
+    },
+
+    "followsView": {
+      "title": "Follows",
+      "description": "Social-graph follow edges. Filter by follower, followee, status (pending vs accepted), or tier (collaborator vs follower). Useful for spam audits.",
+      "filterFollower": "Follower (uuid or username)",
+      "filterFollowee": "Followee (uuid or username)",
+      "filterStatus": "Status",
+      "filterTier": "Tier",
+      "statusPending": "Pending",
+      "statusAccepted": "Accepted",
+      "tierFollower": "Follower",
+      "tierCollaborator": "Collaborator",
+      "colCreated": "Created",
+      "colFollower": "Follower",
+      "colFollowee": "Followee",
+      "colStatus": "Status",
+      "colTier": "Tier",
+      "drillProfileFollower": "View follower's profile",
+      "drillProfileFollowee": "View followee's profile"
+    },
+
+    "watchlistsView": {
+      "title": "Watchlists",
+      "description": "Per-user species or scientific-name watch entries with optional radius. Filter by user, taxon, or scientific name.",
+      "filterUser": "User (uuid or username)",
+      "filterTaxon": "Taxon (uuid)",
+      "filterName": "Scientific name (contains)",
+      "colCreated": "Created",
+      "colUser": "User",
+      "colTaxon": "Taxon / name",
+      "colRadius": "Radius (km)",
+      "colDigestOnly": "Digest only",
+      "yes": "Yes",
+      "no": "No"
+    },
+
+    "projectsView": {
+      "title": "Projects",
+      "description": "Named polygons (typically ANPs or sampling grids) under M29. Filter by visibility, owner, or name.",
+      "filterOwner": "Owner (uuid or username)",
+      "filterVisibility": "Visibility",
+      "filterName": "Name (contains)",
+      "visPublic": "Public",
+      "visPrivate": "Private",
+      "colCreated": "Created",
+      "colSlug": "Slug",
+      "colName": "Name",
+      "colOwner": "Owner",
+      "colVisibility": "Visibility",
+      "colArea": "Area (km²)",
+      "colObsCount": "Observations",
+      "drillView": "Open project",
+      "drillObs": "Tagged observations"
+    },
+
+    "taxonChangesView": {
+      "title": "Taxon changes",
+      "description": "Audit log of taxon-related admin actions (conservation status, future renames/synonyms). Backed by admin_audit filtered to taxon_* operations. Filter by taxon, action, actor, or date range.",
+      "filterTaxon": "Taxon (uuid)",
+      "filterAction": "Action",
+      "filterActor": "Actor (uuid or username)",
+      "filterFrom": "From",
+      "actConservation": "Conservation set",
+      "colCreated": "Created",
+      "colTaxon": "Taxon",
+      "colAction": "Action",
+      "colActor": "Actor",
+      "colDiff": "Diff",
+      "drillFull": "Full diff"
+    },
+
     "audit_op": {
       "role_grant": "Role granted",
       "role_revoke": "Role revoked",

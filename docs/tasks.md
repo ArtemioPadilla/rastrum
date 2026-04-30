@@ -4,7 +4,7 @@
 > Source of truth for both surfaces; renders the live page at
 > [/docs/tasks/](https://rastrum.org/en/docs/tasks/).
 > 
-> **Updated:** 2026-04-27 (post-launch + v1.1 cross-cutting shipments + on-device MegaDetector cascade).
+> **Updated:** 2026-04-30 (v1.2 research workflow — M28 community discovery, M29 projects, M30 CLI batch import, M31 camera stations, M32 multi-provider vision, obs-detail redesign, admin console PR16 entity browsers).
 
 ---
 
@@ -17,9 +17,8 @@
 | v0.5 | Beta | shipped (partial) | 11 / 13 |
 | v1.0 | Public Launch | shipped (partial) | 18 / 21 |
 | v1.0.x | Post-launch polish | in_progress | 8 / 24 |
-| v1.1 | UX polish (post-launch brainstorm) | shipped (mostly) | 34 / 36 |
-| v1.2 | Profile privacy & public profile | shipped 2026-04-28 | 3 / 3 |
-| v1.3 | Module 27: AI Sponsorships | shipped 2026-04-28 | 1 / 1 |
+| v1.1 | UX polish + admin console + M22/M26/M27 | shipped (mostly) | 38 / 43 |
+| v1.2 | Research workflow (M28-M32 + obs-detail + privacy) | shipped 2026-04-30 | 17 / 17 |
 | **v0.1 → v1.0** | **Public launch** | **shipped 2026-04-26** | **54 / 59** |
 
 Phases v1.5, v2.0, v2.5 are tracked in [`progress.json`](progress.json) but have no shipped code yet — they are planned scope only.
@@ -84,15 +83,15 @@ Remaining:
 
 ## v1.1 — UX polish (post-launch brainstorm) — shipped (mostly)
 
-**34 of 36 items done.** (Originally 15; added 6 cross-cutting items
+**35 of 37 items done.** (Originally 15; added 6 cross-cutting items
 shipped 2026-04-27/28: M22, owner CRUD, atomic delete-observation,
-suggest-from-share-page, OG pipeline, onboarding v2; then the 15-PR
-admin-console series shipped 2026-04-26 → 2026-04-29: PR1-PR15 covering
+suggest-from-share-page, OG pipeline, onboarding v2; then the 16-PR
+admin-console series shipped 2026-04-26 → 2026-04-29: PR1-PR16 covering
 foundation → engineering hygiene → observability → future-proofing →
-deferred cleanup → observability UI surface.)
+deferred cleanup → observability UI surface → entity browsers.)
 
 Admin console "do all" series (2026-04-26 → 2026-04-29):
-- `admin-console-foundation` (PR1) → `admin-console-pr15-observability-ui` (PR15) — schema + chrome + 36 Edge Function handlers + 8 crons across 15 PRs. Full primitives now live: time-bounded role grants, two-person rule with `enforce_two_person_irreversible` feature-flag gate, HMAC-SHA256 webhook subscriptions with `_meta` replay protection + reconcile cron + per-delivery drilldown UI + click-to-replay, hourly anomaly detection, weekly health digest with 12-week sparkline UI + manual recompute, forensics CSV export, structured `function_errors` sink with admin browser tab + single + bulk ack, real moderator trust score, durable observability dry-run workflow. _(✓ all 15 done)_
+- `admin-console-foundation` (PR1) → `admin-console-pr16-entity-browsers` (PR16) — schema + chrome + 36 Edge Function handlers + 8 crons + 7 read-only entity browsers across 16 PRs. Full primitives now live: time-bounded role grants, two-person rule with `enforce_two_person_irreversible` feature-flag gate, HMAC-SHA256 webhook subscriptions with `_meta` replay protection + reconcile cron + per-delivery drilldown UI + click-to-replay, hourly anomaly detection, weekly health digest with 12-week sparkline UI + manual recompute, forensics CSV export, structured `function_errors` sink with admin browser tab + single + bulk ack, real moderator trust score, durable observability dry-run workflow, and PR16's read-only browsers over Identifications / Notifications / Media / Follows / Watchlists / Projects / Taxon changes (shared `ConsoleEntityBrowser` template + `entity-browser.ts` runtime, server-side paginated, URL-driven filter state). _(✓ all 16 done)_
 
 Cross-cutting shipments (2026-04-27/28):
 - `community-validation` — Module 22 implementation: `validation_queue` view, 3 RLS policies, 4 routes, suggest modal + dashboard, research-grade chip on existing views, suggest CTA on `/share/obs`.  _(✓ done)_
@@ -131,7 +130,7 @@ Remaining:
 
 ### Bundled review follow-ups still planned
 
-- `m26-v1-1-review-followups` — Six small polish items flagged by ArtemIO/Nyx on PR #100 + #101 reviews: `?u=` alias documentation, `document.title` → i18n key, runVisitor error-vs-not-found split, `ConfirmDialog` component to replace `confirm()`/`alert()` in the Block flow (matches `ReportDialog` pattern), extract overflow-menu logic into `lib/overflow-menu.ts` (currently duplicated 3× across `PublicProfileViewV2`, `ExploreRecentView`, `Comments`), and `fave_count` data-attr naming standardization across feed views. All non-blocking; deferred for a deliberate v1.2 polish sweep. _(· planned)_
+- `m26-v1-1-review-followups` — Six small polish items flagged by ArtemIO/Nyx on PR #100 + #101 reviews. Shipped 2026-04-29 as PR #149 (ConfirmDialog component replaces `confirm()`/`alert()` in the Block flow + delete-photo flow, matching the `ReportDialog` pattern) + PR #150 (the other 5: `?u=` alias removed since it had zero references, `document.title` → i18n key in PublicProfileViewV2/ExploreSpeciesView/PokedexView, runVisitor error-vs-not-found split, `lib/overflow-menu.ts` extraction across all 3 consumers, `fave_count_aria-{one,other}` naming standardization). _(✓ done)_
 - `social-graph-m26-v11` — Follow-ups: ReactionStrip count overlay on feed cards (needs an aggregate RPC to avoid N+1), Block/Report on observation cards + comments, "Block this user" affordance on profile cards in lists, additional ARIA refinements. _(· planned)_
 - `deploy-functions-resilience` — Pin esm.sh imports to versioned URLs across `supabase/functions/*/index.ts` so a transient esm.sh 522 doesn't permanently park the auto-deploy. Surfaced when PR #66's auto-deploy 522'd on a Cloudflare hiccup. _(· planned)_
 - `visitor-pokedex-route` — Public `/u/<handle>/dex/` page so the Pokédex link on PublicProfileViewV2 doesn't have to be hidden for non-owners (PR #68 currently hides it as a workaround). _(· planned)_

@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS public.users (
 -- Profile / gamification additive columns (module 08 v0.1 slice).
 -- See docs/specs/modules/08-profile-activity-gamification.md.
 ALTER TABLE public.users
-  ADD COLUMN IF NOT EXISTS profile_public        boolean  NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS profile_public        boolean  NOT NULL DEFAULT true,
   ADD COLUMN IF NOT EXISTS gamification_opt_in   boolean  NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS streak_digest_opt_in  boolean  NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS region_primary        text,
@@ -3065,7 +3065,8 @@ CREATE TABLE IF NOT EXISTS public.notifications (
   user_id     uuid        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   kind        text        NOT NULL
                           CHECK (kind IN ('follow','follow_accepted','reaction','comment','mention',
-                                          'identification','badge','digest')),
+                                          'identification','badge','digest',
+                                          'vertex_token_expiring')),
   payload     jsonb       NOT NULL DEFAULT '{}',
   read_at     timestamptz,
   created_at  timestamptz NOT NULL DEFAULT now()
@@ -3074,6 +3075,21 @@ CREATE INDEX IF NOT EXISTS idx_notifications_user_unread
   ON public.notifications(user_id, read_at) WHERE read_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_notifications_user_created
   ON public.notifications(user_id, created_at DESC);
+
+-- M32 v1.1 (#159): widen the kind CHECK to include
+-- 'vertex_token_expiring'. Idempotent — drops the existing
+-- constraint by name (auto-named when CREATE TABLE first ran) then
+-- adds the new one. Existing rows are unchanged.
+DO $$
+BEGIN
+  ALTER TABLE public.notifications DROP CONSTRAINT IF EXISTS notifications_kind_check;
+EXCEPTION WHEN others THEN NULL; END $$;
+ALTER TABLE public.notifications
+  ADD CONSTRAINT notifications_kind_check CHECK (
+    kind IN ('follow','follow_accepted','reaction','comment','mention',
+             'identification','badge','digest',
+             'vertex_token_expiring')
+  );
 
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
@@ -3633,7 +3649,11 @@ ALTER TABLE public.sponsor_credentials
   ADD COLUMN IF NOT EXISTS preferred_model text NOT NULL DEFAULT 'claude-haiku-4-5'
     CHECK (length(preferred_model) BETWEEN 1 AND 64),
   ADD COLUMN IF NOT EXISTS endpoint        text
-    CHECK (endpoint IS NULL OR length(endpoint) <= 512);
+    CHECK (endpoint IS NULL OR length(endpoint) <= 512),
+  -- M32 v1.1 (#159): track when a Vertex AI access token expires
+  -- so the `vertex_token_expiry_monitor` cron can notify the
+  -- sponsor 5 minutes before. NULL for non-Vertex credentials.
+  ADD COLUMN IF NOT EXISTS token_expires_at timestamptz;
 
 ALTER TABLE public.sponsor_credentials ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS sponsor_credentials_owner_read ON public.sponsor_credentials;
@@ -4136,8 +4156,13 @@ SELECT
   observation_count, species_count, obs_count_7d, obs_count_30d,
   last_observation_at, joined_at
 FROM public.users
-WHERE profile_public = true
-  AND hide_from_leaderboards = false;
+WHERE hide_from_leaderboards = false;
+-- 2026-04-30: dropped `profile_public = true AND` — M28 visibility is now
+-- governed solely by its dedicated opt-out (hide_from_leaderboards). The
+-- belt-and-suspenders gate on profile_public was inherited from the M08
+-- binary privacy model, which is being deprecated in favor of M25's
+-- profile_privacy matrix. /community/observers/ is now default-discoverable;
+-- users wanting to hide flip the toggle in Profile → Edit.
 
 GRANT SELECT ON public.community_observers TO anon, authenticated;
 
@@ -4152,11 +4177,31 @@ SELECT
   observation_count, species_count, obs_count_7d, obs_count_30d,
   centroid_geog, last_observation_at, joined_at
 FROM public.users
-WHERE profile_public = true
-  AND hide_from_leaderboards = false;
+WHERE hide_from_leaderboards = false;
+-- 2026-04-30: same change as community_observers above — M28-only opt-out.
 
 GRANT SELECT ON public.community_observers_with_centroid TO authenticated;
 -- Explicitly NO grant to anon. Lack of grant is the security gate.
+
+-- =====================================================================
+-- M28 default visibility (2026-04-30) — A + B + C combined
+--
+-- Goal: by default, users see all members on /community/observers/.
+--   A) New users default to profile_public=true (was false from M08).
+--   B) M28 views drop the profile_public requirement (above).
+--   C) Backfill existing profile_public=false users to true so they
+--      appear immediately. Users who explicitly want privacy can flip
+--      profile_public=false (hides /u/ profile page) AND/OR
+--      hide_from_leaderboards=true (hides M28 card specifically).
+--
+-- Idempotent: ALTER COLUMN DEFAULT is no-op on second run; the UPDATE
+-- only touches rows that haven't already been backfilled.
+-- =====================================================================
+ALTER TABLE public.users ALTER COLUMN profile_public SET DEFAULT true;
+
+UPDATE public.users
+   SET profile_public = true
+ WHERE profile_public = false;
 
 -- =====================================================================
 -- Module 26 v1.1 — observation_reaction_summary (2026-04-29)
@@ -4253,6 +4298,42 @@ $$;
 
 REVOKE ALL ON FUNCTION public.community_observers_nearby(numeric, int, int, text, text[], boolean) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.community_observers_nearby(numeric, int, int, text, text[], boolean) TO authenticated;
+
+-- 10) Nearby helper at an arbitrary point — authenticated only. Same
+-- privacy gate as community_observers_nearby (reads the centroid view,
+-- which is not granted to anon), but uses caller-supplied coords
+-- instead of the viewer's stored centroid. Lets a brand-new user with
+-- no observations still discover nearby observers via GPS. Coords
+-- never persist server-side; the client passes them per-call.
+CREATE OR REPLACE FUNCTION public.community_observers_nearby_at(
+  p_lat      double precision,
+  p_lng      double precision,
+  p_radius_m numeric  DEFAULT 200000,
+  p_limit    int      DEFAULT 20,
+  p_offset   int      DEFAULT 0,
+  p_country  text     DEFAULT NULL,
+  p_taxa     text[]   DEFAULT NULL,
+  p_experts  boolean  DEFAULT false
+)
+RETURNS SETOF public.community_observers_with_centroid
+LANGUAGE sql STABLE PARALLEL SAFE AS $$
+  SELECT v.*
+    FROM public.community_observers_with_centroid v
+   WHERE v.centroid_geog IS NOT NULL
+     AND ST_DWithin(
+       v.centroid_geog,
+       ST_SetSRID(ST_MakePoint(p_lng, p_lat), 4326)::geography,
+       p_radius_m
+     )
+     AND (p_country IS NULL OR v.country_code = p_country)
+     AND (p_taxa    IS NULL OR v.expert_taxa @> p_taxa)
+     AND (p_experts = false OR v.is_expert = true)
+   ORDER BY v.centroid_geog <-> ST_SetSRID(ST_MakePoint(p_lng, p_lat), 4326)::geography
+   LIMIT p_limit OFFSET p_offset;
+$$;
+
+REVOKE ALL ON FUNCTION public.community_observers_nearby_at(double precision, double precision, numeric, int, int, text, text[], boolean) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.community_observers_nearby_at(double precision, double precision, numeric, int, int, text, text[], boolean) TO authenticated;
 
 -- ============================================================
 -- Observation detail redesign — material edit tracking + soft-delete
@@ -6210,3 +6291,72 @@ AS $$
 $$;
 
 GRANT EXECUTE ON FUNCTION public.station_trap_nights(uuid, date, date) TO anon, authenticated, service_role;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- PR16 — Hot-path indexes for admin entity browsers (Identifications,
+-- Notifications, Media, Follows, Watchlists, Projects). Each backs a
+-- (filter_field, created_at DESC) lookup pattern in the browser tabs.
+-- All idempotent (CREATE INDEX IF NOT EXISTS) and additive only — no
+-- write penalty beyond the index keys themselves.
+-- ════════════════════════════════════════════════════════════════════════
+
+-- Identifications — admin time-ordered list, validator filter, RG filter
+CREATE INDEX IF NOT EXISTS idx_id_created_desc
+  ON public.identifications (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_id_validator_created
+  ON public.identifications (validated_by, created_at DESC)
+  WHERE validated_by IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_id_rg_created
+  ON public.identifications (is_research_grade, created_at DESC);
+
+-- Notifications — kind-filtered admin browse (per-user is already covered)
+CREATE INDEX IF NOT EXISTS idx_notifications_kind_created
+  ON public.notifications (kind, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notifications_created_desc
+  ON public.notifications (created_at DESC);
+
+-- Media files — type-filter + active browse
+CREATE INDEX IF NOT EXISTS idx_media_type_created
+  ON public.media_files (media_type, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_media_active_created
+  ON public.media_files (created_at DESC)
+  WHERE deleted_at IS NULL;
+
+-- Watchlists — taxon-filtered browse
+CREATE INDEX IF NOT EXISTS idx_watchlists_taxon_created
+  ON public.watchlists (taxon_id, created_at DESC)
+  WHERE taxon_id IS NOT NULL;
+
+-- Follows — time-ordered admin spam-audit
+CREATE INDEX IF NOT EXISTS idx_follows_created_desc
+  ON public.follows (created_at DESC);
+
+-- Projects — time-ordered admin browse
+CREATE INDEX IF NOT EXISTS idx_projects_created_desc
+  ON public.projects (created_at DESC);
+
+-- Observation comments — author timeline (existing comments view + future
+-- author drill-downs from the user browser)
+CREATE INDEX IF NOT EXISTS idx_comments_author_created
+  ON public.observation_comments (author_id, created_at DESC);
+
+-- ════════════════════════════════════════════════════════════════════════
+-- PR16 — Admin SELECT policies on owner-scoped tables (notifications,
+-- watchlists). These tables previously had only owner-scoped RLS; admin
+-- already has equivalent service-role visibility for ops. These policies
+-- expose the same audit visibility through the console using the
+-- has_role() predicate that is the canonical privilege gate.
+-- Privacy-neutral: admin can already read these via Supabase Studio /
+-- service-role; this just plumbs them through anon/authenticated so the
+-- console can render them. No write privilege is granted.
+-- ════════════════════════════════════════════════════════════════════════
+
+DROP POLICY IF EXISTS notif_admin_read ON public.notifications;
+CREATE POLICY notif_admin_read ON public.notifications
+  FOR SELECT TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'));
+
+DROP POLICY IF EXISTS watchlists_admin_read ON public.watchlists;
+CREATE POLICY watchlists_admin_read ON public.watchlists
+  FOR SELECT TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'));

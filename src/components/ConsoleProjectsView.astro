@@ -1,0 +1,278 @@
+---
+/**
+ * ConsoleProjectsView — admin entity browser over public.projects_with_geojson.
+ *
+ * Read-only. Filters: owner (autocomplete), visibility (public/private),
+ * name (ilike against name + name_es). Drill-down shows the GeoJSON
+ * polygon + species_list + a lazy observation count.
+ *
+ * Uses the projects_with_geojson view (security_invoker=true) so RLS still
+ * applies. The view exposes ST_AsGeoJSON + ST_Area pre-computed so the
+ * client doesn't have to decode PostGIS WKB.
+ *
+ * Schema note: there is no `country` column on projects. The auto-tagging
+ * trigger uses the polygon as the routing key, not a country code. Filter
+ * by visibility instead — same admin-observability shape.
+ */
+import { t } from '../i18n/utils';
+import ConsoleEntityBrowser from './ConsoleEntityBrowser.astro';
+
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+const v = (tr.console as unknown as Record<string, Record<string, string> | string>).projectsView as
+  unknown as Record<string, string>;
+
+const labels = {
+  title: v?.title ?? 'Projects',
+  description: v?.description ?? '',
+  filterOwner: v?.filterOwner ?? 'Owner',
+  filterVisibility: v?.filterVisibility ?? 'Visibility',
+  filterName: v?.filterName ?? 'Name',
+  visPublic: v?.visPublic ?? 'Public',
+  visPrivate: v?.visPrivate ?? 'Private',
+  colCreated: v?.colCreated ?? 'Created',
+  colSlug: v?.colSlug ?? 'Slug',
+  colName: v?.colName ?? 'Name',
+  colOwner: v?.colOwner ?? 'Owner',
+  colVisibility: v?.colVisibility ?? 'Visibility',
+  colArea: v?.colArea ?? 'Area (km²)',
+  drillView: v?.drillView ?? 'Open project',
+  drillObs: v?.drillObs ?? 'Tagged observations',
+};
+---
+
+<ConsoleEntityBrowser
+  lang={lang}
+  prefix="prj"
+  title={labels.title}
+  description={labels.description}
+  filters={[
+    { key: 'owner',      kind: 'text',   label: labels.filterOwner, placeholder: 'uuid or @username' },
+    { key: 'visibility', kind: 'select', label: labels.filterVisibility, options: [
+      { value: 'public',  label: labels.visPublic },
+      { value: 'private', label: labels.visPrivate },
+    ] },
+    { key: 'name',       kind: 'text',   label: labels.filterName, placeholder: 'contains…' },
+  ]}
+  columns={[
+    { key: 'created_at', label: labels.colCreated },
+    { key: 'slug',       label: labels.colSlug },
+    { key: 'name',       label: labels.colName },
+    { key: 'owner',      label: labels.colOwner },
+    { key: 'visibility', label: labels.colVisibility },
+    { key: 'area_km2',   label: labels.colArea, align: 'right' },
+  ]}
+/>
+
+<div id="prj-config" class="hidden" data-lang={lang} data-drill-view={labels.drillView} data-drill-obs={labels.drillObs}></div>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { getUserRoles } from '../lib/user-roles';
+  import {
+    EntityBrowser,
+    filterPredicates,
+    fmtTs,
+    renderUserPill,
+    type FilterSpec,
+    type ColumnSpec,
+    type SupabaseQuery,
+    type RenderContext,
+  } from '../lib/entity-browser';
+  import { escapeHtml } from '../lib/escape';
+
+  type Row = {
+    id: string;
+    created_at: string;
+    slug: string;
+    name: string;
+    name_es: string | null;
+    description: string | null;
+    description_es: string | null;
+    visibility: 'public' | 'private';
+    owner_user_id: string;
+    species_list: unknown;
+    area_km2: number | null;
+    polygon_geojson: Record<string, unknown> | null;
+  };
+
+  const cfgEl = document.getElementById('prj-config');
+  const langAttr = (cfgEl?.dataset.lang === 'es' ? 'es' : 'en') as 'en' | 'es';
+  const labelDrillView = cfgEl?.dataset.drillView ?? 'Open project';
+  const labelDrillObs = cfgEl?.dataset.drillObs ?? 'Tagged observations';
+
+  function isUuid(s: string): boolean {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+  }
+  async function resolveUserId(input: string): Promise<string | undefined> {
+    const trimmed = input.replace(/^@/, '').trim();
+    if (!trimmed) return undefined;
+    if (isUuid(trimmed)) return trimmed;
+    const supabase = getSupabase();
+    const { data } = await supabase.from('users').select('id').eq('username', trimmed).maybeSingle();
+    return (data as { id: string } | null)?.id;
+  }
+
+  const filters: FilterSpec[] = [
+    {
+      key: 'owner',
+      label: 'Owner',
+      kind: 'autocomplete',
+      apply: async (q: SupabaseQuery, v: string): Promise<SupabaseQuery | null> => {
+        const id = await resolveUserId(v);
+        return id ? q.eq('owner_user_id', id) : null;
+      },
+    },
+    { key: 'visibility', label: 'Visibility', kind: 'select', apply: filterPredicates.eq('visibility') },
+    { key: 'name',       label: 'Name',       kind: 'text',   apply: filterPredicates.ilike('name') },
+  ];
+
+  function projectHref(slug: string, lang: 'en' | 'es'): string {
+    const seg = lang === 'es' ? '/proyectos' : '/projects';
+    return `${seg}/${encodeURIComponent(slug)}`;
+  }
+
+  const columns: ColumnSpec<Row>[] = [
+    {
+      key: 'created_at',
+      label: 'Created',
+      cellClass: 'whitespace-nowrap font-mono text-[11px] text-zinc-500',
+      render: r => escapeHtml(fmtTs(r.created_at)),
+    },
+    {
+      key: 'slug',
+      label: 'Slug',
+      render: r => `<code class="text-[10px] rounded bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5">${escapeHtml(r.slug)}</code>`,
+    },
+    {
+      key: 'name',
+      label: 'Name',
+      render: r => {
+        const localised = langAttr === 'es' && r.name_es ? r.name_es : r.name;
+        return `<span class="text-zinc-700 dark:text-zinc-300">${escapeHtml(localised)}</span>`;
+      },
+    },
+    {
+      key: 'owner',
+      label: 'Owner',
+      render: (r, ctx: RenderContext) => renderUserPill(r.owner_user_id, ctx),
+    },
+    {
+      key: 'visibility',
+      label: 'Visibility',
+      render: r => {
+        const cls =
+          r.visibility === 'public'
+            ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300'
+            : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400';
+        return `<span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] ${cls}">${escapeHtml(r.visibility)}</span>`;
+      },
+    },
+    {
+      key: 'area_km2',
+      label: 'Area',
+      align: 'right',
+      cellClass: 'whitespace-nowrap font-mono text-[11px] text-zinc-700 dark:text-zinc-300',
+      render: r => {
+        if (r.area_km2 === null || r.area_km2 === undefined) return '<span class="text-zinc-400">—</span>';
+        const v = r.area_km2;
+        const fmt = v >= 100 ? v.toFixed(0) : v >= 1 ? v.toFixed(1) : v.toFixed(2);
+        return `${escapeHtml(fmt)}`;
+      },
+    },
+  ];
+
+  function renderDrilldown(r: Row): string {
+    const geojson = r.polygon_geojson ? JSON.stringify(r.polygon_geojson, null, 2) : '—';
+    const species = r.species_list ? JSON.stringify(r.species_list, null, 2) : '—';
+    const desc = langAttr === 'es' && r.description_es ? r.description_es : r.description;
+    const href = projectHref(r.slug, langAttr);
+    return `<div class="space-y-2">
+      ${desc ? `<p class="text-[11px] text-zinc-700 dark:text-zinc-300">${escapeHtml(desc)}</p>` : ''}
+      <div class="flex flex-wrap gap-2">
+        <a href="${escapeHtml(href)}" target="_blank" rel="noopener" class="inline-flex items-center rounded border border-zinc-300 dark:border-zinc-700 px-2 py-0.5 text-[11px] hover:bg-zinc-50 dark:hover:bg-zinc-900">${escapeHtml(labelDrillView)} →</a>
+        <span class="inline-flex items-center rounded border border-zinc-200 dark:border-zinc-800 px-2 py-0.5 text-[11px] text-zinc-500" data-prj-obs-count="${escapeHtml(r.id)}">${escapeHtml(labelDrillObs)}: …</span>
+      </div>
+      <details class="rounded border border-zinc-200 dark:border-zinc-800">
+        <summary class="px-2 py-1 text-[11px] cursor-pointer text-zinc-700 dark:text-zinc-300">GeoJSON</summary>
+        <pre class="whitespace-pre-wrap break-all bg-white dark:bg-zinc-950 px-2 py-1 text-[10px] text-zinc-600 dark:text-zinc-400 max-h-60 overflow-y-auto">${escapeHtml(geojson)}</pre>
+      </details>
+      <details class="rounded border border-zinc-200 dark:border-zinc-800">
+        <summary class="px-2 py-1 text-[11px] cursor-pointer text-zinc-700 dark:text-zinc-300">species_list</summary>
+        <pre class="whitespace-pre-wrap break-all bg-white dark:bg-zinc-950 px-2 py-1 text-[10px] text-zinc-600 dark:text-zinc-400 max-h-40 overflow-y-auto">${escapeHtml(species)}</pre>
+      </details>
+    </div>`;
+  }
+
+  /**
+   * Lazy obs-count loader — runs a head:true count(*) over observations
+   * scoped to this project. Caps at 1 query per drill-down expansion via
+   * the data-attribute marker the drilldown emits.
+   */
+  function wireLazyObsCounts(): void {
+    const supabase = getSupabase();
+    const seen = new WeakSet<HTMLElement>();
+    const observer = new MutationObserver(() => {
+      document.querySelectorAll<HTMLElement>('[data-prj-obs-count]').forEach(el => {
+        if (seen.has(el)) return;
+        seen.add(el);
+        const id = el.dataset.prjObsCount;
+        if (!id) return;
+        void supabase
+          .from('observations')
+          .select('id', { count: 'exact', head: true })
+          .eq('project_id', id)
+          .then(({ count }) => {
+            const n = typeof count === 'number' ? count : 0;
+            el.textContent = `${labelDrillObs}: ${n}`;
+          });
+      });
+    });
+    const tbody = document.getElementById('prj-tbody');
+    if (tbody) observer.observe(tbody, { childList: true, subtree: true });
+  }
+
+  async function init(): Promise<void> {
+    const supabase = getSupabase();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      document.getElementById('prj-skeleton')?.classList.add('hidden');
+      document.getElementById('prj-not-auth')?.classList.remove('hidden');
+      return;
+    }
+    const myRoles = await getUserRoles(session.user.id);
+    if (!myRoles.has('admin')) {
+      document.getElementById('prj-skeleton')?.classList.add('hidden');
+      document.getElementById('prj-not-auth')?.classList.remove('hidden');
+      return;
+    }
+    document.getElementById('prj-shell')?.classList.remove('hidden');
+
+    const browser = new EntityBrowser<Row>({
+      prefix: 'prj',
+      tableName: 'projects_with_geojson',
+      selectClause:
+        'id, created_at, slug, name, name_es, description, description_es, visibility, owner_user_id, species_list, area_km2, polygon_geojson',
+      orderBy: 'created_at',
+      columns,
+      filters,
+      resolveUsersFromRow: r => [r.owner_user_id],
+      renderDrilldown,
+      emptyText: '',
+      loadingText: '',
+      lang: langAttr,
+    });
+    await browser.init();
+    wireLazyObsCounts();
+  }
+
+  init().catch(err => {
+    document.getElementById('prj-skeleton')?.classList.add('hidden');
+    const errEl = document.getElementById('prj-error');
+    if (errEl) {
+      errEl.textContent = (err as Error).message;
+      errEl.classList.remove('hidden');
+    }
+  });
+</script>

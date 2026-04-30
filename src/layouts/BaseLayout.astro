@@ -16,6 +16,7 @@ import BanBanner from '../components/BanBanner.astro';
 import { getAlternateUrl } from '../i18n/utils';
 import StructuredData from '../components/StructuredData.astro';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
+import { resolveChromeMode } from '../lib/chrome-mode';
 
 interface Props {
   title: string;
@@ -45,6 +46,14 @@ interface Props {
 const { title, description = 'Species identification platform', lang = 'en', ogImage, ogType, robots } = Astro.props;
 const currentPath = Astro.url.pathname;
 const installLang: 'en' | 'es' = lang === 'es' ? 'es' : 'en';
+
+// Warn at build time if a console-prefixed path slips through to BaseLayout.
+// The chrome (sidebar + role pills + keybindings) is part of the console
+// contract; without it the page renders as orphaned content. Use
+// ConsoleLayout for any /{en,es}/{console,consola}/ route.
+if (resolveChromeMode(currentPath, import.meta.env.BASE_URL) === 'console') {
+  console.warn(`[Rastrum] ${currentPath} uses BaseLayout but is in console chrome — switch to ConsoleLayout (src/components/ConsoleLayout.astro)`);
+}
 
 const SITE_URL = 'https://rastrum.org';
 const canonical = `${SITE_URL}${currentPath}${currentPath.endsWith('/') ? '' : '/'}`;
@@ -76,6 +85,13 @@ function ogSlugForPath(path: string): string {
   if (p.includes('/validate') || p.includes('/validar'))        return 'validate';
   if (p.startsWith('/community/observers') || p.startsWith('/comunidad/observadores'))
                                                                 return 'community-observers';
+  if (p.startsWith('/inbox')    || p.startsWith('/bandeja'))    return 'inbox';
+  if (p.startsWith('/projects') || p.startsWith('/proyectos'))  return 'projects';
+  if (p.startsWith('/profile/sponsored-by') || p.startsWith('/perfil/patrocinado-por'))
+                                                                return 'sponsored-by';
+  if (p.startsWith('/profile/sponsoring') || p.startsWith('/perfil/patrocinando'))
+                                                                return 'sponsoring';
+  if (p.startsWith('/console')  || p.startsWith('/consola'))    return 'console';
   if (p.startsWith('/explore')  || p.startsWith('/explorar'))   return 'explore';
   if (p.startsWith('/chat'))                                    return 'chat';
   if (p.startsWith('/about')  || p.startsWith('/acerca'))       return 'about';

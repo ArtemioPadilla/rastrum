@@ -12,12 +12,13 @@
   plus `country_code_source` `'auto'|'user'` (PR4 #102) tracking whether
   `country_code` was set by the user or inferred from `region_primary`.
 - 7 partial indexes scoped to `WHERE NOT hide_from_leaderboards AND profile_public`.
-  Opted-out / private users add zero cost to anyone's query plan.
+  Opted-out users add zero cost to anyone's query plan. (Indexes still gate on
+  `profile_public` for legacy reasons; harmless under the new default-true model.)
 - `iso_countries` reference table seeded with 30 LatAm + common observer locales
   (idempotent `INSERT … ON CONFLICT DO UPDATE`). `pg_trgm` GIN indexes on
   `name_en` / `name_es` for fuzzy matching by `normalize_country_code(text)`.
 - Two views with the same eligibility predicate
-  (`profile_public = true AND hide_from_leaderboards = false`):
+  (`hide_from_leaderboards = false`):
   - `community_observers` — anon + authenticated. **No centroid.** All discovery
     surfaces except Nearby read from this view.
   - `community_observers_with_centroid` — authenticated only. **Lack of GRANT to
@@ -62,9 +63,11 @@ make db-cron-test   # fires streaks + badges + recompute-user-stats locally
 
 ## Privacy invariants — do NOT break
 
-1. The eligibility predicate (`profile_public AND NOT hide_from_leaderboards`)
-   lives in **one place per view**. Don't duplicate it elsewhere — adding new
-   community queries should consume the views, not `users` directly.
+1. The eligibility predicate (`NOT hide_from_leaderboards`) lives in **one place
+   per view**. Don't duplicate it elsewhere — adding new community queries should
+   consume the views, not `users` directly. As of 2026-04-30 the predicate no
+   longer references `profile_public`; M28 visibility is governed solely by its
+   dedicated opt-out (`hide_from_leaderboards`).
 2. `community_observers_with_centroid` is **never** granted to `anon`. Adding a
    `GRANT SELECT … TO anon` on it would break the privacy gate.
 3. `country_code_source` is set to `'user'` only by the Profile → Edit save
@@ -97,6 +100,55 @@ Profile → Edit toggle.
 | `community-backfill.yml` | shipped 2026-04-29 | PR3 — one-time backfill, automated as a GitHub Actions workflow_dispatch (formerly an operator curl) |
 | #102 | merged 2026-04-29 | PR4 — Profile → Edit country picker + `hide_from_leaderboards` toggle + `country_code_source` |
 | PR5+PR6 | merged 2026-04-29 | Atomic landing — `/community/observers/` page (CSR) + composable filter chips + URL-state serializer + `community_observers_nearby` SQL RPC + MegaMenu split (Biodiversity / Community columns) + MobileDrawer subheading + atomic i18n rewrite of the two production "no leaderboards" strings + OG card + Vitest + Playwright e2e + module status flip to "shipped" |
+
+## UX clarifications (PR17, 2026-04-30)
+
+### Why am I the only one I see? — historical context
+
+**As of 2026-04-30 (PR after #229), this should no longer happen.** `users.profile_public`
+default flipped from `false` → `true`, the M28 views dropped the
+`profile_public = true AND` clause, and a one-time backfill flipped existing
+`profile_public = false` users to `true`. /community/observers/ is now
+default-discoverable; users are visible unless they explicitly toggle
+`hide_from_leaderboards = true` from Profile → Edit.
+
+The PR17 amber explainer banner still renders when the filtered query returns
+0 rows (e.g., a country picker selecting an empty country, or expert-only with
+no experts in the result), but the historical "everyone is private by default"
+case no longer applies.
+
+If you ever DO see only yourself unexpectedly, check:
+1. Did the schema migration apply? `SELECT column_default FROM information_schema.columns WHERE table_name='users' AND column_name='profile_public';` should return `true`.
+2. Did the backfill run? `SELECT count(*) FROM users WHERE profile_public = false;` should be 0 or near-0.
+3. Did counters compute? `SELECT count(*) FROM users WHERE observation_count > 0 AND last_observation_at IS NOT NULL;` should match your active-user count.
+
+### GPS vs centroid Nearby modes
+
+The Nearby filter (`?nearby=true`) has two underlying paths:
+
+1. **Centroid mode (default)** — calls `community_observers_nearby()`,
+   which reads the viewer's stored `centroid_geog` (recomputed nightly
+   from their observations). Brand-new users with zero observations see
+   the empty-state CTA "Log an observation to find observers near you."
+2. **GPS mode (PR17)** — clicking the "📍 Use my location" pill triggers
+   `navigator.geolocation.getCurrentPosition()`, then calls
+   `community_observers_nearby_at(lat, lng, …)` with caller-supplied
+   coords. This unlocks Nearby for new users. On geolocation deny / not
+   available, the page falls back to centroid mode and shows a friendly
+   notice.
+
+**Privacy: coords NEVER touch the URL.** Putting `?lat=…&lng=…` in the
+querystring would leak via the `Referer` header on every outbound link
+and bake into the user's browser history. Instead, coords live in
+`sessionStorage` (key `rastrum.community.gps`), cleared automatically
+when the tab closes. Regression guarded by `tests/unit/community-url.test.ts`
+("NEVER serializes GPS coords into the URL").
+
+The new RPC `community_observers_nearby_at(lat, lng, …)` is a sibling
+of the existing centroid RPC: same `community_observers_with_centroid`
+view, same `authenticated`-only `GRANT EXECUTE`, same SECURITY INVOKER.
+The lack of `GRANT TO anon` is the security gate; the function body is
+unreachable for anon callers regardless of the UI sign-in check.
 
 ## Future work (v1.1)
 

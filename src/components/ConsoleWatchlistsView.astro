@@ -1,0 +1,207 @@
+---
+/**
+ * ConsoleWatchlistsView — admin entity browser over public.watchlists.
+ *
+ * Read-only. Filters: user (autocomplete), taxon (uuid), scientific_name
+ * (ilike). Drill-down renders the full row payload.
+ *
+ * Schema note: watchlists are keyed on (user_id, taxon_id|scientific_name)
+ * with an optional radius_km for spatial digests. There is no `region`
+ * column in v1; the spec's mention of region predates the m08 schema.
+ */
+import { t } from '../i18n/utils';
+import ConsoleEntityBrowser from './ConsoleEntityBrowser.astro';
+
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+const v = (tr.console as unknown as Record<string, Record<string, string> | string>).watchlistsView as
+  unknown as Record<string, string>;
+
+const labels = {
+  title: v?.title ?? 'Watchlists',
+  description: v?.description ?? '',
+  filterUser: v?.filterUser ?? 'User',
+  filterTaxon: v?.filterTaxon ?? 'Taxon',
+  filterName: v?.filterName ?? 'Scientific name',
+  colCreated: v?.colCreated ?? 'Created',
+  colUser: v?.colUser ?? 'User',
+  colTaxon: v?.colTaxon ?? 'Taxon / name',
+  colRadius: v?.colRadius ?? 'Radius (km)',
+  colDigestOnly: v?.colDigestOnly ?? 'Digest only',
+  yes: v?.yes ?? 'Yes',
+  no: v?.no ?? 'No',
+};
+---
+
+<ConsoleEntityBrowser
+  lang={lang}
+  prefix="wl"
+  title={labels.title}
+  description={labels.description}
+  filters={[
+    { key: 'user',  kind: 'text', label: labels.filterUser,  placeholder: 'uuid or @username' },
+    { key: 'taxon', kind: 'text', label: labels.filterTaxon, placeholder: 'uuid' },
+    { key: 'name',  kind: 'text', label: labels.filterName,  placeholder: 'contains…' },
+  ]}
+  columns={[
+    { key: 'created_at',  label: labels.colCreated },
+    { key: 'user',        label: labels.colUser },
+    { key: 'taxon',       label: labels.colTaxon },
+    { key: 'radius_km',   label: labels.colRadius, align: 'right' },
+    { key: 'digest_only', label: labels.colDigestOnly },
+  ]}
+/>
+
+<div id="wl-config" class="hidden" data-lang={lang} data-yes={labels.yes} data-no={labels.no}></div>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { getUserRoles } from '../lib/user-roles';
+  import {
+    EntityBrowser,
+    filterPredicates,
+    fmtTs,
+    renderUserPill,
+    renderTaxonPill,
+    type FilterSpec,
+    type ColumnSpec,
+    type SupabaseQuery,
+    type RenderContext,
+  } from '../lib/entity-browser';
+  import { escapeHtml } from '../lib/escape';
+
+  type Row = {
+    id: string;
+    created_at: string;
+    user_id: string;
+    taxon_id: string | null;
+    scientific_name: string | null;
+    radius_km: number | null;
+    digest_only: boolean;
+  };
+
+  const cfgEl = document.getElementById('wl-config');
+  const langAttr = (cfgEl?.dataset.lang === 'es' ? 'es' : 'en') as 'en' | 'es';
+  const labelYes = cfgEl?.dataset.yes ?? 'Yes';
+  const labelNo = cfgEl?.dataset.no ?? 'No';
+
+  function isUuid(s: string): boolean {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+  }
+  async function resolveUserId(input: string): Promise<string | undefined> {
+    const trimmed = input.replace(/^@/, '').trim();
+    if (!trimmed) return undefined;
+    if (isUuid(trimmed)) return trimmed;
+    const supabase = getSupabase();
+    const { data } = await supabase.from('users').select('id').eq('username', trimmed).maybeSingle();
+    return (data as { id: string } | null)?.id;
+  }
+
+  const filters: FilterSpec[] = [
+    {
+      key: 'user',
+      label: 'User',
+      kind: 'autocomplete',
+      apply: async (q: SupabaseQuery, v: string): Promise<SupabaseQuery | null> => {
+        const id = await resolveUserId(v);
+        return id ? q.eq('user_id', id) : null;
+      },
+    },
+    {
+      key: 'taxon',
+      label: 'Taxon',
+      kind: 'text',
+      apply: (q: SupabaseQuery, v: string): SupabaseQuery | null => {
+        return isUuid(v) ? q.eq('taxon_id', v) : null;
+      },
+    },
+    {
+      key: 'name',
+      label: 'Scientific name',
+      kind: 'text',
+      apply: filterPredicates.ilike('scientific_name'),
+    },
+  ];
+
+  const columns: ColumnSpec<Row>[] = [
+    {
+      key: 'created_at',
+      label: 'Created',
+      cellClass: 'whitespace-nowrap font-mono text-[11px] text-zinc-500',
+      render: r => escapeHtml(fmtTs(r.created_at)),
+    },
+    {
+      key: 'user',
+      label: 'User',
+      render: (r, ctx: RenderContext) => renderUserPill(r.user_id, ctx),
+    },
+    {
+      key: 'taxon',
+      label: 'Taxon / name',
+      render: (r, ctx: RenderContext) => renderTaxonPill(r.taxon_id, r.scientific_name, ctx),
+    },
+    {
+      key: 'radius_km',
+      label: 'Radius (km)',
+      align: 'right',
+      cellClass: 'whitespace-nowrap font-mono text-[11px] text-zinc-700 dark:text-zinc-300',
+      render: r => (r.radius_km !== null ? String(r.radius_km) : '<span class="text-zinc-400">—</span>'),
+    },
+    {
+      key: 'digest_only',
+      label: 'Digest only',
+      render: r =>
+        r.digest_only
+          ? `<span class="inline-flex items-center rounded-full bg-sky-100 dark:bg-sky-900/30 text-sky-800 dark:text-sky-300 px-2 py-0.5 text-[11px]">${escapeHtml(labelYes)}</span>`
+          : `<span class="inline-flex items-center rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 px-2 py-0.5 text-[11px]">${escapeHtml(labelNo)}</span>`,
+    },
+  ];
+
+  function renderDrilldown(r: Row): string {
+    const json = JSON.stringify(r, null, 2);
+    return `<pre class="whitespace-pre-wrap break-all rounded bg-white dark:bg-zinc-950 px-2 py-1 text-[10px] text-zinc-600 dark:text-zinc-400 max-h-60 overflow-y-auto">${escapeHtml(json)}</pre>`;
+  }
+
+  async function init(): Promise<void> {
+    const supabase = getSupabase();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      document.getElementById('wl-skeleton')?.classList.add('hidden');
+      document.getElementById('wl-not-auth')?.classList.remove('hidden');
+      return;
+    }
+    const myRoles = await getUserRoles(session.user.id);
+    if (!myRoles.has('admin')) {
+      document.getElementById('wl-skeleton')?.classList.add('hidden');
+      document.getElementById('wl-not-auth')?.classList.remove('hidden');
+      return;
+    }
+    document.getElementById('wl-shell')?.classList.remove('hidden');
+
+    const browser = new EntityBrowser<Row>({
+      prefix: 'wl',
+      tableName: 'watchlists',
+      selectClause: 'id, created_at, user_id, taxon_id, scientific_name, radius_km, digest_only',
+      orderBy: 'created_at',
+      columns,
+      filters,
+      resolveUsersFromRow: r => [r.user_id],
+      resolveTaxaFromRow: r => (r.taxon_id ? [r.taxon_id] : []),
+      renderDrilldown,
+      emptyText: '',
+      loadingText: '',
+      lang: langAttr,
+    });
+    await browser.init();
+  }
+
+  init().catch(err => {
+    document.getElementById('wl-skeleton')?.classList.add('hidden');
+    const errEl = document.getElementById('wl-error');
+    if (errEl) {
+      errEl.textContent = (err as Error).message;
+      errEl.classList.remove('hidden');
+    }
+  });
+</script>

@@ -28,7 +28,7 @@ narrative source.
 > numbers reflect the actual filename on disk; gaps and the duplicated
 > `15-*.md` are historical (`15-map-location-picker.md` was claimed first,
 > then `15-mcp-server.md` shipped under the same number — see the note
-> below the table). 26 module specs are tracked here today.
+> below the table). 34 module specs are tracked here today.
 
 ---
 

@@ -32,6 +32,20 @@ jobs:
       - name: Unit tests (Vitest)
         run: npm test
 
+      - name: CLI build + tests (cli/, M30)
+        # Skipped if cli/ is missing on the branch; otherwise installs,
+        # builds, and runs the Node native test runner. Matches what
+        # operators run locally — keeps the M30 surface gated by CI.
+        run: |
+          if [ -d cli ]; then
+            cd cli
+            npm install --no-audit --no-fund
+            npm run build
+            npm test
+          else
+            echo "cli/ not present on this branch — skipping"
+          fi
+
       - name: Build (static site)
         run: npm run build
         env:

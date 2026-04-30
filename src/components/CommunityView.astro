@@ -20,6 +20,18 @@ interface Props {
 const { lang } = Astro.props;
 const tr = t(lang);
 
+interface PrivacyExplainerCopy {
+  heading: string;
+  body_public: string;
+  body_anon: string;
+  cta_edit_profile: string;
+}
+interface CommunityEmptyCopy {
+  no_match: string;
+  nearby_no_centroid: string;
+  nearby_anon: string;
+  privacy_explainer: PrivacyExplainerCopy;
+}
 interface CommunityCopy {
   page_title: string;
   page_subtitle: string;
@@ -35,7 +47,7 @@ interface CommunityCopy {
   sort: Record<string, string>;
   filter: Record<string, string>;
   card: Record<string, string>;
-  empty: Record<string, string>;
+  empty: CommunityEmptyCopy;
   leaderboards_optout_link: string;
   edit_profile_optout: string;
 }
@@ -62,6 +74,16 @@ const stringsJson = JSON.stringify({
   emptyNoMatch: cm.empty.no_match,
   emptyNearbyNoCentroid: cm.empty.nearby_no_centroid,
   emptyNearbyAnon: cm.empty.nearby_anon,
+  privacyHeading: cm.empty.privacy_explainer.heading,
+  privacyBodyPublic: cm.empty.privacy_explainer.body_public,
+  privacyBodyAnon: cm.empty.privacy_explainer.body_anon,
+  privacyCtaEditProfile: cm.empty.privacy_explainer.cta_edit_profile,
+  countryUnsetCta: cm.filter.country_unset_cta,
+  useLocationLabel: cm.filter.use_location,
+  locationGranted: cm.filter.location_granted,
+  locationDenied: cm.filter.location_denied,
+  locationUnavailable: cm.filter.location_unavailable,
+  editProfileHref,
   profileBase,
 });
 ---
@@ -123,13 +145,51 @@ const stringsJson = JSON.stringify({
       <input id="cf-nearby" type="checkbox" />
       {cm.filter.nearby}
     </label>
+    <button
+      id="cf-use-location"
+      type="button"
+      class="hidden text-xs px-2 py-1 rounded-lg border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50"
+      aria-label={cm.filter.use_location}
+    >
+      <span aria-hidden="true">📍</span>
+      <span data-label>{cm.filter.use_location}</span>
+    </button>
   </div>
+
+  <p
+    id="cf-country-cta"
+    class="hidden mt-2 text-xs text-amber-700 dark:text-amber-400"
+  >
+    <a href={editProfileHref} class="underline hover:text-amber-800 dark:hover:text-amber-300">
+      {cm.filter.country_unset_cta}
+    </a>
+  </p>
+
+  <p
+    id="cf-location-status"
+    class="hidden mt-2 text-xs text-zinc-500 dark:text-zinc-400"
+    aria-live="polite"
+  ></p>
 
   <div id="community-list" class="mt-4 space-y-2">
     <p class="text-sm text-zinc-500 italic" data-loading>{cm.loading}</p>
   </div>
 
   <div id="community-empty" class="hidden mt-8 text-center text-sm text-zinc-500"></div>
+
+  <aside
+    id="community-privacy-banner"
+    class="hidden mt-4 rounded-lg border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-4 text-sm text-amber-900 dark:text-amber-200"
+    role="note"
+  >
+    <p class="font-semibold mb-1" data-privacy-heading></p>
+    <p class="mb-2" data-privacy-body></p>
+    <a
+      href={editProfileHref}
+      class="inline-block text-emerald-700 dark:text-emerald-400 font-medium hover:underline"
+      data-privacy-cta
+    ></a>
+  </aside>
 
   <nav id="community-pager" class="hidden mt-6 flex items-center justify-between text-sm">
     <button
@@ -149,8 +209,8 @@ const stringsJson = JSON.stringify({
 </section>
 
 <script>
-  import { parseFilters, serializeFilters, type CommunityFilters } from '../lib/community-url';
-  import { loadCommunity, viewerHasCentroid, loadIsoCountries, COMMUNITY_PAGE_SIZE, type CommunityObserver } from '../lib/community';
+  import { parseFilters, serializeFilters, loadGps, saveGps, clearGps, type CommunityFilters, type CommunityGps } from '../lib/community-url';
+  import { loadCommunity, loadCommunityNearbyAt, viewerHasCentroid, loadViewerCommunityMeta, loadIsoCountries, COMMUNITY_PAGE_SIZE, type CommunityObserver } from '../lib/community';
   import { getSupabase } from '../lib/supabase';
 
   interface Strings {
@@ -168,6 +228,16 @@ const stringsJson = JSON.stringify({
     emptyNoMatch: string;
     emptyNearbyNoCentroid: string;
     emptyNearbyAnon: string;
+    privacyHeading: string;
+    privacyBodyPublic: string;
+    privacyBodyAnon: string;
+    privacyCtaEditProfile: string;
+    countryUnsetCta: string;
+    useLocationLabel: string;
+    locationGranted: string;
+    locationDenied: string;
+    locationUnavailable: string;
+    editProfileHref: string;
     profileBase: string;
   }
 
@@ -190,11 +260,34 @@ const stringsJson = JSON.stringify({
   const taxonEl = document.getElementById('cf-taxon') as HTMLInputElement | null;
   const expertsEl = document.getElementById('cf-experts') as HTMLInputElement | null;
   const nearbyEl = document.getElementById('cf-nearby') as HTMLInputElement | null;
+  const useLocationBtn = document.getElementById('cf-use-location') as HTMLButtonElement | null;
+  const locationStatus = document.getElementById('cf-location-status') as HTMLParagraphElement | null;
+  const countryCta = document.getElementById('cf-country-cta') as HTMLParagraphElement | null;
+  const privacyBanner = document.getElementById('community-privacy-banner') as HTMLElement | null;
 
   if (!list || !empty || !pager || !pageLabel || !prev || !next ||
-      !sortEl || !countryEl || !taxonEl || !expertsEl || !nearbyEl) {
+      !sortEl || !countryEl || !taxonEl || !expertsEl || !nearbyEl ||
+      !useLocationBtn || !locationStatus || !countryCta || !privacyBanner) {
     throw new Error('CommunityView: missing required DOM nodes');
   }
+
+  const privacyHeadingEl = privacyBanner.querySelector('[data-privacy-heading]') as HTMLElement | null;
+  const privacyBodyEl = privacyBanner.querySelector('[data-privacy-body]') as HTMLElement | null;
+  const privacyCtaEl = privacyBanner.querySelector('[data-privacy-cta]') as HTMLAnchorElement | null;
+  if (privacyHeadingEl) privacyHeadingEl.textContent = STRINGS.privacyHeading;
+  if (privacyCtaEl) {
+    privacyCtaEl.textContent = STRINGS.privacyCtaEditProfile;
+    privacyCtaEl.href = STRINGS.editProfileHref;
+  }
+
+  // Viewer meta is loaded once on mount and again after auth-state
+  // changes. Initial nulls = unknown / anon. Used by the empty-state
+  // banner and the country CTA.
+  let viewerSignedIn = false;
+  let viewerProfilePublic: boolean | null = null;
+  let viewerCountryCode: string | null = null;
+  // GPS coords from "Use my location" — never serialized to URL.
+  let gpsCoords: CommunityGps | null = loadGps();
 
   // Populate the country dropdown async — non-blocking. If Supabase is
   // unconfigured (preview/test env), the dropdown stays at just "Any"
@@ -251,7 +344,7 @@ const stringsJson = JSON.stringify({
   function renderRow(row: CommunityObserver): HTMLElement {
     const handle = row.username ?? row.id.slice(0, 8);
     const displayName = row.display_name ?? handle;
-    const profileHref = `${STRINGS.profileBase}/${encodeURIComponent(handle)}/`;
+    const profileHref = `${STRINGS.profileBase}/?username=${encodeURIComponent(handle)}`;
     const taxaList = (row.expert_taxa ?? []).join(', ');
     const obsLabel = STRINGS.obsTpl.replace('{n}', String(row.observation_count));
     const speciesLabel = STRINGS.speciesTpl.replace('{n}', String(row.species_count));
@@ -293,6 +386,7 @@ const stringsJson = JSON.stringify({
     list!.innerHTML = `<p class="text-sm text-zinc-500 italic" data-loading>${escapeHtml(STRINGS.loading)}</p>`;
     empty!.classList.add('hidden');
     pager!.classList.add('hidden');
+    privacyBanner!.classList.add('hidden');
   }
 
   function showEmpty(msg: string): void {
@@ -300,6 +394,54 @@ const stringsJson = JSON.stringify({
     empty!.textContent = msg;
     empty!.classList.remove('hidden');
     pager!.classList.add('hidden');
+  }
+
+  function maybeShowPrivacyExplainer(): void {
+    if (!privacyBodyEl) return;
+    if (!viewerSignedIn) {
+      // Anon user: existing empty-state CTAs (sign-in) are sufficient.
+      // The explainer is only for the "I'm signed in but I see nothing"
+      // confusion described in the PR brief.
+      privacyBanner!.classList.add('hidden');
+      return;
+    }
+    privacyBodyEl.textContent = viewerProfilePublic === false
+      ? STRINGS.privacyBodyAnon
+      : STRINGS.privacyBodyPublic;
+    privacyBanner!.classList.remove('hidden');
+  }
+
+  function maybeShowCountryCta(): void {
+    const showCta = viewerSignedIn && viewerCountryCode == null;
+    countryCta!.classList.toggle('hidden', !showCta);
+  }
+
+  function setLocationStatus(msg: string | null, tone: 'info' | 'warn' = 'info'): void {
+    if (!msg) {
+      locationStatus!.classList.add('hidden');
+      locationStatus!.textContent = '';
+      return;
+    }
+    locationStatus!.textContent = msg;
+    locationStatus!.classList.remove('hidden');
+    locationStatus!.classList.toggle('text-amber-700', tone === 'warn');
+    locationStatus!.classList.toggle('dark:text-amber-400', tone === 'warn');
+    locationStatus!.classList.toggle('text-emerald-700', tone === 'info');
+    locationStatus!.classList.toggle('dark:text-emerald-400', tone === 'info');
+    locationStatus!.classList.toggle('text-zinc-500', false);
+    locationStatus!.classList.toggle('dark:text-zinc-400', false);
+  }
+
+  function syncUseLocationButton(): void {
+    if (filters.nearby) {
+      useLocationBtn!.classList.remove('hidden');
+    } else {
+      useLocationBtn!.classList.add('hidden');
+      // Don't clear gpsCoords here — operators may flip nearby off and
+      // on; coords stay in sessionStorage until the tab closes or the
+      // user explicitly revokes.
+      setLocationStatus(null);
+    }
   }
 
   async function refresh(): Promise<void> {
@@ -314,8 +456,11 @@ const stringsJson = JSON.stringify({
       try {
         const { data: { user } } = await getSupabase().auth.getUser();
         if (!user) { showEmpty(STRINGS.emptyNearbyAnon); return; }
-        const has = await viewerHasCentroid();
-        if (!has) { showEmpty(STRINGS.emptyNearbyNoCentroid); return; }
+        // Only require centroid when no GPS overlay is set.
+        if (!gpsCoords) {
+          const has = await viewerHasCentroid();
+          if (!has) { showEmpty(STRINGS.emptyNearbyNoCentroid); return; }
+        }
       } catch {
         showEmpty(STRINGS.emptyNearbyAnon);
         return;
@@ -323,9 +468,12 @@ const stringsJson = JSON.stringify({
     }
 
     try {
-      const { rows, total } = await loadCommunity(filters);
+      const { rows, total } = (filters.nearby && gpsCoords)
+        ? await loadCommunityNearbyAt(filters, gpsCoords.lat, gpsCoords.lng)
+        : await loadCommunity(filters);
       if (rows.length === 0) {
         showEmpty(filters.nearby ? STRINGS.emptyNearbyNoCentroid : STRINGS.emptyNoMatch);
+        maybeShowPrivacyExplainer();
         return;
       }
       list!.innerHTML = '';
@@ -344,6 +492,7 @@ const stringsJson = JSON.stringify({
   function pushAndRefresh(): void {
     filters = { ...readUI(), page: 1 };
     history.replaceState(null, '', window.location.pathname + serializeFilters(filters));
+    syncUseLocationButton();
     void refresh();
   }
 
@@ -362,5 +511,43 @@ const stringsJson = JSON.stringify({
     void refresh();
   });
 
-  void refresh();
+  useLocationBtn.addEventListener('click', () => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      setLocationStatus(STRINGS.locationUnavailable, 'warn');
+      return;
+    }
+    setLocationStatus(STRINGS.useLocationLabel + '…', 'info');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        gpsCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        saveGps(gpsCoords);
+        setLocationStatus(STRINGS.locationGranted, 'info');
+        void refresh();
+      },
+      () => {
+        gpsCoords = null;
+        clearGps();
+        setLocationStatus(STRINGS.locationDenied, 'warn');
+        void refresh();
+      },
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 60_000 },
+    );
+  });
+
+  // Boot: load viewer meta once, then render. Don't block on it; if it
+  // fails (anon, unconfigured Supabase, network), the explainer just
+  // doesn't render — page still works.
+  void (async () => {
+    try {
+      const meta = await loadViewerCommunityMeta();
+      viewerSignedIn = meta.signedIn;
+      viewerProfilePublic = meta.profilePublic;
+      viewerCountryCode = meta.countryCode;
+    } catch {
+      // non-fatal
+    }
+    maybeShowCountryCta();
+    syncUseLocationButton();
+    await refresh();
+  })();
 </script>

@@ -18,8 +18,8 @@ export type StaticCardInput = {
   kind: 'static';
   title: string;
   subtitle?: string;
-  /** One-word section accent — emerald (default), teal, sky, stone. */
-  accent?: 'emerald' | 'teal' | 'sky' | 'stone';
+  /** One-word section accent — emerald (default), teal, sky, stone, orange, amber, slate. */
+  accent?: 'emerald' | 'teal' | 'sky' | 'stone' | 'orange' | 'amber' | 'slate';
 };
 
 export type ObservationCardInput = {
@@ -54,6 +54,9 @@ const ACCENT = {
   teal:    { fg: '#14b8a6', dark: '#134e4a' },
   sky:     { fg: '#0ea5e9', dark: '#0c4a6e' },
   stone:   { fg: '#a8a29e', dark: '#1c1917' },
+  orange:  { fg: '#f97316', dark: '#7c2d12' },
+  amber:   { fg: '#f59e0b', dark: '#78350f' },
+  slate:   { fg: '#64748b', dark: '#0f172a' },
 } as const;
 
 /** Brand mark — vector SVG inlined so satori can render without an extra fetch. */
