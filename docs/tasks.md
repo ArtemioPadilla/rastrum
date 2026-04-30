@@ -17,7 +17,7 @@
 | v0.5 | Beta | shipped (partial) | 11 / 13 |
 | v1.0 | Public Launch | shipped (partial) | 18 / 21 |
 | v1.0.x | Post-launch polish | in_progress | 8 / 24 |
-| v1.1 | UX polish + admin console + M22/M26/M27 | shipped (mostly) | 38 / 43 |
+| v1.1 | UX polish + admin console + M22/M26/M27 | shipped (mostly) | 39 / 44 |
 | v1.2 | Research workflow (M28-M32 + obs-detail + privacy) | shipped 2026-04-30 | 17 / 17 |
 | **v0.1 → v1.0** | **Public launch** | **shipped 2026-04-26** | **54 / 59** |
 
