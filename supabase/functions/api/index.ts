@@ -74,8 +74,33 @@ Deno.serve(async (req: Request) => {
     const body = await req.json().catch(() => null);
     if (!body) return json({ error: 'Invalid JSON body' }, 400);
 
-    const { lat, lng, observed_at, notes, photo_url, habitat, evidence_type = 'direct_sighting' } = body;
+    const { lat, lng, observed_at, notes, photo_url, habitat, evidence_type = 'direct_sighting',
+            camera_station_id, project_slug } = body;
     if (lat == null || lng == null) return json({ error: 'lat and lng are required' }, 400);
+
+    // M31 v1.1 (#156): resolve a camera station explicitly by UUID,
+    // or by (project_slug, station_key) — the second form is what the
+    // CLI uses so the importer doesn't need to know the UUIDs ahead
+    // of time. RLS gates the lookup; if the caller can't see the
+    // station, we silently drop the assignment instead of leaking the
+    // existence of a private station.
+    let resolvedStationId: string | null = null;
+    if (typeof camera_station_id === 'string' && camera_station_id.length > 0) {
+      const { data: stationRow } = await supabase
+        .from('camera_stations')
+        .select('id')
+        .eq('id', camera_station_id)
+        .maybeSingle();
+      resolvedStationId = (stationRow as { id?: string } | null)?.id ?? null;
+    } else if (typeof project_slug === 'string' && typeof body.station_key === 'string') {
+      const { data: stationRow } = await supabase
+        .from('camera_stations')
+        .select('id, project_id, projects!inner(slug)')
+        .eq('station_key', body.station_key)
+        .eq('projects.slug', project_slug)
+        .maybeSingle();
+      resolvedStationId = (stationRow as { id?: string } | null)?.id ?? null;
+    }
 
     // observations table has no scientific_name — insert bare observation,
     // then create an identification row if a name was supplied.
@@ -89,10 +114,11 @@ Deno.serve(async (req: Request) => {
         notes,
         habitat,
         evidence_type,
+        camera_station_id: resolvedStationId,
         app_version: 'api/v1',
         sync_status: 'synced',
       })
-      .select('id, observed_at, created_at')
+      .select('id, observed_at, created_at, camera_station_id')
       .single();
 
     if (obsErr) return json({ error: obsErr.message }, 500);

@@ -61,6 +61,11 @@ export class ApiClient {
     habitat?: string | null;
     evidence_type?: string;
     scientific_name?: string;
+    /** M31 v1.1 (#156): server-side station lookup via (slug, key). */
+    project_slug?: string;
+    station_key?: string;
+    /** Or pass the UUID directly if you already have it. */
+    camera_station_id?: string;
   }): Promise<ObserveResponse> {
     return this.post<ObserveResponse>('observe', input);
   }
