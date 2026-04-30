@@ -1,44 +1,76 @@
 /**
  * kml-parser.ts — Client-side KML polygon parser for Rastrum project boundaries.
  * Parses KML files (standard format from CONABIO, CONANP, Google Earth) into GeoJSON.
+ *
+ * Coordinate order: KML uses "lon,lat,alt" tuples — GeoJSON also uses [lon,lat].
+ * Do NOT swap the order here; the values are already correct as-is.
  */
 
 export type KMLGeoJSON = { type: 'Polygon'; coordinates: number[][][] };
 
 export type KMLValidationResult =
-  | { ok: true; geojson: KMLGeoJSON; vertexCount: number; name?: string }
-  | { ok: false; error: 'no_polygon' | 'too_large' | 'invalid_xml' | 'empty' };
+  | { ok: true; geojson: KMLGeoJSON; vertexCount: number; name?: string; hadMultiGeometry?: boolean }
+  | { ok: false; error: 'no_polygon' | 'too_large' | 'invalid_xml' };
 
 const MAX_KML_BYTES = 500_000;
 
 /**
- * Parse the first polygon found in a KML string into GeoJSON.
- * KML coordinates are "lon,lat,alt" space-separated tuples.
+ * Parse the first (or largest) polygon found in a KML string into GeoJSON.
+ *
+ * Handles:
+ * - Simple <Polygon> placemarks (most common)
+ * - <MultiGeometry> with multiple polygons (common in CONABIO/CONANP exports)
+ *   → selects the polygon with the most vertices and warns the caller via hadMultiGeometry
+ *
+ * KML coordinate format: "lon,lat,alt" space-separated tuples.
+ * GeoJSON format: [[lon, lat], ...] — same order, altitude dropped.
  */
-export function parseKML(text: string): KMLGeoJSON | null {
+export function parseKML(text: string): { geojson: KMLGeoJSON; hadMultiGeometry: boolean } | null {
   const doc = new DOMParser().parseFromString(text, 'text/xml');
   if (doc.querySelector('parsererror')) return null;
 
-  // Try outer boundary first, fall back to any coordinates element
-  const coordsEl =
-    doc.querySelector('Polygon outerBoundaryIs LinearRing coordinates') ??
-    doc.querySelector('Polygon LinearRing coordinates') ??
-    doc.querySelector('coordinates');
-  if (!coordsEl?.textContent) return null;
+  const allPolygons = Array.from(doc.querySelectorAll('Polygon'));
+  if (allPolygons.length === 0) return null;
 
-  const pairs = coordsEl.textContent
+  const hadMultiGeometry =
+    allPolygons.length > 1 ||
+    doc.querySelector('MultiGeometry') !== null;
+
+  // For MultiGeometry: pick the polygon with the most vertices (largest area proxy)
+  let bestCoordEl: Element | null = null;
+  let bestCount = 0;
+  for (const poly of allPolygons) {
+    const coordsEl =
+      poly.querySelector('outerBoundaryIs LinearRing coordinates') ??
+      poly.querySelector('LinearRing coordinates') ??
+      poly.querySelector('coordinates');
+    if (!coordsEl?.textContent) continue;
+    const count = coordsEl.textContent.trim().split(/\s+/).length;
+    if (count > bestCount) {
+      bestCount = count;
+      bestCoordEl = coordsEl;
+    }
+  }
+
+  if (!bestCoordEl?.textContent) return null;
+
+  const pairs = bestCoordEl.textContent
     .trim()
     .split(/\s+/)
     .filter(Boolean)
     .map(pair => {
       const parts = pair.split(',').map(Number);
+      // KML: lon,lat,alt → GeoJSON: [lon, lat] (same order, drop altitude)
       return [parts[0], parts[1]] as [number, number];
     })
     .filter(([lon, lat]) => !isNaN(lon) && !isNaN(lat));
 
   if (pairs.length < 3) return null;
 
-  return { type: 'Polygon', coordinates: [pairs] };
+  return {
+    geojson: { type: 'Polygon', coordinates: [pairs] },
+    hadMultiGeometry,
+  };
 }
 
 /** Extract the first placemark name from KML (for display). */
@@ -52,12 +84,12 @@ export function extractKMLName(text: string): string | undefined {
 export function validateKML(text: string): KMLValidationResult {
   if (text.length > MAX_KML_BYTES) return { ok: false, error: 'too_large' };
   try {
-    const geojson = parseKML(text);
-    if (!geojson) return { ok: false, error: 'no_polygon' };
+    const result = parseKML(text);
+    if (!result) return { ok: false, error: 'no_polygon' };
+    const { geojson, hadMultiGeometry } = result;
     const vertexCount = geojson.coordinates[0].length;
-    if (vertexCount < 3) return { ok: false, error: 'empty' };
     const name = extractKMLName(text);
-    return { ok: true, geojson, vertexCount, name };
+    return { ok: true, geojson, vertexCount, name, hadMultiGeometry };
   } catch {
     return { ok: false, error: 'invalid_xml' };
   }

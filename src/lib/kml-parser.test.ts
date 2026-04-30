@@ -55,18 +55,43 @@ const NAMED_DOCUMENT_KML = `<?xml version="1.0" encoding="UTF-8"?>
   </Document>
 </kml>`;
 
+// MultiGeometry: two polygons — second one has more vertices (should be selected)
+const MULTI_GEOMETRY_KML = `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Placemark>
+    <name>Sierra Norte</name>
+    <MultiGeometry>
+      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <coordinates>-96.70,17.06,0 -96.69,17.06,0 -96.69,17.07,0 -96.70,17.06,0</coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <coordinates>-96.72,17.06,0 -96.70,17.06,0 -96.70,17.08,0 -96.72,17.08,0 -96.71,17.09,0 -96.72,17.06,0</coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    </MultiGeometry>
+  </Placemark>
+</kml>`;
+
 describe('parseKML', () => {
-  it('returns a GeoJSON Polygon for a valid KML', () => {
+  it('returns a GeoJSON Polygon and hadMultiGeometry=false for a simple KML', () => {
     const result = parseKML(SIMPLE_KML);
     expect(result).not.toBeNull();
-    expect(result?.type).toBe('Polygon');
-    expect(result?.coordinates[0]).toHaveLength(5);
+    expect(result?.geojson.type).toBe('Polygon');
+    expect(result?.geojson.coordinates[0]).toHaveLength(5);
+    expect(result?.hadMultiGeometry).toBe(false);
   });
 
   it('returns [lon, lat] pairs (no axis swap needed)', () => {
     const result = parseKML(SIMPLE_KML);
     // First coord in KML: -96.72,17.06  → [lon=-96.72, lat=17.06]
-    expect(result?.coordinates[0][0]).toEqual([-96.72, 17.06]);
+    expect(result?.geojson.coordinates[0][0]).toEqual([-96.72, 17.06]);
   });
 
   it('returns null when no Polygon element present', () => {
@@ -79,6 +104,14 @@ describe('parseKML', () => {
 
   it('returns null for malformed XML', () => {
     expect(parseKML(MALFORMED_XML)).toBeNull();
+  });
+
+  it('handles MultiGeometry: picks the polygon with most vertices, sets hadMultiGeometry=true', () => {
+    const result = parseKML(MULTI_GEOMETRY_KML);
+    expect(result).not.toBeNull();
+    expect(result?.hadMultiGeometry).toBe(true);
+    // The larger polygon (6 vertices) should be selected over the smaller (4 vertices)
+    expect(result?.geojson.coordinates[0]).toHaveLength(6);
   });
 });
 
@@ -97,13 +130,23 @@ describe('extractKMLName', () => {
 });
 
 describe('validateKML', () => {
-  it('returns ok:true with geojson, vertexCount, and name for a valid KML', () => {
+  it('returns ok:true with geojson, vertexCount, name, hadMultiGeometry for valid KML', () => {
     const result = validateKML(SIMPLE_KML);
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.geojson.type).toBe('Polygon');
       expect(result.vertexCount).toBe(5);
       expect(result.name).toBe('Test Zone');
+      expect(result.hadMultiGeometry).toBe(false);
+    }
+  });
+
+  it('returns ok:true with hadMultiGeometry=true for MultiGeometry KML', () => {
+    const result = validateKML(MULTI_GEOMETRY_KML);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.hadMultiGeometry).toBe(true);
+      expect(result.vertexCount).toBe(6); // largest polygon selected
     }
   });
 

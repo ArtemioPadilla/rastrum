@@ -83,12 +83,13 @@ const projectsBase = routes.projects[lang];
           <span>{proj.form_polygon_upload}</span>
         </label>
         <label class="inline-flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-400 cursor-pointer hover:underline" title={proj.kml_upload_label}>
-          <input type="file" id="project-kml-file" accept=".kml,application/vnd.google-earth.kml+xml" class="sr-only" />
+          <input type="file" id="project-kml-file" accept=".kml,application/vnd.google-earth.kml+xml" class="sr-only" aria-label={proj.kml_upload_label} />
           <svg class="h-3.5 w-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
           <span>{proj.kml_upload_button}</span>
         </label>
       </div>
       <div id="project-kml-status" class="hidden mt-1 text-xs"></div>
+      <button type="button" id="project-kml-clear" class="hidden mt-1 text-[11px] text-zinc-400 hover:text-zinc-600 underline">{proj.kml_clear}</button>
     </div>
 
     <p id="project-form-error" class="hidden text-sm text-rose-600 dark:text-rose-400"></p>
@@ -114,6 +115,7 @@ const projectsBase = routes.projects[lang];
     const fileEl   = document.getElementById('project-polygon-file') as HTMLInputElement | null;
     const kmlFileEl = document.getElementById('project-kml-file') as HTMLInputElement | null;
     const kmlStatus = document.getElementById('project-kml-status');
+    const kmlClearBtn = document.getElementById('project-kml-clear') as HTMLButtonElement | null;
     const polyTxt = document.getElementById('project-polygon-text') as HTMLTextAreaElement | null;
     const errEl   = document.getElementById('project-form-error');
     const submit  = document.getElementById('project-form-submit') as HTMLButtonElement | null;
@@ -147,8 +149,14 @@ const projectsBase = routes.projects[lang];
         const msg = proj.kml_parse_success
           .replace('{name}', displayName)
           .replace('{n}', String(result.vertexCount));
-        kmlStatus.textContent = '✓ ' + msg;
+        let statusText = '\u2713 ' + msg;
+        // Warn when MultiGeometry detected (common in CONABIO/CONANP KML exports)
+        if (result.hadMultiGeometry) {
+          statusText += ' \u2014 ' + (proj.kml_multigeometry_warning ?? 'Multiple polygons detected, largest imported');
+        }
+        kmlStatus.textContent = statusText;
         kmlStatus.className = 'mt-1 text-xs text-emerald-700 dark:text-emerald-400';
+        kmlClearBtn?.classList.remove('hidden');
         // Populate the GeoJSON textarea with the parsed polygon
         if (polyTxt) {
           polyTxt.value = JSON.stringify(result.geojson, null, 2);
@@ -160,15 +168,23 @@ const projectsBase = routes.projects[lang];
           case 'too_large':   errMsg = proj.kml_parse_error_too_large;   break;
           case 'no_polygon':  errMsg = proj.kml_parse_error_no_polygon;  break;
           case 'invalid_xml': errMsg = proj.kml_parse_error_invalid;     break;
-          case 'empty':       errMsg = proj.kml_parse_error_empty;       break;
           default:            errMsg = proj.kml_parse_error_invalid;     break;
         }
-        kmlStatus.textContent = '✕ ' + errMsg;
+        kmlStatus.textContent = '\u2715 ' + errMsg;
         kmlStatus.className = 'mt-1 text-xs text-rose-600 dark:text-rose-400';
+        kmlClearBtn?.classList.add('hidden');
         // Reset file input
         kmlFileEl.value = '';
       }
       kmlStatus.classList.remove('hidden');
+    });
+
+    // Clear button: reset KML selection and GeoJSON textarea
+    kmlClearBtn?.addEventListener('click', () => {
+      if (kmlFileEl) kmlFileEl.value = '';
+      if (polyTxt) polyTxt.value = '';
+      if (kmlStatus) { kmlStatus.textContent = ''; kmlStatus.classList.add('hidden'); }
+      kmlClearBtn.classList.add('hidden');
     });
 
     function showError(msg: string) {
