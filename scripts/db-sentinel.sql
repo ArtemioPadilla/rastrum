@@ -74,6 +74,28 @@ BEGIN
       AND column_name  = 'expires_at'
   ) THEN missing := array_append(missing, 'public.user_roles.expires_at'); END IF;
 
+  -- PR14 — deferred cleanups (per-admin tz, webhook replay protection)
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name   = 'users'
+      AND column_name  = 'timezone'
+  ) THEN missing := array_append(missing, 'public.users.timezone'); END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name   = 'admin_webhook_deliveries'
+      AND column_name  = 'nonce'
+  ) THEN missing := array_append(missing, 'public.admin_webhook_deliveries.nonce'); END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name   = 'admin_webhook_deliveries'
+      AND column_name  = 'request_id'
+  ) THEN missing := array_append(missing, 'public.admin_webhook_deliveries.request_id'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'reconcile_webhook_deliveries')
+    THEN missing := array_append(missing, 'public.reconcile_webhook_deliveries()'); END IF;
+
   -- Console PR8 — feature flags + karma config DB tables
   IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'app_feature_flags')      THEN missing := array_append(missing, 'public.app_feature_flags'); END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'karma_config')           THEN missing := array_append(missing, 'public.karma_config'); END IF;

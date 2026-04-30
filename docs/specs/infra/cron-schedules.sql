@@ -27,6 +27,10 @@
 --   v7 (2026-04-29): added 'auto-revoke-expired-roles-daily' (08:15 UTC) and
 --                    'expire-stale-proposals-hourly' (every hour at :25)
 --                    for PR13 future-proofing.
+--   v8 (2026-04-29): added 'reconcile-webhook-deliveries' (every 2 min) for
+--                    PR14 — writes back async pg_net status_code into
+--                    admin_webhook_deliveries and recomputes
+--                    consecutive_failures.
 -- ════════════════════════════════════════════════════════════════════════
 
 CREATE EXTENSION IF NOT EXISTS pg_cron;
@@ -156,6 +160,21 @@ BEGIN
     $$ SELECT public.expire_stale_proposals(); $$
   );
 
+  -- 11. reconcile-webhook-deliveries — every 2 minutes (PR14)
+  --     pg_net.http_post is fire-and-forget; the response lands in
+  --     net._http_response asynchronously. This cron writes the
+  --     resolved status_code back into admin_webhook_deliveries and
+  --     recomputes the parent webhook's consecutive_failures counter
+  --     so the circuit breaker can do its job. Idempotent — rows
+  --     with a non-NULL status_code are skipped.
+  PERFORM cron.unschedule('reconcile-webhook-deliveries')
+    FROM cron.job WHERE jobname = 'reconcile-webhook-deliveries';
+  PERFORM cron.schedule(
+    'reconcile-webhook-deliveries',
+    '*/2 * * * *',
+    $$ SELECT public.reconcile_webhook_deliveries(); $$
+  );
+
   RAISE NOTICE '✓ Cron schedules applied';
 END
 $migration$;
@@ -166,7 +185,8 @@ WHERE jobname IN ('streaks-nightly', 'badges-nightly', 'plantnet-quota-daily',
                   'streak-push-nightly', 'refresh-taxon-rarity-nightly',
                   'recompute-user-stats-nightly',
                   'admin-anomaly-detect-hourly', 'admin-health-digest-weekly',
-                  'auto-revoke-expired-roles-daily', 'expire-stale-proposals-hourly')
+                  'auto-revoke-expired-roles-daily', 'expire-stale-proposals-hourly',
+                  'reconcile-webhook-deliveries')
 ORDER BY jobname;
 
 -- m26: prune read notifications older than 90 days, daily at 04:30 UTC.
