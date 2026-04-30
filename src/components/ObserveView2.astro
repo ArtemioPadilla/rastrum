@@ -1,0 +1,544 @@
+---
+import DropZone from "./DropZone.astro";
+import PipelineGraph from "./PipelineGraph.astro";
+import MapPicker from "./MapPicker.astro";
+import { t } from "../i18n/utils";
+import { HABITATS, WEATHERS } from "../lib/observation-enums";
+
+interface Props { lang: "en" | "es"; }
+const { lang } = Astro.props;
+const isEs = lang === "es";
+const tr = t(lang);
+
+const observeStr = tr.observe as Record<string, string>;
+const habitats = HABITATS;
+const weathers = WEATHERS;
+---
+
+<div class="max-w-2xl mx-auto space-y-6">
+  <!-- Header -->
+  <div class="flex items-start justify-between gap-4">
+    <h1 class="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+      {isEs ? "Registrar observación" : "Log observation"}
+    </h1>
+    <a
+      href={isEs ? "/es/observar/clasico" : "/en/observe/classic"}
+      class="text-xs text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300 underline underline-offset-2 shrink-0 mt-1"
+    >
+      {isEs ? "Formulario clásico" : "Classic form"}
+    </a>
+  </div>
+
+  <!-- Resume in-progress banner -->
+  <div id="obs2-resume-banner" class="hidden rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 p-4 flex items-center gap-3">
+    <span class="text-amber-700 dark:text-amber-300 text-sm flex-1">
+      {isEs ? "Tienes una observación en progreso." : "You have an observation in progress."}
+    </span>
+    <button id="obs2-resume-btn" type="button" class="text-xs font-semibold text-amber-700 dark:text-amber-300 underline">
+      {isEs ? "Retomar" : "Resume"}
+    </button>
+    <button id="obs2-resume-dismiss" type="button" class="text-xs text-zinc-400 hover:text-zinc-600">
+      {isEs ? "Descartar" : "Dismiss"}
+    </button>
+  </div>
+
+  <!-- Drop Zone -->
+  <DropZone lang={lang} />
+
+  <!-- Pipeline section (hidden until files added) -->
+  <div id="obs2-pipeline-section" class="hidden space-y-3">
+    <div class="flex items-center justify-between">
+      <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+        {isEs ? "Procesando archivos" : "Processing files"}
+      </h2>
+      <span id="obs2-pipeline-status" class="text-xs text-zinc-500 dark:text-zinc-400"></span>
+    </div>
+    <PipelineGraph lang={lang} />
+  </div>
+
+  <!-- Post-process form (hidden until pipeline done) -->
+  <form id="obs2-post-form" class="hidden space-y-5" novalidate>
+    <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+      {isEs ? "Últimos detalles" : "Almost done"}
+    </h2>
+
+    <!-- Identification result card -->
+    <div id="obs2-id-card" class="hidden rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 p-4">
+      <div class="flex items-start justify-between gap-2">
+        <div>
+          <p id="obs2-species" class="font-semibold italic text-zinc-900 dark:text-zinc-100"></p>
+          <p id="obs2-common" class="text-sm text-zinc-500 dark:text-zinc-400"></p>
+        </div>
+        <span id="obs2-conf" class="text-xs font-mono text-emerald-600 dark:text-emerald-400 shrink-0"></span>
+      </div>
+      <button type="button" id="obs2-id-edit" class="mt-2 text-xs text-zinc-400 underline">
+        {isEs ? "Editar identificación" : "Edit identification"}
+      </button>
+      <div id="obs2-id-manual" class="hidden mt-2">
+        <input
+          id="obs2-taxon-input"
+          type="text"
+          class="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm"
+          placeholder={isEs ? "Nombre científico (opcional)" : "Scientific name (optional)"}
+        />
+      </div>
+    </div>
+
+    <!-- Location -->
+    <div>
+      <div class="flex items-center justify-between mb-2">
+        <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          {isEs ? "Ubicación" : "Location"}
+        </label>
+        <button type="button" id="obs2-skip-location" class="text-xs text-zinc-400 underline">
+          {isEs ? "Omitir ubicación" : "Skip location"}
+        </button>
+      </div>
+      <div id="obs2-gps-status" class="mb-2 text-xs text-zinc-500 dark:text-zinc-400">
+        {isEs ? "Obteniendo GPS..." : "Acquiring GPS..."}
+      </div>
+      <MapPicker mode="edit" lang={lang} pickerId="obs2-map" initialCoords={null} />
+    </div>
+
+    <!-- Notes -->
+    <div>
+      <label for="obs2-notes" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+        {isEs ? "Notas" : "Notes"} <span class="text-zinc-400">{isEs ? "(opcional)" : "(optional)"}</span>
+      </label>
+      <textarea
+        id="obs2-notes"
+        rows="3"
+        class="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm resize-none"
+        placeholder={isEs ? "¿Qué observaste? Contexto adicional..." : "What did you observe? Any additional context..."}
+      ></textarea>
+    </div>
+
+    <!-- Advanced fields (collapsed) -->
+    <details class="rounded-lg border border-zinc-200 dark:border-zinc-800">
+      <summary class="px-4 py-3 text-sm font-medium text-zinc-600 dark:text-zinc-400 cursor-pointer select-none">
+        {isEs ? "Campos avanzados" : "Advanced fields"}
+      </summary>
+      <div class="px-4 pb-4 pt-2 space-y-4 border-t border-zinc-100 dark:border-zinc-800">
+        <!-- Habitat -->
+        <div>
+          <label for="obs2-habitat" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+            {observeStr.habitat_label ?? (isEs ? "Hábitat" : "Habitat")}
+          </label>
+          <select id="obs2-habitat" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
+            <option value="">{isEs ? "No especificado" : "Not specified"}</option>
+            {habitats.map(h => <option value={h}>{h}</option>)}
+          </select>
+        </div>
+        <!-- Weather -->
+        <div>
+          <label for="obs2-weather" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+            {observeStr.weather_label ?? (isEs ? "Clima" : "Weather")}
+          </label>
+          <select id="obs2-weather" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
+            <option value="">{isEs ? "No especificado" : "Not specified"}</option>
+            {weathers.map(w => <option value={w}>{w}</option>)}
+          </select>
+        </div>
+      </div>
+    </details>
+
+    <!-- Error box -->
+    <div id="obs2-error" class="hidden rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 px-4 py-3 text-sm text-red-700 dark:text-red-300"></div>
+
+    <!-- Save button -->
+    <button
+      type="submit"
+      id="obs2-save-btn"
+      class="w-full min-h-[48px] rounded-xl bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white font-semibold text-sm transition-colors disabled:opacity-50"
+    >
+      {isEs ? "Guardar observación" : "Save observation"}
+    </button>
+  </form>
+
+  <!-- Success state -->
+  <div id="obs2-success" class="hidden rounded-xl border border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 p-6 text-center space-y-3">
+    <div class="text-4xl">✅</div>
+    <p class="font-semibold text-emerald-800 dark:text-emerald-300">
+      {isEs ? "¡Observación guardada!" : "Observation saved!"}
+    </p>
+    <div id="obs2-success-link"></div>
+    <button type="button" id="obs2-new-btn" class="text-sm text-emerald-700 dark:text-emerald-400 underline">
+      {isEs ? "Registrar otra" : "Log another"}
+    </button>
+  </div>
+</div>
+
+<script>
+import type { PipelineFile, PipelineNode, PipelineState } from '../lib/pipeline-engine';
+import {
+  triageFile, buildGraph, savePipelineState, loadPipelineState,
+} from '../lib/pipeline-engine';
+import { saveObservationToOutbox, resolveObserverRef } from '../lib/observe';
+import { syncOutbox } from '../lib/sync';
+
+// ── State ──────────────────────────────────────────────────────────────────
+const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
+const isEs = lang === 'es';
+
+let pipelineState: PipelineState | null = null;
+let location: { lat: number; lng: number; accuracyM: number; altitudeM: number | null } | null = null;
+let bestResult: { scientific_name: string; common_name_en: string | null; confidence: number; source: string } | null = null;
+
+// DOM refs
+const pipelineSection = document.getElementById('obs2-pipeline-section');
+const pipelineStatus  = document.getElementById('obs2-pipeline-status');
+const postForm        = document.getElementById('obs2-post-form') as HTMLFormElement | null;
+const successEl       = document.getElementById('obs2-success');
+const errorEl         = document.getElementById('obs2-error');
+const saveBtn         = document.getElementById('obs2-save-btn') as HTMLButtonElement | null;
+const resumeBanner    = document.getElementById('obs2-resume-banner');
+const gpsStatus       = document.getElementById('obs2-gps-status');
+const idCard          = document.getElementById('obs2-id-card');
+const speciesEl       = document.getElementById('obs2-species');
+const commonEl        = document.getElementById('obs2-common');
+const confEl          = document.getElementById('obs2-conf');
+
+// ── Resume banner ──────────────────────────────────────────────────────────
+(async () => {
+  try {
+    const db = await loadPipelineState('__latest__');
+    if (db && db.status !== 'done' && db.status !== 'failed') {
+      resumeBanner?.classList.remove('hidden');
+      document.getElementById('obs2-resume-btn')?.addEventListener('click', () => {
+        resumePipeline(db);
+        resumeBanner?.classList.add('hidden');
+      });
+      document.getElementById('obs2-resume-dismiss')?.addEventListener('click', () => {
+        resumeBanner?.classList.add('hidden');
+      });
+    }
+  } catch { /* no prior pipeline */ }
+})();
+
+// ── Files dropped ──────────────────────────────────────────────────────────
+document.addEventListener('rastrum:files-dropped', async (e: Event) => {
+  const ev = e as CustomEvent<{ files: File[] }>;
+  const files: File[] = ev.detail.files;
+  if (!files.length) return;
+
+  const pipelineFiles: PipelineFile[] = files.map(f => ({
+    id: crypto.randomUUID(),
+    file: f,
+    kind: triageFile(f),
+    blobUrl: URL.createObjectURL(f),
+  }));
+
+  // Detect available runners
+  const runners = await detectRunners();
+  const nodes = buildGraph(pipelineFiles, runners);
+
+  pipelineState = {
+    id: crypto.randomUUID(),
+    createdAt: Date.now(),
+    files: pipelineFiles,
+    nodes,
+    mode: 'full',
+    status: 'processing',
+  };
+
+  // Save to IndexedDB eagerly
+  await savePipelineState(pipelineState).catch(() => {});
+
+  // Show pipeline section
+  pipelineSection?.classList.remove('hidden');
+  updatePipelineUI();
+
+  // Start GPS in parallel
+  startGPS();
+
+  // Run pipeline
+  await runPipeline(pipelineState);
+});
+
+// ── Available runners detection ────────────────────────────────────────────
+async function detectRunners() {
+  const { getBirdNETCacheStatus, getBirdNETWeightsBaseUrl } = await import('../lib/identifiers/birdnet-cache');
+  const { resolvePlantNetKey } = await import('../lib/identify-runners');
+  const { hasAnthropicKey } = await import('../lib/anthropic-key');
+
+  const [birdnetStatus, plantnetKey, claudeKey] = await Promise.all([
+    getBirdNETWeightsBaseUrl()
+      ? getBirdNETCacheStatus().then(s => s.modelCached && s.labelsCached).catch(() => false)
+      : Promise.resolve(false),
+    resolvePlantNetKey().then(k => !!k).catch(() => false),
+    hasAnthropicKey().catch(() => false),
+  ]);
+
+  let phi = false;
+  try {
+    const { getModelCacheStatus, VISION_MODEL_ID, localAISupported } = await import('../lib/local-ai');
+    if (localAISupported()) {
+      const s = await getModelCacheStatus(VISION_MODEL_ID);
+      phi = s.cached && (localStorage.getItem('rastrum.prefs.usePhiVision') === 'true');
+    }
+  } catch { /* unavailable */ }
+
+  return { plantnet: plantnetKey, birdnet: birdnetStatus, claude: claudeKey, phi };
+}
+
+// ── Pipeline runner ────────────────────────────────────────────────────────
+async function runPipeline(state: PipelineState) {
+  const { runParallelIdentify } = await import('../lib/identify-cascade-client');
+  const { makePlantNetRunner, makeClaudeRunner, makePhiRunner, resolvePlantNetKey } = await import('../lib/identify-runners');
+  const { hasAnthropicKey } = await import('../lib/anthropic-key');
+
+  for (const node of state.nodes) {
+    if (node.kind !== 'identify' || node.state === 'skipped') continue;
+    const pf = state.files.find(f => f.id === node.fileId);
+    if (!pf) continue;
+
+    setNodeState(state, node.id, 'running');
+
+    try {
+      if (pf.kind === 'photo') {
+        // Build runners dynamically
+        const runners: Record<string, import('../lib/identify-cascade-client').IdentifierRunner> = {};
+        if (await resolvePlantNetKey()) runners.plantnet = (await import('../lib/identify-runners')).makePlantNetRunner(lang as 'en' | 'es');
+        if (await hasAnthropicKey()) runners.claude_haiku = makeClaudeRunner(lang as 'en' | 'es');
+
+        if (Object.keys(runners).length === 0) {
+          setNodeState(state, node.id, 'skipped', undefined, 'No runner available');
+        } else {
+          const abort = new AbortController();
+          const out = await runParallelIdentify(pf.file as File, { runners }, abort.signal);
+          if (out.kind === 'winner' || out.kind === 'uncertain') {
+            const r = out.result;
+            setNodeState(state, node.id, 'done', {
+              scientific_name: r.scientific_name,
+              common_name_en: r.common_name_en,
+              confidence: r.confidence,
+              source: r.source,
+            });
+            if (!bestResult || r.confidence > (bestResult.confidence ?? 0)) {
+              bestResult = { scientific_name: r.scientific_name, common_name_en: r.common_name_en ?? null, confidence: r.confidence, source: r.source };
+            }
+          } else {
+            setNodeState(state, node.id, 'failed', undefined, 'No identification result');
+          }
+        }
+      } else if (pf.kind === 'audio') {
+        const { birdnetIdentifier } = await import('../lib/identifiers/birdnet');
+        const av = await birdnetIdentifier.isAvailable();
+        if (!av.ready) {
+          setNodeState(state, node.id, 'skipped', undefined, av.message ?? 'BirdNET not available');
+        } else {
+          const result = await birdnetIdentifier.identify({
+            media: { kind: 'blob', blob: pf.file as Blob },
+            mediaKind: 'audio',
+            locale: lang as 'en' | 'es',
+          });
+          setNodeState(state, node.id, 'done', {
+            scientific_name: result.scientific_name,
+            common_name_en: result.common_name_en,
+            confidence: result.confidence,
+            source: result.source,
+          });
+          if (!bestResult || result.confidence > (bestResult.confidence ?? 0)) {
+            bestResult = { scientific_name: result.scientific_name, common_name_en: result.common_name_en ?? null, confidence: result.confidence, source: result.source };
+          }
+        }
+      }
+    } catch (err) {
+      setNodeState(state, node.id, 'failed', undefined, (err as Error).message);
+    }
+  }
+
+  // Merge node
+  const mergeNode = state.nodes.find(n => n.kind === 'merge');
+  if (mergeNode) setNodeState(state, mergeNode.id, 'done');
+
+  // Location node — mark running, GPS already in progress
+  const locNode = state.nodes.find(n => n.kind === 'location');
+  if (locNode) setNodeState(state, locNode.id, location ? 'done' : 'running');
+
+  state.status = 'done';
+  await savePipelineState(state).catch(() => {});
+
+  // Show post-process form
+  showPostForm();
+}
+
+// ── Node state helpers ─────────────────────────────────────────────────────
+function setNodeState(
+  state: PipelineState,
+  nodeId: string,
+  newState: import('../lib/pipeline-engine').NodeState,
+  output?: import('../lib/pipeline-engine').PipelineResult,
+  error?: string,
+) {
+  const node = state.nodes.find(n => n.id === nodeId);
+  if (!node) return;
+  node.state = newState;
+  if (output) node.output = output;
+  if (error) node.error = error;
+  if (newState === 'running') node.startedAt = Date.now();
+  if (newState === 'done' || newState === 'failed') node.completedAt = Date.now();
+  updatePipelineUI();
+  savePipelineState(state).catch(() => {});
+}
+
+function updatePipelineUI() {
+  if (!pipelineState) return;
+  document.dispatchEvent(new CustomEvent('rastrum:pipeline-update', { detail: { nodes: pipelineState.nodes } }));
+
+  // Status text
+  const running = pipelineState.nodes.filter(n => n.state === 'running').length;
+  const done    = pipelineState.nodes.filter(n => n.state === 'done').length;
+  const total   = pipelineState.nodes.length;
+  if (pipelineStatus) {
+    pipelineStatus.textContent = running > 0
+      ? (isEs ? `Procesando... (${done}/${total})` : `Processing... (${done}/${total})`)
+      : (isEs ? `Listo (${done}/${total})` : `Ready (${done}/${total})`);
+  }
+}
+
+// ── GPS ────────────────────────────────────────────────────────────────────
+function startGPS() {
+  if (!navigator.geolocation) {
+    if (gpsStatus) gpsStatus.textContent = isEs ? 'GPS no disponible' : 'GPS not available';
+    return;
+  }
+  if (gpsStatus) gpsStatus.textContent = isEs ? 'Obteniendo GPS...' : 'Acquiring GPS...';
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      location = {
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        accuracyM: pos.coords.accuracy,
+        altitudeM: pos.coords.altitude,
+      };
+      if (gpsStatus) gpsStatus.textContent = `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)} (±${Math.round(location.accuracyM)}m)`;
+      // Notify map picker
+      window.dispatchEvent(new CustomEvent('rastrum:mappicker-set', {
+        detail: { id: 'obs2-map', coords: { lat: location.lat, lng: location.lng } },
+      }));
+      // Update location node
+      if (pipelineState) {
+        const locNode = pipelineState.nodes.find(n => n.kind === 'location');
+        if (locNode) setNodeState(pipelineState, locNode.id, 'done');
+      }
+    },
+    () => {
+      if (gpsStatus) gpsStatus.textContent = isEs ? 'No se pudo obtener ubicación' : 'Could not get location';
+    },
+    { enableHighAccuracy: true, timeout: 20000 },
+  );
+}
+
+// ── Show post form ─────────────────────────────────────────────────────────
+function showPostForm() {
+  postForm?.classList.remove('hidden');
+  if (bestResult) {
+    idCard?.classList.remove('hidden');
+    if (speciesEl) speciesEl.textContent = bestResult.scientific_name;
+    if (commonEl) commonEl.textContent = bestResult.common_name_en ?? '';
+    if (confEl) confEl.textContent = `${Math.round(bestResult.confidence * 100)}%`;
+  }
+
+  // Edit identification toggle
+  document.getElementById('obs2-id-edit')?.addEventListener('click', () => {
+    document.getElementById('obs2-id-manual')?.classList.toggle('hidden');
+  });
+}
+
+// ── Skip location ──────────────────────────────────────────────────────────
+document.getElementById('obs2-skip-location')?.addEventListener('click', () => {
+  location = { lat: 0, lng: 0, accuracyM: 0, altitudeM: null };
+  if (gpsStatus) gpsStatus.textContent = isEs ? 'Ubicación omitida' : 'Location skipped';
+});
+
+// ── Save ───────────────────────────────────────────────────────────────────
+postForm?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!pipelineState) return;
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = isEs ? 'Guardando...' : 'Saving...'; }
+  if (errorEl) errorEl.classList.add('hidden');
+
+  try {
+    const observerRef = await resolveObserverRef();
+    const notes = (document.getElementById('obs2-notes') as HTMLTextAreaElement | null)?.value.trim() || null;
+    const habitatVal = (document.getElementById('obs2-habitat') as HTMLSelectElement | null)?.value || null;
+    const weatherVal = (document.getElementById('obs2-weather') as HTMLSelectElement | null)?.value || null;
+    const taxonInput = (document.getElementById('obs2-taxon-input') as HTMLInputElement | null)?.value.trim();
+
+    const mediaInputs = pipelineState.files.map(pf => ({
+      blob: pf.file,
+      blobId: pf.id,
+      mimeType: pf.file.type || 'application/octet-stream',
+      sizeBytes: pf.file.size,
+      mediaType: pf.kind === 'audio' ? 'audio' as const : pf.kind === 'video' ? 'video' as const : 'photo' as const,
+    }));
+
+    const identifiedSpecies = taxonInput || bestResult?.scientific_name || '';
+
+    const obs = await saveObservationToOutbox({
+      observerRef,
+      media: mediaInputs,
+      location: location ?? { lat: 0, lng: 0, accuracyM: 0, altitudeM: null, capturedFrom: 'gps' },
+      identification: identifiedSpecies ? {
+        scientificName: identifiedSpecies,
+        confidence: bestResult?.confidence ?? 0,
+        source: (bestResult?.source ?? 'human') as never,
+        status: 'accepted',
+      } : undefined,
+      habitat: habitatVal as never,
+      weather: weatherVal as never,
+      notes,
+    });
+
+    await syncOutbox().catch(() => {});
+
+    // Update pipeline
+    const saveNode = pipelineState.nodes.find(n => n.kind === 'save');
+    if (saveNode) setNodeState(pipelineState, saveNode.id, 'done');
+    pipelineState.status = 'done';
+    await savePipelineState(pipelineState).catch(() => {});
+
+    // Show success
+    postForm?.classList.add('hidden');
+    successEl?.classList.remove('hidden');
+    const linkEl = document.getElementById('obs2-success-link');
+    if (linkEl && obs.id) {
+      const href = `/share/obs/?id=${obs.id}`;
+      linkEl.innerHTML = `<a href="${href}" class="text-emerald-700 dark:text-emerald-400 underline text-sm">${isEs ? 'Ver observaci\u00f3n' : 'View observation'}</a>`;
+    }
+  } catch (err) {
+    if (errorEl) {
+      errorEl.textContent = (err as Error).message ?? (isEs ? 'Error al guardar' : 'Error saving');
+      errorEl.classList.remove('hidden');
+    }
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = isEs ? 'Guardar observaci\u00f3n' : 'Save observation'; }
+  }
+});
+
+// ── New observation ────────────────────────────────────────────────────────
+document.getElementById('obs2-new-btn')?.addEventListener('click', () => {
+  location = null;
+  bestResult = null;
+  pipelineState = null;
+  pipelineSection?.classList.add('hidden');
+  postForm?.classList.add('hidden');
+  successEl?.classList.add('hidden');
+  if (idCard) idCard.classList.add('hidden');
+  window.scrollTo(0, 0);
+});
+
+// ── Resume pipeline ────────────────────────────────────────────────────────
+async function resumePipeline(state: PipelineState) {
+  pipelineState = state;
+  pipelineSection?.classList.remove('hidden');
+  updatePipelineUI();
+  startGPS();
+
+  if (state.status !== 'done') {
+    await runPipeline(state);
+  } else {
+    showPostForm();
+  }
+}
+</script>
