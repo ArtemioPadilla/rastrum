@@ -427,10 +427,22 @@ CREATE POLICY "obs_credentialed_read" ON public.observations FOR SELECT
 
 -- Identifications: tied to observation access
 DROP POLICY IF EXISTS "id_owner" ON public.identifications;
+-- Fixed 2026-04-30: IN (SELECT id FROM observations ...) → EXISTS to prevent 42P17
+-- recursion. The IN subquery re-evaluates RLS on observations during INSERT,
+-- causing infinite recursion (42P17). EXISTS breaks the cycle.
 CREATE POLICY "id_owner" ON public.identifications FOR ALL
   USING (
-    observation_id IN (
-      SELECT id FROM observations WHERE (SELECT auth.uid()) = observer_id
+    EXISTS (
+      SELECT 1 FROM public.observations o
+      WHERE o.id = observation_id
+        AND (SELECT auth.uid()) = o.observer_id
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.observations o
+      WHERE o.id = observation_id
+        AND (SELECT auth.uid()) = o.observer_id
     )
   );
 
@@ -442,10 +454,20 @@ CREATE POLICY "id_public_read" ON public.identifications FOR SELECT
 
 -- Media: same as observations
 DROP POLICY IF EXISTS "media_owner" ON public.media_files;
+-- Fixed 2026-04-30: same EXISTS fix as id_owner (42P17 recursion prevention)
 CREATE POLICY "media_owner" ON public.media_files FOR ALL
   USING (
-    observation_id IN (
-      SELECT id FROM observations WHERE (SELECT auth.uid()) = observer_id
+    EXISTS (
+      SELECT 1 FROM public.observations o
+      WHERE o.id = observation_id
+        AND (SELECT auth.uid()) = o.observer_id
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.observations o
+      WHERE o.id = observation_id
+        AND (SELECT auth.uid()) = o.observer_id
     )
   );
 
