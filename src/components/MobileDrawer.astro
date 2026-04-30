@@ -20,6 +20,10 @@ const watchlistPath      = getLocalizedPath(lang, routes.exploreWatchlist[locale
 const settingsPath       = getLocalizedPath(lang, routes.profileSettings[locale] + '/profile/');
 const sponsoringPath     = getLocalizedPath(lang, routes.sponsoring[locale] + '/');
 const sponsoredByPath    = getLocalizedPath(lang, routes.sponsoredBy[locale] + '/');
+const inboxPath          = getLocalizedPath(lang, routes.inbox[locale] + '/');
+const profileExportPath  = getLocalizedPath(lang, routes.profileExport[locale] + '/');
+const profileDexPath     = getLocalizedPath(lang, routes.dex[locale] + '/');
+const profileImportPath  = getLocalizedPath(lang, routes.profileImport[locale] + '/');
 
 // Explore (Biodiversity + Community subheadings) — M28
 const exploreMapPath        = getLocalizedPath(lang, routes.exploreMap[locale] + '/');
@@ -123,6 +127,10 @@ const getDocLabel = (key: string) => (tr.docs.sections as Record<string, string>
       <a href={profilePath}   class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{tr.profile.view_profile}</a>
       <a href={myObsPath}     class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{tr.profile.my_observations_title}</a>
       <a href={watchlistPath} class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{tr.nav.explore_dropdown.watchlist}</a>
+      <a href={inboxPath}         class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{(tr as unknown as { socialgraph: { inbox: { title: string } } }).socialgraph.inbox.title}</a>
+      <a href={profileDexPath}    class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{(tr as unknown as { pokedex: { title: string } }).pokedex.title}</a>
+      <a href={profileExportPath} class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{tr.profile.export}</a>
+      <a href={profileImportPath} class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{(tr as unknown as { import: { title: string } }).import.title}</a>
       <a href={settingsPath}  class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{tr.profile.settings_link} ▸</a>
       <a href={sponsoringPath}  class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{tr.sponsoring.page_title}</a>
       <a href={sponsoredByPath} class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{tr.sponsoring.quota_nav_label}</a>

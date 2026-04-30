@@ -38,7 +38,11 @@ const railClass = (active: boolean, accent: 'emerald' | 'teal' | 'sky' | 'stone'
 // safelist is wired in `tailwind.config.mjs`; if a build emits unstyled
 // rails, check that file.
 
-const explorePath = getLocalizedPath(lang, routes.explore[locale] + '/');
+const explorePath       = getLocalizedPath(lang, routes.explore[locale] + '/');
+const inboxPath         = getLocalizedPath(lang, routes.inbox[locale] + '/');
+const profileExportPath = getLocalizedPath(lang, routes.profileExport[locale] + '/');
+const profileDexPath    = getLocalizedPath(lang, routes.dex[locale] + '/');
+const profileImportPath = getLocalizedPath(lang, routes.profileImport[locale] + '/');
 const exploreMapPath = getLocalizedPath(lang, routes.exploreMap[locale] + '/');
 const exploreRecentPath = getLocalizedPath(lang, routes.exploreRecent[locale] + '/');
 const exploreWatchlistPath = getLocalizedPath(lang, routes.exploreWatchlist[locale] + '/');
@@ -219,6 +223,10 @@ const docColumns = [
           <a id="menu-profile" href={getLocalizedPath(lang, routes.profile[locale] + '/')} class="block px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800">{tr.profile.view_profile}</a>
           <a id="menu-observations" href={getLocalizedPath(lang, routes.profileObservations[locale] + '/')} class="block px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800">{tr.profile.my_observations_title}</a>
           <a id="menu-watchlist" href={getLocalizedPath(lang, routes.exploreWatchlist[locale] + '/')} class="block px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800">{tr.nav.explore_dropdown.watchlist}</a>
+          <a id="menu-inbox" href={inboxPath} class="block px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800">{(tr as unknown as { socialgraph: { inbox: { title: string } } }).socialgraph.inbox.title}</a>
+          <a id="menu-dex" href={profileDexPath} class="block px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800">{(tr as unknown as { pokedex: { title: string } }).pokedex.title}</a>
+          <a id="menu-export" href={profileExportPath} class="block px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800">{tr.profile.export}</a>
+          <a id="menu-import" href={profileImportPath} class="block px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800">{(tr as unknown as { import: { title: string } }).import.title}</a>
           <a id="menu-settings" href={getLocalizedPath(lang, routes.profileSettings[locale] + '/profile/')} class="block px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800">{tr.profile.settings_link} ▸</a>
           <a id="menu-sponsoring" href={getLocalizedPath(lang, routes.sponsoring[locale] + '/')} class="block px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800">{tr.sponsoring.page_title}</a>
           <a id="menu-sponsored-by" href={getLocalizedPath(lang, routes.sponsoredBy[locale] + '/')} class="block px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800">{tr.sponsoring.quota_nav_label}</a>
