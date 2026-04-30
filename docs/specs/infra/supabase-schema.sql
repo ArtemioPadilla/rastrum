@@ -6515,8 +6515,11 @@ BEGIN
   GET DIAGNOSTICS v_count = ROW_COUNT;
   v_summary := v_summary || jsonb_build_object('reactions', v_count);
 
-  UPDATE public.user_badges     SET user_id      = p_keep WHERE user_id      = p_discard
-    ON CONFLICT (user_id, badge_key) DO NOTHING;
+  -- For badges: delete duplicates in the discard user first, then update
+  DELETE FROM public.user_badges
+  WHERE user_id = p_discard
+    AND badge_key IN (SELECT badge_key FROM public.user_badges WHERE user_id = p_keep);
+  UPDATE public.user_badges SET user_id = p_keep WHERE user_id = p_discard;
   GET DIAGNOSTICS v_count = ROW_COUNT;
   v_summary := v_summary || jsonb_build_object('badges', v_count);
 

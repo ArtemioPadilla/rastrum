@@ -13,7 +13,7 @@ import { test, expect } from '@playwright/test';
 //   #map-satellite-toggle-observe  — flips aria-pressed + the label inside it
 test.describe('observe form: map picker', () => {
   test('opens, drops pin, returns coords to gps-status', async ({ page }) => {
-    await page.goto('/en/observe/');
+    await page.goto('/en/observe/classic/');
 
     await page.locator('#map-picker-open-btn-observe').click();
     await expect(page.locator('#map-modal-observe')).toBeVisible();
@@ -40,7 +40,7 @@ test.describe('observe form: map picker', () => {
   });
 
   test('cancel button closes the modal without updating gps-status', async ({ page }) => {
-    await page.goto('/en/observe/');
+    await page.goto('/en/observe/classic/');
     await page.locator('#map-picker-open-btn-observe').click();
     await expect(page.locator('#map-modal-observe')).toBeVisible();
     await page.locator('#map-cancel-btn-observe').click();
@@ -48,7 +48,7 @@ test.describe('observe form: map picker', () => {
   });
 
   test('satellite toggle updates aria-pressed and label', async ({ page }) => {
-    await page.goto('/en/observe/');
+    await page.goto('/en/observe/classic/');
     await page.locator('#map-picker-open-btn-observe').click();
     await expect(page.locator('#map-picker-status-observe')).toBeHidden({ timeout: 15_000 });
 

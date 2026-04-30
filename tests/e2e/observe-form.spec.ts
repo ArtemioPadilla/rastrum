@@ -3,16 +3,23 @@ import path from 'node:path';
 
 const FIXTURE = path.resolve('tests/fixtures/tiny.png');
 
-// We never click "Submit" here. The submit handler in ObservationForm.astro
-// requires a Supabase session OR persists to Dexie + tries to sync — both
-// would either need a real backend or pollute IndexedDB across runs.
-// Instead, we assert the form's structural pieces render.
+// /en/observe/ now loads ObserveView2 (Observe 2.0 — Drop & Discover).
+// The classic ObservationForm still lives at /en/observe/classic/.
+// Tests that need the classic form fields are pointed there.
 
 test.describe('observe form', () => {
-  test('renders all form fields (en)', async ({ page }) => {
+  test('Observe 2.0: drop zone and capability banner render (en)', async ({ page }) => {
     await page.goto('/en/observe/');
+    await expect(page.locator('h1')).toContainText(/log observation|observation/i);
+    // DropZone inputs (new IDs in ObserveView2)
+    await expect(page.locator('#dz-capture-input')).toHaveCount(1);
+    await expect(page.locator('#dz-gallery-input')).toHaveCount(1);
+    // Capability banner
+    await expect(page.locator('#obs2-capability-banner')).toHaveCount(1);
+  });
 
-    await expect(page.locator('h1')).toContainText(/observation/i);
+  test('classic form: renders all form fields (en)', async ({ page }) => {
+    await page.goto('/en/observe/classic/');
 
     // Photo inputs (camera + gallery)
     await expect(page.locator('#camera-input')).toHaveCount(1);
@@ -27,12 +34,12 @@ test.describe('observe form', () => {
     await expect(page.locator('select[name="weather"]')).toBeVisible();
     await expect(page.locator('select[name="evidence_type"]')).toBeVisible();
 
-    // Submit button — present, but we don't click it.
+    // Submit button
     await expect(page.locator('#submit-btn')).toBeVisible();
   });
 
-  test('uploads a photo and shows preview thumb', async ({ page }) => {
-    await page.goto('/en/observe/');
+  test('classic form: uploads a photo and shows preview thumb', async ({ page }) => {
+    await page.goto('/en/observe/classic/');
     await page.setInputFiles('#gallery-input', FIXTURE);
 
     const grid = page.locator('#photo-grid');
@@ -41,15 +48,15 @@ test.describe('observe form', () => {
     await expect(grid.locator('button[data-rm]').first()).toBeVisible();
   });
 
-  test('typing notes updates textarea', async ({ page }) => {
-    await page.goto('/en/observe/');
+  test('classic form: typing notes updates textarea', async ({ page }) => {
+    await page.goto('/en/observe/classic/');
     const notes = page.locator('textarea[name="notes"]');
     await notes.fill('field test note');
     await expect(notes).toHaveValue('field test note');
   });
 
-  test('renders in Spanish locale', async ({ page }) => {
-    await page.goto('/es/observar/');
+  test('classic form: renders in Spanish locale', async ({ page }) => {
+    await page.goto('/es/observar/clasico/');
     await expect(page.locator('html')).toHaveAttribute('lang', 'es');
     await expect(page.locator('#submit-btn')).toBeVisible();
   });
