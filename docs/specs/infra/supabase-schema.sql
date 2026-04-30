@@ -1351,6 +1351,7 @@ SELECT
   o.habitat,
   o.obscure_level,
   i.id                               AS primary_id_id,
+  i.taxon_id                         AS current_taxon_id,
   i.scientific_name                  AS current_scientific_name,
   i.confidence                       AS current_confidence,
   COALESCE(i.is_research_grade, false) AS is_research_grade,
@@ -4884,8 +4885,14 @@ SELECT
   p.species_list,
   p.created_at,
   p.updated_at,
-  ST_AsGeoJSON(p.polygon)::jsonb           AS polygon_geojson,
-  ST_Area(p.polygon) / 1e6                 AS area_km2
+  CASE
+    WHEN p.polygon IS NOT NULL THEN ST_AsGeoJSON(p.polygon)::jsonb
+    ELSE NULL
+  END                                      AS polygon_geojson,
+  CASE
+    WHEN p.polygon IS NOT NULL THEN ST_Area(p.polygon) / 1e6
+    ELSE NULL
+  END                                      AS area_km2
 FROM public.projects p;
 
 GRANT SELECT ON public.projects_with_geojson TO anon, authenticated, service_role;

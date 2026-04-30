@@ -41,7 +41,6 @@ const tr = t(lang);
       <div>
         <div id="detail-name" class="text-lg font-semibold text-zinc-900 dark:text-zinc-100"></div>
         <div id="detail-username" class="text-sm text-zinc-500"></div>
-        <div id="detail-email" class="text-xs text-zinc-400 mt-0.5"></div>
       </div>
 
       <div>
@@ -99,7 +98,6 @@ const tr = t(lang);
     username: string | null;
     display_name: string | null;
     avatar_url: string | null;
-    email: string | null;
   };
 
   type RoleRow = {
@@ -151,7 +149,7 @@ const tr = t(lang);
 
     let query = supabase
       .from('users')
-      .select('id, username, display_name, avatar_url, email')
+      .select('id, username, display_name, avatar_url')
       .limit(50)
       .order('username', { ascending: true });
 
@@ -213,10 +211,8 @@ const tr = t(lang);
     show('users-detail');
     const nameEl = document.getElementById('detail-name')!;
     const unameEl = document.getElementById('detail-username')!;
-    const emailEl = document.getElementById('detail-email')!;
     nameEl.textContent = u.display_name ?? u.username ?? u.id;
     unameEl.textContent = u.username ? `@${u.username}` : '';
-    emailEl.textContent = u.email ?? '';
     renderRoleChips(userId);
     loadActivity(userId);
   }

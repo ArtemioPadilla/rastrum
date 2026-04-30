@@ -92,3 +92,35 @@ grep -c 'data-console-pill\|<aside' dist/en/console/anomalies/index.html
 Both lines should return non-zero (the sidebar markup is one minified
 line, so a count of 1 is normal). If either returns 0, the page is
 missing console chrome.
+
+## Mobile drawer
+
+Below the `md` breakpoint the desktop `<aside>` is hidden (`md:block`)
+and a hamburger button in the header (`md:hidden`) opens an off-canvas
+left drawer carrying the same role-scoped tab lists. Three load-bearing
+pieces:
+
+1. **Markup is duplicated**, not relocated — the desktop `<aside
+   data-console-sidebar>` and the mobile `<aside
+   data-console-mobile-sidebar>` each render their own copy of the
+   `<ul data-role="...">` elements. Cheaper than reparenting at every
+   breakpoint flip and keeps SSR byte-stable.
+2. **The hydrate script targets both** via the
+   `[data-console-sidebar] ul[data-role], [data-console-mobile-sidebar]
+   ul[data-role]` selector — so role flips reveal the right list in
+   whichever copy is currently visible.
+3. **Drawer behaviour**: Esc / backdrop click / in-drawer link click
+   all close it. Body scroll is locked while open (`overflow: hidden`).
+   `aria-modal="true"`, focus moves to the close button on open and
+   restores on close.
+
+i18n: `console.mobile_menu_{open,close,label}` (EN + ES).
+
+Verify in `dist/`:
+
+```bash
+grep -c 'console-mobile-drawer\|console-mobile-toggle' dist/en/console/index.html
+grep -c 'console-mobile-drawer\|console-mobile-toggle' dist/es/consola/index.html
+```
+
+Both should return ≥ 1.
