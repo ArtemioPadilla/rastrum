@@ -945,6 +945,42 @@
           "label_es": "Rediseño de la página de detalle de observación — layout dos columnas en desktop / apilado en móvil para /share/obs/?id=...; MapPicker.astro reutilizable extraído de ObservationForm; PhotoGallery.astro con lightbox nativo (teclado ←/→/Esc + swipe + compartir por foto); ObsManagePanel.astro con tabs Detalles/Ubicación/Fotos (edición de fecha/hora + hábitat/clima/establecimiento + editor de coordenadas + agregar/quitar fotos); semántica de edición material-vs-menor con badge 'editado tras IDs' por trigger en observations.last_material_edit_at (ubicación > 1 km, observed_at > 24 h, cambio de primary_taxon_id); soft-delete de fotos via media_files.deleted_at (GC de R2 huérfanos = v1.1); borrado de la foto que generó la cascade es atómico via Edge Function delete-photo + RPC delete_photo_atomic SECURITY DEFINER (limpia validated_by/validated_at + is_research_grade + bumpea last_material_edit_at en una transacción)",
           "done": true,
           "done_at": "2026-04-29"
+        },
+        {
+          "id": "projects-anp-m29",
+          "label": "Projects (Module 29) — ANP polygon protocols + auto-tagging trigger. Researchers define a polygon (typically an ANP, reserve, or sampling grid) at /{en,es}/projects/<slug>/ and observations whose location falls inside are auto-tagged via a BEFORE INSERT/UPDATE trigger on observations. Schema: projects table + project_members + auto-assignment trigger; visibility (public/private) with RLS; SECURITY DEFINER upsert_project() because supabase-js can't write geography directly; views with security_invoker = true. Prerequisite for M30 (CLI batch import) and M31 (camera stations).",
+          "label_es": "Proyectos (Módulo 29) — protocolos de polígono ANP + trigger de auto-tagging. Los investigadores definen un polígono (típicamente ANP, reserva o malla de muestreo) en /{en,es}/projects/<slug>/ y las observaciones cuya ubicación cae dentro se auto-etiquetan vía trigger BEFORE INSERT/UPDATE en observations. Schema: tabla projects + project_members + trigger de asignación automática; visibilidad (público/privado) con RLS; upsert_project() SECURITY DEFINER porque supabase-js no puede escribir geography directamente; vistas con security_invoker = true. Prerrequisito para M30 (CLI batch import) y M31 (camera stations).",
+          "done": true,
+          "done_at": "2026-04-29",
+          "status": "shipped — PR #132 (schema + RLS + upsert_project SECURITY DEFINER + auto-tagging trigger + UI). v1.1 follow-up: surface Projects link from chrome (Header MegaMenu Biodiversity column or new top-level slot)",
+          "status_es": "lanzado — PR #132 (schema + RLS + upsert_project SECURITY DEFINER + trigger de auto-tagging + UI). Seguimiento v1.1: exponer el link de Projects desde el chrome (columna Biodiversidad del Explore MegaMenu o slot top-level nuevo)"
+        },
+        {
+          "id": "cli-batch-import-m30",
+          "label": "CLI batch import for camera-trap memory cards (Module 30) — Node 20+ TypeScript CLI (rastrum-import) that walks a directory of camera-trap photos, reads EXIF GPS + timestamp, uploads each photo to R2 via the new POST /api/upload-url Edge Function, and creates an observation through the rst_* API token endpoint. Built for the CONANP-Oaxaca / DRFSIPS / PROREST 2026 workflow (500–2000 images per camera deployment). Auto-tags into the M29 project polygon when --project-slug is set. Resumable via a state file so re-runs skip already-uploaded photos.",
+          "label_es": "CLI de importación masiva para tarjetas de cámaras trampa (Módulo 30) — CLI Node 20+ TypeScript (rastrum-import) que recorre un directorio de fotos de cámara trampa, lee GPS + fecha del EXIF, sube cada foto a R2 vía la nueva Edge Function POST /api/upload-url, y crea una observación a través del endpoint con token rst_*. Construido para el flujo CONANP-Oaxaca / DRFSIPS / PROREST 2026 (500–2000 imágenes por deployment). Auto-etiqueta en el polígono del proyecto M29 cuando --project-slug está definido. Reanudable vía un archivo de estado para que las re-ejecuciones omitan fotos ya subidas.",
+          "done": true,
+          "done_at": "2026-04-29",
+          "status": "shipped — PR #134 (cli/ TypeScript package + /api/upload-url Edge Function endpoint + EXIF walker; depends on M29)",
+          "status_es": "lanzado — PR #134 (paquete TypeScript cli/ + endpoint /api/upload-url + walker de EXIF; depende de M29)"
+        },
+        {
+          "id": "camera-stations-m31",
+          "label": "Camera stations + sampling-effort tracking (Module 31) — schema only for v1; UI is a v1.1 follow-up. A camera station is a fixed deployment with one or more active periods (start/end dates). Standardised wildlife indices like Relative Abundance Index (RAI), detection rate per 100 trap-nights, and species richness all depend on knowing how long the camera was sampling, not just what it captured. Schema: camera_stations (project_id FK + station_key + coords + camera_model) + camera_station_active_periods (start/end). Depends on M29.",
+          "label_es": "Estaciones de cámara + seguimiento de esfuerzo de muestreo (Módulo 31) — sólo schema en v1; la UI es seguimiento v1.1. Una camera station es un deployment fijo con uno o más periodos activos (fechas inicio/fin). Índices estandarizados de fauna como el Índice de Abundancia Relativa (RAI), tasa de detección por 100 noches-trampa, y riqueza de especies dependen de saber cuánto tiempo estuvo muestreando la cámara, no sólo qué capturó. Schema: camera_stations (FK project_id + station_key + coords + camera_model) + camera_station_active_periods (inicio/fin). Depende de M29.",
+          "done": true,
+          "done_at": "2026-04-29",
+          "status": "shipped — PR #141 (schema only; UI = v1.1 follow-up). Standardised wildlife indices (RAI, detection rate per 100 trap-nights, species richness) become computable once UI captures active periods",
+          "status_es": "lanzado — PR #141 (sólo schema; UI = seguimiento v1.1). Los índices estandarizados de fauna (RAI, tasa de detección por 100 noches-trampa, riqueza de especies) se vuelven computables una vez que la UI capture los periodos activos"
+        },
+        {
+          "id": "multi-provider-vision-m32",
+          "label": "Multi-provider vision + per-sponsor model + platform pool (Module 32) — bundles three closely-coupled M27 extensions that share the same provider abstraction. (a) AWS Bedrock provider + per-sponsor preferred_model (Haiku/Sonnet/Opus or their Bedrock equivalents). (b) OpenAI / Azure OpenAI / Google Gemini / Vertex AI providers. (c) Platform-wide call pool (sponsor_pools table + consume_pool_slot RPC) so heavy beneficiaries can fall through to a shared pool. supabase/functions/_shared/vision-provider.ts exports a VisionProvider interface implemented by 6 concrete providers; buildProvider(credential) is the single dispatcher.",
+          "label_es": "Visión multi-proveedor + modelo por patrocinador + pool de plataforma (Módulo 32) — agrupa tres extensiones M27 estrechamente acopladas que comparten la misma abstracción de proveedor. (a) Proveedor AWS Bedrock + preferred_model por patrocinador (Haiku/Sonnet/Opus o sus equivalentes Bedrock). (b) Proveedores OpenAI / Azure OpenAI / Google Gemini / Vertex AI. (c) Pool de llamadas a nivel plataforma (tabla sponsor_pools + RPC consume_pool_slot) para que los beneficiarios pesados puedan caer al pool compartido. supabase/functions/_shared/vision-provider.ts exporta una interfaz VisionProvider implementada por 6 proveedores concretos; buildProvider(credential) es el dispatcher único.",
+          "done": true,
+          "done_at": "2026-04-29",
+          "status": "shipped — PR #143 (closes #115/#116/#118)",
+          "status_es": "lanzado — PR #143 (cierra #115/#116/#118)"
         }
       ]
     },

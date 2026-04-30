@@ -4313,6 +4313,54 @@
         { "label_en": "PR6 — Photos tab + delete-photo Edge Function (atomic transaction via delete_photo_atomic SECURITY DEFINER RPC: media_files.deleted_at + identifications demote clearing validated_by/validated_at/is_research_grade + observations.last_material_edit_at). Photo add via R2 upload flow. Cascade-photo confirm dialog driven by willDemote() helper (covered by vitest)", "label_es": "PR6 — Tab Fotos + Edge Function delete-photo (transacción atómica via RPC delete_photo_atomic SECURITY DEFINER: media_files.deleted_at + degradar identifications limpiando validated_by/validated_at/is_research_grade + observations.last_material_edit_at). Subir fotos via R2 + diálogo confirm cascade-photo dirigido por helper willDemote() (cubierto por vitest)", "status": "done", "pr": 125 },
         { "label_en": "v1.1 follow-ups: gc-orphan-media cron (R2 GC of soft-deleted blobs); native vs PhotoSwipe lightbox decision (was native ≤150 lines per spec)", "label_es": "Seguimientos v1.1: cron gc-orphan-media (GC R2 de blobs soft-deleted); decisión nativo vs PhotoSwipe del lightbox", "status": "planned" }
       ]
+    },
+    "projects-anp-m29": {
+      "phase": "v1.2",
+      "title_en": "Projects (Module 29) — ANP polygon protocols",
+      "title_es": "Proyectos (Módulo 29) — protocolos de polígono ANP",
+      "modules": ["29-projects-anp.md"],
+      "subtasks": [
+        { "label_en": "Schema: projects (slug UNIQUE, polygon geography(MultiPolygon, 4326), visibility public/private) + project_members + RLS + GIST index", "label_es": "Schema: projects (slug UNIQUE, polygon geography(MultiPolygon, 4326), visibility público/privado) + project_members + RLS + índice GIST", "status": "done", "pr": 132 },
+        { "label_en": "BEFORE INSERT/UPDATE OF location trigger on observations: ST_Covers(polygon, NEW.location) → auto-tag NEW.project_id (manual override respected, ORDER BY created_at ASC tiebreaker)", "label_es": "Trigger BEFORE INSERT/UPDATE OF location: ST_Covers(polygon, NEW.location) → auto-etiqueta NEW.project_id (respeta override manual, desempate ORDER BY created_at ASC)", "status": "done", "pr": 132 },
+        { "label_en": "upsert_project SECURITY DEFINER RPC + projects_with_geojson view WITH (security_invoker = true) + UI (List/New/Detail) at /{en,es}/{projects,proyectos}/", "label_es": "RPC upsert_project SECURITY DEFINER + vista projects_with_geojson WITH (security_invoker = true) + UI (List/New/Detail) en /{en,es}/{projects,proyectos}/", "status": "done", "pr": 132 },
+        { "label_en": "v1.1 follow-up: surface Projects link from chrome (Header MegaMenu Biodiversity column) — currently only reachable via direct URL", "label_es": "Seguimiento v1.1: exponer link de Projects desde el chrome (columna Biodiversidad del Explore MegaMenu) — actualmente sólo accesible via URL directa", "status": "planned" }
+      ]
+    },
+    "cli-batch-import-m30": {
+      "phase": "v1.2",
+      "title_en": "CLI batch import for camera-trap memory cards (Module 30)",
+      "title_es": "CLI de importación masiva para tarjetas de cámaras trampa (Módulo 30)",
+      "modules": ["30-cli-batch-import.md"],
+      "subtasks": [
+        { "label_en": "cli/ Node 20+ TypeScript package (rastrum-import) — walker + EXIF reader + orchestrator", "label_es": "Paquete cli/ Node 20+ TypeScript (rastrum-import) — walker + lector EXIF + orquestador", "status": "done", "pr": 134 },
+        { "label_en": "POST /api/upload-url Edge Function endpoint — issues presigned R2 PUT URLs scoped by rst_* token", "label_es": "Endpoint Edge Function POST /api/upload-url — emite URLs presignadas R2 PUT con scope por token rst_*", "status": "done", "pr": 134 },
+        { "label_en": "--project-slug flag auto-tags every observation into the M29 polygon. State file makes the import resumable across SD recoveries", "label_es": "Flag --project-slug auto-etiqueta cada observación en el polígono M29. El archivo de estado vuelve la importación reanudable entre recuperaciones de SD", "status": "done", "pr": 134 },
+        { "label_en": "Built for the CONANP-Oaxaca / DRFSIPS / PROREST 2026 workflow (500–2000 images per camera deployment)", "label_es": "Construido para el flujo CONANP-Oaxaca / DRFSIPS / PROREST 2026 (500–2000 imágenes por deployment)", "status": "done", "pr": 134 }
+      ]
+    },
+    "camera-stations-m31": {
+      "phase": "v1.2",
+      "title_en": "Camera stations + sampling-effort tracking (Module 31)",
+      "title_es": "Estaciones de cámara + seguimiento de esfuerzo de muestreo (Módulo 31)",
+      "modules": ["31-camera-stations.md"],
+      "subtasks": [
+        { "label_en": "Schema: camera_stations (project_id FK + station_key + coords + camera_model)", "label_es": "Schema: camera_stations (FK project_id + station_key + coords + camera_model)", "status": "done", "pr": 141 },
+        { "label_en": "Schema: camera_station_active_periods (start/end) — multiple per station for redeployments across a year", "label_es": "Schema: camera_station_active_periods (inicio/fin) — múltiples por estación para redespliegues a lo largo del año", "status": "done", "pr": 141 },
+        { "label_en": "Foundation for downstream wildlife indices: Relative Abundance Index (RAI), detection rate per 100 trap-nights, species richness — all blocked on knowing how long the camera was sampling", "label_es": "Base para índices de fauna futuros: Índice de Abundancia Relativa (RAI), tasa de detección por 100 noches-trampa, riqueza de especies — todos dependen de saber cuánto tiempo estuvo muestreando la cámara", "status": "done", "pr": 141 },
+        { "label_en": "v1.1 follow-up: UI to capture active periods (CRUD form + station picker on observations + station map layer)", "label_es": "Seguimiento v1.1: UI para capturar periodos activos (formulario CRUD + selector de estación en observaciones + capa de mapa de estaciones)", "status": "planned" }
+      ]
+    },
+    "multi-provider-vision-m32": {
+      "phase": "v1.2",
+      "title_en": "Multi-provider vision + per-sponsor model + platform pool (Module 32)",
+      "title_es": "Visión multi-proveedor + modelo por patrocinador + pool de plataforma (Módulo 32)",
+      "modules": ["32-multi-provider-vision.md"],
+      "subtasks": [
+        { "label_en": "_shared/vision-provider.ts — VisionProvider interface implemented by 6 providers (Anthropic api_key + oauth_token, Bedrock with AWS Sig V4, OpenAI, Azure OpenAI, Gemini)", "label_es": "_shared/vision-provider.ts — interfaz VisionProvider implementada por 6 proveedores (Anthropic api_key + oauth_token, Bedrock con AWS Sig V4, OpenAI, Azure OpenAI, Gemini)", "status": "done", "pr": 143 },
+        { "label_en": "Per-sponsor preferred_model column on ai_credentials — beneficiaries can request Haiku/Sonnet/Opus or Bedrock equivalents (closes #116)", "label_es": "Columna preferred_model por patrocinador en ai_credentials — beneficiarios pueden pedir Haiku/Sonnet/Opus o equivalentes Bedrock (cierra #116)", "status": "done", "pr": 143 },
+        { "label_en": "OpenAI / Azure OpenAI / Google Gemini / Vertex AI providers (closes #118)", "label_es": "Proveedores OpenAI / Azure OpenAI / Google Gemini / Vertex AI (cierra #118)", "status": "done", "pr": 143 },
+        { "label_en": "Platform-wide call pool: sponsor_pools table + consume_pool_slot RPC (closes #115)", "label_es": "Pool de llamadas a nivel plataforma: tabla sponsor_pools + RPC consume_pool_slot (cierra #115)", "status": "done", "pr": 143 }
+      ]
     }
   }
 }

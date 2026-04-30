@@ -177,3 +177,44 @@ specs at `docs/superpowers/specs/2026-04-29-*-design.md`.
   last_material_edit_at bump in one transaction via `delete_photo_atomic`
   SECURITY DEFINER RPC). Soft-delete only for v1; R2 orphan GC (`gc-orphan-media`
   cron) is a v1.1 follow-up. _(✓ shipped — see `docs/runbooks/obs-detail-redesign.md`)_
+
+### v1.2 shipped 2026-04-29 — research-workflow modules (M29 / M30 / M31 / M32)
+
+A second wave landed the same day, focused on the CONANP-Oaxaca / DRFSIPS / PROREST 2026 research workflows.
+
+- `projects-anp-m29` — **Module 29 (Projects).** Researchers define a polygon
+  (ANP, reserve, sampling grid) at `/{en,es}/projects/<slug>/`, and observations
+  whose location falls inside are **auto-tagged via a BEFORE INSERT/UPDATE
+  trigger** on `observations`. Schema: `projects` (slug UNIQUE +
+  `polygon geography(MultiPolygon, 4326)` + public/private visibility) +
+  `project_members` + RLS + GIST index. `upsert_project` is `SECURITY DEFINER`
+  (PostgREST can't write geography); the `projects_with_geojson` view ships
+  `WITH (security_invoker = true)`. Prerequisite for M30 and M31. PR #132.
+  _(✓ shipped — runbook [`docs/runbooks/projects-anp.md`](runbooks/projects-anp.md);
+  v1.1 follow-up: surface the link from chrome — currently only reachable via direct URL.)_
+
+- `cli-batch-import-m30` — **Module 30 (CLI batch import).** Node 20+
+  TypeScript CLI (`rastrum-import`): walks a directory of camera-trap photos,
+  reads EXIF GPS + timestamp, uploads to R2 via the new `POST /api/upload-url`
+  Edge Function, and creates an observation through the `rst_*` API token.
+  Built for the **CONANP-Oaxaca / DRFSIPS / PROREST 2026** workflow (500–2000
+  images per deployment). `--project-slug` auto-tags into the M29 polygon.
+  Resumable via state file. PR #134. _(✓ shipped)_
+
+- `camera-stations-m31` — **Module 31 (Camera stations + sampling effort).**
+  Schema only for v1; UI is a v1.1 follow-up. A camera station is a fixed
+  deployment with one or more **active periods** (start/end). Standardised
+  wildlife indices (RAI, detection rate per 100 trap-nights, species richness)
+  all depend on knowing how long the camera was sampling — this module
+  captures that ground truth. Schema: `camera_stations` +
+  `camera_station_active_periods`. Depends on M29. PR #141. _(✓ shipped — UI = v1.1 follow-up)_
+
+- `multi-provider-vision-m32` — **Module 32 (Multi-provider vision + per-sponsor
+  model + platform pool).** Bundles three closely-coupled M27 extensions that
+  share the same provider abstraction: (a) AWS Bedrock provider +
+  per-sponsor `preferred_model`; (b) OpenAI / Azure OpenAI / Google Gemini /
+  Vertex AI providers; (c) platform-wide call pool (`sponsor_pools` +
+  `consume_pool_slot` RPC). `_shared/vision-provider.ts` exports a
+  `VisionProvider` interface implemented by 6 concrete providers;
+  `buildProvider(credential)` is the single dispatcher. Closes #115/#116/#118.
+  PR #143. _(✓ shipped)_

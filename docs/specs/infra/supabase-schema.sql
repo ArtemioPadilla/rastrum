@@ -3622,6 +3622,19 @@ CREATE TABLE IF NOT EXISTS public.sponsor_credentials (
 );
 CREATE INDEX IF NOT EXISTS sponsor_credentials_user_active_idx
   ON public.sponsor_credentials (user_id) WHERE revoked_at IS NULL;
+
+-- M27.1 (#116) — additive columns for multi-provider routing. The
+-- `resolve_sponsorship` function below references these, so they must
+-- exist before the function's CREATE OR REPLACE runs in the same
+-- file. The full M27.1 block at the bottom of this file extends the
+-- enums + adds the pool tables; the column additions need to ride
+-- with the table they belong to.
+ALTER TABLE public.sponsor_credentials
+  ADD COLUMN IF NOT EXISTS preferred_model text NOT NULL DEFAULT 'claude-haiku-4-5'
+    CHECK (length(preferred_model) BETWEEN 1 AND 64),
+  ADD COLUMN IF NOT EXISTS endpoint        text
+    CHECK (endpoint IS NULL OR length(endpoint) <= 512);
+
 ALTER TABLE public.sponsor_credentials ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS sponsor_credentials_owner_read ON public.sponsor_credentials;
 CREATE POLICY sponsor_credentials_owner_read ON public.sponsor_credentials
@@ -3788,11 +3801,18 @@ CREATE POLICY notifications_sent_no_client_delete ON public.notifications_sent
   AS RESTRICTIVE FOR DELETE TO authenticated, anon USING (false);
 
 -- 9. resolve_sponsorship — devuelve la mejor credencial activa con cuota.
+-- M27.1 (#116, PR #143) added two columns to the OUT-table
+-- (preferred_model, endpoint). `CREATE OR REPLACE FUNCTION` can't
+-- change a function's return type, so on environments where the
+-- pre-M27.1 signature already exists (production) we must DROP first.
+-- Idempotent — a no-op on first install.
+DROP FUNCTION IF EXISTS public.resolve_sponsorship(uuid, public.ai_provider);
 CREATE OR REPLACE FUNCTION public.resolve_sponsorship(
   p_beneficiary uuid, p_provider public.ai_provider
 ) RETURNS TABLE (
   sponsorship_id uuid, sponsor_id uuid, credential_id uuid, vault_secret_id uuid,
-  kind public.ai_credential_kind, used_this_month integer, monthly_call_cap integer
+  kind public.ai_credential_kind, used_this_month integer, monthly_call_cap integer,
+  preferred_model text, endpoint text
 ) LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   WITH active AS (
     SELECT s.id, s.sponsor_id, s.credential_id, s.monthly_call_cap, s.priority, s.created_at
@@ -3808,7 +3828,8 @@ CREATE OR REPLACE FUNCTION public.resolve_sponsorship(
                    AND u.occurred_at >= date_trunc('month', now())) AS used
     FROM active a
   )
-  SELECT w.id, w.sponsor_id, w.credential_id, c.vault_secret_id, c.kind, w.used, w.monthly_call_cap
+  SELECT w.id, w.sponsor_id, w.credential_id, c.vault_secret_id, c.kind, w.used,
+         w.monthly_call_cap, c.preferred_model, c.endpoint
   FROM   with_usage w JOIN public.sponsor_credentials c ON c.id = w.credential_id
   WHERE  w.used < w.monthly_call_cap
   ORDER  BY w.priority ASC, w.created_at ASC
@@ -5827,3 +5848,365 @@ ALTER TABLE public.function_errors
 CREATE INDEX IF NOT EXISTS function_errors_unack_idx
   ON public.function_errors (created_at DESC)
   WHERE acknowledged_at IS NULL;
+-- M27.1 — Multi-provider vision (#116, #118)
+-- ============================================================
+-- Adds provider variants beyond direct-Anthropic to the AI cascade:
+-- AWS Bedrock (#116), OpenAI / Azure OpenAI / Gemini / Vertex AI
+-- (#118). Plus per-sponsor model selection so beneficiaries on a
+-- given credential see Haiku-cost or Sonnet-quality consistently.
+--
+-- Migration is additive-only:
+--   • `ai_provider` enum gains 5 values via ALTER TYPE … ADD VALUE
+--   • `ai_credential_kind` enum gains 4 values
+--   • `sponsor_credentials` gets `preferred_model` (default
+--     'claude-haiku-4-5') and `endpoint` (Azure URL / Vertex region)
+--   • `sponsorships` and `sponsor_pools` get the same
+--     `preferred_model` so a pool sponsor can cap to Haiku-only.
+
+DO $$ BEGIN
+  ALTER TYPE public.ai_provider ADD VALUE IF NOT EXISTS 'bedrock';
+EXCEPTION WHEN others THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TYPE public.ai_provider ADD VALUE IF NOT EXISTS 'openai';
+EXCEPTION WHEN others THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TYPE public.ai_provider ADD VALUE IF NOT EXISTS 'azure_openai';
+EXCEPTION WHEN others THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TYPE public.ai_provider ADD VALUE IF NOT EXISTS 'gemini';
+EXCEPTION WHEN others THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TYPE public.ai_provider ADD VALUE IF NOT EXISTS 'vertex_ai';
+EXCEPTION WHEN others THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TYPE public.ai_credential_kind ADD VALUE IF NOT EXISTS 'bedrock';
+EXCEPTION WHEN others THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TYPE public.ai_credential_kind ADD VALUE IF NOT EXISTS 'openai_api_key';
+EXCEPTION WHEN others THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TYPE public.ai_credential_kind ADD VALUE IF NOT EXISTS 'azure_openai';
+EXCEPTION WHEN others THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TYPE public.ai_credential_kind ADD VALUE IF NOT EXISTS 'gemini_api_key';
+EXCEPTION WHEN others THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TYPE public.ai_credential_kind ADD VALUE IF NOT EXISTS 'vertex_ai';
+EXCEPTION WHEN others THEN NULL; END $$;
+
+-- (sponsor_credentials.preferred_model + endpoint are added inline
+--  with the original CREATE TABLE near line 3625 — they're referenced
+--  by `resolve_sponsorship` below, which is itself defined before
+--  this M27.1 block runs in the same file.)
+
+-- ============================================================
+-- M27.2 — Platform-wide AI call pool (#115)
+-- ============================================================
+-- Sponsor donates N calls to a shared pool that any user can draw
+-- from. Per-user daily cap (`pool_consumption`) prevents Sybil
+-- abuse. Resolution order in identify EF:
+--   1. BYO key (client_keys) — always wins
+--   2. User's personal sponsorship (existing M27 1-to-1)
+--   3. Platform pool — round-robin among active pools
+--   4. Skip Claude (PlantNet only)
+--
+-- Privacy: the consumer's user_id is recorded in pool_consumption
+-- but never joined to auth.users.email in any RPC. Sponsors see
+-- only aggregate stats.
+
+CREATE TABLE IF NOT EXISTS public.sponsor_pools (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  sponsor_id      uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  credential_id   uuid NOT NULL REFERENCES public.sponsor_credentials(id) ON DELETE RESTRICT,
+  total_cap       integer NOT NULL CHECK (total_cap BETWEEN 1 AND 1000000),
+  used            integer NOT NULL DEFAULT 0 CHECK (used >= 0),
+  monthly_reset   boolean NOT NULL DEFAULT false,
+  status          text NOT NULL DEFAULT 'active'
+                  CHECK (status IN ('active','paused','exhausted')),
+  preferred_model text NOT NULL DEFAULT 'claude-haiku-4-5'
+                  CHECK (length(preferred_model) BETWEEN 1 AND 64),
+  daily_user_cap  integer NOT NULL DEFAULT 10
+                  CHECK (daily_user_cap BETWEEN 1 AND 1000),
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  updated_at      timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_sponsor_pools_sponsor ON public.sponsor_pools(sponsor_id);
+CREATE INDEX IF NOT EXISTS idx_sponsor_pools_active
+  ON public.sponsor_pools(status) WHERE status = 'active';
+
+CREATE TABLE IF NOT EXISTS public.pool_consumption (
+  user_id  uuid    NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  day      date    NOT NULL,
+  count    integer NOT NULL DEFAULT 0 CHECK (count >= 0),
+  PRIMARY KEY (user_id, day)
+);
+
+CREATE INDEX IF NOT EXISTS idx_pool_consumption_day ON public.pool_consumption(day);
+
+ALTER TABLE public.sponsor_pools     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.pool_consumption  ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS sponsor_pools_owner_read ON public.sponsor_pools;
+CREATE POLICY sponsor_pools_owner_read ON public.sponsor_pools
+  FOR SELECT TO authenticated
+  USING (sponsor_id = auth.uid());
+
+DROP POLICY IF EXISTS sponsor_pools_owner_write ON public.sponsor_pools;
+CREATE POLICY sponsor_pools_owner_write ON public.sponsor_pools
+  FOR ALL TO authenticated
+  USING (sponsor_id = auth.uid())
+  WITH CHECK (sponsor_id = auth.uid());
+
+-- pool_consumption is read-only for the user themselves; service role
+-- (the identify EF) does the increments via RPC.
+DROP POLICY IF EXISTS pool_consumption_self_read ON public.pool_consumption;
+CREATE POLICY pool_consumption_self_read ON public.pool_consumption
+  FOR SELECT TO authenticated
+  USING (user_id = auth.uid());
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.sponsor_pools     TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.sponsor_pools     TO service_role;
+GRANT SELECT                         ON public.pool_consumption  TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.pool_consumption  TO service_role;
+
+-- ── Pool resolution + atomic consume RPC ────────────────────────────
+-- Picks the next pool slot the caller can draw from. Returns the pool
+-- + credential to use, atomically increments `used` + the per-user
+-- daily counter, and respects daily_user_cap. Service-role only —
+-- the identify EF wraps it with the rest of the identification work.
+CREATE OR REPLACE FUNCTION public.consume_pool_slot(p_user_id uuid)
+RETURNS TABLE (pool_id uuid, credential_id uuid, preferred_model text)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_today    date := current_date;
+  v_used_today integer;
+  v_pool_id  uuid;
+  v_cred_id  uuid;
+  v_model    text;
+  v_cap      integer;
+BEGIN
+  -- Lock the chosen pool row to make the (used + cap) check + increment atomic.
+  SELECT sp.id, sp.credential_id, sp.preferred_model, sp.daily_user_cap
+    INTO v_pool_id, v_cred_id, v_model, v_cap
+    FROM public.sponsor_pools sp
+   WHERE sp.status = 'active' AND sp.used < sp.total_cap
+   ORDER BY sp.created_at ASC
+   FOR UPDATE SKIP LOCKED
+   LIMIT 1;
+  IF v_pool_id IS NULL THEN
+    RETURN;  -- no pool available
+  END IF;
+
+  -- Enforce per-user daily cap.
+  SELECT COALESCE(count, 0) INTO v_used_today
+    FROM public.pool_consumption
+   WHERE user_id = p_user_id AND day = v_today;
+  IF v_used_today >= v_cap THEN
+    RETURN;  -- caller hit daily limit
+  END IF;
+
+  -- Atomic increments.
+  UPDATE public.sponsor_pools SET used = used + 1, updated_at = now()
+   WHERE id = v_pool_id;
+
+  INSERT INTO public.pool_consumption (user_id, day, count)
+       VALUES (p_user_id, v_today, 1)
+  ON CONFLICT (user_id, day) DO UPDATE SET count = pool_consumption.count + 1;
+
+  -- Mark exhausted if we just filled it.
+  UPDATE public.sponsor_pools SET status = 'exhausted'
+   WHERE id = v_pool_id AND used >= total_cap AND status = 'active';
+
+  RETURN QUERY SELECT v_pool_id, v_cred_id, v_model;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.consume_pool_slot(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.consume_pool_slot(uuid) TO service_role;
+
+-- ============================================================
+-- CAMERA STATIONS (M31, issue #112) — sampling-effort metadata for camera traps
+-- ============================================================
+-- A station is a fixed camera deployment. Active periods record
+-- when the camera was capturing — needed for trap-night counts +
+-- standardised wildlife monitoring indices (RAI, detection rate per
+-- 100 trap-nights, species richness per station/project).
+--
+-- Depends on M29 (projects) — every station belongs to a project,
+-- and the auto-tagging trigger on observations writes project_id
+-- before this module's logic ever runs.
+--
+-- v1 ships the schema + minimal owner-RLS. UI / metric rollups are
+-- v1.1 follow-ups.
+
+CREATE TABLE IF NOT EXISTS public.camera_stations (
+  id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  project_id      uuid NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
+  station_key     text NOT NULL CHECK (length(station_key) BETWEEN 1 AND 64),
+  name            text NOT NULL CHECK (length(name) BETWEEN 1 AND 200),
+  name_es         text CHECK (length(name_es) BETWEEN 1 AND 200),
+  coords          geography(Point, 4326) NOT NULL,
+  habitat         text,
+  camera_model    text,
+  notes           text CHECK (length(notes) <= 4000),
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  updated_at      timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (project_id, station_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_camera_stations_project ON public.camera_stations(project_id);
+CREATE INDEX IF NOT EXISTS idx_camera_stations_coords  ON public.camera_stations USING GIST(coords);
+
+CREATE TABLE IF NOT EXISTS public.camera_station_periods (
+  id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  station_id  uuid NOT NULL REFERENCES public.camera_stations(id) ON DELETE CASCADE,
+  start_date  date NOT NULL,
+  end_date    date,
+  notes       text CHECK (length(notes) <= 1000),
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  CHECK (end_date IS NULL OR end_date >= start_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_csp_station ON public.camera_station_periods(station_id, start_date);
+
+-- Optional FK from observations → station; populated by the CLI
+-- importer when --station-key is supplied. The auto-tagging by
+-- coordinates happens via the project polygon (M29) — station
+-- assignment stays explicit because two stations within one polygon
+-- need different trap-night counts.
+ALTER TABLE public.observations
+  ADD COLUMN IF NOT EXISTS camera_station_id uuid
+    REFERENCES public.camera_stations(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_obs_camera_station ON public.observations(camera_station_id)
+  WHERE camera_station_id IS NOT NULL;
+
+-- ── RLS ──────────────────────────────────────────────────────────────
+-- A camera_station inherits its project's visibility — public projects
+-- expose stations to anon; private projects restrict to project members.
+
+ALTER TABLE public.camera_stations         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.camera_station_periods  ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS camera_stations_read ON public.camera_stations;
+CREATE POLICY camera_stations_read ON public.camera_stations
+  FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.projects p
+       WHERE p.id = camera_stations.project_id
+         AND (
+           p.visibility = 'public'
+           OR p.owner_user_id = auth.uid()
+           OR EXISTS (
+             SELECT 1 FROM public.project_members pm
+              WHERE pm.project_id = p.id AND pm.user_id = auth.uid()
+           )
+         )
+    )
+  );
+
+DROP POLICY IF EXISTS camera_stations_owner_write ON public.camera_stations;
+CREATE POLICY camera_stations_owner_write ON public.camera_stations
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.projects p
+       WHERE p.id = camera_stations.project_id
+         AND p.owner_user_id = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS camera_stations_owner_update ON public.camera_stations;
+CREATE POLICY camera_stations_owner_update ON public.camera_stations
+  FOR UPDATE TO authenticated
+  USING (
+    EXISTS (SELECT 1 FROM public.projects p WHERE p.id = camera_stations.project_id AND p.owner_user_id = auth.uid())
+  )
+  WITH CHECK (
+    EXISTS (SELECT 1 FROM public.projects p WHERE p.id = camera_stations.project_id AND p.owner_user_id = auth.uid())
+  );
+
+DROP POLICY IF EXISTS camera_stations_owner_delete ON public.camera_stations;
+CREATE POLICY camera_stations_owner_delete ON public.camera_stations
+  FOR DELETE TO authenticated
+  USING (
+    EXISTS (SELECT 1 FROM public.projects p WHERE p.id = camera_stations.project_id AND p.owner_user_id = auth.uid())
+  );
+
+DROP POLICY IF EXISTS camera_station_periods_read ON public.camera_station_periods;
+CREATE POLICY camera_station_periods_read ON public.camera_station_periods
+  FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.camera_stations cs
+       JOIN public.projects p ON p.id = cs.project_id
+       WHERE cs.id = camera_station_periods.station_id
+         AND (
+           p.visibility = 'public'
+           OR p.owner_user_id = auth.uid()
+           OR EXISTS (
+             SELECT 1 FROM public.project_members pm
+              WHERE pm.project_id = p.id AND pm.user_id = auth.uid()
+           )
+         )
+    )
+  );
+
+DROP POLICY IF EXISTS camera_station_periods_owner_write ON public.camera_station_periods;
+CREATE POLICY camera_station_periods_owner_write ON public.camera_station_periods
+  FOR ALL TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.camera_stations cs
+       JOIN public.projects p ON p.id = cs.project_id
+       WHERE cs.id = camera_station_periods.station_id
+         AND p.owner_user_id = auth.uid()
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.camera_stations cs
+       JOIN public.projects p ON p.id = cs.project_id
+       WHERE cs.id = camera_station_periods.station_id
+         AND p.owner_user_id = auth.uid()
+    )
+  );
+
+GRANT SELECT                        ON public.camera_stations         TO anon, authenticated;
+GRANT INSERT, UPDATE, DELETE        ON public.camera_stations         TO authenticated;
+GRANT SELECT                        ON public.camera_station_periods  TO anon, authenticated;
+GRANT INSERT, UPDATE, DELETE        ON public.camera_station_periods  TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.camera_stations         TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.camera_station_periods  TO service_role;
+
+-- ── Trap-night helper ────────────────────────────────────────────────
+-- Returns the number of nights a station was active across all its
+-- periods, optionally bounded to a date range. NULL end_date means
+-- "still active" — counted up to the supplied upper bound (or now()).
+CREATE OR REPLACE FUNCTION public.station_trap_nights(
+  p_station_id uuid,
+  p_from       date DEFAULT NULL,
+  p_to         date DEFAULT NULL
+)
+RETURNS integer
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT COALESCE(SUM(
+    GREATEST(
+      0,
+      LEAST(COALESCE(end_date, COALESCE(p_to, current_date)), COALESCE(p_to, current_date))
+        - GREATEST(start_date, COALESCE(p_from, start_date))
+    )
+  ), 0)::integer
+  FROM public.camera_station_periods
+  WHERE station_id = p_station_id;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.station_trap_nights(uuid, date, date) TO anon, authenticated, service_role;
