@@ -1844,6 +1844,7 @@
     "follows": "Follows",
     "watchlists": "Watchlists",
     "projects": "Projects",
+    "taxonChanges": "Taxon changes",
     "modOverview": "Overview",
     "modFlagQueue": "Flag queue",
     "modComments": "Comments",
@@ -2656,8 +2657,26 @@
       "colName": "Name",
       "colOwner": "Owner",
       "colVisibility": "Visibility",
+      "colArea": "Area (km²)",
       "colObsCount": "Observations",
-      "drillView": "Open project"
+      "drillView": "Open project",
+      "drillObs": "Tagged observations"
+    },
+
+    "taxonChangesView": {
+      "title": "Taxon changes",
+      "description": "Audit log of taxon-related admin actions (conservation status, future renames/synonyms). Backed by admin_audit filtered to taxon_* operations. Filter by taxon, action, actor, or date range.",
+      "filterTaxon": "Taxon (uuid)",
+      "filterAction": "Action",
+      "filterActor": "Actor (uuid or username)",
+      "filterFrom": "From",
+      "actConservation": "Conservation set",
+      "colCreated": "Created",
+      "colTaxon": "Taxon",
+      "colAction": "Action",
+      "colActor": "Actor",
+      "colDiff": "Diff",
+      "drillFull": "Full diff"
     },
 
     "audit_op": {

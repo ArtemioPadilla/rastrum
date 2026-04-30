@@ -84,6 +84,13 @@ export interface BrowserConfig<Row extends { id?: string; [k: string]: unknown }
   resolveTaxaFromRow?: (row: Row) => string[];
   /** Renders the drill-down panel for a row. */
   renderDrilldown?: (row: Row, ctx: RenderContext) => string;
+  /**
+   * For tables with composite primary keys (e.g. `follows` keyed on
+   * (follower_id, followee_id)), synthesise a stable per-row id so the
+   * EntityBrowser's drill-down expansion state survives re-renders.
+   * Falls back to `row.id` when omitted.
+   */
+  rowIdFromRow?: (row: Row) => string;
   /** Empty-state text. */
   emptyText: string;
   /** Loading-state text. */
@@ -510,7 +517,7 @@ export class EntityBrowser<Row extends { id?: string; [k: string]: unknown }> {
     const ctx = this.st.ctx;
     const html: string[] = [];
     for (const r of rows) {
-      const rowId = (r as { id?: string }).id ?? '';
+      const rowId = this.cfg.rowIdFromRow ? this.cfg.rowIdFromRow(r) : (r as { id?: string }).id ?? '';
       const isExpanded = this.st.expandedRows.has(rowId);
       const cells = this.cfg.columns
         .map(col => {

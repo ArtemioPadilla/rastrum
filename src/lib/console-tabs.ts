@@ -17,7 +17,7 @@ export interface ConsoleTab {
 }
 
 export const CONSOLE_TABS: ConsoleTab[] = [
-  // Admin (27 — 21 base + 6 entity browsers from PR16)
+  // Admin (28 — 21 base + 7 entity browsers from PR16)
   { id: 'overview',       role: 'admin',     routeKey: 'console',                 i18nKey: 'console.overview',     icon: 'gauge',       phase: 1 },
   { id: 'users',          role: 'admin',     routeKey: 'consoleUsers',            i18nKey: 'console.users',        icon: 'users',       phase: 2 },
   { id: 'credentials',    role: 'admin',     routeKey: 'consoleCredentials',      i18nKey: 'console.credentials',  icon: 'shield-check',phase: 2 },
@@ -49,6 +49,7 @@ export const CONSOLE_TABS: ConsoleTab[] = [
   { id: 'follows',        role: 'admin',     routeKey: 'consoleFollows',          i18nKey: 'console.follows',         icon: 'users',        phase: 1 },
   { id: 'watchlists',     role: 'admin',     routeKey: 'consoleWatchlists',       i18nKey: 'console.watchlists',      icon: 'eye',          phase: 1 },
   { id: 'projects',       role: 'admin',     routeKey: 'consoleProjects',         i18nKey: 'console.projects',        icon: 'map',          phase: 1 },
+  { id: 'taxon-changes',  role: 'admin',     routeKey: 'consoleTaxonChanges',     i18nKey: 'console.taxonChanges',    icon: 'history',      phase: 1 },
   // Moderator (5)
   { id: 'mod-overview',   role: 'moderator', routeKey: 'console',                 i18nKey: 'console.modOverview',   icon: 'gauge',      phase: 3 },
   { id: 'mod-flag-queue', role: 'moderator', routeKey: 'consoleModFlagQueue',     i18nKey: 'console.modFlagQueue',  icon: 'flag',       phase: 3 },

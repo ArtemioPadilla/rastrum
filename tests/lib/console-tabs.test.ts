@@ -3,8 +3,8 @@ import { CONSOLE_TABS, tabsForRoles, rolePillsFor } from '../../src/lib/console-
 import type { UserRole } from '../../src/lib/types';
 
 describe('console-tabs', () => {
-  it('declares 38 tabs total (32 + 6 PR16 entity browsers)', () => {
-    expect(CONSOLE_TABS).toHaveLength(38);
+  it('declares 39 tabs total (32 + 7 PR16 entity browsers)', () => {
+    expect(CONSOLE_TABS).toHaveLength(39);
   });
 
   it('every tab has a unique id', () => {
@@ -19,12 +19,12 @@ describe('console-tabs', () => {
     }
   });
 
-  it('admin role has 27 tabs (21 base + 6 PR16 entity browsers)', () => {
-    expect(CONSOLE_TABS.filter(t => t.role === 'admin')).toHaveLength(27);
+  it('admin role has 28 tabs (21 base + 7 PR16 entity browsers)', () => {
+    expect(CONSOLE_TABS.filter(t => t.role === 'admin')).toHaveLength(28);
   });
 
   it('PR16 admin entity browsers are all phase-1 and non-stub', () => {
-    const PR16_IDS = ['identifications', 'notifications', 'media', 'follows', 'watchlists', 'projects'];
+    const PR16_IDS = ['identifications', 'notifications', 'media', 'follows', 'watchlists', 'projects', 'taxon-changes'];
     for (const id of PR16_IDS) {
       const tab = CONSOLE_TABS.find(t => t.id === id);
       expect(tab, `tab ${id} not registered`).toBeDefined();
@@ -50,7 +50,7 @@ describe('console-tabs', () => {
     const all = new Set<UserRole>(['admin', 'expert']);
     const adminTabs = tabsForRoles('admin', all);
     expect(adminTabs.every(t => t.role === 'admin')).toBe(true);
-    expect(adminTabs).toHaveLength(27);
+    expect(adminTabs).toHaveLength(28);
     const moderatorTabs = tabsForRoles('moderator', all);
     expect(moderatorTabs).toHaveLength(0);
   });

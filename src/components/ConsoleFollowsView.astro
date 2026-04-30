@@ -1,0 +1,239 @@
+---
+/**
+ * ConsoleFollowsView — admin entity browser over public.follows.
+ *
+ * Read-only. Filters: follower (autocomplete), followee (autocomplete),
+ * status (pending vs accepted), tier (follower vs collaborator). Useful
+ * for spam-pattern audits — find users who followed N+ people in M
+ * minutes.
+ *
+ * The follows table has a composite primary key (follower_id, followee_id);
+ * we synthesise a stable per-row id via BrowserConfig.rowIdFromRow so the
+ * EntityBrowser's drill-down expansion state survives re-renders.
+ */
+import { t } from '../i18n/utils';
+import ConsoleEntityBrowser from './ConsoleEntityBrowser.astro';
+
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+const v = (tr.console as unknown as Record<string, Record<string, string> | string>).followsView as
+  unknown as Record<string, string>;
+
+const labels = {
+  title: v?.title ?? 'Follows',
+  description: v?.description ?? '',
+  filterFollower: v?.filterFollower ?? 'Follower',
+  filterFollowee: v?.filterFollowee ?? 'Followee',
+  filterStatus: v?.filterStatus ?? 'Status',
+  filterTier: v?.filterTier ?? 'Tier',
+  statusPending: v?.statusPending ?? 'Pending',
+  statusAccepted: v?.statusAccepted ?? 'Accepted',
+  tierFollower: v?.tierFollower ?? 'Follower',
+  tierCollaborator: v?.tierCollaborator ?? 'Collaborator',
+  colCreated: v?.colCreated ?? 'Created',
+  colFollower: v?.colFollower ?? 'Follower',
+  colFollowee: v?.colFollowee ?? 'Followee',
+  colStatus: v?.colStatus ?? 'Status',
+  colTier: v?.colTier ?? 'Tier',
+  drillProfileFollower: v?.drillProfileFollower ?? "View follower's profile",
+  drillProfileFollowee: v?.drillProfileFollowee ?? "View followee's profile",
+};
+---
+
+<ConsoleEntityBrowser
+  lang={lang}
+  prefix="fol"
+  title={labels.title}
+  description={labels.description}
+  filters={[
+    { key: 'follower', kind: 'text',   label: labels.filterFollower, placeholder: 'uuid or @username' },
+    { key: 'followee', kind: 'text',   label: labels.filterFollowee, placeholder: 'uuid or @username' },
+    { key: 'status',   kind: 'select', label: labels.filterStatus, options: [
+      { value: 'pending',  label: labels.statusPending },
+      { value: 'accepted', label: labels.statusAccepted },
+    ] },
+    { key: 'tier',     kind: 'select', label: labels.filterTier, options: [
+      { value: 'follower',     label: labels.tierFollower },
+      { value: 'collaborator', label: labels.tierCollaborator },
+    ] },
+  ]}
+  columns={[
+    { key: 'created_at', label: labels.colCreated },
+    { key: 'follower',   label: labels.colFollower },
+    { key: 'followee',   label: labels.colFollowee },
+    { key: 'status',     label: labels.colStatus },
+    { key: 'tier',       label: labels.colTier },
+  ]}
+/>
+
+<div id="fol-config" class="hidden" data-lang={lang} data-drill-follower={labels.drillProfileFollower} data-drill-followee={labels.drillProfileFollowee}></div>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { getUserRoles } from '../lib/user-roles';
+  import {
+    EntityBrowser,
+    filterPredicates,
+    fmtTs,
+    renderUserPill,
+    type FilterSpec,
+    type ColumnSpec,
+    type SupabaseQuery,
+    type RenderContext,
+  } from '../lib/entity-browser';
+  import { escapeHtml } from '../lib/escape';
+
+  type Row = {
+    follower_id: string;
+    followee_id: string;
+    created_at: string;
+    status: string;
+    tier: string;
+    requested_at: string | null;
+    accepted_at: string | null;
+  };
+
+  const cfgEl = document.getElementById('fol-config');
+  const langAttr = (cfgEl?.dataset.lang === 'es' ? 'es' : 'en') as 'en' | 'es';
+  const labelDrillFollower = cfgEl?.dataset.drillFollower ?? "View follower's profile";
+  const labelDrillFollowee = cfgEl?.dataset.drillFollowee ?? "View followee's profile";
+
+  function isUuid(s: string): boolean {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+  }
+  async function resolveUserId(input: string): Promise<string | undefined> {
+    const trimmed = input.replace(/^@/, '').trim();
+    if (!trimmed) return undefined;
+    if (isUuid(trimmed)) return trimmed;
+    const supabase = getSupabase();
+    const { data } = await supabase.from('users').select('id').eq('username', trimmed).maybeSingle();
+    return (data as { id: string } | null)?.id;
+  }
+
+  function userProfileHref(id: string, lang: 'en' | 'es', usernameMaybe: string | null | undefined): string {
+    const seg = lang === 'es' ? '/perfil/u' : '/profile/u';
+    return `${seg}/${encodeURIComponent(usernameMaybe ?? id)}`;
+  }
+
+  const filters: FilterSpec[] = [
+    {
+      key: 'follower',
+      label: 'Follower',
+      kind: 'autocomplete',
+      apply: async (q: SupabaseQuery, v: string): Promise<SupabaseQuery | null> => {
+        const id = await resolveUserId(v);
+        return id ? q.eq('follower_id', id) : null;
+      },
+    },
+    {
+      key: 'followee',
+      label: 'Followee',
+      kind: 'autocomplete',
+      apply: async (q: SupabaseQuery, v: string): Promise<SupabaseQuery | null> => {
+        const id = await resolveUserId(v);
+        return id ? q.eq('followee_id', id) : null;
+      },
+    },
+    { key: 'status', label: 'Status', kind: 'select', apply: filterPredicates.eq('status') },
+    { key: 'tier',   label: 'Tier',   kind: 'select', apply: filterPredicates.eq('tier') },
+  ];
+
+  const columns: ColumnSpec<Row>[] = [
+    {
+      key: 'created_at',
+      label: 'Created',
+      cellClass: 'whitespace-nowrap font-mono text-[11px] text-zinc-500',
+      render: r => escapeHtml(fmtTs(r.created_at)),
+    },
+    {
+      key: 'follower',
+      label: 'Follower',
+      render: (r, ctx: RenderContext) => renderUserPill(r.follower_id, ctx),
+    },
+    {
+      key: 'followee',
+      label: 'Followee',
+      render: (r, ctx: RenderContext) => renderUserPill(r.followee_id, ctx),
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      render: r => {
+        const cls =
+          r.status === 'accepted'
+            ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300'
+            : 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300';
+        return `<span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] ${cls}">${escapeHtml(r.status)}</span>`;
+      },
+    },
+    {
+      key: 'tier',
+      label: 'Tier',
+      render: r => {
+        const cls =
+          r.tier === 'collaborator'
+            ? 'bg-sky-100 dark:bg-sky-900/30 text-sky-800 dark:text-sky-300'
+            : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300';
+        return `<span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] ${cls}">${escapeHtml(r.tier)}</span>`;
+      },
+    },
+  ];
+
+  function renderDrilldown(r: Row, ctx: RenderContext): string {
+    const followerUser = ctx.users[r.follower_id];
+    const followeeUser = ctx.users[r.followee_id];
+    const followerHref = userProfileHref(r.follower_id, langAttr, followerUser?.username);
+    const followeeHref = userProfileHref(r.followee_id, langAttr, followeeUser?.username);
+    const json = JSON.stringify(r, null, 2);
+    return `<div class="space-y-2">
+      <div class="flex flex-wrap gap-2">
+        <a href="${escapeHtml(followerHref)}" target="_blank" rel="noopener" class="inline-flex items-center rounded border border-zinc-300 dark:border-zinc-700 px-2 py-0.5 text-[11px] hover:bg-zinc-50 dark:hover:bg-zinc-900">${escapeHtml(labelDrillFollower)} →</a>
+        <a href="${escapeHtml(followeeHref)}" target="_blank" rel="noopener" class="inline-flex items-center rounded border border-zinc-300 dark:border-zinc-700 px-2 py-0.5 text-[11px] hover:bg-zinc-50 dark:hover:bg-zinc-900">${escapeHtml(labelDrillFollowee)} →</a>
+      </div>
+      <pre class="whitespace-pre-wrap break-all rounded bg-white dark:bg-zinc-950 px-2 py-1 text-[10px] text-zinc-600 dark:text-zinc-400 max-h-40 overflow-y-auto">${escapeHtml(json)}</pre>
+    </div>`;
+  }
+
+  async function init(): Promise<void> {
+    const supabase = getSupabase();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      document.getElementById('fol-skeleton')?.classList.add('hidden');
+      document.getElementById('fol-not-auth')?.classList.remove('hidden');
+      return;
+    }
+    const myRoles = await getUserRoles(session.user.id);
+    if (!myRoles.has('admin')) {
+      document.getElementById('fol-skeleton')?.classList.add('hidden');
+      document.getElementById('fol-not-auth')?.classList.remove('hidden');
+      return;
+    }
+    document.getElementById('fol-shell')?.classList.remove('hidden');
+
+    const browser = new EntityBrowser<Row>({
+      prefix: 'fol',
+      tableName: 'follows',
+      selectClause: 'follower_id, followee_id, created_at, status, tier, requested_at, accepted_at',
+      orderBy: 'created_at',
+      columns,
+      filters,
+      resolveUsersFromRow: r => [r.follower_id, r.followee_id],
+      rowIdFromRow: r => `${r.follower_id}__${r.followee_id}`,
+      renderDrilldown,
+      emptyText: '',
+      loadingText: '',
+      lang: langAttr,
+    });
+    await browser.init();
+  }
+
+  init().catch(err => {
+    document.getElementById('fol-skeleton')?.classList.add('hidden');
+    const errEl = document.getElementById('fol-error');
+    if (errEl) {
+      errEl.textContent = (err as Error).message;
+      errEl.classList.remove('hidden');
+    }
+  });
+</script>
