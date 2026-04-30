@@ -78,10 +78,27 @@ schema; set to the deployment name for documentation.
 
 ### Google Vertex AI
 
-`kind = 'vertex_ai'`. **Operator must mint an OAuth2 access token
-offline** from the service-account JSON (Vertex tokens last 1 hour;
-auto-rotation is a v1.1 follow-up). Secret is the literal access
-token (`ya29.…`).
+`kind = 'vertex_ai'`. **Recommended: store the service-account JSON
+envelope as the secret** (PR #209 / issue #155). The provider mints
+an OAuth2 access token via JWT-bearer flow inside the Edge Function,
+caches it for ~50 minutes, and refreshes transparently. Secret
+shape:
+
+```json
+{
+  "type": "service_account",
+  "project_id": "my-proj",
+  "private_key_id": "kid-1",
+  "private_key": "-----BEGIN PRIVATE KEY-----\n…\n-----END PRIVATE KEY-----\n",
+  "client_email": "svc@my-proj.iam.gserviceaccount.com"
+}
+```
+
+**Legacy (operator-mints-offline) path still works:** when the
+secret looks like `ya29.…` instead of JSON, the provider uses it
+as-is. Operators on this path own rotation themselves; the
+`vertex_token_expiry_monitor` cron (PR #207) emails 5 minutes
+before expiry to give them a chance to refresh.
 
 `preferred_model` is the full model resource path:
 
@@ -137,18 +154,27 @@ UPDATE public.sponsor_pools SET status = 'exhausted' WHERE id = '<uuid>';
 | Symptom | Cause | Fix |
 |---|---|---|
 | Bedrock provider returns null on every call | Sig V4 signing wrong region OR JSON envelope malformed | Verify `parseBedrockSecret(secret)` returns a non-null result; check `region` field matches the Bedrock endpoint URL |
-| Vertex AI returns 401 after working for ~1h | Access token expired | Re-mint the OAuth2 access token from the service-account JSON; v1.1 will auto-rotate |
+| Vertex AI returns 401 after working for ~1h | Access token expired | Migrate the credential to a service-account JSON envelope (PR #209) — auto-rotation kicks in. Legacy `ya29.…` secrets still need manual re-mint. |
 | Azure OpenAI 404 | `endpoint` URL doesn't include the deployment path or `?api-version=…` | Copy the full URL including query string from the Azure portal |
 | Pool resolution skips a healthy pool | RLS gate on `sponsor_pools` is owner-only — service role bypasses, but check `status = 'active'` and `used < total_cap` | Toggle status, run `consume_pool_slot()` manually as service_role to confirm |
 | `preferred_model` mismatched for provider type | DEFAULT `'claude-haiku-4-5'` is Anthropic shorthand; non-Anthropic providers need explicit model ID | UPDATE the `preferred_model` after creation; Bedrock auto-translates the shorthand |
 
-## v1.1 follow-ups
+## Shipped 2026-04-30 (v1.1 follow-ups)
 
-- **UI**: provider radio + filtered model dropdown in `SponsoringView`
-- **UI**: "Donate to platform pool" tab + cost-per-100-calls table
-- **Sponsor-facing pool dashboard**: capacity / utilisation / top taxa (no beneficiary breakdown)
-- **Vertex AI auto-rotation**: derive access token from service-account JWT inside the EF
-- **Per-pool monthly reset cron**: honour `sponsor_pools.monthly_reset = true`
-- **`pool_consumption` vacuum cron**: delete rows older than 90 days
-- **Vertex token expiry alert**: notify sponsor 5 minutes before expiry
-- **Pool karma incentives**: "donate calls, earn karma" loop
+- **UI** — provider radio + filtered model dropdown in `SponsoringView` (PR #215 / issue #152)
+- **UI** — "Donate to platform pool" section with capacity bar + Pause/Resume (PR #215)
+- **Vertex AI auto-rotation** — service-account JWT minted inside the EF, cached ~50 min (PR #209 / issue #155)
+- **Vertex token expiry alert** — 10-min cron emails 5 min before expiry for legacy literal-token credentials (PR #207 / issue #159)
+- **`monthly_reset` cron** — first-of-month at 00:05 UTC (PR #207 / issue #153)
+- **`pool_consumption` vacuum** — daily at 03:30 UTC, drops rows > 90 days (PR #207 / issue #154)
+- **End-to-end provider smoke probe** — manual + nightly workflow that calls `validateCredential()` against each real API (PR #210 / issue #158)
+
+Run the smoke workflow on demand from the GitHub Actions UI under
+**vision-providers-smoke** (operator must have the
+`VISION_PROVIDERS_TEST_*` secrets set).
+
+## v1.1 follow-ups (still open)
+
+- **Sponsor-facing pool dashboard**: capacity / utilisation / **top taxa** (no beneficiary breakdown). Needs `ai_usage.pool_id` column landing first.
+- **Cost-per-100-calls table** in the model picker (static, manual updates).
+- **Pool karma incentives**: "donate calls, earn karma" loop.

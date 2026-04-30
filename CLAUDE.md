@@ -3,7 +3,7 @@
 > Briefing for AI coding agents (Claude Code, Copilot, Cursor, Codex, …)
 > working in this repo. Read this before making changes.
 >
-> **Last full doc sync:** 2026-04-30 (v1.2 — research workflow M29/M30/M31, multi-provider vision + pool M32).
+> **Last full doc sync:** 2026-04-30 (v1.2 — research workflow M29/M30/M31, multi-provider vision + pool M32, plus all v1.1 follow-ups #152/#153/#154/#155/#156/#157/#158/#159).
 
 ---
 
@@ -483,8 +483,12 @@ indices like RAI / detection-rate-per-100-trap-nights need to know
   counts. NULL `end_date` is counted up to `current_date` (or
   `p_to`).
 
-UI is a v1.1 follow-up; until then, create stations via SQL (see
-runbook).
+Create-station UI shipped on the project-detail page (PR #213) —
+`/{en,es}/projects/detail/?slug=<slug>` shows a Camera stations
+section with Add station + inline trap-night counts. CLI also
+takes `--project-slug --station-key` for batch tagging at import
+time (PR #208 / issue #156). Period editor + per-station
+detection-rate dashboard remain v1.1 follow-ups.
 
 Spec: [`docs/specs/modules/31-camera-stations.md`](docs/specs/modules/31-camera-stations.md).
 Runbook: [`docs/runbooks/camera-stations.md`](docs/runbooks/camera-stations.md).
@@ -518,8 +522,12 @@ Three load-bearing rules:
 Resolution order: BYO key → personal sponsorship → platform pool →
 skip Claude (PlantNet only).
 
-UI for credential creation + pool donation is a v1.1 follow-up;
-until then, register credentials via Supabase Vault + SQL.
+UI shipped 2026-04-30 in `SponsoringView` (PR #215 / issue #152) —
+provider radio (7 kinds, auto-detected from secret prefix) + model
+field + conditional endpoint field for Azure/Bedrock/Vertex, plus
+a "Donate to platform pool" section with progress bar +
+Pause/Resume. Vertex AI tokens auto-rotate via service-account JWT
+(PR #209 / issue #155). Pool maintenance crons live (#207).
 
 Spec: [`docs/specs/modules/32-multi-provider-vision.md`](docs/specs/modules/32-multi-provider-vision.md).
 Runbooks: [`docs/runbooks/multi-provider-vision.md`](docs/runbooks/multi-provider-vision.md),
