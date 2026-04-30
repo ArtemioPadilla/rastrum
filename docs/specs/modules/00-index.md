@@ -88,6 +88,7 @@ narrative source.
 | 29 | Projects (ANP polygon protocols + auto-tagging) | v1.3 | shipped 2026-04-29 (PR #132 — schema + RLS + `upsert_project` SECURITY DEFINER + auto-tagging trigger + UI) | [`29-projects-anp.md`](29-projects-anp.md) |
 | 30 | CLI batch import for camera-trap memory cards | v1.3 | in implementation (PR feat/cli-batch-import-110) | [`30-cli-batch-import.md`](30-cli-batch-import.md) |
 | 31 | Camera stations + sampling-effort tracking | v1.3 | in implementation (PR feat/camera-stations-112 — schema only; UI v1.1) | [`31-camera-stations.md`](31-camera-stations.md) |
+| 32 | Multi-provider vision + per-sponsor model + platform pool | v1.3 | in implementation (PR feat/multi-provider-vision-116 — closes #115/#116/#118) | [`32-multi-provider-vision.md`](32-multi-provider-vision.md) |
 
 ## v1.5 — Territory layer — planned
 
