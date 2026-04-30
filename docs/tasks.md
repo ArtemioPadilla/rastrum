@@ -201,12 +201,16 @@ A second wave landed the same day, focused on the CONANP-Oaxaca / DRFSIPS / PROR
   Resumable via state file. PR #134. _(✓ shipped)_
 
 - `camera-stations-m31` — **Module 31 (Camera stations + sampling effort).**
-  Schema only for v1; UI is a v1.1 follow-up. A camera station is a fixed
-  deployment with one or more **active periods** (start/end). Standardised
-  wildlife indices (RAI, detection rate per 100 trap-nights, species richness)
-  all depend on knowing how long the camera was sampling — this module
-  captures that ground truth. Schema: `camera_stations` +
-  `camera_station_active_periods`. Depends on M29. PR #141. _(✓ shipped — UI = v1.1 follow-up)_
+  Schema (PR #141) + create-station UI on the project-detail page
+  (PR #213) + `/api/observe camera_station_id` server-side resolution +
+  CLI `--project-slug --station-key` flags (PR #208). A camera station is a
+  fixed deployment with one or more **active periods** (start/end).
+  Standardised wildlife indices (RAI, detection rate per 100 trap-nights,
+  species richness) all depend on knowing how long the camera was
+  sampling — this module captures that ground truth. Schema:
+  `camera_stations` + `camera_station_active_periods`. Depends on M29.
+  _(✓ shipped — period management + per-station detection-rate dashboard
+  tracked in #224 / #225 as v1.2 follow-ups)_
 
 - `multi-provider-vision-m32` — **Module 32 (Multi-provider vision + per-sponsor
   model + platform pool).** Bundles three closely-coupled M27 extensions that
@@ -215,5 +219,10 @@ A second wave landed the same day, focused on the CONANP-Oaxaca / DRFSIPS / PROR
   Vertex AI providers; (c) platform-wide call pool (`sponsor_pools` +
   `consume_pool_slot` RPC). `_shared/vision-provider.ts` exports a
   `VisionProvider` interface implemented by 6 concrete providers;
-  `buildProvider(credential)` is the single dispatcher. Closes #115/#116/#118.
-  PR #143. _(✓ shipped)_
+  `buildProvider(credential)` is the single dispatcher. Closes
+  #115/#116/#118. PR #143. v1.1 follow-ups all shipped 2026-04-30:
+  sponsor UI + Donate-to-pool tab (PR #215), Vertex AI service-account
+  auto-rotation (PR #209), pool monthly-reset + ledger-vacuum + Vertex
+  expiry-monitor crons (PR #207), nightly per-provider smoke probe
+  (PR #210). _(✓ shipped — pool dashboard with top-taxa, cost-per-100
+  picker, pool karma incentives tracked as #226/#227/#228)_
