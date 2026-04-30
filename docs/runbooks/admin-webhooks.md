@@ -157,3 +157,56 @@ strongly recommended for any production listener.
    deliveries section shows the response status code.
 4. To rotate the secret: delete the subscription, create a new one.
    The receiver gets a fresh secret either way.
+
+## Per-delivery drill-down + replay (PR15)
+
+Each row in the webhooks list has a **Deliveries** button. Clicking it
+expands an inline drilldown beneath the row showing the **last 50
+deliveries** for that specific webhook. The drilldown is per-row state
+so two webhooks can be open at once without filter state bleeding
+across.
+
+### Status-code chips
+
+| Status         | Chip color | Meaning                                       |
+|----------------|------------|-----------------------------------------------|
+| 2xx            | green      | delivered                                     |
+| 4xx            | amber      | client error — receiver returned but rejected |
+| 5xx            | red        | receiver outage / signature drift             |
+| NULL (pending) | zinc       | request fired, response not yet reconciled    |
+
+The reconcile cron (`reconcile-webhook-deliveries`, every 2 min)
+flips pending rows to a real status_code; if a row stays pending
+longer than that, the receiver is timing out beyond pg_net's
+configured deadline.
+
+### Filter chips
+
+Inside each drilldown: `All / Successful / Failed / Pending`.
+Successful = 2xx; Failed = 4xx + 5xx; Pending = no status_code yet.
+
+### Nonce copy
+
+Each delivery's nonce is rendered click-to-copy via the Clipboard
+API. Useful when correlating a delivery to a receiver-side dedupe log
+or a `_meta.nonce` value from an actual payload capture.
+
+### Replay last delivery
+
+The **Replay last delivery** button at the top of each drilldown
+fires the `webhook.replay_delivery` admin handler. Server-side:
+
+1. Loads the source delivery row + the parent webhook.
+2. Strips any prior `_meta` envelope from the source body.
+3. Builds a fresh envelope with new `event_id`, `nonce`, `timestamp`,
+   and a `replay_of: <source_delivery_id>` pointer.
+4. HMAC-signs the body with the parent webhook's current secret.
+5. POSTs synchronously (replay is rare + ad-hoc, so we capture the
+   response inline rather than via `pg_net`).
+6. Inserts a fresh `admin_webhook_deliveries` row with the new
+   nonce + status_code + (if any) error.
+7. Writes an `admin_audit` row with `op = 'webhook_replay'` and
+   `details: { source_delivery_id, new_event_id }`.
+
+The new envelope's `replay_of` pointer lets the receiver correlate
+the two sends if it cares about audit-of-audit.

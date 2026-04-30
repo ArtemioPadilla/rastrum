@@ -88,9 +88,9 @@ See `docs/specs/infra/supabase-schema.sql` for canonical SQL. Tables:
 | Identification overrides | expert | stub | deferred |
 | Taxon notes | expert | stub | deferred |
 
-**Functional: 28 of 30 console tabs after PR14. Deferred stubs: License disputes, Identification overrides, Taxon notes — no concrete users yet.**
+**Functional: 30 of 32 console tabs after PR15. Deferred stubs: License disputes, Identification overrides, Taxon notes — no concrete users yet.**
 
-### Tabs added in PR9-PR14
+### Tabs added in PR9-PR15
 
 | Tab | Role | Status | Shipped in |
 |---|---|---|---|
@@ -99,6 +99,8 @@ See `docs/specs/infra/supabase-schema.sql` for canonical SQL. Tables:
 | Forensics | admin | done | PR12 |
 | Proposals | admin | done | PR13 |
 | Webhooks | admin | done | PR13 |
+| Health | admin | done | PR15 |
+| Errors | admin | done | PR15 |
 
 ## Cron jobs added in PR12-PR14
 
@@ -111,7 +113,7 @@ See `docs/specs/infra/supabase-schema.sql` for canonical SQL. Tables:
 | `reconcile-webhook-deliveries` | `*/2 * * * *` | `reconcile_webhook_deliveries()` | PR14 |
 | `admin-observability-dryrun` (GH Actions) | `13 9 * * 1` (+ one-shot 2026-05-06) | psql query suite | PR14 |
 
-## Edge Function handlers (32 deployed after PR14)
+## Edge Function handlers (36 deployed after PR15)
 
 | Action verb | Required role | Audit op | Shipped in |
 |---|---|---|---|
@@ -147,6 +149,10 @@ See `docs/specs/infra/supabase-schema.sql` for canonical SQL. Tables:
 | webhook.update | admin | webhook_update | PR13 |
 | webhook.delete | admin | webhook_delete | PR13 |
 | webhook.test | admin | webhook_test | PR13 |
+| webhook.replay_delivery | admin | webhook_replay | PR15 |
+| health.recompute | admin | health_recompute | PR15 |
+| error.acknowledge | admin | error_acknowledge | PR15 |
+| error.acknowledge_bulk | admin | error_acknowledge_bulk | PR15 |
 
 ## v1.1 deferred-cleanup primitives (PR14)
 
