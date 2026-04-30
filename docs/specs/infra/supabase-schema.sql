@@ -3801,6 +3801,12 @@ CREATE POLICY notifications_sent_no_client_delete ON public.notifications_sent
   AS RESTRICTIVE FOR DELETE TO authenticated, anon USING (false);
 
 -- 9. resolve_sponsorship — devuelve la mejor credencial activa con cuota.
+-- M27.1 (#116, PR #143) added two columns to the OUT-table
+-- (preferred_model, endpoint). `CREATE OR REPLACE FUNCTION` can't
+-- change a function's return type, so on environments where the
+-- pre-M27.1 signature already exists (production) we must DROP first.
+-- Idempotent — a no-op on first install.
+DROP FUNCTION IF EXISTS public.resolve_sponsorship(uuid, public.ai_provider);
 CREATE OR REPLACE FUNCTION public.resolve_sponsorship(
   p_beneficiary uuid, p_provider public.ai_provider
 ) RETURNS TABLE (
