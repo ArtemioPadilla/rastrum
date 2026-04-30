@@ -13,6 +13,8 @@ export type KMLValidationResult =
   | { ok: false; error: 'no_polygon' | 'too_large' | 'invalid_xml' };
 
 const MAX_KML_BYTES = 500_000;
+/** Maximum size for KMZ files (ZIP-compressed KML). 5MB = MAX_KML_BYTES * 10. */
+const MAX_KMZ_BYTES = 5_000_000;
 
 /**
  * Parse the first (or largest) polygon found in a KML string into GeoJSON.
@@ -93,4 +95,61 @@ export function validateKML(text: string): KMLValidationResult {
   } catch {
     return { ok: false, error: 'invalid_xml' };
   }
+}
+
+// ── KMZ support ────────────────────────────────────────────────────────────
+
+/**
+ * Extract the KML text from a KMZ file (ZIP archive containing doc.kml).
+ * Uses JSZip (dynamically imported to keep the bundle lazy).
+ *
+ * @param file - A File or Blob with .kmz extension or application/vnd.google-earth.kmz MIME type
+ * @returns The KML text content, or null if no .kml file found inside the archive
+ */
+export async function extractKMLFromKMZ(file: File | Blob): Promise<string | null> {
+  // Dynamic import so JSZip is only loaded when a KMZ is actually uploaded
+  const JSZip = (await import('jszip')).default;
+  const zip = await JSZip.loadAsync(file);
+
+  // KMZ spec: primary document is doc.kml; fall back to first .kml file found
+  const docKml = zip.file('doc.kml');
+  const kmlFile = docKml ?? Object.values(zip.files).find(f => f.name.endsWith('.kml') && !f.dir);
+
+  if (!kmlFile) return null;
+  return kmlFile.async('string');
+}
+
+/** Returns true if the file is a KMZ (by extension or MIME type).
+ * Note: `application/zip` is guarded by extension check to avoid false positives
+ * (iOS/Android sometimes report .kmz files as application/zip). */
+export function isKMZ(file: File): boolean {
+  const name = file.name.toLowerCase();
+  return (
+    name.endsWith('.kmz') ||
+    file.type === 'application/vnd.google-earth.kmz' ||
+    // application/zip only counts if the extension is .kmz (iOS/Android quirk)
+    (file.type === 'application/zip' && name.endsWith('.kmz'))
+  );
+}
+
+/**
+ * Validate a KML or KMZ file. Handles both formats transparently.
+ * For KMZ, extracts doc.kml first, then validates the KML content.
+ */
+export async function validateKMLOrKMZ(file: File): Promise<KMLValidationResult> {
+  if (file.size > MAX_KMZ_BYTES) {
+    // KMZ can be larger than 500KB when compressed; limit to 5MB for KMZ
+    return { ok: false, error: 'too_large' };
+  }
+
+  let text: string;
+  if (isKMZ(file)) {
+    const extracted = await extractKMLFromKMZ(file);
+    if (!extracted) return { ok: false, error: 'no_polygon' };
+    text = extracted;
+  } else {
+    text = await file.text();
+  }
+
+  return validateKML(text);
 }
