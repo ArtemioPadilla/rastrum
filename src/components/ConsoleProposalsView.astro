@@ -36,6 +36,8 @@ const pSelfApproval = (pNs?.selfApprovalForbidden as string) ?? 'You cannot appr
   data-label-self-approval={pSelfApproval}
   data-label-approve-title={pSlide.approveTitle ?? 'Approve proposal'}
   data-label-reject-title={pSlide.rejectTitle ?? 'Reject proposal'}
+  data-label-approve={pActions.approve ?? 'Approve'}
+  data-label-reject={pActions.reject ?? 'Reject'}
 >
   <h1 class="text-xl font-semibold mb-1">{pTitle}</h1>
   <p class="mb-4 text-sm text-zinc-500 dark:text-zinc-400">{pDesc}</p>
@@ -133,6 +135,10 @@ const pSelfApproval = (pNs?.selfApprovalForbidden as string) ?? 'You cannot appr
     executed: sectionEl?.dataset.labelStatusExecuted ?? 'Executed',
   };
   const SELF_APPROVAL_MSG = sectionEl?.dataset.labelSelfApproval ?? 'You cannot approve your own proposal.';
+  const labelApprove = sectionEl?.dataset.labelApprove ?? 'Approve';
+  const labelReject = sectionEl?.dataset.labelReject ?? 'Reject';
+  const labelApproveTitle = sectionEl?.dataset.labelApproveTitle ?? 'Approve proposal';
+  const labelRejectTitle = sectionEl?.dataset.labelRejectTitle ?? 'Reject proposal';
 
   let allRows: ProposalRow[] = [];
   let actors: Record<string, ActorMeta> = {};
@@ -198,8 +204,8 @@ const pSelfApproval = (pNs?.selfApprovalForbidden as string) ?? 'You cannot appr
           <td class="px-3 py-2 text-xs text-zinc-500">${esc(fmtDate(r.expires_at))}</td>
           <td class="px-3 py-2 text-right">
             ${canAct
-              ? `<button data-approve-id="${esc(r.id)}" class="px-2 py-1 rounded border border-emerald-600 text-xs text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 mr-1">Approve</button>
-                 <button data-reject-id="${esc(r.id)}" class="px-2 py-1 rounded border border-red-500 text-xs text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">Reject</button>`
+              ? `<button data-approve-id="${esc(r.id)}" class="px-2 py-1 rounded border border-emerald-600 text-xs text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 mr-1">${esc(labelApprove)}</button>
+                 <button data-reject-id="${esc(r.id)}" class="px-2 py-1 rounded border border-red-500 text-xs text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">${esc(labelReject)}</button>`
               : (r.status === 'pending' && isOwn
                 ? `<span class="text-[11px] text-zinc-500 italic">${esc(SELF_APPROVAL_MSG)}</span>`
                 : '')}
@@ -220,7 +226,7 @@ const pSelfApproval = (pNs?.selfApprovalForbidden as string) ?? 'You cannot appr
     const row = allRows.find(r => r.id === proposalId);
     if (!row) return;
     const id = kind === 'approve' ? 'console-slideover-proposal-approve' : 'console-slideover-proposal-reject';
-    const title = `${kind === 'approve' ? 'Approve' : 'Reject'} ${row.op}`;
+    const title = `${kind === 'approve' ? labelApprove : labelReject} ${row.op}`;
     const action = kind === 'approve' ? 'proposal.approve' : 'proposal.reject';
     if (kind === 'approve') {
       const notesEl = document.getElementById('proposal-approve-notes') as HTMLTextAreaElement | null;

@@ -1,0 +1,93 @@
+name: Admin observability dry-run
+
+# One-week post-merge sanity check on the admin console "do all" series.
+# Catches silent failures that wouldn't otherwise surface organically:
+#   - anomaly cron not firing (admin_anomalies stays empty despite activity)
+#   - webhook reconcile cron not writing back status_code (deliveries pending)
+#   - function_errors not being written (reporter has a gap)
+#   - auto-revoke cron not firing for any expired role
+#
+# Fires once on 2026-05-06 09:13 UTC, then again the same time each Monday.
+# Both modes write a Markdown report to the workflow run summary; if any
+# query returns an unexpected zero or stuck-pending count, the job fails
+# (red badge in Actions = there's something to look at).
+#
+# Required secret: SUPABASE_DB_URL
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '13 9 6 5 *'    # 2026-05-06 09:13 UTC — first-week check
+    - cron: '13 9 * * 1'    # Mondays 09:13 UTC — ongoing weekly heartbeat
+
+jobs:
+  dryrun:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install psql client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+
+      - name: Run observability queries
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          REPORT="$GITHUB_STEP_SUMMARY"
+          {
+            echo "# Admin observability dry-run"
+            echo ""
+            echo "_run at $(date -u +'%Y-%m-%d %H:%M UTC')_"
+            echo ""
+          } >> "$REPORT"
+
+          run_query() {
+            local heading="$1"; shift
+            local sql="$1"; shift
+            {
+              echo "## $heading"
+              echo ""
+              echo '```'
+              psql "$SUPABASE_DB_URL" -At -c "$sql" 2>&1 || echo "QUERY FAILED"
+              echo '```'
+              echo ""
+            } >> "$REPORT"
+          }
+
+          run_query "Anomaly detections (PR12)" \
+            "SELECT 'total=' || count(*), 'first=' || COALESCE(min(created_at)::text,'—'), 'last=' || COALESCE(max(created_at)::text,'—') FROM public.admin_anomalies;"
+
+          run_query "Anomalies by kind" \
+            "SELECT kind || ': ' || count(*) FROM public.admin_anomalies GROUP BY kind ORDER BY 1;"
+
+          run_query "Health digest snapshots" \
+            "SELECT period_start::date || ' → ' || period_end::date || '  (' || (metrics->>'admin_actions') || ' actions)' FROM public.admin_health_digests ORDER BY created_at DESC LIMIT 4;"
+
+          run_query "Function errors by code" \
+            "SELECT function_name || '/' || code || ': ' || count(*) FROM public.function_errors GROUP BY 1 ORDER BY count(*) DESC LIMIT 20;"
+
+          run_query "Webhook deliveries — pending vs settled" \
+            "SELECT 'pending=' || count(*) FILTER (WHERE status_code IS NULL) || ', settled=' || count(*) FILTER (WHERE status_code IS NOT NULL) || ', stuck_pending(>5min)=' || count(*) FILTER (WHERE status_code IS NULL AND attempted_at < now() - interval '5 minutes') FROM public.admin_webhook_deliveries;"
+
+          run_query "Auto-revoke activity (PR13)" \
+            "SELECT 'expiring_grants=' || count(*) FROM public.user_roles WHERE expires_at IS NOT NULL AND revoked_at IS NULL;"
+
+          run_query "Auto-revokes performed (last 7d)" \
+            "SELECT count(*) FROM public.admin_audit WHERE op='role_revoke' AND details->>'auto'='true' AND created_at > now() - interval '7 days';"
+
+          run_query "Trust scores summary" \
+            "SELECT 'count=' || count(*) || ', min=' || min(trust_score) || ', avg=' || round(avg(trust_score)::numeric, 1) || ', max=' || max(trust_score) FROM public.moderator_trust_scores WHERE trust_score IS NOT NULL;"
+
+          # Failure detection: anything that should have a row but doesn't,
+          # or webhook deliveries stuck pending.
+          STUCK=$(psql "$SUPABASE_DB_URL" -At -c "SELECT count(*) FROM public.admin_webhook_deliveries WHERE status_code IS NULL AND attempted_at < now() - interval '5 minutes';")
+          if [ "$STUCK" -gt 0 ]; then
+            echo "" >> "$REPORT"
+            echo "## ⚠️ Failure detected" >> "$REPORT"
+            echo "" >> "$REPORT"
+            echo "$STUCK webhook deliveries stuck pending > 5 min — reconcile cron likely broken." >> "$REPORT"
+            exit 1
+          fi

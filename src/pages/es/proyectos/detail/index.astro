@@ -1,0 +1,13 @@
+---
+import BaseLayout from '../../../../layouts/BaseLayout.astro';
+import ProjectDetailView from '../../../../components/ProjectDetailView.astro';
+import { t } from '../../../../i18n/utils';
+
+const lang = 'es';
+const tr = t(lang);
+const proj = (tr as unknown as { projects: { title: string; subtitle: string } }).projects;
+---
+
+<BaseLayout title={`${proj.title} — Rastrum`} description={proj.subtitle} lang={lang}>
+  <ProjectDetailView lang={lang} />
+</BaseLayout>

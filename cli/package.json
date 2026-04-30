@@ -1,0 +1,27 @@
+{
+  "name": "@rastrum/import-cli",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Batch import CLI for camera-trap memory-card dumps into Rastrum.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "rastrum-import": "./bin/rastrum-import.js"
+  },
+  "engines": {
+    "node": ">=20.10.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node bin/rastrum-import.js",
+    "test": "node --import tsx --test test/*.test.ts"
+  },
+  "dependencies": {
+    "exifr": "^7.1.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
