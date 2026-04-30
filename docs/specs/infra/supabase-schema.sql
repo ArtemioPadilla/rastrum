@@ -6407,3 +6407,93 @@ CREATE POLICY gc_orphan_media_log_admin_read ON public.gc_orphan_media_log
   USING (public.has_role(auth.uid(), 'admin'));
 
 GRANT SELECT, INSERT ON public.gc_orphan_media_log TO service_role;
+-- ── merge_user_accounts RPC (#284) ──────────────────────────────────────────
+-- Rewrites all FK references from discard_user to keep_user in a single
+-- transaction. Called only from the user-merge admin handler.
+-- SECURITY DEFINER so it can write to auth.users (soft-delete discard).
+
+CREATE OR REPLACE FUNCTION public.merge_user_accounts(
+  p_keep    uuid,
+  p_discard uuid,
+  p_actor   uuid,
+  p_reason  text
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth
+AS $$
+DECLARE
+  v_summary jsonb := '{}'::jsonb;
+  v_count   int;
+BEGIN
+  IF p_keep = p_discard THEN
+    RAISE EXCEPTION 'keep and discard must differ';
+  END IF;
+
+  -- Verify both users exist
+  IF NOT EXISTS (SELECT 1 FROM public.users WHERE id = p_keep) THEN
+    RAISE EXCEPTION 'keep user not found: %', p_keep;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.users WHERE id = p_discard) THEN
+    RAISE EXCEPTION 'discard user not found: %', p_discard;
+  END IF;
+
+  -- Rewrite FK references table by table
+  UPDATE public.observations    SET observer_id  = p_keep WHERE observer_id  = p_discard;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  v_summary := v_summary || jsonb_build_object('observations', v_count);
+
+  UPDATE public.identifications SET validated_by = p_keep WHERE validated_by = p_discard;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  v_summary := v_summary || jsonb_build_object('identifications_validated', v_count);
+
+  UPDATE public.comments        SET user_id      = p_keep WHERE user_id      = p_discard;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  v_summary := v_summary || jsonb_build_object('comments', v_count);
+
+  UPDATE public.follows         SET follower_id  = p_keep WHERE follower_id  = p_discard;
+  UPDATE public.follows         SET followee_id  = p_keep WHERE followee_id  = p_discard;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  v_summary := v_summary || jsonb_build_object('follows', v_count);
+
+  UPDATE public.reactions       SET user_id      = p_keep WHERE user_id      = p_discard;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  v_summary := v_summary || jsonb_build_object('reactions', v_count);
+
+  -- For badges: delete duplicates in the discard user first, then update
+  DELETE FROM public.user_badges
+  WHERE user_id = p_discard
+    AND badge_key IN (SELECT badge_key FROM public.user_badges WHERE user_id = p_keep);
+  UPDATE public.user_badges SET user_id = p_keep WHERE user_id = p_discard;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  v_summary := v_summary || jsonb_build_object('badges', v_count);
+
+  UPDATE public.watchlist_entries SET user_id    = p_keep WHERE user_id      = p_discard;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  v_summary := v_summary || jsonb_build_object('watchlist', v_count);
+
+  UPDATE public.projects        SET owner_id     = p_keep WHERE owner_id     = p_discard;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  v_summary := v_summary || jsonb_build_object('projects', v_count);
+
+  -- Soft-delete the discarded account
+  UPDATE public.users SET
+    username     = 'deleted_merged_' || left(p_discard::text, 8),
+    display_name = '[Merged account]',
+    deleted_at   = now()
+  WHERE id = p_discard;
+
+  -- Audit log
+  INSERT INTO public.admin_audit (actor_id, op, payload, reason)
+  VALUES (p_actor, 'user.merge', jsonb_build_object(
+    'keep_user_id',    p_keep,
+    'discard_user_id', p_discard,
+    'summary',         v_summary
+  ), p_reason);
+
+  RETURN v_summary;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.merge_user_accounts(uuid, uuid, uuid, text) TO service_role;
