@@ -3065,7 +3065,8 @@ CREATE TABLE IF NOT EXISTS public.notifications (
   user_id     uuid        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   kind        text        NOT NULL
                           CHECK (kind IN ('follow','follow_accepted','reaction','comment','mention',
-                                          'identification','badge','digest')),
+                                          'identification','badge','digest',
+                                          'vertex_token_expiring')),
   payload     jsonb       NOT NULL DEFAULT '{}',
   read_at     timestamptz,
   created_at  timestamptz NOT NULL DEFAULT now()
@@ -3074,6 +3075,21 @@ CREATE INDEX IF NOT EXISTS idx_notifications_user_unread
   ON public.notifications(user_id, read_at) WHERE read_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_notifications_user_created
   ON public.notifications(user_id, created_at DESC);
+
+-- M32 v1.1 (#159): widen the kind CHECK to include
+-- 'vertex_token_expiring'. Idempotent — drops the existing
+-- constraint by name (auto-named when CREATE TABLE first ran) then
+-- adds the new one. Existing rows are unchanged.
+DO $$
+BEGIN
+  ALTER TABLE public.notifications DROP CONSTRAINT IF EXISTS notifications_kind_check;
+EXCEPTION WHEN others THEN NULL; END $$;
+ALTER TABLE public.notifications
+  ADD CONSTRAINT notifications_kind_check CHECK (
+    kind IN ('follow','follow_accepted','reaction','comment','mention',
+             'identification','badge','digest',
+             'vertex_token_expiring')
+  );
 
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
@@ -3633,7 +3649,11 @@ ALTER TABLE public.sponsor_credentials
   ADD COLUMN IF NOT EXISTS preferred_model text NOT NULL DEFAULT 'claude-haiku-4-5'
     CHECK (length(preferred_model) BETWEEN 1 AND 64),
   ADD COLUMN IF NOT EXISTS endpoint        text
-    CHECK (endpoint IS NULL OR length(endpoint) <= 512);
+    CHECK (endpoint IS NULL OR length(endpoint) <= 512),
+  -- M32 v1.1 (#159): track when a Vertex AI access token expires
+  -- so the `vertex_token_expiry_monitor` cron can notify the
+  -- sponsor 5 minutes before. NULL for non-Vertex credentials.
+  ADD COLUMN IF NOT EXISTS token_expires_at timestamptz;
 
 ALTER TABLE public.sponsor_credentials ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS sponsor_credentials_owner_read ON public.sponsor_credentials;

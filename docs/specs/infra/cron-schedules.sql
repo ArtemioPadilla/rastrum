@@ -239,3 +239,62 @@ SELECT cron.unschedule('ai_errors_log_cleanup')
   WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'ai_errors_log_cleanup');
 SELECT cron.schedule('ai_errors_log_cleanup', '23 3 * * *',
   $$DELETE FROM public.ai_errors_log WHERE occurred_at < now() - interval '30 days'$$);
+
+-- ─────────────────────────────────────────────────────────────────
+-- M32 — sponsor_pools.monthly_reset (#153)
+-- First-of-month at 00:05 UTC: reset `used` to 0 + flip exhausted →
+-- active for any pool with monthly_reset = true. Idempotent —
+-- pools without the flag are untouched.
+-- ─────────────────────────────────────────────────────────────────
+SELECT cron.unschedule('sponsor_pools_monthly_reset')
+  WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'sponsor_pools_monthly_reset');
+SELECT cron.schedule('sponsor_pools_monthly_reset', '5 0 1 * *',
+  $$UPDATE public.sponsor_pools
+       SET used = 0,
+           status = CASE WHEN status = 'exhausted' THEN 'active' ELSE status END,
+           updated_at = now()
+     WHERE monthly_reset = true
+       AND status IN ('active','exhausted')$$);
+
+-- ─────────────────────────────────────────────────────────────────
+-- M32 — pool_consumption vacuum (#154)
+-- Daily at 03:30 UTC: drop rows older than 90 days. The daily-cap
+-- check in `consume_pool_slot()` only consults `day = current_date`,
+-- so older rows are pure dead weight.
+-- ─────────────────────────────────────────────────────────────────
+SELECT cron.unschedule('pool_consumption_vacuum')
+  WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'pool_consumption_vacuum');
+SELECT cron.schedule('pool_consumption_vacuum', '30 3 * * *',
+  $$DELETE FROM public.pool_consumption WHERE day < current_date - 90$$);
+
+-- ─────────────────────────────────────────────────────────────────
+-- M32 — Vertex AI access-token expiry monitor (#159)
+-- Every 10 min: notify the sponsor if any vertex_ai credential's
+-- stored access token expires within the next 5 minutes. A no-op if
+-- the credential is already covered by the auto-rotation work
+-- (#155); operator should disable this cron once #155 lands.
+-- ─────────────────────────────────────────────────────────────────
+SELECT cron.unschedule('vertex_token_expiry_monitor')
+  WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'vertex_token_expiry_monitor');
+SELECT cron.schedule('vertex_token_expiry_monitor', '*/10 * * * *',
+  $$INSERT INTO public.notifications (user_id, kind, payload)
+    SELECT c.user_id, 'vertex_token_expiring',
+           jsonb_build_object(
+             'credential_id', c.id,
+             'label', c.label,
+             'expires_at', c.token_expires_at,
+             'minutes_left', EXTRACT(EPOCH FROM (c.token_expires_at - now())) / 60
+           )
+      FROM public.sponsor_credentials c
+     WHERE c.kind = 'vertex_ai'
+       AND c.revoked_at IS NULL
+       AND c.token_expires_at IS NOT NULL
+       AND c.token_expires_at < now() + interval '5 minutes'
+       AND c.token_expires_at > now()
+       AND NOT EXISTS (
+         SELECT 1 FROM public.notifications n
+          WHERE n.user_id = c.user_id
+            AND n.kind = 'vertex_token_expiring'
+            AND n.payload->>'credential_id' = c.id::text
+            AND n.created_at > now() - interval '15 minutes'
+       )$$);
