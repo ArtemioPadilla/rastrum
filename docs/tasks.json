@@ -4278,12 +4278,12 @@
       "title_es": "Seguimientos de review M26 v1.1 — pulido menor de los notes en PR #100/#101",
       "modules": ["26-social-graph.md"],
       "subtasks": [
-        { "label_en": "?u= alias on readUsername() — document or remove (PR #100 review)", "label_es": "Alias ?u= en readUsername() — documentar o eliminar (review de PR #100)", "status": "planned" },
-        { "label_en": "document.title in JS → use i18n key for consistency (PR #100 review)", "label_es": "document.title en JS → usar key i18n por consistencia (review de PR #100)", "status": "planned" },
-        { "label_en": "runVisitor catch-all → distinguish error vs not-found state (PR #100 review)", "label_es": "runVisitor catch-all → distinguir estado error vs not-found (review de PR #100)", "status": "planned" },
+        { "label_en": "?u= alias on readUsername() — removed (audit showed zero references outside docs across PublicProfileViewV2, FollowingView, FollowersView, PokedexView)", "label_es": "Alias ?u= en readUsername() — eliminado (audit no encontró referencias fuera de docs en PublicProfileViewV2, FollowingView, FollowersView, PokedexView)", "status": "done" },
+        { "label_en": "document.title in JS → use i18n key for consistency (PublicProfileViewV2, ExploreSpeciesView, PokedexView)", "label_es": "document.title en JS → usar key i18n por consistencia (PublicProfileViewV2, ExploreSpeciesView, PokedexView)", "status": "done" },
+        { "label_en": "runVisitor catch-all → distinguish error vs not-found state (Pokedex visitor mode now shows visitor_load_error for network/RPC errors, visitor_not_found only for 0-row PGRST116)", "label_es": "runVisitor catch-all → distinguir estado error vs not-found (modo visitante Pokedex ahora muestra visitor_load_error para errores de red/RPC, visitor_not_found solo para PGRST116 0-rows)", "status": "done" },
         { "label_en": "ConfirmDialog component — replace confirm()/alert() in Block flow (matches ReportDialog pattern, PR #101 review)", "label_es": "Componente ConfirmDialog — reemplazar confirm()/alert() en flujo Block (patrón ReportDialog, review de PR #101)", "status": "planned" },
-        { "label_en": "Extract overflow-menu logic into lib/overflow-menu.ts (currently duplicated 3× across PublicProfileViewV2, ExploreRecentView, Comments)", "label_es": "Extraer lógica de overflow-menu a lib/overflow-menu.ts (duplicada 3× en PublicProfileViewV2, ExploreRecentView, Comments)", "status": "planned" },
-        { "label_en": "Standardize fave_count_one vs fave_aria_one data-attr naming across ExploreRecentView + MyObservationsView", "label_es": "Estandarizar naming de data-attrs fave_count_one vs fave_aria_one en ExploreRecentView + MyObservationsView", "status": "planned" }
+        { "label_en": "Extract overflow-menu logic into lib/overflow-menu.ts (replaces 3× duplication across PublicProfileViewV2, ExploreRecentView, Comments — wireOverflowMenu(wrap, trigger, menu) returns teardown)", "label_es": "Extraer lógica de overflow-menu a lib/overflow-menu.ts (reemplaza duplicación 3× en PublicProfileViewV2, ExploreRecentView, Comments — wireOverflowMenu(wrap, trigger, menu) regresa teardown)", "status": "done" },
+        { "label_en": "Standardize fave_count_one vs fave_aria_one data-attr naming — both consumers now use data-label-fave-aria-one/other", "label_es": "Estandarizar naming de data-attrs fave_count_one vs fave_aria_one — ambos consumidores ahora usan data-label-fave-aria-one/other", "status": "done" }
       ]
     },
     "community-discovery-m28": {

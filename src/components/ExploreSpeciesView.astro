@@ -48,6 +48,7 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
   data-label-distribution={page.distribution}
   data-label-recent-photos={page.recent_photos}
   data-label-no-coords={page.no_coordinates}
+  data-label-page-title={page.page_title}
 >
   <header class="space-y-3 py-6">
     <h1 class="es-title text-3xl font-bold tracking-tight">{page.title}</h1>
@@ -417,7 +418,8 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
       else commonEl.classList.add('hidden');
     }
 
-    document.title = `${taxon.scientific_name} — Rastrum`;
+    const titleTpl = root.dataset.labelPageTitle ?? '{name} — Rastrum';
+    document.title = titleTpl.replaceAll('{name}', taxon.scientific_name);
 
     if (badgesEl) {
       const pills: string[] = [];

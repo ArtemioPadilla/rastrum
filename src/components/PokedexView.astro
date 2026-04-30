@@ -27,6 +27,8 @@ const visitorPrivate  = px?.visitor_private  as string | undefined;
 const visitorNotFound = px?.visitor_not_found as string | undefined;
 const visitorNotFoundCta = px?.visitor_not_found_cta as string | undefined;
 const visitorBack     = px?.visitor_back_to_profile as string | undefined;
+const visitorPageTitle = px?.visitor_page_title as string | undefined;
+const visitorLoadError = px?.visitor_load_error as string | undefined;
 const bucketMap   = (px?.bucket as Record<string, string> | undefined) ?? {};
 const bucketLabels = JSON.stringify(bucketMap);
 const exploreRecentHref = `/${lang}/${lang === 'es' ? 'explorar/recientes' : 'explore/recent'}/`;
@@ -42,6 +44,7 @@ const exploreRecentHref = `/${lang}/${lang === 'es' ? 'explorar/recientes' : 'ex
   data-label-visitor-empty={visitorEmpty ?? ''}
   data-label-visitor-private={visitorPrivate ?? ''}
   data-label-visitor-not-found={visitorNotFound ?? ''}
+  data-label-visitor-page-title={visitorPageTitle ?? ''}
   data-label-empty-owner={empty}
 >
   <header class="mb-5">
@@ -68,6 +71,9 @@ const exploreRecentHref = `/${lang}/${lang === 'es' ? 'explorar/recientes' : 'ex
   {visitor && (
     <p id="pokedex-private" class="hidden text-sm text-zinc-500 text-center py-8 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700">{visitorPrivate}</p>
   )}
+  {visitor && (
+    <p id="pokedex-error" class="hidden text-sm text-red-700 dark:text-red-400 text-center py-8 rounded-lg border border-red-300 dark:border-red-800">{visitorLoadError}</p>
+  )}
 
   <div id="pokedex-groups" class="space-y-6" data-bucket-labels={bucketLabels}></div>
 </section>
@@ -82,6 +88,7 @@ const exploreRecentHref = `/${lang}/${lang === 'es' ? 'explorar/recientes' : 'ex
   const emptyEl   = document.getElementById('pokedex-empty');
   const notFound  = document.getElementById('pokedex-not-found');
   const privateEl = document.getElementById('pokedex-private');
+  const errorEl   = document.getElementById('pokedex-error');
   const titleEl    = root?.querySelector<HTMLElement>('[data-pokedex-title]');
   const subtitleEl = root?.querySelector<HTMLElement>('[data-pokedex-subtitle]');
   const backLink   = root?.querySelector<HTMLAnchorElement>('[data-pokedex-back-link]');
@@ -110,8 +117,7 @@ const exploreRecentHref = `/${lang}/${lang === 'es' ? 'explorar/recientes' : 'ex
 
   function readUsername(): string {
     const params = new URLSearchParams(window.location.search);
-    const fromQuery = params.get('username') || params.get('u') || '';
-    return (fromQuery || '').trim();
+    return (params.get('username') || '').trim();
   }
 
   function applyVisitorChrome(handle: string) {
@@ -122,7 +128,8 @@ const exploreRecentHref = `/${lang}/${lang === 'es' ? 'explorar/recientes' : 'ex
     if (backLink) {
       backLink.href = `/${lang}/u/?username=${encodeURIComponent(handle)}`;
     }
-    document.title = (lang === 'es' ? `Pokédex de @${handle}` : `@${handle}'s Pokédex`) + ' — Rastrum';
+    const titleTpl = root?.dataset.labelVisitorPageTitle ?? '@{handle}\'s Pokédex — Rastrum';
+    document.title = titleTpl.replaceAll('{handle}', handle);
   }
 
   async function loadFromView(supabase: ReturnType<typeof getSupabase>, userId: string): Promise<DexRow[] | null> {
@@ -243,16 +250,24 @@ const exploreRecentHref = `/${lang}/${lang === 'es' ? 'explorar/recientes' : 'ex
     }
     let supabase;
     try { supabase = getSupabase(); } catch {
+      // Misconfigured client = error path, not "not found".
       loading?.classList.add('hidden');
-      notFound?.classList.remove('hidden');
+      errorEl?.classList.remove('hidden');
       return;
     }
     const { data: { user: viewer } } = await supabase.auth.getUser();
-    const { data: profile } = await supabase
+    const { data: profile, error: lookupErr } = await supabase
       .from('users')
       .select('id, username')
       .eq('username', username)
       .maybeSingle<{ id: string; username: string | null }>();
+    // maybeSingle treats "0 rows" as data=null + error=null. PGRST116 on a
+    // narrower path also flags zero rows. Anything else is a real error.
+    if (lookupErr && lookupErr.code !== 'PGRST116') {
+      loading?.classList.add('hidden');
+      errorEl?.classList.remove('hidden');
+      return;
+    }
     if (!profile) {
       loading?.classList.add('hidden');
       notFound?.classList.remove('hidden');
@@ -281,7 +296,7 @@ const exploreRecentHref = `/${lang}/${lang === 'es' ? 'explorar/recientes' : 'ex
   if (mode === 'visitor') {
     runVisitor().catch(() => {
       loading?.classList.add('hidden');
-      notFound?.classList.remove('hidden');
+      errorEl?.classList.remove('hidden');
     });
   } else {
     runOwner().catch(() => {

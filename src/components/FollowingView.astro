@@ -80,8 +80,7 @@ const labelNotFound = lang === 'es' ? 'Perfil no encontrado.' : 'Profile not fou
 
   function readUsername(): string {
     const params = new URLSearchParams(window.location.search);
-    const fromQuery = params.get('username') || params.get('u') || '';
-    return fromQuery.trim();
+    return (params.get('username') || '').trim();
   }
 
   function initialsAvatar(name: string): string {
