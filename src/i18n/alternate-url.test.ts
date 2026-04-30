@@ -20,9 +20,11 @@ describe('getAlternateUrl', () => {
     expect(getAlternateUrl('/en/some/random/', 'es')).toBe('/es/some/random/');
   });
 
-  it('swaps identify to identificar', () => {
-    expect(getAlternateUrl('/en/identify/', 'es')).toBe('/es/identificar/');
-    expect(getAlternateUrl('/es/identificar/', 'en')).toBe('/en/identify/');
+  it('swaps identify/observe to observar/observe (consolidated routes)', () => {
+    // After #273: /identify redirects to /observe; routes.identify → /observe
+    // getAlternateUrl for /en/observe → /es/observar (via routes.identify key)
+    expect(getAlternateUrl('/en/observe/', 'es')).toBe('/es/observar/');
+    expect(getAlternateUrl('/es/observar/', 'en')).toBe('/en/observe/');
   });
 
   it('swaps explore map subroute', () => {
