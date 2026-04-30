@@ -14,15 +14,15 @@ describe('getFabTarget', () => {
     });
   });
 
-  it('on /observe (en) → /identify in quick mode', () => {
+  it('on /observe (en) → /observe?mode=identify in quick mode', () => {
     expect(getFabTarget('/en/observe/', 'en')).toEqual({
-      href: '/en/identify/', mode: 'quick-id',
+      href: '/en/observe/', mode: 'quick-id',
     });
   });
 
-  it('on /observar (es) → /identificar in quick mode', () => {
+  it('on /observar (es) → /observar?mode=identify in quick mode', () => {
     expect(getFabTarget('/es/observar/', 'es')).toEqual({
-      href: '/es/identificar/', mode: 'quick-id',
+      href: '/es/observar/', mode: 'quick-id',
     });
   });
 

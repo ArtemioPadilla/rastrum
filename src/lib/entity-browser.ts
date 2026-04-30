@@ -428,15 +428,16 @@ export class EntityBrowser<Row extends { id?: string; [k: string]: unknown }> {
 
     try {
       let q: SupabaseQuery | null;
-      if (filtersChanged) {
-        const built = supabase
-          .from(this.cfg.tableName)
-          .select(this.cfg.selectClause, { count: 'exact' });
-        q = built as unknown as SupabaseQuery;
-      } else {
-        const built = supabase.from(this.cfg.tableName).select(this.cfg.selectClause);
-        q = built as unknown as SupabaseQuery;
-      }
+      // Both branches produce a PostgrestFilterBuilder — use the same construction
+      // so the type cast is identical and .range() is always available on q.
+      // The { count: 'exact' } option is passed consistently; we only use the
+      // count value when filtersChanged (line ~478). Previously the two branches
+      // produced different builder shapes causing the defensive "range is not a
+      // function" guard to fire spuriously on the notifications tab (issue #275).
+      const built = supabase
+        .from(this.cfg.tableName)
+        .select(this.cfg.selectClause, { count: 'exact' });
+      q = built as unknown as SupabaseQuery;
       q = q.order(this.cfg.orderBy, { ascending: false });
       q = await applyFilters(q, this.cfg.filters, values);
       if (q === null) {
