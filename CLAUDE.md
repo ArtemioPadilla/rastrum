@@ -3,7 +3,7 @@
 > Briefing for AI coding agents (Claude Code, Copilot, Cursor, Codex, …)
 > working in this repo. Read this before making changes.
 >
-> **Last full doc sync:** 2026-04-26 (v1.0 + chrome revamp).
+> **Last full doc sync:** 2026-04-30 (v1.2 — research workflow M29/M30/M31, multi-provider vision + pool M32).
 
 ---
 
@@ -122,15 +122,26 @@ supabase/
 │   └── mcp                   MCP server for AI agents (rst_* token auth, JSON-RPC over HTTP)
 └── config.toml             Local CLI config (deploy via CI, not local)
 
+cli/                            M30 — batch import CLI for camera-trap memory cards
+├── bin/rastrum-import.js   Node entry point (loads compiled dist/cli.js)
+├── src/cli.ts              Orchestrator + parseArgs (pure helper, unit-tested)
+├── src/walker.ts           Recursive async-generator file walker
+├── src/exif.ts             exifr wrapper, parity with PWA's fillFromExif
+├── src/api-client.ts       /api/upload-url + /api/observe + /api/identify client
+├── src/log.ts              Resumable import-log.json
+└── test/                   Node native test runner (--import tsx --test)
+
 docs/
 ├── progress.json           Roadmap (60+ items, bilingual labels)
 ├── tasks.json              Per-item subtask breakdown (rendered at /docs/tasks/)
 ├── tasks.md                Phase summary (regenerated from tasks.json)
 ├── architecture.md         High-level architecture + critical-path flows
 ├── gbif-ipt.md             Operator notes for GBIF IPT publishing
+├── runbooks/               Operator playbooks per module (M29 projects, M30 CLI,
+│                           M31 camera stations, M32 multi-provider + pools, …)
 └── specs/
     ├── infra/              SQL schema, cron, testing, future migrations, CI yml
-    └── modules/            20 module specs + 00-index.md (see numbering note)
+    └── modules/            32+ module specs + 00-index.md (see numbering note)
 ```
 
 ---
@@ -299,7 +310,7 @@ Bootstrap docs: `docs/runbooks/admin-bootstrap.md`. Role model:
 `docs/runbooks/role-model.md`. Audit log: `docs/runbooks/admin-audit.md`.
 Per-action runbook: `docs/runbooks/admin-ops.md`.
 
-**Status:** 26 of 30 console tabs functional, 32 admin Edge Function handlers deployed, all admin write affordances live, CORS tightened to rastrum.org + dev/preview ports, token-bucket rate limit + pgTAP RLS suite enforced in CI. PR12 (observability) added Anomalies + Forensics tabs backed by hourly `detect_admin_anomalies()` cron, weekly `compute_admin_health_digest()` snapshot, and a structured `function_errors` sink wired into the dispatcher. PR13 (future-proofing) added Proposals + Webhooks tabs, time-bounded role grants (`expires_at` + daily `auto_revoke_expired_roles()` cron), a two-person-rule `admin_action_proposals` table with hourly expiry sweep, HMAC-SHA256 outbound webhook signing (`dispatch_admin_webhooks()`), and a v1 placeholder `compute_moderator_trust_score()` primitive. PR14 (deferred cleanup) closed the v1.1 follow-ups: per-admin timezone for the off_hours rule (`users.timezone`), webhook replay protection (`_meta` envelope + nonce + reconcile cron writing back async `pg_net` status_code), the real moderator trust score formula (anomaly + overturn + active-days + recency, clamped 0–100), the dispatcher-level `enforce_two_person_irreversible` enforcement gate (feature flag-gated), and the "Require approval (two-person rule)" toggle on irreversible slide-overs. Deferred stubs (no concrete users): License disputes, Identification overrides, Taxon notes, Bioblitz.
+**Status:** 28 of 32 console tabs functional, 36 admin Edge Function handlers deployed, all admin write affordances live, CORS tightened to rastrum.org + dev/preview ports, token-bucket rate limit + pgTAP RLS suite enforced in CI. PR12 (observability) added Anomalies + Forensics tabs backed by hourly `detect_admin_anomalies()` cron, weekly `compute_admin_health_digest()` snapshot, and a structured `function_errors` sink wired into the dispatcher. PR13 (future-proofing) added Proposals + Webhooks tabs, time-bounded role grants (`expires_at` + daily `auto_revoke_expired_roles()` cron), a two-person-rule `admin_action_proposals` table with hourly expiry sweep, HMAC-SHA256 outbound webhook signing (`dispatch_admin_webhooks()`), and a v1 placeholder `compute_moderator_trust_score()` primitive. PR14 (deferred cleanup) closed the v1.1 follow-ups: per-admin timezone for the off_hours rule (`users.timezone`), webhook replay protection (`_meta` envelope + nonce + reconcile cron writing back async `pg_net` status_code), the real moderator trust score formula (anomaly + overturn + active-days + recency, clamped 0–100), the dispatcher-level `enforce_two_person_irreversible` enforcement gate (feature flag-gated), and the "Require approval (two-person rule)" toggle on irreversible slide-overs. PR15 (observability UI) shipped `/console/health/` (weekly-digest hero card with directional Δ pills + 12-week sparklines, manual `health.recompute`), `/console/errors/` (function_errors browser with severity-coloured pills + URL-driven filters + auto-refresh + single + bulk ack via `error.acknowledge[_bulk]`), and per-webhook deliveries drilldown on `/console/webhooks/` with click-to-replay (`webhook.replay_delivery`) + nonce copy. Deferred stubs (no concrete users): License disputes, Identification overrides, Taxon notes, Bioblitz.
 
 ### Onboarding events + CI smoke
 
@@ -388,6 +399,109 @@ Client-side two-call has a real race window. R2 blobs are left as
 orphans for v1; `gc-orphan-media` cron is a v1.1 follow-up.
 
 Full notes: [`docs/runbooks/obs-detail-redesign.md`](docs/runbooks/obs-detail-redesign.md).
+
+### Projects (M29)
+
+A *project* is a named polygon (typically an ANP or sampling grid)
+under `/{en,es}/projects/`. Three load-bearing rules:
+
+1. **Polygon is the routing key.** `assign_observation_to_project_trigger`
+   runs `BEFORE INSERT OR UPDATE OF location` on `observations` —
+   if `project_id IS NULL` and a location is set, the trigger picks
+   the first project (by `created_at ASC`) whose polygon `ST_Covers`
+   the point. Manual assignments via direct UPDATE are honoured.
+2. **Geography writes go through `upsert_project()` SECURITY
+   DEFINER**, not direct `INSERT INTO projects`. PostgREST has no
+   WKB encoder for the `geography(MultiPolygon, 4326)` column, so
+   the client posts GeoJSON to the RPC which parses + enforces
+   `owner_user_id = auth.uid()`.
+3. **Reads use `projects_with_geojson` view (SECURITY INVOKER).** RLS
+   on the underlying table gates rows by visibility (`public` →
+   anon; `private` → owner + members). Don't `SELECT polygon`
+   directly from `projects` — base64 WKB is what comes back.
+
+Spec: [`docs/specs/modules/29-projects-anp.md`](docs/specs/modules/29-projects-anp.md).
+Runbook: [`docs/runbooks/projects-anp.md`](docs/runbooks/projects-anp.md).
+
+### CLI batch import (M30)
+
+Lives at [`cli/`](cli/) — a separate Node 20+ TypeScript package
+with its own `package.json` so the PWA bundle never picks up
+Node-only deps (`exifr`, AWS SDK). The CLI authenticates with an
+`rst_*` token (scope: `observe`) against the `/api/upload-url` and
+`/api/observe` endpoints in the existing `api` Edge Function.
+
+Two contracts that must stay aligned:
+
+1. **EXIF parsing parity with the PWA** — `cli/src/exif.ts` mirrors
+   `ObservationForm.fillFromExif()` for property-name fallback
+   (`latitude` / `Latitude` / `GPSLatitude`) and the (0,0)
+   null-island rejection.
+2. **Project auto-tagging happens server-side** via M29's trigger.
+   The CLI doesn't pass `--project-slug`; observations whose EXIF
+   GPS lands in a project polygon are tagged automatically.
+
+Spec: [`docs/specs/modules/30-cli-batch-import.md`](docs/specs/modules/30-cli-batch-import.md).
+Runbook: [`docs/runbooks/cli-batch-import.md`](docs/runbooks/cli-batch-import.md).
+
+### Camera stations (M31)
+
+Schema-only in v1 — a `camera_station` is a fixed deployment with
+one or more `camera_station_periods` (start/end dates). Standardised
+indices like RAI / detection-rate-per-100-trap-nights need to know
+*how long the camera was sampling*, not just *what it captured*.
+
+- Station uniqueness is **per project** (`UNIQUE(project_id,
+  station_key)`), so two projects can both have a `SJ-CAM-01`.
+- Station assignment to observations stays **explicit**
+  (`observations.camera_station_id`); two stations within one
+  polygon need different trap-night counts so the polygon trigger
+  doesn't auto-fill it.
+- Use `station_trap_nights(station_id, p_from, p_to)` for trap-night
+  counts. NULL `end_date` is counted up to `current_date` (or
+  `p_to`).
+
+UI is a v1.1 follow-up; until then, create stations via SQL (see
+runbook).
+
+Spec: [`docs/specs/modules/31-camera-stations.md`](docs/specs/modules/31-camera-stations.md).
+Runbook: [`docs/runbooks/camera-stations.md`](docs/runbooks/camera-stations.md).
+
+### Multi-provider vision + platform pool (M32)
+
+`supabase/functions/_shared/vision-provider.ts` exports a
+`VisionProvider` interface with a `buildProvider(credential)`
+dispatcher. Six concrete providers: Anthropic-direct (api_key /
+oauth_token), AWS Bedrock, OpenAI, Azure OpenAI, Google Gemini,
+Vertex AI.
+
+Three load-bearing rules:
+
+1. **Don't add a new provider class without updating
+   `buildProvider`'s exhaustive switch.** The `never`-typed default
+   case is the compiler hook that catches missing dispatch.
+2. **Bedrock secrets are JSON envelopes**
+   `{ region, accessKeyId, secretAccessKey, sessionToken? }`. The
+   AWS Sig V4 signer is hand-rolled (~70 LOC) instead of bundling
+   `@aws-sdk/client-bedrock-runtime` (~3 MB) into the EF.
+   `bedrockModelId(model)` auto-translates Anthropic shorthand
+   (`claude-haiku-4-5` → `us.anthropic.claude-haiku-4-5-v1:0`).
+3. **Pool resolution is atomic via `consume_pool_slot()` SECURITY
+   DEFINER + FOR UPDATE SKIP LOCKED.** It picks an active pool with
+   capacity, enforces `daily_user_cap` per beneficiary, increments
+   both counters, and marks `exhausted` when the pool fills — all
+   in a single PL/pgSQL transaction. The `identify` EF wraps the
+   call after the personal-sponsorship resolution fails.
+
+Resolution order: BYO key → personal sponsorship → platform pool →
+skip Claude (PlantNet only).
+
+UI for credential creation + pool donation is a v1.1 follow-up;
+until then, register credentials via Supabase Vault + SQL.
+
+Spec: [`docs/specs/modules/32-multi-provider-vision.md`](docs/specs/modules/32-multi-provider-vision.md).
+Runbooks: [`docs/runbooks/multi-provider-vision.md`](docs/runbooks/multi-provider-vision.md),
+[`docs/runbooks/sponsor-pools.md`](docs/runbooks/sponsor-pools.md).
 
 ---
 

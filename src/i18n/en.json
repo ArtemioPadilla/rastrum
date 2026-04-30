@@ -27,7 +27,8 @@
       "community_nearby": "Nearby",
       "community_experts": "Experts by taxon",
       "community_country": "By country",
-      "nearby_signin_tooltip": "Sign in to find observers near you"
+      "nearby_signin_tooltip": "Sign in to find observers near you",
+      "projects": "Projects (ANP polygons)"
     },
     "docs_groups": {
       "product": "Product",
@@ -1831,6 +1832,8 @@
     "audit": "Audit log",
     "anomalies": "Anomalies",
     "forensics": "Forensics & export",
+    "health": "Health digest",
+    "errors": "Function errors",
     "features": "Feature flags",
     "proposals": "Proposals",
     "webhooks": "Webhooks",
@@ -2265,6 +2268,8 @@
     "kb_nav_experts": "Expert applications",
     "kb_nav_sync": "Sync failures",
     "kb_nav_api": "API & quotas",
+    "kb_nav_health": "Health digest",
+    "kb_nav_errors": "Function errors",
     "kb_help_navigation": "Navigation",
     "kb_help_actions": "Actions",
     "kb_escape_close": "Close slide-over",
@@ -2411,17 +2416,119 @@
         "test": "Test",
         "disable": "Disable",
         "enable": "Enable",
-        "delete": "Delete"
+        "delete": "Delete",
+        "deliveries": "Deliveries",
+        "hideDeliveries": "Hide deliveries"
       },
       "deliveries": {
         "heading": "Recent deliveries (last 20)",
         "event": "Event",
         "status": "Status",
         "time": "Time",
-        "error": "Error"
+        "error": "Error",
+        "perWebhookHeading": "Last 50 deliveries",
+        "filterAll": "All",
+        "filterSuccess": "Successful",
+        "filterFailed": "Failed",
+        "filterPending": "Pending",
+        "statusPending": "pending",
+        "replayLast": "Replay last delivery",
+        "replayConfirmReason": "Reason for replaying this delivery?",
+        "replayDone": "Replay sent (HTTP {status}).",
+        "replayFailed": "Replay failed: {error}",
+        "nonceCopied": "Nonce copied.",
+        "loadFailed": "Could not load deliveries: {error}",
+        "perWebhookEmpty": "No deliveries for this webhook yet."
       },
       "empty": "No webhooks configured.",
       "deliveriesEmpty": "No deliveries yet."
+    },
+
+    "healthView": {
+      "title": "Platform health digest",
+      "description": "Weekly snapshot of platform-health metrics. Cron fires Mondays 09:00 UTC; manual refresh is idempotent on the current week.",
+      "refresh": "Refresh now",
+      "refreshing": "Refreshing…",
+      "refreshed": "Recomputed.",
+      "refreshFailed": "Recompute failed: {error}",
+      "empty": "Weekly digest fires Mondays 09:00 UTC — no rows yet. Use Refresh now to seed the first one.",
+      "loading": "Loading digest…",
+      "heroLabel": "Latest week",
+      "weekRange": "{from} → {to}",
+      "trendsHeading": "12-week trend",
+      "trendBucketLabel": "Week of {date}",
+      "vsPrevious": "vs prev",
+      "noPrevious": "—",
+      "deltaLabel": "Δ",
+      "metrics": {
+        "admin_actions":       "Admin actions",
+        "bans_issued":         "Bans issued",
+        "bans_lifted":         "Bans lifted",
+        "appeals_open":        "Appeals open",
+        "reports_open":        "Reports open",
+        "anomalies_unack":     "Anomalies unack.",
+        "function_errors_7d":  "Function errors (7d)",
+        "mod_queue_depth":     "Mod queue depth",
+        "expert_queue_depth":  "Expert queue depth"
+      },
+      "trend": {
+        "up": "up",
+        "down": "down",
+        "flat": "flat"
+      },
+      "sparkline": {
+        "value": "{value}",
+        "weekN": "Week of {date}"
+      }
+    },
+
+    "errorsView": {
+      "title": "Function errors",
+      "description": "Structured error sink fed by every Edge Function dispatcher. Triage operationally-handled rows by acknowledging — they stay in the table for post-mortem.",
+      "empty": "No errors in the selected window — that's the good outcome 🎉",
+      "loading": "Loading errors…",
+      "filters": {
+        "function": "Function",
+        "code": "Code",
+        "from": "From",
+        "to": "To",
+        "actor": "Actor (uuid or username)",
+        "state": "State",
+        "stateUnack": "Unacknowledged",
+        "stateAll": "All",
+        "any": "— any —"
+      },
+      "columns": {
+        "timestamp": "Timestamp",
+        "function": "Function / code",
+        "actor": "Actor",
+        "message": "Message",
+        "context": "Context",
+        "state": "State",
+        "actions": "Actions"
+      },
+      "actions": {
+        "acknowledge": "Acknowledge",
+        "acknowledged": "acknowledged",
+        "acknowledgeAll": "Acknowledge all matching",
+        "expandContext": "Expand",
+        "collapseContext": "Collapse",
+        "autoRefresh": "Auto-refresh (30s)",
+        "autoRefreshOn": "Auto-refresh on",
+        "autoRefreshOff": "Auto-refresh off"
+      },
+      "slideOver": {
+        "title": "Acknowledge error",
+        "notes": "Notes (optional)",
+        "bulkTitle": "Acknowledge all matching errors",
+        "bulkConfirm": "This will acknowledge up to 1000 unacknowledged rows matching the current filters. Reason is required."
+      },
+      "bulk": {
+        "doneCount": "Acknowledged {count} rows.",
+        "capHit": "Hit the 1000-row cap. Re-run to acknowledge more."
+      },
+      "topCodes": "Top codes",
+      "filterByCode": "Filter by code"
     },
 
     "audit_op": {
@@ -2469,7 +2576,11 @@
       "sponsorship_request_withdraw": "Sponsorship request withdrawn",
       "vault_failure": "Vault failure",
       "anomaly_acknowledge": "Anomaly acknowledged",
-      "audit_export": "Audit export"
+      "audit_export": "Audit export",
+      "health_recompute": "Health digest recomputed",
+      "error_acknowledge": "Function error acknowledged",
+      "error_acknowledge_bulk": "Function errors bulk-acknowledged",
+      "webhook_replay": "Webhook delivery replayed"
     }
   },
   "projects": {
@@ -2511,5 +2622,10 @@
     "error_invalid_polygon": "GeoJSON must be a Polygon or MultiPolygon with valid coordinates.",
     "error_slug_taken": "That slug is already taken.",
     "error_save_failed": "Could not save the project."
+  },
+  "confirm_dialog": {
+    "default_confirm": "Confirm",
+    "default_cancel": "Cancel",
+    "aria_dialog_label": "Confirmation dialog"
   }
 }

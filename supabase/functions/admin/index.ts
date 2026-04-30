@@ -55,6 +55,9 @@ const WRITE_ACTIONS = new Set([
   'anomaly.acknowledge',
   'proposal.create', 'proposal.approve', 'proposal.reject',
   'webhook.create', 'webhook.update', 'webhook.delete', 'webhook.test',
+  'webhook.replay_delivery',
+  'health.recompute',
+  'error.acknowledge', 'error.acknowledge_bulk',
 ]);
 
 function json(body: unknown, status = 200, req: Request): Response {

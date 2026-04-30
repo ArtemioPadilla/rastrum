@@ -4139,6 +4139,24 @@
         { "label_en": "Doc sync: 4 runbooks updated, CLAUDE.md status line bumped, sentinel asserts +4", "label_es": "Sincronización de docs: 4 runbooks actualizados, status line de CLAUDE.md actualizado, +4 asserts en sentinel", "status": "done" }
       ]
     },
+    "admin-console-pr15-observability-ui": {
+      "phase": "v1.1",
+      "title_en": "Admin console PR15 — observability UI (Health digest cards + sparklines + Errors browser with bulk ack + per-webhook deliveries drilldown + replay)",
+      "title_es": "Consola admin PR15 — UI de observabilidad (tarjetas + sparklines del resumen de salud + navegador de errores con ack en lote + drilldown de entregas por webhook + reenvío)",
+      "modules": ["24-admin-console.md"],
+      "subtasks": [
+        { "label_en": "function_errors.acknowledged_at + acknowledged_by + ack_notes columns + partial unack index", "label_es": "Columnas function_errors.acknowledged_at + acknowledged_by + ack_notes + índice parcial sobre no reconocidos", "status": "done" },
+        { "label_en": "audit_op enum +4: health_recompute, error_acknowledge, error_acknowledge_bulk, webhook_replay", "label_es": "Enum audit_op +4: health_recompute, error_acknowledge, error_acknowledge_bulk, webhook_replay", "status": "done" },
+        { "label_en": "Edge Function handlers: health.recompute + error.acknowledge[_bulk] + webhook.replay_delivery", "label_es": "Handlers de Edge Function: health.recompute + error.acknowledge[_bulk] + webhook.replay_delivery", "status": "done" },
+        { "label_en": "ConsoleHealthView — hero card + 12-week sparklines + manual recompute (EN/ES)", "label_es": "ConsoleHealthView — tarjeta hero + sparklines de 12 semanas + recálculo manual (EN/ES)", "status": "done" },
+        { "label_en": "ConsoleErrorsView — function_errors browser with URL filters + severity pills + auto-refresh + single + bulk ack (EN/ES)", "label_es": "ConsoleErrorsView — navegador function_errors con filtros URL + pills de severidad + auto-refresco + ack simple y en lote (EN/ES)", "status": "done" },
+        { "label_en": "ConsoleWebhooksView — per-webhook deliveries drilldown + filter chips + replay last + nonce copy", "label_es": "ConsoleWebhooksView — drilldown de entregas por webhook + chips de filtro + reenviar última + copiar nonce", "status": "done" },
+        { "label_en": "Pure helpers: src/lib/health-delta.ts + src/lib/error-severity.ts (10 + 8 unit assertions)", "label_es": "Helpers puros: src/lib/health-delta.ts + src/lib/error-severity.ts (10 + 8 aserciones unitarias)", "status": "done" },
+        { "label_en": "Console keybindings: g h → health, g e → errors (g x reclaimed for experts), help overlay updated", "label_es": "Atajos de consola: g h → salud, g e → errores (g x reasignado a expertos), overlay de ayuda actualizado", "status": "done" },
+        { "label_en": "rls.sql 32nd assertion + sentinel +3 columns; admin-handlers-registry test bumps to 36 actions", "label_es": "32ª aserción de rls.sql + sentinel +3 columnas; test de registro de handlers admin sube a 36 acciones", "status": "done" },
+        { "label_en": "Runbooks: admin-function-errors.md (new) + admin-health-digest UI section + admin-webhooks PR15 section + admin-ops 4 new entries", "label_es": "Runbooks: admin-function-errors.md (nuevo) + sección UI de admin-health-digest + sección PR15 de admin-webhooks + 4 entradas nuevas en admin-ops", "status": "done" }
+      ]
+    },
     "social-graph-m26": {
       "phase": "v1.2",
       "title_en": "Social graph + reactions (Module 26)",

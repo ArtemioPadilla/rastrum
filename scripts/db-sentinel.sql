@@ -96,6 +96,26 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'reconcile_webhook_deliveries')
     THEN missing := array_append(missing, 'public.reconcile_webhook_deliveries()'); END IF;
 
+  -- PR15 — observability UI (function_errors ack columns drive the Errors tab)
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name   = 'function_errors'
+      AND column_name  = 'acknowledged_at'
+  ) THEN missing := array_append(missing, 'public.function_errors.acknowledged_at'); END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name   = 'function_errors'
+      AND column_name  = 'acknowledged_by'
+  ) THEN missing := array_append(missing, 'public.function_errors.acknowledged_by'); END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name   = 'function_errors'
+      AND column_name  = 'ack_notes'
+  ) THEN missing := array_append(missing, 'public.function_errors.ack_notes'); END IF;
+
   -- Console PR8 — feature flags + karma config DB tables
   IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'app_feature_flags')      THEN missing := array_append(missing, 'public.app_feature_flags'); END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'karma_config')           THEN missing := array_append(missing, 'public.karma_config'); END IF;
