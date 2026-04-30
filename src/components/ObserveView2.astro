@@ -42,6 +42,31 @@ const weathers = WEATHERS;
     </button>
   </div>
 
+  <!-- AI Capability Status Banner (#274) -->
+  <div id="obs2-capability-banner" class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/60 px-4 py-3 text-xs space-y-1">
+    <div class="flex items-center justify-between">
+      <span class="font-medium text-zinc-700 dark:text-zinc-300">
+        {isEs ? "🤖 Modelos disponibles:" : "🤖 Available AI:"}
+      </span>
+      <div class="flex items-center gap-2">
+        <button id="obs2-banner-collapse" type="button" class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors text-[10px] underline">
+          {isEs ? "Ocultar" : "Hide"}
+        </button>
+        <a id="obs2-setup-link" href={isEs ? "/es/perfil/editar#ai" : "/en/profile/edit#ai"}
+          class="text-emerald-600 dark:text-emerald-400 underline hover:no-underline">
+          {isEs ? "Configurar →" : "Set up →"}
+        </a>
+      </div>
+    </div>
+    <div id="obs2-capability-list" class="flex flex-wrap gap-x-4 gap-y-1 text-zinc-500 dark:text-zinc-400">
+      <!-- Populated by JS -->
+      <span class="animate-pulse">{isEs ? "Verificando modelos..." : "Checking models..."}</span>
+    </div>
+  </div>
+
+  <!-- Contextual hint (shown briefly after file drop) -->
+  <div id="obs2-file-hint" class="hidden rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 px-3 py-2 text-xs text-blue-800 dark:text-blue-300 transition-all"></div>
+
   <!-- Drop Zone -->
   <DropZone lang={lang} />
 
@@ -145,6 +170,18 @@ const weathers = WEATHERS;
     <!-- Error box -->
     <div id="obs2-error" class="hidden rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 px-4 py-3 text-sm text-red-700 dark:text-red-300"></div>
 
+    <!-- Contribution nudge (shown in identify mode) -->
+    <div id="obs2-contribute-nudge" class="hidden rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 p-4 space-y-2">
+      <p class="text-sm font-medium text-emerald-800 dark:text-emerald-300">
+        {isEs ? "¿Contribuir a la ciencia?" : "Want to contribute to science?"}
+      </p>
+      <p class="text-xs text-zinc-600 dark:text-zinc-400">
+        {isEs
+          ? "Guardar esta observación en Rastrum ayuda a los científicos a monitorear la biodiversidad de América Latina."
+          : "Saving this observation to Rastrum helps scientists monitor biodiversity across Latin America."}
+      </p>
+    </div>
+
     <!-- Save button -->
     <button
       type="submit"
@@ -153,7 +190,60 @@ const weathers = WEATHERS;
     >
       {isEs ? "Guardar observación" : "Save observation"}
     </button>
+
+    <!-- Identify-only skip (secondary action) -->
+    <button type="button" id="obs2-skip-save-btn" class="hidden w-full text-center text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 py-1 underline">
+      {isEs ? "Solo identificar, no guardar" : "Just identify, don't save"}
+    </button>
   </form>
+
+  <!-- Identify-only result (shown when ?mode=identify, pipeline done, user skips save) -->
+  <div id="obs2-identify-result" class="hidden rounded-xl border border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 p-5 space-y-3">
+    <p class="font-semibold text-emerald-800 dark:text-emerald-300 text-center">
+      {isEs ? "Identificación completa" : "Identification complete"}
+    </p>
+    <div id="obs2-identify-species-card" class="space-y-1 text-center"></div>
+    <div class="border-t border-emerald-200 dark:border-emerald-800 pt-3 space-y-2">
+      <p class="text-xs text-zinc-500 dark:text-zinc-400 text-center">
+        {isEs
+          ? "¿Quieres que esta observación ayude a la ciencia?"
+          : "Want this sighting to help science?"}
+      </p>
+      <button type="button" id="obs2-contribute-btn"
+        class="w-full min-h-[44px] rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-sm transition-colors">
+        {isEs ? "Sí, guardar en Rastrum" : "Yes, save to Rastrum"}
+      </button>
+      <button type="button" id="obs2-identify-done-btn"
+        class="w-full text-xs text-zinc-400 hover:text-zinc-600 underline py-1">
+        {isEs ? "No gracias" : "No thanks"}
+      </button>
+    </div>
+  </div>
+
+  <!-- No-runners empty state (#274) -->
+  <div id="obs2-no-runners" class="hidden rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-5 space-y-3">
+    <p class="font-semibold text-amber-800 dark:text-amber-300">
+      {isEs ? "🔧 Sin modelos de IA configurados" : "🔧 No AI models configured"}
+    </p>
+    <div class="text-xs text-zinc-600 dark:text-zinc-400 space-y-1">
+      <p>{isEs ? "Para identificar especies automáticamente:" : "To identify species automatically:"}</p>
+      <ul class="list-disc list-inside space-y-0.5 ml-1">
+        <li>{isEs ? "Descarga BirdNET para cantos de ave (gratis, ~50 MB)" : "Download BirdNET for bird calls (free, ~50 MB)"}</li>
+        <li>{isEs ? "Agrega una llave de PlantNet para plantas (gratis, 500/día)" : "Add a PlantNet API key for plants (free, 500/day)"}</li>
+        <li>{isEs ? "Agrega una llave de Claude para identificación general" : "Add a Claude key for general identification"}</li>
+      </ul>
+    </div>
+    <div class="flex gap-3 flex-wrap">
+      <a href={isEs ? "/es/perfil/editar#ai" : "/en/profile/edit#ai"}
+        class="min-h-[40px] rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-xs px-4 flex items-center transition-colors">
+        {isEs ? "Configurar IA →" : "Set up AI →"}
+      </a>
+      <button type="button" id="obs2-no-runners-continue"
+        class="min-h-[40px] rounded-xl border border-zinc-300 dark:border-zinc-700 text-xs px-4 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors">
+        {isEs ? "Guardar sin identificar →" : "Save without ID →"}
+      </button>
+    </div>
+  </div>
 
   <!-- Success state -->
   <div id="obs2-success" class="hidden rounded-xl border border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 p-6 text-center space-y-3">
@@ -193,6 +283,109 @@ const errorEl         = document.getElementById('obs2-error');
 const saveBtn         = document.getElementById('obs2-save-btn') as HTMLButtonElement | null;
 const resumeBanner    = document.getElementById('obs2-resume-banner');
 const gpsStatus       = document.getElementById('obs2-gps-status');
+const contributeNudge = document.getElementById('obs2-contribute-nudge');
+const skipSaveBtn     = document.getElementById('obs2-skip-save-btn') as HTMLButtonElement | null;
+const identifyResult  = document.getElementById('obs2-identify-result');
+const identifySpeciesCard = document.getElementById('obs2-identify-species-card');
+const contributeBtn   = document.getElementById('obs2-contribute-btn');
+const identifyDoneBtn = document.getElementById('obs2-identify-done-btn');
+
+// ── First-time onboarding toast (#274) ────────────────────────────────────
+const ONBOARDING_KEY = 'rastrum.obs2.onboarding_shown';
+if (!localStorage.getItem(ONBOARDING_KEY)) {
+  localStorage.setItem(ONBOARDING_KEY, '1');
+  const toast = document.createElement('div');
+  toast.className = 'fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 px-5 py-3 text-sm shadow-lg max-w-[340px] text-center pointer-events-none';
+  toast.textContent = isEs
+    ? 'Rastrum identifica especies automáticamente. Configura tus modelos de IA en Perfil → Ajustes IA para mejores resultados.'
+    : 'Rastrum identifies species automatically. Set up your AI models in Profile → AI Settings for best results.';
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 5000);
+}
+
+// ── Capability banner (#274) ───────────────────────────────────────────────
+const capBanner   = document.getElementById('obs2-capability-banner');
+const capList     = document.getElementById('obs2-capability-list');
+const collapseBtn = document.getElementById('obs2-banner-collapse');
+const fileHint    = document.getElementById('obs2-file-hint');
+
+// Collapse banner if user has dismissed it before
+const BANNER_COLLAPSED_KEY = 'rastrum.obs2.banner_collapsed';
+if (localStorage.getItem(BANNER_COLLAPSED_KEY)) {
+  capBanner?.classList.add('hidden');
+}
+collapseBtn?.addEventListener('click', () => {
+  localStorage.setItem(BANNER_COLLAPSED_KEY, '1');
+  capBanner?.classList.add('hidden');
+});
+
+// Render capability status
+(async () => {
+  try {
+    const runners = await detectRunners();
+    if (!capList) return;
+    const items = [
+      { label: 'PlantNet (plants)', labelEs: 'PlantNet (plantas)', ok: runners.plantnet },
+      { label: 'BirdNET (birds)', labelEs: 'BirdNET (aves)', ok: runners.birdnet },
+      { label: 'Claude Vision', labelEs: 'Claude Vision', ok: runners.claude },
+      { label: 'Phi Vision (local)', labelEs: 'Phi Vision (local)', ok: runners.phi },
+    ];
+    const allOk = items.every(i => i.ok);
+    // Hide setup link if all configured
+    if (allOk) document.getElementById('obs2-setup-link')?.classList.add('hidden');
+    capList.innerHTML = items.map(item => `
+      <span class="${item.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-400 dark:text-zinc-500'}">
+        ${item.ok ? '✅' : '❌'} ${isEs ? item.labelEs : item.label}
+      </span>
+    `).join('');
+    if (allOk && capBanner) {
+      // All configured — collapse banner after 3s
+      setTimeout(() => {
+        capBanner.classList.add('hidden');
+        localStorage.setItem(BANNER_COLLAPSED_KEY, '1');
+      }, 3000);
+    }
+  } catch { /* silent */ }
+})();
+
+// ── Contextual hint after file drop (#274) ─────────────────────────────────
+let hintTimer: ReturnType<typeof setTimeout> | null = null;
+
+document.addEventListener('rastrum:files-dropped', (e: Event) => {
+  const ev = e as CustomEvent<{ files: File[] }>;
+  const files = ev.detail.files;
+  if (!files.length || !fileHint) return;
+
+  // Determine dominant file type
+  const hasAudio  = files.some(f => f.type.startsWith('audio/'));
+  const hasVideo  = files.some(f => f.type.startsWith('video/'));
+  const hasPhoto  = files.some(f => f.type.startsWith('image/'));
+
+  let hint = '';
+  if (hasAudio && hasPhoto) {
+    hint = isEs ? 'PlantNet identificará plantas. BirdNET identificará cantos de ave.' : 'PlantNet will identify plants. BirdNET will identify bird calls.';
+  } else if (hasAudio) {
+    hint = isEs ? 'BirdNET identificará el canto de ave. Necesitas el modelo descargado (~50 MB).' : 'BirdNET will identify the bird call. Model download required (~50 MB).';
+  } else if (hasVideo) {
+    hint = isEs ? 'Se extraerán fotogramas del video para identificación.' : 'Frames will be extracted from the video for identification.';
+  } else if (hasPhoto) {
+    hint = isEs ? 'PlantNet identificará plantas y hongos. Agrega una llave de Claude para animales.' : 'PlantNet will identify plants and fungi. Add a Claude key for animals.';
+  }
+
+  if (hint) {
+    fileHint.textContent = hint;
+    fileHint.classList.remove('hidden');
+    if (hintTimer) clearTimeout(hintTimer);
+    hintTimer = setTimeout(() => fileHint.classList.add('hidden'), 3000);
+  }
+}, { once: false });
+
+// ── Identify mode detection ────────────────────────────────────────────────
+const identifyMode = new URLSearchParams(window.location.search).get('mode') === 'identify';
+if (identifyMode) {
+  contributeNudge?.classList.remove('hidden');
+  skipSaveBtn?.classList.remove('hidden');
+}
 const idCard          = document.getElementById('obs2-id-card');
 const speciesEl       = document.getElementById('obs2-species');
 const commonEl        = document.getElementById('obs2-common');
@@ -359,8 +552,21 @@ async function runPipeline(state: PipelineState) {
   state.status = 'done';
   await savePipelineState(state).catch(() => {});
 
-  // Show post-process form
-  showPostForm();
+  // Check if all identify nodes were skipped (no runners) 
+  const noRunnersEl = document.getElementById('obs2-no-runners');
+  const identifyNodes = state.nodes.filter(n => n.kind === 'identify');
+  const allSkipped = identifyNodes.length > 0 && identifyNodes.every(n => n.state === 'skipped');
+
+  if (allSkipped) {
+    noRunnersEl?.classList.remove('hidden');
+    document.getElementById('obs2-no-runners-continue')?.addEventListener('click', () => {
+      noRunnersEl?.classList.add('hidden');
+      showPostForm();
+    }, { once: true });
+  } else {
+    noRunnersEl?.classList.add('hidden');
+    showPostForm();
+  }
 }
 
 // ── Node state helpers ─────────────────────────────────────────────────────
@@ -445,6 +651,37 @@ function showPostForm() {
     document.getElementById('obs2-id-manual')?.classList.toggle('hidden');
   });
 }
+
+// ── Identify mode: skip save ──────────────────────────────────────────────
+skipSaveBtn?.addEventListener('click', () => {
+  postForm?.classList.add('hidden');
+  identifyResult?.classList.remove('hidden');
+  if (bestResult && identifySpeciesCard) {
+    identifySpeciesCard.innerHTML = `
+      <p class="font-semibold italic text-zinc-900 dark:text-zinc-100 text-lg">${bestResult.scientific_name}</p>
+      ${bestResult.common_name_en ? `<p class="text-sm text-zinc-500 dark:text-zinc-400">${bestResult.common_name_en}</p>` : ''}
+      <p class="text-sm font-mono text-emerald-600 dark:text-emerald-400">${Math.round(bestResult.confidence * 100)}% confidence · ${bestResult.source}</p>
+    `;
+  }
+});
+
+contributeBtn?.addEventListener('click', () => {
+  identifyResult?.classList.add('hidden');
+  postForm?.classList.remove('hidden');
+  if (saveBtn) saveBtn.textContent = isEs ? 'Guardar en Rastrum' : 'Save to Rastrum';
+});
+
+identifyDoneBtn?.addEventListener('click', () => {
+  identifyResult?.classList.add('hidden');
+  successEl?.classList.remove('hidden');
+  // Hide the "View observation" link — nothing was saved
+  const linkEl = document.getElementById('obs2-success-link');
+  if (linkEl) linkEl.style.display = 'none';
+  const successTitle = successEl?.querySelector('p');
+  if (successTitle) successTitle.textContent = isEs ? '¡Identificación completa!' : 'Identification complete!';
+  const newBtn = document.getElementById('obs2-new-btn');
+  if (newBtn) newBtn.textContent = isEs ? 'Identificar otra' : 'Identify another';
+});
 
 // ── Skip location ──────────────────────────────────────────────────────────
 document.getElementById('obs2-skip-location')?.addEventListener('click', () => {
