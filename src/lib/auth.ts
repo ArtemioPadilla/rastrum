@@ -234,3 +234,46 @@ export async function signOut() {
 export async function signOutEverywhere() {
   return getSupabase().auth.signOut({ scope: 'global' });
 }
+
+// ───────────────────── Identity linking (#286) ──────────────────────────────
+
+export interface LinkedIdentity {
+  provider: string;
+  email: string | null;
+  created_at: string;
+  last_sign_in_at: string | null;
+}
+
+/** Returns the list of OAuth/magic-link identities linked to the current user. */
+export async function listMyIdentities(): Promise<LinkedIdentity[]> {
+  const supabase = getSupabase();
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error || !user) return [];
+  return (user.identities ?? []).map(i => ({
+    provider:        i.provider,
+    email:           (i.identity_data?.['email'] as string) ?? null,
+    created_at:      i.created_at ?? '',
+    last_sign_in_at: i.last_sign_in_at ?? null,
+  }));
+}
+
+/** Link an additional OAuth provider to the current account (OAuth redirect flow). */
+export async function linkIdentity(provider: 'google' | 'github'): Promise<void> {
+  const supabase = getSupabase();
+  const { error } = await supabase.auth.linkIdentity({ provider });
+  if (error) throw new Error(error.message);
+}
+
+/** Unlink an identity by provider name. Requires at least one identity to remain. */
+export async function unlinkIdentity(identityId: string): Promise<void> {
+  const supabase = getSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('not_authenticated');
+  if ((user.identities?.length ?? 0) <= 1) {
+    throw new Error('cannot_remove_last_identity');
+  }
+  const identity = user.identities?.find(i => i.id === identityId);
+  if (!identity) throw new Error('identity_not_linked');
+  const { error } = await supabase.auth.unlinkIdentity(identity);
+  if (error) throw new Error(error.message);
+}

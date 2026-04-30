@@ -298,3 +298,20 @@ SELECT cron.schedule('vertex_token_expiry_monitor', '*/10 * * * *',
             AND n.payload->>'credential_id' = c.id::text
             AND n.created_at > now() - interval '15 minutes'
        )$$);
+
+-- gc-orphan-media: weekly Sunday 04:30 UTC
+-- Env: CRON_SECRET must match the EF's x-cron-secret header
+SELECT cron.schedule(
+  'gc-orphan-media-weekly',
+  '30 4 * * 0',
+  $$
+    SELECT net.http_post(
+      url     := current_setting('app.supabase_url') || '/functions/v1/gc-orphan-media',
+      headers := jsonb_build_object(
+        'Content-Type',   'application/json',
+        'x-cron-secret',  current_setting('app.cron_secret')
+      ),
+      body    := '{"source":"cron"}'::jsonb
+    );
+  $$
+);

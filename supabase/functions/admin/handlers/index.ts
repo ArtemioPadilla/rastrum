@@ -1,4 +1,5 @@
 import { anomalyAcknowledgeHandler } from './anomaly-acknowledge.ts';
+import { userMergeHandler } from './user-merge.ts';
 import { appealAcceptHandler } from './appeal-accept.ts';
 import { appealRejectHandler } from './appeal-reject.ts';
 import { auditExportHandler } from './audit-export.ts';
@@ -73,4 +74,5 @@ export const HANDLERS: Record<string, ActionHandler<unknown>> = {
   'health.recompute': healthRecomputeHandler as unknown as ActionHandler<unknown>,
   'error.acknowledge': errorAcknowledgeHandler as unknown as ActionHandler<unknown>,
   'error.acknowledge_bulk': errorAcknowledgeBulkHandler as unknown as ActionHandler<unknown>,
+  'user.merge': userMergeHandler as unknown as ActionHandler<unknown>,
 };

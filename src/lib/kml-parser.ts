@@ -108,12 +108,14 @@ export function validateKML(text: string): KMLValidationResult {
  */
 export async function extractKMLFromKMZ(file: File | Blob): Promise<string | null> {
   // Dynamic import so JSZip is only loaded when a KMZ is actually uploaded
-  const JSZip = (await import('jszip')).default;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const JSZip = (await import('jszip')).default as any;
   const zip = await JSZip.loadAsync(file);
 
   // KMZ spec: primary document is doc.kml; fall back to first .kml file found
   const docKml = zip.file('doc.kml');
-  const kmlFile = docKml ?? Object.values(zip.files).find(f => f.name.endsWith('.kml') && !f.dir);
+  type ZipObject = { name: string; dir: boolean; async(type: 'string'): Promise<string> };
+  const kmlFile = (docKml as ZipObject | null) ?? (Object.values(zip.files) as ZipObject[]).find(f => f.name.endsWith('.kml') && !f.dir) ?? null;
 
   if (!kmlFile) return null;
   return kmlFile.async('string');

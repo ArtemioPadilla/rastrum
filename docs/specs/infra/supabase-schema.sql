@@ -6379,3 +6379,166 @@ DROP POLICY IF EXISTS watchlists_admin_read ON public.watchlists;
 CREATE POLICY watchlists_admin_read ON public.watchlists
   FOR SELECT TO authenticated
   USING (public.has_role(auth.uid(), 'admin'));
+
+-- ── gc_orphan_media_log (#285) ───────────────────────────────────────────────
+-- Audit log for the gc-orphan-media nightly cron (supabase/functions/gc-orphan-media).
+
+CREATE TABLE IF NOT EXISTS public.gc_orphan_media_log (
+  id           uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  run_at       timestamptz NOT NULL DEFAULT now(),
+  prefix       text NOT NULL,
+  scanned      int  NOT NULL,
+  deleted      int  NOT NULL,
+  bytes_freed  bigint NOT NULL,
+  errors       int  NOT NULL DEFAULT 0,
+  duration_ms  int  NOT NULL,
+  notes        text
+);
+
+CREATE INDEX IF NOT EXISTS idx_gc_orphan_media_log_run_at
+  ON public.gc_orphan_media_log(run_at DESC);
+
+ALTER TABLE public.gc_orphan_media_log ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS gc_orphan_media_log_admin_read ON public.gc_orphan_media_log;
+CREATE POLICY gc_orphan_media_log_admin_read ON public.gc_orphan_media_log
+  FOR SELECT TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'));
+
+GRANT SELECT, INSERT ON public.gc_orphan_media_log TO service_role;
+
+-- ── admin_user_detail RPC (#284) ────────────────────────────────────────────
+-- Returns email + identities for a user. Callable by admin/moderator only.
+-- Reads auth.users + auth.identities which require SECURITY DEFINER.
+
+CREATE OR REPLACE FUNCTION public.admin_user_detail(p_user_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth
+AS $$
+DECLARE
+  v_user        auth.users;
+  v_identities  jsonb;
+BEGIN
+  -- Role check
+  IF NOT (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'moderator')) THEN
+    RAISE EXCEPTION 'permission_denied';
+  END IF;
+
+  SELECT * INTO v_user FROM auth.users WHERE id = p_user_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'user_not_found';
+  END IF;
+
+  SELECT jsonb_agg(jsonb_build_object(
+    'id',              i.id,
+    'provider',        i.provider,
+    'email',           i.identity_data->>'email',
+    'created_at',      i.created_at,
+    'last_sign_in_at', i.last_sign_in_at
+  )) INTO v_identities
+  FROM auth.identities i
+  WHERE i.user_id = p_user_id;
+
+  RETURN jsonb_build_object(
+    'id',               v_user.id,
+    'email',            v_user.email,
+    'email_confirmed',  v_user.email_confirmed_at IS NOT NULL,
+    'confirmed_at',     v_user.email_confirmed_at,
+    'last_sign_in_at',  v_user.last_sign_in_at,
+    'created_at',       v_user.created_at,
+    'identities',       COALESCE(v_identities, '[]'::jsonb)
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.admin_user_detail(uuid) TO authenticated;
+
+-- ── merge_user_accounts RPC (#284) ──────────────────────────────────────────
+-- Rewrites all FK references from discard_user to keep_user in a single
+-- transaction. Called only from the user-merge admin handler.
+-- SECURITY DEFINER so it can write to auth.users (soft-delete discard).
+
+CREATE OR REPLACE FUNCTION public.merge_user_accounts(
+  p_keep    uuid,
+  p_discard uuid,
+  p_actor   uuid,
+  p_reason  text
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth
+AS $$
+DECLARE
+  v_summary jsonb := '{}'::jsonb;
+  v_count   int;
+BEGIN
+  IF p_keep = p_discard THEN
+    RAISE EXCEPTION 'keep and discard must differ';
+  END IF;
+
+  -- Verify both users exist
+  IF NOT EXISTS (SELECT 1 FROM public.users WHERE id = p_keep) THEN
+    RAISE EXCEPTION 'keep user not found: %', p_keep;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.users WHERE id = p_discard) THEN
+    RAISE EXCEPTION 'discard user not found: %', p_discard;
+  END IF;
+
+  -- Rewrite FK references table by table
+  UPDATE public.observations    SET observer_id  = p_keep WHERE observer_id  = p_discard;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  v_summary := v_summary || jsonb_build_object('observations', v_count);
+
+  UPDATE public.identifications SET validated_by = p_keep WHERE validated_by = p_discard;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  v_summary := v_summary || jsonb_build_object('identifications_validated', v_count);
+
+  UPDATE public.comments        SET user_id      = p_keep WHERE user_id      = p_discard;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  v_summary := v_summary || jsonb_build_object('comments', v_count);
+
+  UPDATE public.follows         SET follower_id  = p_keep WHERE follower_id  = p_discard;
+  UPDATE public.follows         SET followee_id  = p_keep WHERE followee_id  = p_discard;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  v_summary := v_summary || jsonb_build_object('follows', v_count);
+
+  UPDATE public.reactions       SET user_id      = p_keep WHERE user_id      = p_discard;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  v_summary := v_summary || jsonb_build_object('reactions', v_count);
+
+  UPDATE public.user_badges     SET user_id      = p_keep WHERE user_id      = p_discard
+    ON CONFLICT (user_id, badge_key) DO NOTHING;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  v_summary := v_summary || jsonb_build_object('badges', v_count);
+
+  UPDATE public.watchlist_entries SET user_id    = p_keep WHERE user_id      = p_discard;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  v_summary := v_summary || jsonb_build_object('watchlist', v_count);
+
+  UPDATE public.projects        SET owner_id     = p_keep WHERE owner_id     = p_discard;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  v_summary := v_summary || jsonb_build_object('projects', v_count);
+
+  -- Soft-delete the discarded account
+  UPDATE public.users SET
+    username     = 'deleted_merged_' || left(p_discard::text, 8),
+    display_name = '[Merged account]',
+    deleted_at   = now()
+  WHERE id = p_discard;
+
+  -- Audit log
+  INSERT INTO public.admin_audit (actor_id, op, payload, reason)
+  VALUES (p_actor, 'user.merge', jsonb_build_object(
+    'keep_user_id',    p_keep,
+    'discard_user_id', p_discard,
+    'summary',         v_summary
+  ), p_reason);
+
+  RETURN v_summary;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.merge_user_accounts(uuid, uuid, uuid, text) TO service_role;

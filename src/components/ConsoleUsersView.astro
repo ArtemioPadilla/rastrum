@@ -43,6 +43,12 @@ const tr = t(lang);
         <div id="detail-username" class="text-sm text-zinc-500"></div>
       </div>
 
+      <!-- Email + identities (#284) -->
+      <div id="detail-identity-section" class="hidden">
+        <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-2">Email &amp; Sign-in Methods</h3>
+        <div id="detail-identities" class="space-y-1 text-xs text-zinc-600 dark:text-zinc-400"></div>
+      </div>
+
       <div>
         <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-2">{tr.console.users_roles_heading}</h3>
         <div id="detail-roles" class="flex flex-wrap gap-2"></div>
@@ -215,6 +221,7 @@ const tr = t(lang);
     unameEl.textContent = u.username ? `@${u.username}` : '';
     renderRoleChips(userId);
     loadActivity(userId);
+    loadIdentities(userId);
   }
 
   function renderRoleChips(userId: string) {
@@ -265,6 +272,43 @@ const tr = t(lang);
       console.warn('console: loadActivity failed', err);
       const msg = dl.dataset.failedMsg ?? 'Could not load activity stats.';
       dl.innerHTML = `<dt class="text-zinc-500 col-span-2 text-sm">${msg}</dt>`;
+    }
+  }
+
+  // Load email + identities via admin_user_detail RPC (#284)
+  async function loadIdentities(userId: string) {
+    const section = document.getElementById('detail-identity-section');
+    const container = document.getElementById('detail-identities');
+    if (!section || !container) return;
+    section.classList.remove('hidden');
+    container.innerHTML = '<span class="italic text-zinc-400">Loading…</span>';
+    try {
+      const { data, error } = await supabase.rpc('admin_user_detail', { p_user_id: userId });
+      if (error) throw error;
+      const detail = data as {
+        email: string | null;
+        email_confirmed: boolean;
+        last_sign_in_at: string | null;
+        identities: Array<{ id: string; provider: string; email: string | null; created_at: string }>;
+      };
+      const formatDate = (d: string | null) => d ? new Date(d).toLocaleDateString() : '—';
+      container.innerHTML = `
+        <div class="mb-1">
+          <span class="font-medium text-zinc-700 dark:text-zinc-300">Email:</span>
+          ${detail.email ?? '—'}
+          ${detail.email_confirmed ? '<span class="text-emerald-500 ml-1">✓ confirmed</span>' : '<span class="text-amber-500 ml-1">unconfirmed</span>'}
+        </div>
+        ${(detail.identities ?? []).map(i => `
+          <div class="flex items-center gap-2 py-0.5">
+            <span class="w-16 shrink-0 font-medium capitalize">${i.provider}</span>
+            <span class="truncate">${i.email ?? ''}  <span class="text-zinc-400">(added ${formatDate(i.created_at)})</span></span>
+          </div>
+        `).join('')}
+        <div class="mt-1 text-zinc-400">Last sign-in: ${formatDate(detail.last_sign_in_at)}</div>
+      `;
+    } catch (err) {
+      container.innerHTML = '<span class="text-red-400 text-xs">Could not load identity info.</span>';
+      console.warn('console: loadIdentities failed', err);
     }
   }
 
