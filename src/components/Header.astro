@@ -103,6 +103,7 @@ const docColumns = [
       { key: 'vision',       label: tr.nav.docs_groups.product_items.vision },
       { key: 'features',     label: tr.nav.docs_groups.product_items.features },
       { key: 'architecture', label: tr.nav.docs_groups.product_items.architecture },
+      { key: 'mcp',          label: tr.nav.docs_groups.product_items.mcp },
     ],
   },
   {
@@ -140,7 +141,7 @@ const docColumns = [
     <span class="hidden sm:block w-px h-6 bg-zinc-200 dark:bg-zinc-800"></span>
 
     <!-- Verbs (left) -->
-    <nav class="hidden sm:flex items-center gap-5 text-sm min-w-0 overflow-hidden">
+    <nav class="hidden sm:flex items-center gap-5 text-sm min-w-0">
       <a href={getLocalizedPath(lang, routes.observe[locale] + '/')}
          data-tour="observe-nav"
          class:list={[
