@@ -117,7 +117,7 @@ export const routes: Record<string, Record<Locale, string>> = {
 export const docPages = [
   'vision', 'features', 'roadmap', 'tasks', 'market',
   'architecture', 'indigenous', 'funding', 'contribute',
-  'faq', 'privacy', 'terms', 'console', 'sponsorships',
+  'faq', 'privacy', 'terms', 'console', 'sponsorships', 'mcp',
 ] as const;
 
 export type DocPage = (typeof docPages)[number];
