@@ -17,7 +17,9 @@
  *   get_platform_status   (scope: status)   — aggregate public metrics
  *   get_admin_metrics     (scope: admin)    — full metrics (requires admin role)
  *
- * Configure in your agent's MCP settings, e.g. for Claude Desktop:
+ * Configure in your agent's MCP settings:
+ *
+ * Claude Desktop / Cursor / Copilot (Streamable HTTP — MCP spec 2025-03-26):
  *   {
  *     "mcpServers": {
  *       "rastrum": {
@@ -28,6 +30,15 @@
  *     }
  *   }
  *
+ * OpenClaw / clients that require SSE transport (GET-based keep-alive):
+ *   {
+ *     "url": "https://<project-ref>.supabase.co/functions/v1/mcp",
+ *     "headers": { "Authorization": "Bearer rst_..." }
+ *   }
+ *   This endpoint also accepts GET requests and responds with an SSE stream
+ *   (keep-alive ping every 25 s) so that SSE-only MCP clients can connect.
+ *   All JSON-RPC calls are still sent as POST.
+ *
  * Tokens are issued at https://rastrum.org/profile/tokens.
  */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
@@ -35,7 +46,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, content-type, mcp-session-id',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
 
 const SERVER_INFO = {
@@ -363,8 +374,35 @@ function json(body: unknown, status = 200): Response {
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+
+  // ── SSE keep-alive for clients that require GET-based SSE transport ──────
+  // OpenClaw and other SSE-only MCP clients open a long-lived GET connection
+  // to confirm the server is alive before sending JSON-RPC via POST.
+  // We satisfy that contract by streaming a ping comment every 25 s and
+  // closing after 55 s (just under Supabase Edge Function's 60 s wall time).
+  if (req.method === 'GET') {
+    const sseHeaders = {
+      ...corsHeaders,
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    };
+    const { readable, writable } = new TransformStream();
+    const writer = writable.getWriter();
+    const enc = new TextEncoder();
+    // Send an immediate ping so the client sees headers right away.
+    writer.write(enc.encode(': ping\n\n'));
+    // Keep the stream alive with periodic pings, then close cleanly.
+    const interval = setInterval(() => writer.write(enc.encode(': ping\n\n')), 25_000);
+    setTimeout(() => {
+      clearInterval(interval);
+      writer.close();
+    }, 55_000);
+    return new Response(readable, { headers: sseHeaders });
+  }
+
   if (req.method !== 'POST') {
-    return rpcError(null, -32600, 'Only POST is supported', 405);
+    return rpcError(null, -32600, 'Method not allowed. Use POST for JSON-RPC or GET for SSE.', 405);
   }
 
   const supabase = createClient(
