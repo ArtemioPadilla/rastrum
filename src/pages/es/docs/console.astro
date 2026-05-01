@@ -1,21 +1,142 @@
 ---
 import DocLayout from '../../../layouts/DocLayout.astro';
+import { t } from '../../../i18n/utils';
+
 const lang = 'es';
+const tr = t(lang);
+
+const githubBase = 'https://github.com/ArtemioPadilla/rastrum/blob/main';
 ---
-<DocLayout title="Consola" lang={lang} section="console">
 
-# Consola
+<DocLayout title={tr.docs.sections.console} lang={lang} section="console" editPath="src/pages/es/docs/console.astro">
+  <article class="space-y-8">
+    <div>
+      <h1 class="text-3xl font-bold tracking-tight mb-4">{tr.docs.sections.console}</h1>
+      <p class="text-lg text-zinc-600 dark:text-zinc-400 max-w-3xl">{tr.docs.descriptions.console}</p>
+      <p class="mt-4 text-sm text-zinc-500 dark:text-zinc-500">
+        Si no ves la píldora <span class="font-mono px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800/40 text-slate-600 dark:text-slate-300">Consola</span> en el encabezado, esta página todavía no aplica para ti — cada superficie privilegiada está protegida por una concesión de rol explícita.
+      </p>
+    </div>
 
-La **Consola** es una superficie de acciones privilegiadas para usuarios con rol de admin, moderador o experto. Si no ves la píldora "Consola" en el encabezado, esta página no aplica para ti.
+    <!-- Who it's for -->
+    <section>
+      <h2 id="roles" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+        <a href="#roles" class="text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Para quién es
+      </h2>
+      <div class="grid sm:grid-cols-3 gap-4 not-prose">
+        <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <p class="font-semibold text-zinc-900 dark:text-zinc-100 mb-2">Admins</p>
+          <p class="text-sm text-zinc-600 dark:text-zinc-400">Gestionan roles de usuario, revisan credenciales de investigador, monitorean fallos de sincronización y cuotas de API, y auditan cada acción privilegiada.</p>
+        </div>
+        <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <p class="font-semibold text-zinc-900 dark:text-zinc-100 mb-2">Moderadores</p>
+          <p class="text-sm text-zinc-600 dark:text-zinc-400">Atienden contenido reportado, gestionan la cola de apelaciones y aplican suspensiones suaves con bitácora auditable.</p>
+        </div>
+        <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <p class="font-semibold text-zinc-900 dark:text-zinc-100 mb-2">Expertos</p>
+          <p class="text-sm text-zinc-600 dark:text-zinc-400">Revisan la cola de validación filtrada por sus taxa y monitorean su puntaje de experiencia por taxón.</p>
+        </div>
+      </div>
+    </section>
 
-## Para qué sirve
+    <!-- What's inside -->
+    <section>
+      <h2 id="surface" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+        <a href="#surface" class="text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Qué incluye
+      </h2>
+      <p class="text-zinc-700 dark:text-zinc-300 mb-4">
+        La consola vive en <span class="font-mono text-sm">/consola/</span> y agrupa 36+ pestañas por rol. La barra lateral y las píldoras son proyecciones de una sola fuente <span class="font-mono text-sm">console-tabs.ts</span>: agregar una nueva superficie es una entrada, no una ruta hecha a mano.
+      </p>
+      <div class="space-y-3 not-prose">
+        <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <p class="font-semibold text-zinc-900 dark:text-zinc-100 mb-2">Pestañas de admin</p>
+          <p class="text-sm text-zinc-600 dark:text-zinc-400">Resumen, Usuarios, Roles, Credenciales, Bitácora, Cuotas de API, Fallos de sync, Ejecuciones de cron, Feature flags, Bans, Karma, Anomalías, Forense, Errores, Salud, Webhooks, Propuestas, más siete navegadores de entidades de solo lectura (Identificaciones, Notificaciones, Medios, Seguimientos, Listas, Proyectos, Cambios de taxón).</p>
+        </div>
+        <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <p class="font-semibold text-zinc-900 dark:text-zinc-100 mb-2">Pestañas de moderador</p>
+          <p class="text-sm text-zinc-600 dark:text-zinc-400">Resumen, Cola de reportes, Triaje de comentarios, Apelaciones.</p>
+        </div>
+        <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <p class="font-semibold text-zinc-900 dark:text-zinc-100 mb-2">Pestañas de experto</p>
+          <p class="text-sm text-zinc-600 dark:text-zinc-400">Resumen, Puntaje de experiencia, Cola de validación, Solicitar insignia de experto.</p>
+        </div>
+      </div>
+    </section>
 
-- **Admins** gestionan roles de usuario, revisan credenciales de investigador, monitorean fallos de sync y cuotas de API, y auditan cada acción privilegiada.
-- **Moderadores** atienden contenido reportado y gestionan suspensiones (PR3).
-- **Expertos** revisan la cola de validación filtrada por sus taxa y miran su puntaje de experiencia por taxón (PR2).
+    <!-- How privileges work -->
+    <section>
+      <h2 id="privileges" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+        <a href="#privileges" class="text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Cómo funcionan los privilegios
+      </h2>
+      <div class="space-y-3 text-zinc-700 dark:text-zinc-300">
+        <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <p class="font-semibold text-zinc-900 dark:text-zinc-100 mb-1">Despachador del lado del servidor</p>
+          <p class="text-sm text-zinc-600 dark:text-zinc-400">Cada escritura privilegiada pasa por la Edge Function <span class="font-mono">supabase/functions/admin/</span>. El despachador reverifica el JWT, exige el rol requerido, ejecuta el handler e inserta un registro <span class="font-mono">admin_audit</span> en la misma transacción. Los navegadores nunca escriben directo a las tablas privilegiadas.</p>
+        </div>
+        <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <p class="font-semibold text-zinc-900 dark:text-zinc-100 mb-1">Predicado RLS: <span class="font-mono">has_role(uid, role)</span></p>
+          <p class="text-sm text-zinc-600 dark:text-zinc-400">Todas las filas con privilegio usan <span class="font-mono">has_role()</span>, no flags desnormalizados como <span class="font-mono">users.is_expert</span>. Los roles también pueden tener vencimiento (<span class="font-mono">expires_at</span>) y revocarse automáticamente cada noche.</p>
+        </div>
+        <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <p class="font-semibold text-zinc-900 dark:text-zinc-100 mb-1">Regla de dos personas</p>
+          <p class="text-sm text-zinc-600 dark:text-zinc-400">Las acciones irreversibles pueden requerir aprobación de un segundo admin a través de <span class="font-mono">admin_action_proposals</span>. El despachador hace cumplir la regla cuando el feature flag está activo; las propuestas pendientes vencen cada hora.</p>
+        </div>
+      </div>
+    </section>
 
-## Cómo está construida
+    <!-- Observability -->
+    <section>
+      <h2 id="observability" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+        <a href="#observability" class="text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Observabilidad y forense
+      </h2>
+      <div class="grid sm:grid-cols-2 gap-4 not-prose">
+        <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <p class="font-semibold text-zinc-900 dark:text-zinc-100 mb-2">Anomalías</p>
+          <p class="text-sm text-zinc-600 dark:text-zinc-400">El cron horario <span class="font-mono">detect_admin_anomalies()</span> marca acciones fuera de horario (zona horaria por admin), concesiones masivas y patrones inusuales de escritura.</p>
+        </div>
+        <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <p class="font-semibold text-zinc-900 dark:text-zinc-100 mb-2">Resumen de salud</p>
+          <p class="text-sm text-zinc-600 dark:text-zinc-400">El snapshot semanal <span class="font-mono">compute_admin_health_digest()</span> alimenta la tarjeta principal en <span class="font-mono">/consola/health/</span> con píldoras direccionales Δ y sparklines de 12 semanas.</p>
+        </div>
+        <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <p class="font-semibold text-zinc-900 dark:text-zinc-100 mb-2">Errores de funciones</p>
+          <p class="text-sm text-zinc-600 dark:text-zinc-400">Sumidero estructurado <span class="font-mono">function_errors</span> conectado al despachador. <span class="font-mono">/consola/errors/</span> ofrece píldoras coloreadas por severidad, filtros por URL y reconocimiento individual o en lote.</p>
+        </div>
+        <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <p class="font-semibold text-zinc-900 dark:text-zinc-100 mb-2">Webhooks</p>
+          <p class="text-sm text-zinc-600 dark:text-zinc-400">Firmado HMAC-SHA256 saliente, vista detallada de entregas por webhook, replay con un clic y protección contra reenvío basada en nonce.</p>
+        </div>
+      </div>
+    </section>
 
-Consulta [Módulo 24](https://github.com/ArtemioPadilla/rastrum/blob/main/docs/specs/modules/24-admin-console.md) para la referencia de implementación, y el [doc de diseño](https://github.com/ArtemioPadilla/rastrum/blob/main/docs/superpowers/specs/2026-04-27-admin-console-design.md) para el rationale.
-
+    <!-- References -->
+    <section>
+      <h2 id="references" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+        <a href="#references" class="text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Referencias
+      </h2>
+      <div class="space-y-2 not-prose">
+        <div class="p-3 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <p class="text-sm"><a href={`${githubBase}/docs/specs/modules/24-admin-console.md`} target="_blank" rel="noopener" class="font-medium text-emerald-600 dark:text-emerald-400 hover:underline">Módulo 24 — Consola admin</a> <span class="text-zinc-500 dark:text-zinc-500">— referencia de implementación</span></p>
+        </div>
+        <div class="p-3 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <p class="text-sm"><a href={`${githubBase}/docs/runbooks/admin-bootstrap.md`} target="_blank" rel="noopener" class="font-medium text-emerald-600 dark:text-emerald-400 hover:underline">Runbook — Bootstrap de admin</a> <span class="text-zinc-500 dark:text-zinc-500">— primer admin / concesiones de rol</span></p>
+        </div>
+        <div class="p-3 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <p class="text-sm"><a href={`${githubBase}/docs/runbooks/role-model.md`} target="_blank" rel="noopener" class="font-medium text-emerald-600 dark:text-emerald-400 hover:underline">Runbook — Modelo de roles</a> <span class="text-zinc-500 dark:text-zinc-500">— concesiones admin / moderador / experto</span></p>
+        </div>
+        <div class="p-3 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <p class="text-sm"><a href={`${githubBase}/docs/runbooks/admin-audit.md`} target="_blank" rel="noopener" class="font-medium text-emerald-600 dark:text-emerald-400 hover:underline">Runbook — Bitácora de auditoría</a> <span class="text-zinc-500 dark:text-zinc-500">— consultando admin_audit</span></p>
+        </div>
+        <div class="p-3 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <p class="text-sm"><a href={`${githubBase}/docs/runbooks/admin-ops.md`} target="_blank" rel="noopener" class="font-medium text-emerald-600 dark:text-emerald-400 hover:underline">Runbook — Operación por acción</a> <span class="text-zinc-500 dark:text-zinc-500">— qué hace cada pestaña en el día a día</span></p>
+        </div>
+        <div class="p-3 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <p class="text-sm"><a href={`${githubBase}/docs/runbooks/admin-entity-browsers.md`} target="_blank" rel="noopener" class="font-medium text-emerald-600 dark:text-emerald-400 hover:underline">Runbook — Navegadores de entidades</a> <span class="text-zinc-500 dark:text-zinc-500">— plantilla paginada compartida</span></p>
+        </div>
+        <div class="p-3 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <p class="text-sm"><a href={`${githubBase}/docs/superpowers/specs/2026-04-27-admin-console-design.md`} target="_blank" rel="noopener" class="font-medium text-emerald-600 dark:text-emerald-400 hover:underline">Doc de diseño — Consola admin</a> <span class="text-zinc-500 dark:text-zinc-500">— racional e historia</span></p>
+        </div>
+      </div>
+    </section>
+  </article>
 </DocLayout>

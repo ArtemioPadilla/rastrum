@@ -1,114 +1,191 @@
 ---
 import DocLayout from '../../../layouts/DocLayout.astro';
+import { t } from '../../../i18n/utils';
+
 const lang = 'en';
----
-<DocLayout title="Contributing" lang={lang} section="contribute">
-
-# 🤝 Contributing
-
-Rastrum is open source and community-driven. There are many ways to contribute beyond code.
-
-## Ways to Contribute
-
-### 🌿 Code
-- **Frontend (SvelteKit 2):** UI components, offline sync, map interactions
-- **Backend (Supabase Edge Functions):** AI pipeline routing, export pipelines
-- **On-device ML (ONNX):** Model quantization, regional species packs
-- **PWA/Capacitor:** iOS/Android wrapper improvements
-
-### 📸 Data & Species Curation
-- Submit field observations from Mexico / LATAM
-- Validate AI identifications as an expert
-- Contribute regional species checklists (Darwin Core format)
-- Add morphometric fields for ecological evidence (tracks, scat)
-
-### 🌐 Translations
-- Spanish ↔ English (core UI)
-- Zapoteco, Mixteco, Náhuatl, Maya, Tsotsil/Tseltal (priority)
-- Partner with INALI, UNAM linguistics, or CIESAS for Indigenous languages
-
-### 🔬 Expert Validation
-- Apply for an expert badge in your taxonomic group (ornithology, botany, mycology, herpetology, entomology...)
-- Review the expert identification queue
-- Contribute regional species keys and disambiguation guides
-
-### 📍 PITs & Trails
-- Install QR anchors in your local trails or protected areas
-- Create biodiversity trail routes with waypoints
-- Document local species checklists per trail segment
-
+const tr = t(lang);
 ---
 
-## Development Setup
+<DocLayout title={tr.docs.sections.contribute} lang={lang} section="contribute" editPath="src/pages/en/docs/contribute.astro">
+  <article class="space-y-8">
+    <div>
+      <h1 class="text-3xl font-bold tracking-tight mb-4">{tr.docs.sections.contribute}</h1>
+      <p class="text-lg text-zinc-600 dark:text-zinc-400 max-w-3xl">{tr.docs.descriptions.contribute}</p>
+      <p class="mt-4 text-sm text-zinc-500 dark:text-zinc-500">
+        Rastrum is solo-developed but open-source and community-driven. Code, observations, expert validation, translations, and docs are all welcome — pick the lane that fits.
+      </p>
+    </div>
 
-```bash
-git clone https://github.com/ArtemioPadilla/rastrum.git
+    <!-- Ways to contribute -->
+    <section>
+      <h2 id="ways" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+        <a href="#ways" class="text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Ways to contribute
+      </h2>
+      <div class="space-y-4 not-prose">
+        <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <p class="font-semibold text-zinc-900 dark:text-zinc-100 mb-2">Code</p>
+          <ul class="text-sm text-zinc-600 dark:text-zinc-400 space-y-1 list-disc pl-5">
+            <li><span class="font-medium text-zinc-700 dark:text-zinc-300">Frontend (Astro + Tailwind):</span> components, identifier UX, offline outbox, MapLibre interactions</li>
+            <li><span class="font-medium text-zinc-700 dark:text-zinc-300">Backend (Supabase Edge Functions, Deno):</span> identifier cascade, enrichment, exports, MCP server, admin dispatcher</li>
+            <li><span class="font-medium text-zinc-700 dark:text-zinc-300">On-device ML:</span> WebLLM tuning, ONNX model packaging, regional species packs</li>
+            <li><span class="font-medium text-zinc-700 dark:text-zinc-300">CLI batch import (Node 20+):</span> camera-trap memory cards, EXIF parity with the PWA</li>
+            <li><span class="font-medium text-zinc-700 dark:text-zinc-300">PWA / Capacitor:</span> service worker, install flow, iOS/Android shell improvements</li>
+          </ul>
+        </div>
+        <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <p class="font-semibold text-zinc-900 dark:text-zinc-100 mb-2">Data &amp; species curation</p>
+          <ul class="text-sm text-zinc-600 dark:text-zinc-400 space-y-1 list-disc pl-5">
+            <li>Submit field observations from Mexico / LATAM</li>
+            <li>Validate AI identifications as a community member or expert</li>
+            <li>Contribute regional species checklists (Darwin Core / SNIB / CONANP presets)</li>
+            <li>Add morphometric fields for ecological evidence (tracks, scat, nests, calls)</li>
+          </ul>
+        </div>
+        <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <p class="font-semibold text-zinc-900 dark:text-zinc-100 mb-2">Translations</p>
+          <ul class="text-sm text-zinc-600 dark:text-zinc-400 space-y-1 list-disc pl-5">
+            <li>Spanish ↔ English parity in <span class="font-mono">{'src/i18n/{en,es}.json'}</span></li>
+            <li>Zapoteco, Mixteco, Náhuatl, Maya, Tsotsil/Tseltal (priority — pilot pending)</li>
+            <li>Partner with INALI, UNAM linguistics, or CIESAS for Indigenous languages</li>
+          </ul>
+        </div>
+        <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <p class="font-semibold text-zinc-900 dark:text-zinc-100 mb-2">Expert validation</p>
+          <ul class="text-sm text-zinc-600 dark:text-zinc-400 space-y-1 list-disc pl-5">
+            <li>Apply for an expert badge in your taxonomic group (ornithology, botany, mycology, herpetology, entomology…)</li>
+            <li>Review the validation queue scoped to your taxa</li>
+            <li>Contribute regional disambiguation guides and identification keys</li>
+          </ul>
+        </div>
+        <div class="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <p class="font-semibold text-zinc-900 dark:text-zinc-100 mb-2">Docs &amp; runbooks</p>
+          <ul class="text-sm text-zinc-600 dark:text-zinc-400 space-y-1 list-disc pl-5">
+            <li>Module specs under <span class="font-mono">docs/specs/modules/</span></li>
+            <li>Operator runbooks under <span class="font-mono">docs/runbooks/</span></li>
+            <li>Doc pages under <span class="font-mono">{'src/pages/{en,es}/docs/'}</span> — must stay paired EN/ES</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- Development setup -->
+    <section>
+      <h2 id="setup" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+        <a href="#setup" class="text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Development setup
+      </h2>
+      <p class="text-zinc-700 dark:text-zinc-300 mb-3">
+        The repo is solo-developed on macOS but the toolchain runs anywhere with Node 20+ and a Postgres-capable Supabase project. <span class="font-mono">make help</span> lists every workflow.
+      </p>
+      <pre class="not-prose p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 text-sm overflow-x-auto"><code class="font-mono text-zinc-800 dark:text-zinc-200">git clone https://github.com/ArtemioPadilla/rastrum.git
 cd rastrum
-npm install
-npm run dev        # Astro dev server (current content site)
-```
-
-Environment variables needed (copy `.env.example`):
-```
-PUBLIC_SUPABASE_URL=
+make install        <span class="text-zinc-500"># npm ci</span>
+make dev            <span class="text-zinc-500"># astro dev — http://localhost:4321</span>
+make test           <span class="text-zinc-500"># vitest run</span>
+make typecheck      <span class="text-zinc-500"># tsc --noEmit</span>
+make build          <span class="text-zinc-500"># static build into dist/</span></code></pre>
+      <p class="text-zinc-700 dark:text-zinc-300 mt-4 mb-3">Copy <span class="font-mono">.env.example</span> to <span class="font-mono">.env.local</span> and fill the keys you need:</p>
+      <pre class="not-prose p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 text-sm overflow-x-auto"><code class="font-mono text-zinc-800 dark:text-zinc-200">PUBLIC_SUPABASE_URL=
 PUBLIC_SUPABASE_ANON_KEY=
-PLANTNET_API_KEY=
-```
+PLANTNET_API_KEY=        <span class="text-zinc-500"># optional, for the PlantNet identifier</span></code></pre>
+    </section>
 
----
+    <!-- Process -->
+    <section>
+      <h2 id="process" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+        <a href="#process" class="text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Contribution process
+      </h2>
+      <ol class="space-y-3 not-prose">
+        <li class="flex items-start gap-3">
+          <span class="shrink-0 mt-0.5 w-6 h-6 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-semibold flex items-center justify-center">1</span>
+          <div>
+            <p class="font-medium text-zinc-900 dark:text-zinc-100">Fork &amp; branch</p>
+            <p class="text-sm text-zinc-600 dark:text-zinc-400">Branch off <span class="font-mono">main</span>; one logical change per PR.</p>
+          </div>
+        </li>
+        <li class="flex items-start gap-3">
+          <span class="shrink-0 mt-0.5 w-6 h-6 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-semibold flex items-center justify-center">2</span>
+          <div>
+            <p class="font-medium text-zinc-900 dark:text-zinc-100">Sign your commits (DCO)</p>
+            <p class="text-sm text-zinc-600 dark:text-zinc-400">Use <span class="font-mono">git commit -s</span>. We use the Developer Certificate of Origin, not a CLA — no paperwork.</p>
+          </div>
+        </li>
+        <li class="flex items-start gap-3">
+          <span class="shrink-0 mt-0.5 w-6 h-6 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-semibold flex items-center justify-center">3</span>
+          <div>
+            <p class="font-medium text-zinc-900 dark:text-zinc-100">Pre-PR checks pass</p>
+            <p class="text-sm text-zinc-600 dark:text-zinc-400"><span class="font-mono">make typecheck</span> &amp; <span class="font-mono">make test</span> &amp; <span class="font-mono">make build</span> — all green, EN/ES pages paired.</p>
+          </div>
+        </li>
+        <li class="flex items-start gap-3">
+          <span class="shrink-0 mt-0.5 w-6 h-6 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-semibold flex items-center justify-center">4</span>
+          <div>
+            <p class="font-medium text-zinc-900 dark:text-zinc-100">Open the PR</p>
+            <p class="text-sm text-zinc-600 dark:text-zinc-400">Clear description, linked issue (if any), screenshots for UI work. CI must be green before review.</p>
+          </div>
+        </li>
+        <li class="flex items-start gap-3">
+          <span class="shrink-0 mt-0.5 w-6 h-6 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-semibold flex items-center justify-center">5</span>
+          <div>
+            <p class="font-medium text-zinc-900 dark:text-zinc-100">Review</p>
+            <p class="text-sm text-zinc-600 dark:text-zinc-400">Aim for a maintainer reply within 7 days. Schema changes hit an extra pre-merge gate that applies the schema twice in a Postgres+PostGIS service container.</p>
+          </div>
+        </li>
+      </ol>
+      <div class="mt-4 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30 not-prose">
+        <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100 mb-1">DCO sign-off</p>
+        <p class="text-sm text-zinc-600 dark:text-zinc-400">Append <span class="font-mono">Signed-off-by: Your Name &lt;your_email&gt;</span> to every commit message (<span class="font-mono">git commit -s</span> does this for you). By signing, you certify you wrote the code or have the right to submit it under the project's license.</p>
+      </div>
+    </section>
 
-## Contribution Process
+    <!-- License -->
+    <section>
+      <h2 id="license" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+        <a href="#license" class="text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors">#</a> License
+      </h2>
+      <div class="not-prose overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-zinc-200 dark:border-zinc-800">
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Component</th>
+              <th class="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">License</th>
+            </tr>
+          </thead>
+          <tbody class="text-zinc-700 dark:text-zinc-300">
+            <tr class="border-b border-zinc-100 dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-950/50">
+              <td class="py-2 px-3 font-medium text-zinc-900 dark:text-zinc-100">Client code (PWA, CLI, components)</td>
+              <td class="py-2 px-3 font-mono">MIT</td>
+            </tr>
+            <tr class="border-b border-zinc-100 dark:border-zinc-900">
+              <td class="py-2 px-3 font-medium text-zinc-900 dark:text-zinc-100">Server / Edge Functions</td>
+              <td class="py-2 px-3 font-mono">AGPL-3.0</td>
+            </tr>
+            <tr class="border-b border-zinc-100 dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-950/50">
+              <td class="py-2 px-3 font-medium text-zinc-900 dark:text-zinc-100">Documentation</td>
+              <td class="py-2 px-3 font-mono">CC BY 4.0</td>
+            </tr>
+            <tr class="border-b border-zinc-100 dark:border-zinc-900">
+              <td class="py-2 px-3 font-medium text-zinc-900 dark:text-zinc-100">Per-observation</td>
+              <td class="py-2 px-3 font-mono">CC BY / CC BY-NC / CC0 (chosen by observer)</td>
+            </tr>
+            <tr>
+              <td class="py-2 px-3 font-medium text-zinc-900 dark:text-zinc-100">Taxonomic data</td>
+              <td class="py-2 px-3 font-mono">CC0</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
 
-1. **Fork** the repo and create a feature branch
-2. **Sign** your commits with DCO (`git commit -s`)  
-   *We use DCO (Developer Certificate of Origin), not CLA — no paperwork, no anxiety*
-3. **Open a PR** with a clear description and linked issue
-4. **Tests** must pass: `npm run build`
-5. **Review** from a maintainer within 7 days
-
----
-
-## DCO Sign-off
-
-Add to every commit:
-```
-Signed-off-by: Your Name &lt;your_email&gt;
-```
-
-Or use `git commit -s` to add automatically. By signing, you certify:
-
-> "I wrote this code, or have the right to submit it under the open source license applicable to this project."
-
----
-
-## License
-
-| Component | License |
-|-----------|---------|
-| Server / backend | AGPL-3.0 |
-| Client SDKs | Apache 2.0 |
-| Documentation | CC BY 4.0 |
-| Taxonomic data | CC0 |
-| ML models (small) | Apache 2.0 |
-
----
-
-## Community Channels
-
-- **GitHub Discussions:** Feature proposals, architectural decisions
-- **GitHub Issues:** Bug reports, feature requests
-- **Spec:** docs/specs/rastrum-v1.md (on GitHub)
-
----
-
-## Priorities for Early Contributors
-
-The highest-impact contributions right now:
-
-1. **Zapoteco UI translation** — first Indigenous language pilot
-2. **SvelteKit migration** — the Astro site needs to move to SvelteKit for the app shell
-3. **Dexie offline queue** — IndexedDB observation outbox + Supabase sync
-4. **EfficientNet-Lite0 ONNX** — quantized model bundle for offline ID
-5. **Darwin Core export** — occurrence CSV + DwC Archive generator
-
+    <!-- Channels -->
+    <section>
+      <h2 id="channels" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+        <a href="#channels" class="text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-colors">#</a> Where to ask
+      </h2>
+      <ul class="space-y-2 not-prose">
+        <li class="text-sm text-zinc-700 dark:text-zinc-300"><span class="font-medium">GitHub Discussions:</span> feature proposals, architectural decisions, "is this in scope?"</li>
+        <li class="text-sm text-zinc-700 dark:text-zinc-300"><span class="font-medium">GitHub Issues:</span> bug reports, concrete feature requests, regressions</li>
+        <li class="text-sm text-zinc-700 dark:text-zinc-300"><span class="font-medium">Module specs:</span> <span class="font-mono">docs/specs/modules/00-index.md</span> on GitHub catalogues the ~34 implementation specs</li>
+      </ul>
+    </section>
+  </article>
 </DocLayout>
