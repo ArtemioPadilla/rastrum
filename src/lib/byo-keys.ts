@@ -99,3 +99,48 @@ export function clearAllKeys(): void {
 export function hasKeysForPlugin(pluginId: string): boolean {
   return Object.keys(getAllKeysForPlugin(pluginId)).length > 0;
 }
+
+/** List all plugin IDs that have at least one key configured. */
+export function listConfiguredPluginIds(): string[] {
+  const m = readMap();
+  const pluginIds = new Set<string>();
+  for (const key of Object.keys(m)) {
+    const dot = key.indexOf('.');
+    if (dot > 0 && m[key]?.trim()) pluginIds.add(key.slice(0, dot));
+  }
+  return [...pluginIds];
+}
+
+/**
+ * Summary of all configured BYO keys for the profile AI settings page.
+ * Returns an array of { pluginId, keyCount, keyNames } for each plugin
+ * that has at least one key set.
+ */
+export function getKeysSummary(): Array<{ pluginId: string; keyCount: number; keyNames: string[] }> {
+  const m = readMap();
+  const byPlugin = new Map<string, string[]>();
+  for (const [fullKey, value] of Object.entries(m)) {
+    if (!value?.trim()) continue;
+    const dot = fullKey.indexOf('.');
+    if (dot <= 0) continue;
+    const pluginId = fullKey.slice(0, dot);
+    const keyName = fullKey.slice(dot + 1);
+    if (!byPlugin.has(pluginId)) byPlugin.set(pluginId, []);
+    byPlugin.get(pluginId)!.push(keyName);
+  }
+  return [...byPlugin.entries()].map(([pluginId, keyNames]) => ({
+    pluginId,
+    keyCount: keyNames.length,
+    keyNames,
+  }));
+}
+
+/** Remove all keys for a specific plugin. */
+export function clearAllKeysForPlugin(pluginId: string): void {
+  const m = readMap();
+  const prefix = pluginId + '.';
+  for (const key of Object.keys(m)) {
+    if (key.startsWith(prefix)) delete m[key];
+  }
+  writeMap(m);
+}
