@@ -1,0 +1,98 @@
+---
+import { t } from '../../i18n/utils';
+
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const isEs = lang === 'es';
+---
+
+<div id="console-onboarding" class="hidden fixed inset-0 z-[70] bg-black/50 flex items-center justify-center" role="dialog" aria-modal="true">
+  <div class="bg-white dark:bg-zinc-950 rounded-xl shadow-2xl border border-zinc-200 dark:border-zinc-800 p-6 max-w-md w-full mx-4 space-y-4">
+    <div id="onboarding-step" class="space-y-3">
+      <h2 id="onboarding-title" class="text-lg font-semibold text-zinc-900 dark:text-zinc-100"></h2>
+      <p id="onboarding-body" class="text-sm text-zinc-600 dark:text-zinc-400"></p>
+    </div>
+    <div class="flex items-center justify-between">
+      <span id="onboarding-progress" class="text-xs text-zinc-400"></span>
+      <div class="flex gap-2">
+        <button id="onboarding-skip" type="button" class="px-3 py-1.5 text-xs text-zinc-500 hover:text-zinc-700">
+          {isEs ? 'Omitir' : 'Skip'}
+        </button>
+        <button id="onboarding-next" type="button" class="px-4 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium">
+          {isEs ? 'Siguiente' : 'Next'}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const ONBOARDING_KEY = 'rastrum.console.onboardingDone';
+  const isEs = document.documentElement.lang === 'es';
+
+  interface Step { title: string; body: string }
+
+  const steps: Step[] = isEs ? [
+    { title: '¡Bienvenido a la Consola!', body: 'Esta es tu centro de control para administrar Rastrum. Aquí puedes gestionar usuarios, observaciones, badges y más.' },
+    { title: 'Barra lateral', body: 'La barra lateral izquierda muestra todas las secciones disponibles según tu rol (admin, moderador, experto). Haz clic en cualquier tab para navegar.' },
+    { title: 'Roles', body: 'Las píldoras de rol en la parte superior te permiten cambiar entre vistas de admin, moderador y experto. Cada rol tiene sus propios tabs.' },
+    { title: 'Atajos de teclado', body: 'Presiona ? en cualquier momento para ver los atajos de teclado. Usa g + letra para navegar rápidamente (ej: g a → Auditoría).' },
+    { title: '¡Listo!', body: 'Ya puedes explorar la consola. Este tutorial no se mostrará de nuevo, pero puedes acceder a la ayuda con ? en cualquier momento.' },
+  ] : [
+    { title: 'Welcome to the Console!', body: 'This is your control center for managing Rastrum. Here you can manage users, observations, badges, and more.' },
+    { title: 'Sidebar', body: 'The left sidebar shows all available sections based on your role (admin, moderator, expert). Click any tab to navigate.' },
+    { title: 'Roles', body: 'The role pills at the top let you switch between admin, moderator, and expert views. Each role has its own set of tabs.' },
+    { title: 'Keyboard shortcuts', body: 'Press ? at any time to see keyboard shortcuts. Use g + letter to navigate quickly (e.g., g a → Audit).' },
+    { title: 'All set!', body: 'You can now explore the console. This walkthrough won\'t show again, but you can access help with ? at any time.' },
+  ];
+
+  let currentStep = 0;
+
+  const overlay = document.getElementById('console-onboarding');
+  const titleEl = document.getElementById('onboarding-title');
+  const bodyEl = document.getElementById('onboarding-body');
+  const progressEl = document.getElementById('onboarding-progress');
+  const nextBtn = document.getElementById('onboarding-next');
+  const skipBtn = document.getElementById('onboarding-skip');
+
+  function render() {
+    if (!titleEl || !bodyEl || !progressEl || !nextBtn) return;
+    const step = steps[currentStep];
+    titleEl.textContent = step.title;
+    bodyEl.textContent = step.body;
+    progressEl.textContent = `${currentStep + 1} / ${steps.length}`;
+    nextBtn.textContent = currentStep === steps.length - 1
+      ? (isEs ? 'Empezar' : 'Get started')
+      : (isEs ? 'Siguiente' : 'Next');
+  }
+
+  function dismiss() {
+    overlay?.classList.add('hidden');
+    try { localStorage.setItem(ONBOARDING_KEY, 'true'); } catch {}
+  }
+
+  nextBtn?.addEventListener('click', () => {
+    if (currentStep < steps.length - 1) {
+      currentStep++;
+      render();
+    } else {
+      dismiss();
+    }
+  });
+
+  skipBtn?.addEventListener('click', dismiss);
+
+  // Show only on first visit
+  if (!localStorage.getItem(ONBOARDING_KEY)) {
+    // Wait for the console gate to resolve — if the user isn't authed,
+    // don't show the onboarding
+    setTimeout(() => {
+      const gate = document.getElementById('console-gate');
+      const isAuthed = gate?.classList.contains('hidden');
+      if (isAuthed) {
+        overlay?.classList.remove('hidden');
+        render();
+      }
+    }, 1500);
+  }
+</script>
