@@ -28,6 +28,8 @@ interface PrivacyExplainerCopy {
 }
 interface CommunityEmptyCopy {
   no_match: string;
+  no_match_filters: string;
+  clear_filters: string;
   nearby_no_centroid: string;
   nearby_anon: string;
   privacy_explainer: PrivacyExplainerCopy;
@@ -72,6 +74,8 @@ const stringsJson = JSON.stringify({
   lastSeenTpl: cm.card.last_seen,
   loading: cm.loading,
   emptyNoMatch: cm.empty.no_match,
+  emptyNoMatchFilters: cm.empty.no_match_filters,
+  emptyClearFilters: cm.empty.clear_filters,
   emptyNearbyNoCentroid: cm.empty.nearby_no_centroid,
   emptyNearbyAnon: cm.empty.nearby_anon,
   privacyHeading: cm.empty.privacy_explainer.heading,
@@ -226,6 +230,8 @@ const stringsJson = JSON.stringify({
     lastSeenTpl: string;
     loading: string;
     emptyNoMatch: string;
+    emptyNoMatchFilters: string;
+    emptyClearFilters: string;
     emptyNearbyNoCentroid: string;
     emptyNearbyAnon: string;
     privacyHeading: string;
@@ -391,9 +397,45 @@ const stringsJson = JSON.stringify({
 
   function showEmpty(msg: string): void {
     list!.innerHTML = '';
+    pager!.classList.add('hidden');
+
+    // For the generic no-match case, render a richer amber banner listing
+    // active filters and offering a clear-filters action.
+    if (msg === STRINGS.emptyNoMatch) {
+      const activeFilters: string[] = [];
+      if (filters.country) activeFilters.push(countryEl!.options[countryEl!.selectedIndex]?.text ?? filters.country);
+      if (filters.taxa.length) activeFilters.push(filters.taxa.join(', '));
+      if (filters.experts) activeFilters.push(STRINGS.expertPill);
+      if (filters.nearby) activeFilters.push(STRINGS.useLocationLabel);
+
+      const filterList = activeFilters.length
+        ? `<ul class="mt-1 list-disc list-inside space-y-0.5">${activeFilters.map(f => `<li>${escapeHtml(f)}</li>`).join('')}</ul>`
+        : '';
+
+      empty!.innerHTML = `
+        <div class="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4 text-left text-sm text-amber-900 dark:text-amber-200">
+          <p class="font-semibold">${escapeHtml(STRINGS.emptyNoMatchFilters)}</p>
+          ${filterList}
+          <button type="button" id="cf-clear-filters"
+            class="mt-3 text-xs underline text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300">
+            ${escapeHtml(STRINGS.emptyClearFilters)}
+          </button>
+        </div>`;
+      empty!.classList.remove('hidden');
+
+      document.getElementById('cf-clear-filters')?.addEventListener('click', () => {
+        sortEl!.value = 'observation_count';
+        countryEl!.value = '';
+        taxonEl!.value = '';
+        expertsEl!.checked = false;
+        nearbyEl!.checked = false;
+        pushAndRefresh();
+      }, { once: true });
+      return;
+    }
+
     empty!.textContent = msg;
     empty!.classList.remove('hidden');
-    pager!.classList.add('hidden');
   }
 
   function maybeShowPrivacyExplainer(): void {
