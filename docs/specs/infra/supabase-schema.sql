@@ -4824,9 +4824,22 @@ CREATE INDEX IF NOT EXISTS idx_obs_project ON public.observations(project_id)
 -- "First" is ordered by `created_at ASC` so the longest-lived project
 -- wins on overlap (operators with overlapping polygons should resolve
 -- by editing one or the other).
+--
+-- SECURITY DEFINER so the trigger:
+--   (a) can auto-tag observations into private projects whose rows the
+--       writer can't SELECT under their own RLS — without this, "polygon
+--       is the routing key" silently breaks for non-member writers
+--       landing on a private polygon.
+--   (b) bypasses RLS evaluation on `projects` entirely. Even though the
+--       projects ↔ project_members cycle is now broken at the policy
+--       level (helper functions below), keeping the trigger as DEFINER
+--       belts-and-braces against future cross-table policies on either
+--       side accidentally re-introducing it.
 CREATE OR REPLACE FUNCTION public.assign_observation_to_project()
 RETURNS TRIGGER
 LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
 BEGIN
   -- Honour explicit assignments (or unassignments) from the client.
@@ -4851,6 +4864,57 @@ CREATE TRIGGER assign_observation_to_project_trigger
   FOR EACH ROW
   EXECUTE FUNCTION public.assign_observation_to_project();
 
+-- ── Membership/owner predicate helpers ──────────────────────────────
+-- These exist purely to break the projects ↔ project_members RLS cycle
+-- (Postgres 42P17 — observed in prod 2026-04-30 on PATCH /observations
+-- when the BEFORE UPDATE OF location trigger scanned `projects` and the
+-- USING clause expanded into project_members → back into projects).
+--
+-- Both helpers are SECURITY DEFINER + STABLE + boolean-only:
+--   - SECURITY DEFINER → the EXISTS subquery executes under the function
+--     owner (postgres, BYPASSRLS), so policies on the inner table do
+--     not re-evaluate. The cycle is broken at the SQL planner level.
+--   - boolean return only → the function cannot leak rows; an attacker
+--     calling is_project_member(p, target_uid) only learns yes/no for a
+--     specific pair, which is information they can already infer from
+--     the public RLS-surfaced join.
+--   - search_path pinned → defends against shadowed schema attacks now
+--     that the function runs with elevated privilege.
+CREATE OR REPLACE FUNCTION public.is_project_owner(p_project_id uuid, p_user_id uuid)
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+SET search_path = public, pg_temp
+AS $$
+  SELECT p_user_id IS NOT NULL
+     AND EXISTS (
+       SELECT 1 FROM public.projects
+        WHERE id = p_project_id
+          AND owner_user_id = p_user_id
+     );
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_project_member(p_project_id uuid, p_user_id uuid)
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+SET search_path = public, pg_temp
+AS $$
+  SELECT p_user_id IS NOT NULL
+     AND EXISTS (
+       SELECT 1 FROM public.project_members
+        WHERE project_id = p_project_id
+          AND user_id    = p_user_id
+     );
+$$;
+
+REVOKE ALL ON FUNCTION public.is_project_owner(uuid, uuid)  FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.is_project_member(uuid, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.is_project_owner(uuid, uuid)  TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.is_project_member(uuid, uuid) TO anon, authenticated, service_role;
+
 -- ── RLS ──────────────────────────────────────────────────────────────
 ALTER TABLE public.projects        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.project_members ENABLE ROW LEVEL SECURITY;
@@ -4861,11 +4925,7 @@ CREATE POLICY projects_public_read ON public.projects
   USING (
     visibility = 'public'
     OR owner_user_id = auth.uid()
-    OR EXISTS (
-      SELECT 1 FROM public.project_members
-       WHERE project_id = projects.id
-         AND user_id    = auth.uid()
-    )
+    OR public.is_project_member(id, auth.uid())
   );
 
 DROP POLICY IF EXISTS projects_owner_insert ON public.projects;
@@ -4884,45 +4944,27 @@ CREATE POLICY projects_owner_delete ON public.projects
   FOR DELETE TO authenticated
   USING (owner_user_id = auth.uid());
 
+-- The four project_members policies all routed through inline EXISTS
+-- subqueries against `projects`, which expanded `projects_public_read`,
+-- which referenced `project_members` again → 42P17 recursion. They now
+-- call is_project_owner() instead, which bypasses RLS via SECURITY DEFINER.
 DROP POLICY IF EXISTS project_members_read ON public.project_members;
--- Fixed 2026-05-01: removed subquery back to projects to prevent 42P17 recursion.
--- The cycle was: UPDATE projects → projects_public_read → project_members_read
--- → SELECT FROM projects → loop.
--- Members can still see their own memberships. Project owners see all members
--- via the project_members_owner_write policy which already has a projects subquery
--- gated on owner_user_id (not triggered by member SELECT).
 CREATE POLICY project_members_read ON public.project_members
   FOR SELECT
   USING (
     user_id = auth.uid()
-    OR EXISTS (
-      SELECT 1 FROM public.projects p
-       WHERE p.id = project_members.project_id
-         AND p.owner_user_id = auth.uid()
-    )
+    OR public.is_project_owner(project_id, auth.uid())
   );
 
 DROP POLICY IF EXISTS project_members_owner_write ON public.project_members;
 CREATE POLICY project_members_owner_write ON public.project_members
   FOR INSERT TO authenticated
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM public.projects p
-       WHERE p.id = project_members.project_id
-         AND p.owner_user_id = auth.uid()
-    )
-  );
+  WITH CHECK (public.is_project_owner(project_id, auth.uid()));
 
 DROP POLICY IF EXISTS project_members_owner_delete ON public.project_members;
 CREATE POLICY project_members_owner_delete ON public.project_members
   FOR DELETE TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.projects p
-       WHERE p.id = project_members.project_id
-         AND p.owner_user_id = auth.uid()
-    )
-  );
+  USING (public.is_project_owner(project_id, auth.uid()));
 
 GRANT SELECT                        ON public.projects        TO anon, authenticated;
 GRANT INSERT, UPDATE, DELETE        ON public.projects        TO authenticated;

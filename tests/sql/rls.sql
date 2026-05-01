@@ -758,12 +758,148 @@ END $$;
 RESET ROLE;
 
 -- ────────────────────────────────────────────────────────────────────────────
+-- M29 — projects ↔ project_members RLS recursion regression (42P17).
+--
+-- Reproduces the prod incident from 2026-04-30: an authenticated user PATCHing
+-- /rest/v1/observations to update `location` triggered the
+-- `assign_observation_to_project` BEFORE UPDATE OF location trigger, which did
+-- a SELECT against `projects` under the user's RLS, which expanded into
+-- `project_members.project_members_read`, which selected back from `projects`
+-- → infinite recursion. Fix: trigger is SECURITY DEFINER, and the policies
+-- on both tables now route owner/member checks through the SECURITY DEFINER
+-- helpers `is_project_owner()` / `is_project_member()` which bypass RLS.
+--
+-- This test asserts ALL THREE code paths that previously hit 42P17:
+--   (a) UPDATE observations SET location = ... (the original prod symptom)
+--   (b) SELECT * FROM project_members AS authenticated
+--   (c) SELECT * FROM projects AS authenticated (with project_members rows)
+-- ────────────────────────────────────────────────────────────────────────────
+
+DO $$
+DECLARE
+  uid_owner   CONSTANT uuid := '00000000-0000-0000-0000-000000000010';
+  uid_member  CONSTANT uuid := '00000000-0000-0000-0000-000000000011';
+  uid_writer  CONSTANT uuid := '00000000-0000-0000-0000-000000000012';
+  proj_id     CONSTANT uuid := '00000000-0000-0000-0000-0000000000a0';
+  obs_id      CONSTANT uuid := '00000000-0000-0000-0000-0000000000b0';
+BEGIN
+  INSERT INTO auth.users (id, email) VALUES
+    (uid_owner,  'proj-owner@test.rastrum'),
+    (uid_member, 'proj-member@test.rastrum'),
+    (uid_writer, 'proj-writer@test.rastrum')
+  ON CONFLICT (id) DO NOTHING;
+
+  INSERT INTO public.users (id, username, display_name) VALUES
+    (uid_owner,  'rls_proj_owner',  'Project Owner'),
+    (uid_member, 'rls_proj_member', 'Project Member'),
+    (uid_writer, 'rls_proj_writer', 'Project Writer')
+  ON CONFLICT (id) DO NOTHING;
+
+  -- A private project covering a polygon around (0,0) so the trigger has
+  -- something to match against on UPDATE.
+  INSERT INTO public.projects (id, slug, name, owner_user_id, visibility, polygon)
+  VALUES (
+    proj_id, 'rls-recursion-probe', 'RLS Recursion Probe', uid_owner, 'private',
+    ST_SetSRID(ST_GeomFromText('MULTIPOLYGON(((-1 -1, 1 -1, 1 1, -1 1, -1 -1)))'), 4326)::geography
+  )
+  ON CONFLICT (id) DO NOTHING;
+
+  INSERT INTO public.project_members (project_id, user_id, role)
+  VALUES (proj_id, uid_member, 'member')
+  ON CONFLICT DO NOTHING;
+
+  -- Seed an observation owned by the writer so the obs_owner policy lets
+  -- them UPDATE it. project_id starts NULL so the trigger has work to do.
+  INSERT INTO public.observations (id, observer_id, observed_at, location, sync_status)
+  VALUES (
+    obs_id, uid_writer, now(),
+    ST_SetSRID(ST_MakePoint(0.5, 0.5), 4326)::geography,
+    'synced'
+  )
+  ON CONFLICT (id) DO NOTHING;
+END $$;
+
+-- Test 33 of 35: UPDATE observations.location as the writer must NOT throw 42P17.
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000012';
+
+DO $$
+DECLARE
+  obs_id CONSTANT uuid := '00000000-0000-0000-0000-0000000000b0';
+  assigned_project uuid;
+BEGIN
+  BEGIN
+    UPDATE public.observations
+       SET location = ST_SetSRID(ST_MakePoint(0.25, 0.25), 4326)::geography
+     WHERE id = obs_id;
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLSTATE = '42P17' THEN
+      RAISE EXCEPTION 'FAIL [Test 33 of 35] (UPDATE observations.location → 42P17 recursion regressed): %', SQLERRM;
+    END IF;
+    RAISE;
+  END;
+
+  -- The trigger should have auto-tagged this observation into the private
+  -- project even though the writer is neither owner nor member — that's the
+  -- (a) clause of the SECURITY DEFINER promise on the trigger function.
+  SELECT project_id INTO assigned_project FROM public.observations WHERE id = obs_id;
+  IF assigned_project IS NULL THEN
+    RAISE EXCEPTION 'FAIL [Test 33 of 35] (private-project auto-tag): expected project_id, got NULL — trigger is not running with elevated privilege';
+  END IF;
+END $$;
+
+-- Test 34 of 35: SELECT project_members as the member must NOT throw 42P17.
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000011';
+
+DO $$
+DECLARE
+  visible_count int;
+BEGIN
+  BEGIN
+    SELECT count(*)::int INTO visible_count FROM public.project_members;
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLSTATE = '42P17' THEN
+      RAISE EXCEPTION 'FAIL [Test 34 of 35] (SELECT project_members → 42P17 recursion regressed): %', SQLERRM;
+    END IF;
+    RAISE;
+  END;
+  IF visible_count < 1 THEN
+    RAISE EXCEPTION 'FAIL [Test 34 of 35] (member self-visibility): expected >= 1, got %', visible_count;
+  END IF;
+END $$;
+
+-- Test 35 of 35: SELECT projects as the owner must NOT throw 42P17 and
+-- must include the private project (owner_user_id branch).
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000010';
+
+DO $$
+DECLARE
+  visible_count int;
+BEGIN
+  BEGIN
+    SELECT count(*)::int INTO visible_count
+      FROM public.projects
+     WHERE id = '00000000-0000-0000-0000-0000000000a0';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLSTATE = '42P17' THEN
+      RAISE EXCEPTION 'FAIL [Test 35 of 35] (SELECT projects → 42P17 recursion regressed): %', SQLERRM;
+    END IF;
+    RAISE;
+  END;
+  IF visible_count <> 1 THEN
+    RAISE EXCEPTION 'FAIL [Test 35 of 35] (owner can read own private project): expected 1, got %', visible_count;
+  END IF;
+END $$;
+
+RESET ROLE;
+
+-- ────────────────────────────────────────────────────────────────────────────
 -- Summary
 -- ────────────────────────────────────────────────────────────────────────────
 
 DO $$
 BEGIN
-  RAISE NOTICE 'RLS suite: 32 of 32 assertions passed';
+  RAISE NOTICE 'RLS suite: 35 of 35 assertions passed';
 END $$;
 
 ROLLBACK;
