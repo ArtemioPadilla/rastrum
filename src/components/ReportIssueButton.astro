@@ -30,10 +30,21 @@ const repoSlug = 'ArtemioPadilla/rastrum';
   data-repo={repoSlug}
   data-lang={lang}
   data-build-sha={buildSha}
+  data-l-steps-label={tr.report.steps_label}
+  data-l-steps-placeholder={tr.report.steps_placeholder}
+  data-l-expected-label={tr.report.expected_label}
+  data-l-expected-placeholder={tr.report.expected_placeholder}
+  data-l-diagnostics-toggle={tr.report.diagnostics_toggle}
+  data-l-diagnostics-env={tr.report.diagnostics_env}
+  data-l-diagnostics-console={tr.report.diagnostics_console}
+  data-l-diagnostics-network={tr.report.diagnostics_network}
+  data-l-diagnostics-none={tr.report.diagnostics_none}
+  data-l-copy={tr.report.copy_diagnostics}
+  data-l-copied={tr.report.copied}
   class="rounded-lg backdrop:bg-black/60 p-0 w-[min(92vw,560px)] max-h-[88vh] overflow-hidden bg-white text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100 shadow-2xl border border-zinc-200 dark:border-zinc-800"
 >
   <form method="dialog" class="flex flex-col max-h-[88vh]">
-    <header class="flex items-center justify-between px-5 py-3 border-b border-zinc-200 dark:border-zinc-800 sticky top-0 bg-white dark:bg-zinc-900">
+    <header class="flex items-center justify-between px-5 py-3 border-b border-zinc-200 dark:border-zinc-800 sticky top-0 bg-white dark:bg-zinc-900 z-10">
       <h2 class="text-base font-semibold">{tr.report.modal_title}</h2>
       <button
         type="button"
@@ -45,6 +56,7 @@ const repoSlug = 'ArtemioPadilla/rastrum';
       </button>
     </header>
     <div class="px-5 py-4 space-y-4 overflow-y-auto flex-1">
+      <!-- Type -->
       <div>
         <label for="report-type" class="block text-sm font-medium mb-1">{tr.report.type_label}</label>
         <select
@@ -57,6 +69,7 @@ const repoSlug = 'ArtemioPadilla/rastrum';
           <option value="translation">{tr.report.type_translation}</option>
         </select>
       </div>
+      <!-- Title -->
       <div>
         <label for="report-title" class="block text-sm font-medium mb-1">{tr.report.title_label}</label>
         <input
@@ -67,141 +80,394 @@ const repoSlug = 'ArtemioPadilla/rastrum';
           class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
         />
       </div>
+      <!-- Description -->
       <div>
         <label for="report-description" class="block text-sm font-medium mb-1">{tr.report.description_label}</label>
         <textarea
           id="report-description"
-          rows="5"
+          rows="4"
           placeholder={tr.report.description_placeholder}
           class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-emerald-500"
         ></textarea>
       </div>
-      <div>
-        <p class="text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">{tr.report.metadata_label}</p>
-        <pre
-          id="report-metadata"
-          class="text-xs bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded p-2 whitespace-pre-wrap break-all max-h-32 overflow-auto select-all"
-        ></pre>
+      <!-- Bug-only: steps + expected (shown/hidden by JS) -->
+      <div id="report-bug-fields" class="space-y-4">
+        <div>
+          <label for="report-steps" class="block text-sm font-medium mb-1">{tr.report.steps_label}</label>
+          <textarea
+            id="report-steps"
+            rows="3"
+            placeholder={tr.report.steps_placeholder}
+            class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          ></textarea>
+        </div>
+        <div>
+          <label for="report-expected" class="block text-sm font-medium mb-1">{tr.report.expected_label}</label>
+          <textarea
+            id="report-expected"
+            rows="2"
+            placeholder={tr.report.expected_placeholder}
+            class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          ></textarea>
+        </div>
       </div>
+      <!-- Diagnostics accordion -->
+      <details id="report-diagnostics" class="group">
+        <summary class="flex items-center gap-2 cursor-pointer text-xs font-medium text-zinc-600 dark:text-zinc-400 select-none py-1">
+          <svg class="w-3.5 h-3.5 transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+          {tr.report.diagnostics_toggle}
+          <span id="report-diag-count" class="inline-flex items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-[10px] font-bold min-w-[18px] h-[18px] px-1 hidden">0</span>
+        </summary>
+        <div class="mt-2 space-y-3">
+          <!-- Environment -->
+          <div>
+            <p class="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">{tr.report.diagnostics_env}</p>
+            <pre
+              id="report-env-block"
+              class="text-xs bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded p-2 whitespace-pre-wrap break-all max-h-28 overflow-auto"
+            ></pre>
+          </div>
+          <!-- Console errors -->
+          <div>
+            <p class="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">{tr.report.diagnostics_console}</p>
+            <pre
+              id="report-console-block"
+              class="text-xs bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded p-2 whitespace-pre-wrap break-all max-h-32 overflow-auto"
+            ></pre>
+          </div>
+          <!-- Network errors -->
+          <div>
+            <p class="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-1">{tr.report.diagnostics_network}</p>
+            <pre
+              id="report-network-block"
+              class="text-xs bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded p-2 whitespace-pre-wrap break-all max-h-32 overflow-auto"
+            ></pre>
+          </div>
+        </div>
+      </details>
     </div>
-    <footer class="sticky bottom-0 flex items-center justify-end gap-2 px-5 py-3 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+    <footer class="sticky bottom-0 flex items-center justify-between gap-2 px-5 py-3 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 z-10">
       <button
         type="button"
-        id="report-cancel-btn"
-        class="min-h-[44px] px-4 py-2 rounded text-sm font-medium border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+        id="report-copy-btn"
+        class="min-h-[44px] px-3 py-2 rounded text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 inline-flex items-center gap-1.5 transition-colors"
+        title={tr.report.copy_diagnostics}
       >
-        {tr.report.cancel}
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        <span id="report-copy-label">{tr.report.copy_diagnostics}</span>
       </button>
-      <button
-        type="button"
-        id="report-submit-btn"
-        class="min-h-[44px] px-4 py-2 rounded text-sm font-semibold bg-emerald-700 hover:bg-emerald-800 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-      >
-        {tr.report.open_on_github}
-      </button>
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          id="report-cancel-btn"
+          class="min-h-[44px] px-4 py-2 rounded text-sm font-medium border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+        >
+          {tr.report.cancel}
+        </button>
+        <button
+          type="button"
+          id="report-submit-btn"
+          class="min-h-[44px] px-4 py-2 rounded text-sm font-semibold bg-emerald-700 hover:bg-emerald-800 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        >
+          {tr.report.open_on_github}
+        </button>
+      </div>
     </footer>
   </form>
 </dialog>
 
+<!--
+  is:inline so the capture hooks install at parse time, before any
+  module-graph code runs. This catches errors from the earliest moments.
+-->
 <script is:inline>
-  (function () {
-    const btn = document.getElementById('report-issue-btn');
-    const modal = document.getElementById('report-issue-modal');
-    if (!btn || !modal) return;
+(function () {
+  // ── Telemetry capture (runs once, survives SPA navigations) ──────────
+  var W = window;
+  if (!W.__rastrum_diag) {
+    var MAX = 30;
+    var diag = { console: [], network: [], errors: [] };
+    W.__rastrum_diag = diag;
 
-    const dlg = modal;
-    const repo = dlg.dataset.repo || '';
-    const lang = dlg.dataset.lang || 'en';
-    const buildSha = dlg.dataset.buildSha || 'dev';
+    // 1. console.error + console.warn
+    var origError = console.error.bind(console);
+    var origWarn  = console.warn.bind(console);
+    function capture(level, args) {
+      var msg = Array.prototype.map.call(args, function (a) {
+        return a instanceof Error ? (a.message + '\n' + (a.stack || '')) : String(a);
+      }).join(' ');
+      diag.console.push({ ts: new Date().toISOString(), level: level, msg: msg.slice(0, 500) });
+      if (diag.console.length > MAX) diag.console.shift();
+    }
+    console.error = function () { capture('error', arguments); origError.apply(console, arguments); };
+    console.warn  = function () { capture('warn',  arguments); origWarn.apply(console, arguments); };
 
-    const typeEl = document.getElementById('report-type');
-    const titleEl = document.getElementById('report-title');
-    const descEl = document.getElementById('report-description');
-    const metaEl = document.getElementById('report-metadata');
-    const closeBtn = document.getElementById('report-close-btn');
-    const cancelBtn = document.getElementById('report-cancel-btn');
-    const submitBtn = document.getElementById('report-submit-btn');
+    // 2. Unhandled errors + promise rejections
+    W.addEventListener('error', function (ev) {
+      diag.errors.push({
+        ts: new Date().toISOString(),
+        msg: (ev.message || 'Unknown error').slice(0, 300),
+        src: ev.filename ? (ev.filename + ':' + ev.lineno + ':' + ev.colno) : ''
+      });
+      if (diag.errors.length > MAX) diag.errors.shift();
+    });
+    W.addEventListener('unhandledrejection', function (ev) {
+      var r = ev.reason;
+      var msg = r instanceof Error ? (r.message + '\n' + (r.stack || '')) : String(r || 'Unhandled rejection');
+      diag.errors.push({ ts: new Date().toISOString(), msg: msg.slice(0, 300), src: 'promise' });
+      if (diag.errors.length > MAX) diag.errors.shift();
+    });
 
-    function buildMetadata() {
-      return {
-        url: window.location.href,
-        userAgent: navigator.userAgent,
-        locale: lang,
-        buildSha: buildSha,
-        online: navigator.onLine,
-        viewport: window.innerWidth + 'x' + window.innerHeight,
-        timestamp: new Date().toISOString(),
+    // 3. Network error capture (wrap fetch)
+    var origFetch = W.fetch;
+    if (origFetch) {
+      W.fetch = function () {
+        var url = arguments[0];
+        var urlStr = typeof url === 'string' ? url : (url && url.url ? url.url : String(url));
+        var method = 'GET';
+        if (arguments[1] && arguments[1].method) method = arguments[1].method;
+        if (typeof url === 'object' && url.method) method = url.method;
+        return origFetch.apply(W, arguments).then(function (res) {
+          if (!res.ok) {
+            diag.network.push({
+              ts: new Date().toISOString(),
+              method: method.toUpperCase(),
+              url: urlStr.slice(0, 200),
+              status: res.status,
+              statusText: res.statusText || ''
+            });
+            if (diag.network.length > MAX) diag.network.shift();
+          }
+          return res;
+        }, function (err) {
+          diag.network.push({
+            ts: new Date().toISOString(),
+            method: method.toUpperCase(),
+            url: urlStr.slice(0, 200),
+            status: 0,
+            statusText: err && err.message ? err.message.slice(0, 100) : 'Network error'
+          });
+          if (diag.network.length > MAX) diag.network.shift();
+          throw err;
+        });
       };
     }
+  }
 
-    function refreshMetadata() {
-      if (!metaEl) return;
-      const m = buildMetadata();
-      metaEl.textContent =
-        'URL: ' + m.url + '\n' +
-        'User Agent: ' + m.userAgent + '\n' +
-        'Locale: ' + m.locale + '\n' +
-        'Build: ' + m.buildSha + '\n' +
-        'Online: ' + (m.online ? 'yes' : 'no') + '\n' +
-        'Viewport: ' + m.viewport + '\n' +
-        'Time: ' + m.timestamp;
-    }
+  // ── Modal wiring ─────────────────────────────────────────────────────
+  var btn = document.getElementById('report-issue-btn');
+  var modal = document.getElementById('report-issue-modal');
+  if (!btn || !modal) return;
 
-    function templateFor(type) {
-      switch (type) {
-        case 'feature': return 'feature.yml';
-        case 'question': return 'question.yml';
-        case 'translation': return 'translation.yml';
-        case 'bug':
-        default: return 'bug.yml';
+  var dlg = modal;
+  var repo = dlg.dataset.repo || '';
+  var lang = dlg.dataset.lang || 'en';
+  var buildSha = dlg.dataset.buildSha || 'dev';
+  var noneLabel = dlg.dataset.lDiagnosticsNone || 'None captured';
+  var copyLabel = dlg.dataset.lCopy || 'Copy diagnostics';
+  var copiedLabel = dlg.dataset.lCopied || 'Copied!';
+
+  var typeEl    = document.getElementById('report-type');
+  var titleEl   = document.getElementById('report-title');
+  var descEl    = document.getElementById('report-description');
+  var stepsEl   = document.getElementById('report-steps');
+  var expectedEl = document.getElementById('report-expected');
+  var bugFields = document.getElementById('report-bug-fields');
+  var envBlock  = document.getElementById('report-env-block');
+  var consBlock = document.getElementById('report-console-block');
+  var netBlock  = document.getElementById('report-network-block');
+  var diagCount = document.getElementById('report-diag-count');
+  var closeBtn  = document.getElementById('report-close-btn');
+  var cancelBtn = document.getElementById('report-cancel-btn');
+  var submitBtn = document.getElementById('report-submit-btn');
+  var copyBtn   = document.getElementById('report-copy-btn');
+  var copyLabelEl = document.getElementById('report-copy-label');
+
+  // Show/hide bug-specific fields based on type
+  function syncBugFields() {
+    var isBug = !typeEl || typeEl.value === 'bug';
+    if (bugFields) bugFields.style.display = isBug ? '' : 'none';
+  }
+  if (typeEl) typeEl.addEventListener('change', syncBugFields);
+  syncBugFields();
+
+  // ── Build environment string ─────────────────────────────────────────
+  function getEnvString() {
+    var lines = [];
+    lines.push('URL: ' + location.href);
+    lines.push('User Agent: ' + navigator.userAgent);
+    lines.push('Locale: ' + lang);
+    lines.push('Build: ' + buildSha);
+    lines.push('Online: ' + (navigator.onLine ? 'yes' : 'no'));
+    lines.push('Viewport: ' + innerWidth + 'x' + innerHeight);
+    lines.push('Time: ' + new Date().toISOString());
+    try {
+      var conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      if (conn) {
+        lines.push('Connection: ' + (conn.effectiveType || '?') + (conn.downlink ? ' / ' + conn.downlink + ' Mbps' : ''));
       }
+    } catch (_) { /* ignore */ }
+    return lines.join('\n');
+  }
+
+  // ── Build console errors string ──────────────────────────────────────
+  function getConsoleString() {
+    var diag = window.__rastrum_diag;
+    if (!diag) return noneLabel;
+    var items = diag.console.concat(diag.errors);
+    if (!items.length) return noneLabel;
+    // Sort by timestamp, most recent last
+    items.sort(function (a, b) { return a.ts < b.ts ? -1 : 1; });
+    // Take last 10
+    var recent = items.slice(-10);
+    return recent.map(function (e) {
+      var prefix = e.level ? '[' + e.level + ']' : '[error]';
+      var src = e.src ? ' (' + e.src + ')' : '';
+      return e.ts + ' ' + prefix + ' ' + e.msg + src;
+    }).join('\n---\n');
+  }
+
+  // ── Build network errors string ──────────────────────────────────────
+  function getNetworkString() {
+    var diag = window.__rastrum_diag;
+    if (!diag || !diag.network.length) return noneLabel;
+    var recent = diag.network.slice(-10);
+    return recent.map(function (e) {
+      return e.ts + ' ' + e.method + ' ' + e.url + ' → ' + (e.status || 'ERR') + (e.statusText ? ' ' + e.statusText : '');
+    }).join('\n');
+  }
+
+  // ── Count total diagnostic items ─────────────────────────────────────
+  function getDiagItemCount() {
+    var diag = window.__rastrum_diag;
+    if (!diag) return 0;
+    return diag.console.length + diag.errors.length + diag.network.length;
+  }
+
+  // ── Refresh diagnostics panel ────────────────────────────────────────
+  function refreshDiagnostics() {
+    if (envBlock)  envBlock.textContent  = getEnvString();
+    if (consBlock) consBlock.textContent = getConsoleString();
+    if (netBlock)  netBlock.textContent  = getNetworkString();
+    var count = getDiagItemCount();
+    if (diagCount) {
+      diagCount.textContent = String(count);
+      diagCount.classList.toggle('hidden', count === 0);
+    }
+  }
+
+  // ── Build full diagnostics text for clipboard ────────────────────────
+  function buildFullDiagnostics() {
+    var sections = [];
+    sections.push('## Environment\n' + getEnvString());
+    var cons = getConsoleString();
+    if (cons !== noneLabel) sections.push('## Console Errors\n```\n' + cons + '\n```');
+    var net = getNetworkString();
+    if (net !== noneLabel) sections.push('## Failed Requests\n```\n' + net + '\n```');
+    // Include user-entered fields for context
+    var title = (titleEl && titleEl.value) ? titleEl.value.trim() : '';
+    var desc  = (descEl && descEl.value) ? descEl.value.trim() : '';
+    var header = '';
+    if (title) header += '**Title:** ' + title + '\n';
+    if (desc)  header += '**Description:** ' + desc + '\n';
+    return (header ? header + '\n' : '') + sections.join('\n\n');
+  }
+
+  // ── GitHub URL builder per template type ─────────────────────────────
+  function buildGithubUrl() {
+    var type = (typeEl && typeEl.value) || 'bug';
+    var title = (titleEl && titleEl.value) ? titleEl.value.trim() : '';
+    var desc  = (descEl && descEl.value) ? descEl.value.trim() : '';
+    var base  = 'https://github.com/' + repo + '/issues/new';
+
+    // GitHub Issue Forms: query params must match the `id` fields in the .yml template.
+    // The `body` param is ignored when using .yml templates.
+    var params = new URLSearchParams();
+
+    if (type === 'bug') {
+      params.set('template', 'bug.yml');
+      params.set('title', '[Bug]: ' + title);
+      params.set('description', desc);
+      params.set('steps', (stepsEl && stepsEl.value) ? stepsEl.value.trim() : '');
+      params.set('expected', (expectedEl && expectedEl.value) ? expectedEl.value.trim() : '');
+      // Actual = description (user describes what happened)
+      params.set('actual', desc);
+      // Environment block with full diagnostics
+      var envLines = getEnvString();
+      var consStr = getConsoleString();
+      var netStr  = getNetworkString();
+      var envFull = envLines;
+      if (consStr !== noneLabel) envFull += '\n\nConsole errors:\n' + consStr;
+      if (netStr  !== noneLabel) envFull += '\n\nFailed requests:\n' + netStr;
+      params.set('environment', envFull);
+    } else if (type === 'feature') {
+      params.set('template', 'feature.yml');
+      params.set('title', '[Feature]: ' + title);
+      params.set('problem', desc);
+    } else if (type === 'question') {
+      params.set('template', 'question.yml');
+      params.set('title', '[Question]: ' + title);
+      params.set('question', desc);
+    } else if (type === 'translation') {
+      params.set('template', 'translation.yml');
+      params.set('title', '[i18n]: ' + title);
+      params.set('current', desc);
     }
 
-    function buildBody() {
-      const m = buildMetadata();
-      const desc = (descEl && descEl.value ? descEl.value : '').trim();
-      const env =
-        '### Environment\n' +
-        '- URL: ' + m.url + '\n' +
-        '- User Agent: ' + m.userAgent + '\n' +
-        '- Locale: ' + m.locale + '\n' +
-        '- Build: ' + m.buildSha + '\n' +
-        '- Online: ' + (m.online ? 'yes' : 'no') + '\n' +
-        '- Viewport: ' + m.viewport + '\n' +
-        '- Time: ' + m.timestamp;
-      return desc ? (desc + '\n\n' + env) : env;
-    }
+    return base + '?' + params.toString();
+  }
 
-    function openOnGithub() {
-      const type = (typeEl && typeEl.value) || 'bug';
-      const tpl = templateFor(type);
-      const title = (titleEl && titleEl.value ? titleEl.value : '').trim();
-      const body = buildBody();
-      const url =
-        'https://github.com/' + repo + '/issues/new' +
-        '?template=' + encodeURIComponent(tpl) +
-        '&title=' + encodeURIComponent(title) +
-        '&body=' + encodeURIComponent(body);
-      window.open(url, '_blank', 'noopener,noreferrer');
+  // ── Copy to clipboard ────────────────────────────────────────────────
+  function copyDiagnostics() {
+    var text = buildFullDiagnostics();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () {
+        flashCopied();
+      }, function () {
+        fallbackCopy(text);
+      });
+    } else {
+      fallbackCopy(text);
     }
+  }
 
-    function open() {
-      refreshMetadata();
-      if (typeof dlg.showModal === 'function') dlg.showModal();
-      else dlg.setAttribute('open', '');
-    }
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); flashCopied(); } catch (_) { /* silent */ }
+    document.body.removeChild(ta);
+  }
 
-    function close() {
-      if (typeof dlg.close === 'function') dlg.close();
-      else dlg.removeAttribute('open');
-    }
+  function flashCopied() {
+    if (!copyLabelEl) return;
+    copyLabelEl.textContent = copiedLabel;
+    setTimeout(function () { copyLabelEl.textContent = copyLabel; }, 1800);
+  }
 
-    btn.addEventListener('click', open);
-    closeBtn && closeBtn.addEventListener('click', close);
-    cancelBtn && cancelBtn.addEventListener('click', close);
-    submitBtn && submitBtn.addEventListener('click', function () {
-      openOnGithub();
-      close();
-    });
-  })();
+  // ── Open / close ─────────────────────────────────────────────────────
+  function openModal() {
+    refreshDiagnostics();
+    syncBugFields();
+    if (typeof dlg.showModal === 'function') dlg.showModal();
+    else dlg.setAttribute('open', '');
+  }
+
+  function closeModal() {
+    if (typeof dlg.close === 'function') dlg.close();
+    else dlg.removeAttribute('open');
+  }
+
+  btn.addEventListener('click', openModal);
+  if (closeBtn)  closeBtn.addEventListener('click', closeModal);
+  if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+  if (copyBtn)   copyBtn.addEventListener('click', copyDiagnostics);
+  if (submitBtn) submitBtn.addEventListener('click', function () {
+    var url = buildGithubUrl();
+    window.open(url, '_blank', 'noopener,noreferrer');
+    closeModal();
+  });
+})();
 </script>
