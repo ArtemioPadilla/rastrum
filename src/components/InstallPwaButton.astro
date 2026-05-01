@@ -134,6 +134,7 @@ const tr = t(lang);
     try {
       await saved.prompt();
       const choice = await saved.userChoice;
+      window.posthog?.capture('pwa_install_prompted', { outcome: choice.outcome });
       if (choice.outcome === 'accepted' || choice.outcome === 'dismissed') {
         // The contract is that the prompt is single-use.
         saved = null;
@@ -145,6 +146,7 @@ const tr = t(lang);
   });
 
   window.addEventListener('appinstalled', () => {
+    window.posthog?.capture('pwa_installed');
     saved = null;
     hideAndroidBtn();
     iosHint?.classList.add('hidden');

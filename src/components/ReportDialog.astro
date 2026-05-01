@@ -196,6 +196,7 @@ const reportTr = tr.socialgraph.report;
       errorEl?.classList.add('hidden');
       try {
         await reportTarget({ target, target_id: targetId, reason, note });
+        window.posthog?.capture('content_reported', { target, reason });
         thanksEl?.classList.remove('hidden');
         setTimeout(close, 1400);
       } catch (err) {

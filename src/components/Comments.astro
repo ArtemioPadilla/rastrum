@@ -521,6 +521,7 @@ const sgReportLabel = sgTree.socialgraph.report.button;
         await fetchAuthors([row.author_id]);
         composerInput.value = '';
         render();
+        window.posthog?.capture('comment_posted', { observation_id: obsId });
       } finally {
         composerSubmit.disabled = false;
       }

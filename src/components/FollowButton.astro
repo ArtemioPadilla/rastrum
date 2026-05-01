@@ -146,11 +146,13 @@ const signInPath = getLocalizedPath(lang, routes.signIn[lang] + '/');
           dbState = out.status === 'accepted' ? 'accepted' : 'pending';
           visible = dbState === 'accepted' ? 'following' : 'requested';
           paint(btn, visible, root);
+          window.posthog?.capture('user_followed', { target_user_id: targetId, status: dbState });
         } else if (dbState === 'pending' || dbState === 'accepted') {
           visible = 'follow';
           paint(btn, 'follow', root);
           await unfollowUser(targetId);
           dbState = 'none';
+          window.posthog?.capture('user_unfollowed', { target_user_id: targetId });
         }
       } catch (err) {
         dbState = prev.dbState;

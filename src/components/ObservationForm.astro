@@ -2462,6 +2462,7 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
     if (!obsDraft) return;
     const savedObs = await saveObservationToOutbox(obsDraft);
     lastSavedObservationId = savedObs.id;
+    window.posthog?.capture('observation_saved', { observation_id: savedObs.id });
     form.dispatchEvent(new CustomEvent('rastrum:form-saved'));
 
     // Attempt immediate sync if online; otherwise it'll flush on next online event.

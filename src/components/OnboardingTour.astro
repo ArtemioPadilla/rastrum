@@ -492,7 +492,13 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
     unlockScroll();
     markSeen();
     try { returnFocusEl?.focus(); } catch { /* noop */ }
-    try { window.dispatchEvent(new CustomEvent('rastrum:onboarding-event', { detail: { type: current === TOTAL - 1 ? 'completed' : 'dismissed', step: current } })); } catch { /* noop */ }
+    const outcomeType = current === TOTAL - 1 ? 'completed' : 'dismissed';
+    try { window.dispatchEvent(new CustomEvent('rastrum:onboarding-event', { detail: { type: outcomeType, step: current } })); } catch { /* noop */ }
+    if (outcomeType === 'completed') {
+      window.posthog?.capture('onboarding_completed', { steps_total: TOTAL });
+    } else {
+      window.posthog?.capture('onboarding_dismissed', { step_reached: current, steps_total: TOTAL });
+    }
   }
 
   function go(to: number): void {

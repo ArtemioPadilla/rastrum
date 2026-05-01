@@ -347,6 +347,18 @@ const v = (tr as unknown as { validation: Record<string, string> }).validation;
 
         // Parent decides which toast to show. Pass the actual outcome
         // so the queue view doesn't lie about promotion.
+        window.posthog?.capture('identification_suggested', {
+          observation_id: observationId,
+          scientific_name: sci,
+          confidence,
+          promoted_to_research_grade: promoted,
+        });
+        if (promoted) {
+          window.posthog?.capture('identification_promoted_to_research_grade', {
+            observation_id: observationId,
+            scientific_name: sci,
+          });
+        }
         window.dispatchEvent(new CustomEvent('rastrum:suggestion-submitted', {
           detail: { observation_id: observationId, promoted },
         }));

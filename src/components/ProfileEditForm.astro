@@ -658,6 +658,7 @@ const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } })
     }
     status?.classList.remove('hidden');
     setTimeout(() => status?.classList.add('hidden'), 3000);
+    window.posthog?.capture('profile_updated');
 
     // Save flips country_code_source to 'user'; hide the inferred badge.
     document.getElementById('country-inferred-badge')?.classList.add('hidden');

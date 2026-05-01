@@ -190,6 +190,12 @@ const sizeClasses = size === 'md'
         btn.disabled = true;
         try {
           await react({ target, target_id: targetId, kind: kind as 'fave' | 'helpful' | 'agree_id' | 'disagree_id' | 'needs_id' | 'confirm_id' });
+          window.posthog?.capture('observation_reaction_toggled', {
+            target,
+            target_id: targetId,
+            kind,
+            action: wasOn ? 'removed' : 'added',
+          });
         } catch (err) {
           // Rollback.
           paint(btn, wasOn);
