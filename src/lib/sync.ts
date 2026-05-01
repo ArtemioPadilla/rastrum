@@ -273,7 +273,7 @@ export function markLocalAIDownloadWarningShown(): void {
  * Run the identifier cascade against the freshly-synced observation.
  *
  * The cascade is the *plugin* layer (src/lib/identifiers/) rather than the
- * Edge Function's hardcoded waterfall. It walks every registered plugin
+ * Edge Function's hardcoded list. It walks every registered plugin
  * whose capabilities match (media + taxa + runtime), in cost order, and
  * stops at the first result above the accept threshold. Falls back to
  * Phi-3.5-vision on-device when the user opted in and cloud paths fail.
@@ -320,7 +320,7 @@ async function triggerIdentify(observationId: string): Promise<void> {
   // Camera-trap photos prefer the MegaDetector + SpeciesNet pipeline.
   // When PUBLIC_MEGADETECTOR_ENDPOINT is unset the plugin reports
   // model_not_bundled and the cascade transparently falls through to
-  // the standard waterfall (PlantNet → Claude → on-device).
+  // the standard cost-sorted race (PlantNet ∥ Claude ∥ on-device).
   const preferred: string[] = [];
   if (mediaKind === 'photo' && evidenceType === 'camera_trap') {
     preferred.push('camera_trap_megadetector');

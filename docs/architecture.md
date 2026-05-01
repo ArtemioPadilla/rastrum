@@ -99,7 +99,8 @@ src/lib/sync.ts → syncOutbox()
     │ (c) fire-and-forget identify + enrich-environment
     ▼
 identify Edge Function (cascade.ts)
-    │ PlantNet → Claude Haiku → on-device fallbacks
+    │ parallel race: PlantNet ∥ Claude Haiku ∥ on-device
+    │ first past confidence threshold wins
     ▼
 sync_primary_id_trigger (Postgres)
     │ denormalises obscure_level + location_obscured for RLS
@@ -113,28 +114,33 @@ The identification pipeline runs differently depending on where it's triggered. 
 
 **Client-side (Identify page — `/en/identify/`):** PlantNet, Claude, and Phi-vision fire in parallel. The first provider to return a result above its confidence threshold wins and cancels the others. If all fail, Phi-vision prompts the user to opt in to the local model download.
 
-**Server-side (sync.ts → `identify` Edge Function):** the classic serial waterfall via `cascade.ts`:
+**Server-side (sync.ts → `identify` Edge Function):** the same parallel race via `cascade.ts`. Available providers are sorted by license cost and fired concurrently; the first result above the accept threshold wins:
 
 ```
-PlantNet API (cloud, when key present)
-  ├─ score ≥ 0.7 → write identification, done
-  └─ score < 0.7 → fallthrough
-      Claude Haiku 4.5 (cloud, server key or BYO)
-        ├─ confidence ≥ 0.4 → write, done
-        └─ confidence < 0.4 → fallthrough
-            EfficientNet-Lite0 ONNX (in-browser, base classifier)
-              └─ Phi-3.5-vision (in-browser, last resort, capped at 0.35)
+runCascade() — parallel race, cost-sorted
+  ┌─────────────────────────────────────────────────────┐
+  │  PlantNet API        (free-quota · cloud)           │
+  │  Claude Haiku 4.5    (byo-key · cloud)              │  run concurrently
+  │  EfficientNet-Lite0  (free-nc · on-device ONNX)     │  via Promise.race
+  │  Phi-3.5-vision      (free-nc · on-device WebLLM)   │
+  └──────────────────────────┬──────────────────────────┘
+                             │
+                  first confidence ≥ 0.7 wins
+                  others cancelled (AbortController)
+                             │
+                  if none above threshold →
+                  best-of-all returned (needs_review)
 ```
 
-The serial cascade is deterministic by license cost: cloud first when keys are
-present, on-device when they aren't. The `force_provider` knob bypasses
-the waterfall for testing. All confidence < 0.4 results are blocked
+The cascade is deterministic by license cost: free plugins go first; BYO-key
+plugins run when keys are present. The `force_provider` knob bypasses
+the race for testing. All confidence < 0.4 results are blocked
 from research-grade by the `enforce_research_grade_quality` trigger.
 
 When offline at submit time, the outbox holds the row plus the binary;
 the cascade is deferred. On `online` event or `visibilitychange` returning
 to visible, `registerSyncTriggers()` runs `syncOutbox()`, which fires the
-server-side waterfall via the `identify` Edge Function.
+server-side cascade via the `identify` Edge Function.
 
 ### 3. Audio identification (BirdNET)
 
