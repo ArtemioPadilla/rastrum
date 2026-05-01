@@ -762,10 +762,21 @@ postForm?.addEventListener('submit', async (e) => {
     const weatherVal = (document.getElementById('obs2-weather') as HTMLSelectElement | null)?.value || null;
     const taxonInput = (document.getElementById('obs2-taxon-input') as HTMLInputElement | null)?.value.trim();
 
+    // MediaRecorder-produced Blobs sometimes have an empty `type` (notably
+    // iOS Safari and certain Android Chrome paths). Falling back to
+    // application/octet-stream causes sync.ts's MIME-prefix chain to mis-classify
+    // the file as `media_type='photo'`, which then breaks the share/obs page
+    // (broken-image card + audio player never mounts). Backfill a sensible
+    // MIME from the triaged kind so the type carries through.
     const mediaInputs = pipelineState.files.map(pf => ({
       blob: pf.file,
       blobId: pf.id,
-      mimeType: pf.file.type || 'application/octet-stream',
+      mimeType: pf.file.type || (
+        pf.kind === 'audio' ? 'audio/webm' :
+        pf.kind === 'video' ? 'video/webm' :
+        pf.kind === 'photo' ? 'image/jpeg' :
+        'application/octet-stream'
+      ),
       sizeBytes: pf.file.size,
       mediaType: pf.kind === 'audio' ? 'audio' as const : pf.kind === 'video' ? 'video' as const : 'photo' as const,
     }));

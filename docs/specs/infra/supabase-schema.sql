@@ -292,8 +292,12 @@ CREATE TABLE IF NOT EXISTS public.identifications (
   confidence      numeric CHECK (confidence BETWEEN 0 AND 1),
   source          text NOT NULL
                   CHECK (source IN (
+                    -- Server-side cascade
                     'plantnet','claude_haiku','claude_sonnet','onnx_offline','human',
-                    'birdnet_lite','onnx_efficientnet_lite0','camera_trap_megadetector','phi_vision'
+                    -- Client-side identifiers
+                    'birdnet_lite','onnx_efficientnet_lite0','camera_trap_megadetector','phi_vision',
+                    -- M32 multi-provider vision (each provider tags its result with its kind)
+                    'bedrock','openai','azure_openai','gemini','vertex_ai'
                   )),
   raw_response    jsonb,                   -- full API response
   is_primary      boolean NOT NULL DEFAULT true,
@@ -6652,6 +6656,10 @@ ALTER TABLE public.identifications
 ALTER TABLE public.identifications
   ADD CONSTRAINT identifications_source_check
   CHECK (source IN (
+    -- Server-side cascade
     'plantnet','claude_haiku','claude_sonnet','onnx_offline','human',
-    'birdnet_lite','onnx_efficientnet_lite0','camera_trap_megadetector','phi_vision'
+    -- Client-side identifiers (M03 + M31)
+    'birdnet_lite','onnx_efficientnet_lite0','camera_trap_megadetector','phi_vision',
+    -- M32 multi-provider vision (each provider tags its result with its kind)
+    'bedrock','openai','azure_openai','gemini','vertex_ai'
   ));
