@@ -15,6 +15,7 @@ import { resizeImage, uploadMedia } from './upload';
 import { escapeHtml as escAttr } from './escape';
 import { t } from '../i18n/utils';
 import { openConfirmDialog } from './confirm-dialog';
+import { correctIdentificationName } from './taxonomy-synonyms';
 
 type Ident = { scientific_name?: string; is_primary?: boolean } | undefined;
 
@@ -147,6 +148,8 @@ export async function wireManagePanelDetails(
       if (!navigator.onLine) {
         const sci = sciInput?.value.trim();
         if (sci) {
+          // Apply taxonomy synonym correction for known outdated names
+          const correctedSci = correctIdentificationName(sci);
           // Update the Dexie record's identification data
           try {
             const { getDB } = await import('./db');
@@ -155,20 +158,23 @@ export async function wireManagePanelDetails(
             if (record && record.data) {
               record.data.identification = {
                 ...record.data.identification,
-                scientificName: sci,
+                scientificName: correctedSci,
                 source: 'human' as const,
                 status: 'accepted' as const,
                 confidence: 0.95,
               };
-              // Mark for re-sync so the identification gets persisted server-side
+              // Always flip to 'pending' — records stuck in 'error' or 'draft'
+              // must also re-enter the sync queue after a species correction.
               await db.observations.update(obsId, {
                 data: record.data,
-                sync_status: record.sync_status === 'synced' ? 'pending' : record.sync_status,
+                sync_status: 'pending',
                 updated_at: new Date().toISOString(),
               });
               savedEl?.classList.remove('hidden');
               const speciesEl = document.getElementById('species');
-              if (speciesEl) speciesEl.textContent = sci;
+              if (speciesEl) speciesEl.textContent = correctedSci;
+              // If the user typed an outdated name, update the input
+              if (correctedSci !== sci && sciInput) sciInput.value = correctedSci;
               // Show offline indicator
               if (savedEl) {
                 savedEl.textContent = lang === 'es'
@@ -228,6 +234,8 @@ export async function wireManagePanelDetails(
 
         const sci = sciInput?.value.trim();
         if (sci) {
+          // Apply taxonomy synonym correction for known outdated names (#345)
+          const correctedSci = correctIdentificationName(sci);
           // Demote the current primary identification. Capture the error —
           // if RLS rejects this (stale session, wrong owner), we must not
           // proceed to the insert or the unique partial index will reject it.
@@ -247,7 +255,7 @@ export async function wireManagePanelDetails(
 
           const { error: idErr } = await supabase.from('identifications').insert({
             observation_id: obsId,
-            scientific_name: sci,
+            scientific_name: correctedSci,
             confidence: 0.95,
             source: 'human',
             is_primary: true,
@@ -261,8 +269,18 @@ export async function wireManagePanelDetails(
 
       savedEl?.classList.remove('hidden');
       const sci = sciInput?.value.trim();
-      const speciesEl = document.getElementById('species');
-      if (sci && speciesEl) speciesEl.textContent = sci;
+      if (sci) {
+        const correctedSci = correctIdentificationName(sci);
+        const speciesEl = document.getElementById('species');
+        if (speciesEl) speciesEl.textContent = correctedSci;
+        // If the user typed an outdated name, update the input to show the correction
+        if (correctedSci !== sci && sciInput) sciInput.value = correctedSci;
+      }
+      // Notify the page that identification data changed so it can
+      // re-fetch community IDs and other dependent sections.
+      window.dispatchEvent(new CustomEvent('rastrum:observation-updated', {
+        detail: { observationId: obsId },
+      }));
     } catch (err) {
       if (errEl) {
         errEl.textContent = err instanceof Error ? err.message : String(err);
