@@ -177,8 +177,13 @@ async function syncOne(record: ObservationRecord): Promise<void> {
   //      EfficientNet on image), persist that identification directly. Audio
   //      has no server-side identifier in the cascade, so without this step
   //      the observation lands as "Unknown species" forever.
+  //
+  //      Fix #343: also persist identifications with status 'needs_review',
+  //      and accept pipeline results that have confidence > 0 even when
+  //      scientificName is still empty (partial results with common names).
   const clientId = obs.identification;
-  if (clientId.scientificName && clientId.status === 'accepted') {
+  const hasIdentification = clientId.scientificName || (clientId.confidence > 0 && clientId.source !== 'human');
+  if (hasIdentification && (clientId.status === 'accepted' || clientId.status === 'needs_review')) {
     const supabase = getSupabase();
     const { error: clientIdErr } = await supabase.from('identifications').insert({
       observation_id: record.id,
@@ -186,6 +191,11 @@ async function syncOne(record: ObservationRecord): Promise<void> {
       confidence: Math.max(0, Math.min(1, clientId.confidence ?? 0)),
       source: clientId.source ?? 'human',
       is_primary: true,
+      raw_response: {
+        common_name_en: clientId.commonNameEn,
+        common_name_es: clientId.commonNameEs,
+        client_persisted: true,
+      },
     });
     if (clientIdErr) {
       console.warn('[rastrum] client identification persist failed', clientIdErr);
