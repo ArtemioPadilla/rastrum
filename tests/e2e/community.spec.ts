@@ -73,6 +73,6 @@ test.describe('community/observers — mobile', () => {
     await page.locator('#mobile-menu-toggle').click();
     const drawer = page.locator('#mobile-drawer');
     await expect(drawer).toBeVisible();
-    await expect(drawer.getByText('Community', { exact: true })).toBeVisible();
+    await expect(drawer.locator('p').filter({ hasText: /^Community$/ })).toBeVisible();
   });
 });

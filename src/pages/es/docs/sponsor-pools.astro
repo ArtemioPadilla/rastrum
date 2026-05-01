@@ -1,0 +1,12 @@
+---
+import DocLayout from '../../../layouts/DocLayout.astro';
+import SponsorPoolsDocView from '../../../components/SponsorPoolsDocView.astro';
+import { t } from '../../../i18n/utils';
+
+const lang = 'es';
+const tr = t(lang);
+---
+
+<DocLayout title={tr.docs.sections['sponsor-pools']} lang={lang} section="sponsor-pools" editPath="src/pages/es/docs/sponsor-pools.astro">
+  <SponsorPoolsDocView lang={lang} />
+</DocLayout>

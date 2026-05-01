@@ -1,0 +1,51 @@
+---
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const isEs = lang === 'es';
+---
+
+<article class="prose prose-zinc dark:prose-invert max-w-none">
+  <h1>{isEs ? 'Descubrimiento de Comunidad' : 'Community Discovery'}</h1>
+  <p class="lead text-lg text-zinc-600 dark:text-zinc-400">
+    {isEs
+      ? 'Encuentra observadores, expertos y naturalistas cerca de ti. Filtra por país, taxón, actividad reciente y más — todo desde una sola página.'
+      : 'Find observers, experts, and naturalists near you. Filter by country, taxon, recent activity, and more — all from a single page.'}
+  </p>
+
+  <p>
+    {isEs
+      ? 'La página de comunidad reúne a todos los observadores de Rastrum en un directorio filtrable. Puedes ordenar por número de especies, actividad reciente o karma, y filtrar por país, grupo taxonómico o rol de experto. Si estás autenticado, el filtro "Cerca de mí" muestra observadores en tu región usando tu centroide aproximado — nunca tu ubicación exacta.'
+      : 'The community page brings together all Rastrum observers in a filterable directory. You can sort by species count, recent activity, or karma, and filter by country, taxon group, or expert role. If you\'re signed in, the "Nearby" filter shows observers in your region using your approximate centroid — never your exact location.'}
+  </p>
+
+  <h2>{isEs ? 'Funcionalidades' : 'Features'}</h2>
+  <ul>
+    <li><strong>{isEs ? 'Directorio de observadores' : 'Observer directory'}:</strong> {isEs
+      ? 'Página paginada con tarjetas de perfil, conteo de especies, racha activa e insignia de experto.'
+      : 'Paginated page with profile cards, species count, active streak, and expert badge.'}</li>
+    <li><strong>{isEs ? 'Filtros combinables' : 'Composable filters'}:</strong> {isEs
+      ? 'Ordenar (especies, actividad 7d/30d, karma), filtrar por país (ISO-3166), solo expertos, y cercanía.'
+      : 'Sort (species, 7d/30d activity, karma), filter by country (ISO-3166), experts only, and nearby.'}</li>
+    <li><strong>{isEs ? 'Filtro de cercanía' : 'Nearby filter'}:</strong> {isEs
+      ? 'Disponible solo para usuarios autenticados. Usa el centroide de tus observaciones — la ubicación precisa nunca se expone.'
+      : 'Available only for signed-in users. Uses the centroid of your observations — precise location is never exposed.'}</li>
+    <li><strong>{isEs ? 'Opt-out de leaderboards' : 'Leaderboard opt-out'}:</strong> {isEs
+      ? 'Cualquier usuario puede ocultarse del directorio desde Perfil → Editar sin afectar su perfil público.'
+      : 'Any user can hide from the directory via Profile → Edit without affecting their public profile.'}</li>
+    <li><strong>{isEs ? 'Estado de URL' : 'URL state'}:</strong> {isEs
+      ? 'Todos los filtros se serializan en la URL para que puedas compartir o guardar búsquedas específicas.'
+      : 'All filters are serialized into the URL so you can share or bookmark specific searches.'}</li>
+  </ul>
+
+  <h2>{isEs ? 'Privacidad' : 'Privacy'}</h2>
+  <p>
+    {isEs
+      ? 'El centroide de cada usuario se calcula a partir de sus observaciones y solo es visible para usuarios autenticados a través de una vista SQL dedicada. Los usuarios anónimos no pueden acceder a datos de ubicación. El opt-out de leaderboards es independiente de la configuración de perfil público.'
+      : 'Each user\'s centroid is computed from their observations and is only visible to authenticated users via a dedicated SQL view. Anonymous users cannot access location data. The leaderboard opt-out is independent of the public profile setting.'}
+  </p>
+
+  <p class="text-sm text-zinc-500 mt-8">
+    {isEs ? 'Spec técnica: ' : 'Technical spec: '}
+    <a href="https://github.com/ArtemioPadilla/rastrum/blob/main/docs/specs/modules/28-community-discovery.md" class="underline">docs/specs/modules/28-community-discovery.md</a>
+  </p>
+</article>

@@ -1,0 +1,51 @@
+---
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const isEs = lang === 'es';
+---
+
+<article class="prose prose-zinc dark:prose-invert max-w-none">
+  <h1>{isEs ? 'Pools de Patrocinio y Multi-Proveedor' : 'Sponsor Pools & Multi-Provider Vision'}</h1>
+  <p class="lead text-lg text-zinc-600 dark:text-zinc-400">
+    {isEs
+      ? 'Rastrum soporta múltiples proveedores de visión AI (Anthropic, Google Vertex, OpenAI) y permite a los sponsors elegir qué modelo usan sus beneficiarios. Los pools de plataforma distribuyen créditos comunitarios.'
+      : 'Rastrum supports multiple AI vision providers (Anthropic, Google Vertex, OpenAI) and lets sponsors choose which model their beneficiaries use. Platform pools distribute community credits.'}
+  </p>
+
+  <p>
+    {isEs
+      ? 'El sistema multi-proveedor extiende los patrocinios de AI (ver la página de Patrocinios IA) con soporte para múltiples backends de visión. Cada credencial de sponsor puede especificar un modelo preferido, y el cascade de identificación respeta esa preferencia. Los pools de plataforma permiten que operadores o instituciones donen créditos que se distribuyen automáticamente entre usuarios sin BYO key.'
+      : 'The multi-provider system extends AI sponsorships (see the AI Sponsorships page) with support for multiple vision backends. Each sponsor credential can specify a preferred model, and the identification cascade respects that preference. Platform pools let operators or institutions donate credits that are automatically distributed among users without a BYO key.'}
+  </p>
+
+  <h2>{isEs ? 'Funcionalidades' : 'Features'}</h2>
+  <ul>
+    <li><strong>{isEs ? 'Múltiples proveedores' : 'Multiple providers'}:</strong> {isEs
+      ? 'Anthropic Claude, Google Vertex AI y OpenAI GPT-4o como backends de visión. El cascade elige por costo, licencia y disponibilidad.'
+      : 'Anthropic Claude, Google Vertex AI, and OpenAI GPT-4o as vision backends. The cascade picks by cost, license, and availability.'}</li>
+    <li><strong>{isEs ? 'Modelo por sponsor' : 'Per-sponsor model'}:</strong> {isEs
+      ? 'Cada sponsor puede fijar un modelo preferido para sus beneficiarios (ej. solo Haiku para controlar costos).'
+      : 'Each sponsor can pin a preferred model for their beneficiaries (e.g. Haiku-only to control costs).'}</li>
+    <li><strong>{isEs ? 'Pools de plataforma' : 'Platform pools'}:</strong> {isEs
+      ? 'Credenciales institucionales que se comparten entre todos los usuarios elegibles. Cuota mensual global con distribución equitativa.'
+      : 'Institutional credentials shared across all eligible users. Global monthly cap with fair distribution.'}</li>
+    <li><strong>{isEs ? 'Auto-rotación' : 'Auto-rotation'}:</strong> {isEs
+      ? 'Cuando un proveedor falla o alcanza su límite, el cascade rota automáticamente al siguiente proveedor disponible.'
+      : 'When a provider fails or hits its limit, the cascade automatically rotates to the next available provider.'}</li>
+    <li><strong>{isEs ? 'Karma por pool' : 'Pool karma'}:</strong> {isEs
+      ? 'Los contribuyentes a pools de plataforma ganan karma proporcional al uso de sus créditos donados.'
+      : 'Platform pool contributors earn karma proportional to the usage of their donated credits.'}</li>
+  </ul>
+
+  <h2>{isEs ? 'Cómo funciona el cascade' : 'How the cascade works'}</h2>
+  <p>
+    {isEs
+      ? 'Cuando un usuario identifica una foto, Rastrum evalúa las credenciales disponibles en orden: (1) BYO key del usuario, (2) credencial de sponsor con modelo preferido, (3) pool de plataforma, (4) PlantNet gratuito, (5) modelo on-device. Si el proveedor preferido falla, el sistema rota al siguiente sin intervención del usuario.'
+      : 'When a user identifies a photo, Rastrum evaluates available credentials in order: (1) user\'s BYO key, (2) sponsor credential with preferred model, (3) platform pool, (4) free PlantNet, (5) on-device model. If the preferred provider fails, the system rotates to the next one without user intervention.'}
+  </p>
+
+  <p class="text-sm text-zinc-500 mt-8">
+    {isEs ? 'Spec técnica: ' : 'Technical spec: '}
+    <a href="https://github.com/ArtemioPadilla/rastrum/blob/main/docs/specs/modules/32-multi-provider-vision.md" class="underline">docs/specs/modules/32-multi-provider-vision.md</a>
+  </p>
+</article>
