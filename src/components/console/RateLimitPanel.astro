@@ -1,0 +1,118 @@
+---
+import { t } from '../../i18n/utils';
+
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const isEs = lang === 'es';
+---
+
+<div id="ratelimit-panel" class="space-y-3">
+  <div class="flex items-center justify-between">
+    <h3 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+      {isEs ? 'Estado de rate limits' : 'Rate limit status'}
+    </h3>
+    <button id="ratelimit-refresh" type="button" class="text-xs text-zinc-500 hover:text-zinc-700 underline">
+      {isEs ? 'Actualizar' : 'Refresh'}
+    </button>
+  </div>
+
+  <div id="ratelimit-loading" class="text-xs text-zinc-500 italic">
+    {isEs ? 'Cargando...' : 'Loading...'}
+  </div>
+
+  <div id="ratelimit-not-configured" class="hidden text-xs text-zinc-400">
+    {isEs ? 'Rate limiting no configurado.' : 'Rate limiting not configured.'}
+  </div>
+
+  <div id="ratelimit-empty" class="hidden text-xs text-zinc-400">
+    {isEs ? 'Sin actividad de rate limit reciente.' : 'No recent rate limit activity.'}
+  </div>
+
+  <div id="ratelimit-list" class="hidden overflow-x-auto rounded border border-zinc-200 dark:border-zinc-800">
+    <table class="min-w-full text-xs">
+      <thead class="bg-zinc-50 dark:bg-zinc-900/40 text-left uppercase tracking-wide text-zinc-500">
+        <tr>
+          <th class="px-3 py-2">{isEs ? 'Actor' : 'Actor'}</th>
+          <th class="px-3 py-2">{isEs ? 'Bucket' : 'Bucket'}</th>
+          <th class="px-3 py-2">{isEs ? 'Conteo' : 'Count'}</th>
+          <th class="px-3 py-2">{isEs ? 'Límite' : 'Limit'}</th>
+          <th class="px-3 py-2">{isEs ? 'Reset' : 'Reset'}</th>
+          <th class="px-3 py-2">{isEs ? 'Estado' : 'Status'}</th>
+        </tr>
+      </thead>
+      <tbody id="ratelimit-tbody" class="divide-y divide-zinc-100 dark:divide-zinc-800"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  import { getSupabase } from '../../lib/supabase';
+  import { escapeHtml } from '../../lib/escape';
+
+  const listEl = document.getElementById('ratelimit-list');
+  const tbodyEl = document.getElementById('ratelimit-tbody');
+  const loadingEl = document.getElementById('ratelimit-loading');
+  const emptyEl = document.getElementById('ratelimit-empty');
+  const notConfiguredEl = document.getElementById('ratelimit-not-configured');
+
+  async function load() {
+    loadingEl?.classList.remove('hidden');
+    emptyEl?.classList.add('hidden');
+    listEl?.classList.add('hidden');
+    notConfiguredEl?.classList.add('hidden');
+
+    try {
+      const supabase = getSupabase();
+      const { data, error } = await supabase
+        .from('rate_limit_buckets')
+        .select('*')
+        .order('updated_at', { ascending: false })
+        .limit(100);
+
+      loadingEl?.classList.add('hidden');
+
+      if (error) {
+        if (error.message.includes('does not exist') || error.code === '42P01') {
+          notConfiguredEl?.classList.remove('hidden');
+          return;
+        }
+        throw error;
+      }
+
+      if (!data || data.length === 0) {
+        emptyEl?.classList.remove('hidden');
+        return;
+      }
+
+      if (tbodyEl) {
+        tbodyEl.innerHTML = data.map((row: Record<string, unknown>) => {
+          const count = Number(row.current_count ?? 0);
+          const limit = Number(row.max_count ?? 100);
+          const pct = limit > 0 ? count / limit : 0;
+          const statusCls = pct >= 1 ? 'text-red-600' : pct >= 0.8 ? 'text-amber-600' : 'text-emerald-600';
+          const statusLabel = pct >= 1 ? 'exceeded' : pct >= 0.8 ? 'warning' : 'ok';
+          const resetAt = row.reset_at ? new Date(row.reset_at as string).toLocaleTimeString() : '—';
+          return `<tr>
+            <td class="px-3 py-2 font-mono text-[11px]">${escapeHtml(String(row.actor_id ?? '').slice(0, 12))}…</td>
+            <td class="px-3 py-2">${escapeHtml(String(row.bucket_name ?? ''))}</td>
+            <td class="px-3 py-2 tabular-nums">${count}</td>
+            <td class="px-3 py-2 tabular-nums">${limit}</td>
+            <td class="px-3 py-2 text-zinc-500">${escapeHtml(resetAt)}</td>
+            <td class="px-3 py-2 ${statusCls} font-medium">${statusLabel}</td>
+          </tr>`;
+        }).join('');
+      }
+
+      listEl?.classList.remove('hidden');
+    } catch (err) {
+      loadingEl?.classList.add('hidden');
+      if (tbodyEl) {
+        tbodyEl.innerHTML = `<tr><td colspan="6" class="px-3 py-2 text-red-500">${escapeHtml((err as Error).message)}</td></tr>`;
+        listEl?.classList.remove('hidden');
+      }
+    }
+  }
+
+  document.getElementById('ratelimit-refresh')?.addEventListener('click', () => load());
+  load();
+</script>
