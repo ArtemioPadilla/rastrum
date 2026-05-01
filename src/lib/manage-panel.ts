@@ -207,33 +207,60 @@ export async function wireManagePanelDetails(
         weather: weatherEl?.value ?? '',
         establishment_means: estabEl?.value ?? '',
       });
-      const { error: obsErr } = await supabase
-        .from('observations')
-        .update(payload)
-        .eq('id', obsId);
-      if (obsErr) throw obsErr;
 
-      const sci = sciInput?.value.trim();
-      if (sci) {
-        await supabase.from('identifications')
-          .update({ is_primary: false })
-          .eq('observation_id', obsId)
-          .eq('is_primary', true);
-        const { data: { user: viewer } } = await supabase.auth.getUser();
-        const { error: idErr } = await supabase.from('identifications').insert({
-          observation_id: obsId,
-          scientific_name: sci,
-          confidence: 0.95,
-          source: 'human',
-          is_primary: true,
-          validated_by: null,
-          validated_at: new Date().toISOString(),
-          raw_response: { manual_override: true, by: viewer?.id ?? null },
-        });
-        if (idErr) throw idErr;
-      }
+      // Wrap the entire online save in a timeout so the button never
+      // stays disabled indefinitely (e.g. stale auth lock, network limbo).
+      const SAVE_TIMEOUT_MS = 15_000;
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(
+          lang === 'es'
+            ? 'La operación tardó demasiado. Verifica tu conexión e intenta de nuevo.'
+            : 'Operation timed out. Check your connection and try again.'
+        )), SAVE_TIMEOUT_MS),
+      );
+
+      await Promise.race([timeout, (async () => {
+        const { error: obsErr } = await supabase
+          .from('observations')
+          .update(payload)
+          .eq('id', obsId);
+        if (obsErr) throw obsErr;
+
+        const sci = sciInput?.value.trim();
+        if (sci) {
+          // Demote the current primary identification. Capture the error —
+          // if RLS rejects this (stale session, wrong owner), we must not
+          // proceed to the insert or the unique partial index will reject it.
+          const { error: demoteErr } = await supabase.from('identifications')
+            .update({ is_primary: false })
+            .eq('observation_id', obsId)
+            .eq('is_primary', true);
+          if (demoteErr) throw demoteErr;
+
+          let viewerId: string | null = null;
+          try {
+            const { data: { user: viewer } } = await supabase.auth.getUser();
+            viewerId = viewer?.id ?? null;
+          } catch {
+            // Auth fetch failed — proceed without viewer ID rather than hang
+          }
+
+          const { error: idErr } = await supabase.from('identifications').insert({
+            observation_id: obsId,
+            scientific_name: sci,
+            confidence: 0.95,
+            source: 'human',
+            is_primary: true,
+            validated_by: null,
+            validated_at: new Date().toISOString(),
+            raw_response: { manual_override: true, by: viewerId },
+          });
+          if (idErr) throw idErr;
+        }
+      })()]);
 
       savedEl?.classList.remove('hidden');
+      const sci = sciInput?.value.trim();
       const speciesEl = document.getElementById('species');
       if (sci && speciesEl) speciesEl.textContent = sci;
     } catch (err) {
