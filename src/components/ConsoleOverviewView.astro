@@ -239,7 +239,7 @@ const tr = t(lang);
     const alerts: AlertEntry[] = [];
 
     if (openReportsCount > 0) {
-      alerts.push({ text: alertReportsTpl.replace('{n}', String(openReportsCount)), href: '../flag-queue/', color: 'amber' });
+      alerts.push({ text: alertReportsTpl.replace('{n}', String(openReportsCount)), href: lang === 'es' ? '/es/consola/cola-banderas/' : '/en/console/flag-queue/', color: 'amber' });
     }
     if (pendingExpertsCount > 0) {
       alerts.push({ text: alertExpertsTpl.replace('{n}', String(pendingExpertsCount)), href: '../experts/', color: 'amber' });

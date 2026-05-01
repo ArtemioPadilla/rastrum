@@ -140,7 +140,7 @@ const docColumns = [
     <span class="hidden sm:block w-px h-6 bg-zinc-200 dark:bg-zinc-800"></span>
 
     <!-- Verbs (left) -->
-    <nav class="hidden sm:flex items-center gap-5 text-sm">
+    <nav class="hidden sm:flex items-center gap-5 text-sm min-w-0 overflow-hidden">
       <a href={getLocalizedPath(lang, routes.observe[locale] + '/')}
          data-tour="observe-nav"
          class:list={[
@@ -171,7 +171,7 @@ const docColumns = [
     </nav>
 
     <!-- Reference (right of verbs, before auth) -->
-    <nav class="hidden sm:flex items-center gap-5 text-sm ml-auto">
+    <nav class="hidden lg:flex items-center gap-5 text-sm ml-auto">
       <a href={getLocalizedPath(lang, routes.about[locale] + '/')}
          class:list={[
            'relative pb-1 transition-colors after:content-[""] after:absolute after:left-0 after:right-0 after:-bottom-3 after:h-[2px] after:rounded after:transition-transform after:origin-left',
@@ -194,7 +194,7 @@ const docColumns = [
     </nav>
 
     <!-- Auth + utilities — ml-auto on mobile pushes to the right edge since the reference nav (which carries ml-auto on desktop) is hidden under sm: -->
-    <div class="flex items-center gap-2 ml-auto sm:ml-2">
+    <div class="flex items-center gap-2 ml-auto sm:ml-2 shrink-0">
       <!-- Search trigger (⌕) — mobile only (desktop version lives in the reference nav above) -->
       <button
         id="hdr-search-btn-mobile"
@@ -215,7 +215,7 @@ const docColumns = [
       </a>
       <SyncPill lang={locale} />
       <BellIcon lang={locale} />
-      <div id="avatar-wrap" class="hidden relative">
+      <div id="avatar-wrap" class="hidden relative shrink-0">
         <button id="avatar-btn" aria-label="Account menu" class="block rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500">
           <img id="header-avatar" src="" alt="" class="w-8 h-8 rounded-full bg-emerald-600 object-cover" />
         </button>
