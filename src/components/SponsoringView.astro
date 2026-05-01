@@ -451,6 +451,7 @@ const i18nBag = {
     if (!label || !secret) return;
     try {
       await createCredential({ label, secret, kind, preferred_model, endpoint });
+      window.posthog?.capture('sponsorship_credential_added', { kind });
       (document.getElementById('cred-secret-input') as HTMLInputElement).value = '';
       (document.getElementById('cred-model-input') as HTMLInputElement).value = '';
       (document.getElementById('cred-endpoint-input') as HTMLInputElement).value = '';
