@@ -4885,6 +4885,12 @@ CREATE POLICY projects_owner_delete ON public.projects
   USING (owner_user_id = auth.uid());
 
 DROP POLICY IF EXISTS project_members_read ON public.project_members;
+-- Fixed 2026-05-01: removed subquery back to projects to prevent 42P17 recursion.
+-- The cycle was: UPDATE projects → projects_public_read → project_members_read
+-- → SELECT FROM projects → loop.
+-- Members can still see their own memberships. Project owners see all members
+-- via the project_members_owner_write policy which already has a projects subquery
+-- gated on owner_user_id (not triggered by member SELECT).
 CREATE POLICY project_members_read ON public.project_members
   FOR SELECT
   USING (
@@ -4892,7 +4898,7 @@ CREATE POLICY project_members_read ON public.project_members
     OR EXISTS (
       SELECT 1 FROM public.projects p
        WHERE p.id = project_members.project_id
-         AND (p.visibility = 'public' OR p.owner_user_id = auth.uid())
+         AND p.owner_user_id = auth.uid()
     )
   );
 
