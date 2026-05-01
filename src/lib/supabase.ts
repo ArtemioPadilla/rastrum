@@ -48,6 +48,7 @@ export function getSupabase(): SupabaseClient {
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
+      flowType: 'pkce',
       storageKey: 'rastrum-auth-v1',
       ...(lock ? { lock } : {}),
     },
