@@ -2,32 +2,32 @@ import { describe, it, expect } from 'vitest';
 import { getFabTarget, isActiveSection } from './chrome-helpers';
 
 describe('getFabTarget', () => {
-  it('default: any non-observe page → /observe (auth-respecting)', () => {
+  it('default: any non-observe page → /observe', () => {
     expect(getFabTarget('/en/explore/map/', 'en')).toEqual({
-      href: '/en/observe/', mode: 'observe',
+      href: '/en/observe/', onObserve: false,
     });
     expect(getFabTarget('/en/profile/', 'en')).toEqual({
-      href: '/en/observe/', mode: 'observe',
+      href: '/en/observe/', onObserve: false,
     });
     expect(getFabTarget('/es/explorar/', 'es')).toEqual({
-      href: '/es/observar/', mode: 'observe',
+      href: '/es/observar/', onObserve: false,
     });
   });
 
-  it('on /observe (en) → /observe?mode=identify in quick mode', () => {
+  it('on /observe (en) → onObserve is true (FAB triggers camera)', () => {
     expect(getFabTarget('/en/observe/', 'en')).toEqual({
-      href: '/en/observe/', mode: 'quick-id',
+      href: '/en/observe/', onObserve: true,
     });
   });
 
-  it('on /observar (es) → /observar?mode=identify in quick mode', () => {
+  it('on /observar (es) → onObserve is true', () => {
     expect(getFabTarget('/es/observar/', 'es')).toEqual({
-      href: '/es/observar/', mode: 'quick-id',
+      href: '/es/observar/', onObserve: true,
     });
   });
 
   it('handles missing trailing slash on observe', () => {
-    expect(getFabTarget('/en/observe', 'en').mode).toBe('quick-id');
+    expect(getFabTarget('/en/observe', 'en').onObserve).toBe(true);
   });
 });
 

@@ -24,13 +24,7 @@ const tr = t(lang);
         <span>{tr.home.cta}</span>
         <span class="text-xs font-normal opacity-80">{tr.home.cta_subtitle}</span>
       </a>
-      <!-- CTA secundario: Identificación rápida (sin guardar) -->
-      <a
-        href={getLocalizedPath(lang, routes.identify[lang] + '/')}
-        class="inline-block px-6 py-3 border border-zinc-300 dark:border-zinc-700 hover:border-emerald-500/50 text-zinc-700 dark:text-zinc-300 font-medium rounded-lg transition-colors"
-      >
-        {tr.home.cta_identify}
-      </a>
+      <!-- CTAs secundarios -->
       <a
         href={getDocPath(lang)}
         class="inline-block px-6 py-3 border border-zinc-300 dark:border-zinc-700 hover:border-emerald-500/50 text-zinc-700 dark:text-zinc-300 font-medium rounded-lg transition-colors"
