@@ -455,8 +455,10 @@ Deno.serve(async (req: Request) => {
   }
 
   // ── notifications/initialized ─────────────────────────────────────
+  // Streamable HTTP (2025-03-26) expects 202 Accepted for notifications.
+  // Legacy SSE transport also sends this; both are fine with 202.
   if (body.method === 'notifications/initialized') {
-    return new Response('', { status: 204, headers: corsHeaders });
+    return new Response(null, { status: 202, headers: corsHeaders });
   }
 
   // Everything below requires auth.
