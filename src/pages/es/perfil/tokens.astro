@@ -179,30 +179,34 @@ const tr = t(lang) as any;
     const expiresEl = document.getElementById('token-expires') as HTMLSelectElement;
     const expires_in_days = expiresEl.value ? parseInt(expiresEl.value) : undefined;
 
-    const res = await fetch(TOKENS_URL, {
-      method: 'POST',
-      headers: {
-        Authorization: await getAuthHeader(),
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ name, scopes, expires_in_days }),
-    });
-
-    const data = await res.json();
-    if (data.token) {
+    const btn = e.currentTarget?.querySelector('button[type=submit]') as HTMLButtonElement | null;
+    if (btn) { btn.disabled = true; btn.textContent = 'Creando…'; }
+    try {
+      const res = await fetch(TOKENS_URL, {
+        method: 'POST',
+        headers: {
+          Authorization: await getAuthHeader(),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name, scopes, expires_in_days }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? `Error ${res.status}`);
       const banner = document.getElementById('new-token-banner')!;
       const val = document.getElementById('new-token-value')!;
       val.textContent = data.token;
       banner.classList.remove('hidden');
       banner.scrollIntoView({ behavior: 'smooth' });
-
       document.getElementById('copy-btn')!.onclick = () => {
         navigator.clipboard.writeText(data.token);
         (document.getElementById('copy-btn') as HTMLButtonElement).textContent = '✓';
       };
-
       (document.getElementById('token-name') as HTMLInputElement).value = '';
       loadTokens();
+    } catch (err) {
+      alert(`Error al crear el token: ${err instanceof Error ? err.message : err}`);
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Crear token'; }
     }
   });
 

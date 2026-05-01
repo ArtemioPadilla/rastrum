@@ -136,13 +136,16 @@ const tr = t(lang) as any;
     const scopes = Array.from(document.querySelectorAll<HTMLInputElement>('input[name="scope"]:checked')).map(el => el.value);
     const expiresEl = document.getElementById('token-expires') as HTMLSelectElement;
     const expires_in_days = expiresEl.value ? parseInt(expiresEl.value) : undefined;
-    const res = await fetch(TOKENS_URL, {
-      method: 'POST',
-      headers: { Authorization: await getAuthHeader(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, scopes, expires_in_days }),
-    });
-    const data = await res.json();
-    if (data.token) {
+    const btn = e.currentTarget?.querySelector('button[type=submit]') as HTMLButtonElement | null;
+    if (btn) { btn.disabled = true; btn.textContent = 'Creating…'; }
+    try {
+      const res = await fetch(TOKENS_URL, {
+        method: 'POST',
+        headers: { Authorization: await getAuthHeader(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, scopes, expires_in_days }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? `Error ${res.status}`);
       const banner = document.getElementById('new-token-banner')!;
       document.getElementById('new-token-value')!.textContent = data.token;
       banner.classList.remove('hidden');
@@ -153,6 +156,10 @@ const tr = t(lang) as any;
       };
       (document.getElementById('token-name') as HTMLInputElement).value = '';
       loadTokens();
+    } catch (err) {
+      alert(`Failed to create token: ${err instanceof Error ? err.message : err}`);
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Create token'; }
     }
   });
 
