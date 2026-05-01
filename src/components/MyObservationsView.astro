@@ -178,6 +178,7 @@ const tabs = [
 <script>
   import { getSupabase } from '../lib/supabase';
   import { isSyncFilter, type SyncFilter } from '../lib/social';
+  import { buildBugReportUrl } from '../lib/bug-report';
 
   type Lang = 'en' | 'es';
 
@@ -218,16 +219,8 @@ const tabs = [
     const errorDetail = syncError ? syncError.slice(0, 80) : '';
     let bugBtn = '';
     if (syncError) {
-      const issueTitle = encodeURIComponent(`Sync error: ${syncError.slice(0, 60)}`);
-      const issueBody = encodeURIComponent(
-        `**Error:** ${syncError}\n` +
-        `**Observation ID:** ${obsId ?? 'unknown'}\n` +
-        `**Observation:** ${obsName ?? 'unknown'}\n` +
-        `**Timestamp:** ${new Date().toISOString()}\n` +
-        `**User agent:** ${navigator.userAgent}`
-      );
-      const issueUrl = `https://github.com/ArtemioPadilla/rastrum/issues/new?title=${issueTitle}&body=${issueBody}`;
-      bugBtn = `<a href="${issueUrl}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-red-700 dark:text-red-400 underline hover:no-underline" aria-label="${reportLabel}">${reportLabel}</a>`;
+      // Use data attributes — click handler calls buildBugReportUrl() async with full telemetry
+      bugBtn = `<button type="button" class="mo-report-bug-btn inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-red-700 dark:text-red-400 underline hover:no-underline" data-bug-error="${escapeText(syncError)}" data-bug-obs-id="${escapeText(obsId ?? '')}" data-bug-obs-name="${escapeText(obsName ?? '')}" aria-label="${reportLabel}">${reportLabel}</button>`;
     }
     return `<span class="inline-flex flex-wrap items-center gap-1 rounded-full bg-red-100 dark:bg-red-900/30 px-2 py-0.5 text-[11px] font-semibold text-red-800 dark:text-red-300">${errorLabel}${errorDetail ? `<span class="font-normal opacity-80 ml-1">${escapeText(errorDetail)}</span>` : ''}${bugBtn}</span>`;
   }
@@ -617,6 +610,27 @@ const tabs = [
             const id = btn.dataset.shareWhenId ?? '';
             const name = btn.dataset.shareWhenName ?? 'Rastrum';
             if (id) queueShareWhenSynced(id, name);
+          });
+        });
+        // Wire freshly-rendered "report bug" buttons.
+        list.querySelectorAll<HTMLButtonElement>('button.mo-report-bug-btn:not([data-bound])').forEach((btn) => {
+          btn.dataset.bound = '1';
+          btn.addEventListener('click', async (ev) => {
+            ev.preventDefault();
+            btn.textContent = '...';
+            btn.disabled = true;
+            try {
+              const url = await buildBugReportUrl({
+                title: `Sync error: ${(btn.dataset.bugError ?? '').slice(0, 60)}`,
+                errorMsg: btn.dataset.bugError,
+                obsId: btn.dataset.bugObsId,
+                obsName: btn.dataset.bugObsName,
+              });
+              window.open(url, '_blank', 'noopener');
+            } finally {
+              btn.textContent = root?.dataset.labelSyncReportBug ?? 'Report bug';
+              btn.disabled = false;
+            }
           });
         });
       }
