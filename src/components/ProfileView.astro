@@ -23,12 +23,17 @@ const { lang } = Astro.props;
 const tr = t(lang);
 const locale = lang as Locale;
 
-const myObservationsPath = getLocalizedPath(lang, routes.profileObservations[locale] + '/');
-const settingsPath       = getLocalizedPath(lang, routes.profileSettings[locale] + '/profile/');
-const publicProfileBase  = getLocalizedPath(lang, routes.profileUser[locale] + '/');
+const myObservationsPath    = getLocalizedPath(lang, routes.profileObservations[locale] + '/');
+const settingsPath          = getLocalizedPath(lang, routes.profileSettings[locale] + '/profile/');
+const publicProfileBase     = getLocalizedPath(lang, routes.profileUser[locale] + '/');
+const importPath            = getLocalizedPath(lang, routes.profileImport[locale] + '/');
+const cameraTrapPath        = getLocalizedPath(lang, routes.profileImportCameraTrap[locale] + '/');
+const exportPath            = getLocalizedPath(lang, routes.profileExport[locale] + '/');
+const tokensPath            = getLocalizedPath(lang, routes.profileTokens[locale] + '/');
 const k = (tr as unknown as { karma: Record<string, string> }).karma;
 const expertApplyPath = getLocalizedPath(lang, lang === 'es' ? '/es/perfil/aplicar-experto/' : '/en/profile/expert-apply/');
 const ep = (tr as unknown as { profile: { expert_prompt: Record<string, string> } }).profile.expert_prompt;
+const pt = (tr as unknown as { profile: Record<string, string> }).profile;
 ---
 
 <div class="max-w-3xl mx-auto pb-28 sm:pb-6">
@@ -175,6 +180,35 @@ const ep = (tr as unknown as { profile: { expert_prompt: Record<string, string> 
         <ul id="karma-expertise-list" class="space-y-1 text-sm">
           <li class="text-xs text-zinc-500 italic">{k.expertise_empty}</li>
         </ul>
+      </div>
+    </section>
+
+    <!-- Data tools (#222) — Import / Camera-trap / Export / API tokens -->
+    <section class="mb-8">
+      <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-3">
+        {pt.tools_heading}
+      </h2>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <a href={importPath} class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 hover:border-emerald-400 dark:hover:border-emerald-700 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors group">
+          <div class="text-xl mb-2">📥</div>
+          <p class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 group-hover:text-emerald-700 dark:group-hover:text-emerald-400">{pt.tools_import}</p>
+          <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">{pt.tools_import_desc}</p>
+        </a>
+        <a href={cameraTrapPath} class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 hover:border-emerald-400 dark:hover:border-emerald-700 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors group">
+          <div class="text-xl mb-2">📷</div>
+          <p class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 group-hover:text-emerald-700 dark:group-hover:text-emerald-400">{pt.tools_camera_trap}</p>
+          <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">{pt.tools_camera_trap_desc}</p>
+        </a>
+        <a href={exportPath} class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 hover:border-emerald-400 dark:hover:border-emerald-700 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors group">
+          <div class="text-xl mb-2">📤</div>
+          <p class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 group-hover:text-emerald-700 dark:group-hover:text-emerald-400">{pt.tools_export}</p>
+          <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">{pt.tools_export_desc}</p>
+        </a>
+        <a href={tokensPath} class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 hover:border-emerald-400 dark:hover:border-emerald-700 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors group">
+          <div class="text-xl mb-2">🔑</div>
+          <p class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 group-hover:text-emerald-700 dark:group-hover:text-emerald-400">{pt.tools_tokens}</p>
+          <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">{pt.tools_tokens_desc}</p>
+        </a>
       </div>
     </section>
 

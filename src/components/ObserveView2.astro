@@ -65,6 +65,67 @@ const weathers = WEATHERS;
     </div>
   </div>
 
+  <!-- AI mode selector (#296) -->
+  <div id="obs2-ai-mode-selector" class="hidden">
+    <div class="flex items-center gap-2 flex-wrap">
+      <span class="text-xs font-medium text-zinc-500 dark:text-zinc-400 shrink-0">
+        {observeStr.ai_mode_label ?? (isEs ? "Fuente de IA" : "AI source")}:
+      </span>
+      <div class="flex rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden text-xs" role="group">
+        <button type="button" data-mode="sponsored"
+          class="obs2-mode-btn px-3 py-1.5 font-medium transition-colors bg-emerald-700 text-white">
+          {observeStr.ai_mode_sponsored ?? (isEs ? "Patrocinado" : "Sponsored")}
+        </button>
+        <button type="button" id="obs2-mode-own-key" data-mode="own-key"
+          class="obs2-mode-btn px-3 py-1.5 font-medium transition-colors bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 border-l border-zinc-200 dark:border-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed">
+          {observeStr.ai_mode_own_key ?? (isEs ? "Llave propia" : "Own key")}
+        </button>
+        <button type="button" id="obs2-mode-local" data-mode="local"
+          class="obs2-mode-btn px-3 py-1.5 font-medium transition-colors bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 border-l border-zinc-200 dark:border-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed">
+          {observeStr.ai_mode_local ?? (isEs ? "Solo local" : "Local only")}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Mode Selector (#296) -->
+  <!-- Starts hidden; JS reveals after reading localStorage -->
+  <div id="obs2-ai-mode-selector" class="hidden">
+    <div class="flex items-center gap-3 flex-wrap">
+      <span class="text-xs font-medium text-zinc-500 dark:text-zinc-400 shrink-0">
+        {isEs ? "Fuente de IA" : "AI source"}
+      </span>
+      <div class="flex rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden text-xs font-medium" role="group" aria-label={isEs ? "Fuente de IA" : "AI source"}>
+        <button
+          type="button"
+          id="obs2-mode-sponsored"
+          data-mode="sponsored"
+          class="obs2-mode-btn px-3 py-1.5 transition-colors bg-emerald-600 text-white"
+        >
+          {isEs ? "Patrocinado" : "Sponsored"}
+        </button>
+        <button
+          type="button"
+          id="obs2-mode-own-key"
+          data-mode="own-key"
+          class="obs2-mode-btn px-3 py-1.5 transition-colors border-l border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+          title={isEs ? "Configura una llave en Perfil → Ajustes IA" : "Configure a key in Profile → AI Settings"}
+        >
+          {isEs ? "Llave propia" : "Own key"}
+        </button>
+        <button
+          type="button"
+          id="obs2-mode-local"
+          data-mode="local"
+          class="obs2-mode-btn px-3 py-1.5 transition-colors border-l border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+          title={isEs ? "Descarga BirdNET en Perfil → Ajustes IA" : "Download BirdNET in Profile → AI Settings"}
+        >
+          {isEs ? "Solo local" : "Local only"}
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Contextual hint (shown briefly after file drop) -->
   <div id="obs2-file-hint" class="hidden rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 px-3 py-2 text-xs text-blue-800 dark:text-blue-300 transition-all"></div>
 
@@ -318,6 +379,83 @@ const identifySpeciesCard = document.getElementById('obs2-identify-species-card'
 const contributeBtn   = document.getElementById('obs2-contribute-btn');
 const identifyDoneBtn = document.getElementById('obs2-identify-done-btn');
 
+// ── AI Mode selector (#296) ───────────────────────────────────────────────
+const AI_MODE_KEY = 'rastrum.obs2.aiMode';
+type AiMode = 'sponsored' | 'own-key' | 'local';
+
+function readAiMode(): AiMode {
+  const stored = localStorage.getItem(AI_MODE_KEY);
+  if (stored === 'own-key' || stored === 'local') return stored;
+  return 'sponsored';
+}
+
+function writeAiMode(mode: AiMode): void {
+  localStorage.setItem(AI_MODE_KEY, mode);
+}
+
+function showAiModeToast(msg: string): void {
+  const toast = document.createElement('div');
+  toast.className = 'fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 px-5 py-3 text-sm shadow-lg max-w-[340px] text-center pointer-events-none';
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 4000);
+}
+
+const modeSelectorEl = document.getElementById('obs2-ai-mode-selector');
+const modeButtons = document.querySelectorAll<HTMLButtonElement>('.obs2-mode-btn');
+
+function applyModeButtonStyles(active: AiMode): void {
+  modeButtons.forEach(btn => {
+    const isActive = btn.dataset.mode === active;
+    btn.classList.toggle('bg-emerald-600', isActive);
+    btn.classList.toggle('text-white', isActive);
+    btn.classList.toggle('text-zinc-600', !isActive);
+    btn.classList.toggle('dark:text-zinc-400', !isActive);
+    btn.classList.toggle('hover:bg-zinc-100', !isActive);
+    btn.classList.toggle('dark:hover:bg-zinc-800', !isActive);
+  });
+}
+
+// Initialise mode selector availability and current selection
+(async () => {
+  try {
+    const { hasKeysForPlugin } = await import('../lib/byo-keys');
+    const { getBirdNETCacheStatus, getBirdNETWeightsBaseUrl } = await import('../lib/identifiers/birdnet-cache');
+
+    const hasByo = hasKeysForPlugin('claude_haiku') || hasKeysForPlugin('plantnet');
+    const hasBirdnet = getBirdNETWeightsBaseUrl()
+      ? await getBirdNETCacheStatus().then(s => s.modelCached && s.labelsCached).catch(() => false)
+      : false;
+
+    const ownKeyBtn = document.getElementById('obs2-mode-own-key') as HTMLButtonElement | null;
+    const localBtn  = document.getElementById('obs2-mode-local')   as HTMLButtonElement | null;
+
+    if (ownKeyBtn && !hasByo) {
+      ownKeyBtn.disabled = true;
+      ownKeyBtn.classList.add('opacity-40', 'cursor-not-allowed');
+      ownKeyBtn.classList.remove('hover:bg-zinc-100', 'dark:hover:bg-zinc-800');
+    }
+    if (localBtn && !hasBirdnet) {
+      localBtn.disabled = true;
+      localBtn.classList.add('opacity-40', 'cursor-not-allowed');
+      localBtn.classList.remove('hover:bg-zinc-100', 'dark:hover:bg-zinc-800');
+    }
+
+    const currentMode = readAiMode();
+    applyModeButtonStyles(currentMode);
+    modeSelectorEl?.classList.remove('hidden');
+
+    modeButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const mode = btn.dataset.mode as AiMode;
+        if (btn.disabled) return;
+        writeAiMode(mode);
+        applyModeButtonStyles(mode);
+      });
+    });
+  } catch { /* silent — selector stays hidden */ }
+})();
+
 // ── First-time onboarding toast (#274) ────────────────────────────────────
 const ONBOARDING_KEY = 'rastrum.obs2.onboarding_shown';
 if (!localStorage.getItem(ONBOARDING_KEY)) {
@@ -511,6 +649,34 @@ async function runPipeline(state: PipelineState) {
   const { makePlantNetRunner, makeClaudeRunner, makePhiRunner, resolvePlantNetKey } = await import('../lib/identify-runners');
   const { hasAnthropicKey } = await import('../lib/anthropic-key');
 
+  // Resolve AI mode — fall back to sponsored if selected mode is unavailable
+  let aiMode = readAiMode();
+  if (aiMode === 'own-key') {
+    const { hasKeysForPlugin } = await import('../lib/byo-keys');
+    const hasByo = hasKeysForPlugin('claude_haiku') || hasKeysForPlugin('plantnet');
+    if (!hasByo) {
+      aiMode = 'sponsored';
+      writeAiMode('sponsored');
+      applyModeButtonStyles('sponsored');
+      showAiModeToast(isEs
+        ? 'Modo de IA no disponible — usando patrocinado.'
+        : 'Selected AI mode unavailable — using sponsored.');
+    }
+  } else if (aiMode === 'local') {
+    const { getBirdNETCacheStatus, getBirdNETWeightsBaseUrl } = await import('../lib/identifiers/birdnet-cache');
+    const hasBirdnet = getBirdNETWeightsBaseUrl()
+      ? await getBirdNETCacheStatus().then(s => s.modelCached && s.labelsCached).catch(() => false)
+      : false;
+    if (!hasBirdnet) {
+      aiMode = 'sponsored';
+      writeAiMode('sponsored');
+      applyModeButtonStyles('sponsored');
+      showAiModeToast(isEs
+        ? 'Modo de IA no disponible — usando patrocinado.'
+        : 'Selected AI mode unavailable — using sponsored.');
+    }
+  }
+
   for (const node of state.nodes) {
     if (node.kind !== 'identify' || node.state === 'skipped') continue;
     const pf = state.files.find(f => f.id === node.fileId);
@@ -520,10 +686,27 @@ async function runPipeline(state: PipelineState) {
 
     try {
       if (pf.kind === 'photo') {
-        // Build runners dynamically
+        // Build runners based on selected AI mode
         const runners: Record<string, import('../lib/identify-cascade-client').IdentifierRunner> = {};
-        if (await resolvePlantNetKey()) runners.plantnet = (await import('../lib/identify-runners')).makePlantNetRunner(lang as 'en' | 'es');
-        if (await hasAnthropicKey()) runners.claude_haiku = makeClaudeRunner(lang as 'en' | 'es');
+
+        if (aiMode === 'local') {
+          // Local-only: no network AI for photos — skip
+          setNodeState(state, node.id, 'skipped', undefined, 'Local-only mode: no photo runner');
+          continue;
+        } else if (aiMode === 'own-key') {
+          // Own-key: use BYO keys directly, skip Edge Function
+          const { hasKeysForPlugin } = await import('../lib/byo-keys');
+          if (hasKeysForPlugin('plantnet') && await resolvePlantNetKey()) {
+            runners.plantnet = makePlantNetRunner(lang as 'en' | 'es');
+          }
+          if (hasKeysForPlugin('claude_haiku') && await hasAnthropicKey()) {
+            runners.claude_haiku = makeClaudeRunner(lang as 'en' | 'es');
+          }
+        } else {
+          // Sponsored (default): existing behavior
+          if (await resolvePlantNetKey()) runners.plantnet = (await import('../lib/identify-runners')).makePlantNetRunner(lang as 'en' | 'es');
+          if (await hasAnthropicKey()) runners.claude_haiku = makeClaudeRunner(lang as 'en' | 'es');
+        }
 
         if (Object.keys(runners).length === 0) {
           setNodeState(state, node.id, 'skipped', undefined, 'No runner available');
