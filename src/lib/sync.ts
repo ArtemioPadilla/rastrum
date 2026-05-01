@@ -385,6 +385,23 @@ export async function syncOutbox(): Promise<SyncResult> {
 async function syncOutboxInner(): Promise<SyncResult> {
   const db = getDB();
   const supabase = getSupabase();
+
+  // Auth guard: bail early when there's no valid session. Without this,
+  // Supabase queries fail silently with an expired/missing JWT and the
+  // UI stays in a loading state indefinitely (#342).
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      const noAuth: SyncResult = { synced: 0, failed: 0, skipped_guest: 0, last_error: 'no_session' };
+      emit<SyncDoneDetail>(SYNC_EVENTS.done, noAuth);
+      return noAuth;
+    }
+  } catch {
+    const noAuth: SyncResult = { synced: 0, failed: 0, skipped_guest: 0, last_error: 'session_check_failed' };
+    emit<SyncDoneDetail>(SYNC_EVENTS.done, noAuth);
+    return noAuth;
+  }
+
   // Pending AND error rows both belong in the queue. An 'error' row is one
   // that previously failed (e.g. CORS, network blip); we want manual retry
   // and the auto-retry-on-mount to re-attempt them, not just the never-tried
