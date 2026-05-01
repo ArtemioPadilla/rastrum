@@ -140,6 +140,65 @@ export async function wireManagePanelDetails(
     const origLabel = saveBtn.textContent ?? 'Save';
     saveBtn.textContent = copy.saving;
     try {
+      // Offline guard: if we're offline, save the species override locally
+      // and queue it for sync. The observation details (notes, habitat, etc.)
+      // are server-only fields that can wait, but the species name is critical
+      // for the user's workflow.
+      if (!navigator.onLine) {
+        const sci = sciInput?.value.trim();
+        if (sci) {
+          // Update the Dexie record's identification data
+          try {
+            const { getDB } = await import('./db');
+            const db = getDB();
+            const record = await db.observations.get(obsId);
+            if (record && record.data) {
+              record.data.identification = {
+                ...record.data.identification,
+                scientificName: sci,
+                source: 'human' as const,
+                status: 'accepted' as const,
+                confidence: 0.95,
+              };
+              // Mark for re-sync so the identification gets persisted server-side
+              await db.observations.update(obsId, {
+                data: record.data,
+                sync_status: record.sync_status === 'synced' ? 'pending' : record.sync_status,
+                updated_at: new Date().toISOString(),
+              });
+              savedEl?.classList.remove('hidden');
+              const speciesEl = document.getElementById('species');
+              if (speciesEl) speciesEl.textContent = sci;
+              // Show offline indicator
+              if (savedEl) {
+                savedEl.textContent = lang === 'es'
+                  ? '✓ Guardado localmente — se sincronizará cuando haya conexión'
+                  : '✓ Saved locally — will sync when online';
+              }
+            } else {
+              throw new Error('Observation not found in local database');
+            }
+          } catch (dbErr) {
+            if (errEl) {
+              errEl.textContent = lang === 'es'
+                ? 'Error al guardar localmente. Intenta de nuevo con conexión.'
+                : 'Error saving locally. Try again when online.';
+              errEl.classList.remove('hidden');
+            }
+          }
+        } else {
+          if (errEl) {
+            errEl.textContent = lang === 'es'
+              ? 'Sin conexión — solo se puede guardar el nombre de especie offline'
+              : 'Offline — only species name can be saved offline';
+            errEl.classList.remove('hidden');
+          }
+        }
+        saveBtn.disabled = false;
+        saveBtn.textContent = origLabel;
+        return;
+      }
+
       const payload = buildDetailsUpdatePayload({
         notes: notesEl?.value ?? '',
         obscure_level: obsEl?.value ?? 'none',
