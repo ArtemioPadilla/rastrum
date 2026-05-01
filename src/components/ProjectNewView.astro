@@ -229,6 +229,7 @@ const projectsBase = routes.projects[lang];
       submit?.setAttribute('disabled', 'true');
       try {
         await upsertProject({ slug, name, name_es, description, description_es, visibility, polygon });
+        window.posthog?.capture('project_created', { slug, visibility });
         window.location.assign(`/${lang}${projectsBase}/detail/?slug=${encodeURIComponent(slug)}`);
       } catch (err) {
         const code = (err instanceof Error) ? err.message : 'unknown';
