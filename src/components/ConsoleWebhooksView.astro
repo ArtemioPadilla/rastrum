@@ -23,7 +23,7 @@ const wActions = (wNs?.actions as Record<string, string>) ?? {};
 const wDeliv  = (wNs?.deliveries as Record<string, string>) ?? {};
 const wEmpty  = (wNs?.empty as string) ?? 'No webhooks configured.';
 const wDelivEmpty = (wNs?.deliveriesEmpty as string) ?? 'No deliveries yet.';
-const wDelivPerWebhookHeading = (wDeliv?.perWebhookHeading as string) ?? 'Last 50 deliveries';
+const wDelivPerWebhookHeading = (wDeliv?.perWebhookHeading as string) ?? 'Delivery history';
 const wDelivPerWebhookEmpty = (wDeliv?.perWebhookEmpty as string) ?? 'No deliveries for this webhook yet.';
 const wDelivFilters = {
   all: (wDeliv?.filterAll as string) ?? 'All',
@@ -55,6 +55,8 @@ const eventKeys: Array<keyof typeof wEvents> = [
   data-label-action-hide-deliveries={labelHideDeliveriesBtn}
   data-label-deliv-heading={wDelivPerWebhookHeading}
   data-label-deliv-empty={wDelivPerWebhookEmpty}
+  data-label-deliv-prev={wDeliv?.prev ?? 'Prev'}
+  data-label-deliv-next={wDeliv?.next ?? 'Next'}
   data-label-deliv-filter-all={wDelivFilters.all}
   data-label-deliv-filter-success={wDelivFilters.success}
   data-label-deliv-filter-failed={wDelivFilters.failed}
@@ -215,8 +217,10 @@ const eventKeys: Array<keyof typeof wEvents> = [
   const labelDelete = sectionEl?.dataset.labelActionDelete ?? 'Delete';
   const labelDeliveries = sectionEl?.dataset.labelActionDeliveries ?? 'Deliveries';
   const labelHideDeliveries = sectionEl?.dataset.labelActionHideDeliveries ?? 'Hide deliveries';
-  const labelDelivHeading = sectionEl?.dataset.labelDelivHeading ?? 'Last 50 deliveries';
+  const labelDelivHeading = sectionEl?.dataset.labelDelivHeading ?? 'Delivery history';
   const labelDelivEmpty = sectionEl?.dataset.labelDelivEmpty ?? 'No deliveries for this webhook yet.';
+  const labelDelivPrev = sectionEl?.dataset.labelDelivPrev ?? 'Prev';
+  const labelDelivNext = sectionEl?.dataset.labelDelivNext ?? 'Next';
   const labelDelivFilterAll = sectionEl?.dataset.labelDelivFilterAll ?? 'All';
   const labelDelivFilterSuccess = sectionEl?.dataset.labelDelivFilterSuccess ?? 'Successful';
   const labelDelivFilterFailed = sectionEl?.dataset.labelDelivFilterFailed ?? 'Failed';
@@ -238,7 +242,9 @@ const eventKeys: Array<keyof typeof wEvents> = [
   let allDeliveries: DeliveryRow[] = [];
   let jwt: string | null = null;
 
-  type DrillState = { perWebhookRows: DeliveryRow[]; filter: 'all' | 'success' | 'failed' | 'pending' };
+  const DRILLDOWN_PAGE_SIZE = 50;
+
+  type DrillState = { perWebhookRows: DeliveryRow[]; filter: 'all' | 'success' | 'failed' | 'pending'; page: number; totalCount: number };
   const drilldown = new Map<string, DrillState>();
   const expanded = new Set<string>();
 
@@ -282,6 +288,13 @@ const eventKeys: Array<keyof typeof wEvents> = [
     const filtered = state.perWebhookRows.filter(d => deliveryMatchesFilter(d, state.filter));
     const hasReplayable = state.perWebhookRows.length > 0;
 
+    const totalPages = Math.max(1, Math.ceil(state.totalCount / DRILLDOWN_PAGE_SIZE));
+    const rangeStart = state.page * DRILLDOWN_PAGE_SIZE + 1;
+    const rangeEnd = Math.min((state.page + 1) * DRILLDOWN_PAGE_SIZE, state.totalCount);
+    const pageInfo = state.totalCount > 0
+      ? `${rangeStart}–${rangeEnd} of ${state.totalCount}`
+      : '';
+
     const filterButton = (key: DrillState['filter'], label: string) => {
       const active = state.filter === key;
       return `<button type="button" data-deliv-filter="${esc(webhookId)}" data-deliv-filter-key="${key}" aria-pressed="${active ? 'true' : 'false'}" class="px-2.5 py-1 text-[11px] ${active ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-medium' : 'bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300'}">${esc(label)}</button>`;
@@ -305,6 +318,14 @@ const eventKeys: Array<keyof typeof wEvents> = [
             </tr>
           `;
         }).join('');
+
+    const pagerHtml = totalPages > 1
+      ? `<div class="flex items-center justify-between mt-2">
+           <button type="button" data-deliv-prev="${esc(webhookId)}" class="px-2.5 py-1 rounded border border-zinc-300 dark:border-zinc-700 text-[11px] hover:bg-zinc-50 dark:hover:bg-zinc-800 disabled:opacity-50" ${state.page === 0 ? 'disabled' : ''}>${esc(labelDelivPrev)}</button>
+           <span class="text-[11px] text-zinc-500">${esc(pageInfo)}</span>
+           <button type="button" data-deliv-next="${esc(webhookId)}" class="px-2.5 py-1 rounded border border-zinc-300 dark:border-zinc-700 text-[11px] hover:bg-zinc-50 dark:hover:bg-zinc-800 disabled:opacity-50" ${state.page >= totalPages - 1 ? 'disabled' : ''}>${esc(labelDelivNext)}</button>
+         </div>`
+      : (pageInfo ? `<div class="mt-2 text-[11px] text-zinc-500 text-center">${esc(pageInfo)}</div>` : '');
 
     return `
       <tr id="drilldown-${esc(webhookId)}">
@@ -335,6 +356,7 @@ const eventKeys: Array<keyof typeof wEvents> = [
               <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800">${tableBody}</tbody>
             </table>
           </div>
+          ${pagerHtml}
         </td>
       </tr>
     `;
@@ -380,20 +402,23 @@ const eventKeys: Array<keyof typeof wEvents> = [
     }).join('');
   }
 
-  async function loadDrilldown(webhookId: string) {
+  async function loadDrilldown(webhookId: string, page = 0) {
     const supabase = getSupabase();
-    const { data, error } = await supabase
+    const offset = page * DRILLDOWN_PAGE_SIZE;
+    const { data, count, error } = await supabase
       .from('admin_webhook_deliveries')
-      .select('id, webhook_id, event, status_code, error, attempted_at, nonce')
+      .select('id, webhook_id, event, status_code, error, attempted_at, nonce', { count: 'exact' })
       .eq('webhook_id', webhookId)
       .order('attempted_at', { ascending: false })
-      .limit(50);
+      .range(offset, offset + DRILLDOWN_PAGE_SIZE - 1);
     if (error) throw new Error(error.message);
     const rows = ((data ?? []) as unknown) as DeliveryRow[];
     const existing = drilldown.get(webhookId);
     drilldown.set(webhookId, {
       perWebhookRows: rows,
       filter: existing?.filter ?? 'all',
+      page,
+      totalCount: count ?? 0,
     });
   }
 
@@ -569,6 +594,37 @@ const eventKeys: Array<keyof typeof wEvents> = [
         if (state) {
           state.filter = key;
           renderWebhooks();
+        }
+        return;
+      }
+      const prevPageEl = target.closest<HTMLElement>('[data-deliv-prev]');
+      if (prevPageEl) {
+        const id = prevPageEl.dataset.delivPrev!;
+        const state = drilldown.get(id);
+        if (state && state.page > 0) {
+          try {
+            await loadDrilldown(id, state.page - 1);
+            renderWebhooks();
+          } catch (err) {
+            showActionToast(labelDelivLoadFailedTmpl.replace('{error}', (err as Error).message), false);
+          }
+        }
+        return;
+      }
+      const nextPageEl = target.closest<HTMLElement>('[data-deliv-next]');
+      if (nextPageEl) {
+        const id = nextPageEl.dataset.delivNext!;
+        const state = drilldown.get(id);
+        if (state) {
+          const totalPages = Math.ceil(state.totalCount / DRILLDOWN_PAGE_SIZE);
+          if (state.page < totalPages - 1) {
+            try {
+              await loadDrilldown(id, state.page + 1);
+              renderWebhooks();
+            } catch (err) {
+              showActionToast(labelDelivLoadFailedTmpl.replace('{error}', (err as Error).message), false);
+            }
+          }
         }
         return;
       }
