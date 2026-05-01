@@ -2,28 +2,24 @@ import { routes, type Locale } from '../i18n/utils';
 
 export interface FabTarget {
   href: string;
-  /** 'observe' = full save flow; 'quick-id' = lightweight photo lookup. */
-  mode: 'observe' | 'quick-id';
+  /** True when the user is already on /observe — the FAB triggers the
+   *  camera input instead of navigating. */
+  onObserve: boolean;
 }
 
 /**
- * Default = /observe. On /observe itself the FAB shifts to /identify (quick
- * lookup, no save) so the camera button is never a no-op while still
- * meaning "photo → identification."
+ * FAB always points to /observe. When the user is already on /observe,
+ * `onObserve` is true so the client script can trigger the camera input
+ * directly instead of navigating to the same page.
  */
 export function getFabTarget(pathname: string, lang: string): FabTarget {
   const locale: Locale = lang === 'es' ? 'es' : 'en';
   const base = import.meta.env?.BASE_URL?.replace(/\/$/, '') ?? '';
   const observeSlug = routes.observe[locale];
-  const identifySlug = routes.identify[locale];
 
-  // Match /en/observe, /en/observe/, /es/observar, /es/observar/
   const onObserve = pathname.replace(/\/$/, '') === `${base}/${locale}${observeSlug}`;
 
-  if (onObserve) {
-    return { href: `${base}/${locale}${identifySlug}/`, mode: 'quick-id' };
-  }
-  return { href: `${base}/${locale}${observeSlug}/`, mode: 'observe' };
+  return { href: `${base}/${locale}${observeSlug}/`, onObserve };
 }
 
 /**

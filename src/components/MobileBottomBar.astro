@@ -18,7 +18,7 @@ const exploreRecentPath = getLocalizedPath(lang, routes.exploreRecent[locale] + 
 const chatPath    = getLocalizedPath(lang, routes.chat[locale] + '/');
 const profilePath = getLocalizedPath(lang, routes.profile[locale] + '/');
 const homePath    = getLocalizedPath(lang, '/');
-const identifyPath = getLocalizedPath(lang, routes.identify[locale] + '/');
+const observePath = getLocalizedPath(lang, routes.observe[locale] + '/');
 const exploreMapPath = getLocalizedPath(lang, routes.exploreMap[locale] + '/');
 const signInPath  = getLocalizedPath(lang, routes.signIn[locale] + '/');
 
@@ -28,7 +28,6 @@ const expActive    = isActiveSection(currentPath, 'explore',       lang);
 const chatActive   = isActiveSection(currentPath, 'chat',          lang);
 const profActive   = isActiveSection(currentPath, 'profile',       lang);
 const homeActive   = isActiveSection(currentPath, 'home',          lang);
-const idActive     = isActiveSection(currentPath, 'identify',      lang);
 const recentActive = isActiveSection(currentPath, 'exploreRecent', lang);
 ---
 
@@ -36,8 +35,8 @@ const recentActive = isActiveSection(currentPath, 'exploreRecent', lang);
   Mobile bottom bar. Two layouts driven by auth state, swapped by the
   inline script below: the signed-in 5-slot version (Explore · Chat ·
   [FAB] · Recent · Profile) and the signed-out 4-slot version (Home ·
-  Identify · Map · Sign in) — sacred geometry: the FAB only appears
-  when it means "observe."
+  Observe · Map · Sign in). The center FAB always means "observe";
+  when already on /observe it triggers the camera input directly.
 -->
 <nav
   id="mobile-bottom-bar"
@@ -65,18 +64,17 @@ const recentActive = isActiveSection(currentPath, 'exploreRecent', lang);
     <!-- FAB slot — h-full so absolute children measure from the bar's top edge (not from items-end's collapsed bottom strip) -->
     <div class="relative h-full">
       <a
+        id="mbb-fab"
         href={fab.href}
         data-tour="fab"
-        aria-label={fab.mode === 'quick-id' ? tr.nav.bottom.fab_quick_id_label : tr.nav.bottom.fab_observe_label}
+        data-on-observe={fab.onObserve ? 'true' : undefined}
+        aria-label={tr.nav.bottom.fab_observe_label}
         class="absolute left-1/2 -translate-x-1/2 -top-7 w-14 h-14 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center shadow-lg ring-4 ring-white dark:ring-zinc-950 motion-reduce:transition-none transition-transform active:scale-95"
       >
         <svg aria-hidden="true" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 0 1 2-2h2l1.5-2h7L17 7h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>
-        {fab.mode === 'quick-id' && (
-          <span aria-hidden="true" class="absolute -top-1 -right-1 w-5 h-5 bg-yellow-400 text-zinc-900 rounded-full flex items-center justify-center text-[10px] font-bold border-2 border-white dark:border-zinc-950">⚡</span>
-        )}
       </a>
       <span class="absolute left-1/2 -translate-x-1/2 bottom-1 text-[9px] text-zinc-500 dark:text-zinc-400 whitespace-nowrap">
-        {fab.mode === 'quick-id' ? tr.nav.bottom.quick_id : tr.nav.bottom.observe}
+        {tr.nav.bottom.observe}
       </span>
     </div>
 
@@ -105,12 +103,12 @@ const recentActive = isActiveSection(currentPath, 'exploreRecent', lang);
       <svg aria-hidden="true" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h3v-7h6v7h3a1 1 0 001-1V10"/></svg>
       <span>{tr.nav.bottom.home}</span>
     </a>
-    <a href={identifyPath} class:list={[
+    <a href={observePath} class:list={[
       'flex flex-col items-center justify-center gap-0.5 py-1 text-[10px]',
-      (idActive || obsActive) ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-500 dark:text-zinc-400'
-    ]} aria-label={tr.nav.bottom.identify}>
+      obsActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-500 dark:text-zinc-400'
+    ]}>
       <svg aria-hidden="true" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 0 1 2-2h2l1.5-2h7L17 7h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>
-      <span>{tr.nav.bottom.identify}</span>
+      <span>{tr.nav.bottom.observe}</span>
     </a>
     <a href={exploreMapPath} class:list={[
       'flex flex-col items-center justify-center gap-0.5 py-1 text-[10px]',
@@ -125,6 +123,25 @@ const recentActive = isActiveSection(currentPath, 'exploreRecent', lang);
     </a>
   </div>
 </nav>
+
+<!--
+  FAB camera shortcut. When the user is already on /observe and taps the
+  FAB, intercept the click and trigger the DropZone capture input directly
+  instead of navigating to the same page.
+-->
+<script is:inline>
+  (function () {
+    var fab = document.getElementById('mbb-fab');
+    if (!fab || fab.dataset.onObserve !== 'true') return;
+    fab.addEventListener('click', function (e) {
+      var capInput = document.getElementById('dz-capture-input');
+      if (!capInput) return;
+      e.preventDefault();
+      capInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(function () { capInput.click(); }, 300);
+    });
+  })();
+</script>
 
 <!--
   First-paint cache. Header.astro writes `rastrum.headerAvatar` to localStorage

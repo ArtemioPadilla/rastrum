@@ -93,12 +93,6 @@ const quickActions = [
     keywords: 'observe photo identify species record',
   },
   {
-    id: 'action-quick-identify',
-    label:   { en: 'Quick identify',        es: 'Identificación rápida' },
-    url:     { en: '/en/identify/',          es: '/es/identificar/' },
-    keywords: 'identify photo species quick',
-  },
-  {
     id: 'action-sign-out',
     label:   { en: 'Sign out',              es: 'Cerrar sesión' },
     url:     null,
