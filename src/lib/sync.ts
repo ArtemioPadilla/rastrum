@@ -336,9 +336,12 @@ async function triggerIdentify(observationId: string): Promise<void> {
   // sync_primary_id_trigger then materialises denormalised columns on
   // the observation row (primary_taxon_id, obscure_level, location_obscured).
   const r = cascadeResult.best;
+  // Apply taxonomy synonym correction for known outdated names (#345)
+  const { correctIdentificationName } = await import('./taxonomy-synonyms');
+  const correctedName = correctIdentificationName(r.scientific_name);
   const { error: insertErr } = await supabase.from('identifications').insert({
     observation_id: observationId,
-    scientific_name: r.scientific_name,
+    scientific_name: correctedName,
     confidence: r.confidence,
     source: r.source,
     raw_response: r.raw as object,
