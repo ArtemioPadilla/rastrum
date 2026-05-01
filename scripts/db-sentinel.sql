@@ -96,6 +96,26 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'reconcile_webhook_deliveries')
     THEN missing := array_append(missing, 'public.reconcile_webhook_deliveries()'); END IF;
 
+  -- PR15 — observability UI (function_errors ack columns drive the Errors tab)
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name   = 'function_errors'
+      AND column_name  = 'acknowledged_at'
+  ) THEN missing := array_append(missing, 'public.function_errors.acknowledged_at'); END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name   = 'function_errors'
+      AND column_name  = 'acknowledged_by'
+  ) THEN missing := array_append(missing, 'public.function_errors.acknowledged_by'); END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name   = 'function_errors'
+      AND column_name  = 'ack_notes'
+  ) THEN missing := array_append(missing, 'public.function_errors.ack_notes'); END IF;
+
   -- Console PR8 — feature flags + karma config DB tables
   IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'app_feature_flags')      THEN missing := array_append(missing, 'public.app_feature_flags'); END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'karma_config')           THEN missing := array_append(missing, 'public.karma_config'); END IF;
@@ -125,6 +145,20 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'expire_stale_proposals')      THEN missing := array_append(missing, 'public.expire_stale_proposals()'); END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'dispatch_admin_webhooks')     THEN missing := array_append(missing, 'public.dispatch_admin_webhooks()'); END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'compute_moderator_trust_score') THEN missing := array_append(missing, 'public.compute_moderator_trust_score()'); END IF;
+
+  -- Module 28 — Community discovery (Nearby RPCs, both centroid- and GPS-based)
+  IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'community_observers_nearby')    THEN missing := array_append(missing, 'public.community_observers_nearby()'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'community_observers_nearby_at') THEN missing := array_append(missing, 'public.community_observers_nearby_at()'); END IF;
+
+  -- PR16 — admin entity browser hot-path indexes. If a future schema
+  -- change drops one of these the corresponding admin browser tab silently
+  -- regresses to a sequential scan. Sentinel keeps that observable.
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_id_created_desc')              THEN missing := array_append(missing, 'public.idx_id_created_desc'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_notifications_kind_created')   THEN missing := array_append(missing, 'public.idx_notifications_kind_created'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_media_active_created')         THEN missing := array_append(missing, 'public.idx_media_active_created'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_follows_created_desc')         THEN missing := array_append(missing, 'public.idx_follows_created_desc'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_projects_created_desc')        THEN missing := array_append(missing, 'public.idx_projects_created_desc'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_comments_author_created')      THEN missing := array_append(missing, 'public.idx_comments_author_created'); END IF;
 
   IF array_length(missing, 1) IS NOT NULL THEN
     RAISE EXCEPTION 'Sentinel verify failed — missing objects: %', missing;

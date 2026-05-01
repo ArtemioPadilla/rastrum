@@ -40,6 +40,24 @@ interface CommentUnlockPayload { comment_id: string }
 interface UserBanPayload { target_user_id: string; duration_hours: number | null }
 interface UserUnbanPayload { target_user_id: string; ban_id: string }
 
+interface UserDetailPayload {
+  user_id?: string;
+  email?: string;
+}
+export interface UserDetailResult {
+  id: string;
+  email: string | null;
+  email_confirmed_at: string | null;
+  created_at: string | null;
+  last_sign_in_at: string | null;
+  identities: Array<{
+    provider: string;
+    email: string | null;
+    created_at: string | null;
+    last_sign_in_at: string | null;
+  }>;
+}
+
 interface BadgeAwardManualPayload { target_user_id: string; badge_key: string }
 interface BadgeRevokePayload { target_user_id: string; badge_key: string }
 
@@ -81,6 +99,24 @@ interface WebhookUpdatePayload {
   enabled?: boolean;
 }
 interface WebhookIdPayload { webhookId: string }
+interface WebhookReplayPayload { deliveryId: string }
+
+interface ErrorAcknowledgePayload { errorId: string; notes?: string }
+export interface ErrorAcknowledgeBulkFilters {
+  functionName?: string;
+  code?: string;
+  from?: string;
+  to?: string;
+}
+interface ErrorAcknowledgeBulkPayload {
+  filters: ErrorAcknowledgeBulkFilters;
+  notes?: string;
+}
+export interface ErrorAcknowledgeBulkResult {
+  count: number;
+  capHit: boolean;
+  filters: ErrorAcknowledgeBulkFilters;
+}
 interface AuditExportFilters {
   from?: string;
   to?: string;
@@ -177,6 +213,8 @@ export const adminClient = {
       call('user.ban', payload, reason, jwt),
     unban: (payload: UserUnbanPayload, reason: string, jwt: string) =>
       call('user.unban', payload, reason, jwt),
+    detail: (payload: UserDetailPayload, reason: string, jwt: string) =>
+      call<UserDetailResult>('user.detail', payload, reason, jwt),
   },
   badge: {
     awardManual: (payload: BadgeAwardManualPayload, reason: string, jwt: string) =>
@@ -223,5 +261,17 @@ export const adminClient = {
       call('webhook.delete', payload, reason, jwt),
     test: (payload: WebhookIdPayload, reason: string, jwt: string) =>
       call<{ statusCode: number | null; error: string | null }>('webhook.test', payload, reason, jwt),
+    replayDelivery: (payload: WebhookReplayPayload, reason: string, jwt: string) =>
+      call<{ statusCode: number | null; error: string | null; newDeliveryId: string; newEventId: string }>('webhook.replay_delivery', payload, reason, jwt),
+  },
+  health: {
+    recompute: (reason: string, jwt: string) =>
+      call<{ digestId: string | null }>('health.recompute', {}, reason, jwt),
+  },
+  error: {
+    acknowledge: (payload: ErrorAcknowledgePayload, reason: string, jwt: string) =>
+      call('error.acknowledge', payload, reason, jwt),
+    acknowledgeBulk: (payload: ErrorAcknowledgeBulkPayload, reason: string, jwt: string) =>
+      call<ErrorAcknowledgeBulkResult>('error.acknowledge_bulk', payload, reason, jwt),
   },
 };

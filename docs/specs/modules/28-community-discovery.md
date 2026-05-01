@@ -30,7 +30,7 @@
 
 ## Privacy invariants
 
-- Eligibility predicate `profile_public = true AND hide_from_leaderboards = false` lives in exactly one place per view; both views read it live (no caching, no propagation delay).
+- Eligibility predicate `hide_from_leaderboards = false` lives in exactly one place per view; both views read it live (no caching, no propagation delay). _As of 2026-04-30, the predicate no longer requires `profile_public = true`; M28 visibility decoupled from M08 binary privacy and is governed solely by its dedicated opt-out._
 - Centroid is exposed only via the authenticated view; anon callers cannot read it via any path. The lack of a `GRANT SELECT … TO anon` on `community_observers_with_centroid` is the security gate.
 - The Nearby feature is sign-in gated in the UI; the SQL gate is enforced regardless.
 - `country_code` setter never overwrites a user-set value (the cron only writes when `country_code IS NULL`).

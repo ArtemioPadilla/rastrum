@@ -1,12 +1,6 @@
 ---
-import BaseLayout from '../../layouts/BaseLayout.astro';
-import IdentifyView from '../../components/IdentifyView.astro';
-import { t } from '../../i18n/utils';
-
-const lang = 'en';
-const tr = t(lang);
+// /en/identify → redirected to /en/observe (consolidated — see issue #273)
+// Keeps the identify concept but within the unified observe flow.
+// Permanent redirect so old links and search engines update.
+return Astro.redirect('/en/observe/?mode=identify', 301);
 ---
-
-<BaseLayout title={`${tr.identify.title} — Rastrum`} description="Identify any species from a photo using parallel AI cascade — PlantNet, Claude vision, and on-device Phi-vision. No account required." lang={lang}>
-  <IdentifyView lang={lang} />
-</BaseLayout>

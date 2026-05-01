@@ -66,4 +66,26 @@ describe('parseArgs', () => {
     delete process.env.RASTRUM_BASE_URL;
     delete process.env.RASTRUM_TOKEN;
   });
+
+  it('accepts --project-slug and --station-key together', () => {
+    const args = parseArgs([
+      '--dir', '/sd',
+      '--baseUrl', 'https://x/',
+      '--token', FAKE_TOKEN,
+      '--project-slug', 'anp-sierra-juarez',
+      '--station-key',  'SJ-CAM-01',
+    ]);
+    assert.equal(args.projectSlug, 'anp-sierra-juarez');
+    assert.equal(args.stationKey,  'SJ-CAM-01');
+  });
+
+  it('rejects --station-key without --project-slug', () => {
+    assert.throws(
+      () => parseArgs([
+        '--dir', '/sd', '--baseUrl', 'https://x/', '--token', FAKE_TOKEN,
+        '--station-key', 'SJ-CAM-01',
+      ]),
+      /project-slug/
+    );
+  });
 });

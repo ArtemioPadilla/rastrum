@@ -24,6 +24,11 @@ export interface RunOpts {
   skipIdentify: boolean;
   /** Notes string applied to every observation (e.g. station code). */
   notes?: string;
+  /** Camera station tagging (M31 / issue #156). The CLI passes
+   *  `(project_slug, station_key)` to `/api/observe`; the EF
+   *  resolves the station UUID server-side under RLS. */
+  projectSlug?: string;
+  stationKey?: string;
   /** Print 1-line per file instead of just summary every 10. */
   verbose: boolean;
 }
@@ -109,6 +114,8 @@ async function processOne(
       observed_at: exif.capturedAtIso,
       photo_url: presigned.public_url,
       notes: opts.notes,
+      project_slug: opts.projectSlug,
+      station_key: opts.stationKey,
     });
     obsId = obs.id;
   } catch (err) {
@@ -191,6 +198,11 @@ export function parseArgs(argv: string[]): ParsedArgs {
   const token = String(args.token ?? process.env.RASTRUM_TOKEN ?? '');
   if (!token.startsWith('rst_')) throw new Error('Missing --token rst_… or RASTRUM_TOKEN env (must start with rst_)');
   const logPath = String(args.log ?? `${dir.replace(/\/$/, '')}/import-log.json`);
+  const projectSlug = pickString(args, 'project-slug', 'projectSlug');
+  const stationKey  = pickString(args, 'station-key',  'stationKey');
+  if (stationKey && !projectSlug) {
+    throw new Error('--station-key requires --project-slug (the EF resolves stations by project + key pair)');
+  }
   return {
     dir,
     logPath,
@@ -199,6 +211,16 @@ export function parseArgs(argv: string[]): ParsedArgs {
     dryRun: args['dry-run'] === true || args.dryRun === true,
     skipIdentify: args['skip-identify'] === true || args.skipIdentify === true,
     notes: typeof args.notes === 'string' ? args.notes : undefined,
+    projectSlug,
+    stationKey,
     verbose: args.verbose === true || args.v === true,
   };
+}
+
+function pickString(args: Record<string, string | boolean>, ...keys: string[]): string | undefined {
+  for (const k of keys) {
+    const v = args[k];
+    if (typeof v === 'string' && v.length > 0) return v;
+  }
+  return undefined;
 }

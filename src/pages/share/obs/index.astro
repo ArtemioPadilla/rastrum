@@ -96,17 +96,156 @@ const lang: 'en' | 'es' = 'en';
       // The gallery's static SSR markup is empty; this dispatch fills it.
       const { data: media } = await supabase
         .from('media_files')
-        .select('id, url, thumbnail_url, is_primary, sort_order, deleted_at')
+        .select('id, url, thumbnail_url, is_primary, sort_order, deleted_at, media_type, mime_type')
         .eq('observation_id', id)
         .is('deleted_at', null)
         .order('is_primary', { ascending: false })
         .order('sort_order', { ascending: true });
-      const photos = (media ?? []).map((m: { id: string; url: string; thumbnail_url: string | null }) => ({
+
+      type MediaRow = { id: string; url: string; thumbnail_url: string | null; media_type?: string; mime_type?: string | null };
+
+      const photos = (media ?? []).filter((m: MediaRow) => !m.media_type || m.media_type === 'photo').map((m: MediaRow) => ({
         id: m.id, url: m.url, thumbnail_url: m.thumbnail_url, caption: null,
       }));
       window.dispatchEvent(new CustomEvent('rastrum:photos-ready', {
         detail: { photos, galleryId: 'obs-detail' },
       }));
+
+      // ── Audio players (spectrogram) ──
+      // TODO: when Astro supports SSR hydration in this context, use AudioPlayer.astro directly
+      function buildAudioPlayerHTML(audioUrl: string, mimeType: string, obsIdAttr: string, lang: string): string {
+        const isEs = lang === 'es';
+        const playLabel    = isEs ? 'Reproducir' : 'Play';
+        const pauseLabel   = isEs ? 'Pausar' : 'Pause';
+        const spectroLabel = isEs ? 'Ver espectrograma' : 'Show spectrogram';
+        const spectroHide  = isEs ? 'Ocultar espectrograma' : 'Hide spectrogram';
+        const freqLabel    = isEs ? 'Frecuencia (kHz)' : 'Frequency (kHz)';
+        const timeLabel    = isEs ? 'Tiempo (s)' : 'Time (s)';
+        const loadLabel    = isEs ? 'Cargando audio…' : 'Loading audio…';
+        const errLabel     = isEs ? 'No se pudo cargar el audio.' : 'Could not load audio.';
+        return `
+            <div
+              class="rastrum-audio-player rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden"
+              data-audio-url="${audioUrl}"
+              data-mime-type="${mimeType}"
+              data-obs-id="${obsIdAttr}"
+              data-show-spectrogram="true"
+              data-lang="${lang}"
+              data-label-play="${playLabel}"
+              data-label-pause="${pauseLabel}"
+              data-label-spectro="${spectroLabel}"
+              data-label-spectro-hide="${spectroHide}"
+              data-label-freq="${freqLabel}"
+              data-label-time="${timeLabel}"
+            >
+              <div class="px-3 pt-3">
+                <div id="ws-wave-${obsIdAttr}" style="min-height:60px;"></div>
+              </div>
+              <div class="flex items-center gap-3 px-3 py-2">
+                <button id="ws-play-${obsIdAttr}" type="button" aria-label="${playLabel}"
+                  class="w-9 h-9 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center shrink-0 transition-colors disabled:opacity-40"
+                  disabled>
+                  <svg class="play-icon w-4 h-4 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                  <svg class="pause-icon hidden w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                </button>
+                <span id="ws-time-${obsIdAttr}" class="text-xs font-mono text-zinc-500 dark:text-zinc-400 tabular-nums shrink-0">0:00</span>
+                <span class="loading-label text-xs text-zinc-400 dark:text-zinc-500">${loadLabel}</span>
+                <span class="error-label hidden text-xs text-red-500">${errLabel}</span>
+                <div class="flex-1"></div>
+                <button id="ws-toggle-spec-${obsIdAttr}" type="button" aria-expanded="false"
+                  class="text-xs text-emerald-700 dark:text-emerald-400 underline underline-offset-2 hover:no-underline shrink-0">
+                  ${spectroLabel}
+                </button>
+              </div>
+              <div id="ws-spec-${obsIdAttr}" class="hidden px-3 pb-2">
+                <div class="flex items-center gap-2 mb-2">
+                  <span class="text-[10px] text-zinc-500">${isEs ? 'Rango:' : 'Range:'}</span>
+                  <select id="ws-freq-range-${obsIdAttr}" class="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[10px] px-1 py-0.5">
+                    <option value="12000">0 – 12 kHz</option>
+                    <option value="8000">0 – 8 kHz</option>
+                    <option value="4000">0 – 4 kHz</option>
+                    <option value="2000">0 – 2 kHz</option>
+                  </select>
+                  <div style="flex:1"></div>
+                  <button id="ws-export-${obsIdAttr}" type="button" class="flex items-center gap-1 text-[10px] text-zinc-500 hover:text-zinc-200 transition-colors">
+                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                    ${isEs ? 'Exportar PNG' : 'Export PNG'}
+                  </button>
+                  <button id="ws-info-btn-${obsIdAttr}" type="button" class="w-5 h-5 rounded-full border border-zinc-700 text-[10px] text-zinc-400 hover:border-emerald-500 hover:text-emerald-500 flex items-center justify-center font-bold">?</button>
+                </div>
+                <div id="ws-info-panel-${obsIdAttr}" class="hidden mb-2 rounded-lg border border-emerald-900/40 bg-emerald-950/30 p-3 text-xs text-zinc-300 space-y-1.5">
+                  <p class="font-semibold text-emerald-300">${isEs ? '¿Qué es un espectrograma?' : 'What is a spectrogram?'}</p>
+                  <p>${isEs ? 'Muestra cómo cambian las frecuencias del sonido a lo largo del tiempo. Horizontal = tiempo, vertical = frecuencia, color = intensidad (más brillante = más fuerte).' : 'Shows how sound frequencies change over time. Horizontal = time, vertical = frequency (pitch), color = intensity — brighter = louder.'}</p>
+                  <p>${isEs ? '🌈 Inferno: negro=silencio, morado=débil, naranja=moderado, amarillo=fuerte.' : '🌈 Inferno: black=silence, purple=faint, orange=moderate, yellow=loud.'}</p>
+                  <p>${isEs ? '🐦 Cantos de aves: 1–8 kHz. Líneas horizontales = tonos sostenidos; verticales = clics.' : '🐦 Bird songs: 1–8 kHz. Horizontal streaks = sustained tones; vertical = clicks.'}</p>
+                  <p id="ws-birdnet-info-${obsIdAttr}" class="hidden font-medium text-emerald-400">${isEs ? '✅ Bandas coloreadas = detecciones BirdNET. Toca para ver detalles.' : '✅ Colored bands = BirdNET detections. Tap for details.'}</p>
+                </div>
+                <div class="flex items-end justify-between mb-1 text-[10px] text-zinc-500 select-none">
+                  <span id="ws-freq-top-${obsIdAttr}">12 kHz</span><span class="italic">${freqLabel}</span><span>0 Hz</span>
+                </div>
+                <div class="relative">
+                  <div id="ws-spec-host-${obsIdAttr}" class="ws-spectrogram-host w-full rounded overflow-hidden bg-zinc-950" style="height:140px;" aria-hidden="true"></div>
+                  <div id="ws-detections-${obsIdAttr}" class="absolute inset-0 pointer-events-none" aria-hidden="true"></div>
+                  <div id="ws-tooltip-${obsIdAttr}" class="hidden absolute z-10 rounded-lg border border-emerald-700 bg-zinc-900/95 shadow-lg p-2.5 text-xs max-w-[200px] pointer-events-none" role="tooltip"></div>
+                </div>
+                <div class="mt-1 text-[10px] text-zinc-500 text-right select-none italic">${timeLabel}</div>
+                <div id="ws-legend-${obsIdAttr}" class="hidden mt-2 space-y-1"></div>
+              </div>
+            </div>`;
+      }
+
+      const audioFiles = (media ?? []).filter((m: MediaRow) => m.media_type === 'audio');
+      if (audioFiles.length > 0) {
+        const playersEl = document.getElementById('obs-audio-players');
+        if (playersEl) {
+          const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
+          playersEl.classList.remove('hidden');
+          playersEl.innerHTML = audioFiles.map((af: MediaRow, idx: number) => {
+            const obsIdAttr = `obs-detail-audio-${idx}`;
+            const mimeType  = af.mime_type ?? 'audio/mpeg';
+            return buildAudioPlayerHTML(af.url, mimeType, obsIdAttr, lang);
+          }).join('');
+
+          // Re-run AudioPlayer init for the new DOM nodes
+          document.dispatchEvent(new CustomEvent('rastrum:audio-players-ready'));
+
+          // ── Fetch BirdNET detections from the identifications table ──
+          // Query the primary identification for this observation to get
+          // raw_response.segments (sliding-window detections with timestamps).
+          const { data: ident } = await supabase
+            .from('identifications')
+            .select('raw_response, source')
+            .eq('observation_id', id)
+            .eq('is_primary', true)
+            .eq('source', 'birdnet_lite')
+            .maybeSingle();
+
+          if (ident?.raw_response) {
+            type RawResponse = {
+              segments?: Array<{ startSec: number; endSec: number; top: Array<{ scientific_name: string; common_name_en: string | null; score: number }> }>;
+              durationSec?: number;
+            };
+            const raw = ident.raw_response as RawResponse;
+            if (raw.segments && raw.segments.length > 0) {
+              // Known limitation (v1): the BirdNET identification is stored once
+              // per observation, not per audio file. If an observation has multiple
+              // audio files, all players show the same segment detections from the
+              // primary identification. Fix in a future PR by storing a media_file_id
+              // FK on the identifications row.
+              audioFiles.forEach((_af: unknown, idx: number) => {
+                const obsIdAttr = `obs-detail-audio-${idx}`;
+                document.dispatchEvent(new CustomEvent('rastrum:audio-birdnet-ready', {
+                  detail: {
+                    obsId: obsIdAttr,
+                    segments: raw.segments,
+                    durationSec: raw.durationSec ?? (raw.segments[raw.segments.length - 1]?.endSec ?? 0),
+                  },
+                }));
+              });
+            }
+          }
+        }
+      }
 
       // Coords readout + view-mode mini-map hydration. PostgREST returns
       // `location` as a GeoJSON Point; for non-owner viewers we prefer

@@ -837,6 +837,30 @@
           "label": "Admin console PR14 — close v1.1 deferreds (per-admin tz for off_hours + webhook _meta replay + reconcile cron + real trust formula + irreversible enforcement gate + durable observability dry-run workflow)",
           "label_es": "Consola admin PR14 — cierre de pendientes v1.1 (zona horaria por admin + replay de webhooks + cron reconcile + fórmula real de confianza + gate de cumplimiento irreversible + workflow durable de dry-run)",
           "done": true
+        },
+        {
+          "id": "admin-console-pr15-observability-ui",
+          "label": "Admin console PR15 — observability UI (Health digest cards + sparklines + Errors browser with bulk ack + per-webhook deliveries drilldown + replay)",
+          "label_es": "Consola admin PR15 — UI de observabilidad (tarjetas + sparklines del resumen de salud + navegador de errores con ack en lote + drilldown de entregas por webhook + reenvío)",
+          "done": true
+        },
+        {
+          "id": "admin-console-pr16-entity-browsers",
+          "label": "Admin console PR16 — read-only entity browsers (Identifications, Notifications, Media, Follows, Watchlists, Projects, Taxon changes) on shared ConsoleEntityBrowser template + entity-browser.ts runtime; server-side paginated, URL-driven filter state, lazy FK lookups, auto-populated dropdown facets, indexed hot-paths",
+          "label_es": "Consola admin PR16 — navegadores de entidades de solo lectura (Identificaciones, Notificaciones, Medios, Seguimientos, Listas de vigilancia, Proyectos, Cambios de taxón) sobre plantilla compartida ConsoleEntityBrowser + runtime entity-browser.ts; paginación servidor, estado de filtros via URL, lookups lazy, dropdowns auto-poblados, índices hot-path",
+          "done": true
+        },
+        {
+          "id": "community-observers-pr17-ux-fixes",
+          "label": "Community observers UX fixes — privacy-default explainer banner (with viewer-state-aware copy), set-country inline CTA, GPS-based Nearby (community_observers_nearby_at SECURITY INVOKER RPC, sessionStorage-only coords for Referer-leak prevention), regression guard test",
+          "label_es": "Fixes de UX en observadores comunidad — banner explicativo de privacidad por defecto (copy según estado del viewer), CTA inline para fijar país, modo Cercanos con GPS real (RPC community_observers_nearby_at SECURITY INVOKER, coords solo en sessionStorage para prevenir filtración por Referer), test de regresión",
+          "done": true
+        },
+        {
+          "id": "console-chrome-rendering-fix",
+          "label": "Console chrome rendering fix — all 70 /console + /consola pages were using BaseLayout instead of ConsoleLayout, so admins saw page content with no sidebar / role pills / keybindings; ConsoleLayout was dead code. Refactored ConsoleLayout for static SSG (optional auth props, server-renders all 3 role tab lists hidden, client script reveals based on getUserRoles()), wrapped all 70 pages, added build-time console.warn in BaseLayout to prevent regression",
+          "label_es": "Fix del chrome de la consola — las 70 páginas /console + /consola usaban BaseLayout en vez de ConsoleLayout, así que los admins veían el contenido sin sidebar / role pills / keybindings; ConsoleLayout era código muerto. Se refactorizó ConsoleLayout para SSG estático (props de auth opcionales, renderiza las 3 listas de rol ocultas, script cliente las revela según getUserRoles()), se envolvieron las 70 páginas, se añadió console.warn en BaseLayout para prevenir regresiones",
+          "done": true
         }
       ]
     },
@@ -920,9 +944,12 @@
         },
         {
           "id": "m26-v1-1-review-followups",
-          "label": "M26 v1.1 review follow-ups — bundled polish flagged by ArtemIO/Nyx on PR #100 + #101 reviews. 6 small items: ?u= alias documentation, document.title → i18n key, runVisitor error vs not-found split, ConfirmDialog component (replaces confirm()/alert() in Block flow), extract overflow-menu to lib/, fave_count data-attr naming standardization. All non-blocking, deferred for a v1.2 polish sweep",
-          "label_es": "Seguimientos de review de M26 v1.1 — pulido agrupado de los notes de ArtemIO/Nyx en reviews de PR #100 + #101. 6 ítems pequeños: documentación del alias ?u=, document.title → key i18n, split de runVisitor error vs not-found, componente ConfirmDialog (reemplaza confirm()/alert() en flujo Block), extraer overflow-menu a lib/, estandarización de naming de data-attrs fave_count. Todos no-bloqueantes, diferidos para un sweep de pulido v1.2",
-          "done": false
+          "label": "M26 v1.1 review follow-ups — bundled polish flagged by ArtemIO/Nyx on PR #100 + #101 reviews. 6 small items: ?u= alias documentation, document.title → i18n key, runVisitor error vs not-found split, ConfirmDialog component (replaces confirm()/alert() in Block flow), extract overflow-menu to lib/, fave_count data-attr naming standardization.",
+          "label_es": "Seguimientos de review de M26 v1.1 — pulido agrupado de los notes de ArtemIO/Nyx en reviews de PR #100 + #101. 6 ítems pequeños: documentación del alias ?u=, document.title → key i18n, split de runVisitor error vs not-found, componente ConfirmDialog (reemplaza confirm()/alert() en flujo Block), extraer overflow-menu a lib/, estandarización de naming de data-attrs fave_count.",
+          "done": true,
+          "done_at": "2026-04-29",
+          "status": "shipped — PR #149 (ConfirmDialog component + Block-flow + delete-photo migrations) + PR #150 (?u= alias removal, document.title → i18n, runVisitor error/not-found split, lib/overflow-menu.ts extraction across 3 consumers, fave_count_aria-* naming standardization)",
+          "status_es": "lanzado — PR #149 (componente ConfirmDialog + migraciones flujo Block + delete-photo) + PR #150 (eliminación del alias ?u=, document.title → i18n, split runVisitor error/not-found, extracción lib/overflow-menu.ts a 3 consumidores, estandarización fave_count_aria-*)"
         },
         {
           "id": "community-discovery-m28",

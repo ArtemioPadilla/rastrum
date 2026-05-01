@@ -1,0 +1,696 @@
+---
+/**
+ * AudioPlayer — waveform + spectrogram player for audio observations.
+ *
+ * Uses wavesurfer.js (v7) with the Spectrogram plugin.
+ * Renders client-side only (the `<script>` block). The HTML shell is
+ * lightweight and accessible without JS (falls back to a native <audio> tag).
+ *
+ * Props:
+ *   audioUrl   — R2 URL to the audio file
+ *   mimeType   — MIME type hint (e.g. 'audio/mpeg', 'audio/ogg')
+ *   lang       — 'en' | 'es'
+ *   obsId      — Observation ID, used to scope DOM IDs so multiple players
+ *                can coexist on the same page (future-proofing)
+ *   label      — Optional accessible label (e.g. species name)
+ *   showSpectrogram — Whether to render the spectrogram (default: true).
+ *                     Pass false to show waveform-only (faster, lower memory).
+ *
+ * Spectrogram notes:
+ *   - Color map: inferno (perceptually uniform, bioacoustics standard)
+ *   - Frequency range: 0–12 kHz (covers most bird vocalizations)
+ *   - FFT window: 512 (good freq resolution for tonal bird songs)
+ *   - Lazy: spectrogram is only computed when the user clicks "Show spectrogram"
+ *     to avoid blocking the UI on low-end phones
+ *   - BirdNET detection windows (if provided) are drawn as overlays on the
+ *     spectrogram canvas (future: pass detections as JSON prop)
+ */
+
+interface Props {
+  audioUrl: string;
+  mimeType?: string;
+  lang: 'en' | 'es';
+  obsId: string;
+  label?: string;
+  showSpectrogram?: boolean;
+}
+
+const {
+  audioUrl,
+  mimeType = 'audio/mpeg',
+  lang,
+  obsId,
+  label = '',
+  showSpectrogram = true,
+} = Astro.props;
+
+const isEs = lang === 'es';
+const playLabel    = isEs ? 'Reproducir' : 'Play';
+const pauseLabel   = isEs ? 'Pausar' : 'Pause';
+const spectroLabel = isEs ? 'Ver espectrograma' : 'Show spectrogram';
+const spectroHide  = isEs ? 'Ocultar espectrograma' : 'Hide spectrogram';
+const loadingLabel = isEs ? 'Cargando audio…' : 'Loading audio…';
+const errorLabel   = isEs ? 'No se pudo cargar el audio.' : 'Could not load audio.';
+const freqLabel    = isEs ? 'Frecuencia (kHz)' : 'Frequency (kHz)';
+const timeLabel    = isEs ? 'Tiempo (s)' : 'Time (s)';
+
+const waveId    = `ws-wave-${obsId}`;
+const spectroId = `ws-spec-${obsId}`;
+const playBtnId = `ws-play-${obsId}`;
+const toggleId  = `ws-toggle-spec-${obsId}`;
+const timerId   = `ws-time-${obsId}`;
+---
+
+<div
+  class="rastrum-audio-player rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden"
+  data-audio-url={audioUrl}
+  data-mime-type={mimeType}
+  data-obs-id={obsId}
+  data-show-spectrogram={showSpectrogram ? 'true' : 'false'}
+  data-lang={lang}
+  data-label-play={playLabel}
+  data-label-pause={pauseLabel}
+  data-label-spectro={spectroLabel}
+  data-label-spectro-hide={spectroHide}
+  data-label-freq={freqLabel}
+  data-label-time={timeLabel}
+>
+  <!-- Waveform container -->
+  <div class="px-3 pt-3">
+    <div id={waveId} class="w-full" style="min-height: 60px;"></div>
+  </div>
+
+  <!-- Controls bar -->
+  <div class="flex items-center gap-3 px-3 py-2">
+    <!-- Play/Pause -->
+    <button
+      id={playBtnId}
+      type="button"
+      aria-label={playLabel}
+      class="w-9 h-9 rounded-full bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white flex items-center justify-center shrink-0 transition-colors disabled:opacity-40"
+      disabled
+    >
+      <!-- Play icon (default) -->
+      <svg class="play-icon w-4 h-4 ml-0.5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M8 5v14l11-7z"/>
+      </svg>
+      <!-- Pause icon (hidden until playing) -->
+      <svg class="pause-icon hidden w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+      </svg>
+    </button>
+
+    <!-- Time readout -->
+    <span id={timerId} class="text-xs font-mono text-zinc-500 dark:text-zinc-400 tabular-nums shrink-0">0:00</span>
+
+    <!-- Loading / error state -->
+    <span class="loading-label text-xs text-zinc-400 dark:text-zinc-500">{loadingLabel}</span>
+    <span class="error-label hidden text-xs text-red-500">{errorLabel}</span>
+
+    <div class="flex-1"></div>
+
+    <!-- Toggle spectrogram (only shown when showSpectrogram=true) -->
+    {showSpectrogram && (
+      <button
+        id={toggleId}
+        type="button"
+        aria-expanded="false"
+        class="text-xs text-emerald-700 dark:text-emerald-400 underline underline-offset-2 hover:no-underline transition-all shrink-0"
+      >
+        {spectroLabel}
+      </button>
+    )}
+  </div>
+
+  <!-- Spectrogram panel (lazy, collapsed by default) -->
+  {showSpectrogram && (
+    <div id={spectroId} class="hidden px-3 pb-2">
+      <!-- Spectrogram toolbar: freq zoom + export -->
+      <div class="flex items-center gap-2 mb-2 flex-wrap">
+        <!-- Frequency range selector -->
+        <div class="flex items-center gap-1 text-[10px] text-zinc-500 dark:text-zinc-400">
+          <span>{isEs ? 'Rango:' : 'Range:'}</span>
+          <select
+            id={`ws-freq-range-${obsId}`}
+            class="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-[10px] px-1 py-0.5"
+            aria-label={isEs ? 'Rango de frecuencias' : 'Frequency range'}
+          >
+            <option value="12000">0 – 12 kHz</option>
+            <option value="8000">0 – 8 kHz</option>
+            <option value="4000">0 – 4 kHz</option>
+            <option value="2000">0 – 2 kHz</option>
+          </select>
+        </div>
+        <div class="flex-1"></div>
+        <!-- Export PNG -->
+        <button
+          id={`ws-export-${obsId}`}
+          type="button"
+          class="flex items-center gap-1 text-[10px] text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"
+          title={isEs ? 'Descargar espectrograma como imagen' : 'Download spectrogram as image'}
+        >
+          <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+          </svg>
+          {isEs ? 'Exportar PNG' : 'Export PNG'}
+        </button>
+        <!-- Info tooltip toggle -->
+        <button
+          id={`ws-info-btn-${obsId}`}
+          type="button"
+          class="w-5 h-5 rounded-full border border-zinc-300 dark:border-zinc-700 text-[10px] text-zinc-500 dark:text-zinc-400 hover:border-emerald-500 hover:text-emerald-500 transition-colors flex items-center justify-center font-bold"
+          aria-label={isEs ? '¿Qué estoy viendo?' : 'What am I looking at?'}
+          title={isEs ? '¿Qué estoy viendo?' : 'What am I looking at?'}
+        >?</button>
+      </div>
+
+      <!-- Educational info panel (collapsed by default) -->
+      <div id={`ws-info-panel-${obsId}`} class="hidden mb-2 rounded-lg border border-emerald-200 dark:border-emerald-900/40 bg-emerald-50 dark:bg-emerald-950/30 p-3 text-xs text-zinc-700 dark:text-zinc-300 space-y-1.5">
+        <p class="font-semibold text-emerald-800 dark:text-emerald-300">{isEs ? '¿Qué es un espectrograma?' : 'What is a spectrogram?'}</p>
+        <p>{isEs
+          ? 'Muestra cómo cambian las frecuencias del sonido a lo largo del tiempo. El eje horizontal es el tiempo, el vertical es la frecuencia (tono), y el color indica la intensidad (más brillante = más fuerte).'
+          : 'Shows how the frequencies in a sound change over time. The horizontal axis is time, the vertical axis is frequency (pitch), and the color shows intensity — brighter = louder.'}
+        </p>
+        <p>{isEs
+          ? '🌈 Colormap inferno: negro = silencio, morado/azul = débil, naranja = moderado, amarillo/blanco = muy fuerte.'
+          : '🌈 Inferno colormap: black = silence, purple/blue = faint, orange = moderate, yellow/white = very loud.'}
+        </p>
+        <p>{isEs
+          ? '🐦 Los cantos de aves suelen aparecer entre 1–8 kHz. Patrones horizontales = tonos sostenidos; patrones verticales = clics o golpes.'
+          : '🐦 Bird songs typically appear between 1–8 kHz. Horizontal streaks = sustained tones; vertical streaks = clicks or percussive sounds.'}
+        </p>
+        <p id={`ws-birdnet-info-${obsId}`} class="hidden font-medium text-emerald-700 dark:text-emerald-400">{isEs
+          ? '✅ Las bandas verdes/coloreadas muestran segmentos donde BirdNET detectó una especie. Toca una banda para ver detalles.'
+          : '✅ Colored bands show segments where BirdNET detected a species. Tap a band for details.'}
+        </p>
+      </div>
+
+      <!-- Frequency axis top label -->
+      <div class="flex items-end justify-between mb-1 text-[10px] text-zinc-400 dark:text-zinc-500 select-none">
+        <span id={`ws-freq-top-${obsId}`}>12 kHz</span>
+        <span class="italic">{freqLabel}</span>
+        <span>0 Hz</span>
+      </div>
+
+      <!-- Spectrogram host + BirdNET overlay container -->
+      <div class="relative">
+        <!-- Spectrogram canvas renders here (wavesurfer appends it) -->
+        <div
+          id={`ws-spec-host-${obsId}`}
+          class="ws-spectrogram-host w-full rounded overflow-hidden bg-zinc-950"
+          style="height: 140px;"
+          aria-hidden="true"
+        ></div>
+        <!-- BirdNET detection overlays (injected by JS) -->
+        <div id={`ws-detections-${obsId}`} class="absolute inset-0 pointer-events-none" aria-hidden="true"></div>
+        <!-- Interactive tooltip -->
+        <div
+          id={`ws-tooltip-${obsId}`}
+          class="hidden absolute z-10 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white/95 dark:bg-zinc-900/95 shadow-lg p-2.5 text-xs max-w-[200px] pointer-events-none"
+          role="tooltip"
+        ></div>
+      </div>
+
+      <!-- Time axis label -->
+      <div class="mt-1 text-[10px] text-zinc-400 dark:text-zinc-500 text-right select-none italic">
+        {timeLabel}
+      </div>
+
+      <!-- BirdNET species legend (populated by JS) -->
+      <div id={`ws-legend-${obsId}`} class="hidden mt-2 space-y-1"></div>
+    </div>
+  )}
+
+  <!-- Fallback for no-JS: native audio element -->
+  <noscript>
+    <div class="px-3 pb-3">
+      <audio controls src={audioUrl} class="w-full">
+        <track kind="captions" />
+      </audio>
+    </div>
+  </noscript>
+</div>
+
+<script>
+/**
+ * AudioPlayer client-side init — v2+v3.
+ * v2: BirdNET detection overlay on spectrogram with interactive tooltips
+ * v3: frequency zoom, export spectrogram as PNG
+ *
+ * Each `.rastrum-audio-player` element is independent (separate WaveSurfer
+ * instance). Data flows from the page via data-* attributes and the
+ * `rastrum:audio-birdnet-ready` custom event.
+ */
+(function () {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAll);
+  } else {
+    initAll();
+  }
+
+  function initAll() {
+    document.querySelectorAll<HTMLElement>('.rastrum-audio-player').forEach(el => {
+      if (el.dataset.wsReady) return;
+      el.dataset.wsReady = '1';
+      initPlayer(el);
+    });
+  }
+
+  document.addEventListener('rastrum:audio-players-ready', () => {
+    document.querySelectorAll<HTMLElement>('.rastrum-audio-player').forEach(el => {
+      if (el.dataset.wsReady) return;
+      el.dataset.wsReady = '1';
+      initPlayer(el);
+    });
+  });
+
+  // Listen for BirdNET results injected after the player is already live
+  document.addEventListener('rastrum:audio-birdnet-ready', (e: Event) => {
+    const ev = e as CustomEvent<{ obsId: string; segments: BirdNetSegment[]; durationSec: number }>;
+    const { obsId, segments, durationSec } = ev.detail;
+    const container = document.querySelector<HTMLElement>(`[data-obs-id="${obsId}"]`);
+    if (!container) return;
+    renderDetectionOverlay(container, obsId, segments, durationSec);
+  });
+
+  // ── Types ──────────────────────────────────────────────────────────────
+  interface BirdNetCandidate {
+    scientific_name: string;
+    common_name_en: string | null;
+    score: number;
+  }
+  interface BirdNetSegment {
+    startSec: number;
+    endSec: number;
+    top: BirdNetCandidate[];
+  }
+
+  // ── Inferno colormap (256 RGBA entries) ───────────────────────────────
+  function buildInfernoColormap(): [number, number, number, number][] {
+    const stops: [number, [number, number, number]][] = [
+      [0,    [0,   0,   4]],
+      [0.13, [31,  12,  72]],
+      [0.25, [85,  15,  109]],
+      [0.38, [139, 34,  82]],
+      [0.50, [188, 55,  84]],
+      [0.63, [229, 107, 54]],
+      [0.75, [246, 163, 10]],
+      [0.88, [250, 213, 43]],
+      [1.0,  [252, 255, 164]],
+    ];
+    const out: [number, number, number, number][] = [];
+    for (let i = 0; i < 256; i++) {
+      const t = i / 255;
+      let lo = stops[0], hi = stops[stops.length - 1];
+      for (let j = 0; j < stops.length - 1; j++) {
+        if (t >= stops[j][0] && t <= stops[j + 1][0]) { lo = stops[j]; hi = stops[j + 1]; break; }
+      }
+      const span = hi[0] - lo[0];
+      const f = span > 0 ? (t - lo[0]) / span : 0;
+      const r = Math.round(lo[1][0] + f * (hi[1][0] - lo[1][0]));
+      const g = Math.round(lo[1][1] + f * (hi[1][1] - lo[1][1]));
+      const b = Math.round(lo[1][2] + f * (hi[1][2] - lo[1][2]));
+      out.push([r / 255, g / 255, b / 255, 1]);
+    }
+    return out;
+  }
+
+  // ── Detection overlay (v2) ─────────────────────────────────────────────
+  // Species color palette: up to 8 distinct colors for different species
+  const SPECIES_COLORS = [
+    { bg: 'rgba(16,185,129,0.25)',  border: '#10b981', text: '#6ee7b7' },   // emerald
+    { bg: 'rgba(251,191,36,0.25)',  border: '#fbbf24', text: '#fde68a' },   // amber
+    { bg: 'rgba(167,139,250,0.25)', border: '#a78bfa', text: '#c4b5fd' },   // violet
+    { bg: 'rgba(251,113,133,0.25)', border: '#fb7185', text: '#fda4af' },   // rose
+    { bg: 'rgba(56,189,248,0.25)',  border: '#38bdf8', text: '#7dd3fc' },   // sky
+    { bg: 'rgba(52,211,153,0.25)',  border: '#34d399', text: '#6ee7b7' },   // green
+    { bg: 'rgba(249,115,22,0.25)',  border: '#f97316', text: '#fdba74' },   // orange
+    { bg: 'rgba(232,121,249,0.25)', border: '#e879f9', text: '#f0abfc' },   // fuchsia
+  ];
+
+  function renderDetectionOverlay(
+    container: HTMLElement,
+    obsId: string,
+    segments: BirdNetSegment[],
+    durationSec: number,
+  ) {
+    const overlayEl  = document.getElementById(`ws-detections-${obsId}`);
+    const tooltipEl  = document.getElementById(`ws-tooltip-${obsId}`);
+    const legendEl   = document.getElementById(`ws-legend-${obsId}`);
+    const birdInfoEl = document.getElementById(`ws-birdnet-info-${obsId}`);
+    const lang       = container.dataset.lang ?? 'en';
+    const isEs       = lang === 'es';
+    if (!overlayEl || !durationSec) return;
+
+    // Filter meaningful detections (confidence >= 0.3)
+    const CONF_THRESHOLD = 0.3;
+    const filtered = segments
+      .filter(seg => seg.top[0]?.score >= CONF_THRESHOLD)
+      .map(seg => ({ ...seg, best: seg.top[0]! }));
+
+    if (filtered.length === 0) return;
+
+    // Assign consistent colors per species
+    const speciesOrder: string[] = [];
+    for (const seg of filtered) {
+      if (!speciesOrder.includes(seg.best.scientific_name)) {
+        speciesOrder.push(seg.best.scientific_name);
+      }
+    }
+    const colorMap = new Map<string, typeof SPECIES_COLORS[0]>();
+    speciesOrder.forEach((sp, i) => colorMap.set(sp, SPECIES_COLORS[i % SPECIES_COLORS.length]!));
+
+    // Build overlay bands
+    const bands: HTMLElement[] = [];
+    for (const seg of filtered) {
+      const color = colorMap.get(seg.best.scientific_name)!;
+      const leftPct  = (seg.startSec / durationSec) * 100;
+      const widthPct = ((seg.endSec - seg.startSec) / durationSec) * 100;
+
+      const band = document.createElement('div');
+      band.style.cssText = `
+        position: absolute; top: 0; bottom: 0;
+        left: ${leftPct}%; width: ${widthPct}%;
+        background: ${color.bg};
+        border-left: 2px solid ${color.border};
+        border-right: 1px solid ${color.border}40;
+        cursor: pointer;
+        pointer-events: auto;
+        transition: background 0.15s;
+      `;
+      band.setAttribute('role', 'button');
+      band.setAttribute('tabindex', '0');
+      const confPct = Math.round(seg.best.score * 100);
+      const spName  = seg.best.scientific_name;
+      const commonName = seg.best.common_name_en ?? spName;
+      const timeRange = `${seg.startSec.toFixed(1)}s – ${seg.endSec.toFixed(1)}s`;
+      band.setAttribute('aria-label', `${spName} ${confPct}%`);
+
+      // Hover: show tooltip
+      const showTip = (e: MouseEvent | FocusEvent) => {
+        if (!tooltipEl) return;
+        const confBar = Math.round(seg.best.score * 10);
+        const confBarFill = '█'.repeat(confBar) + '░'.repeat(10 - confBar);
+        tooltipEl.innerHTML = `
+          <div class="font-semibold italic text-zinc-900 dark:text-zinc-100" style="color:${color.border}">${spName}</div>
+          <div class="text-zinc-500 dark:text-zinc-400">${commonName}</div>
+          <div class="mt-1 font-mono text-[10px]" style="color:${color.text}">
+            ${confBarFill} ${confPct}%
+          </div>
+          <div class="text-zinc-500 dark:text-zinc-400 mt-0.5">⏱ ${timeRange}</div>
+          <div class="text-zinc-400 dark:text-zinc-500 mt-1 text-[9px] leading-tight">
+            ${isEs
+              ? `Confianza: ${confPct}% — qué tan seguro está BirdNET de que este es el canto de <em>${spName}</em> en este intervalo. Valores ≥50% son confiables.`
+              : `Confidence: ${confPct}% — how certain BirdNET is that this is a <em>${spName}</em> call in this window. Values ≥50% are reliable.`
+            }
+          </div>
+        `;
+        // Position tooltip above cursor
+        const rect = band.getBoundingClientRect();
+        const containerRect = overlayEl.getBoundingClientRect();
+        let left = rect.left - containerRect.left;
+        const tipWidth = 200;
+        if (left + tipWidth > containerRect.width) left = containerRect.width - tipWidth - 4;
+        tooltipEl.style.left = `${Math.max(0, left)}px`;
+        tooltipEl.style.top = '-8px';
+        tooltipEl.style.transform = 'translateY(-100%)';
+        tooltipEl.classList.remove('hidden');
+      };
+      const hideTip = () => tooltipEl?.classList.add('hidden');
+
+      band.addEventListener('mouseenter', showTip);
+      band.addEventListener('focusin', showTip);
+      band.addEventListener('mouseleave', hideTip);
+      band.addEventListener('focusout', hideTip);
+      band.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') showTip(e as unknown as MouseEvent); });
+
+      // Label inside band if wide enough (>8%)
+      if (widthPct > 8) {
+        const lbl = document.createElement('div');
+        lbl.style.cssText = `
+          position: absolute; top: 4px; left: 4px;
+          font-size: 9px; font-weight: 600;
+          white-space: nowrap; overflow: hidden;
+          color: ${color.text};
+          text-shadow: 0 0 4px rgba(0,0,0,0.9);
+          pointer-events: none;
+        `;
+        lbl.textContent = `${spName.split(' ')[0]} ${confPct}%`;
+        band.appendChild(lbl);
+      }
+      overlayEl.appendChild(band);
+      bands.push(band);
+    }
+
+    // Build species legend below spectrogram
+    if (legendEl) {
+      legendEl.classList.remove('hidden');
+      legendEl.innerHTML = `
+        <div class="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1">
+          ${isEs ? 'Especies detectadas' : 'Detected species'}
+        </div>
+        ${speciesOrder.map(sp => {
+          const color  = colorMap.get(sp)!;
+          const maxConf = Math.round(Math.max(...filtered.filter(s => s.best.scientific_name === sp).map(s => s.best.score)) * 100);
+          const common = filtered.find(s => s.best.scientific_name === sp)?.best.common_name_en ?? sp;
+          const segs   = filtered.filter(s => s.best.scientific_name === sp).length;
+          return `
+            <div class="flex items-center gap-2 text-xs rounded-lg p-2 border" style="border-color:${color.border}40;background:${color.bg}">
+              <div class="w-3 h-3 rounded-sm shrink-0 border" style="background:${color.bg};border-color:${color.border}"></div>
+              <div class="min-w-0">
+                <div class="font-semibold italic text-zinc-900 dark:text-zinc-100 truncate">${sp}</div>
+                <div class="text-zinc-500 dark:text-zinc-400 text-[10px]">${common}</div>
+              </div>
+              <div class="ml-auto text-right shrink-0">
+                <div class="font-mono text-[10px]" style="color:${color.text}">${maxConf}%</div>
+                <div class="text-zinc-500 text-[9px]">${segs} ${isEs ? 'segmentos' : 'segments'}</div>
+              </div>
+            </div>`;
+        }).join('')}
+        <div class="text-[9px] text-zinc-500 dark:text-zinc-400 mt-1 leading-tight">
+          ${isEs
+            ? '% = confianza máxima · seg = segmentos donde se detectó · toca una banda verde para más detalles'
+            : '% = max confidence · seg = segments where detected · tap a green band for details'
+          }
+        </div>
+      `;
+    }
+
+    // Show BirdNET info line in educational panel
+    birdInfoEl?.classList.remove('hidden');
+  }
+
+  // ── Main player init ──────────────────────────────────────────────────
+  async function initPlayer(container: HTMLElement) {
+    if (!container.dataset.wsReady) container.dataset.wsReady = '1';
+    const audioUrl   = container.dataset.audioUrl ?? '';
+    const obsId      = container.dataset.obsId ?? '';
+    const showSpec   = container.dataset.showSpectrogram === 'true';
+    const labelPause = container.dataset.labelPause ?? 'Pause';
+    const labelPlay  = container.dataset.labelPlay  ?? 'Play';
+    const labelSpec  = container.dataset.labelSpectro ?? 'Show spectrogram';
+    const labelSpecH = container.dataset.labelSpectroHide ?? 'Hide spectrogram';
+
+    if (!audioUrl) return;
+
+    const waveEl     = document.getElementById(`ws-wave-${obsId}`);
+    const playBtn    = document.getElementById(`ws-play-${obsId}`) as HTMLButtonElement | null;
+    const toggleBtn  = document.getElementById(`ws-toggle-spec-${obsId}`) as HTMLButtonElement | null;
+    const spectroPanel = document.getElementById(`ws-spec-${obsId}`);
+    const specHost   = document.getElementById(`ws-spec-host-${obsId}`);
+    const timeEl     = document.getElementById(`ws-time-${obsId}`);
+    const loadingEl  = container.querySelector<HTMLElement>('.loading-label');
+    const errorEl    = container.querySelector<HTMLElement>('.error-label');
+    const freqSelect = document.getElementById(`ws-freq-range-${obsId}`) as HTMLSelectElement | null;
+    const exportBtn  = document.getElementById(`ws-export-${obsId}`) as HTMLButtonElement | null;
+    const infoBtn    = document.getElementById(`ws-info-btn-${obsId}`) as HTMLButtonElement | null;
+    const infoPanel  = document.getElementById(`ws-info-panel-${obsId}`);
+
+    if (!waveEl) return;
+
+    function formatTime(sec: number): string {
+      const m = Math.floor(sec / 60);
+      const s = Math.floor(sec % 60);
+      return `${m}:${s.toString().padStart(2, '0')}`;
+    }
+
+    // Info panel toggle
+    infoBtn?.addEventListener('click', () => {
+      const hidden = infoPanel?.classList.toggle('hidden');
+      infoBtn.setAttribute('aria-expanded', hidden ? 'false' : 'true');
+    });
+
+    try {
+      const WaveSurfer = (await import('wavesurfer.js')).default;
+      const ws = WaveSurfer.create({
+        container: waveEl,
+        waveColor: '#10b981',
+        progressColor: '#047857',
+        cursorColor: '#6ee7b7',
+        barWidth: 2,
+        barGap: 1,
+        barRadius: 2,
+        height: 60,
+        normalize: true,
+        url: audioUrl,
+      });
+
+      ws.on('ready', () => {
+        loadingEl?.classList.add('hidden');
+        if (playBtn) { playBtn.disabled = false; playBtn.setAttribute('aria-label', labelPlay); }
+        if (timeEl) timeEl.textContent = `0:00 / ${formatTime(ws.getDuration())}`;
+      });
+      ws.on('error', () => { loadingEl?.classList.add('hidden'); errorEl?.classList.remove('hidden'); });
+      ws.on('play', () => {
+        playBtn?.querySelector('.play-icon')?.classList.add('hidden');
+        playBtn?.querySelector('.pause-icon')?.classList.remove('hidden');
+        playBtn?.setAttribute('aria-label', labelPause);
+      });
+      ws.on('pause', () => {
+        playBtn?.querySelector('.pause-icon')?.classList.add('hidden');
+        playBtn?.querySelector('.play-icon')?.classList.remove('hidden');
+        playBtn?.setAttribute('aria-label', labelPlay);
+      });
+      ws.on('finish', () => {
+        playBtn?.querySelector('.pause-icon')?.classList.add('hidden');
+        playBtn?.querySelector('.play-icon')?.classList.remove('hidden');
+        playBtn?.setAttribute('aria-label', labelPlay);
+      });
+      ws.on('timeupdate', (t: number) => {
+        if (timeEl) timeEl.textContent = `${formatTime(t)} / ${formatTime(ws.getDuration())}`;
+      });
+
+      playBtn?.addEventListener('click', () => ws.playPause());
+
+      // ── Lazy spectrogram (v1 + v2 + v3) ──────────────────────────────
+      if (showSpec && toggleBtn && spectroPanel) {
+        let spectroLoaded  = false;
+        let spectroPlugin: unknown = null;
+        let currentFreqMax = 12000;
+
+        const COLORMAP = buildInfernoColormap();
+
+        async function loadSpectrogram(freqMax = 12000) {
+          const host = specHost;
+          if (!host) return null;
+          try {
+            const { SpectrogramPlugin } = await import('wavesurfer.js/plugins/spectrogram');
+            const plugin = SpectrogramPlugin.create({
+              container: host,
+              labels: true,
+              labelsBackground: 'rgba(9,9,11,0.7)',
+              labelsColor: '#a1a1aa',
+              labelsHzColor: '#a1a1aa',
+              height: 140,
+              frequencyMax: freqMax,
+              frequencyMin: 0,
+              fftSamples: 512,
+              colorMap: COLORMAP,
+            });
+            ws.registerPlugin(plugin);
+            return plugin;
+          } catch (e) {
+            console.warn('[rastrum] spectrogram failed:', e);
+            return null;
+          }
+        }
+
+        toggleBtn.addEventListener('click', async () => {
+          const expanded = toggleBtn.getAttribute('aria-expanded') === 'true';
+          if (!expanded) {
+            spectroPanel.classList.remove('hidden');
+            toggleBtn.setAttribute('aria-expanded', 'true');
+            toggleBtn.textContent = labelSpecH;
+            if (!spectroLoaded) {
+              spectroLoaded = true;
+              spectroPlugin = await loadSpectrogram(currentFreqMax);
+            }
+          } else {
+            spectroPanel.classList.add('hidden');
+            toggleBtn.setAttribute('aria-expanded', 'false');
+            toggleBtn.textContent = labelSpec;
+          }
+        });
+
+        // v3: Frequency zoom
+        freqSelect?.addEventListener('change', async () => {
+          const newFreq = parseInt(freqSelect.value, 10);
+          if (newFreq === currentFreqMax || !spectroLoaded) { currentFreqMax = newFreq; return; }
+          currentFreqMax = newFreq;
+          // Update top label
+          const topLabel = document.getElementById(`ws-freq-top-${obsId}`);
+          if (topLabel) topLabel.textContent = `${newFreq / 1000} kHz`;
+          // Recreate spectrogram with new freq range
+          if (specHost) specHost.innerHTML = '';
+          spectroPlugin = await loadSpectrogram(newFreq);
+        });
+
+        // v3: Export spectrogram as PNG
+        exportBtn?.addEventListener('click', async () => {
+          const canvas = specHost?.querySelector('canvas');
+          if (!canvas) {
+            exportBtn.textContent = container.dataset.lang === 'es' ? '(Abre el espectrograma primero)' : '(Open spectrogram first)';
+            setTimeout(() => exportBtn.innerHTML = `<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg> Export PNG`, 2000);
+            return;
+          }
+          try {
+            // Use blob URL for cross-origin safety (R2 audio + iOS Safari).
+            // canvas.toDataURL() works when wavesurfer renders from an
+            // in-memory AudioBuffer — no taint issues. Wrap in Blob just in
+            // case the browser restricts the data: scheme for downloads.
+            const dataUrl = canvas.toDataURL('image/png');
+            const res = await fetch(dataUrl);
+            const blob = await res.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.download = `spectrogram-${obsId}.png`;
+            link.href = blobUrl;
+            link.click();
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+          } catch {
+            // Last resort: open in new tab (user can long-press to save on iOS)
+            const dataUrl = canvas.toDataURL('image/png');
+            window.open(dataUrl, '_blank');
+          }
+        });
+      }
+
+    } catch (err) {
+      loadingEl?.classList.add('hidden');
+      errorEl?.classList.remove('hidden');
+      console.warn('[rastrum] WaveSurfer init failed:', err);
+    }
+  }
+
+  function buildInfernoColormap(): [number, number, number, number][] {
+    const stops: [number, [number, number, number]][] = [
+      [0,    [0,   0,   4]],
+      [0.13, [31,  12,  72]],
+      [0.25, [85,  15,  109]],
+      [0.38, [139, 34,  82]],
+      [0.50, [188, 55,  84]],
+      [0.63, [229, 107, 54]],
+      [0.75, [246, 163, 10]],
+      [0.88, [250, 213, 43]],
+      [1.0,  [252, 255, 164]],
+    ];
+    const out: [number, number, number, number][] = [];
+    for (let i = 0; i < 256; i++) {
+      const t = i / 255;
+      let lo = stops[0], hi = stops[stops.length - 1];
+      for (let j = 0; j < stops.length - 1; j++) {
+        if (t >= stops[j][0] && t <= stops[j + 1][0]) { lo = stops[j]; hi = stops[j + 1]; break; }
+      }
+      const span = hi[0] - lo[0];
+      const f = span > 0 ? (t - lo[0]) / span : 0;
+      out.push([
+        Math.round(lo[1][0] + f * (hi[1][0] - lo[1][0])) / 255,
+        Math.round(lo[1][1] + f * (hi[1][1] - lo[1][1])) / 255,
+        Math.round(lo[1][2] + f * (hi[1][2] - lo[1][2])) / 255,
+        1,
+      ]);
+    }
+    return out;
+  }
+})();
+</script>

@@ -1,0 +1,21 @@
+<!-- SUNSET: 2026-06-30 — remove this page and redirect to /observe -->
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import ObservationForm from '../../../components/ObservationForm.astro';
+import { t } from '../../../i18n/utils';
+
+const lang = 'en';
+const tr = t(lang);
+---
+
+<BaseLayout title={`${tr.observe.title} (Classic) — Rastrum`} description="Classic observation form with all fields." lang={lang}>
+  <div class="mb-4 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
+    ⚠️ Classic form will be removed on 2026-06-30. Use the new <a href="/en/observe" class="underline hover:no-underline font-medium">/observe</a> instead.
+  </div>
+  <div class="mb-4">
+    <a href="/en/observe" class="text-sm text-emerald-600 dark:text-emerald-400 hover:underline">
+      ← Try the new Drop &amp; Discover form
+    </a>
+  </div>
+  <ObservationForm lang={lang} />
+</BaseLayout>

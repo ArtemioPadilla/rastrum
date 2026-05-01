@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS public.users (
 -- Profile / gamification additive columns (module 08 v0.1 slice).
 -- See docs/specs/modules/08-profile-activity-gamification.md.
 ALTER TABLE public.users
-  ADD COLUMN IF NOT EXISTS profile_public        boolean  NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS profile_public        boolean  NOT NULL DEFAULT true,
   ADD COLUMN IF NOT EXISTS gamification_opt_in   boolean  NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS streak_digest_opt_in  boolean  NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS region_primary        text,
@@ -399,7 +399,11 @@ CREATE POLICY "taxa_public_read" ON public.taxa FOR SELECT USING (true);
 -- policy can stay single-table and inexpensive.
 DROP POLICY IF EXISTS "obs_owner" ON public.observations;
 CREATE POLICY "obs_owner" ON public.observations FOR ALL
-  USING ((SELECT auth.uid()) = observer_id);
+  USING    ((SELECT auth.uid()) = observer_id)
+  -- Explicit WITH CHECK prevents Postgres from falling back to the USING clause
+  -- on INSERT/UPDATE, which in complex policy environments can trigger 42P17
+  -- infinite recursion when other permissive policies subquery this table.
+  WITH CHECK ((SELECT auth.uid()) = observer_id);
 
 DROP POLICY IF EXISTS "obs_public_read" ON public.observations;
 CREATE POLICY "obs_public_read" ON public.observations FOR SELECT
@@ -415,41 +419,78 @@ CREATE POLICY "obs_public_read" ON public.observations FOR SELECT
 -- Same dataset shape, just no obscuration. Admin sets credentialed_researcher
 -- after ID verification (no self-serve toggle).
 DROP POLICY IF EXISTS "obs_credentialed_read" ON public.observations;
+-- Fixed 2026-04-30: replaced correlated subquery with EXISTS (42P17 prevention)
 CREATE POLICY "obs_credentialed_read" ON public.observations FOR SELECT
   USING (
     sync_status = 'synced'
-    AND (SELECT credentialed_researcher FROM public.users WHERE id = auth.uid()) = true
+    AND EXISTS (
+      SELECT 1 FROM public.users
+      WHERE id = auth.uid()
+        AND credentialed_researcher = true
+    )
   );
 
 -- Identifications: tied to observation access
 DROP POLICY IF EXISTS "id_owner" ON public.identifications;
+-- Fixed 2026-04-30: IN (SELECT id FROM observations ...) → EXISTS to prevent 42P17
+-- recursion. The IN subquery re-evaluates RLS on observations during INSERT,
+-- causing infinite recursion (42P17). EXISTS breaks the cycle.
 CREATE POLICY "id_owner" ON public.identifications FOR ALL
   USING (
-    observation_id IN (
-      SELECT id FROM observations WHERE (SELECT auth.uid()) = observer_id
+    EXISTS (
+      SELECT 1 FROM public.observations o
+      WHERE o.id = observation_id
+        AND (SELECT auth.uid()) = o.observer_id
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.observations o
+      WHERE o.id = observation_id
+        AND (SELECT auth.uid()) = o.observer_id
     )
   );
 
 DROP POLICY IF EXISTS "id_public_read" ON public.identifications;
+-- Fixed 2026-04-30: IN (SELECT) → EXISTS to prevent 42P17 chain
 CREATE POLICY "id_public_read" ON public.identifications FOR SELECT
   USING (
-    observation_id IN (SELECT id FROM observations WHERE sync_status = 'synced')
+    EXISTS (
+      SELECT 1 FROM public.observations o
+      WHERE o.id = observation_id
+        AND o.sync_status = 'synced'
+    )
   );
 
 -- Media: same as observations
 DROP POLICY IF EXISTS "media_owner" ON public.media_files;
+-- Fixed 2026-04-30: same EXISTS fix as id_owner (42P17 recursion prevention)
 CREATE POLICY "media_owner" ON public.media_files FOR ALL
   USING (
-    observation_id IN (
-      SELECT id FROM observations WHERE (SELECT auth.uid()) = observer_id
+    EXISTS (
+      SELECT 1 FROM public.observations o
+      WHERE o.id = observation_id
+        AND (SELECT auth.uid()) = o.observer_id
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.observations o
+      WHERE o.id = observation_id
+        AND (SELECT auth.uid()) = o.observer_id
     )
   );
 
 DROP POLICY IF EXISTS "media_public_read" ON public.media_files;
+-- Fixed 2026-04-30: IN (SELECT) → EXISTS to prevent 42P17 chain
 CREATE POLICY "media_public_read" ON public.media_files FOR SELECT
   USING (
-    observation_id IN (SELECT id FROM observations WHERE sync_status = 'synced')
-    AND metadata_redacted = false
+    metadata_redacted = false
+    AND EXISTS (
+      SELECT 1 FROM public.observations o
+      WHERE o.id = observation_id
+        AND o.sync_status = 'synced'
+    )
   );
 
 -- Taxon usage history (taxonomy renames/synonyms bookkeeping). Read
@@ -859,10 +900,15 @@ CREATE POLICY comments_self_update ON public.observation_comments FOR UPDATE
   USING ((SELECT auth.uid()) = author_id);
 
 DROP POLICY IF EXISTS comments_public_read ON public.observation_comments;
+-- Fixed 2026-04-30: IN (SELECT) → EXISTS to prevent 42P17 chain
 CREATE POLICY comments_public_read ON public.observation_comments FOR SELECT
   USING (
     deleted_at IS NULL
-    AND observation_id IN (SELECT id FROM public.observations WHERE sync_status = 'synced')
+    AND EXISTS (
+      SELECT 1 FROM public.observations o
+      WHERE o.id = observation_id
+        AND o.sync_status = 'synced'
+    )
   );
 
 CREATE TABLE IF NOT EXISTS public.watchlists (
@@ -1342,6 +1388,14 @@ GRANT SELECT ON public.sync_failures TO authenticated;
 --   (primary ID is not research-grade AND its confidence is < 0.5)
 -- The two-clause "needs help" test avoids re-queueing already-promoted
 -- rows whose confidence happens to sit between 0.4 and 0.5.
+--
+-- DROP VIEW first because the column shape evolved (PR #258 reordered
+-- columns to add `current_taxon_id` before `current_scientific_name`)
+-- and Postgres CREATE OR REPLACE VIEW does not permit column renames /
+-- reordering. Without this DROP, db-apply.yml fails on existing DBs
+-- with "cannot change name of view column …". Idempotent: IF EXISTS
+-- makes the DROP safe on first apply.
+DROP VIEW IF EXISTS public.validation_queue CASCADE;
 CREATE OR REPLACE VIEW public.validation_queue AS
 SELECT
   o.id                               AS observation_id,
@@ -1351,6 +1405,7 @@ SELECT
   o.habitat,
   o.obscure_level,
   i.id                               AS primary_id_id,
+  i.taxon_id                         AS current_taxon_id,
   i.scientific_name                  AS current_scientific_name,
   i.confidence                       AS current_confidence,
   COALESCE(i.is_research_grade, false) AS is_research_grade,
@@ -3065,7 +3120,8 @@ CREATE TABLE IF NOT EXISTS public.notifications (
   user_id     uuid        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   kind        text        NOT NULL
                           CHECK (kind IN ('follow','follow_accepted','reaction','comment','mention',
-                                          'identification','badge','digest')),
+                                          'identification','badge','digest',
+                                          'vertex_token_expiring')),
   payload     jsonb       NOT NULL DEFAULT '{}',
   read_at     timestamptz,
   created_at  timestamptz NOT NULL DEFAULT now()
@@ -3074,6 +3130,21 @@ CREATE INDEX IF NOT EXISTS idx_notifications_user_unread
   ON public.notifications(user_id, read_at) WHERE read_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_notifications_user_created
   ON public.notifications(user_id, created_at DESC);
+
+-- M32 v1.1 (#159): widen the kind CHECK to include
+-- 'vertex_token_expiring'. Idempotent — drops the existing
+-- constraint by name (auto-named when CREATE TABLE first ran) then
+-- adds the new one. Existing rows are unchanged.
+DO $$
+BEGIN
+  ALTER TABLE public.notifications DROP CONSTRAINT IF EXISTS notifications_kind_check;
+EXCEPTION WHEN others THEN NULL; END $$;
+ALTER TABLE public.notifications
+  ADD CONSTRAINT notifications_kind_check CHECK (
+    kind IN ('follow','follow_accepted','reaction','comment','mention',
+             'identification','badge','digest',
+             'vertex_token_expiring')
+  );
 
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
@@ -3633,7 +3704,11 @@ ALTER TABLE public.sponsor_credentials
   ADD COLUMN IF NOT EXISTS preferred_model text NOT NULL DEFAULT 'claude-haiku-4-5'
     CHECK (length(preferred_model) BETWEEN 1 AND 64),
   ADD COLUMN IF NOT EXISTS endpoint        text
-    CHECK (endpoint IS NULL OR length(endpoint) <= 512);
+    CHECK (endpoint IS NULL OR length(endpoint) <= 512),
+  -- M32 v1.1 (#159): track when a Vertex AI access token expires
+  -- so the `vertex_token_expiry_monitor` cron can notify the
+  -- sponsor 5 minutes before. NULL for non-Vertex credentials.
+  ADD COLUMN IF NOT EXISTS token_expires_at timestamptz;
 
 ALTER TABLE public.sponsor_credentials ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS sponsor_credentials_owner_read ON public.sponsor_credentials;
@@ -4136,8 +4211,13 @@ SELECT
   observation_count, species_count, obs_count_7d, obs_count_30d,
   last_observation_at, joined_at
 FROM public.users
-WHERE profile_public = true
-  AND hide_from_leaderboards = false;
+WHERE hide_from_leaderboards = false;
+-- 2026-04-30: dropped `profile_public = true AND` — M28 visibility is now
+-- governed solely by its dedicated opt-out (hide_from_leaderboards). The
+-- belt-and-suspenders gate on profile_public was inherited from the M08
+-- binary privacy model, which is being deprecated in favor of M25's
+-- profile_privacy matrix. /community/observers/ is now default-discoverable;
+-- users wanting to hide flip the toggle in Profile → Edit.
 
 GRANT SELECT ON public.community_observers TO anon, authenticated;
 
@@ -4152,11 +4232,31 @@ SELECT
   observation_count, species_count, obs_count_7d, obs_count_30d,
   centroid_geog, last_observation_at, joined_at
 FROM public.users
-WHERE profile_public = true
-  AND hide_from_leaderboards = false;
+WHERE hide_from_leaderboards = false;
+-- 2026-04-30: same change as community_observers above — M28-only opt-out.
 
 GRANT SELECT ON public.community_observers_with_centroid TO authenticated;
 -- Explicitly NO grant to anon. Lack of grant is the security gate.
+
+-- =====================================================================
+-- M28 default visibility (2026-04-30) — A + B + C combined
+--
+-- Goal: by default, users see all members on /community/observers/.
+--   A) New users default to profile_public=true (was false from M08).
+--   B) M28 views drop the profile_public requirement (above).
+--   C) Backfill existing profile_public=false users to true so they
+--      appear immediately. Users who explicitly want privacy can flip
+--      profile_public=false (hides /u/ profile page) AND/OR
+--      hide_from_leaderboards=true (hides M28 card specifically).
+--
+-- Idempotent: ALTER COLUMN DEFAULT is no-op on second run; the UPDATE
+-- only touches rows that haven't already been backfilled.
+-- =====================================================================
+ALTER TABLE public.users ALTER COLUMN profile_public SET DEFAULT true;
+
+UPDATE public.users
+   SET profile_public = true
+ WHERE profile_public = false;
 
 -- =====================================================================
 -- Module 26 v1.1 — observation_reaction_summary (2026-04-29)
@@ -4253,6 +4353,42 @@ $$;
 
 REVOKE ALL ON FUNCTION public.community_observers_nearby(numeric, int, int, text, text[], boolean) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.community_observers_nearby(numeric, int, int, text, text[], boolean) TO authenticated;
+
+-- 10) Nearby helper at an arbitrary point — authenticated only. Same
+-- privacy gate as community_observers_nearby (reads the centroid view,
+-- which is not granted to anon), but uses caller-supplied coords
+-- instead of the viewer's stored centroid. Lets a brand-new user with
+-- no observations still discover nearby observers via GPS. Coords
+-- never persist server-side; the client passes them per-call.
+CREATE OR REPLACE FUNCTION public.community_observers_nearby_at(
+  p_lat      double precision,
+  p_lng      double precision,
+  p_radius_m numeric  DEFAULT 200000,
+  p_limit    int      DEFAULT 20,
+  p_offset   int      DEFAULT 0,
+  p_country  text     DEFAULT NULL,
+  p_taxa     text[]   DEFAULT NULL,
+  p_experts  boolean  DEFAULT false
+)
+RETURNS SETOF public.community_observers_with_centroid
+LANGUAGE sql STABLE PARALLEL SAFE AS $$
+  SELECT v.*
+    FROM public.community_observers_with_centroid v
+   WHERE v.centroid_geog IS NOT NULL
+     AND ST_DWithin(
+       v.centroid_geog,
+       ST_SetSRID(ST_MakePoint(p_lng, p_lat), 4326)::geography,
+       p_radius_m
+     )
+     AND (p_country IS NULL OR v.country_code = p_country)
+     AND (p_taxa    IS NULL OR v.expert_taxa @> p_taxa)
+     AND (p_experts = false OR v.is_expert = true)
+   ORDER BY v.centroid_geog <-> ST_SetSRID(ST_MakePoint(p_lng, p_lat), 4326)::geography
+   LIMIT p_limit OFFSET p_offset;
+$$;
+
+REVOKE ALL ON FUNCTION public.community_observers_nearby_at(double precision, double precision, numeric, int, int, text, text[], boolean) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.community_observers_nearby_at(double precision, double precision, numeric, int, int, text, text[], boolean) TO authenticated;
 
 -- ============================================================
 -- Observation detail redesign — material edit tracking + soft-delete
@@ -4803,8 +4939,14 @@ SELECT
   p.species_list,
   p.created_at,
   p.updated_at,
-  ST_AsGeoJSON(p.polygon)::jsonb           AS polygon_geojson,
-  ST_Area(p.polygon) / 1e6                 AS area_km2
+  CASE
+    WHEN p.polygon IS NOT NULL THEN ST_AsGeoJSON(p.polygon)::jsonb
+    ELSE NULL
+  END                                      AS polygon_geojson,
+  CASE
+    WHEN p.polygon IS NOT NULL THEN ST_Area(p.polygon) / 1e6
+    ELSE NULL
+  END                                      AS area_km2
 FROM public.projects p;
 
 GRANT SELECT ON public.projects_with_geojson TO anon, authenticated, service_role;
@@ -5812,6 +5954,42 @@ SELECT u.id AS user_id,
 GRANT SELECT ON public.moderator_trust_scores TO authenticated;
 
 -- ============================================================
+-- PR15 — Observability UI surface (Health + Errors + Webhook drill-down)
+-- See docs/runbooks/admin-health-digest.md
+-- See docs/runbooks/admin-function-errors.md
+-- See docs/runbooks/admin-webhooks.md
+-- ============================================================
+
+-- 1. audit_op enum extensions for the new actions.
+DO $$ BEGIN
+  ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'health_recompute';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'error_acknowledge';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'error_acknowledge_bulk';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'webhook_replay';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- 2. function_errors — acknowledge audit fields.
+-- The Errors tab (/console/errors/) lets admins triage and acknowledge
+-- operationally-handled rows. Acknowledged rows stay in the table so the
+-- audit trail and post-mortem queries are preserved.
+ALTER TABLE public.function_errors
+  ADD COLUMN IF NOT EXISTS acknowledged_at timestamptz;
+ALTER TABLE public.function_errors
+  ADD COLUMN IF NOT EXISTS acknowledged_by uuid REFERENCES auth.users(id);
+ALTER TABLE public.function_errors
+  ADD COLUMN IF NOT EXISTS ack_notes text;
+
+-- Drives the default Unacknowledged tab — partial index keeps writes cheap
+-- (most acknowledged rows aren't read again outside forensics queries).
+CREATE INDEX IF NOT EXISTS function_errors_unack_idx
+  ON public.function_errors (created_at DESC)
+  WHERE acknowledged_at IS NULL;
 -- M27.1 — Multi-provider vision (#116, #118)
 -- ============================================================
 -- Adds provider variants beyond direct-Anthropic to the AI cascade:
@@ -6173,7 +6351,6 @@ AS $$
   WHERE station_id = p_station_id;
 $$;
 
-REVOKE ALL ON FUNCTION public.station_trap_nights(uuid, date, date) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.station_trap_nights(uuid, date, date) TO anon, authenticated, service_role;
 
 -- ── MCP platform metrics ─────────────────────────────────────────────
@@ -6219,3 +6396,190 @@ AS $$
 $$;
 REVOKE ALL ON FUNCTION public.admin_platform_metrics() FROM public;
 GRANT EXECUTE ON FUNCTION public.admin_platform_metrics() TO service_role;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- PR16 — Hot-path indexes for admin entity browsers (Identifications,
+-- Notifications, Media, Follows, Watchlists, Projects). Each backs a
+-- (filter_field, created_at DESC) lookup pattern in the browser tabs.
+-- All idempotent (CREATE INDEX IF NOT EXISTS) and additive only — no
+-- write penalty beyond the index keys themselves.
+-- ════════════════════════════════════════════════════════════════════════
+
+-- Identifications — admin time-ordered list, validator filter, RG filter
+CREATE INDEX IF NOT EXISTS idx_id_created_desc
+  ON public.identifications (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_id_validator_created
+  ON public.identifications (validated_by, created_at DESC)
+  WHERE validated_by IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_id_rg_created
+  ON public.identifications (is_research_grade, created_at DESC);
+
+-- Notifications — kind-filtered admin browse (per-user is already covered)
+CREATE INDEX IF NOT EXISTS idx_notifications_kind_created
+  ON public.notifications (kind, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notifications_created_desc
+  ON public.notifications (created_at DESC);
+
+-- Media files — type-filter + active browse
+CREATE INDEX IF NOT EXISTS idx_media_type_created
+  ON public.media_files (media_type, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_media_active_created
+  ON public.media_files (created_at DESC)
+  WHERE deleted_at IS NULL;
+
+-- Watchlists — taxon-filtered browse
+CREATE INDEX IF NOT EXISTS idx_watchlists_taxon_created
+  ON public.watchlists (taxon_id, created_at DESC)
+  WHERE taxon_id IS NOT NULL;
+
+-- Follows — time-ordered admin spam-audit
+CREATE INDEX IF NOT EXISTS idx_follows_created_desc
+  ON public.follows (created_at DESC);
+
+-- Projects — time-ordered admin browse
+CREATE INDEX IF NOT EXISTS idx_projects_created_desc
+  ON public.projects (created_at DESC);
+
+-- Observation comments — author timeline (existing comments view + future
+-- author drill-downs from the user browser)
+CREATE INDEX IF NOT EXISTS idx_comments_author_created
+  ON public.observation_comments (author_id, created_at DESC);
+
+-- ════════════════════════════════════════════════════════════════════════
+-- PR16 — Admin SELECT policies on owner-scoped tables (notifications,
+-- watchlists). These tables previously had only owner-scoped RLS; admin
+-- already has equivalent service-role visibility for ops. These policies
+-- expose the same audit visibility through the console using the
+-- has_role() predicate that is the canonical privilege gate.
+-- Privacy-neutral: admin can already read these via Supabase Studio /
+-- service-role; this just plumbs them through anon/authenticated so the
+-- console can render them. No write privilege is granted.
+-- ════════════════════════════════════════════════════════════════════════
+
+DROP POLICY IF EXISTS notif_admin_read ON public.notifications;
+CREATE POLICY notif_admin_read ON public.notifications
+  FOR SELECT TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'));
+
+DROP POLICY IF EXISTS watchlists_admin_read ON public.watchlists;
+CREATE POLICY watchlists_admin_read ON public.watchlists
+  FOR SELECT TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'));
+
+-- ════════════════════════════════════════════════════════════════════════
+-- gc_orphan_media_log — audit log for the gc-orphan-media cron (#285)
+-- ════════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS public.gc_orphan_media_log (
+  id            uuid        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  run_at        timestamptz NOT NULL DEFAULT now(),
+  prefix        text        NOT NULL,
+  scanned       int         NOT NULL,
+  deleted       int         NOT NULL DEFAULT 0,
+  bytes_freed   bigint      NOT NULL DEFAULT 0,
+  errors        int         NOT NULL DEFAULT 0,
+  duration_ms   int         NOT NULL DEFAULT 0,
+  notes         text
+);
+
+CREATE INDEX IF NOT EXISTS idx_gc_orphan_media_log_run_at
+  ON public.gc_orphan_media_log(run_at DESC);
+
+ALTER TABLE public.gc_orphan_media_log ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS gc_orphan_media_log_admin_read ON public.gc_orphan_media_log;
+CREATE POLICY gc_orphan_media_log_admin_read ON public.gc_orphan_media_log
+  FOR SELECT TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'));
+
+GRANT SELECT, INSERT ON public.gc_orphan_media_log TO service_role;
+-- ── merge_user_accounts RPC (#284) ──────────────────────────────────────────
+-- Rewrites all FK references from discard_user to keep_user in a single
+-- transaction. Called only from the user-merge admin handler.
+-- SECURITY DEFINER so it can write to auth.users (soft-delete discard).
+
+CREATE OR REPLACE FUNCTION public.merge_user_accounts(
+  p_keep    uuid,
+  p_discard uuid,
+  p_actor   uuid,
+  p_reason  text
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth
+AS $$
+DECLARE
+  v_summary jsonb := '{}'::jsonb;
+  v_count   int;
+BEGIN
+  IF p_keep = p_discard THEN
+    RAISE EXCEPTION 'keep and discard must differ';
+  END IF;
+
+  -- Verify both users exist
+  IF NOT EXISTS (SELECT 1 FROM public.users WHERE id = p_keep) THEN
+    RAISE EXCEPTION 'keep user not found: %', p_keep;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.users WHERE id = p_discard) THEN
+    RAISE EXCEPTION 'discard user not found: %', p_discard;
+  END IF;
+
+  -- Rewrite FK references table by table
+  UPDATE public.observations    SET observer_id  = p_keep WHERE observer_id  = p_discard;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  v_summary := v_summary || jsonb_build_object('observations', v_count);
+
+  UPDATE public.identifications SET validated_by = p_keep WHERE validated_by = p_discard;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  v_summary := v_summary || jsonb_build_object('identifications_validated', v_count);
+
+  UPDATE public.comments        SET user_id      = p_keep WHERE user_id      = p_discard;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  v_summary := v_summary || jsonb_build_object('comments', v_count);
+
+  UPDATE public.follows         SET follower_id  = p_keep WHERE follower_id  = p_discard;
+  UPDATE public.follows         SET followee_id  = p_keep WHERE followee_id  = p_discard;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  v_summary := v_summary || jsonb_build_object('follows', v_count);
+
+  UPDATE public.reactions       SET user_id      = p_keep WHERE user_id      = p_discard;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  v_summary := v_summary || jsonb_build_object('reactions', v_count);
+
+  -- For badges: delete duplicates in the discard user first, then update
+  DELETE FROM public.user_badges
+  WHERE user_id = p_discard
+    AND badge_key IN (SELECT badge_key FROM public.user_badges WHERE user_id = p_keep);
+  UPDATE public.user_badges SET user_id = p_keep WHERE user_id = p_discard;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  v_summary := v_summary || jsonb_build_object('badges', v_count);
+
+  UPDATE public.watchlist_entries SET user_id    = p_keep WHERE user_id      = p_discard;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  v_summary := v_summary || jsonb_build_object('watchlist', v_count);
+
+  UPDATE public.projects        SET owner_id     = p_keep WHERE owner_id     = p_discard;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  v_summary := v_summary || jsonb_build_object('projects', v_count);
+
+  -- Soft-delete the discarded account
+  UPDATE public.users SET
+    username     = 'deleted_merged_' || left(p_discard::text, 8),
+    display_name = '[Merged account]',
+    deleted_at   = now()
+  WHERE id = p_discard;
+
+  -- Audit log
+  INSERT INTO public.admin_audit (actor_id, op, payload, reason)
+  VALUES (p_actor, 'user.merge', jsonb_build_object(
+    'keep_user_id',    p_keep,
+    'discard_user_id', p_discard,
+    'summary',         v_summary
+  ), p_reason);
+
+  RETURN v_summary;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.merge_user_accounts(uuid, uuid, uuid, text) TO service_role;

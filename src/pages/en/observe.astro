@@ -1,12 +1,16 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
-import ObservationForm from '../../components/ObservationForm.astro';
+import ObserveView2 from '../../components/ObserveView2.astro';
 import { t } from '../../i18n/utils';
 
 const lang = 'en';
 const tr = t(lang);
 ---
 
-<BaseLayout title={`${tr.observe.title} — Rastrum`} description="Capture biodiversity observations with photos, audio, GPS, and Darwin Core fields. Offline-first; syncs to GBIF and CONABIO when online." lang={lang}>
-  <ObservationForm lang={lang} />
+<BaseLayout
+  title={`${tr.observe.title} — Rastrum`}
+  description="Identify species or log biodiversity observations. Drop photos, audio, or video — AI identifies with PlantNet, BirdNET, and Claude Vision. Offline-first, syncs to GBIF and CONABIO."
+  lang={lang}
+>
+  <ObserveView2 lang={lang} />
 </BaseLayout>

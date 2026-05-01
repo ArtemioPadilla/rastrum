@@ -361,7 +361,12 @@
       "taxon": "Taxon",
       "nearby": "Nearby",
       "experts_only": "Experts only",
-      "any": "Any"
+      "any": "Any",
+      "country_unset_cta": "Your country isn't set yet — set it in Profile → Edit so others can find you by country.",
+      "use_location": "Use my location",
+      "location_granted": "Using your current location",
+      "location_denied": "Location access denied — using your observation centroid instead",
+      "location_unavailable": "Location not available on this device"
     },
     "card": {
       "obs": "{n} obs",
@@ -373,7 +378,13 @@
     "empty": {
       "no_match": "No observers match these filters. Try removing one.",
       "nearby_no_centroid": "Log an observation to find observers near you.",
-      "nearby_anon": "Sign in to find observers near you."
+      "nearby_anon": "Sign in to find observers near you.",
+      "privacy_explainer": {
+        "heading": "Most observers haven't enabled their public profile yet.",
+        "body_public": "Profiles are private by default. Other observers show up here once they turn on their public profile in Profile → Edit.",
+        "body_anon": "Profiles are private by default. Your profile is also private — flip the toggle in Profile → Edit to be discoverable, and others will appear once they do the same.",
+        "cta_edit_profile": "Configure your own profile →"
+      }
     },
     "leaderboards_optout_link": "Hide me from community leaderboards",
     "edit_profile_optout": "Profile → Edit"
@@ -456,6 +467,7 @@
     "public_profile_loading": "Loading profile…",
     "public_profile_no_observations": "No public observations yet.",
     "public_profile_member_since": "Member since",
+    "public_profile_page_title": "{name} — Rastrum",
     "settings_link": "Settings",
     "view_public": "View public",
     "country": "Country",
@@ -466,7 +478,15 @@
     "country_inferred_title": "We guessed this from your region. Pick a country to override.",
     "community_visible": "Show me in community discovery and leaderboards",
     "community_visible_hint": "When on, your public profile can appear on the Community page and in leaderboards. Turn off any time.",
-    "community_visible_disabled": "Make your profile public to enable community discovery."
+    "community_visible_disabled": "Make your profile public to enable community discovery.",
+    "identities_heading": "Sign-in methods",
+    "identities_hint": "Link another sign-in method to avoid accidentally creating duplicate accounts.",
+    "identities_loading": "Loading sign-in methods…",
+    "identities_link_google": "Link Google",
+    "identities_link_github": "Link GitHub",
+    "identities_link_success": "Sign-in method linked successfully.",
+    "identities_unlink_success": "Sign-in method removed.",
+    "identities_error_last": "You must keep at least one sign-in method."
   },
   "observe": {
     "title": "New observation",
@@ -1175,7 +1195,8 @@
       "kind_follow": "{{actor}} started following you",
       "kind_follow_request": "{{actor}} requested to follow you",
       "kind_follow_accepted": "{{actor}} accepted your follow request",
-      "kind_reaction": "{{actor}} reacted to your observation"
+      "kind_reaction": "{{actor}} reacted to your observation",
+      "kind_vertex_token_expiring": "Your Vertex AI access token expires in a few minutes — open Sponsoring to rotate it"
     },
     "report": {
       "button": "Report",
@@ -1531,7 +1552,8 @@
       "taxonomy": "Taxonomy",
       "distribution": "Distribution",
       "recent_photos": "Recent photos",
-      "no_coordinates": "No public observations with coordinates yet."
+      "no_coordinates": "No public observations with coordinates yet.",
+      "page_title": "{name} — Rastrum"
     }
   },
   "karma": {
@@ -1620,7 +1642,9 @@
     "visitor_private": "This Pokédex is private.",
     "visitor_not_found": "User not found.",
     "visitor_not_found_cta": "Browse recent observations →",
-    "visitor_back_to_profile": "← Back to profile"
+    "visitor_back_to_profile": "← Back to profile",
+    "visitor_page_title": "@{handle}'s Pokédex — Rastrum",
+    "visitor_load_error": "Couldn't load this Pokédex. Check your connection and try again."
   },
   "commandpalette": {
     "privacy_settings": "Privacy settings",
@@ -1828,10 +1852,19 @@
     "audit": "Audit log",
     "anomalies": "Anomalies",
     "forensics": "Forensics & export",
+    "health": "Health digest",
+    "errors": "Function errors",
     "features": "Feature flags",
     "proposals": "Proposals",
     "webhooks": "Webhooks",
     "bioblitz": "Bioblitz events",
+    "identifications": "Identifications",
+    "notifications": "Notifications",
+    "media": "Media",
+    "follows": "Follows",
+    "watchlists": "Watchlists",
+    "projects": "Projects",
+    "taxonChanges": "Taxon changes",
     "modOverview": "Overview",
     "modFlagQueue": "Flag queue",
     "modComments": "Comments",
@@ -1844,6 +1877,10 @@
     "expTaxonNotes": "Taxon notes",
     "stub_coming_soon": "Coming in a later phase",
     "stub_track_issue": "Track on GitHub →",
+    "flags_stub_hint": "Admin-side flag overview is deferred — see License disputes / Identification overrides for related queues.",
+    "mobile_menu_open": "Open console menu",
+    "mobile_menu_close": "Close console menu",
+    "mobile_menu_label": "Console navigation",
     "overview_alerts_heading": "Needs your attention",
     "overview_at_a_glance": "At a glance",
     "overview_no_alerts": "Nothing on fire — platform is healthy.",
@@ -2262,6 +2299,8 @@
     "kb_nav_experts": "Expert applications",
     "kb_nav_sync": "Sync failures",
     "kb_nav_api": "API & quotas",
+    "kb_nav_health": "Health digest",
+    "kb_nav_errors": "Function errors",
     "kb_help_navigation": "Navigation",
     "kb_help_actions": "Actions",
     "kb_escape_close": "Close slide-over",
@@ -2287,7 +2326,6 @@
     "mod_appeals_action_reject": "Reject appeal",
     "mod_appeals_reviewer_note_label": "Note to user (optional)",
     "mod_appeals_kb_nav": "Appeals",
-
     "anomaliesView": {
       "title": "Anomaly detections",
       "description": "Automated rule-based detections from admin_audit. Acknowledged anomalies stay in the log so the audit trail is preserved.",
@@ -2318,7 +2356,6 @@
       },
       "empty": "No anomalies match the current filter."
     },
-
     "forensicsView": {
       "title": "Forensics export",
       "description": "Filter and export admin_audit rows. CSV is built server-side and the call itself is logged via audit_export.",
@@ -2343,7 +2380,6 @@
       },
       "empty": "No matches."
     },
-
     "proposalsView": {
       "title": "Action proposals",
       "description": "Two-person rule for irreversible actions. A proposal expires after 24 hours; the approver must differ from the proposer.",
@@ -2378,7 +2414,6 @@
       "selfApprovalForbidden": "You cannot approve your own proposal.",
       "empty": "No proposals match the current filter."
     },
-
     "webhooksView": {
       "title": "Webhook subscriptions",
       "description": "Outbound HMAC-SHA256-signed webhooks. Auto-disabled after 10 consecutive failures.",
@@ -2408,19 +2443,251 @@
         "test": "Test",
         "disable": "Disable",
         "enable": "Enable",
-        "delete": "Delete"
+        "delete": "Delete",
+        "deliveries": "Deliveries",
+        "hideDeliveries": "Hide deliveries"
       },
       "deliveries": {
         "heading": "Recent deliveries (last 20)",
         "event": "Event",
         "status": "Status",
         "time": "Time",
-        "error": "Error"
+        "error": "Error",
+        "perWebhookHeading": "Last 50 deliveries",
+        "filterAll": "All",
+        "filterSuccess": "Successful",
+        "filterFailed": "Failed",
+        "filterPending": "Pending",
+        "statusPending": "pending",
+        "replayLast": "Replay last delivery",
+        "replayConfirmReason": "Reason for replaying this delivery?",
+        "replayDone": "Replay sent (HTTP {status}).",
+        "replayFailed": "Replay failed: {error}",
+        "nonceCopied": "Nonce copied.",
+        "loadFailed": "Could not load deliveries: {error}",
+        "perWebhookEmpty": "No deliveries for this webhook yet."
       },
       "empty": "No webhooks configured.",
       "deliveriesEmpty": "No deliveries yet."
     },
-
+    "healthView": {
+      "title": "Platform health digest",
+      "description": "Weekly snapshot of platform-health metrics. Cron fires Mondays 09:00 UTC; manual refresh is idempotent on the current week.",
+      "refresh": "Refresh now",
+      "refreshing": "Refreshing…",
+      "refreshed": "Recomputed.",
+      "refreshFailed": "Recompute failed: {error}",
+      "empty": "Weekly digest fires Mondays 09:00 UTC — no rows yet. Use Refresh now to seed the first one.",
+      "loading": "Loading digest…",
+      "heroLabel": "Latest week",
+      "weekRange": "{from} → {to}",
+      "trendsHeading": "12-week trend",
+      "trendBucketLabel": "Week of {date}",
+      "vsPrevious": "vs prev",
+      "noPrevious": "—",
+      "deltaLabel": "Δ",
+      "metrics": {
+        "admin_actions": "Admin actions",
+        "bans_issued": "Bans issued",
+        "bans_lifted": "Bans lifted",
+        "appeals_open": "Appeals open",
+        "reports_open": "Reports open",
+        "anomalies_unack": "Anomalies unack.",
+        "function_errors_7d": "Function errors (7d)",
+        "mod_queue_depth": "Mod queue depth",
+        "expert_queue_depth": "Expert queue depth"
+      },
+      "trend": {
+        "up": "up",
+        "down": "down",
+        "flat": "flat"
+      },
+      "sparkline": {
+        "value": "{value}",
+        "weekN": "Week of {date}"
+      }
+    },
+    "errorsView": {
+      "title": "Function errors",
+      "description": "Structured error sink fed by every Edge Function dispatcher. Triage operationally-handled rows by acknowledging — they stay in the table for post-mortem.",
+      "empty": "No errors in the selected window — that's the good outcome 🎉",
+      "loading": "Loading errors…",
+      "filters": {
+        "function": "Function",
+        "code": "Code",
+        "from": "From",
+        "to": "To",
+        "actor": "Actor (uuid or username)",
+        "state": "State",
+        "stateUnack": "Unacknowledged",
+        "stateAll": "All",
+        "any": "— any —"
+      },
+      "columns": {
+        "timestamp": "Timestamp",
+        "function": "Function / code",
+        "actor": "Actor",
+        "message": "Message",
+        "context": "Context",
+        "state": "State",
+        "actions": "Actions"
+      },
+      "actions": {
+        "acknowledge": "Acknowledge",
+        "acknowledged": "acknowledged",
+        "acknowledgeAll": "Acknowledge all matching",
+        "expandContext": "Expand",
+        "collapseContext": "Collapse",
+        "autoRefresh": "Auto-refresh (30s)",
+        "autoRefreshOn": "Auto-refresh on",
+        "autoRefreshOff": "Auto-refresh off"
+      },
+      "slideOver": {
+        "title": "Acknowledge error",
+        "notes": "Notes (optional)",
+        "bulkTitle": "Acknowledge all matching errors",
+        "bulkConfirm": "This will acknowledge up to 1000 unacknowledged rows matching the current filters. Reason is required."
+      },
+      "bulk": {
+        "doneCount": "Acknowledged {count} rows.",
+        "capHit": "Hit the 1000-row cap. Re-run to acknowledge more."
+      },
+      "topCodes": "Top codes",
+      "filterByCode": "Filter by code"
+    },
+    "entityBrowser": {
+      "clearFilters": "Clear filters",
+      "empty": "No rows match the current filter set.",
+      "loading": "Loading…",
+      "prev": "Prev",
+      "next": "Next",
+      "expand": "Expand row",
+      "anyOption": "— any —"
+    },
+    "identificationsView": {
+      "title": "Identifications",
+      "description": "Every identification ever recorded — AI cascade picks, human IDs, validations. Filter by identifier, taxon, validation state, or research-grade status.",
+      "filterIdentifier": "Identifier (uuid or username)",
+      "filterTaxon": "Taxon (uuid or scientific name)",
+      "filterSource": "Source",
+      "filterValidated": "Validated",
+      "filterRG": "Research grade",
+      "anyOption": "— any —",
+      "valYes": "Yes",
+      "valNo": "No",
+      "colCreated": "Created",
+      "colIdentifier": "Identifier",
+      "colTaxon": "Taxon",
+      "colConfidence": "Confidence",
+      "colSource": "Source",
+      "colValidated": "Validated",
+      "colObservation": "Observation",
+      "drillObs": "Open observation"
+    },
+    "notificationsView": {
+      "title": "Notifications",
+      "description": "All notifications fanned out by social-graph triggers (follow, reaction, comment, identification, badge, digest). Filter by recipient, kind, or read state.",
+      "filterRecipient": "Recipient (uuid or username)",
+      "filterKind": "Kind",
+      "filterRead": "Read state",
+      "filterFrom": "From",
+      "filterTo": "To",
+      "stateAny": "Any state",
+      "stateRead": "Read",
+      "stateUnread": "Unread",
+      "colCreated": "Created",
+      "colRecipient": "Recipient",
+      "colKind": "Kind",
+      "colPayload": "Payload",
+      "colRead": "Read",
+      "drillFull": "Full payload"
+    },
+    "mediaView": {
+      "title": "Media",
+      "description": "All photos, audio and video files registered against observations. Filter by media type, deletion state, or owner.",
+      "filterType": "Type",
+      "filterState": "State",
+      "filterObservation": "Observation (uuid)",
+      "stateActive": "Active",
+      "stateDeleted": "Deleted",
+      "stateAll": "All",
+      "typePhoto": "Photo",
+      "typeAudio": "Audio",
+      "typeVideo": "Video",
+      "colCreated": "Created",
+      "colThumb": "Thumb",
+      "colObservation": "Observation",
+      "colMime": "MIME",
+      "colSize": "Size",
+      "colState": "State",
+      "drillR2Url": "R2 URL"
+    },
+    "followsView": {
+      "title": "Follows",
+      "description": "Social-graph follow edges. Filter by follower, followee, status (pending vs accepted), or tier (collaborator vs follower). Useful for spam audits.",
+      "filterFollower": "Follower (uuid or username)",
+      "filterFollowee": "Followee (uuid or username)",
+      "filterStatus": "Status",
+      "filterTier": "Tier",
+      "statusPending": "Pending",
+      "statusAccepted": "Accepted",
+      "tierFollower": "Follower",
+      "tierCollaborator": "Collaborator",
+      "colCreated": "Created",
+      "colFollower": "Follower",
+      "colFollowee": "Followee",
+      "colStatus": "Status",
+      "colTier": "Tier",
+      "drillProfileFollower": "View follower's profile",
+      "drillProfileFollowee": "View followee's profile"
+    },
+    "watchlistsView": {
+      "title": "Watchlists",
+      "description": "Per-user species or scientific-name watch entries with optional radius. Filter by user, taxon, or scientific name.",
+      "filterUser": "User (uuid or username)",
+      "filterTaxon": "Taxon (uuid)",
+      "filterName": "Scientific name (contains)",
+      "colCreated": "Created",
+      "colUser": "User",
+      "colTaxon": "Taxon / name",
+      "colRadius": "Radius (km)",
+      "colDigestOnly": "Digest only",
+      "yes": "Yes",
+      "no": "No"
+    },
+    "projectsView": {
+      "title": "Projects",
+      "description": "Named polygons (typically ANPs or sampling grids) under M29. Filter by visibility, owner, or name.",
+      "filterOwner": "Owner (uuid or username)",
+      "filterVisibility": "Visibility",
+      "filterName": "Name (contains)",
+      "visPublic": "Public",
+      "visPrivate": "Private",
+      "colCreated": "Created",
+      "colSlug": "Slug",
+      "colName": "Name",
+      "colOwner": "Owner",
+      "colVisibility": "Visibility",
+      "colArea": "Area (km²)",
+      "colObsCount": "Observations",
+      "drillView": "Open project",
+      "drillObs": "Tagged observations"
+    },
+    "taxonChangesView": {
+      "title": "Taxon changes",
+      "description": "Audit log of taxon-related admin actions (conservation status, future renames/synonyms). Backed by admin_audit filtered to taxon_* operations. Filter by taxon, action, actor, or date range.",
+      "filterTaxon": "Taxon (uuid)",
+      "filterAction": "Action",
+      "filterActor": "Actor (uuid or username)",
+      "filterFrom": "From",
+      "actConservation": "Conservation set",
+      "colCreated": "Created",
+      "colTaxon": "Taxon",
+      "colAction": "Action",
+      "colActor": "Actor",
+      "colDiff": "Diff",
+      "drillFull": "Full diff"
+    },
     "audit_op": {
       "role_grant": "Role granted",
       "role_revoke": "Role revoked",
@@ -2466,8 +2733,14 @@
       "sponsorship_request_withdraw": "Sponsorship request withdrawn",
       "vault_failure": "Vault failure",
       "anomaly_acknowledge": "Anomaly acknowledged",
-      "audit_export": "Audit export"
-    }
+      "audit_export": "Audit export",
+      "health_recompute": "Health digest recomputed",
+      "error_acknowledge": "Function error acknowledged",
+      "error_acknowledge_bulk": "Function errors bulk-acknowledged",
+      "webhook_replay": "Webhook delivery replayed"
+    },
+    "users_search_email_placeholder": "Search by email or user ID…",
+    "users_identity_heading": "Email & identities"
   },
   "projects": {
     "title": "Projects",
@@ -2507,6 +2780,73 @@
     "form_signin_required": "Sign in to create a project.",
     "error_invalid_polygon": "GeoJSON must be a Polygon or MultiPolygon with valid coordinates.",
     "error_slug_taken": "That slug is already taken.",
-    "error_save_failed": "Could not save the project."
+    "error_save_failed": "Could not save the project.",
+    "stations_title": "Camera stations",
+    "stations_empty": "No camera stations registered for this project yet.",
+    "stations_owner_only": "Only the project owner can add or edit stations.",
+    "stations_add": "Add station",
+    "stations_col_key": "Key",
+    "stations_col_name": "Name",
+    "stations_col_coords": "Coords",
+    "stations_col_periods": "Active periods",
+    "stations_col_trapn": "Trap-nights",
+    "stations_form_title": "New camera station",
+    "stations_form_key": "Station key (researcher code, e.g. SJ-CAM-01)",
+    "stations_form_name": "Display name (English)",
+    "stations_form_name_es": "Display name (Spanish)",
+    "stations_form_lat": "Latitude",
+    "stations_form_lng": "Longitude",
+    "stations_form_habitat": "Habitat",
+    "stations_form_model": "Camera model",
+    "stations_form_notes": "Notes",
+    "stations_form_save": "Save station",
+    "stations_form_cancel": "Cancel",
+    "stations_period_open": "Open period",
+    "stations_period_close": "Close period",
+    "stations_period_start": "Start date",
+    "stations_period_end": "End date (leave empty for \"still active\")",
+    "stations_period_active": "still active",
+    "stations_error_key_taken": "A station with that key already exists in this project.",
+    "stations_error_invalid_key": "Station key must be 1–64 alphanumerics, hyphens, or underscores.",
+    "stations_error_invalid_coords": "Coords must be valid latitude/longitude in WGS84.",
+    "stations_error_save_failed": "Could not save the station.",
+    "kml_upload_label": "Upload KML boundary",
+    "kml_upload_button": "Choose KML file",
+    "kml_parse_success": "{name} — {n} vertices",
+    "kml_parse_error_no_polygon": "No polygon found in KML file",
+    "kml_parse_error_too_large": "File too large (max 500 KB)",
+    "kml_parse_error_invalid": "Invalid or malformed KML file",
+    "kml_clear": "Clear",
+    "kml_multigeometry_warning": "Multiple polygons detected — largest area imported"
+  },
+  "confirm_dialog": {
+    "default_confirm": "Confirm",
+    "default_cancel": "Cancel",
+    "aria_dialog_label": "Confirmation dialog"
+  },
+  "observe2": {
+    "heading": "Log observation",
+    "classic_link": "Use classic form",
+    "pipeline_heading": "Processing your files",
+    "pipeline_ready": "Ready to save",
+    "pipeline_processing": "Identifying species...",
+    "post_form_heading": "Almost done",
+    "location_label": "Location",
+    "location_skip": "Skip location",
+    "notes_label": "Notes",
+    "notes_placeholder": "What did you observe? Any additional context...",
+    "advanced_toggle": "Advanced fields",
+    "save_btn": "Save observation",
+    "saving": "Saving...",
+    "saved_heading": "Observation saved!",
+    "saved_view": "View observation",
+    "resume_banner": "You have an observation in progress.",
+    "resume_btn": "Resume",
+    "resume_dismiss": "Dismiss",
+    "quick_heading": "Quick capture",
+    "quick_camera": "Open camera",
+    "quick_confirm": "Confirm & save",
+    "quick_edit": "Edit in full form",
+    "quick_discard": "Discard"
   }
 }

@@ -20,7 +20,7 @@
 import type { Identifier, IDResult, IdentifyInput } from './types';
 import {
   BIRDNET_SAMPLE_RATE, BIRDNET_WINDOW_SAMPLES, BIRDNET_TOP_K,
-  parseLabel, buildInputTensor, topK,
+  parseLabel, buildInputTensor, buildSegmentTensors, topK,
 } from './birdnet-audio';
 import {
   getBirdNETCacheStatus, getCachedModelBuffer, getCachedLabels,
@@ -133,29 +133,67 @@ export const birdnetIdentifier: Identifier = {
     onProgress({ progress: 0.3, text: 'Decoding audio…' });
     const decoded = await decodeAudio(input);
 
-    onProgress({ progress: 0.55, text: 'Preparing tensor…' });
-    const tensorData = buildInputTensor(decoded.channels, decoded.sampleRate);
+    onProgress({ progress: 0.45, text: 'Segmenting audio…' });
     const ort = await import('onnxruntime-web');
     const TensorCtor = (ort as unknown as { Tensor: new (type: string, data: Float32Array, dims: number[]) => unknown }).Tensor;
-    const inputTensor = new TensorCtor('float32', tensorData, [1, BIRDNET_WINDOW_SAMPLES]);
-
-    onProgress({ progress: 0.7, text: 'Running inference…' });
     const inputName = sess.inputNames[0] ?? 'input';
-    const feeds: Record<string, unknown> = { [inputName]: inputTensor };
-    const out = await sess.run(feeds);
-    const outputName = sess.outputNames[0] ?? Object.keys(out)[0];
-    const scoresRaw = out[outputName]?.data;
-    if (!(scoresRaw instanceof Float32Array)) {
-      throw new Error('BirdNET output tensor missing or wrong type.');
+    const outputName0 = sess.outputNames[0];
+
+    // Sliding-window inference: 3-s windows with 1.5-s hop (50% overlap).
+    // This gives temporal resolution for the spectrogram overlay.
+    const segments = buildSegmentTensors(decoded.channels, decoded.sampleRate, 1.5);
+
+    interface SegmentResult {
+      startSec: number;
+      endSec: number;
+      top: Array<{ scientific_name: string; common_name_en: string | null; score: number; label: string }>;
+    }
+    const segmentResults: SegmentResult[] = [];
+    let globalBestScore = 0;
+    let globalBestSegIdx = 0;
+
+    for (let i = 0; i < segments.length; i++) {
+      onProgress({
+        progress: 0.45 + 0.45 * (i / segments.length),
+        text: `Identifying segment ${i + 1} / ${segments.length}…`,
+      });
+      const seg = segments[i];
+      const inputTensor = new TensorCtor('float32', seg.tensor, [1, BIRDNET_WINDOW_SAMPLES]);
+      const feeds: Record<string, unknown> = { [inputName]: inputTensor };
+      const out = await sess.run(feeds);
+      const outputName = outputName0 ?? Object.keys(out)[0];
+      const scoresRaw = out[outputName]?.data;
+      if (!(scoresRaw instanceof Float32Array)) continue;
+      const top = topK(scoresRaw, BIRDNET_TOP_K);
+      const segTop = top.map(t => ({ label: lbls[t.classIdx] ?? '', score: t.score, ...parseLabel(lbls[t.classIdx] ?? '') }));
+      segmentResults.push({ startSec: seg.startSec, endSec: seg.endSec, top: segTop });
+      if (segTop[0] && segTop[0].score > globalBestScore) {
+        globalBestScore = segTop[0].score;
+        globalBestSegIdx = segmentResults.length - 1;
+      }
     }
 
     onProgress({ progress: 0.95, text: 'Reading top predictions…' });
-    const top = topK(scoresRaw, BIRDNET_TOP_K);
-    const best = top[0];
-    if (!best) throw new Error('BirdNET returned no predictions.');
 
-    const parsed = parseLabel(lbls[best.classIdx] ?? '');
-    const candidates = top.map(t => ({ label: lbls[t.classIdx] ?? '', score: t.score, ...parseLabel(lbls[t.classIdx] ?? '') }));
+    if (segmentResults.length === 0) throw new Error('BirdNET returned no predictions.');
+    const bestSeg = segmentResults[globalBestSegIdx];
+    const best = bestSeg.top[0];
+    if (!best) throw new Error('BirdNET returned no predictions.');
+    const parsed = parseLabel(best.label);
+
+    // Build a deduplicated list of all species detected across segments
+    // (for the spectrogram overlay and raw response)
+    const allSpeciesMap = new Map<string, { scientific_name: string; common_name_en: string | null; maxScore: number }>();
+    for (const seg of segmentResults) {
+      for (const c of seg.top) {
+        if (!c.scientific_name) continue;
+        const existing = allSpeciesMap.get(c.scientific_name);
+        if (!existing || c.score > existing.maxScore) {
+          allSpeciesMap.set(c.scientific_name, { scientific_name: c.scientific_name, common_name_en: c.common_name_en, maxScore: c.score });
+        }
+      }
+    }
+    const allSpecies = [...allSpeciesMap.values()].sort((a, b) => b.maxScore - a.maxScore);
 
     onProgress({ progress: 1, text: 'Done' });
 
@@ -167,7 +205,18 @@ export const birdnetIdentifier: Identifier = {
       kingdom: 'Animalia',
       confidence: best.score,
       source: PLUGIN_ID,
-      raw: { top: candidates },
+      raw: {
+        // Legacy field kept for backward compat
+        top: bestSeg.top,
+        // New: per-segment detection windows with timestamps
+        segments: segmentResults,
+        // Deduplicated species list across all segments
+        allSpecies,
+        // Total audio duration in seconds
+        durationSec: decoded.channels[0]?.length
+          ? decoded.channels[0].length / decoded.sampleRate
+          : (segmentResults[segmentResults.length - 1]?.endSec ?? 0),
+      },
       warning: 'BirdNET model is licensed CC BY-NC-SA 4.0 (non-commercial). Cite Kahl et al. 2021.',
     };
   },

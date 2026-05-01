@@ -1,0 +1,258 @@
+---
+/**
+ * ConsoleTaxonChangesView — admin entity browser for taxon-related audit
+ * entries. Backed by `admin_audit` filtered to taxon-touching operations
+ * (taxon_conservation_set, plus any future taxon_* op via target_type
+ * = 'taxon'). There is no dedicated taxon_changes_log table in v1; this
+ * is the canonical audit surface for taxon mutations.
+ *
+ * Filters: taxon (uuid via target_id), action (op enum), actor
+ * (autocomplete), date range. Drill-down renders the full before/after
+ * diff JSON.
+ */
+import { t } from '../i18n/utils';
+import ConsoleEntityBrowser from './ConsoleEntityBrowser.astro';
+
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+const v = (tr.console as unknown as Record<string, Record<string, string> | string>).taxonChangesView as
+  unknown as Record<string, string>;
+
+const labels = {
+  title: v?.title ?? 'Taxon changes',
+  description: v?.description ?? '',
+  filterTaxon: v?.filterTaxon ?? 'Taxon',
+  filterAction: v?.filterAction ?? 'Action',
+  filterActor: v?.filterActor ?? 'Actor',
+  filterFrom: v?.filterFrom ?? 'From',
+  actConservation: v?.actConservation ?? 'Conservation set',
+  colCreated: v?.colCreated ?? 'Created',
+  colTaxon: v?.colTaxon ?? 'Taxon',
+  colAction: v?.colAction ?? 'Action',
+  colActor: v?.colActor ?? 'Actor',
+  colDiff: v?.colDiff ?? 'Diff',
+  drillFull: v?.drillFull ?? 'Full diff',
+};
+---
+
+<ConsoleEntityBrowser
+  lang={lang}
+  prefix="txc"
+  title={labels.title}
+  description={labels.description}
+  filters={[
+    { key: 'taxon',  kind: 'text',   label: labels.filterTaxon,  placeholder: 'uuid' },
+    { key: 'action', kind: 'select', label: labels.filterAction, options: [
+      { value: 'taxon_conservation_set', label: labels.actConservation },
+    ] },
+    { key: 'actor',  kind: 'text',   label: labels.filterActor, placeholder: 'uuid or @username' },
+    { key: 'from',   kind: 'date',   label: labels.filterFrom },
+  ]}
+  columns={[
+    { key: 'created_at', label: labels.colCreated },
+    { key: 'taxon',      label: labels.colTaxon },
+    { key: 'op',         label: labels.colAction },
+    { key: 'actor',      label: labels.colActor },
+    { key: 'diff',       label: labels.colDiff },
+  ]}
+/>
+
+<div id="txc-config" class="hidden" data-lang={lang} data-act-conservation={labels.actConservation}></div>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { getUserRoles } from '../lib/user-roles';
+  import {
+    EntityBrowser,
+    filterPredicates,
+    fmtTs,
+    renderUserPill,
+    renderTaxonPill,
+    type FilterSpec,
+    type ColumnSpec,
+    type SupabaseQuery,
+    type RenderContext,
+  } from '../lib/entity-browser';
+  import { escapeHtml } from '../lib/escape';
+
+  type Row = {
+    id: number;
+    created_at: string;
+    actor_id: string;
+    op: string;
+    target_type: string | null;
+    target_id: string | null;
+    before: Record<string, unknown> | null;
+    after: Record<string, unknown> | null;
+    reason: string;
+  };
+
+  // The audit_op enum has only one taxon-related op today; expand this list as
+  // new taxon_* ops are added (e.g. taxon_rename, taxon_synonym_set).
+  const TAXON_OPS = ['taxon_conservation_set'];
+
+  const cfgEl = document.getElementById('txc-config');
+  const langAttr = (cfgEl?.dataset.lang === 'es' ? 'es' : 'en') as 'en' | 'es';
+
+  function isUuid(s: string): boolean {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+  }
+  async function resolveUserId(input: string): Promise<string | undefined> {
+    const trimmed = input.replace(/^@/, '').trim();
+    if (!trimmed) return undefined;
+    if (isUuid(trimmed)) return trimmed;
+    const supabase = getSupabase();
+    const { data } = await supabase.from('users').select('id').eq('username', trimmed).maybeSingle();
+    return (data as { id: string } | null)?.id;
+  }
+
+  const filters: FilterSpec[] = [
+    {
+      key: 'taxon',
+      label: 'Taxon',
+      kind: 'text',
+      apply: (q: SupabaseQuery, v: string): SupabaseQuery | null => {
+        return isUuid(v) ? q.eq('target_id', v) : null;
+      },
+    },
+    {
+      key: 'action',
+      label: 'Action',
+      kind: 'select',
+      apply: filterPredicates.eq('op'),
+    },
+    {
+      key: 'actor',
+      label: 'Actor',
+      kind: 'autocomplete',
+      apply: async (q: SupabaseQuery, v: string): Promise<SupabaseQuery | null> => {
+        const id = await resolveUserId(v);
+        return id ? q.eq('actor_id', id) : null;
+      },
+    },
+    { key: 'from', label: 'From', kind: 'date', apply: filterPredicates.gteDate('created_at') },
+  ];
+
+  const ACTION_PILL_COLOURS: Record<string, string> = {
+    taxon_conservation_set: 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300',
+  };
+
+  const columns: ColumnSpec<Row>[] = [
+    {
+      key: 'created_at',
+      label: 'Created',
+      cellClass: 'whitespace-nowrap font-mono text-[11px] text-zinc-500',
+      render: r => escapeHtml(fmtTs(r.created_at)),
+    },
+    {
+      key: 'taxon',
+      label: 'Taxon',
+      render: (r, ctx: RenderContext) =>
+        r.target_id && isUuid(r.target_id) ? renderTaxonPill(r.target_id, null, ctx) : '<span class="text-zinc-400">—</span>',
+    },
+    {
+      key: 'op',
+      label: 'Action',
+      render: r => {
+        const cls = ACTION_PILL_COLOURS[r.op] ?? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300';
+        return `<span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${cls}">${escapeHtml(r.op)}</span>`;
+      },
+    },
+    {
+      key: 'actor',
+      label: 'Actor',
+      render: (r, ctx: RenderContext) => renderUserPill(r.actor_id, ctx),
+    },
+    {
+      key: 'diff',
+      label: 'Diff',
+      cellClass: 'max-w-[260px]',
+      render: r => {
+        const before = r.before ? JSON.stringify(r.before) : '—';
+        const after = r.after ? JSON.stringify(r.after) : '—';
+        const trim = (s: string): string => (s.length > 40 ? s.slice(0, 38) + '…' : s);
+        return `<code class="text-[10px] font-mono text-zinc-600 dark:text-zinc-400 break-words">${escapeHtml(trim(before))} → ${escapeHtml(trim(after))}</code>`;
+      },
+    },
+  ];
+
+  function renderDrilldown(r: Row): string {
+    const before = r.before ? JSON.stringify(r.before, null, 2) : 'null';
+    const after = r.after ? JSON.stringify(r.after, null, 2) : 'null';
+    return `<div class="space-y-2 text-[11px]">
+      <p><span class="font-medium text-zinc-700 dark:text-zinc-300">reason:</span> ${escapeHtml(r.reason)}</p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <div>
+          <p class="font-medium text-zinc-700 dark:text-zinc-300 mb-1">before</p>
+          <pre class="whitespace-pre-wrap break-all rounded bg-white dark:bg-zinc-950 px-2 py-1 text-[10px] text-zinc-600 dark:text-zinc-400 max-h-60 overflow-y-auto">${escapeHtml(before)}</pre>
+        </div>
+        <div>
+          <p class="font-medium text-zinc-700 dark:text-zinc-300 mb-1">after</p>
+          <pre class="whitespace-pre-wrap break-all rounded bg-white dark:bg-zinc-950 px-2 py-1 text-[10px] text-zinc-600 dark:text-zinc-400 max-h-60 overflow-y-auto">${escapeHtml(after)}</pre>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  async function init(): Promise<void> {
+    const supabase = getSupabase();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      document.getElementById('txc-skeleton')?.classList.add('hidden');
+      document.getElementById('txc-not-auth')?.classList.remove('hidden');
+      return;
+    }
+    const myRoles = await getUserRoles(session.user.id);
+    if (!myRoles.has('admin')) {
+      document.getElementById('txc-skeleton')?.classList.add('hidden');
+      document.getElementById('txc-not-auth')?.classList.remove('hidden');
+      return;
+    }
+    document.getElementById('txc-shell')?.classList.remove('hidden');
+
+    // Pre-baseline filter: limit admin_audit to taxon-related ops. We model
+    // this as a synthetic filter so it shows up in the chain before the
+    // user-selected ones, and it persists across pagination.
+    const taxonOpsFilter: FilterSpec = {
+      key: '__op_baseline',
+      label: '',
+      kind: 'select',
+      apply: (q: SupabaseQuery): SupabaseQuery => q.in('op', TAXON_OPS),
+    };
+    // Always-on baseline: applied via a wrapping filter list whose value is
+    // hard-coded to a non-empty sentinel so applyFilters() runs the
+    // predicate. We don't render the underlying form element.
+    const baselineHidden = document.createElement('input');
+    baselineHidden.type = 'hidden';
+    baselineHidden.id = 'txc-f-__op_baseline';
+    baselineHidden.value = '1';
+    document.getElementById('txc-shell')?.appendChild(baselineHidden);
+
+    const browser = new EntityBrowser<Row>({
+      prefix: 'txc',
+      tableName: 'admin_audit',
+      selectClause: 'id, created_at, actor_id, op, target_type, target_id, before, after, reason',
+      orderBy: 'created_at',
+      columns,
+      filters: [taxonOpsFilter, ...filters],
+      resolveUsersFromRow: r => [r.actor_id],
+      resolveTaxaFromRow: r => (r.target_id && isUuid(r.target_id) ? [r.target_id] : []),
+      rowIdFromRow: r => String(r.id),
+      renderDrilldown,
+      emptyText: '',
+      loadingText: '',
+      lang: langAttr,
+    });
+    await browser.init();
+  }
+
+  init().catch(err => {
+    document.getElementById('txc-skeleton')?.classList.add('hidden');
+    const errEl = document.getElementById('txc-error');
+    if (errEl) {
+      errEl.textContent = (err as Error).message;
+      errEl.classList.remove('hidden');
+    }
+  });
+</script>

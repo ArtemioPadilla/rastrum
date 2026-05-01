@@ -1,12 +1,4 @@
 ---
-import BaseLayout from '../../layouts/BaseLayout.astro';
-import IdentifyView from '../../components/IdentifyView.astro';
-import { t } from '../../i18n/utils';
-
-const lang = 'es';
-const tr = t(lang);
+// /es/identificar → redirigido a /es/observar (flujo unificado — ver issue #273)
+return Astro.redirect('/es/observar/?mode=identify', 301);
 ---
-
-<BaseLayout title={`${tr.identify.title} — Rastrum`} description="Identifica cualquier especie desde una foto con cascade IA paralelo — PlantNet, Claude vision y Phi-vision en dispositivo. Sin cuenta requerida." lang={lang}>
-  <IdentifyView lang={lang} />
-</BaseLayout>

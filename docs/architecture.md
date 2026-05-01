@@ -462,11 +462,176 @@ Operator runbook: [`docs/runbooks/obs-detail-redesign.md`](runbooks/obs-detail-r
 
 ---
 
+## Projects + research workflow (M29 / M30 / M31, v1.2 shipped 2026-04-30)
+
+A polygon-anchored monitoring stack for ANP / DRFSIPS / PROREST 2026 use:
+
+```
+                          ┌──────────────────────────┐
+                          │  projects                │
+                          │   (geography MultiPolygon)│
+                          │   visibility, owner,     │
+                          │   bilingual name + desc  │
+                          └─────────┬────────────────┘
+                                    │ FK + auto-tag trigger
+                  ┌─────────────────┼──────────────────────┐
+                  │                 │                      │
+                  ▼                 ▼                      ▼
+       ┌──────────────────┐  ┌──────────────────┐  ┌────────────────────┐
+       │  observations    │  │  camera_stations │  │  CLI batch import  │
+       │    project_id    │  │    project_id +  │  │   (cli/, M30)      │
+       │    camera_       │  │    station_key   │  │                    │
+       │    station_id    │  │    (UNIQUE per   │  │  walks SD card →   │
+       │                  │  │    project)      │  │  /api/upload-url → │
+       └──────────────────┘  └──────────────────┘  │  /api/observe      │
+                                                   └────────────────────┘
+```
+
+- **Auto-tagging**: `assign_observation_to_project_trigger` runs `BEFORE
+  INSERT OR UPDATE OF location` on `observations`; if `project_id` is null
+  and a location is set, it picks the first project (by `created_at ASC`)
+  whose polygon `ST_Covers` the point.
+- **Geography writes** go through `upsert_project()` SECURITY DEFINER —
+  PostgREST has no WKB encoder for the `geography(MultiPolygon, 4326)`
+  column, so the client posts GeoJSON to the RPC.
+- **Trap-night counts** for camera stations come from
+  `station_trap_nights(station_id, p_from, p_to)` SQL function. NULL
+  `end_date` is counted up to `current_date` (or `p_to`).
+- **CLI** (`cli/`) is a separate Node 20+ TypeScript package with its own
+  `package.json` so the PWA never picks up Node-only deps; it uses
+  `rst_*` API tokens against `POST /api/upload-url` (added in M30) for
+  batch upload of camera-trap photos.
+
+Specs: [`docs/specs/modules/29-projects-anp.md`](specs/modules/29-projects-anp.md),
+[`docs/specs/modules/30-cli-batch-import.md`](specs/modules/30-cli-batch-import.md),
+[`docs/specs/modules/31-camera-stations.md`](specs/modules/31-camera-stations.md).
+Runbooks: [`projects-anp.md`](runbooks/projects-anp.md),
+[`cli-batch-import.md`](runbooks/cli-batch-import.md),
+[`camera-stations.md`](runbooks/camera-stations.md).
+
+---
+
+## Multi-provider vision + platform pool (M32, v1.2 shipped 2026-04-30)
+
+The original cascade in `identify/index.ts` called `api.anthropic.com`
+directly with a hard-coded model. M32 replaces that with a `VisionProvider`
+abstraction so the same call site can route through any of six providers,
+plus adds a platform-wide call pool that sponsors donate to.
+
+```
+                ┌─────────────────────┐
+   image bytes  │  identify/index.ts  │
+   ──────────► │   parallel cascade   │
+                │   ─────────────────  │
+                │   PlantNet runner    │
+                │   Vision runner ────┤
+                │   ONNX (placeholder) │
+                └──────────┬───────────┘
+                           │ resolve credential:
+                           │   1. BYO key (client_keys)
+                           │   2. Personal sponsorship
+                           │   3. consume_pool_slot() ─┐ FOR UPDATE SKIP LOCKED
+                           │   4. skip                  │ atomic per-user cap
+                           ▼                            │
+              ┌─────────────────────────────┐           │
+              │  buildProvider(credential)  │           │
+              ├─────────────────────────────┤           │
+              │ AnthropicProvider           │           │
+              │ BedrockProvider (Sig V4)    │           │
+              │ OpenAIProvider              │           │
+              │ AzureOpenAIProvider         │           │
+              │ GeminiProvider              │           │
+              │ VertexAIProvider            │           │
+              └─────────────────────────────┘           │
+                                                        ▼
+                                              ┌──────────────────┐
+                                              │  sponsor_pools   │
+                                              │  pool_consumption│
+                                              │  (atomic ledger) │
+                                              └──────────────────┘
+```
+
+- **`buildProvider()` exhaustive switch** — adding a new
+  `CredentialKind` without updating the dispatcher fails the
+  TypeScript build via the `never`-typed default case.
+- **Bedrock Sig V4 hand-rolled** (~70 LOC) instead of bundling
+  `@aws-sdk/client-bedrock-runtime` (~3 MB) into the EF.
+- **`bedrockModelId(model)` translation** — the column default
+  `claude-haiku-4-5` (Anthropic shorthand) auto-converts to
+  `us.anthropic.claude-haiku-4-5-v1:0` so a Bedrock credential
+  configured without an explicit Bedrock model still works.
+- **Pool privacy**: `pool_consumption (user_id, day, count)` is
+  service-role-write / self-read. No RPC joins it to `auth.users`;
+  sponsors see only aggregate stats.
+
+UI for credential creation + pool donation lands in v1.1; until
+then, register credentials via Supabase Vault + SQL.
+
+Spec: [`docs/specs/modules/32-multi-provider-vision.md`](specs/modules/32-multi-provider-vision.md).
+Runbooks: [`multi-provider-vision.md`](runbooks/multi-provider-vision.md),
+[`sponsor-pools.md`](runbooks/sponsor-pools.md).
+
+---
+
+## Karma + expertise + rarity (Module 23, v1.1 shipped)
+
+Karma is a per-user reputation primitive used for ranking, badging, and
+moderation weight. It's not a leaderboard surface — it's an input to
+other modules' decisions:
+
+- `compute_user_karma(uid)` SECURITY DEFINER returns a 0–1000 number
+  derived from observation count, ID accuracy on community-validated
+  records, validator track record, and rarity-weighted contributions.
+- `users.karma_cache` is the denormalised hot-path column refreshed
+  nightly by `recompute-karma` (cron 09:00 UTC).
+- Phase 1 (foundation) is shipped — schema + recompute + cache. Phase 2
+  (engagement bonuses) and Phase 3 (conservation bonuses) are tracked
+  in `progress.json` as v1.1 follow-ups.
+
+Spec: [`docs/specs/modules/23-karma-expertise-rarity.md`](specs/modules/23-karma-expertise-rarity.md).
+Runbook: [`docs/runbooks/karma-phase-1-post-merge-verification.md`](runbooks/karma-phase-1-post-merge-verification.md).
+
+---
+
+## AI sponsorships (Module 27, v1.1 shipped — extended by M32)
+
+Any user can share their Anthropic credential (API key OR long-lived
+OAuth token) with a specific list of beneficiaries. The `identify`
+Edge Function resolves the call in this order: BYO key → personal
+sponsorship → platform pool → skip Claude (PlantNet-only). The original
+operator-key fallback was removed in PR #78.
+
+Three load-bearing rules:
+
+1. **Credentials live in Supabase Vault**, never in `users` columns.
+   `sponsor_credentials.vault_secret_id` is the FK; the Edge Function
+   reads via `vault.read_secret()` SECURITY DEFINER wrapper.
+2. **Caps are enforced atomically.** `consume_sponsor_slot()` SECURITY
+   DEFINER uses `FOR UPDATE SKIP LOCKED` to claim a slot, increments
+   `monthly_calls`, and flips `paused=true` when the cap is hit. Resend
+   email fires at 80% and 100% thresholds.
+3. **Heartbeat probes catch revoked credentials.** A daily cron pings
+   each active credential with `max_tokens:1`; failures auto-pause the
+   sponsorship and email the sponsor.
+
+UI: `/profile/sponsoring/`, `/profile/sponsored-by/`, banner on
+`/identify`, header dropdown entry, mobile drawer entry, sponsor +
+reciprocal badges on public profile, request-to-be-sponsored flow
+(5 endpoints + dialogs), abuse-report button per beneficiary.
+
+Spec: [`docs/specs/modules/27-ai-sponsorships.md`](specs/modules/27-ai-sponsorships.md).
+M32 (multi-provider vision + platform pool) is the natural extension —
+see the section above.
+
+---
+
 ## Further reading
 
 - [`AGENTS.md`](../AGENTS.md) — conventions, pitfalls, pre-PR checklist.
 - [`docs/specs/modules/00-index.md`](specs/modules/00-index.md) — module
   catalog with shipped status.
+- [`docs/runbooks/00-index.md`](runbooks/00-index.md) — operator runbook
+  index (admin console, research workflow, observation flow, ops hygiene).
 - [`docs/specs/infra/supabase-schema.sql`](specs/infra/supabase-schema.sql)
   — the canonical schema. Apply with `make db-apply`.
 - [`docs/gbif-ipt.md`](gbif-ipt.md) — GBIF publishing flow.

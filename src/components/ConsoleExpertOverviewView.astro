@@ -90,8 +90,8 @@ const tr = t(lang);
   async function loadKpis(userId: string) {
     const [scoreResult, verifiedResult, recentResult, queueResult, userResult] = await Promise.all([
       supabase.from('user_expertise').select('score').eq('user_id', userId),
-      supabase.from('user_expertise').select('id', { count: 'exact', head: true }).eq('user_id', userId).not('verified_at', 'is', null),
-      supabase.from('identifications').select('id, taxon_id, created_at, observations(current_scientific_name)').eq('validated_by', userId).order('created_at', { ascending: false }).limit(5),
+      supabase.from('user_expertise').select('user_id', { count: 'exact', head: true }).eq('user_id', userId).not('verified_at', 'is', null),
+      supabase.from('identifications').select('id, taxon_id, created_at, taxa:taxon_id(scientific_name)').eq('validated_by', userId).order('created_at', { ascending: false }).limit(5),
       supabase.from('validation_queue').select('observation_id, current_scientific_name, current_taxon_id'),
       supabase.from('users').select('expert_taxa').eq('id', userId).single(),
     ]);
@@ -146,8 +146,13 @@ const tr = t(lang);
     const recent = recentResult.data ?? [];
     if (recentEl && recent.length > 0) {
       const rows = recent.map(r => {
-        const obsArr = r.observations as unknown as Array<{ current_scientific_name?: string }> | null;
-        const name = obsArr?.[0]?.current_scientific_name ?? r.taxon_id ?? '—';
+        // Embedded taxa via FK come back as either an object or array depending
+        // on the supabase-js version + cardinality detection. Handle both.
+        const taxaRaw = (r as { taxa?: unknown }).taxa;
+        const taxaObj = Array.isArray(taxaRaw)
+          ? (taxaRaw[0] as { scientific_name?: string } | undefined)
+          : (taxaRaw as { scientific_name?: string } | null | undefined);
+        const name = taxaObj?.scientific_name ?? r.taxon_id ?? '—';
         const when = new Date(r.created_at).toLocaleDateString();
         return `<div class="flex items-center justify-between rounded-md border border-zinc-200 dark:border-zinc-700 px-3 py-2 text-sm">
           <span class="text-zinc-700 dark:text-zinc-300 font-medium italic">${name}</span>

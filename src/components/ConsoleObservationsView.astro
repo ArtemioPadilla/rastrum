@@ -174,7 +174,7 @@ const tr = t(lang);
     primary_taxon_id: string | null;
     obscure_level: string;
     location_obscured: unknown;
-    observer_license: string;
+    observer_license: string | null;
     hidden: boolean;
     hidden_reason: string | null;
     hidden_at: string | null;
@@ -182,7 +182,7 @@ const tr = t(lang);
     sync_status: string;
     created_at: string;
     taxa: { scientific_name: string } | null;
-    users: { username: string | null; display_name: string | null } | null;
+    users: { username: string | null; display_name: string | null; observer_license: string | null } | null;
   };
 
   function show(id: string) { document.getElementById(id)?.classList.remove('hidden'); }
@@ -237,13 +237,13 @@ const tr = t(lang);
 
     let query = supabase
       .from('observations')
-      .select('id, observer_id, observed_at, primary_taxon_id, obscure_level, location_obscured, observer_license, hidden, hidden_reason, hidden_at, hidden_by, sync_status, created_at, taxa(scientific_name), users:observer_id(username, display_name)')
+      .select('id, observer_id, observed_at, primary_taxon_id, obscure_level, location_obscured, hidden, hidden_reason, hidden_at, hidden_by, sync_status, created_at, taxa(scientific_name), users:observer_id(username, display_name, observer_license)')
       .order('created_at', { ascending: false })
       .limit(50);
 
     if (status) query = query.eq('sync_status', status);
     if (obscure) query = query.eq('obscure_level', obscure);
-    if (license) query = query.eq('observer_license', license);
+    if (license) query = query.eq('users.observer_license', license);
     if (hiddenVal === 'true') query = query.eq('hidden', true);
     if (hiddenVal === 'false') query = query.eq('hidden', false);
     if (owner) {
@@ -293,7 +293,7 @@ const tr = t(lang);
       return `<li data-obs-id="${escHtml(o.id)}" class="px-3 py-2 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/40 ${isSelected}">
         <div class="font-medium text-sm italic text-zinc-900 dark:text-zinc-100 truncate">${escHtml(taxon)}</div>
         <div class="text-xs text-zinc-500 truncate">${escHtml(uname)} · ${escHtml(fmtDate(o.created_at))}</div>
-        <div class="mt-1 flex flex-wrap gap-1">${hiddenChip}${obscureChip}<span class="inline-block text-[9px] rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 px-1 py-0.5">${escHtml(o.observer_license)}</span></div>
+        <div class="mt-1 flex flex-wrap gap-1">${hiddenChip}${obscureChip}<span class="inline-block text-[9px] rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 px-1 py-0.5">${escHtml(o.users?.observer_license ?? 'CC BY 4.0')}</span></div>
       </li>`;
     }).join('');
   }
@@ -326,7 +326,7 @@ const tr = t(lang);
     createdEl.textContent = fmtDate(o.created_at);
     statusEl.textContent = o.sync_status;
     obscureEl.textContent = o.obscure_level;
-    licenseEl.textContent = o.observer_license;
+    licenseEl.textContent = o.users?.observer_license ?? 'CC BY 4.0';
 
     if (o.hidden) {
       hiddenEl.textContent = 'Hidden by admin';
@@ -409,7 +409,7 @@ const tr = t(lang);
 
     const licenseBtn = (ev.target as HTMLElement).closest<HTMLElement>('#obs-action-license');
     if (licenseBtn && selectedId) {
-      const current = allObs.find(x => x.id === selectedId)?.observer_license ?? 'CC BY 4.0';
+      const current = allObs.find(x => x.id === selectedId)?.users?.observer_license ?? 'CC BY 4.0';
       const sel = document.getElementById('slideover-obs-license-select') as HTMLSelectElement | null;
       if (sel) sel.value = current;
       document.dispatchEvent(new CustomEvent('console:slideover-open', {

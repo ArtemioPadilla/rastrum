@@ -65,6 +65,7 @@ const sponsoringI18n = {
   data-label-research-grade={tr.profile.research_grade}
   data-label-stat-obs={tr.profile.total_observations}
   data-label-stat-species={tr.profile.species_count}
+  data-label-page-title={tr.profile.public_profile_page_title}
   data-share-obs-base="/share/obs/"
 >
   <div data-pp-loading class="py-12 text-center text-sm text-zinc-500 dark:text-zinc-400">
@@ -225,6 +226,8 @@ const sponsoringI18n = {
 
 <script>
   import { getSupabase } from '../lib/supabase';
+  import { wireOverflowMenu } from '../lib/overflow-menu';
+  import { openConfirmDialog } from '../lib/confirm-dialog';
 
   type Lang = 'en' | 'es';
 
@@ -255,7 +258,7 @@ const sponsoringI18n = {
 
   function readUsername(): string {
     const params = new URLSearchParams(window.location.search);
-    const fromQuery = params.get('username') || params.get('u') || '';
+    const fromQuery = params.get('username') || '';
     if (fromQuery) return fromQuery.trim();
     const segments = window.location.pathname.split('/').filter(Boolean);
     const last = segments[segments.length - 1] || '';
@@ -343,7 +346,8 @@ const sponsoringI18n = {
     const ownerLabel = root.dataset.labelOwnerOnly ?? '';
 
     const name = showName ? (profile.display_name || profile.username || 'Observer') : (profile.username || 'Observer');
-    document.title = `${name} — Rastrum`;
+    const titleTpl = root.dataset.labelPageTitle ?? '{name} — Rastrum';
+    document.title = titleTpl.replaceAll('{name}', name);
 
     const nameEl = root.querySelector<HTMLElement>('[data-pp-name]');
     if (nameEl) nameEl.textContent = name;
@@ -491,24 +495,14 @@ const sponsoringI18n = {
       const trigger = root.querySelector<HTMLButtonElement>('[data-pp-overflow-trigger]');
       const menu = root.querySelector<HTMLElement>('[data-pp-overflow-menu]');
       ovWrap?.classList.remove('hidden');
-      const closeMenu = () => {
-        menu?.classList.add('hidden');
-        trigger?.setAttribute('aria-expanded', 'false');
-      };
-      const openMenu = () => {
-        menu?.classList.remove('hidden');
-        trigger?.setAttribute('aria-expanded', 'true');
-      };
-      trigger?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (menu?.classList.contains('hidden')) openMenu(); else closeMenu();
-      });
-      document.addEventListener('click', (e) => {
-        if (!ovWrap?.contains(e.target as Node)) closeMenu();
-      });
-      document.addEventListener('keydown', (e) => {
-        if ((e as KeyboardEvent).key === 'Escape') closeMenu();
-      });
+      let closeMenu = () => {};
+      if (ovWrap && trigger && menu) {
+        wireOverflowMenu(ovWrap, trigger, menu);
+        closeMenu = () => {
+          menu.classList.add('hidden');
+          trigger.setAttribute('aria-expanded', 'false');
+        };
+      }
 
       const blockBtn = menu?.querySelector<HTMLButtonElement>('[data-pp-action="block"]');
       const reportBtn = menu?.querySelector<HTMLButtonElement>('[data-pp-action="report"]');
@@ -516,10 +510,13 @@ const sponsoringI18n = {
 
       blockBtn?.addEventListener('click', async () => {
         closeMenu();
-        const confirmCopy = lang === 'es'
-          ? `¿Bloquear a @${handleStr}?\n\nNo verán tus reacciones ni tú las suyas. Puedes deshacerlo en Ajustes → Privacidad.`
-          : `Block @${handleStr}?\n\nThey won't see your reactions and you won't see theirs. You can undo this in Settings → Privacy.`;
-        if (!confirm(confirmCopy)) return;
+        const title = lang === 'es' ? `¿Bloquear a @${handleStr}?` : `Block @${handleStr}?`;
+        const message = lang === 'es'
+          ? 'No verán tus reacciones ni tú las suyas. Puedes deshacerlo en Ajustes → Privacidad.'
+          : "They won't see your reactions and you won't see theirs. You can undo this in Settings → Privacy.";
+        const confirmLabel = lang === 'es' ? 'Bloquear' : 'Block';
+        const ok = await openConfirmDialog({ title, message, confirmLabel, variant: 'danger' });
+        if (!ok) return;
         blockBtn.disabled = true;
         try {
           const { blockUser } = await import('../lib/social');

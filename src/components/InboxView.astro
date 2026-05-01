@@ -43,6 +43,7 @@ const subtitleCopy = lang === 'es'
     data-label-kind-follow-request={inboxTr.kind_follow_request}
     data-label-kind-follow-accepted={inboxTr.kind_follow_accepted}
     data-label-kind-reaction={inboxTr.kind_reaction}
+    data-label-kind-vertex-token-expiring={inboxTr.kind_vertex_token_expiring}
     data-label-empty={inboxTr.empty}
     data-label-mark-read={lang === 'es' ? 'Marcar leído' : 'Mark read'}
     data-label-just-now={lang === 'es' ? 'ahora' : 'just now'}
@@ -175,6 +176,7 @@ const subtitleCopy = lang === 'es'
     if (kind === 'follow_request') return root.dataset.labelKindFollowRequest ?? '';
     if (kind === 'follow_accepted') return root.dataset.labelKindFollowAccepted ?? '';
     if (kind === 'reaction') return root.dataset.labelKindReaction ?? '';
+    if (kind === 'vertex_token_expiring') return root.dataset.labelKindVertexTokenExpiring ?? '';
     return '';
   }
 
@@ -200,6 +202,11 @@ const subtitleCopy = lang === 'es'
     if (kind === 'identification' || kind === 'badge') {
       return `<span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-900/60">
         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15 8.5 22 9.3 17 14.1 18.2 21 12 17.8 5.8 21 7 14.1 2 9.3 9 8.5 12 2"/></svg>
+      </span>`;
+    }
+    if (kind === 'vertex_token_expiring') {
+      return `<span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 ring-1 ring-rose-200 dark:ring-rose-900/60">
+        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
       </span>`;
     }
     return `<span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 ring-1 ring-zinc-200 dark:ring-zinc-700"><span class="block h-1.5 w-1.5 rounded-full bg-current"/></span>`;
@@ -229,6 +236,10 @@ const subtitleCopy = lang === 'es'
     if (n.kind === 'reaction') {
       const obsId = typeof p.target_id === 'string' ? (p.target_id as string) : '';
       if (obsId) return `/share/obs/?id=${encodeURIComponent(obsId)}`;
+    }
+    if (n.kind === 'vertex_token_expiring') {
+      // Land the sponsor on their credentials page so they can rotate.
+      return `/${lang === 'es' ? 'es/perfil/patrocinios' : 'en/profile/sponsoring'}/`;
     }
     return '#';
   }

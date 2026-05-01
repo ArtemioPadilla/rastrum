@@ -423,3 +423,77 @@ Hard delete; CASCADE removes related `admin_webhook_deliveries` rows.
 POSTs `{test:true, webhook_id, sent_at}` to a single webhook with a
 proper signature header. Persists the response status_code in
 `admin_webhook_deliveries`. Returns `{ statusCode, error }`.
+
+### `webhook.replay_delivery` (PR15)
+
+Re-fires an existing delivery body to the same parent webhook with a
+fresh `_meta` envelope (new event_id + nonce + timestamp + a
+`replay_of: <source_id>` pointer). HMAC-signs with the parent's
+current secret and inserts a brand-new `admin_webhook_deliveries`
+row. Returns `{ statusCode, error, newDeliveryId, newEventId }`.
+
+```ts
+const res = await adminClient.webhook.replayDelivery(
+  { deliveryId: '<uuid>' },
+  'manual replay — receiver was down at original send',
+  session!.access_token,
+);
+```
+
+Required role: `admin`. Audits as `webhook_replay` with
+`details: { source_delivery_id, new_event_id }`.
+
+### `health.recompute` (PR15)
+
+Manually fires `compute_admin_health_digest()`. Idempotent on
+`(period_start, period_end)` — same week → same row, but the audit
+trail still records the intent. Returns `{ digestId }` (uuid of the
+latest row, or null if no rows exist).
+
+```ts
+const res = await adminClient.health.recompute(
+  'pre-meeting refresh of platform health snapshot',
+  session!.access_token,
+);
+```
+
+Required role: `admin`. Audits as `health_recompute`.
+
+### `error.acknowledge` (PR15)
+
+Single-row ack on `function_errors`. Sets `acknowledged_at = now()`,
+`acknowledged_by = actor.id`, `ack_notes = <notes>`. Throws if the
+row is already acknowledged.
+
+```ts
+await adminClient.error.acknowledge(
+  { errorId: '<uuid>', notes: 'expected — handler regressed in PR123' },
+  'triaging post-deploy errors',
+  session!.access_token,
+);
+```
+
+Required role: `admin`. Audits as `error_acknowledge`.
+
+### `error.acknowledge_bulk` (PR15)
+
+Filter-scoped bulk ack on `function_errors`. Filters: `functionName`,
+`code`, `from`, `to` — all optional; an empty filter set scopes to
+ALL unacknowledged rows (use carefully). Capped at 1000 rows
+server-side; the result includes `capHit: boolean` so the UI can
+prompt for a re-run.
+
+```ts
+const res = await adminClient.error.acknowledgeBulk(
+  {
+    filters: { code: 'rate_limit_exceeded', from: '2026-04-29T00:00:00Z' },
+    notes: 'expected after the burst-test backfill',
+  },
+  'triaging the rate-limit backlog from yesterday smoke test',
+  session!.access_token,
+);
+console.log('acknowledged', res.result?.count, 'cap hit:', res.result?.capHit);
+```
+
+Required role: `admin`. Audits as `error_acknowledge_bulk` with
+`details: { filters, count }`.

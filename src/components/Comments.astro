@@ -121,6 +121,7 @@ const sgReportLabel = sgTree.socialgraph.report.button;
 <script>
   import { getSupabase } from '../lib/supabase';
   import { buildCommentTree, formatTimeAgo, sanitizeCommentBody, type CommentRow, type CommentNode } from '../lib/social';
+  import { wireOverflowMenu } from '../lib/overflow-menu';
 
   const PAGE_SIZE = 20;
 
@@ -325,20 +326,12 @@ const sgReportLabel = sgTree.socialgraph.report.button;
         const blockBtn = wrap.querySelector<HTMLButtonElement>('.comment-action-block');
         const reportBtn = wrap.querySelector<HTMLButtonElement>('.comment-action-report');
 
+        if (!trigger || !menu) return;
+        wireOverflowMenu(wrap, trigger, menu);
         const closeMenu = () => {
-          menu?.classList.add('hidden');
-          trigger?.setAttribute('aria-expanded', 'false');
+          menu.classList.add('hidden');
+          trigger.setAttribute('aria-expanded', 'false');
         };
-        const openMenu = () => {
-          menu?.classList.remove('hidden');
-          trigger?.setAttribute('aria-expanded', 'true');
-        };
-
-        trigger?.addEventListener('click', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          if (menu?.classList.contains('hidden')) openMenu(); else closeMenu();
-        });
 
         blockBtn?.addEventListener('click', async () => {
           closeMenu();
@@ -379,23 +372,6 @@ const sgReportLabel = sgTree.socialgraph.report.button;
         });
       });
     }
-
-    // Click-outside / Esc closes any open comment overflow menu.
-    document.addEventListener('click', (e) => {
-      const tgt = e.target as Node;
-      listEl?.querySelectorAll<HTMLElement>('.comment-overflow').forEach((wrap) => {
-        if (wrap.contains(tgt)) return;
-        wrap.querySelector('.comment-overflow-menu')?.classList.add('hidden');
-        wrap.querySelector('.comment-overflow-trigger')?.setAttribute('aria-expanded', 'false');
-      });
-    });
-    document.addEventListener('keydown', (e) => {
-      if ((e as KeyboardEvent).key !== 'Escape') return;
-      listEl?.querySelectorAll<HTMLElement>('.comment-overflow').forEach((wrap) => {
-        wrap.querySelector('.comment-overflow-menu')?.classList.add('hidden');
-        wrap.querySelector('.comment-overflow-trigger')?.setAttribute('aria-expanded', 'false');
-      });
-    });
 
     function beginEdit(id: string) {
       const row = allRows.find(r => r.id === id);

@@ -115,6 +115,23 @@ test.describe('Legacy redirects → settings (PR-2)', () => {
     }
   }
 
+  // Asserts a route resolves to a real (non-redirecting) page that contains
+  // an expected marker — used to lock the PR #261 fix that removed 4 stale
+  // redirects which had been creating loops with the Settings-tab buttons.
+  async function expectServesRealPage(
+    request: import('@playwright/test').APIRequestContext,
+    path: string,
+    markerSubstring: string,
+  ) {
+    const response = await request.get(path, { maxRedirects: 0 });
+    expect(response.status(), `Expected ${path} to serve 200, got ${response.status()}`).toBe(200);
+    const html = await response.text();
+    // The Astro redirect stub uses <meta http-equiv="refresh"> — its absence
+    // is what we're locking against future regression.
+    expect(html, `Expected ${path} to NOT be a meta-refresh redirect stub`).not.toContain('http-equiv="refresh"');
+    expect(html, `Expected ${path} to render real UI containing "${markerSubstring}"`).toContain(markerSubstring);
+  }
+
   test('/en/profile/edit redirects to settings/profile', async ({ request }) => {
     await expectRedirectMarkup(request, '/en/profile/edit', 'settings/profile');
   });
@@ -123,19 +140,23 @@ test.describe('Legacy redirects → settings (PR-2)', () => {
     await expectRedirectMarkup(request, '/es/perfil/editar', 'ajustes/profile');
   });
 
-  test('/en/profile/tokens redirects to settings/developer', async ({ request }) => {
-    await expectRedirectMarkup(request, '/en/profile/tokens', 'settings/developer');
+  // PR #261 — these 4 routes used to redirect to their /settings/<tab>/ pages,
+  // but the Settings tabs themselves had buttons pointing AT these URLs,
+  // creating a click-loop. The redirects were removed; the standalone pages
+  // serve directly. These tests lock the fix.
+  test('/en/profile/tokens serves the real tokens UI (no redirect loop)', async ({ request }) => {
+    await expectServesRealPage(request, '/en/profile/tokens/', 'create-form');
   });
 
-  test('/en/profile/export redirects to settings/data', async ({ request }) => {
-    await expectRedirectMarkup(request, '/en/profile/export', 'settings/data');
+  test('/en/profile/export serves the real export UI', async ({ request }) => {
+    await expectServesRealPage(request, '/en/profile/export/', 'Darwin Core');
   });
 
-  test('/en/profile/import redirects to settings/data', async ({ request }) => {
-    await expectRedirectMarkup(request, '/en/profile/import', 'settings/data');
+  test('/en/profile/import serves the real import UI', async ({ request }) => {
+    await expectServesRealPage(request, '/en/profile/import/', 'Bulk-import');
   });
 
-  test('/en/profile/expert-apply redirects to settings/developer', async ({ request }) => {
-    await expectRedirectMarkup(request, '/en/profile/expert-apply', 'settings/developer');
+  test('/en/profile/expert-apply serves the real apply UI', async ({ request }) => {
+    await expectServesRealPage(request, '/en/profile/expert-apply/', 'expert');
   });
 });

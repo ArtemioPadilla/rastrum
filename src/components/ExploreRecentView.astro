@@ -56,8 +56,8 @@ const sgReport = sgTree.socialgraph.report.button;
   data-label-block-error={sgCards.block_user_error}
   data-label-report-aria={sgCards.report_observation_aria}
   data-label-block-observer-aria={sgCards.block_observer_aria}
-  data-label-fave-count-one={(tr as unknown as { socialgraph: { reactions: Record<string, string> } }).socialgraph.reactions.fave_count_aria_one}
-  data-label-fave-count-other={(tr as unknown as { socialgraph: { reactions: Record<string, string> } }).socialgraph.reactions.fave_count_aria_other}
+  data-label-fave-aria-one={(tr as unknown as { socialgraph: { reactions: Record<string, string> } }).socialgraph.reactions.fave_count_aria_one}
+  data-label-fave-aria-other={(tr as unknown as { socialgraph: { reactions: Record<string, string> } }).socialgraph.reactions.fave_count_aria_other}
 >
   <header class="space-y-3 py-6">
     <h1 class="text-3xl font-bold tracking-tight">{page.title}</h1>
@@ -92,6 +92,7 @@ const sgReport = sgTree.socialgraph.report.button;
 <script>
   import { getSupabase } from '../lib/supabase';
   import { formatTimeAgo } from '../lib/social';
+  import { wireOverflowMenu } from '../lib/overflow-menu';
 
   type Lang = 'en' | 'es';
 
@@ -262,8 +263,8 @@ const sgReport = sgTree.socialgraph.report.button;
       blockError: root.dataset.labelBlockError ?? 'Could not block.',
       reportAria: root.dataset.labelReportAria ?? 'Report this observation',
       blockObserverAria: root.dataset.labelBlockObserverAria ?? 'Block this observer',
-      faveCountOne: root.dataset.labelFaveCountOne ?? '{{count}} person favorited this',
-      faveCountOther: root.dataset.labelFaveCountOther ?? '{{count}} people favorited this',
+      faveAriaOne: root.dataset.labelFaveAriaOne ?? '{{count}} person favorited this',
+      faveAriaOther: root.dataset.labelFaveAriaOther ?? '{{count}} people favorited this',
     };
 
     const listEl = root.querySelector('.er-list') as HTMLUListElement | null;
@@ -336,7 +337,7 @@ const sgReport = sgTree.socialgraph.report.button;
           if (!chip) continue;
           const countEl = chip.querySelector<HTMLElement>('.er-fave-count');
           if (countEl) countEl.textContent = String(n);
-          const tpl = n === 1 ? labels.faveCountOne : labels.faveCountOther;
+          const tpl = n === 1 ? labels.faveAriaOne : labels.faveAriaOther;
           chip.setAttribute('aria-label', tpl.replace('{{count}}', String(n)));
           chip.classList.remove('hidden');
         }
@@ -352,20 +353,12 @@ const sgReport = sgTree.socialgraph.report.button;
         const blockBtn = wrap.querySelector<HTMLButtonElement>('.er-action-block');
         const reportBtn = wrap.querySelector<HTMLButtonElement>('.er-action-report');
 
+        if (!trigger || !menu) return;
+        wireOverflowMenu(wrap, trigger, menu);
         const closeMenu = () => {
-          menu?.classList.add('hidden');
-          trigger?.setAttribute('aria-expanded', 'false');
+          menu.classList.add('hidden');
+          trigger.setAttribute('aria-expanded', 'false');
         };
-        const openMenu = () => {
-          menu?.classList.remove('hidden');
-          trigger?.setAttribute('aria-expanded', 'true');
-        };
-
-        trigger?.addEventListener('click', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          if (menu?.classList.contains('hidden')) openMenu(); else closeMenu();
-        });
 
         blockBtn?.addEventListener('click', async (e) => {
           e.preventDefault();
@@ -412,27 +405,6 @@ const sgReport = sgTree.socialgraph.report.button;
         });
       });
     }
-
-    // Click outside / Esc closes any open overflow menu in this list.
-    document.addEventListener('click', (e) => {
-      const tgt = e.target as Node;
-      root.querySelectorAll<HTMLElement>('.er-overflow').forEach((wrap) => {
-        if (wrap.contains(tgt)) return;
-        const menu = wrap.querySelector<HTMLElement>('.er-overflow-menu');
-        const trigger = wrap.querySelector<HTMLButtonElement>('.er-overflow-trigger');
-        menu?.classList.add('hidden');
-        trigger?.setAttribute('aria-expanded', 'false');
-      });
-    });
-    document.addEventListener('keydown', (e) => {
-      if ((e as KeyboardEvent).key !== 'Escape') return;
-      root.querySelectorAll<HTMLElement>('.er-overflow').forEach((wrap) => {
-        const menu = wrap.querySelector<HTMLElement>('.er-overflow-menu');
-        const trigger = wrap.querySelector<HTMLButtonElement>('.er-overflow-trigger');
-        menu?.classList.add('hidden');
-        trigger?.setAttribute('aria-expanded', 'false');
-      });
-    });
 
     async function loadMore() {
       if (busy || exhausted) return;

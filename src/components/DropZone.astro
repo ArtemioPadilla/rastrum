@@ -1,0 +1,188 @@
+---
+/**
+ * DropZone.astro — Unified media drop zone for Observe 2.0
+ *
+ * Accepts files via:
+ *   - Drag and drop (desktop)
+ *   - Tap to pick (mobile/desktop)
+ *   - Paste from clipboard (Ctrl+V, Chrome desktop)
+ *   - PWA Share Target (pre-populated via rastrum:files-dropped event)
+ *
+ * Dispatches `rastrum:files-dropped` CustomEvent with `{ files: File[] }`.
+ */
+
+interface Props {
+  lang: 'en' | 'es';
+  /** Optional extra CSS classes for the container */
+  class?: string;
+}
+
+const { lang, class: extraClass = '' } = Astro.props;
+const isEs = lang === 'es';
+
+const dropLabel      = isEs ? 'Suelta fotos, audio o video aquí' : 'Drop photos, audio, or video here';
+const tapLabel       = isEs ? 'Toca para seleccionar archivos' : 'Tap to select files';
+const orLabel        = isEs ? 'o' : 'or';
+const captureLabel   = isEs ? 'Capturar' : 'Capture';
+const galleryLabel   = isEs ? 'Galería' : 'Gallery';
+const audioLabel     = isEs ? 'Grabar audio' : 'Record audio';
+const dragOverLabel  = isEs ? 'Suelta los archivos' : 'Drop files here';
+const pasteHint      = isEs ? 'También puedes pegar (Ctrl+V)' : 'You can also paste (Ctrl+V)';
+---
+
+<div
+  id="drop-zone-root"
+  class={`relative rounded-2xl border-2 border-dashed border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/40 transition-all ${extraClass}`}
+  aria-label={dropLabel}
+  role="region"
+>
+  <!-- Hidden file inputs -->
+  <input id="dz-capture-input" type="file" accept="image/*,audio/*,video/*" capture="environment" multiple class="sr-only" aria-label={captureLabel} />
+  <input id="dz-gallery-input" type="file" accept="image/*,audio/*,video/*" multiple class="sr-only" aria-label={galleryLabel} />
+  <input id="dz-audio-input"   type="file" accept="audio/*" class="sr-only" aria-label={audioLabel} />
+
+  <!-- Default state -->
+  <div id="dz-default" class="flex flex-col items-center justify-center gap-3 px-6 py-10 text-center">
+    <!-- Upload icon -->
+    <div class="w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+      <svg class="w-7 h-7 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
+      </svg>
+    </div>
+
+    <div>
+      <p class="text-sm font-medium text-zinc-700 dark:text-zinc-300">{dropLabel}</p>
+      <p class="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">{tapLabel}</p>
+    </div>
+
+    <!-- Action buttons row -->
+    <div class="flex flex-wrap items-center justify-center gap-2 mt-1">
+      <button id="dz-capture-btn" type="button"
+        class="flex items-center gap-1.5 rounded-lg border border-emerald-600/50 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
+      >
+        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+        {captureLabel}
+      </button>
+
+      <span class="text-xs text-zinc-400">{orLabel}</span>
+
+      <button id="dz-gallery-btn" type="button"
+        class="flex items-center gap-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors"
+      >
+        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"/>
+        </svg>
+        {galleryLabel}
+      </button>
+
+      <button id="dz-audio-btn" type="button"
+        class="flex items-center gap-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors"
+      >
+        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"/>
+        </svg>
+        {audioLabel}
+      </button>
+    </div>
+
+    <p class="text-[10px] text-zinc-400 dark:text-zinc-600 mt-1">{pasteHint}</p>
+  </div>
+
+  <!-- Drag-over overlay -->
+  <div id="dz-dragover" class="hidden absolute inset-0 rounded-2xl flex items-center justify-center bg-emerald-500/10 border-2 border-emerald-500">
+    <p class="text-sm font-semibold text-emerald-700 dark:text-emerald-300">{dragOverLabel}</p>
+  </div>
+
+  <!-- Preview thumbnails (populated by JS) -->
+  <div id="dz-previews" class="hidden px-4 pb-4 flex flex-wrap gap-2"></div>
+</div>
+
+<script>
+const root      = document.getElementById('drop-zone-root');
+const defaultEl = document.getElementById('dz-default');
+const dragover  = document.getElementById('dz-dragover');
+const previews  = document.getElementById('dz-previews');
+const capBtn    = document.getElementById('dz-capture-btn');
+const galBtn    = document.getElementById('dz-gallery-btn');
+const audBtn    = document.getElementById('dz-audio-btn');
+const capInput  = document.getElementById('dz-capture-input') as HTMLInputElement | null;
+const galInput  = document.getElementById('dz-gallery-input') as HTMLInputElement | null;
+const audInput  = document.getElementById('dz-audio-input')   as HTMLInputElement | null;
+
+// ── Button → input wiring ──────────────────────────────────────────────────
+capBtn?.addEventListener('click', () => capInput?.click());
+galBtn?.addEventListener('click', () => galInput?.click());
+audBtn?.addEventListener('click', () => audInput?.click());
+
+function onInputChange(input: HTMLInputElement | null) {
+  return () => {
+    if (!input?.files?.length) return;
+    dispatch(Array.from(input.files));
+    input.value = '';
+  };
+}
+capInput?.addEventListener('change', onInputChange(capInput));
+galInput?.addEventListener('change', onInputChange(galInput));
+audInput?.addEventListener('change', onInputChange(audInput));
+
+// ── Drag & drop ────────────────────────────────────────────────────────────
+root?.addEventListener('dragenter', (e) => { e.preventDefault(); dragover?.classList.remove('hidden'); });
+root?.addEventListener('dragleave', (e) => { if (!root.contains(e.relatedTarget as Node)) dragover?.classList.add('hidden'); });
+root?.addEventListener('dragover', (e) => e.preventDefault());
+root?.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dragover?.classList.add('hidden');
+  const files = Array.from(e.dataTransfer?.files ?? []);
+  if (files.length) dispatch(files);
+});
+
+// ── Paste (Ctrl+V) — desktop Chrome ────────────────────────────────────────
+document.addEventListener('paste', (e) => {
+  // Only if drop-zone is visible/relevant
+  if (!root) return;
+  const items = Array.from(e.clipboardData?.items ?? []);
+  const files = items
+    .filter(i => i.kind === 'file')
+    .map(i => i.getAsFile())
+    .filter(Boolean) as File[];
+  if (files.length) dispatch(files);
+});
+
+// ── Dispatch event ─────────────────────────────────────────────────────────
+function dispatch(files: File[]) {
+  document.dispatchEvent(new CustomEvent('rastrum:files-dropped', { detail: { files } }));
+  showPreviews(files);
+}
+
+// ── Thumbnail previews ─────────────────────────────────────────────────────
+function showPreviews(files: File[]) {
+  if (!previews || !defaultEl) return;
+  defaultEl.classList.add('hidden');
+  previews.classList.remove('hidden');
+  previews.classList.add('flex');
+
+  for (const file of files) {
+    const thumb = document.createElement('div');
+    thumb.className = 'relative w-16 h-16 rounded-lg overflow-hidden bg-zinc-200 dark:bg-zinc-800 shrink-0';
+
+    if (file.type.startsWith('image/')) {
+      const img = document.createElement('img');
+      img.src = URL.createObjectURL(file);
+      img.className = 'w-full h-full object-cover';
+      img.alt = file.name;
+      thumb.appendChild(img);
+    } else if (file.type.startsWith('audio/')) {
+      thumb.innerHTML = '<div class="w-full h-full flex items-center justify-center text-2xl">🎵</div>';
+    } else if (file.type.startsWith('video/')) {
+      thumb.innerHTML = '<div class="w-full h-full flex items-center justify-center text-2xl">🎬</div>';
+    } else {
+      thumb.innerHTML = '<div class="w-full h-full flex items-center justify-center text-2xl">📄</div>';
+    }
+
+    previews.appendChild(thumb);
+  }
+}
+</script>

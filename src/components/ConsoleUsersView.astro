@@ -20,11 +20,17 @@ const tr = t(lang);
   <div id="users-shell" class="hidden grid grid-cols-1 md:grid-cols-[280px_1fr] gap-4 h-[calc(100vh-140px)]">
     <!-- Left: user list -->
     <aside class="flex flex-col border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden">
-      <div class="p-2 border-b border-zinc-200 dark:border-zinc-800">
+      <div class="p-2 border-b border-zinc-200 dark:border-zinc-800 space-y-1.5">
         <input
           id="users-search"
           type="search"
           placeholder={tr.console.users_search_placeholder}
+          class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm"
+        />
+        <input
+          id="users-search-email"
+          type="search"
+          placeholder={tr.console.users_search_email_placeholder}
           class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm"
         />
       </div>
@@ -41,12 +47,16 @@ const tr = t(lang);
       <div>
         <div id="detail-name" class="text-lg font-semibold text-zinc-900 dark:text-zinc-100"></div>
         <div id="detail-username" class="text-sm text-zinc-500"></div>
-        <div id="detail-email" class="text-xs text-zinc-400 mt-0.5"></div>
       </div>
 
       <div>
         <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-2">{tr.console.users_roles_heading}</h3>
         <div id="detail-roles" class="flex flex-wrap gap-2"></div>
+      </div>
+
+      <div id="detail-identity-section" class="hidden">
+        <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-2">{tr.console.users_identity_heading}</h3>
+        <dl id="detail-identity" class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm text-zinc-700 dark:text-zinc-300"></dl>
       </div>
 
       <div>
@@ -99,7 +109,6 @@ const tr = t(lang);
     username: string | null;
     display_name: string | null;
     avatar_url: string | null;
-    email: string | null;
   };
 
   type RoleRow = {
@@ -151,7 +160,7 @@ const tr = t(lang);
 
     let query = supabase
       .from('users')
-      .select('id, username, display_name, avatar_url, email')
+      .select('id, username, display_name, avatar_url')
       .limit(50)
       .order('username', { ascending: true });
 
@@ -213,12 +222,11 @@ const tr = t(lang);
     show('users-detail');
     const nameEl = document.getElementById('detail-name')!;
     const unameEl = document.getElementById('detail-username')!;
-    const emailEl = document.getElementById('detail-email')!;
     nameEl.textContent = u.display_name ?? u.username ?? u.id;
     unameEl.textContent = u.username ? `@${u.username}` : '';
-    emailEl.textContent = u.email ?? '';
     renderRoleChips(userId);
     loadActivity(userId);
+    loadIdentityDetail(userId);
   }
 
   function renderRoleChips(userId: string) {
@@ -246,7 +254,9 @@ const tr = t(lang);
     try {
       const [obsResult, rgResult, trustResult] = await Promise.all([
         supabase.from('observations').select('id', { count: 'exact', head: true }).eq('observer_id', userId),
-        supabase.from('identifications').select('id', { count: 'exact', head: true }).eq('identifier_id', userId).eq('quality_grade', 'research'),
+        // identifications table uses validated_by (uuid) and is_research_grade (boolean)
+        // identifier_id and quality_grade do not exist in this schema
+        supabase.from('identifications').select('id', { count: 'exact', head: true }).eq('validated_by', userId).eq('is_research_grade', true),
         supabase.rpc('compute_moderator_trust_score', { p_user_id: userId }),
       ]);
 
@@ -267,6 +277,35 @@ const tr = t(lang);
       console.warn('console: loadActivity failed', err);
       const msg = dl.dataset.failedMsg ?? 'Could not load activity stats.';
       dl.innerHTML = `<dt class="text-zinc-500 col-span-2 text-sm">${msg}</dt>`;
+    }
+  }
+
+  async function loadIdentityDetail(userId: string) {
+    const section = document.getElementById('detail-identity-section')!;
+    const dl = document.getElementById('detail-identity')!;
+    section.classList.add('hidden');
+    dl.innerHTML = '<dt class="text-zinc-500 col-span-2 text-xs italic">Loading…</dt>';
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) return;
+
+    try {
+      const result = await adminClient.user.detail({ user_id: userId }, 'view user identity (admin console)', session.access_token);
+      section.classList.remove('hidden');
+      const fmtDate = (s: string | null) => s ? new Date(s).toLocaleDateString() : '—';
+      const emailRow = `
+        <dt class="text-zinc-500 text-xs">Email</dt>
+        <dd class="text-xs font-mono">${escHtml(result.email ?? '—')}${result.email_confirmed_at ? ` <span class="text-zinc-400">(confirmed ${fmtDate(result.email_confirmed_at)})</span>` : ''}</dd>
+      `;
+      const idRows = (result.identities ?? []).map(i => `
+        <dt class="text-zinc-500 text-xs pl-2 border-l-2 border-zinc-200 dark:border-zinc-700">${escHtml(i.provider)}</dt>
+        <dd class="text-xs">${escHtml(i.email ?? '—')} · <span class="text-zinc-400">added ${fmtDate(i.created_at)} · last sign-in ${fmtDate(i.last_sign_in_at)}</span></dd>
+      `).join('');
+      dl.innerHTML = emailRow + idRows;
+    } catch (err) {
+      console.warn('console: loadIdentityDetail failed', err);
+      section.classList.remove('hidden');
+      dl.innerHTML = '<dt class="text-zinc-400 text-xs col-span-2 italic">Identity info unavailable</dt>';
     }
   }
 
@@ -346,6 +385,38 @@ const tr = t(lang);
       writeFilterState({ q });
       loadUsers(q);
     }, 300);
+  });
+
+  // Email / user-ID search — calls the admin user.detail handler
+  let emailSearchTimer: ReturnType<typeof setTimeout> | null = null;
+  document.getElementById('users-search-email')?.addEventListener('input', (ev) => {
+    if (emailSearchTimer) clearTimeout(emailSearchTimer);
+    emailSearchTimer = setTimeout(async () => {
+      const raw = (ev.target as HTMLInputElement).value.trim();
+      if (!raw) return;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+      const payload = raw.includes('@') ? { email: raw } : { user_id: raw };
+      try {
+        const result = await adminClient.user.detail(payload, 'email/id lookup (admin console)', session.access_token);
+        // Find matching user in list or synthesize a fake row for display
+        const found = allUsers.find(u => u.id === result.id);
+        if (found) {
+          selectUser(found.id);
+        } else {
+          // User not in the current page; add to list and select
+          allUsers = [{ id: result.id, username: null, display_name: result.email ?? result.id, avatar_url: null }, ...allUsers];
+          renderList();
+          show('users-list');
+          selectUser(result.id);
+        }
+        hide('users-error');
+      } catch (err) {
+        const e = document.getElementById('users-error')!;
+        e.textContent = (err as Error).message;
+        show('users-error');
+      }
+    }, 400);
   });
 
   init().catch(err => {

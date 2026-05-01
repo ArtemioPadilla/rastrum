@@ -17,7 +17,7 @@ export interface ConsoleTab {
 }
 
 export const CONSOLE_TABS: ConsoleTab[] = [
-  // Admin (15)
+  // Admin (28 — 21 base + 7 entity browsers from PR16)
   { id: 'overview',       role: 'admin',     routeKey: 'console',                 i18nKey: 'console.overview',     icon: 'gauge',       phase: 1 },
   { id: 'users',          role: 'admin',     routeKey: 'consoleUsers',            i18nKey: 'console.users',        icon: 'users',       phase: 2 },
   { id: 'credentials',    role: 'admin',     routeKey: 'consoleCredentials',      i18nKey: 'console.credentials',  icon: 'shield-check',phase: 2 },
@@ -33,10 +33,23 @@ export const CONSOLE_TABS: ConsoleTab[] = [
   { id: 'audit',          role: 'admin',     routeKey: 'consoleAudit',            i18nKey: 'console.audit',        icon: 'scroll',      phase: 1 },
   { id: 'anomalies',      role: 'admin',     routeKey: 'consoleAnomalies',        i18nKey: 'console.anomalies',    icon: 'alert',       phase: 1 },
   { id: 'forensics',      role: 'admin',     routeKey: 'consoleForensics',        i18nKey: 'console.forensics',    icon: 'search',      phase: 1 },
+  { id: 'health',         role: 'admin',     routeKey: 'consoleHealth',           i18nKey: 'console.health',       icon: 'heart-pulse', phase: 1 },
+  { id: 'errors',         role: 'admin',     routeKey: 'consoleErrors',           i18nKey: 'console.errors',       icon: 'alert-triangle', phase: 1 },
   { id: 'features',       role: 'admin',     routeKey: 'consoleFeatureFlags',     i18nKey: 'console.features',     icon: 'toggle',      phase: 4 },
   { id: 'proposals',      role: 'admin',     routeKey: 'consoleProposals',        i18nKey: 'console.proposals',    icon: 'gavel',       phase: 1 },
   { id: 'webhooks',       role: 'admin',     routeKey: 'consoleWebhooks',         i18nKey: 'console.webhooks',     icon: 'plug',        phase: 1 },
   { id: 'bioblitz',       role: 'admin',     routeKey: 'consoleBioblitz',         i18nKey: 'console.bioblitz',     icon: 'calendar',    phase: 4 },
+  // Entity browsers (PR16) — admin observability over the 6 entities
+  // that previously required an SQL drop to inspect. Read-only; every
+  // action button on these tabs deep-links to the existing tab that owns
+  // the entity. Performance: server-side paginated, indexed hot-path.
+  { id: 'identifications',role: 'admin',     routeKey: 'consoleIdentifications',  i18nKey: 'console.identifications', icon: 'check-circle', phase: 1 },
+  { id: 'notifications',  role: 'admin',     routeKey: 'consoleNotifications',    i18nKey: 'console.notifications',   icon: 'bell',         phase: 1 },
+  { id: 'media',          role: 'admin',     routeKey: 'consoleMedia',            i18nKey: 'console.media',           icon: 'image',        phase: 1 },
+  { id: 'follows',        role: 'admin',     routeKey: 'consoleFollows',          i18nKey: 'console.follows',         icon: 'users',        phase: 1 },
+  { id: 'watchlists',     role: 'admin',     routeKey: 'consoleWatchlists',       i18nKey: 'console.watchlists',      icon: 'eye',          phase: 1 },
+  { id: 'projects',       role: 'admin',     routeKey: 'consoleProjects',         i18nKey: 'console.projects',        icon: 'map',          phase: 1 },
+  { id: 'taxon-changes',  role: 'admin',     routeKey: 'consoleTaxonChanges',     i18nKey: 'console.taxonChanges',    icon: 'history',      phase: 1 },
   // Moderator (5)
   { id: 'mod-overview',   role: 'moderator', routeKey: 'console',                 i18nKey: 'console.modOverview',   icon: 'gauge',      phase: 3 },
   { id: 'mod-flag-queue', role: 'moderator', routeKey: 'consoleModFlagQueue',     i18nKey: 'console.modFlagQueue',  icon: 'flag',       phase: 3 },

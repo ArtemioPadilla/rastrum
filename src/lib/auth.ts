@@ -234,3 +234,54 @@ export async function signOut() {
 export async function signOutEverywhere() {
   return getSupabase().auth.signOut({ scope: 'global' });
 }
+
+// ───────────────────── Identity linking (issue #286) ─────────────────────
+
+export interface LinkedIdentity {
+  provider: string;
+  email: string | null;
+  created_at: string | null;
+  last_sign_in_at: string | null;
+}
+
+/** Returns the list of OAuth identities linked to the current user. */
+export async function listMyIdentities(): Promise<LinkedIdentity[]> {
+  const sb = getSupabase();
+  const { data: { user }, error } = await sb.auth.getUser();
+  if (error || !user) return [];
+  return (user.identities ?? []).map((i) => ({
+    provider:        i.provider,
+    email:           (i.identity_data?.['email'] as string | undefined) ?? null,
+    created_at:      i.created_at ?? null,
+    last_sign_in_at: i.last_sign_in_at ?? null,
+  }));
+}
+
+/**
+ * Starts the OAuth link flow for the given provider.
+ * Supabase will redirect the user through OAuth and back to the
+ * current origin + /auth/callback/. The existing session is preserved;
+ * on return the new identity is added to auth.identities.
+ */
+export async function linkIdentity(provider: 'google' | 'github'): Promise<void> {
+  const sb = getSupabase();
+  const { error } = await sb.auth.linkIdentity({ provider });
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * Unlinks the specified OAuth provider from the current user.
+ * Blocks if it's the last remaining identity.
+ */
+export async function unlinkIdentity(provider: string): Promise<void> {
+  const sb = getSupabase();
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) throw new Error('not_authenticated');
+  if ((user.identities?.length ?? 0) <= 1) {
+    throw new Error('cannot_remove_last_identity');
+  }
+  const identity = user.identities?.find(i => i.provider === provider);
+  if (!identity) throw new Error('identity_not_linked');
+  const { error } = await sb.auth.unlinkIdentity(identity);
+  if (error) throw new Error(error.message);
+}

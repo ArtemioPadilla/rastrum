@@ -88,9 +88,9 @@ See `docs/specs/infra/supabase-schema.sql` for canonical SQL. Tables:
 | Identification overrides | expert | stub | deferred |
 | Taxon notes | expert | stub | deferred |
 
-**Functional: 28 of 30 console tabs after PR14. Deferred stubs: License disputes, Identification overrides, Taxon notes — no concrete users yet.**
+**Functional: 36 of 39 console tabs after PR16 (+ 7 admin entity browsers, no new stubs). Deferred stubs: License disputes, Identification overrides, Taxon notes — no concrete users yet.**
 
-### Tabs added in PR9-PR14
+### Tabs added in PR9-PR15
 
 | Tab | Role | Status | Shipped in |
 |---|---|---|---|
@@ -99,6 +99,8 @@ See `docs/specs/infra/supabase-schema.sql` for canonical SQL. Tables:
 | Forensics | admin | done | PR12 |
 | Proposals | admin | done | PR13 |
 | Webhooks | admin | done | PR13 |
+| Health | admin | done | PR15 |
+| Errors | admin | done | PR15 |
 
 ## Cron jobs added in PR12-PR14
 
@@ -111,7 +113,7 @@ See `docs/specs/infra/supabase-schema.sql` for canonical SQL. Tables:
 | `reconcile-webhook-deliveries` | `*/2 * * * *` | `reconcile_webhook_deliveries()` | PR14 |
 | `admin-observability-dryrun` (GH Actions) | `13 9 * * 1` (+ one-shot 2026-05-06) | psql query suite | PR14 |
 
-## Edge Function handlers (32 deployed after PR14)
+## Edge Function handlers (36 deployed after PR15)
 
 | Action verb | Required role | Audit op | Shipped in |
 |---|---|---|---|
@@ -147,6 +149,10 @@ See `docs/specs/infra/supabase-schema.sql` for canonical SQL. Tables:
 | webhook.update | admin | webhook_update | PR13 |
 | webhook.delete | admin | webhook_delete | PR13 |
 | webhook.test | admin | webhook_test | PR13 |
+| webhook.replay_delivery | admin | webhook_replay | PR15 |
+| health.recompute | admin | health_recompute | PR15 |
+| error.acknowledge | admin | error_acknowledge | PR15 |
+| error.acknowledge_bulk | admin | error_acknowledge_bulk | PR15 |
 
 ## v1.1 deferred-cleanup primitives (PR14)
 
@@ -167,3 +173,33 @@ placeholder to real formula:
 - **`compute_moderator_trust_score()` v1.1** — `70 - 8·unack_30d - 25·overturn_rate + 30·min(1, sqrt(active_days_90d/30)) + 5·acted_in_last_7_days`, clamped 0-100. Bumping the formula requires bumping the in-function version comment AND shipping a runbook entry.
 - **Per-admin timezone for off_hours** — `users.timezone` (nullable IANA, defaults to UTC). Profile → Edit picker covers UTC + 8 LATAM/EU zones.
 - **Durable observability dry-run** — `.github/workflows/admin-observability-dryrun.yml` runs once on 2026-05-06 09:13 UTC and weekly Mondays thereafter. Fails red if any webhook delivery has been pending > 5 minutes — that's the silent-failure tripwire for the whole console subsystem.
+
+## Tabs added in PR16 (admin entity browsers)
+
+PR16 closes the read-only observability gap with seven paginated entity
+browsers built on a shared `ConsoleEntityBrowser` template +
+`entity-browser.ts` runtime. Every browser is admin-only, phase-1,
+non-stub, server-side paginated (50 rows/page), with auto-populated
+dropdown facets, URL-driven filter state, and lazy drill-downs.
+
+| Tab | Role | Status | Backing source | Shipped in |
+|---|---|---|---|---|
+| Identifications | admin | done | `identifications` | PR16 |
+| Notifications | admin | done | `notifications` | PR16 |
+| Media | admin | done | `media_files` | PR16 |
+| Follows | admin | done | `follows` | PR16 |
+| Watchlists | admin | done | `watchlists` | PR16 |
+| Projects | admin | done | `projects_with_geojson` | PR16 |
+| Taxon changes | admin | done | `admin_audit` (filtered to taxon_* ops) | PR16 |
+
+Adds idempotent `(filter_field, created_at DESC)` indexes on each table
+and two privacy-neutral admin-SELECT policies (`notif_admin_read`,
+`watchlists_admin_read`). No new tables, no new cron, no new edge
+function handlers — every browser is a `select-only` view layer over
+existing schema.
+
+Per-browser composite-PK handling: `follows` keys on
+`(follower_id, followee_id)`, so it provides a `rowIdFromRow` to the
+runtime for stable drill-down expansion. Same pattern is available for
+any future composite-key browser. Runbook:
+[`docs/runbooks/admin-entity-browsers.md`](../../runbooks/admin-entity-browsers.md).

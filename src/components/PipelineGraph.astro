@@ -1,0 +1,264 @@
+---
+/**
+ * PipelineGraph.astro — Animated SVG DAG for Observe 2.0 pipeline visualization
+ *
+ * Listens for `rastrum:pipeline-update` CustomEvent and re-renders node states.
+ * Nodes: grey=pending, blue pulse=running, green=done, red=failed, dim=skipped.
+ *
+ * Layout: inputs (left) → identify (center) → merge → location → save (right).
+ * For N > 3 files of same type, collapses into a single grouped node.
+ */
+
+interface Props {
+  lang: 'en' | 'es';
+}
+const { lang } = Astro.props;
+const isEs = lang === 'es';
+
+const labels = {
+  pending:  isEs ? 'Pendiente'    : 'Pending',
+  running:  isEs ? 'Procesando'   : 'Processing',
+  done:     isEs ? 'Listo'        : 'Done',
+  failed:   isEs ? 'Error'        : 'Failed',
+  skipped:  isEs ? 'Omitido'      : 'Skipped',
+  tapHint:  isEs ? 'Toca un nodo para detalles' : 'Tap a node for details',
+  noNodes:  isEs ? 'Esperando archivos…' : 'Waiting for files…',
+};
+---
+
+<div class="pipeline-graph-wrapper relative">
+  <!-- SVG canvas — resized by JS -->
+  <svg
+    id="pipeline-svg"
+    class="w-full overflow-visible"
+    xmlns="http://www.w3.org/2000/svg"
+    aria-label={isEs ? 'Grafo del pipeline de identificación' : 'Identification pipeline graph'}
+    role="img"
+  >
+    <!-- Rendered by JS -->
+    <text id="pg-empty-msg" x="50%" y="50%" text-anchor="middle" dominant-baseline="middle"
+      class="text-xs fill-zinc-400 dark:fill-zinc-500" font-size="12">
+      {labels.noNodes}
+    </text>
+  </svg>
+
+  <!-- Node detail tooltip -->
+  <div id="pg-tooltip"
+    class="hidden absolute z-10 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-lg p-3 text-xs max-w-[220px] pointer-events-none"
+    role="tooltip"
+  ></div>
+
+  <!-- Tap hint -->
+  <p class="text-[10px] text-center text-zinc-400 dark:text-zinc-600 mt-1">{labels.tapHint}</p>
+</div>
+
+<style>
+  @keyframes pg-pulse {
+    0%, 100% { opacity: 1; r: 6px; }
+    50%       { opacity: 0.6; r: 8px; }
+  }
+  .pg-pulse-ring { animation: pg-pulse 1.2s ease-in-out infinite; }
+</style>
+
+<script>
+import type { PipelineNode } from '../lib/pipeline-engine';
+
+const svg     = document.getElementById('pipeline-svg') as SVGSVGElement | null;
+const tooltip = document.getElementById('pg-tooltip');
+const emptyMsg = document.getElementById('pg-empty-msg');
+
+// Color palette (dark-mode safe via CSS vars via hardcoded safe values)
+const COLORS = {
+  pending:  { fill: '#d4d4d8', stroke: '#a1a1aa', text: '#71717a' },  // zinc-300/400/500
+  running:  { fill: '#93c5fd', stroke: '#3b82f6', text: '#1d4ed8' },  // blue
+  done:     { fill: '#6ee7b7', stroke: '#10b981', text: '#065f46' },  // emerald
+  failed:   { fill: '#fca5a5', stroke: '#ef4444', text: '#991b1b' },  // red
+  skipped:  { fill: '#e4e4e7', stroke: '#d4d4d8', text: '#a1a1aa' },  // dim zinc
+};
+
+interface LayoutNode {
+  node: PipelineNode;
+  x: number;
+  y: number;
+  col: number;
+  row: number;
+}
+
+function layoutNodes(nodes: PipelineNode[]): LayoutNode[] {
+  if (!nodes.length) return [];
+
+  // Group by column: inputs(0), identify(1), merge(2), location(3), save(4)
+  const COL: Record<string, number> = {
+    input: 0, identify: 1, merge: 2, location: 3, save: 4,
+  };
+
+  const cols: PipelineNode[][] = [[], [], [], [], []];
+  for (const n of nodes) {
+    const c = COL[n.kind] ?? 2;
+    cols[c].push(n);
+  }
+
+  const COL_X = [60, 160, 280, 380, 480];
+  const ROW_H = 60;
+  const BASE_Y = 40;
+
+  const layout: LayoutNode[] = [];
+  for (let c = 0; c < cols.length; c++) {
+    const col = cols[c];
+    for (let r = 0; r < col.length; r++) {
+      const totalH = (col.length - 1) * ROW_H;
+      const y = BASE_Y + r * ROW_H - totalH / 2 + 80;
+      layout.push({ node: col[r], x: COL_X[c], y, col: c, row: r });
+    }
+  }
+  return layout;
+}
+
+function ns(tag: string): SVGElement {
+  return document.createElementNS('http://www.w3.org/2000/svg', tag);
+}
+
+function renderGraph(nodes: PipelineNode[]) {
+  if (!svg) return;
+
+  // Clear previous render (keep empty msg)
+  Array.from(svg.children).forEach(c => {
+    if (c.id !== 'pg-empty-msg') c.remove();
+  });
+
+  if (!nodes.length) {
+    emptyMsg?.removeAttribute('display');
+    return;
+  }
+  emptyMsg?.setAttribute('display', 'none');
+
+  const layout = layoutNodes(nodes);
+  const byId = new Map(layout.map(l => [l.node.id, l]));
+
+  // Height
+  const maxY = Math.max(...layout.map(l => l.y)) + 60;
+  svg.setAttribute('height', String(maxY));
+  svg.setAttribute('viewBox', `0 0 540 ${maxY}`);
+
+  // Draw edges first
+  for (const l of layout) {
+    for (const depId of l.node.dependsOn) {
+      const dep = byId.get(depId);
+      if (!dep) continue;
+      const line = ns('line') as SVGLineElement;
+      line.setAttribute('x1', String(dep.x + 24));
+      line.setAttribute('y1', String(dep.y));
+      line.setAttribute('x2', String(l.x - 24));
+      line.setAttribute('y2', String(l.y));
+      line.setAttribute('stroke', '#d4d4d8');
+      line.setAttribute('stroke-width', '1.5');
+      line.setAttribute('stroke-dasharray', l.node.state === 'pending' ? '4 3' : 'none');
+      svg.appendChild(line);
+    }
+  }
+
+  // Draw nodes
+  for (const l of layout) {
+    const n = l.node;
+    const color = COLORS[n.state] ?? COLORS.pending;
+    const g = ns('g') as SVGGElement;
+    g.setAttribute('transform', `translate(${l.x},${l.y})`);
+    g.style.cursor = 'pointer';
+    g.setAttribute('role', 'button');
+    g.setAttribute('tabindex', '0');
+    g.setAttribute('aria-label', `${n.label}: ${n.state}`);
+
+    // Pulse ring for running
+    if (n.state === 'running') {
+      const pulse = ns('circle') as SVGCircleElement;
+      pulse.setAttribute('r', '20');
+      pulse.setAttribute('fill', color.stroke);
+      pulse.setAttribute('opacity', '0.2');
+      pulse.classList.add('pg-pulse-ring');
+      g.appendChild(pulse);
+    }
+
+    // Main circle
+    const circle = ns('circle') as SVGCircleElement;
+    circle.setAttribute('r', '18');
+    circle.setAttribute('fill', color.fill);
+    circle.setAttribute('stroke', color.stroke);
+    circle.setAttribute('stroke-width', '2');
+    g.appendChild(circle);
+
+    // State icon
+    const icon = stateIcon(n.state);
+    if (icon) {
+      const iconEl = ns('text') as SVGTextElement;
+      iconEl.setAttribute('text-anchor', 'middle');
+      iconEl.setAttribute('dominant-baseline', 'middle');
+      iconEl.setAttribute('font-size', '12');
+      iconEl.textContent = icon;
+      g.appendChild(iconEl);
+    }
+
+    // Label below
+    const label = ns('text') as SVGTextElement;
+    label.setAttribute('text-anchor', 'middle');
+    label.setAttribute('dominant-baseline', 'middle');
+    label.setAttribute('y', '30');
+    label.setAttribute('font-size', '9');
+    label.setAttribute('fill', color.text);
+    label.textContent = truncate(n.label, 14);
+    g.appendChild(label);
+
+    // Tooltip on click/tap
+    g.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showTooltip(n, l.x, l.y);
+    });
+
+    svg.appendChild(g);
+  }
+}
+
+function stateIcon(state: string): string {
+  if (state === 'done')    return '✓';
+  if (state === 'failed')  return '✗';
+  if (state === 'running') return '⟳';
+  if (state === 'skipped') return '–';
+  return '';
+}
+
+function truncate(s: string, max: number): string {
+  return s.length > max ? s.slice(0, max - 1) + '…' : s;
+}
+
+function showTooltip(node: PipelineNode, x: number, y: number) {
+  if (!tooltip || !svg) return;
+  const svgRect = svg.getBoundingClientRect();
+  const scale = svgRect.width / (parseFloat(svg.getAttribute('viewBox')?.split(' ')[2] ?? '540') || 540);
+
+  tooltip.style.left = `${x * scale + 20}px`;
+  tooltip.style.top  = `${y * scale - 20}px`;
+  tooltip.classList.remove('hidden');
+
+  let html = `<strong class="text-zinc-900 dark:text-zinc-100">${node.label}</strong>`;
+  html += `<br><span class="text-zinc-500 capitalize">${node.state}</span>`;
+  if (node.runner)  html += `<br><span class="text-zinc-400">Runner: ${node.runner}</span>`;
+  if (node.output) {
+    html += `<br><span class="italic text-emerald-700 dark:text-emerald-400">${node.output.scientific_name}</span>`;
+    if (node.output.confidence) {
+      html += ` <span class="text-zinc-400">${Math.round(node.output.confidence * 100)}%</span>`;
+    }
+  }
+  if (node.error) {
+    html += `<br><span class="text-red-500">${node.error}</span>`;
+  }
+  tooltip.innerHTML = html;
+}
+
+// Dismiss tooltip on outside click
+document.addEventListener('click', () => tooltip?.classList.add('hidden'));
+
+// ── Listen for pipeline updates ─────────────────────────────────────────────
+document.addEventListener('rastrum:pipeline-update', (e: Event) => {
+  const ev = e as CustomEvent<{ nodes: PipelineNode[] }>;
+  renderGraph(ev.detail.nodes);
+});
+</script>

@@ -132,6 +132,9 @@ const fCols = (forensicsNs?.columns as Record<string, string>) ?? {};
     'vault_failure',
     'anomaly_acknowledge',
     'audit_export',
+    'health_recompute',
+    'error_acknowledge', 'error_acknowledge_bulk',
+    'webhook_replay',
   ];
 
   let jwt: string | null = null;

@@ -14,6 +14,7 @@ import { willDemote, type PhotoForDeletion } from './photo-deletion';
 import { resizeImage, uploadMedia } from './upload';
 import { escapeHtml as escAttr } from './escape';
 import { t } from '../i18n/utils';
+import { openConfirmDialog } from './confirm-dialog';
 
 type Ident = { scientific_name?: string; is_primary?: boolean } | undefined;
 
@@ -219,6 +220,8 @@ type PhotoRow = PhotoForDeletion & {
 type PhotosCopy = {
   delete_confirm_demote: string;
   delete_confirm_simple: string;
+  delete_confirm_title: string;
+  delete_confirm_label: string;
   upload_failed: string;
   uploading: string;
   delete_photo_aria: string;
@@ -261,6 +264,8 @@ export async function wireManagePanelPhotos(obsId: string): Promise<void> {
     ? {
         delete_confirm_demote: 'Esta foto fue la base de la identificación actual. Eliminarla marcará la observación como pendiente de revisión. ¿Continuar?',
         delete_confirm_simple: '¿Eliminar esta foto?',
+        delete_confirm_title:  'Eliminar foto',
+        delete_confirm_label:  'Eliminar',
         upload_failed:         'Subida de foto fallida. Intenta de nuevo.',
         uploading:             'Subiendo…',
         delete_photo_aria:     'Eliminar foto',
@@ -268,6 +273,8 @@ export async function wireManagePanelPhotos(obsId: string): Promise<void> {
     : {
         delete_confirm_demote: 'This photo was the basis for the current identification. Deleting it will mark the observation as needing review. Continue?',
         delete_confirm_simple: 'Delete this photo?',
+        delete_confirm_title:  'Delete photo',
+        delete_confirm_label:  'Delete',
         upload_failed:         'Photo upload failed. Please try again.',
         uploading:             'Uploading…',
         delete_photo_aria:     'Delete photo',
@@ -347,7 +354,13 @@ export async function wireManagePanelPhotos(obsId: string): Promise<void> {
     setError(null);
     const demote = willDemote(allPhotos, mediaId);
     const msg = demote ? copy.delete_confirm_demote : copy.delete_confirm_simple;
-    if (!window.confirm(msg)) return;
+    const ok = await openConfirmDialog({
+      title: copy.delete_confirm_title,
+      message: msg,
+      confirmLabel: copy.delete_confirm_label,
+      variant: 'danger',
+    });
+    if (!ok) return;
 
     const { data, error } = await supabase.functions.invoke<{ ok: boolean; error?: string }>(
       'delete-photo',
