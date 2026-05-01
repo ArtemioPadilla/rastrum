@@ -301,7 +301,7 @@ SELECT cron.schedule('vertex_token_expiry_monitor', '*/10 * * * *',
 
 -- ─────────────────────────────────────────────────────────────────
 -- v9 (2026-04-30): added 'gc-orphan-media' (Sundays 04:30 UTC)
---   for #285 — nightly R2 orphan blob GC.
+--   for #163 — R2 GC for soft-deleted media + orphan blobs.
 --   Token stored in vault under 'gc_orphan_media_cron_token'.
 -- ─────────────────────────────────────────────────────────────────
 SELECT cron.unschedule('gc_orphan_media')

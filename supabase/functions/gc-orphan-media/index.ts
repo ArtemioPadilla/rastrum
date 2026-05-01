@@ -1,8 +1,13 @@
 /**
  * gc-orphan-media — nightly cron Edge Function
  *
- * Lists R2 objects under known prefixes, cross-checks against DB references,
- * and deletes orphan blobs older than MIN_AGE_DAYS (default 30).
+ * Two-phase GC:
+ *   Phase 1 — Soft-deleted media: queries media_files rows where
+ *     deleted_at IS NOT NULL, deletes the corresponding R2 objects,
+ *     then hard-deletes the DB rows (only when R2 delete succeeds).
+ *   Phase 2 — Orphan blobs: lists R2 objects under known prefixes,
+ *     cross-checks against DB references, and deletes orphan blobs
+ *     older than MIN_AGE_DAYS (default 30).
  *
  * Deployed --no-verify-jwt (cron-only, no user-facing route).
  *
@@ -22,9 +27,14 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+const BATCH_SIZE = 50;
+const MAX_RETRIES = 2;
+const RETRY_DELAY_MS = 500;
+
 // ── R2 S3-compatible helpers ──────────────────────────────────────────────────
 
-/** Minimal AWS Sig-v4 for Cloudflare R2 (S3-compatible). */
 async function hmacSha256(key: ArrayBuffer, data: string): Promise<ArrayBuffer> {
   const cryptoKey = await crypto.subtle.importKey('raw', key, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   return crypto.subtle.sign('HMAC', cryptoKey, new TextEncoder().encode(data));
@@ -115,7 +125,6 @@ async function listR2Objects(cfg: R2Config, prefix: string): Promise<R2Object[]>
     }
     const xml = await res.text();
 
-    // Parse XML — minimal hand-rolled parser to avoid Deno XML deps
     const keys = [...xml.matchAll(/<Key>([^<]+)<\/Key>/g)].map(m => m[1]);
     const sizes = [...xml.matchAll(/<Size>([^<]+)<\/Size>/g)].map(m => parseInt(m[1]));
     const dates = [...xml.matchAll(/<LastModified>([^<]+)<\/LastModified>/g)].map(m => m[1]);
@@ -143,6 +152,52 @@ async function deleteR2Object(cfg: R2Config, key: string): Promise<void> {
     const body = await res.text();
     throw new Error(`R2 delete failed for ${key} (${res.status}): ${body}`);
   }
+}
+
+/** Retry an R2 delete up to MAX_RETRIES times with a short delay. */
+async function deleteR2ObjectWithRetry(cfg: R2Config, key: string): Promise<void> {
+  let lastErr: Error | undefined;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      await deleteR2Object(cfg, key);
+      return;
+    } catch (err) {
+      lastErr = err as Error;
+      if (attempt < MAX_RETRIES) {
+        await new Promise(r => setTimeout(r, RETRY_DELAY_MS * (attempt + 1)));
+      }
+    }
+  }
+  throw lastErr;
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Extract the R2 object key from a media_files.url value.
+ * URLs look like: https://media.rastrum.org/observations/<obs-id>/<blob-id>.jpg
+ * The key is the path after the host: observations/<obs-id>/<blob-id>.jpg
+ */
+function r2KeyFromUrl(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    // Strip leading slash from pathname
+    const key = parsed.pathname.replace(/^\//, '');
+    return key || null;
+  } catch {
+    // Bare key (no protocol) — return as-is if it looks like a path
+    if (url.includes('/') && !url.startsWith('http')) return url;
+    return null;
+  }
+}
+
+/** Process an array in chunks of `size`. */
+function chunk<T>(arr: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) {
+    chunks.push(arr.slice(i, i + size));
+  }
+  return chunks;
 }
 
 // ── Edge Function handler ─────────────────────────────────────────────────────
@@ -182,10 +237,111 @@ Deno.serve(async (_req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
   );
 
+  // ── Phase 1: Soft-deleted media_files ─────────────────────────────────────
+  // Query rows where deleted_at IS NOT NULL, delete R2 objects, then
+  // hard-delete the DB rows. Only hard-delete when R2 succeeds — if R2
+  // fails, the row stays so the next run retries.
+
+  const softDeleteResult = {
+    found: 0,
+    r2Deleted: 0,
+    rowsHardDeleted: 0,
+    bytesFreed: 0,
+    errors: [] as string[],
+    durationMs: 0,
+  };
+
+  const phase1Start = Date.now();
+  try {
+    const { data: softDeleted, error: queryErr } = await admin
+      .from('media_files')
+      .select('id, url, file_size_bytes, deleted_at')
+      .not('deleted_at', 'is', null)
+      .order('deleted_at', { ascending: true })
+      .limit(500);
+
+    if (queryErr) throw new Error(`soft-delete query failed: ${queryErr.message}`);
+
+    const rows = softDeleted ?? [];
+    softDeleteResult.found = rows.length;
+    console.log(`gc-orphan-media: [phase1] found ${rows.length} soft-deleted media_files`);
+
+    const batches = chunk(rows, BATCH_SIZE);
+    for (const batch of batches) {
+      const hardDeleteIds: string[] = [];
+
+      for (const row of batch) {
+        const key = r2KeyFromUrl(row.url);
+        if (!key) {
+          console.warn(`gc-orphan-media: [phase1] cannot extract R2 key from url: ${row.url}`);
+          softDeleteResult.errors.push(`bad_url:${row.id}`);
+          continue;
+        }
+
+        if (dryRun) {
+          console.log(`gc-orphan-media: [phase1][DRY RUN] would delete R2 key=${key} media_id=${row.id}`);
+          softDeleteResult.r2Deleted++;
+          softDeleteResult.bytesFreed += row.file_size_bytes ?? 0;
+          hardDeleteIds.push(row.id);
+          continue;
+        }
+
+        try {
+          await deleteR2ObjectWithRetry(cfg, key);
+          console.log(`gc-orphan-media: [phase1] deleted R2 key=${key} media_id=${row.id} (${row.file_size_bytes ?? 0} bytes)`);
+          softDeleteResult.r2Deleted++;
+          softDeleteResult.bytesFreed += row.file_size_bytes ?? 0;
+          hardDeleteIds.push(row.id);
+        } catch (err) {
+          const msg = (err as Error).message;
+          console.error(`gc-orphan-media: [phase1] R2 delete failed for ${key} (media_id=${row.id}), skipping hard-delete: ${msg}`);
+          softDeleteResult.errors.push(`${row.id}:${msg}`);
+          // Do NOT hard-delete — next run will retry
+        }
+      }
+
+      // Hard-delete only the rows whose R2 objects were successfully removed
+      if (hardDeleteIds.length > 0 && !dryRun) {
+        const { error: delErr, count } = await admin
+          .from('media_files')
+          .delete({ count: 'exact' })
+          .in('id', hardDeleteIds);
+        if (delErr) {
+          console.error(`gc-orphan-media: [phase1] hard-delete failed: ${delErr.message}`);
+          softDeleteResult.errors.push(`hard_delete:${delErr.message}`);
+        } else {
+          softDeleteResult.rowsHardDeleted += count ?? hardDeleteIds.length;
+        }
+      } else if (dryRun && hardDeleteIds.length > 0) {
+        console.log(`gc-orphan-media: [phase1][DRY RUN] would hard-delete ${hardDeleteIds.length} media_files rows`);
+        softDeleteResult.rowsHardDeleted += hardDeleteIds.length;
+      }
+    }
+  } catch (err) {
+    const msg = (err as Error).message;
+    console.error(`gc-orphan-media: [phase1] failed: ${msg}`);
+    softDeleteResult.errors.push(msg);
+  }
+  softDeleteResult.durationMs = Date.now() - phase1Start;
+
+  // Write phase 1 audit log
+  await admin.from('gc_orphan_media_log').insert({
+    prefix: 'soft-deleted',
+    scanned: softDeleteResult.found,
+    deleted: softDeleteResult.rowsHardDeleted,
+    bytes_freed: softDeleteResult.bytesFreed,
+    errors: softDeleteResult.errors.length,
+    duration_ms: softDeleteResult.durationMs,
+    notes: dryRun ? 'dry_run=true' : null,
+  }).then(({ error }) => {
+    if (error) console.warn(`gc-orphan-media: audit log insert failed: ${error.message}`);
+  });
+
+  // ── Phase 2: Orphan R2 blobs ──────────────────────────────────────────────
   // Prefixes to scan (og/ is whitelisted — cheap to regen, skip GC)
   const PREFIXES = ['observations/', 'avatars/'];
 
-  const results: Array<{
+  const orphanResults: Array<{
     prefix: string;
     scanned: number;
     deleted: number;
@@ -203,20 +359,23 @@ Deno.serve(async (_req) => {
     const errors: string[] = [];
 
     try {
-      // 1. List all R2 objects under this prefix
       const objects = await listR2Objects(cfg, prefix);
-      console.log(`gc-orphan-media: [${prefix}] found ${objects.length} objects`);
+      console.log(`gc-orphan-media: [phase2][${prefix}] found ${objects.length} objects`);
 
-      // 2. Build referenced keys set from DB
+      // Build referenced keys set from DB — only include non-deleted rows
       const referencedKeys = new Set<string>();
 
       if (prefix === 'observations/') {
         const { data: mediaRows } = await admin
           .from('media_files')
-          .select('storage_key')
-          .not('storage_key', 'is', null);
+          .select('url')
+          .is('deleted_at', null)
+          .not('url', 'is', null);
         for (const row of mediaRows ?? []) {
-          if (row.storage_key) referencedKeys.add(row.storage_key);
+          if (row.url) {
+            const key = r2KeyFromUrl(row.url);
+            if (key) referencedKeys.add(key);
+          }
         }
       } else if (prefix === 'avatars/') {
         const { data: userRows } = await admin
@@ -225,38 +384,39 @@ Deno.serve(async (_req) => {
           .not('avatar_url', 'is', null);
         for (const row of userRows ?? []) {
           if (row.avatar_url) {
-            // Extract the key from a full URL or bare key
             const match = row.avatar_url.match(/avatars\/[^?#]+/);
             if (match) referencedKeys.add(match[0]);
           }
         }
       }
 
-      // 3. Process each object
-      for (const obj of objects) {
-        const isReferenced = referencedKeys.has(obj.key);
-        const isTooNew = obj.lastModified > cutoff;
+      // Process in batches
+      const objectBatches = chunk(objects, BATCH_SIZE);
+      for (const batch of objectBatches) {
+        for (const obj of batch) {
+          const isReferenced = referencedKeys.has(obj.key);
+          const isTooNew = obj.lastModified > cutoff;
 
-        if (isReferenced || isTooNew) {
-          skipped++;
-          continue;
-        }
+          if (isReferenced || isTooNew) {
+            skipped++;
+            continue;
+          }
 
-        // Orphan + old enough → delete
-        if (dryRun) {
-          console.log(`gc-orphan-media: [DRY RUN] would delete ${obj.key} (${obj.size} bytes, modified ${obj.lastModified.toISOString()})`);
-          deleted++;
-          bytesFreed += obj.size;
-        } else {
-          try {
-            await deleteR2Object(cfg, obj.key);
-            console.log(`gc-orphan-media: deleted ${obj.key} (${obj.size} bytes)`);
+          if (dryRun) {
+            console.log(`gc-orphan-media: [phase2][DRY RUN] would delete ${obj.key} (${obj.size} bytes, modified ${obj.lastModified.toISOString()})`);
             deleted++;
             bytesFreed += obj.size;
-          } catch (err) {
-            const msg = (err as Error).message;
-            console.error(`gc-orphan-media: failed to delete ${obj.key}: ${msg}`);
-            errors.push(`${obj.key}: ${msg}`);
+          } else {
+            try {
+              await deleteR2ObjectWithRetry(cfg, obj.key);
+              console.log(`gc-orphan-media: [phase2] deleted ${obj.key} (${obj.size} bytes)`);
+              deleted++;
+              bytesFreed += obj.size;
+            } catch (err) {
+              const msg = (err as Error).message;
+              console.error(`gc-orphan-media: [phase2] failed to delete ${obj.key}: ${msg}`);
+              errors.push(`${obj.key}: ${msg}`);
+            }
           }
         }
       }
@@ -270,9 +430,8 @@ Deno.serve(async (_req) => {
         errors,
         durationMs: Date.now() - prefixStart,
       };
-      results.push(prefixResult);
+      orphanResults.push(prefixResult);
 
-      // 4. Write log row to DB
       await admin.from('gc_orphan_media_log').insert({
         prefix,
         scanned: objects.length,
@@ -285,8 +444,8 @@ Deno.serve(async (_req) => {
 
     } catch (err) {
       const msg = (err as Error).message;
-      console.error(`gc-orphan-media: prefix ${prefix} failed: ${msg}`);
-      results.push({
+      console.error(`gc-orphan-media: [phase2] prefix ${prefix} failed: ${msg}`);
+      orphanResults.push({
         prefix,
         scanned: 0,
         deleted: 0,
@@ -298,20 +457,34 @@ Deno.serve(async (_req) => {
     }
   }
 
-  const totalDeleted = results.reduce((s, r) => s + r.deleted, 0);
-  const totalBytesFreed = results.reduce((s, r) => s + r.bytesFreed, 0);
-  const totalErrors = results.reduce((s, r) => s + r.errors.length, 0);
+  // ── Summary ───────────────────────────────────────────────────────────────
 
-  console.log(`gc-orphan-media: done — deleted=${totalDeleted} bytes_freed=${totalBytesFreed} errors=${totalErrors} duration=${Date.now() - startTime}ms`);
+  const totalDeleted = softDeleteResult.rowsHardDeleted + orphanResults.reduce((s, r) => s + r.deleted, 0);
+  const totalBytesFreed = softDeleteResult.bytesFreed + orphanResults.reduce((s, r) => s + r.bytesFreed, 0);
+  const totalErrors = softDeleteResult.errors.length + orphanResults.reduce((s, r) => s + r.errors.length, 0);
+
+  console.log(
+    `gc-orphan-media: done — phase1_deleted=${softDeleteResult.rowsHardDeleted} phase2_deleted=${orphanResults.reduce((s, r) => s + r.deleted, 0)} bytes_freed=${totalBytesFreed} errors=${totalErrors} duration=${Date.now() - startTime}ms`,
+  );
 
   return new Response(
     JSON.stringify({
       deleted: totalDeleted,
-      skipped: results.reduce((s, r) => s + r.skipped, 0),
       bytesFreed: totalBytesFreed,
-      errors: results.flatMap(r => r.errors),
+      errors: [
+        ...softDeleteResult.errors,
+        ...orphanResults.flatMap(r => r.errors),
+      ],
       dryRun,
-      results,
+      softDeleted: {
+        found: softDeleteResult.found,
+        r2Deleted: softDeleteResult.r2Deleted,
+        rowsHardDeleted: softDeleteResult.rowsHardDeleted,
+        bytesFreed: softDeleteResult.bytesFreed,
+        errors: softDeleteResult.errors,
+        durationMs: softDeleteResult.durationMs,
+      },
+      orphans: orphanResults,
     }),
     { headers: { 'Content-Type': 'application/json' } },
   );
