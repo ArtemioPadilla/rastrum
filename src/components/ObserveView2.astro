@@ -44,15 +44,12 @@ const weathers = WEATHERS;
 
   <!-- AI Capability Status Banner (#274) -->
   <!-- Banner starts hidden to prevent SSR flash; JS reveals it after checking localStorage/sessionStorage -->
-  <div id="obs2-capability-banner" class="hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/60 px-4 py-3 text-xs space-y-1">
+  <div id="obs2-capability-banner" class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/60 px-4 py-3 text-xs space-y-1">
     <div class="flex items-center justify-between">
       <span class="font-medium text-zinc-700 dark:text-zinc-300">
         {isEs ? "🤖 Modelos disponibles:" : "🤖 Available AI:"}
       </span>
       <div class="flex items-center gap-2">
-        <button id="obs2-banner-collapse" type="button" class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors text-[10px] underline">
-          {isEs ? "Ocultar" : "Hide"}
-        </button>
         <a id="obs2-setup-link" href={isEs ? "/es/perfil/editar#on-device-ai-section" : "/en/profile/edit#on-device-ai-section"}
           class="text-emerald-600 dark:text-emerald-400 underline hover:no-underline">
           {isEs ? "Configurar →" : "Set up →"}
@@ -334,21 +331,9 @@ if (!localStorage.getItem(ONBOARDING_KEY)) {
 // ── Capability banner (#274) ───────────────────────────────────────────────
 const capBanner   = document.getElementById('obs2-capability-banner');
 const capList     = document.getElementById('obs2-capability-list');
-const collapseBtn = document.getElementById('obs2-banner-collapse');
 const fileHint    = document.getElementById('obs2-file-hint');
 
-// Collapse banner if user has dismissed it before
-// Use sessionStorage so the banner shows once per session.
-// localStorage was permanent — users could never re-check their config status.
-const BANNER_COLLAPSED_KEY = 'rastrum.obs2.banner_collapsed';
-if (!sessionStorage.getItem(BANNER_COLLAPSED_KEY)) {
-  // Show the banner this session (not previously dismissed in this session)
-  capBanner?.classList.remove('hidden');
-}
-collapseBtn?.addEventListener('click', () => {
-  sessionStorage.setItem(BANNER_COLLAPSED_KEY, '1');
-  capBanner?.classList.add('hidden');
-});
+// Banner is always visible — no hide/collapse logic.
 
 // Render capability status
 (async () => {
@@ -369,13 +354,6 @@ collapseBtn?.addEventListener('click', () => {
         ${item.ok ? '✅' : '❌'} ${isEs ? item.labelEs : item.label}
       </span>
     `).join('');
-    if (allOk && capBanner) {
-      // All configured — collapse banner after 10s, use sessionStorage (not permanent)
-      setTimeout(() => {
-        capBanner.classList.add('hidden');
-        sessionStorage.setItem(BANNER_COLLAPSED_KEY, '1');
-      }, 10000);
-    }
   } catch { /* silent */ }
 })();
 
