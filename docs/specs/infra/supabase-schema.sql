@@ -244,6 +244,9 @@ CREATE TABLE IF NOT EXISTS public.observations (
   -- Content sensitivity (v1.1+): blur/gate graphic photos (dead animals, predation, wounds)
   content_sensitive  boolean NOT NULL DEFAULT false,
 
+  -- Per-observation license override (v1.0.x). NULL = use observer's default.
+  license               text CHECK (license IN ('CC BY 4.0','CC BY-NC 4.0','CC0')),
+
   -- Environmental enrichment (auto-filled)
   moon_phase            text,
   moon_illumination     numeric CHECK (moon_illumination BETWEEN 0 AND 1),
@@ -286,6 +289,9 @@ CREATE INDEX IF NOT EXISTS idx_obs_public ON observations(sync_status, obscure_l
 
 -- Idempotent column add for existing databases (v1.1+)
 ALTER TABLE public.observations ADD COLUMN IF NOT EXISTS content_sensitive boolean NOT NULL DEFAULT false;
+
+-- Idempotent column add for existing databases (v1.0.x)
+ALTER TABLE public.observations ADD COLUMN IF NOT EXISTS license text CHECK (license IN ('CC BY 4.0','CC BY-NC 4.0','CC0'));
 
 -- ============================================================
 -- IDENTIFICATIONS
