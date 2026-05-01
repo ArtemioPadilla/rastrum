@@ -45,7 +45,7 @@ BEGIN
   PERFORM cron.schedule('streaks-nightly', '0 7 * * *', format($body$
     SELECT net.http_post(
       url     := %L,
-      headers := '{"Content-Type":"application/json"}'::jsonb,
+      headers := ('{"Content-Type":"application/json","X-Cron-Secret":"' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'cron_secret') || '"}')::jsonb,
       body    := '{}'::jsonb
     );
   $body$, v_base || '/recompute-streaks'));
@@ -55,7 +55,7 @@ BEGIN
   PERFORM cron.schedule('badges-nightly', '30 7 * * *', format($body$
     SELECT net.http_post(
       url     := %L,
-      headers := '{"Content-Type":"application/json"}'::jsonb,
+      headers := ('{"Content-Type":"application/json","X-Cron-Secret":"' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'cron_secret') || '"}')::jsonb,
       body    := '{}'::jsonb
     );
   $body$, v_base || '/award-badges'));
@@ -67,7 +67,7 @@ BEGIN
   PERFORM cron.schedule('plantnet-quota-daily', '55 23 * * *', format($body$
     SELECT net.http_post(
       url     := %L,
-      headers := '{"Content-Type":"application/json"}'::jsonb,
+      headers := ('{"Content-Type":"application/json","X-Cron-Secret":"' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'cron_secret') || '"}')::jsonb,
       body    := '{}'::jsonb
     );
   $body$, v_base || '/plantnet-monitor'));
@@ -80,7 +80,7 @@ BEGIN
   PERFORM cron.schedule('streak-push-nightly', '55 1 * * *', format($body$
     SELECT net.http_post(
       url     := %L,
-      headers := '{"Content-Type":"application/json"}'::jsonb,
+      headers := ('{"Content-Type":"application/json","X-Cron-Secret":"' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'cron_secret') || '"}')::jsonb,
       body    := '{}'::jsonb
     );
   $body$, v_base || '/streak-push'));
@@ -107,7 +107,7 @@ BEGIN
   PERFORM cron.schedule('recompute-user-stats-nightly', '0 8 * * *', format($body$
     SELECT net.http_post(
       url     := %L,
-      headers := '{"Content-Type":"application/json"}'::jsonb,
+      headers := ('{"Content-Type":"application/json","X-Cron-Secret":"' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'cron_secret') || '"}')::jsonb,
       body    := '{}'::jsonb
     );
   $body$, v_base || '/recompute-user-stats'));
