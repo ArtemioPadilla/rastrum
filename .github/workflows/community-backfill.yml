@@ -68,6 +68,7 @@ jobs:
           # auto-injected SUPABASE_SERVICE_ROLE_KEY.
           response=$(curl -sS -X POST \
             -H "Content-Type: application/json" \
+            -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}" \
             -d '{}' \
             -w '\n%{http_code}' \
             "$url")

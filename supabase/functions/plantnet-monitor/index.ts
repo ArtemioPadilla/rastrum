@@ -22,6 +22,7 @@
  */
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
+import { requireCronSecret } from '../_shared/cron-auth.ts';
 
 interface PlantNetUsage {
   remaining: number;
@@ -49,7 +50,10 @@ async function postWebhook(url: string, message: string): Promise<void> {
   });
 }
 
-serve(async () => {
+serve(async (req) => {
+  const denied = requireCronSecret(req);
+  if (denied) return denied;
+
   const url = Deno.env.get('SUPABASE_URL');
   const role = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   const apiKey = Deno.env.get('PLANTNET_API_KEY');
