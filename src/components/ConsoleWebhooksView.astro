@@ -132,7 +132,13 @@ const eventKeys: Array<keyof typeof wEvents> = [
     <!-- List -->
     <div>
       <h2 class="text-sm font-semibold mb-2">Webhooks</h2>
-      <div id="webhooks-loading" class="text-sm text-zinc-500 italic">{c.loading}</div>
+      <div id="webhooks-loading" class="flex items-center gap-2 text-sm text-zinc-500 italic">
+        <svg class="animate-spin h-4 w-4 text-zinc-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <span>{c.loading}</span>
+      </div>
       <div id="webhooks-empty" class="hidden rounded border border-dashed border-zinc-200 dark:border-zinc-700 p-6 text-center text-sm text-zinc-500">
         {wEmpty}
       </div>
@@ -241,6 +247,7 @@ const eventKeys: Array<keyof typeof wEvents> = [
   let allWebhooks: WebhookRow[] = [];
   let allDeliveries: DeliveryRow[] = [];
   let jwt: string | null = null;
+  let reconcileInFlight = false;
 
   const DRILLDOWN_PAGE_SIZE = 50;
 
@@ -480,12 +487,13 @@ const eventKeys: Array<keyof typeof wEvents> = [
     if (!myRoles.has('admin')) { show('webhooks-not-auth'); return; }
     jwt = session.access_token;
     show('webhooks-shell');
-    hide('webhooks-loading');
     try {
       await loadAll();
     } catch (err) {
       const e = document.getElementById('webhooks-error');
       if (e) { e.textContent = (err as Error).message; e.classList.remove('hidden'); }
+    } finally {
+      hide('webhooks-loading');
     }
   }
 
@@ -545,27 +553,39 @@ const eventKeys: Array<keyof typeof wEvents> = [
 
     try {
       if (testId) {
-        const res = await adminClient.webhook.test({ webhookId: testId }, 'manual webhook test', jwt);
-        const code = res.result?.statusCode;
-        alert(code ? `Test delivery: HTTP ${code}` : `Test delivery failed: ${res.result?.error ?? 'unknown'}`);
-        await loadAll();
+        if (reconcileInFlight) return;
+        reconcileInFlight = true;
+        try {
+          const res = await adminClient.webhook.test({ webhookId: testId }, 'manual webhook test', jwt);
+          const code = res.result?.statusCode;
+          alert(code ? `Test delivery: HTTP ${code}` : `Test delivery failed: ${res.result?.error ?? 'unknown'}`);
+          await loadAll();
+        } finally { reconcileInFlight = false; }
         return;
       }
       if (toggleEl) {
+        if (reconcileInFlight) return;
         const id = toggleEl.dataset.toggleId!;
         const enabled = toggleEl.dataset.toggleTo === 'true';
         const reason = prompt(`Reason for ${enabled ? 'enabling' : 'disabling'} this webhook?`);
         if (!reason || reason.length < 5) return;
-        await adminClient.webhook.update({ webhookId: id, enabled }, reason, jwt);
-        await loadAll();
+        reconcileInFlight = true;
+        try {
+          await adminClient.webhook.update({ webhookId: id, enabled }, reason, jwt);
+          await loadAll();
+        } finally { reconcileInFlight = false; }
         return;
       }
       if (deleteId) {
+        if (reconcileInFlight) return;
         if (!confirm('Delete this webhook? This cannot be undone.')) return;
         const reason = prompt('Reason for deletion?');
         if (!reason || reason.length < 5) return;
-        await adminClient.webhook.delete({ webhookId: deleteId }, reason, jwt);
-        await loadAll();
+        reconcileInFlight = true;
+        try {
+          await adminClient.webhook.delete({ webhookId: deleteId }, reason, jwt);
+          await loadAll();
+        } finally { reconcileInFlight = false; }
         return;
       }
       if (deliveriesId) {
@@ -629,11 +649,13 @@ const eventKeys: Array<keyof typeof wEvents> = [
         return;
       }
       if (replayLastId) {
+        if (reconcileInFlight) return;
         const state = drilldown.get(replayLastId);
         const last = state?.perWebhookRows[0];
         if (!last) return;
         const reason = prompt(labelDelivReplayConfirm);
         if (!reason || reason.length < 5) return;
+        reconcileInFlight = true;
         try {
           const res = await adminClient.webhook.replayDelivery({ deliveryId: last.id }, reason, jwt);
           const code = res.result?.statusCode;
@@ -648,7 +670,7 @@ const eventKeys: Array<keyof typeof wEvents> = [
         } catch (err) {
           const msg = err instanceof AdminClientError ? err.message : (err as Error).message;
           showActionToast(labelDelivReplayFailedTmpl.replace('{error}', msg), false);
-        }
+        } finally { reconcileInFlight = false; }
         return;
       }
       if (copyNonce) {
