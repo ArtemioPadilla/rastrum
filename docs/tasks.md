@@ -4,7 +4,7 @@
 > Source of truth for both surfaces; renders the live page at
 > [/docs/tasks/](https://rastrum.org/en/docs/tasks/).
 > 
-> **Updated:** 2026-04-30 (v1.2 research workflow — M28 community discovery, M29 projects, M30 CLI batch import, M31 camera stations, M32 multi-provider vision, obs-detail redesign, admin console PR16 entity browsers).
+> **Updated:** 2026-04-30 (v1.2 research workflow — M28 community discovery, M29 projects, M30 CLI batch import, M31 camera stations, M32 multi-provider vision, obs-detail redesign, admin console PR16 entity browsers; subtask granularity deepened for 53 roadmap items per #180).
 
 ---
 
@@ -74,7 +74,7 @@ Remaining:
 - `plantnet-quota-monitor` — Alerting / dashboard for PlantNet daily-quota usage (500/day shared); fall through gracefully when exhausted  _(· planned)_
 - `oauth-logo-google` — Upload Rastrum logo + privacy/terms URLs at Google Cloud Console OAuth consent screen  _(! blocked: Manual operator action — see GitHub issue #3)_
 - `oauth-logo-github` — Upload Rastrum logo at GitHub Developer Settings OAuth app  _(! blocked: Manual operator action — see GitHub issue #3)_
-- `tasks-json-deepfill` — Deepen tasks.json subtask granularity where 3-subtask backfill is thin (esp. v1.0 social + tokens items)  _(· planned)_
+- `tasks-json-deepfill` — Deepen tasks.json subtask granularity where 3-subtask backfill is thin (esp. v1.0 social + tokens items)  _(· in_progress — 53 items expanded from ≤3 to 5–7 specific subtasks per #180)_
 - `issue-5-gps-retest` — GPS auto-fill retest on Eugenio's Android device — fix shipped, awaiting confirmation  _(! blocked: Awaits real-device retest — see GitHub issue #5)_
 - `issue-18-camera-retest` — 'Tomar foto' retest on Eugenio's Android — Android-specific hint shipped, awaiting confirmation  _(! blocked: Awaits real-device retest — see GitHub issue #18)_
 - `smoke-test-nightly` — Nightly cron-fired Playwright smoke test against production rastrum.org (currently only PR-triggered)  _(· planned)_
