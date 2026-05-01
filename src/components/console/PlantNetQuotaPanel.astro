@@ -1,0 +1,276 @@
+---
+/**
+ * PlantNetQuotaPanel — embeddable panel showing PlantNet daily-quota usage.
+ *
+ * Queries the `api_usage` table (populated by the plantnet-monitor Edge
+ * Function) and renders:
+ *   1. Current day's usage gauge (used / quota)
+ *   2. 7-day usage trend as a bar chart
+ *   3. Alert threshold indicator (>80% warning, >95% critical)
+ *
+ * Auth-gated to admin role. Handles missing table gracefully.
+ * Bilingual EN/ES via the console i18n namespace.
+ */
+import { t } from '../../i18n/utils';
+
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+const isEs = lang === 'es';
+
+const pn = (tr.console as unknown as Record<string, Record<string, unknown>>).plantnetQuota as
+  unknown as Record<string, string> | undefined;
+
+const title       = pn?.title       ?? (isEs ? 'Cuota PlantNet' : 'PlantNet Quota');
+const description = pn?.description ?? (isEs ? 'Uso diario de la API PlantNet (500/día, clave compartida).' : 'PlantNet API daily usage (500/day shared key).');
+const todayLabel  = pn?.today       ?? (isEs ? 'Hoy' : 'Today');
+const usedLabel   = pn?.used        ?? (isEs ? 'Usado' : 'Used');
+const quotaLabel  = pn?.quota       ?? (isEs ? 'Cuota' : 'Quota');
+const remainLabel = pn?.remaining   ?? (isEs ? 'Restante' : 'Remaining');
+const trendLabel  = pn?.trend       ?? (isEs ? 'Últimos 7 días' : 'Last 7 days');
+const noData      = pn?.noData      ?? (isEs ? 'Sin datos de cuota todavía.' : 'No quota data yet.');
+const warnLabel   = pn?.warning     ?? (isEs ? 'Advertencia' : 'Warning');
+const critLabel   = pn?.critical    ?? (isEs ? 'Crítico' : 'Critical');
+const okLabel     = pn?.ok          ?? (isEs ? 'Normal' : 'Normal');
+const notAuth     = (tr.console as unknown as Record<string, string>).not_authorized
+                    ?? (isEs ? 'No tienes acceso a la consola.' : "You don't have console access.");
+const loadingText = (tr.console as unknown as Record<string, string>).loading
+                    ?? (isEs ? 'Cargando…' : 'Loading…');
+---
+
+<section
+  class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-5 shadow-sm space-y-4"
+  data-plantnet-panel
+  data-today-label={todayLabel}
+  data-used-label={usedLabel}
+  data-quota-label={quotaLabel}
+  data-remain-label={remainLabel}
+  data-trend-label={trendLabel}
+  data-no-data={noData}
+  data-warn-label={warnLabel}
+  data-crit-label={critLabel}
+  data-ok-label={okLabel}
+>
+  <header>
+    <h2 class="text-base font-semibold text-zinc-900 dark:text-zinc-100">{title}</h2>
+    <p class="text-xs text-zinc-500 dark:text-zinc-400">{description}</p>
+  </header>
+
+  <div id="pnq-not-auth" class="hidden rounded border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-900 dark:text-amber-100">
+    {notAuth}
+  </div>
+
+  <div id="pnq-loading" class="text-sm text-zinc-500 italic">{loadingText}</div>
+
+  <div id="pnq-empty" class="hidden rounded border border-dashed border-zinc-300 dark:border-zinc-700 p-4 text-sm text-zinc-500">
+    {noData}
+  </div>
+
+  <div id="pnq-error" class="hidden text-sm text-red-600 dark:text-red-400"></div>
+
+  <div id="pnq-content" class="hidden space-y-4">
+    <!-- Alert threshold pill -->
+    <div id="pnq-alert" class="hidden flex items-center gap-2">
+      <span id="pnq-alert-pill" class="text-xs font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full"></span>
+      <span id="pnq-alert-text" class="text-xs text-zinc-600 dark:text-zinc-400"></span>
+    </div>
+
+    <!-- Today's usage gauge -->
+    <div class="space-y-2">
+      <div class="flex items-baseline justify-between">
+        <span class="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">{todayLabel}</span>
+        <span id="pnq-fraction" class="text-sm font-mono font-semibold text-zinc-900 dark:text-zinc-100"></span>
+      </div>
+      <div class="rounded-full overflow-hidden bg-zinc-200 dark:bg-zinc-700 h-3 w-full">
+        <div id="pnq-bar" class="h-3 rounded-full transition-all duration-500" style="width:0%"></div>
+      </div>
+      <div class="flex justify-between text-[11px] text-zinc-500">
+        <span id="pnq-pct"></span>
+        <span id="pnq-remain"></span>
+      </div>
+    </div>
+
+    <!-- 7-day trend bar chart -->
+    <div>
+      <p class="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-2">{trendLabel}</p>
+      <div id="pnq-trend" class="flex items-end gap-1 h-16"></div>
+    </div>
+  </div>
+</section>
+
+<script>
+  import { getSupabase } from '../../lib/supabase';
+  import { getUserRoles } from '../../lib/user-roles';
+
+  type UsageRow = {
+    date: string;
+    provider: string;
+    used: number;
+    quota: number;
+    remaining: number;
+  };
+
+  const panel = document.querySelector<HTMLElement>('[data-plantnet-panel]');
+  if (panel) {
+    const todayLbl = panel.dataset.todayLabel ?? 'Today';
+    const usedLbl = panel.dataset.usedLabel ?? 'Used';
+    const quotaLbl = panel.dataset.quotaLabel ?? 'Quota';
+    const remainLbl = panel.dataset.remainLabel ?? 'Remaining';
+    const trendLbl = panel.dataset.trendLabel ?? 'Last 7 days';
+    const noDataLbl = panel.dataset.noData ?? 'No quota data yet.';
+    const warnLbl = panel.dataset.warnLabel ?? 'Warning';
+    const critLbl = panel.dataset.critLabel ?? 'Critical';
+    const okLbl = panel.dataset.okLabel ?? 'Normal';
+
+    function show(id: string) { document.getElementById(id)?.classList.remove('hidden'); }
+    function hide(id: string) { document.getElementById(id)?.classList.add('hidden'); }
+
+    function barColor(pct: number): string {
+      if (pct >= 0.95) return 'bg-red-500';
+      if (pct >= 0.80) return 'bg-amber-400';
+      return 'bg-emerald-500';
+    }
+
+    function alertState(pct: number): { cls: string; label: string } {
+      if (pct >= 0.95) return {
+        cls: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
+        label: critLbl,
+      };
+      if (pct >= 0.80) return {
+        cls: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
+        label: warnLbl,
+      };
+      return {
+        cls: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
+        label: okLbl,
+      };
+    }
+
+    function renderGauge(row: UsageRow) {
+      const pct = row.quota > 0 ? Math.min(row.used / row.quota, 1) : 0;
+
+      const fraction = document.getElementById('pnq-fraction');
+      if (fraction) fraction.textContent = `${row.used.toLocaleString()} / ${row.quota.toLocaleString()}`;
+
+      const bar = document.getElementById('pnq-bar');
+      if (bar) {
+        bar.style.width = `${(pct * 100).toFixed(1)}%`;
+        bar.className = `h-3 rounded-full transition-all duration-500 ${barColor(pct)}`;
+      }
+
+      const pctEl = document.getElementById('pnq-pct');
+      if (pctEl) pctEl.textContent = `${(pct * 100).toFixed(1)}% ${usedLbl.toLowerCase()}`;
+
+      const remainEl = document.getElementById('pnq-remain');
+      if (remainEl) remainEl.textContent = `${row.remaining.toLocaleString()} ${remainLbl.toLowerCase()}`;
+
+      // Alert pill
+      const alertEl = document.getElementById('pnq-alert');
+      const pill = document.getElementById('pnq-alert-pill');
+      const alertText = document.getElementById('pnq-alert-text');
+      if (alertEl && pill && alertText) {
+        const state = alertState(pct);
+        pill.className = `text-xs font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${state.cls}`;
+        pill.textContent = state.label;
+        alertText.textContent = pct >= 0.95
+          ? `${(pct * 100).toFixed(0)}% — ${row.remaining} ${remainLbl.toLowerCase()}`
+          : pct >= 0.80
+            ? `${(pct * 100).toFixed(0)}% — ${row.remaining} ${remainLbl.toLowerCase()}`
+            : `${(pct * 100).toFixed(0)}%`;
+        alertEl.classList.remove('hidden');
+      }
+    }
+
+    function renderTrend(rows: UsageRow[]) {
+      const trendEl = document.getElementById('pnq-trend');
+      if (!trendEl) return;
+
+      if (rows.length === 0) {
+        trendEl.innerHTML = '';
+        return;
+      }
+
+      // rows are DESC; reverse for chronological order
+      const chrono = [...rows].reverse();
+      const maxUsed = Math.max(1, ...chrono.map(r => r.used));
+
+      trendEl.innerHTML = chrono.map(r => {
+        const pct = r.quota > 0 ? Math.min(r.used / r.quota, 1) : 0;
+        const heightPct = Math.max(4, Math.round((r.used / maxUsed) * 100));
+        const color = barColor(pct);
+        const dayLabel = r.date.slice(5); // MM-DD
+        return `<div class="flex-1 flex flex-col items-center gap-0.5" title="${r.date}: ${r.used} / ${r.quota}">
+          <div class="w-full rounded-t ${color} transition-all" style="height:${heightPct}%"></div>
+          <span class="text-[9px] text-zinc-400 tabular-nums">${dayLabel}</span>
+        </div>`;
+      }).join('');
+    }
+
+    async function init() {
+      let supabase;
+      try { supabase = getSupabase(); } catch {
+        hide('pnq-loading');
+        show('pnq-not-auth');
+        return;
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) { hide('pnq-loading'); show('pnq-not-auth'); return; }
+
+      const myRoles = await getUserRoles(session.user.id);
+      if (!myRoles.has('admin')) { hide('pnq-loading'); show('pnq-not-auth'); return; }
+
+      const cutoff = new Date();
+      cutoff.setUTCDate(cutoff.getUTCDate() - 7);
+      const cutoffStr = cutoff.toISOString().slice(0, 10);
+
+      try {
+        const { data, error } = await supabase
+          .from('api_usage')
+          .select('date, provider, used, quota, remaining')
+          .eq('provider', 'plantnet')
+          .gte('date', cutoffStr)
+          .order('date', { ascending: false })
+          .limit(8);
+
+        hide('pnq-loading');
+
+        if (error) {
+          // Graceful missing-table handling: PostgREST returns 42P01 for
+          // missing relations. Show the empty state instead of an error.
+          if (error.code === '42P01' || error.message.includes('does not exist')) {
+            show('pnq-empty');
+            return;
+          }
+          const errEl = document.getElementById('pnq-error');
+          if (errEl) errEl.textContent = error.message;
+          show('pnq-error');
+          return;
+        }
+
+        const rows = (data ?? []) as UsageRow[];
+        if (rows.length === 0) {
+          show('pnq-empty');
+          return;
+        }
+
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const todayRow = rows.find(r => r.date === todayStr) ?? rows[0];
+
+        renderGauge(todayRow);
+        renderTrend(rows);
+        show('pnq-content');
+      } catch (err) {
+        hide('pnq-loading');
+        const errEl = document.getElementById('pnq-error');
+        if (errEl) errEl.textContent = (err as Error).message;
+        show('pnq-error');
+      }
+    }
+
+    init().catch(() => {
+      hide('pnq-loading');
+      show('pnq-not-auth');
+    });
+  }
+</script>
