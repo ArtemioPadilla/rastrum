@@ -370,10 +370,18 @@ CREATE TABLE IF NOT EXISTS public.media_files (
   -- Order
   sort_order          integer NOT NULL DEFAULT 0,
   is_primary          boolean NOT NULL DEFAULT false,
+  -- Source photo tracking (M03 v1.1): when a media_file is a crop or
+  -- derivative of another photo (e.g., MegaDetector bbox crop), this
+  -- points to the original. NULL for original uploads.
+  source_photo_id     uuid REFERENCES public.media_files(id) ON DELETE SET NULL,
   created_at          timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE INDEX IF NOT EXISTS idx_media_observation ON media_files(observation_id);
+
+-- Idempotent column add for existing databases (M03 v1.1)
+ALTER TABLE public.media_files ADD COLUMN IF NOT EXISTS source_photo_id uuid REFERENCES public.media_files(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_media_source_photo ON media_files(source_photo_id) WHERE source_photo_id IS NOT NULL;
 
 -- Same FK story as identifications above — needed so PostgREST can
 -- embed media_files in observations queries.
