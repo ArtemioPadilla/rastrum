@@ -3,7 +3,8 @@
 > Briefing for AI coding agents (Claude Code, Copilot, Cursor, Codex, …)
 > working in this repo. Read this before making changes.
 >
-> **Last full doc sync:** 2026-04-30 (v1.2 — research workflow M29/M30/M31, multi-provider vision + pool M32, plus all v1.1 follow-ups #152/#153/#154/#155/#156/#157/#158/#159).
+> **Last full doc sync:** 2026-05-01 (v1.2 + 42 field-bug/admin/docs PRs from
+> 2026-05-01 session — see docs/changelog for details).
 
 ---
 
@@ -42,7 +43,7 @@ make help                     # list every target with descriptions
 make install                  # npm ci
 make dev                      # astro dev — http://localhost:4321
 make build                    # static build into dist/
-make test                     # vitest run (~680 tests today)
+make test                     # vitest run (734 tests today)
 make typecheck                # tsc --noEmit
 make db-apply                 # apply supabase-schema.sql (idempotent)
 make db-verify                # show tables, RLS, triggers, extensions
@@ -565,6 +566,17 @@ Runbooks: [`docs/runbooks/multi-provider-vision.md`](docs/runbooks/multi-provide
 | Test file imports `phi-vision.ts` directly and panics in Node | WebLLM bundle pulls WebGPU APIs at import time | Mock at the module boundary in your test, not at the WebLLM SDK level (see `local-ai.test.ts`). |
 | `gh` CLI deploys still hit `rastrum.artemiop.com` in docs | Old canonical domain | **Resolved 2026-04-26:** all docs migrated to `rastrum.org`; the old domain redirects but new content goes to `rastrum.org`. |
 
+### Pitfalls discovered 2026-05-01
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Magic link loops on "Verificando tu enlace" in PWA | Race between `detectSessionInUrl` and manual token parsing in callback.astro | Strip hash/query BEFORE calling `getSupabase()` + `hasRun` guard + 8s timeout. Fixed in PR #350. |
+| Sync loses AI identification | `syncOne` step 4.5 only persisted IDs with `status === 'accepted'` | Broadened to also accept `needs_review` + confidence > 0. Fixed in PR #353. |
+| Audio media_files classified as photo | MIME type empty on iOS Safari MediaRecorder | Fallback chain: MIME → file extension → `evidenceType`. Fixed in PR #357. |
+| Phi Vision crashes mobile browser | No device memory check before loading 4 GB model | `localAISupported()` now rejects `navigator.deviceMemory ≤ 4`. Fixed in PR #354. |
+| E2E test fails after adding doc page to MegaMenu | New link duplicates text in mobile drawer, Playwright strict mode violation | Use `locator('p').filter()` instead of `getByText()` for group headings. |
+| `flowType: 'pkce'` not set | Supabase defaulted to implicit flow with hash fragments | Set `flowType: 'pkce'` in `supabase.ts` — PKCE uses `?code=` (single-use, server-exchanged). |
+
 ---
 
 ## Things you should NOT do without asking
@@ -660,14 +672,39 @@ The validate gate is the fix.
 3. Optionally add to `docs/tasks.md` for the prose narrative.
 4. The `/docs/roadmap/` and `/docs/tasks/` pages re-render automatically.
 
+### Fixing a GitHub issue
+1. Read the issue on GitHub: `gh issue view NNN`.
+2. Check `docs/tasks.json` for related subtasks.
+3. Create a worktree: `git worktree add .worktrees/fix-NNN -b fix/NNN main`.
+4. Read the relevant code before changing it.
+5. Make the fix. Run `npx tsc --noEmit` + `npm run test`.
+6. Commit, push, create PR: `gh pr create --base main --head fix/NNN`.
+7. Clean up: `git worktree remove .worktrees/fix-NNN`.
+
+---
+
+## Batch PR workflow (worktrees)
+
+When fixing multiple issues in parallel, use git worktrees:
+
+```bash
+git checkout main && git pull --ff-only
+git worktree add .worktrees/fix-NNN -b fix/NNN main
+# ... work in .worktrees/fix-NNN ...
+git worktree remove .worktrees/fix-NNN
+```
+
+Worktrees live in `.worktrees/` (gitignored). Each has its own working
+tree but shares the same `.git` — branches don't interfere.
+
 ---
 
 ## Pre-PR checklist
 
 ```bash
 npm run typecheck   # tsc --noEmit, zero errors
-npm run test        # vitest run — ~680 tests today, all green
-npm run build       # zero errors, ~186 pages today, EN/ES paired
+npm run test        # vitest run — 734 tests today, all green
+npm run build       # zero errors, 209 pages today, EN/ES paired
 git status -s       # nothing untracked except .claude/ or .env.local
 ```
 

@@ -3,7 +3,8 @@
 > Briefing for AI coding agents (Claude Code, Copilot, Cursor, Codex, …)
 > working in this repo. Read this before making changes.
 >
-> **Last full doc sync:** 2026-04-26 (v1.0 + chrome revamp).
+> **Last full doc sync:** 2026-05-01 (v1.0.1 — 42 PRs: field bug fixes,
+> admin console buildout, E2E tests, observability, docs).
 
 ---
 
@@ -41,7 +42,7 @@ make help                     # list every target with descriptions
 make install                  # npm ci
 make dev                      # astro dev — http://localhost:4321
 make build                    # static build into dist/
-make test                     # vitest run (225 tests today)
+make test                     # vitest run (734 tests today)
 make typecheck                # tsc --noEmit
 make db-apply                 # apply supabase-schema.sql (idempotent)
 make db-verify                # show tables, RLS, triggers, extensions
@@ -73,7 +74,13 @@ src/
 │   ├── Header.astro        Verb-first chrome (Observe/Explore ▾/Chat | About/Docs ▾)
 │   ├── MegaMenu.astro      3-col dropdown shell, used by Docs ▾
 │   ├── MobileBottomBar.astro 5-slot bottom bar with center camera FAB (signed-in)
-│   └── MobileDrawer.astro  Right-side hamburger overlay (mobile only)
+│   ├── MobileDrawer.astro  Right-side hamburger overlay (mobile only)
+│   ├── console/            Admin console components
+│   │   ├── ExpertApplicationsBrowser.astro
+│   │   ├── FlagsBrowser → ConsoleFlagsView.astro
+│   │   ├── RateLimitPanel.astro
+│   │   ├── PlantNetQuotaPanel.astro
+│   │   └── ConsoleOnboarding.astro  First-time admin walkthrough
 ├── i18n/{en,es}.json       Translations. ANY new UI string lives here.
 ├── i18n/utils.ts           t(lang) helper, routes + routeTree, docPages list.
 ├── layouts/                BaseLayout (PWA, theme, SW reg) + DocLayout (sidebar)
@@ -91,9 +98,14 @@ src/
 │   ├── identifiers/        Plugin platform — see `13-identifier-registry.md`
 │   │   ├── types.ts        Identifier interface + KeySpec + IdentifyInput
 │   │   ├── registry.ts     Singleton registry (collision-detected)
-│   │   ├── cascade.ts      runCascade() — license-cost-sorted waterfall
+│   │   ├── cascade.ts      runCascade() — parallel race, first-past-threshold
 │   │   ├── index.ts        bootstrapIdentifiers() registers built-ins
 │   │   └── *.ts            One file per plugin
+│   ├── taxonomy-synonyms.ts  Lightweight synonym map (Aratinga → Psittacara)
+│   ├── console-tabs.ts    Console tab definitions (admin/mod/expert)
+│   ├── console-keybindings.ts  g-prefix keyboard shortcuts for console
+│   ├── console-alerts.ts  Operational anomaly checks (stuck webhooks, cron silence)
+│   ├── console-bulk.ts    Shared bulk-selection helpers for entity browsers
 │   └── types.ts            ObserverRef, Observation, MediaFile, …
 ├── pages/{en,es}/          Locale-paired routes. /en/observe ↔ /es/observar;
 │                           explore subroutes: /explore/{recent,watchlist,species}
@@ -110,6 +122,8 @@ supabase/
 │   ├── share-card            Public OG card renderer
 │   ├── get-upload-url        R2 presigned upload URLs
 │   ├── export-dwca           Darwin Core Archive ZIP
+│   ├── gc-orphan-media       R2 GC: soft-deleted + orphan blobs (nightly cron)
+│   ├── plantnet-monitor      PlantNet quota probe + webhook alert (nightly cron)
 │   ├── api                   REST API (rst_* token auth)
 │   └── mcp                   MCP server for AI agents (rst_* token auth, JSON-RPC over HTTP)
 └── config.toml             Local CLI config (deploy via CI, not local)
@@ -120,6 +134,9 @@ docs/
 ├── tasks.md                Phase summary (regenerated from tasks.json)
 ├── architecture.md         High-level architecture + critical-path flows
 ├── gbif-ipt.md             Operator notes for GBIF IPT publishing
+├── runbooks/
+│   ├── taxonomy-references.md   Official taxonomy authorities per taxon group
+│   └── deprecate-profile-public.md  3-phase migration plan for profile_privacy
 └── specs/
     ├── infra/              SQL schema, cron, testing, future migrations, CI yml
     └── modules/            20 module specs + 00-index.md (see numbering note)
@@ -241,6 +258,17 @@ Full design rationale: `docs/superpowers/specs/2026-04-26-ux-revamp-design.md`.
 | Test file imports `phi-vision.ts` directly and panics in Node | WebLLM bundle pulls WebGPU APIs at import time | Mock at the module boundary in your test, not at the WebLLM SDK level (see `local-ai.test.ts`). |
 | `gh` CLI deploys still hit `rastrum.artemiop.com` in docs | Old canonical domain | **Resolved 2026-04-26:** all docs migrated to `rastrum.org`; the old domain redirects but new content goes to `rastrum.org`. |
 
+### Pitfalls discovered 2026-05-01
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Magic link loops on "Verificando tu enlace" in PWA | Race between `detectSessionInUrl` and manual token parsing in callback.astro | Strip hash/query BEFORE calling `getSupabase()` + `hasRun` guard + 8s timeout. Fixed in PR #350. |
+| Sync loses AI identification | `syncOne` step 4.5 only persisted IDs with `status === 'accepted'` | Broadened to also accept `needs_review` + confidence > 0. Fixed in PR #353. |
+| Audio media_files classified as photo | MIME type empty on iOS Safari MediaRecorder | Fallback chain: MIME → file extension → `evidenceType`. Fixed in PR #357. |
+| Phi Vision crashes mobile browser | No device memory check before loading 4 GB model | `localAISupported()` now rejects `navigator.deviceMemory ≤ 4`. Fixed in PR #354. |
+| E2E test fails after adding doc page to MegaMenu | New link duplicates text in mobile drawer, Playwright strict mode violation | Use `locator('p').filter()` instead of `getByText()` for group headings. |
+| `flowType: 'pkce'` not set | Supabase defaulted to implicit flow with hash fragments | Set `flowType: 'pkce'` in `supabase.ts` — PKCE uses `?code=` (single-use, server-exchanged). |
+
 ---
 
 ## Things you should NOT do without asking
@@ -296,14 +324,51 @@ See "Identifier plugin contract" above. Use the existing plugins
 3. Optionally add to `docs/tasks.md` for the prose narrative.
 4. The `/docs/roadmap/` and `/docs/tasks/` pages re-render automatically.
 
+### Fixing a GitHub issue
+1. Read the issue on GitHub: `gh issue view NNN`.
+2. Check `docs/tasks.json` for related subtasks.
+3. Create a worktree: `git worktree add .worktrees/fix-NNN -b fix/NNN main`.
+4. Read the relevant code before changing it.
+5. Make the fix. Run `npx tsc --noEmit` + `npm run test`.
+6. Commit, push, create PR: `gh pr create --base main --head fix/NNN`.
+7. Clean up: `git worktree remove .worktrees/fix-NNN`.
+
+---
+
+## Batch PR workflow (worktrees + subagents)
+
+When fixing multiple issues in parallel, use this pattern:
+
+```bash
+# 1. Pull latest main
+git checkout main && git pull --ff-only
+
+# 2. Create worktrees (one per issue)
+git worktree add .worktrees/fix-NNN -b fix/NNN main
+
+# 3. Work in each worktree independently
+cd .worktrees/fix-NNN
+# ... make changes ...
+npx tsc --noEmit && npm run test
+git add -A && git commit -m "fix(area): description (#NNN)"
+git push -u origin fix/NNN
+gh pr create --base main --head fix/NNN --title "..." --body "Closes #NNN"
+
+# 4. Clean up
+git worktree remove .worktrees/fix-NNN
+```
+
+Worktrees live in `.worktrees/` (gitignored). Each has its own working
+tree but shares the same `.git` — branches don't interfere with each other.
+
 ---
 
 ## Pre-PR checklist
 
 ```bash
 npm run typecheck   # tsc --noEmit, zero errors
-npm run test        # vitest run — 225 tests today, all green
-npm run build       # zero errors, 57 pages today, EN/ES paired
+npm run test        # vitest run — 734 tests today, all green
+npm run build       # zero errors, 209 pages today, EN/ES paired
 git status -s       # nothing untracked except .claude/ or .env.local
 ```
 
