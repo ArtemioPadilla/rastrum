@@ -1,7 +1,8 @@
 ---
 // Language-neutral callback page. Supabase redirects the magic link here with
-// `?code=...` in the URL. We exchange it client-side (static Astro, no SSR)
-// and bounce to the user's preferred language home.
+// `?code=...` (PKCE) or `#access_token=...` (implicit) in the URL. We exchange
+// it client-side (static Astro, no SSR) and bounce to the user's preferred
+// language home.
 import BaseLayout from '../../layouts/BaseLayout.astro';
 ---
 
@@ -17,6 +18,9 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
       <h1 class="text-xl font-semibold text-red-600 dark:text-red-400">Link didn't work</h1>
       <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-400" id="error-detail">
         That link didn't work. It may have expired. Request a new one.
+      </p>
+      <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-500">
+        Tip: if you have the app installed, the 6-digit code is more reliable than the link.
       </p>
       <a href="/en/sign-in/" class="mt-4 inline-block text-sm font-medium text-emerald-700 dark:text-emerald-400 underline underline-offset-2">
         Try again
@@ -38,27 +42,39 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
       if (errorDetail && message) errorDetail.textContent = message;
     }
 
-    async function run() {
-      // Supabase may return the session in either format:
-      //   PKCE flow         → ?code=xxx              (query string)
-      //   Implicit flow     → #access_token=…&refresh_token=…  (hash fragment)
-      // We detect which and handle both.
+    // Guard: prevent run() from executing more than once (SW cache + network
+    // race, or detectSessionInUrl triggering a re-render).
+    let hasRun = false;
 
+    async function run() {
+      if (hasRun) return;
+      hasRun = true;
+
+      // Capture tokens BEFORE anything else can consume them, then
+      // immediately strip them from the URL so a reload won't re-trigger.
       const query = new URLSearchParams(window.location.search);
       const hash  = new URLSearchParams(window.location.hash.replace(/^#/, ''));
-      const errorCode        = query.get('error')        || hash.get('error');
+
+      const errorCode        = query.get('error')             || hash.get('error');
       const errorDescription = query.get('error_description') || hash.get('error_description');
       const code             = query.get('code');
       const accessToken      = hash.get('access_token');
       const refreshToken     = hash.get('refresh_token');
-      const supabase         = getSupabase();
+
+      // Strip hash and query immediately so detectSessionInUrl (which runs
+      // lazily inside getSupabase()) cannot race us for the same tokens.
+      if (window.location.hash || code) {
+        history.replaceState(null, '', window.location.pathname);
+      }
+
+      const supabase = getSupabase();
 
       if (errorCode) {
         showError(errorDescription || errorCode);
         return;
       }
 
-      // PKCE flow
+      // PKCE flow — preferred since we now set flowType: 'pkce' in supabase.ts
       if (code) {
         const { error } = await exchangeCode(code);
         if (error) { showError(error.message); return; }
@@ -66,33 +82,30 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
         return;
       }
 
-      // Implicit flow — manually call setSession if `detectSessionInUrl`
-      // hasn't already consumed it (Astro static pages sometimes race this).
+      // Implicit flow fallback — older magic links or OAuth providers that
+      // still return tokens in the hash fragment.
       if (accessToken && refreshToken) {
         const { error } = await supabase.auth.setSession({
           access_token: accessToken,
           refresh_token: refreshToken,
         });
         if (error) { showError(error.message); return; }
-        // Clean the hash out of the URL so a refresh doesn't re-trigger.
-        history.replaceState(null, '', window.location.pathname);
         redirectToHome();
         return;
       }
 
-      // No code, no tokens — maybe detectSessionInUrl already ran
+      // No code, no tokens — maybe detectSessionInUrl already consumed them
+      // before we could, or the user navigated here directly.
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         redirectToHome();
         return;
       }
 
-      showError('No sign-in token in URL.');
+      showError('No sign-in token found. The link may have expired or was already used.');
     }
 
     async function redirectToHome() {
-      // Read the user's preferred_lang from their profile (public.users).
-      // Fall back to browser language, then en.
       let lang: 'en' | 'es' = 'en';
       try {
         const supabase = getSupabase();
@@ -116,6 +129,14 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
       window.location.replace(`/${lang}/`);
     }
 
-    run();
+    // Timeout: if the callback hasn't resolved in 8 seconds, show an
+    // actionable error instead of spinning forever.
+    const timeout = setTimeout(() => {
+      if (!errorBox?.classList.contains('hidden')) return; // already showing error
+      if (working?.classList.contains('hidden')) return;   // already redirected
+      showError('Sign-in is taking too long. The link may have expired — try requesting a new code.');
+    }, 8000);
+
+    run().finally(() => clearTimeout(timeout));
   </script>
 </BaseLayout>
