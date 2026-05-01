@@ -241,6 +241,9 @@ CREATE TABLE IF NOT EXISTS public.observations (
                         CHECK (evidence_type IN
                           ('direct_sighting','track','scat','burrow','nest','feather','bone','sound','camera_trap')),
 
+  -- Content sensitivity (v1.1+): blur/gate graphic photos (dead animals, predation, wounds)
+  content_sensitive  boolean NOT NULL DEFAULT false,
+
   -- Environmental enrichment (auto-filled)
   moon_phase            text,
   moon_illumination     numeric CHECK (moon_illumination BETWEEN 0 AND 1),
@@ -280,6 +283,9 @@ CREATE INDEX IF NOT EXISTS idx_obs_sync ON observations(sync_status) WHERE sync_
 CREATE INDEX IF NOT EXISTS idx_obs_primary_taxon ON observations(primary_taxon_id);
 CREATE INDEX IF NOT EXISTS idx_obs_public ON observations(sync_status, obscure_level)
   WHERE sync_status = 'synced';
+
+-- Idempotent column add for existing databases (v1.1+)
+ALTER TABLE public.observations ADD COLUMN IF NOT EXISTS content_sensitive boolean NOT NULL DEFAULT false;
 
 -- ============================================================
 -- IDENTIFICATIONS

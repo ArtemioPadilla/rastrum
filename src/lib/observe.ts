@@ -44,6 +44,7 @@ export interface ObservationDraft {
   weather?: WeatherTag | null;
   evidenceType?: EvidenceType;
   notes?: string | null;
+  contentSensitive?: boolean;
   appVersion?: string;
   deviceOs?: string | null;
   /**
@@ -85,6 +86,7 @@ export function buildObservation(draft: ObservationDraft): Observation {
     habitat:       draft.habitat       ?? null,
     weather:       draft.weather       ?? null,
     evidenceType:  draft.evidenceType  ?? 'direct_sighting',
+    contentSensitive: draft.contentSensitive ?? false,
     notes:         draft.notes         ?? null,
     moonPhase: null,
     moonIllumination: null,

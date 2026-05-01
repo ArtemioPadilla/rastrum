@@ -91,6 +91,7 @@ export interface Observation {
   habitat: HabitatType | null;
   weather: WeatherTag | null;
   evidenceType: EvidenceType;
+  contentSensitive: boolean;
   notes: string | null;
 
   // Env enrichment, filled post-submission (v1.0+)
