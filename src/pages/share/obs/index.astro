@@ -28,6 +28,54 @@ const lang: 'en' | 'es' = 'en';
         const err = document.getElementById('err');
         if (err) { err.textContent = e.message; err.classList.remove('hidden'); }
       });
+
+      // ── Stale-data guard ──
+      // Track when the page was last fetched so we can re-fetch when the
+      // user returns to the tab after being away. This covers:
+      //   - AI cascade completing while the user was on another tab
+      //   - Species correction saved in the manage panel (same or other tab)
+      //   - Another user suggesting an identification
+      let lastFetchedAt = Date.now();
+      const STALE_THRESHOLD_MS = 30_000; // 30 seconds
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState !== 'visible') return;
+        if (Date.now() - lastFetchedAt < STALE_THRESHOLD_MS) return;
+        refreshObservationData(id);
+      });
+
+      // Listen for in-page updates from the manage panel (same tab).
+      window.addEventListener('rastrum:observation-updated', () => {
+        refreshObservationData(id);
+      });
+
+      /**
+       * Re-fetch the primary identification and update the species name
+       * without a full page reload. Lightweight: only queries the
+       * identifications table, not the full observation.
+       */
+      async function refreshObservationData(obsId: string) {
+        lastFetchedAt = Date.now();
+        try {
+          const supabase = getSupabase();
+          const { data: ids } = await supabase
+            .from('identifications')
+            .select('scientific_name, is_primary, is_research_grade, confidence')
+            .eq('observation_id', obsId)
+            .order('created_at', { ascending: false });
+
+          if (ids && ids.length > 0) {
+            const primary = (ids as Array<{ scientific_name: string; is_primary: boolean }>)
+              .find(i => i.is_primary) ?? ids[0];
+            const speciesEl = document.getElementById('species');
+            if (speciesEl && primary.scientific_name) {
+              speciesEl.textContent = primary.scientific_name;
+            }
+          }
+        } catch {
+          // Silent — background refresh, not user-initiated.
+        }
+      }
     }
 
     async function load(id: string) {
