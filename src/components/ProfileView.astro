@@ -27,6 +27,8 @@ const myObservationsPath = getLocalizedPath(lang, routes.profileObservations[loc
 const settingsPath       = getLocalizedPath(lang, routes.profileSettings[locale] + '/profile/');
 const publicProfileBase  = getLocalizedPath(lang, routes.profileUser[locale] + '/');
 const k = (tr as unknown as { karma: Record<string, string> }).karma;
+const expertApplyPath = getLocalizedPath(lang, lang === 'es' ? '/es/perfil/aplicar-experto/' : '/en/profile/expert-apply/');
+const ep = (tr as unknown as { profile: { expert_prompt: Record<string, string> } }).profile.expert_prompt;
 ---
 
 <div class="max-w-3xl mx-auto pb-28 sm:pb-6">
@@ -99,9 +101,29 @@ const k = (tr as unknown as { karma: Record<string, string> }).karma;
       </div>
     </header>
 
+    <!-- Expert-apply CTA (#223) — shown only when user qualifies and hasn't dismissed -->
+    <div id="expert-prompt" class="hidden rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 p-4 mb-6">
+      <p class="text-sm font-semibold text-amber-800 dark:text-amber-300" id="expert-prompt-heading">{ep.heading}</p>
+      <p class="text-xs text-zinc-600 dark:text-zinc-400 mt-1" id="expert-prompt-body"></p>
+      <div class="flex gap-2 mt-3 flex-wrap">
+        <a href={expertApplyPath}
+          class="min-h-[36px] rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-xs px-4 flex items-center transition-colors">
+          {ep.cta}
+        </a>
+        <button type="button" id="expert-prompt-dismiss"
+          class="min-h-[36px] rounded-lg border border-zinc-300 dark:border-zinc-700 text-xs px-4 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors">
+          {ep.dismiss}
+        </button>
+      </div>
+    </div>
+
+    <!-- Expert-pending notice — shown when application is under review -->
+    <div id="expert-pending" class="hidden rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 px-4 py-3 mb-6 text-xs text-blue-800 dark:text-blue-300">
+      {ep.pending}
+    </div>
+
     <!-- Stats row -->
-    <section class="grid grid-cols-3 gap-3 mb-8">
-      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4">
+    <section class="grid grid-cols-3 gap-3 mb-8">      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4">
         <p class="text-2xl font-bold text-zinc-900 dark:text-zinc-100" id="stat-observations">0</p>
         <p class="text-xs text-zinc-500 dark:text-zinc-400">{tr.profile.total_observations}</p>
       </div>
@@ -293,6 +315,53 @@ const k = (tr as unknown as { karma: Record<string, string> }).karma;
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id);
     if (statWatchlist) statWatchlist.textContent = String(watchlistCount ?? 0);
+
+    // Expert-apply CTA (#223)
+    void (async () => {
+      try {
+        const { evaluateExpertEligibility } = await import('../lib/expert');
+        const DISMISS_KEY = 'rastrum.profile.expertPromptDismissed';
+        const dismissed = sessionStorage.getItem(DISMISS_KEY) === '1';
+
+        const { data: expertiseRow } = await supabase
+          .from('user_expertise')
+          .select('taxon_count')
+          .eq('user_id', user.id)
+          .maybeSingle<{ taxon_count: number }>();
+
+        const eligibility = evaluateExpertEligibility(
+          {
+            species_count: profile.species_count ?? 0,
+            is_expert: profile.is_expert ?? false,
+            expert_application_status: (profile as unknown as { expert_application_status?: string | null }).expert_application_status as 'pending' | 'approved' | 'rejected' | null,
+          },
+          { taxon_count: expertiseRow?.taxon_count ?? 0 },
+        );
+
+        const promptEl  = document.getElementById('expert-prompt');
+        const pendingEl = document.getElementById('expert-pending');
+        const bodyEl    = document.getElementById('expert-prompt-body');
+        const isEs      = document.documentElement.lang === 'es';
+
+        if (eligibility.reason === 'pending') {
+          pendingEl?.classList.remove('hidden');
+        } else if (eligibility.qualifies && !dismissed && promptEl) {
+          const bodyTpl = isEs
+            ? `Has identificado {species} especies en {taxa} taxones distintos. Aplica al estatus de experto para que tus validaciones tengan 3× de peso.`
+            : `You've identified {species} species across {taxa} different taxa. Apply for expert status to get 3× weight on community validations.`;
+          if (bodyEl) {
+            bodyEl.textContent = bodyTpl
+              .replace('{species}', String(eligibility.speciesCount))
+              .replace('{taxa}', String(eligibility.taxonCount));
+          }
+          promptEl.classList.remove('hidden');
+          document.getElementById('expert-prompt-dismiss')?.addEventListener('click', () => {
+            sessionStorage.setItem(DISMISS_KEY, '1');
+            promptEl.classList.add('hidden');
+          }, { once: true });
+        }
+      } catch { /* non-fatal */ }
+    })();
 
     // Badges
     if (profile.gamification_opt_in) {
