@@ -1,0 +1,183 @@
+---
+import { t } from '../../i18n/utils';
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+const c = (tr as unknown as { console: Record<string, string> }).console;
+const isEs = lang === 'es';
+---
+
+<section class="max-w-5xl">
+  <div id="ea-not-auth" class="hidden rounded border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-900 dark:text-amber-100">{c.not_authorized}</div>
+  <div id="ea-shell" class="hidden space-y-4">
+    <div class="flex items-center justify-between flex-wrap gap-2">
+      <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">{c.expertApplications}</h2>
+      <select id="ea-status-filter" class="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1 text-sm">
+        <option value="pending">{c.expert_apps_status_pending}</option>
+        <option value="approved">{c.expert_apps_status_approved}</option>
+        <option value="rejected">{c.expert_apps_status_rejected}</option>
+        <option value="">{isEs ? 'Todos' : 'All'}</option>
+      </select>
+    </div>
+    <div id="ea-loading" class="text-sm text-zinc-500 italic">{isEs ? 'Cargando...' : 'Loading...'}</div>
+    <div id="ea-empty" class="hidden text-sm text-zinc-500">{c.expert_apps_empty}</div>
+    <div id="ea-list" class="hidden space-y-2"></div>
+    <nav id="ea-pager" class="hidden flex items-center justify-between text-sm">
+      <button id="ea-prev" class="px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 disabled:opacity-50">←</button>
+      <span id="ea-page" class="text-zinc-500"></span>
+      <button id="ea-next" class="px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 disabled:opacity-50">→</button>
+    </nav>
+    <!-- Slide-over -->
+    <div id="ea-slideover" class="hidden fixed inset-0 z-50">
+      <div id="ea-backdrop" class="absolute inset-0 bg-black/40"></div>
+      <div class="absolute right-0 top-0 bottom-0 w-full max-w-md bg-white dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-800 shadow-xl overflow-y-auto p-6 space-y-4">
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100" id="ea-detail-heading"></h3>
+          <button id="ea-close" class="text-zinc-400 hover:text-zinc-600 text-xl" aria-label="Close">&times;</button>
+        </div>
+        <dl class="space-y-3 text-sm">
+          <div><dt class="text-xs font-medium text-zinc-500 uppercase">{isEs ? 'Estado' : 'Status'}</dt><dd id="ea-detail-status" class="mt-0.5"></dd></div>
+          <div><dt class="text-xs font-medium text-zinc-500 uppercase">{isEs ? 'Solicitante' : 'Applicant'}</dt><dd id="ea-detail-user" class="mt-0.5 font-mono text-xs break-all"></dd></div>
+          <div><dt class="text-xs font-medium text-zinc-500 uppercase">{isEs ? 'Enviado' : 'Submitted'}</dt><dd id="ea-detail-date" class="mt-0.5"></dd></div>
+          <div><dt class="text-xs font-medium text-zinc-500 uppercase">{c.expert_apps_taxa}</dt><dd id="ea-detail-taxa" class="mt-0.5"></dd></div>
+          <div><dt class="text-xs font-medium text-zinc-500 uppercase">{c.expert_apps_rationale}</dt><dd id="ea-detail-rationale" class="mt-0.5 whitespace-pre-wrap"></dd></div>
+        </dl>
+        <div id="ea-action-section" class="space-y-3 border-t border-zinc-200 dark:border-zinc-800 pt-4">
+          <div>
+            <label for="ea-note" class="text-xs font-medium text-zinc-500 uppercase">{c.expert_apps_reviewer_note}</label>
+            <p class="text-[10px] text-zinc-400">{c.expert_apps_reviewer_note_required}</p>
+            <textarea id="ea-note" rows="3" class="mt-1 w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm resize-none"></textarea>
+          </div>
+          <div class="flex gap-2">
+            <button id="ea-reject-btn" class="min-h-[36px] rounded-lg border border-red-300 dark:border-red-700 text-red-700 dark:text-red-400 text-sm font-semibold px-4 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors">{c.expert_apps_reject}</button>
+            <button id="ea-approve-btn" class="min-h-[36px] rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-semibold px-4 transition-colors">{c.expert_apps_approve}</button>
+          </div>
+          <div id="ea-action-error" class="hidden text-sm text-red-600"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  import { getSupabase } from '../../lib/supabase';
+  import { escapeHtml } from '../../lib/escape';
+  const isEs = document.documentElement.lang === 'es';
+  const shell = document.getElementById('ea-shell');
+  const notAuth = document.getElementById('ea-not-auth');
+  const loading = document.getElementById('ea-loading');
+  const emptyEl = document.getElementById('ea-empty');
+  const listEl = document.getElementById('ea-list');
+  const pager = document.getElementById('ea-pager');
+  const pageLabel = document.getElementById('ea-page');
+  const prevBtn = document.getElementById('ea-prev') as HTMLButtonElement | null;
+  const nextBtn = document.getElementById('ea-next') as HTMLButtonElement | null;
+  const statusFilter = document.getElementById('ea-status-filter') as HTMLSelectElement | null;
+  const slideover = document.getElementById('ea-slideover');
+  const PAGE_SIZE = 50;
+  let page = 1;
+  let selectedApp: Record<string, unknown> | null = null;
+  let cachedRows: Record<string, unknown>[] = [];
+
+  function statusPill(s: string): string {
+    const cls: Record<string, string> = { pending: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300', approved: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300', rejected: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300' };
+    return `<span class="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded ${cls[s] ?? 'bg-zinc-100 text-zinc-600'}">${escapeHtml(s)}</span>`;
+  }
+
+  async function load(): Promise<void> {
+    if (!listEl || !loading || !emptyEl) return;
+    loading.classList.remove('hidden'); emptyEl.classList.add('hidden'); listEl.classList.add('hidden'); pager?.classList.add('hidden');
+    const sb = getSupabase();
+    const status = statusFilter?.value || '';
+    let q = sb.from('expert_applications').select('*', { count: 'exact' }).order('created_at', { ascending: false }).range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
+    if (status) q = q.eq('status', status);
+    const { data: rows, count, error } = await q;
+    loading.classList.add('hidden');
+    if (error) { listEl.innerHTML = `<p class="text-sm text-red-600">${escapeHtml(error.message)}</p>`; listEl.classList.remove('hidden'); return; }
+    if (!rows?.length) { emptyEl.classList.remove('hidden'); return; }
+    cachedRows = rows as Record<string, unknown>[];
+    listEl.innerHTML = cachedRows.map(r => {
+      const taxa = (r.taxa as string[] ?? []).join(', ');
+      const date = new Date(r.created_at as string).toLocaleDateString();
+      return `<button type="button" data-id="${escapeHtml(r.id as string)}" class="ea-row w-full text-left rounded-lg border border-zinc-200 dark:border-zinc-800 p-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors flex items-center justify-between gap-2"><div class="min-w-0"><p class="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">${escapeHtml((r.user_id as string).slice(0, 8))}…</p><p class="text-xs text-zinc-500 truncate">${escapeHtml(taxa)} · ${escapeHtml(date)}</p></div>${statusPill(r.status as string)}</button>`;
+    }).join('');
+    listEl.classList.remove('hidden');
+    const total = count ?? 0; const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    if (pageLabel) pageLabel.textContent = `${page} / ${totalPages}`;
+    if (prevBtn) prevBtn.disabled = page <= 1;
+    if (nextBtn) nextBtn.disabled = page * PAGE_SIZE >= total;
+    pager?.classList.remove('hidden');
+    listEl.querySelectorAll('.ea-row').forEach(btn => btn.addEventListener('click', () => {
+      const app = cachedRows.find(r => r.id === (btn as HTMLElement).dataset.id);
+      if (app) openDetail(app);
+    }));
+  }
+
+  function openDetail(app: Record<string, unknown>): void {
+    selectedApp = app;
+    const h = document.getElementById('ea-detail-heading');
+    if (h) h.textContent = (app.user_id as string).slice(0, 8) + '…';
+    const s = document.getElementById('ea-detail-status'); if (s) s.innerHTML = statusPill(app.status as string);
+    const u = document.getElementById('ea-detail-user'); if (u) u.textContent = app.user_id as string;
+    const d = document.getElementById('ea-detail-date'); if (d) d.textContent = new Date(app.created_at as string).toLocaleString();
+    const t = document.getElementById('ea-detail-taxa'); if (t) t.textContent = (app.taxa as string[] ?? []).join(', ');
+    const r = document.getElementById('ea-detail-rationale'); if (r) r.textContent = (app.rationale as string) ?? '';
+    const n = document.getElementById('ea-note') as HTMLTextAreaElement | null; if (n) n.value = '';
+    const e = document.getElementById('ea-action-error'); if (e) e.classList.add('hidden');
+    document.getElementById('ea-action-section')?.classList.toggle('hidden', app.status !== 'pending');
+    slideover?.classList.remove('hidden'); document.body.style.overflow = 'hidden';
+  }
+
+  function closeDetail(): void { slideover?.classList.add('hidden'); document.body.style.overflow = ''; selectedApp = null; }
+
+  async function callAdmin(action: string, payload: Record<string, unknown>): Promise<void> {
+    const sb = getSupabase();
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) throw new Error('Not authenticated');
+    const url = import.meta.env.PUBLIC_SUPABASE_URL || (sb as unknown as { supabaseUrl: string }).supabaseUrl;
+    const res = await fetch(`${url}/functions/v1/admin`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` }, body: JSON.stringify({ action, payload, reason: 'Console action' }) });
+    if (!res.ok) { const b = await res.json().catch(() => ({})); throw new Error((b as { error?: string }).error ?? `HTTP ${res.status}`); }
+  }
+
+  function showToast(msg: string): void {
+    const el = document.createElement('div');
+    el.className = 'fixed top-4 left-1/2 -translate-x-1/2 z-[60] rounded-xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 px-5 py-3 text-sm shadow-lg max-w-[340px] text-center pointer-events-none';
+    el.textContent = msg; document.body.appendChild(el); setTimeout(() => el.remove(), 3000);
+  }
+
+  (async () => {
+    const sb = getSupabase();
+    const { data: { user } } = await sb.auth.getUser();
+    if (!user) { notAuth?.classList.remove('hidden'); return; }
+    const { data: roles } = await sb.from('user_roles').select('role').eq('user_id', user.id).eq('role', 'admin');
+    if (!roles?.length) { notAuth?.classList.remove('hidden'); return; }
+    shell?.classList.remove('hidden');
+    const params = new URLSearchParams(window.location.search);
+    if (statusFilter && params.has('status')) statusFilter.value = params.get('status') ?? 'pending';
+    await load();
+  })();
+
+  statusFilter?.addEventListener('change', () => { page = 1; void load(); });
+  prevBtn?.addEventListener('click', () => { page = Math.max(1, page - 1); void load(); });
+  nextBtn?.addEventListener('click', () => { page++; void load(); });
+  document.getElementById('ea-close')?.addEventListener('click', closeDetail);
+  document.getElementById('ea-backdrop')?.addEventListener('click', closeDetail);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDetail(); });
+
+  document.getElementById('ea-approve-btn')?.addEventListener('click', async () => {
+    if (!selectedApp) return;
+    const errEl = document.getElementById('ea-action-error');
+    try { await callAdmin('expert_app.approve', { application_id: selectedApp.id }); showToast(isEs ? 'Solicitud aprobada.' : 'Application approved.'); closeDetail(); await load(); }
+    catch (err) { if (errEl) { errEl.textContent = (err as Error).message; errEl.classList.remove('hidden'); } }
+  });
+
+  document.getElementById('ea-reject-btn')?.addEventListener('click', async () => {
+    if (!selectedApp) return;
+    const noteEl = document.getElementById('ea-note') as HTMLTextAreaElement | null;
+    const errEl = document.getElementById('ea-action-error');
+    const note = noteEl?.value.trim() ?? '';
+    if (!note) { if (errEl) { errEl.textContent = isEs ? 'La nota del revisor es requerida.' : 'Reviewer note is required.'; errEl.classList.remove('hidden'); } return; }
+    try { await callAdmin('expert_app.reject', { application_id: selectedApp.id, reviewer_note: note }); showToast(isEs ? 'Solicitud rechazada.' : 'Application rejected.'); closeDetail(); await load(); }
+    catch (err) { if (errEl) { errEl.textContent = (err as Error).message; errEl.classList.remove('hidden'); } }
+  });
+</script>
