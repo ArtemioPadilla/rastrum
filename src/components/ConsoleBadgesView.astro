@@ -1,5 +1,6 @@
 ---
 import { t } from '../i18n/utils';
+import ConsoleSlideOver from './ConsoleSlideOver.astro';
 
 interface Props { lang: 'en' | 'es' }
 const { lang } = Astro.props;
@@ -131,6 +132,25 @@ const tr = t(lang);
 
   <p id="badges-error" class="hidden mt-3 text-sm text-red-600 dark:text-red-400"></p>
 </section>
+
+<!-- Badge revoke slide-over — irreversible={true} enables the
+     "Require approval" checkbox for the two-person rule. -->
+<ConsoleSlideOver
+  lang={lang}
+  id="console-slideover-badge-revoke"
+  titleKey={tr.console.badges_revoke_btn}
+  irreversible={true}
+  reasonTemplates={[
+    tr.console.reason_policy_violation,
+    tr.console.reason_awarded_in_error,
+    tr.console.quick_reason_custom,
+  ]}
+>
+  <label class="block text-sm">
+    <span class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.console.badges_award_user_label}</span>
+    <input id="badge-revoke-target-user" type="text" class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm font-mono" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+  </label>
+</ConsoleSlideOver>
 
 <script>
   import { getSupabase } from '../lib/supabase';
@@ -379,27 +399,56 @@ const tr = t(lang);
     });
 
     document.getElementById('badges-btn-revoke')?.addEventListener('click', async () => {
-      if (!selectedKey || !sessionToken) return;
-      const targetUserId = (document.getElementById('badges-award-target-user') as HTMLInputElement).value.trim();
-      if (!targetUserId) {
-        showActionMsg('Enter the target user ID in the award form field to revoke.', true);
-        show('badges-award-form');
-        return;
+      if (!selectedKey) return;
+      // Pre-fill the target user field from the award form if available
+      const awardUserInput = document.getElementById('badges-award-target-user') as HTMLInputElement | null;
+      const revokeUserInput = document.getElementById('badge-revoke-target-user') as HTMLInputElement | null;
+      if (revokeUserInput && awardUserInput?.value) {
+        revokeUserInput.value = awardUserInput.value;
+      } else if (revokeUserInput) {
+        revokeUserInput.value = '';
       }
-      if (!confirm('Revoke this badge from the specified user?')) return;
-      try {
-        await adminClient.badge.revoke(
-          { target_user_id: targetUserId, badge_key: selectedKey },
-          `Admin revoked badge '${selectedKey}' from user ${targetUserId} via console`,
-          sessionToken,
-        );
-        showActionMsg('Badge revoked successfully.', false);
-        await selectBadge(selectedKey);
-      } catch (err) {
-        showActionMsg('Failed to revoke badge: ' + (err as Error).message, true);
-      }
+      document.dispatchEvent(new CustomEvent('console:slideover-open', {
+        detail: {
+          id: 'console-slideover-badge-revoke',
+          title: `Revoke badge: ${selectedKey}`,
+          action: 'badge.revoke',
+          payload: { badge_key: selectedKey },
+        },
+      }));
     });
   }
+
+  // Badge revoke via ConsoleSlideOver
+  document.addEventListener('console:slideover-submit', async (ev) => {
+    const { id, action, payload, reason } = (ev as CustomEvent<{ id: string; action: string; payload: Record<string, string>; reason: string }>).detail;
+    if (id !== 'console-slideover-badge-revoke') return;
+
+    const targetUserId = (document.getElementById('badge-revoke-target-user') as HTMLInputElement).value.trim();
+    if (!targetUserId) {
+      document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id, ok: false, error: 'User ID is required.' } }));
+      return;
+    }
+
+    if (!sessionToken) {
+      document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id, ok: false, error: 'Session expired.' } }));
+      return;
+    }
+
+    const badgeKey = payload.badge_key ?? selectedKey ?? '';
+    try {
+      await adminClient.badge.revoke(
+        { target_user_id: targetUserId, badge_key: badgeKey },
+        reason,
+        sessionToken,
+      );
+      document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id, ok: true } }));
+      if (selectedKey) await selectBadge(selectedKey);
+    } catch (err) {
+      const msg = (err as Error).message;
+      document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id, ok: false, error: msg } }));
+    }
+  });
 
   init().catch(err => {
     const e = document.getElementById('badges-error')!;
