@@ -51,6 +51,7 @@ const projectsBase = routes.projects[lang];
 <script>
   import { listProjects } from '../lib/projects';
   import { getSupabase } from '../lib/supabase';
+  import { escapeHtml } from '../lib/escape';
 
   const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
   const root = document.querySelector('[data-projects-base]') as HTMLElement | null;
@@ -115,10 +116,6 @@ const projectsBase = routes.projects[lang];
           <div class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">${area} km²</div>
         </a>
       `;
-    }
-
-    function escapeHtml(s: string): string {
-      return s.replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch] ?? ch);
     }
 
     void load();
