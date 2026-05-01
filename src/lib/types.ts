@@ -119,6 +119,7 @@ export interface UserProfile {
   expert_taxa: string[] | null;
   observer_license: 'CC BY 4.0' | 'CC BY-NC 4.0' | 'CC0';
   observation_count: number;
+  /** @deprecated Use profile_privacy matrix instead (Module 25). Removal planned for v1.2. See docs/runbooks/deprecate-profile-public.md */
   profile_public: boolean;
   /** Module 25 v1.2.0: per-facet privacy matrix. JSONB column. */
   profile_privacy?: Record<string, string> | null;
