@@ -1,54 +1,60 @@
 # MCP Proxy — mcp.rastrum.org
 
-Cloudflare Worker that exposes the Supabase Edge Function at a clean URL:
+Exposes the Supabase Edge Function at a clean URL using Cloudflare routing rules
+(no Worker runtime — just header + path manipulation at the edge):
 
 ```
 https://mcp.rastrum.org  →  https://reppvlqejgoqvitturxp.supabase.co/functions/v1/mcp
 ```
 
-## Why a Worker (not a plain CNAME)
+## Why not a plain CNAME
 
-Supabase uses SNI-based routing — it needs the `Host` header to match the project
-subdomain. A plain CNAME would send `Host: mcp.rastrum.org`, which Supabase doesn't
-recognise. The Worker rewrites the target URL so Cloudflare's fetch sets the correct
-host automatically.
+Supabase uses SNI-based routing — it needs `Host: reppvlqejgoqvitturxp.supabase.co`.
+A plain CNAME forwards `Host: mcp.rastrum.org`, which Supabase doesn't recognise.
+A Cloudflare Worker would fix that but adds an unnecessary runtime hop for what is
+purely a URL rewrite + header override. Cloudflare Rules handle both at the network
+layer with zero additional compute.
 
-## Worker script
+## Setup (Cloudflare dashboard)
 
-Create a new Worker in the Cloudflare dashboard (Workers & Pages → Create) and paste:
+### 1 — DNS
 
-```javascript
-export default {
-  async fetch(request) {
-    const UPSTREAM = 'https://reppvlqejgoqvitturxp.supabase.co/functions/v1/mcp';
+Add a CNAME record in the `rastrum.org` zone:
 
-    const url = new URL(request.url);
-    const target = new URL(UPSTREAM);
-    // Preserve any path suffix the client may add (e.g. /health)
-    target.pathname = UPSTREAM.replace('https://reppvlqejgoqvitturxp.supabase.co', '') + url.pathname.replace(/^\/$/, '');
-    target.search = url.search;
+| Type | Name | Target | Proxy |
+|------|------|--------|-------|
+| CNAME | `mcp` | `reppvlqejgoqvitturxp.supabase.co` | ✅ Proxied (orange cloud) |
 
-    const proxied = new Request(target.toString(), {
-      method:  request.method,
-      headers: request.headers,
-      body:    request.method !== 'GET' && request.method !== 'HEAD' ? request.body : null,
-    });
+### 2 — Transform Rule (path rewrite)
 
-    return fetch(proxied);
-  },
-};
+**Rules → Transform Rules → URL Rewrite → Create rule**
+
+- **When:** `(http.host eq "mcp.rastrum.org")`
+- **Path → Rewrite to… Dynamic:**
+  ```
+  concat("/functions/v1/mcp", http.request.uri.path)
+  ```
+- Save.
+
+This turns `https://mcp.rastrum.org` → path `/functions/v1/mcp` before the request
+leaves Cloudflare.
+
+### 3 — Origin Rule (Host header override)
+
+**Rules → Origin Rules → Create rule**
+
+- **When:** `(http.host eq "mcp.rastrum.org")`
+- **Host Header → Override:** `reppvlqejgoqvitturxp.supabase.co`
+- Save.
+
+Without this, Cloudflare would forward the original `Host: mcp.rastrum.org` and
+Supabase would return 404.
+
+## Verify
+
+```bash
+curl -s -X POST https://mcp.rastrum.org \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"ping"}' | jq .
+# → {"jsonrpc":"2.0","id":1,"result":{}}
 ```
-
-## Deploy steps
-
-1. **Cloudflare dashboard** → Workers & Pages → Create application → Create Worker
-2. Paste the script above → Save and deploy
-3. **Settings → Triggers → Custom Domains** → Add `mcp.rastrum.org`
-   - Cloudflare will provision the TLS certificate automatically
-4. Verify: `curl -X POST https://mcp.rastrum.org -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"0"}}}'`
-   - Should return `{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2024-11-05",...}}`
-
-## DNS
-
-No manual DNS record needed — adding the custom domain in Workers triggers Cloudflare
-to create a `AAAA` / `A` record pointing to Workers automatically (orange-cloud).
