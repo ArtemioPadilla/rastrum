@@ -78,6 +78,13 @@ const labels = {
         <!-- The page script replaces innerHTML when audios are found.
              The div stays hidden until then. -->
         <div id="obs-audio-players" class="hidden space-y-3"></div>
+        <!-- Hidden AudioPlayer instance so Astro bundles the <script> that
+             listens for `rastrum:audio-players-ready`. The dynamic HTML
+             injected by the page script creates `.rastrum-audio-player`
+             nodes, but without this anchor the init JS is tree-shaken. -->
+        <div class="hidden" aria-hidden="true">
+          <AudioPlayer audioUrl="" lang={lang} obsId="__anchor" showSpectrogram={false} />
+        </div>
       </aside>
 
       <section class="md:col-span-5 lg:col-span-5 space-y-6">

@@ -190,7 +190,7 @@ const tabs = [
   type Lang = 'en' | 'es';
 
   type Ident = { scientific_name: string; is_primary: boolean; is_research_grade?: boolean };
-  type Media = { url: string; is_primary: boolean };
+  type Media = { url: string; is_primary: boolean; media_type?: string | null };
   type Row = {
     id: string;
     observed_at: string;
@@ -240,7 +240,10 @@ const tabs = [
     const ident = Array.isArray(r.identifications) ? r.identifications[0] : r.identifications;
     const unknown = root?.dataset.labelUnknownSpecies ?? 'Unidentified';
     const name = ident?.scientific_name ?? unknown;
-    const photo = (r.media_files ?? []).find(m => m.is_primary)?.url ?? (r.media_files ?? [])[0]?.url ?? '';
+    const photoMedia = (r.media_files ?? []).filter(m => !m.media_type || m.media_type === 'photo');
+    const audioMedia = (r.media_files ?? []).filter(m => m.media_type === 'audio');
+    const photo = photoMedia.find(m => m.is_primary)?.url ?? photoMedia[0]?.url ?? '';
+    const hasAudioOnly = !photo && audioMedia.length > 0;
     const date = new Date(r.observed_at).toLocaleDateString(lang === 'es' ? 'es' : 'en');
     const region = r.state_province ? ' · ' + r.state_province : '';
     const isSynced = r.sync_status === 'synced';
@@ -291,7 +294,7 @@ const tabs = [
       <div class="flex items-center gap-3 p-3 ${isSynced ? 'hover:bg-zinc-50 dark:hover:bg-zinc-800/40' : 'opacity-90'} ${hiddenOverlayClass}">
         <${wrapTag} ${wrapAttr} class="flex items-center gap-3 min-w-0 flex-1">
           <div class="w-16 h-16 shrink-0 rounded-lg overflow-hidden bg-zinc-100 dark:bg-zinc-800">
-            ${photo ? `<img src="${escapeText(photo)}" alt="${escapeText(name)}" class="w-full h-full object-cover" loading="lazy" />` : ''}
+            ${photo ? `<img src="${escapeText(photo)}" alt="${escapeText(name)}" class="w-full h-full object-cover" loading="lazy" />` : hasAudioOnly ? `<div class="w-full h-full flex items-center justify-center text-zinc-400 dark:text-zinc-500"><svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z"/></svg></div>` : ''}
           </div>
           <div class="min-w-0 flex-1">
             <p class="text-sm italic font-medium text-zinc-900 dark:text-zinc-100 truncate">${escapeText(name)}</p>
@@ -417,7 +420,7 @@ const tabs = [
     const supabase = getSupabase();
     let q = supabase
       .from('observations')
-      .select('id, observed_at, sync_status, state_province, hidden, hidden_reason, identifications(scientific_name, is_primary, is_research_grade), media_files(url, is_primary)')
+      .select('id, observed_at, sync_status, state_province, hidden, hidden_reason, identifications(scientific_name, is_primary, is_research_grade), media_files(url, is_primary, media_type)')
       .eq('observer_id', userId)
       .order('observed_at', { ascending: false })
       .range(offset, offset + PAGE_SIZE - 1);

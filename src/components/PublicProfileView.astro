@@ -136,7 +136,7 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
     observed_at: string;
     state_province: string | null;
     identifications: Array<{ scientific_name: string; is_primary: boolean }> | { scientific_name: string; is_primary: boolean } | null;
-    media_files: Array<{ url: string; is_primary: boolean }>;
+    media_files: Array<{ url: string; is_primary: boolean; media_type?: string | null }>;
   };
 
   type BadgeRow = {
@@ -295,7 +295,7 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
     // Recent observations (top 12)
     const { data: obs } = await supabase
       .from('observations')
-      .select('id, observed_at, state_province, identifications!inner(scientific_name, is_primary), media_files(url, is_primary)')
+      .select('id, observed_at, state_province, identifications!inner(scientific_name, is_primary), media_files(url, is_primary, media_type)')
       .eq('observer_id', profile.id)
       .eq('sync_status', 'synced')
       .eq('identifications.is_primary', true)
@@ -314,7 +314,10 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
     if (obsList) {
       obsList.innerHTML = (obs as ObsRow[]).map(o => {
         const ident = Array.isArray(o.identifications) ? o.identifications[0] : o.identifications;
-        const photo = (o.media_files ?? []).find(m => m.is_primary)?.url ?? (o.media_files ?? [])[0]?.url ?? '';
+        const photoMedia = (o.media_files ?? []).filter(m => !m.media_type || m.media_type === 'photo');
+        const audioMedia = (o.media_files ?? []).filter(m => m.media_type === 'audio');
+        const photo = photoMedia.find(m => m.is_primary)?.url ?? photoMedia[0]?.url ?? '';
+        const hasAudioOnly = !photo && audioMedia.length > 0;
         const date = new Date(o.observed_at).toLocaleDateString(lang === 'es' ? 'es' : 'en');
         const name = ident?.scientific_name ?? unknown;
         const safeName = name.replace(/</g, '&lt;');
@@ -322,7 +325,7 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
         return `<li class="rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50">
           <a href="${shareBase}?id=${o.id}" class="block">
             <div class="aspect-square bg-zinc-100 dark:bg-zinc-800">
-              ${photo ? `<img src="${photo}" alt="${safeName}" class="w-full h-full object-cover" loading="lazy" />` : ''}
+              ${photo ? `<img src="${photo}" alt="${safeName}" class="w-full h-full object-cover" loading="lazy" />` : hasAudioOnly ? `<div class="w-full h-full flex flex-col items-center justify-center gap-1 text-zinc-400 dark:text-zinc-500"><svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z"/></svg><span class="text-[9px] uppercase tracking-wider">Audio</span></div>` : ''}
             </div>
             <div class="p-2">
               <p class="text-xs italic font-medium text-zinc-900 dark:text-zinc-100 truncate">${safeName}</p>

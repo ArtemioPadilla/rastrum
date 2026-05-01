@@ -157,7 +157,7 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
     id: string;
     location: GeoJSON.Point | null;
     observed_at: string;
-    media_files: { url: string | null; is_primary: boolean | null }[];
+    media_files: { url: string | null; is_primary: boolean | null; media_type?: string | null }[];
   };
 
   function escapeText(s: string): string {
@@ -473,7 +473,7 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
     try {
       const { data, error } = await supabase
         .from('observations')
-        .select('id, location, observed_at, media_files(url, is_primary)')
+        .select('id, location, observed_at, media_files(url, is_primary, media_type)')
         .eq('sync_status', 'synced')
         .eq('primary_taxon_id', taxon.id)
         .order('observed_at', { ascending: false })
@@ -486,11 +486,12 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
 
     if (photosEl) {
       const top = obsRows
-        .filter(o => (o.media_files ?? []).some(m => m?.url))
+        .filter(o => (o.media_files ?? []).some(m => m?.url && (!m.media_type || m.media_type === 'photo')))
         .slice(0, 6)
         .map(o => {
-          const media = (o.media_files ?? []).find(m => m?.is_primary && m?.url) ?? (o.media_files ?? []).find(m => m?.url);
-          const url = media?.url ?? '';
+          const media = (o.media_files ?? []).filter(m => !m?.media_type || m.media_type === 'photo');
+          const pick = media.find(m => m?.is_primary && m?.url) ?? media.find(m => m?.url);
+          const url = pick?.url ?? '';
           return `<li><a href="${shareBase}?id=${encodeURIComponent(o.id)}" class="block aspect-square overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-800"><img src="${escapeText(url)}" alt="${escapeText(taxon!.scientific_name)}" loading="lazy" class="w-full h-full object-cover" /></a></li>`;
         });
       photosEl.innerHTML = top.join('');

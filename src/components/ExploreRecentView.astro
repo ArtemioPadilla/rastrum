@@ -104,7 +104,7 @@ const sgReport = sgTree.socialgraph.report.button;
     taxa: { common_name_es: string | null; common_name_en: string | null } | null;
   };
 
-  type Media = { url: string | null; is_primary: boolean | null };
+  type Media = { url: string | null; is_primary: boolean | null; media_type: string | null };
 
   type Observer = {
     id: string;
@@ -171,7 +171,10 @@ const sgReport = sgTree.socialgraph.report.button;
       ? (ident?.taxa?.common_name_es ?? ident?.taxa?.common_name_en ?? '')
       : (ident?.taxa?.common_name_en ?? ident?.taxa?.common_name_es ?? '');
     const confidence = typeof ident?.confidence === 'number' ? Math.max(0, Math.min(1, ident.confidence)) : null;
-    const photo = (r.media_files ?? []).find(m => m?.is_primary)?.url ?? (r.media_files ?? []).find(m => !!m?.url)?.url ?? '';
+    const photoMedia = (r.media_files ?? []).filter(m => !m?.media_type || m.media_type === 'photo');
+    const audioMedia = (r.media_files ?? []).filter(m => m?.media_type === 'audio');
+    const photo = photoMedia.find(m => m?.is_primary)?.url ?? photoMedia.find(m => !!m?.url)?.url ?? '';
+    const hasAudioOnly = !photo && audioMedia.length > 0;
     const ago = formatTimeAgo(r.observed_at, lang);
     const isPublic = canShowRealName(observer, viewerAuthed);
     const observerName = isPublic ? (observer?.display_name || observer?.username || '') : '';
@@ -229,7 +232,9 @@ const sgReport = sgTree.socialgraph.report.button;
         <div class="aspect-square w-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
           ${photo
             ? `<img src="${escapeText(photo)}" alt="${escapeText(sci)}" loading="lazy" class="w-full h-full object-cover" />`
-            : ''}
+            : hasAudioOnly
+              ? `<div class="w-full h-full flex flex-col items-center justify-center gap-2 text-zinc-400 dark:text-zinc-500"><svg class="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z"/></svg><span class="text-[10px] font-medium uppercase tracking-wider">${lang === 'es' ? 'Audio' : 'Audio'}</span></div>`
+              : ''}
         </div>
         <div class="p-3 space-y-1">
           <p class="text-sm italic font-semibold text-zinc-900 dark:text-zinc-100 truncate">${escapeText(sci)}</p>
@@ -306,7 +311,7 @@ const sgReport = sgTree.socialgraph.report.button;
         .select(`
           id, observed_at, state_province, observer_id,
           identifications(scientific_name, is_primary, is_research_grade, confidence, taxa(common_name_es, common_name_en)),
-          media_files(url, is_primary),
+          media_files(url, is_primary, media_type),
           users:observer_id(id, username, display_name, profile_public, profile_privacy)
         `)
         .eq('sync_status', 'synced')
