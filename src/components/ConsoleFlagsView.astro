@@ -4,47 +4,191 @@ import { t } from '../i18n/utils';
 interface Props { lang: 'en' | 'es' }
 const { lang } = Astro.props;
 const tr = t(lang);
+const c = (tr as unknown as { console: Record<string, string> }).console;
+const isEs = lang === 'es';
 ---
 
 <section class="max-w-5xl">
   <div id="flags-not-auth" class="hidden rounded border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-900 dark:text-amber-100">
-    {tr.console.not_authorized}
+    {c.not_authorized}
   </div>
 
-  <div id="flags-shell" class="hidden">
-    <div class="rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-8 text-center space-y-3">
-      <p class="text-sm font-medium text-zinc-600 dark:text-zinc-400">{tr.console.stub_coming_soon}</p>
-      <p class="text-xs text-zinc-500 dark:text-zinc-400">{tr.console.flags_stub_hint}</p>
-      <a
-        href="https://github.com/ArtemioPadilla/rastrum/issues/259"
-        target="_blank"
-        rel="noopener"
-        class="inline-block text-xs text-zinc-500 dark:text-zinc-400 underline"
-      >
-        {tr.console.stub_track_issue}
-      </a>
+  <div id="flags-shell" class="hidden space-y-4">
+    <div class="flex items-center justify-between flex-wrap gap-2">
+      <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+        {isEs ? 'Contenido reportado' : 'Flagged content'}
+      </h2>
+      <div class="flex items-center gap-2">
+        <select id="flags-status-filter" class="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-1.5 text-sm">
+          <option value="pending">{isEs ? 'Pendientes' : 'Pending'}</option>
+          <option value="resolved">{isEs ? 'Resueltos' : 'Resolved'}</option>
+          <option value="all">{isEs ? 'Todos' : 'All'}</option>
+        </select>
+        <button id="flags-refresh" type="button" class="rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
+          {isEs ? 'Actualizar' : 'Refresh'}
+        </button>
+      </div>
     </div>
+
+    <div id="flags-loading" class="text-sm text-zinc-500 dark:text-zinc-400 italic">
+      {isEs ? 'Cargando reportes...' : 'Loading flags...'}
+    </div>
+
+    <div id="flags-empty" class="hidden rounded-lg border border-zinc-200 dark:border-zinc-800 p-8 text-center">
+      <p class="text-zinc-500 dark:text-zinc-400">
+        {isEs ? 'No hay contenido reportado pendiente.' : 'No pending flagged content.'}
+      </p>
+    </div>
+
+    <div id="flags-list" class="hidden space-y-2"></div>
+
+    <nav id="flags-pager" class="hidden flex items-center justify-between text-sm">
+      <button id="flags-prev" type="button" class="px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 disabled:opacity-50" disabled>
+        ←
+      </button>
+      <span id="flags-page" class="text-zinc-500"></span>
+      <button id="flags-next" type="button" class="px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 disabled:opacity-50" disabled>
+        →
+      </button>
+    </nav>
   </div>
 </section>
 
 <script>
   import { getSupabase } from '../lib/supabase';
   import { getUserRoles } from '../lib/user-roles';
+  import { escapeHtml } from '../lib/escape';
+
+  const PAGE_SIZE = 20;
+  let currentPage = 0;
+  let currentFilter = 'pending';
+
+  const isEs = document.documentElement.lang === 'es';
+  const shell = document.getElementById('flags-shell');
+  const notAuth = document.getElementById('flags-not-auth');
+  const listEl = document.getElementById('flags-list');
+  const loadingEl = document.getElementById('flags-loading');
+  const emptyEl = document.getElementById('flags-empty');
+  const pagerEl = document.getElementById('flags-pager');
+  const pageLabel = document.getElementById('flags-page');
+  const prevBtn = document.getElementById('flags-prev') as HTMLButtonElement | null;
+  const nextBtn = document.getElementById('flags-next') as HTMLButtonElement | null;
+  const filterEl = document.getElementById('flags-status-filter') as HTMLSelectElement | null;
+  const refreshBtn = document.getElementById('flags-refresh');
 
   function show(id: string) { document.getElementById(id)?.classList.remove('hidden'); }
 
-  const supabase = getSupabase();
+  function statusPill(s: string): string {
+    const cls: Record<string, string> = {
+      pending: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
+      resolved: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
+    };
+    return `<span class="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded ${cls[s] ?? 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300'}">${escapeHtml(s)}</span>`;
+  }
 
-  async function init() {
+  async function loadFlags(): Promise<void> {
+    if (!listEl || !loadingEl) return;
+    loadingEl.classList.remove('hidden');
+    emptyEl?.classList.add('hidden');
+    listEl.classList.add('hidden');
+    listEl.innerHTML = '';
+    pagerEl?.classList.add('hidden');
+
+    try {
+      const supabase = getSupabase();
+      let query = supabase
+        .from('flags')
+        .select('*, users!reporter_id(display_name, username)', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE - 1);
+
+      if (currentFilter !== 'all') {
+        query = query.eq('status', currentFilter);
+      }
+
+      const { data, count, error } = await query;
+      loadingEl.classList.add('hidden');
+
+      if (error) {
+        listEl.innerHTML = `<p class="text-sm text-red-600">${escapeHtml(error.message)}</p>`;
+        listEl.classList.remove('hidden');
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        emptyEl?.classList.remove('hidden');
+        return;
+      }
+
+      for (const flag of data) {
+        const reporter = Array.isArray(flag.users) ? flag.users[0] : flag.users;
+        const reporterName = reporter?.display_name || reporter?.username || 'Anonymous';
+        const date = new Date(flag.created_at as string).toLocaleDateString(
+          isEs ? 'es' : 'en',
+          { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' },
+        );
+        const statusColor = flag.status === 'pending'
+          ? 'text-amber-600'
+          : 'text-emerald-600';
+
+        const row = document.createElement('div');
+        row.className = 'rounded-lg border border-zinc-200 dark:border-zinc-800 p-3 flex items-start justify-between gap-3';
+        row.innerHTML = `
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 text-sm">
+              <span class="font-medium text-zinc-900 dark:text-zinc-100">${escapeHtml(String(flag.target_type))}/${escapeHtml(String(flag.target_id).slice(0, 8))}</span>
+              ${statusPill(flag.status as string)}
+            </div>
+            <p class="text-xs text-zinc-500 mt-0.5 truncate">${escapeHtml(String(flag.reason ?? (isEs ? 'Sin razón' : 'No reason')))}</p>
+            <p class="text-xs text-zinc-400 mt-0.5">${escapeHtml(String(reporterName))} · ${escapeHtml(date)}</p>
+          </div>
+        `;
+        listEl.appendChild(row);
+      }
+
+      listEl.classList.remove('hidden');
+
+      const total = count ?? 0;
+      const totalPages = Math.ceil(total / PAGE_SIZE);
+      if (totalPages > 1) {
+        pagerEl?.classList.remove('hidden');
+        if (pageLabel) pageLabel.textContent = `${currentPage + 1} / ${totalPages}`;
+        if (prevBtn) prevBtn.disabled = currentPage === 0;
+        if (nextBtn) nextBtn.disabled = currentPage >= totalPages - 1;
+      }
+    } catch (err) {
+      loadingEl.classList.add('hidden');
+      if (listEl) {
+        listEl.innerHTML = `<p class="text-sm text-red-600">${escapeHtml((err as Error).message)}</p>`;
+        listEl.classList.remove('hidden');
+      }
+    }
+  }
+
+  filterEl?.addEventListener('change', () => {
+    currentFilter = filterEl.value;
+    currentPage = 0;
+    void loadFlags();
+  });
+
+  prevBtn?.addEventListener('click', () => {
+    if (currentPage > 0) { currentPage--; void loadFlags(); }
+  });
+  nextBtn?.addEventListener('click', () => {
+    currentPage++;
+    void loadFlags();
+  });
+  refreshBtn?.addEventListener('click', () => void loadFlags());
+
+  (async () => {
+    const supabase = getSupabase();
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) { show('flags-not-auth'); return; }
     const myRoles = await getUserRoles(session.user.id);
-    if (!myRoles.has('admin')) {
-      show('flags-not-auth');
-      return;
-    }
-    show('flags-shell');
-  }
-
-  init().catch(() => { show('flags-not-auth'); });
+    if (!myRoles.has('admin')) { show('flags-not-auth'); return; }
+    shell?.classList.remove('hidden');
+    const params = new URLSearchParams(window.location.search);
+    if (filterEl && params.has('status')) filterEl.value = params.get('status') ?? 'pending';
+    await loadFlags();
+  })().catch(() => { show('flags-not-auth'); });
 </script>

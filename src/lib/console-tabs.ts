@@ -30,7 +30,7 @@ export const CONSOLE_TABS: ConsoleTab[] = [
   { id: 'badges',         role: 'admin',     routeKey: 'consoleBadges',           i18nKey: 'console.badges',       icon: 'star',        phase: 4 },
   { id: 'taxa',           role: 'admin',     routeKey: 'consoleTaxa',             i18nKey: 'console.taxa',         icon: 'tree',        phase: 4 },
   { id: 'karma',          role: 'admin',     routeKey: 'consoleKarma',            i18nKey: 'console.karma',        icon: 'sparkles',    phase: 4 },
-  { id: 'flags',          role: 'admin',     routeKey: 'consoleFlags',            i18nKey: 'console.flags',        icon: 'flag',        phase: 4, stub: true },
+  { id: 'flags',          role: 'admin',     routeKey: 'consoleFlags',            i18nKey: 'console.flags',        icon: 'flag',        phase: 1 },
   { id: 'audit',          role: 'admin',     routeKey: 'consoleAudit',            i18nKey: 'console.audit',        icon: 'scroll',      phase: 1 },
   { id: 'anomalies',      role: 'admin',     routeKey: 'consoleAnomalies',        i18nKey: 'console.anomalies',    icon: 'alert',       phase: 1 },
   { id: 'forensics',      role: 'admin',     routeKey: 'consoleForensics',        i18nKey: 'console.forensics',    icon: 'search',      phase: 1 },
