@@ -258,6 +258,23 @@ const initialLng  = initialCoords?.lng ?? '';
             state.satToggle.classList.toggle('border-emerald-500', state.isSatellite);
           }
         });
+
+        // If no initial coordinates were provided, attempt geolocation to center
+        // the map on the user's actual position instead of the CDMX default.
+        if (!haveInitial && navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              const { latitude: lat, longitude: lng } = pos.coords;
+              if (state.map && isValidLatLng(lat, lng)) {
+                state.map.flyTo({ center: [lng, lat], zoom: 13 });
+                state.marker?.setLngLat([lng, lat]);
+                setSelected(state, lat, lng);
+              }
+            },
+            () => { /* geolocation denied or timed out — keep the default view */ },
+            { enableHighAccuracy: true, timeout: 8000 },
+          );
+        }
       } catch {
         setStatus(state, state.isEs
           ? 'No se pudo cargar el mapa. Usa la entrada manual.'

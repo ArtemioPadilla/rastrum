@@ -731,8 +731,11 @@ function startGPS() {
         if (locNode) setNodeState(pipelineState, locNode.id, 'done');
       }
     },
-    () => {
-      if (gpsStatus) gpsStatus.textContent = isEs ? 'No se pudo obtener ubicación' : 'Could not get location';
+    (err) => {
+      const msg = err.code === 1
+        ? (isEs ? 'Permiso de ubicación denegado' : 'Location permission denied')
+        : (isEs ? 'No se pudo obtener ubicación — usa el mapa para elegir' : 'Could not get location — use the map to pick one');
+      if (gpsStatus) gpsStatus.textContent = msg;
     },
     { enableHighAccuracy: true, timeout: 20000 },
   );
