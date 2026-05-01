@@ -45,12 +45,21 @@ let createEngine: typeof CreateMLCEngineFn | null = null;
 
 /**
  * Returns true when WebLLM can probably run on this device.
- * Hard requirement: WebGPU. Soft requirement: ≥4 GB RAM (we can't reliably
- * detect free VRAM, so we rely on the user to opt in informedly).
+ * Hard requirement: WebGPU. Soft requirement: ≥6 GB device memory.
+ * Mobile devices with ≤4 GB RAM will crash when loading the ~4 GB
+ * Phi-3.5-vision model, so we gate on navigator.deviceMemory when
+ * available (Chrome/Edge expose it; Safari/Firefox don't — for those
+ * we fall through and rely on the download warning).
  */
 export function localAISupported(): boolean {
   if (typeof navigator === 'undefined') return false;
-  return 'gpu' in navigator && typeof (navigator as Navigator & { gpu?: unknown }).gpu !== 'undefined';
+  const hasGpu = 'gpu' in navigator && typeof (navigator as Navigator & { gpu?: unknown }).gpu !== 'undefined';
+  if (!hasGpu) return false;
+  // navigator.deviceMemory is approximate (0.25, 0.5, 1, 2, 4, 8 GiB).
+  // Phi-3.5-vision needs ~4 GB VRAM + overhead; reject devices reporting ≤4 GB.
+  const mem = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
+  if (typeof mem === 'number' && mem <= 4) return false;
+  return true;
 }
 
 async function ensureCreator() {

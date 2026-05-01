@@ -91,7 +91,7 @@ export interface IdentifierCapabilities {
 /** Per-plugin status surfaced to the UI. */
 export type IdentifierAvailability =
   | { ready: true }
-  | { ready: false; reason: 'needs_key' | 'needs_download' | 'unsupported' | 'model_not_bundled' | 'disabled'; message?: string };
+  | { ready: false; reason: 'needs_key' | 'needs_download' | 'unsupported' | 'insufficient_memory' | 'model_not_bundled' | 'disabled'; message?: string };
 
 /** Context passed to identify(). All fields optional. */
 export interface IdentifyInput {

@@ -25,8 +25,13 @@ export const phiVisionIdentifier: Identifier = {
     cost_per_id_usd: 0,
   },
   async isAvailable() {
-    if (typeof navigator === 'undefined' || !('gpu' in navigator)) {
-      return { ready: false, reason: 'unsupported', message: 'WebGPU not available.' };
+    const { localAISupported } = await import('../local-ai');
+    if (!localAISupported()) {
+      const mem = typeof navigator !== 'undefined' ? (navigator as Navigator & { deviceMemory?: number }).deviceMemory : undefined;
+      if (typeof mem === 'number' && mem <= 4) {
+        return { ready: false, reason: 'insufficient_memory', message: `Device has ~${mem} GB RAM — Phi Vision needs ≥6 GB` };
+      }
+      return { ready: false, reason: 'unsupported', message: 'WebGPU not available' };
     }
     const { getModelCacheStatus, VISION_MODEL_ID } = await import('../local-ai');
     const status = await getModelCacheStatus(VISION_MODEL_ID);
