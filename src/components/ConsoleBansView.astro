@@ -97,40 +97,36 @@ const tr = t(lang);
   ]}
 />
 
-<!-- Issue ban slide-over (custom, not using ConsoleSlideOver because it needs extra fields) -->
-<div id="bans-issue-panel" class="hidden fixed inset-0 z-50 pointer-events-none">
-  <div class="absolute inset-0 bg-black/40 pointer-events-auto" id="bans-issue-backdrop"></div>
-  <aside class="absolute right-0 top-0 bottom-0 w-full md:w-[420px] bg-white dark:bg-zinc-950 border-l border-zinc-200 dark:border-zinc-800 shadow-xl pointer-events-auto overflow-y-auto p-5 flex flex-col gap-3">
-    <header class="flex justify-between items-start">
-      <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">{tr.console.bans_ban_user_heading}</h2>
-      <button type="button" id="bans-issue-close" class="text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 text-xl leading-none">&times;</button>
-    </header>
-    <label class="block text-sm">
-      <span class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.console.bans_target_user_label}</span>
-      <input id="bans-issue-user-id" type="text" class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm font-mono" placeholder="uuid" />
-    </label>
-    <label class="block text-sm">
-      <span class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.console.bans_duration_label}</span>
-      <select id="bans-issue-duration" class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm">
-        <option value="1">{tr.console.bans_duration_1h}</option>
-        <option value="24">{tr.console.bans_duration_24h}</option>
-        <option value="168">{tr.console.bans_duration_7d}</option>
-        <option value="720">{tr.console.bans_duration_30d}</option>
-        <option value="">{tr.console.bans_duration_indefinite}</option>
-      </select>
-    </label>
-    <label class="block text-sm">
-      <span class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.console.slideover_reason_label}</span>
-      <textarea id="bans-issue-reason" rows="3" class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-2 text-sm" placeholder={tr.console.slideover_reason_placeholder}></textarea>
-    </label>
-    <p id="bans-issue-error" class="hidden text-sm text-red-600 dark:text-red-400"></p>
-    <div class="mt-auto flex justify-end gap-2 pt-3">
-      <button type="button" id="bans-issue-cancel" class="px-3 py-1.5 rounded text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-900">{tr.console.slideover_cancel}</button>
-      <button type="button" id="bans-issue-submit" class="px-3 py-1.5 rounded bg-red-600 hover:bg-red-700 text-white text-sm font-medium">{tr.console.bans_chip_ban}</button>
-    </div>
-    <p class="text-[10px] text-zinc-500 mt-1">{tr.console.slideover_audit_note}</p>
-  </aside>
-</div>
+<!-- Issue ban slide-over — uses ConsoleSlideOver with irreversible={true}
+     so the "Require approval" checkbox is available for user.ban. -->
+<ConsoleSlideOver
+  lang={lang}
+  id="console-slideover-bans-issue"
+  titleKey={tr.console.bans_ban_user_heading}
+  irreversible={true}
+  reasonTemplates={[
+    tr.console.reason_spam,
+    tr.console.reason_harassment,
+    tr.console.reason_multiple_policy_violations,
+    tr.console.reason_nom059_breach,
+    tr.console.quick_reason_custom,
+  ]}
+>
+  <label class="block text-sm">
+    <span class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.console.bans_target_user_label}</span>
+    <input id="bans-issue-user-id" type="text" class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm font-mono" placeholder="uuid" />
+  </label>
+  <label class="block text-sm">
+    <span class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.console.bans_duration_label}</span>
+    <select id="bans-issue-duration" class="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm">
+      <option value="1">{tr.console.bans_duration_1h}</option>
+      <option value="24">{tr.console.bans_duration_24h}</option>
+      <option value="168">{tr.console.bans_duration_7d}</option>
+      <option value="720">{tr.console.bans_duration_30d}</option>
+      <option value="">{tr.console.bans_duration_indefinite}</option>
+    </select>
+  </label>
+</ConsoleSlideOver>
 
 <script>
   import { getSupabase } from '../lib/supabase';
@@ -306,62 +302,51 @@ const tr = t(lang);
     }
 
     if ((ev.target as HTMLElement).closest('#bans-open-issue')) {
-      show('bans-issue-panel');
       (document.getElementById('bans-issue-user-id') as HTMLInputElement).value = '';
-      (document.getElementById('bans-issue-reason') as HTMLTextAreaElement).value = '';
-      hide('bans-issue-error');
-      return;
-    }
-
-    if ((ev.target as HTMLElement).closest('#bans-issue-backdrop, #bans-issue-close, #bans-issue-cancel')) {
-      hide('bans-issue-panel');
-      return;
-    }
-
-    if ((ev.target as HTMLElement).closest('#bans-issue-submit')) {
-      handleIssueBan();
+      document.dispatchEvent(new CustomEvent('console:slideover-open', {
+        detail: {
+          id: 'console-slideover-bans-issue',
+          title: 'Ban user',
+          action: 'user.ban',
+          payload: {},
+        },
+      }));
       return;
     }
   });
 
-  async function handleIssueBan() {
-    const userId = (document.getElementById('bans-issue-user-id') as HTMLInputElement).value.trim();
-    const durationStr = (document.getElementById('bans-issue-duration') as HTMLSelectElement).value;
-    const reason = (document.getElementById('bans-issue-reason') as HTMLTextAreaElement).value.trim();
-    const errorEl = document.getElementById('bans-issue-error')!;
+  // Issue ban + Unban via slide-over
+  document.addEventListener('console:slideover-submit', async (ev) => {
+    const { id, action, payload, reason } = (ev as CustomEvent<{ id: string; action: string; payload: Record<string, string>; reason: string }>).detail;
 
-    if (!userId) { errorEl.textContent = 'User ID is required.'; show('bans-issue-error'); return; }
-    if (reason.length < 5) { errorEl.textContent = 'Reason must be at least 5 characters.'; show('bans-issue-error'); return; }
+    if (id === 'console-slideover-bans-issue' && action === 'user.ban') {
+      const userId = (document.getElementById('bans-issue-user-id') as HTMLInputElement).value.trim();
+      const durationStr = (document.getElementById('bans-issue-duration') as HTMLSelectElement).value;
 
-    const durationHours = durationStr ? parseInt(durationStr, 10) : null;
-    const submitBtn = document.getElementById('bans-issue-submit') as HTMLButtonElement;
-    submitBtn.disabled = true;
-    hide('bans-issue-error');
+      if (!userId) {
+        document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id, ok: false, error: 'User ID is required.' } }));
+        return;
+      }
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.access_token) {
-      errorEl.textContent = 'Session expired.';
-      show('bans-issue-error');
-      submitBtn.disabled = false;
+      const durationHours = durationStr ? parseInt(durationStr, 10) : null;
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id, ok: false, error: 'Session expired.' } }));
+        return;
+      }
+
+      try {
+        await adminClient.user.ban({ target_user_id: userId, duration_hours: durationHours }, reason, session.access_token);
+        document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id, ok: true } }));
+        await loadBans();
+      } catch (err) {
+        const msg = err instanceof AdminClientError ? err.message : (err as Error).message;
+        document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id, ok: false, error: msg } }));
+      }
       return;
     }
 
-    try {
-      await adminClient.user.ban({ target_user_id: userId, duration_hours: durationHours }, reason, session.access_token);
-      hide('bans-issue-panel');
-      await loadBans();
-    } catch (err) {
-      const msg = err instanceof AdminClientError ? err.message : (err as Error).message;
-      errorEl.textContent = msg;
-      show('bans-issue-error');
-    } finally {
-      submitBtn.disabled = false;
-    }
-  }
-
-  // Unban via slide-over
-  document.addEventListener('console:slideover-submit', async (ev) => {
-    const { id, action, payload, reason } = (ev as CustomEvent<{ id: string; action: string; payload: Record<string, string>; reason: string }>).detail;
     if (id !== 'console-slideover-bans') return;
 
     const { data: { session } } = await supabase.auth.getSession();
