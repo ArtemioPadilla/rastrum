@@ -110,7 +110,7 @@ const tr = t(lang);
         itemsEl.innerHTML = `
           <div class="flex items-center justify-between rounded-md border border-amber-200 dark:border-amber-700/40 bg-amber-50 dark:bg-amber-900/10 px-3 py-2 text-sm">
             <span class="text-amber-900 dark:text-amber-100">${openCount} open report(s) need attention</span>
-            <a href="../flag-queue/" class="text-amber-700 dark:text-amber-300 underline text-xs">View queue →</a>
+            <a href={lang === "es" ? "/es/consola/cola-banderas/" : "/en/console/flag-queue/"} class="text-amber-700 dark:text-amber-300 underline text-xs">View queue →</a>
           </div>
         `;
       }
