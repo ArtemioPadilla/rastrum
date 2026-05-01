@@ -197,13 +197,18 @@ export const birdnetIdentifier: Identifier = {
 
     onProgress({ progress: 1, text: 'Done' });
 
+    // BirdNET-Lite v2.4 emits raw logits (no activation). Apply sigmoid
+    // to map into [0,1] so the value satisfies the `identifications.confidence
+    // CHECK BETWEEN 0 AND 1` constraint and renders sensibly as a percentage.
+    const sigmoid = (x: number) => 1 / (1 + Math.exp(-x));
+
     return {
       scientific_name: parsed.scientific_name,
       common_name_en: parsed.common_name_en,
       common_name_es: null,
       family: null,
       kingdom: 'Animalia',
-      confidence: best.score,
+      confidence: sigmoid(best.score),
       source: PLUGIN_ID,
       raw: {
         // Legacy field kept for backward compat

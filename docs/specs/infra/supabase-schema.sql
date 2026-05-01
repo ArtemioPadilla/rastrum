@@ -291,7 +291,14 @@ CREATE TABLE IF NOT EXISTS public.identifications (
   scientific_name text,                    -- denormalized, stored at ID time
   confidence      numeric CHECK (confidence BETWEEN 0 AND 1),
   source          text NOT NULL
-                  CHECK (source IN ('plantnet','claude_haiku','claude_sonnet','onnx_offline','human')),
+                  CHECK (source IN (
+                    -- Server-side cascade
+                    'plantnet','claude_haiku','claude_sonnet','onnx_offline','human',
+                    -- Client-side identifiers
+                    'birdnet_lite','onnx_efficientnet_lite0','camera_trap_megadetector','phi_vision',
+                    -- M32 multi-provider vision (each provider tags its result with its kind)
+                    'bedrock','openai','azure_openai','gemini','vertex_ai'
+                  )),
   raw_response    jsonb,                   -- full API response
   is_primary      boolean NOT NULL DEFAULT true,
   is_research_grade boolean DEFAULT false,
@@ -6636,3 +6643,23 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.merge_user_accounts(uuid, uuid, uuid, text) TO service_role;
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- Migration: extend identifications.source CHECK to cover client-side
+-- identifiers (BirdNET-Lite audio, EfficientNet-Lite0 images, MegaDetector
+-- camera-trap, Phi-3.5-vision). Without this, the sync layer's direct
+-- insert of a client identification (added 2026-05-01 to fix audio
+-- observations landing as "Unknown species") fails the CHECK constraint.
+-- ═══════════════════════════════════════════════════════════════════════════
+ALTER TABLE public.identifications
+  DROP CONSTRAINT IF EXISTS identifications_source_check;
+ALTER TABLE public.identifications
+  ADD CONSTRAINT identifications_source_check
+  CHECK (source IN (
+    -- Server-side cascade
+    'plantnet','claude_haiku','claude_sonnet','onnx_offline','human',
+    -- Client-side identifiers (M03 + M31)
+    'birdnet_lite','onnx_efficientnet_lite0','camera_trap_megadetector','phi_vision',
+    -- M32 multi-provider vision (each provider tags its result with its kind)
+    'bedrock','openai','azure_openai','gemini','vertex_ai'
+  ));
