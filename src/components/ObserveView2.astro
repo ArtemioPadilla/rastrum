@@ -43,7 +43,8 @@ const weathers = WEATHERS;
   </div>
 
   <!-- AI Capability Status Banner (#274) -->
-  <div id="obs2-capability-banner" class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/60 px-4 py-3 text-xs space-y-1">
+  <!-- Banner starts hidden to prevent SSR flash; JS reveals it after checking localStorage/sessionStorage -->
+  <div id="obs2-capability-banner" class="hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/60 px-4 py-3 text-xs space-y-1">
     <div class="flex items-center justify-between">
       <span class="font-medium text-zinc-700 dark:text-zinc-300">
         {isEs ? "🤖 Modelos disponibles:" : "🤖 Available AI:"}
@@ -337,12 +338,15 @@ const collapseBtn = document.getElementById('obs2-banner-collapse');
 const fileHint    = document.getElementById('obs2-file-hint');
 
 // Collapse banner if user has dismissed it before
+// Use sessionStorage so the banner shows once per session.
+// localStorage was permanent — users could never re-check their config status.
 const BANNER_COLLAPSED_KEY = 'rastrum.obs2.banner_collapsed';
-if (localStorage.getItem(BANNER_COLLAPSED_KEY)) {
-  capBanner?.classList.add('hidden');
+if (!sessionStorage.getItem(BANNER_COLLAPSED_KEY)) {
+  // Show the banner this session (not previously dismissed in this session)
+  capBanner?.classList.remove('hidden');
 }
 collapseBtn?.addEventListener('click', () => {
-  localStorage.setItem(BANNER_COLLAPSED_KEY, '1');
+  sessionStorage.setItem(BANNER_COLLAPSED_KEY, '1');
   capBanner?.classList.add('hidden');
 });
 
@@ -366,11 +370,11 @@ collapseBtn?.addEventListener('click', () => {
       </span>
     `).join('');
     if (allOk && capBanner) {
-      // All configured — collapse banner after 3s
+      // All configured — collapse banner after 10s, use sessionStorage (not permanent)
       setTimeout(() => {
         capBanner.classList.add('hidden');
-        localStorage.setItem(BANNER_COLLAPSED_KEY, '1');
-      }, 3000);
+        sessionStorage.setItem(BANNER_COLLAPSED_KEY, '1');
+      }, 10000);
     }
   } catch { /* silent */ }
 })();
