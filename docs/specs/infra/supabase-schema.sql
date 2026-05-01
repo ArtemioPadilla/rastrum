@@ -1179,6 +1179,11 @@ DROP POLICY IF EXISTS "tokens_delete_own" ON public.user_api_tokens;
 CREATE POLICY "tokens_delete_own" ON public.user_api_tokens
   FOR UPDATE TO authenticated USING (auth.uid() = user_id);
 
+-- Edge Function uses service_role key; authenticated needs SELECT for the
+-- RLS policies to fire (read own tokens list in the UI via direct client).
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.user_api_tokens TO service_role;
+GRANT SELECT, UPDATE                 ON public.user_api_tokens TO authenticated;
+
 -- ─────────────────────────────────────────────────────────────────────
 -- Expert applications (module 08 — credentialed-tier review queue)
 -- Users submit one application per request. Admins review out-of-band
