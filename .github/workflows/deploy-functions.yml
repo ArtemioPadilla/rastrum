@@ -201,29 +201,45 @@ jobs:
           push_secret RESEND_API_KEY        "${RESEND_API_KEY:-}"
           push_secret OPERATOR_EMAIL        "${OPERATOR_EMAIL:-}"
 
+      - name: Classify functions (cron vs standard)
+        id: classify
+        run: |
+          # Cron-only functions are called by pg_cron with the publishable
+          # anon key, which Edge Functions reject when JWT verification is
+          # enabled. These MUST be deployed with --no-verify-jwt.
+          # Update this list when adding new cron-triggered functions.
+          CRON_ONLY="recompute-streaks award-badges gc-orphan-media plantnet-monitor recompute-user-stats streak-push"
+          echo "cron_only=$CRON_ONLY" >> "$GITHUB_OUTPUT"
+
       - name: Deploy
         if: ${{ steps.targets.outputs.fns != '' }}
         run: |
           set -e
-          # Functions that don't require a user JWT at the Edge layer:
-          #   share-card            — OG scrapers fetch anonymously
-          #   recompute-streaks     — cron-only; gates internally on service-role
-          #   award-badges          — cron-only; gates internally on service-role
-          #   recompute-user-stats  — cron-only (M28); gates internally on service-role
-          #   plantnet-monitor      — cron-only; gates internally on service-role
-          #   streak-push           — cron-only; gates internally on service-role
-          #   mcp / api             — gate internally on rst_ tokens (not JWTs)
+          # Two categories of functions skip JWT verification at the Edge layer:
+          #
+          # 1. Cron-only (from classify step) — called by pg_cron with the
+          #    publishable anon key; gate internally on service-role.
+          #    Deploying these WITH JWT verification causes silent cron failures.
+          #
+          # 2. Other no-JWT functions — public or token-gated, not cron:
+          #    share-card  — OG scrapers fetch anonymously
+          #    mcp / api   — gate internally on rst_ tokens (not JWTs)
+          #
           # Module 26 functions (follow / react / report) DO verify JWT.
-          NO_JWT="share-card recompute-streaks award-badges recompute-user-stats plantnet-monitor streak-push mcp api gc-orphan-media"
-          deploy_one() {
-            local fn="$1"
-            local flag=""
-            for nj in $NO_JWT; do [ "$fn" = "$nj" ] && flag="--no-verify-jwt"; done
-            echo "→ deploying $fn $flag"
-            supabase functions deploy "$fn" --project-ref "$PROJECT_REF" $flag
-          }
+          CRON_ONLY="${{ steps.classify.outputs.cron_only }}"
+          OTHER_NO_JWT="share-card mcp api"
           for fn in ${{ steps.targets.outputs.fns }}; do
-            deploy_one "$fn"
+            EXTRA_FLAGS=""
+            if echo " $CRON_ONLY " | grep -q " $fn "; then
+              EXTRA_FLAGS="--no-verify-jwt"
+              echo "→ deploying $fn (cron-only, --no-verify-jwt)"
+            elif echo " $OTHER_NO_JWT " | grep -q " $fn "; then
+              EXTRA_FLAGS="--no-verify-jwt"
+              echo "→ deploying $fn (no-jwt, --no-verify-jwt)"
+            else
+              echo "→ deploying $fn"
+            fi
+            supabase functions deploy "$fn" --project-ref "$PROJECT_REF" $EXTRA_FLAGS
           done
 
       - name: Audit CORS on every browser-facing function
