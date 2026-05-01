@@ -581,15 +581,13 @@ const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } })
       inferredBadge.classList.toggle('hidden', !shouldShowInferredCountryBadge(profile));
     }
 
-    // The inferred-country badge is meaningful only when a country is set.
-    // If the user clears the picker, hide the badge optimistically — saving
-    // will flip country_code_source to 'user' regardless, but this gives
-    // immediate UI feedback so they don't see "inferred" pinned to an empty
-    // field while editing.
+    // Hide the inferred badge when the user manually changes the country,
+    // since they're now explicitly choosing — saving will flip
+    // country_code_source to 'user' regardless, but this gives immediate
+    // UI feedback.
     const countrySelect = form.elements.namedItem('country_code') as HTMLSelectElement | null;
     countrySelect?.addEventListener('change', () => {
-      if (!inferredBadge) return;
-      if (!countrySelect.value) inferredBadge.classList.add('hidden');
+      inferredBadge?.classList.add('hidden');
     });
 
     syncCommunityVisibleEnabled(Boolean(profile.profile_public));
