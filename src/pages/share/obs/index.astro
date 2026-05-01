@@ -111,9 +111,18 @@ const lang: 'en' | 'es' = 'en';
         detail: { photos, galleryId: 'obs-detail' },
       }));
 
+      // Hide the photo gallery entirely for audio-only observations so
+      // there's no broken/empty image placeholder.
+      const audioFiles = (media ?? []).filter((m: MediaRow) => m.media_type === 'audio');
+      const isAudioOnly = photos.length === 0 && audioFiles.length > 0;
+      if (isAudioOnly) {
+        const galleryRoot = document.querySelector<HTMLElement>('[data-gallery-id="obs-detail"]');
+        if (galleryRoot) galleryRoot.classList.add('hidden');
+      }
+
       // ── Audio players (spectrogram) ──
       // TODO: when Astro supports SSR hydration in this context, use AudioPlayer.astro directly
-      function buildAudioPlayerHTML(audioUrl: string, mimeType: string, obsIdAttr: string, lang: string): string {
+      function buildAudioPlayerHTML(audioUrl: string, mimeType: string, obsIdAttr: string, lang: string, autoExpand = false): string {
         const isEs = lang === 'es';
         const playLabel    = isEs ? 'Reproducir' : 'Play';
         const pauseLabel   = isEs ? 'Pausar' : 'Pause';
@@ -141,6 +150,7 @@ const lang: 'en' | 'es' = 'en';
               data-label-time="${timeLabel}"
               data-label-radial="${radialLabel}"
               data-label-radial-hide="${radialHide}"
+              data-auto-expand="${autoExpand ? 'true' : 'false'}"
             >
               <div class="px-3 pt-3">
                 <div id="ws-wave-${obsIdAttr}" style="min-height:60px;"></div>
@@ -209,7 +219,6 @@ const lang: 'en' | 'es' = 'en';
             </div>`;
       }
 
-      const audioFiles = (media ?? []).filter((m: MediaRow) => m.media_type === 'audio');
       if (audioFiles.length > 0) {
         const playersEl = document.getElementById('obs-audio-players');
         if (playersEl) {
@@ -218,7 +227,7 @@ const lang: 'en' | 'es' = 'en';
           playersEl.innerHTML = audioFiles.map((af: MediaRow, idx: number) => {
             const obsIdAttr = `obs-detail-audio-${idx}`;
             const mimeType  = af.mime_type ?? 'audio/mpeg';
-            return buildAudioPlayerHTML(af.url, mimeType, obsIdAttr, lang);
+            return buildAudioPlayerHTML(af.url, mimeType, obsIdAttr, lang, isAudioOnly);
           }).join('');
 
           // Re-run AudioPlayer init for the new DOM nodes

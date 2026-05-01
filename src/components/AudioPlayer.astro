@@ -20,6 +20,8 @@ interface Props {
   obsId: string;
   label?: string;
   showSpectrogram?: boolean;
+  /** When true, the spectrogram panel starts expanded (useful for audio-only observations). */
+  autoExpand?: boolean;
 }
 
 const {
@@ -29,6 +31,7 @@ const {
   obsId,
   label = '',
   showSpectrogram = true,
+  autoExpand = false,
 } = Astro.props;
 
 const isEs = lang === 'es';
@@ -59,6 +62,7 @@ const radialHide   = isEs ? 'Ocultar' : 'Hide';
   data-label-time={timeLabel}
   data-label-radial={radialLabel}
   data-label-radial-hide={radialHide}
+  data-auto-expand={autoExpand ? 'true' : 'false'}
 >
   <!-- Waveform container -->
   <div class="px-3 pt-3">
@@ -476,6 +480,7 @@ const radialHide   = isEs ? 'Ocultar' : 'Hide';
     const audioUrl   = container.dataset.audioUrl ?? '';
     const obsId      = container.dataset.obsId ?? '';
     const showSpec   = container.dataset.showSpectrogram === 'true';
+    const autoExpand = container.dataset.autoExpand === 'true';
     const labelPause = container.dataset.labelPause ?? 'Pause';
     const labelPlay  = container.dataset.labelPlay  ?? 'Play';
     const labelSpec  = container.dataset.labelSpectro ?? 'Show spectrogram';
@@ -592,7 +597,7 @@ const radialHide   = isEs ? 'Ocultar' : 'Hide';
         async function loadSpectrogram(freqMax = 12000) {
           if (!specHost) return null;
           try {
-            const { SpectrogramPlugin } = await import('wavesurfer.js/plugins/spectrogram');
+            const SpectrogramPlugin = (await import('wavesurfer.js/plugins/spectrogram')).default;
             const plugin = SpectrogramPlugin.create({
               container: specHost, labels: true,
               labelsBackground: 'rgba(9,9,11,0.7)', labelsColor: '#a1a1aa', labelsHzColor: '#a1a1aa',
@@ -616,6 +621,16 @@ const radialHide   = isEs ? 'Ocultar' : 'Hide';
             toggleBtn.textContent = labelSpec;
           }
         });
+
+        // Auto-expand spectrogram when requested (audio-only observations)
+        if (autoExpand) {
+          ws.on('ready', async () => {
+            spectroPanel.classList.remove('hidden');
+            toggleBtn.setAttribute('aria-expanded', 'true');
+            toggleBtn.textContent = labelSpecH;
+            if (!spectroLoaded) { spectroLoaded = true; spectroPlugin = await loadSpectrogram(currentFreqMax); }
+          });
+        }
 
         freqSelect?.addEventListener('change', async () => {
           const newFreq = parseInt(freqSelect.value, 10);
