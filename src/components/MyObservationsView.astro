@@ -126,8 +126,15 @@ const tabs = [
   </div>
   <div id="mo-toast" class="hidden fixed bottom-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg text-sm shadow-lg" role="status" aria-live="polite"></div>
 
-  <div id="mo-signin" class="hidden rounded-lg border border-zinc-300 dark:border-zinc-700 p-4 text-sm">
-    <p>{tr.profile.not_signed_in}</p>
+  <div id="mo-signin" class="hidden rounded-lg border border-zinc-300 dark:border-zinc-700 p-4 text-sm space-y-2">
+    <p id="mo-signin-msg">{tr.profile.not_signed_in}</p>
+    <a
+      id="mo-signin-link"
+      href={lang === 'es' ? '/es/ingresar/' : '/en/sign-in/'}
+      class="inline-flex min-h-[40px] items-center rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white"
+    >
+      {lang === 'es' ? 'Iniciar sesión' : 'Sign in'}
+    </a>
   </div>
 
   <div id="mo-content" class="hidden">
@@ -674,6 +681,19 @@ const tabs = [
     });
   }
 
+  function showExpiredSessionUI() {
+    const signinEl = document.getElementById('mo-signin');
+    const msgEl = document.getElementById('mo-signin-msg');
+    if (signinEl) signinEl.classList.remove('hidden');
+    if (msgEl) {
+      msgEl.textContent = lang === 'es'
+        ? 'Tu sesión expiró. Inicia sesión de nuevo para ver tus observaciones.'
+        : 'Session expired — please sign in again to view your observations.';
+    }
+    // Hide the loading skeleton in case it was shown
+    document.getElementById('mo-loading')?.classList.add('hidden');
+  }
+
   async function init() {
     if (!root) return;
     let supabase;
@@ -683,9 +703,34 @@ const tabs = [
       document.getElementById('mo-signin')?.classList.remove('hidden');
       return;
     }
-    const { data: { user } } = await supabase.auth.getUser();
+
+    // Guard: check session first. getSession() reads from localStorage and
+    // is synchronous-ish — it won't hang on a stale token the way getUser()
+    // can when the refresh token is invalid and GoTrue retries internally.
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      showExpiredSessionUI();
+      return;
+    }
+
+    // getUser() validates the JWT server-side. Wrap in a timeout so a
+    // stalled token-refresh doesn't leave the page spinning forever.
+    let user: import('@supabase/supabase-js').User | null = null;
+    try {
+      const userPromise = supabase.auth.getUser();
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('auth_timeout')), 8_000),
+      );
+      const { data } = await Promise.race([userPromise, timeout]);
+      user = data.user;
+    } catch {
+      // Network error or timeout — session exists in localStorage but
+      // can't be verified. Show expired-session UI.
+      showExpiredSessionUI();
+      return;
+    }
     if (!user) {
-      document.getElementById('mo-signin')?.classList.remove('hidden');
+      showExpiredSessionUI();
       return;
     }
     userId = user.id;
