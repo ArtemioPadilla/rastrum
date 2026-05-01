@@ -375,6 +375,38 @@ async function triggerIdentify(observationId: string): Promise<void> {
     return;
   }
 
+  // #334: Persist secondary species detections from BirdNET's sliding-window
+  // analysis. Each distinct species detected across audio segments gets its
+  // own non-primary identification row, enabling the obs-detail page to show
+  // "Also detected: ..." and Darwin Core exports to include all species.
+  const rawResponse = r.raw as Record<string, unknown> | undefined;
+  const allSpecies = rawResponse?.allSpecies as Array<{
+    scientific_name: string;
+    common_name_en: string | null;
+    maxScore: number;
+  }> | undefined;
+
+  if (allSpecies && allSpecies.length > 1 && r.source === 'birdnet_lite') {
+    const sigmoid = (x: number) => 1 / (1 + Math.exp(-x));
+    const secondarySpecies = allSpecies
+      .filter(sp => sp.scientific_name !== r.scientific_name)
+      .slice(0, 4); // Cap at 4 secondary IDs to avoid noise
+
+    for (const sp of secondarySpecies) {
+      const correctedSecondary = correctIdentificationName(sp.scientific_name);
+      await supabase.from('identifications').insert({
+        observation_id: observationId,
+        scientific_name: correctedSecondary,
+        confidence: sigmoid(sp.maxScore),
+        source: 'birdnet_lite',
+        is_primary: false,
+        raw_response: { secondary_detection: true, max_score: sp.maxScore, common_name_en: sp.common_name_en },
+      }).then(({ error }) => {
+        if (error) console.warn('[rastrum] secondary BirdNET ID insert failed', correctedSecondary, error.message);
+      });
+    }
+  }
+
   await db.idQueue.delete(observationId);
 }
 
