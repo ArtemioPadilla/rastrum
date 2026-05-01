@@ -130,4 +130,40 @@ test.describe('console — smoke', () => {
     await expect(page.locator('#bioblitz-not-auth')).toHaveText(/don't have console access/i);
     expect(await page.locator('body').textContent()).not.toContain('Internal Server Error');
   });
+
+  // --- Sidebar + role pills smoke tests (#249) ---
+
+  test('console page loads without crashing (no 500, no empty body)', async ({ page }) => {
+    const response = await page.goto('/en/console/', { waitUntil: 'domcontentloaded' });
+    expect(response?.status()).not.toBe(500);
+    const body = await page.locator('body').textContent();
+    expect(body).not.toContain('Internal Server Error');
+    expect(body && body.length > 0).toBe(true);
+  });
+
+  test('sidebar navigation is present in the DOM', async ({ page }) => {
+    await page.goto('/en/console/', { waitUntil: 'domcontentloaded' });
+    const sidebar = page.locator('[data-console-sidebar]');
+    await expect(sidebar).toBeAttached();
+    // The sidebar contains role-scoped tab lists for all three roles.
+    const roleLists = sidebar.locator('ul[data-role]');
+    expect(await roleLists.count()).toBeGreaterThanOrEqual(3);
+  });
+
+  test('role pills (admin / moderator / expert) are rendered in the DOM', async ({ page }) => {
+    await page.goto('/en/console/', { waitUntil: 'domcontentloaded' });
+    const pills = page.locator('[data-console-pills]');
+    await expect(pills).toBeAttached();
+    // All three role pills are server-rendered (hidden until auth resolves).
+    for (const role of ['admin', 'moderator', 'expert']) {
+      await expect(page.locator(`[data-console-pill="${role}"]`)).toBeAttached();
+    }
+  });
+
+  test('at least one tab link is present in the sidebar', async ({ page }) => {
+    await page.goto('/en/console/', { waitUntil: 'domcontentloaded' });
+    const sidebar = page.locator('[data-console-sidebar]');
+    const links = sidebar.locator('a[href]');
+    expect(await links.count()).toBeGreaterThan(0);
+  });
 });
