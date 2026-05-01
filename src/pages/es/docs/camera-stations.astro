@@ -1,0 +1,12 @@
+---
+import DocLayout from '../../../layouts/DocLayout.astro';
+import CameraStationsDocView from '../../../components/CameraStationsDocView.astro';
+import { t } from '../../../i18n/utils';
+
+const lang = 'es';
+const tr = t(lang);
+---
+
+<DocLayout title={tr.docs.sections['camera-stations']} lang={lang} section="camera-stations" editPath="src/pages/es/docs/camera-stations.astro">
+  <CameraStationsDocView lang={lang} />
+</DocLayout>

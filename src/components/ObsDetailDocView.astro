@@ -1,0 +1,54 @@
+---
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const isEs = lang === 'es';
+---
+
+<article class="prose prose-zinc dark:prose-invert max-w-none">
+  <h1>{isEs ? 'Detalle de Observación' : 'Observation Detail'}</h1>
+  <p class="lead text-lg text-zinc-600 dark:text-zinc-400">
+    {isEs
+      ? 'Cada observación tiene una página de detalle pública con galería de fotos, mapa, identificaciones de la comunidad, y herramientas de gestión para el dueño.'
+      : 'Every observation has a public detail page with a photo gallery, map, community identifications, and management tools for the owner.'}
+  </p>
+
+  <p>
+    {isEs
+      ? 'La página de detalle de observación es el punto central para ver, compartir y gestionar una observación individual. Incluye un layout de dos columnas (apilado en móvil) con la galería de fotos y mapa a la izquierda, y metadatos, identificaciones y acciones a la derecha. Los dueños pueden editar la ubicación, eliminar fotos, y gestionar la licencia directamente desde esta vista.'
+      : 'The observation detail page is the central point for viewing, sharing, and managing an individual observation. It features a two-column layout (stacked on mobile) with the photo gallery and map on the left, and metadata, identifications, and actions on the right. Owners can edit the location, delete photos, and manage the license directly from this view.'}
+  </p>
+
+  <h2>{isEs ? 'Funcionalidades' : 'Features'}</h2>
+  <ul>
+    <li><strong>{isEs ? 'Galería de fotos' : 'Photo gallery'}:</strong> {isEs
+      ? 'Lightbox nativo con navegación por teclado, swipe táctil y botón de compartir. Soporte para múltiples fotos por observación.'
+      : 'Native lightbox with keyboard navigation, touch swipe, and share button. Support for multiple photos per observation.'}</li>
+    <li><strong>{isEs ? 'Mapa interactivo' : 'Interactive map'}:</strong> {isEs
+      ? 'MapLibre con el punto de la observación. Las coordenadas se muestran con precisión variable según el nivel de oscurecimiento.'
+      : 'MapLibre with the observation point. Coordinates are shown with variable precision based on the obscure level.'}</li>
+    <li><strong>{isEs ? 'Identificaciones comunitarias' : 'Community identifications'}:</strong> {isEs
+      ? 'Lista de sugerencias de ID de la comunidad con nivel de confianza, nombre del identificador y timestamp.'
+      : 'List of community ID suggestions with confidence level, identifier name, and timestamp.'}</li>
+    <li><strong>{isEs ? 'Gestión del dueño' : 'Owner management'}:</strong> {isEs
+      ? 'Tabs de gestión con edición de ubicación, eliminación atómica de fotos vía Edge Function, y cambio de licencia.'
+      : 'Management tabs with location editing, atomic photo deletion via Edge Function, and license change.'}</li>
+    <li><strong>{isEs ? 'Compartir público' : 'Public sharing'}:</strong> {isEs
+      ? 'URL pública en /share/obs/ con tarjeta OG para redes sociales. Funciona sin autenticación.'
+      : 'Public URL at /share/obs/ with OG card for social media. Works without authentication.'}</li>
+    <li><strong>{isEs ? 'Reacciones y comentarios' : 'Reactions & comments'}:</strong> {isEs
+      ? 'Los usuarios autenticados pueden reaccionar y sugerir identificaciones alternativas.'
+      : 'Authenticated users can react and suggest alternative identifications.'}</li>
+  </ul>
+
+  <h2>{isEs ? 'Privacidad de ubicación' : 'Location privacy'}</h2>
+  <p>
+    {isEs
+      ? 'Las observaciones de especies sensibles (NOM-059 / CITES) usan el nivel de oscurecimiento para reducir la precisión de las coordenadas públicas. Solo el observador o un investigador acreditado puede ver la ubicación exacta. El mapa y las coordenadas mostradas respetan este nivel automáticamente.'
+      : 'Observations of sensitive species (NOM-059 / CITES) use the obscure level to coarsen public coordinates. Only the observer or a credentialed researcher can see the exact location. The map and displayed coordinates respect this level automatically.'}
+  </p>
+
+  <p class="text-sm text-zinc-500 mt-8">
+    {isEs ? 'Página de detalle: ' : 'Detail page: '}
+    <code>/share/obs/&lt;id&gt;</code>
+  </p>
+</article>

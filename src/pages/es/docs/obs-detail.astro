@@ -1,0 +1,12 @@
+---
+import DocLayout from '../../../layouts/DocLayout.astro';
+import ObsDetailDocView from '../../../components/ObsDetailDocView.astro';
+import { t } from '../../../i18n/utils';
+
+const lang = 'es';
+const tr = t(lang);
+---
+
+<DocLayout title={tr.docs.sections['obs-detail']} lang={lang} section="obs-detail" editPath="src/pages/es/docs/obs-detail.astro">
+  <ObsDetailDocView lang={lang} />
+</DocLayout>

@@ -1,0 +1,51 @@
+---
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const isEs = lang === 'es';
+---
+
+<article class="prose prose-zinc dark:prose-invert max-w-none">
+  <h1>{isEs ? 'Estaciones de Cámara' : 'Camera Stations'}</h1>
+  <p class="lead text-lg text-zinc-600 dark:text-zinc-400">
+    {isEs
+      ? 'Registra despliegues de cámaras trampa con periodos activos, calcula noches-trampa y vincula observaciones a estaciones fijas dentro de tus proyectos.'
+      : 'Register camera-trap deployments with active periods, compute trap-nights, and link observations to fixed stations within your projects.'}
+  </p>
+
+  <p>
+    {isEs
+      ? 'Una estación de cámara representa un punto fijo de despliegue con uno o más periodos activos (fecha de inicio y fin). Rastrum calcula automáticamente las noches-trampa y permite derivar índices estándar de vida silvestre como el Índice de Abundancia Relativa (RAI) y la tasa de detección por cada 100 noches-trampa.'
+      : 'A camera station represents a fixed deployment point with one or more active periods (start and end dates). Rastrum automatically computes trap-nights and lets you derive standard wildlife indices like Relative Abundance Index (RAI) and detection rate per 100 trap-nights.'}
+  </p>
+
+  <h2>{isEs ? 'Funcionalidades' : 'Features'}</h2>
+  <ul>
+    <li><strong>{isEs ? 'Estaciones por proyecto' : 'Per-project stations'}:</strong> {isEs
+      ? 'Cada estación pertenece a un proyecto. Crea estaciones desde la UI del proyecto o vía la CLI con --station-key.'
+      : 'Each station belongs to a project. Create stations from the project UI or via the CLI with --station-key.'}</li>
+    <li><strong>{isEs ? 'Periodos activos' : 'Active periods'}:</strong> {isEs
+      ? 'Define múltiples periodos de despliegue por estación. Un periodo sin fecha de fin significa "aún activo".'
+      : 'Define multiple deployment periods per station. A period with no end date means "still active".'}</li>
+    <li><strong>{isEs ? 'Noches-trampa automáticas' : 'Automatic trap-nights'}:</strong> {isEs
+      ? 'Rastrum calcula las noches-trampa sumando los días de todos los periodos activos de la estación.'
+      : 'Rastrum computes trap-nights by summing the days across all active periods for the station.'}</li>
+    <li><strong>{isEs ? 'Vinculación de observaciones' : 'Observation linking'}:</strong> {isEs
+      ? 'Las observaciones se vinculan a estaciones explícitamente — dos estaciones en el mismo polígono necesitan conteos separados.'
+      : 'Observations are linked to stations explicitly — two stations within the same polygon need separate counts.'}</li>
+    <li><strong>{isEs ? 'Integración con CLI' : 'CLI integration'}:</strong> {isEs
+      ? 'El comando rastrum-import acepta --station-key para asignar estación durante la importación masiva de fotos.'
+      : 'The rastrum-import command accepts --station-key to assign a station during batch photo import.'}</li>
+  </ul>
+
+  <h2>{isEs ? 'Índices de vida silvestre' : 'Wildlife indices'}</h2>
+  <p>
+    {isEs
+      ? 'Con las noches-trampa calculadas, puedes derivar métricas estándar de monitoreo de biodiversidad: RAI (detecciones / noches-trampa × 100), tasa de detección por especie, y esfuerzo de muestreo acumulado por proyecto. Estos datos son compatibles con los formatos de reporte de CONANP y CONABIO.'
+      : 'With trap-nights computed, you can derive standard biodiversity monitoring metrics: RAI (detections / trap-nights × 100), per-species detection rate, and cumulative sampling effort per project. This data is compatible with CONANP and CONABIO reporting formats.'}
+  </p>
+
+  <p class="text-sm text-zinc-500 mt-8">
+    {isEs ? 'Spec técnica: ' : 'Technical spec: '}
+    <a href="https://github.com/ArtemioPadilla/rastrum/blob/main/docs/specs/modules/31-camera-stations.md" class="underline">docs/specs/modules/31-camera-stations.md</a>
+  </p>
+</article>

@@ -119,7 +119,8 @@ export const docPages = [
   'vision', 'features', 'roadmap', 'tasks', 'market',
   'architecture', 'indigenous', 'funding', 'contribute',
   'faq', 'privacy', 'terms', 'console', 'sponsorships', 'mcp',
-  'changelog',
+  'changelog', 'community', 'camera-stations', 'sponsor-pools',
+  'obs-detail',
 ] as const;
 
 export type DocPage = (typeof docPages)[number];
@@ -316,6 +317,22 @@ export const docPageMeta = {
   changelog: {
     en: "Version history and significant changes in Rastrum. What shipped per version, with PR links and summaries.",
     es: "Historial de versiones y cambios significativos en Rastrum. Lo que se entregó por versión, con enlaces a PRs y resúmenes.",
+  },
+  community: {
+    en: "Community discovery: find observers, experts, and naturalists. Filter by country, taxon, activity, and nearby — with privacy-first centroid gating.",
+    es: "Descubrimiento de comunidad: encuentra observadores, expertos y naturalistas. Filtra por país, taxón, actividad y cercanía — con centroide protegido.",
+  },
+  'camera-stations': {
+    en: "Camera-trap station management: active periods, trap-night computation, RAI and detection-rate indices for biodiversity monitoring projects.",
+    es: "Gestión de estaciones de cámara trampa: periodos activos, cálculo de noches-trampa, índices RAI y tasa de detección para proyectos de monitoreo.",
+  },
+  'sponsor-pools': {
+    en: "Multi-provider vision and platform sponsor pools. Anthropic, Vertex, OpenAI backends with per-sponsor model pinning and community credit distribution.",
+    es: "Visión multi-proveedor y pools de patrocinio de plataforma. Backends Anthropic, Vertex, OpenAI con modelo por sponsor y distribución de créditos comunitarios.",
+  },
+  'obs-detail': {
+    en: "Observation detail page: photo gallery, interactive map, community identifications, owner management tools, and public sharing with OG cards.",
+    es: "Página de detalle de observación: galería de fotos, mapa interactivo, identificaciones comunitarias, herramientas de gestión y compartir público con tarjetas OG.",
   },
 } as const satisfies Record<DocPage, { en: string; es: string }>;
 

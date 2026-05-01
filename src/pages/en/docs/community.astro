@@ -1,0 +1,12 @@
+---
+import DocLayout from '../../../layouts/DocLayout.astro';
+import CommunityDocView from '../../../components/CommunityDocView.astro';
+import { t } from '../../../i18n/utils';
+
+const lang = 'en';
+const tr = t(lang);
+---
+
+<DocLayout title={tr.docs.sections.community} lang={lang} section="community" editPath="src/pages/en/docs/community.astro">
+  <CommunityDocView lang={lang} />
+</DocLayout>
