@@ -125,11 +125,19 @@ async function syncOne(record: ObservationRecord): Promise<void> {
       .map((b, idx) => ({
         id: b.id,
         observation_id: record.id,
-        media_type: (
-          b.mime_type.startsWith('image/') ? 'photo' :
-          b.mime_type.startsWith('audio/') ? 'audio' :
-          b.mime_type.startsWith('video/') ? 'video' : 'photo'
-        ) as 'photo' | 'audio' | 'video',
+        media_type: ((): 'photo' | 'audio' | 'video' => {
+          const mime = b.mime_type || '';
+          if (mime.startsWith('image/')) return 'photo';
+          if (mime.startsWith('audio/')) return 'audio';
+          if (mime.startsWith('video/')) return 'video';
+          // Fallback: check the upload URL or blob ID for audio/video extensions
+          const ref = (b.upload_url ?? b.id ?? '').toLowerCase();
+          if (/\.(webm|ogg|mp3|wav|m4a|aac|flac|opus)$/i.test(ref)) return 'audio';
+          if (/\.(mp4|mov|avi|mkv|webm)$/i.test(ref)) return 'video';
+          // Last resort: check the observation's evidence_type — sound evidence is audio
+          if (obs.evidenceType === 'sound') return 'audio';
+          return 'photo';
+        })(),
         url: b.upload_url!,
         mime_type: b.mime_type,
         file_size_bytes: b.size_bytes,
