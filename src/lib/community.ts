@@ -159,6 +159,7 @@ export async function loadViewerCommunityMeta(): Promise<ViewerCommunityMeta> {
     const supabase = getSupabase();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { signedIn: false, profilePublic: null, countryCode: null };
+    // TODO(#251): migrate to profile_privacy matrix check (v1.1)
     const { data } = await supabase
       .from('users')
       .select('profile_public, country_code')
