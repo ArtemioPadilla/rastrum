@@ -69,7 +69,7 @@ Remaining:
 - `arch-diagram-parallel` — Update architecture page cascade SVG to show parallel race (currently shows serial waterfall)  _(· planned)_
 - `identify-server-cascade` — Move runParallelIdentify to identify Edge Function for server-side parity (currently client-only)  _(· planned)_
 - `inapp-camera-secondary` — Re-introduce in-app getUserMedia camera as secondary 'preview' path with system camera staying primary  _(! blocked: Awaits feedback from real users — deferred from v1.0 because system camera is more reliable on test devices. GitHub issue #18)_
-- `expert-app-admin-ui` — Admin review UI for expert_applications (schema shipped v1.0; admin approve/reject UX missing)  _(· planned)_
+- `expert-app-admin-ui` — Admin review UI for expert_applications (schema shipped v1.0; admin approve/reject UX missing; **console tab shipped** — `ExpertApplicationsBrowser.astro` + `console-tabs.ts` entry live since admin-console series; closes #328)  _(· planned — remaining: approve/reject actions + email notification)_
 - `bioblitz-events-ui-poll` — Bioblitz event detail UI — build when first community organizer requests one  _(! blocked: Speculative without a pilot event. Reshelved here from v1.0 alongside its schema sibling.)_
 - `plantnet-quota-monitor` — Alerting / dashboard for PlantNet daily-quota usage (500/day shared); fall through gracefully when exhausted  _(· planned)_
 - `oauth-logo-google` — Upload Rastrum logo + privacy/terms URLs at Google Cloud Console OAuth consent screen  _(! blocked: Manual operator action — see GitHub issue #3)_
@@ -226,3 +226,16 @@ A second wave landed the same day, focused on the CONANP-Oaxaca / DRFSIPS / PROR
   expiry-monitor crons (PR #207), nightly per-provider smoke probe
   (PR #210). _(✓ shipped — pool dashboard with top-taxa, cost-per-100
   picker, pool karma incentives tracked as #226/#227/#228)_
+
+---
+
+## Resolved issues
+
+### #328 — AI-mode-selector + expert-applications console tab (closed)
+
+Both features were shipped in prior PRs and are live in the codebase:
+
+- **Expert-applications console tab:** `ExpertApplicationsBrowser.astro` + `console-tabs.ts` entry + EN/ES route pages. Shipped as part of the admin-console series (PR1–PR16). The remaining `expert-app-admin-ui` subtasks (approve/reject actions + email notification) are separate planned work.
+- **AI mode selector in ObserveView2:** Three-way toggle (Sponsored / Own key / Local) with `localStorage` persistence under `rastrum.obs2.aiMode`. Shipped as part of the ObserveView2 + ai-sponsorships work.
+
+No code changes needed — this is a docs-only update to reflect completion.
