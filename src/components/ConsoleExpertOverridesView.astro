@@ -1,9 +1,15 @@
 ---
+/**
+ * ConsoleExpertOverridesView — expert queue for manual identification overrides.
+ * Gate: expert OR admin role.
+ * Queries `identifications` where source = 'human' and is_primary = true.
+ */
 import { t } from '../i18n/utils';
 
 interface Props { lang: 'en' | 'es' }
 const { lang } = Astro.props;
 const tr = t(lang);
+const isEs = lang === 'es';
 ---
 
 <section class="max-w-5xl">
@@ -11,30 +17,179 @@ const tr = t(lang);
     {tr.console.not_authorized}
   </div>
 
-  <div id="exp-overrides-shell" class="hidden">
-    <div class="rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-8 text-center space-y-3">
-      <p class="text-sm font-medium text-zinc-600 dark:text-zinc-400">{tr.console.stub_coming_soon}</p>
-      <a
-        href="https://github.com/ArtemioPadilla/rastrum/issues"
-        target="_blank"
-        rel="noopener"
-        class="inline-block text-xs text-zinc-500 dark:text-zinc-400 underline"
-      >
-        {tr.console.stub_track_issue}
-      </a>
+  <div id="exp-overrides-shell" class="hidden space-y-4">
+    <div class="flex items-center justify-between flex-wrap gap-2">
+      <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+        {isEs ? 'Correcciones de identificación' : 'Identification overrides'}
+      </h2>
+      <div class="flex items-center gap-2">
+        <input
+          id="overrides-search"
+          type="text"
+          placeholder={isEs ? 'Buscar por taxón…' : 'Search by taxon…'}
+          class="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-1.5 text-sm w-48"
+        />
+        <button id="overrides-refresh" type="button" class="rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
+          {isEs ? 'Actualizar' : 'Refresh'}
+        </button>
+      </div>
     </div>
+
+    <div id="overrides-loading" class="text-sm text-zinc-500 dark:text-zinc-400 italic">
+      {isEs ? 'Cargando correcciones…' : 'Loading overrides…'}
+    </div>
+
+    <div id="overrides-not-configured" class="hidden rounded-lg border border-zinc-200 dark:border-zinc-800 p-8 text-center">
+      <p class="text-zinc-500 dark:text-zinc-400">
+        {isEs ? 'La tabla de identificaciones no está configurada aún.' : 'Identifications table not configured yet.'}
+      </p>
+    </div>
+
+    <div id="overrides-empty" class="hidden rounded-lg border border-zinc-200 dark:border-zinc-800 p-8 text-center">
+      <p class="text-zinc-500 dark:text-zinc-400">
+        {isEs ? 'No hay correcciones de identificación.' : 'No identification overrides found.'}
+      </p>
+    </div>
+
+    <div id="overrides-list" class="hidden space-y-2"></div>
+
+    <nav id="overrides-pager" class="hidden flex items-center justify-between text-sm">
+      <button id="overrides-prev" type="button" class="px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 disabled:opacity-50" disabled>
+        ←
+      </button>
+      <span id="overrides-page" class="text-zinc-500"></span>
+      <button id="overrides-next" type="button" class="px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 disabled:opacity-50" disabled>
+        →
+      </button>
+    </nav>
   </div>
 </section>
 
 <script>
   import { getSupabase } from '../lib/supabase';
   import { getUserRoles } from '../lib/user-roles';
+  import { escapeHtml } from '../lib/escape';
+
+  const PAGE_SIZE = 20;
+  let currentPage = 0;
+  let searchTerm = '';
+
+  const isEs = document.documentElement.lang === 'es';
+  const shell = document.getElementById('exp-overrides-shell');
+  const listEl = document.getElementById('overrides-list');
+  const loadingEl = document.getElementById('overrides-loading');
+  const emptyEl = document.getElementById('overrides-empty');
+  const notConfiguredEl = document.getElementById('overrides-not-configured');
+  const pagerEl = document.getElementById('overrides-pager');
+  const pageLabel = document.getElementById('overrides-page');
+  const prevBtn = document.getElementById('overrides-prev') as HTMLButtonElement | null;
+  const nextBtn = document.getElementById('overrides-next') as HTMLButtonElement | null;
+  const searchEl = document.getElementById('overrides-search') as HTMLInputElement | null;
+  const refreshBtn = document.getElementById('overrides-refresh');
 
   function show(id: string) { document.getElementById(id)?.classList.remove('hidden'); }
 
-  const supabase = getSupabase();
+  async function loadOverrides(): Promise<void> {
+    if (!listEl || !loadingEl) return;
+    loadingEl.classList.remove('hidden');
+    emptyEl?.classList.add('hidden');
+    notConfiguredEl?.classList.add('hidden');
+    listEl.classList.add('hidden');
+    listEl.innerHTML = '';
+    pagerEl?.classList.add('hidden');
 
-  async function init() {
+    try {
+      const supabase = getSupabase();
+      let query = supabase
+        .from('identifications')
+        .select('*', { count: 'exact' })
+        .eq('source', 'human')
+        .eq('is_primary', true)
+        .order('created_at', { ascending: false })
+        .range(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE - 1);
+
+      if (searchTerm) {
+        query = query.ilike('taxon_name', `%${searchTerm}%`);
+      }
+
+      const { data, count, error } = await query;
+      loadingEl.classList.add('hidden');
+
+      if (error) {
+        if (error.code === '42P01' || error.message.includes('does not exist') || error.message.includes('relation')) {
+          notConfiguredEl?.classList.remove('hidden');
+          return;
+        }
+        listEl.innerHTML = `<p class="text-sm text-red-600">${escapeHtml(error.message)}</p>`;
+        listEl.classList.remove('hidden');
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        emptyEl?.classList.remove('hidden');
+        return;
+      }
+
+      for (const row of data) {
+        const date = new Date(row.created_at as string).toLocaleDateString(
+          isEs ? 'es' : 'en',
+          { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' },
+        );
+
+        const el = document.createElement('div');
+        el.className = 'rounded-lg border border-zinc-200 dark:border-zinc-800 p-3 flex items-start justify-between gap-3';
+        el.innerHTML = `
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 text-sm">
+              <span class="font-medium text-zinc-900 dark:text-zinc-100">${escapeHtml(String(row.taxon_name ?? (isEs ? 'Sin nombre' : 'Unnamed')))}</span>
+              <span class="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300">${escapeHtml(String(row.source ?? 'human'))}</span>
+            </div>
+            <p class="text-xs text-zinc-500 mt-0.5 truncate">${isEs ? 'Observación' : 'Observation'}: ${escapeHtml(String(row.observation_id ?? '—').slice(0, 8))}…</p>
+            <p class="text-xs text-zinc-400 mt-0.5">${escapeHtml(date)}</p>
+          </div>
+        `;
+        listEl.appendChild(el);
+      }
+
+      listEl.classList.remove('hidden');
+
+      const total = count ?? 0;
+      const totalPages = Math.ceil(total / PAGE_SIZE);
+      if (totalPages > 1) {
+        pagerEl?.classList.remove('hidden');
+        if (pageLabel) pageLabel.textContent = `${currentPage + 1} / ${totalPages}`;
+        if (prevBtn) prevBtn.disabled = currentPage === 0;
+        if (nextBtn) nextBtn.disabled = currentPage >= totalPages - 1;
+      }
+    } catch (err) {
+      loadingEl.classList.add('hidden');
+      if (notConfiguredEl) {
+        notConfiguredEl.classList.remove('hidden');
+      }
+    }
+  }
+
+  let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+  searchEl?.addEventListener('input', () => {
+    if (searchTimeout) clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+      searchTerm = searchEl.value.trim();
+      currentPage = 0;
+      void loadOverrides();
+    }, 300);
+  });
+
+  prevBtn?.addEventListener('click', () => {
+    if (currentPage > 0) { currentPage--; void loadOverrides(); }
+  });
+  nextBtn?.addEventListener('click', () => {
+    currentPage++;
+    void loadOverrides();
+  });
+  refreshBtn?.addEventListener('click', () => void loadOverrides());
+
+  (async () => {
+    const supabase = getSupabase();
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) { show('exp-overrides-not-auth'); return; }
     const myRoles = await getUserRoles(session.user.id);
@@ -42,8 +197,7 @@ const tr = t(lang);
       show('exp-overrides-not-auth');
       return;
     }
-    show('exp-overrides-shell');
-  }
-
-  init().catch(() => { show('exp-overrides-not-auth'); });
+    shell?.classList.remove('hidden');
+    await loadOverrides();
+  })().catch(() => { show('exp-overrides-not-auth'); });
 </script>
