@@ -93,7 +93,7 @@ export const claudeIdentifier: Identifier = {
       family: r.family ?? null,
       kingdom: (r.kingdom as IDResult['kingdom']) ?? 'Unknown',
       confidence: r.confidence ?? 0,
-      source: 'claude_haiku',
+      source: (r.source as IDResult['source']) ?? PLUGIN_ID,
       raw: r.raw,
     };
   },
