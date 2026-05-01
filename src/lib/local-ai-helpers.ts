@@ -150,20 +150,57 @@ export function markPwaInstalled(): void {
   try { localStorage.setItem(PWA_INSTALLED_KEY, 'true'); } catch { /* full storage */ }
 }
 
+let relatedAppsCheckComplete = false;
+let relatedAppsCheckPromise: Promise<void> | null = null;
+
 /**
  * Async probe via Chrome's `getInstalledRelatedApps()`. When it
  * confirms our PWA is installed, write the localStorage memo so
  * subsequent loads short-circuit synchronously via `isPwaInstalled()`.
  * Safe no-op on browsers that don't support the API.
+ *
+ * Deduplicates concurrent calls — only one in-flight probe at a time.
  */
 export async function markInstalledIfRelatedAppsKnown(): Promise<void> {
-  if (typeof navigator === 'undefined') return;
-  const nav = navigator as Navigator & {
-    getInstalledRelatedApps?: () => Promise<Array<{ platform: string; url?: string; id?: string }>>;
-  };
-  if (typeof nav.getInstalledRelatedApps !== 'function') return;
-  try {
-    const apps = await nav.getInstalledRelatedApps();
-    if (apps.length > 0) markPwaInstalled();
-  } catch { /* permissions or feature gated — ignore */ }
+  if (relatedAppsCheckComplete) return;
+  if (relatedAppsCheckPromise) return relatedAppsCheckPromise;
+
+  relatedAppsCheckPromise = (async () => {
+    try {
+      if (typeof navigator === 'undefined') return;
+      const nav = navigator as Navigator & {
+        getInstalledRelatedApps?: () => Promise<Array<{ platform: string; url?: string }>>;
+      };
+      if (!nav.getInstalledRelatedApps) return;
+      const apps = await nav.getInstalledRelatedApps();
+      if (apps.length > 0) {
+        markPwaInstalled();
+      }
+    } catch {
+      // API not available or rejected — no-op
+    } finally {
+      relatedAppsCheckComplete = true;
+      relatedAppsCheckPromise = null;
+    }
+  })();
+
+  return relatedAppsCheckPromise;
+}
+
+/**
+ * Wait for the getInstalledRelatedApps check to complete before showing
+ * the install banner. Returns true if the PWA is installed (after the
+ * async check). Call this instead of isPwaInstalled() when you need to
+ * avoid the flash-of-banner race condition.
+ */
+export async function awaitPwaInstallCheck(): Promise<boolean> {
+  if (isPwaInstalled()) return true;
+  await markInstalledIfRelatedAppsKnown();
+  return isPwaInstalled();
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('appinstalled', () => {
+    markPwaInstalled();
+  });
 }
