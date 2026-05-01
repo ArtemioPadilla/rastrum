@@ -119,6 +119,7 @@ export const docPages = [
   'vision', 'features', 'roadmap', 'tasks', 'market',
   'architecture', 'indigenous', 'funding', 'contribute',
   'faq', 'privacy', 'terms', 'console', 'sponsorships', 'mcp',
+  'changelog',
 ] as const;
 
 export type DocPage = (typeof docPages)[number];
@@ -311,6 +312,10 @@ export const docPageMeta = {
   mcp: {
     en: "Connect AI agents to Rastrum via the Model Context Protocol. Setup guide for Claude Desktop, Cursor, OpenClaw, and the Claude Code CLI.",
     es: "Conecta agentes de IA a Rastrum mediante el Model Context Protocol. Guía de configuración para Claude Desktop, Cursor, OpenClaw y Claude Code CLI.",
+  },
+  changelog: {
+    en: "Version history and significant changes in Rastrum. What shipped per version, with PR links and summaries.",
+    es: "Historial de versiones y cambios significativos en Rastrum. Lo que se entregó por versión, con enlaces a PRs y resúmenes.",
   },
 } as const satisfies Record<DocPage, { en: string; es: string }>;
 
