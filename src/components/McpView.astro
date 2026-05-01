@@ -1,0 +1,162 @@
+---
+const { lang } = Astro.props;
+const isEs = lang === 'es';
+
+const MCP_URL = 'https://mcp.rastrum.org';
+const TOKENS_PATH = isEs ? '/es/perfil/tokens/' : '/en/profile/tokens/';
+
+const tools = [
+  { scope: 'observe',  name: 'submit_observation',  desc: isEs ? 'Crear una observación'                      : 'Create an observation' },
+  { scope: 'observe',  name: 'list_observations',   desc: isEs ? 'Listar tus observaciones'                   : 'List your observations' },
+  { scope: 'observe',  name: 'get_observation',     desc: isEs ? 'Obtener una observación por ID'             : 'Get a single observation by ID' },
+  { scope: 'identify', name: 'identify_species',    desc: isEs ? 'Identificar especie desde una foto'         : 'Identify species from a photo URL' },
+  { scope: 'export',   name: 'export_darwin_core',  desc: isEs ? 'Exportar CSV Darwin Core'                   : 'Export Darwin Core CSV' },
+  { scope: 'status',   name: 'get_platform_status', desc: isEs ? 'Métricas públicas de la plataforma'         : 'Aggregate public platform metrics' },
+  { scope: 'admin',    name: 'get_admin_metrics',   desc: isEs ? 'Métricas completas (requiere rol admin)'    : 'Full metrics (requires admin role)' },
+];
+
+function scopeBadge(scope: string): string {
+  if (scope === 'observe')  return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300';
+  if (scope === 'identify') return 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300';
+  if (scope === 'export')   return 'bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300';
+  if (scope === 'status')   return 'bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300';
+  return 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300';
+}
+
+const copyLabel = isEs ? 'Copiar' : 'Copy';
+const copiedLabel = isEs ? 'Copiado' : 'Copied';
+---
+
+<article class="prose prose-zinc dark:prose-invert max-w-none">
+
+  <h2>{isEs ? '¿Qué es el servidor MCP de Rastrum?' : 'What is the Rastrum MCP server?'}</h2>
+  <p>
+    {isEs
+      ? 'El servidor MCP (Model Context Protocol) permite que agentes de IA — Claude Desktop, Cursor, OpenClaw, Copilot y cualquier cliente compatible — accedan a tus datos de biodiversidad directamente, sin copiar y pegar.'
+      : 'The Rastrum MCP server lets AI agents — Claude Desktop, Cursor, OpenClaw, Copilot, and any compatible client — access your biodiversity data directly, without copy-pasting.'}
+  </p>
+
+  <h2>{isEs ? 'URL del servidor' : 'Server URL'}</h2>
+  <div class="not-prose flex items-center gap-3 rounded-lg border dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 px-4 py-3 font-mono text-sm">
+    <span id="mcp-url" class="select-all">{MCP_URL}</span>
+    <button id="copy-url-btn"
+      class="ml-auto shrink-0 rounded bg-zinc-200 dark:bg-zinc-700 px-2 py-1 text-xs hover:bg-zinc-300 dark:hover:bg-zinc-600">
+      {copyLabel}
+    </button>
+  </div>
+
+  <h2>{isEs ? 'Paso 1 — Genera un token' : 'Step 1 — Generate a token'}</h2>
+  <p>
+    {isEs
+      ? 'Los tokens se crean en tu perfil. Elige los scopes que necesite tu agente:'
+      : 'Tokens are created in your profile. Pick the scopes your agent needs:'}
+  </p>
+  <div class="not-prose mb-4">
+    <a href={TOKENS_PATH}
+       class="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800">
+      {isEs ? 'Ir a Tokens API →' : 'Go to API Tokens →'}
+    </a>
+  </div>
+
+  <h2>{isEs ? 'Herramientas disponibles' : 'Available tools'}</h2>
+  <div class="not-prose overflow-x-auto rounded-lg border dark:border-zinc-700">
+    <table class="w-full text-sm">
+      <thead class="bg-zinc-50 dark:bg-zinc-900 text-left text-xs uppercase tracking-wide text-zinc-500">
+        <tr>
+          <th class="px-4 py-2">{isEs ? 'Herramienta' : 'Tool'}</th>
+          <th class="px-4 py-2">Scope</th>
+          <th class="px-4 py-2">{isEs ? 'Descripción' : 'Description'}</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800">
+        {tools.map(tool => (
+          <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-900/50">
+            <td class="px-4 py-2 font-mono text-xs">{tool.name}</td>
+            <td class="px-4 py-2">
+              <span class={`inline-block rounded px-1.5 py-0.5 text-xs font-medium ${scopeBadge(tool.scope)}`}>{tool.scope}</span>
+            </td>
+            <td class="px-4 py-2 text-zinc-600 dark:text-zinc-400">{tool.desc}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+
+  <h2>{isEs ? 'Paso 2 — Configura tu cliente' : 'Step 2 — Configure your client'}</h2>
+
+  <h3>OpenClaw / Claude Desktop</h3>
+  <pre><code>{`{
+  "mcpServers": {
+    "rastrum": {
+      "type": "http",
+      "url": "${MCP_URL}",
+      "headers": { "Authorization": "Bearer rst_..." }
+    }
+  }
+}`}</code></pre>
+
+  <h3>Cursor</h3>
+  <p>{isEs ? 'En' : 'In'} <code>~/.cursor/mcp.json</code>:</p>
+  <pre><code>{`{
+  "rastrum": {
+    "url": "${MCP_URL}",
+    "headers": { "Authorization": "Bearer rst_..." }
+  }
+}`}</code></pre>
+
+  <h3>Claude Code (CLI)</h3>
+  <pre><code>{`claude mcp add rastrum --transport http "${MCP_URL}" \\
+  --header "Authorization: Bearer rst_..."`}</code></pre>
+
+  <h2>{isEs ? 'Scopes y permisos' : 'Scopes & permissions'}</h2>
+  <div class="not-prose overflow-x-auto rounded-lg border dark:border-zinc-700">
+    <table class="w-full text-sm">
+      <thead class="bg-zinc-50 dark:bg-zinc-900 text-left text-xs uppercase tracking-wide text-zinc-500">
+        <tr>
+          <th class="px-4 py-2">Scope</th>
+          <th class="px-4 py-2">{isEs ? 'Qué permite' : 'What it allows'}</th>
+          <th class="px-4 py-2">{isEs ? 'Recomendado para' : 'Recommended for'}</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800 text-zinc-700 dark:text-zinc-300">
+        <tr>
+          <td class="px-4 py-2 font-mono text-xs">observe</td>
+          <td class="px-4 py-2">{isEs ? 'Leer y crear observaciones' : 'Read & create observations'}</td>
+          <td class="px-4 py-2">{isEs ? 'Agentes de campo' : 'Field agents'}</td>
+        </tr>
+        <tr>
+          <td class="px-4 py-2 font-mono text-xs">identify</td>
+          <td class="px-4 py-2">{isEs ? 'Cascada de identificación de especies' : 'Species ID cascade'}</td>
+          <td class="px-4 py-2">{isEs ? 'Bots de identificación' : 'ID bots'}</td>
+        </tr>
+        <tr>
+          <td class="px-4 py-2 font-mono text-xs">export</td>
+          <td class="px-4 py-2">{isEs ? 'Exportar Darwin Core CSV' : 'Export Darwin Core CSV'}</td>
+          <td class="px-4 py-2">{isEs ? 'Pipelines de datos' : 'Data pipelines'}</td>
+        </tr>
+        <tr>
+          <td class="px-4 py-2 font-mono text-xs">status</td>
+          <td class="px-4 py-2">{isEs ? 'Métricas públicas de la plataforma' : 'Public platform metrics'}</td>
+          <td class="px-4 py-2">{isEs ? 'Bots de monitoreo' : 'Monitoring bots'}</td>
+        </tr>
+        <tr>
+          <td class="px-4 py-2 font-mono text-xs">admin</td>
+          <td class="px-4 py-2">{isEs ? 'Métricas completas (requiere rol admin)' : 'Full metrics (requires admin role)'}</td>
+          <td class="px-4 py-2">{isEs ? 'Operadores' : 'Operators'}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+</article>
+
+<script define:vars={{ MCP_URL, copiedLabel, copyLabel }}>
+  const btn = document.getElementById('copy-url-btn');
+  if (btn) {
+    btn.addEventListener('click', () => {
+      navigator.clipboard.writeText(MCP_URL);
+      btn.textContent = copiedLabel;
+      setTimeout(() => { btn.textContent = copyLabel; }, 1500);
+    });
+  }
+</script>

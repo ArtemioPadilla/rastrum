@@ -117,7 +117,7 @@ export const routes: Record<string, Record<Locale, string>> = {
 export const docPages = [
   'vision', 'features', 'roadmap', 'tasks', 'market',
   'architecture', 'indigenous', 'funding', 'contribute',
-  'faq', 'privacy', 'terms', 'console', 'sponsorships',
+  'faq', 'privacy', 'terms', 'console', 'sponsorships', 'mcp',
 ] as const;
 
 export type DocPage = (typeof docPages)[number];
@@ -305,6 +305,10 @@ export const docPageMeta = {
   sponsorships: {
     en: "Share your Anthropic credential with friends, capped per month and audited. How sponsorship works for sponsors and beneficiaries.",
     es: "Comparte tu credencial Anthropic con amigos, con límite mensual y auditoría. Cómo funcionan los patrocinios para sponsors y beneficiarios.",
+  },
+  mcp: {
+    en: "Connect AI agents to Rastrum via the Model Context Protocol. Setup guide for Claude Desktop, Cursor, OpenClaw, and the Claude Code CLI.",
+    es: "Conecta agentes de IA a Rastrum mediante el Model Context Protocol. Guía de configuración para Claude Desktop, Cursor, OpenClaw y Claude Code CLI.",
   },
 } as const satisfies Record<DocPage, { en: string; es: string }>;
 
