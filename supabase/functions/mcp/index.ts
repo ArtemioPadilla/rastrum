@@ -384,7 +384,9 @@ Deno.serve(async (req: Request) => {
   // Clients that support Streamable HTTP (Claude Desktop, Cursor, Copilot)
   // never issue a GET, so this branch is invisible to them.
   if (req.method === 'GET') {
-    const selfUrl = new URL(req.url).href.split('?')[0]; // strip any query params
+    // Supabase Edge Runtime may forward the request as http:// internally;
+    // force https:// so the MCP SDK origin-check passes.
+    const selfUrl = new URL(req.url).href.split('?')[0].replace(/^http:/, 'https:');
     const sseHeaders = {
       ...corsHeaders,
       'Content-Type': 'text/event-stream',
