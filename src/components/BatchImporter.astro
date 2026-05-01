@@ -9,7 +9,7 @@ interface Props {
    *   defaults to `camera_trap`. The cascade prefers the MegaDetector +
    *   SpeciesNet plugin (`camera_trap_megadetector`) — when the operator
    *   has set `PUBLIC_MEGADETECTOR_ENDPOINT` it runs first; when unset
-   *   the cascade falls through to the standard waterfall.
+   *   the cascade falls through to the standard cost-sorted race.
    */
   mode?: 'generic' | 'camera_trap';
 }
