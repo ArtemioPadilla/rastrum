@@ -201,6 +201,19 @@ const weathers = WEATHERS;
             {weathers.map(w => <option value={w}>{w}</option>)}
           </select>
         </div>
+        <!-- License -->
+        <div>
+          <label for="obs2-license" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+            {observeStr.license_label ?? (isEs ? "Licencia" : "License")}
+          </label>
+          <select id="obs2-license" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
+            <option value="">{isEs ? "Usar mi licencia por defecto" : "Use my default license"}</option>
+            <option value="CC BY 4.0">CC BY 4.0</option>
+            <option value="CC BY-NC 4.0">CC BY-NC 4.0</option>
+            <option value="CC0">CC0</option>
+          </select>
+          <p class="mt-1 text-xs text-zinc-400">{isEs ? "Anula tu licencia por defecto solo para esta observación" : "Overrides your default license for this observation only"}</p>
+        </div>
         <!-- Content sensitivity -->
         <div class="flex items-start gap-3">
           <input id="obs2-sensitive" type="checkbox" class="mt-1 rounded border-zinc-300 dark:border-zinc-700 text-emerald-600 focus:ring-emerald-500" />
@@ -819,6 +832,8 @@ postForm?.addEventListener('submit', async (e) => {
     const habitatVal = (document.getElementById('obs2-habitat') as HTMLSelectElement | null)?.value || null;
     const weatherVal = (document.getElementById('obs2-weather') as HTMLSelectElement | null)?.value || null;
     const sensitiveVal = (document.getElementById('obs2-sensitive') as HTMLInputElement | null)?.checked ?? false;
+    const licenseVal = (document.getElementById('obs2-license') as HTMLSelectElement | null)?.value || null;
+    const licenseTyped = licenseVal as 'CC BY 4.0' | 'CC BY-NC 4.0' | 'CC0' | null;
     const taxonInput = (document.getElementById('obs2-taxon-input') as HTMLInputElement | null)?.value.trim();
 
     // MediaRecorder-produced Blobs sometimes have an empty `type` (notably
@@ -856,6 +871,7 @@ postForm?.addEventListener('submit', async (e) => {
       weather: weatherVal as never,
       notes,
       contentSensitive: sensitiveVal,
+      license: licenseTyped,
     });
 
     await syncOutbox().catch(() => {});
