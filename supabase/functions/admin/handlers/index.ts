@@ -36,6 +36,8 @@ import { errorAcknowledgeHandler } from './error-acknowledge.ts';
 import { errorAcknowledgeBulkHandler } from './error-acknowledge-bulk.ts';
 import { userDetailHandler } from './user-detail.ts';
 import { userMergeHandler } from './user-merge.ts';
+import { expertAppApproveHandler } from './expert-app-approve.ts';
+import { expertAppRejectHandler } from './expert-app-reject.ts';
 import type { ActionHandler } from './role-grant.ts';
 
 export const HANDLERS: Record<string, ActionHandler<unknown>> = {
@@ -77,4 +79,6 @@ export const HANDLERS: Record<string, ActionHandler<unknown>> = {
   'error.acknowledge_bulk': errorAcknowledgeBulkHandler as unknown as ActionHandler<unknown>,
   'user.detail': userDetailHandler as unknown as ActionHandler<unknown>,
   'user.merge': userMergeHandler as unknown as ActionHandler<unknown>,
+  'expert_app.approve': expertAppApproveHandler as unknown as ActionHandler<unknown>,
+  'expert_app.reject':  expertAppRejectHandler  as unknown as ActionHandler<unknown>,
 };

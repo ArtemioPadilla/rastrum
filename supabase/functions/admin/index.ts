@@ -58,6 +58,7 @@ const WRITE_ACTIONS = new Set([
   'webhook.replay_delivery',
   'health.recompute',
   'error.acknowledge', 'error.acknowledge_bulk',
+  'expert_app.approve', 'expert_app.reject',
 ]);
 
 function json(body: unknown, status = 200, req: Request): Response {

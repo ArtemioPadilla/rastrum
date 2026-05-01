@@ -34,7 +34,9 @@ export type AuditOp =
   | 'webhook_replay'
   | 'health_recompute'
   | 'error_acknowledge'
-  | 'error_acknowledge_bulk';
+  | 'error_acknowledge_bulk'
+  | 'expert_app_approve'
+  | 'expert_app_reject';
 
 export interface AuditRow {
   actor_id: string;
