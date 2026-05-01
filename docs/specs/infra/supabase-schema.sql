@@ -6187,7 +6187,7 @@ AS $$
   SELECT jsonb_build_object(
     'total_observations',    (SELECT COUNT(*) FROM observations WHERE sync_status = 'synced'),
     'total_species',         (SELECT COUNT(DISTINCT primary_taxon_id) FROM observations WHERE sync_status = 'synced' AND primary_taxon_id IS NOT NULL),
-    'active_observers_30d',  (SELECT COUNT(DISTINCT observer_id) FROM observations WHERE observed_at >= now() - interval '30 days'),
+    'active_observers_30d',  (SELECT COUNT(DISTINCT observer_id) FROM observations WHERE sync_status = 'synced' AND observed_at >= now() - interval '30 days'),
     'public_projects',       (SELECT COUNT(*) FROM projects WHERE visibility = 'public'),
     'observations_7d',       (SELECT COUNT(*) FROM observations WHERE observed_at >= now() - interval '7 days' AND sync_status = 'synced'),
     'as_of',                 now()

@@ -291,10 +291,15 @@ const TOOLS: Tool[] = [
     scope: 'admin',
     inputSchema: { type: 'object', properties: {} },
     async handler(_args, ctx) {
-      const { data: isAdmin, error: roleErr } = await ctx.supabase
-        .rpc('has_role', { uid: ctx.user_id, r: 'admin' });
+      const { data: roleRow, error: roleErr } = await ctx.supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('user_id', ctx.user_id)
+        .eq('role', 'admin')
+        .is('revoked_at', null)
+        .maybeSingle();
       if (roleErr) throw new Error(roleErr.message);
-      if (!isAdmin) throw new Error('Caller does not hold the admin role.');
+      if (!roleRow) throw new Error('Caller does not hold the admin role.');
       const { data, error } = await ctx.supabase.rpc('admin_platform_metrics');
       if (error) throw new Error(error.message);
       return data;
