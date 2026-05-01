@@ -306,6 +306,10 @@ export const docPageMeta = {
     en: "Share your Anthropic credential with friends, capped per month and audited. How sponsorship works for sponsors and beneficiaries.",
     es: "Comparte tu credencial Anthropic con amigos, con límite mensual y auditoría. Cómo funcionan los patrocinios para sponsors y beneficiarios.",
   },
+  mcp: {
+    en: "Connect AI agents to Rastrum via the Model Context Protocol. Setup guide for Claude Desktop, Cursor, OpenClaw, and the Claude Code CLI.",
+    es: "Conecta agentes de IA a Rastrum mediante el Model Context Protocol. Guía de configuración para Claude Desktop, Cursor, OpenClaw y Claude Code CLI.",
+  },
 } as const satisfies Record<DocPage, { en: string; es: string }>;
 
 /**
