@@ -376,11 +376,15 @@ Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   // ── SSE keep-alive for clients that require GET-based SSE transport ──────
-  // OpenClaw and other SSE-only MCP clients open a long-lived GET connection
-  // to confirm the server is alive before sending JSON-RPC via POST.
-  // We satisfy that contract by streaming a ping comment every 25 s and
-  // closing after 55 s (just under Supabase Edge Function's 60 s wall time).
+  // The legacy SSE MCP transport (used by OpenClaw ≤ v2026.4.26 and other
+  // SSE-only clients) opens a long-lived GET connection and waits for an
+  // `endpoint` event that tells it where to POST JSON-RPC messages.
+  // We emit that event immediately (pointing back at this same URL), then
+  // keep the connection alive with periodic ping comments.
+  // Clients that support Streamable HTTP (Claude Desktop, Cursor, Copilot)
+  // never issue a GET, so this branch is invisible to them.
   if (req.method === 'GET') {
+    const selfUrl = new URL(req.url).href.split('?')[0]; // strip any query params
     const sseHeaders = {
       ...corsHeaders,
       'Content-Type': 'text/event-stream',
@@ -390,8 +394,8 @@ Deno.serve(async (req: Request) => {
     const { readable, writable } = new TransformStream();
     const writer = writable.getWriter();
     const enc = new TextEncoder();
-    // Send an immediate ping so the client sees headers right away.
-    writer.write(enc.encode(': ping\n\n'));
+    // Required by the MCP SSE spec: the client waits for this before connecting.
+    writer.write(enc.encode(`event: endpoint\ndata: ${selfUrl}\n\n`));
     // Keep the stream alive with periodic pings, then close cleanly.
     const interval = setInterval(() => writer.write(enc.encode(': ping\n\n')), 25_000);
     setTimeout(() => {
