@@ -77,7 +77,7 @@ Deno.serve(async (req: Request) => {
     if (!Array.isArray(scopes) || !scopes.every((s): s is string => typeof s === 'string')) {
       return json({ error: 'scopes must be an array of strings' }, 400);
     }
-    const ALLOWED_SCOPES = ['observe', 'identify', 'export', 'read_all'];
+    const ALLOWED_SCOPES = ['observe', 'identify', 'export', 'read_all', 'status', 'admin'];
     const invalidScopes = scopes.filter((s: string) => !ALLOWED_SCOPES.includes(s));
     if (invalidScopes.length > 0) {
       return json({ error: `Invalid scopes: ${invalidScopes.join(', ')}` }, 400);
