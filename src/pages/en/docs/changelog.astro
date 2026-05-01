@@ -1,0 +1,12 @@
+---
+import DocLayout from '../../../layouts/DocLayout.astro';
+import ChangelogView from '../../../components/ChangelogView.astro';
+import { t } from '../../../i18n/utils';
+
+const lang = 'en';
+const tr = t(lang);
+---
+
+<DocLayout title="Changelog" lang={lang} section="changelog" editPath="src/pages/en/docs/changelog.astro">
+  <ChangelogView lang={lang} />
+</DocLayout>
