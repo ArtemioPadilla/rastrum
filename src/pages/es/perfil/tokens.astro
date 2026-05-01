@@ -21,7 +21,7 @@ const tr = t(lang) as any;
         {tr.tokens.copy_now}
       </p>
       <div class="flex items-center gap-2">
-        <code id="new-token-value" class="flex-1 rounded bg-white border px-3 py-2 text-sm font-mono break-all"></code>
+        <code id="new-token-value" class="flex-1 rounded bg-white dark:bg-zinc-800 dark:text-zinc-100 border dark:border-zinc-600 px-3 py-2 text-sm font-mono break-all"></code>
         <button id="copy-btn" class="shrink-0 rounded bg-green-600 px-3 py-2 text-sm text-white hover:bg-green-700">
           {tr.tokens.copy}
         </button>
@@ -34,7 +34,7 @@ const tr = t(lang) as any;
     </section>
 
     <!-- Create form -->
-    <form id="create-form" class="rounded-xl border p-5 space-y-4">
+    <form id="create-form" class="rounded-xl border dark:border-zinc-700 p-5 space-y-4">
       <h2 class="font-semibold">{tr.tokens.new}</h2>
 
       <div>
@@ -45,7 +45,7 @@ const tr = t(lang) as any;
           id="token-name"
           type="text"
           placeholder={tr.tokens.name_placeholder}
-          class="w-full rounded border px-3 py-2 text-sm"
+          class="w-full rounded border dark:border-zinc-600 px-3 py-2 text-sm bg-white dark:bg-zinc-800 dark:text-white dark:placeholder-zinc-400"
           maxlength="64"
           required
         />
@@ -54,7 +54,7 @@ const tr = t(lang) as any;
       <div>
         <label class="block text-sm font-medium mb-1">{tr.tokens.scopes_label}</label>
         <div class="flex flex-wrap gap-3">
-          {['observe', 'identify', 'export', 'read_all'].map(scope => (
+          {['observe', 'identify', 'export', 'status', 'admin', 'read_all'].map(scope => (
             <label class="flex items-center gap-2 text-sm cursor-pointer">
               <input
                 type="checkbox"
@@ -62,7 +62,7 @@ const tr = t(lang) as any;
                 value={scope}
                 checked={['observe', 'identify', 'export'].includes(scope)}
               />
-              <code class="text-xs bg-gray-100 px-1 rounded">{scope}</code>
+              <code class="text-xs bg-gray-100 dark:bg-zinc-700 dark:text-zinc-200 px-1 rounded">{scope}</code>
             </label>
           ))}
         </div>
@@ -72,7 +72,7 @@ const tr = t(lang) as any;
         <label class="block text-sm font-medium mb-1" for="token-expires">
           {tr.tokens.expires_label}
         </label>
-        <select id="token-expires" class="rounded border px-3 py-2 text-sm">
+        <select id="token-expires" class="rounded border dark:border-zinc-600 px-3 py-2 text-sm bg-white dark:bg-zinc-800 dark:text-white">
           <option value="">{tr.tokens.no_expiry}</option>
           <option value="30">30 {tr.tokens.days}</option>
           <option value="90">90 {tr.tokens.days}</option>
