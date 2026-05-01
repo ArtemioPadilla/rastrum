@@ -500,11 +500,31 @@ export async function wireManagePanelLocation(
     savingEl?.classList.remove('hidden');
     try {
       const literal = pointGeographyLiteral(e.detail.coords.lat, e.detail.coords.lng);
-      const { error } = await supabase
+      // Hard 15 s timeout — if PostgREST never returns (RLS recursion regressed,
+      // CORS preflight stalled, auth refresh deadlock, etc.) the user gets a
+      // visible error instead of a button stuck on "saving…" forever.
+      // Returning the explicit `select()` makes PostgREST send back the updated
+      // row, which forces the round-trip to complete instead of fire-and-forget.
+      const updatePromise = supabase
         .from('observations')
         .update({ location: literal, updated_at: new Date().toISOString() })
-        .eq('id', obsId);
-      if (error) throw error;
+        .eq('id', obsId)
+        .select('id, location')
+        .maybeSingle();
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('save_timeout')), 15_000),
+      );
+      const result = await Promise.race([updatePromise, timeout]) as { data: unknown; error: { message?: string; code?: string } | null };
+      if (result.error) {
+        console.error('[manage-panel] location update failed', { obsId, err: result.error });
+        throw new Error(result.error.message || result.error.code || 'update_failed');
+      }
+      if (!result.data) {
+        // Empty body = RLS filtered the UPDATE (no rows matched observer_id).
+        // Don't claim success — the row didn't change.
+        console.warn('[manage-panel] location update returned 0 rows (RLS filtered)', { obsId });
+        throw new Error('rls_filtered');
+      }
 
       window.dispatchEvent(new CustomEvent('rastrum:mappicker-set', {
         detail: { id: 'obs-detail-loc-view', coords: e.detail.coords },
@@ -517,8 +537,21 @@ export async function wireManagePanelLocation(
       savedEl?.classList.remove('hidden');
     } catch (err) {
       const code = err instanceof Error ? err.message : String(err);
+      console.error('[manage-panel] location save error', { obsId, code, err });
       if (errEl) {
-        errEl.textContent = code === 'coords_invalid' ? errCopy.invalidCoords : errCopy.saveFailed;
+        if (code === 'coords_invalid') {
+          errEl.textContent = errCopy.invalidCoords;
+        } else if (code === 'save_timeout') {
+          errEl.textContent = isEs
+            ? 'Tiempo de espera agotado. Revisa tu conexión o intenta de nuevo.'
+            : 'Save timed out. Check your connection and try again.';
+        } else if (code === 'rls_filtered') {
+          errEl.textContent = isEs
+            ? 'No tienes permiso para editar esta observación.'
+            : 'You do not have permission to edit this observation.';
+        } else {
+          errEl.textContent = `${errCopy.saveFailed} (${code})`;
+        }
         errEl.classList.remove('hidden');
       }
     } finally {
