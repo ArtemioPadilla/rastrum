@@ -140,17 +140,21 @@ const tr = t(lang);
   // ── OAuth ──
   googleBtn?.addEventListener('click', async () => {
     googleBtn.disabled = true;
+    window.posthog?.capture('sign_in_initiated', { method: 'google' });
     const { error } = await signInWithGoogle();
     if (error) {
       googleBtn.disabled = false;
+      window.posthog?.capture('sign_in_failed', { method: 'google', error: error.message });
       if (emailErr) { emailErr.textContent = error.message; emailErr.classList.remove('hidden'); }
     }
   });
   githubBtn?.addEventListener('click', async () => {
     githubBtn.disabled = true;
+    window.posthog?.capture('sign_in_initiated', { method: 'github' });
     const { error } = await signInWithGitHub();
     if (error) {
       githubBtn.disabled = false;
+      window.posthog?.capture('sign_in_failed', { method: 'github', error: error.message });
       if (emailErr) { emailErr.textContent = error.message; emailErr.classList.remove('hidden'); }
     }
   });
@@ -158,12 +162,15 @@ const tr = t(lang);
   // ── Passkey ──
   passkeyBtn?.addEventListener('click', async () => {
     passkeyBtn.disabled = true;
+    window.posthog?.capture('sign_in_initiated', { method: 'passkey' });
     const result = await verifyPasskey();
     if (result.error) {
       passkeyBtn.disabled = false;
+      window.posthog?.capture('sign_in_failed', { method: 'passkey', error: result.error.message });
       if (emailErr) { emailErr.textContent = result.error.message; emailErr.classList.remove('hidden'); }
       return;
     }
+    window.posthog?.capture('sign_in_completed', { method: 'passkey' });
     window.location.replace(window.location.pathname.startsWith('/es/') ? '/es/' : '/en/');
   });
 
@@ -176,11 +183,13 @@ const tr = t(lang);
     emailErr?.classList.add('hidden');
     sendBtn.disabled = true;
     sendLabel.textContent = isEs ? 'Enviando…' : 'Sending…';
+    window.posthog?.capture('sign_in_initiated', { method: 'email_otp' });
 
     const { error } = await requestEmailOtp(email);
     sendBtn.disabled = false;
     sendLabel.textContent = isEs ? 'Enviar código' : 'Send code';
     if (error) {
+      window.posthog?.capture('sign_in_failed', { method: 'email_otp', error: error.message });
       if (emailErr) { emailErr.textContent = error.message; emailErr.classList.remove('hidden'); }
       return;
     }
@@ -210,13 +219,17 @@ const tr = t(lang);
     verifyBtn.disabled = true;
     verifyLabel.textContent = isEs ? 'Verificando…' : 'Verifying…';
 
-    const { error } = await verifyEmailOtp(pendingEmail, code);
+    const { error, data } = await verifyEmailOtp(pendingEmail, code);
     verifyBtn.disabled = false;
     verifyLabel.textContent = isEs ? 'Verificar' : 'Verify';
     if (error) {
+      window.posthog?.capture('sign_in_failed', { method: 'email_otp', error: error.message });
       if (codeErr) { codeErr.textContent = error.message; codeErr.classList.remove('hidden'); }
       return;
     }
+    const userId = data?.user?.id;
+    if (userId) window.posthog?.identify(userId);
+    window.posthog?.capture('sign_in_completed', { method: 'email_otp' });
     window.location.replace(isEs ? '/es/' : '/en/');
   });
 
