@@ -167,11 +167,37 @@ async function syncOne(record: ObservationRecord): Promise<void> {
     console.warn('[rastrum] OG card render failed (non-fatal)', err);
   }
 
-  // 4. Mark synced in Dexie + enqueue ID request if not already
+  // 4. Mark synced in Dexie
   await db.observations.update(record.id, {
     sync_status: 'synced',
     updated_at: new Date().toISOString(),
   });
+
+  // 4.5. If the client already identified the species (e.g. BirdNET on audio,
+  //      EfficientNet on image), persist that identification directly. Audio
+  //      has no server-side identifier in the cascade, so without this step
+  //      the observation lands as "Unknown species" forever.
+  const clientId = obs.identification;
+  if (clientId.scientificName && clientId.status === 'accepted') {
+    const supabase = getSupabase();
+    const { error: clientIdErr } = await supabase.from('identifications').insert({
+      observation_id: record.id,
+      scientific_name: clientId.scientificName,
+      confidence: Math.max(0, Math.min(1, clientId.confidence ?? 0)),
+      source: clientId.source ?? 'human',
+      is_primary: true,
+    });
+    if (clientIdErr) {
+      console.warn('[rastrum] client identification persist failed', clientIdErr);
+      // Fall through to server cascade as a backstop.
+    } else {
+      // Identification persisted; skip the server cascade for this observation.
+      triggerEnvEnrichment(record.id).catch(err => console.warn('[rastrum] enrich failed', err));
+      return;
+    }
+  }
+
+  // 5. No client identification (or persistence failed) — queue the server cascade.
   const existingQueue = await db.idQueue.get(record.id);
   if (!existingQueue) {
     await db.idQueue.put({
@@ -181,8 +207,8 @@ async function syncOne(record: ObservationRecord): Promise<void> {
     });
   }
 
-  // 5. Trigger the identify Edge Function async (fire-and-forget; the queue
-  //    catches retries). The function does its own DB writes.
+  // 5b. Trigger the identify Edge Function async (fire-and-forget; the queue
+  //     catches retries). The function does its own DB writes.
   triggerIdentify(record.id).catch(err => console.warn('[rastrum] identify failed', err));
 
   // 6. Trigger environmental enrichment (lunar / weather). Also fire-and-forget.
