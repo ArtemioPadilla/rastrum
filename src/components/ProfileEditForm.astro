@@ -3,9 +3,15 @@ import { t } from '../i18n/utils';
 
 interface Props {
   lang: 'en' | 'es';
+  /** When set, only renders that section. Used by the split settings tabs. */
+  section?: 'all' | 'basic' | 'ai' | 'security';
 }
-const { lang } = Astro.props;
+const { lang, section = 'all' } = Astro.props;
 const tr = t(lang);
+const isEs = lang === 'es';
+const showBasic    = section === 'all' || section === 'basic';
+const showAI       = section === 'all' || section === 'ai';
+const showSecurity = section === 'all' || section === 'security';
 const pip = (tr as unknown as { pipeline: Record<string, string> }).pipeline;
 const onb = (tr as unknown as { onboarding: Record<string, string> }).onboarding;
 const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } }).privacy;
@@ -14,6 +20,7 @@ const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } })
 <div class="max-w-2xl mx-auto">
   <h1 class="text-2xl font-bold tracking-tight mb-6">{tr.profile.edit}</h1>
 
+  {showBasic && (
   <form id="edit-form" class="space-y-5" novalidate>
     <div>
       <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.profile.username}</label>
@@ -134,7 +141,9 @@ const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } })
     </div>
     <p id="form-error" class="hidden text-sm text-red-600 dark:text-red-400"></p>
   </form>
+  )}
 
+  {showSecurity && (
   <!-- \u2500\u2500 Sign-in methods (issue #286) \u2500\u2500 -->
   <section class="mt-10 border-t border-zinc-200 dark:border-zinc-800 pt-8" id="identity-section">
     <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
@@ -161,6 +170,7 @@ const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } })
 
     <p id="identity-status" class="hidden mt-3 text-sm"></p>
   </section>
+  )}
 
   <!-- ── Streak push reminders (ux-streak-push) ── -->
   <section class="mt-10 border-t border-zinc-200 dark:border-zinc-800 pt-8">
@@ -182,6 +192,7 @@ const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } })
     <p id="streak-push-warning" class="hidden mt-2 text-xs text-amber-700 dark:text-amber-400"></p>
   </section>
 
+  {showAI && (
   <!-- ── Pipeline de identificación ── -->
   <section class="mt-10 border-t border-zinc-200 dark:border-zinc-800 pt-8">
     <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2">
@@ -426,6 +437,7 @@ const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } })
       </div>
     </div>
   </section>
+  )}
 
   <!-- ── Confirmation modals (single dialog reused via data attrs) ── -->
   <dialog id="confirm-dialog" class="rounded-xl p-0 m-auto bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 shadow-2xl border border-zinc-200 dark:border-zinc-800 max-w-md w-[92vw] backdrop:bg-black/50">

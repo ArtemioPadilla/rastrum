@@ -1,0 +1,421 @@
+---
+import { t } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+const { lang } = Astro.props;
+const tr = t(lang);
+const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } }).privacy;
+---
+
+<div class="max-w-2xl mx-auto">
+  <h1 class="text-2xl font-bold tracking-tight mb-6">{tr.profile.edit}</h1>
+
+  <form id="edit-form" class="space-y-5" novalidate>
+    <div>
+      <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.profile.username}</label>
+      <input name="username" type="text" pattern="[a-zA-Z0-9_]{3,30}" maxlength="30" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
+      <p class="mt-1 text-xs text-zinc-500">{tr.profile.username_hint}</p>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.profile.display_name}</label>
+      <input name="display_name" type="text" maxlength="80" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.profile.bio}</label>
+      <textarea name="bio" maxlength="500" rows="3" placeholder={tr.profile.bio_placeholder} class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm"></textarea>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.profile.region_primary}</label>
+      <input name="region_primary" type="text" placeholder={tr.profile.region_placeholder} class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
+    </div>
+    <div>
+      <div class="flex items-center justify-between mb-1">
+        <label for="country_code" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300">{tr.profile.country}</label>
+        <span
+          id="country-inferred-badge"
+          class="hidden text-[11px] font-medium text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 rounded-full"
+          title={tr.profile.country_inferred_title}
+        >{tr.profile.country_inferred_badge}</span>
+      </div>
+      <select id="country_code" name="country_code" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
+        <option value="">{tr.profile.country_any}</option>
+      </select>
+      <p class="mt-1 text-xs text-zinc-500" data-country-hint>{tr.profile.country_hint}</p>
+      <p class="mt-1 hidden text-xs text-amber-700 dark:text-amber-400" data-country-load-error>{tr.profile.country_load_error}</p>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.profile.avatar_url}</label>
+      <input name="avatar_url" type="url" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
+    </div>
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.profile.preferred_lang}</label>
+        <select name="preferred_lang" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
+          <option value="es">Español</option>
+          <option value="en">English</option>
+          <option value="zap">Zapoteco</option>
+          <option value="mix">Mixteco</option>
+          <option value="nah">Náhuatl</option>
+          <option value="myn">Maya</option>
+          <option value="tzo">Tsotsil</option>
+          <option value="tze">Tseltal</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.profile.license}</label>
+        <select name="observer_license" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
+          <option value="CC BY 4.0">CC BY 4.0</option>
+          <option value="CC BY-NC 4.0">CC BY-NC 4.0</option>
+          <option value="CC0">CC0</option>
+        </select>
+        <p class="mt-1 text-xs text-zinc-500">{tr.profile.license_hint}</p>
+      </div>
+    </div>
+
+    <div>
+      <label for="timezone" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{tr.profile.timezone}</label>
+      <select id="timezone" name="timezone" class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
+        <option value="">UTC</option>
+        <option value="America/Mexico_City">America/Mexico_City</option>
+        <option value="America/Bogota">America/Bogota</option>
+        <option value="America/Lima">America/Lima</option>
+        <option value="America/Argentina/Buenos_Aires">America/Argentina/Buenos_Aires</option>
+        <option value="America/Santiago">America/Santiago</option>
+        <option value="America/Sao_Paulo">America/Sao_Paulo</option>
+        <option value="Europe/Madrid">Europe/Madrid</option>
+        <option value="Europe/London">Europe/London</option>
+      </select>
+      <p class="mt-1 text-xs text-zinc-500">{tr.profile.timezone_description}</p>
+    </div>
+
+    <fieldset class="space-y-3 border-t border-zinc-200 dark:border-zinc-800 pt-5">
+      <p class="text-xs text-zinc-500 dark:text-zinc-400">
+        <a href={`/${lang}/${lang === 'es' ? 'perfil/ajustes' : 'profile/settings'}/privacy/`}
+           class="text-emerald-700 dark:text-emerald-400 hover:underline">
+          {privacyTr.manage_in_tab_note}
+        </a>
+      </p>
+      <label class="flex items-start gap-3 cursor-pointer">
+        <input type="checkbox" name="gamification_opt_in" class="mt-1" />
+        <div>
+          <p class="text-sm font-medium text-zinc-700 dark:text-zinc-300">{tr.profile.gamification}</p>
+          <p class="text-xs text-zinc-500">{tr.profile.gamification_hint}</p>
+        </div>
+      </label>
+      <label class="flex items-start gap-3 cursor-pointer">
+        <input type="checkbox" name="streak_digest_opt_in" class="mt-1" />
+        <div>
+          <p class="text-sm font-medium text-zinc-700 dark:text-zinc-300">{tr.profile.streak_digest}</p>
+          <p class="text-xs text-zinc-500">{tr.profile.streak_digest_hint}</p>
+        </div>
+      </label>
+      <label class="flex items-start gap-3 cursor-pointer" id="community-visible-row">
+        <input type="checkbox" name="community_visible" class="mt-1" />
+        <div>
+          <p class="text-sm font-medium text-zinc-700 dark:text-zinc-300">{tr.profile.community_visible}</p>
+          <p class="text-xs text-zinc-500" data-helper-on>{tr.profile.community_visible_hint}</p>
+          <p class="text-xs text-amber-700 dark:text-amber-400 hidden" data-helper-off>{tr.profile.community_visible_disabled}</p>
+        </div>
+      </label>
+    </fieldset>
+
+    <div class="flex items-center gap-3 pt-2">
+      <button type="submit" id="save-btn" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+        <span data-label>{tr.profile.save}</span>
+      </button>
+      <a href={`/${lang}/${lang === 'es' ? 'perfil' : 'profile'}/`} class="text-sm text-zinc-600 dark:text-zinc-400 hover:underline">
+        ← {tr.profile.view_profile}
+      </a>
+      <span id="save-status" class="hidden text-sm text-emerald-600 dark:text-emerald-400">✓ {tr.profile.saved}</span>
+    </div>
+    <p id="form-error" class="hidden text-sm text-red-600 dark:text-red-400"></p>
+  </form>
+
+  <!-- ── Streak push reminders (ux-streak-push) ── -->
+  <section class="mt-10 border-t border-zinc-200 dark:border-zinc-800 pt-8">
+    <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2">
+      {tr.profile_streak_push.section_title}
+    </h2>
+    <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">{tr.profile_streak_push.section_hint}</p>
+
+    <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3 flex items-start gap-3 flex-wrap">
+      <button
+        id="streak-push-toggle"
+        type="button"
+        class="rounded-lg border border-emerald-600/60 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 text-sm font-medium text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 disabled:opacity-50"
+      >
+        <span data-spp-label>{tr.profile_streak_push.enable}</span>
+      </button>
+      <p id="streak-push-status" class="text-xs text-zinc-500"></p>
+    </div>
+    <p id="streak-push-warning" class="hidden mt-2 text-xs text-amber-700 dark:text-amber-400"></p>
+  </section>
+</div>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { shouldShowInferredCountryBadge, buildCommunityDiscoveryPayload } from '../lib/profile-edit';
+  import type { UserProfile } from '../lib/types';
+
+  const form = document.getElementById('edit-form') as HTMLFormElement | null;
+  const saveBtn = document.getElementById('save-btn') as HTMLButtonElement | null;
+  const btnLabel = saveBtn?.querySelector('[data-label]') as HTMLElement | null;
+  const status = document.getElementById('save-status');
+  const err = document.getElementById('form-error') as HTMLParagraphElement | null;
+
+  const ORIGINAL = btnLabel?.textContent ?? 'Save';
+  const SAVING = btnLabel?.textContent?.trim() === 'Guardar' ? 'Guardando…' : 'Saving…';
+
+  type EditableKey =
+    | 'username' | 'display_name' | 'bio' | 'region_primary' | 'avatar_url'
+    | 'preferred_lang' | 'observer_license' | 'country_code' | 'timezone'
+    | 'gamification_opt_in' | 'streak_digest_opt_in';
+
+  type IsoCountry = { code: string; name_en: string; name_es: string };
+
+  function syncCommunityVisibleEnabled(isPublic: boolean) {
+    const visibleEl = form?.elements.namedItem('community_visible') as HTMLInputElement | null;
+    const helperOn = form?.querySelector('[data-helper-on]') as HTMLElement | null;
+    const helperOff = form?.querySelector('[data-helper-off]') as HTMLElement | null;
+    if (!visibleEl || !helperOn || !helperOff) return;
+    visibleEl.disabled = !isPublic;
+    helperOn.classList.toggle('hidden', !isPublic);
+    helperOff.classList.toggle('hidden', isPublic);
+    if (!isPublic) visibleEl.checked = false;
+  }
+
+  async function populateCountryOptions(supabase: ReturnType<typeof getSupabase>, selectedCode: string | null) {
+    const select = form?.elements.namedItem('country_code') as HTMLSelectElement | null;
+    if (!select) return;
+    const errEl  = document.querySelector<HTMLElement>('[data-country-load-error]');
+    const hintEl = document.querySelector<HTMLElement>('[data-country-hint]');
+    const isEs = document.documentElement.lang === 'es';
+    const nameCol: 'name_es' | 'name_en' = isEs ? 'name_es' : 'name_en';
+    const { data, error } = await supabase
+      .from('iso_countries')
+      .select('code, name_en, name_es')
+      .order(nameCol, { ascending: true });
+    if (error || !data || data.length === 0) {
+      errEl?.classList.remove('hidden');
+      hintEl?.classList.add('hidden');
+      return;
+    }
+    const rows = data as IsoCountry[];
+    const frag = document.createDocumentFragment();
+    for (const row of rows) {
+      const opt = document.createElement('option');
+      opt.value = row.code;
+      opt.textContent = row[nameCol];
+      frag.appendChild(opt);
+    }
+    select.appendChild(frag);
+    select.value = selectedCode ?? '';
+  }
+
+  async function load() {
+    if (!form) return;
+    const supabase = getSupabase();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      window.location.replace(`${window.location.pathname.startsWith('/es/') ? '/es/ingresar/' : '/en/sign-in/'}`);
+      return;
+    }
+    const { data: profile } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', user.id)
+      .maybeSingle<UserProfile>();
+
+    if (!profile) return;
+
+    (form.elements.namedItem('username') as HTMLInputElement).value = profile.username ?? '';
+    (form.elements.namedItem('display_name') as HTMLInputElement).value = profile.display_name ?? '';
+    (form.elements.namedItem('bio') as HTMLTextAreaElement).value = profile.bio ?? '';
+    (form.elements.namedItem('region_primary') as HTMLInputElement).value = profile.region_primary ?? '';
+    (form.elements.namedItem('avatar_url') as HTMLInputElement).value = profile.avatar_url ?? '';
+    (form.elements.namedItem('preferred_lang') as HTMLSelectElement).value = profile.preferred_lang ?? 'es';
+    (form.elements.namedItem('observer_license') as HTMLSelectElement).value = profile.observer_license ?? 'CC BY 4.0';
+    const tzSelect = form.elements.namedItem('timezone') as HTMLSelectElement | null;
+    if (tzSelect) tzSelect.value = profile.timezone ?? '';
+    (form.elements.namedItem('gamification_opt_in') as HTMLInputElement).checked = profile.gamification_opt_in;
+    (form.elements.namedItem('streak_digest_opt_in') as HTMLInputElement).checked = profile.streak_digest_opt_in;
+    (form.elements.namedItem('community_visible') as HTMLInputElement).checked = !profile.hide_from_leaderboards;
+
+    await populateCountryOptions(supabase, profile.country_code ?? null);
+
+    const inferredBadge = document.getElementById('country-inferred-badge');
+    if (inferredBadge) {
+      inferredBadge.classList.toggle('hidden', !shouldShowInferredCountryBadge(profile));
+    }
+
+    const countrySelect = form.elements.namedItem('country_code') as HTMLSelectElement | null;
+    countrySelect?.addEventListener('change', () => {
+      if (!inferredBadge) return;
+      if (!countrySelect.value) inferredBadge.classList.add('hidden');
+    });
+
+    syncCommunityVisibleEnabled(Boolean(profile.profile_public));
+  }
+
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!form || !saveBtn || !btnLabel) return;
+
+    err?.classList.add('hidden');
+    status?.classList.add('hidden');
+    saveBtn.disabled = true;
+    btnLabel.textContent = SAVING;
+
+    const data = new FormData(form);
+    const nullableText = (k: EditableKey) => {
+      const v = (data.get(k) ?? '').toString().trim();
+      return v === '' ? null : v;
+    };
+    const payload: Record<string, unknown> = {
+      username:             nullableText('username'),
+      display_name:         nullableText('display_name'),
+      bio:                  nullableText('bio'),
+      region_primary:       nullableText('region_primary'),
+      avatar_url:           nullableText('avatar_url'),
+      preferred_lang:       (data.get('preferred_lang') ?? 'es').toString(),
+      observer_license:     (data.get('observer_license') ?? 'CC BY 4.0').toString(),
+      timezone:             nullableText('timezone'),
+      gamification_opt_in:  data.get('gamification_opt_in') === 'on',
+      streak_digest_opt_in: data.get('streak_digest_opt_in') === 'on',
+      ...buildCommunityDiscoveryPayload({
+        country_code:       ((data.get('country_code') as string) ?? '').trim(),
+        community_visible:  data.get('community_visible') === 'on',
+      }),
+    };
+
+    const supabase = getSupabase();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { error } = await supabase.from('users').update(payload).eq('id', user.id);
+
+    saveBtn.disabled = false;
+    btnLabel.textContent = ORIGINAL;
+
+    if (error) {
+      if (err) {
+        const isEs = document.documentElement.lang === 'es';
+        if (error.message.includes('username_check') || error.message.includes('users_username_check')) {
+          err.textContent = isEs
+            ? 'El nombre de usuario solo puede tener letras, números y guion bajo (_), entre 3 y 30 caracteres. Ej: eugenio_bio'
+            : 'Username can only contain letters, numbers, and underscores (_), 3–30 characters. E.g. eugenio_bio';
+        } else if (error.message.includes('username') && error.message.includes('unique')) {
+          err.textContent = isEs ? 'Ese nombre de usuario ya está en uso.' : 'That username is already taken.';
+        } else {
+          err.textContent = error.message;
+        }
+        err.classList.remove('hidden');
+      }
+      return;
+    }
+    status?.classList.remove('hidden');
+    setTimeout(() => status?.classList.add('hidden'), 3000);
+
+    document.getElementById('country-inferred-badge')?.classList.add('hidden');
+
+    try {
+      const username = (payload.username as string | null) ?? null;
+      if (username) {
+        const { count: obsCount } = await getSupabase()
+          .from('observations')
+          .select('id', { count: 'exact', head: true })
+          .eq('observer_id', user.id);
+        const { renderProfileOgPng } = await import('../lib/og-card');
+        const { uploadMedia } = await import('../lib/upload');
+        const png = await renderProfileOgPng({
+          displayName:        (payload.display_name as string) || username,
+          username,
+          observationsCount:  obsCount ?? undefined,
+          region:             (payload.region_primary as string) || null,
+        });
+        await uploadMedia(png, `og/u/${username}.png`, 'image/png');
+      }
+    } catch (e) {
+      console.warn('[rastrum] profile OG render failed (non-fatal)', e);
+    }
+  });
+
+  load().catch(console.error);
+
+  // ── Streak push reminder toggle ──
+  const isEsLang = document.documentElement.lang === 'es';
+  const sppBtn = document.getElementById('streak-push-toggle') as HTMLButtonElement | null;
+  const sppLabel = sppBtn?.querySelector('[data-spp-label]') as HTMLElement | null;
+  const sppStatus = document.getElementById('streak-push-status');
+  const sppWarn = document.getElementById('streak-push-warning');
+
+  const SPP_TXT = isEsLang
+    ? {
+        enable: 'Activar recordatorios push de racha',
+        enabling: 'Suscribiendo…',
+        enabled: 'Recordatorios push activados.',
+        disable: 'Desactivar',
+        disabling: 'Desactivando…',
+        permission_blocked: 'Las notificaciones del navegador están bloqueadas. Actívalas en la configuración del sitio y vuelve a intentar.',
+        unsupported: 'Este navegador no soporta web push (prueba Chrome en Android o Safari 16.4+ en iOS).',
+        vapid_missing: 'El push aún no está configurado — el operador debe publicar primero una llave VAPID.',
+      }
+    : {
+        enable: 'Enable streak push reminders',
+        enabling: 'Subscribing…',
+        enabled: 'Push reminders enabled.',
+        disable: 'Disable',
+        disabling: 'Disabling…',
+        permission_blocked: 'Browser notifications are blocked. Enable them in your browser site settings, then try again.',
+        unsupported: "This browser doesn't support web push (try Chrome on Android or Safari 16.4+ on iOS).",
+        vapid_missing: "Push isn't configured yet — the operator must publish a VAPID key first.",
+      };
+
+  function setSppLabel(txt: string) { if (sppLabel) sppLabel.textContent = txt; }
+  function setSppStatus(txt: string) { if (sppStatus) sppStatus.textContent = txt; }
+  function setSppWarn(txt: string | null) {
+    if (!sppWarn) return;
+    if (!txt) { sppWarn.classList.add('hidden'); sppWarn.textContent = ''; return; }
+    sppWarn.textContent = txt;
+    sppWarn.classList.remove('hidden');
+  }
+
+  async function refreshSpp() {
+    if (!sppBtn) return;
+    const { isStreakPushEnabled } = await import('../lib/push');
+    const on = await isStreakPushEnabled();
+    if (on) {
+      setSppLabel(SPP_TXT.disable);
+      setSppStatus('✓ ' + SPP_TXT.enabled);
+      sppBtn.dataset.state = 'on';
+    } else {
+      setSppLabel(SPP_TXT.enable);
+      setSppStatus('');
+      sppBtn.dataset.state = 'off';
+    }
+    setSppWarn(null);
+  }
+
+  sppBtn?.addEventListener('click', async () => {
+    if (!sppBtn) return;
+    sppBtn.disabled = true;
+    const state = sppBtn.dataset.state;
+    setSppLabel(state === 'on' ? SPP_TXT.disabling : SPP_TXT.enabling);
+    const lib = await import('../lib/push');
+    const r = state === 'on' ? await lib.disableStreakPush() : await lib.enableStreakPush();
+    sppBtn.disabled = false;
+    if (!r.ok) {
+      const reasonMap: Record<string, string> = {
+        unsupported: SPP_TXT.unsupported,
+        permission_blocked: SPP_TXT.permission_blocked,
+        vapid_missing: SPP_TXT.vapid_missing,
+      };
+      setSppWarn(reasonMap[r.reason ?? 'unknown'] ?? r.message ?? '');
+    }
+    await refreshSpp();
+  });
+
+  refreshSpp().catch(() => {});
+</script>

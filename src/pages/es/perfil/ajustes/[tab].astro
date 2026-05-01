@@ -9,6 +9,8 @@ import { t, getLocalizedPath, routes } from '../../../../i18n/utils';
 export function getStaticPaths() {
   return [
     { params: { tab: 'profile' } },
+    { params: { tab: 'security' } },
+    { params: { tab: 'ai' } },
     { params: { tab: 'preferences' } },
     { params: { tab: 'data' } },
     { params: { tab: 'developer' } },
@@ -21,7 +23,7 @@ const tr = t(lang);
 const settings = (tr as unknown as { settings: { title: string; tabs: Record<string, string>; preferences: Record<string, string>; data: Record<string, string>; developer: Record<string, string> } }).settings;
 
 const { tab } = Astro.params;
-const activeTab = tab as 'profile' | 'preferences' | 'data' | 'developer' | 'privacy';
+const activeTab = tab as 'profile' | 'security' | 'ai' | 'preferences' | 'data' | 'developer' | 'privacy';
 
 const importPath        = getLocalizedPath(lang, routes.profileImport['es'] + '/');
 const importCameraTrap  = getLocalizedPath(lang, routes.profileImportCameraTrap['es'] + '/');
@@ -37,7 +39,15 @@ const mcpUrl = 'https://reppvlqejgoqvitturxp.supabase.co/functions/v1/mcp';
 <BaseLayout title={pageTitle} description="Ajustes de cuenta Rastrum." lang={lang}>
   <SettingsShell lang={lang} activeTab={activeTab}>
     {activeTab === 'profile' && (
-      <ProfileEditForm lang={lang} />
+      <ProfileEditForm lang={lang} section="basic" />
+    )}
+
+    {activeTab === 'security' && (
+      <ProfileEditForm lang={lang} section="security" />
+    )}
+
+    {activeTab === 'ai' && (
+      <ProfileEditForm lang={lang} section="ai" />
     )}
 
     {activeTab === 'preferences' && (
