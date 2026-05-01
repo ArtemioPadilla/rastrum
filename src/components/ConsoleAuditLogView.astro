@@ -26,6 +26,7 @@ const tr = t(lang);
   data-label-all-time={tr.console.audit_filter_all_time}
   data-label-active-filters={tr.console.audit_active_filters}
   data-label-csv={tr.console.audit_csv_export}
+  data-label-search-placeholder={tr.console.audit_search_placeholder}
 >
   <h1 class="text-xl font-semibold mb-4">{tr.console.audit}</h1>
   <div id="audit-not-auth" class="hidden rounded border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-900 dark:text-amber-100">
@@ -65,6 +66,14 @@ const tr = t(lang);
           <option value="">{tr.console.audit_filter_since}: {tr.console.audit_filter_all_time}</option>
         </select>
       </div>
+
+      <!-- Search input -->
+      <input
+        id="audit-search"
+        type="search"
+        placeholder={tr.console.audit_search_placeholder}
+        class="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm w-56"
+      />
 
       <!-- CSV export -->
       <button id="audit-csv-btn" class="ml-auto px-3 py-1.5 rounded border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800">
@@ -111,6 +120,8 @@ const tr = t(lang);
   const labelActivePills = sectionEl.dataset.labelActiveFilters ?? 'Active filters:';
 
   let allRows: Row[] = [];
+  let searchTerm = '';
+  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   async function load() {
     const supabase = getSupabase();
@@ -128,6 +139,13 @@ const tr = t(lang);
 
     if (saved['since'] !== undefined) sinceFilter.value = saved['since'];
 
+    // Restore search from URL state
+    const searchInput = document.getElementById('audit-search') as HTMLInputElement;
+    if (saved['search']) {
+      searchInput.value = saved['search'];
+      searchTerm = saved['search'];
+    }
+
     const sinceVal = sinceFilter.value;
     let query = supabase
       .from('admin_audit')
@@ -140,6 +158,11 @@ const tr = t(lang);
       const cutoff = new Date();
       cutoff.setUTCDate(cutoff.getUTCDate() - days);
       query = query.gte('created_at', cutoff.toISOString());
+    }
+
+    if (searchTerm) {
+      const term = searchTerm.replace(/%/g, '\\%');
+      query = query.or(`reason.ilike.%${term}%,before::text.ilike.%${term}%,after::text.ilike.%${term}%`);
     }
 
     const { data, error } = await query;
@@ -192,7 +215,7 @@ const tr = t(lang);
       targets.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
   }
 
-  function getActiveFilters(): { actor: string; op: string; target: string; since: string } {
+  function getActiveFilters(): { actor: string; op: string; target: string; since: string; search: string } {
     const actorSel = document.getElementById('audit-filter-actor') as HTMLSelectElement;
     const opSel = document.getElementById('audit-filter-op') as HTMLSelectElement;
     const targetSel = document.getElementById('audit-filter-target') as HTMLSelectElement;
@@ -202,15 +225,23 @@ const tr = t(lang);
       op: opSel?.value ?? '',
       target: targetSel?.value ?? '',
       since: sinceSel?.value ?? '',
+      search: searchTerm,
     };
   }
 
   function filteredRows(): Row[] {
-    const { actor, op, target } = getActiveFilters();
+    const { actor, op, target, search } = getActiveFilters();
+    const lowerSearch = search.toLowerCase();
     return allRows.filter(r => {
       if (actor && r.actor_id !== actor) return false;
       if (op && r.op !== op) return false;
       if (target && r.target_type !== target) return false;
+      if (lowerSearch) {
+        const inReason = r.reason.toLowerCase().includes(lowerSearch);
+        const inBefore = JSON.stringify(r.before).toLowerCase().includes(lowerSearch);
+        const inAfter = JSON.stringify(r.after).toLowerCase().includes(lowerSearch);
+        if (!inReason && !inBefore && !inAfter) return false;
+      }
       return true;
     });
   }
@@ -246,13 +277,14 @@ const tr = t(lang);
   }
 
   function renderActivePills() {
-    const { actor, op, target } = getActiveFilters();
+    const { actor, op, target, search } = getActiveFilters();
     const pillsContainer = document.getElementById('audit-active-pills')!;
     const pills: { key: string; label: string }[] = [];
 
     if (actor) pills.push({ key: 'actor', label: `${labelActor}: ${actor.slice(0, 12)}…` });
     if (op) pills.push({ key: 'op', label: `op: ${op}` });
     if (target) pills.push({ key: 'target', label: `target: ${target}` });
+    if (search) pills.push({ key: 'search', label: `"${search}"` });
 
     if (pills.length === 0) {
       pillsContainer.classList.add('hidden');
@@ -273,8 +305,8 @@ const tr = t(lang);
   }
 
   function onFilterChange() {
-    const { actor, op, target, since } = getActiveFilters();
-    writeFilterState({ actor, op, target, since });
+    const { actor, op, target, since, search } = getActiveFilters();
+    writeFilterState({ actor, op, target, since, search });
     renderRows();
     renderActivePills();
   }
@@ -282,6 +314,21 @@ const tr = t(lang);
   function wireFilters() {
     ['audit-filter-actor', 'audit-filter-op', 'audit-filter-target'].forEach(id => {
       document.getElementById(id)?.addEventListener('change', onFilterChange);
+    });
+
+    // Debounced search input
+    const searchInput = document.getElementById('audit-search') as HTMLInputElement;
+    searchInput?.addEventListener('input', () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        searchTerm = searchInput.value.trim();
+        onFilterChange();
+        // Re-fetch from server with the search term applied
+        load().catch(err => {
+          const e = document.getElementById('audit-error')!;
+          e.textContent = (err as Error).message; e.classList.remove('hidden');
+        });
+      }, 300);
     });
 
     document.getElementById('audit-filter-since')?.addEventListener('change', () => {
@@ -304,6 +351,11 @@ const tr = t(lang);
       if (elId) {
         const sel = document.getElementById(elId) as HTMLSelectElement | null;
         if (sel) sel.value = '';
+      }
+      if (key === 'search') {
+        searchTerm = '';
+        const searchInput = document.getElementById('audit-search') as HTMLInputElement | null;
+        if (searchInput) searchInput.value = '';
       }
       onFilterChange();
     });
