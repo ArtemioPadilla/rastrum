@@ -39,7 +39,7 @@ export interface BugReportOptions {
   obsId?: string;
   /** Species name for context */
   obsName?: string;
-  /** Extra key/value pairs to include in the report */
+  /** Extra key/value pairs to include in the environment block */
   extra?: Record<string, string>;
 }
 
@@ -62,47 +62,41 @@ export async function buildBugReportUrl(opts: BugReportOptions): Promise<string>
   // Recent console errors (last N captured)
   const recentErrors = _capturedErrors.slice(-MAX_CONSOLE_ERRORS);
 
-  const telemetry: Record<string, string> = {
-    'App version': appVersion,
+  // ── description field — what happened ──────────────────────────────────────
+  const descriptionLines = [
+    errorMsg ? `**Error:** \`${errorMsg.slice(0, 200)}\`` : '',
+    obsId    ? `**Observation ID:** ${obsId}` : '',
+    obsName  ? `**Species:** ${obsName}` : '',
+    '',
+    recentErrors.length > 0
+      ? `**Recent console errors:**\n\`\`\`\n${recentErrors.join('\n---\n').slice(0, 1000)}\n\`\`\``
+      : '_No console errors captured._',
+  ].filter(Boolean).join('\n');
+
+  // ── environment field — telemetry table ────────────────────────────────────
+  const envData: Record<string, string> = {
+    URL:          location.href,
+    'User Agent': navigator.userAgent,
+    Locale:       navigator.language,
+    Build:        appVersion,
     'SW version': swVersion,
-    'URL': location.href,
-    'Timestamp': new Date().toISOString(),
-    'User agent': navigator.userAgent,
-    'Online': String(navigator.onLine),
-    'Language': navigator.language,
+    Online:       String(navigator.onLine),
+    Viewport:     `${window.innerWidth}x${window.innerHeight}`,
+    Time:         new Date().toISOString(),
     ...(extra ?? {}),
   };
 
-  const telemetryTable = Object.entries(telemetry)
-    .map(([k, v]) => `| ${k} | \`${v.replace(/`/g, "'")}` + '` |')
+  const environmentBlock = Object.entries(envData)
+    .map(([k, v]) => `- ${k}: ${v}`)
     .join('\n');
 
-  const consoleSection =
-    recentErrors.length > 0
-      ? `\n\n### Recent console errors\n\`\`\`\n${recentErrors.join('\n---\n').slice(0, 1500)}\n\`\`\``
-      : '\n\n### Recent console errors\n_(none captured)_';
-
-  const body = [
-    errorMsg ? `**Error:** \`${errorMsg.slice(0, 200)}\`` : '',
-    obsId ? `**Observation ID:** ${obsId}` : '',
-    obsName ? `**Species:** ${obsName}` : '',
-    '',
-    '### Telemetry',
-    '| Field | Value |',
-    '|---|---|',
-    telemetryTable,
-    consoleSection,
-    '',
-    '---',
-    '_Reported automatically via Rastrum bug report button_',
-  ]
-    .filter(l => l !== null)
-    .join('\n');
-
+  // GitHub issue forms: field values are passed as ?field_id=value
+  // When .yml templates exist, ?body= is ignored — must use field IDs.
   const params = new URLSearchParams({
-    title,
-    body,
-    labels: 'bug',
+    template:    'bug.yml',
+    title:       `[Bug]: ${title}`,
+    description: descriptionLines,
+    environment: environmentBlock,
   });
 
   return `https://github.com/${REPO}/issues/new?${params.toString()}`;
