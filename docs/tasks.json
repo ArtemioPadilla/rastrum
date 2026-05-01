@@ -1,5 +1,5 @@
 {
-  "updated": "2026-04-28",
+  "updated": "2026-04-30",
   "schema_version": 1,
   "notes_en": "Per-item task breakdown. Each entry mirrors docs/tasks.md. Subtasks: 'done'|'in_progress'|'blocked'|'planned'. The page at /{lang}/docs/tasks/ renders this with progress bars + commit/spec links.",
   "notes_es": "Desglose por ítem. Cada entrada refleja docs/tasks.md. Subtareas: 'done'|'in_progress'|'blocked'|'planned'. La página /{lang}/docs/tasks/ la renderiza con barras de progreso y enlaces a commits y specs.",
@@ -654,6 +654,21 @@
           "label_en": "99+ overflow text",
           "label_es": "Texto 99+",
           "status": "done"
+        },
+        {
+          "label_en": "Supabase RPC or client query for unread activity_events count",
+          "label_es": "RPC o query cliente para contar activity_events no leidos",
+          "status": "done"
+        },
+        {
+          "label_en": "CSS pulse animation on new unread arrival",
+          "label_es": "Animacion CSS pulse al llegar nuevo no leido",
+          "status": "planned"
+        },
+        {
+          "label_en": "Accessible aria-label announcing unread count to screen readers",
+          "label_es": "aria-label accesible anunciando conteo a lectores de pantalla",
+          "status": "planned"
         }
       ]
     },
@@ -714,6 +729,26 @@
           "label_en": "DateTimeOriginal → observation timestamp",
           "label_es": "DateTimeOriginal → timestamp",
           "status": "done"
+        },
+        {
+          "label_en": "XMP sidecar parsing for drone/camera-trap metadata",
+          "label_es": "Parseo XMP sidecar para metadatos de dron/camara trampa",
+          "status": "planned"
+        },
+        {
+          "label_en": "ID3 tag extraction from audio recordings (MediaRecorder output)",
+          "label_es": "Extraccion de tags ID3 de grabaciones de audio",
+          "status": "planned"
+        },
+        {
+          "label_en": "Camera make/model stored on media_files for device analytics",
+          "label_es": "Marca/modelo de camara almacenado en media_files",
+          "status": "planned"
+        },
+        {
+          "label_en": "Orientation tag auto-rotation before upload",
+          "label_es": "Auto-rotacion por tag de orientacion antes de subir",
+          "status": "planned"
         }
       ]
     },
@@ -894,6 +929,26 @@
           "label_en": "Plugin-level confidence_ceiling cap",
           "label_es": "Cap confidence_ceiling por plugin",
           "status": "done"
+        },
+        {
+          "label_en": "UI warning banner when identification confidence < 0.4",
+          "label_es": "Banner de advertencia cuando confianza < 0.4",
+          "status": "planned"
+        },
+        {
+          "label_en": "Admin dashboard widget showing research-grade rejection rate",
+          "label_es": "Widget admin mostrando tasa de rechazo research-grade",
+          "status": "planned"
+        },
+        {
+          "label_en": "Vitest coverage for trigger edge cases (null confidence, exact 0.4 boundary)",
+          "label_es": "Cobertura Vitest para casos borde del trigger",
+          "status": "planned"
+        },
+        {
+          "label_en": "Documentation in module spec for quality-gate thresholds and rationale",
+          "label_es": "Documentacion en spec del modulo sobre umbrales y justificacion",
+          "status": "planned"
         }
       ]
     },
@@ -974,6 +1029,26 @@
           "label_en": "Form dropdown with 9 values",
           "label_es": "Dropdown con 9 valores",
           "status": "done"
+        },
+        {
+          "label_en": "i18n labels for all 9 evidence_type enum values in EN + ES",
+          "label_es": "Labels i18n para los 9 valores del enum en EN + ES",
+          "status": "done"
+        },
+        {
+          "label_en": "Darwin Core mapping of evidence_type to DwC basisOfRecord",
+          "label_es": "Mapeo Darwin Core de evidence_type a basisOfRecord",
+          "status": "planned"
+        },
+        {
+          "label_en": "Filter by evidence_type on /explore/recent grid",
+          "label_es": "Filtro por evidence_type en grilla /explore/recent",
+          "status": "planned"
+        },
+        {
+          "label_en": "Icon set for each evidence type in observation detail view",
+          "label_es": "Set de iconos por tipo de evidencia en vista de detalle",
+          "status": "planned"
         }
       ]
     },
@@ -2170,6 +2245,41 @@
           "label_en": "Bilingual templates",
           "label_es": "Plantillas bilingües",
           "status": "planned"
+        },
+        {
+          "label_en": "PDF layout engine selection (Puppeteer headless vs react-pdf/pdfkit)",
+          "label_es": "Seleccion de motor PDF (Puppeteer vs react-pdf/pdfkit)",
+          "status": "planned"
+        },
+        {
+          "label_en": "Cover page with trail map snapshot (MapLibre static image API)",
+          "label_es": "Portada con snapshot del mapa del sendero",
+          "status": "planned"
+        },
+        {
+          "label_en": "Species checklist table with thumbnails, scientific + common names, confidence",
+          "label_es": "Tabla checklist de especies con miniaturas y nombres",
+          "status": "planned"
+        },
+        {
+          "label_en": "Diversity statistics section (species richness, Shannon index, observation count)",
+          "label_es": "Seccion de estadisticas de diversidad (riqueza, Shannon, conteo)",
+          "status": "planned"
+        },
+        {
+          "label_en": "Bilingual EN/ES PDF templates with locale-aware date formatting",
+          "label_es": "Plantillas PDF bilingues EN/ES con formato de fecha por locale",
+          "status": "planned"
+        },
+        {
+          "label_en": "Edge Function endpoint for on-demand PDF generation with auth check",
+          "label_es": "Endpoint Edge Function para generacion PDF bajo demanda con auth",
+          "status": "planned"
+        },
+        {
+          "label_en": "Download button in ExportView component alongside CSV options",
+          "label_es": "Boton de descarga en ExportView junto a opciones CSV",
+          "status": "planned"
         }
       ]
     },
@@ -2193,6 +2303,36 @@
           "label_en": "Multi-camera grid analysis",
           "label_es": "Análisis de grid multi-cámara",
           "status": "planned"
+        },
+        {
+          "label_en": "Occupancy modelling pipeline (R or Python) with detection/non-detection matrices",
+          "label_es": "Pipeline de modelado de ocupacion con matrices de deteccion",
+          "status": "planned"
+        },
+        {
+          "label_en": "Activity histogram visualization by species and time-of-day (24h polar chart)",
+          "label_es": "Histograma de actividad por especie y hora del dia (grafico polar 24h)",
+          "status": "planned"
+        },
+        {
+          "label_en": "Multi-camera grid analysis aggregating detections across camera_stations",
+          "label_es": "Analisis de grilla multi-camara agregando detecciones entre estaciones",
+          "status": "planned"
+        },
+        {
+          "label_en": "Trap-night effort calculation from camera_station_active_periods (M31 dependency)",
+          "label_es": "Calculo de esfuerzo noches-trampa desde periodos activos (dep. M31)",
+          "status": "planned"
+        },
+        {
+          "label_en": "RAI (Relative Abundance Index) per species per station with confidence intervals",
+          "label_es": "RAI por especie por estacion con intervalos de confianza",
+          "status": "planned"
+        },
+        {
+          "label_en": "Export occupancy + activity results as CSV and integration with DwC-A",
+          "label_es": "Exportar resultados de ocupacion + actividad como CSV e integracion DwC-A",
+          "status": "planned"
         }
       ]
     },
@@ -2215,6 +2355,41 @@
         {
           "label_en": "Citation generator",
           "label_es": "Generador de citas",
+          "status": "planned"
+        },
+        {
+          "label_en": "Automated DwC-A ZIP generation via export-dwca Edge Function on schedule",
+          "label_es": "Generacion automatica de ZIP DwC-A via Edge Function programada",
+          "status": "planned"
+        },
+        {
+          "label_en": "Dataset metadata EML file with contact, citation, and license fields",
+          "label_es": "Archivo EML de metadatos del dataset con contacto, cita y licencia",
+          "status": "planned"
+        },
+        {
+          "label_en": "Versioned dataset releases with semantic versioning and changelog",
+          "label_es": "Releases versionados del dataset con versionado semantico y changelog",
+          "status": "planned"
+        },
+        {
+          "label_en": "DOI minting via Zenodo or DataCite API integration",
+          "label_es": "Acunacion de DOI via integracion con API de Zenodo o DataCite",
+          "status": "planned"
+        },
+        {
+          "label_en": "Citation generator producing BibTeX + APA + RIS formats",
+          "label_es": "Generador de citas en formatos BibTeX + APA + RIS",
+          "status": "planned"
+        },
+        {
+          "label_en": "GBIF IPT registration and endpoint configuration",
+          "label_es": "Registro en GBIF IPT y configuracion de endpoint",
+          "status": "planned"
+        },
+        {
+          "label_en": "Operator runbook for initial GBIF publisher account setup",
+          "label_es": "Runbook de operador para configuracion inicial de cuenta GBIF",
           "status": "planned"
         }
       ]
@@ -2360,6 +2535,36 @@
           "label_en": "Performance budget: 30fps mobile",
           "label_es": "Presupuesto de performance: 30 fps",
           "status": "planned"
+        },
+        {
+          "label_en": "WebXR Device API feature detection with Capacitor ARKit/ARCore fallback path",
+          "label_es": "Deteccion WebXR Device API con fallback Capacitor ARKit/ARCore",
+          "status": "planned"
+        },
+        {
+          "label_en": "Real-time camera frame capture and resize to model input dimensions",
+          "label_es": "Captura de frame de camara en tiempo real y resize a dimensiones del modelo",
+          "status": "planned"
+        },
+        {
+          "label_en": "On-frame species identification via lightweight ONNX model or server cascade",
+          "label_es": "Identificacion por frame via modelo ONNX ligero o cascada servidor",
+          "status": "planned"
+        },
+        {
+          "label_en": "3D label overlay anchored to detected organism bounding box",
+          "label_es": "Overlay de etiqueta 3D anclado al bounding box del organismo",
+          "status": "planned"
+        },
+        {
+          "label_en": "Performance budget enforcement: 30fps on mid-range mobile (Snapdragon 7xx)",
+          "label_es": "Presupuesto de rendimiento: 30fps en movil gama media (Snapdragon 7xx)",
+          "status": "planned"
+        },
+        {
+          "label_en": "Tap-to-capture flow: freeze frame + save observation from AR view",
+          "label_es": "Flujo tap-to-capture: congelar frame + guardar observacion desde vista AR",
+          "status": "planned"
         }
       ]
     },
@@ -2385,6 +2590,38 @@
           "label_en": "Conversation flow in Zapoteco for Sierra Norte pilot",
           "label_es": "Flujo en Zapoteco para piloto Sierra Norte",
           "status": "planned"
+        },
+        {
+          "label_en": "Whisper-tiny ONNX via transformers.js for client-side STT",
+          "label_es": "Whisper-tiny ONNX via transformers.js para STT en cliente",
+          "status": "planned"
+        },
+        {
+          "label_en": "Language detection and routing for Zapoteco, Mixteco, Nahuatl, Maya, Tseltal",
+          "label_es": "Deteccion de idioma y enrutamiento para Zapoteco, Mixteco, Nahuatl, Maya, Tseltal",
+          "status": "planned"
+        },
+        {
+          "label_en": "Custom-trained TTS model for Zapoteco (Sierra Norte pilot)",
+          "label_es": "Modelo TTS entrenado para Zapoteco (piloto Sierra Norte)",
+          "status": "blocked",
+          "blocker_en": "Requires community partnership and voice corpus",
+          "blocker_es": "Requiere alianza comunitaria y corpus de voz"
+        },
+        {
+          "label_en": "Conversational flow in Zapoteco for observation form field-by-field input",
+          "label_es": "Flujo conversacional en Zapoteco para entrada campo por campo",
+          "status": "planned"
+        },
+        {
+          "label_en": "Fallback to Spanish STT when indigenous language model confidence is low",
+          "label_es": "Fallback a STT en espanol cuando confianza del modelo indigena es baja",
+          "status": "planned"
+        },
+        {
+          "label_en": "Community governance review and consent protocol before deployment",
+          "label_es": "Revision de gobernanza comunitaria y protocolo de consentimiento antes del despliegue",
+          "status": "planned"
         }
       ]
     },
@@ -2407,6 +2644,36 @@
         {
           "label_en": "Bidirectional sync agreements",
           "label_es": "Acuerdos de sincronización bidireccional",
+          "status": "planned"
+        },
+        {
+          "label_en": "Draft MOUs with CONABIO, CONANP, and INAH legal teams",
+          "label_es": "Borradores de MOU con equipos legales de CONABIO, CONANP e INAH",
+          "status": "planned"
+        },
+        {
+          "label_en": "Whitelisted REST API endpoints with rst_* token authentication",
+          "label_es": "Endpoints REST API con autenticacion rst_* token",
+          "status": "planned"
+        },
+        {
+          "label_en": "Structured audit log for all agency API calls (request/response metadata)",
+          "label_es": "Log de auditoria estructurado para llamadas API de agencias",
+          "status": "planned"
+        },
+        {
+          "label_en": "Bidirectional sync protocol: push observations to SNIB, pull taxa updates",
+          "label_es": "Protocolo de sync bidireccional: push observaciones a SNIB, pull actualizaciones de taxa",
+          "status": "planned"
+        },
+        {
+          "label_en": "Rate limiting and quota management per agency partner",
+          "label_es": "Limitacion de tasa y gestion de cuota por agencia",
+          "status": "planned"
+        },
+        {
+          "label_en": "Data format adapters: Rastrum JSON to SNIB CSV and CONANP XML schemas",
+          "label_es": "Adaptadores de formato: JSON Rastrum a CSV SNIB y XML CONANP",
           "status": "planned"
         }
       ]
@@ -3009,6 +3276,16 @@
           "label_en": "Cross-link to 21-identify.md spec for full parallel-cascade contract",
           "label_es": "Enlazar cruzado al spec 21-identify.md para el contrato completo de cascade paralelo",
           "status": "done"
+        },
+        {
+          "label_en": "Add timing annotations showing expected latency per provider in diagram",
+          "label_es": "Agregar anotaciones de tiempo mostrando latencia esperada por proveedor",
+          "status": "planned"
+        },
+        {
+          "label_en": "Include MegaDetector bbox pre-processing step in the cascade visualization",
+          "label_es": "Incluir paso de pre-procesamiento bbox MegaDetector en la visualizacion",
+          "status": "planned"
         }
       ]
     },
@@ -3035,6 +3312,36 @@
           "label_en": "Deploy + integration test via gh workflow run deploy-functions.yml",
           "label_es": "Desplegar + prueba de integracion via gh workflow run deploy-functions.yml",
           "status": "planned"
+        },
+        {
+          "label_en": "Design server-side parallel-race contract in 21-identify.md spec",
+          "label_es": "Disenar contrato de carrera paralela servidor en spec 21-identify.md",
+          "status": "planned"
+        },
+        {
+          "label_en": "Port runParallelIdentify logic to Deno Edge Function environment",
+          "label_es": "Portar logica runParallelIdentify a entorno Deno Edge Function",
+          "status": "planned"
+        },
+        {
+          "label_en": "Implement provider timeout and cancellation for losing race participants",
+          "label_es": "Implementar timeout y cancelacion de proveedores perdedores",
+          "status": "planned"
+        },
+        {
+          "label_en": "Wire BYO key forwarding (client_keys.*) through server cascade",
+          "label_es": "Conectar reenvio de BYO keys (client_keys.*) a traves de cascada servidor",
+          "status": "planned"
+        },
+        {
+          "label_en": "Integration test via gh workflow run deploy-functions.yml",
+          "label_es": "Test de integracion via gh workflow run deploy-functions.yml",
+          "status": "planned"
+        },
+        {
+          "label_en": "Fallback behavior when all server providers fail (return partial results vs error)",
+          "label_es": "Comportamiento de fallback cuando todos los proveedores fallan",
+          "status": "planned"
         }
       ]
     },
@@ -3057,6 +3364,16 @@
         {
           "label_en": "Mobile smoke test via Playwright mobile-chrome project",
           "label_es": "Prueba humo movil via proyecto Playwright mobile-chrome",
+          "status": "planned"
+        },
+        {
+          "label_en": "getUserMedia permission handling with graceful denial fallback to file input",
+          "label_es": "Manejo de permisos getUserMedia con fallback a input de archivo",
+          "status": "planned"
+        },
+        {
+          "label_en": "Live viewfinder overlay with capture button and flash toggle",
+          "label_es": "Overlay de visor en vivo con boton de captura y toggle de flash",
           "status": "planned"
         }
       ]
@@ -3081,6 +3398,21 @@
           "label_en": "Email notification to applicant on decision (Supabase Edge Function)",
           "label_es": "Notificacion por correo al solicitante al decidir (Supabase Edge Function)",
           "status": "planned"
+        },
+        {
+          "label_en": "Application detail view showing credentials, taxa expertise, and references",
+          "label_es": "Vista de detalle mostrando credenciales, expertise taxonomica y referencias",
+          "status": "planned"
+        },
+        {
+          "label_en": "Bulk approve/reject with multi-select checkboxes for batch processing",
+          "label_es": "Aprobacion/rechazo masivo con checkboxes de seleccion multiple",
+          "status": "planned"
+        },
+        {
+          "label_en": "Audit trail logging each admin decision with timestamp and reason",
+          "label_es": "Log de auditoria registrando cada decision admin con timestamp y razon",
+          "status": "planned"
         }
       ]
     },
@@ -3103,6 +3435,31 @@
         {
           "label_en": "Participation badge award on bioblitz completion",
           "label_es": "Otorgamiento de insignia de participacion al completar bioblitz",
+          "status": "planned"
+        },
+        {
+          "label_en": "Event detail page wired to events table + region polygon on MapLibre",
+          "label_es": "Pagina de detalle de evento conectada a tabla events + poligono en MapLibre",
+          "status": "planned"
+        },
+        {
+          "label_en": "Live observation aggregates with Supabase Realtime subscriptions",
+          "label_es": "Agregados de observaciones en vivo con suscripciones Supabase Realtime",
+          "status": "planned"
+        },
+        {
+          "label_en": "Participation badge award on bioblitz completion via award-badges function",
+          "label_es": "Insignia de participacion al completar bioblitz via funcion award-badges",
+          "status": "planned"
+        },
+        {
+          "label_en": "Species leaderboard showing top contributors during event window",
+          "label_es": "Tabla de lideres de especies mostrando top contribuidores durante el evento",
+          "status": "planned"
+        },
+        {
+          "label_en": "Event countdown timer and status banner (upcoming / active / completed)",
+          "label_es": "Temporizador de cuenta regresiva y banner de estado del evento",
           "status": "planned"
         }
       ]
@@ -3127,6 +3484,16 @@
           "label_en": "Respect LOCAL_AI_OPTIN flag and show inline model-load progress",
           "label_es": "Respetar el flag LOCAL_AI_OPTIN y mostrar progreso de carga del modelo inline",
           "status": "planned"
+        },
+        {
+          "label_en": "Warm-start WebLLM engine in background on /chat page mount",
+          "label_es": "Inicio en caliente del motor WebLLM en background al montar /chat",
+          "status": "planned"
+        },
+        {
+          "label_en": "Graceful fallback to server cascade when local model load fails or times out",
+          "label_es": "Fallback a cascada servidor cuando carga local falla o expira",
+          "status": "planned"
         }
       ]
     },
@@ -3149,6 +3516,16 @@
         {
           "label_en": "Persist dismissal flag in localStorage so banner never re-shows after dismiss",
           "label_es": "Persistir flag de rechazo en localStorage para que el banner no vuelva a aparecer tras descartarse",
+          "status": "planned"
+        },
+        {
+          "label_en": "A/B test timing: show after 2nd vs 3rd page view via feature flag",
+          "label_es": "Test A/B de timing: mostrar tras 2da vs 3ra vista via feature flag",
+          "status": "planned"
+        },
+        {
+          "label_en": "Analytics event tracking for install prompt shown / accepted / dismissed",
+          "label_es": "Tracking de eventos para prompt mostrado / aceptado / descartado",
           "status": "planned"
         }
       ]
@@ -3173,6 +3550,21 @@
           "label_en": "Graceful fallthrough to Claude when quota is exhausted",
           "label_es": "Fallthrough elegante a Claude cuando la cuota esta agotada",
           "status": "planned"
+        },
+        {
+          "label_en": "Store daily quota usage in a plantnet_quota_log table or KV store",
+          "label_es": "Almacenar uso diario de cuota en tabla plantnet_quota_log o KV",
+          "status": "planned"
+        },
+        {
+          "label_en": "Graceful fallthrough to Claude when PlantNet quota is exhausted",
+          "label_es": "Fallthrough a Claude cuando cuota PlantNet se agota",
+          "status": "planned"
+        },
+        {
+          "label_en": "Admin dashboard widget showing 7-day PlantNet usage trend",
+          "label_es": "Widget admin mostrando tendencia de uso PlantNet de 7 dias",
+          "status": "planned"
         }
       ]
     },
@@ -3195,6 +3587,21 @@
         {
           "label_en": "Verify consent screen passes Google OAuth verification review",
           "label_es": "Verificar que la pantalla de consentimiento pasa la revision de verificacion OAuth de Google",
+          "status": "planned"
+        },
+        {
+          "label_en": "Set privacy policy URL to https://rastrum.org/en/privacy/ and terms to /en/terms/",
+          "label_es": "Configurar URL de politica de privacidad y terminos",
+          "status": "planned"
+        },
+        {
+          "label_en": "Add authorized redirect URIs for both Supabase callback and localhost dev",
+          "label_es": "Agregar URIs de redireccion autorizadas para callback Supabase y localhost dev",
+          "status": "planned"
+        },
+        {
+          "label_en": "Test full OAuth flow end-to-end after consent screen update",
+          "label_es": "Probar flujo OAuth completo end-to-end tras actualizar pantalla de consentimiento",
           "status": "planned"
         }
       ]
@@ -3219,6 +3626,16 @@
           "label_en": "Verify GitHub OAuth flow still works after settings change",
           "label_es": "Verificar que el flujo OAuth de GitHub sigue funcionando tras el cambio de configuracion",
           "status": "planned"
+        },
+        {
+          "label_en": "Confirm user:email scope returns email for private-email GitHub accounts",
+          "label_es": "Confirmar que scope user:email retorna email para cuentas GitHub con email privado",
+          "status": "planned"
+        },
+        {
+          "label_en": "Update AGENTS.md and operator runbook with new OAuth app configuration",
+          "label_es": "Actualizar AGENTS.md y runbook de operador con nueva configuracion OAuth",
+          "status": "planned"
         }
       ]
     },
@@ -3241,6 +3658,31 @@
         {
           "label_en": "Re-render /docs/tasks/ and verify progress bars show correct granularity",
           "label_es": "Re-renderizar /docs/tasks/ y verificar que las barras de progreso muestran la granularidad correcta",
+          "status": "planned"
+        },
+        {
+          "label_en": "Audit all items with 3 or fewer subtasks for thin coverage",
+          "label_es": "Auditar todos los items con 3 o menos subtareas por cobertura delgada",
+          "status": "in_progress"
+        },
+        {
+          "label_en": "Expand generic subtasks (Design/Implement/Test) to 5-7 feature-specific steps",
+          "label_es": "Expandir subtareas genericas a 5-7 pasos especificos por feature",
+          "status": "in_progress"
+        },
+        {
+          "label_en": "Add bilingual label_en + label_es for every new subtask",
+          "label_es": "Agregar label_en + label_es bilingue para cada nueva subtarea",
+          "status": "in_progress"
+        },
+        {
+          "label_en": "Validate tasks.json remains parseable after edits",
+          "label_es": "Validar que tasks.json sigue siendo parseable tras ediciones",
+          "status": "planned"
+        },
+        {
+          "label_en": "Update tasks.md prose to reflect expanded subtask granularity",
+          "label_es": "Actualizar prosa de tasks.md para reflejar granularidad expandida",
           "status": "planned"
         }
       ]
@@ -3265,6 +3707,16 @@
           "label_en": "Close issue-5 once confirmed; re-open with device details if still failing",
           "label_es": "Cerrar issue-5 una vez confirmado; reabrir con detalles del dispositivo si sigue fallando",
           "status": "planned"
+        },
+        {
+          "label_en": "Document GPS fallback chain (live GPS -> EXIF -> manual) in observation form tooltip",
+          "label_es": "Documentar cadena de fallback GPS en tooltip del formulario",
+          "status": "planned"
+        },
+        {
+          "label_en": "Add GPS accuracy indicator (meters) visible to user during location acquisition",
+          "label_es": "Agregar indicador de precision GPS (metros) visible durante adquisicion",
+          "status": "planned"
         }
       ]
     },
@@ -3288,6 +3740,16 @@
           "label_en": "Close issue-18 once confirmed; log device model + Android version in issue comment",
           "label_es": "Cerrar issue-18 una vez confirmado; registrar modelo del dispositivo + version Android en el comentario del issue",
           "status": "planned"
+        },
+        {
+          "label_en": "Cross-browser test matrix: Chrome Android, Samsung Internet, Firefox Android",
+          "label_es": "Matriz de pruebas cross-browser: Chrome Android, Samsung Internet, Firefox Android",
+          "status": "planned"
+        },
+        {
+          "label_en": "Fallback UX when capture attribute is not supported (plain file picker)",
+          "label_es": "UX de fallback cuando atributo capture no es soportado",
+          "status": "planned"
         }
       ]
     },
@@ -3310,6 +3772,26 @@
         {
           "label_en": "Notify on failure via GitHub issue creation using actions/github-script",
           "label_es": "Notificar en fallo via creacion de issue de GitHub usando actions/github-script",
+          "status": "planned"
+        },
+        {
+          "label_en": "Smoke test: home page loads with correct title and meta tags",
+          "label_es": "Smoke test: pagina de inicio carga con titulo y meta tags correctos",
+          "status": "planned"
+        },
+        {
+          "label_en": "Smoke test: nav links resolve (observe, explore, chat, about, docs)",
+          "label_es": "Smoke test: links de navegacion resuelven correctamente",
+          "status": "planned"
+        },
+        {
+          "label_en": "Smoke test: observe form renders with GPS and photo upload controls",
+          "label_es": "Smoke test: formulario de observacion renderiza con controles GPS y foto",
+          "status": "planned"
+        },
+        {
+          "label_en": "Smoke test: /docs/* pages accessible and render content",
+          "label_es": "Smoke test: paginas /docs/* accesibles y renderizan contenido",
           "status": "planned"
         }
       ]
@@ -3336,6 +3818,26 @@
           "label_en": "Display license badge on observation detail view and public share card",
           "label_es": "Mostrar insignia de licencia en la vista de detalle de observacion y en la tarjeta de compartir publica",
           "status": "planned"
+        },
+        {
+          "label_en": "Persist selected license on observations.license column (schema already supports it)",
+          "label_es": "Persistir licencia seleccionada en columna observations.license",
+          "status": "planned"
+        },
+        {
+          "label_en": "Default license preference stored in user profile settings",
+          "label_es": "Preferencia de licencia por defecto almacenada en perfil de usuario",
+          "status": "planned"
+        },
+        {
+          "label_en": "License tooltip explaining each option in plain language (EN + ES)",
+          "label_es": "Tooltip de licencia explicando cada opcion en lenguaje simple",
+          "status": "planned"
+        },
+        {
+          "label_en": "Darwin Core export respects per-observation license in dcterms:license field",
+          "label_es": "Exportacion Darwin Core respeta licencia por observacion en campo dcterms:license",
+          "status": "planned"
         }
       ]
     },
@@ -3358,6 +3860,21 @@
         {
           "label_en": "IntersectionObserver highlights active h2 pill as user scrolls; click scrolls to section",
           "label_es": "IntersectionObserver resalta la pildora h2 activa mientras el usuario desplaza; clic desplaza a la seccion",
+          "status": "planned"
+        },
+        {
+          "label_en": "IntersectionObserver highlights active h2 pill as user scrolls",
+          "label_es": "IntersectionObserver resalta pill activo del h2 al hacer scroll",
+          "status": "planned"
+        },
+        {
+          "label_en": "Click pill scrolls to corresponding section with smooth scroll behavior",
+          "label_es": "Click en pill hace scroll suave a la seccion correspondiente",
+          "status": "planned"
+        },
+        {
+          "label_en": "aria-current attribute on active pill for screen reader accessibility",
+          "label_es": "Atributo aria-current en pill activo para accesibilidad",
           "status": "planned"
         }
       ]
@@ -3382,6 +3899,26 @@
           "label_en": "Load-more button fetches next page; sign-in CTA for anonymous visitors on private obs",
           "label_es": "Boton Cargar mas obtiene la siguiente pagina; CTA de inicio de sesion para visitantes anonimos en obs privadas",
           "status": "planned"
+        },
+        {
+          "label_en": "Query observations table ordered by created_at DESC, limit 20, respecting RLS",
+          "label_es": "Query tabla observations ordenada por created_at DESC, limite 20, respetando RLS",
+          "status": "planned"
+        },
+        {
+          "label_en": "Skeleton loading state while observations are being fetched",
+          "label_es": "Estado de carga skeleton mientras se obtienen observaciones",
+          "status": "planned"
+        },
+        {
+          "label_en": "Filter chips: evidence type, kingdom, date range",
+          "label_es": "Chips de filtro: tipo de evidencia, reino, rango de fechas",
+          "status": "planned"
+        },
+        {
+          "label_en": "Empty state illustration when no public observations exist yet",
+          "label_es": "Ilustracion de estado vacio cuando no hay observaciones publicas",
+          "status": "planned"
         }
       ]
     },
@@ -3404,6 +3941,26 @@
         {
           "label_en": "EN/ES parity: locale-aware common names from taxa table; slug routing for both locales",
           "label_es": "Paridad EN/ES: nombres comunes con conciencia de idioma desde la tabla taxa; enrutamiento de slug para ambos idiomas",
+          "status": "planned"
+        },
+        {
+          "label_en": "Species detail: conservation badges (NOM-059/CITES), taxonomy chain, distribution mini-map",
+          "label_es": "Detalle de especie: insignias de conservacion, cadena taxonomica, mini-mapa de distribucion",
+          "status": "planned"
+        },
+        {
+          "label_en": "Recent photo strip showing latest 8 observations of the species",
+          "label_es": "Tira de fotos recientes mostrando ultimas 8 observaciones de la especie",
+          "status": "planned"
+        },
+        {
+          "label_en": "Observation count and observer count stats on species detail page",
+          "label_es": "Conteo de observaciones y observadores en pagina de detalle de especie",
+          "status": "planned"
+        },
+        {
+          "label_en": "Link to DwC export filtered by species for researchers",
+          "label_es": "Link a exportacion DwC filtrada por especie para investigadores",
           "status": "planned"
         }
       ]
@@ -3428,6 +3985,16 @@
           "label_en": "Redirect /profile/watchlist to /explore/watchlist 301 already in place; verify it persists",
           "label_es": "Redireccion /profile/watchlist a /explore/watchlist 301 ya en su lugar; verificar que persiste",
           "status": "done"
+        },
+        {
+          "label_en": "Add/remove species from watchlist with optimistic UI update",
+          "label_es": "Agregar/remover especies de watchlist con actualizacion optimista de UI",
+          "status": "planned"
+        },
+        {
+          "label_en": "Notification preference per watchlist entry (email digest, in-app, none)",
+          "label_es": "Preferencia de notificacion por entrada de watchlist (digest email, in-app, ninguna)",
+          "status": "planned"
         }
       ]
     },
@@ -4148,6 +4715,16 @@
           "label_en": "Recent activity feed from admin_audit",
           "label_es": "Feed de actividad reciente desde admin_audit",
           "status": "done"
+        },
+        {
+          "label_en": "7-day trend sparklines on each KPI card",
+          "label_es": "Sparklines de tendencia de 7 dias en cada tarjeta KPI",
+          "status": "planned"
+        },
+        {
+          "label_en": "Export KPI snapshot as CSV for monthly reporting",
+          "label_es": "Exportar snapshot de KPIs como CSV para reportes mensuales",
+          "status": "planned"
         }
       ]
     },
@@ -4690,36 +5267,120 @@
       "phase": "v1.1",
       "title_en": "Community observers UX fixes — privacy explainer + country CTA + GPS-based Nearby",
       "title_es": "Fixes UX en observadores comunidad — explicador de privacidad + CTA país + Cercanos con GPS",
-      "modules": ["28-community-discovery.md"],
+      "modules": [
+        "28-community-discovery.md"
+      ],
       "subtasks": [
-        { "label_en": "Privacy-default explainer banner — viewer-state-aware copy (private vs public profile); renders on 0 rows + signed in", "label_es": "Banner explicativo de privacidad por defecto — copy según el viewer (privado vs público); aparece con 0 filas + sesión iniciada", "status": "done" },
-        { "label_en": "Set-country inline CTA — only when viewer is signed in AND country_code IS NULL; links to /profile/edit/", "label_es": "CTA inline para fijar país — sólo si viewer en sesión y country_code IS NULL; enlaza a /profile/edit/", "status": "done" },
-        { "label_en": "community_observers_nearby_at(lat, lng, radius_m, …) SECURITY INVOKER RPC; granted to authenticated only; reuses GiST index on centroid_geog", "label_es": "RPC community_observers_nearby_at(lat, lng, radius_m, …) SECURITY INVOKER; sólo a authenticated; reutiliza índice GiST en centroid_geog", "status": "done" },
-        { "label_en": "📍 Use my location pill via navigator.geolocation; coords stored in sessionStorage (key rastrum.community.gps), NEVER URL — Referer-leak prevention", "label_es": "📍 Botón Usar mi ubicación con navigator.geolocation; coords en sessionStorage (clave rastrum.community.gps), NUNCA en la URL — prevención de filtración por Referer", "status": "done" },
-        { "label_en": "Fallback to centroid Nearby on geolocation deny; friendly toast", "label_es": "Fallback a Cercanos por centroide al denegar geolocalización; toast amigable", "status": "done" },
-        { "label_en": "loadGps / saveGps / clearGps helpers in community-url.ts (testable, dependency-injected)", "label_es": "Helpers loadGps / saveGps / clearGps en community-url.ts (testeable, inyección de dependencias)", "status": "done" },
-        { "label_en": "Regression-guard test: 'NEVER serializes GPS coords into the URL' + 9 sessionStorage round-trip / malformed / out-of-range cases", "label_es": "Test de regresión: 'NUNCA serializa coords GPS en la URL' + 9 casos de round-trip / malformado / fuera de rango", "status": "done" },
-        { "label_en": "loadViewerCommunityMeta() — single query for {signedIn, profilePublic, countryCode}; no N+1", "label_es": "loadViewerCommunityMeta() — una sola consulta para {signedIn, profilePublic, countryCode}; sin N+1", "status": "done" },
-        { "label_en": "Sentinel verify entries for both nearby RPCs", "label_es": "Entradas en sentinel verify para los dos RPCs de Cercanos", "status": "done" },
-        { "label_en": "CLAUDE.md M28 4th load-bearing rule + docs/runbooks/community-discovery.md UX clarifications section", "label_es": "Regla 4 del M28 en CLAUDE.md + sección de aclaraciones UX en docs/runbooks/community-discovery.md", "status": "done" }
+        {
+          "label_en": "Privacy-default explainer banner — viewer-state-aware copy (private vs public profile); renders on 0 rows + signed in",
+          "label_es": "Banner explicativo de privacidad por defecto — copy según el viewer (privado vs público); aparece con 0 filas + sesión iniciada",
+          "status": "done"
+        },
+        {
+          "label_en": "Set-country inline CTA — only when viewer is signed in AND country_code IS NULL; links to /profile/edit/",
+          "label_es": "CTA inline para fijar país — sólo si viewer en sesión y country_code IS NULL; enlaza a /profile/edit/",
+          "status": "done"
+        },
+        {
+          "label_en": "community_observers_nearby_at(lat, lng, radius_m, …) SECURITY INVOKER RPC; granted to authenticated only; reuses GiST index on centroid_geog",
+          "label_es": "RPC community_observers_nearby_at(lat, lng, radius_m, …) SECURITY INVOKER; sólo a authenticated; reutiliza índice GiST en centroid_geog",
+          "status": "done"
+        },
+        {
+          "label_en": "📍 Use my location pill via navigator.geolocation; coords stored in sessionStorage (key rastrum.community.gps), NEVER URL — Referer-leak prevention",
+          "label_es": "📍 Botón Usar mi ubicación con navigator.geolocation; coords en sessionStorage (clave rastrum.community.gps), NUNCA en la URL — prevención de filtración por Referer",
+          "status": "done"
+        },
+        {
+          "label_en": "Fallback to centroid Nearby on geolocation deny; friendly toast",
+          "label_es": "Fallback a Cercanos por centroide al denegar geolocalización; toast amigable",
+          "status": "done"
+        },
+        {
+          "label_en": "loadGps / saveGps / clearGps helpers in community-url.ts (testable, dependency-injected)",
+          "label_es": "Helpers loadGps / saveGps / clearGps en community-url.ts (testeable, inyección de dependencias)",
+          "status": "done"
+        },
+        {
+          "label_en": "Regression-guard test: 'NEVER serializes GPS coords into the URL' + 9 sessionStorage round-trip / malformed / out-of-range cases",
+          "label_es": "Test de regresión: 'NUNCA serializa coords GPS en la URL' + 9 casos de round-trip / malformado / fuera de rango",
+          "status": "done"
+        },
+        {
+          "label_en": "loadViewerCommunityMeta() — single query for {signedIn, profilePublic, countryCode}; no N+1",
+          "label_es": "loadViewerCommunityMeta() — una sola consulta para {signedIn, profilePublic, countryCode}; sin N+1",
+          "status": "done"
+        },
+        {
+          "label_en": "Sentinel verify entries for both nearby RPCs",
+          "label_es": "Entradas en sentinel verify para los dos RPCs de Cercanos",
+          "status": "done"
+        },
+        {
+          "label_en": "CLAUDE.md M28 4th load-bearing rule + docs/runbooks/community-discovery.md UX clarifications section",
+          "label_es": "Regla 4 del M28 en CLAUDE.md + sección de aclaraciones UX en docs/runbooks/community-discovery.md",
+          "status": "done"
+        }
       ]
     },
     "console-chrome-rendering-fix": {
       "phase": "v1.1",
       "title_en": "Console chrome rendering fix — restore sidebar + role pills (70 console pages were using BaseLayout, ConsoleLayout was dead code)",
       "title_es": "Fix del chrome de la consola — restaurar sidebar + role pills (70 páginas usaban BaseLayout, ConsoleLayout era código muerto)",
-      "modules": ["24-admin-console.md"],
+      "modules": [
+        "24-admin-console.md"
+      ],
       "subtasks": [
-        { "label_en": "Diagnose: ConsoleLayout existed but unused; all 70 /console + /consola pages imported BaseLayout, leaving the chrome unrendered", "label_es": "Diagnóstico: ConsoleLayout existía pero sin uso; las 70 páginas /console + /consola importaban BaseLayout dejando el chrome sin renderizar", "status": "done" },
-        { "label_en": "Refactor ConsoleLayout to be SSG-safe: props (allRoles, activeRole, currentPath, identity) made optional with sensible defaults", "label_es": "Refactor de ConsoleLayout para SSG: props (allRoles, activeRole, currentPath, identity) ahora opcionales con defaults sensatos", "status": "done" },
-        { "label_en": "Server-render all 3 role tab lists with data-role attributes, all initially hidden; client script reveals based on getUserRoles()", "label_es": "Renderiza en server las 3 listas de tabs por rol con data-role, todas ocultas; script cliente las revela según getUserRoles()", "status": "done" },
-        { "label_en": "Same pattern for role pills: all 3 ship hidden, JS reveals only those held by the viewer; active role styled with role accent", "label_es": "Mismo patrón para los role pills: las 3 ocultas, JS revela las del viewer; rol activo con acento de su rol", "status": "done" },
-        { "label_en": "Active tab highlighting via currentPath = Astro.url.pathname (works at build time since each route has its own static HTML)", "label_es": "Resaltado del tab activo via currentPath = Astro.url.pathname (funciona en build estático porque cada ruta tiene su propio HTML)", "status": "done" },
-        { "label_en": "Swap BaseLayout → ConsoleLayout in all 35 EN console pages + 35 ES consola pages (70 total)", "label_es": "Reemplazar BaseLayout → ConsoleLayout en las 35 páginas EN console + 35 ES consola (70 total)", "status": "done" },
-        { "label_en": "BaseLayout: console.warn at build time if a /console/* or /consola/* path slips through using BaseLayout (regression guard)", "label_es": "BaseLayout: console.warn en build si una ruta /console/* o /consola/* pasa por BaseLayout (guard de regresión)", "status": "done" },
-        { "label_en": "Verification: grep dist/ confirms <aside + data-console-pill + data-role admin/moderator/expert present on all sampled pages", "label_es": "Verificación: grep en dist/ confirma <aside + data-console-pill + data-role admin/moderator/expert en todas las páginas muestreadas", "status": "done" },
-        { "label_en": "New runbook: docs/runbooks/admin-chrome-rendering.md (the ConsoleLayout-only invariant)", "label_es": "Nuevo runbook: docs/runbooks/admin-chrome-rendering.md (la invariante 'sólo ConsoleLayout')", "status": "done" },
-        { "label_en": "CLAUDE.md Console section: 4th load-bearing rule documenting the ConsoleLayout-only contract + chrome-rendering runbook cross-link", "label_es": "Sección Console de CLAUDE.md: 4ª regla load-bearing documentando el contrato 'sólo ConsoleLayout' + cross-link al runbook de chrome rendering", "status": "done" }
+        {
+          "label_en": "Diagnose: ConsoleLayout existed but unused; all 70 /console + /consola pages imported BaseLayout, leaving the chrome unrendered",
+          "label_es": "Diagnóstico: ConsoleLayout existía pero sin uso; las 70 páginas /console + /consola importaban BaseLayout dejando el chrome sin renderizar",
+          "status": "done"
+        },
+        {
+          "label_en": "Refactor ConsoleLayout to be SSG-safe: props (allRoles, activeRole, currentPath, identity) made optional with sensible defaults",
+          "label_es": "Refactor de ConsoleLayout para SSG: props (allRoles, activeRole, currentPath, identity) ahora opcionales con defaults sensatos",
+          "status": "done"
+        },
+        {
+          "label_en": "Server-render all 3 role tab lists with data-role attributes, all initially hidden; client script reveals based on getUserRoles()",
+          "label_es": "Renderiza en server las 3 listas de tabs por rol con data-role, todas ocultas; script cliente las revela según getUserRoles()",
+          "status": "done"
+        },
+        {
+          "label_en": "Same pattern for role pills: all 3 ship hidden, JS reveals only those held by the viewer; active role styled with role accent",
+          "label_es": "Mismo patrón para los role pills: las 3 ocultas, JS revela las del viewer; rol activo con acento de su rol",
+          "status": "done"
+        },
+        {
+          "label_en": "Active tab highlighting via currentPath = Astro.url.pathname (works at build time since each route has its own static HTML)",
+          "label_es": "Resaltado del tab activo via currentPath = Astro.url.pathname (funciona en build estático porque cada ruta tiene su propio HTML)",
+          "status": "done"
+        },
+        {
+          "label_en": "Swap BaseLayout → ConsoleLayout in all 35 EN console pages + 35 ES consola pages (70 total)",
+          "label_es": "Reemplazar BaseLayout → ConsoleLayout en las 35 páginas EN console + 35 ES consola (70 total)",
+          "status": "done"
+        },
+        {
+          "label_en": "BaseLayout: console.warn at build time if a /console/* or /consola/* path slips through using BaseLayout (regression guard)",
+          "label_es": "BaseLayout: console.warn en build si una ruta /console/* o /consola/* pasa por BaseLayout (guard de regresión)",
+          "status": "done"
+        },
+        {
+          "label_en": "Verification: grep dist/ confirms <aside + data-console-pill + data-role admin/moderator/expert present on all sampled pages",
+          "label_es": "Verificación: grep en dist/ confirma <aside + data-console-pill + data-role admin/moderator/expert en todas las páginas muestreadas",
+          "status": "done"
+        },
+        {
+          "label_en": "New runbook: docs/runbooks/admin-chrome-rendering.md (the ConsoleLayout-only invariant)",
+          "label_es": "Nuevo runbook: docs/runbooks/admin-chrome-rendering.md (la invariante 'sólo ConsoleLayout')",
+          "status": "done"
+        },
+        {
+          "label_en": "CLAUDE.md Console section: 4th load-bearing rule documenting the ConsoleLayout-only contract + chrome-rendering runbook cross-link",
+          "label_es": "Sección Console de CLAUDE.md: 4ª regla load-bearing documentando el contrato 'sólo ConsoleLayout' + cross-link al runbook de chrome rendering",
+          "status": "done"
+        }
       ]
     },
     "social-graph-m26": {
@@ -5182,6 +5843,31 @@
           "label_en": "Bioblitz events — UI (event detail page, live aggregates, participation badges)",
           "label_es": "Eventos bioblitz — UI (página de detalle, agregados en vivo, insignias de participación)",
           "status": "planned"
+        },
+        {
+          "label_en": "Event detail page with title, description, date range, and region polygon on map",
+          "label_es": "Pagina de detalle de evento con titulo, descripcion, rango de fechas y poligono en mapa",
+          "status": "planned"
+        },
+        {
+          "label_en": "Live observation count and species tally aggregated from event polygon",
+          "label_es": "Conteo en vivo de observaciones y especies agregado del poligono del evento",
+          "status": "planned"
+        },
+        {
+          "label_en": "Participation badge awarded on bioblitz completion via award-badges function",
+          "label_es": "Insignia de participacion otorgada al completar bioblitz via funcion award-badges",
+          "status": "planned"
+        },
+        {
+          "label_en": "Event listing page at /explore/events with upcoming/active/past filters",
+          "label_es": "Pagina de listado de eventos en /explore/events con filtros proximo/activo/pasado",
+          "status": "planned"
+        },
+        {
+          "label_en": "Join event button with auth check and participant count display",
+          "label_es": "Boton unirse a evento con verificacion auth y conteo de participantes",
+          "status": "planned"
         }
       ]
     },
@@ -5196,6 +5882,31 @@
         {
           "label_en": "Confidence ring (SVG arc graded emerald→amber→red) instead of percentage pill — faster comprehension for non-technical users",
           "label_es": "Anillo de confianza (arco SVG en emerald→ámbar→rojo) en lugar de pastilla con porcentaje — más fácil de leer para no-técnicos",
+          "status": "done"
+        },
+        {
+          "label_en": "SVG arc component with graded color stops (emerald > 0.7, amber 0.4-0.7, red < 0.4)",
+          "label_es": "Componente SVG arc con paradas de color graduadas",
+          "status": "done"
+        },
+        {
+          "label_en": "Animated arc fill on mount for visual engagement",
+          "label_es": "Relleno animado del arco al montar para engagement visual",
+          "status": "done"
+        },
+        {
+          "label_en": "Accessible aria-label with numeric confidence for screen readers",
+          "label_es": "aria-label accesible con confianza numerica para lectores de pantalla",
+          "status": "done"
+        },
+        {
+          "label_en": "Replace percentage pill on observation detail and share card views",
+          "label_es": "Reemplazar pill de porcentaje en vistas de detalle y tarjeta compartida",
+          "status": "done"
+        },
+        {
+          "label_en": "Vitest snapshot test for ring rendering at boundary values (0, 0.4, 0.7, 1.0)",
+          "label_es": "Test snapshot Vitest para renderizado en valores limite",
           "status": "done"
         }
       ]
@@ -5212,6 +5923,31 @@
           "label_en": "Quick-taxon icons under photo upload (🌿 plant · 🐦 bird · 🐾 mammal · 🐛 insect · 🍄 fungus) — primes the cascade and sets honest user expectations",
           "label_es": "Íconos rápidos de taxón bajo el subidor de fotos (🌿 planta · 🐦 ave · 🐾 mamífero · 🐛 insecto · 🍄 hongo) — orienta la cascada y fija expectativas honestas",
           "status": "done"
+        },
+        {
+          "label_en": "Chip row component with 5 kingdom icons below photo upload area",
+          "label_es": "Componente fila de chips con 5 iconos de reino debajo del area de foto",
+          "status": "done"
+        },
+        {
+          "label_en": "Tap chip sets taxon_hint field on observation for cascade priming",
+          "label_es": "Tocar chip establece campo taxon_hint en observacion para priming de cascada",
+          "status": "done"
+        },
+        {
+          "label_en": "Visual feedback: selected chip gets ring highlight + deselect on second tap",
+          "label_es": "Feedback visual: chip seleccionado con anillo + deseleccionar al segundo tap",
+          "status": "done"
+        },
+        {
+          "label_en": "i18n labels for all 5 chip tooltips in EN + ES",
+          "label_es": "Labels i18n para tooltips de los 5 chips en EN + ES",
+          "status": "done"
+        },
+        {
+          "label_en": "Mobile-friendly touch targets (min 44px) with horizontal scroll on narrow screens",
+          "label_es": "Targets tactiles movil (min 44px) con scroll horizontal en pantallas angostas",
+          "status": "done"
         }
       ]
     },
@@ -5226,6 +5962,31 @@
         {
           "label_en": "Auto-compress photos > 4 MP to 4 MP via canvas before upload — cuts R2 footprint 4×, speeds sync on slow networks, no ID quality loss",
           "label_es": "Compresión automática de fotos > 4 MP a 4 MP vía canvas antes de subir — reduce R2 4×, acelera la sincronización en redes lentas, sin pérdida de calidad de ID",
+          "status": "done"
+        },
+        {
+          "label_en": "Canvas-based resize to 4 MP max before upload (preserves aspect ratio)",
+          "label_es": "Resize basado en canvas a 4 MP max antes de subir (preserva proporcion)",
+          "status": "done"
+        },
+        {
+          "label_en": "JPEG quality parameter tuned for ID accuracy vs file size tradeoff",
+          "label_es": "Parametro de calidad JPEG ajustado para balance precision ID vs tamano",
+          "status": "done"
+        },
+        {
+          "label_en": "Skip compression for images already under 4 MP threshold",
+          "label_es": "Omitir compresion para imagenes ya bajo umbral de 4 MP",
+          "status": "done"
+        },
+        {
+          "label_en": "EXIF orientation preserved through compression pipeline",
+          "label_es": "Orientacion EXIF preservada a traves del pipeline de compresion",
+          "status": "done"
+        },
+        {
+          "label_en": "File size reduction logged for sync performance analytics",
+          "label_es": "Reduccion de tamano registrada para analiticas de rendimiento de sync",
           "status": "done"
         }
       ]
@@ -5242,6 +6003,31 @@
           "label_en": "Share button on result card → /share/obs/<id> with existing OG card; critical for viral pickup during family launch",
           "label_es": "Botón de compartir en la tarjeta de resultado → /share/obs/<id> con la OG card existente; clave para difusión viral durante el lanzamiento familiar",
           "status": "done"
+        },
+        {
+          "label_en": "Web Share API integration with fallback to clipboard copy",
+          "label_es": "Integracion Web Share API con fallback a copiar al portapapeles",
+          "status": "done"
+        },
+        {
+          "label_en": "Share URL points to /share/obs/<id> with pre-rendered OG card",
+          "label_es": "URL de compartir apunta a /share/obs/<id> con tarjeta OG pre-renderizada",
+          "status": "done"
+        },
+        {
+          "label_en": "Share button positioned on observation result card after identification",
+          "label_es": "Boton compartir posicionado en tarjeta de resultado tras identificacion",
+          "status": "done"
+        },
+        {
+          "label_en": "Toast confirmation after successful share or clipboard copy",
+          "label_es": "Toast de confirmacion tras compartir exitosamente o copiar al portapapeles",
+          "status": "done"
+        },
+        {
+          "label_en": "Analytics event tracking for share button taps",
+          "label_es": "Tracking de eventos para taps en boton compartir",
+          "status": "done"
         }
       ]
     },
@@ -5257,6 +6043,31 @@
           "label_en": "Save observation as draft without GPS — current form blocks submit on missing location, breaking the flow for users in cell-dead zones",
           "label_es": "Guardar observación como borrador sin GPS — el formulario actual bloquea el submit si falta ubicación, lo que rompe el flujo en zonas sin señal",
           "status": "done"
+        },
+        {
+          "label_en": "Draft status on Dexie outbox entries when GPS is missing",
+          "label_es": "Estado borrador en entradas del outbox Dexie cuando falta GPS",
+          "status": "done"
+        },
+        {
+          "label_en": "Resume draft flow: list drafts on observe page with edit/delete actions",
+          "label_es": "Flujo de retomar borrador: listar borradores con acciones editar/eliminar",
+          "status": "done"
+        },
+        {
+          "label_en": "Visual indicator distinguishing drafts from pending-sync observations",
+          "label_es": "Indicador visual distinguiendo borradores de observaciones pendientes de sync",
+          "status": "done"
+        },
+        {
+          "label_en": "Auto-save to draft on page navigation away from incomplete form",
+          "label_es": "Auto-guardado a borrador al navegar fuera del formulario incompleto",
+          "status": "done"
+        },
+        {
+          "label_en": "Draft count badge on observe nav item when drafts exist",
+          "label_es": "Badge de conteo de borradores en item de navegacion observar",
+          "status": "done"
         }
       ]
     },
@@ -5269,6 +6080,31 @@
         {
           "label_en": "First-signup onboarding — 3 dismissible cards (install PWA → take a photo → see your profile); skippable; never repeats",
           "label_es": "Onboarding al primer registro — 3 tarjetas descartables (instala la PWA → toma una foto → mira tu perfil); saltable; sin repeticiones",
+          "status": "done"
+        },
+        {
+          "label_en": "3 dismissible onboarding cards (install PWA, take a photo, see your profile)",
+          "label_es": "3 tarjetas de onboarding descartables (instalar PWA, tomar foto, ver perfil)",
+          "status": "done"
+        },
+        {
+          "label_en": "Cards shown only on first sign-up via localStorage flag",
+          "label_es": "Tarjetas mostradas solo en primer registro via flag localStorage",
+          "status": "done"
+        },
+        {
+          "label_en": "Skip button to dismiss all remaining cards at once",
+          "label_es": "Boton saltar para descartar todas las tarjetas restantes",
+          "status": "done"
+        },
+        {
+          "label_en": "Never repeats after dismissal (localStorage persistence)",
+          "label_es": "Nunca se repite tras descarte (persistencia localStorage)",
+          "status": "done"
+        },
+        {
+          "label_en": "Bilingual card content in EN + ES matching user locale",
+          "label_es": "Contenido de tarjetas bilingue EN + ES segun locale del usuario",
           "status": "done"
         }
       ]
@@ -5285,6 +6121,31 @@
           "label_en": "Chat follow-up suggestion chips below each AI reply (¿Es venenosa?, ¿Cómo distingo de X?, Hábitat) — reduce cold-start friction",
           "label_es": "Chips de sugerencia de seguimiento bajo cada respuesta de IA en chat (¿Es venenosa?, ¿Cómo distinguir de X?, Hábitat) — reduce fricción de arranque",
           "status": "done"
+        },
+        {
+          "label_en": "Suggestion chip row rendered below each AI reply in chat",
+          "label_es": "Fila de chips de sugerencia renderizada debajo de cada respuesta AI en chat",
+          "status": "done"
+        },
+        {
+          "label_en": "Context-aware chips based on identified species (toxicity, habitat, lookalikes)",
+          "label_es": "Chips contextuales basados en especie identificada (toxicidad, habitat, similares)",
+          "status": "done"
+        },
+        {
+          "label_en": "Tap chip auto-fills chat input and sends follow-up question",
+          "label_es": "Tocar chip auto-rellena input de chat y envia pregunta de seguimiento",
+          "status": "done"
+        },
+        {
+          "label_en": "Bilingual chip labels in EN + ES",
+          "label_es": "Labels de chips bilingues en EN + ES",
+          "status": "done"
+        },
+        {
+          "label_en": "Chips hidden after one is selected to avoid clutter",
+          "label_es": "Chips ocultos tras seleccionar uno para evitar desorden",
+          "status": "done"
         }
       ]
     },
@@ -5297,6 +6158,31 @@
         {
           "label_en": "Persist chat conversation history per device in Dexie — currently lost on reload",
           "label_es": "Persistir historial de chat por dispositivo en Dexie — actualmente se pierde al recargar",
+          "status": "done"
+        },
+        {
+          "label_en": "Dexie table for chat conversation history (per-device, per-user)",
+          "label_es": "Tabla Dexie para historial de conversacion de chat (por dispositivo, por usuario)",
+          "status": "done"
+        },
+        {
+          "label_en": "Restore previous conversation on /chat page mount",
+          "label_es": "Restaurar conversacion previa al montar pagina /chat",
+          "status": "done"
+        },
+        {
+          "label_en": "Clear conversation button with confirmation dialog",
+          "label_es": "Boton limpiar conversacion con dialogo de confirmacion",
+          "status": "done"
+        },
+        {
+          "label_en": "Conversation auto-pruned after 50 messages to limit IndexedDB size",
+          "label_es": "Conversacion auto-podada tras 50 mensajes para limitar tamano IndexedDB",
+          "status": "done"
+        },
+        {
+          "label_en": "Scroll-to-bottom on page load when restoring conversation",
+          "label_es": "Scroll al fondo al cargar pagina cuando se restaura conversacion",
           "status": "done"
         }
       ]
@@ -5313,6 +6199,31 @@
           "label_en": "Time-slider on /explore map — drag months to see phenological patterns; visually striking for first-time visitors",
           "label_es": "Deslizador temporal en el mapa /explore — arrastra meses para ver patrones fenológicos; impacta visualmente a nuevos visitantes",
           "status": "done"
+        },
+        {
+          "label_en": "Range slider component for month selection on /explore map",
+          "label_es": "Componente slider de rango para seleccion de mes en mapa /explore",
+          "status": "done"
+        },
+        {
+          "label_en": "GeoJSON source filtered by observation date range on slider change",
+          "label_es": "Fuente GeoJSON filtrada por rango de fecha al cambiar slider",
+          "status": "done"
+        },
+        {
+          "label_en": "Animated transition when filtering observations by time window",
+          "label_es": "Transicion animada al filtrar observaciones por ventana de tiempo",
+          "status": "done"
+        },
+        {
+          "label_en": "Month labels displayed below slider with locale-aware formatting",
+          "label_es": "Etiquetas de mes mostradas debajo del slider con formato por locale",
+          "status": "done"
+        },
+        {
+          "label_en": "Reset button to clear time filter and show all observations",
+          "label_es": "Boton reset para limpiar filtro de tiempo y mostrar todas las observaciones",
+          "status": "done"
         }
       ]
     },
@@ -5325,6 +6236,31 @@
         {
           "label_en": "Replace bare spinners with skeleton screens on /observations, /explore, profile — cumulatively makes the platform feel snappier",
           "label_es": "Reemplazar spinners desnudos con esqueletos en /observations, /explore y perfil — la plataforma se siente más ágil en su conjunto",
+          "status": "done"
+        },
+        {
+          "label_en": "Skeleton placeholder components for observation cards, profile sections, explore grid",
+          "label_es": "Componentes skeleton para tarjetas de observacion, secciones de perfil, grilla explore",
+          "status": "done"
+        },
+        {
+          "label_en": "CSS shimmer animation on skeleton elements for loading perception",
+          "label_es": "Animacion shimmer CSS en elementos skeleton para percepcion de carga",
+          "status": "done"
+        },
+        {
+          "label_en": "Skeleton dimensions match real content to prevent layout shift (CLS)",
+          "label_es": "Dimensiones skeleton coinciden con contenido real para prevenir layout shift",
+          "status": "done"
+        },
+        {
+          "label_en": "Graceful transition from skeleton to real content on data load",
+          "label_es": "Transicion suave de skeleton a contenido real al cargar datos",
+          "status": "done"
+        },
+        {
+          "label_en": "Dark mode compatible skeleton colors via CSS custom properties",
+          "label_es": "Colores skeleton compatibles con modo oscuro via propiedades CSS custom",
           "status": "done"
         }
       ]
@@ -5341,6 +6277,31 @@
           "label_en": "SpeechRecognition voice input in /chat — accessibility win, especially for indigenous-language native speakers",
           "label_es": "Entrada de voz vía SpeechRecognition en /chat — accesibilidad, sobre todo para hablantes nativos de lenguas indígenas",
           "status": "done"
+        },
+        {
+          "label_en": "SpeechRecognition API integration with microphone permission handling",
+          "label_es": "Integracion API SpeechRecognition con manejo de permisos de microfono",
+          "status": "done"
+        },
+        {
+          "label_en": "Voice input button in /chat with recording indicator animation",
+          "label_es": "Boton de entrada de voz en /chat con animacion de indicador de grabacion",
+          "status": "done"
+        },
+        {
+          "label_en": "Transcript auto-fills chat input field on speech end",
+          "label_es": "Transcripcion auto-rellena campo de input de chat al terminar habla",
+          "status": "done"
+        },
+        {
+          "label_en": "Language detection matching current locale (EN or ES) for recognition",
+          "label_es": "Deteccion de idioma segun locale actual (EN o ES) para reconocimiento",
+          "status": "done"
+        },
+        {
+          "label_en": "Graceful fallback message when SpeechRecognition is not supported",
+          "label_es": "Mensaje de fallback cuando SpeechRecognition no es soportado",
+          "status": "done"
         }
       ]
     },
@@ -5355,6 +6316,31 @@
         {
           "label_en": "First-observation confetti + 'Bienvenido a Rastrum 🌱' banner on the user's literal first synced observation",
           "label_es": "Confetti + banner 'Bienvenido a Rastrum 🌱' en la primera observación sincronizada del usuario",
+          "status": "done"
+        },
+        {
+          "label_en": "Confetti animation triggered on first synced observation completion",
+          "label_es": "Animacion de confeti al completar primera observacion sincronizada",
+          "status": "done"
+        },
+        {
+          "label_en": "Bilingual welcome banner with species illustration",
+          "label_es": "Banner de bienvenida bilingue con ilustracion de especie",
+          "status": "done"
+        },
+        {
+          "label_en": "First-observation flag stored in user profile to prevent repeat",
+          "label_es": "Flag de primera observacion almacenado en perfil para prevenir repeticion",
+          "status": "done"
+        },
+        {
+          "label_en": "Banner auto-dismisses after 5 seconds with manual close button",
+          "label_es": "Banner se descarta automaticamente tras 5 segundos con boton de cierre",
+          "status": "done"
+        },
+        {
+          "label_en": "Activity feed event logged for first observation milestone",
+          "label_es": "Evento de feed de actividad registrado para hito de primera observacion",
           "status": "done"
         }
       ]
@@ -5371,6 +6357,31 @@
           "label_en": "Indigenous-language taxon search (Zapoteco / Náhuatl / Maya / Mixteco / Tseltal → scientific name); requires corpus + governance per local-contexts",
           "label_es": "Búsqueda de taxón en lenguas indígenas (Zapoteco / Náhuatl / Maya / Mixteco / Tseltal → nombre científico); requiere corpus + gobernanza per local-contexts",
           "status": "planned"
+        },
+        {
+          "label_en": "Corpus partnership with CONABIO and community Co-PIs for indigenous name data",
+          "label_es": "Alianza de corpus con CONABIO y Co-PIs comunitarios para datos de nombres indigenas",
+          "status": "planned"
+        },
+        {
+          "label_en": "Indigenous name lookup table: Zapoteco, Nahuatl, Maya, Mixteco, Tseltal to scientific name",
+          "label_es": "Tabla de busqueda de nombres indigenas a nombre cientifico",
+          "status": "planned"
+        },
+        {
+          "label_en": "Search autocomplete supporting indigenous language input alongside Spanish/Latin",
+          "label_es": "Autocompletado de busqueda soportando entrada en lengua indigena",
+          "status": "planned"
+        },
+        {
+          "label_en": "Governance review and community consent protocol before deployment",
+          "label_es": "Revision de gobernanza y protocolo de consentimiento comunitario",
+          "status": "planned"
+        },
+        {
+          "label_en": "Local Contexts BC/TK notice integration for culturally sensitive taxa",
+          "label_es": "Integracion de avisos BC/TK de Local Contexts para taxa culturalmente sensibles",
+          "status": "planned"
         }
       ]
     },
@@ -5385,6 +6396,31 @@
         {
           "label_en": "Image deduplication on submit — perceptual hash warns when the same photo is being re-uploaded",
           "label_es": "Deduplicación de imágenes al enviar — hash perceptual avisa cuando se re-sube la misma foto",
+          "status": "done"
+        },
+        {
+          "label_en": "Perceptual hash computation (pHash) on image upload in observation form",
+          "label_es": "Computacion de hash perceptual (pHash) al subir imagen en formulario",
+          "status": "done"
+        },
+        {
+          "label_en": "Duplicate detection warning when hash matches an existing upload in session",
+          "label_es": "Advertencia de duplicado cuando hash coincide con subida existente en sesion",
+          "status": "done"
+        },
+        {
+          "label_en": "User can override warning and submit duplicate intentionally",
+          "label_es": "Usuario puede ignorar advertencia y enviar duplicado intencionalmente",
+          "status": "done"
+        },
+        {
+          "label_en": "Hash comparison runs client-side with no server round-trip",
+          "label_es": "Comparacion de hash corre en cliente sin round-trip al servidor",
+          "status": "done"
+        },
+        {
+          "label_en": "Performance budget: hash computation under 100ms per image on mid-range mobile",
+          "label_es": "Presupuesto de rendimiento: hash bajo 100ms por imagen en movil gama media",
           "status": "done"
         }
       ]
@@ -5401,6 +6437,31 @@
           "label_en": "Web Push notification at 8 PM local when a streak is 1 day from breaking — opt-in only, single nightly notification",
           "label_es": "Notificación push a las 20:00 hora local cuando una racha está a 1 día de romperse — opcional, una notificación nocturna",
           "status": "planned"
+        },
+        {
+          "label_en": "Web Push subscription opt-in UI in profile notification preferences",
+          "label_es": "UI de opt-in para suscripcion Web Push en preferencias de notificacion del perfil",
+          "status": "planned"
+        },
+        {
+          "label_en": "Edge Function to check streaks at risk (1 day from breaking) nightly",
+          "label_es": "Edge Function para verificar rachas en riesgo (1 dia de romperse) cada noche",
+          "status": "planned"
+        },
+        {
+          "label_en": "Push notification payload with streak count and motivational message (EN + ES)",
+          "label_es": "Payload de notificacion push con conteo de racha y mensaje motivacional",
+          "status": "planned"
+        },
+        {
+          "label_en": "Respect user timezone for 8 PM local delivery via timezone column on users table",
+          "label_es": "Respetar zona horaria del usuario para entrega a las 8 PM local",
+          "status": "planned"
+        },
+        {
+          "label_en": "Rate limit: maximum one push notification per user per day",
+          "label_es": "Limite de tasa: maximo una notificacion push por usuario por dia",
+          "status": "planned"
         }
       ]
     },
@@ -5415,6 +6476,31 @@
         {
           "label_en": "Atomic delete-observation Edge Function — wipes R2 photos + OG card alongside DB rows; no orphan blobs",
           "label_es": "Función Edge atómica delete-observation — borra fotos en R2 + tarjeta OG además de filas DB; sin blobs huérfanos",
+          "status": "done"
+        },
+        {
+          "label_en": "Edge Function that deletes observation + all media_files + R2 blobs in one transaction",
+          "label_es": "Edge Function que elimina observacion + media_files + blobs R2 en una transaccion",
+          "status": "done"
+        },
+        {
+          "label_en": "R2 object deletion via presigned DELETE or service binding",
+          "label_es": "Eliminacion de objetos R2 via DELETE presignado o service binding",
+          "status": "done"
+        },
+        {
+          "label_en": "OG card cleanup alongside media deletion (no orphan share cards)",
+          "label_es": "Limpieza de tarjeta OG junto con eliminacion de media (sin tarjetas huerfanas)",
+          "status": "done"
+        },
+        {
+          "label_en": "RLS check ensuring only observation owner or admin can trigger delete",
+          "label_es": "Verificacion RLS asegurando que solo dueno o admin puede eliminar",
+          "status": "done"
+        },
+        {
+          "label_en": "Confirmation dialog in UI before triggering irreversible delete",
+          "label_es": "Dialogo de confirmacion en UI antes de eliminar irreversiblemente",
           "status": "done"
         }
       ]
@@ -5431,6 +6517,31 @@
           "label_en": "Suggest identification from any /share/obs page — community-suggestions list visible to all viewers",
           "label_es": "Sugerir identificación desde cualquier página /share/obs — lista de sugerencias comunitarias visible para todos",
           "status": "done"
+        },
+        {
+          "label_en": "Suggest identification modal on /share/obs page for community input",
+          "label_es": "Modal de sugerir identificacion en pagina /share/obs para input comunitario",
+          "status": "done"
+        },
+        {
+          "label_en": "Community suggestions list visible to all viewers below primary ID",
+          "label_es": "Lista de sugerencias comunitarias visible a todos debajo de ID primaria",
+          "status": "done"
+        },
+        {
+          "label_en": "Auth check: only signed-in users can submit suggestions",
+          "label_es": "Verificacion auth: solo usuarios autenticados pueden enviar sugerencias",
+          "status": "done"
+        },
+        {
+          "label_en": "Suggestion includes taxon name, confidence, and optional notes",
+          "label_es": "Sugerencia incluye nombre de taxon, confianza y notas opcionales",
+          "status": "done"
+        },
+        {
+          "label_en": "Consensus recomputation triggered when new suggestion is added",
+          "label_es": "Recomputacion de consenso disparada al agregar nueva sugerencia",
+          "status": "done"
         }
       ]
     },
@@ -5445,6 +6556,31 @@
         {
           "label_en": "Karma engagement layers — toast, digest, leaderboards (Phase 2)",
           "label_es": "Capas de engagement — notificaciones, resumen, leaderboards (Fase 2)",
+          "status": "planned"
+        },
+        {
+          "label_en": "Toast notification on karma milestone achievements (100, 500, 1000 points)",
+          "label_es": "Notificacion toast en hitos de karma (100, 500, 1000 puntos)",
+          "status": "planned"
+        },
+        {
+          "label_en": "Weekly karma digest email summarizing points earned and rank change",
+          "label_es": "Email semanal de resumen de karma con puntos ganados y cambio de rango",
+          "status": "planned"
+        },
+        {
+          "label_en": "Community leaderboard page at /explore/leaderboard with opt-in visibility",
+          "label_es": "Pagina de tabla de lideres en /explore/leaderboard con visibilidad opt-in",
+          "status": "planned"
+        },
+        {
+          "label_en": "Karma breakdown tooltip on profile showing points by category",
+          "label_es": "Tooltip de desglose de karma en perfil mostrando puntos por categoria",
+          "status": "planned"
+        },
+        {
+          "label_en": "Seasonal karma challenges with time-limited bonus multipliers",
+          "label_es": "Desafios de karma estacionales con multiplicadores de bonificacion temporales",
           "status": "planned"
         }
       ]
@@ -5461,6 +6597,31 @@
           "label_en": "Karma conservation bonuses — IUCN/NOM-059 multipliers (Phase 3)",
           "label_es": "Karma — bonos de conservación IUCN/NOM-059 (Fase 3)",
           "status": "planned"
+        },
+        {
+          "label_en": "IUCN Red List status multiplier (Vulnerable 1.5x, Endangered 2x, CR 3x)",
+          "label_es": "Multiplicador por estado Lista Roja IUCN (Vulnerable 1.5x, En Peligro 2x, CR 3x)",
+          "status": "planned"
+        },
+        {
+          "label_en": "NOM-059 category multiplier for Mexican endemic threatened species",
+          "label_es": "Multiplicador por categoria NOM-059 para especies amenazadas endemicas mexicanas",
+          "status": "planned"
+        },
+        {
+          "label_en": "First-observation-of-species bonus for new taxa records in a region",
+          "label_es": "Bonificacion por primera observacion de especie para nuevos registros en una region",
+          "status": "planned"
+        },
+        {
+          "label_en": "Protected area observation bonus when GPS falls within ANP polygon (M29)",
+          "label_es": "Bonificacion por observacion en area protegida cuando GPS cae en poligono ANP",
+          "status": "planned"
+        },
+        {
+          "label_en": "Conservation karma leaderboard filtered by region and time period",
+          "label_es": "Tabla de lideres de karma de conservacion filtrada por region y periodo",
+          "status": "planned"
         }
       ]
     },
@@ -5476,6 +6637,36 @@
           "label_en": "M26 UI integration — bell→inbox + unread badge, rich notification cards, profile follower/following pills + Block/Report overflow, shared ReportDialog with focus trap, ReactionStrip on /share/obs/, FollowButton on the new follow Edge Function (Requested state for private profiles)",
           "label_es": "Integración UI de M26 — campana→bandeja + badge no leídos, tarjetas ricas, pills de seguidores/siguiendo + menú ⋮ Bloquear/Reportar, ReportDialog compartido con focus trap, ReactionStrip en /share/obs/, FollowButton sobre la nueva Edge Function (estado Solicitado en perfiles privados)",
           "status": "done"
+        },
+        {
+          "label_en": "Bell icon repointed to /inbox with unread badge from notifications table",
+          "label_es": "Icono de campana apuntando a /inbox con badge de no leidos",
+          "status": "done"
+        },
+        {
+          "label_en": "Rich notification cards with avatars, thumbnails, type-coded icons, skeletons",
+          "label_es": "Tarjetas de notificacion ricas con avatares, miniaturas, iconos por tipo, skeletons",
+          "status": "done"
+        },
+        {
+          "label_en": "Profile follower/following pills + overflow menu (Block + Report)",
+          "label_es": "Pills de seguidores/siguiendo en perfil + menu overflow (Bloquear + Reportar)",
+          "status": "done"
+        },
+        {
+          "label_en": "Shared ReportDialog modal with focus trap, Esc close, reason radio + optional note",
+          "label_es": "Modal ReportDialog compartido con focus trap, cierre Esc, radio de razon + nota",
+          "status": "done"
+        },
+        {
+          "label_en": "FollowButton calling m26 follow Edge Function with Requested state for private profiles",
+          "label_es": "FollowButton llamando Edge Function follow m26 con estado Requested para perfiles privados",
+          "status": "done"
+        },
+        {
+          "label_en": "ReactionStrip rewritten to self-hydrate and wired interactive on /share/obs/",
+          "label_es": "ReactionStrip reescrito para auto-hidratar e interactivo en /share/obs/",
+          "status": "done"
         }
       ]
     },
@@ -5489,6 +6680,31 @@
           "label_en": "CI/CD — auto-deploy Edge Functions on path-filtered push (mirrors db-apply.yml). Filesystem-derived function list eliminates drift; manual workflow_dispatch preserved for surgical rollback",
           "label_es": "CI/CD — auto-deploy de Edge Functions en push con filtro de ruta (refleja db-apply.yml). Lista derivada del filesystem elimina drift; workflow_dispatch manual preservado para rollback quirúrgico",
           "status": "done"
+        },
+        {
+          "label_en": "Path-filtered GitHub Actions workflow triggering on supabase/functions/** changes",
+          "label_es": "Workflow GitHub Actions filtrado por path en cambios supabase/functions/**",
+          "status": "done"
+        },
+        {
+          "label_en": "Filesystem-derived function list eliminates drift between UI enum and deploy loop",
+          "label_es": "Lista de funciones derivada del filesystem elimina drift entre enum UI y loop de deploy",
+          "status": "done"
+        },
+        {
+          "label_en": "Manual workflow_dispatch preserved for surgical rollback of individual functions",
+          "label_es": "workflow_dispatch manual preservado para rollback quirurgico de funciones individuales",
+          "status": "done"
+        },
+        {
+          "label_en": "Deploy job uses pinned supabase CLI version for reproducibility",
+          "label_es": "Job de deploy usa version fija de CLI supabase para reproducibilidad",
+          "status": "done"
+        },
+        {
+          "label_en": "Slack/email notification on deploy failure with function name and error log",
+          "label_es": "Notificacion Slack/email en fallo de deploy con nombre de funcion y log de error",
+          "status": "planned"
         }
       ]
     },
@@ -5501,6 +6717,31 @@
         {
           "label_en": "CI gate — db-validate.yml fails if any public.* table lacks ENABLE ROW LEVEL SECURITY. Closes the loop on the Supabase rls_disabled_in_public lint by catching missing RLS at PR review time instead of via the after-the-fact security alert email",
           "label_es": "Gate CI — db-validate.yml falla si cualquier tabla public.* no tiene ENABLE ROW LEVEL SECURITY. Cierra el ciclo del lint rls_disabled_in_public de Supabase atrapando RLS faltante en PR review en lugar de via el email de alerta de seguridad post-merge",
+          "status": "done"
+        },
+        {
+          "label_en": "db-validate.yml workflow checking all public.* tables have ENABLE ROW LEVEL SECURITY",
+          "label_es": "Workflow db-validate.yml verificando que todas las tablas public.* tienen RLS habilitado",
+          "status": "done"
+        },
+        {
+          "label_en": "SQL query against pg_catalog to detect tables missing RLS",
+          "label_es": "Query SQL contra pg_catalog para detectar tablas sin RLS",
+          "status": "done"
+        },
+        {
+          "label_en": "CI job fails PR if any public table lacks RLS (non-zero exit code)",
+          "label_es": "Job CI falla PR si alguna tabla publica carece de RLS (exit code no-cero)",
+          "status": "done"
+        },
+        {
+          "label_en": "Clear error message listing specific tables missing RLS in CI output",
+          "label_es": "Mensaje de error claro listando tablas especificas sin RLS en output CI",
+          "status": "done"
+        },
+        {
+          "label_en": "Runs on every PR that touches supabase/ or docs/specs/infra/ paths",
+          "label_es": "Corre en cada PR que toca paths supabase/ o docs/specs/infra/",
           "status": "done"
         }
       ]
