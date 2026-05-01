@@ -201,6 +201,18 @@ const weathers = WEATHERS;
             {weathers.map(w => <option value={w}>{w}</option>)}
           </select>
         </div>
+        <!-- Content sensitivity -->
+        <div class="flex items-start gap-3">
+          <input id="obs2-sensitive" type="checkbox" class="mt-1 rounded border-zinc-300 dark:border-zinc-700 text-emerald-600 focus:ring-emerald-500" />
+          <div>
+            <label for="obs2-sensitive" class="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              {observeStr.content_sensitive_label ?? (isEs ? "Contiene contenido gráfico" : "Contains graphic content")}
+            </label>
+            <p class="text-xs text-zinc-400 dark:text-zinc-500">
+              {observeStr.content_sensitive_hint ?? (isEs ? "Fotos se difuminarán para otros usuarios" : "Photos will be blurred for other users")}
+            </p>
+          </div>
+        </div>
       </div>
     </details>
 
@@ -806,6 +818,7 @@ postForm?.addEventListener('submit', async (e) => {
     const notes = (document.getElementById('obs2-notes') as HTMLTextAreaElement | null)?.value.trim() || null;
     const habitatVal = (document.getElementById('obs2-habitat') as HTMLSelectElement | null)?.value || null;
     const weatherVal = (document.getElementById('obs2-weather') as HTMLSelectElement | null)?.value || null;
+    const sensitiveVal = (document.getElementById('obs2-sensitive') as HTMLInputElement | null)?.checked ?? false;
     const taxonInput = (document.getElementById('obs2-taxon-input') as HTMLInputElement | null)?.value.trim();
 
     // MediaRecorder-produced Blobs sometimes have an empty `type` (notably
@@ -842,6 +855,7 @@ postForm?.addEventListener('submit', async (e) => {
       habitat: habitatVal as never,
       weather: weatherVal as never,
       notes,
+      contentSensitive: sensitiveVal,
     });
 
     await syncOutbox().catch(() => {});
