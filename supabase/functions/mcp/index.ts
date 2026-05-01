@@ -14,6 +14,8 @@
  *   list_observations     (scope: observe)  — paginated own-observations
  *   get_observation       (scope: observe)  — single observation by id
  *   export_darwin_core    (scope: export)   — return CSV string
+ *   get_platform_status   (scope: status)   — aggregate public metrics
+ *   get_admin_metrics     (scope: admin)    — full metrics (requires admin role)
  *
  * Configure in your agent's MCP settings, e.g. for Claude Desktop:
  *   {
@@ -51,7 +53,7 @@ const PROTOCOL_VERSION = '2024-11-05';
 interface Tool {
   name: string;
   description: string;
-  scope: 'observe' | 'identify' | 'export';
+  scope: 'observe' | 'identify' | 'export' | 'status' | 'admin';
   inputSchema: Record<string, unknown>;
   handler: (args: Record<string, unknown>, ctx: ToolCtx) => Promise<unknown>;
 }
@@ -268,6 +270,41 @@ const TOOLS: Tool[] = [
       return { csv: [header, ...rows].join('\n'), rows: rows.length };
     },
   },
+
+  {
+    name: 'get_platform_status',
+    description:
+      'Returns aggregate public metrics for the Rastrum platform: total observations, distinct species recorded, active observers in the last 30 days, public projects, and new observations in the last 7 days.',
+    scope: 'status',
+    inputSchema: { type: 'object', properties: {} },
+    async handler(_args, ctx) {
+      const { data, error } = await ctx.supabase.rpc('platform_status_metrics');
+      if (error) throw new Error(error.message);
+      return data;
+    },
+  },
+
+  {
+    name: 'get_admin_metrics',
+    description:
+      'Returns full platform metrics for operators: user registrations (total / 7d / 30d), observations (total / 7d / 30d), active users (7d), distinct species, and public projects. Requires both admin token scope AND the caller holding the admin role in the platform.',
+    scope: 'admin',
+    inputSchema: { type: 'object', properties: {} },
+    async handler(_args, ctx) {
+      const { data: roleRow, error: roleErr } = await ctx.supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('user_id', ctx.user_id)
+        .eq('role', 'admin')
+        .is('revoked_at', null)
+        .maybeSingle();
+      if (roleErr) throw new Error(roleErr.message);
+      if (!roleRow) throw new Error('Caller does not hold the admin role.');
+      const { data, error } = await ctx.supabase.rpc('admin_platform_metrics');
+      if (error) throw new Error(error.message);
+      return data;
+    },
+  },
 ];
 
 // ── Token verification (mirrors api/index.ts) ─────────────────────────
@@ -359,7 +396,9 @@ Deno.serve(async (req: Request) => {
       instructions:
         'Rastrum biodiversity platform MCP server. Set Authorization: Bearer rst_<token> '
         + '(create at https://rastrum.org/profile/tokens). Tools available depend on the '
-        + 'token\'s scopes (observe, identify, export).',
+        + 'token\'s scopes: observe (submit/list/get observations), identify (species ID cascade), '
+        + 'export (Darwin Core CSV), status (aggregate platform metrics), '
+        + 'admin (full metrics — token owner must also hold the admin role).',
     });
   }
 

@@ -6353,6 +6353,50 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.station_trap_nights(uuid, date, date) TO anon, authenticated, service_role;
 
+-- ── MCP platform metrics ─────────────────────────────────────────────
+-- Called by the MCP server's get_platform_status tool (scope: status).
+-- Returns aggregate counts safe to share with any token holder.
+CREATE OR REPLACE FUNCTION public.platform_status_metrics()
+RETURNS jsonb
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT jsonb_build_object(
+    'total_observations',    (SELECT COUNT(*) FROM observations WHERE sync_status = 'synced'),
+    'total_species',         (SELECT COUNT(DISTINCT primary_taxon_id) FROM observations WHERE sync_status = 'synced' AND primary_taxon_id IS NOT NULL),
+    'active_observers_30d',  (SELECT COUNT(DISTINCT observer_id) FROM observations WHERE sync_status = 'synced' AND observed_at >= now() - interval '30 days'),
+    'public_projects',       (SELECT COUNT(*) FROM projects WHERE visibility = 'public'),
+    'observations_7d',       (SELECT COUNT(*) FROM observations WHERE observed_at >= now() - interval '7 days' AND sync_status = 'synced'),
+    'as_of',                 now()
+  )
+$$;
+REVOKE ALL ON FUNCTION public.platform_status_metrics() FROM public;
+GRANT EXECUTE ON FUNCTION public.platform_status_metrics() TO service_role;
+
+-- Called by the MCP server's get_admin_metrics tool (scope: admin).
+-- The Edge Function also verifies the caller holds the admin role before
+-- invoking this, so the service_role-only grant is a second guard.
+CREATE OR REPLACE FUNCTION public.admin_platform_metrics()
+RETURNS jsonb
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT jsonb_build_object(
+    'total_users',           (SELECT COUNT(*) FROM users),
+    'new_users_7d',          (SELECT COUNT(*) FROM users WHERE joined_at >= now() - interval '7 days'),
+    'new_users_30d',         (SELECT COUNT(*) FROM users WHERE joined_at >= now() - interval '30 days'),
+    'total_observations',    (SELECT COUNT(*) FROM observations WHERE sync_status = 'synced'),
+    'observations_7d',       (SELECT COUNT(*) FROM observations WHERE observed_at >= now() - interval '7 days' AND sync_status = 'synced'),
+    'observations_30d',      (SELECT COUNT(*) FROM observations WHERE observed_at >= now() - interval '30 days' AND sync_status = 'synced'),
+    'active_users_7d',       (SELECT COUNT(DISTINCT observer_id) FROM observations WHERE observed_at >= now() - interval '7 days'),
+    'total_species',         (SELECT COUNT(DISTINCT primary_taxon_id) FROM observations WHERE primary_taxon_id IS NOT NULL),
+    'public_projects',       (SELECT COUNT(*) FROM projects WHERE visibility = 'public'),
+    'as_of',                 now()
+  )
+$$;
+REVOKE ALL ON FUNCTION public.admin_platform_metrics() FROM public;
+GRANT EXECUTE ON FUNCTION public.admin_platform_metrics() TO service_role;
+
 -- ════════════════════════════════════════════════════════════════════════
 -- PR16 — Hot-path indexes for admin entity browsers (Identifications,
 -- Notifications, Media, Follows, Watchlists, Projects). Each backs a
