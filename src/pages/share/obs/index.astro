@@ -123,6 +123,8 @@ const lang: 'en' | 'es' = 'en';
         const timeLabel    = isEs ? 'Tiempo (s)' : 'Time (s)';
         const loadLabel    = isEs ? 'Cargando audio…' : 'Loading audio…';
         const errLabel     = isEs ? 'No se pudo cargar el audio.' : 'Could not load audio.';
+        const radialLabel  = isEs ? 'Visualizar' : 'Visualize';
+        const radialHide   = isEs ? 'Ocultar' : 'Hide';
         return `
             <div
               class="rastrum-audio-player rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden"
@@ -137,6 +139,8 @@ const lang: 'en' | 'es' = 'en';
               data-label-spectro-hide="${spectroHide}"
               data-label-freq="${freqLabel}"
               data-label-time="${timeLabel}"
+              data-label-radial="${radialLabel}"
+              data-label-radial-hide="${radialHide}"
             >
               <div class="px-3 pt-3">
                 <div id="ws-wave-${obsIdAttr}" style="min-height:60px;"></div>
@@ -152,10 +156,21 @@ const lang: 'en' | 'es' = 'en';
                 <span class="loading-label text-xs text-zinc-400 dark:text-zinc-500">${loadLabel}</span>
                 <span class="error-label hidden text-xs text-red-500">${errLabel}</span>
                 <div class="flex-1"></div>
+                <button id="ws-toggle-radial-${obsIdAttr}" type="button" aria-expanded="false"
+                  class="text-xs text-sky-600 dark:text-sky-400 underline underline-offset-2 hover:no-underline shrink-0">${radialLabel}</button>
                 <button id="ws-toggle-spec-${obsIdAttr}" type="button" aria-expanded="false"
                   class="text-xs text-emerald-700 dark:text-emerald-400 underline underline-offset-2 hover:no-underline shrink-0">
                   ${spectroLabel}
                 </button>
+              </div>
+              <div id="ws-radial-${obsIdAttr}" class="hidden px-3 pb-3">
+                <div class="relative flex items-center justify-center rounded-xl bg-zinc-950 overflow-hidden" style="height:280px;">
+                  <canvas id="ws-radial-canvas-${obsIdAttr}" class="w-full h-full" aria-hidden="true"></canvas>
+                  <div id="ws-radial-label-${obsIdAttr}" class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none">
+                    <span id="ws-radial-species-${obsIdAttr}" class="text-sm font-semibold italic text-white/80 drop-shadow-lg transition-all duration-300"></span>
+                    <span id="ws-radial-common-${obsIdAttr}" class="text-[11px] text-white/50 mt-0.5 transition-all duration-300"></span>
+                  </div>
+                </div>
               </div>
               <div id="ws-spec-${obsIdAttr}" class="hidden px-3 pb-2">
                 <div class="flex items-center gap-2 mb-2">
