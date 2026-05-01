@@ -18,6 +18,13 @@
  *   g k → /console/api/   (k for "kuotas" — q is reserved for search)
  *   g h → /console/health/
  *   g e → /console/errors/
+ *   g n → /console/anomalies/
+ *   g f → /console/forensics/
+ *   g w → /console/webhooks/
+ *   g p → /console/proposals/
+ *   g d → /console/badges/    (d for "distinctions" — b is taken by bans)
+ *   g i → /console/identifications/
+ *   g m → /console/media/
  *
  *   ?   → opens help overlay
  *   Esc → closes any open slide-over (already handled in ConsoleSlideOver;
@@ -44,6 +51,13 @@ const BINDINGS: Binding[] = [
   { key: 'k', path: 'api',         labelKey: 'kb_nav_api'         },
   { key: 'h', path: 'health',      labelKey: 'kb_nav_health'      },
   { key: 'e', path: 'errors',      labelKey: 'kb_nav_errors'      },
+  { key: 'n', path: 'anomalies',       labelKey: 'kb_nav_anomalies'       },
+  { key: 'f', path: 'forensics',       labelKey: 'kb_nav_forensics'       },
+  { key: 'w', path: 'webhooks',        labelKey: 'kb_nav_webhooks'        },
+  { key: 'p', path: 'proposals',       labelKey: 'kb_nav_proposals'       },
+  { key: 'd', path: 'badges',          labelKey: 'kb_nav_badges'          },
+  { key: 'i', path: 'identifications', labelKey: 'kb_nav_identifications' },
+  { key: 'm', path: 'media',           labelKey: 'kb_nav_media'           },
 ];
 
 function isInTextInput(el: Element | null): boolean {
