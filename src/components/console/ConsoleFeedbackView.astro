@@ -1,0 +1,157 @@
+---
+/**
+ * ConsoleFeedbackView — admin dashboard for viewing user feedback
+ * collected via micro-surveys. Read-only, no PII beyond optional username.
+ */
+import { t, type Locale } from '../../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+const { lang } = Astro.props;
+const tr = t(lang);
+
+const labels = {
+  en: {
+    title: 'User Feedback',
+    subtitle: 'Responses from micro-surveys and journey guides',
+    noData: 'No feedback responses yet. Feedback is collected after users complete journey guides and key actions.',
+    totalResponses: 'Total responses',
+    surveyBreakdown: 'By survey',
+    recentResponses: 'Recent responses',
+    exportCsv: 'Export CSV',
+    surveyId: 'Survey',
+    response: 'Response',
+    page: 'Page',
+    date: 'Date',
+    loading: 'Loading feedback data...',
+  },
+  es: {
+    title: 'Retroalimentación de usuarios',
+    subtitle: 'Respuestas de micro-encuestas y guías de journey',
+    noData: 'Aún no hay respuestas de retroalimentación. Se recopilan después de que los usuarios completan guías y acciones clave.',
+    totalResponses: 'Total de respuestas',
+    surveyBreakdown: 'Por encuesta',
+    recentResponses: 'Respuestas recientes',
+    exportCsv: 'Exportar CSV',
+    surveyId: 'Encuesta',
+    response: 'Respuesta',
+    page: 'Página',
+    date: 'Fecha',
+    loading: 'Cargando datos de retroalimentación...',
+  },
+};
+const l = labels[lang] ?? labels.en;
+---
+
+<div class="space-y-6">
+  <div>
+    <h1 class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{l.title}</h1>
+    <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-1">{l.subtitle}</p>
+  </div>
+
+  <!-- Summary cards -->
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <div class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
+      <p class="text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">{l.totalResponses}</p>
+      <p id="fb-total" class="text-3xl font-bold text-zinc-900 dark:text-zinc-100 mt-1">—</p>
+    </div>
+    <div class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 col-span-2">
+      <p class="text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-2">{l.surveyBreakdown}</p>
+      <div id="fb-breakdown" class="flex flex-wrap gap-2">
+        <span class="text-sm text-zinc-400">{l.loading}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent responses table -->
+  <div class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden">
+    <div class="flex items-center justify-between px-4 py-3 border-b border-zinc-200 dark:border-zinc-800">
+      <h2 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{l.recentResponses}</h2>
+      <button id="fb-export" type="button" class="text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 font-medium">{l.exportCsv}</button>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-zinc-100 dark:border-zinc-800 text-left">
+            <th class="px-4 py-2 text-xs font-medium text-zinc-500 dark:text-zinc-400">{l.surveyId}</th>
+            <th class="px-4 py-2 text-xs font-medium text-zinc-500 dark:text-zinc-400">{l.response}</th>
+            <th class="px-4 py-2 text-xs font-medium text-zinc-500 dark:text-zinc-400">{l.page}</th>
+            <th class="px-4 py-2 text-xs font-medium text-zinc-500 dark:text-zinc-400">{l.date}</th>
+          </tr>
+        </thead>
+        <tbody id="fb-table-body">
+          <tr>
+            <td colspan="4" class="px-4 py-8 text-center text-zinc-400">{l.noData}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Load feedback from localStorage (admin-only view; in production this
+  // would query the feedback_responses table via Supabase).
+  function loadFeedback() {
+    try {
+      const key = 'rastrum.feedback.responses';
+      const all = JSON.parse(localStorage.getItem(key) ?? '[]');
+
+      const totalEl = document.getElementById('fb-total');
+      const breakdownEl = document.getElementById('fb-breakdown');
+      const tableBody = document.getElementById('fb-table-body');
+
+      if (totalEl) totalEl.textContent = String(all.length);
+
+      // Breakdown by survey
+      if (breakdownEl && all.length > 0) {
+        const counts: Record<string, number> = {};
+        for (const r of all) {
+          counts[r.surveyId] = (counts[r.surveyId] ?? 0) + 1;
+        }
+        breakdownEl.innerHTML = Object.entries(counts)
+          .map(([id, count]) =>
+            `<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 text-xs">
+              <span class="font-medium">${id.replace('survey-', '')}</span>
+              <span class="text-zinc-500">${count}</span>
+            </span>`
+          ).join('');
+      }
+
+      // Table rows
+      if (tableBody && all.length > 0) {
+        const recent = all.slice(-20).reverse();
+        tableBody.innerHTML = recent.map((r: { surveyId: string; response: Record<string, unknown>; pagePath: string; createdAt: string }) =>
+          `<tr class="border-b border-zinc-50 dark:border-zinc-800/50">
+            <td class="px-4 py-2 text-zinc-700 dark:text-zinc-300">${r.surveyId.replace('survey-', '')}</td>
+            <td class="px-4 py-2 text-zinc-700 dark:text-zinc-300">${JSON.stringify(r.response)}</td>
+            <td class="px-4 py-2 text-zinc-500 dark:text-zinc-400 text-xs">${r.pagePath}</td>
+            <td class="px-4 py-2 text-zinc-500 dark:text-zinc-400 text-xs">${new Date(r.createdAt).toLocaleDateString()}</td>
+          </tr>`
+        ).join('');
+      }
+    } catch { /* noop */ }
+  }
+
+  // CSV export
+  document.getElementById('fb-export')?.addEventListener('click', () => {
+    try {
+      const all = JSON.parse(localStorage.getItem('rastrum.feedback.responses') ?? '[]');
+      if (all.length === 0) return;
+      const header = 'surveyId,response,pagePath,createdAt\n';
+      const rows = all.map((r: { surveyId: string; response: Record<string, unknown>; pagePath: string; createdAt: string }) =>
+        `"${r.surveyId}","${JSON.stringify(r.response).replace(/"/g, '""')}","${r.pagePath}","${r.createdAt}"`
+      ).join('\n');
+      const blob = new Blob([header + rows], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `rastrum-feedback-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch { /* noop */ }
+  });
+
+  loadFeedback();
+</script>

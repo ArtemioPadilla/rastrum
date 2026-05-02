@@ -1,0 +1,102 @@
+---
+/**
+ * JourneyGuideLoader — mounts in BaseLayout, checks the journey guide
+ * registry on page load, and auto-starts the matching guide if the user
+ * hasn't seen it yet.
+ *
+ * Also listens for `rastrum:replay-guide` events to replay a specific guide.
+ */
+import JourneySpotlight from './JourneySpotlight.astro';
+import JourneyReplayButton from './JourneyReplayButton.astro';
+import MicroSurvey from './MicroSurvey.astro';
+import { t, type Locale } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+  currentPath: string;
+}
+const { lang, currentPath } = Astro.props;
+const tr = t(lang);
+---
+
+<JourneySpotlight lang={lang} />
+<JourneyReplayButton lang={lang} currentPath={currentPath} />
+<MicroSurvey lang={lang} />
+
+<script define:vars={{ lang, currentPath }}>
+  // Dynamic import to keep the guide registry tree-shakeable in pages
+  // that don't need it. The import resolves at runtime in the browser.
+  async function initGuides() {
+    const { findGuideForRoute, isGuideSeen } = await import('../lib/journey-guides');
+    const guide = findGuideForRoute(currentPath);
+    if (!guide || guide.activation !== 'first-visit' || isGuideSeen(guide)) return;
+
+    // Resolve i18n step titles/bodies from the translation tree
+    const { t: getT } = await import('../i18n/utils');
+    const tr = getT(lang);
+
+    function resolveKey(key) {
+      const parts = key.split('.');
+      let val = tr;
+      for (const p of parts) {
+        if (val && typeof val === 'object' && p in val) val = val[p];
+        else return key;
+      }
+      return typeof val === 'string' ? val : key;
+    }
+
+    const steps = guide.steps.map(s => ({
+      target: s.target,
+      title: resolveKey(s.titleKey),
+      body: resolveKey(s.bodyKey),
+    }));
+
+    // Delay slightly so the page finishes rendering and target elements exist
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('rastrum:journey-guide-start', {
+        detail: { guideId: guide.id, steps },
+      }));
+    }, 1500);
+  }
+
+  // Replay handler — dispatched by JourneyReplayButton or any other UI
+  window.addEventListener('rastrum:replay-guide', async (ev) => {
+    const { guideId } = (ev).detail ?? {};
+    if (!guideId) return;
+
+    const { journeyGuides, resetGuide } = await import('../lib/journey-guides');
+    const guide = journeyGuides.find(g => g.id === guideId);
+    if (!guide) return;
+
+    resetGuide(guide);
+
+    const { t: getT } = await import('../i18n/utils');
+    const tr = getT(lang);
+
+    function resolveKey(key) {
+      const parts = key.split('.');
+      let val = tr;
+      for (const p of parts) {
+        if (val && typeof val === 'object' && p in val) val = val[p];
+        else return key;
+      }
+      return typeof val === 'string' ? val : key;
+    }
+
+    const steps = guide.steps.map(s => ({
+      target: s.target,
+      title: resolveKey(s.titleKey),
+      body: resolveKey(s.bodyKey),
+    }));
+
+    window.dispatchEvent(new CustomEvent('rastrum:journey-guide-start', {
+      detail: { guideId: guide.id, steps },
+    }));
+  });
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => initGuides());
+  } else {
+    initGuides();
+  }
+</script>

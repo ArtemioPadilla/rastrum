@@ -14,6 +14,15 @@ module.exports = {
         'http://localhost/en/docs/vision/index.html',
         'http://localhost/en/identify/index.html',
         'http://localhost/en/observe/index.html',
+        // Journey persona landing pages
+        'http://localhost/en/explore/index.html',
+        'http://localhost/en/explore/map/index.html',
+        'http://localhost/en/explore/recent/index.html',
+        'http://localhost/en/community/observers/index.html',
+        'http://localhost/en/chat/index.html',
+        'http://localhost/en/docs/roadmap/index.html',
+        'http://localhost/es/observar/index.html',
+        'http://localhost/es/explorar/index.html',
       ],
       numberOfRuns: process.env.LHCI_RUNS ? Number(process.env.LHCI_RUNS) : 1,
       settings: {

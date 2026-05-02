@@ -51,6 +51,7 @@ export const CONSOLE_TABS: ConsoleTab[] = [
   { id: 'watchlists',     role: 'admin',     routeKey: 'consoleWatchlists',       i18nKey: 'console.watchlists',      icon: 'eye',          phase: 1 },
   { id: 'projects',       role: 'admin',     routeKey: 'consoleProjects',         i18nKey: 'console.projects',        icon: 'map',          phase: 1 },
   { id: 'taxon-changes',  role: 'admin',     routeKey: 'consoleTaxonChanges',     i18nKey: 'console.taxonChanges',    icon: 'history',      phase: 1 },
+  { id: 'feedback',       role: 'admin',     routeKey: 'consoleFeedback',         i18nKey: 'console.feedback',        icon: 'message-circle', phase: 1 },
   // Moderator (5)
   { id: 'mod-overview',   role: 'moderator', routeKey: 'console',                 i18nKey: 'console.modOverview',   icon: 'gauge',      phase: 3 },
   { id: 'mod-flag-queue', role: 'moderator', routeKey: 'consoleModFlagQueue',     i18nKey: 'console.modFlagQueue',  icon: 'flag',       phase: 3 },
