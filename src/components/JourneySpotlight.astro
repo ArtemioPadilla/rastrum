@@ -107,7 +107,12 @@ const l = labels[lang] ?? labels.en;
     }
 
     function positionTooltip(targetEl: Element | null): void {
-      if (!targetEl) {
+      // Treat zero-size rects (hidden/display:none elements) same as null —
+      // element exists in DOM but is not visible, so we can't point to it.
+      const base = targetEl?.getBoundingClientRect();
+      const isVisible = base && (base.width > 0 || base.height > 0);
+
+      if (!targetEl || !isVisible) {
         tooltip.style.left = '50%';
         tooltip.style.top = '50%';
         tooltip.style.transform = 'translate(-50%, -50%)';
@@ -117,8 +122,7 @@ const l = labels[lang] ?? labels.en;
       }
 
       const PAD = 8;
-      const base = targetEl.getBoundingClientRect();
-      const tr = new DOMRect(base.left - PAD, base.top - PAD, base.width + PAD * 2, base.height + PAD * 2);
+      const tr = new DOMRect(base!.left - PAD, base!.top - PAD, base!.width + PAD * 2, base!.height + PAD * 2);
       const vw = window.innerWidth;
       const vh = window.innerHeight;
 
