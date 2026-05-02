@@ -172,7 +172,7 @@ const proj = (tr as unknown as { projects: Record<string, string> }).projects;
 
   // ── M31: camera stations ─────────────────────────────────────────
   async function initStations(projectId: string, ownerUserId: string) {
-    const { listProjectStations, createStation, trapNights, isValidStationKey } = await import('../lib/camera-stations');
+    const { listProjectStations, createStation, trapNights, isValidStationKey, listStationPeriods, createPeriod, closePeriod } = await import('../lib/camera-stations');
     const { getSupabase } = await import('../lib/supabase');
     const sb = getSupabase();
     const { data: { session } } = await sb.auth.getSession();
@@ -211,32 +211,228 @@ const proj = (tr as unknown as { projects: Record<string, string> }).projects;
         return;
       }
       empty?.classList.add('hidden');
+      // i18n labels for periods
+      const i18nPeriods = {
+        heading:       lang === 'es' ? 'Periodos activos'                                              : 'Active periods',
+        active:        lang === 'es' ? 'Activo'                                                        : 'Active',
+        closed:        lang === 'es' ? 'Cerrado'                                                       : 'Closed',
+        start:         lang === 'es' ? 'Fecha de inicio'                                               : 'Start date',
+        end:           lang === 'es' ? 'Fecha de fin'                                                  : 'End date',
+        notes:         lang === 'es' ? 'Notas'                                                         : 'Notes',
+        closeBtn:      lang === 'es' ? 'Cerrar periodo'                                                : 'Close period',
+        closeConfirm:  lang === 'es' ? '¿Cerrar este periodo? La fecha de fin se establecerá a hoy.'   : 'Close this period? End date will be set to today.',
+        openBtn:       lang === 'es' ? 'Abrir nuevo periodo'                                           : 'Open new period',
+        openSuccess:   lang === 'es' ? 'Periodo abierto.'                                              : 'Period opened.',
+        closeSuccess:  lang === 'es' ? 'Periodo cerrado.'                                              : 'Period closed.',
+        noPeriods:     lang === 'es' ? 'Aún no hay periodos registrados.'                              : 'No periods recorded yet.',
+        openFailed:    lang === 'es' ? 'No se pudo abrir el periodo.'                                  : 'Could not open the period.',
+        closeFailed:   lang === 'es' ? 'No se pudo cerrar el periodo.'                                 : 'Could not close the period.',
+        trapNights:    lang === 'es' ? 'noches-trampa'                                                 : 'trap-nights',
+      };
+
       // Render skeleton; trap-night counts fetched async per row.
       list.innerHTML = rows.map((r) => {
         const label = (lang === 'es' && r.name_es) ? r.name_es : r.name;
         return `
-          <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3 flex items-center gap-3 flex-wrap" data-station-id="${r.id}">
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-2">
-                <span class="text-sm font-mono text-zinc-700 dark:text-zinc-300">${escapeHtml(r.station_key)}</span>
-                <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">${escapeHtml(label)}</span>
+          <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900" data-station-id="${r.id}">
+            <div class="p-3 flex items-center gap-3 flex-wrap">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-mono text-zinc-700 dark:text-zinc-300">${escapeHtml(r.station_key)}</span>
+                  <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">${escapeHtml(label)}</span>
+                </div>
+                <div class="text-[11px] text-zinc-500 dark:text-zinc-400">
+                  ${r.habitat ? escapeHtml(r.habitat) + ' · ' : ''}${r.camera_model ? escapeHtml(r.camera_model) : ''}
+                </div>
               </div>
-              <div class="text-[11px] text-zinc-500 dark:text-zinc-400">
-                ${r.habitat ? escapeHtml(r.habitat) + ' · ' : ''}${r.camera_model ? escapeHtml(r.camera_model) : ''}
+              <div class="text-xs text-zinc-600 dark:text-zinc-400 font-mono">
+                <span data-station-trapn>—</span> ${escapeHtml(i18nPeriods.trapNights)}
               </div>
             </div>
-            <div class="text-xs text-zinc-600 dark:text-zinc-400 font-mono">
-              <span data-station-trapn>—</span> ${escapeHtml(lang === 'es' ? 'noches-trampa' : 'trap-nights')}
-            </div>
+            <details class="border-t border-zinc-200 dark:border-zinc-800">
+              <summary class="cursor-pointer px-3 py-2 text-xs font-semibold text-zinc-600 dark:text-zinc-400 select-none">
+                ${escapeHtml(i18nPeriods.heading)}
+              </summary>
+              <div class="px-3 pb-3 space-y-2" data-periods-container="${r.id}">
+                <p class="text-xs text-zinc-500 dark:text-zinc-400">${escapeHtml(lang === 'es' ? 'Cargando…' : 'Loading…')}</p>
+              </div>
+            </details>
           </div>
         `;
       }).join('');
+
       // Fetch trap-night counts in parallel.
       for (const r of rows) {
         trapNights(r.id).then((n) => {
           const cell = list.querySelector(`[data-station-id="${r.id}"] [data-station-trapn]`);
           if (cell) cell.textContent = String(n);
         });
+      }
+
+      // Load periods on details open (lazy).
+      list.querySelectorAll('details').forEach((det) => {
+        let loaded = false;
+        det.addEventListener('toggle', () => {
+          if (!det.open || loaded) return;
+          loaded = true;
+          const container = det.querySelector('[data-periods-container]') as HTMLElement | null;
+          if (!container) return;
+          const stationId = container.dataset.periodsContainer ?? '';
+          void loadPeriods(stationId, container);
+        });
+      });
+
+      async function loadPeriods(stationId: string, container: HTMLElement) {
+        let periods: Awaited<ReturnType<typeof listStationPeriods>>;
+        try {
+          periods = await listStationPeriods(stationId);
+        } catch {
+          container.innerHTML = `<p class="text-xs text-rose-600 dark:text-rose-400">—</p>`;
+          return;
+        }
+        renderPeriods(stationId, container, periods);
+      }
+
+      function renderPeriods(stationId: string, container: HTMLElement, periods: Awaited<ReturnType<typeof listStationPeriods>>) {
+        const today = new Date().toISOString().slice(0, 10);
+        let html = '';
+
+        if (periods.length === 0) {
+          html += `<p class="text-xs text-zinc-500 dark:text-zinc-400">${escapeHtml(i18nPeriods.noPeriods)}</p>`;
+        } else {
+          html += `<ul class="space-y-1.5">`;
+          for (const p of periods) {
+            const isActive = p.end_date === null;
+            const badge = isActive
+              ? `<span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">${escapeHtml(i18nPeriods.active)}</span>`
+              : `<span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">${escapeHtml(i18nPeriods.closed)}</span>`;
+            const endLabel = p.end_date ?? '—';
+            const notesLine = p.notes ? `<div class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">${escapeHtml(p.notes)}</div>` : '';
+            const closeBtn = (isActive && isOwner)
+              ? `<button type="button" data-close-period="${p.id}" class="ml-auto text-[11px] text-rose-600 dark:text-rose-400 hover:underline">${escapeHtml(i18nPeriods.closeBtn)}</button>`
+              : '';
+            html += `
+              <li class="flex items-start gap-2 flex-wrap text-xs text-zinc-700 dark:text-zinc-300">
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2">
+                    ${badge}
+                    <span class="font-mono">${escapeHtml(p.start_date)}</span>
+                    <span class="text-zinc-400">→</span>
+                    <span class="font-mono">${escapeHtml(endLabel)}</span>
+                  </div>
+                  ${notesLine}
+                </div>
+                ${closeBtn}
+              </li>`;
+          }
+          html += `</ul>`;
+        }
+
+        // "Open new period" button (owner only)
+        if (isOwner) {
+          html += `
+            <button type="button" data-open-period-btn="${stationId}" class="mt-2 inline-flex items-center rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white px-2.5 py-1 text-[11px] font-semibold min-h-[28px]">
+              ${escapeHtml(i18nPeriods.openBtn)}
+            </button>
+            <form data-open-period-form="${stationId}" class="hidden mt-2 space-y-2 border-t border-zinc-200 dark:border-zinc-800 pt-2">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-[11px] font-medium text-zinc-700 dark:text-zinc-300">${escapeHtml(i18nPeriods.start)}</label>
+                  <input type="date" name="start_date" required value="${today}"
+                    class="mt-0.5 block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-2 py-1 text-xs font-mono" />
+                </div>
+                <div>
+                  <label class="block text-[11px] font-medium text-zinc-700 dark:text-zinc-300">${escapeHtml(i18nPeriods.notes)}</label>
+                  <input type="text" name="notes" maxlength="4000" placeholder=""
+                    class="mt-0.5 block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-2 py-1 text-xs" />
+                </div>
+              </div>
+              <p data-period-form-error class="hidden text-[11px] text-rose-600 dark:text-rose-400"></p>
+              <div class="flex items-center justify-end gap-2">
+                <button type="button" data-open-period-cancel="${stationId}" class="rounded-lg px-2 py-1 text-[11px] text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800">${escapeHtml(lang === 'es' ? 'Cancelar' : 'Cancel')}</button>
+                <button type="submit" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-2 py-1 text-[11px] font-semibold text-white min-h-[28px]">${escapeHtml(lang === 'es' ? 'Guardar' : 'Save')}</button>
+              </div>
+            </form>`;
+        }
+
+        html += `<p data-period-status="${stationId}" class="hidden text-[11px] mt-1"></p>`;
+        container.innerHTML = html;
+
+        // Wire close-period buttons
+        container.querySelectorAll<HTMLButtonElement>('[data-close-period]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const periodId = btn.dataset.closePeriod ?? '';
+            void handleClosePeriod(periodId, stationId, container);
+          });
+        });
+
+        // Wire open-period button + form
+        const openBtn = container.querySelector<HTMLButtonElement>(`[data-open-period-btn="${stationId}"]`);
+        const openForm = container.querySelector<HTMLFormElement>(`[data-open-period-form="${stationId}"]`);
+        const periodCancelBtn = container.querySelector<HTMLButtonElement>(`[data-open-period-cancel="${stationId}"]`);
+
+        openBtn?.addEventListener('click', () => openForm?.classList.remove('hidden'));
+        periodCancelBtn?.addEventListener('click', () => {
+          openForm?.classList.add('hidden');
+          openForm?.reset();
+        });
+
+        openForm?.addEventListener('submit', (ev) => {
+          ev.preventDefault();
+          const fd = new FormData(openForm);
+          const start_date = String(fd.get('start_date') ?? '').trim();
+          const notes = String(fd.get('notes') ?? '').trim() || null;
+          if (!start_date) return;
+          void handleOpenPeriod(stationId, start_date, notes, container, openForm);
+        });
+      }
+
+      async function handleClosePeriod(periodId: string, stationId: string, container: HTMLElement) {
+        if (!confirm(i18nPeriods.closeConfirm)) return;
+        const today = new Date().toISOString().slice(0, 10);
+        const statusEl = container.querySelector<HTMLElement>(`[data-period-status="${stationId}"]`);
+        try {
+          await closePeriod(periodId, today);
+          showPeriodStatus(statusEl, i18nPeriods.closeSuccess, false);
+          const periods = await listStationPeriods(stationId);
+          renderPeriods(stationId, container, periods);
+          // Refresh trap-night count for this station
+          const stationCard = list?.querySelector(`[data-station-id="${stationId}"]`);
+          const trapnEl = stationCard?.querySelector('[data-station-trapn]');
+          if (trapnEl) {
+            trapNights(stationId).then((n) => { trapnEl.textContent = String(n); });
+          }
+        } catch {
+          showPeriodStatus(statusEl, i18nPeriods.closeFailed, true);
+        }
+      }
+
+      async function handleOpenPeriod(stationId: string, start_date: string, notes: string | null, container: HTMLElement, form: HTMLFormElement) {
+        const statusEl = container.querySelector<HTMLElement>(`[data-period-status="${stationId}"]`);
+        try {
+          await createPeriod({ station_id: stationId, start_date, notes });
+          form.reset();
+          form.classList.add('hidden');
+          showPeriodStatus(statusEl, i18nPeriods.openSuccess, false);
+          const periods = await listStationPeriods(stationId);
+          renderPeriods(stationId, container, periods);
+          // Refresh trap-night count for this station
+          const stationCard = list?.querySelector(`[data-station-id="${stationId}"]`);
+          const trapnEl = stationCard?.querySelector('[data-station-trapn]');
+          if (trapnEl) {
+            trapNights(stationId).then((n) => { trapnEl.textContent = String(n); });
+          }
+        } catch {
+          showPeriodStatus(statusEl, i18nPeriods.openFailed, true);
+        }
+      }
+
+      function showPeriodStatus(el: HTMLElement | null | undefined, msg: string, isError: boolean) {
+        if (!el) return;
+        el.textContent = msg;
+        el.className = `text-[11px] mt-1 ${isError ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-400'}`;
+        el.classList.remove('hidden');
+        setTimeout(() => el.classList.add('hidden'), 4000);
       }
     }
     await refresh();
