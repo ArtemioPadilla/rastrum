@@ -71,6 +71,17 @@ type IdentifyRequest = {
    * parallel race). Values: 'plantnet' | 'claude_haiku'.
    */
   force_provider?: 'plantnet' | 'claude_haiku';
+  /**
+   * When true, run ALL available server-side runners in parallel (mirrors
+   * the client-side cascade from `src/lib/identifiers/cascade.ts`).
+   * Default false — existing behaviour unchanged.
+   */
+  cascade?: boolean;
+  /** Provider ids to exclude from the cascade (e.g. ['plantnet']). */
+  excluded_providers?: string[];
+  /** Provider ids to run first, in declared order. Others follow in
+   *  default order after the preferred set. */
+  preferred_providers?: string[];
 };
 
 type IDResult = {
@@ -82,6 +93,12 @@ type IDResult = {
   confidence: number;
   source: 'plantnet' | 'claude_haiku';
   raw: unknown;
+};
+
+type CascadeAttempt = {
+  provider: string;
+  confidence: number | null;
+  error?: string;
 };
 
 const CONFIDENCE_THRESHOLD = 0.7;
@@ -259,6 +276,7 @@ type ServerRunner = (signal: AbortSignal) => Promise<IDResult | null>;
 interface RunCascadeResult {
   result: IDResult | null;
   errors: Record<string, string>;
+  attempts: CascadeAttempt[];
 }
 
 /**
@@ -277,13 +295,14 @@ async function runServerCascade(
   timeoutMs = RACE_TIMEOUT_MS,
 ): Promise<RunCascadeResult> {
   const entries = Object.entries(runners);
-  if (entries.length === 0) return { result: null, errors: { _: 'no runners' } };
+  if (entries.length === 0) return { result: null, errors: { _: 'no runners' }, attempts: [] };
 
   const ctrl = new AbortController();
   const timeoutId = setTimeout(() => ctrl.abort(), timeoutMs);
 
   const collected: Array<{ id: string; result: IDResult }> = [];
   const errors: Record<string, string> = {};
+  const attempts: CascadeAttempt[] = [];
   let winner: { id: string; result: IDResult } | null = null;
 
   const promises = entries.map(([id, runner]) =>
@@ -291,14 +310,21 @@ async function runServerCascade(
       .then((r) => {
         if (r && r.confidence >= threshold && !winner) {
           winner = { id, result: r };
+          attempts.push({ provider: id, confidence: r.confidence });
           ctrl.abort();
         } else if (r) {
           collected.push({ id, result: r });
+          attempts.push({ provider: id, confidence: r.confidence });
+        } else {
+          attempts.push({ provider: id, confidence: null });
         }
       })
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : String(err);
-        if (!msg.includes('aborted')) errors[id] = msg;
+        if (!msg.includes('aborted')) {
+          errors[id] = msg;
+          attempts.push({ provider: id, confidence: null, error: msg });
+        }
       }),
   );
 
@@ -308,12 +334,12 @@ async function runServerCascade(
     clearTimeout(timeoutId);
   }
 
-  if (winner) return { result: (winner as { id: string; result: IDResult }).result, errors };
+  if (winner) return { result: (winner as { id: string; result: IDResult }).result, errors, attempts };
   if (collected.length > 0) {
     collected.sort((a, b) => b.result.confidence - a.result.confidence);
-    return { result: collected[0].result, errors };
+    return { result: collected[0].result, errors, attempts };
   }
-  return { result: null, errors };
+  return { result: null, errors, attempts };
 }
 
 // ─────────────── HTTP handler ───────────────
@@ -321,7 +347,7 @@ async function runServerCascade(
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info, x-rastrum-build',
+  'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info, x-rastrum-build, x-rastrum-cascade',
   'Access-Control-Max-Age': '86400',
 };
 
@@ -493,6 +519,7 @@ serve(async (req) => {
   }
 
   let result: IDResult | null = null;
+  let cascadeAttempts: CascadeAttempt[] | null = null;
 
   if (body.force_provider === 'plantnet') {
     result = await callPlantNet(imageBytes, byoPlantnet);
@@ -503,6 +530,52 @@ serve(async (req) => {
       credential: claudeCred ?? undefined,
       resolvedCredential: resolvedClaudeCred ?? undefined,
     });
+  } else if (body.cascade) {
+    // Cascade mode: build the runners map dynamically based on user_hint,
+    // apply excluded_providers filter, then preferred_providers ordering.
+    // Mirrors the client-side cascade from src/lib/identifiers/cascade.ts.
+    const allRunners: Record<string, ServerRunner> = {};
+    const isPlantLike = body.user_hint === 'plant' || body.user_hint === 'fungi' || body.user_hint === 'unknown' || !body.user_hint;
+    if (isPlantLike) {
+      allRunners.plantnet = (signal) => callPlantNet(imageBytes, byoPlantnet, signal);
+    }
+    if (claudeCred) {
+      allRunners.claude_haiku = (signal) => callClaudeHaiku(imageBytes, mimeType, {
+        lat: body.location?.lat,
+        lng: body.location?.lng,
+        credential: claudeCred ?? undefined,
+        resolvedCredential: resolvedClaudeCred ?? undefined,
+        signal,
+      });
+    }
+    allRunners.onnx_base = (signal) => callOnnxBase(imageBytes, signal);
+    // Future: add new server-side plugins here.
+
+    // Apply excluded_providers filter.
+    const excluded = new Set(body.excluded_providers ?? []);
+    for (const id of excluded) {
+      delete allRunners[id];
+    }
+
+    // Apply preferred_providers ordering: preferred first (in declared
+    // order), then remaining runners in their default insertion order.
+    const preferred = body.preferred_providers ?? [];
+    const orderedRunners: Record<string, ServerRunner> = {};
+    for (const id of preferred) {
+      if (allRunners[id]) {
+        orderedRunners[id] = allRunners[id];
+      }
+    }
+    const preferredSet = new Set(preferred);
+    for (const [id, runner] of Object.entries(allRunners)) {
+      if (!preferredSet.has(id)) {
+        orderedRunners[id] = runner;
+      }
+    }
+
+    const cascaded = await runServerCascade(orderedRunners);
+    result = cascaded.result;
+    cascadeAttempts = cascaded.attempts;
   } else {
     // Default: race PlantNet, Claude Haiku, and (placeholder) ONNX-base in
     // parallel. The first to return confidence ≥ threshold wins; the rest
@@ -552,14 +625,18 @@ serve(async (req) => {
 
   if (!result) {
     const hasAnyClaudeCred = !!claudeCred;
-    return corsResponse(JSON.stringify({
+    const errorPayload: Record<string, unknown> = {
       error: hasAnyClaudeCred ? 'identification_failed' : 'no_id_engine_available',
       hint: hasAnyClaudeCred
         ? 'PlantNet returned nothing and Claude failed to parse the response.'
         : sponsorshipSkipReason
           ? `Claude skipped (${sponsorshipSkipReason}). Supply a BYO key, accept a sponsorship, or wait for the rate-limit window to reset.`
           : 'No Claude credential available. Supply a BYO key (client_keys.anthropic) or accept a sponsorship; the operator no longer provides a fallback key.',
-    }), {
+    };
+    if (cascadeAttempts) {
+      errorPayload.cascade_attempts = cascadeAttempts;
+    }
+    return corsResponse(JSON.stringify(errorPayload), {
       status: 200,
       headers: { 'content-type': 'application/json' },
     });
@@ -578,7 +655,12 @@ serve(async (req) => {
     }
   }
 
-  return corsResponse(JSON.stringify(result), {
+  const responsePayload: Record<string, unknown> = { ...result };
+  if (cascadeAttempts) {
+    responsePayload.cascade_attempts = cascadeAttempts;
+  }
+
+  return corsResponse(JSON.stringify(responsePayload), {
     headers: { 'content-type': 'application/json' },
   });
 });
