@@ -25,7 +25,7 @@ test.describe('J2: Observer first observation journey', () => {
 
   test('observe page renders form elements', async ({ authedPage: page }) => {
     await page.goto('/en/observe/');
-    await expect(page.locator('main')).toBeVisible();
+    await expect(page.locator('main').first()).toBeVisible();
 
     // The observation form should have key elements
     // DropZone or file input for photos
@@ -35,48 +35,48 @@ test.describe('J2: Observer first observation journey', () => {
 
   test('observe page ES route works', async ({ authedPage: page }) => {
     await page.goto('/es/observar/');
-    await expect(page.locator('main')).toBeVisible();
+    await expect(page.locator('main').first()).toBeVisible();
   });
 
   test('profile page renders for authenticated user', async ({ authedPage: page }) => {
     await page.goto('/en/profile/');
-    await expect(page.locator('main')).toBeVisible();
+    await expect(page.locator('main').first()).toBeVisible();
   });
 
   test('profile observations page renders', async ({ authedPage: page }) => {
     await page.goto('/en/profile/observations/');
-    await expect(page.locator('main')).toBeVisible();
+    await expect(page.locator('main').first()).toBeVisible();
   });
 
   test('profile settings page renders', async ({ authedPage: page }) => {
     await page.goto('/en/profile/settings/');
-    await expect(page.locator('main')).toBeVisible();
+    await expect(page.locator('main').first()).toBeVisible();
   });
 
   test('explore recent page renders', async ({ authedPage: page }) => {
     await page.goto('/en/explore/recent/');
-    await expect(page.locator('main')).toBeVisible();
+    await expect(page.locator('main').first()).toBeVisible();
   });
 
   test('full journey: home → onboarding → observe → profile', async ({ authedPage: page }) => {
     // Start at home
     await page.goto('/en/');
-    await expect(page.locator('main')).toBeVisible();
+    await expect(page.locator('main').first()).toBeVisible();
 
     // Navigate to observe
     await page.goto('/en/observe/');
-    await expect(page.locator('main')).toBeVisible();
+    await expect(page.locator('main').first()).toBeVisible();
 
     // Navigate to profile
     await page.goto('/en/profile/');
-    await expect(page.locator('main')).toBeVisible();
+    await expect(page.locator('main').first()).toBeVisible();
 
     // Navigate to observations list
     await page.goto('/en/profile/observations/');
-    await expect(page.locator('main')).toBeVisible();
+    await expect(page.locator('main').first()).toBeVisible();
 
     // Navigate to explore
     await page.goto('/en/explore/recent/');
-    await expect(page.locator('main')).toBeVisible();
+    await expect(page.locator('main').first()).toBeVisible();
   });
 });
