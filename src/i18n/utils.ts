@@ -162,6 +162,7 @@ export const routeTree: Record<string, RouteNode> = {
   // Community discovery (M28)
   community:          { labels: { en: 'Community',  es: 'Comunidad' } },
   communityObservers: { labels: { en: 'Observers',  es: 'Observadores' }, parent: 'community' },
+  communityMap:       { labels: { en: 'Map',         es: 'Mapa' },             parent: 'community' },
   about:       { labels: { en: 'About',         es: 'Acerca' } },
   docs:        { labels: { en: 'Docs',          es: 'Docs' } },
   signIn:      { labels: { en: 'Sign in',       es: 'Ingresar' } },
