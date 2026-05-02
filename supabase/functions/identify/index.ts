@@ -550,6 +550,30 @@ serve(async (req) => {
     }
   }
 
+  // Pool call sponsor drip: award 0.5 karma to the pool's sponsor each
+  // time a beneficiary successfully uses a pool-funded identification.
+  if (result && poolUsed) {
+    try {
+      const { data: poolRow, error: poolLookupErr } = await db()
+        .from('sponsor_pools')
+        .select('sponsor_id')
+        .eq('id', poolUsed.poolId)
+        .single();
+      if (poolLookupErr) {
+        console.warn(`[identify] pool sponsor lookup failed: ${poolLookupErr.message}`);
+      } else if (poolRow) {
+        const sponsorId = (poolRow as { sponsor_id: string }).sponsor_id;
+        await db().rpc('add_karma_simple', {
+          p_user_id: sponsorId,
+          p_delta: 0.5,
+          p_reason: 'pool_call_sponsor_drip',
+        });
+      }
+    } catch (err) {
+      console.warn(`[identify] pool sponsor karma drip failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
   if (!result) {
     const hasAnyClaudeCred = !!claudeCred;
     return corsResponse(JSON.stringify({
