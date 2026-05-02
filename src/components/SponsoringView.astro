@@ -1,5 +1,6 @@
 ---
 import { t } from '../i18n/utils';
+import { MODEL_COSTS, formatCostBadge } from '../lib/model-costs';
 interface Props { lang: 'en' | 'es' }
 const { lang } = Astro.props;
 const tr = t(lang);
@@ -26,6 +27,8 @@ const i18nBag = {
     other:              tr.sponsoring.paused_reason_other,
   },
 };
+const modelCostsJson = JSON.stringify(MODEL_COSTS);
+const langJson = JSON.stringify(lang);
 ---
 
 <section class="max-w-4xl mx-auto p-6 space-y-10">
@@ -102,6 +105,7 @@ const i18nBag = {
       <div>
         <label class="block text-sm font-medium" for="pool-model-input">{lang === 'es' ? 'Modelo' : 'Model'}</label>
         <input id="pool-model-input" type="text" required value="claude-haiku-4-5" class="mt-1 block w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-mono bg-white dark:bg-zinc-900" />
+        <div id="pool-model-cost" class="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400"></div>
       </div>
       <div>
         <label class="block text-sm font-medium" for="pool-daily-input">{lang === 'es' ? 'Cap diario por usuario' : 'Daily cap per user'}</label>
@@ -214,6 +218,7 @@ const i18nBag = {
         <label class="block text-sm font-medium" for="cred-model-input">{lang === 'es' ? 'Modelo preferido' : 'Preferred model'}</label>
         <input id="cred-model-input" name="preferred_model" type="text" class="mt-1 block w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-mono bg-white dark:bg-zinc-900" placeholder="claude-haiku-4-5" />
         <p class="mt-1 text-xs text-zinc-500">{lang === 'es' ? 'Defaults: claude-haiku-4-5 (Anthropic/Bedrock), gpt-4o-mini (OpenAI/Azure), gemini-2.0-flash-exp (Gemini/Vertex). Bedrock auto-traduce el shorthand de Anthropic.' : 'Defaults: claude-haiku-4-5 (Anthropic/Bedrock), gpt-4o-mini (OpenAI/Azure), gemini-2.0-flash-exp (Gemini/Vertex). Bedrock auto-translates Anthropic shorthand.'}</p>
+        <div id="cred-model-cost" class="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400"></div>
       </div>
       <div id="cred-endpoint-row" class="hidden">
         <label class="block text-sm font-medium" for="cred-endpoint-input">{lang === 'es' ? 'Endpoint' : 'Endpoint'}</label>
@@ -275,6 +280,8 @@ const i18nBag = {
 </section>
 
 <script type="application/json" id="sponsoring-i18n" set:html={JSON.stringify(i18nBag)} />
+<script type="application/json" id="model-costs-data" set:html={modelCostsJson} />
+<script type="application/json" id="sponsoring-lang" set:html={langJson} />
 
 <script>
   import {
@@ -309,6 +316,41 @@ const i18nBag = {
 
   const HAIKU_45_INPUT_USD_PER_1K  = 0.001;
   const HAIKU_45_OUTPUT_USD_PER_1K = 0.005;
+
+  // ── #227: model cost display ───────────────────────────────────────
+  type ModelCostEntry = { model: string; provider: string; costPer100Calls: number; label: string; description_en: string; description_es: string };
+  const modelCosts: ModelCostEntry[] = JSON.parse(
+    (document.getElementById('model-costs-data') as HTMLScriptElement | null)?.textContent ?? '[]'
+  ) as ModelCostEntry[];
+  const pageLang: 'en' | 'es' = JSON.parse(
+    (document.getElementById('sponsoring-lang') as HTMLScriptElement | null)?.textContent ?? '"en"'
+  ) as 'en' | 'es';
+
+  function formatCostBadgeClient(cost: number): string {
+    if (cost < 0.50) return pageLang === 'es' ? '💚 Económico' : '💚 Budget';
+    if (cost < 2.00) return pageLang === 'es' ? '💛 Moderado' : '💛 Moderate';
+    return pageLang === 'es' ? '🔶 Premium' : '🔶 Premium';
+  }
+
+  function updateCostDisplay(inputId: string, containerId: string) {
+    const input = document.getElementById(inputId) as HTMLInputElement | null;
+    const container = document.getElementById(containerId);
+    if (!input || !container) return;
+    const model = input.value.trim();
+    const entry = modelCosts.find(m => m.model === model);
+    if (entry) {
+      const badge = formatCostBadgeClient(entry.costPer100Calls);
+      const desc = pageLang === 'es' ? entry.description_es : entry.description_en;
+      const per100 = pageLang === 'es' ? 'por 100 llamadas' : 'per 100 calls';
+      container.innerHTML = `<span class="inline-flex items-center gap-1.5">${badge} · <span class="font-medium">$${entry.costPer100Calls.toFixed(2)}</span> ${per100} · ${escHtml(desc)}</span>`;
+    } else {
+      container.textContent = '';
+    }
+  }
+
+  document.getElementById('cred-model-input')?.addEventListener('input', () => updateCostDisplay('cred-model-input', 'cred-model-cost'));
+  document.getElementById('pool-model-input')?.addEventListener('input', () => updateCostDisplay('pool-model-input', 'pool-model-cost'));
+  updateCostDisplay('pool-model-input', 'pool-model-cost');
 
   const escHtml = (s: string): string => s
     .replace(/&/g, '&amp;')
