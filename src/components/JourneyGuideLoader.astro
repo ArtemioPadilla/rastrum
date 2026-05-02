@@ -4,12 +4,18 @@
  * registry on page load, and auto-starts the matching guide if the user
  * hasn't seen it yet.
  *
+ * i18n resolution and guide data are computed server-side (frontmatter) and
+ * serialised via define:vars — avoids any client-side dynamic import() which
+ * breaks on locale-prefixed routes in Astro static output (the browser would
+ * try to fetch /es/lib/journey-guides instead of the Vite bundle URL).
+ *
  * Also listens for `rastrum:replay-guide` events to replay a specific guide.
  */
 import JourneySpotlight from './JourneySpotlight.astro';
 import JourneyReplayButton from './JourneyReplayButton.astro';
 import MicroSurvey from './MicroSurvey.astro';
-import { t, type Locale } from '../i18n/utils';
+import { t } from '../i18n/utils';
+import { journeyGuides } from '../lib/journey-guides';
 
 interface Props {
   lang: 'en' | 'es';
@@ -17,71 +23,80 @@ interface Props {
 }
 const { lang, currentPath } = Astro.props;
 const tr = t(lang);
+
+function resolveKey(key: string): string {
+  const parts = key.split('.');
+  let val: unknown = tr;
+  for (const p of parts) {
+    if (val && typeof val === 'object' && p in (val as Record<string, unknown>)) {
+      val = (val as Record<string, unknown>)[p];
+    } else return key;
+  }
+  return typeof val === 'string' ? val : key;
+}
+
+// Serialise all guides with resolved i18n strings so the client script
+// needs no imports at all — just JSON data + localStorage.
+const resolvedGuides = journeyGuides.map(g => ({
+  id: g.id,
+  storageKey: g.storageKey,
+  activation: g.activation,
+  // triggerRoute is a RegExp — serialise as string for the client
+  triggerRouteSource: g.triggerRoute.source,
+  triggerRouteFlags: g.triggerRoute.flags,
+  steps: g.steps.map(s => ({
+    target: s.target,
+    title: resolveKey(s.titleKey),
+    body: resolveKey(s.bodyKey),
+  })),
+}));
 ---
 
 <JourneySpotlight lang={lang} />
 <JourneyReplayButton lang={lang} currentPath={currentPath} />
 <MicroSurvey lang={lang} />
 
-<script define:vars={{ lang, currentPath }}>
-  // Static imports — Vite bundles these at build time, preventing the
-  // relative-path 404s that dynamic `import('../lib/journey-guides')` caused
-  // on locale-prefixed routes like /es/perfil/ (resolved to /es/lib/… at
-  // runtime instead of the correct bundle URL).
-  import { findGuideForRoute, isGuideSeen, journeyGuides, resetGuide } from '../lib/journey-guides';
-  import { t as getT } from '../i18n/utils';
+<script define:vars={{ currentPath, resolvedGuides }}>
+  // No imports needed — all guide data (including resolved i18n strings)
+  // was computed server-side and injected by define:vars.
 
-  function resolveKey(tr, key) {
-    const parts = key.split('.');
-    let val = tr;
-    for (const p of parts) {
-      if (val && typeof val === 'object' && p in val) val = val[p];
-      else return key;
-    }
-    return typeof val === 'string' ? val : key;
+  function isGuideSeen(storageKey) {
+    try { return localStorage.getItem(storageKey) === 'done'; } catch { return true; }
+  }
+
+  function resetGuide(storageKey) {
+    try { localStorage.removeItem(storageKey); } catch { /* noop */ }
+  }
+
+  function findGuide(path) {
+    return resolvedGuides.find(g =>
+      new RegExp(g.triggerRouteSource, g.triggerRouteFlags).test(path)
+    );
   }
 
   function initGuides() {
-    const guide = findGuideForRoute(currentPath);
-    if (!guide || guide.activation !== 'first-visit' || isGuideSeen(guide)) return;
+    const guide = findGuide(currentPath);
+    if (!guide || guide.activation !== 'first-visit' || isGuideSeen(guide.storageKey)) return;
 
-    // Resolve i18n step titles/bodies from the translation tree
-    const tr = getT(lang);
-
-    const steps = guide.steps.map(s => ({
-      target: s.target,
-      title: resolveKey(tr, s.titleKey),
-      body: resolveKey(tr, s.bodyKey),
-    }));
-
-    // Delay slightly so the page finishes rendering and target elements exist
     setTimeout(() => {
       window.dispatchEvent(new CustomEvent('rastrum:journey-guide-start', {
-        detail: { guideId: guide.id, steps },
+        detail: { guideId: guide.id, steps: guide.steps },
       }));
     }, 1500);
   }
 
   // Replay handler — dispatched by JourneyReplayButton or any other UI
   window.addEventListener('rastrum:replay-guide', (ev) => {
-    const { guideId } = (ev).detail ?? {};
+    const { guideId } = ev.detail ?? {};
     if (!guideId) return;
 
-    const guide = journeyGuides.find(g => g.id === guideId);
+    const guide = resolvedGuides.find(g => g.id === guideId);
     if (!guide) return;
 
-    resetGuide(guide);
-
-    const tr = getT(lang);
-
-    const steps = guide.steps.map(s => ({
-      target: s.target,
-      title: resolveKey(tr, s.titleKey),
-      body: resolveKey(tr, s.bodyKey),
-    }));
+    resetGuide(guide.storageKey);
 
     window.dispatchEvent(new CustomEvent('rastrum:journey-guide-start', {
-      detail: { guideId: guide.id, steps },
+      detail: { guideId: guide.id, steps: guide.steps },
     }));
   });
 
