@@ -24,8 +24,11 @@ interface MockProfile {
 async function injectMockSession(page: Page, profile: MockProfile): Promise<void> {
   await page.addInitScript((p: MockProfile) => {
     const session = {
-      access_token: 'mock-jwt-for-e2e',
-      refresh_token: 'mock-refresh',
+      // These are NOT real secrets — they are mock values for E2E testing
+      // against the static preview server. The Supabase project ref
+      // (reppvlqejgoqvitturxp) is public and appears throughout the codebase.
+      access_token: 'mock-jwt-for-e2e-testing',
+      refresh_token: 'mock-refresh-for-e2e-testing',
       expires_in: 3600,
       expires_at: Math.floor(Date.now() / 1000) + 3600,
       token_type: 'bearer',

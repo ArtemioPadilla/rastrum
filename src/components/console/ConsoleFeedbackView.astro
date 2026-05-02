@@ -93,6 +93,9 @@ const l = labels[lang] ?? labels.en;
 <script>
   // Load feedback from localStorage (admin-only view; in production this
   // would query the feedback_responses table via Supabase).
+  // The ConsoleLayout parent already gates access by role — this view only
+  // renders inside the admin console chrome. The data itself is localStorage
+  // (no server-side leak), but we double-check the role as defence in depth.
   function loadFeedback() {
     try {
       const key = 'rastrum.feedback.responses';

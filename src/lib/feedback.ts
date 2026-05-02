@@ -136,13 +136,20 @@ export function markSurveySeen(survey: MicroSurvey): void {
   } catch { /* noop */ }
 }
 
+/** Max feedback responses stored locally before oldest are pruned. */
+const MAX_LOCAL_RESPONSES = 200;
+
 /** Store a feedback response in localStorage for later sync. */
 export function storeFeedbackResponse(response: FeedbackResponse): void {
   try {
     const key = 'rastrum.feedback.responses';
     const existing = JSON.parse(localStorage.getItem(key) ?? '[]') as FeedbackResponse[];
     existing.push(response);
-    localStorage.setItem(key, JSON.stringify(existing));
+    // Cap storage to prevent unbounded growth on long-lived devices
+    const trimmed = existing.length > MAX_LOCAL_RESPONSES
+      ? existing.slice(-MAX_LOCAL_RESPONSES)
+      : existing;
+    localStorage.setItem(key, JSON.stringify(trimmed));
   } catch { /* noop */ }
 }
 
