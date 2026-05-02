@@ -332,6 +332,13 @@ const langJson = JSON.stringify(lang);
     return pageLang === 'es' ? '🔶 Premium' : '🔶 Premium';
   }
 
+  const escHtml = (s: string): string => s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
   function updateCostDisplay(inputId: string, containerId: string) {
     const input = document.getElementById(inputId) as HTMLInputElement | null;
     const container = document.getElementById(containerId);
@@ -351,13 +358,6 @@ const langJson = JSON.stringify(lang);
   document.getElementById('cred-model-input')?.addEventListener('input', () => updateCostDisplay('cred-model-input', 'cred-model-cost'));
   document.getElementById('pool-model-input')?.addEventListener('input', () => updateCostDisplay('pool-model-input', 'pool-model-cost'));
   updateCostDisplay('pool-model-input', 'pool-model-cost');
-
-  const escHtml = (s: string): string => s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
 
   function fmtDate(s: string | null): string {
     if (!s) return '';
