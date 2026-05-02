@@ -1,0 +1,493 @@
+---
+/**
+ * CommunityMapView — aggregated heatmap of observer activity.
+ *
+ * Privacy invariant: minimum 3 observers per hex cell to render.
+ * Anonymous users see data from `community_observers` (no centroid).
+ * Authenticated users get centroid data from `community_observers_with_centroid`.
+ * Individual centroids are never exposed — only aggregated hex cells.
+ */
+import { t, getLocalizedPath, routes } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+const { lang } = Astro.props;
+const tr = t(lang);
+
+interface CommunityMapCopy {
+  map_title: string;
+  map_subtitle: string;
+  map_observers_in_view: string;
+  map_min_cluster: string;
+  map_sign_in_hint: string;
+  map_loading: string;
+  map_no_data: string;
+  filter: Record<string, string>;
+  expert_pill: string;
+  sort: Record<string, string>;
+}
+const cm = (tr as unknown as { community: CommunityMapCopy }).community;
+
+const stringsJson = JSON.stringify({
+  lang,
+  mapTitle: cm.map_title,
+  mapSubtitle: cm.map_subtitle,
+  observersInView: cm.map_observers_in_view,
+  minCluster: cm.map_min_cluster,
+  signInHint: cm.map_sign_in_hint,
+  loading: cm.map_loading,
+  noData: cm.map_no_data,
+  filterCountry: cm.filter.country,
+  filterAny: cm.filter.any,
+  filterExpertsOnly: cm.filter.experts_only,
+  sortObs: cm.sort.obs,
+  sortSpecies: cm.sort.species,
+  sortActive7d: cm.sort.active_7d,
+  sortActive30d: cm.sort.active_30d,
+  expertPill: cm.expert_pill,
+});
+---
+
+<section
+  id="community-map-root"
+  class="flex flex-col h-[calc(100vh-4rem)]"
+  data-strings={stringsJson}
+>
+  <div class="px-4 py-3 border-b border-zinc-200 dark:border-zinc-800">
+    <div class="flex items-start justify-between gap-4 flex-wrap max-w-5xl mx-auto">
+      <div class="min-w-0">
+        <h1 class="text-xl font-bold tracking-tight">{cm.map_title}</h1>
+        <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-0.5">{cm.map_subtitle}</p>
+      </div>
+      <span
+        id="cm-observer-count"
+        class="hidden text-xs font-medium px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 whitespace-nowrap"
+        aria-live="polite"
+      ></span>
+    </div>
+  </div>
+
+  <div
+    id="cm-chips"
+    class="px-4 py-2 border-b border-zinc-200 dark:border-zinc-800 flex flex-wrap gap-2 items-center max-w-5xl mx-auto w-full"
+  >
+    <select
+      id="cm-sort"
+      aria-label={cm.sort.obs}
+      class="text-sm rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1"
+    >
+      <option value="observation_count">{cm.sort.obs}</option>
+      <option value="species_count">{cm.sort.species}</option>
+      <option value="obs_count_7d">{cm.sort.active_7d}</option>
+      <option value="obs_count_30d">{cm.sort.active_30d}</option>
+    </select>
+    <select
+      id="cm-country"
+      aria-label={cm.filter.country}
+      class="text-sm rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1"
+    >
+      <option value="">{cm.filter.country}: {cm.filter.any}</option>
+    </select>
+    <label class="text-sm flex items-center gap-1.5">
+      <input id="cm-experts" type="checkbox" />
+      {cm.filter.experts_only}
+    </label>
+  </div>
+
+  <div id="cm-map-container" class="flex-1 relative bg-zinc-100 dark:bg-zinc-900">
+    <p id="cm-loading" class="absolute inset-0 flex items-center justify-center text-sm text-zinc-500 italic">
+      {cm.map_loading}
+    </p>
+    <p id="cm-no-data" class="hidden absolute inset-0 flex items-center justify-center text-sm text-zinc-500">
+      {cm.map_no_data}
+    </p>
+    <p id="cm-sign-in-hint" class="hidden absolute bottom-4 left-4 right-4 text-center text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-lg px-3 py-2 z-10">
+      {cm.map_sign_in_hint}
+    </p>
+    <p id="cm-privacy-note" class="hidden absolute bottom-4 left-4 right-4 text-center text-xs text-zinc-500 dark:text-zinc-400 bg-white/90 dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 z-10">
+      {cm.map_min_cluster}
+    </p>
+  </div>
+</section>
+
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.0/dist/maplibre-gl.css" />
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { loadIsoCountries } from '../lib/community';
+
+  interface Strings {
+    lang: 'en' | 'es';
+    mapTitle: string;
+    mapSubtitle: string;
+    observersInView: string;
+    minCluster: string;
+    signInHint: string;
+    loading: string;
+    noData: string;
+    filterCountry: string;
+    filterAny: string;
+    filterExpertsOnly: string;
+    sortObs: string;
+    sortSpecies: string;
+    sortActive7d: string;
+    sortActive30d: string;
+    expertPill: string;
+  }
+
+  interface ObserverRow {
+    id: string;
+    country_code: string | null;
+    is_expert: boolean;
+    observation_count: number;
+    species_count: number;
+    obs_count_7d: number;
+    obs_count_30d: number;
+    centroid_lat?: number | null;
+    centroid_lng?: number | null;
+  }
+
+  // H3-like hex cell key at ~0.5° resolution for privacy aggregation.
+  // Rounds lat/lng to 0.5° grid cells — coarse enough to protect
+  // individual locations while showing meaningful density patterns.
+  function hexKey(lat: number, lng: number): string {
+    const rLat = (Math.round(lat * 2) / 2).toFixed(1);
+    const rLng = (Math.round(lng * 2) / 2).toFixed(1);
+    return `${rLat},${rLng}`;
+  }
+
+  function hexCenter(key: string): [number, number] {
+    const [lat, lng] = key.split(',').map(Number);
+    return [lng, lat];
+  }
+
+  const MIN_OBSERVERS_PER_CELL = 3;
+
+  const root = document.getElementById('community-map-root');
+  if (!root) throw new Error('CommunityMapView: missing #community-map-root');
+  const STRINGS: Strings = JSON.parse(root.dataset.strings ?? '{}');
+
+  const mapContainer = document.getElementById('cm-map-container');
+  const loadingEl = document.getElementById('cm-loading');
+  const noDataEl = document.getElementById('cm-no-data');
+  const signInHintEl = document.getElementById('cm-sign-in-hint');
+  const privacyNoteEl = document.getElementById('cm-privacy-note');
+  const countBadge = document.getElementById('cm-observer-count');
+  const sortEl = document.getElementById('cm-sort') as HTMLSelectElement | null;
+  const countryEl = document.getElementById('cm-country') as HTMLSelectElement | null;
+  const expertsEl = document.getElementById('cm-experts') as HTMLInputElement | null;
+
+  if (!mapContainer || !loadingEl || !noDataEl || !signInHintEl ||
+      !privacyNoteEl || !countBadge || !sortEl || !countryEl || !expertsEl) {
+    throw new Error('CommunityMapView: missing required DOM nodes');
+  }
+
+  // Populate country dropdown
+  void (async () => {
+    try {
+      const countries = await loadIsoCountries(STRINGS.lang);
+      for (const c of countries) {
+        const opt = document.createElement('option');
+        opt.value = c.code;
+        opt.textContent = c.name;
+        countryEl.appendChild(opt);
+      }
+    } catch {
+      // non-fatal
+    }
+  })();
+
+  type MapLibreMap = import('maplibre-gl').Map;
+  let map: MapLibreMap | null = null;
+  let allRows: ObserverRow[] = [];
+  let isAuthenticated = false;
+
+  async function fetchObservers(): Promise<ObserverRow[]> {
+    const supabase = getSupabase();
+
+    // Check auth status
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      isAuthenticated = !!user;
+    } catch {
+      isAuthenticated = false;
+    }
+
+    // Authenticated users get centroid data for the heatmap.
+    // Anonymous users get country_code only (no centroid).
+    if (isAuthenticated) {
+      const { data, error } = await supabase
+        .from('community_observers_with_centroid')
+        .select('id, country_code, is_expert, observation_count, species_count, obs_count_7d, obs_count_30d, centroid_lat, centroid_lng');
+      if (error) throw error;
+      return (data ?? []) as ObserverRow[];
+    }
+
+    // Anon: no centroid, just country-level data
+    const { data, error } = await supabase
+      .from('community_observers')
+      .select('id, country_code, is_expert, observation_count, species_count, obs_count_7d, obs_count_30d');
+    if (error) throw error;
+    return (data ?? []) as ObserverRow[];
+  }
+
+  function filterRows(rows: ObserverRow[]): ObserverRow[] {
+    let filtered = rows;
+    const country = countryEl.value;
+    if (country) filtered = filtered.filter(r => r.country_code === country);
+    if (expertsEl.checked) filtered = filtered.filter(r => r.is_expert);
+    return filtered;
+  }
+
+  interface HexCell {
+    key: string;
+    center: [number, number]; // [lng, lat]
+    count: number;
+    weight: number;
+  }
+
+  function aggregateToHex(rows: ObserverRow[], sortField: string): HexCell[] {
+    const cells = new Map<string, { count: number; weight: number }>();
+
+    for (const row of rows) {
+      const lat = row.centroid_lat;
+      const lng = row.centroid_lng;
+      if (lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+
+      const key = hexKey(lat, lng);
+      const existing = cells.get(key) ?? { count: 0, weight: 0 };
+      existing.count += 1;
+
+      // Weight by the selected sort metric
+      let w = row.observation_count;
+      if (sortField === 'species_count') w = row.species_count;
+      else if (sortField === 'obs_count_7d') w = row.obs_count_7d;
+      else if (sortField === 'obs_count_30d') w = row.obs_count_30d;
+      existing.weight += w;
+
+      cells.set(key, existing);
+    }
+
+    // Privacy: only include cells with >= MIN_OBSERVERS_PER_CELL
+    const result: HexCell[] = [];
+    for (const [key, cell] of cells) {
+      if (cell.count >= MIN_OBSERVERS_PER_CELL) {
+        result.push({
+          key,
+          center: hexCenter(key),
+          count: cell.count,
+          weight: cell.weight,
+        });
+      }
+    }
+    return result;
+  }
+
+  function buildGeoJSON(cells: HexCell[]): GeoJSON.FeatureCollection {
+    return {
+      type: 'FeatureCollection',
+      features: cells.map(cell => ({
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: cell.center,
+        },
+        properties: {
+          count: cell.count,
+          weight: cell.weight,
+        },
+      })),
+    };
+  }
+
+  function updateCountBadge(rows: ObserverRow[]) {
+    const total = rows.length;
+    countBadge.textContent = STRINGS.observersInView.replace('{count}', String(total));
+    countBadge.classList.toggle('hidden', total === 0);
+  }
+
+  async function renderMap() {
+    loadingEl.classList.remove('hidden');
+    noDataEl.classList.add('hidden');
+    signInHintEl.classList.add('hidden');
+    privacyNoteEl.classList.add('hidden');
+
+    try {
+      if (allRows.length === 0) {
+        allRows = await fetchObservers();
+      }
+
+      const filtered = filterRows(allRows);
+      updateCountBadge(filtered);
+
+      if (filtered.length === 0) {
+        loadingEl.classList.add('hidden');
+        noDataEl.classList.remove('hidden');
+        return;
+      }
+
+      if (!isAuthenticated) {
+        signInHintEl.classList.remove('hidden');
+      }
+
+      const hasCentroids = filtered.some(r => r.centroid_lat != null && r.centroid_lng != null);
+
+      if (!map) {
+        const maplibre = (await import('maplibre-gl')).default;
+        map = new maplibre.Map({
+          container: mapContainer,
+          style: 'https://tiles.openfreemap.org/styles/liberty',
+          center: [-99.1, 19.4], // CDMX default
+          zoom: 4,
+          attributionControl: { compact: true },
+        });
+        map.addControl(new maplibre.NavigationControl({ showCompass: false }), 'top-right');
+
+        await new Promise<void>((resolve) => {
+          map!.on('load', () => resolve());
+        });
+      }
+
+      loadingEl.classList.add('hidden');
+
+      // If we have centroid data, render the heatmap
+      if (hasCentroids) {
+        const cells = aggregateToHex(filtered, sortEl.value);
+        const geojson = buildGeoJSON(cells);
+
+        // Update or add source
+        const src = map.getSource('observers') as import('maplibre-gl').GeoJSONSource | undefined;
+        if (src) {
+          src.setData(geojson);
+        } else {
+          map.addSource('observers', {
+            type: 'geojson',
+            data: geojson,
+          });
+
+          // Heatmap layer
+          map.addLayer({
+            id: 'observers-heat',
+            type: 'heatmap',
+            source: 'observers',
+            paint: {
+              'heatmap-weight': [
+                'interpolate', ['linear'], ['get', 'weight'],
+                0, 0,
+                100, 1,
+              ],
+              'heatmap-intensity': [
+                'interpolate', ['linear'], ['zoom'],
+                0, 0.5,
+                9, 2,
+              ],
+              'heatmap-color': [
+                'interpolate', ['linear'], ['heatmap-density'],
+                0, 'rgba(16,185,129,0)',
+                0.2, 'rgba(16,185,129,0.4)',
+                0.4, 'rgba(52,211,153,0.6)',
+                0.6, 'rgba(251,191,36,0.7)',
+                0.8, 'rgba(245,158,11,0.8)',
+                1, 'rgba(239,68,68,0.9)',
+              ],
+              'heatmap-radius': [
+                'interpolate', ['linear'], ['zoom'],
+                0, 15,
+                6, 30,
+                9, 50,
+              ],
+              'heatmap-opacity': 0.8,
+            },
+          });
+
+          // Circle layer for zoomed-in view
+          map.addLayer({
+            id: 'observers-circles',
+            type: 'circle',
+            source: 'observers',
+            minzoom: 7,
+            paint: {
+              'circle-radius': [
+                'interpolate', ['linear'], ['get', 'count'],
+                3, 8,
+                10, 16,
+                50, 28,
+              ],
+              'circle-color': [
+                'interpolate', ['linear'], ['get', 'count'],
+                3, '#10b981',
+                10, '#f59e0b',
+                50, '#ef4444',
+              ],
+              'circle-opacity': 0.7,
+              'circle-stroke-width': 1,
+              'circle-stroke-color': '#ffffff',
+            },
+          });
+
+          // Count labels on circles
+          map.addLayer({
+            id: 'observers-labels',
+            type: 'symbol',
+            source: 'observers',
+            minzoom: 7,
+            layout: {
+              'text-field': ['get', 'count'],
+              'text-size': 11,
+              'text-font': ['Open Sans Bold'],
+              'text-allow-overlap': true,
+            },
+            paint: {
+              'text-color': '#ffffff',
+            },
+          });
+        }
+
+        privacyNoteEl.classList.remove('hidden');
+      } else if (!isAuthenticated) {
+        // No centroids for anon — show sign-in hint, map still renders
+        signInHintEl.classList.remove('hidden');
+      }
+    } catch (err) {
+      loadingEl.classList.add('hidden');
+      const msg = err instanceof Error ? err.message : String(err);
+      loadingEl.textContent = msg;
+      loadingEl.classList.remove('hidden');
+    }
+  }
+
+  function onFilterChange() {
+    const filtered = filterRows(allRows);
+    updateCountBadge(filtered);
+
+    if (!map) return;
+
+    const hasCentroids = filtered.some(r => r.centroid_lat != null && r.centroid_lng != null);
+    if (hasCentroids) {
+      const cells = aggregateToHex(filtered, sortEl.value);
+      const geojson = buildGeoJSON(cells);
+      const src = map.getSource('observers') as import('maplibre-gl').GeoJSONSource | undefined;
+      if (src) {
+        src.setData(geojson);
+      }
+      noDataEl.classList.add('hidden');
+      privacyNoteEl.classList.remove('hidden');
+    } else {
+      const src = map.getSource('observers') as import('maplibre-gl').GeoJSONSource | undefined;
+      if (src) {
+        src.setData({ type: 'FeatureCollection', features: [] });
+      }
+      if (filtered.length === 0) {
+        noDataEl.classList.remove('hidden');
+      }
+      privacyNoteEl.classList.add('hidden');
+    }
+  }
+
+  sortEl.addEventListener('change', onFilterChange);
+  countryEl.addEventListener('change', onFilterChange);
+  expertsEl.addEventListener('change', onFilterChange);
+
+  void renderMap();
+</script>
