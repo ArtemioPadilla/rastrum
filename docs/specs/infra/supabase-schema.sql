@@ -6718,3 +6718,18 @@ ALTER TABLE public.identifications
     -- M32 multi-provider vision (each provider tags its result with its kind)
     'bedrock','openai','azure_openai','gemini','vertex_ai'
   ));
+
+-- ============================================================
+-- CONSERVATION STATUS COLUMNS (karma conservation bonus — #189)
+-- ============================================================
+-- taxa.iucn_category and taxa.nom059_status already exist in the
+-- CREATE TABLE above. These idempotent ALTERs are here as a
+-- documentation marker: the karma conservation bonus system
+-- (src/lib/karma-conservation.ts) reads these columns to compute
+-- multipliers for karma rewards. Observations of threatened species
+-- earn bonus karma:
+--   IUCN:    LC(1×) → NT(1.2×) → VU(1.5×) → EN(2×) → CR(3×) → EW(5×)
+--   NOM-059: Pr(1.3×) → A(1.8×) → P(2.5×) → E(4×)
+-- The higher of the two multipliers wins.
+ALTER TABLE public.taxa ADD COLUMN IF NOT EXISTS iucn_category text;
+ALTER TABLE public.taxa ADD COLUMN IF NOT EXISTS nom059_status text;
