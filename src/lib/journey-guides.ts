@@ -39,7 +39,7 @@ export const journeyGuides: JourneyGuide[] = [
     activation: 'first-visit',
     steps: [
       {
-        target: '#obs2-media-trigger, [data-dropzone], input[type="file"]',
+        target: '#obs2-post-form, input[type="file"], [data-dropzone]',
         titleKey: 'guides.observe.step1_title',
         bodyKey: 'guides.observe.step1_body',
       },
@@ -141,7 +141,7 @@ export const journeyGuides: JourneyGuide[] = [
         bodyKey: 'guides.community.step1_body',
       },
       {
-        target: '[data-observer-card], ul[data-observers] li:first-child, .community-list li:first-child',
+        target: '#community-list, [data-observer-card], ul[data-observers] li:first-child',
         titleKey: 'guides.community.step2_title',
         bodyKey: 'guides.community.step2_body',
       },
@@ -159,7 +159,7 @@ export const journeyGuides: JourneyGuide[] = [
     activation: 'first-visit',
     steps: [
       {
-        target: '[data-console-tabs], .console-tabs, nav[aria-label*="console"], nav[aria-label*="consola"]',
+        target: '[data-console-pills], [data-console-tabs], .console-tabs',
         titleKey: 'guides.console.step1_title',
         bodyKey: 'guides.console.step1_body',
       },
