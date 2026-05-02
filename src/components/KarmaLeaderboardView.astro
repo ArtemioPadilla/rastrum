@@ -1,0 +1,185 @@
+---
+/**
+ * KarmaLeaderboardView — shared EN+ES page body for /community/leaderboard/.
+ *
+ * Shows top 20 users by karma_total (descending). Queries the
+ * `community_observers` view which already filters out users with
+ * `hide_from_leaderboards = true`.
+ *
+ * Client-rendered (CSR) like CommunityView — the audience is signed-in
+ * observers checking their standing.
+ */
+import { t, getLocalizedPath, routes, type Locale } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+const { lang } = Astro.props;
+const locale = lang as Locale;
+const tr = t(lang);
+
+interface LeaderboardCopy {
+  leaderboard_title: string;
+  leaderboard_subtitle: string;
+  leaderboard_rank: string;
+  leaderboard_observer: string;
+  leaderboard_karma: string;
+  leaderboard_species: string;
+  leaderboard_empty: string;
+  loading: string;
+}
+const cm = (tr as unknown as { community: LeaderboardCopy }).community;
+const profileBase = getLocalizedPath(lang, routes.publicProfile[locale]);
+
+const stringsJson = JSON.stringify({
+  lang,
+  loading: cm.loading,
+  emptyMsg: cm.leaderboard_empty,
+  rankLabel: cm.leaderboard_rank,
+  observerLabel: cm.leaderboard_observer,
+  karmaLabel: cm.leaderboard_karma,
+  speciesLabel: cm.leaderboard_species,
+  profileBase,
+});
+---
+
+<section
+  id="leaderboard-root"
+  class="max-w-4xl mx-auto px-4 py-6"
+  data-strings={stringsJson}
+>
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold tracking-tight">{cm.leaderboard_title}</h1>
+    <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-1">{cm.leaderboard_subtitle}</p>
+  </div>
+
+  <div id="leaderboard-loading" class="text-sm text-zinc-500 italic">
+    {cm.loading}
+  </div>
+
+  <div id="leaderboard-empty" class="hidden mt-8 text-center text-sm text-zinc-500">
+    {cm.leaderboard_empty}
+  </div>
+
+  <div id="leaderboard-table-wrap" class="hidden overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b border-zinc-200 dark:border-zinc-800 text-left text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+          <th class="py-2 pr-2 w-12">{cm.leaderboard_rank}</th>
+          <th class="py-2 px-2">{cm.leaderboard_observer}</th>
+          <th class="py-2 px-2 text-right">{cm.leaderboard_karma}</th>
+          <th class="py-2 pl-2 text-right">{cm.leaderboard_species}</th>
+        </tr>
+      </thead>
+      <tbody id="leaderboard-body"></tbody>
+    </table>
+  </div>
+</section>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+
+  interface LeaderboardStrings {
+    lang: 'en' | 'es';
+    loading: string;
+    emptyMsg: string;
+    profileBase: string;
+  }
+
+  const root = document.getElementById('leaderboard-root');
+  if (!root) throw new Error('KarmaLeaderboardView: missing #leaderboard-root');
+
+  const STRINGS: LeaderboardStrings = JSON.parse(root.dataset.strings ?? '{}');
+
+  const loadingEl = document.getElementById('leaderboard-loading');
+  const emptyEl = document.getElementById('leaderboard-empty');
+  const tableWrap = document.getElementById('leaderboard-table-wrap');
+  const tbody = document.getElementById('leaderboard-body');
+
+  if (!loadingEl || !emptyEl || !tableWrap || !tbody) {
+    throw new Error('KarmaLeaderboardView: missing required DOM nodes');
+  }
+
+  function escapeHtml(s: string): string {
+    return String(s ?? '').replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c] as string));
+  }
+
+  interface LeaderboardRow {
+    id: string;
+    username: string | null;
+    display_name: string | null;
+    avatar_url: string | null;
+    karma_total: number;
+    species_count: number;
+  }
+
+  function renderRow(row: LeaderboardRow, rank: number): HTMLTableRowElement {
+    const handle = row.username ?? row.id.slice(0, 8);
+    const displayName = row.display_name ?? handle;
+    const profileHref = `${STRINGS.profileBase}/?username=${encodeURIComponent(handle)}`;
+
+    const tr = document.createElement('tr');
+    tr.className = 'border-b border-zinc-100 dark:border-zinc-800/50 hover:bg-zinc-50 dark:hover:bg-zinc-900/50';
+
+    const rankMedal = rank <= 3
+      ? ['🥇', '🥈', '🥉'][rank - 1]
+      : String(rank);
+
+    tr.innerHTML = `
+      <td class="py-3 pr-2 text-center font-medium text-zinc-600 dark:text-zinc-300">${rankMedal}</td>
+      <td class="py-3 px-2">
+        <a href="${profileHref}" class="flex items-center gap-3 group">
+          ${row.avatar_url
+            ? `<img src="${escapeHtml(row.avatar_url)}" alt="" loading="lazy" class="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 object-cover flex-none">`
+            : `<div class="w-8 h-8 rounded-full bg-emerald-700 text-white flex items-center justify-center font-semibold text-xs flex-none">${escapeHtml(displayName.slice(0, 1).toUpperCase())}</div>`}
+          <div class="min-w-0">
+            <span class="block text-sm font-medium text-zinc-800 dark:text-zinc-100 truncate group-hover:text-emerald-600 dark:group-hover:text-emerald-400">@${escapeHtml(handle)}</span>
+            ${row.display_name ? `<span class="block text-xs text-zinc-500 dark:text-zinc-400 truncate">${escapeHtml(row.display_name)}</span>` : ''}
+          </div>
+        </a>
+      </td>
+      <td class="py-3 px-2 text-right font-semibold text-emerald-700 dark:text-emerald-400">${Math.round(row.karma_total)}</td>
+      <td class="py-3 pl-2 text-right text-zinc-600 dark:text-zinc-300">${row.species_count}</td>
+    `;
+    return tr;
+  }
+
+  void (async () => {
+    try {
+      const supabase = getSupabase();
+      const { data, error } = await supabase
+        .from('community_observers')
+        .select('id, username, display_name, avatar_url, karma_total, species_count')
+        .order('karma_total', { ascending: false, nullsFirst: false })
+        .limit(20);
+
+      loadingEl.classList.add('hidden');
+
+      if (error) {
+        loadingEl.classList.remove('hidden');
+        loadingEl.textContent = error.message;
+        loadingEl.classList.add('text-red-600');
+        loadingEl.classList.remove('text-zinc-500');
+        return;
+      }
+
+      const rows = (data ?? []) as LeaderboardRow[];
+      if (rows.length === 0) {
+        emptyEl.classList.remove('hidden');
+        return;
+      }
+
+      for (let i = 0; i < rows.length; i++) {
+        tbody.appendChild(renderRow(rows[i], i + 1));
+      }
+      tableWrap.classList.remove('hidden');
+    } catch (err) {
+      loadingEl.classList.remove('hidden');
+      loadingEl.textContent = err instanceof Error ? err.message : String(err);
+      loadingEl.classList.add('text-red-600');
+      loadingEl.classList.remove('text-zinc-500');
+    }
+  })();
+</script>
