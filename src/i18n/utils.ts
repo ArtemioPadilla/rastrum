@@ -63,6 +63,7 @@ export const routes: Record<string, Record<Locale, string>> = {
   // Community discovery (M28)
   community:           { en: '/community',           es: '/comunidad' },
   communityObservers:  { en: '/community/observers', es: '/comunidad/observadores' },
+  communityMap:        { en: '/community/map',        es: '/comunidad/mapa' },
   leaderboard:         { en: '/community/leaderboard', es: '/comunidad/tabla-de-lideres' },
   privacy: { en: '/privacy', es: '/privacidad' },
   terms: { en: '/terms', es: '/terminos' },
