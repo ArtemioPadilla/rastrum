@@ -3986,7 +3986,8 @@ ALTER TABLE public.karma_events ADD CONSTRAINT karma_events_reason_check
   CHECK (reason IN (
     'consensus_win','consensus_loss','first_in_rastrum',
     'observation_synced','comment_reaction','manual_adjust',
-    'ai_sponsorship_active','ai_sponsorship_revoked','ai_sponsor_call'
+    'ai_sponsorship_active','ai_sponsorship_revoked','ai_sponsor_call',
+    'pool_donation','pool_call_sponsor_drip'
   ));
 
 -- 11. add_karma_simple — generic karma helper.
@@ -4700,7 +4701,9 @@ VALUES
   ('consensus_loss',     -2,   'Consensus loss',        'Consenso perdido',          'Base penalty before rarity/confidence multipliers (capped at 2×).',               'Penalización base antes de multiplicadores (máx 2×).'),
   ('first_in_rastrum',   10,   'First in Rastrum',      'Primero en Rastrum',        'Awarded for the first observation of a taxon ever recorded on the platform.',     'Otorgado por la primera observación de un taxón registrada en la plataforma.'),
   ('comment_reaction',   0.5,  'Comment reaction',      'Reacción en comentario',    'Awarded when another user reacts positively to a comment.',                       'Otorgado cuando otro usuario reacciona positivamente a un comentario.'),
-  ('manual_adjust',      NULL, 'Manual adjustment',     'Ajuste manual',             'Admin-issued karma adjustment. Delta varies per case.',                           'Ajuste de karma emitido por un administrador. El delta varía por caso.')
+  ('manual_adjust',      NULL, 'Manual adjustment',     'Ajuste manual',             'Admin-issued karma adjustment. Delta varies per case.',                           'Ajuste de karma emitido por un administrador. El delta varía por caso.'),
+  ('pool_donation',      20,   'Pool donation',         'Donación a pool',           'Awarded when a sponsor donates calls to a platform pool.',                        'Otorgado cuando un patrocinador dona llamadas a un pool.'),
+  ('pool_call_sponsor_drip', 0.5, 'Pool call (sponsor drip)', 'Llamada de pool (goteo patrocinador)', 'Small karma drip to the sponsor each time a beneficiary uses a pool call.', 'Pequeño goteo de karma al patrocinador cada vez que un beneficiario usa una llamada del pool.')
 ON CONFLICT (reason) DO UPDATE
   SET label_en       = EXCLUDED.label_en,
       label_es       = EXCLUDED.label_es,
@@ -6285,6 +6288,18 @@ $$;
 
 REVOKE ALL ON FUNCTION public.consume_pool_slot(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.consume_pool_slot(uuid) TO service_role;
+
+-- ── Pool donation karma — +20 on INSERT to sponsor_pools ────────────
+-- Awards pool_donation karma to the sponsor when they create a new pool.
+CREATE OR REPLACE FUNCTION public.award_pool_donation_karma() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  PERFORM public.add_karma_simple(NEW.sponsor_id, 20, 'pool_donation');
+  RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS sponsor_pools_award_donation_karma ON public.sponsor_pools;
+CREATE TRIGGER sponsor_pools_award_donation_karma AFTER INSERT ON public.sponsor_pools
+  FOR EACH ROW EXECUTE FUNCTION public.award_pool_donation_karma();
 
 -- ============================================================
 -- CAMERA STATIONS (M31, issue #112) — sampling-effort metadata for camera traps
