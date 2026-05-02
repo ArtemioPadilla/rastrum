@@ -8,6 +8,7 @@ interface Props {
 const { lang } = Astro.props;
 const tr = t(lang);
 const buildSha = import.meta.env.PUBLIC_BUILD_SHA || 'dev';
+const appVersion = import.meta.env.PUBLIC_VERSION || 'dev';
 const repoSlug = 'ArtemioPadilla/rastrum';
 ---
 
@@ -30,6 +31,7 @@ const repoSlug = 'ArtemioPadilla/rastrum';
   data-repo={repoSlug}
   data-lang={lang}
   data-build-sha={buildSha}
+  data-app-version={appVersion}
   data-l-steps-label={tr.report.steps_label}
   data-l-steps-placeholder={tr.report.steps_placeholder}
   data-l-expected-label={tr.report.expected_label}
@@ -263,6 +265,7 @@ const repoSlug = 'ArtemioPadilla/rastrum';
   var repo = dlg.dataset.repo || '';
   var lang = dlg.dataset.lang || 'en';
   var buildSha = dlg.dataset.buildSha || 'dev';
+  var appVersion = dlg.dataset.appVersion || document.querySelector('meta[name="app-version"]')?.content || 'dev';
   var noneLabel = dlg.dataset.lDiagnosticsNone || 'None captured';
   var copyLabel = dlg.dataset.lCopy || 'Copy diagnostics';
   var copiedLabel = dlg.dataset.lCopied || 'Copied!';
@@ -297,7 +300,8 @@ const repoSlug = 'ArtemioPadilla/rastrum';
     lines.push('URL: ' + location.href);
     lines.push('User Agent: ' + navigator.userAgent);
     lines.push('Locale: ' + lang);
-    lines.push('Build: ' + buildSha);
+    lines.push('Version: ' + appVersion);
+    lines.push('Build SHA: ' + buildSha);
     lines.push('Online: ' + (navigator.onLine ? 'yes' : 'no'));
     lines.push('Viewport: ' + innerWidth + 'x' + innerHeight);
     lines.push('Time: ' + new Date().toISOString());

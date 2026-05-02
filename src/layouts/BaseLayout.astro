@@ -131,6 +131,8 @@ const resolvedOgImage = ogImage ?? `${SITE_URL}/og/${ogLang}/${ogSlugForPath(cur
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="application-name" content="Rastrum" />
     <meta name="apple-mobile-web-app-title" content="Rastrum" />
+    <meta name="app-version" content={import.meta.env.PUBLIC_VERSION ?? 'dev'} />
+    <meta name="build-sha" content={import.meta.env.PUBLIC_BUILD_SHA ?? 'dev'} />
     <title>{title}</title>
     <StructuredData type="organization" />
     {currentPath === `/${lang}/` && <StructuredData type="website" lang={lang === 'es' ? 'es' : 'en'} />}
