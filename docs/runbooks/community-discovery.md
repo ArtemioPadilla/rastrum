@@ -152,8 +152,54 @@ unreachable for anon callers regardless of the UI sign-in check.
 
 ## Future work (v1.1)
 
-- Observer heatmap / community map view.
+- ~~Observer heatmap / community map view.~~ **Shipped** — see "Community Map" section below.
 - Mod-curated featured-observer lists.
 - Time windows beyond `7d` / `30d` / all-time (the rollup-table refactor in the
   spec's "C" option).
 - Materialized rollup table when `users` exceeds ~100k rows.
+
+## Community Map (v1.1)
+
+The community map page (`/community/map/` EN, `/comunidad/mapa/` ES) renders an
+aggregated heatmap of observer activity using MapLibre GL.
+
+### How it works
+
+- **Anonymous users** see the map with country-level data from `community_observers`
+  (no centroid). A sign-in hint encourages authentication for the full heatmap.
+- **Authenticated users** get centroid data from `community_observers_with_centroid`.
+  Individual centroids are aggregated into ~0.5° hex cells before rendering.
+- Filter chips (country, expert, sort metric) mirror the `/community/observers/`
+  pattern and update the heatmap in real time.
+- A count badge shows "X observers in view" based on the current filter state.
+
+### Privacy invariants (min 3 per cell)
+
+The heatmap enforces a **minimum of 3 observers per hex cell** before rendering
+that cell. This prevents individual observer locations from being inferred via
+the heatmap. The aggregation happens client-side after fetching from the
+auth-gated `community_observers_with_centroid` view.
+
+- The `community_observers_with_centroid` view is **never** granted to `anon`.
+  Anonymous users cannot access centroid data at all.
+- Even for authenticated users, individual centroids are never displayed — only
+  aggregated hex cells meeting the minimum threshold.
+
+### SQL view dependency
+
+The heatmap reads from the same two views as the observers list:
+
+- `community_observers` — anon + authenticated, no centroid
+- `community_observers_with_centroid` — authenticated only, includes
+  `centroid_lat` / `centroid_lng` (derived from `centroid_geog`)
+
+No new SQL views, RPCs, or schema changes are required. The nightly
+`recompute-user-stats` cron keeps centroids up to date.
+
+### Component structure
+
+- `src/components/CommunityMapView.astro` — shared EN+ES view component
+- `src/pages/en/community/map.astro` — EN page
+- `src/pages/es/comunidad/mapa.astro` — ES page
+- Route: `routes.communityMap = { en: '/community/map', es: '/comunidad/mapa' }`
+- MegaMenu + MobileDrawer links under the Community column

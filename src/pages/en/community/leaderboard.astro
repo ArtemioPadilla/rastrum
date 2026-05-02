@@ -1,0 +1,13 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import KarmaLeaderboardView from '../../../components/KarmaLeaderboardView.astro';
+import { t } from '../../../i18n/utils';
+
+const lang = 'en';
+const tr = t(lang);
+const cm = (tr as unknown as { community: { leaderboard_title: string; leaderboard_subtitle: string } }).community;
+---
+
+<BaseLayout title={`${cm.leaderboard_title} — Rastrum`} description={cm.leaderboard_subtitle} lang={lang}>
+  <KarmaLeaderboardView lang={lang} />
+</BaseLayout>

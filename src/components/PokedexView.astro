@@ -150,29 +150,32 @@ const exploreRecentHref = `/${lang}/${lang === 'es' ? 'explorar/recientes' : 'ex
       .order('observed_at', { ascending: false });
     const rows = (data ?? []) as Array<{
       observed_at: string;
-      identifications: Array<{ scientific_name: string; taxon_id: string; is_primary: boolean }>;
+      identifications: Array<{ scientific_name: string; taxon_id: string | null; is_primary: boolean }>;
     }>;
-    const byTaxon = new Map<string, { name: string; first: string; count: number }>();
+    const bySpecies = new Map<string, { taxonId: string | null; name: string; first: string; count: number }>();
     for (const r of rows) {
       for (const id of r.identifications) {
-        const prev = byTaxon.get(id.taxon_id);
+        if (!id.scientific_name) continue;
+        const key = id.taxon_id ?? id.scientific_name;
+        const prev = bySpecies.get(key);
         if (prev) { prev.count++; if (r.observed_at < prev.first) prev.first = r.observed_at; }
-        else byTaxon.set(id.taxon_id, { name: id.scientific_name, first: r.observed_at, count: 1 });
+        else bySpecies.set(key, { taxonId: id.taxon_id, name: id.scientific_name, first: r.observed_at, count: 1 });
       }
     }
-    const taxonIds = Array.from(byTaxon.keys());
-    if (!taxonIds.length) return [];
-    const { data: rarity } = await supabase
-      .from('taxon_rarity').select('taxon_id, bucket').in('taxon_id', taxonIds);
+    const taxonIds = Array.from(bySpecies.values()).map(v => v.taxonId).filter((id): id is string => id != null);
     const rarityMap = new Map<string, number>();
-    for (const r of (rarity ?? []) as Array<{ taxon_id: string; bucket: number }>) {
-      rarityMap.set(r.taxon_id, r.bucket ?? 1);
+    if (taxonIds.length) {
+      const { data: rarity } = await supabase
+        .from('taxon_rarity').select('taxon_id, bucket').in('taxon_id', taxonIds);
+      for (const r of (rarity ?? []) as Array<{ taxon_id: string; bucket: number }>) {
+        rarityMap.set(r.taxon_id, r.bucket ?? 1);
+      }
     }
-    return Array.from(byTaxon.entries()).map(([taxonId, v]) => ({
-      taxon_id: taxonId,
+    return Array.from(bySpecies.entries()).map(([key, v]) => ({
+      taxon_id: v.taxonId ?? key,
       scientific_name: v.name,
       kingdom: null,
-      rarity_bucket: rarityMap.get(taxonId) ?? 1,
+      rarity_bucket: v.taxonId ? (rarityMap.get(v.taxonId) ?? 1) : 1,
       first_observed_at: v.first,
       obs_count: v.count,
     }));
