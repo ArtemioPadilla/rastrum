@@ -166,3 +166,9 @@ status: ## Short git status
 
 push: ## Push current branch to origin
 	git push origin $$(git rev-parse --abbrev-ref HEAD)
+
+## Release
+.PHONY: release
+release: ## Bump version. Usage: make release VERSION=2026.6.0
+	@if [ -z "$(VERSION)" ]; then echo "✗ VERSION is not set. Usage: make release VERSION=2026.6.0"; exit 1; fi
+	@bash scripts/bump-version.sh "$(VERSION)"
