@@ -1,0 +1,44 @@
+---
+/**
+ * JourneyReplayButton — "?" button that replays the contextual guide
+ * for the current page. Only renders if a guide exists for this route.
+ */
+import { findGuideForRoute } from '../lib/journey-guides';
+
+interface Props {
+  lang: 'en' | 'es';
+  currentPath: string;
+}
+const { lang, currentPath } = Astro.props;
+const guide = findGuideForRoute(currentPath);
+const label = lang === 'es' ? '¿Cómo funciona?' : 'How does this work?';
+---
+
+{guide && (
+  <button
+    id="journey-replay-btn"
+    class="fixed bottom-20 right-4 z-40 rounded-full bg-stone-100 dark:bg-stone-800
+           px-3 py-1.5 text-sm shadow-md hover:shadow-lg transition-shadow
+           sm:bottom-6 print:hidden"
+    data-guide-id={guide.id}
+    aria-label={label}
+    title={label}
+  >
+    <span aria-hidden="true">?</span>
+    <span class="sr-only">{label}</span>
+  </button>
+)}
+
+{guide && (
+  <script>
+    const btn = document.getElementById('journey-replay-btn');
+    btn?.addEventListener('click', () => {
+      const guideId = btn.dataset.guideId;
+      if (guideId) {
+        window.dispatchEvent(new CustomEvent('rastrum:replay-guide', {
+          detail: { guideId },
+        }));
+      }
+    });
+  </script>
+)}
