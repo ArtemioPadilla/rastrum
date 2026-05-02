@@ -1,0 +1,13 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import CommunityMapView from '../../../components/CommunityMapView.astro';
+import { t } from '../../../i18n/utils';
+
+const lang = 'es';
+const tr = t(lang);
+const cm = (tr as unknown as { community: { map_title: string; map_subtitle: string } }).community;
+---
+
+<BaseLayout title={`${cm.map_title} — Rastrum`} description={cm.map_subtitle} lang={lang}>
+  <CommunityMapView lang={lang} />
+</BaseLayout>

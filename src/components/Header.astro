@@ -56,6 +56,7 @@ const communityObserversTopHref     = `${communityObserversBase}?sort=obs_count_
 const communityObserversNearbyHref  = `${communityObserversBase}?nearby=true`;
 const communityObserversExpertsHref = `${communityObserversBase}?expert=true`;
 const communityObserversCountryHref = `${communityObserversBase}?country=`;
+const communityMapHref = getLocalizedPath(lang, routes.communityMap[locale] + '/');
 const communityLeaderboardHref = getLocalizedPath(lang, routes.leaderboard[locale] + '/');
 
 const validateLabel =
@@ -69,6 +70,7 @@ interface ExploreMegaMenu {
   community_nearby: string;
   community_experts: string;
   community_country: string;
+  community_map: string;
   community_leaderboard?: string;
   projects?: string;
 }
@@ -94,6 +96,7 @@ const exploreColumns = [
       { key: 'communityNearby',  label: em.community_nearby,  href: communityObserversNearbyHref },
       { key: 'communityExperts', label: em.community_experts, href: communityObserversExpertsHref },
       { key: 'communityCountry', label: em.community_country, href: communityObserversCountryHref },
+      { key: 'communityMap',     label: em.community_map,     href: communityMapHref },
       { key: 'leaderboard',     label: em.community_leaderboard ?? (lang === 'es' ? 'Tabla de líderes' : 'Leaderboard'), href: communityLeaderboardHref },
     ],
   },

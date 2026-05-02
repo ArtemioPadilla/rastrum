@@ -34,6 +34,7 @@ const projectsPath          = getLocalizedPath(lang, routes.projects[locale] + '
 const communityObserversBase    = getLocalizedPath(lang, routes.communityObservers[locale] + '/');
 const communityObserversTopHref    = `${communityObserversBase}?sort=obs_count_30d`;
 const communityObserversNearbyHref = `${communityObserversBase}?nearby=true`;
+const communityMapHref             = getLocalizedPath(lang, routes.communityMap[locale] + '/');
 const communityLeaderboardHref     = getLocalizedPath(lang, routes.leaderboard[locale] + '/');
 interface ExploreMegaMenu {
   biodiversity: string;
@@ -41,6 +42,7 @@ interface ExploreMegaMenu {
   community_all: string;
   community_top: string;
   community_nearby: string;
+  community_map: string;
   community_leaderboard?: string;
   projects?: string;
 }
@@ -96,6 +98,7 @@ const getDocLabel = (key: string) => (tr.docs.sections as Record<string, string>
       <a href={communityObserversBase}       class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{em.community_all}</a>
       <a href={communityObserversTopHref}    class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{em.community_top}</a>
       <a href={communityObserversNearbyHref} class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{em.community_nearby}</a>
+      <a href={communityMapHref}             class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{em.community_map}</a>
       <a href={communityLeaderboardHref}     class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{em.community_leaderboard ?? (lang === 'es' ? 'Tabla de líderes' : 'Leaderboard')}</a>
     </section>
 
