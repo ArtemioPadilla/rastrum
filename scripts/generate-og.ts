@@ -60,8 +60,8 @@ const PAGES: PageSpec[] = [
   {
     slug: 'identify',
     cards: {
-      en: { kind: 'static', title: 'Identify a species',            subtitle: 'PlantNet · Claude · Phi-3.5 — all in parallel.',                         accent: 'emerald' },
-      es: { kind: 'static', title: 'Identifica una especie',        subtitle: 'PlantNet · Claude · Phi-3.5 — todos en paralelo.',                       accent: 'emerald' },
+      en: { kind: 'static', title: 'Identify a species',            subtitle: 'PlantNet · Claude · GPT-4o · Gemini — all in parallel.',                accent: 'emerald' },
+      es: { kind: 'static', title: 'Identifica una especie',        subtitle: 'PlantNet · Claude · GPT-4o · Gemini — todos en paralelo.',              accent: 'emerald' },
     },
   },
   {
@@ -158,8 +158,8 @@ const PAGES: PageSpec[] = [
   {
     slug: 'sponsoring',
     cards: {
-      en: { kind: 'static', title: 'AI sponsorships',               subtitle: 'Share your Anthropic credential with specific beneficiaries. Caps + auto-pause.', accent: 'amber' },
-      es: { kind: 'static', title: 'Patrocinios de IA',             subtitle: 'Comparte tu credencial Anthropic con beneficiarios. Topes + auto-pausa.',  accent: 'amber' },
+      en: { kind: 'static', title: 'AI sponsorships',               subtitle: 'Share your AI credentials with specific beneficiaries. Caps + auto-pause.', accent: 'amber' },
+      es: { kind: 'static', title: 'Patrocinios de IA',             subtitle: 'Comparte tus credenciales de IA con beneficiarios. Topes + auto-pausa.',  accent: 'amber' },
     },
   },
   {
