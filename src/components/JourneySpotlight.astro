@@ -123,7 +123,7 @@ const l = labels[lang] ?? labels.en;
       const vh = window.innerHeight;
 
       ring.style.left = `${tr.left}px`;
-      ring.style.top = `${tr.top + window.scrollY}px`;
+      ring.style.top = `${tr.top}px`;
       ring.style.width = `${tr.width}px`;
       ring.style.height = `${tr.height}px`;
       ring.classList.remove('hidden');
@@ -145,7 +145,7 @@ const l = labels[lang] ?? labels.en;
       else ty = Math.max(M, Math.min(vh / 2 - TH / 2, vh - TH - M));
 
       tooltip.style.left = `${tx}px`;
-      tooltip.style.top = `${ty + window.scrollY}px`;
+      tooltip.style.top = `${ty}px`;
       tooltip.style.transform = 'none';
     }
 
@@ -186,8 +186,8 @@ const l = labels[lang] ?? labels.en;
       document.documentElement.style.overflow = 'hidden';
       document.body.style.overflow = 'hidden';
 
-      render();
       requestAnimationFrame(() => {
+        render();
         tooltip.focus();
         emit('guide_opened');
       });

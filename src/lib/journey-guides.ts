@@ -39,22 +39,22 @@ export const journeyGuides: JourneyGuide[] = [
     activation: 'first-visit',
     steps: [
       {
-        target: '[data-dropzone], #obs-dropzone, input[type="file"]',
+        target: '#obs2-media-trigger, [data-dropzone], input[type="file"]',
         titleKey: 'guides.observe.step1_title',
         bodyKey: 'guides.observe.step1_body',
       },
       {
-        target: '#obs-id-result, [data-id-result]',
+        target: '#obs2-id-card, #obs-id-result, [data-id-result]',
         titleKey: 'guides.observe.step2_title',
         bodyKey: 'guides.observe.step2_body',
       },
       {
-        target: '#obs-species-confirm, [data-species-confirm]',
+        target: '#obs2-id-card, #obs-species-confirm, [data-species-confirm]',
         titleKey: 'guides.observe.step3_title',
         bodyKey: 'guides.observe.step3_body',
       },
       {
-        target: '#obs-save-btn, [data-save-btn], button[type="submit"]',
+        target: '#obs2-save-btn, #obs-save-btn, [data-save-btn]',
         titleKey: 'guides.observe.step4_title',
         bodyKey: 'guides.observe.step4_body',
       },
@@ -67,17 +67,17 @@ export const journeyGuides: JourneyGuide[] = [
     activation: 'first-visit',
     steps: [
       {
-        target: '[data-explore-tabs], .explore-tabs, nav[aria-label]',
+        target: '[data-explore-tabs], .explore-tabs, main nav, nav[role="tablist"]',
         titleKey: 'guides.explore.step1_title',
         bodyKey: 'guides.explore.step1_body',
       },
       {
-        target: '[data-explore-map], a[href*="map"]',
+        target: '[data-explore-map], main a[href*="map"], .explore-card a[href*="map"]',
         titleKey: 'guides.explore.step2_title',
         bodyKey: 'guides.explore.step2_body',
       },
       {
-        target: '[data-explore-filters], .explore-filters',
+        target: '[data-explore-filters], .explore-filters, #cf-sort',
         titleKey: 'guides.explore.step3_title',
         bodyKey: 'guides.explore.step3_body',
       },
@@ -141,12 +141,12 @@ export const journeyGuides: JourneyGuide[] = [
         bodyKey: 'guides.community.step1_body',
       },
       {
-        target: '.observer-card, [data-observer-card]',
+        target: '[data-observer-card], ul[data-observers] li:first-child, .community-list li:first-child',
         titleKey: 'guides.community.step2_title',
         bodyKey: 'guides.community.step2_body',
       },
       {
-        target: '#follow-btn, [data-follow-btn]',
+        target: '[data-follow-btn], #follow-btn, a[href*="/profile/u"]',
         titleKey: 'guides.community.step3_title',
         bodyKey: 'guides.community.step3_body',
       },
@@ -159,17 +159,17 @@ export const journeyGuides: JourneyGuide[] = [
     activation: 'first-visit',
     steps: [
       {
-        target: '[data-console-tabs], .console-tabs',
+        target: '[data-console-tabs], .console-tabs, nav[aria-label*="console"], nav[aria-label*="consola"]',
         titleKey: 'guides.console.step1_title',
         bodyKey: 'guides.console.step1_body',
       },
       {
-        target: '[data-console-health], a[href*="health"]',
+        target: '[data-console-health], a[href*="health"], a[href*="salud"]',
         titleKey: 'guides.console.step2_title',
         bodyKey: 'guides.console.step2_body',
       },
       {
-        target: '[data-console-keyboard], .keyboard-hint',
+        target: '[data-console-keyboard], .keyboard-hint, [data-shortcut]',
         titleKey: 'guides.console.step3_title',
         bodyKey: 'guides.console.step3_body',
       },
