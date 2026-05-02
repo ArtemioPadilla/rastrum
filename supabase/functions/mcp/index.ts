@@ -154,7 +154,8 @@ const TOOLS: Tool[] = [
           observation_id:   obs.id,
           identifier_id:    ctx.user_id,
           scientific_name:  args.scientific_name,
-          id_source:        'human',
+          source:           'human',
+          is_primary:       true,
           confidence:       1.0,
         });
       }
@@ -191,7 +192,7 @@ const TOOLS: Tool[] = [
         .select(`
           id, observed_at, notes, habitat, evidence_type, created_at,
           media_files(url, is_primary),
-          identifications(scientific_name, confidence, id_source)
+          identifications(scientific_name, confidence, source)
         `)
         .eq('observer_id', ctx.user_id)
         .order('observed_at', { ascending: false })
@@ -218,7 +219,7 @@ const TOOLS: Tool[] = [
         .select(`
           id, observed_at, notes, habitat, evidence_type, location, created_at,
           media_files(url, is_primary, media_type),
-          identifications(scientific_name, confidence, id_source, created_at)
+          identifications(scientific_name, confidence, source, created_at)
         `)
         .eq('observer_id', ctx.user_id)
         .eq('id', args.id)
@@ -245,7 +246,7 @@ const TOOLS: Tool[] = [
         .from('observations')
         .select(`
           id, observed_at, notes, habitat, location,
-          identifications(scientific_name, confidence, id_source)
+          identifications(scientific_name, confidence, source)
         `)
         .eq('observer_id', ctx.user_id)
         .order('observed_at', { ascending: false });
@@ -264,7 +265,7 @@ const TOOLS: Tool[] = [
         const lng = match ? match[1] : '';
         const lat = match ? match[2] : '';
         const ids = Array.isArray(row.identifications) ? row.identifications : [];
-        const primary = (ids as Array<{ scientific_name?: string; confidence?: number; id_source?: string }>)
+        const primary = (ids as Array<{ scientific_name?: string; confidence?: number; source?: string }>)
           .sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0))[0];
         return [
           row.id,
@@ -275,7 +276,7 @@ const TOOLS: Tool[] = [
           row.habitat ?? '',
           `"${((row.notes as string) ?? '').replace(/"/g, '""')}"`,
           'HumanObservation',
-          primary?.id_source ?? '',
+          primary?.source ?? '',
         ].join(',');
       });
       return { csv: [header, ...rows].join('\n'), rows: rows.length };
