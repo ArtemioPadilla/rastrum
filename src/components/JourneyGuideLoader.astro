@@ -24,31 +24,34 @@ const tr = t(lang);
 <MicroSurvey lang={lang} />
 
 <script define:vars={{ lang, currentPath }}>
-  // Dynamic import to keep the guide registry tree-shakeable in pages
-  // that don't need it. The import resolves at runtime in the browser.
-  async function initGuides() {
-    const { findGuideForRoute, isGuideSeen } = await import('../lib/journey-guides');
+  // Static imports — Vite bundles these at build time, preventing the
+  // relative-path 404s that dynamic `import('../lib/journey-guides')` caused
+  // on locale-prefixed routes like /es/perfil/ (resolved to /es/lib/… at
+  // runtime instead of the correct bundle URL).
+  import { findGuideForRoute, isGuideSeen, journeyGuides, resetGuide } from '../lib/journey-guides';
+  import { t as getT } from '../i18n/utils';
+
+  function resolveKey(tr, key) {
+    const parts = key.split('.');
+    let val = tr;
+    for (const p of parts) {
+      if (val && typeof val === 'object' && p in val) val = val[p];
+      else return key;
+    }
+    return typeof val === 'string' ? val : key;
+  }
+
+  function initGuides() {
     const guide = findGuideForRoute(currentPath);
     if (!guide || guide.activation !== 'first-visit' || isGuideSeen(guide)) return;
 
     // Resolve i18n step titles/bodies from the translation tree
-    const { t: getT } = await import('../i18n/utils');
     const tr = getT(lang);
-
-    function resolveKey(key) {
-      const parts = key.split('.');
-      let val = tr;
-      for (const p of parts) {
-        if (val && typeof val === 'object' && p in val) val = val[p];
-        else return key;
-      }
-      return typeof val === 'string' ? val : key;
-    }
 
     const steps = guide.steps.map(s => ({
       target: s.target,
-      title: resolveKey(s.titleKey),
-      body: resolveKey(s.bodyKey),
+      title: resolveKey(tr, s.titleKey),
+      body: resolveKey(tr, s.bodyKey),
     }));
 
     // Delay slightly so the page finishes rendering and target elements exist
@@ -60,33 +63,21 @@ const tr = t(lang);
   }
 
   // Replay handler — dispatched by JourneyReplayButton or any other UI
-  window.addEventListener('rastrum:replay-guide', async (ev) => {
+  window.addEventListener('rastrum:replay-guide', (ev) => {
     const { guideId } = (ev).detail ?? {};
     if (!guideId) return;
 
-    const { journeyGuides, resetGuide } = await import('../lib/journey-guides');
     const guide = journeyGuides.find(g => g.id === guideId);
     if (!guide) return;
 
     resetGuide(guide);
 
-    const { t: getT } = await import('../i18n/utils');
     const tr = getT(lang);
-
-    function resolveKey(key) {
-      const parts = key.split('.');
-      let val = tr;
-      for (const p of parts) {
-        if (val && typeof val === 'object' && p in val) val = val[p];
-        else return key;
-      }
-      return typeof val === 'string' ? val : key;
-    }
 
     const steps = guide.steps.map(s => ({
       target: s.target,
-      title: resolveKey(s.titleKey),
-      body: resolveKey(s.bodyKey),
+      title: resolveKey(tr, s.titleKey),
+      body: resolveKey(tr, s.bodyKey),
     }));
 
     window.dispatchEvent(new CustomEvent('rastrum:journey-guide-start', {
