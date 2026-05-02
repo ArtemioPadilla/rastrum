@@ -56,6 +56,18 @@ export interface VisionInput {
   systemPrompt: string;
   userText: string;
   signal?: AbortSignal;
+  /** Pixel-space bounding box [x1, y1, x2, y2] from MegaDetector.
+   *  When set, providers append a focus instruction to the system prompt
+   *  so the model concentrates on the detected animal region. */
+  crop_bbox?: [number, number, number, number];
+}
+
+/** Build the bbox focus instruction appended to the system prompt when
+ *  a MegaDetector bounding box is supplied. Pure helper — exported for
+ *  unit testing. */
+export function buildBboxHint(bbox: [number, number, number, number]): string {
+  const [x1, y1, x2, y2] = bbox;
+  return `\nAn animal detector identified a subject in the bounding box from pixel (${x1},${y1}) to (${x2},${y2}). Focus your identification on the animal in that region.`;
 }
 
 export interface VisionProvider {
@@ -136,6 +148,15 @@ export function toVisionResult(
   };
 }
 
+// ── Shared prompt helper ─────────────────────────────────────────────
+
+/** Resolve the effective system prompt, appending bbox hint when present. */
+function effectiveSystemPrompt(input: VisionInput): string {
+  return input.crop_bbox
+    ? input.systemPrompt + buildBboxHint(input.crop_bbox)
+    : input.systemPrompt;
+}
+
 // ── Anthropic direct ────────────────────────────────────────────────
 class AnthropicProvider implements VisionProvider {
   constructor(private readonly cred: ResolvedCredential) {}
@@ -148,10 +169,11 @@ class AnthropicProvider implements VisionProvider {
     if (this.cred.kind === 'oauth_token') headers['Authorization'] = `Bearer ${this.cred.secret}`;
     else                                  headers['x-api-key']     = this.cred.secret;
 
+    const sysPrompt = effectiveSystemPrompt(input);
     const body = {
       model: this.cred.model,
       max_tokens: 512,
-      system: [{ type: 'text', text: input.systemPrompt, cache_control: { type: 'ephemeral' } }],
+      system: [{ type: 'text', text: sysPrompt, cache_control: { type: 'ephemeral' } }],
       messages: [{
         role: 'user',
         content: [
@@ -190,7 +212,7 @@ class BedrockProvider implements VisionProvider {
     const body = {
       anthropic_version: 'bedrock-2023-05-31',
       max_tokens: 512,
-      system: input.systemPrompt,
+      system: effectiveSystemPrompt(input),
       messages: [{
         role: 'user',
         content: [
@@ -378,7 +400,7 @@ async function callOpenAICompatible(
     model,
     max_tokens: 512,
     messages: [
-      { role: 'system', content: input.systemPrompt },
+      { role: 'system', content: effectiveSystemPrompt(input) },
       {
         role: 'user',
         content: [
@@ -451,7 +473,7 @@ async function callGeminiCompatible(
   source: string,
 ): Promise<VisionResult | null> {
   const body = {
-    systemInstruction: { parts: [{ text: input.systemPrompt }] },
+    systemInstruction: { parts: [{ text: effectiveSystemPrompt(input) }] },
     contents: [{
       role: 'user',
       parts: [

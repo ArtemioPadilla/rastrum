@@ -1576,9 +1576,10 @@ const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } })
     if (!sppBtn) return;
     sppBtn.disabled = true;
     const state = sppBtn.dataset.state;
-    setSppLabel(state === 'on' ? SPP_TXT.disabling : SPP_TXT.enabling);
+    const turningOn = state !== 'on';
+    setSppLabel(turningOn ? SPP_TXT.enabling : SPP_TXT.disabling);
     const lib = await import('../lib/push');
-    const r = state === 'on' ? await lib.disableStreakPush() : await lib.enableStreakPush();
+    const r = turningOn ? await lib.enableStreakPush() : await lib.disableStreakPush();
     sppBtn.disabled = false;
     if (!r.ok) {
       const reasonMap: Record<string, string> = {
@@ -1587,6 +1588,12 @@ const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } })
         vapid_missing: SPP_TXT.vapid_missing,
       };
       setSppWarn(reasonMap[r.reason ?? 'unknown'] ?? r.message ?? '');
+    } else {
+      const supabase = getSupabase();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.from('users').update({ streak_digest_opt_in: turningOn }).eq('id', user.id);
+      }
     }
     await refreshSpp();
   });
