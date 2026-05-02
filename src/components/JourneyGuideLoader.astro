@@ -74,15 +74,34 @@ const resolvedGuides = journeyGuides.map(g => ({
     );
   }
 
+  function waitForTarget(selector, callback, maxWaitMs = 4000) {
+    const selectors = selector.split(',').map(s => s.trim());
+    const start = Date.now();
+    function poll() {
+      for (const sel of selectors) {
+        try {
+          if (document.querySelector(sel)) { callback(); return; }
+        } catch { /* invalid selector */ }
+      }
+      if (Date.now() - start < maxWaitMs) {
+        setTimeout(poll, 200);
+      } else {
+        callback(); // fire anyway (tooltip will center if target not found)
+      }
+    }
+    setTimeout(poll, 500); // minimum delay before first check
+  }
+
   function initGuides() {
     const guide = findGuide(currentPath);
     if (!guide || guide.activation !== 'first-visit' || isGuideSeen(guide.storageKey)) return;
 
-    setTimeout(() => {
+    const firstTarget = guide.steps[0]?.target ?? 'body';
+    waitForTarget(firstTarget, () => {
       window.dispatchEvent(new CustomEvent('rastrum:journey-guide-start', {
         detail: { guideId: guide.id, steps: guide.steps },
       }));
-    }, 1500);
+    });
   }
 
   // Replay handler — dispatched by JourneyReplayButton or any other UI
