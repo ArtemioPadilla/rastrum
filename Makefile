@@ -50,7 +50,7 @@ preview: build ## Build then preview the built site
 	npm run preview
 
 ## Database — Supabase
-.PHONY: db-ping db-apply db-verify db-reset-local db-diff db-psql db-tables db-policies db-triggers
+.PHONY: db-ping db-apply db-verify db-reset-local db-diff db-psql db-tables db-policies db-triggers db-backfill-taxon-id
 db-ping: ## Verify connection to Supabase
 	$(call require_env,SUPABASE_DB)
 	@psql "$$SUPABASE_DB" -c "SELECT now(), current_database(), current_user, version();"
@@ -131,6 +131,12 @@ db-reset-local: ## Reset a local Supabase branch (requires supabase CLI)
 db-diff: ## Show drift between local and deployed schema (requires supabase CLI)
 	@command -v supabase >/dev/null || { echo "Install: brew install supabase/tap/supabase"; exit 1; }
 	supabase db diff --linked
+
+db-backfill-taxon-id: ## One-time backfill: resolve primary_taxon_id on observations created before PR #416 fix
+	$(call require_env,SUPABASE_DB)
+	@echo "Running backfill: resolve primary_taxon_id for observations missing it (PR #416)"
+	@psql "$$SUPABASE_DB" -v ON_ERROR_STOP=1 -f scripts/backfill-primary-taxon-id.sql
+	@echo "Done. Verify with: make db-tables"
 
 ## Docs & checks
 .PHONY: lint typecheck test docs-check
