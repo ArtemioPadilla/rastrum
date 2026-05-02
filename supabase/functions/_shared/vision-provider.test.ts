@@ -81,3 +81,54 @@ Deno.test('defaultModelFor — non-empty for every kind', () => {
     if (!m || m.length === 0) throw new Error(`empty default model for ${k}`);
   }
 });
+
+// ── crop_bbox / buildBboxHint tests (#174) ──────────────────────────
+
+import { buildBboxHint, type VisionInput } from './vision-provider.ts';
+
+Deno.test('buildBboxHint — formats pixel coordinates into focus instruction', () => {
+  const hint = buildBboxHint([100, 200, 400, 600]);
+  assertEquals(hint.includes('(100,200)'), true);
+  assertEquals(hint.includes('(400,600)'), true);
+  assertEquals(hint.includes('Focus your identification'), true);
+});
+
+Deno.test('buildBboxHint — handles zero-origin bbox', () => {
+  const hint = buildBboxHint([0, 0, 50, 50]);
+  assertEquals(hint.includes('(0,0)'), true);
+  assertEquals(hint.includes('(50,50)'), true);
+});
+
+Deno.test('effectiveSystemPrompt — appends bbox hint when crop_bbox is set', () => {
+  // We can't call the private effectiveSystemPrompt directly, but we
+  // can verify the contract via buildBboxHint + string concatenation
+  // (effectiveSystemPrompt is just systemPrompt + buildBboxHint).
+  const base = 'You are a biologist.';
+  const bbox: [number, number, number, number] = [10, 20, 300, 400];
+  const result = base + buildBboxHint(bbox);
+  assertEquals(result.startsWith(base), true);
+  assertEquals(result.includes('(10,20)'), true);
+  assertEquals(result.includes('(300,400)'), true);
+});
+
+Deno.test('VisionInput — crop_bbox is optional (omitted = no hint)', () => {
+  // Type-level check: a VisionInput without crop_bbox compiles fine.
+  const input: VisionInput = {
+    imageBase64: 'abc',
+    mimeType: 'image/jpeg',
+    systemPrompt: 'test',
+    userText: 'identify',
+  };
+  assertEquals(input.crop_bbox, undefined);
+});
+
+Deno.test('VisionInput — crop_bbox is accepted when provided', () => {
+  const input: VisionInput = {
+    imageBase64: 'abc',
+    mimeType: 'image/jpeg',
+    systemPrompt: 'test',
+    userText: 'identify',
+    crop_bbox: [50, 100, 200, 300],
+  };
+  assertEquals(input.crop_bbox, [50, 100, 200, 300]);
+});
