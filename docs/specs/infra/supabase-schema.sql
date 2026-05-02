@@ -622,6 +622,37 @@ CREATE TRIGGER update_obs_count_trigger
   WHEN (NEW.sync_status = 'synced')
   EXECUTE FUNCTION public.update_user_obs_count();
 
+-- Auto-resolve taxon_id from scientific_name when an identification is
+-- inserted without an explicit taxon_id. This ensures the profile_pokedex
+-- view (which JOINs on taxa) can find the row.
+CREATE OR REPLACE FUNCTION public.resolve_identification_taxon()
+RETURNS trigger AS $$
+BEGIN
+  IF NEW.taxon_id IS NULL AND NEW.scientific_name IS NOT NULL THEN
+    SELECT id INTO NEW.taxon_id
+    FROM public.taxa
+    WHERE scientific_name = NEW.scientific_name
+    LIMIT 1;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS resolve_id_taxon_trigger ON public.identifications;
+CREATE TRIGGER resolve_id_taxon_trigger
+  BEFORE INSERT OR UPDATE OF scientific_name ON public.identifications
+  FOR EACH ROW
+  EXECUTE FUNCTION public.resolve_identification_taxon();
+
+-- Backfill: resolve taxon_id for existing identifications that were inserted
+-- before the resolve_id_taxon_trigger existed.
+UPDATE public.identifications i
+SET taxon_id = t.id
+FROM public.taxa t
+WHERE i.taxon_id IS NULL
+  AND i.scientific_name IS NOT NULL
+  AND t.scientific_name = i.scientific_name;
+
 -- Keep observations.primary_taxon_id / obscure_level / location_obscured
 -- in sync with the primary identification. Runs whenever an identification
 -- row is flagged is_primary = true.
@@ -2761,7 +2792,7 @@ CREATE OR REPLACE VIEW public.profile_pokedex AS
 SELECT
   o.observer_id   AS user_id,
   i.taxon_id,
-  t.scientific_name,
+  COALESCE(t.scientific_name, i.scientific_name) AS scientific_name,
   t.kingdom,
   tr.bucket       AS rarity_bucket,
   MIN(o.observed_at) AS first_observed_at,
@@ -2769,13 +2800,14 @@ SELECT
 FROM public.observations o
 JOIN public.identifications i
   ON i.observation_id = o.id AND i.is_primary = true
-JOIN public.taxa t                ON t.id = i.taxon_id
-LEFT JOIN public.taxon_rarity tr  ON tr.taxon_id = i.taxon_id
+LEFT JOIN public.taxa t               ON t.id = i.taxon_id
+LEFT JOIN public.taxon_rarity tr      ON tr.taxon_id = i.taxon_id
 WHERE
   o.sync_status = 'synced'
   AND o.obscure_level <> 'private'
+  AND i.scientific_name IS NOT NULL
   AND public.can_see_facet(o.observer_id, 'pokedex', (SELECT auth.uid()))
-GROUP BY o.observer_id, i.taxon_id, t.scientific_name, t.kingdom, tr.bucket;
+GROUP BY o.observer_id, i.taxon_id, COALESCE(t.scientific_name, i.scientific_name), t.kingdom, tr.bucket;
 
 GRANT SELECT ON public.profile_pokedex TO anon, authenticated;
 
@@ -6686,3 +6718,18 @@ ALTER TABLE public.identifications
     -- M32 multi-provider vision (each provider tags its result with its kind)
     'bedrock','openai','azure_openai','gemini','vertex_ai'
   ));
+
+-- ============================================================
+-- CONSERVATION STATUS COLUMNS (karma conservation bonus — #189)
+-- ============================================================
+-- taxa.iucn_category and taxa.nom059_status already exist in the
+-- CREATE TABLE above. These idempotent ALTERs are here as a
+-- documentation marker: the karma conservation bonus system
+-- (src/lib/karma-conservation.ts) reads these columns to compute
+-- multipliers for karma rewards. Observations of threatened species
+-- earn bonus karma:
+--   IUCN:    LC(1×) → NT(1.2×) → VU(1.5×) → EN(2×) → CR(3×) → EW(5×)
+--   NOM-059: Pr(1.3×) → A(1.8×) → P(2.5×) → E(4×)
+-- The higher of the two multipliers wins.
+ALTER TABLE public.taxa ADD COLUMN IF NOT EXISTS iucn_category text;
+ALTER TABLE public.taxa ADD COLUMN IF NOT EXISTS nom059_status text;
