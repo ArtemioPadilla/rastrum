@@ -71,6 +71,13 @@ type IdentifyRequest = {
    * parallel race). Values: 'plantnet' | 'claude_haiku'.
    */
   force_provider?: 'plantnet' | 'claude_haiku';
+  /**
+   * Pixel-space bounding box [x1, y1, x2, y2] from MegaDetector. When
+   * provided, vision providers append a focus instruction to their system
+   * prompt so the model concentrates on the detected animal region.
+   * PlantNet ignores this (plant-focused, no bbox hint support).
+   */
+  crop_bbox?: [number, number, number, number];
 };
 
 type IDResult = {
@@ -165,6 +172,8 @@ interface ClaudeContext {
    */
   credential?: { secret: string; kind: CredentialKind };
   signal?: AbortSignal;
+  /** MegaDetector bounding box forwarded to the vision provider. */
+  crop_bbox?: [number, number, number, number];
 }
 
 async function callClaudeHaiku(
@@ -220,6 +229,7 @@ async function callViaProvider(
       systemPrompt: DEFAULT_SYSTEM_PROMPT,
       userText,
       signal: context.signal,
+      crop_bbox: context.crop_bbox,
     });
   } catch (err) {
     console.warn(`[identify] provider.identify failed kind=${cred.kind}: ${err instanceof Error ? err.message : String(err)}`);
@@ -502,6 +512,7 @@ serve(async (req) => {
       lng: body.location?.lng,
       credential: claudeCred ?? undefined,
       resolvedCredential: resolvedClaudeCred ?? undefined,
+      crop_bbox: body.crop_bbox,
     });
   } else {
     // Default: race PlantNet, Claude Haiku, and (placeholder) ONNX-base in
@@ -518,6 +529,7 @@ serve(async (req) => {
       lng: body.location?.lng,
       credential: claudeCred ?? undefined,
       resolvedCredential: resolvedClaudeCred ?? undefined,
+      crop_bbox: body.crop_bbox,
       signal,
     });
     runners.onnx_base = (signal) => callOnnxBase(imageBytes, signal);
