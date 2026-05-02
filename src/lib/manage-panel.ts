@@ -163,6 +163,7 @@ export async function wireManagePanelDetails(
                 status: 'accepted' as const,
                 confidence: 0.95,
               };
+              // Mark for re-sync so the identification gets persisted server-side.
               // Always flip to 'pending' — records stuck in 'error' or 'draft'
               // must also re-enter the sync queue after a species correction.
               await db.observations.update(obsId, {
@@ -213,69 +214,40 @@ export async function wireManagePanelDetails(
         weather: weatherEl?.value ?? '',
         establishment_means: estabEl?.value ?? '',
       });
+      const { error: obsErr } = await supabase
+        .from('observations')
+        .update(payload)
+        .eq('id', obsId);
+      if (obsErr) throw obsErr;
 
-      // Wrap the entire online save in a timeout so the button never
-      // stays disabled indefinitely (e.g. stale auth lock, network limbo).
-      const SAVE_TIMEOUT_MS = 15_000;
-      const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error(
-          lang === 'es'
-            ? 'La operación tardó demasiado. Verifica tu conexión e intenta de nuevo.'
-            : 'Operation timed out. Check your connection and try again.'
-        )), SAVE_TIMEOUT_MS),
-      );
-
-      await Promise.race([timeout, (async () => {
-        const { error: obsErr } = await supabase
-          .from('observations')
-          .update(payload)
-          .eq('id', obsId);
-        if (obsErr) throw obsErr;
-
-        const sci = sciInput?.value.trim();
-        if (sci) {
-          // Apply taxonomy synonym correction for known outdated names (#345)
-          const correctedSci = correctIdentificationName(sci);
-          // Demote the current primary identification. Capture the error —
-          // if RLS rejects this (stale session, wrong owner), we must not
-          // proceed to the insert or the unique partial index will reject it.
-          const { error: demoteErr } = await supabase.from('identifications')
-            .update({ is_primary: false })
-            .eq('observation_id', obsId)
-            .eq('is_primary', true);
-          if (demoteErr) throw demoteErr;
-
-          let viewerId: string | null = null;
-          try {
-            const { data: { user: viewer } } = await supabase.auth.getUser();
-            viewerId = viewer?.id ?? null;
-          } catch {
-            // Auth fetch failed — proceed without viewer ID rather than hang
-          }
-
-          const { error: idErr } = await supabase.from('identifications').insert({
-            observation_id: obsId,
-            scientific_name: correctedSci,
-            confidence: 0.95,
-            source: 'human',
-            is_primary: true,
-            validated_by: null,
-            validated_at: new Date().toISOString(),
-            raw_response: { manual_override: true, by: viewerId },
-          });
-          if (idErr) throw idErr;
-        }
-      })()]);
-
-      savedEl?.classList.remove('hidden');
       const sci = sciInput?.value.trim();
       if (sci) {
+        // Apply taxonomy synonym correction for known outdated names (#345)
         const correctedSci = correctIdentificationName(sci);
+        await supabase.from('identifications')
+          .update({ is_primary: false })
+          .eq('observation_id', obsId)
+          .eq('is_primary', true);
+        const { data: { user: viewer } } = await supabase.auth.getUser();
+        const { error: idErr } = await supabase.from('identifications').insert({
+          observation_id: obsId,
+          scientific_name: correctedSci,
+          confidence: 0.95,
+          source: 'human',
+          is_primary: true,
+          validated_by: null,
+          validated_at: new Date().toISOString(),
+          raw_response: { manual_override: true, by: viewer?.id ?? null },
+        });
+        if (idErr) throw idErr;
+        // Update the species name in the UI with the corrected name
         const speciesEl = document.getElementById('species');
         if (speciesEl) speciesEl.textContent = correctedSci;
         // If the user typed an outdated name, update the input to show the correction
         if (correctedSci !== sci && sciInput) sciInput.value = correctedSci;
       }
+
+      savedEl?.classList.remove('hidden');
       // Notify the page that identification data changed so it can
       // re-fetch community IDs and other dependent sections.
       window.dispatchEvent(new CustomEvent('rastrum:observation-updated', {
