@@ -50,8 +50,21 @@ export async function verifyJwtAndLoadRoles(req: Request): Promise<Actor> {
   return { id: userRes.user.id, roles };
 }
 
+/**
+ * Role hierarchy: admin ⊃ moderator. An admin implicitly satisfies any
+ * check that requires moderator. All other roles are independent.
+ */
+const ROLE_IMPLIES: Record<UserRole, UserRole[]> = {
+  admin:      ['moderator'],
+  moderator:  [],
+  expert:     [],
+  researcher: [],
+};
+
 export function requireRole(actor: Actor, required: UserRole): void {
-  if (!actor.roles.has(required)) {
-    throw new HttpError(403, `requires ${required}`);
+  if (actor.roles.has(required)) return;
+  for (const held of actor.roles) {
+    if (ROLE_IMPLIES[held]?.includes(required)) return;
   }
+  throw new HttpError(403, `requires ${required}`);
 }

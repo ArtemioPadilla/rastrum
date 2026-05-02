@@ -2232,7 +2232,10 @@ ALTER TABLE public.admin_audit ENABLE ROW LEVEL SECURITY;
 
 -- 6. Sync trigger keeps users.is_expert / .credentialed_researcher cached
 CREATE OR REPLACE FUNCTION public.sync_user_role_flags() RETURNS trigger
-LANGUAGE plpgsql AS $$
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 BEGIN
   IF (TG_OP = 'INSERT' OR TG_OP = 'UPDATE') THEN
     UPDATE public.users
