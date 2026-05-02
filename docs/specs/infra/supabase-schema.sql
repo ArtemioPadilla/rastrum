@@ -6260,11 +6260,11 @@ GRANT EXECUTE ON FUNCTION public.consume_pool_slot(uuid) TO service_role;
 -- ── Pool donation karma — +20 on INSERT to sponsor_pools ────────────
 -- Awards pool_donation karma to the sponsor when they create a new pool.
 CREATE OR REPLACE FUNCTION public.award_pool_donation_karma() RETURNS trigger
-LANGUAGE plpgsql AS $
+LANGUAGE plpgsql AS $$
 BEGIN
   PERFORM public.add_karma_simple(NEW.sponsor_id, 20, 'pool_donation');
   RETURN NEW;
-END $;
+END $$;
 DROP TRIGGER IF EXISTS sponsor_pools_award_donation_karma ON public.sponsor_pools;
 CREATE TRIGGER sponsor_pools_award_donation_karma AFTER INSERT ON public.sponsor_pools
   FOR EACH ROW EXECUTE FUNCTION public.award_pool_donation_karma();
