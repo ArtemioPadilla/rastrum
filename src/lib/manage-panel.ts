@@ -641,7 +641,7 @@ export async function wireManagePanelLocation(
       // differs from UPDATE policy (e.g., obscured locations hidden from view).
       const updatePromise = supabase
         .from('observations')
-        .update({ location: literal, updated_at: new Date().toISOString() })
+        .update({ location: literal, location_source: 'manual', updated_at: new Date().toISOString() })
         .eq('id', obsId);
       const timeout = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('save_timeout')), 15_000),
