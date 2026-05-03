@@ -680,9 +680,43 @@ serve(async (req) => {
 
   if (body.observation_id !== 'cascade-only') {
     if (serviceRole && supabaseUrl) {
+      // Upsert the taxon so observations.primary_taxon_id can be resolved.
+      // The identify cascade returns enough metadata (scientific_name, kingdom,
+      // family, common names) to create a minimal taxa row. On conflict we
+      // update the common names in case they improved (PlantNet → Claude or
+      // vice-versa). We do NOT overwrite kingdom/family since those come from
+      // authoritative sources (PlantNet / GBIF) and should not be clobbered.
+      let taxonId: string | null = null;
+      try {
+        const taxonPayload = {
+          scientific_name: result.scientific_name,
+          common_name_es: result.common_name_es ?? null,
+          common_name_en: result.common_name_en ?? null,
+          kingdom: result.kingdom !== 'Unknown' ? result.kingdom : null,
+          family: result.family ?? null,
+          taxon_rank: 'species',
+        };
+        const { data: taxonRow, error: taxonErr } = await db()
+          .from('taxa')
+          .upsert(taxonPayload, {
+            onConflict: 'scientific_name',
+            ignoreDuplicates: false,
+          })
+          .select('id')
+          .maybeSingle();
+        if (taxonErr) {
+          console.warn('[identify] taxa upsert failed (non-fatal)', taxonErr.message);
+        } else if (taxonRow?.id) {
+          taxonId = taxonRow.id as string;
+        }
+      } catch (e) {
+        console.warn('[identify] taxa upsert exception (non-fatal)', e);
+      }
+
       await db().from('identifications').insert({
         observation_id: body.observation_id,
         scientific_name: result.scientific_name,
+        taxon_id: taxonId,
         confidence: result.confidence,
         source: result.source,
         raw_response: result.raw as object,
