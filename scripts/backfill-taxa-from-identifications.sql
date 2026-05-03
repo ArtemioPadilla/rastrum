@@ -8,7 +8,9 @@
 -- After this runs, re-run backfill-primary-taxon-id.sql to propagate
 -- primary_taxon_id to observations.
 --
--- Safe to run multiple times (ON CONFLICT DO NOTHING).
+-- Safe to run multiple times (WHERE NOT EXISTS guard avoids duplicates;
+-- we avoid ON CONFLICT because scientific_name only has a plain index,
+-- not a UNIQUE constraint).
 -- Run with: psql "$SUPABASE_DB_URL" -f scripts/backfill-taxa-from-identifications.sql
 -- ─────────────────────────────────────────────────────────────────────────────
 
@@ -37,8 +39,7 @@ BEGIN
     AND i.scientific_name <> ''
     AND NOT EXISTS (
       SELECT 1 FROM public.taxa t WHERE t.scientific_name = i.scientific_name
-    )
-  ON CONFLICT (scientific_name) DO NOTHING;
+    );
 
   GET DIAGNOSTICS v_count = ROW_COUNT;
   RAISE NOTICE 'Step 1: inserted % new taxa from identifications', v_count;
