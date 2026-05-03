@@ -10,7 +10,7 @@ const SPONSORSHIPS_CRON_TOKEN = Deno.env.get('SPONSORSHIPS_CRON_TOKEN');
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', ...CORS_HEADERS },
   });
 }
 
@@ -31,7 +31,18 @@ function withCronToken(req: Request): boolean {
 
 const UUID_RE = /^[0-9a-f-]{36}$/;
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'authorization, content-type',
+};
+
 serve(async (req) => {
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
+  }
+
   const url = new URL(req.url);
   const path = url.pathname.replace(/^\/sponsorships/, '') || '/';
 
