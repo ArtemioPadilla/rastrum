@@ -532,10 +532,25 @@ export async function wireManagePanelPhotos(obsId: string): Promise<void> {
 }
 
 /**
- * Build the WKT geography literal Postgres expects for a `geography(POINT,4326)`
- * column. Note longitude precedes latitude per PostGIS / GeoJSON convention,
- * matching how `src/lib/sync.ts` and `ObservationForm.astro` write coords.
+ * Build a GeoJSON Point object for PostgREST / supabase-js UPDATE calls on
+ * `geography(Point,4326)` columns. PostgREST accepts WKT on INSERT via the
+ * PostgREST type-casting path, but UPDATE through supabase-js serialises the
+ * value as JSON — sending a raw WKT string results in a no-op write (the
+ * column stays at its old value). GeoJSON is the safe format for both paths.
+ *
+ * Note: longitude precedes latitude per GeoJSON spec.
  */
+export function pointGeographyGeoJSON(lat: number, lng: number): { type: 'Point'; coordinates: [number, number] } {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    throw new Error('coords_invalid');
+  }
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    throw new Error('coords_invalid');
+  }
+  return { type: 'Point', coordinates: [lng, lat] };
+}
+
+/** @deprecated Use pointGeographyGeoJSON — WKT silently no-ops on UPDATE via supabase-js */
 export function pointGeographyLiteral(lat: number, lng: number): string {
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
     throw new Error('coords_invalid');
@@ -629,19 +644,21 @@ export async function wireManagePanelLocation(
     savedEl?.classList.add('hidden');
     savingEl?.classList.remove('hidden');
     try {
-      const literal = pointGeographyLiteral(e.detail.coords.lat, e.detail.coords.lng);
+      // GeoJSON format is required for UPDATE via supabase-js — WKT strings are
+      // accepted by PostgREST on INSERT (via type-casting) but silently no-op
+      // on UPDATE because supabase-js serialises the value as JSON, not SQL.
+      // See issue #449.
+      const geoJson = pointGeographyGeoJSON(e.detail.coords.lat, e.detail.coords.lng);
       // Hard 15 s timeout — if PostgREST never returns (RLS recursion regressed,
       // CORS preflight stalled, auth refresh deadlock, etc.) the user gets a
       // visible error instead of a button stuck on "saving…" forever.
-      // Returning the explicit `select()` makes PostgREST send back the updated
-      // row, which forces the round-trip to complete instead of fire-and-forget.
       // Use count-based update: PostgREST returns the count of affected rows
       // via the `Prefer: count=exact` header. This is more reliable than
       // .select().maybeSingle() which can return null when RLS SELECT policy
       // differs from UPDATE policy (e.g., obscured locations hidden from view).
       const updatePromise = supabase
         .from('observations')
-        .update({ location: literal, location_source: 'manual', updated_at: new Date().toISOString() })
+        .update({ location: geoJson, location_source: 'manual', updated_at: new Date().toISOString() })
         .eq('id', obsId);
       const timeout = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('save_timeout')), 15_000),
