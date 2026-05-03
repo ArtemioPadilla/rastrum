@@ -55,9 +55,18 @@ async function authedFetch(path: string, init?: RequestInit): Promise<Response> 
   });
 }
 
+async function readErrorBody(r: Response): Promise<string> {
+  try {
+    const body = await r.json() as { error?: string; detail?: string; hint?: string };
+    return [body.error, body.detail, body.hint].filter(Boolean).join(' | ');
+  } catch {
+    return String(r.status);
+  }
+}
+
 export async function listCredentials(): Promise<SponsorCredential[]> {
   const r = await authedFetch('/credentials');
-  if (!r.ok) throw new Error(`listCredentials: ${r.status}`);
+  if (!r.ok) throw new Error(`listCredentials: ${await readErrorBody(r)}`);
   return r.json();
 }
 
@@ -141,7 +150,7 @@ export async function deleteCredential(id: string): Promise<void> {
 
 export async function listSponsorships(role: 'sponsor' | 'beneficiary'): Promise<Sponsorship[]> {
   const r = await authedFetch(`/sponsorships?role=${role}`);
-  if (!r.ok) throw new Error(`listSponsorships: ${r.status}`);
+  if (!r.ok) throw new Error(`listSponsorships: ${await readErrorBody(r)}`);
   return r.json();
 }
 
@@ -192,7 +201,7 @@ export async function createRequest(args: { sponsor_username: string; message?: 
 
 export async function listRequests(role: 'requester' | 'sponsor'): Promise<SponsorshipRequest[]> {
   const r = await authedFetch(`/requests?role=${role}`);
-  if (!r.ok) throw new Error(`listRequests: ${r.status}`);
+  if (!r.ok) throw new Error(`listRequests: ${await readErrorBody(r)}`);
   return r.json();
 }
 
