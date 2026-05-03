@@ -122,6 +122,14 @@ const { lang } = Astro.props;
   // Read slug from query param (?slug=X) — static site can't use [slug].astro
   const slug = new URLSearchParams(window.location.search).get('slug') ?? '';
 
+  // Don't run if no slug — this component may be rendered alongside
+  // ExplorePlacesView on the index page; running load() without a slug
+  // causes unnecessary errors and may abort sibling scripts.
+  if (!slug) {
+    // Hide skeleton immediately so ExplorePlacesView can use the loading state area
+    document.getElementById('place-loading')?.classList.add('hidden');
+  } else {
+
   async function load() {
     const supabase = getSupabase();
     // skeleton is already visible on load
@@ -327,4 +335,5 @@ const { lang } = Astro.props;
   }
 
   load();
+  } // end if (slug)
 </script>
