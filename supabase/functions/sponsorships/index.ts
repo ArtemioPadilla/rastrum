@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
-import { detectKind, validateAnthropicCredential } from '../_shared/anthropic-validate.ts';
+import { detectKind, detectAnyKind, validateAnthropicCredential } from '../_shared/anthropic-validate.ts';
 import { decryptCredential } from '../_shared/sponsorship.ts';
 
 const SUPABASE_URL            = Deno.env.get('SUPABASE_URL')!;
@@ -98,7 +98,7 @@ serve(async (req) => {
     if (!label || !secret) return jsonResponse(400, { error: 'label_and_secret_required' });
     if (label.length < 1 || label.length > 64) return jsonResponse(400, { error: 'label_length_1_64' });
 
-    const kind = detectKind(secret);
+    const kind = detectAnyKind(secret);
     if (!kind) return jsonResponse(400, { error: 'unrecognized_secret_prefix' });
 
     const validation = await validateAnthropicCredential(secret);
@@ -165,7 +165,7 @@ serve(async (req) => {
       const body = await req.json().catch(() => ({}));
       const { secret } = body as { secret?: string };
       if (!secret) return jsonResponse(400, { error: 'secret_required' });
-      const kind = detectKind(secret);
+      const kind = detectAnyKind(secret);
       if (!kind) return jsonResponse(400, { error: 'unrecognized_secret_prefix' });
       const validation = await validateAnthropicCredential(secret);
       if (!validation.valid) return jsonResponse(400, { error: 'validation_failed', detail: validation.error });

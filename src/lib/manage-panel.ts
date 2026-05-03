@@ -658,8 +658,19 @@ export async function wireManagePanelLocation(
       window.dispatchEvent(new CustomEvent('rastrum:mappicker-set-initial', {
         detail: { id: 'obs-detail-edit', coords: e.detail.coords },
       }));
+      // Also update the main obs-detail header map and coords text
+      window.dispatchEvent(new CustomEvent('rastrum:mappicker-set', {
+        detail: { id: 'obs-detail', coords: e.detail.coords },
+      }));
+      const coordStr = `${e.detail.coords.lat.toFixed(4)}, ${e.detail.coords.lng.toFixed(4)}`;
+      // Update both the manage-panel coords text and the main header coords
       const coordsEl = document.querySelector<HTMLElement>('[data-loc-coords]');
-      if (coordsEl) coordsEl.textContent = `${e.detail.coords.lat.toFixed(4)}, ${e.detail.coords.lng.toFixed(4)}`;
+      if (coordsEl) coordsEl.textContent = coordStr;
+      const obsCoords = document.querySelector<HTMLElement>('[data-obs-coords]');
+      if (obsCoords) obsCoords.textContent = coordStr;
+      // Remove any "Location not available" placeholder in the header
+      const noLocEl = document.querySelector<HTMLElement>('[data-no-location]');
+      if (noLocEl) noLocEl.classList.add('hidden');
       savedEl?.classList.remove('hidden');
     } catch (err) {
       const code = err instanceof Error ? err.message : String(err);
