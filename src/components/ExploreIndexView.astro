@@ -43,6 +43,13 @@ const cards = [
     // Magnifying-glass-with-checkmark — a "validate / verify" metaphor.
     iconPath: 'M21 21l-4.35-4.35M16 9a7 7 0 11-14 0 7 7 0 0114 0zm-9 0l2 2 4-4',
   },
+  {
+    href: getLocalizedPath(lang, routes.projects[lang] + '/'),
+    title: isEs ? 'Proyectos' : 'Projects',
+    body:  isEs ? 'Define un polígono ANP y las observaciones dentro se etiquetan automáticamente a tu proyecto.'
+                : 'Define an ANP polygon and observations inside are automatically tagged to your project.',
+    iconPath: 'M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7',
+  },
 ];
 ---
 
