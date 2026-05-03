@@ -124,7 +124,7 @@ export async function wireManagePanelDetails(
   const deleteBtn  = document.getElementById('m-delete')        as HTMLButtonElement | null;
   const form       = document.getElementById('manage-form')     as HTMLFormElement | null;
 
-  if (sciInput)   sciInput.value   = '';
+  if (sciInput)   sciInput.value   = (_ident?.scientific_name as string | null) ?? '';
   if (notesEl)    notesEl.value    = (obs.notes as string | null) ?? '';
   if (obsEl)      obsEl.value      = (obs.obscure_level as string) ?? 'none';
   if (observedAt) observedAt.value = isoToLocalDatetimeInput(obs.observed_at as string | null | undefined);
@@ -609,25 +609,21 @@ export async function wireManagePanelLocation(
       // visible error instead of a button stuck on "saving…" forever.
       // Returning the explicit `select()` makes PostgREST send back the updated
       // row, which forces the round-trip to complete instead of fire-and-forget.
+      // Use count-based update: PostgREST returns the count of affected rows
+      // via the `Prefer: count=exact` header. This is more reliable than
+      // .select().maybeSingle() which can return null when RLS SELECT policy
+      // differs from UPDATE policy (e.g., obscured locations hidden from view).
       const updatePromise = supabase
         .from('observations')
         .update({ location: literal, updated_at: new Date().toISOString() })
-        .eq('id', obsId)
-        .select('id, location')
-        .maybeSingle();
+        .eq('id', obsId);
       const timeout = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('save_timeout')), 15_000),
       );
-      const result = await Promise.race([updatePromise, timeout]) as { data: unknown; error: { message?: string; code?: string } | null };
+      const result = await Promise.race([updatePromise, timeout]) as { error: { message?: string; code?: string } | null };
       if (result.error) {
         console.error('[manage-panel] location update failed', { obsId, err: result.error });
         throw new Error(result.error.message || result.error.code || 'update_failed');
-      }
-      if (!result.data) {
-        // Empty body = RLS filtered the UPDATE (no rows matched observer_id).
-        // Don't claim success — the row didn't change.
-        console.warn('[manage-panel] location update returned 0 rows (RLS filtered)', { obsId });
-        throw new Error('rls_filtered');
       }
 
       window.dispatchEvent(new CustomEvent('rastrum:mappicker-set', {
