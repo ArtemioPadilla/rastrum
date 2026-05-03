@@ -30,6 +30,7 @@ export const routes: Record<string, Record<Locale, string>> = {
   exploreRecent: { en: '/explore/recent', es: '/explorar/recientes' },
   exploreWatchlist: { en: '/explore/watchlist', es: '/explorar/seguimiento' },
   exploreSpecies: { en: '/explore/species', es: '/explorar/especies' },
+  explorePlaces:  { en: '/explore/places',  es: '/explorar/lugares' },
   exploreValidate: { en: '/explore/validate', es: '/explorar/validar' },
   observe: { en: '/observe', es: '/observar' },
   about: { en: '/about', es: '/acerca' },
@@ -159,6 +160,7 @@ export const routeTree: Record<string, RouteNode> = {
   exploreRecent:     { labels: { en: 'Recent',    es: 'Recientes' },    parent: 'explore' },
   exploreWatchlist:  { labels: { en: 'Watchlist', es: 'Seguimiento' },  parent: 'explore' },
   exploreSpecies:    { labels: { en: 'Species',   es: 'Especies' },     parent: 'explore' },
+  explorePlaces:     { labels: { en: 'Places',    es: 'Lugares' },      parent: 'explore' },
   exploreValidate:   { labels: { en: 'Validate',  es: 'Validar' },      parent: 'explore' },
   chat:        { labels: { en: 'Chat',          es: 'Chat' } },
   // Community discovery (M28)

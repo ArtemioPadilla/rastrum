@@ -7141,37 +7141,38 @@ GRANT EXECUTE ON FUNCTION public.place_top_species(uuid, int) TO authenticated, 
 GRANT EXECUTE ON FUNCTION public.place_top_observers(uuid, int) TO authenticated, anon;
 GRANT EXECUTE ON FUNCTION public.place_geojson_by_slug(text) TO authenticated, anon;
 
--- ── M-Loc-5: places_map_geojson RPC ──────────────────────────────────────────
--- Returns a GeoJSON FeatureCollection of places for the explore map layer.
--- Only includes places with observations. Capped to avoid large payloads.
+-- ── M-Loc-4/5: places_near RPC ────────────────────────────────────────────────
+-- Returns places sorted by distance from a given lat/lng point.
+-- Used by the "Near me" button on the places index page.
 
-CREATE OR REPLACE FUNCTION public.places_map_geojson(p_limit int DEFAULT 150)
-RETURNS json
+CREATE OR REPLACE FUNCTION public.places_near(
+  p_lat    double precision,
+  p_lng    double precision,
+  p_limit  int DEFAULT 20,
+  p_offset int DEFAULT 0
+)
+RETURNS TABLE (
+  id           uuid,
+  slug         text,
+  name         text,
+  place_type   text,
+  obs_count    int,
+  species_count int,
+  distance_m   double precision
+)
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
-  SELECT json_build_object(
-    'type', 'FeatureCollection',
-    'features', COALESCE(json_agg(
-      json_build_object(
-        'type', 'Feature',
-        'geometry', ST_AsGeoJSON(geometry)::json,
-        'properties', json_build_object(
-          'id',         id,
-          'slug',       slug,
-          'name',       name,
-          'place_type', place_type,
-          'obs_count',  obs_count
-        )
-      )
-    ), '[]'::json)
-  )
-  FROM (
-    SELECT id, slug, name, place_type, obs_count, geometry
-    FROM public.places
-    WHERE obs_count > 0
-    ORDER BY obs_count DESC
-    LIMIT p_limit
-  ) t;
+  SELECT
+    id, slug, name, place_type, obs_count, species_count,
+    ST_Distance(
+      geometry,
+      ST_SetSRID(ST_MakePoint(p_lng, p_lat), 4326)::geography
+    ) AS distance_m
+  FROM public.places
+  WHERE obs_count > 0
+  ORDER BY distance_m ASC
+  LIMIT p_limit OFFSET p_offset;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.places_map_geojson(int) TO authenticated, anon;
+GRANT EXECUTE ON FUNCTION public.places_near(double precision, double precision, int, int)
+  TO authenticated, anon;

@@ -36,12 +36,26 @@ const cards = [
     iconPath: 'M5 4v3M19 4v3M3 12h18M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
   },
   {
+    href: getLocalizedPath(lang, routes.explorePlaces[lang] + '/'),
+    title: isEs ? 'Lugares' : 'Places',
+    body:  isEs ? 'Explora áreas protegidas, reservas y zonas activas. Descubre qué se ha observado cerca de ti.'
+                : 'Explore protected areas, reserves and active zones. Discover what has been observed near you.',
+    iconPath: 'M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z',
+  },
+  {
     href: getLocalizedPath(lang, routes.exploreValidate[lang] + '/'),
     title: isEs ? 'Validar' : 'Validate',
     body:  isEs ? 'Sugiere identificaciones para observaciones que necesitan ayuda. Las sugerencias de expertos pesan más en el consenso.'
                 : "Suggest identifications for observations that need community help. Expert suggestions carry more weight in consensus.",
     // Magnifying-glass-with-checkmark — a "validate / verify" metaphor.
     iconPath: 'M21 21l-4.35-4.35M16 9a7 7 0 11-14 0 7 7 0 0114 0zm-9 0l2 2 4-4',
+  },
+  {
+    href: getLocalizedPath(lang, routes.explorePlaces[lang] + '/'),
+    title: isEs ? 'Lugares' : 'Places',
+    body:  isEs ? 'Áreas protegidas, zonas H3 y lugares comunitarios con observaciones de biodiversidad.'
+                : 'Protected areas, H3 zones, and community places with biodiversity observations.',
+    iconPath: 'M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0zM15 11a3 3 0 11-6 0 3 3 0 016 0z',
   },
   {
     href: getLocalizedPath(lang, routes.projects[lang] + '/'),
