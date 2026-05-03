@@ -648,6 +648,15 @@ export async function wireManagePanelLocation(
       // PostgREST cannot implicitly cast jsonb → geography (requires owning both
       // types). Use the RPC function instead — it accepts lat/lng as floats
       // and builds the geography internally with ST_MakePoint.
+      //
+      // Refresh the session first: an expired JWT causes the RPC to hang
+      // (PostgREST waits for auth rather than returning 401 immediately),
+      // which triggers the 15 s save_timeout. A fresh token prevents that.
+      try {
+        await supabase.auth.refreshSession();
+      } catch {
+        // Non-fatal — if refresh fails the RPC will still fail fast with 401
+      }
       // Hard 15 s timeout — if PostgREST never returns the user gets a
       // visible error instead of a button stuck on "saving…" forever.
       const updatePromise = supabase
