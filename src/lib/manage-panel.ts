@@ -662,13 +662,19 @@ export async function wireManagePanelLocation(
       const timeout = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('save_timeout')), 15_000),
       );
-      const updatePromise = refreshPromise.then(() =>
-        supabase.rpc('update_observation_location', {
+      const updatePromise = refreshPromise.then(() => {
+        // Log params before calling RPC to verify they are valid
+        console.log('[manage-panel] calling update_observation_location', {
+          p_obs_id: obsId,
+          p_lat: e.detail.coords.lat,
+          p_lng: e.detail.coords.lng,
+        });
+        return supabase.rpc('update_observation_location', {
           p_obs_id: obsId,
           p_lat:    e.detail.coords.lat,
           p_lng:    e.detail.coords.lng,
-        }),
-      );
+        });
+      });
       const result = await Promise.race([updatePromise, timeout]) as { error: { message?: string; code?: string } | null };
       if (result.error) {
         // Log full error details so the console report includes the actual
