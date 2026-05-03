@@ -233,6 +233,8 @@ const placesIndexBase = `/${lang}/${lang === 'es' ? 'explorar/lugares' : 'explor
     emptyEl.classList.add('hidden');
     paginationEl.classList.add('hidden');
 
+    try {
+
     const supabase = getSupabase();
     const offset   = currentPage * PAGE_SIZE;
 
@@ -249,7 +251,13 @@ const placesIndexBase = `/${lang}/${lang === 'es' ? 'explorar/lugares' : 'explor
 
     loadingEl.classList.add('hidden');
 
-    if (error || !data || data.length === 0) {
+    if (error) {
+      console.error('[places-index] fetch error', error);
+      emptyEl.textContent = `Error: ${error.message ?? 'unknown'}`;
+      emptyEl.classList.remove('hidden');
+      return;
+    }
+    if (!data || data.length === 0) {
       emptyEl.textContent = labels.empty;
       emptyEl.classList.remove('hidden');
       return;
@@ -266,6 +274,12 @@ const placesIndexBase = `/${lang}/${lang === 'es' ? 'explorar/lugares' : 'explor
       prevBtn.disabled       = currentPage === 0;
       nextBtn.disabled       = currentPage >= pages - 1;
       paginationEl.classList.remove('hidden');
+    }
+    } catch (err) {
+      console.error('[places-index] unexpected error', err);
+      loadingEl.classList.add('hidden');
+      emptyEl.textContent = `Error loading places: ${(err as Error)?.message ?? err}`;
+      emptyEl.classList.remove('hidden');
     }
   }
 
