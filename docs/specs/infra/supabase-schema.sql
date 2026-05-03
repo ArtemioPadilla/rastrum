@@ -6837,3 +6837,28 @@ DO $$ BEGIN
     CHECK (reaction_type IN ('thumbs_up','thumbs_down','heart','expert','best_shot'));
 EXCEPTION WHEN others THEN NULL; END $$;
 
+-- ── GeoJSON → geography implicit cast ────────────────────────────────────────
+-- PostgREST sends JSON objects as jsonb when updating geography columns.
+-- Without this cast, PATCH /observations with {location: {type:"Point",...}}
+-- fails with HTTP 500 ("could not find implicit cast from jsonb to geography").
+-- The cast function wraps ST_GeomFromGeoJSON and forces SRID=4326.
+-- castcontext='i' (implicit) allows PostgREST to use it automatically.
+
+CREATE OR REPLACE FUNCTION public.jsonb_to_geography(jsonb)
+RETURNS geography
+LANGUAGE sql
+IMMUTABLE
+STRICT
+SECURITY INVOKER
+SET search_path = public, pg_temp
+AS $$
+  SELECT ST_SetSRID(ST_GeomFromGeoJSON($1::text), 4326)::geography;
+$$;
+
+DO $$ BEGIN
+  CREATE CAST (jsonb AS geography)
+    WITH FUNCTION public.jsonb_to_geography(jsonb)
+    AS IMPLICIT;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+
