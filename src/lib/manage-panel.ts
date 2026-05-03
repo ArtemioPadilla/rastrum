@@ -6,7 +6,7 @@
 //
 // Material-edit detection happens server-side via the
 // `observations_material_edit_check` BEFORE UPDATE trigger (PR2). The
-// client only issues plain `update(...)` calls — no application-side
+// client only issues plain `update(...)` calls - no application-side
 // flagging is needed.
 
 import { getSupabase } from './supabase';
@@ -103,11 +103,11 @@ export async function wireManagePanelDetails(
   const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
   const copy: SaveCopy = lang === 'es'
     ? {
-        saving: 'Guardando…',
+        saving: 'Guardando...',
         delete_confirm: '¿Eliminar esta observación? Esta acción no se puede deshacer. Las fotos, identificaciones y metadatos se eliminarán.',
       }
     : {
-        saving: 'Saving…',
+        saving: 'Saving...',
         delete_confirm: 'Delete this observation? This cannot be undone. Photos, identifications, and metadata will all be removed.',
       };
 
@@ -163,7 +163,7 @@ export async function wireManagePanelDetails(
                 status: 'accepted' as const,
                 confidence: 0.95,
               };
-              // Always flip to 'pending' — records stuck in 'error' or 'draft'
+              // Always flip to 'pending' - records stuck in 'error' or 'draft'
               // must also re-enter the sync queue after a species correction.
               await db.observations.update(obsId, {
                 data: record.data,
@@ -178,8 +178,8 @@ export async function wireManagePanelDetails(
               // Show offline indicator
               if (savedEl) {
                 savedEl.textContent = lang === 'es'
-                  ? '✓ Guardado localmente — se sincronizará cuando haya conexión'
-                  : '✓ Saved locally — will sync when online';
+                  ? '✓ Guardado localmente - se sincronizará cuando haya conexión'
+                  : '✓ Saved locally - will sync when online';
               }
             } else {
               throw new Error('Observation not found in local database');
@@ -195,8 +195,8 @@ export async function wireManagePanelDetails(
         } else {
           if (errEl) {
             errEl.textContent = lang === 'es'
-              ? 'Sin conexión — solo se puede guardar el nombre de especie offline'
-              : 'Offline — only species name can be saved offline';
+              ? 'Sin conexión - solo se puede guardar el nombre de especie offline'
+              : 'Offline - only species name can be saved offline';
             errEl.classList.remove('hidden');
           }
         }
@@ -236,7 +236,7 @@ export async function wireManagePanelDetails(
         if (sci) {
           // Apply taxonomy synonym correction for known outdated names (#345)
           const correctedSci = correctIdentificationName(sci);
-          // Demote the current primary identification. Capture the error —
+          // Demote the current primary identification. Capture the error -
           // if RLS rejects this (stale session, wrong owner), we must not
           // proceed to the insert or the unique partial index will reject it.
           const { error: demoteErr } = await supabase.from('identifications')
@@ -250,7 +250,7 @@ export async function wireManagePanelDetails(
             const { data: { user: viewer } } = await supabase.auth.getUser();
             viewerId = viewer?.id ?? null;
           } catch {
-            // Auth fetch failed — proceed without viewer ID rather than hang
+            // Auth fetch failed - proceed without viewer ID rather than hang
           }
 
           const { error: idErr } = await supabase.from('identifications').insert({
@@ -371,7 +371,7 @@ export async function wireManagePanelPhotos(obsId: string): Promise<void> {
         delete_confirm_title:  'Eliminar foto',
         delete_confirm_label:  'Eliminar',
         upload_failed:         'Subida de foto fallida. Intenta de nuevo.',
-        uploading:             'Subiendo…',
+        uploading:             'Subiendo...',
         delete_photo_aria:     'Eliminar foto',
       }
     : {
@@ -380,7 +380,7 @@ export async function wireManagePanelPhotos(obsId: string): Promise<void> {
         delete_confirm_title:  'Delete photo',
         delete_confirm_label:  'Delete',
         upload_failed:         'Photo upload failed. Please try again.',
-        uploading:             'Uploading…',
+        uploading:             'Uploading...',
         delete_photo_aria:     'Delete photo',
       };
 
@@ -535,7 +535,7 @@ export async function wireManagePanelPhotos(obsId: string): Promise<void> {
  * Build a GeoJSON Point object for PostgREST / supabase-js UPDATE calls on
  * `geography(Point,4326)` columns. PostgREST accepts WKT on INSERT via the
  * PostgREST type-casting path, but UPDATE through supabase-js serialises the
- * value as JSON — sending a raw WKT string results in a no-op write (the
+ * value as JSON - sending a raw WKT string results in a no-op write (the
  * column stays at its old value). GeoJSON is the safe format for both paths.
  *
  * Note: longitude precedes latitude per GeoJSON spec.
@@ -550,7 +550,7 @@ export function pointGeographyGeoJSON(lat: number, lng: number): { type: 'Point'
   return { type: 'Point', coordinates: [lng, lat] };
 }
 
-/** @deprecated Use pointGeographyGeoJSON — WKT silently no-ops on UPDATE via supabase-js */
+/** @deprecated Use pointGeographyGeoJSON - WKT silently no-ops on UPDATE via supabase-js */
 export function pointGeographyLiteral(lat: number, lng: number): string {
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
     throw new Error('coords_invalid');
@@ -611,14 +611,14 @@ export async function wireManagePanelLocation(
   const savedEl  = document.getElementById('m-loc-saved');
   const errEl    = document.getElementById('m-loc-error');
 
-  // GPS button — use device location
+  // GPS button - use device location
   const gpsBtn = document.getElementById('m-loc-gps') as HTMLButtonElement | null;
   if (gpsBtn && 'geolocation' in navigator) {
     gpsBtn.classList.remove('hidden');
     gpsBtn.addEventListener('click', () => {
       const gpsStatus = document.getElementById('m-loc-gps-status');
       gpsBtn.disabled = true;
-      if (gpsStatus) { gpsStatus.textContent = isEs ? 'Obteniendo ubicación…' : 'Getting location…'; gpsStatus.classList.remove('hidden'); }
+      if (gpsStatus) { gpsStatus.textContent = isEs ? 'Obteniendo ubicación...' : 'Getting location...'; gpsStatus.classList.remove('hidden'); }
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           gpsBtn.disabled = false;
@@ -640,7 +640,7 @@ export async function wireManagePanelLocation(
   // Use a named handler so we can remove any previously registered listener
   // before adding a new one. wireManagePanelLocation can be called more than
   // once (page navigation, panel re-init), and window.addEventListener without
-  // cleanup stacks duplicate listeners — each one fires on the same event,
+  // cleanup stacks duplicate listeners - each one fires on the same event,
   // causing concurrent refreshSession() + RPC calls that deadlock the
   // supabase-js auth mutex and trigger save_timeout.
   const existingHandler = (window as Window & { __rastrum_loc_handler?: EventListener }).__rastrum_loc_handler;
@@ -653,37 +653,32 @@ export async function wireManagePanelLocation(
     savedEl?.classList.add('hidden');
     savingEl?.classList.remove('hidden');
     try {
-      // GeoJSON format is required for UPDATE via supabase-js — WKT strings are
       // PostgREST cannot implicitly cast jsonb → geography (requires owning both
       // types). Use the RPC function instead — it accepts lat/lng as floats
       // and builds the geography internally with ST_MakePoint.
       //
-      // Include both refreshSession + RPC inside the single 15 s timeout so
-      // a hanging auth refresh doesn’t eat the whole budget before the RPC
-      // even starts. refreshSession is capped at 5 s; on failure we proceed
-      // with the existing token (the RPC will fail with 401 if truly expired,
-      // which shows the session-expired error instead of a generic timeout).
-      const refreshPromise = Promise.race([
-        supabase.auth.refreshSession(),
-        new Promise<void>(resolve => setTimeout(resolve, 5_000)),
-      ]).catch(() => { /* non-fatal */ });
-      // Hard 15 s timeout on the full operation (refresh + RPC).
+      // Do NOT call refreshSession() before the RPC — supabase-js has an
+      // internal auth lock mutex that serializes all auth calls. The page
+      // already calls getUser() in multiple places concurrently; adding a
+      // refreshSession() here causes the RPC's own internal auth-token
+      // lookup to queue behind the mutex and the fetch never starts within
+      // the 15 s window. supabase-js refreshes tokens automatically on
+      // every request when needed — no manual refresh required.
+      //
+      // Hard 15 s timeout on the RPC.
       const timeout = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('save_timeout')), 15_000),
       );
-      const updatePromise = refreshPromise.then(() => {
-        // Log params before calling RPC to verify they are valid
-        // console.log captured by ReportIssueButton via [manage-panel] prefix filter
-        console.log('[manage-panel] calling update_observation_location', {
-          p_obs_id: obsId,
-          p_lat: e.detail.coords.lat,
-          p_lng: e.detail.coords.lng,
-        });
-        return supabase.rpc('update_observation_location', {
-          p_obs_id: obsId,
-          p_lat:    e.detail.coords.lat,
-          p_lng:    e.detail.coords.lng,
-        });
+      // Log params before calling RPC
+      console.log('[manage-panel] calling update_observation_location', {
+        p_obs_id: obsId,
+        p_lat: e.detail.coords.lat,
+        p_lng: e.detail.coords.lng,
+      });
+      const updatePromise = supabase.rpc('update_observation_location', {
+        p_obs_id: obsId,
+        p_lat:    e.detail.coords.lat,
+        p_lng:    e.detail.coords.lng,
       });
       const result = await Promise.race([updatePromise, timeout]) as { error: { message?: string; code?: string } | null };
       if (result.error) {
@@ -724,7 +719,7 @@ export async function wireManagePanelLocation(
       if (noLocEl) noLocEl.classList.add('hidden');
       savedEl?.classList.remove('hidden');
     } catch (err) {
-      // Serialize error properly — supabase-js PostgrestError is a POJO, not an Error
+      // Serialize error properly - supabase-js PostgrestError is a POJO, not an Error
       // instance, so err instanceof Error is false and String(err) = "[object Object]".
       // Use JSON.stringify with a fallback to expose the full error object in the log.
       const safeStr = (v: unknown): string => {
