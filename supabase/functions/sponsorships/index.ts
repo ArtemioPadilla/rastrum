@@ -44,11 +44,22 @@ serve(async (req) => {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
   }
 
+  // Support X-HTTP-Method-Override for environments that block DELETE/PUT (mobile carriers)
+  const methodOverride = req.headers.get('X-HTTP-Method-Override');
+  const effectiveMethod = (methodOverride === 'DELETE' || methodOverride === 'PATCH' || methodOverride === 'PUT')
+    ? methodOverride
+    : method;
+  const req2 = effectiveMethod !== method
+    ? new Request(req.url, { method: effectiveMethod, headers: req.headers, body: req.body })
+    : req;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const req = req2 as typeof req2;  // use effective method
   const url = new URL(req.url);
   const path = url.pathname.replace(/^\/sponsorships/, '') || '/';
 
   // ───────────── Heartbeat (cron-only) ─────────────
-  if (req.method === 'POST' && path === '/heartbeat') {
+  if (method === 'POST' && path === '/heartbeat') {
     if (!withCronToken(req)) return jsonResponse(401, { error: 'no_cron_token' });
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE);
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60_000).toISOString();
@@ -92,7 +103,7 @@ serve(async (req) => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE);
 
   // POST /credentials
-  if (req.method === 'POST' && path === '/credentials') {
+  if (method === 'POST' && path === '/credentials') {
     const body = await req.json().catch(() => ({}));
     const { label, secret, provider = 'anthropic' } = body as { label?: string; secret?: string; provider?: string };
     if (!label || !secret) return jsonResponse(400, { error: 'label_and_secret_required' });
@@ -143,7 +154,7 @@ serve(async (req) => {
   }
 
   // GET /credentials
-  if (req.method === 'GET' && path === '/credentials') {
+  if (method === 'GET' && path === '/credentials') {
     const { data, error } = await supabase
       .from('sponsor_credentials')
       .select('id, label, provider, kind, preferred_model, validated_at, last_used_at, revoked_at, created_at')
@@ -159,7 +170,7 @@ serve(async (req) => {
   // POST /credentials/:id/test — validate credential is working right now
   {
     const m = path.match(/^\/credentials\/([0-9a-f-]{36})\/test$/);
-    if (m && req.method === 'POST') {
+    if (m && method === 'POST') {
       const credId = m[1];
       const { data: cred } = await supabase
         .from('sponsor_credentials')
@@ -218,7 +229,7 @@ serve(async (req) => {
   // POST /credentials/:id/rotate
   {
     const m = path.match(/^\/credentials\/([0-9a-f-]{36})\/rotate$/);
-    if (m && req.method === 'POST') {
+    if (m && method === 'POST') {
       const credId = m[1];
       const { data: cred } = await supabase
         .from('sponsor_credentials').select('user_id, vault_secret_id, label')
@@ -272,7 +283,7 @@ serve(async (req) => {
   // DELETE /credentials/:id
   {
     const m = path.match(/^\/credentials\/([0-9a-f-]{36})$/);
-    if (m && req.method === 'DELETE') {
+    if (m && method === 'DELETE') {
       const credId = m[1];
       const { data: cred } = await supabase
         .from('sponsor_credentials').select('user_id, vault_secret_id')
@@ -299,7 +310,7 @@ serve(async (req) => {
   }
 
   // POST /sponsorships
-  if (req.method === 'POST' && path === '/sponsorships') {
+  if (method === 'POST' && path === '/sponsorships') {
     const body = await req.json().catch(() => ({}));
     const {
       beneficiary_username, credential_id,
@@ -355,7 +366,7 @@ serve(async (req) => {
   }
 
   // GET /sponsorships?role=sponsor|beneficiary
-  if (req.method === 'GET' && path === '/sponsorships') {
+  if (method === 'GET' && path === '/sponsorships') {
     const role = url.searchParams.get('role') ?? 'sponsor';
     const col = role === 'beneficiary' ? 'beneficiary_id' : 'sponsor_id';
     const { data, error } = await supabase
@@ -374,7 +385,7 @@ serve(async (req) => {
   // POST /sponsorships/:id/unpause (3-strike check)
   {
     const m = path.match(/^\/sponsorships\/([0-9a-f-]{36})\/unpause$/);
-    if (m && req.method === 'POST') {
+    if (m && method === 'POST') {
       const id = m[1];
       const { data: spons } = await supabase
         .from('sponsorships').select('sponsor_id, beneficiary_id, status').eq('id', id).single();
@@ -410,7 +421,7 @@ serve(async (req) => {
   // GET /sponsorships/:id/usage
   {
     const m = path.match(/^\/sponsorships\/([0-9a-f-]{36})\/usage$/);
-    if (m && req.method === 'GET') {
+    if (m && method === 'GET') {
       const id = m[1];
       const { data: spons } = await supabase
         .from('sponsorships').select('sponsor_id, beneficiary_id, monthly_call_cap').eq('id', id).single();
@@ -457,7 +468,7 @@ serve(async (req) => {
   // PATCH /sponsorships/:id
   {
     const m = path.match(/^\/sponsorships\/([0-9a-f-]{36})$/);
-    if (m && req.method === 'PATCH') {
+    if (m && method === 'PATCH') {
       const id = m[1];
       const body = await req.json().catch(() => ({}));
       const { data: spons } = await supabase
@@ -489,7 +500,7 @@ serve(async (req) => {
   // DELETE /sponsorships/:id
   {
     const m = path.match(/^\/sponsorships\/([0-9a-f-]{36})$/);
-    if (m && req.method === 'DELETE') {
+    if (m && method === 'DELETE') {
       const id = m[1];
       const { data: spons } = await supabase
         .from('sponsorships').select('sponsor_id, beneficiary_id').eq('id', id).single();
@@ -513,7 +524,43 @@ serve(async (req) => {
   }
 
   // POST /requests — beneficiary creates a request to a sponsor by username
-  if (req.method === 'POST' && path === '/requests') {
+  // PATCH /pools/:id — update cap, daily_user_cap, preferred_model
+  {
+    const m = path.match(/^\/pools\/([0-9a-f-]{36})$/);
+    if (m && method === 'PATCH') {
+      const poolId = m[1];
+      const { data: pool } = await supabase.from('sponsor_pools').select('credential_id').eq('id', poolId).single();
+      if (!pool) return jsonResponse(404, { error: 'not_found' });
+      const { data: cred } = await supabase.from('sponsor_credentials').select('user_id').eq('id', (pool as { credential_id: string }).credential_id).single();
+      if (!cred || (cred as { user_id: string }).user_id !== ctx.userId) return jsonResponse(403, { error: 'forbidden' });
+      const body = await req.json().catch(() => ({}));
+      const patch: Record<string, unknown> = {};
+      if (typeof body.total_cap === 'number') patch.total_cap = body.total_cap;
+      if (typeof body.daily_user_cap === 'number') patch.daily_user_cap = body.daily_user_cap;
+      if (typeof body.preferred_model === 'string') patch.preferred_model = body.preferred_model;
+      if (typeof body.status === 'string' && ['active','paused'].includes(body.status)) patch.status = body.status;
+      const { error } = await supabase.from('sponsor_pools').update(patch).eq('id', poolId);
+      if (error) return jsonResponse(500, { error: 'update_failed', detail: error.message });
+      return jsonResponse(200, { ok: true });
+    }
+  }
+
+  // DELETE /pools/:id — remove pool (sets status to revoked or hard-deletes)
+  {
+    const m = path.match(/^\/pools\/([0-9a-f-]{36})$/);
+    if (m && method === 'DELETE') {
+      const poolId = m[1];
+      const { data: pool } = await supabase.from('sponsor_pools').select('credential_id').eq('id', poolId).single();
+      if (!pool) return jsonResponse(404, { error: 'not_found' });
+      const { data: cred } = await supabase.from('sponsor_credentials').select('user_id').eq('id', (pool as { credential_id: string }).credential_id).single();
+      if (!cred || (cred as { user_id: string }).user_id !== ctx.userId) return jsonResponse(403, { error: 'forbidden' });
+      const { error } = await supabase.from('sponsor_pools').delete().eq('id', poolId);
+      if (error) return jsonResponse(500, { error: 'delete_failed', detail: error.message });
+      return jsonResponse(204, null);
+    }
+  }
+
+  if (method === 'POST' && path === '/requests') {
     const body = await req.json().catch(() => ({}));
     const { sponsor_username, message } = body as { sponsor_username?: string; message?: string };
     if (!sponsor_username) return jsonResponse(400, { error: 'sponsor_username_required' });
@@ -542,7 +589,7 @@ serve(async (req) => {
   }
 
   // GET /requests?role=requester|sponsor
-  if (req.method === 'GET' && path === '/requests') {
+  if (method === 'GET' && path === '/requests') {
     const role = url.searchParams.get('role') ?? 'requester';
     const col = role === 'sponsor' ? 'target_sponsor_id' : 'requester_id';
     const { data, error } = await supabase
@@ -559,7 +606,7 @@ serve(async (req) => {
   // POST /requests/:id/approve — sponsor approves; creates a sponsorship row
   {
     const m = path.match(/^\/requests\/([0-9a-f-]{36})\/approve$/);
-    if (m && req.method === 'POST') {
+    if (m && method === 'POST') {
       const id = m[1];
       const body = await req.json().catch(() => ({}));
       const { credential_id, monthly_call_cap = 200, priority = 100 } = body as { credential_id?: string; monthly_call_cap?: number; priority?: number };
@@ -617,7 +664,7 @@ serve(async (req) => {
   // POST /requests/:id/reject
   {
     const m = path.match(/^\/requests\/([0-9a-f-]{36})\/reject$/);
-    if (m && req.method === 'POST') {
+    if (m && method === 'POST') {
       const id = m[1];
       const { data: request } = await supabase
         .from('sponsorship_requests').select('target_sponsor_id, status').eq('id', id).single();
@@ -639,7 +686,7 @@ serve(async (req) => {
   // DELETE /requests/:id — requester withdraws
   {
     const m = path.match(/^\/requests\/([0-9a-f-]{36})$/);
-    if (m && req.method === 'DELETE') {
+    if (m && method === 'DELETE') {
       const id = m[1];
       const { data: request } = await supabase
         .from('sponsorship_requests').select('requester_id, status').eq('id', id).single();
@@ -658,5 +705,5 @@ serve(async (req) => {
     }
   }
 
-  return jsonResponse(404, { error: 'not_found', path, method: req.method });
+  return jsonResponse(404, { error: 'not_found', path, method: method });
 });

@@ -296,7 +296,7 @@ const langJson = JSON.stringify(lang);
     listCredentials, createCredential, rotateCredential, deleteCredential,
     listSponsorships, createSponsorship, unpauseSponsorship, revokeSponsorship, testCredential,
     detectKind,
-    listMyPools, createPool, setPoolStatus,
+    listMyPools, createPool, setPoolStatus, updatePool, deletePool,
   } from '../lib/sponsorships';
 
   type I18nBag = {
@@ -663,12 +663,13 @@ const langJson = JSON.stringify(lang);
               <div class="h-full bg-emerald-600" style="width: ${pct}%"></div>
             </div>
           </div>
-          <div class="flex items-center gap-1">
+          <div class="flex items-center gap-1 flex-wrap justify-end">
             ${p.status === 'active'
-              ? `<button data-pool-pause="${escHtml(p.id)}" class="text-xs text-amber-700 hover:text-amber-900 px-2 py-1">Pause</button>`
+              ? `<button data-pool-pause="${escHtml(p.id)}" class="text-xs px-2 py-1 rounded border border-amber-400 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20">Pause</button>`
               : p.status === 'paused'
-                ? `<button data-pool-resume="${escHtml(p.id)}" class="text-xs text-emerald-700 hover:text-emerald-900 px-2 py-1">Resume</button>`
+                ? `<button data-pool-resume="${escHtml(p.id)}" class="text-xs px-2 py-1 rounded border border-emerald-500 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20">Resume</button>`
                 : ''}
+            <button data-pool-delete="${escHtml(p.id)}" class="text-xs px-2 py-1 rounded border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">Delete</button>
           </div>
         </li>
       `;
@@ -684,6 +685,11 @@ const langJson = JSON.stringify(lang);
       } else if (target.dataset.poolResume) {
         await setPoolStatus(target.dataset.poolResume, 'active');
         await refreshPools();
+      } else if (target.dataset.poolDelete) {
+        if (await showConfirm('Delete this pool? This cannot be undone.')) {
+          await deletePool(target.dataset.poolDelete);
+          await refreshPools();
+        }
       }
     } catch (err) { alert(`Error: ${(err as Error).message}`); }
   });
