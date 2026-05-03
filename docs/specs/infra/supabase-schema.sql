@@ -6852,7 +6852,11 @@ STRICT
 SECURITY INVOKER
 SET search_path = public, pg_temp
 AS $$
-  SELECT ST_SetSRID(ST_GeomFromGeoJSON($1::text), 4326)::geography;
+  -- Pass jsonb directly to ST_GeomFromGeoJSON (PostGIS accepts jsonb natively).
+  -- Do NOT cast to text first: $1::text wraps the value in escaped quotes,
+  -- producing '"{\"type\":\"Point\"}"' instead of '{"type":"Point"}',
+  -- which causes ST_GeomFromGeoJSON to fail with "parse error - invalid geometry".
+  SELECT ST_SetSRID(ST_GeomFromGeoJSON($1), 4326)::geography;
 $$;
 
 DO $$ BEGIN
