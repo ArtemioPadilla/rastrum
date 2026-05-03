@@ -34,7 +34,8 @@ const UUID_RE = /^[0-9a-f-]{36}$/;
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'authorization, content-type',
+  'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info, x-rastrum-build',
+  'Access-Control-Max-Age': '86400',
 };
 
 serve(async (req) => {
