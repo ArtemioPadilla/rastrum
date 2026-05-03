@@ -484,6 +484,9 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
     esTabs?.forEach(btn => {
       btn.addEventListener('click', () => switchEsView(btn.dataset.view ?? 'grid'));
     });
+    // Ensure grid view is active on first load (panels start hidden via HTML
+    // but gridEls need explicit show so the initial state is consistent)
+    switchEsView('grid');
 
     // ── M34: Search ────────────────────────────────────────
     let searchInitialized = false;
