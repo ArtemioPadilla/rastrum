@@ -1,0 +1,160 @@
+---
+import BaseLayout from '../../../../../layouts/BaseLayout.astro';
+---
+<BaseLayout title="Compare Places — Rastrum" description="Compare biodiversity between two locations." lang="en">
+<div class="max-w-5xl mx-auto px-4 py-6">
+  <h1 class="text-2xl font-bold mb-6">Compare Places</h1>
+
+  <!-- Controls -->
+  <div class="flex flex-col sm:flex-row gap-3 mb-8">
+    <input id="slug-a" type="text" placeholder="Place slug A (e.g. reserva-biosfera-tehuacan)"
+      class="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+    <input id="slug-b" type="text" placeholder="Place slug B"
+      class="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+    <button id="compare-btn"
+      class="px-5 py-2 text-sm font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">
+      Compare
+    </button>
+  </div>
+
+  <!-- Results -->
+  <div id="compare-loading" class="hidden text-zinc-400 text-sm py-4">Loading...</div>
+  <div id="compare-error" class="hidden text-red-500 text-sm py-4"></div>
+
+  <div id="compare-results" class="hidden">
+    <!-- Map -->
+    <div id="compare-map" class="rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800 mb-6" style="height:300px"></div>
+
+    <!-- Side by side stats -->
+    <div class="grid grid-cols-2 gap-4 mb-6">
+      <div class="rounded-xl border border-emerald-200 dark:border-emerald-800 p-4">
+        <h2 id="name-a" class="font-semibold text-zinc-900 dark:text-zinc-100 text-sm mb-3"></h2>
+        <div class="space-y-1 text-sm text-zinc-600 dark:text-zinc-400">
+          <div>🔭 <strong id="obs-a" class="text-zinc-900 dark:text-zinc-100">—</strong> obs</div>
+          <div>🌿 <strong id="spp-a" class="text-zinc-900 dark:text-zinc-100">—</strong> species</div>
+          <div>👥 <strong id="obs-count-a" class="text-zinc-900 dark:text-zinc-100">—</strong> observers</div>
+        </div>
+      </div>
+      <div class="rounded-xl border border-amber-200 dark:border-amber-800 p-4">
+        <h2 id="name-b" class="font-semibold text-zinc-900 dark:text-zinc-100 text-sm mb-3"></h2>
+        <div class="space-y-1 text-sm text-zinc-600 dark:text-zinc-400">
+          <div>🔭 <strong id="obs-b" class="text-zinc-900 dark:text-zinc-100">—</strong> obs</div>
+          <div>🌿 <strong id="spp-b" class="text-zinc-900 dark:text-zinc-100">—</strong> species</div>
+          <div>👥 <strong id="obs-count-b" class="text-zinc-900 dark:text-zinc-100">—</strong> observers</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Top species side by side -->
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <h3 class="text-sm font-semibold text-emerald-700 mb-2">Top species — A</h3>
+        <ol id="species-a" class="space-y-1"></ol>
+      </div>
+      <div>
+        <h3 class="text-sm font-semibold text-amber-700 mb-2">Top species — B</h3>
+        <ol id="species-b" class="space-y-1"></ol>
+      </div>
+    </div>
+  </div>
+</div>
+
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.css" />
+<script>
+  import { getSupabase } from '../../../../../lib/supabase';
+
+  // Pre-fill from query params
+  const params = new URLSearchParams(window.location.search);
+  const paramA = params.get('a') ?? '';
+  const paramB = params.get('b') ?? '';
+  if (paramA) (document.getElementById('slug-a') as HTMLInputElement).value = paramA;
+  if (paramB) (document.getElementById('slug-b') as HTMLInputElement).value = paramB;
+
+  document.getElementById('compare-btn')!.addEventListener('click', doCompare);
+  if (paramA && paramB) doCompare();
+
+  async function doCompare() {
+    const slugA = (document.getElementById('slug-a') as HTMLInputElement).value.trim();
+    const slugB = (document.getElementById('slug-b') as HTMLInputElement).value.trim();
+    if (!slugA || !slugB) return;
+
+    const loading = document.getElementById('compare-loading')!;
+    const results = document.getElementById('compare-results')!;
+    const error = document.getElementById('compare-error')!;
+    loading.classList.remove('hidden');
+    results.classList.add('hidden');
+    error.classList.add('hidden');
+
+    // Update URL
+    const url = new URL(window.location.href);
+    url.searchParams.set('a', slugA); url.searchParams.set('b', slugB);
+    window.history.replaceState({}, '', url.toString());
+
+    const supabase = getSupabase();
+    const [{ data: placeA }, { data: placeB }] = await Promise.all([
+      supabase.rpc('place_geojson_by_slug', { p_slug: slugA }),
+      supabase.rpc('place_geojson_by_slug', { p_slug: slugB }),
+    ]);
+
+    loading.classList.add('hidden');
+
+    if (!placeA || !placeB) {
+      error.textContent = `Could not find one or both places. Check the slugs.`;
+      error.classList.remove('hidden');
+      return;
+    }
+
+    // Stats
+    document.getElementById('name-a')!.textContent = placeA.name;
+    document.getElementById('name-b')!.textContent = placeB.name;
+    document.getElementById('obs-a')!.textContent = (placeA.obs_count ?? 0).toLocaleString();
+    document.getElementById('obs-b')!.textContent = (placeB.obs_count ?? 0).toLocaleString();
+    document.getElementById('spp-a')!.textContent = (placeA.species_count ?? 0).toLocaleString();
+    document.getElementById('spp-b')!.textContent = (placeB.species_count ?? 0).toLocaleString();
+    document.getElementById('obs-count-a')!.textContent = (placeA.observer_count ?? 0).toLocaleString();
+    document.getElementById('obs-count-b')!.textContent = (placeB.observer_count ?? 0).toLocaleString();
+
+    // Top species
+    const [{ data: spA }, { data: spB }] = await Promise.all([
+      supabase.rpc('place_top_species', { p_place_id: placeA.id, p_limit: 8 }),
+      supabase.rpc('place_top_species', { p_place_id: placeB.id, p_limit: 8 }),
+    ]);
+
+    const renderSpecies = (list: {scientific_name: string; obs_count: number}[], elId: string) => {
+      const el = document.getElementById(elId)!;
+      if (!list?.length) { el.innerHTML = '<li class="text-xs text-zinc-400">No species yet</li>'; return; }
+      el.innerHTML = list.map((s, i) =>
+        `<li class="text-xs flex justify-between gap-2"><span><span class="text-zinc-400">${i+1}.</span> <em>${s.scientific_name}</em></span><span class="text-zinc-400">${s.obs_count}</span></li>`
+      ).join('');
+    };
+    renderSpecies(spA ?? [], 'species-a');
+    renderSpecies(spB ?? [], 'species-b');
+
+    results.classList.remove('hidden');
+
+    // Map with both polygons
+    const maplibregl = await import('maplibre-gl');
+    const mapEl = document.getElementById('compare-map')!;
+    mapEl.innerHTML = ''; // reset if re-comparing
+    const map = new maplibregl.Map({
+      container: mapEl as HTMLElement,
+      style: 'https://tiles.openfreemap.org/styles/liberty',
+      center: placeA.centroid_geojson?.coordinates ?? [0, 0],
+      zoom: 7,
+      attributionControl: false,
+    });
+    map.on('load', () => {
+      if (placeA.geometry_geojson) {
+        map.addSource('place-a', { type: 'geojson', data: { type: 'Feature', geometry: placeA.geometry_geojson, properties: {} } });
+        map.addLayer({ id: 'fill-a', type: 'fill', source: 'place-a', paint: { 'fill-color': '#10b981', 'fill-opacity': 0.2 } });
+        map.addLayer({ id: 'outline-a', type: 'line', source: 'place-a', paint: { 'line-color': '#059669', 'line-width': 2 } });
+      }
+      if (placeB.geometry_geojson) {
+        map.addSource('place-b', { type: 'geojson', data: { type: 'Feature', geometry: placeB.geometry_geojson, properties: {} } });
+        map.addLayer({ id: 'fill-b', type: 'fill', source: 'place-b', paint: { 'fill-color': '#f59e0b', 'fill-opacity': 0.2 } });
+        map.addLayer({ id: 'outline-b', type: 'line', source: 'place-b', paint: { 'line-color': '#d97706', 'line-width': 2 } });
+      }
+    });
+  }
+</script>
+</BaseLayout>
