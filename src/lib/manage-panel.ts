@@ -597,7 +597,7 @@ export async function wireManagePanelLocation(
   const errEl    = document.getElementById('m-loc-error');
 
   // GPS button — use device location
-  const gpsBtn = document.getElementById('m-loc-gps');
+  const gpsBtn = document.getElementById('m-loc-gps') as HTMLButtonElement | null;
   if (gpsBtn && 'geolocation' in navigator) {
     gpsBtn.classList.remove('hidden');
     gpsBtn.addEventListener('click', () => {
