@@ -88,6 +88,7 @@ const lang: 'en' | 'es' = 'en';
         .select(`
           id, observed_at, obscure_level, state_province, habitat, weather, establishment_means, observer_id, notes,
           last_material_edit_at, location, location_obscured,
+          places:place_id(id, slug, name, place_type),
           identifications(scientific_name, is_primary, is_research_grade),
           users:observer_id(display_name, username, profile_public)
         `)
@@ -382,6 +383,23 @@ const lang: 'en' | 'es' = 'en';
           coordsEl.textContent = isObscured
             ? (isEs ? `~${formatted} (aproximado)` : `~${formatted} (coarsened)`)
             : formatted;
+        }
+      }
+
+      // ── Place chip ──
+      const placeData = (obs as Record<string, unknown>).places as { id: string; slug: string; name: string; place_type?: string } | null | undefined;
+      const place = Array.isArray(placeData) ? (placeData[0] ?? null) : (placeData ?? null);
+      if (place?.slug && place?.name) {
+        const chipEl = document.getElementById('obs-place-chip') as HTMLAnchorElement | null;
+        if (chipEl) {
+          const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
+          const href = lang === 'es'
+            ? `/es/explorar/lugares/?slug=${place.slug}`
+            : `/en/explore/places/?slug=${place.slug}`;
+          chipEl.href = href;
+          const labelSpan = chipEl.querySelector('span');
+          if (labelSpan) labelSpan.textContent = place.name;
+          chipEl.classList.remove('hidden');
         }
       }
 
