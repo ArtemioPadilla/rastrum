@@ -712,13 +712,13 @@ const langJson = JSON.stringify(lang);
       (document.getElementById('rotate-cred-id') as HTMLInputElement).value = target.dataset.rotate;
       rotateDialog?.showModal();
     } else if (target.dataset.delete) {
-      if (await showConfirm(isEs ? '¿Eliminar esta credencial? Los patrocinios que la usen serán pausados.' : 'Delete this credential? Sponsorships using it will be paused.')) {
+      if (await showConfirm(pageLang === 'es' ? '¿Eliminar esta credencial? Los patrocinios que la usen serán pausados.' : 'Delete this credential? Sponsorships using it will be paused.')) {
         await deleteCredential(target.dataset.delete);
         await refreshCreds();
         await refreshBens();
       }
     } else if (target.dataset.revoke) {
-      if (await showConfirm('Revoke this credential? Sponsorships using it will be paused.')) {
+      if (await showConfirm(pageLang === 'es' ? '¿Revocar esta credencial? Los patrocinios que la usen serán pausados.' : 'Revoke this credential? Sponsorships using it will be paused.')) {
         await deleteCredential(target.dataset.revoke);
         await refreshCreds();
         await refreshBens();
