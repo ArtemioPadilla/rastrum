@@ -7,6 +7,13 @@ const SUPABASE_URL            = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE   = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const SPONSORSHIPS_CRON_TOKEN = Deno.env.get('SPONSORSHIPS_CRON_TOKEN');
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info, x-rastrum-build',
+  'Access-Control-Max-Age': '86400',
+};
+
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -30,13 +37,6 @@ function withCronToken(req: Request): boolean {
 }
 
 const UUID_RE = /^[0-9a-f-]{36}$/;
-
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info, x-rastrum-build',
-  'Access-Control-Max-Age': '86400',
-};
 
 serve(async (req) => {
   // Handle CORS preflight
