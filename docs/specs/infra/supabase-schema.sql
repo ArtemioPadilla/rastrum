@@ -7073,3 +7073,70 @@ CREATE TRIGGER assign_observation_place_trigger
   BEFORE INSERT OR UPDATE OF location ON public.observations
   FOR EACH ROW
   EXECUTE FUNCTION public.assign_observation_place();
+
+-- ── M-Loc-3: Place detail RPCs ────────────────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION public.place_top_species(
+  p_place_id uuid,
+  p_limit    int DEFAULT 20
+)
+RETURNS TABLE (
+  taxon_id       uuid,
+  scientific_name text,
+  common_name_es  text,
+  slug            text,
+  obs_count       bigint
+)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+  SELECT t.id, t.scientific_name, t.common_name_es, t.slug, COUNT(*) AS obs_count
+  FROM public.observations o
+  JOIN public.taxa t ON t.id = o.primary_taxon_id
+  WHERE o.place_id = p_place_id AND o.sync_status = 'synced'
+  GROUP BY t.id, t.scientific_name, t.common_name_es, t.slug
+  ORDER BY obs_count DESC
+  LIMIT p_limit;
+$$;
+
+CREATE OR REPLACE FUNCTION public.place_top_observers(
+  p_place_id uuid,
+  p_limit    int DEFAULT 10
+)
+RETURNS TABLE (
+  user_id      uuid,
+  display_name text,
+  avatar_url   text,
+  obs_count    bigint
+)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+  SELECT u.id, u.display_name, u.avatar_url, COUNT(*) AS obs_count
+  FROM public.observations o
+  JOIN public.users u ON u.id = o.observer_id
+  WHERE o.place_id = p_place_id AND o.sync_status = 'synced'
+  GROUP BY u.id, u.display_name, u.avatar_url
+  ORDER BY obs_count DESC
+  LIMIT p_limit;
+$$;
+
+CREATE OR REPLACE FUNCTION public.place_geojson_by_slug(p_slug text)
+RETURNS json
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+  SELECT row_to_json(t) FROM (
+    SELECT
+      id, slug, name, name_local, place_type, source,
+      country_code, state_province, description,
+      obs_count, species_count, observer_count,
+      first_obs_at, last_obs_at,
+      ST_AsGeoJSON(geometry)::json AS geometry_geojson,
+      ST_AsGeoJSON(ST_Centroid(geometry::geometry))::json AS centroid_geojson
+    FROM public.places
+    WHERE slug = p_slug
+    LIMIT 1
+  ) t;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.place_top_species(uuid, int) TO authenticated, anon;
+GRANT EXECUTE ON FUNCTION public.place_top_observers(uuid, int) TO authenticated, anon;
+GRANT EXECUTE ON FUNCTION public.place_geojson_by_slug(text) TO authenticated, anon;
