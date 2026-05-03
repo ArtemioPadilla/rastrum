@@ -144,7 +144,10 @@ serve(async (req) => {
       .select('id, label, provider, kind, validated_at, last_used_at, revoked_at, created_at')
       .eq('user_id', ctx.userId)
       .order('created_at', { ascending: false });
-    if (error) return jsonResponse(500, { error: 'list_failed', detail: error.message });
+    if (error) {
+      console.error('[sponsorships] GET /credentials failed:', JSON.stringify({ code: error.code, message: error.message, details: error.details, hint: error.hint }));
+      return jsonResponse(500, { error: 'list_failed', detail: error.message, hint: error.hint });
+    }
     return jsonResponse(200, data ?? []);
   }
 
@@ -294,7 +297,10 @@ serve(async (req) => {
       .eq(col, ctx.userId)
       .order('priority', { ascending: true })
       .order('created_at', { ascending: false });
-    if (error) return jsonResponse(500, { error: 'list_failed', detail: error.message });
+    if (error) {
+      console.error('[sponsorships] GET /sponsorships failed:', JSON.stringify({ code: error.code, message: error.message, details: error.details, hint: error.hint }));
+      return jsonResponse(500, { error: 'list_failed', detail: error.message, hint: error.hint });
+    }
     return jsonResponse(200, data ?? []);
   }
 
@@ -476,7 +482,10 @@ serve(async (req) => {
       .from('sponsorship_requests').select('*').eq(col, ctx.userId)
       .order('created_at', { ascending: false })
       .limit(100);
-    if (error) return jsonResponse(500, { error: 'list_failed', detail: error.message });
+    if (error) {
+      console.error('[sponsorships] GET /requests failed:', JSON.stringify({ code: error.code, message: error.message, details: error.details, hint: error.hint }));
+      return jsonResponse(500, { error: 'list_failed', detail: error.message, hint: error.hint });
+    }
     return jsonResponse(200, data ?? []);
   }
 
