@@ -98,3 +98,28 @@ BEGIN
 END $$;
 
 COMMIT;
+
+-- ── Diagnostic: show what the remaining NULL observations look like ───────────
+DO $$
+DECLARE
+  r RECORD;
+BEGIN
+  FOR r IN
+    SELECT
+      o.id,
+      o.sync_status,
+      (SELECT COUNT(*) FROM public.identifications i WHERE i.observation_id = o.id) AS id_count,
+      (SELECT string_agg(
+         COALESCE(i.scientific_name,'(null)') ||
+         '[taxon=' || COALESCE(i.taxon_id::text,'NULL') ||
+         ',primary=' || COALESCE(i.is_primary::text,'NULL') || ']',
+         ', ')
+       FROM public.identifications i WHERE i.observation_id = o.id) AS ids
+    FROM public.observations o
+    WHERE o.primary_taxon_id IS NULL AND o.sync_status = 'synced'
+    LIMIT 20
+  LOOP
+    RAISE NOTICE 'NULL-obs: id=% id_count=% identifications=%',
+      r.id, r.id_count, COALESCE(r.ids, 'NONE');
+  END LOOP;
+END $$;
