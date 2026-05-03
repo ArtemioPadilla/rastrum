@@ -665,8 +665,20 @@ export async function wireManagePanelLocation(
       );
       const result = await Promise.race([updatePromise, timeout]) as { error: { message?: string; code?: string } | null };
       if (result.error) {
-        console.error('[manage-panel] location update failed', { obsId, err: result.error });
-        throw new Error(result.error.message || result.error.code || 'update_failed');
+        // Log full error details so the console report includes the actual
+        // Supabase/PostgREST message instead of "[object Object]"
+        const errMsg = result.error.message ?? result.error.code ?? 'unknown';
+        const errCode = (result.error as { code?: string }).code ?? '';
+        const errDetails = (result.error as { details?: string }).details ?? '';
+        const errHint = (result.error as { hint?: string }).hint ?? '';
+        console.error('[manage-panel] location update failed', {
+          obsId,
+          message: errMsg,
+          code: errCode,
+          details: errDetails,
+          hint: errHint,
+        });
+        throw new Error(`${errCode ? errCode + ': ' : ''}${errMsg}`);
       }
 
       window.dispatchEvent(new CustomEvent('rastrum:mappicker-set', {
@@ -691,7 +703,7 @@ export async function wireManagePanelLocation(
       savedEl?.classList.remove('hidden');
     } catch (err) {
       const code = err instanceof Error ? err.message : String(err);
-      console.error('[manage-panel] location save error', { obsId, code, err });
+      console.error('[manage-panel] location save error', { obsId, code, message: err instanceof Error ? err.message : String(err) });
       if (errEl) {
         if (code === 'coords_invalid') {
           errEl.textContent = errCopy.invalidCoords;
