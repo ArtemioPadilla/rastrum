@@ -131,7 +131,13 @@ const placesIndexBase = `/${lang}/${lang === 'es' ? 'explorar/lugares' : 'explor
 
   const PAGE_SIZE = 20;
 
-  const root = document.getElementById('explore-places-root')!;
+  const root = document.getElementById('explore-places-root');
+  if (!root) {
+    console.error('[places-index] root element not found — script aborted');
+    throw new Error('explore-places-root not found');
+  }
+
+  console.log('[places-index] script started, root found');
 
   // Labels from data attrs
   const labels = {
@@ -297,6 +303,7 @@ const placesIndexBase = `/${lang}/${lang === 'es' ? 'explorar/lugares' : 'explor
       detailEl.classList.remove('hidden');
     } else {
       // Index mode
+      console.log('[places-index] index mode, calling fetchPage');
       indexEl.classList.remove('hidden');
       detailEl.classList.add('hidden');
       fetchPage();
