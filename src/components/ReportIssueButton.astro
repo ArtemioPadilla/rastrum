@@ -191,18 +191,32 @@ const repoSlug = 'ArtemioPadilla/rastrum';
     var diag = { console: [], network: [], errors: [] };
     W.__rastrum_diag = diag;
 
-    // 1. console.error + console.warn
+    // 1. console.error + console.warn + console.log (filtered to [rastrum] prefix)
     var origError = console.error.bind(console);
     var origWarn  = console.warn.bind(console);
+    var origLog   = console.log.bind(console);
+    // Prefix filter: only capture app-namespaced logs to avoid library noise
+    // (MapLibre, Supabase internals, etc. flood console.log with tile/network data).
+    // Any log whose first argument starts with '[rastrum]', '[manage-panel]',
+    // '[sync]', '[identify]' etc. is considered an app log.
+    var APP_LOG_PREFIX = /^\[rastrum|^\[manage-panel|^\[sync|^\[identify|^\[retry|^\[observe/;
     function capture(level, args) {
+      var firstArg = args.length > 0 ? String(args[0]) : '';
+      // For log level: only capture if it looks like an app log
+      if (level === 'log' && !APP_LOG_PREFIX.test(firstArg)) return;
       var msg = Array.prototype.map.call(args, function (a) {
-        return a instanceof Error ? (a.message + '\n' + (a.stack || '')) : String(a);
+        if (a === null) return 'null';
+        if (a === undefined) return 'undefined';
+        if (a instanceof Error) return a.message + '\n' + (a.stack || '');
+        if (typeof a === 'object') { try { return JSON.stringify(a); } catch { return String(a); } }
+        return String(a);
       }).join(' ');
       diag.console.push({ ts: new Date().toISOString(), level: level, msg: msg.slice(0, 500) });
       if (diag.console.length > MAX) diag.console.shift();
     }
     console.error = function () { capture('error', arguments); origError.apply(console, arguments); };
     console.warn  = function () { capture('warn',  arguments); origWarn.apply(console, arguments); };
+    console.log   = function () { capture('log',   arguments); origLog.apply(console, arguments); };
 
     // 2. Unhandled errors + promise rejections
     W.addEventListener('error', function (ev) {
