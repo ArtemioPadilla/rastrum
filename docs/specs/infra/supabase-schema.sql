@@ -6758,3 +6758,60 @@ ALTER TABLE public.identifications
 -- The higher of the two multipliers wins.
 ALTER TABLE public.taxa ADD COLUMN IF NOT EXISTS iucn_category text;
 ALTER TABLE public.taxa ADD COLUMN IF NOT EXISTS nom059_status text;
+
+-- ── M34: Species Explorer — taxa enhancements ──────────────────────────────
+-- hero_media_id: community-voted best photo for the species
+-- hero_observation_id: the observation that provides the hero photo
+-- hero_updated_at: when the hero was last recomputed
+-- slug: URL-safe species identifier (lower, spaces→dashes)
+ALTER TABLE public.taxa ADD COLUMN IF NOT EXISTS hero_media_id uuid REFERENCES public.media_files(id) ON DELETE SET NULL;
+ALTER TABLE public.taxa ADD COLUMN IF NOT EXISTS hero_observation_id uuid REFERENCES public.observations(id) ON DELETE SET NULL;
+ALTER TABLE public.taxa ADD COLUMN IF NOT EXISTS hero_updated_at timestamptz;
+ALTER TABLE public.taxa ADD COLUMN IF NOT EXISTS slug text;
+
+-- Back-fill slugs for existing taxa (idempotent)
+UPDATE public.taxa
+SET slug = lower(regexp_replace(scientific_name, '\s+', '-', 'g'))
+WHERE slug IS NULL AND scientific_name IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS taxa_slug_idx ON public.taxa(slug)
+  WHERE slug IS NOT NULL;
+
+-- Materialized view for the taxonomy sunburst
+CREATE MATERIALIZED VIEW IF NOT EXISTS public.species_taxonomy_counts AS
+SELECT
+  t.id                            AS taxon_id,
+  t.kingdom,
+  t.phylum,
+  t.class,
+  t."order",
+  t.family,
+  t.genus,
+  t.scientific_name,
+  t.common_name_es,
+  t.common_name_en,
+  t.slug,
+  t.hero_media_id,
+  COUNT(DISTINCT o.id)            AS observation_count,
+  COUNT(DISTINCT o.observer_id)   AS observer_count
+FROM public.taxa t
+JOIN public.observations o ON o.primary_taxon_id = t.id
+WHERE o.sync_status = 'synced'
+GROUP BY
+  t.id, t.kingdom, t.phylum, t.class, t."order",
+  t.family, t.genus, t.scientific_name, t.common_name_es, t.common_name_en,
+  t.slug, t.hero_media_id
+WITH DATA;
+
+CREATE UNIQUE INDEX IF NOT EXISTS species_taxonomy_counts_taxon_id_idx
+  ON public.species_taxonomy_counts (taxon_id);
+
+-- Allow best_shot reactions (community hero photo nominations)
+DO $$ BEGIN
+  ALTER TABLE public.reactions
+    DROP CONSTRAINT IF EXISTS reactions_reaction_type_check;
+  ALTER TABLE public.reactions
+    ADD CONSTRAINT reactions_reaction_type_check
+    CHECK (reaction_type IN ('thumbs_up','thumbs_down','heart','expert','best_shot'));
+EXCEPTION WHEN others THEN NULL; END $$;
+

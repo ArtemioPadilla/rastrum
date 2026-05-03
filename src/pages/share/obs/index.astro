@@ -408,6 +408,88 @@ const lang: 'en' | 'es' = 'en';
         await wireManagePanelDetails(id, obs as Record<string, unknown>, ident);
         await wireManagePanelLocation(id, obs as Record<string, unknown>);
         await wireManagePanelPhotos(id);
+
+        // M34: Best shot nomination
+        const isEs = document.documentElement.lang === 'es';
+        if ((obs as { primary_taxon_id?: string }).primary_taxon_id) {
+          const bestShotMount = document.getElementById('best-shot-mount');
+          if (bestShotMount) {
+            bestShotMount.classList.remove('hidden');
+            const btnEl = document.getElementById('best-shot-btn') as HTMLButtonElement | null;
+            const labelEl = document.getElementById('best-shot-label');
+            const countEl = document.getElementById('best-shot-count');
+
+            // Get primary media id
+            const primaryMedia = (media ?? []).find((m: {is_primary?: boolean}) => m.is_primary);
+            const mediaId = (primaryMedia as {id?: string} | undefined)?.id;
+            const taxonName = (obs as {scientific_name?: string}).scientific_name
+              || (obs as {primary_taxon_id?: string}).primary_taxon_id;
+
+            if (labelEl && taxonName) {
+              labelEl.textContent = (isEs ? 'Nominar como mejor foto de ' : 'Nominate as best shot for ') + taxonName;
+            }
+
+            if (mediaId) {
+              // Get current viewer
+              let currentViewer: { id?: string } | null = null;
+              try {
+                const { data: { user: v } } = await supabase.auth.getUser();
+                currentViewer = v;
+              } catch { /* signed out */ }
+
+              // Check if already voted
+              const { data: existingVote } = await supabase
+                .from('reactions')
+                .select('id')
+                .eq('target_type', 'media')
+                .eq('target_id', mediaId)
+                .eq('reaction_type', 'best_shot')
+                .eq('user_id', currentViewer?.id ?? '')
+                .maybeSingle();
+
+              let hasVoted = !!existingVote;
+              if (countEl) {
+                const { count } = await supabase
+                  .from('reactions')
+                  .select('id', { count: 'exact', head: true })
+                  .eq('target_type', 'media')
+                  .eq('target_id', mediaId)
+                  .eq('reaction_type', 'best_shot');
+                countEl.textContent = count ? `${count} ${isEs ? 'votos' : 'votes'}` : '';
+              }
+
+              if (btnEl) {
+                btnEl.textContent = hasVoted
+                  ? (isEs ? '\u2713 Nominada' : '\u2713 Nominated')
+                  : (isEs ? '\ud83d\udcf8 Nominar como mejor foto' : '\ud83d\udcf8 Nominate as best shot');
+                btnEl.className = hasVoted
+                  ? 'text-xs text-emerald-700 dark:text-emerald-400'
+                  : 'text-xs text-zinc-600 dark:text-zinc-400 hover:text-emerald-700 dark:hover:text-emerald-400';
+
+                btnEl.addEventListener('click', async () => {
+                  if (hasVoted) {
+                    await supabase.from('reactions').delete()
+                      .eq('target_type', 'media').eq('target_id', mediaId)
+                      .eq('reaction_type', 'best_shot').eq('user_id', currentViewer?.id ?? '');
+                    hasVoted = false;
+                  } else {
+                    await supabase.from('reactions').insert({
+                      target_type: 'media', target_id: mediaId,
+                      reaction_type: 'best_shot', user_id: currentViewer?.id,
+                    });
+                    hasVoted = true;
+                  }
+                  btnEl.textContent = hasVoted
+                    ? (isEs ? '\u2713 Nominada' : '\u2713 Nominated')
+                    : (isEs ? '\ud83d\udcf8 Nominar como mejor foto' : '\ud83d\udcf8 Nominate as best shot');
+                  btnEl.className = hasVoted
+                    ? 'text-xs text-emerald-700 dark:text-emerald-400'
+                    : 'text-xs text-zinc-600 dark:text-zinc-400 hover:text-emerald-700 dark:hover:text-emerald-400';
+                });
+              }
+            }
+          }
+        }
       }
 
       // Surface the "edited after IDs" badge (PR2 schema column).
