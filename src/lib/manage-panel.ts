@@ -649,24 +649,25 @@ export async function wireManagePanelLocation(
       // types). Use the RPC function instead — it accepts lat/lng as floats
       // and builds the geography internally with ST_MakePoint.
       //
-      // Refresh the session first: an expired JWT causes the RPC to hang
-      // (PostgREST waits for auth rather than returning 401 immediately),
-      // which triggers the 15 s save_timeout. A fresh token prevents that.
-      try {
-        await supabase.auth.refreshSession();
-      } catch {
-        // Non-fatal — if refresh fails the RPC will still fail fast with 401
-      }
-      // Hard 15 s timeout — if PostgREST never returns the user gets a
-      // visible error instead of a button stuck on "saving…" forever.
-      const updatePromise = supabase
-        .rpc('update_observation_location', {
+      // Include both refreshSession + RPC inside the single 15 s timeout so
+      // a hanging auth refresh doesn’t eat the whole budget before the RPC
+      // even starts. refreshSession is capped at 5 s; on failure we proceed
+      // with the existing token (the RPC will fail with 401 if truly expired,
+      // which shows the session-expired error instead of a generic timeout).
+      const refreshPromise = Promise.race([
+        supabase.auth.refreshSession(),
+        new Promise<void>(resolve => setTimeout(resolve, 5_000)),
+      ]).catch(() => { /* non-fatal */ });
+      // Hard 15 s timeout on the full operation (refresh + RPC).
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('save_timeout')), 15_000),
+      );
+      const updatePromise = refreshPromise.then(() =>
+        supabase.rpc('update_observation_location', {
           p_obs_id: obsId,
           p_lat:    e.detail.coords.lat,
           p_lng:    e.detail.coords.lng,
-        });
-      const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('save_timeout')), 15_000),
+        }),
       );
       const result = await Promise.race([updatePromise, timeout]) as { error: { message?: string; code?: string } | null };
       if (result.error) {
