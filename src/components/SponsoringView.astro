@@ -227,6 +227,7 @@ const langJson = JSON.stringify(lang);
       </div>
 
       <div class="flex gap-2 justify-end">
+        <p id="cred-submit-error" class="hidden text-xs text-red-600 dark:text-red-400 mb-2"></p>
         <button type="button" id="cred-cancel" class="px-3 py-1.5 text-sm rounded border border-zinc-300 dark:border-zinc-700">{cancelLabel}</button>
         <button type="submit" id="cred-submit" class="px-3 py-1.5 text-sm rounded bg-emerald-700 text-white">{tr.sponsoring.validate_btn}</button>
       </div>
@@ -470,12 +471,12 @@ const langJson = JSON.stringify(lang);
     const kind = kindSel.value;
     const defaults = JSON.parse(modelInput.dataset.defaults ?? '{}') as Record<string, string>;
     const def = defaults[kind] ?? 'claude-haiku-4-5';
-    modelInput.placeholder = def;
-    // Auto-fill if empty or if it's still the previous default
+    // Only update placeholder — never overwrite user-typed value.
+    // If the field holds a default from a previous provider, clear it so
+    // the new placeholder shows through (empty string → placeholder visible).
     const prevDefaults = Object.values(defaults);
-    if (!modelInput.value || prevDefaults.includes(modelInput.value)) {
-      modelInput.value = '';
-    }
+    if (prevDefaults.includes(modelInput.value)) modelInput.value = '';
+    modelInput.placeholder = def;
   }
   document.getElementById('cred-kind-select')?.addEventListener('change', syncModelPlaceholder);
   syncModelPlaceholder();
@@ -506,7 +507,10 @@ const langJson = JSON.stringify(lang);
     const secret = (document.getElementById('cred-secret-input') as HTMLInputElement).value.trim();
     const kind   = (document.getElementById('cred-kind-select')  as HTMLSelectElement).value as
       'api_key'|'oauth_token'|'bedrock'|'openai_api_key'|'azure_openai'|'gemini_api_key'|'vertex_ai';
-    const preferred_model = (document.getElementById('cred-model-input') as HTMLInputElement).value.trim() || undefined;
+    const modelInput = document.getElementById('cred-model-input') as HTMLInputElement | null;
+    const modelVal = modelInput?.value.trim() || '';
+    const modelDefaults = JSON.parse(modelInput?.dataset.defaults ?? '{}') as Record<string, string>;
+    const preferred_model = modelVal || modelDefaults[kind] || 'claude-haiku-4-5';
     const endpoint        = (document.getElementById('cred-endpoint-input') as HTMLInputElement).value.trim() || null;
     if (!label || !secret) return;
     try {
@@ -519,7 +523,12 @@ const langJson = JSON.stringify(lang);
       if (preview) preview.textContent = '';
       addCredDialog?.close();
       await refreshCreds();
-    } catch (err) { alert(`Error: ${(err as Error).message}`); }
+    } catch (err) {
+      const errEl = document.getElementById('cred-submit-error');
+      const msg = (err as Error).message;
+      if (errEl) { errEl.textContent = `Error: ${msg}`; errEl.classList.remove('hidden'); }
+      else alert(`Error: ${msg}`);
+    }
   });
 
   const rotateDialog = document.getElementById('rotate-cred-dialog') as HTMLDialogElement | null;
