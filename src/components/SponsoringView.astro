@@ -438,7 +438,20 @@ const langJson = JSON.stringify(lang);
   }
 
   const addCredDialog = document.getElementById('add-cred-dialog') as HTMLDialogElement | null;
-  document.getElementById('add-cred-btn')?.addEventListener('click', () => addCredDialog?.showModal());
+  document.getElementById('add-cred-btn')?.addEventListener('click', () => {
+    // Reset form on open so stale state from previous opens doesn't linger
+    const modelInput = document.getElementById('cred-model-input') as HTMLInputElement | null;
+    if (modelInput) modelInput.value = '';
+    const kindSel = document.getElementById('cred-kind-select') as HTMLSelectElement | null;
+    if (kindSel) { kindSel.value = 'api_key'; delete kindSel.dataset.touched; }
+    const preview = document.getElementById('cred-kind-preview');
+    if (preview) preview.textContent = '';
+    const errEl = document.getElementById('cred-submit-error');
+    if (errEl) errEl.classList.add('hidden');
+    syncModelPlaceholder(); // sets correct placeholder for api_key (Anthropic default)
+    syncEndpointRow();
+    addCredDialog?.showModal();
+  });
   document.getElementById('cred-cancel')?.addEventListener('click', () => addCredDialog?.close());
   // M32 (#152): auto-detect kind from secret prefix; fall back to
   // user-selected dropdown for Bedrock / Azure / Vertex (JSON envelopes
@@ -495,6 +508,7 @@ const langJson = JSON.stringify(lang);
     if (kind && kindSel && (kindSel.value === 'api_key' || !kindSel.dataset.touched)) {
       kindSel.value = kind;
       syncEndpointRow();
+      syncModelPlaceholder(); // programmatic value change doesn't fire 'change' event
     }
   });
   document.getElementById('cred-kind-select')?.addEventListener('change', () => {
