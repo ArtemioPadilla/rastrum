@@ -6879,3 +6879,197 @@ GRANT EXECUTE ON FUNCTION public.update_observation_location(uuid, double precis
   TO authenticated;
 
 
+
+-- ════════════════════════════════════════════════════════════════════════
+-- M-Loc-1: Places infrastructure
+-- ════════════════════════════════════════════════════════════════════════
+-- Adds:
+--   - public.places table with GIST/GIN indexes and RLS
+--   - observations.place_id FK column + index
+--   - assign_observation_place trigger (BEFORE INSERT OR UPDATE OF location)
+--   - H3 fallback: auto-creates a place_type='h3_cell' row when no named
+--     place covers the location
+-- Blocked by: none (foundational)
+-- Blocks: M-Loc-2, M-Loc-3, M-Loc-4, M-Loc-5
+-- ════════════════════════════════════════════════════════════════════════
+
+-- ── places table ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.places (
+  id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  slug            text UNIQUE NOT NULL,
+  name            text NOT NULL,
+  name_local      text,
+  place_type      text NOT NULL
+                  CHECK (place_type IN ('protected_area','h3_cell','custom','community')),
+  geometry        geography(Geometry,4326) NOT NULL,
+  h3_cells        text[],
+  h3_resolution   int,
+  source          text NOT NULL
+                  CHECK (source IN ('wdpa','user','auto_h3','nominatim')),
+  source_id       text,
+  country_code    text,
+  state_province  text,
+  description     text,
+  created_by      uuid REFERENCES public.users(id),
+  obs_count       int NOT NULL DEFAULT 0,
+  species_count   int NOT NULL DEFAULT 0,
+  observer_count  int NOT NULL DEFAULT 0,
+  first_obs_at    timestamptz,
+  last_obs_at     timestamptz,
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  updated_at      timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_places_geometry  ON public.places USING GIST(geometry);
+CREATE INDEX IF NOT EXISTS idx_places_h3_cells  ON public.places USING GIN(h3_cells);
+CREATE INDEX IF NOT EXISTS idx_places_type      ON public.places(place_type);
+CREATE INDEX IF NOT EXISTS idx_places_obs_count ON public.places(obs_count DESC);
+
+ALTER TABLE public.places ENABLE ROW LEVEL SECURITY;
+
+-- Everyone can read places (public catalogue)
+DROP POLICY IF EXISTS places_public_read  ON public.places;
+CREATE POLICY places_public_read  ON public.places FOR SELECT USING (true);
+
+-- Only the row owner can update custom/community places
+DROP POLICY IF EXISTS places_owner_update ON public.places;
+CREATE POLICY places_owner_update ON public.places FOR UPDATE TO authenticated
+  USING (created_by = (SELECT auth.uid()))
+  WITH CHECK (created_by = (SELECT auth.uid()));
+
+-- Authenticated users may insert custom or community places
+DROP POLICY IF EXISTS places_user_insert  ON public.places;
+CREATE POLICY places_user_insert  ON public.places FOR INSERT TO authenticated
+  WITH CHECK (place_type IN ('custom','community') AND created_by = (SELECT auth.uid()));
+
+-- ── observations.place_id FK ──────────────────────────────────────────────────
+ALTER TABLE public.observations ADD COLUMN IF NOT EXISTS place_id uuid REFERENCES public.places(id);
+CREATE INDEX IF NOT EXISTS idx_obs_place ON public.observations(place_id) WHERE place_id IS NOT NULL;
+
+-- ── assign_observation_place trigger ─────────────────────────────────────────
+-- Fires BEFORE INSERT OR UPDATE OF location so the trigger can rewrite
+-- NEW.place_id before the row lands in the table (no extra UPDATE round-trip).
+--
+-- Logic:
+--   1. If location is NULL → leave place_id unchanged, return NEW.
+--   2. Look for the smallest named place (place_type ≠ 'h3_cell') that
+--      contains the point.  ST_Within on the GIST index is sub-ms at
+--      the expected volume (<10 k places for MX).
+--   3. If none found → compute a deterministic slug from rounded lat/lng,
+--      upsert an auto_h3 place_type='h3_cell' row (ST_Buffer 5 km), and
+--      use its id.
+--
+-- H3 extension: if h3-pg is available the slug uses the real H3 cell ID
+-- at resolution 7 instead of the lat/lng rounding approximation.
+-- Degrade gracefully when the extension is absent.
+--
+-- SECURITY DEFINER: needed to INSERT into places (service-role bypass)
+-- without exposing a writable service-role key to the trigger body.
+-- The WHERE clause on the UPDATE guard still enforces observer ownership.
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.assign_observation_place()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_place_id     uuid;
+  v_lat          double precision;
+  v_lng          double precision;
+  v_slug         text;
+  v_h3_available boolean := false;
+  v_cell_id      text;
+BEGIN
+  -- 1. No location → nothing to do
+  IF NEW.location IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  -- 2. Find the most-specific named place (smallest area, not an h3_cell)
+  SELECT id INTO v_place_id
+    FROM public.places
+   WHERE place_type != 'h3_cell'
+     AND ST_Within(NEW.location::geometry, geometry::geometry)
+   ORDER BY ST_Area(geometry::geometry) ASC
+   LIMIT 1;
+
+  IF v_place_id IS NOT NULL THEN
+    NEW.place_id := v_place_id;
+    RETURN NEW;
+  END IF;
+
+  -- 3. No named place found → upsert an H3 fallback cell
+  v_lat := ST_Y(NEW.location::geometry);
+  v_lng := ST_X(NEW.location::geometry);
+
+  -- Try to use h3-pg for a real cell ID if available
+  BEGIN
+    SELECT EXISTS (
+      SELECT 1 FROM pg_extension WHERE extname = 'h3'
+    ) INTO v_h3_available;
+  EXCEPTION WHEN OTHERS THEN
+    v_h3_available := false;
+  END;
+
+  IF v_h3_available THEN
+    BEGIN
+      -- h3_lat_lng_to_cell returns an h3index (bigint or text depending on version)
+      SELECT h3_lat_lng_to_cell(v_lat, v_lng, 7)::text INTO v_cell_id;
+      v_slug := 'h3_' || v_cell_id;
+    EXCEPTION WHEN OTHERS THEN
+      -- Extension present but function signature differs — fall back gracefully
+      v_h3_available := false;
+    END;
+  END IF;
+
+  IF NOT v_h3_available OR v_cell_id IS NULL THEN
+    -- Lat/lng rounding approximation (~5 km grid at equator, resolution 7 equivalent)
+    v_slug := 'h3_' ||
+              replace(to_char(round(v_lat::numeric, 2), 'FM999990.00'), '.', 'p')
+              || '_' ||
+              replace(to_char(round(v_lng::numeric, 2), 'FM999990.00'), '.', 'p');
+    -- Normalize sign: negative becomes 'm' prefix
+    v_slug := replace(v_slug, 'h3_-', 'h3_m');
+    v_slug := replace(v_slug, '__m', '_m');
+  END IF;
+
+  -- Upsert the H3 cell row (idempotent on slug)
+  INSERT INTO public.places (
+    slug,
+    name,
+    place_type,
+    geometry,
+    source,
+    country_code
+  )
+  VALUES (
+    v_slug,
+    'Zona H3 ' || v_slug,
+    'h3_cell',
+    -- ~5 km buffer around the point
+    ST_Buffer(
+      ST_SetSRID(ST_MakePoint(v_lng, v_lat), 4326)::geography,
+      5000
+    ),
+    'auto_h3',
+    NULL  -- country_code backfilled separately if needed
+  )
+  ON CONFLICT (slug) DO NOTHING
+  RETURNING id INTO v_place_id;
+
+  -- If DO NOTHING fired (row already existed) fetch the id
+  IF v_place_id IS NULL THEN
+    SELECT id INTO v_place_id FROM public.places WHERE slug = v_slug;
+  END IF;
+
+  NEW.place_id := v_place_id;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS assign_observation_place_trigger ON public.observations;
+CREATE TRIGGER assign_observation_place_trigger
+  BEFORE INSERT OR UPDATE OF location ON public.observations
+  FOR EACH ROW
+  EXECUTE FUNCTION public.assign_observation_place();
