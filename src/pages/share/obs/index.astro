@@ -320,12 +320,51 @@ const lang: 'en' | 'es' = 'en';
       }
 
       // Coords readout + view-mode mini-map hydration. PostgREST returns
-      // `location` as a GeoJSON Point; for non-owner viewers we prefer
-      // `location_obscured` when present (sensitive species). The
-      // MapPicker mini-map SSRs with `initialCoords={null}` — we hydrate
-      // it now via `rastrum:mappicker-set` (PR5).
-      const obsLoc = (obs as { location?: { coordinates?: [number, number] } | null }).location;
-      const obscuredLoc = (obs as { location_obscured?: { coordinates?: [number, number] } | null }).location_obscured;
+      // `location` as EWKB hex for geography columns (e.g. "0101000020E6100000...").
+      // Parse it to {coordinates:[lng,lat]} before use. If it's already an object
+      // (future PostgREST versions or cached GeoJSON), use it directly.
+      function parseLocationToGeoJSON(
+        raw: unknown,
+      ): { coordinates: [number, number] } | null {
+        if (!raw) return null;
+        // Already a GeoJSON-like object
+        if (typeof raw === 'object' && raw !== null && 'coordinates' in raw) {
+          const r = raw as { coordinates?: [number, number] };
+          return Array.isArray(r.coordinates) && r.coordinates.length >= 2 ? r as { coordinates: [number, number] } : null;
+        }
+        if (typeof raw !== 'string') return null;
+        // EWKB hex: little-endian, bytes 0-0 = byte order, 1-4 = type, 5-8 = SRID (if flag set),
+        // then 8 bytes lng + 8 bytes lat (little-endian IEEE 754 doubles).
+        // Byte 0: 01 = little-endian. Bytes 1-4 (LE): type flags.
+        // Bit 0x20000000 of type = SRID present (4 extra bytes before coords).
+        try {
+          const hex = raw.replace(/\s/g, '');
+          if (hex.length < 42) return null; // too short
+          const byteOrder = parseInt(hex.slice(0, 2), 16);
+          if (byteOrder !== 1) return null; // only handle little-endian
+          // Read type (4 bytes LE)
+          const typeHex = hex.slice(2, 10);
+          const typeBytes = [0,2,4,6].map(i => parseInt(typeHex.slice(i, i+2), 16));
+          const typeVal = typeBytes[0] | (typeBytes[1]<<8) | (typeBytes[2]<<16) | (typeBytes[3]<<24);
+          const hasSrid = !!(typeVal & 0x20000000);
+          const coordOffset = 10 + (hasSrid ? 8 : 0); // skip SRID if present
+          if (hex.length < coordOffset + 32) return null;
+          function readDoubleLE(h: string, off: number): number {
+            const bytes = new Uint8Array(8);
+            for (let i = 0; i < 8; i++) bytes[i] = parseInt(h.slice(off + i*2, off + i*2+2), 16);
+            return new DataView(bytes.buffer).getFloat64(0, true);
+          }
+          const lng = readDoubleLE(hex, coordOffset);
+          const lat = readDoubleLE(hex, coordOffset + 16);
+          if (!isFinite(lng) || !isFinite(lat)) return null;
+          return { coordinates: [lng, lat] };
+        } catch {
+          return null;
+        }
+      }
+
+      const obsLoc = parseLocationToGeoJSON((obs as Record<string,unknown>).location);
+      const obscuredLoc = parseLocationToGeoJSON((obs as Record<string,unknown>).location_obscured);
       const usePoint = (!viewerIsObserver && obscuredLoc?.coordinates) ? obscuredLoc : obsLoc;
       const coords = usePoint?.coordinates;
       if (Array.isArray(coords) && coords.length >= 2) {
