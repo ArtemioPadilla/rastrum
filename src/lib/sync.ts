@@ -314,7 +314,15 @@ async function triggerIdentify(observationId: string): Promise<void> {
   const localAIEnabled = isLocalAIEnabled();
 
   const excluded: string[] = [];
-  if (!localAIEnabled) excluded.push('webllm_phi35_vision', 'onnx_efficientnet_lite0', 'birdnet_lite');
+  // Large models (Phi-3.5 2.4 GB, BirdNET ~50 MB) gate on localAIEnabled.
+  // EfficientNet-Lite0 is only ~2.8 MB — run it whenever it's downloaded,
+  // regardless of the localAI bandwidth toggle.
+  if (!localAIEnabled) excluded.push('webllm_phi35_vision', 'birdnet_lite');
+  const { getOnnxBaseCacheStatus, getOnnxBaseWeightsBaseUrl } = await (await import('./identifiers/onnx-base-cache'));
+  const efficientNetCached = getOnnxBaseWeightsBaseUrl()
+    ? await getOnnxBaseCacheStatus().then(s => s.modelCached && s.labelsCached).catch(() => false)
+    : false;
+  if (!efficientNetCached) excluded.push('onnx_efficientnet_lite0');
   if (!hasAnthropicKey) excluded.push('claude_haiku');
 
   // Camera-trap photos prefer the MegaDetector + SpeciesNet pipeline.
