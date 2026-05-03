@@ -394,8 +394,8 @@ const lang: 'en' | 'es' = 'en';
         if (chipEl) {
           const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
           const href = lang === 'es'
-            ? `/es/explorar/lugares/${place.slug}/`
-            : `/en/explore/places/${place.slug}/`;
+            ? `/es/explorar/lugares/?slug=${place.slug}`
+            : `/en/explore/places/?slug=${place.slug}`;
           chipEl.href = href;
           const labelSpan = chipEl.querySelector('span');
           if (labelSpan) labelSpan.textContent = place.name;
