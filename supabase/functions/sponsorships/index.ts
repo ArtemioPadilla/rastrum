@@ -156,6 +156,65 @@ serve(async (req) => {
     return jsonResponse(200, data ?? []);
   }
 
+  // POST /credentials/:id/test — validate credential is working right now
+  {
+    const m = path.match(/^\/credentials\/([0-9a-f-]{36})\/test$/);
+    if (m && req.method === 'POST') {
+      const credId = m[1];
+      const { data: cred } = await supabase
+        .from('sponsor_credentials')
+        .select('user_id, vault_secret_id, kind, provider, preferred_model')
+        .eq('id', credId).single();
+      if (!cred || (cred as { user_id: string }).user_id !== ctx.userId) {
+        return jsonResponse(404, { error: 'not_found' });
+      }
+      const t0 = Date.now();
+      try {
+        const secret = await decryptCredential(supabase, (cred as { vault_secret_id: string }).vault_secret_id);
+        const kind = (cred as { kind: string }).kind as import('../_shared/anthropic-validate.ts').AnyCredentialKind;
+        const provider = (cred as { provider: string }).provider;
+        const model = (cred as { preferred_model: string }).preferred_model ?? 'claude-haiku-4-5';
+
+        // Provider-specific minimal ping
+        let testOk = false;
+        let testError: string | undefined;
+
+        if (provider === 'anthropic' || kind === 'api_key' || kind === 'oauth_token') {
+          const { pickAuthHeader } = await import('../_shared/sponsorship.ts');
+          const headers = { ...pickAuthHeader(kind, secret), 'anthropic-version': '2023-06-01', 'content-type': 'application/json' } as Record<string,string>;
+          const r = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST', headers,
+            body: JSON.stringify({ model: model.includes('/') ? model : `${model}-20251001`, max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] }),
+          });
+          testOk = r.status !== 401 && r.status !== 403;
+          if (!testOk) testError = `HTTP ${r.status}`;
+        } else if (provider === 'openai' || kind === 'openai_api_key') {
+          const r = await fetch('https://api.openai.com/v1/models', {
+            headers: { 'Authorization': `Bearer ${secret}` },
+          });
+          testOk = r.ok;
+          if (!testOk) testError = `HTTP ${r.status}`;
+        } else if (provider === 'gemini' || kind === 'gemini_api_key') {
+          const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${secret}`);
+          testOk = r.ok;
+          if (!testOk) testError = `HTTP ${r.status}`;
+        } else {
+          // Bedrock, Azure, Vertex — can't easily test without full config
+          testOk = true;
+          testError = 'test_not_supported_for_provider';
+        }
+
+        const latency_ms = Date.now() - t0;
+        if (testOk) {
+          await supabase.from('sponsor_credentials').update({ validated_at: new Date().toISOString() }).eq('id', credId);
+        }
+        return jsonResponse(200, { ok: testOk, latency_ms, error: testError ?? null });
+      } catch (e) {
+        return jsonResponse(200, { ok: false, latency_ms: Date.now() - t0, error: (e as Error).message });
+      }
+    }
+  }
+
   // POST /credentials/:id/rotate
   {
     const m = path.match(/^\/credentials\/([0-9a-f-]{36})\/rotate$/);

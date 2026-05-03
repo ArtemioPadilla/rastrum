@@ -179,6 +179,12 @@ export async function unpauseSponsorship(id: string): Promise<{ ok?: boolean; er
   return r.json();
 }
 
+export async function testCredential(id: string): Promise<{ ok: boolean; latency_ms: number; error: string | null }> {
+  const r = await authedFetch(`/credentials/${id}/test`, { method: 'POST' });
+  if (!r.ok) throw new Error(`testCredential: ${await readErrorBody(r)}`);
+  return r.json();
+}
+
 export async function revokeSponsorship(id: string): Promise<void> {
   const r = await authedFetch(`/sponsorships/${id}`, { method: 'DELETE' });
   if (!r.ok && r.status !== 204) throw new Error(`revokeSponsorship: ${r.status}`);
