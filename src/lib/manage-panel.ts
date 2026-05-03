@@ -673,7 +673,8 @@ export async function wireManagePanelLocation(
       );
       const updatePromise = refreshPromise.then(() => {
         // Log params before calling RPC to verify they are valid
-        console.log('[manage-panel] calling update_observation_location', {
+        // console.warn so ReportIssueButton captures it in __rastrum_diag
+        console.warn('[manage-panel] calling update_observation_location', {
           p_obs_id: obsId,
           p_lat: e.detail.coords.lat,
           p_lng: e.detail.coords.lng,
