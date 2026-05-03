@@ -139,17 +139,34 @@ async function main() {
       console.log(`[wdpa-import] DRY RUN: would unzip to ${extractDir}`);
     }
 
-    // 3. Find shapefile or GPKG
+    // 3. Find shapefile or GPKG — WDPA outer zip contains nested zips
+    //    e.g. WDPA_May2026_Public_shp.zip → WDPA_May2026_Public_shp_0.zip → *.shp
     let sourceFile = "";
     if (!DRY_RUN) {
+      // First pass: extract any nested zips
+      const nestedZips = fs
+        .readdirSync(extractDir, { recursive: true })
+        .map((f) => String(f))
+        .filter((f) => f.endsWith(".zip"));
+      for (const nested of nestedZips) {
+        const nestedPath = path.join(extractDir, nested);
+        const nestedDir = nestedPath.replace(/\.zip$/, "");
+        fs.mkdirSync(nestedDir, { recursive: true });
+        execSync(`unzip -q "${nestedPath}" -d "${nestedDir}"`, { stdio: "pipe" });
+        console.log(`[wdpa-import] Extracted nested zip: ${nested}`);
+      }
       const gpkgFiles = fs
         .readdirSync(extractDir, { recursive: true })
         .map((f) => String(f))
-        .filter((f) => f.endsWith(".gpkg") || f.endsWith(".shp"));
+        .filter((f) => f.endsWith(".gpkg") || (f.endsWith(".shp") && !f.includes("point") && !f.includes("line")));
       if (gpkgFiles.length === 0) {
-        throw new Error("No .gpkg or .shp found in archive");
+        // Print what's actually in the archive to help diagnose
+        const allFiles = fs.readdirSync(extractDir, { recursive: true }).map(String).slice(0, 30);
+        throw new Error(`No .gpkg or .shp found in archive. Contents: ${allFiles.join(", ")}`);
       }
-      sourceFile = path.join(extractDir, gpkgFiles[0]);
+      // Prefer polygon shapefile (WDPA_polygons) over points or lines
+      const polyFile = gpkgFiles.find(f => f.includes("polygon") || f.includes("poly")) ?? gpkgFiles[0];
+      sourceFile = path.join(extractDir, polyFile);
       console.log(`[wdpa-import] Source file: ${sourceFile}`);
     }
 
