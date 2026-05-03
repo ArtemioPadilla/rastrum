@@ -702,17 +702,18 @@ const langJson = JSON.stringify(lang);
         const result = await testCredential(credId);
         btn.textContent = result.ok ? `✓ ${result.latency_ms}ms` : `✗ ${result.error ?? 'fail'}`;
         btn.className = btn.className.replace('border-emerald-600 text-emerald-700 dark:text-emerald-400', result.ok ? 'border-emerald-600 text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30' : 'border-red-400 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20');
-        setTimeout(() => { btn.textContent = 'Test'; btn.disabled = false; btn.className = btn.className.replace(' bg-emerald-50 dark:bg-emerald-900/30', '').replace(' bg-red-50 dark:bg-red-900/20', ''); }, 4000);
+        setTimeout(() => { btn.textContent = 'Test'; btn.disabled = false; btn.className = btn.className.replace(' bg-emerald-50 dark:bg-emerald-900/30', '').replace(' bg-red-50 dark:bg-red-900/20', ''); }, 8000);
         await refreshCreds();
       } catch (err) {
         btn.textContent = `✗ ${(err as Error).message.slice(0, 30)}`;
-        setTimeout(() => { btn.textContent = origText; btn.disabled = false; }, 4000);
+        setTimeout(() => { btn.textContent = origText; btn.disabled = false; }, 8000);
       }
     } else if (target.dataset.rotate) {
       (document.getElementById('rotate-cred-id') as HTMLInputElement).value = target.dataset.rotate;
       rotateDialog?.showModal();
     } else if (target.dataset.delete) {
-      if (await showConfirm(pageLang === 'es' ? '¿Eliminar esta credencial? Los patrocinios que la usen serán pausados.' : 'Delete this credential? Sponsorships using it will be paused.')) {
+      const isEsLang = document.documentElement.lang === 'es';
+      if (await showConfirm(isEsLang ? '¿Eliminar esta credencial? Los patrocinios que la usen serán pausados.' : 'Delete this credential? Sponsorships using it will be paused.')) {
         await deleteCredential(target.dataset.delete);
         await refreshCreds();
         await refreshBens();
