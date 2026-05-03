@@ -216,7 +216,14 @@ const langJson = JSON.stringify(lang);
       </div>
       <div>
         <label class="block text-sm font-medium" for="cred-model-input">{lang === 'es' ? 'Modelo preferido' : 'Preferred model'}</label>
-        <input id="cred-model-input" name="preferred_model" type="text" class="mt-1 block w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-mono bg-white dark:bg-zinc-900" placeholder="claude-haiku-4-5" data-defaults='{"api_key":"claude-haiku-4-5","oauth_token":"claude-haiku-4-5","bedrock":"claude-haiku-4-5","openai_api_key":"gpt-4o-mini","azure_openai":"gpt-4o-mini","gemini_api_key":"gemini-2.0-flash-exp","vertex_ai":"gemini-2.0-flash-exp"}' />
+        <input id="cred-model-input" name="preferred_model" type="text" list="cred-model-suggestions" autocomplete="off"
+          class="mt-1 block w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-mono bg-white dark:bg-zinc-900" placeholder="claude-haiku-4-5"
+          data-defaults='{"api_key":"claude-haiku-4-5","oauth_token":"claude-haiku-4-5","bedrock":"claude-haiku-4-5","openai_api_key":"gpt-4o-mini","azure_openai":"gpt-4o-mini","gemini_api_key":"gemini-2.0-flash-exp","vertex_ai":"gemini-2.0-flash-exp"}'
+          data-suggestions='{"api_key":["claude-haiku-4-5","claude-sonnet-4-5","claude-opus-4-5","claude-haiku-4-6","claude-sonnet-4-6"],"oauth_token":["claude-haiku-4-5","claude-sonnet-4-5","claude-opus-4-5"],"bedrock":["claude-haiku-4-5","claude-sonnet-4-5","claude-opus-4-5","amazon.titan-text-express-v1"],"openai_api_key":["gpt-4o-mini","gpt-4o","gpt-4.1","gpt-4.1-mini","o1-mini","o3-mini"],"azure_openai":["gpt-4o-mini","gpt-4o","gpt-4","gpt-35-turbo"],"gemini_api_key":["gemini-2.0-flash-exp","gemini-2.0-flash","gemini-1.5-flash","gemini-1.5-pro","gemini-2.5-pro-preview"],"vertex_ai":["gemini-2.0-flash-exp","gemini-2.0-flash","gemini-1.5-flash","gemini-1.5-pro"]}' />
+        <datalist id="cred-model-suggestions"></datalist>
+        <a id="cred-model-docs-link" href="#" target="_blank" rel="noopener" class="mt-0.5 block text-xs text-emerald-700 dark:text-emerald-400 hover:underline hidden">
+          {lang === 'es' ? 'Ver modelos disponibles →' : 'Browse available models →'}
+        </a>
         <p class="mt-1 text-xs text-zinc-500">{lang === 'es' ? 'Defaults: claude-haiku-4-5 (Anthropic/Bedrock), gpt-4o-mini (OpenAI/Azure), gemini-2.0-flash-exp (Gemini/Vertex). Bedrock auto-traduce el shorthand de Anthropic.' : 'Defaults: claude-haiku-4-5 (Anthropic/Bedrock), gpt-4o-mini (OpenAI/Azure), gemini-2.0-flash-exp (Gemini/Vertex). Bedrock auto-translates Anthropic shorthand.'}</p>
         <div id="cred-model-cost" class="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400"></div>
       </div>
@@ -477,20 +484,42 @@ const langJson = JSON.stringify(lang);
   document.getElementById('cred-kind-select')?.addEventListener('change', syncEndpointRow);
   syncEndpointRow();
 
-  // Update model placeholder when provider changes
+  const MODEL_DOCS: Record<string, string> = {
+    api_key:        'https://docs.anthropic.com/en/docs/about-claude/models/overview',
+    oauth_token:    'https://docs.anthropic.com/en/docs/about-claude/models/overview',
+    bedrock:        'https://docs.aws.amazon.com/bedrock/latest/userguide/models-supported.html',
+    openai_api_key: 'https://platform.openai.com/docs/models',
+    azure_openai:   'https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models',
+    gemini_api_key: 'https://ai.google.dev/gemini-api/docs/models/gemini',
+    vertex_ai:      'https://cloud.google.com/vertex-ai/generative-ai/docs/learn/models',
+  };
+
+  // Update model placeholder + datalist suggestions + docs link when provider changes
   function syncModelPlaceholder() {
     const kindSel = document.getElementById('cred-kind-select') as HTMLSelectElement | null;
     const modelInput = document.getElementById('cred-model-input') as HTMLInputElement | null;
     if (!kindSel || !modelInput) return;
     const kind = kindSel.value;
     const defaults = JSON.parse(modelInput.dataset.defaults ?? '{}') as Record<string, string>;
+    const suggestions = JSON.parse(modelInput.dataset.suggestions ?? '{}') as Record<string, string[]>;
     const def = defaults[kind] ?? 'claude-haiku-4-5';
     // Only update placeholder — never overwrite user-typed value.
-    // If the field holds a default from a previous provider, clear it so
-    // the new placeholder shows through (empty string → placeholder visible).
     const prevDefaults = Object.values(defaults);
     if (prevDefaults.includes(modelInput.value)) modelInput.value = '';
     modelInput.placeholder = def;
+    // Populate datalist with provider-specific suggestions
+    const datalist = document.getElementById('cred-model-suggestions');
+    if (datalist) {
+      const opts = suggestions[kind] ?? [];
+      datalist.innerHTML = opts.map(m => `<option value="${m}"></option>`).join('');
+    }
+    // Update docs link
+    const docsLink = document.getElementById('cred-model-docs-link') as HTMLAnchorElement | null;
+    if (docsLink) {
+      const url = MODEL_DOCS[kind];
+      if (url) { docsLink.href = url; docsLink.classList.remove('hidden'); }
+      else docsLink.classList.add('hidden');
+    }
   }
   document.getElementById('cred-kind-select')?.addEventListener('change', syncModelPlaceholder);
   syncModelPlaceholder();
