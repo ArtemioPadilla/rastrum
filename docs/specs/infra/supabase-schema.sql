@@ -6837,32 +6837,45 @@ DO $$ BEGIN
     CHECK (reaction_type IN ('thumbs_up','thumbs_down','heart','expert','best_shot'));
 EXCEPTION WHEN others THEN NULL; END $$;
 
--- ── GeoJSON → geography implicit cast ────────────────────────────────────────
--- PostgREST sends JSON objects as jsonb when updating geography columns.
--- Without this cast, PATCH /observations with {location: {type:"Point",...}}
--- fails with HTTP 500 ("could not find implicit cast from jsonb to geography").
--- The cast function wraps ST_GeomFromGeoJSON and forces SRID=4326.
--- castcontext='i' (implicit) allows PostgREST to use it automatically.
+-- ── Location update via RPC ──────────────────────────────────────────────────
+-- PostgREST cannot cast jsonb → geography implicitly (requires owning both
+-- types, which the DB role does not). Instead of a CAST, we expose an RPC
+-- function that accepts lat/lng as floats and builds the geography internally.
+-- The client calls rpc('update_observation_location', {p_obs_id, p_lat, p_lng}).
+-- SECURITY DEFINER so the function runs as the function owner (bypasses RLS
+-- for the geography construction only); the WHERE clause still enforces
+-- observer_id = auth.uid() so users can only move their own observations.
 
-CREATE OR REPLACE FUNCTION public.jsonb_to_geography(jsonb)
-RETURNS geography
-LANGUAGE sql
-IMMUTABLE
-STRICT
-SECURITY INVOKER
+CREATE OR REPLACE FUNCTION public.update_observation_location(
+  p_obs_id uuid,
+  p_lat    double precision,
+  p_lng    double precision
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
-  -- Pass jsonb directly to ST_GeomFromGeoJSON (PostGIS accepts jsonb natively).
-  -- Do NOT cast to text first: $1::text wraps the value in escaped quotes,
-  -- producing '"{\"type\":\"Point\"}"' instead of '{"type":"Point"}',
-  -- which causes ST_GeomFromGeoJSON to fail with "parse error - invalid geometry".
-  SELECT ST_SetSRID(ST_GeomFromGeoJSON($1), 4326)::geography;
+BEGIN
+  -- RLS-equivalent guard: only the owner can move their observation.
+  -- The function is SECURITY DEFINER so geography construction works,
+  -- but we explicitly check auth.uid() = observer_id for safety.
+  UPDATE public.observations
+  SET
+    location        = ST_SetSRID(ST_MakePoint(p_lng, p_lat), 4326)::geography,
+    location_source = 'manual',
+    updated_at      = now()
+  WHERE id          = p_obs_id
+    AND observer_id = (SELECT auth.uid());
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'rls_filtered'
+      USING HINT = 'Observation not found or you are not the owner.';
+  END IF;
+END;
 $$;
 
-DO $$ BEGIN
-  CREATE CAST (jsonb AS geography)
-    WITH FUNCTION public.jsonb_to_geography(jsonb)
-    AS IMPLICIT;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+GRANT EXECUTE ON FUNCTION public.update_observation_location(uuid, double precision, double precision)
+  TO authenticated;
 
 

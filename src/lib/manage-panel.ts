@@ -645,21 +645,17 @@ export async function wireManagePanelLocation(
     savingEl?.classList.remove('hidden');
     try {
       // GeoJSON format is required for UPDATE via supabase-js — WKT strings are
-      // accepted by PostgREST on INSERT (via type-casting) but silently no-op
-      // on UPDATE because supabase-js serialises the value as JSON, not SQL.
-      // See issue #449.
-      const geoJson = pointGeographyGeoJSON(e.detail.coords.lat, e.detail.coords.lng);
-      // Hard 15 s timeout — if PostgREST never returns (RLS recursion regressed,
-      // CORS preflight stalled, auth refresh deadlock, etc.) the user gets a
+      // PostgREST cannot implicitly cast jsonb → geography (requires owning both
+      // types). Use the RPC function instead — it accepts lat/lng as floats
+      // and builds the geography internally with ST_MakePoint.
+      // Hard 15 s timeout — if PostgREST never returns the user gets a
       // visible error instead of a button stuck on "saving…" forever.
-      // Use count-based update: PostgREST returns the count of affected rows
-      // via the `Prefer: count=exact` header. This is more reliable than
-      // .select().maybeSingle() which can return null when RLS SELECT policy
-      // differs from UPDATE policy (e.g., obscured locations hidden from view).
       const updatePromise = supabase
-        .from('observations')
-        .update({ location: geoJson, location_source: 'manual', updated_at: new Date().toISOString() })
-        .eq('id', obsId);
+        .rpc('update_observation_location', {
+          p_obs_id: obsId,
+          p_lat:    e.detail.coords.lat,
+          p_lng:    e.detail.coords.lng,
+        });
       const timeout = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('save_timeout')), 15_000),
       );
