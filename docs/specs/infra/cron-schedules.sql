@@ -318,3 +318,20 @@ SELECT cron.schedule('gc_orphan_media', '30 4 * * 0',
       )
     )
   )$$);
+
+-- ─────────────────────────────────────────────────────────────────
+-- v10 (2026-05-03): added 'retry-unidentified' (every 30 min)
+--   Finds synced observations without any identification and
+--   re-queues the identify cascade for each. Cost 0 to schedule —
+--   identify itself selects cheapest available provider. Caps at
+--   20 observations per run to avoid thundering herd.
+--   Deployed --no-verify-jwt (cron-only).
+-- ─────────────────────────────────────────────────────────────────
+SELECT cron.unschedule('retry-unidentified')
+  WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'retry-unidentified');
+SELECT cron.schedule('retry-unidentified', '*/30 * * * *',
+  $$SELECT net.http_post(
+    url     := 'https://reppvlqejgoqvitturxp.supabase.co/functions/v1/retry-unidentified',
+    headers := '{"Content-Type":"application/json"}'::jsonb,
+    body    := '{}'::jsonb
+  )$$);
