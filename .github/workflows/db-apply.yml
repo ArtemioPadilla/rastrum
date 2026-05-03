@@ -153,6 +153,19 @@ jobs:
         run: |
           psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f scripts/db-sentinel.sql
 
+      - name: Backfill primary_taxon_id (idempotent — runs after every schema apply)
+        # Resolves taxon_id on identifications that have scientific_name but no
+        # taxon_id, promotes sole identifications to is_primary, and backfills
+        # observations.primary_taxon_id. Safe to re-run (idempotent WHERE clauses).
+        # This covers observations submitted before the sync_primary_identification
+        # trigger gained the scientific_name fallback lookup.
+        if: steps.changes.outputs.schema == 'true'
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f scripts/backfill-primary-taxon-id.sql
+          echo "::notice::primary_taxon_id backfill complete"
+
       - name: Refresh taxon_rarity (workflow_dispatch only)
         if: github.event_name == 'workflow_dispatch' && inputs.run_rarity_refresh == true
         env:
