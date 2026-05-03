@@ -112,8 +112,8 @@ const { lang } = Astro.props;
     obs_label: (n: number) => `${n} obs`,
   };
 
-  // Read slug from URL
-  const slug = window.location.pathname.split('/').filter(Boolean).pop() ?? '';
+  // Read slug from query param (?slug=X) — static site can't use [slug].astro
+  const slug = new URLSearchParams(window.location.search).get('slug') ?? '';
 
   async function load() {
     const supabase = getSupabase();
@@ -310,7 +310,7 @@ const { lang } = Astro.props;
 
     const list = document.getElementById('nearby-list')!;
     if (!places || places.length === 0) return;
-    const base = lang === 'es' ? '/es/explorar/lugares/' : '/en/explore/places/';
+    const base = lang === 'es' ? '/es/explorar/lugares/?slug=' : '/en/explore/places/?slug=';
     list.innerHTML = places.map((p: { slug: string; name: string; obs_count: number }) =>
       `<a href="${base}${p.slug}/" class="flex items-center justify-between py-2 border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:text-emerald-600">
         <span class="text-sm">📍 ${p.name}</span>
