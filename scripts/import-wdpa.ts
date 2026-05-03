@@ -40,7 +40,10 @@ import * as http from "node:http";
 // WDPA bulk download — free shapefile, no API key required (CC BY 4.0)
 // The shp_0 archive contains the main polygon layer for all countries.
 const WDPA_URL =
-  "https://d1gam3xoknrgr2.cloudfront.net/current/WDPA_WDOECM_wdpa_shp_0.zip";
+  "https://d1gam3xoknrgr2.cloudfront.net/current/WDPA_May2026_Public_shp.zip";
+// NOTE: WDPA releases a new file monthly. If this URL returns 404, check:
+// https://www.protectedplanet.net/en/resources for the current filename.
+// Pattern: WDPA_<MonthYear>_Public_shp.zip
 
 // ISO3 codes to import (v1: Mexico only; expand for LATAM in v2)
 const DEFAULT_COUNTRIES = ["MEX"];
