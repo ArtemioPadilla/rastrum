@@ -702,19 +702,28 @@ export async function wireManagePanelLocation(
       if (noLocEl) noLocEl.classList.add('hidden');
       savedEl?.classList.remove('hidden');
     } catch (err) {
-      const code = err instanceof Error ? err.message : String(err);
-      console.error('[manage-panel] location save error', { obsId, code, message: err instanceof Error ? err.message : String(err) });
+      // Serialize error properly — supabase-js PostgrestError is a POJO, not an Error
+      // instance, so err instanceof Error is false and String(err) = "[object Object]".
+      // Use JSON.stringify with a fallback to expose the full error object in the log.
+      const safeStr = (v: unknown): string => {
+        if (v instanceof Error) return v.message;
+        try { return JSON.stringify(v); } catch { return String(v); }
+      };
+      const code = err instanceof Error ? err.message : safeStr(err);
+      console.error('[manage-panel] location save error', safeStr(err));
       if (errEl) {
-        if (code === 'coords_invalid') {
+        // PostgREST 403 = RLS blocked the UPDATE. Most common cause: JWT expired.
+        const is403 = code.includes('403') || code.includes('PGRST116') || code.includes('rls_filtered') || code.includes('JWT expired') || code.includes('permission denied');
+        if (code === 'coords_invalid' || code.includes('coords_invalid')) {
           errEl.textContent = errCopy.invalidCoords;
-        } else if (code === 'save_timeout') {
+        } else if (code === 'save_timeout' || code.includes('save_timeout')) {
           errEl.textContent = isEs
             ? 'Tiempo de espera agotado. Revisa tu conexión o intenta de nuevo.'
             : 'Save timed out. Check your connection and try again.';
-        } else if (code === 'rls_filtered') {
+        } else if (is403) {
           errEl.textContent = isEs
-            ? 'No tienes permiso para editar esta observación.'
-            : 'You do not have permission to edit this observation.';
+            ? 'Sesión expirada. Vuelve a iniciar sesión para guardar cambios.'
+            : 'Session expired. Sign in again to save changes.';
         } else {
           errEl.textContent = `${errCopy.saveFailed} (${code})`;
         }
