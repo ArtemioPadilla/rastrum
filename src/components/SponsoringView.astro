@@ -216,7 +216,7 @@ const langJson = JSON.stringify(lang);
       </div>
       <div>
         <label class="block text-sm font-medium" for="cred-model-input">{lang === 'es' ? 'Modelo preferido' : 'Preferred model'}</label>
-        <input id="cred-model-input" name="preferred_model" type="text" class="mt-1 block w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-mono bg-white dark:bg-zinc-900" placeholder="claude-haiku-4-5" />
+        <input id="cred-model-input" name="preferred_model" type="text" class="mt-1 block w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-mono bg-white dark:bg-zinc-900" placeholder="claude-haiku-4-5" data-defaults='{"api_key":"claude-haiku-4-5","oauth_token":"claude-haiku-4-5","bedrock":"claude-haiku-4-5","openai_api_key":"gpt-4o-mini","azure_openai":"gpt-4o-mini","gemini_api_key":"gemini-2.0-flash-exp","vertex_ai":"gemini-2.0-flash-exp"}' />
         <p class="mt-1 text-xs text-zinc-500">{lang === 'es' ? 'Defaults: claude-haiku-4-5 (Anthropic/Bedrock), gpt-4o-mini (OpenAI/Azure), gemini-2.0-flash-exp (Gemini/Vertex). Bedrock auto-traduce el shorthand de Anthropic.' : 'Defaults: claude-haiku-4-5 (Anthropic/Bedrock), gpt-4o-mini (OpenAI/Azure), gemini-2.0-flash-exp (Gemini/Vertex). Bedrock auto-translates Anthropic shorthand.'}</p>
         <div id="cred-model-cost" class="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400"></div>
       </div>
@@ -461,6 +461,24 @@ const langJson = JSON.stringify(lang);
   }
   document.getElementById('cred-kind-select')?.addEventListener('change', syncEndpointRow);
   syncEndpointRow();
+
+  // Update model placeholder when provider changes
+  function syncModelPlaceholder() {
+    const kindSel = document.getElementById('cred-kind-select') as HTMLSelectElement | null;
+    const modelInput = document.getElementById('cred-model-input') as HTMLInputElement | null;
+    if (!kindSel || !modelInput) return;
+    const kind = kindSel.value;
+    const defaults = JSON.parse(modelInput.dataset.defaults ?? '{}') as Record<string, string>;
+    const def = defaults[kind] ?? 'claude-haiku-4-5';
+    modelInput.placeholder = def;
+    // Auto-fill if empty or if it's still the previous default
+    const prevDefaults = Object.values(defaults);
+    if (!modelInput.value || prevDefaults.includes(modelInput.value)) {
+      modelInput.value = '';
+    }
+  }
+  document.getElementById('cred-kind-select')?.addEventListener('change', syncModelPlaceholder);
+  syncModelPlaceholder();
 
   document.getElementById('cred-secret-input')?.addEventListener('input', async (e) => {
     const val = (e.target as HTMLInputElement).value;
