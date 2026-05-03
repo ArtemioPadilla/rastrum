@@ -39,7 +39,8 @@ BEGIN
     AND i.scientific_name <> ''
     AND NOT EXISTS (
       SELECT 1 FROM public.taxa t WHERE t.scientific_name = i.scientific_name
-    );
+    )
+  ORDER BY i.scientific_name;  -- required by DISTINCT ON
 
   GET DIAGNOSTICS v_count = ROW_COUNT;
   RAISE NOTICE 'Step 1: inserted % new taxa from identifications', v_count;
