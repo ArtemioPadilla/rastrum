@@ -637,7 +637,16 @@ export async function wireManagePanelLocation(
     });
   }
 
-  window.addEventListener('rastrum:mappicker-save', async (ev) => {
+  // Use a named handler so we can remove any previously registered listener
+  // before adding a new one. wireManagePanelLocation can be called more than
+  // once (page navigation, panel re-init), and window.addEventListener without
+  // cleanup stacks duplicate listeners — each one fires on the same event,
+  // causing concurrent refreshSession() + RPC calls that deadlock the
+  // supabase-js auth mutex and trigger save_timeout.
+  const existingHandler = (window as Window & { __rastrum_loc_handler?: EventListener }).__rastrum_loc_handler;
+  if (existingHandler) window.removeEventListener('rastrum:mappicker-save', existingHandler);
+
+  const locHandler: EventListener = async (ev) => {
     const e = ev as CustomEvent<{ id: string; coords: { lat: number; lng: number } }>;
     if (e.detail.id !== 'obs-detail-edit') return;
     errEl?.classList.add('hidden');
@@ -744,5 +753,9 @@ export async function wireManagePanelLocation(
     } finally {
       savingEl?.classList.add('hidden');
     }
-  });
+  };
+
+  // Register and store the handler so future calls can remove the old one
+  window.addEventListener('rastrum:mappicker-save', locHandler);
+  (window as Window & { __rastrum_loc_handler?: EventListener }).__rastrum_loc_handler = locHandler;
 }
