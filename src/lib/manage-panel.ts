@@ -596,6 +596,32 @@ export async function wireManagePanelLocation(
   const savedEl  = document.getElementById('m-loc-saved');
   const errEl    = document.getElementById('m-loc-error');
 
+  // GPS button — use device location
+  const gpsBtn = document.getElementById('m-loc-gps');
+  if (gpsBtn && 'geolocation' in navigator) {
+    gpsBtn.classList.remove('hidden');
+    gpsBtn.addEventListener('click', () => {
+      const gpsStatus = document.getElementById('m-loc-gps-status');
+      gpsBtn.disabled = true;
+      if (gpsStatus) { gpsStatus.textContent = isEs ? 'Obteniendo ubicación…' : 'Getting location…'; gpsStatus.classList.remove('hidden'); }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          gpsBtn.disabled = false;
+          if (gpsStatus) gpsStatus.classList.add('hidden');
+          const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          window.dispatchEvent(new CustomEvent('rastrum:mappicker-set-initial', { detail: { id: 'obs-detail-edit', coords } }));
+          window.dispatchEvent(new CustomEvent('rastrum:mappicker-set', { detail: { id: 'obs-detail-edit', coords } }));
+        },
+        (err) => {
+          gpsBtn.disabled = false;
+          if (gpsStatus) { gpsStatus.textContent = isEs ? 'No se pudo obtener la ubicación GPS.' : 'Could not get GPS location.'; }
+          console.warn('[manage-panel] GPS error', err);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+      );
+    });
+  }
+
   window.addEventListener('rastrum:mappicker-save', async (ev) => {
     const e = ev as CustomEvent<{ id: string; coords: { lat: number; lng: number } }>;
     if (e.detail.id !== 'obs-detail-edit') return;
