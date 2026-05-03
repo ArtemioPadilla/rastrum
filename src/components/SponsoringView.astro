@@ -287,7 +287,7 @@ const langJson = JSON.stringify(lang);
 <script>
   import {
     listCredentials, createCredential, rotateCredential, deleteCredential,
-    listSponsorships, createSponsorship, unpauseSponsorship, revokeSponsorship,
+    listSponsorships, createSponsorship, unpauseSponsorship, revokeSponsorship, testCredential,
     detectKind,
     listMyPools, createPool, setPoolStatus,
   } from '../lib/sponsorships';
@@ -426,12 +426,13 @@ const langJson = JSON.stringify(lang);
       const validated = c.validated_at ? `validated ${fmtDate(c.validated_at)}` : 'never validated';
       li.innerHTML = `
         <div>
-          <div class="font-medium">${escHtml(c.label)} <span class="text-xs text-zinc-500">(${escHtml(c.kind)})</span></div>
+          <div class="font-medium">${escHtml(c.label)} <span class="text-xs text-zinc-500">${escHtml(c.kind)} · ${escHtml(c.preferred_model ?? "")}</span></div>
           <div class="text-xs text-zinc-500">${escHtml(validated)}</div>
         </div>
-        <div class="flex gap-2">
-          <button data-rotate="${escHtml(c.id)}" class="text-sm text-emerald-700 hover:text-emerald-900">Rotate</button>
-          <button data-revoke="${escHtml(c.id)}" class="text-sm text-red-600 hover:text-red-800">Revoke</button>
+        <div class="flex gap-2 items-center">
+          <button data-test="${escHtml(c.id)}" class="text-xs px-2 py-1 rounded border border-emerald-600 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30">Test</button>
+          <button data-rotate="${escHtml(c.id)}" class="text-xs px-2 py-1 rounded border border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800">Rotate</button>
+          <button data-delete="${escHtml(c.id)}" class="text-xs px-2 py-1 rounded border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">Delete</button>
         </div>`;
       credsList.appendChild(li);
     }
@@ -662,9 +663,31 @@ const langJson = JSON.stringify(lang);
 
   document.getElementById('creds-list')?.addEventListener('click', async (e) => {
     const target = e.target as HTMLElement;
-    if (target.dataset.rotate) {
+    if (target.dataset.test) {
+      const btn = target as HTMLButtonElement;
+      const credId = btn.dataset.test!;
+      const origText = btn.textContent ?? 'Test';
+      btn.disabled = true;
+      btn.textContent = '…';
+      try {
+        const result = await testCredential(credId);
+        btn.textContent = result.ok ? `✓ ${result.latency_ms}ms` : `✗ ${result.error ?? 'fail'}`;
+        btn.className = btn.className.replace('border-emerald-600 text-emerald-700 dark:text-emerald-400', result.ok ? 'border-emerald-600 text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30' : 'border-red-400 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20');
+        setTimeout(() => { btn.textContent = 'Test'; btn.disabled = false; btn.className = btn.className.replace(' bg-emerald-50 dark:bg-emerald-900/30', '').replace(' bg-red-50 dark:bg-red-900/20', ''); }, 4000);
+        await refreshCreds();
+      } catch (err) {
+        btn.textContent = `✗ ${(err as Error).message.slice(0, 30)}`;
+        setTimeout(() => { btn.textContent = origText; btn.disabled = false; }, 4000);
+      }
+    } else if (target.dataset.rotate) {
       (document.getElementById('rotate-cred-id') as HTMLInputElement).value = target.dataset.rotate;
       rotateDialog?.showModal();
+    } else if (target.dataset.delete) {
+      if (await showConfirm(isEs ? '¿Eliminar esta credencial? Los patrocinios que la usen serán pausados.' : 'Delete this credential? Sponsorships using it will be paused.')) {
+        await deleteCredential(target.dataset.delete);
+        await refreshCreds();
+        await refreshBens();
+      }
     } else if (target.dataset.revoke) {
       if (await showConfirm('Revoke this credential? Sponsorships using it will be paused.')) {
         await deleteCredential(target.dataset.revoke);
