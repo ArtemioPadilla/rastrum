@@ -97,7 +97,23 @@ const sharePathBase = '/share/obs/';
         .replace(/'/g, '&#39;');
     }
 
-    function rowMarkup(r: ValidationQueueRow, mediaUrl: string | null, observerName: string | null): string {
+    /** Render the 80×80 media thumbnail based on media type. */
+    function mediaThumbnail(url: string | null, type: string | null): string {
+      if (!url) return '';
+      if (type === 'audio') {
+        return `<div class="w-full h-full flex flex-col items-center justify-center gap-1 p-1">
+          <span class="text-xl" aria-hidden="true">🔊</span>
+          <audio controls src="${escapeText(url)}" class="w-full" style="height:24px;max-width:72px;min-width:0;" preload="none"></audio>
+        </div>`;
+      }
+      if (type === 'video') {
+        return `<video src="${escapeText(url)}" class="w-full h-full object-cover" muted playsinline loop preload="none"></video>`;
+      }
+      // Default: photo
+      return `<img src="${escapeText(url)}" alt="" class="w-full h-full object-cover" loading="lazy" />`;
+    }
+
+    function rowMarkup(r: ValidationQueueRow, mediaUrl: string | null, mediaType: string | null, observerName: string | null): string {
       const sharePath = `${labels.shareBase ?? '/share/obs/'}?id=${encodeURIComponent(r.observation_id)}`;
       const isOwn = !!userId && userId === r.observer_id;
       const hasId = !!r.current_scientific_name;
@@ -128,7 +144,7 @@ const sharePathBase = '/share/obs/';
       return `<li class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 overflow-hidden">
         <div class="flex gap-3 p-3">
           <a href="${sharePath}" class="block w-20 h-20 shrink-0 rounded-lg overflow-hidden bg-zinc-100 dark:bg-zinc-800">
-            ${mediaUrl ? `<img src="${escapeText(mediaUrl)}" alt="" class="w-full h-full object-cover" loading="lazy" />` : ''}
+            ${mediaThumbnail(mediaUrl, mediaType)}
           </a>
           <div class="min-w-0 flex-1">
             <p class="text-sm italic font-semibold ${hasId ? 'text-emerald-700 dark:text-emerald-400' : 'text-zinc-500'}">
@@ -184,18 +200,21 @@ const sharePathBase = '/share/obs/';
           return;
         }
 
-        // Side-fetch primary photo + observer username for each row.
+        // Side-fetch primary media (url + media_type) + observer username for each row.
         const obsIds = rows.map(r => r.observation_id);
         const observerIds = Array.from(new Set(rows.map(r => r.observer_id)));
         const [{ data: media }, { data: users }] = await Promise.all([
-          supabase.from('media_files').select('observation_id, url, is_primary').in('observation_id', obsIds),
+          supabase.from('media_files').select('observation_id, url, is_primary, media_type').in('observation_id', obsIds),
           supabase.from('users').select('id, username, display_name').in('id', observerIds),
         ]);
-        const mediaByObs: Record<string, string> = {};
+        const mediaByObs: Record<string, { url: string; type: string }> = {};
         for (const m of (media ?? [])) {
           const k = (m as { observation_id: string }).observation_id;
           if (!mediaByObs[k] || (m as { is_primary?: boolean }).is_primary) {
-            mediaByObs[k] = (m as { url: string }).url;
+            mediaByObs[k] = {
+              url: (m as { url: string }).url,
+              type: (m as { media_type?: string }).media_type ?? 'photo',
+            };
           }
         }
         const observerById: Record<string, string> = {};
@@ -208,7 +227,12 @@ const sharePathBase = '/share/obs/';
 
         const list = document.getElementById('vq-list');
         if (list) {
-          list.innerHTML = rows.map(r => rowMarkup(r, mediaByObs[r.observation_id] ?? null, observerById[r.observer_id] ?? null)).join('');
+          list.innerHTML = rows.map(r => rowMarkup(
+            r,
+            mediaByObs[r.observation_id]?.url ?? null,
+            mediaByObs[r.observation_id]?.type ?? null,
+            observerById[r.observer_id] ?? null,
+          )).join('');
           // Wire CTA buttons to the modal.
           list.querySelectorAll<HTMLButtonElement>('button[data-action="suggest"], button[data-action="confirm"]').forEach(btn => {
             btn.addEventListener('click', () => {
