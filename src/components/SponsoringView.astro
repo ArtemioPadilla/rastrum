@@ -725,7 +725,7 @@ const langJson = JSON.stringify(lang);
         await refreshBens();
       }
     } else if (target.dataset.revoke) {
-      if (await showConfirm('Revoke this credential? Sponsorships using it will be paused.')) {
+      if (await showConfirm(pageLang === 'es' ? '¿Revocar esta credencial? Los patrocinios que la usen serán pausados.' : 'Revoke this credential? Sponsorships using it will be paused.')) {
         await deleteCredential(target.dataset.revoke);
         await refreshCreds();
         await refreshBens();
