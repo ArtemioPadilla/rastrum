@@ -104,7 +104,7 @@ const langJson = JSON.stringify(lang);
       </div>
       <div>
         <label class="block text-sm font-medium" for="pool-model-input">{lang === 'es' ? 'Modelo' : 'Model'}</label>
-        <input id="pool-model-input" type="text" required value="claude-haiku-4-5" class="mt-1 block w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-mono bg-white dark:bg-zinc-900" />
+        <input id="pool-model-input" type="text" required class="mt-1 block w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-mono bg-white dark:bg-zinc-900" placeholder="gpt-4o-mini" data-defaults='{"api_key":"claude-haiku-4-5","oauth_token":"claude-haiku-4-5","bedrock":"claude-haiku-4-5","openai_api_key":"gpt-4o-mini","azure_openai":"gpt-4o-mini","gemini_api_key":"gemini-2.0-flash-exp","vertex_ai":"gemini-2.0-flash-exp"}' />
         <div id="pool-model-cost" class="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400"></div>
       </div>
       <div>
@@ -554,9 +554,24 @@ const langJson = JSON.stringify(lang);
     try { creds = await listCredentials(); } catch { alert('Could not load credentials.'); return; }
     const sel = document.getElementById('pool-cred-select') as HTMLSelectElement | null;
     if (!sel) return;
-    sel.innerHTML = creds.map((c) => `<option value="${c.id}">${escHtml(c.label)}</option>`).join('');
+    sel.innerHTML = creds.map((c) => `<option value="${escHtml(c.id)}" data-model="${escHtml(c.preferred_model ?? '')}" data-kind="${escHtml(c.kind ?? '')}">${escHtml(c.label)}</option>`).join('');
+    // Pre-fill model from first credential
+    syncPoolModel(creds);
     poolDialog?.showModal();
   });
+  function syncPoolModel(creds: { id: string; preferred_model?: string; kind?: string }[]) {
+    const sel = document.getElementById('pool-cred-select') as HTMLSelectElement | null;
+    const modelInput = document.getElementById('pool-model-input') as HTMLInputElement | null;
+    if (!sel || !modelInput) return;
+    const opt = sel.selectedOptions[0] as HTMLOptionElement | undefined;
+    const credModel = opt?.dataset.model ?? '';
+    const credKind  = opt?.dataset.kind ?? '';
+    const kindDefaults = JSON.parse(modelInput.dataset.defaults ?? '{}') as Record<string, string>;
+    const def = credModel || kindDefaults[credKind] || 'claude-haiku-4-5';
+    modelInput.value = def;
+    updateCostDisplay('pool-model-input', 'pool-model-cost');
+  }
+  document.getElementById('pool-cred-select')?.addEventListener('change', () => syncPoolModel([]));
   document.getElementById('pool-cancel')?.addEventListener('click', () => poolDialog?.close());
   poolDialog?.querySelector('form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
