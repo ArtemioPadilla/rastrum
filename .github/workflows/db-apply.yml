@@ -177,6 +177,18 @@ jobs:
           psql "$SUPABASE_DB_URL" -f scripts/diagnose-location-trigger.sql || true
           echo "::notice::location trigger diagnosis complete"
 
+      - name: Backfill place_id (idempotent — runs after every schema apply)
+        # M-Loc-1: Assigns place_id to existing synced observations that have a
+        # location but no place_id. Safe to re-run (idempotent WHERE clause).
+        # Only matches named places (place_type != 'h3_cell'); H3 fallback cells
+        # are created by the trigger on future INSERT/UPDATE.
+        if: steps.changes.outputs.schema == 'true'
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f scripts/backfill-place-id.sql
+          echo "::notice::place_id backfill complete"
+
       - name: Refresh taxon_rarity (workflow_dispatch only)
         if: github.event_name == 'workflow_dispatch' && inputs.run_rarity_refresh == true
         env:
