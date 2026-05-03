@@ -74,7 +74,27 @@ BEGIN
     AND o.primary_taxon_id IS NULL;
 
   GET DIAGNOSTICS v_count = ROW_COUNT;
-  RAISE NOTICE 'Step 3: backfilled primary_taxon_id for % observation(s)', v_count;
+  RAISE NOTICE 'Step 3 (is_primary=true): backfilled primary_taxon_id for % observation(s)', v_count;
+
+  -- Step 3b: also catch observations where the sole identification has
+  -- is_primary = NULL or false but there's only one identification and
+  -- it has a taxon_id. This handles legacy rows inserted before the
+  -- is_primary DEFAULT true was reliable.
+  UPDATE public.observations o
+  SET primary_taxon_id = i.taxon_id,
+      updated_at       = now()
+  FROM public.identifications i
+  WHERE i.observation_id   = o.id
+    AND i.taxon_id         IS NOT NULL
+    AND o.primary_taxon_id IS NULL
+    AND NOT EXISTS (
+      SELECT 1 FROM public.identifications i2
+      WHERE i2.observation_id = o.id
+        AND i2.id <> i.id
+    );
+
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  RAISE NOTICE 'Step 3b (sole identification fallback): backfilled primary_taxon_id for % observation(s)', v_count;
 END $$;
 
 -- ── Verification ──────────────────────────────────────────────────────────────
