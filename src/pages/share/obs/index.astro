@@ -459,33 +459,43 @@ const lang: 'en' | 'es' = 'en';
               }
 
               if (btnEl) {
-                btnEl.textContent = hasVoted
-                  ? (isEs ? '\u2713 Nominada' : '\u2713 Nominated')
-                  : (isEs ? '\ud83d\udcf8 Nominar como mejor foto' : '\ud83d\udcf8 Nominate as best shot');
-                btnEl.className = hasVoted
-                  ? 'text-xs text-emerald-700 dark:text-emerald-400'
-                  : 'text-xs text-zinc-600 dark:text-zinc-400 hover:text-emerald-700 dark:hover:text-emerald-400';
+                const isLoggedIn = !!currentViewer?.id;
 
-                btnEl.addEventListener('click', async () => {
-                  if (hasVoted) {
-                    await supabase.from('reactions').delete()
-                      .eq('target_type', 'media').eq('target_id', mediaId)
-                      .eq('reaction_type', 'best_shot').eq('user_id', currentViewer?.id ?? '');
-                    hasVoted = false;
-                  } else {
-                    await supabase.from('reactions').insert({
-                      target_type: 'media', target_id: mediaId,
-                      reaction_type: 'best_shot', user_id: currentViewer?.id,
-                    });
-                    hasVoted = true;
-                  }
+                if (!isLoggedIn) {
+                  // Not logged in: show read-only count, disable button with hint
+                  btnEl.textContent = isEs ? '\ud83d\udcf8 Inicia sesi\u00f3n para nominar' : '\ud83d\udcf8 Sign in to nominate';
+                  btnEl.className = 'text-xs text-zinc-400 dark:text-zinc-600 cursor-not-allowed';
+                  btnEl.disabled = true;
+                  btnEl.title = isEs ? 'Necesitas iniciar sesi\u00f3n para nominar fotos' : 'You need to sign in to nominate photos';
+                } else {
                   btnEl.textContent = hasVoted
                     ? (isEs ? '\u2713 Nominada' : '\u2713 Nominated')
                     : (isEs ? '\ud83d\udcf8 Nominar como mejor foto' : '\ud83d\udcf8 Nominate as best shot');
                   btnEl.className = hasVoted
                     ? 'text-xs text-emerald-700 dark:text-emerald-400'
                     : 'text-xs text-zinc-600 dark:text-zinc-400 hover:text-emerald-700 dark:hover:text-emerald-400';
-                });
+
+                  btnEl.addEventListener('click', async () => {
+                    if (hasVoted) {
+                      await supabase.from('reactions').delete()
+                        .eq('target_type', 'media').eq('target_id', mediaId)
+                        .eq('reaction_type', 'best_shot').eq('user_id', currentViewer!.id ?? '');
+                      hasVoted = false;
+                    } else {
+                      await supabase.from('reactions').insert({
+                        target_type: 'media', target_id: mediaId,
+                        reaction_type: 'best_shot', user_id: currentViewer!.id,
+                      });
+                      hasVoted = true;
+                    }
+                    btnEl.textContent = hasVoted
+                      ? (isEs ? '\u2713 Nominada' : '\u2713 Nominated')
+                      : (isEs ? '\ud83d\udcf8 Nominar como mejor foto' : '\ud83d\udcf8 Nominate as best shot');
+                    btnEl.className = hasVoted
+                      ? 'text-xs text-emerald-700 dark:text-emerald-400'
+                      : 'text-xs text-zinc-600 dark:text-zinc-400 hover:text-emerald-700 dark:hover:text-emerald-400';
+                  });
+                }
               }
             }
           }

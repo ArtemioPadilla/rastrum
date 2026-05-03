@@ -605,11 +605,15 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
           path.setAttribute('fill-opacity', String(0.9 - depth * 0.1));
           path.setAttribute('stroke', '#fff');
           path.setAttribute('stroke-width', '0.005');
-          path.style.cursor = 'pointer';
+          // Only leaf nodes (species) navigate to the detail page.
+          // Intermediate nodes (kingdom → genus) update the center label only
+          // so the user can explore the hierarchy without accidental navigation.
+          const isLeaf = child.children.length === 0;
+          path.style.cursor = isLeaf ? 'pointer' : 'default';
           path.addEventListener('click', () => {
             if (nameEl) nameEl.textContent = child.name;
             if (countEl) countEl.textContent = `${child.count} obs`;
-            if (child.taxonId) showDetail(child.taxonId);
+            if (isLeaf && child.taxonId) showDetail(child.taxonId);
           });
           svg!.appendChild(path);
           renderLevel(child, depth + 1, angle, angle + sweep, maxDepth);
