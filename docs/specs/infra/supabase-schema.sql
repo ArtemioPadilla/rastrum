@@ -7140,3 +7140,38 @@ $$;
 GRANT EXECUTE ON FUNCTION public.place_top_species(uuid, int) TO authenticated, anon;
 GRANT EXECUTE ON FUNCTION public.place_top_observers(uuid, int) TO authenticated, anon;
 GRANT EXECUTE ON FUNCTION public.place_geojson_by_slug(text) TO authenticated, anon;
+
+-- ── M-Loc-5: places_map_geojson RPC ──────────────────────────────────────────
+-- Returns a GeoJSON FeatureCollection of places for the explore map layer.
+-- Only includes places with observations. Capped to avoid large payloads.
+
+CREATE OR REPLACE FUNCTION public.places_map_geojson(p_limit int DEFAULT 150)
+RETURNS json
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+  SELECT json_build_object(
+    'type', 'FeatureCollection',
+    'features', COALESCE(json_agg(
+      json_build_object(
+        'type', 'Feature',
+        'geometry', ST_AsGeoJSON(geometry)::json,
+        'properties', json_build_object(
+          'id',         id,
+          'slug',       slug,
+          'name',       name,
+          'place_type', place_type,
+          'obs_count',  obs_count
+        )
+      )
+    ), '[]'::json)
+  )
+  FROM (
+    SELECT id, slug, name, place_type, obs_count, geometry
+    FROM public.places
+    WHERE obs_count > 0
+    ORDER BY obs_count DESC
+    LIMIT p_limit
+  ) t;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.places_map_geojson(int) TO authenticated, anon;
