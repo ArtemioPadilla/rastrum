@@ -32,11 +32,19 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Extract version
+      - name: Generate version from git
         id: pkg
         run: |
-          VERSION=$(node -e "process.stdout.write(require('./package.json').version)")
+          # CalVer: YYYY.M.patch where patch = commits in the current month.
+          # Example: 2026.5.3 = third deploy of May 2026.
+          YEAR=$(date -u +%Y)
+          MONTH=$(date -u +%-m)
+          MONTH_START=$(date -u -d "$(date -u +%Y-%m-01)" +%Y-%m-%dT00:00:00Z 2>/dev/null || date -u -j -f '%Y-%m-%dT%H:%M:%SZ' "$(date -u +%Y-%m-)01T00:00:00Z" +%Y-%m-%dT00:00:00Z)
+          PATCH=$(git log --oneline --after="${MONTH_START}" HEAD | wc -l | tr -d ' ')
+          # Patch is 0-indexed commits count; min 0, ensures bumping on every push
+          VERSION="${YEAR}.${MONTH}.${PATCH}"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "[version] Generated: $VERSION"
       - name: Typecheck
         run: npx tsc --noEmit
 
