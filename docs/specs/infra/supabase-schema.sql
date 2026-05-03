@@ -659,6 +659,7 @@ WHERE i.taxon_id IS NULL
 CREATE OR REPLACE FUNCTION public.sync_primary_identification()
 RETURNS trigger AS $$
 DECLARE
+  v_taxon_id      uuid;
   v_obscure_level text;
   v_raw_loc       geography(Point, 4326);
 BEGIN
@@ -666,14 +667,27 @@ BEGIN
     RETURN NEW;
   END IF;
 
+  -- Resolve taxon_id: use the explicit value if present, otherwise look up
+  -- by scientific_name. This handles Edge Function / client inserts that
+  -- supply scientific_name but not taxon_id (identify EF, sync.ts client).
+  -- Without this fallback, observations.primary_taxon_id stays NULL and
+  -- the /explore/species/ grid shows no species. See issue #475.
+  v_taxon_id := NEW.taxon_id;
+  IF v_taxon_id IS NULL AND NEW.scientific_name IS NOT NULL THEN
+    SELECT id INTO v_taxon_id
+    FROM public.taxa
+    WHERE scientific_name = NEW.scientific_name
+    LIMIT 1;
+  END IF;
+
   SELECT obscure_level INTO v_obscure_level
-  FROM public.taxa WHERE id = NEW.taxon_id;
+  FROM public.taxa WHERE id = v_taxon_id;
 
   SELECT location INTO v_raw_loc
   FROM public.observations WHERE id = NEW.observation_id;
 
   UPDATE public.observations
-  SET primary_taxon_id = NEW.taxon_id,
+  SET primary_taxon_id = v_taxon_id,
       obscure_level    = COALESCE(v_obscure_level, 'none'),
       location_obscured = CASE
         WHEN v_obscure_level IS NULL OR v_obscure_level = 'none' THEN NULL
@@ -684,6 +698,14 @@ BEGIN
       END,
       updated_at = now()
   WHERE id = NEW.observation_id;
+
+  -- Also patch the identification row so taxon_id is persisted for future
+  -- trigger runs (e.g. if is_primary flips again on the same row).
+  IF v_taxon_id IS NOT NULL AND NEW.taxon_id IS NULL THEN
+    UPDATE public.identifications
+    SET taxon_id = v_taxon_id
+    WHERE id = NEW.id;
+  END IF;
 
   RETURN NEW;
 END;
