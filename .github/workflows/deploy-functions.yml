@@ -128,9 +128,10 @@ jobs:
             else
               echo "→ deploying: $FNS"
             fi
-            # On push, never resync secrets — that's a privileged op reserved
-            # for explicit dispatch.
-            echo "sync_secrets=false" >> "$GITHUB_OUTPUT"
+            # On push, always sync secrets — ensures Supabase has the latest
+            # values whenever a function is deployed (prevents 500s from stale
+            # or missing env vars after first-time function deploys).
+            echo "sync_secrets=true" >> "$GITHUB_OUTPUT"
           fi
           echo "fns=$FNS" >> "$GITHUB_OUTPUT"
 
