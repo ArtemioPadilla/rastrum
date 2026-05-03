@@ -59,12 +59,25 @@ const placesIndexBase = `/${lang}/${lang === 'es' ? 'explorar/lugares' : 'explor
 
     <!-- Search + filter bar -->
     <div class="flex flex-col sm:flex-row gap-3 mb-6">
-      <input
-        id="places-search"
-        type="search"
-        placeholder={page.search_placeholder}
-        class="flex-1 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-4 py-2 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-      />
+      <div class="relative flex-1">
+        <input
+          id="places-search"
+          type="search"
+          autocomplete="off"
+          placeholder={page.search_placeholder}
+          class="w-full rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-4 py-2 pl-9 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        />
+        <!-- Search icon -->
+        <svg class="absolute left-2.5 top-2.5 h-4 w-4 text-zinc-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+        <!-- Autocomplete dropdown -->
+        <ul
+          id="places-autocomplete"
+          class="hidden absolute z-50 top-full left-0 right-0 mt-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg overflow-hidden max-h-60 overflow-y-auto"
+          role="listbox"
+        ></ul>
+      </div>
       <select
         id="places-type-filter"
         class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500"
@@ -276,13 +289,98 @@ const placesIndexBase = `/${lang}/${lang === 'es' ? 'explorar/lugares' : 'explor
     }
   }
 
-  // Search — debounce 300ms
+  // Autocomplete
+  const autocompleteEl = document.getElementById('places-autocomplete') as HTMLUListElement;
+  let acTimer: ReturnType<typeof setTimeout>;
+  let acActive = -1;
+
+  function hideAC() {
+    autocompleteEl.classList.add('hidden');
+    autocompleteEl.innerHTML = '';
+    acActive = -1;
+  }
+
+  function showAC(results: { slug: string; name: string; place_type: string; obs_count: number }[]) {
+    if (!results.length) { hideAC(); return; }
+    const placeBase = isEs ? '/es/explorar/lugares/?slug=' : '/en/explore/places/?slug=';
+    const typeLabelFn = (t: string) => ({
+      protected_area: isEs ? 'Área Protegida' : 'Protected Area',
+      h3_cell: isEs ? 'Zona H3' : 'H3 Zone',
+      custom: isEs ? 'Custom' : 'Custom',
+      community: isEs ? 'Comunitario' : 'Community',
+    }[t] ?? t);
+
+    autocompleteEl.innerHTML = results.map((p, i) =>
+      `<li role="option" data-slug="${p.slug}" data-idx="${i}"
+        class="flex items-center justify-between px-4 py-2.5 cursor-pointer hover:bg-emerald-50 dark:hover:bg-emerald-900/20 border-b border-zinc-100 dark:border-zinc-800 last:border-0 text-sm">
+        <span>
+          <span class="font-medium text-zinc-900 dark:text-zinc-100">${p.name}</span>
+          <span class="ml-2 text-xs text-zinc-400">${typeLabelFn(p.place_type)}</span>
+        </span>
+        <span class="text-xs text-zinc-400 shrink-0">${p.obs_count} obs</span>
+      </li>`
+    ).join('');
+    autocompleteEl.classList.remove('hidden');
+
+    autocompleteEl.querySelectorAll('li').forEach(li => {
+      li.addEventListener('mousedown', e => {
+        e.preventDefault();
+        const slug = (li as HTMLElement).dataset.slug!;
+        const name = li.querySelector('.font-medium')!.textContent!;
+        searchEl.value = name;
+        searchQuery = name;
+        hideAC();
+        // Navigate directly to place detail
+        window.location.href = placeBase + slug;
+      });
+    });
+  }
+
+  // Search — debounce 300ms + autocomplete
   searchEl.addEventListener('input', () => {
     clearTimeout(debounceTimer);
+    clearTimeout(acTimer);
+    const val = searchEl.value.trim();
+    if (val.length < 2) { hideAC(); }
+    acTimer = setTimeout(async () => {
+      if (val.length < 2) return;
+      const supabase = getSupabase();
+      const { data } = await supabase
+        .from('places')
+        .select('slug, name, place_type, obs_count')
+        .ilike('name', `${val}%`)
+        .order('obs_count', { ascending: false })
+        .limit(6);
+      showAC(data ?? []);
+    }, 200);
     debounceTimer = setTimeout(() => {
-      searchQuery = searchEl.value.trim();
+      searchQuery = val;
       resetAndFetch();
     }, 300);
+  });
+
+  // Keyboard navigation for autocomplete
+  searchEl.addEventListener('keydown', e => {
+    const items = autocompleteEl.querySelectorAll('li');
+    if (!items.length) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      acActive = Math.min(acActive + 1, items.length - 1);
+      items.forEach((li, i) => li.classList.toggle('bg-emerald-50', i === acActive));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      acActive = Math.max(acActive - 1, -1);
+      items.forEach((li, i) => li.classList.toggle('bg-emerald-50', i === acActive));
+    } else if (e.key === 'Enter' && acActive >= 0) {
+      e.preventDefault();
+      (items[acActive] as HTMLElement).dispatchEvent(new MouseEvent('mousedown'));
+    } else if (e.key === 'Escape') {
+      hideAC();
+    }
+  });
+
+  document.addEventListener('click', e => {
+    if (!searchEl.contains(e.target as Node) && !autocompleteEl.contains(e.target as Node)) hideAC();
   });
 
   // Type filter
