@@ -101,8 +101,13 @@ serve(async (req) => {
     const kind = detectAnyKind(secret);
     if (!kind) return jsonResponse(400, { error: 'unrecognized_secret_prefix' });
 
-    const validation = await validateAnthropicCredential(secret);
-    if (!validation.valid) return jsonResponse(400, { error: 'validation_failed', detail: validation.error });
+    // Only validate Anthropic credentials (api_key / oauth_token) at creation time.
+    // Other providers (OpenAI, Gemini, Bedrock, Azure, Vertex) are stored as-is —
+    // they'll fail at identify-time if invalid, which gives a clearer error.
+    if (kind === 'api_key' || kind === 'oauth_token') {
+      const validation = await validateAnthropicCredential(secret);
+      if (!validation.valid) return jsonResponse(400, { error: 'validation_failed', detail: validation.error });
+    }
 
     const { data: vaultRow, error: vaultErr } = await supabase.rpc('create_vault_secret', {
       p_secret: secret, p_name: `sponsor_credential:${ctx.userId}:${label}`,
@@ -167,8 +172,11 @@ serve(async (req) => {
       if (!secret) return jsonResponse(400, { error: 'secret_required' });
       const kind = detectAnyKind(secret);
       if (!kind) return jsonResponse(400, { error: 'unrecognized_secret_prefix' });
-      const validation = await validateAnthropicCredential(secret);
-      if (!validation.valid) return jsonResponse(400, { error: 'validation_failed', detail: validation.error });
+      // Validate only Anthropic keys at rotate time
+      if (kind === 'api_key' || kind === 'oauth_token') {
+        const validation = await validateAnthropicCredential(secret);
+        if (!validation.valid) return jsonResponse(400, { error: 'validation_failed', detail: validation.error });
+      }
 
       const { data: newSecretId, error: vaultErr } = await supabase.rpc('create_vault_secret', {
         p_secret: secret,
