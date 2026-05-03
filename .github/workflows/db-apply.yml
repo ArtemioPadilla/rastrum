@@ -163,6 +163,9 @@ jobs:
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
+          # First create any missing taxa from scientific_names in identifications,
+          # then resolve taxon_id on identifications + backfill primary_taxon_id.
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f scripts/backfill-taxa-from-identifications.sql
           psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f scripts/backfill-primary-taxon-id.sql
           echo "::notice::primary_taxon_id backfill complete"
 
