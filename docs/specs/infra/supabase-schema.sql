@@ -4613,6 +4613,16 @@ ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'sponsorship_request_create';
 ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'sponsorship_request_approve';
 ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'sponsorship_request_reject';
 ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'sponsorship_request_withdraw';
+-- ── Sponsoring table grants — service_role needs explicit GRANT even with BYPASSRLS ──
+-- The Edge Function (sponsorships/index.ts) uses the service_role key. In Supabase,
+-- service_role bypasses RLS but still requires table-level GRANT from the schema owner.
+-- Without these, all sponsoring Edge Function calls get "permission denied for table …".
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.sponsor_credentials    TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.sponsorships           TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.sponsorship_requests   TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.ai_usage               TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.ai_errors_log          TO service_role;
+
 -- ════════════════════════════════════════════════════════════════════════════
 -- PR8 — admin console hardening
 -- ════════════════════════════════════════════════════════════════════════════
