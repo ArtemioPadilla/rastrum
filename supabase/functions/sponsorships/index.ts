@@ -9,8 +9,8 @@ const SPONSORSHIPS_CRON_TOKEN = Deno.env.get('SPONSORSHIPS_CRON_TOKEN');
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info, x-rastrum-build',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info, x-rastrum-build, x-http-method-override',
   'Access-Control-Max-Age': '86400',
 };
 
