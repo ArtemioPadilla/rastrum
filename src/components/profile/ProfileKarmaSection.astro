@@ -7,18 +7,22 @@ interface Props {
   viewer: 'self' | 'signed_in' | 'anonymous';
   targetUserId?: string;
   ownerOnly?: boolean;
+  defer?: boolean;
 }
 
-const { lang, ownerOnly = false } = Astro.props;
+const { lang, ownerOnly = false, defer = false } = Astro.props;
 const tr = t(lang);
 const k = (tr as unknown as { karma: Record<string, string> }).karma;
 const ownerPill = (tr as unknown as { privacy?: { owner_only_badge?: string } }).privacy?.owner_only_badge ?? (lang === 'es' ? '🔒 Solo tú lo ves' : '🔒 Only you see this');
+const sectionClass = `rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 mb-6${defer ? ' hidden' : ''}`;
 ---
 
 <section
   data-widget="karma-section"
   data-target-user-id={Astro.props.targetUserId}
-  class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 mb-6"
+  data-defer={defer ? '1' : '0'}
+  data-karma-hydrated="0"
+  class={sectionClass}
 >
   <header class="flex items-baseline justify-between mb-3">
     <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
@@ -51,14 +55,19 @@ const ownerPill = (tr as unknown as { privacy?: { owner_only_badge?: string } })
   import { escAttr } from '../../lib/karma';
 
   async function hydrate(el: HTMLElement) {
+    if (el.dataset.karmaHydrated === '1') return;
+
     const totalEl = el.querySelector<HTMLElement>('[data-karma-total]');
     const listEl = el.querySelector<HTMLUListElement>('[data-expertise]');
     if (!totalEl || !listEl) return;
+
+    const deferred = el.dataset.defer === '1';
 
     let supabase;
     try { supabase = getSupabase(); } catch { return; }
     let userId = el.dataset.targetUserId ?? null;
     if (!userId) {
+      if (deferred) return;
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       userId = user.id;
@@ -70,6 +79,8 @@ const ownerPill = (tr as unknown as { privacy?: { owner_only_badge?: string } })
       .maybeSingle<{ karma_total: number | null; top_expertise: Array<{ taxon_id: string; scientific_name: string; score: number }> | null }>();
 
     if (!data) return;
+
+    el.dataset.karmaHydrated = '1';
     totalEl.textContent = String(Math.round(data.karma_total ?? 0));
     const rows = data.top_expertise ?? [];
     if (rows.length) {
@@ -77,7 +88,15 @@ const ownerPill = (tr as unknown as { privacy?: { owner_only_badge?: string } })
         .map((r) => `<li class="flex items-center gap-2"><span class="italic">${escAttr(r.scientific_name)}</span><span class="ml-auto font-mono text-xs">${Math.round(r.score)}</span></li>`)
         .join('');
     }
+    if (deferred) el.classList.remove('hidden');
+    document.dispatchEvent(new CustomEvent('rastrum:karma-hydrated', { detail: { targetUserId: userId } }));
   }
 
-  document.querySelectorAll<HTMLElement>('[data-widget="karma-section"]').forEach(hydrate);
+  function hydrateAll() {
+    document.querySelectorAll<HTMLElement>('[data-widget="karma-section"]').forEach((el) => {
+      hydrate(el).catch(() => { /* env not configured */ });
+    });
+  }
+  hydrateAll();
+  document.addEventListener('rastrum:karma-ready', hydrateAll);
 </script>
