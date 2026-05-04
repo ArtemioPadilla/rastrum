@@ -38,6 +38,51 @@ function withCronToken(req: Request): boolean {
 
 const UUID_RE = /^[0-9a-f-]{36}$/;
 
+// Map a CredentialKind to the matching ai_provider enum. Server keeps
+// the two consistent so downstream resolvers (resolve_sponsorship) can
+// dispatch by either column.
+const KIND_TO_PROVIDER: Record<string, string> = {
+  api_key:        'anthropic',
+  oauth_token:    'anthropic',
+  bedrock:        'bedrock',
+  openai_api_key: 'openai',
+  azure_openai:   'azure_openai',
+  gemini_api_key: 'gemini',
+  vertex_ai:      'vertex_ai',
+};
+
+// Provider-specific minimal liveness probe shared by /credentials/:id/test
+// (encrypted secret out of Vault) and /credentials/validate (raw secret
+// from the Add-credential modal). For Bedrock / Azure / Vertex we'd need
+// the full JSON envelope to sign — out of scope for v1, returns
+// `test_not_supported_for_provider` so the UI can hint instead.
+async function probeCredential(kind: string, secret: string, model: string): Promise<{ ok: boolean; latency_ms: number; error: string | null }> {
+  const t0 = Date.now();
+  try {
+    if (kind === 'api_key' || kind === 'oauth_token') {
+      const { pickAuthHeader } = await import('../_shared/sponsorship.ts');
+      const headers = { ...pickAuthHeader(kind, secret), 'anthropic-version': '2023-06-01', 'content-type': 'application/json' } as Record<string,string>;
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST', headers,
+        body: JSON.stringify({ model: model.includes('/') ? model : `${model}-20251001`, max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] }),
+      });
+      const ok = r.status !== 401 && r.status !== 403;
+      return { ok, latency_ms: Date.now() - t0, error: ok ? null : `HTTP ${r.status}` };
+    }
+    if (kind === 'openai_api_key') {
+      const r = await fetch('https://api.openai.com/v1/models', { headers: { 'Authorization': `Bearer ${secret}` } });
+      return { ok: r.ok, latency_ms: Date.now() - t0, error: r.ok ? null : `HTTP ${r.status}` };
+    }
+    if (kind === 'gemini_api_key') {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(secret)}`);
+      return { ok: r.ok, latency_ms: Date.now() - t0, error: r.ok ? null : `HTTP ${r.status}` };
+    }
+    return { ok: true, latency_ms: Date.now() - t0, error: 'test_not_supported_for_provider' };
+  } catch (e) {
+    return { ok: false, latency_ms: Date.now() - t0, error: (e as Error).message };
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -99,12 +144,23 @@ serve(async (req) => {
   // POST /credentials
   if (method === 'POST' && path === '/credentials') {
     const body = await req.json().catch(() => ({}));
-    const { label, secret, provider = 'anthropic' } = body as { label?: string; secret?: string; provider?: string };
+    const {
+      label, secret,
+      kind: kindHint,
+      preferred_model: preferredModel,
+      endpoint,
+    } = body as {
+      label?: string; secret?: string;
+      kind?: string; preferred_model?: string; endpoint?: string | null;
+    };
     if (!label || !secret) return jsonResponse(400, { error: 'label_and_secret_required' });
     if (label.length < 1 || label.length > 64) return jsonResponse(400, { error: 'label_length_1_64' });
 
-    const kind = detectAnyKind(secret);
+    // Trust the client's explicit kind for ambiguous prefixes (Bedrock /
+    // Azure / Vertex JSON envelopes) but fall back to prefix sniffing.
+    const kind = (kindHint && kindHint in KIND_TO_PROVIDER) ? kindHint : detectAnyKind(secret);
     if (!kind) return jsonResponse(400, { error: 'unrecognized_secret_prefix' });
+    const provider = KIND_TO_PROVIDER[kind];
 
     // Only validate Anthropic credentials (api_key / oauth_token) at creation time.
     // Other providers (OpenAI, Gemini, Bedrock, Azure, Vertex) are stored as-is —
@@ -119,17 +175,25 @@ serve(async (req) => {
     });
     if (vaultErr || !vaultRow) return jsonResponse(500, { error: 'vault_insert_failed', detail: vaultErr?.message });
 
+    const insertRow: Record<string, unknown> = {
+      user_id:         ctx.userId,
+      provider,
+      kind,
+      label,
+      vault_secret_id: vaultRow as string,
+      validated_at:    new Date().toISOString(),
+    };
+    if (preferredModel && preferredModel.length >= 1 && preferredModel.length <= 64) {
+      insertRow.preferred_model = preferredModel;
+    }
+    if (endpoint && endpoint.length <= 512) {
+      insertRow.endpoint = endpoint;
+    }
+
     const { data: cred, error: insErr } = await supabase
       .from('sponsor_credentials')
-      .insert({
-        user_id:         ctx.userId,
-        provider,
-        kind,
-        label,
-        vault_secret_id: vaultRow as string,
-        validated_at:    new Date().toISOString(),
-      })
-      .select('id, label, provider, kind, validated_at, created_at')
+      .insert(insertRow)
+      .select('id, label, provider, kind, preferred_model, endpoint, validated_at, created_at')
       .single();
     if (insErr) {
       await supabase.rpc('delete_vault_secret', { p_secret_id: vaultRow });
@@ -142,9 +206,24 @@ serve(async (req) => {
       target_type: 'sponsor_credential',
       target_id:   cred?.id ?? null,
       reason:      'user_created_credential',
-      after:       { label, kind },
+      after:       { label, kind, provider, preferred_model: preferredModel ?? null },
     });
     return jsonResponse(201, cred);
+  }
+
+  // POST /credentials/validate — probe a secret WITHOUT saving (Test
+  // button in the Add-credential modal).
+  if (method === 'POST' && path === '/credentials/validate') {
+    const body = await req.json().catch(() => ({}));
+    const { secret, kind: kindHint, preferred_model: preferredModel } = body as {
+      secret?: string; kind?: string; preferred_model?: string;
+    };
+    if (!secret) return jsonResponse(400, { error: 'secret_required' });
+    const kind = (kindHint && kindHint in KIND_TO_PROVIDER) ? kindHint : detectAnyKind(secret);
+    if (!kind) return jsonResponse(400, { error: 'unrecognized_secret_prefix' });
+    const model = (preferredModel && preferredModel.length > 0) ? preferredModel : 'claude-haiku-4-5';
+    const result = await probeCredential(kind, secret, model);
+    return jsonResponse(200, result);
   }
 
   // GET /credentials

@@ -74,7 +74,28 @@ export async function createCredential(args: CreateCredentialArgs): Promise<Spon
   const r = await authedFetch('/credentials', { method: 'POST', body: JSON.stringify(args) });
   if (!r.ok) {
     const body = await r.json().catch(() => ({}));
-    throw new Error(`createCredential: ${(body as { error?: string }).error ?? r.status}`);
+    const detail = (body as { error?: string; detail?: string }).detail;
+    const error  = (body as { error?: string }).error ?? r.status;
+    throw new Error(`createCredential: ${[error, detail].filter(Boolean).join(' | ')}`);
+  }
+  return r.json();
+}
+
+/** Probe a not-yet-saved secret. Lets the user click "Test" in the
+ *  add-credential modal before committing. Returns the same shape as
+ *  testCredential() so consumers can render uniformly. */
+export async function validateUnsavedCredential(args: {
+  secret: string;
+  kind?: CredentialKind;
+  preferred_model?: string;
+  endpoint?: string | null;
+}): Promise<{ ok: boolean; latency_ms: number; error: string | null }> {
+  const r = await authedFetch('/credentials/validate', { method: 'POST', body: JSON.stringify(args) });
+  if (!r.ok) {
+    const body = await r.json().catch(() => ({}));
+    const detail = (body as { error?: string; detail?: string }).detail;
+    const error  = (body as { error?: string }).error ?? r.status;
+    throw new Error(`validateUnsavedCredential: ${[error, detail].filter(Boolean).join(' | ')}`);
   }
   return r.json();
 }
