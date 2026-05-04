@@ -4299,6 +4299,7 @@ SELECT
   id, username, display_name, avatar_url, country_code,
   expert_taxa, is_expert,
   observation_count, species_count, obs_count_7d, obs_count_30d,
+  karma_total,
   last_observation_at, joined_at
 FROM public.users
 WHERE hide_from_leaderboards = false;
@@ -4320,6 +4321,7 @@ SELECT
   id, username, display_name, avatar_url, country_code,
   expert_taxa, is_expert,
   observation_count, species_count, obs_count_7d, obs_count_30d,
+  karma_total,
   centroid_geog, last_observation_at, joined_at
 FROM public.users
 WHERE hide_from_leaderboards = false;
