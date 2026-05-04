@@ -138,6 +138,11 @@ export const onnxBaseIdentifier: Identifier = {
     runtime: 'client',
     license: 'free',
     cost_per_id_usd: 0,
+    // Capped at 0.4 (#582) so EfficientNet never crosses ACCEPT_THRESHOLD
+    // (0.7) on its own. ImageNet labels are English common names, not
+    // scientific binomials, so this plugin is hint-only — surfaces top-k
+    // alternates in the UI but never wins the cascade.
+    confidence_ceiling: 0.4,
   },
   async isAvailable() {
     if (!getOnnxBaseWeightsBaseUrl()) {

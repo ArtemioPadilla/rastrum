@@ -194,7 +194,14 @@ async function syncOne(record: ObservationRecord): Promise<void> {
   //      scientificName is still empty (partial results with common names).
   const clientId = obs.identification;
   const hasIdentification = clientId.scientificName || (clientId.confidence > 0 && clientId.source !== 'human');
-  if (hasIdentification && (clientId.status === 'accepted' || clientId.status === 'needs_review')) {
+  // #582: never persist identifications whose source produces non-binomial
+  // scientific names. EfficientNet writes English ImageNet labels into
+  // scientific_name which corrupts taxa rows + DwC exports. Treat as a
+  // hint only — fall through to the server cascade for a real ID.
+  const NON_BINOMIAL_SOURCES = new Set(['onnx_efficientnet_lite0']);
+  if (hasIdentification && NON_BINOMIAL_SOURCES.has(clientId.source ?? '')) {
+    console.warn('[rastrum] skipping non-binomial source persist:', clientId.source);
+  } else if (hasIdentification && (clientId.status === 'accepted' || clientId.status === 'needs_review')) {
     const supabase = getSupabase();
 
     // Upsert taxa row so observations.primary_taxon_id can be resolved by
@@ -391,6 +398,20 @@ async function triggerIdentify(observationId: string): Promise<void> {
   // sync_primary_id_trigger then materialises denormalised columns on
   // the observation row (primary_taxon_id, obscure_level, location_obscured).
   const r = cascadeResult.best;
+
+  // #582: skip non-binomial sources — they produce English ImageNet labels
+  // that pollute taxa.scientific_name and DwC exports. Cascade can still
+  // surface them as alternates in the UI, but never as the primary ID.
+  const NON_BINOMIAL_SOURCES_ID = new Set(['onnx_efficientnet_lite0']);
+  if (NON_BINOMIAL_SOURCES_ID.has(r.source)) {
+    console.warn('[rastrum] cascade winner is non-binomial source, not persisting:', r.source);
+    await db.idQueue.update(observationId, {
+      attempts: ((await db.idQueue.get(observationId))?.attempts ?? 0) + 1,
+      last_error: 'non-binomial source: ' + r.source,
+    });
+    return;
+  }
+
   // Apply taxonomy synonym correction for known outdated names (#345)
   const { correctIdentificationName } = await import('./taxonomy-synonyms');
   const correctedName = correctIdentificationName(r.scientific_name);
