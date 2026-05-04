@@ -7146,7 +7146,7 @@ GRANT EXECUTE ON FUNCTION public.place_geojson_by_slug(text) TO authenticated, a
 -- Used by the "Show areas" toggle on the explore map.
 CREATE OR REPLACE FUNCTION public.places_map_geojson(p_limit int DEFAULT 200)
 RETURNS json LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp
-AS $
+AS $$
   SELECT json_build_object(
     'type', 'FeatureCollection',
     'features', COALESCE(json_agg(f.feature), '[]'::json)
@@ -7169,7 +7169,7 @@ AS $
     ORDER BY obs_count DESC
     LIMIT p_limit
   ) f;
-$;
+$$;
 
 GRANT EXECUTE ON FUNCTION public.places_map_geojson(int) TO authenticated, anon;
 
