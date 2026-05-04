@@ -1,90 +1,69 @@
 ---
+import { t } from '../i18n/utils';
 interface Props { lang: 'en' | 'es' }
 const { lang } = Astro.props;
-const isEs = lang === 'es';
+const tr = t(lang);
+const s = (tr as unknown as { docs_sponsorships: Record<string, string> }).docs_sponsorships;
 ---
 
 <article class="prose prose-zinc dark:prose-invert max-w-none">
-  <h1>{isEs ? 'Patrocinios IA' : 'AI Sponsorships'}</h1>
+  <h1>{s.title}</h1>
   <p class="lead text-lg text-zinc-600 dark:text-zinc-400">
-    {isEs
-      ? 'Comparte tu credencial Anthropic con amigos para que puedan identificar especies con Claude — sin que ellos paguen y sin que tú pierdas el control de tu cuota.'
-      : 'Share your Anthropic credential with friends so they can identify species with Claude — at no cost to them, with full control of your quota.'}
+    {s.subtitle}
   </p>
 
-  <h2>{isEs ? '¿Cómo funciona?' : 'How does it work?'}</h2>
+  <h2>{s.what_heading}</h2>
+  <p>{s.what_body}</p>
+
+  <h2>{s.sponsor_heading}</h2>
+  <p>{s.sponsor_body}</p>
   <ol>
-    <li>{isEs
-      ? 'Vas a Perfil → Patrocinios IA y agregas una credencial Anthropic (API key sk-ant-api03-… o long-lived token sk-ant-oat01-…).'
-      : 'Go to Profile → AI Sponsoring and add an Anthropic credential (API key sk-ant-api03-… or long-lived token sk-ant-oat01-…).'}</li>
-    <li>{isEs
-      ? 'La credencial se guarda cifrada en Supabase Vault. Solo el Edge Function de Rastrum la puede descifrar al momento de la llamada. Nunca aparece en logs ni en el navegador.'
-      : 'The credential is stored encrypted in Supabase Vault. Only the Rastrum Edge Function can decrypt it at call time. Never appears in logs or in the browser.'}</li>
-    <li>{isEs
-      ? 'Agregas a tus amigos por nombre de usuario, defines una cuota mensual (default 200 calls/mes, máx 10000), y eliges la prioridad si tienes múltiples credenciales.'
-      : 'Add your friends by username, set a monthly cap (default 200 calls/month, max 10000), and pick a priority if you have multiple credentials.'}</li>
-    <li>{isEs
-      ? 'Cuando un amigo identifica una foto, Rastrum usa tu credencial automáticamente. Tú ganas karma social por compartir.'
-      : 'When a friend identifies a photo, Rastrum uses your credential automatically. You earn social karma for sharing.'}</li>
+    <li>{s.sponsor_step_1}</li>
+    <li>{s.sponsor_step_2}</li>
+    <li>{s.sponsor_step_3}</li>
+    <li>{s.sponsor_step_4}</li>
   </ol>
 
-  <h2>{isEs ? 'Reglas de uso' : 'Usage rules'}</h2>
+  <h2>{s.request_heading}</h2>
+  <p>{s.request_body}</p>
+  <p>{s.request_detail}</p>
+
+  <h2>{s.pool_heading}</h2>
+  <p>{s.pool_body}</p>
+  <p>{s.pool_detail}</p>
+
+  <h2>{s.rules_heading}</h2>
   <ul>
-    <li><strong>{isEs ? 'BYO siempre gana' : 'BYO always wins'}:</strong> {isEs
-      ? 'Si un usuario configura su propia API key, esa se usa primero. El patrocinio solo aplica cuando no hay BYO.'
-      : 'If a user configures their own API key, that\'s used first. Sponsorship only applies when there\'s no BYO.'}</li>
-    <li><strong>{isEs ? 'Cuota mensual estricta' : 'Hard monthly cap'}:</strong> {isEs
-      ? 'Cuando un beneficiary llega al 80%, te llegará un aviso. Al 100%, su acceso a Claude se corta hasta el primero del mes siguiente.'
-      : 'When a beneficiary reaches 80%, you get notified. At 100%, their Claude access cuts off until the 1st of next month.'}</li>
-    <li><strong>{isEs ? 'Auto-pausa por abuso' : 'Auto-pause on abuse'}:</strong> {isEs
-      ? 'Si un beneficiary hace más de 30 calls en 10 minutos, su patrocinio se pausa automáticamente y te llegará un email para revisar.'
-      : 'If a beneficiary makes more than 30 calls in 10 minutes, their sponsorship auto-pauses and you get an email to review.'}</li>
-    <li><strong>{isEs ? 'Karma capped' : 'Karma capped'}:</strong> {isEs
-      ? '+20 karma al activar un patrocinio. +1 karma por call usado, hasta el cap mensual. Sin karma para auto-patrocinios o si el beneficiary tiene menos de 10 karma propio (anti-Sybil).'
-      : '+20 karma on sponsorship activation. +1 karma per call used, up to the monthly cap. No karma for self-sponsorships or if the beneficiary has less than 10 own karma (anti-Sybil).'}</li>
+    <li><strong>{s.rule_byo_wins}:</strong> {s.rule_byo_wins_detail}</li>
+    <li><strong>{s.rule_monthly_cap}:</strong> {s.rule_monthly_cap_detail}</li>
+    <li><strong>{s.rule_auto_pause}:</strong> {s.rule_auto_pause_detail}</li>
+    <li><strong>{s.rule_karma}:</strong> {s.rule_karma_detail}</li>
   </ul>
 
-  <h2>{isEs ? 'Costos' : 'Costs'}</h2>
-  <p>{isEs
-    ? 'Las identificaciones cuentan contra tu cuota Anthropic, no contra Rastrum. Una identificación con Claude Haiku 4.5 cuesta aproximadamente $0.001–$0.01 USD por foto. Si usas un long-lived token (OAT) contra tu suscripción Pro/Max, las llamadas son efectivamente gratuitas dentro de tu plan.'
-    : 'Identifications count against your Anthropic quota, not against Rastrum. A Claude Haiku 4.5 ID costs approximately $0.001–$0.01 USD per photo. If you use a long-lived token (OAT) against your Pro/Max subscription, calls are effectively free within your plan.'}</p>
-
-  <h2>{isEs ? 'Privacidad' : 'Privacy'}</h2>
+  <h2>{s.privacy_heading}</h2>
+  <p>{s.privacy_body}</p>
   <ul>
-    <li>{isEs
-      ? 'Tu lista de beneficiaries es pública por defecto en tu perfil (puedes ocultarla por sponsorship).'
-      : 'Your beneficiary list is public by default on your profile (you can hide per sponsorship).'}</li>
-    <li>{isEs
-      ? 'A quién te patrocina es privado por defecto en tu perfil (puedes hacerlo público por sponsorship).'
-      : 'Who sponsors you is private by default on your profile (you can make it public per sponsorship).'}</li>
-    <li>{isEs
-      ? 'Para que la relación sea visible públicamente, ambas partes tienen que opt-in.'
-      : 'For the relationship to be publicly visible, both parties have to opt-in.'}</li>
+    <li>{s.privacy_sponsor_public}</li>
+    <li>{s.privacy_beneficiary_private}</li>
+    <li>{s.privacy_mutual_optin}</li>
   </ul>
 
-  <h2>{isEs ? 'Cómo conseguir un patrocinador' : 'How to get sponsored'}</h2>
-  <p>{isEs
-    ? 'Hoy, el sponsor te agrega por nombre de usuario. Pídele a alguien que ya está en Rastrum (un amigo, un experto que sigues, alguien de tu comunidad) que te patrocine. No hay un mercado público de sponsors — es out-of-band intencionalmente, para mantener la red basada en confianza.'
-    : 'Today, the sponsor adds you by username. Ask someone already on Rastrum (a friend, an expert you follow, someone from your community) to sponsor you. There\'s no public marketplace of sponsors — it\'s intentionally out-of-band to keep the network trust-based.'}</p>
+  <h2>{s.cost_heading}</h2>
+  <p>{s.cost_body}</p>
+  <p>{s.cost_detail}</p>
 
-  <h2>{isEs ? 'FAQ' : 'FAQ'}</h2>
-  <h3>{isEs ? '¿Pueden ver mis fotos los sponsors?' : 'Can sponsors see my photos?'}</h3>
-  <p>{isEs
-    ? 'No directamente. Los sponsors ven cuántas calls hiciste y cuándo, pero no las imágenes ni las identificaciones. Si tu observación es pública (default), cualquiera puede verla — pero eso no es específico al patrocinio.'
-    : 'Not directly. Sponsors see how many calls you made and when, but not the images or the identifications. If your observation is public (default), anyone can see it — but that\'s not sponsorship-specific.'}</p>
+  <h2>{s.faq_heading}</h2>
+  <h3>{s.faq_photos_q}</h3>
+  <p>{s.faq_photos_a}</p>
 
-  <h3>{isEs ? '¿Qué pasa si mi sponsor revoca el patrocinio?' : 'What happens if my sponsor revokes the sponsorship?'}</h3>
-  <p>{isEs
-    ? 'Las identificaciones futuras dejan de usar su credencial. PlantNet (gratis) y Phi-3.5 on-device siguen funcionando. Configura tu propia API key para tener acceso continuo a Claude.'
-    : 'Future identifications stop using their credential. PlantNet (free) and Phi-3.5 on-device keep working. Configure your own API key for continued Claude access.'}</p>
+  <h3>{s.faq_revoke_q}</h3>
+  <p>{s.faq_revoke_a}</p>
 
-  <h3>{isEs ? '¿Puedo patrocinarme a mí mismo?' : 'Can I sponsor myself?'}</h3>
-  <p>{isEs
-    ? 'Sí, eso es útil para usar la misma UI para tu propio uso. No genera karma (sería farming), pero todo lo demás funciona normal.'
-    : 'Yes, that\'s useful for using the same UI for your own usage. It doesn\'t generate karma (would be farming), but everything else works normally.'}</p>
+  <h3>{s.faq_self_q}</h3>
+  <p>{s.faq_self_a}</p>
 
   <p class="text-sm text-zinc-500 mt-8">
-    {isEs ? 'Spec técnica: ' : 'Technical spec: '}
+    {s.spec_link}
     <a href="https://github.com/ArtemioPadilla/rastrum/blob/main/docs/specs/modules/27-ai-sponsorships.md" class="underline">docs/specs/modules/27-ai-sponsorships.md</a>
   </p>
 </article>
