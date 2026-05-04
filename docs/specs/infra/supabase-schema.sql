@@ -7492,3 +7492,52 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 GRANT EXECUTE ON FUNCTION public.recompute_consensus(uuid) TO service_role;
 GRANT EXECUTE ON FUNCTION public.recompute_consensus(uuid) TO authenticated;
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- karma_leaderboard_30d — 30-day rolling karma leaderboard
+-- ═══════════════════════════════════════════════════════════════════════════
+-- Materialized view that aggregates positive karma deltas over the last 30
+-- days per user. The eligibility predicate mirrors community_observers
+-- (`hide_from_leaderboards = false`); MVs don't have RLS, so the privacy
+-- gate is baked into the WHERE clause.
+--
+-- Refreshed every 6h via pg_cron (see cron-schedules.sql). Initial refresh
+-- (non-concurrent, fine on an empty MV) runs at apply time so the view is
+-- queryable immediately. Subsequent refreshes use CONCURRENTLY thanks to
+-- the unique index on user_id.
+CREATE MATERIALIZED VIEW IF NOT EXISTS public.karma_leaderboard_30d AS
+SELECT
+  u.id                                                                AS user_id,
+  u.username,
+  u.display_name,
+  u.avatar_url,
+  u.country_code,
+  u.species_count,
+  COALESCE(SUM(ke.delta) FILTER (WHERE ke.delta > 0), 0)::numeric     AS karma_30d,
+  COUNT(*) FILTER (WHERE ke.reason = 'consensus_win' AND ke.delta > 0)::int AS wins_30d,
+  COUNT(ke.id)::int                                                   AS events_30d
+FROM public.users u
+LEFT JOIN public.karma_events ke
+  ON ke.user_id = u.id
+ AND ke.created_at >= now() - interval '30 days'
+WHERE u.hide_from_leaderboards = false
+GROUP BY u.id;
+
+CREATE UNIQUE INDEX IF NOT EXISTS karma_leaderboard_30d_user_id_uidx
+  ON public.karma_leaderboard_30d (user_id);
+
+CREATE INDEX IF NOT EXISTS karma_leaderboard_30d_karma_idx
+  ON public.karma_leaderboard_30d (karma_30d DESC NULLS LAST);
+
+GRANT SELECT ON public.karma_leaderboard_30d TO anon, authenticated;
+
+-- Initial population. Safe to run on each apply: REFRESH on an MV that's
+-- already been refreshed is just a no-op write. Non-concurrent so it works
+-- on the very first apply when the MV is empty (CONCURRENTLY requires
+-- the MV to be populated at least once).
+DO $$ BEGIN
+  REFRESH MATERIALIZED VIEW public.karma_leaderboard_30d;
+EXCEPTION WHEN OTHERS THEN
+  -- A pre-existing concurrent refresh from cron may collide; ignore.
+  NULL;
+END $$;

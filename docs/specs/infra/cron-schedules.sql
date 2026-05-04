@@ -370,3 +370,17 @@ SELECT cron.schedule(
    WHERE p.id = s.place_id;
   $$
 );
+
+-- ─────────────────────────────────────────────────────────────────
+-- v12 (2026-05-04): #552 — 'refresh-karma-leaderboard-30d' (every 6h)
+--   Refreshes the karma_leaderboard_30d materialized view that backs
+--   the 30-day rolling tab on /community/leaderboard/. CONCURRENTLY
+--   needs the unique index on user_id (created in supabase-schema.sql).
+-- ─────────────────────────────────────────────────────────────────
+SELECT cron.unschedule('refresh-karma-leaderboard-30d')
+  WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'refresh-karma-leaderboard-30d');
+SELECT cron.schedule(
+  'refresh-karma-leaderboard-30d',
+  '0 */6 * * *',
+  $$ REFRESH MATERIALIZED VIEW CONCURRENTLY public.karma_leaderboard_30d $$
+);
