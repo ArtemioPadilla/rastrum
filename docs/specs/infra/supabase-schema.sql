@@ -4299,6 +4299,7 @@ SELECT
   id, username, display_name, avatar_url, country_code,
   expert_taxa, is_expert,
   observation_count, species_count, obs_count_7d, obs_count_30d,
+  karma_total,
   last_observation_at, joined_at
 FROM public.users
 WHERE hide_from_leaderboards = false;
@@ -4320,6 +4321,7 @@ SELECT
   id, username, display_name, avatar_url, country_code,
   expert_taxa, is_expert,
   observation_count, species_count, obs_count_7d, obs_count_30d,
+  karma_total,
   centroid_geog, last_observation_at, joined_at
 FROM public.users
 WHERE hide_from_leaderboards = false;
@@ -7294,3 +7296,195 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.pool_top_taxa(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.pool_daily_usage(uuid) TO authenticated;
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- Wire dead karma reasons: observation_synced + first_in_rastrum.
+-- ═══════════════════════════════════════════════════════════════════════════
+
+CREATE OR REPLACE FUNCTION public.award_observation_synced_karma()
+RETURNS trigger AS $$
+BEGIN
+  PERFORM public.add_karma_simple(NEW.observer_id, 1, 'observation_synced');
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS award_observation_synced_karma_trigger ON public.observations;
+CREATE TRIGGER award_observation_synced_karma_trigger
+  AFTER INSERT ON public.observations
+  FOR EACH ROW
+  EXECUTE FUNCTION public.award_observation_synced_karma();
+
+CREATE OR REPLACE FUNCTION public.recompute_consensus(p_observation_id uuid)
+RETURNS void AS $$
+DECLARE
+  winning_taxon  uuid;
+  winning_score  numeric;
+  validator_count integer;
+  prev_research_grade boolean;
+  was_promoted   boolean := false;
+  v_voter        record;
+  v_winner_rank  integer;
+  v_voter_rank   integer;
+  v_obs_path     uuid[];
+  v_outcome      text;
+  v_observer_id  uuid;
+  v_other_rg_exists boolean;
+  v_already_awarded boolean;
+BEGIN
+  WITH weighted AS (
+    SELECT i.taxon_id,
+           SUM(
+             CASE
+               WHEN EXISTS (
+                 SELECT 1 FROM public.user_expertise ue
+                 WHERE ue.user_id = i.validated_by
+                   AND ue.taxon_id = ANY(
+                     SELECT array_prepend(t.id, t.ancestor_path)
+                     FROM public.taxa t WHERE t.id = i.taxon_id
+                   )
+               )
+               THEN 3.0
+               ELSE 1.0
+             END
+           ) AS score,
+           count(DISTINCT i.validated_by) AS validators
+    FROM   public.identifications i
+    WHERE  i.observation_id = p_observation_id
+      AND  i.taxon_id IS NOT NULL
+      AND  i.validated_by IS NOT NULL
+    GROUP BY i.taxon_id
+  )
+  SELECT taxon_id, score, validators
+    INTO winning_taxon, winning_score, validator_count
+    FROM weighted
+   ORDER BY score DESC
+   LIMIT 1;
+
+  IF winning_taxon IS NULL THEN RETURN; END IF;
+
+  IF (
+    SELECT count(*) FROM (
+      SELECT i.taxon_id,
+             SUM(CASE
+                   WHEN EXISTS (
+                     SELECT 1 FROM public.user_expertise ue
+                     WHERE ue.user_id = i.validated_by
+                       AND ue.taxon_id = ANY(
+                         SELECT array_prepend(t.id, t.ancestor_path)
+                         FROM public.taxa t WHERE t.id = i.taxon_id
+                       )
+                   )
+                   THEN 3.0
+                   ELSE 1.0
+                 END) AS s
+      FROM public.identifications i
+      WHERE i.observation_id = p_observation_id
+        AND i.taxon_id IS NOT NULL
+        AND i.validated_by IS NOT NULL
+      GROUP BY i.taxon_id
+    ) sub
+    WHERE sub.s = winning_score
+  ) > 1 THEN
+    RETURN;
+  END IF;
+
+  SELECT COALESCE(bool_or(is_research_grade), false)
+    INTO prev_research_grade
+    FROM public.identifications
+   WHERE observation_id = p_observation_id AND is_primary;
+
+  IF winning_score >= 2.0 AND validator_count >= 2 THEN
+    UPDATE public.identifications
+       SET is_research_grade = true
+     WHERE observation_id = p_observation_id
+       AND taxon_id = winning_taxon
+       AND is_primary;
+    was_promoted := NOT prev_research_grade;
+  END IF;
+
+  IF NOT was_promoted THEN RETURN; END IF;
+
+  SELECT array_prepend(t.id, t.ancestor_path)
+    INTO v_obs_path
+    FROM public.taxa t
+   WHERE t.id = winning_taxon;
+
+  SELECT MIN(array_position(v_obs_path, ue.taxon_id))
+    INTO v_winner_rank
+    FROM public.identifications i
+    JOIN public.user_expertise ue ON ue.user_id = i.validated_by
+   WHERE i.observation_id = p_observation_id
+     AND i.taxon_id = winning_taxon
+     AND ue.taxon_id = ANY(v_obs_path);
+
+  FOR v_voter IN
+    SELECT DISTINCT i.validated_by AS user_id, i.taxon_id, i.confidence
+    FROM   public.identifications i
+    WHERE  i.observation_id = p_observation_id
+      AND  i.validated_by IS NOT NULL
+  LOOP
+    IF v_voter.taxon_id = winning_taxon THEN
+      v_outcome := 'win';
+    ELSE
+      SELECT MIN(array_position(v_obs_path, ue.taxon_id))
+        INTO v_voter_rank
+        FROM public.user_expertise ue
+       WHERE ue.user_id = v_voter.user_id
+         AND ue.taxon_id = ANY(v_obs_path);
+
+      IF v_winner_rank IS NOT NULL
+         AND (v_voter_rank IS NULL OR v_winner_rank < v_voter_rank) THEN
+        v_outcome := 'loss';
+      ELSE
+        CONTINUE;
+      END IF;
+    END IF;
+
+    PERFORM public.award_karma(
+      v_voter.user_id,
+      p_observation_id,
+      winning_taxon,
+      v_outcome,
+      COALESCE(v_voter.confidence, 0.7)
+    );
+  END LOOP;
+
+  SELECT observer_id INTO v_observer_id
+    FROM public.observations
+   WHERE id = p_observation_id;
+
+  IF v_observer_id IS NULL THEN RETURN; END IF;
+
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.identifications i
+   WHERE i.taxon_id = winning_taxon
+     AND i.is_research_grade = true
+     AND i.observation_id <> p_observation_id
+  ) INTO v_other_rg_exists;
+
+  IF v_other_rg_exists THEN RETURN; END IF;
+
+  SELECT EXISTS (
+    SELECT 1 FROM public.karma_events
+    WHERE reason = 'first_in_rastrum'
+      AND taxon_id = winning_taxon
+  ) INTO v_already_awarded;
+
+  IF v_already_awarded THEN RETURN; END IF;
+
+  INSERT INTO public.karma_events
+    (user_id, observation_id, taxon_id, delta, reason)
+  VALUES
+    (v_observer_id, p_observation_id, winning_taxon, 10, 'first_in_rastrum');
+
+  UPDATE public.users
+     SET karma_total      = karma_total + 10,
+         karma_updated_at = now()
+   WHERE id = v_observer_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION public.recompute_consensus(uuid) TO service_role;
+GRANT EXECUTE ON FUNCTION public.recompute_consensus(uuid) TO authenticated;

@@ -46,6 +46,21 @@ describe('microcopyForVote', () => {
     expect(txt).toContain('-4');
   });
 
+  it('does not include conservation bonus suffix (parity with award_karma SQL)', () => {
+    const txt = microcopyForVote({
+      lang: 'en',
+      bucket: 3,
+      multiplier: 2.5,
+      expertiseLevel: 'Plantae',
+      expertiseWeight: 1.0,
+      streakMultiplier: 1.0,
+      confidence: 0.9,
+      inGrace: false,
+    });
+    expect(txt).not.toMatch(/conservation bonus/i);
+    expect(txt).not.toMatch(/IUCN|NOM-059/);
+  });
+
   it('renders grace copy when in grace period', () => {
     const txt = microcopyForVote({
       lang: 'es',
