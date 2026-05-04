@@ -239,3 +239,34 @@ export async function withdrawRequest(id: string): Promise<void> {
   const r = await authedFetch(`/requests/${id}`, { method: 'POST', headers: { 'X-HTTP-Method-Override': 'DELETE' } });
   if (!r.ok && r.status !== 204) throw new Error(`withdrawRequest: ${r.status}`);
 }
+
+// ── M32 #247: community pool donations ───────────────────────────
+export async function listActivePools(): Promise<(SponsorPool & { credential_label: string })[]> {
+  const sb = getSupabase();
+  const { data, error } = await sb
+    .from('sponsor_pools')
+    .select('id, credential_id, total_cap, used, monthly_reset, status, preferred_model, daily_user_cap, created_at, sponsor_credentials(label)')
+    .eq('status', 'active')
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row: Record<string, unknown>) => {
+    const cred = row.sponsor_credentials as { label: string } | null;
+    return { ...row, credential_label: cred?.label ?? 'Pool' } as SponsorPool & { credential_label: string };
+  });
+}
+
+export async function donateToPool(input: {
+  pool_id: string;
+  credential_id: string;
+  calls: number;
+}): Promise<{ ok: boolean; error?: string }> {
+  const r = await authedFetch('/pools/donate', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+  if (!r.ok) {
+    const body = await r.json().catch(() => ({}));
+    return { ok: false, error: (body as { error?: string }).error ?? `HTTP ${r.status}` };
+  }
+  return { ok: true };
+}

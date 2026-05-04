@@ -59,6 +59,8 @@ const communityObserversCountryHref = `${communityObserversBase}?country=`;
 const communityMapHref = getLocalizedPath(lang, routes.communityMap[locale] + '/');
 const communityLeaderboardHref = getLocalizedPath(lang, routes.leaderboard[locale] + '/');
 
+const communityDonatePath = getLocalizedPath(lang, routes.communityDonate[locale] + '/');
+
 const validateLabel =
   ((tr as unknown as { validation?: { nav_validate_label?: string } }).validation?.nav_validate_label) ?? 'Validate';
 
