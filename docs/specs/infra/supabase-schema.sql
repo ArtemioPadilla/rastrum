@@ -4130,6 +4130,24 @@ END $$;
 REVOKE ALL ON FUNCTION public.delete_vault_secret(uuid) FROM public;
 GRANT EXECUTE ON FUNCTION public.delete_vault_secret(uuid) TO service_role;
 
+-- 16b. read_vault_secret — companion to create/delete. Edge Functions
+--      can't `.schema('vault')` directly via PostgREST (the vault schema
+--      isn't in the API exposed-schemas list, and surfacing it would
+--      over-expose raw secret rows). This SECURITY DEFINER wrapper is
+--      the only path the EF has to read a decrypted secret. Used by
+--      /credentials/:id/test, the heartbeat cron, and the sponsor
+--      cascade in the identify EF.
+CREATE OR REPLACE FUNCTION public.read_vault_secret(p_secret_id uuid)
+RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE v_secret text;
+BEGIN
+  EXECUTE 'SELECT decrypted_secret FROM vault.decrypted_secrets WHERE id = $1'
+    INTO v_secret USING p_secret_id;
+  RETURN v_secret;
+END $$;
+REVOKE ALL ON FUNCTION public.read_vault_secret(uuid) FROM public;
+GRANT EXECUTE ON FUNCTION public.read_vault_secret(uuid) TO service_role;
+
 -- 17. upsert_vault_secret_by_name — used by CI to sync the cron token to
 --     Vault on every db-apply. We can't use psql's `:'var'` substitution
 --     inside dollar-quoted DO blocks (psql skips substitution there),
