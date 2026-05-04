@@ -204,7 +204,7 @@ const tr = t(lang);
     // RLS still gates the rows.
     const { data, error } = await supabase
       .from('observations')
-      .select('id, location, obscure_level, observed_at, taxa:primary_taxon_id(kingdom)')
+      .select('id, location, location_obscured, obscure_level, observed_at, taxa:primary_taxon_id(kingdom)')
       .eq('sync_status', 'synced')
       .limit(500);
 
@@ -215,7 +215,14 @@ const tr = t(lang);
 
     const features: GeoJSON.Feature[] = [];
     for (const row of data ?? []) {
-      const geom = (row as { location: unknown }).location as GeoJSON.Point | null;
+      // Prefer location_obscured for sensitive observations (non-owner
+      // viewers should see the coarsened point, not precise coords).
+      // Fall back to precise location when obscure_level is 'none' or
+      // when location_obscured is unavailable.
+      const precise = (row as { location: unknown }).location as GeoJSON.Point | null;
+      const obscured = (row as { location_obscured: unknown }).location_obscured as GeoJSON.Point | null;
+      const level = (row as { obscure_level?: string }).obscure_level;
+      const geom = (level && level !== 'none' && obscured?.coordinates) ? obscured : precise;
       if (!geom?.coordinates) continue;
       const observedAt = (row as { observed_at?: string | null }).observed_at ?? null;
       const observedMonth = observedAt ? new Date(observedAt).getUTCMonth() : null;
