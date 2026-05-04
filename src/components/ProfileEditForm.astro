@@ -411,6 +411,32 @@ const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } })
       </div>
     </div>
 
+    <!-- SpeciesNet (on-device species classifier) — companion to MegaDetector -->
+    <div class="mt-6 pt-5 border-t border-zinc-100 dark:border-zinc-800/60">
+      <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">{tr.auth.speciesnet_section}</h3>
+      <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">{tr.auth.speciesnet_hint}</p>
+      <p id="speciesnet-url-missing" class="hidden text-xs text-amber-700 dark:text-amber-400 mb-2">{tr.auth.speciesnet_weights_url_missing}</p>
+
+      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+        <div class="flex items-start justify-between gap-3 flex-wrap">
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">SpeciesNet (distilled)</p>
+            <p class="text-xs text-zinc-500" id="speciesnet-status">—</p>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button id="speciesnet-download" type="button" class="rounded-lg border border-emerald-600/60 px-3 py-1.5 text-xs sm:text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 disabled:opacity-50">
+              <span data-snlabel>{tr.auth.speciesnet_download}</span>
+            </button>
+            <button id="speciesnet-delete" type="button" class="hidden rounded-lg border border-red-300 dark:border-red-900/50 px-3 py-1.5 text-xs sm:text-sm font-medium text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">
+              {tr.auth.speciesnet_delete}
+            </button>
+          </div>
+        </div>
+        <p id="speciesnet-progress" class="hidden mt-2 text-xs text-zinc-600 dark:text-zinc-400 font-mono"></p>
+        <p class="mt-3 text-[11px] text-zinc-500 dark:text-zinc-400">{tr.auth.speciesnet_attribution}</p>
+      </div>
+    </div>
+
     <!-- Offline maps — Mexico (pmtiles) -->
     <div class="mt-6 pt-5 border-t border-zinc-100 dark:border-zinc-800/60">
       <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">{tr.map.offline_section}</h3>
@@ -1196,6 +1222,89 @@ const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } })
   });
 
   refreshOnnxBase().catch(() => {});
+
+  // ── SpeciesNet (on-device species classifier) — same shape as EfficientNet (#585) ──
+  const snDownloadBtn = document.getElementById('speciesnet-download') as HTMLButtonElement | null;
+  const snDeleteBtn   = document.getElementById('speciesnet-delete')   as HTMLButtonElement | null;
+  const snStatus      = document.getElementById('speciesnet-status');
+  const snProgress    = document.getElementById('speciesnet-progress');
+  const snUrlMissing  = document.getElementById('speciesnet-url-missing');
+  const snLabel       = snDownloadBtn?.querySelector('[data-snlabel]') as HTMLElement | null;
+  const SN_DEFAULT_LABEL = snLabel?.textContent ?? '';
+  const SN_REDOWNLOAD_LABEL = isEsLang ? 'Volver a descargar' : 'Re-download';
+
+  let snLib: typeof import('../lib/identifiers/speciesnet-cache') | null = null;
+  async function getSnLib() {
+    if (!snLib) snLib = await import('../lib/identifiers/speciesnet-cache');
+    return snLib;
+  }
+
+  async function refreshSpeciesNet() {
+    if (!snDownloadBtn || !snDeleteBtn || !snStatus || !snLabel) return;
+    const lib = await getSnLib().catch(() => null);
+    if (!lib) return;
+    const baseUrl = lib.getSpeciesNetWeightsUrl();
+    if (!baseUrl) {
+      snUrlMissing?.classList.remove('hidden');
+      snDownloadBtn.disabled = true;
+    } else {
+      snUrlMissing?.classList.add('hidden');
+      snDownloadBtn.disabled = false;
+    }
+    const status = await lib.getSpeciesNetCacheStatus();
+    if (status.modelCached) {
+      snStatus.textContent = `${tr('Cached on this device','Guardado en este dispositivo')} · ${bytesHuman(status.approxBytes)}`;
+      snLabel.textContent = SN_REDOWNLOAD_LABEL;
+      snDeleteBtn.classList.remove('hidden');
+    } else {
+      snStatus.textContent = `${tr('Not downloaded','No descargado')} · ~100 MB`;
+      snLabel.textContent = SN_DEFAULT_LABEL;
+      snDeleteBtn.classList.add('hidden');
+    }
+  }
+
+  snDownloadBtn?.addEventListener('click', async () => {
+    if (!snDownloadBtn) return;
+    const ok = await confirmDialog({
+      title: tr('Download SpeciesNet?','¿Descargar SpeciesNet?'),
+      bodyHtml: `
+        <p><strong>${tr('Size','Tamaño')}:</strong> ~100 MB</p>
+        <ul class="list-disc pl-4 space-y-1 text-zinc-600 dark:text-zinc-400">
+          <li>${tr('Pairs with MegaDetector — detector finds animals, SpeciesNet identifies the species.','Se complementa con MegaDetector — el detector encuentra animales, SpeciesNet identifica la especie.')}</li>
+          <li>${tr('Runs entirely on this device after download.','Se ejecuta totalmente en este dispositivo tras la descarga.')}</li>
+        </ul>
+      `,
+      okLabel: tr('Download','Descargar'),
+    });
+    if (!ok) return;
+    snDownloadBtn.disabled = true;
+    snProgress?.classList.remove('hidden');
+    try {
+      const lib = await getSnLib();
+      await lib.downloadSpeciesNetWeights((p) => {
+        if (snProgress) snProgress.textContent = `${Math.round((p.progress ?? 0) * 100)}%  ${p.text ?? ''}`;
+      });
+    } catch (e) {
+      if (snStatus) snStatus.textContent = e instanceof Error ? e.message : 'Failed';
+    } finally {
+      snDownloadBtn.disabled = false;
+      await refreshSpeciesNet();
+    }
+  });
+
+  snDeleteBtn?.addEventListener('click', async () => {
+    const ok = await confirmDialog({
+      title: tr('Delete SpeciesNet from this device?','¿Borrar SpeciesNet de este dispositivo?'),
+      bodyHtml: `<p>${tr("This frees ~100 MB. You can re-download anytime.","Libera ~100 MB. Puedes volver a descargarlo en cualquier momento.")}</p>`,
+      okLabel: tr('Delete','Borrar'),
+    });
+    if (!ok) return;
+    const lib = await getSnLib();
+    await lib.clearSpeciesNetCache();
+    await refreshSpeciesNet();
+  });
+
+  refreshSpeciesNet().catch(() => {});
 
   // ── Offline maps (pmtiles, Mexico zoom 0–10) ──
   const pmDownloadBtn = document.getElementById('pmtiles-download') as HTMLButtonElement | null;
