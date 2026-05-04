@@ -630,14 +630,38 @@ export async function wireManagePanelLocation(
         throw new Error('rls_filtered');
       }
 
+      // Verify the returned row actually has the new coordinates. PostgREST
+      // returns geography as GeoJSON; if the coordinates don't match what we
+      // sent, the update silently failed (e.g. type cast issue).
+      const returned = result.data as { location?: { coordinates?: [number, number] } | null };
+      const retCoords = returned?.location?.coordinates;
+      if (Array.isArray(retCoords) && retCoords.length >= 2) {
+        const retLng = retCoords[0];
+        const retLat = retCoords[1];
+        const EPS = 0.0001;
+        if (Math.abs(retLat - e.detail.coords.lat) > EPS || Math.abs(retLng - e.detail.coords.lng) > EPS) {
+          console.error('[manage-panel] location update returned stale coords', {
+            obsId, sent: e.detail.coords, got: { lat: retLat, lng: retLng },
+          });
+          throw new Error('update_stale');
+        }
+      }
+
       window.dispatchEvent(new CustomEvent('rastrum:mappicker-set', {
         detail: { id: 'obs-detail-loc-view', coords: e.detail.coords },
       }));
       window.dispatchEvent(new CustomEvent('rastrum:mappicker-set-initial', {
         detail: { id: 'obs-detail-edit', coords: e.detail.coords },
       }));
+      // Also update the main page's view-mode mini-map and coords readout
+      // so the left-aside map reflects the new location without a reload.
+      window.dispatchEvent(new CustomEvent('rastrum:mappicker-set', {
+        detail: { id: 'obs-detail', coords: e.detail.coords },
+      }));
       const coordsEl = document.querySelector<HTMLElement>('[data-loc-coords]');
       if (coordsEl) coordsEl.textContent = `${e.detail.coords.lat.toFixed(4)}, ${e.detail.coords.lng.toFixed(4)}`;
+      const mainCoordsEl = document.querySelector<HTMLElement>('[data-obs-coords]');
+      if (mainCoordsEl) mainCoordsEl.textContent = `${e.detail.coords.lat.toFixed(4)}, ${e.detail.coords.lng.toFixed(4)}`;
       savedEl?.classList.remove('hidden');
     } catch (err) {
       const code = err instanceof Error ? err.message : String(err);
@@ -653,6 +677,10 @@ export async function wireManagePanelLocation(
           errEl.textContent = isEs
             ? 'No tienes permiso para editar esta observación.'
             : 'You do not have permission to edit this observation.';
+        } else if (code === 'update_stale') {
+          errEl.textContent = isEs
+            ? 'La ubicación no se guardó correctamente. Intenta de nuevo.'
+            : 'Location did not save correctly. Please try again.';
         } else {
           errEl.textContent = `${errCopy.saveFailed} (${code})`;
         }
