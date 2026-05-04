@@ -7714,3 +7714,25 @@ END $$;
 
 REVOKE ALL ON FUNCTION public.upsert_primary_identification(uuid, text, uuid, numeric, text, jsonb) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.upsert_primary_identification(uuid, text, uuid, numeric, text, jsonb) TO authenticated, service_role;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- #581 — anon_rate_limit: persistent per-IP rate counter for unauthenticated
+-- callers. Replaces the in-memory globalThis Map in identify EF that reset
+-- on every V8 cold start. Cleanup cron lives in cron-schedules.sql.
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.anon_rate_limit (
+  ip        text NOT NULL,
+  endpoint  text NOT NULL,
+  ts        timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS anon_rate_limit_lookup
+  ON public.anon_rate_limit (endpoint, ip, ts DESC);
+
+ALTER TABLE public.anon_rate_limit ENABLE ROW LEVEL SECURITY;
+-- Service-role only — no anon/authenticated grants. The EF talks to this
+-- table via service role; never exposed to clients.
+DROP POLICY IF EXISTS anon_rate_limit_service_only ON public.anon_rate_limit;
+CREATE POLICY anon_rate_limit_service_only ON public.anon_rate_limit
+  FOR ALL TO service_role
+  USING (true) WITH CHECK (true);

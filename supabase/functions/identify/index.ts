@@ -44,6 +44,7 @@ import {
   type ResolvedCredential,
   type VisionResult,
 } from '../_shared/vision-provider.ts';
+import { checkAnonRateLimit } from '../_shared/anon-rate-limit.ts';
 
 type IdentifyRequest = {
   observation_id: string;
@@ -385,25 +386,29 @@ serve(async (req) => {
   const hasAuth = req.headers.has('authorization')
     && req.headers.get('authorization')!.toLowerCase().startsWith('bearer ');
   if (!hasAuth) {
+    // Persistent rate-limit (#581): the previous globalThis Map reset on
+    // every V8 cold start and was per-isolate. Now backed by Postgres
+    // (anon_rate_limit table + 6h cleanup cron).
     const ip = req.headers.get('cf-connecting-ip')
       ?? req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
       ?? 'unknown';
-    const key = `ip:${ip}`;
-    const ipMap = (globalThis as unknown as { __identifyRateMap?: Map<string, number[]> }).__identifyRateMap
-      ?? new Map<string, number[]>();
-    (globalThis as unknown as { __identifyRateMap?: Map<string, number[]> }).__identifyRateMap = ipMap;
-    const WINDOW_MS = 60 * 60 * 1000;        // 1 hour
-    const ANON_LIMIT = 10;                    // 10 IDs / hour / IP
-    const now = Date.now();
-    const recent = (ipMap.get(key) ?? []).filter(t => now - t < WINDOW_MS);
-    if (recent.length >= ANON_LIMIT) {
-      return corsResponse(
-        JSON.stringify({ error: 'rate_limited', retry_after_seconds: 3600 }),
-        { status: 429, headers: { 'content-type': 'application/json' } },
-      );
+    const ANON_LIMIT = 10;
+    const WINDOW_SEC = 60 * 60;
+    const supabaseUrlForRl = Deno.env.get('SUPABASE_URL');
+    const serviceRoleForRl = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (supabaseUrlForRl && serviceRoleForRl) {
+      const dbForRl = createClient(supabaseUrlForRl, serviceRoleForRl, { auth: { persistSession: false } });
+      const allowed = await checkAnonRateLimit(dbForRl, ip, 'identify', ANON_LIMIT, WINDOW_SEC);
+      if (!allowed) {
+        return corsResponse(
+          JSON.stringify({ error: 'rate_limited', retry_after_seconds: WINDOW_SEC }),
+          { status: 429, headers: { 'content-type': 'application/json' } },
+        );
+      }
     }
-    recent.push(now);
-    ipMap.set(key, recent);
+    // If env is not set we fail open — better to serve traffic than to
+    // brick the EF when env is misconfigured. Misconfiguration is loud
+    // elsewhere (the function would 500 on serviceRole reads anyway).
   }
 
   let body: IdentifyRequest;
