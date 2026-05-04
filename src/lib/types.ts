@@ -91,6 +91,7 @@ export interface Observation {
   habitat: HabitatType | null;
   weather: WeatherTag | null;
   evidenceType: EvidenceType;
+  cameraStationId: string | null;
   license: 'CC BY 4.0' | 'CC BY-NC 4.0' | 'CC0' | null;
   contentSensitive: boolean;
   notes: string | null;
