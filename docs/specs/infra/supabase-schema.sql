@@ -7736,3 +7736,45 @@ DROP POLICY IF EXISTS anon_rate_limit_service_only ON public.anon_rate_limit;
 CREATE POLICY anon_rate_limit_service_only ON public.anon_rate_limit
   FOR ALL TO service_role
   USING (true) WITH CHECK (true);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- #590 — retry-unidentified scope refactor.
+--
+--   * users.last_active_at: bumped on every authenticated request (or via the
+--     touch_user_activity RPC). The retry-unidentified cron skips obs whose
+--     observer was active < 7 days ago — their browser will retry client-side.
+--   * observations.identification_status: 'pending' (default) | 'abandoned'.
+--     Cron flips to 'abandoned' after 30 days without an ID so the obs can
+--     be flagged for human review in /console/identifications/.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+ALTER TABLE public.users
+  ADD COLUMN IF NOT EXISTS last_active_at timestamptz;
+
+CREATE INDEX IF NOT EXISTS users_last_active_at_idx
+  ON public.users (last_active_at DESC NULLS LAST);
+
+ALTER TABLE public.observations
+  ADD COLUMN IF NOT EXISTS identification_status text
+  CHECK (identification_status IN ('pending', 'abandoned'))
+  DEFAULT 'pending';
+
+CREATE OR REPLACE FUNCTION public.touch_user_activity()
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RETURN;
+  END IF;
+  -- Debounce: only update if last_active_at is older than 5 minutes.
+  -- Avoids hammering the row on a chatty session.
+  UPDATE public.users
+     SET last_active_at = now()
+   WHERE id = auth.uid()
+     AND (last_active_at IS NULL OR last_active_at < now() - interval '5 minutes');
+END $$;
+
+REVOKE ALL ON FUNCTION public.touch_user_activity() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.touch_user_activity() TO authenticated;
