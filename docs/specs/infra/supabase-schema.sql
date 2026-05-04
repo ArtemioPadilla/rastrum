@@ -1762,6 +1762,25 @@ CREATE POLICY karma_events_self_read ON public.karma_events
 -- INSERT into karma_events is restricted to service_role / SECURITY DEFINER
 -- functions (award_karma). The append-only ledger has no client-write policy.
 
+-- karma_events realtime publication membership.
+-- Required so signed-in users can subscribe to their own INSERTs via
+-- supabase-js Realtime (see src/lib/karma-toast.ts subscribeToKarmaEvents).
+-- The `karma_events_self_read` RLS policy above + server-side filter
+-- `user_id=eq.<auth.uid()>` on the channel together gate access; the
+-- publication just makes the WAL stream available to the broker.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime')
+     AND NOT EXISTS (
+       SELECT 1 FROM pg_publication_tables
+        WHERE pubname = 'supabase_realtime'
+          AND schemaname = 'public'
+          AND tablename = 'karma_events'
+     ) THEN
+    EXECUTE 'ALTER PUBLICATION supabase_realtime ADD TABLE public.karma_events';
+  END IF;
+END $$;
+
 -- 5. users: karma_total + grace columns.
 ALTER TABLE public.users
   ADD COLUMN IF NOT EXISTS karma_total      numeric NOT NULL DEFAULT 0,

@@ -193,5 +193,34 @@ const resolvedOgImage = ogImage ?? `${SITE_URL}/og/${ogLang}/${ogSlugForPath(cur
     <ReportDialog lang={installLang} />
     <ConfirmDialog lang={installLang} />
     <PhotoCropModal lang={installLang} />
+    <script>
+      import { getSupabase } from '../lib/supabase';
+      import { subscribeToKarmaEvents } from '../lib/karma-toast';
+
+      let cleanup: (() => void) | null = null;
+
+      async function start() {
+        try {
+          const supabase = getSupabase();
+          const { data } = await supabase.auth.getSession();
+          const userId = data.session?.user?.id;
+          if (!userId) return;
+          cleanup = subscribeToKarmaEvents(userId, supabase);
+        } catch {
+          // env not configured, or not signed in — skip silently.
+        }
+      }
+
+      function dispose() {
+        if (cleanup) {
+          cleanup();
+          cleanup = null;
+        }
+      }
+
+      start();
+      window.addEventListener('pagehide', dispose);
+      window.addEventListener('beforeunload', dispose);
+    </script>
   </body>
 </html>

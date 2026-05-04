@@ -1,3 +1,6 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { KARMA_REASONS } from './karma-config';
+
 export interface KarmaToast {
   delta: number;
   reason: string;
@@ -5,8 +8,31 @@ export interface KarmaToast {
   timestamp: number;
 }
 
+interface KarmaEventRow {
+  id: number | string;
+  user_id: string;
+  delta: number;
+  reason: string;
+  created_at: string;
+}
+
 const TOAST_DURATION_MS = 4000;
 let toastContainer: HTMLElement | null = null;
+
+const reasonLabelMap: Record<string, { en: string; es: string }> = Object.fromEntries(
+  KARMA_REASONS.map((r) => [r.id, { en: r.label_en, es: r.label_es }]),
+);
+
+function resolveLabel(reason: string, lang: 'en' | 'es'): string {
+  const entry = reasonLabelMap[reason];
+  if (!entry) return reason;
+  return lang === 'es' ? entry.es : entry.en;
+}
+
+function detectLang(): 'en' | 'es' {
+  if (typeof document === 'undefined') return 'en';
+  return document.documentElement.lang === 'es' ? 'es' : 'en';
+}
 
 export function showKarmaToast(toast: KarmaToast): void {
   if (!toastContainer) {
@@ -41,19 +67,63 @@ export function showKarmaToast(toast: KarmaToast): void {
 }
 
 /**
- * Subscribe to realtime karma_events inserts for this user and show a
- * toast for each new event. Deferred to a future PR — the Supabase
- * Realtime channel setup requires the typed client and auth session.
+ * Subscribe to realtime karma_events INSERTs for `userId` and fire a toast
+ * for each. Returns an `unsubscribe` callback that is safe to invoke
+ * multiple times. The Realtime channel is filtered server-side by
+ * `user_id=eq.<userId>`, mirroring the `karma_events_self_read` RLS
+ * policy so a viewer cannot subscribe to another user's stream.
  */
-export function subscribeToKarmaEvents(_userId: string, _supabase: unknown): void {
-  // Phase 2 stub — realtime subscription will be wired in a follow-up
-  // PR once the karma_events table is populated by award_karma().
+type KarmaChannel = {
+  on: (
+    event: string,
+    filter: { event: string; schema: string; table: string; filter: string },
+    handler: (payload: { new: KarmaEventRow }) => void,
+  ) => KarmaChannel;
+  subscribe: () => KarmaChannel;
+};
+
+export function subscribeToKarmaEvents(
+  userId: string,
+  supabase: SupabaseClient,
+): () => void {
+  // supabase-js v2 types model postgres_changes only via overloads that
+  // depend on a generic Database schema; the runtime signature is the
+  // looser KarmaChannel shape above.
+  const channel = (supabase.channel(`karma_events:${userId}`) as unknown as KarmaChannel)
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'karma_events',
+        filter: `user_id=eq.${userId}`,
+      },
+      (payload) => {
+        const row = payload?.new;
+        if (!row || typeof row.delta !== 'number') return;
+        const lang = detectLang();
+        showKarmaToast({
+          delta: row.delta,
+          reason: row.reason,
+          label: resolveLabel(row.reason, lang),
+          timestamp: Date.parse(row.created_at) || Date.now(),
+        });
+      },
+    )
+    .subscribe();
+
+  let removed = false;
+  return () => {
+    if (removed) return;
+    removed = true;
+    try {
+      supabase.removeChannel(channel as unknown as Parameters<SupabaseClient['removeChannel']>[0]);
+    } catch {
+      // Channel may already be torn down by the client.
+    }
+  };
 }
 
-/**
- * Reset the toast container reference. Used by tests to clean up
- * between runs.
- */
 export function _resetToastContainer(): void {
   toastContainer = null;
 }
