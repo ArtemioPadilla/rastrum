@@ -165,6 +165,7 @@ Deno.serve(async (req: Request) => {
         },
         body: JSON.stringify({
           image_url: body.image_url,
+          observation_id: body.observation_id ?? 'cascade-only',
           location: body.lat != null ? { lat: body.lat, lng: body.lng } : undefined,
           user_hint: body.user_hint,
         }),
@@ -172,6 +173,12 @@ Deno.serve(async (req: Request) => {
     );
 
     const result = await identifyRes.json();
+    // #591: opt-in cascade_attempts. Default response stays small (winner
+    // only); pass ?include_trace=true for the full per-provider trace.
+    const includeTrace = url.searchParams.get('include_trace') === 'true';
+    if (!includeTrace && result && typeof result === 'object') {
+      delete (result as Record<string, unknown>).cascade_attempts;
+    }
     return json(result, identifyRes.status);
   }
 
