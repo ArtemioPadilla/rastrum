@@ -131,10 +131,10 @@ const labels = {
       label: 'Thumb',
       render: r => {
         if (r.media_type === 'audio') {
-          return `<div class="w-12 h-12 rounded overflow-hidden audio-thumb-mount" data-audio-url="${escapeHtml(r.url)}"></div>`;
+          return `<div class="w-12 h-12 rounded overflow-hidden media-player-mount" data-media-url="${escapeHtml(r.url)}" data-media-kind="audio"></div>`;
         }
-        if (r.media_type !== 'photo') {
-          return `<span class="inline-flex items-center justify-center w-12 h-12 rounded bg-zinc-100 dark:bg-zinc-800 text-base">🎞️</span>`;
+        if (r.media_type === 'video') {
+          return `<div class="w-12 h-12 rounded overflow-hidden media-player-mount" data-media-url="${escapeHtml(r.url)}" data-media-kind="video"></div>`;
         }
         const src = r.thumbnail_url ?? r.url;
         return `<img src="${escapeHtml(src)}" alt="" loading="lazy" decoding="async" class="w-12 h-12 rounded object-cover bg-zinc-100 dark:bg-zinc-800" onerror="this.style.opacity=0.3;this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2248%22 height=%2248%22><rect width=%2248%22 height=%2248%22 fill=%22%23ddd%22/></svg>'" />`;

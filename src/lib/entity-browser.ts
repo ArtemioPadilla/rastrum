@@ -563,13 +563,14 @@ export class EntityBrowser<Row extends { id?: string; [k: string]: unknown }> {
     }
     tbody.innerHTML = html.join('');
 
-    // Hydrate audio thumbnails rendered by column renderers
-    tbody.querySelectorAll<HTMLElement>('.audio-thumb-mount:not([data-mounted])').forEach(el => {
+    // Hydrate media thumbnails (audio + video) rendered by column renderers
+    tbody.querySelectorAll<HTMLElement>('.media-player-mount:not([data-mounted])').forEach(el => {
       el.dataset.mounted = '1';
-      const url = el.dataset.audioUrl;
+      const url = el.dataset.mediaUrl;
+      const kind = (el.dataset.mediaKind === 'video' ? 'video' : 'audio') as 'audio' | 'video';
       if (url) {
-        import('./audio-thumb').then(({ mountAudioThumb }) => {
-          mountAudioThumb(el, url, { compact: true });
+        import('./media-player').then(({ mountMediaPlayer }) => {
+          mountMediaPlayer(el, url, { kind, size: 'xs', lang: 'en' });
         });
       }
     });

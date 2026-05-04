@@ -173,9 +173,12 @@ const sgReport = sgTree.socialgraph.report.button;
     const confidence = typeof ident?.confidence === 'number' ? Math.max(0, Math.min(1, ident.confidence)) : null;
     const photoMedia = (r.media_files ?? []).filter(m => !m?.media_type || m.media_type === 'photo');
     const audioMedia = (r.media_files ?? []).filter(m => m?.media_type === 'audio');
+    const videoMedia = (r.media_files ?? []).filter(m => m?.media_type === 'video');
     const photo = photoMedia.find(m => m?.is_primary)?.url ?? photoMedia.find(m => !!m?.url)?.url ?? '';
-    const hasAudioOnly = !photo && audioMedia.length > 0;
+    const hasVideoOnly = !photo && videoMedia.length > 0 && audioMedia.length === 0;
+    const hasAudioOnly = !photo && !hasVideoOnly && audioMedia.length > 0;
     const firstAudioUrl = hasAudioOnly ? (audioMedia[0]?.url ?? '') : '';
+    const firstVideoUrl = hasVideoOnly ? (videoMedia[0]?.url ?? '') : '';
     const ago = formatTimeAgo(r.observed_at, lang);
     const isPublic = canShowRealName(observer, viewerAuthed);
     const observerName = isPublic ? (observer?.display_name || observer?.username || '') : '';
@@ -234,8 +237,10 @@ const sgReport = sgTree.socialgraph.report.button;
           ${photo
             ? `<img src="${escapeText(photo)}" alt="${escapeText(sci)}" loading="lazy" class="w-full h-full object-cover" />`
             : hasAudioOnly
-              ? `<div class="w-full h-full audio-thumb-mount" data-audio-url="${escapeText(firstAudioUrl)}"></div>`
-              : ''}
+              ? `<div class="w-full h-full media-player-mount" data-media-url="${escapeText(firstAudioUrl)}" data-media-kind="audio"></div>`
+              : hasVideoOnly
+                ? `<div class="w-full h-full media-player-mount" data-media-url="${escapeText(firstVideoUrl)}" data-media-kind="video"></div>`
+                : ''}
         </div>
         <div class="p-3 space-y-1">
           <p class="text-sm italic font-semibold text-zinc-900 dark:text-zinc-100 truncate">${escapeText(sci)}</p>
@@ -429,13 +434,14 @@ const sgReport = sgTree.socialgraph.report.button;
             }).join(''),
           );
           wireOverflowMenus(listEl);
-          // Hydrate audio thumbnails
-          listEl.querySelectorAll<HTMLElement>('.audio-thumb-mount:not([data-mounted])').forEach((el) => {
+          // Hydrate media thumbnails (audio + video)
+          listEl.querySelectorAll<HTMLElement>('.media-player-mount:not([data-mounted])').forEach((el) => {
             el.dataset.mounted = '1';
-            const url = el.dataset.audioUrl;
+            const url = el.dataset.mediaUrl;
+            const kind = (el.dataset.mediaKind === 'video' ? 'video' : 'audio') as 'audio' | 'video';
             if (url) {
-              import('../lib/audio-thumb').then(({ mountAudioThumb }) => {
-                mountAudioThumb(el, url, { compact: false });
+              import('../lib/media-player').then(({ mountMediaPlayer }) => {
+                mountMediaPlayer(el, url, { kind, size: 'xs', lang });
               });
             }
           });

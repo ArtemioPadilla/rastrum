@@ -242,9 +242,12 @@ const tabs = [
     const name = ident?.scientific_name ?? unknown;
     const photoMedia = (r.media_files ?? []).filter(m => !m.media_type || m.media_type === 'photo');
     const audioMedia = (r.media_files ?? []).filter(m => m.media_type === 'audio');
+    const videoMedia = (r.media_files ?? []).filter(m => m.media_type === 'video');
     const photo = photoMedia.find(m => m.is_primary)?.url ?? photoMedia[0]?.url ?? '';
-    const hasAudioOnly = !photo && audioMedia.length > 0;
+    const hasVideoOnly = !photo && videoMedia.length > 0 && audioMedia.length === 0;
+    const hasAudioOnly = !photo && !hasVideoOnly && audioMedia.length > 0;
     const firstAudioUrl = hasAudioOnly ? (audioMedia[0]?.url ?? '') : '';
+    const firstVideoUrl = hasVideoOnly ? (videoMedia[0]?.url ?? '') : '';
     const date = new Date(r.observed_at).toLocaleDateString(lang === 'es' ? 'es' : 'en');
     const region = r.state_province ? ' · ' + r.state_province : '';
     const isSynced = r.sync_status === 'synced';
@@ -295,7 +298,7 @@ const tabs = [
       <div class="flex items-center gap-3 p-3 ${isSynced ? 'hover:bg-zinc-50 dark:hover:bg-zinc-800/40' : 'opacity-90'} ${hiddenOverlayClass}">
         <${wrapTag} ${wrapAttr} class="flex items-center gap-3 min-w-0 flex-1">
           <div class="w-16 h-16 shrink-0 rounded-lg overflow-hidden bg-zinc-100 dark:bg-zinc-800">
-            ${photo ? `<img src="${escapeText(photo)}" alt="${escapeText(name)}" class="w-full h-full object-cover" loading="lazy" />` : hasAudioOnly ? `<div class="w-full h-full audio-thumb-mount" data-audio-url="${escapeText(firstAudioUrl)}"></div>` : ''}
+            ${photo ? `<img src="${escapeText(photo)}" alt="${escapeText(name)}" class="w-full h-full object-cover" loading="lazy" />` : hasAudioOnly ? `<div class="w-full h-full media-player-mount" data-media-url="${escapeText(firstAudioUrl)}" data-media-kind="audio"></div>` : hasVideoOnly ? `<div class="w-full h-full media-player-mount" data-media-url="${escapeText(firstVideoUrl)}" data-media-kind="video"></div>` : ''}
           </div>
           <div class="min-w-0 flex-1">
             <p class="text-sm italic font-medium text-zinc-900 dark:text-zinc-100 truncate">${escapeText(name)}</p>
@@ -592,13 +595,14 @@ const tabs = [
       const list = document.getElementById('mo-list');
       if (list) {
         list.insertAdjacentHTML('beforeend', page.map(rowMarkup).join(''));
-        // Hydrate audio thumbnails
-        list.querySelectorAll<HTMLElement>('.audio-thumb-mount:not([data-mounted])').forEach((el) => {
+        // Hydrate media thumbnails (audio + video)
+        list.querySelectorAll<HTMLElement>('.media-player-mount:not([data-mounted])').forEach((el) => {
           el.dataset.mounted = '1';
-          const url = el.dataset.audioUrl;
+          const url = el.dataset.mediaUrl;
+          const kind = (el.dataset.mediaKind === 'video' ? 'video' : 'audio') as 'audio' | 'video';
           if (url) {
-            import('../lib/audio-thumb').then(({ mountAudioThumb }) => {
-              mountAudioThumb(el, url, { compact: true });
+            import('../lib/media-player').then(({ mountMediaPlayer }) => {
+              mountMediaPlayer(el, url, { kind, size: 'xs', lang });
             });
           }
         });
