@@ -101,14 +101,12 @@ const sharePathBase = '/share/obs/';
     function mediaThumbnail(url: string | null, type: string | null): string {
       if (!url) return '';
       const isAudio = type === 'audio' || /\.(mp3|ogg|wav|m4a|webm)$/i.test(url);
+      const isVideo = type === 'video';
       if (isAudio) {
-        return `<div class="w-full h-full flex flex-col items-center justify-center gap-1 p-1">
-          <span class="text-xl" aria-hidden="true">🔊</span>
-          <audio controls src="${escapeText(url)}" class="w-full" style="height:24px;max-width:72px;min-width:0;" preload="none" onclick="event.stopPropagation()" ontouchstart="event.stopPropagation()"></audio>
-        </div>`;
+        return `<div class="w-full h-full media-player-mount" data-media-url="${escapeText(url)}" data-media-kind="audio" onclick="event.stopPropagation()" ontouchstart="event.stopPropagation()"></div>`;
       }
-      if (type === 'video') {
-        return `<video src="${escapeText(url)}" class="w-full h-full object-cover" muted playsinline loop preload="none"></video>`;
+      if (isVideo) {
+        return `<div class="w-full h-full media-player-mount" data-media-url="${escapeText(url)}" data-media-kind="video" onclick="event.stopPropagation()" ontouchstart="event.stopPropagation()"></div>`;
       }
       // Default: photo
       return `<img src="${escapeText(url)}" alt="" class="w-full h-full object-cover" loading="lazy" />`;
@@ -234,6 +232,17 @@ const sharePathBase = '/share/obs/';
             mediaByObs[r.observation_id]?.type ?? null,
             observerById[r.observer_id] ?? null,
           )).join('');
+          // Hydrate media thumbnails (audio + video).
+          list.querySelectorAll<HTMLElement>('.media-player-mount:not([data-mounted])').forEach(el => {
+            el.dataset.mounted = '1';
+            const url = el.dataset.mediaUrl;
+            const kind = (el.dataset.mediaKind === 'video' ? 'video' : 'audio') as 'audio' | 'video';
+            if (url) {
+              import('../lib/media-player').then(({ mountMediaPlayer }) => {
+                mountMediaPlayer(el, url, { kind, size: 'xs', lang: isEs ? 'es' : 'en' });
+              });
+            }
+          });
           // Wire CTA buttons to the modal.
           list.querySelectorAll<HTMLButtonElement>('button[data-action="suggest"], button[data-action="confirm"]').forEach(btn => {
             btn.addEventListener('click', () => {

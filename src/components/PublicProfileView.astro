@@ -316,9 +316,12 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
         const ident = Array.isArray(o.identifications) ? o.identifications[0] : o.identifications;
         const photoMedia = (o.media_files ?? []).filter(m => !m.media_type || m.media_type === 'photo');
         const audioMedia = (o.media_files ?? []).filter(m => m.media_type === 'audio');
+        const videoMedia = (o.media_files ?? []).filter(m => m.media_type === 'video');
         const photo = photoMedia.find(m => m.is_primary)?.url ?? photoMedia[0]?.url ?? '';
-        const hasAudioOnly = !photo && audioMedia.length > 0;
+        const hasVideoOnly = !photo && videoMedia.length > 0 && audioMedia.length === 0;
+        const hasAudioOnly = !photo && !hasVideoOnly && audioMedia.length > 0;
         const firstAudioUrl = hasAudioOnly ? (audioMedia[0]?.url ?? '') : '';
+        const firstVideoUrl = hasVideoOnly ? (videoMedia[0]?.url ?? '') : '';
         const date = new Date(o.observed_at).toLocaleDateString(lang === 'es' ? 'es' : 'en');
         const name = ident?.scientific_name ?? unknown;
         const safeName = name.replace(/</g, '&lt;');
@@ -326,7 +329,7 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
         return `<li class="rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50">
           <a href="${shareBase}?id=${o.id}" class="block">
             <div class="aspect-square bg-zinc-100 dark:bg-zinc-800">
-              ${photo ? `<img src="${photo}" alt="${safeName}" class="w-full h-full object-cover" loading="lazy" />` : hasAudioOnly ? `<div class="w-full h-full audio-thumb-mount" data-audio-url="${firstAudioUrl.replace(/</g, '&lt;')}"></div>` : ''}
+              ${photo ? `<img src="${photo}" alt="${safeName}" class="w-full h-full object-cover" loading="lazy" />` : hasAudioOnly ? `<div class="w-full h-full media-player-mount" data-media-url="${firstAudioUrl.replace(/</g, '&lt;')}" data-media-kind="audio"></div>` : hasVideoOnly ? `<div class="w-full h-full media-player-mount" data-media-url="${firstVideoUrl.replace(/</g, '&lt;')}" data-media-kind="video"></div>` : ''}
             </div>
             <div class="p-2">
               <p class="text-xs italic font-medium text-zinc-900 dark:text-zinc-100 truncate">${safeName}</p>
@@ -335,13 +338,14 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
           </a>
         </li>`;
       }).join('');
-      // Hydrate audio thumbnails
-      obsList.querySelectorAll<HTMLElement>('.audio-thumb-mount:not([data-mounted])').forEach((el) => {
+      // Hydrate media thumbnails (audio + video)
+      obsList.querySelectorAll<HTMLElement>('.media-player-mount:not([data-mounted])').forEach((el) => {
         el.dataset.mounted = '1';
-        const url = el.dataset.audioUrl;
+        const url = el.dataset.mediaUrl;
+        const kind = (el.dataset.mediaKind === 'video' ? 'video' : 'audio') as 'audio' | 'video';
         if (url) {
-          import('../lib/audio-thumb').then(({ mountAudioThumb }) => {
-            mountAudioThumb(el, url, { compact: false });
+          import('../lib/media-player').then(({ mountMediaPlayer }) => {
+            mountMediaPlayer(el, url, { kind, size: 'xs', lang });
           });
         }
       });
