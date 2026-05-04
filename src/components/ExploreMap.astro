@@ -434,10 +434,20 @@ const tr = t(lang);
       const isActive = toggleBtn.dataset.active === 'true';
 
       if (!placesLoaded) {
-        // Load places GeoJSON from RPC on first activation
-        const supabase = getSupabase();
-        const { data: geojson } = await supabase.rpc('places_map_geojson', { p_limit: 150 });
-        if (geojson) {
+        // Show loading state
+        if (toggleLabel) toggleLabel.textContent = isEs ? 'Cargando…' : 'Loading…';
+        toggleBtn.disabled = true;
+        try {
+          const supabase = getSupabase();
+          const { data: geojson, error: rpcErr } = await supabase.rpc('places_map_geojson', { p_limit: 150 });
+          if (rpcErr || !geojson) {
+            if (toggleLabel) toggleLabel.textContent = isEs ? 'No disponible' : 'Unavailable';
+            setTimeout(() => {
+              if (toggleLabel) toggleLabel.textContent = isEs ? 'Mostrar áreas' : 'Show areas';
+              toggleBtn.disabled = false;
+            }, 2000);
+            return;
+          }
           map.addSource('places-source', { type: 'geojson', data: geojson });
           map.addLayer({
             id: 'places-fill',
@@ -465,6 +475,8 @@ const tr = t(lang);
           map.on('mouseleave', 'places-fill', () => { map.getCanvas().style.cursor = ''; });
 
           placesLoaded = true;
+        } finally {
+          toggleBtn.disabled = false;
         }
       }
 

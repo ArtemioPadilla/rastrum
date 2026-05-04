@@ -7141,6 +7141,38 @@ GRANT EXECUTE ON FUNCTION public.place_top_species(uuid, int) TO authenticated, 
 GRANT EXECUTE ON FUNCTION public.place_top_observers(uuid, int) TO authenticated, anon;
 GRANT EXECUTE ON FUNCTION public.place_geojson_by_slug(text) TO authenticated, anon;
 
+-- ── places_map_geojson RPC ─────────────────────────────────────────────────────
+-- Returns a GeoJSON FeatureCollection of all places with obs_count > 0.
+-- Used by the "Show areas" toggle on the explore map.
+CREATE OR REPLACE FUNCTION public.places_map_geojson(p_limit int DEFAULT 200)
+RETURNS json LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp
+AS $
+  SELECT json_build_object(
+    'type', 'FeatureCollection',
+    'features', COALESCE(json_agg(f.feature), '[]'::json)
+  )
+  FROM (
+    SELECT json_build_object(
+      'type',       'Feature',
+      'geometry',   ST_AsGeoJSON(geometry)::json,
+      'properties', json_build_object(
+        'id',            id,
+        'slug',          slug,
+        'name',          name,
+        'place_type',    place_type,
+        'obs_count',     obs_count,
+        'species_count', species_count
+      )
+    ) AS feature
+    FROM public.places
+    WHERE obs_count > 0
+    ORDER BY obs_count DESC
+    LIMIT p_limit
+  ) f;
+$;
+
+GRANT EXECUTE ON FUNCTION public.places_map_geojson(int) TO authenticated, anon;
+
 -- ── M-Loc-4/5: places_near RPC ────────────────────────────────────────────────
 -- Returns places sorted by distance from a given lat/lng point.
 -- Used by the "Near me" button on the places index page.
