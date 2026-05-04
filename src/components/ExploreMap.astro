@@ -240,8 +240,10 @@ const tr = t(lang);
       const species = primaryIdent?.scientific_name ?? (isEs ? 'Sin identificar' : 'Unidentified');
       const mediaArr = (row as { media_files?: Array<{ url?: string; thumbnail_url?: string; is_primary?: boolean; media_type?: string }> }).media_files;
       const photos = Array.isArray(mediaArr) ? mediaArr.filter(m => !m.media_type || m.media_type === 'photo') : [];
+      const audios = Array.isArray(mediaArr) ? mediaArr.filter(m => m.media_type === 'audio') : [];
       const thumb = (photos.find(m => m.is_primary) ?? photos[0])?.thumbnail_url
         ?? (photos.find(m => m.is_primary) ?? photos[0])?.url ?? '';
+      const audioUrl = audios[0]?.url ?? '';
       const dateStr = observedAt ? new Date(observedAt).toLocaleDateString(isEs ? 'es-MX' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '';
       features.push({
         type: 'Feature',
@@ -251,6 +253,7 @@ const tr = t(lang);
           kingdom,
           species,
           thumb,
+          audioUrl,
           date: dateStr,
           observed_month: observedMonth,
           pending: false,
@@ -386,17 +389,35 @@ const tr = t(lang);
       if (props.pending === true || props.pending === 'true') return;
       const coords = (feat.geometry as GeoJSON.Point).coordinates.slice() as [number, number];
       const thumbUrl = props.thumb ?? '';
+      const obsAudioUrl = props.audioUrl ?? '';
       const speciesName = props.species ?? '';
       const date = props.date ?? '';
       const obsId = props.id ?? '';
-      const imgHtml = thumbUrl
+      const hasPhoto = !!thumbUrl;
+      const hasAudio = !hasPhoto && !!obsAudioUrl;
+      const mediaHtml = hasPhoto
         ? `<img src="${thumbUrl}" alt="" style="width:100%;height:120px;object-fit:cover;border-radius:6px 6px 0 0;display:block" loading="lazy"/>`
-        : `<div style="width:100%;height:60px;background:${isDark ? '#1e293b' : '#f4f4f5'};border-radius:6px 6px 0 0;display:flex;align-items:center;justify-content:center;color:${isDark ? '#64748b' : '#a1a1aa'};font-size:20px">🌿</div>`;
-      const html = `<div style="min-width:180px;max-width:220px;font-family:system-ui;overflow:hidden;border-radius:6px">${imgHtml}<div style="padding:8px 10px"><div style="font-size:13px;font-weight:600;font-style:italic;color:${isDark ? '#f1f5f9' : '#18181b'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${speciesName}</div>${date ? `<div style="font-size:11px;color:${isDark ? '#94a3b8' : '#71717a'};margin-top:2px">${date}</div>` : ''}<a href="${shareBase}?id=${obsId}" style="display:inline-block;margin-top:6px;font-size:11px;color:#10b981;text-decoration:none;font-weight:500">${isEs ? 'Ver observación →' : 'View observation →'}</a></div></div>`;
-      new maplibregl.Popup({ closeButton: true, maxWidth: '240px', offset: 12 })
+        : hasAudio
+          ? `<div id="map-audio-thumb-${obsId}" style="width:100%;height:100px;border-radius:6px 6px 0 0;overflow:hidden"></div>`
+          : `<div style="width:100%;height:60px;background:${isDark ? '#1e293b' : '#f4f4f5'};border-radius:6px 6px 0 0;display:flex;align-items:center;justify-content:center;color:${isDark ? '#64748b' : '#a1a1aa'};font-size:20px">🌿</div>`;
+      const html = `<div style="min-width:180px;max-width:220px;font-family:system-ui;overflow:hidden;border-radius:6px">${mediaHtml}<div style="padding:8px 10px"><div style="font-size:13px;font-weight:600;font-style:italic;color:${isDark ? '#f1f5f9' : '#18181b'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${speciesName}</div>${date ? `<div style="font-size:11px;color:${isDark ? '#94a3b8' : '#71717a'};margin-top:2px">${date}</div>` : ''}<a href="${shareBase}?id=${obsId}" style="display:inline-block;margin-top:6px;font-size:11px;color:#10b981;text-decoration:none;font-weight:500">${isEs ? 'Ver observación →' : 'View observation →'}</a></div></div>`;
+      const popup = new maplibregl.Popup({ closeButton: true, maxWidth: '240px', offset: 12 })
         .setLngLat(coords)
         .setHTML(html)
         .addTo(map);
+
+      // Mount audio player after popup DOM is ready
+      if (hasAudio) {
+        requestAnimationFrame(() => {
+          const el = document.getElementById(`map-audio-thumb-${obsId}`);
+          if (el) {
+            import('../lib/audio-thumb').then(({ mountAudioThumb }) => {
+              const cleanup = mountAudioThumb(el, obsAudioUrl as string, { label: 'Audio' });
+              popup.on('close', cleanup);
+            });
+          }
+        });
+      }
     });
 
     // Click on cluster → zoom in to expand

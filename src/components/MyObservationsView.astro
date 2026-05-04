@@ -244,6 +244,7 @@ const tabs = [
     const audioMedia = (r.media_files ?? []).filter(m => m.media_type === 'audio');
     const photo = photoMedia.find(m => m.is_primary)?.url ?? photoMedia[0]?.url ?? '';
     const hasAudioOnly = !photo && audioMedia.length > 0;
+    const firstAudioUrl = hasAudioOnly ? (audioMedia[0]?.url ?? '') : '';
     const date = new Date(r.observed_at).toLocaleDateString(lang === 'es' ? 'es' : 'en');
     const region = r.state_province ? ' · ' + r.state_province : '';
     const isSynced = r.sync_status === 'synced';
@@ -294,7 +295,7 @@ const tabs = [
       <div class="flex items-center gap-3 p-3 ${isSynced ? 'hover:bg-zinc-50 dark:hover:bg-zinc-800/40' : 'opacity-90'} ${hiddenOverlayClass}">
         <${wrapTag} ${wrapAttr} class="flex items-center gap-3 min-w-0 flex-1">
           <div class="w-16 h-16 shrink-0 rounded-lg overflow-hidden bg-zinc-100 dark:bg-zinc-800">
-            ${photo ? `<img src="${escapeText(photo)}" alt="${escapeText(name)}" class="w-full h-full object-cover" loading="lazy" />` : hasAudioOnly ? `<div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-900"><svg class="w-10 h-6 opacity-70" viewBox="0 0 60 24" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="wgs" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#10b981"/><stop offset="100%" stop-color="#047857"/></linearGradient></defs><rect x="1" y="8" width="3" height="8" rx="1" fill="url(#wgs)" opacity=".5"/><rect x="7" y="4" width="3" height="16" rx="1" fill="url(#wgs)" opacity=".7"/><rect x="13" y="2" width="3" height="20" rx="1" fill="url(#wgs)" opacity=".9"/><rect x="19" y="6" width="3" height="12" rx="1" fill="url(#wgs)" opacity=".6"/><rect x="25" y="3" width="3" height="18" rx="1" fill="url(#wgs)"/><rect x="31" y="7" width="3" height="10" rx="1" fill="url(#wgs)" opacity=".5"/><rect x="37" y="1" width="3" height="22" rx="1" fill="url(#wgs)" opacity=".8"/><rect x="43" y="5" width="3" height="14" rx="1" fill="url(#wgs)" opacity=".7"/><rect x="49" y="8" width="3" height="8" rx="1" fill="url(#wgs)" opacity=".5"/><rect x="55" y="4" width="3" height="16" rx="1" fill="url(#wgs)" opacity=".6"/></svg></div>` : ''}
+            ${photo ? `<img src="${escapeText(photo)}" alt="${escapeText(name)}" class="w-full h-full object-cover" loading="lazy" />` : hasAudioOnly ? `<div class="w-full h-full audio-thumb-mount" data-audio-url="${escapeText(firstAudioUrl)}"></div>` : ''}
           </div>
           <div class="min-w-0 flex-1">
             <p class="text-sm italic font-medium text-zinc-900 dark:text-zinc-100 truncate">${escapeText(name)}</p>
@@ -591,6 +592,16 @@ const tabs = [
       const list = document.getElementById('mo-list');
       if (list) {
         list.insertAdjacentHTML('beforeend', page.map(rowMarkup).join(''));
+        // Hydrate audio thumbnails
+        list.querySelectorAll<HTMLElement>('.audio-thumb-mount:not([data-mounted])').forEach((el) => {
+          el.dataset.mounted = '1';
+          const url = el.dataset.audioUrl;
+          if (url) {
+            import('../lib/audio-thumb').then(({ mountAudioThumb }) => {
+              mountAudioThumb(el, url, { compact: true });
+            });
+          }
+        });
         const syncedIds = page.filter(r => r.sync_status === 'synced').map(r => r.id);
         paintReactionCountsMo(syncedIds).catch(() => { /* silent */ });
         // Wire freshly-rendered share buttons.

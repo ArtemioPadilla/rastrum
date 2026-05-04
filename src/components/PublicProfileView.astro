@@ -318,6 +318,7 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
         const audioMedia = (o.media_files ?? []).filter(m => m.media_type === 'audio');
         const photo = photoMedia.find(m => m.is_primary)?.url ?? photoMedia[0]?.url ?? '';
         const hasAudioOnly = !photo && audioMedia.length > 0;
+        const firstAudioUrl = hasAudioOnly ? (audioMedia[0]?.url ?? '') : '';
         const date = new Date(o.observed_at).toLocaleDateString(lang === 'es' ? 'es' : 'en');
         const name = ident?.scientific_name ?? unknown;
         const safeName = name.replace(/</g, '&lt;');
@@ -325,7 +326,7 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
         return `<li class="rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50">
           <a href="${shareBase}?id=${o.id}" class="block">
             <div class="aspect-square bg-zinc-100 dark:bg-zinc-800">
-              ${photo ? `<img src="${photo}" alt="${safeName}" class="w-full h-full object-cover" loading="lazy" />` : hasAudioOnly ? `<div class="w-full h-full flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-900"><svg class="w-3/4 h-10 opacity-70" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="wgp" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#10b981"/><stop offset="100%" stop-color="#047857"/></linearGradient></defs><rect x="2" y="14" width="3" height="12" rx="1" fill="url(#wgp)" opacity=".5"/><rect x="8" y="8" width="3" height="24" rx="1" fill="url(#wgp)" opacity=".6"/><rect x="14" y="4" width="3" height="32" rx="1" fill="url(#wgp)" opacity=".8"/><rect x="20" y="10" width="3" height="20" rx="1" fill="url(#wgp)" opacity=".7"/><rect x="26" y="6" width="3" height="28" rx="1" fill="url(#wgp)" opacity=".9"/><rect x="32" y="12" width="3" height="16" rx="1" fill="url(#wgp)" opacity=".6"/><rect x="38" y="2" width="3" height="36" rx="1" fill="url(#wgp)"/><rect x="44" y="8" width="3" height="24" rx="1" fill="url(#wgp)" opacity=".7"/><rect x="50" y="14" width="3" height="12" rx="1" fill="url(#wgp)" opacity=".5"/><rect x="56" y="6" width="3" height="28" rx="1" fill="url(#wgp)" opacity=".8"/><rect x="62" y="10" width="3" height="20" rx="1" fill="url(#wgp)" opacity=".9"/><rect x="68" y="4" width="3" height="32" rx="1" fill="url(#wgp)" opacity=".7"/><rect x="74" y="12" width="3" height="16" rx="1" fill="url(#wgp)" opacity=".6"/><rect x="80" y="8" width="3" height="24" rx="1" fill="url(#wgp)" opacity=".8"/><rect x="86" y="14" width="3" height="12" rx="1" fill="url(#wgp)" opacity=".5"/><rect x="92" y="10" width="3" height="20" rx="1" fill="url(#wgp)" opacity=".6"/></svg><span class="text-[9px] uppercase tracking-wider text-emerald-400/70">Audio</span></div>` : ''}
+              ${photo ? `<img src="${photo}" alt="${safeName}" class="w-full h-full object-cover" loading="lazy" />` : hasAudioOnly ? `<div class="w-full h-full audio-thumb-mount" data-audio-url="${firstAudioUrl.replace(/</g, '&lt;')}"></div>` : ''}
             </div>
             <div class="p-2">
               <p class="text-xs italic font-medium text-zinc-900 dark:text-zinc-100 truncate">${safeName}</p>
@@ -334,6 +335,16 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
           </a>
         </li>`;
       }).join('');
+      // Hydrate audio thumbnails
+      obsList.querySelectorAll<HTMLElement>('.audio-thumb-mount:not([data-mounted])').forEach((el) => {
+        el.dataset.mounted = '1';
+        const url = el.dataset.audioUrl;
+        if (url) {
+          import('../lib/audio-thumb').then(({ mountAudioThumb }) => {
+            mountAudioThumb(el, url, { compact: false });
+          });
+        }
+      });
     }
   }
 
