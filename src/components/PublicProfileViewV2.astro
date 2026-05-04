@@ -19,6 +19,7 @@ import FollowButton from './FollowButton.astro';
 import ShareButton from './ShareButton.astro';
 import ExpertiseLegendBadge from './ExpertiseLegendBadge.astro';
 import ExpertiseCoverageGrid from './ExpertiseCoverageGrid.astro';
+import ProfileKarmaSection from './profile/ProfileKarmaSection.astro';
 
 interface Props {
   lang: 'en' | 'es';
@@ -201,13 +202,10 @@ const sponsoringI18n = {
       <p data-pp-validation-owner-only data-owner-only-badge class="hidden mt-2 text-[10px] uppercase tracking-wider text-amber-700 dark:text-amber-400"></p>
     </section>
 
-    <section data-pp-karma-section class="hidden mb-8">
-      <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-3">
-        {lang === 'es' ? 'Karma' : 'Karma'}
-      </h2>
-      <p data-pp-karma-body class="text-sm text-zinc-700 dark:text-zinc-300"></p>
+    <div data-pp-karma-section class="hidden mb-8">
+      <ProfileKarmaSection lang={lang} viewer="anonymous" defer={true} />
       <p data-pp-karma-owner-only data-owner-only-badge class="hidden mt-2 text-[10px] uppercase tracking-wider text-amber-700 dark:text-amber-400"></p>
-    </section>
+    </div>
 
     <section data-pp-pokedex-section class="hidden mb-8">
       <a data-pp-pokedex-link class="block rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 hover:border-emerald-400 dark:hover:border-emerald-700">
@@ -604,15 +602,23 @@ const sponsoringI18n = {
       }
     }
 
-    // Karma
     if (showKarma) {
-      show(root.querySelector('[data-pp-karma-section]'));
-      const body = root.querySelector<HTMLElement>('[data-pp-karma-body]');
-      if (body) body.textContent = `${profile.karma_total ?? 0}`;
-      if (isOwner && facets.karma_total === false) {
-        const badge = root.querySelector<HTMLElement>('[data-pp-karma-owner-only]');
-        if (badge) { badge.textContent = ownerLabel; badge.classList.remove('hidden'); }
-      }
+      const wrap = root.querySelector<HTMLElement>('[data-pp-karma-section]');
+      const inner = wrap?.querySelector<HTMLElement>('[data-widget="karma-section"]') ?? null;
+      if (inner) inner.dataset.targetUserId = profile.id;
+
+      const onHydrated = (ev: Event) => {
+        const detail = (ev as CustomEvent<{ targetUserId?: string }>).detail;
+        if (detail?.targetUserId !== profile.id) return;
+        document.removeEventListener('rastrum:karma-hydrated', onHydrated);
+        show(wrap);
+        if (isOwner && facets.karma_total === false) {
+          const badge = root.querySelector<HTMLElement>('[data-pp-karma-owner-only]');
+          if (badge) { badge.textContent = ownerLabel; badge.classList.remove('hidden'); }
+        }
+      };
+      document.addEventListener('rastrum:karma-hydrated', onHydrated);
+      document.dispatchEvent(new CustomEvent('rastrum:karma-ready'));
     }
 
     // Pokédex link.
