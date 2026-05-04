@@ -7613,37 +7613,86 @@ EXCEPTION WHEN OTHERS THEN
 END $$;
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- #595 — has_active_sponsorship(provider): cheap metadata read for the
--- client to gate Claude isAvailable() on whether the signed-in user has
--- coverage. SECURITY DEFINER, no decryption, no JOIN to vault. Returns
--- true if the user has either:
---   (a) an active personal sponsorship for this provider, OR
---   (b) an active platform pool with capacity (total_cap > used).
+-- #589 — UNIQUE primary identification per observation + upsert RPC.
+--
+-- Multiple code paths (sync.ts step 4.5, triggerIdentify, identify EF,
+-- retry-unidentified, MCP observe_create) each independently insert
+-- is_primary=true rows. Under transient errors (4.5 returns clientIdErr but
+-- the row was actually written), two primary rows can land for the same
+-- observation. There was no SQL guard.
+--
+-- Cleanup must precede the index creation; otherwise db-apply fails on
+-- existing duplicates.
 -- ─────────────────────────────────────────────────────────────────────────────
-CREATE OR REPLACE FUNCTION public.has_active_sponsorship(p_provider public.ai_provider)
-RETURNS boolean
-LANGUAGE sql STABLE SECURITY DEFINER
+
+DO $$ BEGIN
+  WITH ranked AS (
+    SELECT id, observation_id,
+           ROW_NUMBER() OVER (PARTITION BY observation_id
+                              ORDER BY created_at DESC, id DESC) AS rn
+    FROM public.identifications
+    WHERE is_primary IS TRUE
+  )
+  UPDATE public.identifications i
+  SET is_primary = false
+  FROM ranked r
+  WHERE i.id = r.id AND r.rn > 1;
+END $$;
+
+CREATE UNIQUE INDEX IF NOT EXISTS identifications_one_primary_per_obs
+  ON public.identifications (observation_id)
+  WHERE is_primary IS TRUE;
+
+-- upsert_primary_identification: SECURITY DEFINER RPC that demotes any
+-- lower-confidence existing primary, or inserts as non-primary if a
+-- higher-confidence primary already exists. Callers stop fighting the
+-- UNIQUE constraint by routing every primary write through here.
+CREATE OR REPLACE FUNCTION public.upsert_primary_identification(
+  p_observation_id uuid,
+  p_scientific_name text,
+  p_taxon_id uuid,
+  p_confidence numeric,
+  p_source text,
+  p_raw_response jsonb
+) RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT auth.uid() IS NOT NULL AND (
-    EXISTS (
-      SELECT 1 FROM public.sponsorships s
-      JOIN public.sponsor_credentials c ON c.id = s.credential_id
-      WHERE s.beneficiary_id = auth.uid()
-        AND s.provider       = p_provider
-        AND s.status         = 'active'
-        AND c.revoked_at IS NULL
-    )
-    OR EXISTS (
-      SELECT 1 FROM public.sponsor_pools p
-      JOIN public.sponsor_credentials c ON c.id = p.credential_id
-      WHERE c.provider       = p_provider
-        AND p.status         = 'active'
-        AND p.used < p.total_cap
-        AND c.revoked_at IS NULL
-    )
-  );
-$$;
+DECLARE
+  v_id uuid;
+BEGIN
+  UPDATE public.identifications
+  SET is_primary = false
+  WHERE observation_id = p_observation_id
+    AND is_primary IS TRUE
+    AND confidence < p_confidence;
 
-REVOKE ALL ON FUNCTION public.has_active_sponsorship(public.ai_provider) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.has_active_sponsorship(public.ai_provider) TO authenticated;
+  IF EXISTS (
+    SELECT 1 FROM public.identifications
+    WHERE observation_id = p_observation_id AND is_primary IS TRUE
+  ) THEN
+    INSERT INTO public.identifications (
+      observation_id, scientific_name, taxon_id,
+      confidence, source, raw_response, is_primary
+    )
+    VALUES (
+      p_observation_id, p_scientific_name, p_taxon_id,
+      p_confidence, p_source, p_raw_response, false
+    )
+    RETURNING id INTO v_id;
+  ELSE
+    INSERT INTO public.identifications (
+      observation_id, scientific_name, taxon_id,
+      confidence, source, raw_response, is_primary
+    )
+    VALUES (
+      p_observation_id, p_scientific_name, p_taxon_id,
+      p_confidence, p_source, p_raw_response, true
+    )
+    RETURNING id INTO v_id;
+  END IF;
+  RETURN v_id;
+END $$;
+
+REVOKE ALL ON FUNCTION public.upsert_primary_identification(uuid, text, uuid, numeric, text, jsonb) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.upsert_primary_identification(uuid, text, uuid, numeric, text, jsonb) TO authenticated, service_role;
