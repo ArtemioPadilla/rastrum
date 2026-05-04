@@ -91,16 +91,13 @@ const labels = {
           >{labels.editLocation}</button>
         </div>
 
-        <!-- Audio player mount — populated dynamically when audio media_files exist -->
-        <!-- The page script replaces innerHTML when audios are found.
-             The div stays hidden until then. -->
+        <!-- Audio player mount — populated dynamically when audio media_files exist.
+             The page script injects `.rastrum-audio-player-mount` nodes; the
+             hidden `<AudioPlayer>` below ensures Astro bundles the lib so
+             those mounts have something to attach to. -->
         <div id="obs-audio-players" class="hidden space-y-3"></div>
-        <!-- Hidden AudioPlayer instance so Astro bundles the <script> that
-             listens for `rastrum:audio-players-ready`. The dynamic HTML
-             injected by the page script creates `.rastrum-audio-player`
-             nodes, but without this anchor the init JS is tree-shaken. -->
         <div class="hidden" aria-hidden="true">
-          <AudioPlayer audioUrl="" lang={lang} obsId="__anchor" showSpectrogram={false} />
+          <AudioPlayer audioUrl="" lang={lang} obsId="__anchor" />
         </div>
       </aside>
 
