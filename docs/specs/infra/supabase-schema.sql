@@ -7778,3 +7778,5 @@ END $$;
 
 REVOKE ALL ON FUNCTION public.touch_user_activity() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.touch_user_activity() TO authenticated;
+
+-- 2026-05-04: trigger db-apply to deploy upsert_primary_identification (#618)
