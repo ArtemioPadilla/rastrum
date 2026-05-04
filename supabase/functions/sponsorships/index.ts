@@ -46,15 +46,9 @@ serve(async (req) => {
 
   // Support X-HTTP-Method-Override for environments that block DELETE/PUT (mobile carriers)
   const methodOverride = req.headers.get('X-HTTP-Method-Override');
-  const effectiveMethod = (methodOverride === 'DELETE' || methodOverride === 'PATCH' || methodOverride === 'PUT')
+  const method = (methodOverride === 'DELETE' || methodOverride === 'PATCH' || methodOverride === 'PUT')
     ? methodOverride
-    : method;
-  const req2 = effectiveMethod !== method
-    ? new Request(req.url, { method: effectiveMethod, headers: req.headers, body: req.body })
-    : req;
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const req = req2 as typeof req2;  // use effective method
+    : req.method;
   const url = new URL(req.url);
   const path = url.pathname.replace(/^\/sponsorships/, '') || '/';
 

@@ -311,6 +311,7 @@ const langJson = JSON.stringify(lang);
     request_approve: string;
     request_reject: string;
     add_credential: string;
+    pool_dashboard_view: string;
     confirm_reject_request: string;
     paused_reason: {
       rate_limit: string;
@@ -323,6 +324,8 @@ const langJson = JSON.stringify(lang);
   const tr: I18nBag = JSON.parse(
     (document.getElementById('sponsoring-i18n') as HTMLScriptElement | null)?.textContent ?? '{}'
   ) as I18nBag;
+
+  const poolDashViewLabel = tr.pool_dashboard_view ?? 'View';
 
   const HAIKU_45_INPUT_USD_PER_1K  = 0.001;
   const HAIKU_45_OUTPUT_USD_PER_1K = 0.005;
