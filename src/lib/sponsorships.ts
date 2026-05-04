@@ -45,11 +45,20 @@ export interface CreateCredentialArgs {
 async function authedFetch(path: string, init?: RequestInit): Promise<Response> {
   const { data: { session } } = await getSupabase().auth.getSession();
   if (!session) throw new Error('not_authenticated');
+  // Belt-and-braces: a corrupted/persisted session can produce a token
+  // with non-ByteString characters which makes fetch() reject at
+  // construction with a cryptic "headers ... not a valid ByteString"
+  // error. Fail loudly with a clearer message + force re-auth.
+  const token = session.access_token;
+  if (typeof token !== 'string' || !/^[\x20-\x7E]+$/.test(token)) {
+    await getSupabase().auth.signOut().catch(() => {});
+    throw new Error('session_token_corrupted_please_sign_in_again');
+  }
   return fetch(`${FN_BASE}${path}`, {
     ...init,
     headers: {
       ...(init?.headers ?? {}),
-      'authorization': `Bearer ${session.access_token}`,
+      'authorization': `Bearer ${token}`,
       'content-type':  'application/json',
     },
   });

@@ -104,16 +104,17 @@ serve(async (req) => {
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60_000).toISOString();
     const { data: stale } = await supabase
       .from('sponsor_credentials')
-      .select('id, vault_secret_id, user_id, label')
+      .select('id, vault_secret_id, user_id, label, kind')
       .is('revoked_at', null)
       .or(`validated_at.is.null,validated_at.lt.${sevenDaysAgo}`)
+      .in('kind', ['api_key', 'oauth_token'])
       .limit(50);
 
     const results: Array<{ id: string; ok: boolean; error?: string }> = [];
-    for (const cred of (stale ?? []) as Array<{ id: string; vault_secret_id: string }>) {
+    for (const cred of (stale ?? []) as Array<{ id: string; vault_secret_id: string; kind: 'api_key' | 'oauth_token' }>) {
       try {
         const secret = await decryptCredential(supabase, cred.vault_secret_id);
-        const result = await validateAnthropicCredential(secret);
+        const result = await validateAnthropicCredential(secret, cred.kind);
         if (result.valid) {
           await supabase.from('sponsor_credentials')
             .update({ validated_at: new Date().toISOString() })
@@ -166,7 +167,9 @@ serve(async (req) => {
     // Other providers (OpenAI, Gemini, Bedrock, Azure, Vertex) are stored as-is —
     // they'll fail at identify-time if invalid, which gives a clearer error.
     if (kind === 'api_key' || kind === 'oauth_token') {
-      const validation = await validateAnthropicCredential(secret);
+      // Pass kind explicitly — older / non-`sk-ant-api03-` Anthropic
+      // prefixes get rejected by the validator's own detect otherwise.
+      const validation = await validateAnthropicCredential(secret, kind);
       if (!validation.valid) return jsonResponse(400, { error: 'validation_failed', detail: validation.error });
     }
 
