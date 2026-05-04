@@ -11,8 +11,8 @@ const shim: Storage = {
 };
 Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: shim });
 
-import { mountAudioPlayer } from './audio-player';
-import { __resetForTests } from './audio-player/registry';
+import { mountMediaPlayer, mountAudioPlayer } from './media-player';
+import { __resetForTests } from './media-player/registry';
 
 vi.mock('wavesurfer.js', () => {
   class FakeWS {
@@ -35,7 +35,7 @@ vi.mock('wavesurfer.js/plugins/spectrogram', () => ({
   default: { create: () => ({}) },
 }));
 
-describe('mountAudioPlayer', () => {
+describe('mountMediaPlayer (audio kind)', () => {
   beforeEach(() => {
     __resetForTests();
     _store.clear();
@@ -76,6 +76,62 @@ describe('mountAudioPlayer', () => {
     const c = document.createElement('div');
     document.body.appendChild(c);
     const cleanup = mountAudioPlayer(c, 'data:audio/wav;base64,', { size: 'xs', lang: 'en' });
+    cleanup();
+    expect(() => cleanup()).not.toThrow();
+  });
+});
+
+describe('mountMediaPlayer (video kind)', () => {
+  beforeEach(() => {
+    __resetForTests();
+    _store.clear();
+    document.body.innerHTML = '';
+  });
+
+  it('builds an xs video shell with poster + play overlay', () => {
+    const c = document.createElement('div');
+    document.body.appendChild(c);
+    const cleanup = mountMediaPlayer(c, 'http://example/clip.mp4', {
+      kind: 'video', size: 'xs', lang: 'en', poster: 'http://example/poster.jpg',
+    });
+    const video = c.querySelector('video');
+    expect(video).not.toBeNull();
+    expect(video?.poster).toContain('poster.jpg');
+    expect(c.querySelector('button[aria-label]')).not.toBeNull();
+    cleanup();
+    expect(c.children.length).toBe(0);
+  });
+
+  it('builds an md video shell with controls bar (play, time, volume, fullscreen)', () => {
+    const c = document.createElement('div');
+    document.body.appendChild(c);
+    const cleanup = mountMediaPlayer(c, 'http://example/clip.mp4', {
+      kind: 'video', size: 'md', lang: 'en',
+    });
+    expect(c.querySelector('video')).not.toBeNull();
+    expect(c.querySelector('input[type="range"]')).not.toBeNull();
+    // Two play affordances: the bar button and the centered overlay.
+    expect(c.querySelectorAll('button').length).toBeGreaterThanOrEqual(2);
+    cleanup();
+  });
+
+  it('builds an sm video shell with popover volume', () => {
+    const c = document.createElement('div');
+    document.body.appendChild(c);
+    const cleanup = mountMediaPlayer(c, 'http://example/clip.mp4', {
+      kind: 'video', size: 'sm', lang: 'en',
+    });
+    expect(c.querySelector('input[type="range"]')).toBeNull();
+    expect(c.querySelector('button[data-volume-toggle]')).not.toBeNull();
+    cleanup();
+  });
+
+  it('video cleanup is idempotent', () => {
+    const c = document.createElement('div');
+    document.body.appendChild(c);
+    const cleanup = mountMediaPlayer(c, 'http://example/clip.mp4', {
+      kind: 'video', size: 'sm', lang: 'en',
+    });
     cleanup();
     expect(() => cleanup()).not.toThrow();
   });
