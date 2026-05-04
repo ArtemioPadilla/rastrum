@@ -718,14 +718,14 @@ serve(async (req) => {
         console.warn('[identify] taxa upsert exception (non-fatal)', e);
       }
 
-      await db().from('identifications').insert({
-        observation_id: body.observation_id,
-        scientific_name: result.scientific_name,
-        taxon_id: taxonId,
-        confidence: result.confidence,
-        source: result.source,
-        raw_response: result.raw as object,
-        is_primary: true,
+      // #589: UNIQUE-safe insert via upsert RPC.
+      await db().rpc('upsert_primary_identification', {
+        p_observation_id: body.observation_id,
+        p_scientific_name: result.scientific_name,
+        p_taxon_id: taxonId,
+        p_confidence: result.confidence,
+        p_source: result.source,
+        p_raw_response: result.raw as object,
       });
     }
   }

@@ -228,14 +228,17 @@ async function syncOne(record: ObservationRecord): Promise<void> {
       }
     }
 
-    const { error: clientIdErr } = await supabase.from('identifications').insert({
-      observation_id: record.id,
-      scientific_name: clientId.scientificName,
-      taxon_id: taxonId,
-      confidence: Math.max(0, Math.min(1, clientId.confidence ?? 0)),
-      source: clientId.source ?? 'human',
-      is_primary: true,
-      raw_response: {
+    // Route through upsert_primary_identification RPC (#589) which honors
+    // the UNIQUE(observation_id) WHERE is_primary partial index — demoting
+    // lower-confidence existing primary rows instead of fighting the
+    // constraint.
+    const { error: clientIdErr } = await supabase.rpc('upsert_primary_identification', {
+      p_observation_id: record.id,
+      p_scientific_name: clientId.scientificName,
+      p_taxon_id: taxonId,
+      p_confidence: Math.max(0, Math.min(1, clientId.confidence ?? 0)),
+      p_source: clientId.source ?? 'human',
+      p_raw_response: {
         common_name_en: clientId.commonNameEn,
         common_name_es: clientId.commonNameEs,
         client_persisted: true,
@@ -370,17 +373,18 @@ async function triggerIdentify(observationId: string): Promise<void> {
   // Apply taxonomy synonym correction for known outdated names (#345)
   const { correctIdentificationName } = await import('./taxonomy-synonyms');
   const correctedName = correctIdentificationName(r.scientific_name);
+  // #589: route through upsert_primary_identification RPC for UNIQUE-safe insert.
   // #586: persist full cascade trace (attempts + winner + raw provider response)
   // for forensics and future re-rank passes. Bounded to 4 KB.
   const { serializeClientCascade } = await import('./cascade-trace');
   const trace = serializeClientCascade(cascadeResult);
-  const { error: insertErr } = await supabase.from('identifications').insert({
-    observation_id: observationId,
-    scientific_name: correctedName,
-    confidence: r.confidence,
-    source: r.source,
-    raw_response: trace as unknown as object,
-    is_primary: true,
+  const { error: insertErr } = await supabase.rpc('upsert_primary_identification', {
+    p_observation_id: observationId,
+    p_scientific_name: correctedName,
+    p_taxon_id: null,
+    p_confidence: r.confidence,
+    p_source: r.source,
+    p_raw_response: trace as unknown as object,
   });
 
   if (insertErr) {
