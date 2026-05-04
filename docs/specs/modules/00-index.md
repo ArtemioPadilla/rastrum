@@ -95,6 +95,7 @@ narrative source.
 | # | Module | Target | Status | Spec |
 |---|---|---|---|---|
 | 24 | Diversity Indices & Spatial Analytics (Shannon, Simpson, Hill numbers, ANPs, municipios) | v1.5 | planned (spec v1.0) | [`24-diversity-indices.md`](24-diversity-indices.md) |
+| 33 | User Journeys: Comprehensive Testing, Guided Tours & Feedback Loop | v1.2 → v1.4 | partial (spec + Phase 1 E2E tests + Phase 2 guides + Phase 3 feedback) | [`33-user-journeys-testing.md`](33-user-journeys-testing.md) |
 
 > **Numbering note.** Two specs share the `15-` prefix:
 > [`15-map-location-picker.md`](15-map-location-picker.md) was claimed first
@@ -144,7 +145,7 @@ ML training pipeline) rather than waiting on engineering capacity.
 
 ## How to add a new module spec
 
-1. Claim the next free `NN-*.md` slot (currently `29-`).
+1. Claim the next free `NN-*.md` slot (currently `34-`).
 2. Copy the structure of an existing spec
    (`01-photo-id.md` is a good template).
 3. Include: **Overview → Data model → APIs / logic → Edge cases → Cost / risk

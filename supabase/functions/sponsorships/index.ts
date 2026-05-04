@@ -1,16 +1,23 @@
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
-import { detectKind, validateAnthropicCredential } from '../_shared/anthropic-validate.ts';
+import { detectKind, detectAnyKind, validateAnthropicCredential } from '../_shared/anthropic-validate.ts';
 import { decryptCredential } from '../_shared/sponsorship.ts';
 
 const SUPABASE_URL            = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE   = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const SPONSORSHIPS_CRON_TOKEN = Deno.env.get('SPONSORSHIPS_CRON_TOKEN');
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info, x-rastrum-build',
+  'Access-Control-Max-Age': '86400',
+};
+
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', ...CORS_HEADERS },
   });
 }
 
@@ -32,11 +39,27 @@ function withCronToken(req: Request): boolean {
 const UUID_RE = /^[0-9a-f-]{36}$/;
 
 serve(async (req) => {
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
+  }
+
+  // Support X-HTTP-Method-Override for environments that block DELETE/PUT (mobile carriers)
+  const methodOverride = req.headers.get('X-HTTP-Method-Override');
+  const effectiveMethod = (methodOverride === 'DELETE' || methodOverride === 'PATCH' || methodOverride === 'PUT')
+    ? methodOverride
+    : method;
+  const req2 = effectiveMethod !== method
+    ? new Request(req.url, { method: effectiveMethod, headers: req.headers, body: req.body })
+    : req;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const req = req2 as typeof req2;  // use effective method
   const url = new URL(req.url);
   const path = url.pathname.replace(/^\/sponsorships/, '') || '/';
 
   // ───────────── Heartbeat (cron-only) ─────────────
-  if (req.method === 'POST' && path === '/heartbeat') {
+  if (method === 'POST' && path === '/heartbeat') {
     if (!withCronToken(req)) return jsonResponse(401, { error: 'no_cron_token' });
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE);
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60_000).toISOString();
@@ -80,17 +103,22 @@ serve(async (req) => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE);
 
   // POST /credentials
-  if (req.method === 'POST' && path === '/credentials') {
+  if (method === 'POST' && path === '/credentials') {
     const body = await req.json().catch(() => ({}));
     const { label, secret, provider = 'anthropic' } = body as { label?: string; secret?: string; provider?: string };
     if (!label || !secret) return jsonResponse(400, { error: 'label_and_secret_required' });
     if (label.length < 1 || label.length > 64) return jsonResponse(400, { error: 'label_length_1_64' });
 
-    const kind = detectKind(secret);
+    const kind = detectAnyKind(secret);
     if (!kind) return jsonResponse(400, { error: 'unrecognized_secret_prefix' });
 
-    const validation = await validateAnthropicCredential(secret);
-    if (!validation.valid) return jsonResponse(400, { error: 'validation_failed', detail: validation.error });
+    // Only validate Anthropic credentials (api_key / oauth_token) at creation time.
+    // Other providers (OpenAI, Gemini, Bedrock, Azure, Vertex) are stored as-is —
+    // they'll fail at identify-time if invalid, which gives a clearer error.
+    if (kind === 'api_key' || kind === 'oauth_token') {
+      const validation = await validateAnthropicCredential(secret);
+      if (!validation.valid) return jsonResponse(400, { error: 'validation_failed', detail: validation.error });
+    }
 
     const { data: vaultRow, error: vaultErr } = await supabase.rpc('create_vault_secret', {
       p_secret: secret, p_name: `sponsor_credential:${ctx.userId}:${label}`,
@@ -126,20 +154,82 @@ serve(async (req) => {
   }
 
   // GET /credentials
-  if (req.method === 'GET' && path === '/credentials') {
+  if (method === 'GET' && path === '/credentials') {
     const { data, error } = await supabase
       .from('sponsor_credentials')
-      .select('id, label, provider, kind, validated_at, last_used_at, revoked_at, created_at')
+      .select('id, label, provider, kind, preferred_model, validated_at, last_used_at, revoked_at, created_at')
       .eq('user_id', ctx.userId)
       .order('created_at', { ascending: false });
-    if (error) return jsonResponse(500, { error: 'list_failed', detail: error.message });
+    if (error) {
+      console.error('[sponsorships] GET /credentials failed:', JSON.stringify({ code: error.code, message: error.message, details: error.details, hint: error.hint }));
+      return jsonResponse(500, { error: 'list_failed', detail: error.message, hint: error.hint });
+    }
     return jsonResponse(200, data ?? []);
+  }
+
+  // POST /credentials/:id/test — validate credential is working right now
+  {
+    const m = path.match(/^\/credentials\/([0-9a-f-]{36})\/test$/);
+    if (m && method === 'POST') {
+      const credId = m[1];
+      const { data: cred } = await supabase
+        .from('sponsor_credentials')
+        .select('user_id, vault_secret_id, kind, provider, preferred_model')
+        .eq('id', credId).single();
+      if (!cred || (cred as { user_id: string }).user_id !== ctx.userId) {
+        return jsonResponse(404, { error: 'not_found' });
+      }
+      const t0 = Date.now();
+      try {
+        const secret = await decryptCredential(supabase, (cred as { vault_secret_id: string }).vault_secret_id);
+        const kind = (cred as { kind: string }).kind as import('../_shared/anthropic-validate.ts').AnyCredentialKind;
+        const provider = (cred as { provider: string }).provider;
+        const model = (cred as { preferred_model: string }).preferred_model ?? 'claude-haiku-4-5';
+
+        // Provider-specific minimal ping
+        let testOk = false;
+        let testError: string | undefined;
+
+        if (provider === 'anthropic' || kind === 'api_key' || kind === 'oauth_token') {
+          const { pickAuthHeader } = await import('../_shared/sponsorship.ts');
+          const headers = { ...pickAuthHeader(kind, secret), 'anthropic-version': '2023-06-01', 'content-type': 'application/json' } as Record<string,string>;
+          const r = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST', headers,
+            body: JSON.stringify({ model: model.includes('/') ? model : `${model}-20251001`, max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] }),
+          });
+          testOk = r.status !== 401 && r.status !== 403;
+          if (!testOk) testError = `HTTP ${r.status}`;
+        } else if (provider === 'openai' || kind === 'openai_api_key') {
+          const r = await fetch('https://api.openai.com/v1/models', {
+            headers: { 'Authorization': `Bearer ${secret}` },
+          });
+          testOk = r.ok;
+          if (!testOk) testError = `HTTP ${r.status}`;
+        } else if (provider === 'gemini' || kind === 'gemini_api_key') {
+          const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${secret}`);
+          testOk = r.ok;
+          if (!testOk) testError = `HTTP ${r.status}`;
+        } else {
+          // Bedrock, Azure, Vertex — can't easily test without full config
+          testOk = true;
+          testError = 'test_not_supported_for_provider';
+        }
+
+        const latency_ms = Date.now() - t0;
+        if (testOk) {
+          await supabase.from('sponsor_credentials').update({ validated_at: new Date().toISOString() }).eq('id', credId);
+        }
+        return jsonResponse(200, { ok: testOk, latency_ms, error: testError ?? null });
+      } catch (e) {
+        return jsonResponse(200, { ok: false, latency_ms: Date.now() - t0, error: (e as Error).message });
+      }
+    }
   }
 
   // POST /credentials/:id/rotate
   {
     const m = path.match(/^\/credentials\/([0-9a-f-]{36})\/rotate$/);
-    if (m && req.method === 'POST') {
+    if (m && method === 'POST') {
       const credId = m[1];
       const { data: cred } = await supabase
         .from('sponsor_credentials').select('user_id, vault_secret_id, label')
@@ -150,10 +240,13 @@ serve(async (req) => {
       const body = await req.json().catch(() => ({}));
       const { secret } = body as { secret?: string };
       if (!secret) return jsonResponse(400, { error: 'secret_required' });
-      const kind = detectKind(secret);
+      const kind = detectAnyKind(secret);
       if (!kind) return jsonResponse(400, { error: 'unrecognized_secret_prefix' });
-      const validation = await validateAnthropicCredential(secret);
-      if (!validation.valid) return jsonResponse(400, { error: 'validation_failed', detail: validation.error });
+      // Validate only Anthropic keys at rotate time
+      if (kind === 'api_key' || kind === 'oauth_token') {
+        const validation = await validateAnthropicCredential(secret);
+        if (!validation.valid) return jsonResponse(400, { error: 'validation_failed', detail: validation.error });
+      }
 
       const { data: newSecretId, error: vaultErr } = await supabase.rpc('create_vault_secret', {
         p_secret: secret,
@@ -190,7 +283,7 @@ serve(async (req) => {
   // DELETE /credentials/:id
   {
     const m = path.match(/^\/credentials\/([0-9a-f-]{36})$/);
-    if (m && req.method === 'DELETE') {
+    if (m && method === 'DELETE') {
       const credId = m[1];
       const { data: cred } = await supabase
         .from('sponsor_credentials').select('user_id, vault_secret_id')
@@ -217,7 +310,7 @@ serve(async (req) => {
   }
 
   // POST /sponsorships
-  if (req.method === 'POST' && path === '/sponsorships') {
+  if (method === 'POST' && path === '/sponsorships') {
     const body = await req.json().catch(() => ({}));
     const {
       beneficiary_username, credential_id,
@@ -273,7 +366,7 @@ serve(async (req) => {
   }
 
   // GET /sponsorships?role=sponsor|beneficiary
-  if (req.method === 'GET' && path === '/sponsorships') {
+  if (method === 'GET' && path === '/sponsorships') {
     const role = url.searchParams.get('role') ?? 'sponsor';
     const col = role === 'beneficiary' ? 'beneficiary_id' : 'sponsor_id';
     const { data, error } = await supabase
@@ -282,14 +375,17 @@ serve(async (req) => {
       .eq(col, ctx.userId)
       .order('priority', { ascending: true })
       .order('created_at', { ascending: false });
-    if (error) return jsonResponse(500, { error: 'list_failed', detail: error.message });
+    if (error) {
+      console.error('[sponsorships] GET /sponsorships failed:', JSON.stringify({ code: error.code, message: error.message, details: error.details, hint: error.hint }));
+      return jsonResponse(500, { error: 'list_failed', detail: error.message, hint: error.hint });
+    }
     return jsonResponse(200, data ?? []);
   }
 
   // POST /sponsorships/:id/unpause (3-strike check)
   {
     const m = path.match(/^\/sponsorships\/([0-9a-f-]{36})\/unpause$/);
-    if (m && req.method === 'POST') {
+    if (m && method === 'POST') {
       const id = m[1];
       const { data: spons } = await supabase
         .from('sponsorships').select('sponsor_id, beneficiary_id, status').eq('id', id).single();
@@ -325,7 +421,7 @@ serve(async (req) => {
   // GET /sponsorships/:id/usage
   {
     const m = path.match(/^\/sponsorships\/([0-9a-f-]{36})\/usage$/);
-    if (m && req.method === 'GET') {
+    if (m && method === 'GET') {
       const id = m[1];
       const { data: spons } = await supabase
         .from('sponsorships').select('sponsor_id, beneficiary_id, monthly_call_cap').eq('id', id).single();
@@ -372,7 +468,7 @@ serve(async (req) => {
   // PATCH /sponsorships/:id
   {
     const m = path.match(/^\/sponsorships\/([0-9a-f-]{36})$/);
-    if (m && req.method === 'PATCH') {
+    if (m && method === 'PATCH') {
       const id = m[1];
       const body = await req.json().catch(() => ({}));
       const { data: spons } = await supabase
@@ -404,7 +500,7 @@ serve(async (req) => {
   // DELETE /sponsorships/:id
   {
     const m = path.match(/^\/sponsorships\/([0-9a-f-]{36})$/);
-    if (m && req.method === 'DELETE') {
+    if (m && method === 'DELETE') {
       const id = m[1];
       const { data: spons } = await supabase
         .from('sponsorships').select('sponsor_id, beneficiary_id').eq('id', id).single();
@@ -428,7 +524,43 @@ serve(async (req) => {
   }
 
   // POST /requests — beneficiary creates a request to a sponsor by username
-  if (req.method === 'POST' && path === '/requests') {
+  // PATCH /pools/:id — update cap, daily_user_cap, preferred_model
+  {
+    const m = path.match(/^\/pools\/([0-9a-f-]{36})$/);
+    if (m && method === 'PATCH') {
+      const poolId = m[1];
+      const { data: pool } = await supabase.from('sponsor_pools').select('credential_id').eq('id', poolId).single();
+      if (!pool) return jsonResponse(404, { error: 'not_found' });
+      const { data: cred } = await supabase.from('sponsor_credentials').select('user_id').eq('id', (pool as { credential_id: string }).credential_id).single();
+      if (!cred || (cred as { user_id: string }).user_id !== ctx.userId) return jsonResponse(403, { error: 'forbidden' });
+      const body = await req.json().catch(() => ({}));
+      const patch: Record<string, unknown> = {};
+      if (typeof body.total_cap === 'number') patch.total_cap = body.total_cap;
+      if (typeof body.daily_user_cap === 'number') patch.daily_user_cap = body.daily_user_cap;
+      if (typeof body.preferred_model === 'string') patch.preferred_model = body.preferred_model;
+      if (typeof body.status === 'string' && ['active','paused'].includes(body.status)) patch.status = body.status;
+      const { error } = await supabase.from('sponsor_pools').update(patch).eq('id', poolId);
+      if (error) return jsonResponse(500, { error: 'update_failed', detail: error.message });
+      return jsonResponse(200, { ok: true });
+    }
+  }
+
+  // DELETE /pools/:id — remove pool (sets status to revoked or hard-deletes)
+  {
+    const m = path.match(/^\/pools\/([0-9a-f-]{36})$/);
+    if (m && method === 'DELETE') {
+      const poolId = m[1];
+      const { data: pool } = await supabase.from('sponsor_pools').select('credential_id').eq('id', poolId).single();
+      if (!pool) return jsonResponse(404, { error: 'not_found' });
+      const { data: cred } = await supabase.from('sponsor_credentials').select('user_id').eq('id', (pool as { credential_id: string }).credential_id).single();
+      if (!cred || (cred as { user_id: string }).user_id !== ctx.userId) return jsonResponse(403, { error: 'forbidden' });
+      const { error } = await supabase.from('sponsor_pools').delete().eq('id', poolId);
+      if (error) return jsonResponse(500, { error: 'delete_failed', detail: error.message });
+      return jsonResponse(204, null);
+    }
+  }
+
+  if (method === 'POST' && path === '/requests') {
     const body = await req.json().catch(() => ({}));
     const { sponsor_username, message } = body as { sponsor_username?: string; message?: string };
     if (!sponsor_username) return jsonResponse(400, { error: 'sponsor_username_required' });
@@ -457,21 +589,24 @@ serve(async (req) => {
   }
 
   // GET /requests?role=requester|sponsor
-  if (req.method === 'GET' && path === '/requests') {
+  if (method === 'GET' && path === '/requests') {
     const role = url.searchParams.get('role') ?? 'requester';
     const col = role === 'sponsor' ? 'target_sponsor_id' : 'requester_id';
     const { data, error } = await supabase
       .from('sponsorship_requests').select('*').eq(col, ctx.userId)
       .order('created_at', { ascending: false })
       .limit(100);
-    if (error) return jsonResponse(500, { error: 'list_failed', detail: error.message });
+    if (error) {
+      console.error('[sponsorships] GET /requests failed:', JSON.stringify({ code: error.code, message: error.message, details: error.details, hint: error.hint }));
+      return jsonResponse(500, { error: 'list_failed', detail: error.message, hint: error.hint });
+    }
     return jsonResponse(200, data ?? []);
   }
 
   // POST /requests/:id/approve — sponsor approves; creates a sponsorship row
   {
     const m = path.match(/^\/requests\/([0-9a-f-]{36})\/approve$/);
-    if (m && req.method === 'POST') {
+    if (m && method === 'POST') {
       const id = m[1];
       const body = await req.json().catch(() => ({}));
       const { credential_id, monthly_call_cap = 200, priority = 100 } = body as { credential_id?: string; monthly_call_cap?: number; priority?: number };
@@ -529,7 +664,7 @@ serve(async (req) => {
   // POST /requests/:id/reject
   {
     const m = path.match(/^\/requests\/([0-9a-f-]{36})\/reject$/);
-    if (m && req.method === 'POST') {
+    if (m && method === 'POST') {
       const id = m[1];
       const { data: request } = await supabase
         .from('sponsorship_requests').select('target_sponsor_id, status').eq('id', id).single();
@@ -551,7 +686,7 @@ serve(async (req) => {
   // DELETE /requests/:id — requester withdraws
   {
     const m = path.match(/^\/requests\/([0-9a-f-]{36})$/);
-    if (m && req.method === 'DELETE') {
+    if (m && method === 'DELETE') {
       const id = m[1];
       const { data: request } = await supabase
         .from('sponsorship_requests').select('requester_id, status').eq('id', id).single();
@@ -570,5 +705,5 @@ serve(async (req) => {
     }
   }
 
-  return jsonResponse(404, { error: 'not_found', path, method: req.method });
+  return jsonResponse(404, { error: 'not_found', path, method: method });
 });

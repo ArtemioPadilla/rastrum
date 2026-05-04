@@ -1,0 +1,127 @@
+---
+/**
+ * JourneyGuideLoader — mounts in BaseLayout, checks the journey guide
+ * registry on page load, and auto-starts the matching guide if the user
+ * hasn't seen it yet.
+ *
+ * i18n resolution and guide data are computed server-side (frontmatter) and
+ * serialised via define:vars — avoids any client-side dynamic import() which
+ * breaks on locale-prefixed routes in Astro static output (the browser would
+ * try to fetch /es/lib/journey-guides instead of the Vite bundle URL).
+ *
+ * Also listens for `rastrum:replay-guide` events to replay a specific guide.
+ */
+import JourneySpotlight from './JourneySpotlight.astro';
+import JourneyReplayButton from './JourneyReplayButton.astro';
+import MicroSurvey from './MicroSurvey.astro';
+import { t } from '../i18n/utils';
+import { journeyGuides } from '../lib/journey-guides';
+
+interface Props {
+  lang: 'en' | 'es';
+  currentPath: string;
+}
+const { lang, currentPath } = Astro.props;
+const tr = t(lang);
+
+function resolveKey(key: string): string {
+  const parts = key.split('.');
+  let val: unknown = tr;
+  for (const p of parts) {
+    if (val && typeof val === 'object' && p in (val as Record<string, unknown>)) {
+      val = (val as Record<string, unknown>)[p];
+    } else return key;
+  }
+  return typeof val === 'string' ? val : key;
+}
+
+// Serialise all guides with resolved i18n strings so the client script
+// needs no imports at all — just JSON data + localStorage.
+const resolvedGuides = journeyGuides.map(g => ({
+  id: g.id,
+  storageKey: g.storageKey,
+  activation: g.activation,
+  // triggerRoute is a RegExp — serialise as string for the client
+  triggerRouteSource: g.triggerRoute.source,
+  triggerRouteFlags: g.triggerRoute.flags,
+  steps: g.steps.map(s => ({
+    target: s.target,
+    title: resolveKey(s.titleKey),
+    body: resolveKey(s.bodyKey),
+  })),
+}));
+---
+
+<JourneySpotlight lang={lang} />
+<JourneyReplayButton lang={lang} currentPath={currentPath} />
+<MicroSurvey lang={lang} />
+
+<script define:vars={{ currentPath, resolvedGuides }}>
+  // No imports needed — all guide data (including resolved i18n strings)
+  // was computed server-side and injected by define:vars.
+
+  function isGuideSeen(storageKey) {
+    try { return localStorage.getItem(storageKey) === 'done'; } catch { return true; }
+  }
+
+  function resetGuide(storageKey) {
+    try { localStorage.removeItem(storageKey); } catch { /* noop */ }
+  }
+
+  function findGuide(path) {
+    return resolvedGuides.find(g =>
+      new RegExp(g.triggerRouteSource, g.triggerRouteFlags).test(path)
+    );
+  }
+
+  function waitForTarget(selector, callback, maxWaitMs = 4000) {
+    const selectors = selector.split(',').map(s => s.trim());
+    const start = Date.now();
+    function poll() {
+      for (const sel of selectors) {
+        try {
+          if (document.querySelector(sel)) { callback(); return; }
+        } catch { /* invalid selector */ }
+      }
+      if (Date.now() - start < maxWaitMs) {
+        setTimeout(poll, 200);
+      } else {
+        callback(); // fire anyway (tooltip will center if target not found)
+      }
+    }
+    setTimeout(poll, 500); // minimum delay before first check
+  }
+
+  function initGuides() {
+    const guide = findGuide(currentPath);
+    if (!guide || guide.activation !== 'first-visit' || isGuideSeen(guide.storageKey)) return;
+
+    const firstTarget = guide.steps[0]?.target ?? 'body';
+    waitForTarget(firstTarget, () => {
+      window.dispatchEvent(new CustomEvent('rastrum:journey-guide-start', {
+        detail: { guideId: guide.id, steps: guide.steps },
+      }));
+    });
+  }
+
+  // Replay handler — dispatched by JourneyReplayButton or any other UI
+  window.addEventListener('rastrum:replay-guide', (ev) => {
+    const { guideId } = ev.detail ?? {};
+    if (!guideId) return;
+
+    const guide = resolvedGuides.find(g => g.id === guideId);
+    if (!guide) return;
+
+    resetGuide(guide.storageKey);
+
+    window.dispatchEvent(new CustomEvent('rastrum:journey-guide-start', {
+      detail: { guideId: guide.id, steps: guide.steps },
+    }));
+  });
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => initGuides());
+  } else {
+    initGuides();
+  }
+</script>

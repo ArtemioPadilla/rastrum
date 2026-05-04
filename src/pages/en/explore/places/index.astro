@@ -1,0 +1,16 @@
+---
+import BaseLayout from '../../../../layouts/BaseLayout.astro';
+import ExplorePlacesView from '../../../../components/ExplorePlacesView.astro';
+import { t } from '../../../../i18n/utils';
+
+const lang = 'en';
+const tr = t(lang);
+const page = tr.explore_pages.places;
+---
+<BaseLayout
+  title={`${page.title} — Rastrum`}
+  description="Browse protected areas, H3 zones, and community places with biodiversity observations on Rastrum."
+  lang={lang}
+>
+  <ExplorePlacesView lang={lang} />
+</BaseLayout>

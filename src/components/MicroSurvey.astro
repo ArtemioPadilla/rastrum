@@ -1,0 +1,209 @@
+---
+/**
+ * MicroSurvey — inline feedback widget triggered after journey completions
+ * and key user actions. Shows a single question, stores response locally.
+ *
+ * Listens for telemetry events and shows the matching survey from the
+ * feedback registry.
+ */
+interface Props {
+  lang: 'en' | 'es';
+}
+const { lang } = Astro.props;
+
+const labels = {
+  en: {
+    dismiss: 'Dismiss',
+    thanks: 'Thanks for the feedback!',
+    terrible: 'Terrible',
+    bad: 'Bad',
+    ok: 'OK',
+    good: 'Good',
+    great: 'Great',
+    thumbsUp: 'Yes',
+    thumbsDown: 'No',
+  },
+  es: {
+    dismiss: 'Cerrar',
+    thanks: '¡Gracias por tu retroalimentación!',
+    terrible: 'Terrible',
+    bad: 'Mal',
+    ok: 'OK',
+    good: 'Bien',
+    great: 'Excelente',
+    thumbsUp: 'Sí',
+    thumbsDown: 'No',
+  },
+};
+const l = labels[lang] ?? labels.en;
+---
+
+<div
+  id="micro-survey"
+  class="hidden fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-80
+         z-50 bg-white dark:bg-zinc-900 rounded-xl shadow-2xl border
+         border-zinc-200 dark:border-zinc-800 p-4 transition-all"
+  role="complementary"
+  aria-label="Feedback"
+  data-dismiss={l.dismiss}
+  data-thanks={l.thanks}
+  data-terrible={l.terrible}
+  data-bad={l.bad}
+  data-ok={l.ok}
+  data-good={l.good}
+  data-great={l.great}
+  data-thumbs-up={l.thumbsUp}
+  data-thumbs-down={l.thumbsDown}
+>
+  <div class="flex items-start justify-between gap-2 mb-3">
+    <p id="ms-question" class="text-sm font-medium text-zinc-900 dark:text-zinc-100"></p>
+    <button id="ms-dismiss" type="button" class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 text-xs shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center" aria-label={l.dismiss}>✕</button>
+  </div>
+  <div id="ms-options" class="flex flex-wrap gap-2"></div>
+  <p id="ms-thanks" class="hidden text-sm text-emerald-600 dark:text-emerald-400 font-medium"></p>
+</div>
+
+<script>
+  const root = document.getElementById('micro-survey');
+  if (root) {
+    const questionEl = document.getElementById('ms-question') as HTMLElement;
+    const optionsEl = document.getElementById('ms-options') as HTMLElement;
+    const thanksEl = document.getElementById('ms-thanks') as HTMLElement;
+    const dismissBtn = document.getElementById('ms-dismiss') as HTMLButtonElement;
+
+    const thanksText = root.dataset.thanks ?? 'Thanks!';
+    let activeSurveyId = '';
+
+    function showSurvey(question: string, format: string, surveyId: string): void {
+      activeSurveyId = surveyId;
+      questionEl.textContent = question;
+      optionsEl.innerHTML = '';
+      thanksEl.classList.add('hidden');
+      optionsEl.classList.remove('hidden');
+
+      if (format === 'emoji-scale') {
+        const emojis = [
+          { emoji: '😫', label: root.dataset.terrible ?? 'Terrible', value: 1 },
+          { emoji: '😕', label: root.dataset.bad ?? 'Bad', value: 2 },
+          { emoji: '😐', label: root.dataset.ok ?? 'OK', value: 3 },
+          { emoji: '😊', label: root.dataset.good ?? 'Good', value: 4 },
+          { emoji: '🤩', label: root.dataset.great ?? 'Great', value: 5 },
+        ];
+        for (const e of emojis) {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors min-h-[44px]';
+          btn.innerHTML = `<span class="text-xl">${e.emoji}</span><span class="text-[10px] text-zinc-500">${e.label}</span>`;
+          btn.addEventListener('click', () => submitResponse({ rating: e.value }));
+          optionsEl.appendChild(btn);
+        }
+      } else if (format === 'thumbs') {
+        const thumbs = [
+          { emoji: '👍', label: root.dataset.thumbsUp ?? 'Yes', value: 'up' },
+          { emoji: '👎', label: root.dataset.thumbsDown ?? 'No', value: 'down' },
+        ];
+        for (const t of thumbs) {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'flex items-center gap-1.5 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-sm min-h-[44px]';
+          btn.innerHTML = `<span class="text-lg">${t.emoji}</span><span>${t.label}</span>`;
+          btn.addEventListener('click', () => submitResponse({ thumb: t.value }));
+          optionsEl.appendChild(btn);
+        }
+      }
+
+      root.classList.remove('hidden');
+    }
+
+    function submitResponse(response: Record<string, unknown>): void {
+      const feedbackResponse = {
+        id: `fb-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        surveyId: activeSurveyId,
+        response,
+        pagePath: window.location.pathname,
+        createdAt: new Date().toISOString(),
+        synced: false,
+      };
+
+      // Store locally
+      try {
+        const key = 'rastrum.feedback.responses';
+        const existing = JSON.parse(localStorage.getItem(key) ?? '[]');
+        existing.push(feedbackResponse);
+        localStorage.setItem(key, JSON.stringify(existing));
+      } catch { /* noop */ }
+
+      // Mark survey as seen
+      try {
+        const storageKey = `rastrum.survey.${activeSurveyId.replace('survey-', '')}`;
+        localStorage.setItem(storageKey, 'done');
+      } catch { /* noop */ }
+
+      // Show thanks
+      optionsEl.classList.add('hidden');
+      thanksEl.textContent = thanksText;
+      thanksEl.classList.remove('hidden');
+
+      // Emit telemetry
+      try {
+        window.dispatchEvent(new CustomEvent('rastrum:onboarding-event', {
+          detail: { type: 'survey_responded', surveyId: activeSurveyId, response },
+        }));
+      } catch { /* noop */ }
+
+      // Auto-hide after 2s
+      setTimeout(() => { root.classList.add('hidden'); }, 2000);
+    }
+
+    dismissBtn.addEventListener('click', () => {
+      root.classList.add('hidden');
+      try {
+        window.dispatchEvent(new CustomEvent('rastrum:onboarding-event', {
+          detail: { type: 'survey_dismissed', surveyId: activeSurveyId },
+        }));
+      } catch { /* noop */ }
+    });
+
+    // Listen for telemetry events that should trigger surveys
+    const SURVEY_EVENTS = [
+      'rastrum:onboarding-event',
+      'rastrum:observation-saved',
+      'rastrum:validation-submitted',
+      'rastrum:explore-empty-state',
+    ];
+
+    for (const eventName of SURVEY_EVENTS) {
+      window.addEventListener(eventName, async (ev) => {
+        const detail = (ev as CustomEvent).detail ?? {};
+        try {
+          const { findSurveyForEvent } = await import('../lib/feedback');
+          const { t: getT } = await import('../i18n/utils');
+          const survey = findSurveyForEvent(eventName, detail);
+          if (!survey) return;
+
+          const lang = document.documentElement.lang || 'en';
+          const tr = getT(lang);
+
+          // Resolve the question key
+          function resolveKey(key: string): string {
+            const parts = key.split('.');
+            let val: unknown = tr;
+            for (const p of parts) {
+              if (val && typeof val === 'object' && p in (val as Record<string, unknown>)) {
+                val = (val as Record<string, unknown>)[p];
+              } else return key;
+            }
+            return typeof val === 'string' ? val : key;
+          }
+
+          const question = resolveKey(survey.questionKey);
+          const delay = survey.trigger.delay ?? 2000;
+
+          setTimeout(() => {
+            showSurvey(question, survey.format, survey.id);
+          }, delay);
+        } catch { /* module not available */ }
+      });
+    }
+  }
+</script>

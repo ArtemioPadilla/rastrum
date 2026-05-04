@@ -16,6 +16,7 @@ const lang: 'en' | 'es' = 'en';
     import { labelFor } from '../../../lib/observation-enums';
     import { wireManagePanelDetails, wireManagePanelLocation, wireManagePanelPhotos } from '../../../lib/manage-panel';
     import { t } from '../../../i18n/utils';
+    import { parseLocationToGeoJSON } from '../../../lib/geo';
 
     const id = new URLSearchParams(window.location.search).get('id');
     if (!id) {
@@ -88,6 +89,7 @@ const lang: 'en' | 'es' = 'en';
         .select(`
           id, observed_at, obscure_level, state_province, habitat, weather, establishment_means, observer_id, notes,
           last_material_edit_at, location, location_obscured,
+          places:place_id(id, slug, name, place_type),
           identifications(scientific_name, is_primary, is_research_grade),
           users:observer_id(display_name, username, profile_public)
         `)
@@ -320,12 +322,14 @@ const lang: 'en' | 'es' = 'en';
       }
 
       // Coords readout + view-mode mini-map hydration. PostgREST returns
-      // `location` as a GeoJSON Point; for non-owner viewers we prefer
-      // `location_obscured` when present (sensitive species). The
-      // MapPicker mini-map SSRs with `initialCoords={null}` — we hydrate
-      // it now via `rastrum:mappicker-set` (PR5).
-      const obsLoc = (obs as { location?: { coordinates?: [number, number] } | null }).location;
-      const obscuredLoc = (obs as { location_obscured?: { coordinates?: [number, number] } | null }).location_obscured;
+      // `location` as EWKB hex for geography columns (e.g. "0101000020E6100000...").
+      // Parse it to {coordinates:[lng,lat]} before use. If it's already an object
+      // (future PostgREST versions or cached GeoJSON), use it directly.
+            // Coords readout + view-mode mini-map hydration. PostgREST returns
+      // `location` as EWKB hex for geography columns — parsed via geo.ts.
+      // For non-owner viewers we prefer `location_obscured` when present.
+      const obsLoc = parseLocationToGeoJSON((obs as Record<string,unknown>).location);
+      const obscuredLoc = parseLocationToGeoJSON((obs as Record<string,unknown>).location_obscured);
       const usePoint = (!viewerIsObserver && obscuredLoc?.coordinates) ? obscuredLoc : obsLoc;
       const coords = usePoint?.coordinates;
       if (Array.isArray(coords) && coords.length >= 2) {
@@ -343,6 +347,23 @@ const lang: 'en' | 'es' = 'en';
           coordsEl.textContent = isObscured
             ? (isEs ? `~${formatted} (aproximado)` : `~${formatted} (coarsened)`)
             : formatted;
+        }
+      }
+
+      // ── Place chip ──
+      const placeData = (obs as Record<string, unknown>).places as { id: string; slug: string; name: string; place_type?: string } | null | undefined;
+      const place = Array.isArray(placeData) ? (placeData[0] ?? null) : (placeData ?? null);
+      if (place?.slug && place?.name) {
+        const chipEl = document.getElementById('obs-place-chip') as HTMLAnchorElement | null;
+        if (chipEl) {
+          const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
+          const href = lang === 'es'
+            ? `/es/explorar/lugares/?slug=${place.slug}`
+            : `/en/explore/places/?slug=${place.slug}`;
+          chipEl.href = href;
+          const labelSpan = chipEl.querySelector('span');
+          if (labelSpan) labelSpan.textContent = place.name;
+          chipEl.classList.remove('hidden');
         }
       }
 
@@ -408,6 +429,98 @@ const lang: 'en' | 'es' = 'en';
         await wireManagePanelDetails(id, obs as Record<string, unknown>, ident);
         await wireManagePanelLocation(id, obs as Record<string, unknown>);
         await wireManagePanelPhotos(id);
+
+        // M34: Best shot nomination
+        const isEs = document.documentElement.lang === 'es';
+        if ((obs as { primary_taxon_id?: string }).primary_taxon_id) {
+          const bestShotMount = document.getElementById('best-shot-mount');
+          if (bestShotMount) {
+            bestShotMount.classList.remove('hidden');
+            const btnEl = document.getElementById('best-shot-btn') as HTMLButtonElement | null;
+            const labelEl = document.getElementById('best-shot-label');
+            const countEl = document.getElementById('best-shot-count');
+
+            // Get primary media id
+            const primaryMedia = (media ?? []).find((m: {is_primary?: boolean}) => m.is_primary);
+            const mediaId = (primaryMedia as {id?: string} | undefined)?.id;
+            const taxonName = (obs as {scientific_name?: string}).scientific_name
+              || (obs as {primary_taxon_id?: string}).primary_taxon_id;
+
+            if (labelEl && taxonName) {
+              labelEl.textContent = (isEs ? 'Nominar como mejor foto de ' : 'Nominate as best shot for ') + taxonName;
+            }
+
+            if (mediaId) {
+              // Get current viewer
+              let currentViewer: { id?: string } | null = null;
+              try {
+                const { data: { user: v } } = await supabase.auth.getUser();
+                currentViewer = v;
+              } catch { /* signed out */ }
+
+              // Check if already voted
+              const { data: existingVote } = await supabase
+                .from('reactions')
+                .select('id')
+                .eq('target_type', 'media')
+                .eq('target_id', mediaId)
+                .eq('reaction_type', 'best_shot')
+                .eq('user_id', currentViewer?.id ?? '')
+                .maybeSingle();
+
+              let hasVoted = !!existingVote;
+              if (countEl) {
+                const { count } = await supabase
+                  .from('reactions')
+                  .select('id', { count: 'exact', head: true })
+                  .eq('target_type', 'media')
+                  .eq('target_id', mediaId)
+                  .eq('reaction_type', 'best_shot');
+                countEl.textContent = count ? `${count} ${isEs ? 'votos' : 'votes'}` : '';
+              }
+
+              if (btnEl) {
+                const isLoggedIn = !!currentViewer?.id;
+
+                if (!isLoggedIn) {
+                  // Not logged in: show read-only count, disable button with hint
+                  btnEl.textContent = isEs ? '\ud83d\udcf8 Inicia sesi\u00f3n para nominar' : '\ud83d\udcf8 Sign in to nominate';
+                  btnEl.className = 'text-xs text-zinc-400 dark:text-zinc-600 cursor-not-allowed';
+                  btnEl.disabled = true;
+                  btnEl.title = isEs ? 'Necesitas iniciar sesi\u00f3n para nominar fotos' : 'You need to sign in to nominate photos';
+                } else {
+                  btnEl.textContent = hasVoted
+                    ? (isEs ? '\u2713 Nominada' : '\u2713 Nominated')
+                    : (isEs ? '\ud83d\udcf8 Nominar como mejor foto' : '\ud83d\udcf8 Nominate as best shot');
+                  btnEl.className = hasVoted
+                    ? 'text-xs text-emerald-700 dark:text-emerald-400'
+                    : 'text-xs text-zinc-600 dark:text-zinc-400 hover:text-emerald-700 dark:hover:text-emerald-400';
+
+                  btnEl.addEventListener('click', async () => {
+                    if (hasVoted) {
+                      await supabase.from('reactions').delete()
+                        .eq('target_type', 'media').eq('target_id', mediaId)
+                        .eq('reaction_type', 'best_shot').eq('user_id', currentViewer!.id ?? '');
+                      hasVoted = false;
+                    } else {
+                      await supabase.from('reactions').insert({
+                        target_type: 'media', target_id: mediaId,
+                        reaction_type: 'best_shot', user_id: currentViewer!.id,
+                      });
+                      hasVoted = true;
+                    }
+                    btnEl.textContent = hasVoted
+                      ? (isEs ? '\u2713 Nominada' : '\u2713 Nominated')
+                      : (isEs ? '\ud83d\udcf8 Nominar como mejor foto' : '\ud83d\udcf8 Nominate as best shot');
+                    btnEl.className = hasVoted
+                      ? 'text-xs text-emerald-700 dark:text-emerald-400'
+                      : 'text-xs text-zinc-600 dark:text-zinc-400 hover:text-emerald-700 dark:hover:text-emerald-400';
+                  });
+                }
+              }
+            }
+          }
+        }
       }
 
       // Surface the "edited after IDs" badge (PR2 schema column).
