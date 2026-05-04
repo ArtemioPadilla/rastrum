@@ -15,6 +15,7 @@ import type { UserRole } from '../lib/types';
 import { CONSOLE_TABS } from '../lib/console-tabs';
 import { t, getLocalizedPath, routes } from '../i18n/utils';
 import ConsoleOnboarding from './console/ConsoleOnboarding.astro';
+import ReportIssueButton from './ReportIssueButton.astro';
 
 interface Props {
   lang: 'en' | 'es';
@@ -453,6 +454,7 @@ const knownPills: Set<UserRole> | null = allRoles ?? null;
       })();
     </script>
 
+    <ReportIssueButton lang={lang} />
     <ConsoleOnboarding lang={lang} />
   </body>
 </html>
