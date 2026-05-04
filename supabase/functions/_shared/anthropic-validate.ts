@@ -65,12 +65,19 @@ export async function validateAnthropicCredential(
       method: 'POST',
       headers,
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
+        // Un-dated alias — Anthropic resolves to the latest patch of
+        // Haiku 4.5. Avoids false 403s when a hard-coded `-YYYYMMDD`
+        // version drops out of the operator's tier.
+        model: 'claude-haiku-4-5',
         max_tokens: 1,
         messages: [{ role: 'user', content: 'hi' }],
       }),
     });
-    if (res.status === 401 || res.status === 403) return { valid: false, error: 'auth_failed' };
+    // 401 = bad key; 403 = key valid but no access to the probe model
+    // (org/tier gating). Surface the distinction so the operator knows
+    // whether to rotate the key or pick a different model.
+    if (res.status === 401) return { valid: false, error: 'auth_failed_401_invalid_key' };
+    if (res.status === 403) return { valid: false, error: 'auth_failed_403_no_model_access' };
     return { valid: true, kind };
   } catch (e) {
     return { valid: false, error: `network: ${(e as Error).message}` };
