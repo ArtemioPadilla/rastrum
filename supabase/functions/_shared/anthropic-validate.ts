@@ -43,8 +43,14 @@ export function detectAnyKind(secret: string): AnyCredentialKind | null {
   return null;
 }
 
-export async function validateAnthropicCredential(secret: string): Promise<ValidationResult> {
-  const kind = detectKind(secret);
+export async function validateAnthropicCredential(
+  secret: string,
+  /** Caller-supplied kind. When the operator picked Anthropic from the
+   *  dropdown we trust them — otherwise older / non-`api03` Anthropic
+   *  prefixes get rejected here even though the key is fine. */
+  kindHint?: 'api_key' | 'oauth_token',
+): Promise<ValidationResult> {
+  const kind = kindHint ?? detectKind(secret);
   if (!kind) return { valid: false, error: 'invalid_prefix' };
 
   const headers: HeadersInit = {
