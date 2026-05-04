@@ -102,27 +102,29 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
       <nav id="es-sunburst-breadcrumb" class="mt-2 text-xs text-zinc-500 dark:text-zinc-400 flex flex-wrap gap-1"></nav>
     </div>
 
-    <label class="block mb-4">
-      <span class="sr-only">{page.search_placeholder}</span>
-      <input
-        type="search"
-        class="es-search w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-        placeholder={page.search_placeholder}
-        autocomplete="off"
-      />
-    </label>
+    <div id="es-panel-grid">
+      <label class="block mb-4">
+        <span class="sr-only">{page.search_placeholder}</span>
+        <input
+          type="search"
+          class="es-search w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          placeholder={page.search_placeholder}
+          autocomplete="off"
+        />
+      </label>
 
-    <div class="es-skeleton">
-      <Skeleton variant="card" count={6} ariaLabel={page.loading} />
+      <div class="es-skeleton">
+        <Skeleton variant="card" count={6} ariaLabel={page.loading} />
+      </div>
+
+      <ul class="es-list grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></ul>
+
+      <p class="es-empty hidden mt-4 rounded-xl border border-zinc-200 dark:border-zinc-800 p-8 text-center text-zinc-500 dark:text-zinc-400">
+        {page.empty}
+      </p>
+
+      <p class="es-error hidden mt-4 rounded-lg border border-red-300 dark:border-red-800 p-4 text-center text-sm text-red-700 dark:text-red-400"></p>
     </div>
-
-    <ul class="es-list grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></ul>
-
-    <p class="es-empty hidden mt-4 rounded-xl border border-zinc-200 dark:border-zinc-800 p-8 text-center text-zinc-500 dark:text-zinc-400">
-      {page.empty}
-    </p>
-
-    <p class="es-error hidden mt-4 rounded-lg border border-red-300 dark:border-red-800 p-4 text-center text-sm text-red-700 dark:text-red-400"></p>
   </div>
 
   <!-- Detail mode -->
@@ -448,6 +450,7 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
 
     // ── M34: View switcher (grid / radial / search) ────────────────────
     const esTabs = root?.querySelectorAll<HTMLButtonElement>('[data-view]');
+    const esPanelGrid = document.getElementById('es-panel-grid');
     const esPanelSearch = document.getElementById('es-panel-search');
     const esPanelRadial = document.getElementById('es-panel-radial');
     const isEs = lang === 'es';
@@ -465,15 +468,9 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
         }
       });
 
-      // Show/hide panels
-      const gridWrapper = listEl?.closest('div');
-      const gridLabel = root?.querySelector<HTMLElement>('label.block');
-      const gridSkeleton = root?.querySelector<HTMLElement>('.es-skeleton');
-      const gridList = root?.querySelector<HTMLElement>('.es-list');
-      const gridEmpty = root?.querySelector<HTMLElement>('.es-empty');
-      const gridError = root?.querySelector<HTMLElement>('.es-error');
-      const gridEls = [gridLabel, gridSkeleton, gridList, gridEmpty, gridError];
-      gridEls.forEach(el => { if (el) el.classList.toggle('hidden', view !== 'grid'); });
+      // Toggle whole panels — never touch the stateful skeleton/empty/error
+      // children, which are owned by the data-load state machine.
+      esPanelGrid?.classList.toggle('hidden', view !== 'grid');
       esPanelSearch?.classList.toggle('hidden', view !== 'search');
       esPanelRadial?.classList.toggle('hidden', view !== 'radial');
 
