@@ -657,8 +657,23 @@ const langJson = JSON.stringify(lang);
       await refreshCreds();
     } catch (err) {
       const msg = (err as Error).message;
-      if (errEl) { errEl.textContent = `Error: ${msg}`; errEl.classList.remove('hidden'); }
-      else alert(`Error: ${msg}`);
+      // 409 label_already_in_use — focus + select the label so the user
+      // can rename in one keystroke. Surface the friendly server detail
+      // instead of the raw "duplicate key value..." Postgres message.
+      if (msg.includes('label_already_in_use')) {
+        if (errEl) {
+          errEl.textContent = msg.split('|').slice(1).join('|').trim() || msg;
+          errEl.classList.remove('hidden');
+        }
+        const labelInput = document.getElementById('cred-label-input') as HTMLInputElement | null;
+        labelInput?.focus();
+        labelInput?.select();
+      } else if (errEl) {
+        errEl.textContent = `Error: ${msg}`;
+        errEl.classList.remove('hidden');
+      } else {
+        alert(`Error: ${msg}`);
+      }
     } finally {
       if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = originalSubmitText; }
       if (testBtn)   { testBtn.disabled = false; }
