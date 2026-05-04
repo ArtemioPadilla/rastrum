@@ -16,6 +16,7 @@ import { phiVisionIdentifier } from './phi-vision';
 import { birdnetIdentifier } from './birdnet';
 import { onnxBaseIdentifier } from './onnx-base';
 import { cameraTrapMegadetectorIdentifier } from './camera-trap-megadetector';
+import { speciesnetIdentifier } from './speciesnet';
 
 let booted = false;
 export function bootstrapIdentifiers() {
@@ -26,6 +27,7 @@ export function bootstrapIdentifiers() {
   registry.register(birdnetIdentifier);
   registry.register(onnxBaseIdentifier);
   registry.register(cameraTrapMegadetectorIdentifier);
+  registry.register(speciesnetIdentifier);
   booted = true;
   return registry;
 }

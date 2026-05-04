@@ -1,0 +1,99 @@
+---
+import BaseLayout from '../../../../../layouts/BaseLayout.astro';
+---
+<BaseLayout title="Comparar Lugares — Rastrum" description="Compara la biodiversidad entre dos lugares." lang="es">
+<div class="max-w-5xl mx-auto px-4 py-6">
+  <h1 class="text-2xl font-bold mb-6">Comparar Lugares</h1>
+  <div class="flex flex-col sm:flex-row gap-3 mb-8">
+    <input id="slug-a" type="text" placeholder="Slug del lugar A"
+      class="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+    <input id="slug-b" type="text" placeholder="Slug del lugar B"
+      class="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+    <button id="compare-btn" class="px-5 py-2 text-sm font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">Comparar</button>
+  </div>
+  <div id="compare-loading" class="hidden text-zinc-400 text-sm py-4">Cargando...</div>
+  <div id="compare-error" class="hidden text-red-500 text-sm py-4"></div>
+  <div id="compare-results" class="hidden">
+    <div id="compare-map" class="rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800 mb-6" style="height:300px"></div>
+    <div class="grid grid-cols-2 gap-4 mb-6">
+      <div class="rounded-xl border border-emerald-200 dark:border-emerald-800 p-4">
+        <h2 id="name-a" class="font-semibold text-sm mb-3"></h2>
+        <div class="space-y-1 text-sm text-zinc-600 dark:text-zinc-400">
+          <div>🔭 <strong id="obs-a">—</strong> obs</div>
+          <div>🌿 <strong id="spp-a">—</strong> especies</div>
+          <div>👥 <strong id="obs-count-a">—</strong> observadores</div>
+        </div>
+      </div>
+      <div class="rounded-xl border border-amber-200 dark:border-amber-800 p-4">
+        <h2 id="name-b" class="font-semibold text-sm mb-3"></h2>
+        <div class="space-y-1 text-sm text-zinc-600 dark:text-zinc-400">
+          <div>🔭 <strong id="obs-b">—</strong> obs</div>
+          <div>🌿 <strong id="spp-b">—</strong> especies</div>
+          <div>👥 <strong id="obs-count-b">—</strong> observadores</div>
+        </div>
+      </div>
+    </div>
+    <div class="grid grid-cols-2 gap-4">
+      <div><h3 class="text-sm font-semibold text-emerald-700 mb-2">Top especies — A</h3><ol id="species-a" class="space-y-1"></ol></div>
+      <div><h3 class="text-sm font-semibold text-amber-700 mb-2">Top especies — B</h3><ol id="species-b" class="space-y-1"></ol></div>
+    </div>
+  </div>
+</div>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.css" />
+<script>
+  import { getSupabase } from '../../../../../lib/supabase';
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('a')) (document.getElementById('slug-a') as HTMLInputElement).value = params.get('a')!;
+  if (params.get('b')) (document.getElementById('slug-b') as HTMLInputElement).value = params.get('b')!;
+  document.getElementById('compare-btn')!.addEventListener('click', doCompare);
+  if (params.get('a') && params.get('b')) doCompare();
+  async function doCompare() {
+    const slugA = (document.getElementById('slug-a') as HTMLInputElement).value.trim();
+    const slugB = (document.getElementById('slug-b') as HTMLInputElement).value.trim();
+    if (!slugA || !slugB) return;
+    const loading = document.getElementById('compare-loading')!;
+    const results = document.getElementById('compare-results')!;
+    const error = document.getElementById('compare-error')!;
+    loading.classList.remove('hidden'); results.classList.add('hidden'); error.classList.add('hidden');
+    const url = new URL(window.location.href);
+    url.searchParams.set('a', slugA); url.searchParams.set('b', slugB);
+    window.history.replaceState({}, '', url.toString());
+    const supabase = getSupabase();
+    const [{ data: placeA }, { data: placeB }] = await Promise.all([
+      supabase.rpc('place_geojson_by_slug', { p_slug: slugA }),
+      supabase.rpc('place_geojson_by_slug', { p_slug: slugB }),
+    ]);
+    loading.classList.add('hidden');
+    if (!placeA || !placeB) { error.textContent = 'No se encontró uno o ambos lugares.'; error.classList.remove('hidden'); return; }
+    document.getElementById('name-a')!.textContent = placeA.name;
+    document.getElementById('name-b')!.textContent = placeB.name;
+    ['obs','spp','obs-count'].forEach(k => {
+      const mapKey: Record<string,string> = { obs: 'obs_count', spp: 'species_count', 'obs-count': 'observer_count' };
+      (document.getElementById(`${k}-a`) as HTMLElement).textContent = (placeA[mapKey[k]] ?? 0).toLocaleString();
+      (document.getElementById(`${k}-b`) as HTMLElement).textContent = (placeB[mapKey[k]] ?? 0).toLocaleString();
+    });
+    const [{ data: spA }, { data: spB }] = await Promise.all([
+      supabase.rpc('place_top_species', { p_place_id: placeA.id, p_limit: 8 }),
+      supabase.rpc('place_top_species', { p_place_id: placeB.id, p_limit: 8 }),
+    ]);
+    const renderSp = (list: {scientific_name: string; obs_count: number}[], id: string) => {
+      const el = document.getElementById(id)!;
+      el.innerHTML = list?.length ? list.map((s,i) => `<li class="text-xs flex justify-between gap-2"><span><span class="text-zinc-400">${i+1}.</span> <em>${s.scientific_name}</em></span><span class="text-zinc-400">${s.obs_count}</span></li>`).join('') : '<li class="text-xs text-zinc-400">Sin especies aún</li>';
+    };
+    renderSp(spA ?? [], 'species-a'); renderSp(spB ?? [], 'species-b');
+    results.classList.remove('hidden');
+    const maplibregl = await import('maplibre-gl');
+    document.getElementById('compare-map')!.innerHTML = '';
+    const map = new maplibregl.Map({ container: document.getElementById('compare-map') as HTMLElement, style: 'https://tiles.openfreemap.org/styles/liberty', center: placeA.centroid_geojson?.coordinates ?? [0,0], zoom: 7, attributionControl: false });
+    map.on('load', () => {
+      [[placeA, 'a', '#10b981', '#059669'],[placeB, 'b', '#f59e0b', '#d97706']].forEach(([p,id,fill,line]) => {
+        const place = p as {geometry_geojson: object};
+        if (!place?.geometry_geojson) return;
+        map.addSource(`place-${id}`, { type: 'geojson', data: { type: 'Feature', geometry: place.geometry_geojson, properties: {} } });
+        map.addLayer({ id: `fill-${id}`, type: 'fill', source: `place-${id}`, paint: { 'fill-color': fill as string, 'fill-opacity': 0.2 } });
+        map.addLayer({ id: `outline-${id}`, type: 'line', source: `place-${id}`, paint: { 'line-color': line as string, 'line-width': 2 } });
+      });
+    });
+  }
+</script>
+</BaseLayout>

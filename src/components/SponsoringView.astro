@@ -91,7 +91,7 @@ const langJson = JSON.stringify(lang);
     </p>
   </section>
 
-  <dialog id="add-pool-dialog" class="rounded-xl p-6 max-w-md backdrop:bg-black/50">
+  <dialog id="add-pool-dialog" class="rounded-xl p-6 max-w-md w-full backdrop:bg-black/50 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100">
     <h3 class="text-lg font-semibold mb-2">{lang === 'es' ? 'Donar al pool' : 'Donate to pool'}</h3>
     <form method="dialog" class="space-y-3">
       <div>
@@ -104,7 +104,7 @@ const langJson = JSON.stringify(lang);
       </div>
       <div>
         <label class="block text-sm font-medium" for="pool-model-input">{lang === 'es' ? 'Modelo' : 'Model'}</label>
-        <input id="pool-model-input" type="text" required value="claude-haiku-4-5" class="mt-1 block w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-mono bg-white dark:bg-zinc-900" />
+        <input id="pool-model-input" type="text" required class="mt-1 block w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-mono bg-white dark:bg-zinc-900" placeholder="gpt-4o-mini" data-defaults='{"api_key":"claude-haiku-4-5","oauth_token":"claude-haiku-4-5","bedrock":"claude-haiku-4-5","openai_api_key":"gpt-4o-mini","azure_openai":"gpt-4o-mini","gemini_api_key":"gemini-2.0-flash-exp","vertex_ai":"gemini-2.0-flash-exp"}' />
         <div id="pool-model-cost" class="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400"></div>
       </div>
       <div>
@@ -183,8 +183,8 @@ const langJson = JSON.stringify(lang);
     </div>
   </section>
 
-  <dialog id="add-cred-dialog" class="rounded-xl p-6 max-w-md backdrop:bg-black/50">
-    <h3 class="text-lg font-semibold mb-2">{tr.sponsoring.add_credential}</h3>
+  <dialog id="add-cred-dialog" class="rounded-xl p-6 max-w-md w-full backdrop:bg-black/50 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100">
+    <h3 class="text-lg font-semibold mb-2 text-zinc-900 dark:text-zinc-100">{tr.sponsoring.add_credential}</h3>
     <form method="dialog" class="space-y-3">
       <div>
         <label class="block text-sm font-medium" for="cred-label-input">{tr.sponsoring.credential_label}</label>
@@ -216,7 +216,14 @@ const langJson = JSON.stringify(lang);
       </div>
       <div>
         <label class="block text-sm font-medium" for="cred-model-input">{lang === 'es' ? 'Modelo preferido' : 'Preferred model'}</label>
-        <input id="cred-model-input" name="preferred_model" type="text" class="mt-1 block w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-mono bg-white dark:bg-zinc-900" placeholder="claude-haiku-4-5" />
+        <input id="cred-model-input" name="preferred_model" type="text" list="cred-model-suggestions" autocomplete="off"
+          class="mt-1 block w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-mono bg-white dark:bg-zinc-900" placeholder="claude-haiku-4-5"
+          data-defaults='{"api_key":"claude-haiku-4-5","oauth_token":"claude-haiku-4-5","bedrock":"claude-haiku-4-5","openai_api_key":"gpt-4o-mini","azure_openai":"gpt-4o-mini","gemini_api_key":"gemini-2.0-flash-exp","vertex_ai":"gemini-2.0-flash-exp"}'
+          data-suggestions='{"api_key":["claude-haiku-4-5","claude-sonnet-4-5","claude-opus-4-5","claude-haiku-4-6","claude-sonnet-4-6"],"oauth_token":["claude-haiku-4-5","claude-sonnet-4-5","claude-opus-4-5"],"bedrock":["claude-haiku-4-5","claude-sonnet-4-5","claude-opus-4-5","amazon.titan-text-express-v1"],"openai_api_key":["gpt-4o-mini","gpt-4o","gpt-4.1","gpt-4.1-mini","o1-mini","o3-mini"],"azure_openai":["gpt-4o-mini","gpt-4o","gpt-4","gpt-35-turbo"],"gemini_api_key":["gemini-2.0-flash-exp","gemini-2.0-flash","gemini-1.5-flash","gemini-1.5-pro","gemini-2.5-pro-preview"],"vertex_ai":["gemini-2.0-flash-exp","gemini-2.0-flash","gemini-1.5-flash","gemini-1.5-pro"]}' />
+        <datalist id="cred-model-suggestions"></datalist>
+        <a id="cred-model-docs-link" href="#" target="_blank" rel="noopener" class="mt-0.5 block text-xs text-emerald-700 dark:text-emerald-400 hover:underline hidden">
+          {lang === 'es' ? 'Ver modelos disponibles →' : 'Browse available models →'}
+        </a>
         <p class="mt-1 text-xs text-zinc-500">{lang === 'es' ? 'Defaults: claude-haiku-4-5 (Anthropic/Bedrock), gpt-4o-mini (OpenAI/Azure), gemini-2.0-flash-exp (Gemini/Vertex). Bedrock auto-traduce el shorthand de Anthropic.' : 'Defaults: claude-haiku-4-5 (Anthropic/Bedrock), gpt-4o-mini (OpenAI/Azure), gemini-2.0-flash-exp (Gemini/Vertex). Bedrock auto-translates Anthropic shorthand.'}</p>
         <div id="cred-model-cost" class="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400"></div>
       </div>
@@ -227,13 +234,14 @@ const langJson = JSON.stringify(lang);
       </div>
 
       <div class="flex gap-2 justify-end">
+        <p id="cred-submit-error" class="hidden text-xs text-red-600 dark:text-red-400 mb-2"></p>
         <button type="button" id="cred-cancel" class="px-3 py-1.5 text-sm rounded border border-zinc-300 dark:border-zinc-700">{cancelLabel}</button>
         <button type="submit" id="cred-submit" class="px-3 py-1.5 text-sm rounded bg-emerald-700 text-white">{tr.sponsoring.validate_btn}</button>
       </div>
     </form>
   </dialog>
 
-  <dialog id="rotate-cred-dialog" class="rounded-xl p-6 max-w-md backdrop:bg-black/50">
+  <dialog id="rotate-cred-dialog" class="rounded-xl p-6 max-w-md w-full backdrop:bg-black/50 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100">
     <h3 class="text-lg font-semibold mb-2">{tr.sponsoring.rotate_btn}</h3>
     <form method="dialog" class="space-y-3">
       <input id="rotate-cred-id" type="hidden" />
@@ -248,7 +256,7 @@ const langJson = JSON.stringify(lang);
     </form>
   </dialog>
 
-  <dialog id="add-ben-dialog" class="rounded-xl p-6 max-w-md backdrop:bg-black/50">
+  <dialog id="add-ben-dialog" class="rounded-xl p-6 max-w-md w-full backdrop:bg-black/50 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100">
     <h3 class="text-lg font-semibold mb-2">{tr.sponsoring.add_beneficiary}</h3>
     <form method="dialog" class="space-y-3">
       <div>
@@ -270,7 +278,7 @@ const langJson = JSON.stringify(lang);
     </form>
   </dialog>
 
-  <dialog id="confirm-dialog" class="rounded-xl p-6 max-w-md backdrop:bg-black/50">
+  <dialog id="confirm-dialog" class="rounded-xl p-6 max-w-md w-full backdrop:bg-black/50 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100">
     <p id="confirm-message" class="text-sm">—</p>
     <div class="mt-4 flex gap-2 justify-end">
       <button type="button" id="confirm-no" class="px-3 py-1.5 text-sm rounded border border-zinc-300 dark:border-zinc-700">{cancelLabel}</button>
@@ -286,9 +294,9 @@ const langJson = JSON.stringify(lang);
 <script>
   import {
     listCredentials, createCredential, rotateCredential, deleteCredential,
-    listSponsorships, createSponsorship, unpauseSponsorship, revokeSponsorship,
+    listSponsorships, createSponsorship, unpauseSponsorship, revokeSponsorship, testCredential,
     detectKind,
-    listMyPools, createPool, setPoolStatus,
+    listMyPools, createPool, setPoolStatus, updatePool, deletePool,
   } from '../lib/sponsorships';
 
   type I18nBag = {
@@ -332,6 +340,13 @@ const langJson = JSON.stringify(lang);
     return pageLang === 'es' ? '🔶 Premium' : '🔶 Premium';
   }
 
+  const escHtml = (s: string): string => s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
   function updateCostDisplay(inputId: string, containerId: string) {
     const input = document.getElementById(inputId) as HTMLInputElement | null;
     const container = document.getElementById(containerId);
@@ -351,13 +366,6 @@ const langJson = JSON.stringify(lang);
   document.getElementById('cred-model-input')?.addEventListener('input', () => updateCostDisplay('cred-model-input', 'cred-model-cost'));
   document.getElementById('pool-model-input')?.addEventListener('input', () => updateCostDisplay('pool-model-input', 'pool-model-cost'));
   updateCostDisplay('pool-model-input', 'pool-model-cost');
-
-  const escHtml = (s: string): string => s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
 
   function fmtDate(s: string | null): string {
     if (!s) return '';
@@ -425,19 +433,33 @@ const langJson = JSON.stringify(lang);
       const validated = c.validated_at ? `validated ${fmtDate(c.validated_at)}` : 'never validated';
       li.innerHTML = `
         <div>
-          <div class="font-medium">${escHtml(c.label)} <span class="text-xs text-zinc-500">(${escHtml(c.kind)})</span></div>
+          <div class="font-medium">${escHtml(c.label)} <span class="text-xs text-zinc-500">${escHtml(c.kind)} · ${escHtml(c.preferred_model ?? "")}</span></div>
           <div class="text-xs text-zinc-500">${escHtml(validated)}</div>
         </div>
-        <div class="flex gap-2">
-          <button data-rotate="${escHtml(c.id)}" class="text-sm text-emerald-700 hover:text-emerald-900">Rotate</button>
-          <button data-revoke="${escHtml(c.id)}" class="text-sm text-red-600 hover:text-red-800">Revoke</button>
+        <div class="flex gap-2 items-center">
+          <button data-test="${escHtml(c.id)}" class="text-xs px-2 py-1 rounded border border-emerald-600 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30">Test</button>
+          <button data-rotate="${escHtml(c.id)}" class="text-xs px-2 py-1 rounded border border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800">Rotate</button>
+          <button data-delete="${escHtml(c.id)}" class="text-xs px-2 py-1 rounded border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">Delete</button>
         </div>`;
       credsList.appendChild(li);
     }
   }
 
   const addCredDialog = document.getElementById('add-cred-dialog') as HTMLDialogElement | null;
-  document.getElementById('add-cred-btn')?.addEventListener('click', () => addCredDialog?.showModal());
+  document.getElementById('add-cred-btn')?.addEventListener('click', () => {
+    // Reset form on open so stale state from previous opens doesn't linger
+    const modelInput = document.getElementById('cred-model-input') as HTMLInputElement | null;
+    if (modelInput) modelInput.value = '';
+    const kindSel = document.getElementById('cred-kind-select') as HTMLSelectElement | null;
+    if (kindSel) { kindSel.value = 'api_key'; delete kindSel.dataset.touched; }
+    const preview = document.getElementById('cred-kind-preview');
+    if (preview) preview.textContent = '';
+    const errEl = document.getElementById('cred-submit-error');
+    if (errEl) errEl.classList.add('hidden');
+    syncModelPlaceholder(); // sets correct placeholder for api_key (Anthropic default)
+    syncEndpointRow();
+    addCredDialog?.showModal();
+  });
   document.getElementById('cred-cancel')?.addEventListener('click', () => addCredDialog?.close());
   // M32 (#152): auto-detect kind from secret prefix; fall back to
   // user-selected dropdown for Bedrock / Azure / Vertex (JSON envelopes
@@ -462,6 +484,46 @@ const langJson = JSON.stringify(lang);
   document.getElementById('cred-kind-select')?.addEventListener('change', syncEndpointRow);
   syncEndpointRow();
 
+  const MODEL_DOCS: Record<string, string> = {
+    api_key:        'https://docs.anthropic.com/en/docs/about-claude/models/overview',
+    oauth_token:    'https://docs.anthropic.com/en/docs/about-claude/models/overview',
+    bedrock:        'https://docs.aws.amazon.com/bedrock/latest/userguide/models-supported.html',
+    openai_api_key: 'https://platform.openai.com/docs/models',
+    azure_openai:   'https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models',
+    gemini_api_key: 'https://ai.google.dev/gemini-api/docs/models/gemini',
+    vertex_ai:      'https://cloud.google.com/vertex-ai/generative-ai/docs/learn/models',
+  };
+
+  // Update model placeholder + datalist suggestions + docs link when provider changes
+  function syncModelPlaceholder() {
+    const kindSel = document.getElementById('cred-kind-select') as HTMLSelectElement | null;
+    const modelInput = document.getElementById('cred-model-input') as HTMLInputElement | null;
+    if (!kindSel || !modelInput) return;
+    const kind = kindSel.value;
+    const defaults = JSON.parse(modelInput.dataset.defaults ?? '{}') as Record<string, string>;
+    const suggestions = JSON.parse(modelInput.dataset.suggestions ?? '{}') as Record<string, string[]>;
+    const def = defaults[kind] ?? 'claude-haiku-4-5';
+    // Only update placeholder — never overwrite user-typed value.
+    const prevDefaults = Object.values(defaults);
+    if (prevDefaults.includes(modelInput.value)) modelInput.value = '';
+    modelInput.placeholder = def;
+    // Populate datalist with provider-specific suggestions
+    const datalist = document.getElementById('cred-model-suggestions');
+    if (datalist) {
+      const opts = suggestions[kind] ?? [];
+      datalist.innerHTML = opts.map(m => `<option value="${m}"></option>`).join('');
+    }
+    // Update docs link
+    const docsLink = document.getElementById('cred-model-docs-link') as HTMLAnchorElement | null;
+    if (docsLink) {
+      const url = MODEL_DOCS[kind];
+      if (url) { docsLink.href = url; docsLink.classList.remove('hidden'); }
+      else docsLink.classList.add('hidden');
+    }
+  }
+  document.getElementById('cred-kind-select')?.addEventListener('change', syncModelPlaceholder);
+  syncModelPlaceholder();
+
   document.getElementById('cred-secret-input')?.addEventListener('input', async (e) => {
     const val = (e.target as HTMLInputElement).value;
     const { detectAnyKind } = await import('../lib/sponsorships');
@@ -476,6 +538,7 @@ const langJson = JSON.stringify(lang);
     if (kind && kindSel && (kindSel.value === 'api_key' || !kindSel.dataset.touched)) {
       kindSel.value = kind;
       syncEndpointRow();
+      syncModelPlaceholder(); // programmatic value change doesn't fire 'change' event
     }
   });
   document.getElementById('cred-kind-select')?.addEventListener('change', () => {
@@ -488,7 +551,10 @@ const langJson = JSON.stringify(lang);
     const secret = (document.getElementById('cred-secret-input') as HTMLInputElement).value.trim();
     const kind   = (document.getElementById('cred-kind-select')  as HTMLSelectElement).value as
       'api_key'|'oauth_token'|'bedrock'|'openai_api_key'|'azure_openai'|'gemini_api_key'|'vertex_ai';
-    const preferred_model = (document.getElementById('cred-model-input') as HTMLInputElement).value.trim() || undefined;
+    const modelInput = document.getElementById('cred-model-input') as HTMLInputElement | null;
+    const modelVal = modelInput?.value.trim() || '';
+    const modelDefaults = JSON.parse(modelInput?.dataset.defaults ?? '{}') as Record<string, string>;
+    const preferred_model = modelVal || modelDefaults[kind] || 'claude-haiku-4-5';
     const endpoint        = (document.getElementById('cred-endpoint-input') as HTMLInputElement).value.trim() || null;
     if (!label || !secret) return;
     try {
@@ -501,7 +567,12 @@ const langJson = JSON.stringify(lang);
       if (preview) preview.textContent = '';
       addCredDialog?.close();
       await refreshCreds();
-    } catch (err) { alert(`Error: ${(err as Error).message}`); }
+    } catch (err) {
+      const errEl = document.getElementById('cred-submit-error');
+      const msg = (err as Error).message;
+      if (errEl) { errEl.textContent = `Error: ${msg}`; errEl.classList.remove('hidden'); }
+      else alert(`Error: ${msg}`);
+    }
   });
 
   const rotateDialog = document.getElementById('rotate-cred-dialog') as HTMLDialogElement | null;
@@ -527,9 +598,24 @@ const langJson = JSON.stringify(lang);
     try { creds = await listCredentials(); } catch { alert('Could not load credentials.'); return; }
     const sel = document.getElementById('pool-cred-select') as HTMLSelectElement | null;
     if (!sel) return;
-    sel.innerHTML = creds.map((c) => `<option value="${c.id}">${escHtml(c.label)}</option>`).join('');
+    sel.innerHTML = creds.map((c) => `<option value="${escHtml(c.id)}" data-model="${escHtml(c.preferred_model ?? '')}" data-kind="${escHtml(c.kind ?? '')}">${escHtml(c.label)}</option>`).join('');
+    // Pre-fill model from first credential
+    syncPoolModel(creds);
     poolDialog?.showModal();
   });
+  function syncPoolModel(creds: { id: string; preferred_model?: string; kind?: string }[]) {
+    const sel = document.getElementById('pool-cred-select') as HTMLSelectElement | null;
+    const modelInput = document.getElementById('pool-model-input') as HTMLInputElement | null;
+    if (!sel || !modelInput) return;
+    const opt = sel.selectedOptions[0] as HTMLOptionElement | undefined;
+    const credModel = opt?.dataset.model ?? '';
+    const credKind  = opt?.dataset.kind ?? '';
+    const kindDefaults = JSON.parse(modelInput.dataset.defaults ?? '{}') as Record<string, string>;
+    const def = credModel || kindDefaults[credKind] || 'claude-haiku-4-5';
+    modelInput.value = def;
+    updateCostDisplay('pool-model-input', 'pool-model-cost');
+  }
+  document.getElementById('pool-cred-select')?.addEventListener('change', () => syncPoolModel([]));
   document.getElementById('pool-cancel')?.addEventListener('click', () => poolDialog?.close());
   poolDialog?.querySelector('form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -577,12 +663,13 @@ const langJson = JSON.stringify(lang);
               <div class="h-full bg-emerald-600" style="width: ${pct}%"></div>
             </div>
           </div>
-          <div class="flex items-center gap-1">
+          <div class="flex items-center gap-1 flex-wrap justify-end">
             ${p.status === 'active'
-              ? `<button data-pool-pause="${escHtml(p.id)}" class="text-xs text-amber-700 hover:text-amber-900 px-2 py-1">Pause</button>`
+              ? `<button data-pool-pause="${escHtml(p.id)}" class="text-xs px-2 py-1 rounded border border-amber-400 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20">Pause</button>`
               : p.status === 'paused'
-                ? `<button data-pool-resume="${escHtml(p.id)}" class="text-xs text-emerald-700 hover:text-emerald-900 px-2 py-1">Resume</button>`
+                ? `<button data-pool-resume="${escHtml(p.id)}" class="text-xs px-2 py-1 rounded border border-emerald-500 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20">Resume</button>`
                 : ''}
+            <button data-pool-delete="${escHtml(p.id)}" class="text-xs px-2 py-1 rounded border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">Delete</button>
           </div>
         </li>
       `;
@@ -598,6 +685,11 @@ const langJson = JSON.stringify(lang);
       } else if (target.dataset.poolResume) {
         await setPoolStatus(target.dataset.poolResume, 'active');
         await refreshPools();
+      } else if (target.dataset.poolDelete) {
+        if (await showConfirm('Delete this pool? This cannot be undone.')) {
+          await deletePool(target.dataset.poolDelete);
+          await refreshPools();
+        }
       }
     } catch (err) { alert(`Error: ${(err as Error).message}`); }
   });
@@ -606,11 +698,34 @@ const langJson = JSON.stringify(lang);
 
   document.getElementById('creds-list')?.addEventListener('click', async (e) => {
     const target = e.target as HTMLElement;
-    if (target.dataset.rotate) {
+    if (target.dataset.test) {
+      const btn = target as HTMLButtonElement;
+      const credId = btn.dataset.test!;
+      const origText = btn.textContent ?? 'Test';
+      btn.disabled = true;
+      btn.textContent = '…';
+      try {
+        const result = await testCredential(credId);
+        btn.textContent = result.ok ? `✓ ${result.latency_ms}ms` : `✗ ${result.error ?? 'fail'}`;
+        btn.className = btn.className.replace('border-emerald-600 text-emerald-700 dark:text-emerald-400', result.ok ? 'border-emerald-600 text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30' : 'border-red-400 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20');
+        setTimeout(() => { btn.textContent = 'Test'; btn.disabled = false; btn.className = btn.className.replace(' bg-emerald-50 dark:bg-emerald-900/30', '').replace(' bg-red-50 dark:bg-red-900/20', ''); }, 8000);
+        await refreshCreds();
+      } catch (err) {
+        btn.textContent = `✗ ${(err as Error).message.slice(0, 30)}`;
+        setTimeout(() => { btn.textContent = origText; btn.disabled = false; }, 8000);
+      }
+    } else if (target.dataset.rotate) {
       (document.getElementById('rotate-cred-id') as HTMLInputElement).value = target.dataset.rotate;
       rotateDialog?.showModal();
+    } else if (target.dataset.delete) {
+      const isEsLang = document.documentElement.lang === 'es';
+      if (await showConfirm(isEsLang ? '¿Eliminar esta credencial? Los patrocinios que la usen serán pausados.' : 'Delete this credential? Sponsorships using it will be paused.')) {
+        await deleteCredential(target.dataset.delete);
+        await refreshCreds();
+        await refreshBens();
+      }
     } else if (target.dataset.revoke) {
-      if (await showConfirm('Revoke this credential? Sponsorships using it will be paused.')) {
+      if (await showConfirm(pageLang === 'es' ? '¿Revocar esta credencial? Los patrocinios que la usen serán pausados.' : 'Revoke this credential? Sponsorships using it will be paused.')) {
         await deleteCredential(target.dataset.revoke);
         await refreshCreds();
         await refreshBens();

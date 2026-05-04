@@ -1,0 +1,422 @@
+---
+/**
+ * ExplorePlacesView — two-tier surface for browsing places.
+ *
+ * Index mode (default, no ?slug=):
+ *   - Grid of places sorted by obs_count desc
+ *   - Search by name (debounce 300ms)
+ *   - Filter by place_type
+ *   - Pagination (20 per page, prev/next)
+ *
+ * Detail mode (?slug=…):
+ *   - Delegates to PlaceDetailView (already implemented in M-Loc-3)
+ *
+ * Pattern: mirrors ExploreSpeciesView / ShareObsView (static site, no getStaticPaths).
+ */
+import { t } from '../i18n/utils';
+import PlaceDetailView from './PlaceDetailView.astro';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+
+const { lang } = Astro.props;
+const tr = t(lang);
+const page = tr.explore_pages.places;
+
+const placesIndexBase = `/${lang}/${lang === 'es' ? 'explorar/lugares' : 'explore/places'}/`;
+---
+
+<div
+  id="explore-places-root"
+  data-lang={lang}
+  data-places-base={placesIndexBase}
+  data-label-search-placeholder={page.search_placeholder}
+  data-label-filter-all={page.filter_all}
+  data-label-filter-protected-area={page.filter_protected_area}
+  data-label-filter-h3-cell={page.filter_h3_cell}
+  data-label-filter-custom={page.filter_custom}
+  data-label-filter-community={page.filter_community}
+  data-label-empty={page.empty}
+  data-label-loading={page.loading}
+  data-label-obs-count={page.obs_count}
+  data-label-species-count={page.species_count}
+  data-label-type-protected-area={page.type_protected_area}
+  data-label-type-h3-cell={page.type_h3_cell}
+  data-label-type-custom={page.type_custom}
+  data-label-type-community={page.type_community}
+  data-label-prev={page.prev}
+  data-label-next={page.next}
+  data-label-page-of={page.page_of}
+>
+
+  <!-- INDEX MODE (shown when no ?slug= present) -->
+  <div id="places-index">
+    <header class="space-y-3 py-6">
+      <h1 class="text-3xl font-bold tracking-tight">{page.title}</h1>
+      <p class="text-zinc-600 dark:text-zinc-400">{page.subtitle}</p>
+    </header>
+
+    <!-- Search + filter bar -->
+    <div class="flex flex-col sm:flex-row gap-3 mb-6">
+      <div class="relative flex-1">
+        <input
+          id="places-search"
+          type="search"
+          autocomplete="off"
+          placeholder={page.search_placeholder}
+          class="w-full rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-4 py-2 pl-9 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        />
+        <!-- Search icon -->
+        <svg class="absolute left-2.5 top-2.5 h-4 w-4 text-zinc-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+        <!-- Autocomplete dropdown -->
+        <ul
+          id="places-autocomplete"
+          class="hidden absolute z-50 top-full left-0 right-0 mt-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg overflow-hidden max-h-60 overflow-y-auto"
+          role="listbox"
+        ></ul>
+      </div>
+      <select
+        id="places-type-filter"
+        class="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+      >
+        <option value="">{page.filter_all}</option>
+        <option value="protected_area">{page.filter_protected_area}</option>
+        <option value="h3_cell">{page.filter_h3_cell}</option>
+        <option value="custom">{page.filter_custom}</option>
+        <option value="community">{page.filter_community}</option>
+      </select>
+    </div>
+
+    <!-- Loading state -->
+    <div id="places-loading" class="flex items-center justify-center py-16 text-zinc-400">
+      <svg class="animate-spin h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+      </svg>
+      <span>{page.loading}</span>
+    </div>
+
+    <!-- Empty state -->
+    <div id="places-empty" class="hidden py-16 text-center text-zinc-400 text-sm">{page.empty}</div>
+
+    <!-- Grid -->
+    <div id="places-grid" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+
+    <!-- Pagination -->
+    <div id="places-pagination" class="hidden flex items-center justify-between mt-6 py-4 border-t border-zinc-200 dark:border-zinc-800">
+      <button
+        id="places-prev"
+        class="px-4 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+      >{page.prev}</button>
+      <span id="places-page-label" class="text-sm text-zinc-500"></span>
+      <button
+        id="places-next"
+        class="px-4 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+      >{page.next}</button>
+    </div>
+  </div>
+
+  <!-- DETAIL MODE (shown when ?slug= is present) -->
+  <div id="places-detail" class="hidden">
+    <PlaceDetailView lang={lang} />
+  </div>
+
+</div>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+
+  const PAGE_SIZE = 20;
+
+  const root = document.getElementById('explore-places-root');
+  if (!root) {
+    console.error('[places-index] root element not found — script aborted');
+    throw new Error('explore-places-root not found');
+  }
+
+  console.log('[places-index] script started, root found');
+
+  // Labels from data attrs
+  const labels = {
+    obsCount:        root.dataset.labelObsCount!,
+    speciesCount:    root.dataset.labelSpeciesCount!,
+    empty:           root.dataset.labelEmpty!,
+    prev:            root.dataset.labelPrev!,
+    next:            root.dataset.labelNext!,
+    pageOf:          root.dataset.labelPageOf!,
+    types: {
+      protected_area: root.dataset.labelTypeProtectedArea!,
+      h3_cell:        root.dataset.labelTypeH3Cell!,
+      custom:         root.dataset.labelTypeCustom!,
+      community:      root.dataset.labelTypeCommunity!,
+    } as Record<string, string>,
+  };
+
+  const placesBase = root.dataset.placesBase!;
+
+  // Elements
+  const indexEl      = document.getElementById('places-index')!;
+  const detailEl     = document.getElementById('places-detail')!;
+  const loadingEl    = document.getElementById('places-loading')!;
+  const emptyEl      = document.getElementById('places-empty')!;
+  const gridEl       = document.getElementById('places-grid')!;
+  const paginationEl = document.getElementById('places-pagination')!;
+  const searchEl     = document.getElementById('places-search') as HTMLInputElement;
+  const filterEl     = document.getElementById('places-type-filter') as HTMLSelectElement;
+  const prevBtn      = document.getElementById('places-prev') as HTMLButtonElement;
+  const nextBtn      = document.getElementById('places-next') as HTMLButtonElement;
+  const pageLabel    = document.getElementById('places-page-label')!;
+
+  // State
+  let currentPage  = 0;
+  let totalCount   = 0;
+  let searchQuery  = '';
+  let typeFilter   = '';
+  let debounceTimer: ReturnType<typeof setTimeout>;
+
+  function totalPages() {
+    return Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  }
+
+  function formatLabel(template: string, vars: Record<string, number | string>) {
+    return template.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ''));
+  }
+
+  function typeBadgeClass(type: string): string {
+    const map: Record<string, string> = {
+      protected_area: 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300',
+      h3_cell:        'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300',
+      custom:         'bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-300',
+      community:      'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300',
+    };
+    return map[type] ?? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400';
+  }
+
+  function escHtml(s: string | number): string {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function renderCard(place: {
+    slug: string;
+    name: string;
+    place_type: string;
+    obs_count: number;
+    species_count: number;
+  }): string {
+    const typeName   = labels.types[place.place_type] ?? place.place_type;
+    const badgeClass = typeBadgeClass(place.place_type);
+    const obsLabel   = formatLabel(labels.obsCount, { count: (place.obs_count ?? 0).toLocaleString() });
+    const sppLabel   = formatLabel(labels.speciesCount, { count: (place.species_count ?? 0).toLocaleString() });
+    const href       = `${placesBase}?slug=${encodeURIComponent(place.slug)}`;
+
+    return `<a
+      href="${href}"
+      class="group block rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 hover:border-emerald-500/60 hover:shadow-md transition-all"
+    >
+      <div class="flex items-start justify-between gap-2 mb-2">
+        <h2 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors line-clamp-2">
+          ${escHtml(place.name)}
+        </h2>
+        <span class="shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${badgeClass}">${escHtml(typeName)}</span>
+      </div>
+      <div class="flex items-center gap-3 text-xs text-zinc-500 dark:text-zinc-400">
+        <span>🔭 ${escHtml(obsLabel)}</span>
+        <span>🌿 ${escHtml(sppLabel)}</span>
+      </div>
+    </a>`;
+  }
+
+  async function fetchPage() {
+    loadingEl.classList.remove('hidden');
+    gridEl.classList.add('hidden');
+    emptyEl.classList.add('hidden');
+    paginationEl.classList.add('hidden');
+
+    try {
+
+    const supabase = getSupabase();
+    const offset   = currentPage * PAGE_SIZE;
+
+    let query = supabase
+      .from('places')
+      .select('id,slug,name,place_type,obs_count,species_count,observer_count,last_obs_at', { count: 'exact' })
+      .order('obs_count', { ascending: false })
+      .range(offset, offset + PAGE_SIZE - 1);
+
+    if (typeFilter)   query = query.eq('place_type', typeFilter);
+    if (searchQuery)  query = query.ilike('name', `%${searchQuery}%`);
+
+    const { data, count, error } = await query;
+
+    loadingEl.classList.add('hidden');
+
+    if (error) {
+      console.error('[places-index] fetch error', error);
+      emptyEl.textContent = `Error: ${error.message ?? 'unknown'}`;
+      emptyEl.classList.remove('hidden');
+      return;
+    }
+    if (!data || data.length === 0) {
+      emptyEl.textContent = labels.empty;
+      emptyEl.classList.remove('hidden');
+      return;
+    }
+
+    totalCount = count ?? data.length;
+
+    gridEl.innerHTML = data.map(renderCard).join('');
+    gridEl.classList.remove('hidden');
+
+    const pages = totalPages();
+    if (pages > 1) {
+      pageLabel.textContent  = formatLabel(labels.pageOf, { page: currentPage + 1, total: pages });
+      prevBtn.disabled       = currentPage === 0;
+      nextBtn.disabled       = currentPage >= pages - 1;
+      paginationEl.classList.remove('hidden');
+    }
+    } catch (err) {
+      console.error('[places-index] unexpected error', err);
+      loadingEl.classList.add('hidden');
+      emptyEl.textContent = `Error loading places: ${(err as Error)?.message ?? err}`;
+      emptyEl.classList.remove('hidden');
+    }
+  }
+
+  function resetAndFetch() {
+    currentPage = 0;
+    fetchPage();
+  }
+
+  function init() {
+    const slug = new URLSearchParams(window.location.search).get('slug');
+
+    if (slug) {
+      // Detail mode: hide index, show PlaceDetailView (it reads ?slug= itself)
+      indexEl.classList.add('hidden');
+      detailEl.classList.remove('hidden');
+    } else {
+      // Index mode
+      console.log('[places-index] index mode, calling fetchPage');
+      indexEl.classList.remove('hidden');
+      detailEl.classList.add('hidden');
+      fetchPage();
+    }
+  }
+
+  // Autocomplete
+  const autocompleteEl = document.getElementById('places-autocomplete') as HTMLUListElement;
+  let acTimer: ReturnType<typeof setTimeout>;
+  let acActive = -1;
+
+  function hideAC() {
+    autocompleteEl.classList.add('hidden');
+    autocompleteEl.innerHTML = '';
+    acActive = -1;
+  }
+
+  function showAC(results: { slug: string; name: string; place_type: string; obs_count: number }[]) {
+    if (!results.length) { hideAC(); return; }
+    const placeBase = isEs ? '/es/explorar/lugares/?slug=' : '/en/explore/places/?slug=';
+    const typeLabelFn = (t: string) => ({
+      protected_area: isEs ? 'Área Protegida' : 'Protected Area',
+      h3_cell: isEs ? 'Zona H3' : 'H3 Zone',
+      custom: isEs ? 'Custom' : 'Custom',
+      community: isEs ? 'Comunitario' : 'Community',
+    }[t] ?? t);
+
+    autocompleteEl.innerHTML = results.map((p, i) =>
+      `<li role="option" data-slug="${p.slug}" data-idx="${i}"
+        class="flex items-center justify-between px-4 py-2.5 cursor-pointer hover:bg-emerald-50 dark:hover:bg-emerald-900/20 border-b border-zinc-100 dark:border-zinc-800 last:border-0 text-sm">
+        <span>
+          <span class="font-medium text-zinc-900 dark:text-zinc-100">${p.name}</span>
+          <span class="ml-2 text-xs text-zinc-400">${typeLabelFn(p.place_type)}</span>
+        </span>
+        <span class="text-xs text-zinc-400 shrink-0">${p.obs_count} obs</span>
+      </li>`
+    ).join('');
+    autocompleteEl.classList.remove('hidden');
+
+    autocompleteEl.querySelectorAll('li').forEach(li => {
+      li.addEventListener('mousedown', e => {
+        e.preventDefault();
+        const slug = (li as HTMLElement).dataset.slug!;
+        const name = li.querySelector('.font-medium')!.textContent!;
+        searchEl.value = name;
+        searchQuery = name;
+        hideAC();
+        // Navigate directly to place detail
+        window.location.href = placeBase + slug;
+      });
+    });
+  }
+
+  // Search — debounce 300ms + autocomplete
+  searchEl.addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    clearTimeout(acTimer);
+    const val = searchEl.value.trim();
+    if (val.length < 2) { hideAC(); }
+    acTimer = setTimeout(async () => {
+      if (val.length < 2) return;
+      const supabase = getSupabase();
+      const { data } = await supabase
+        .from('places')
+        .select('slug, name, place_type, obs_count')
+        .ilike('name', `${val}%`)
+        .order('obs_count', { ascending: false })
+        .limit(6);
+      showAC(data ?? []);
+    }, 200);
+    debounceTimer = setTimeout(() => {
+      searchQuery = val;
+      resetAndFetch();
+    }, 300);
+  });
+
+  // Keyboard navigation for autocomplete
+  searchEl.addEventListener('keydown', e => {
+    const items = autocompleteEl.querySelectorAll('li');
+    if (!items.length) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      acActive = Math.min(acActive + 1, items.length - 1);
+      items.forEach((li, i) => li.classList.toggle('bg-emerald-50', i === acActive));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      acActive = Math.max(acActive - 1, -1);
+      items.forEach((li, i) => li.classList.toggle('bg-emerald-50', i === acActive));
+    } else if (e.key === 'Enter' && acActive >= 0) {
+      e.preventDefault();
+      (items[acActive] as HTMLElement).dispatchEvent(new MouseEvent('mousedown'));
+    } else if (e.key === 'Escape') {
+      hideAC();
+    }
+  });
+
+  document.addEventListener('click', e => {
+    if (!searchEl.contains(e.target as Node) && !autocompleteEl.contains(e.target as Node)) hideAC();
+  });
+
+  // Type filter
+  filterEl.addEventListener('change', () => {
+    typeFilter = filterEl.value;
+    resetAndFetch();
+  });
+
+  // Pagination
+  prevBtn.addEventListener('click', () => {
+    if (currentPage > 0) { currentPage--; fetchPage(); }
+  });
+  nextBtn.addEventListener('click', () => {
+    if (currentPage < totalPages() - 1) { currentPage++; fetchPage(); }
+  });
+
+  init();
+</script>

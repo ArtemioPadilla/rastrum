@@ -55,9 +55,18 @@ async function authedFetch(path: string, init?: RequestInit): Promise<Response> 
   });
 }
 
+async function readErrorBody(r: Response): Promise<string> {
+  try {
+    const body = await r.json() as { error?: string; detail?: string; hint?: string };
+    return [body.error, body.detail, body.hint].filter(Boolean).join(' | ');
+  } catch {
+    return String(r.status);
+  }
+}
+
 export async function listCredentials(): Promise<SponsorCredential[]> {
   const r = await authedFetch('/credentials');
-  if (!r.ok) throw new Error(`listCredentials: ${r.status}`);
+  if (!r.ok) throw new Error(`listCredentials: ${await readErrorBody(r)}`);
   return r.json();
 }
 
@@ -135,13 +144,23 @@ export async function rotateCredential(id: string, secret: string): Promise<void
 }
 
 export async function deleteCredential(id: string): Promise<void> {
-  const r = await authedFetch(`/credentials/${id}`, { method: 'DELETE' });
+  const r = await authedFetch(`/credentials/${id}`, { method: 'POST', headers: { 'X-HTTP-Method-Override': 'DELETE' } });
   if (!r.ok && r.status !== 204) throw new Error(`deleteCredential: ${r.status}`);
+}
+
+export async function updatePool(id: string, patch: { total_cap?: number; daily_user_cap?: number; preferred_model?: string; status?: 'active' | 'paused' }): Promise<void> {
+  const r = await authedFetch(`/pools/${id}`, { method: 'PATCH', body: JSON.stringify(patch) });
+  if (!r.ok) throw new Error(`updatePool: ${await readErrorBody(r)}`);
+}
+
+export async function deletePool(id: string): Promise<void> {
+  const r = await authedFetch(`/pools/${id}`, { method: 'POST', headers: { 'X-HTTP-Method-Override': 'DELETE' } });
+  if (!r.ok && r.status !== 204) throw new Error(`deletePool: ${await readErrorBody(r)}`);
 }
 
 export async function listSponsorships(role: 'sponsor' | 'beneficiary'): Promise<Sponsorship[]> {
   const r = await authedFetch(`/sponsorships?role=${role}`);
-  if (!r.ok) throw new Error(`listSponsorships: ${r.status}`);
+  if (!r.ok) throw new Error(`listSponsorships: ${await readErrorBody(r)}`);
   return r.json();
 }
 
@@ -170,8 +189,14 @@ export async function unpauseSponsorship(id: string): Promise<{ ok?: boolean; er
   return r.json();
 }
 
+export async function testCredential(id: string): Promise<{ ok: boolean; latency_ms: number; error: string | null }> {
+  const r = await authedFetch(`/credentials/${id}/test`, { method: 'POST' });
+  if (!r.ok) throw new Error(`testCredential: ${await readErrorBody(r)}`);
+  return r.json();
+}
+
 export async function revokeSponsorship(id: string): Promise<void> {
-  const r = await authedFetch(`/sponsorships/${id}`, { method: 'DELETE' });
+  const r = await authedFetch(`/sponsorships/${id}`, { method: 'POST', headers: { 'X-HTTP-Method-Override': 'DELETE' } });
   if (!r.ok && r.status !== 204) throw new Error(`revokeSponsorship: ${r.status}`);
 }
 
@@ -192,7 +217,7 @@ export async function createRequest(args: { sponsor_username: string; message?: 
 
 export async function listRequests(role: 'requester' | 'sponsor'): Promise<SponsorshipRequest[]> {
   const r = await authedFetch(`/requests?role=${role}`);
-  if (!r.ok) throw new Error(`listRequests: ${r.status}`);
+  if (!r.ok) throw new Error(`listRequests: ${await readErrorBody(r)}`);
   return r.json();
 }
 
@@ -211,6 +236,6 @@ export async function rejectRequest(id: string): Promise<void> {
 }
 
 export async function withdrawRequest(id: string): Promise<void> {
-  const r = await authedFetch(`/requests/${id}`, { method: 'DELETE' });
+  const r = await authedFetch(`/requests/${id}`, { method: 'POST', headers: { 'X-HTTP-Method-Override': 'DELETE' } });
   if (!r.ok && r.status !== 204) throw new Error(`withdrawRequest: ${r.status}`);
 }
