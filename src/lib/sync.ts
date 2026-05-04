@@ -370,12 +370,16 @@ async function triggerIdentify(observationId: string): Promise<void> {
   // Apply taxonomy synonym correction for known outdated names (#345)
   const { correctIdentificationName } = await import('./taxonomy-synonyms');
   const correctedName = correctIdentificationName(r.scientific_name);
+  // #586: persist full cascade trace (attempts + winner + raw provider response)
+  // for forensics and future re-rank passes. Bounded to 4 KB.
+  const { serializeClientCascade } = await import('./cascade-trace');
+  const trace = serializeClientCascade(cascadeResult);
   const { error: insertErr } = await supabase.from('identifications').insert({
     observation_id: observationId,
     scientific_name: correctedName,
     confidence: r.confidence,
     source: r.source,
-    raw_response: r.raw as object,
+    raw_response: trace as unknown as object,
     is_primary: true,
   });
 
