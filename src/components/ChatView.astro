@@ -753,7 +753,7 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
   });
 
   // ── Cascade helpers ──
-  async function runAttachmentCascade(att: ChatAttachment): Promise<{
+  async function runAttachmentCascade(att: ChatAttachment, currentTurnText: string): Promise<{
     best: CascadeCandidate | null;
     alternates: CascadeCandidate[];
   }> {
@@ -764,7 +764,11 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
     // Phi-vision exclusion — Phi is surfaced via the slower "looking
     // more carefully" step below, not the primary pass.
     const { buildCascadeOptions } = await import('../lib/identify-options');
-    const opts = await buildCascadeOptions({ mediaKind });
+    // #593: derive user_hint from conversation context (current turn
+    // keywords + propagated kingdom from prior winning IDs).
+    const { deriveHintFromConversation } = await import('../lib/chat-hint');
+    const userHint = deriveHintFromConversation(currentTurnText, conversation);
+    const opts = await buildCascadeOptions({ mediaKind, userHint });
     const result = await runCascade(
       {
         media: { kind: 'blob', blob: att.blob, mime: att.mimeType },
@@ -944,7 +948,7 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
       const placeholderIdx = conversation.length - 1;
 
       try {
-        const { best, alternates } = await runAttachmentCascade(att);
+        const { best, alternates } = await runAttachmentCascade(att, text);
         const ACCEPT_LOW = 0.4;
         const cascadeOk = !!best && best.confidence >= ACCEPT_LOW;
 
