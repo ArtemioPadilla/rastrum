@@ -226,32 +226,50 @@ export async function wireManagePanelDetails(
       );
 
       await Promise.race([timeout, (async () => {
-        const { error: obsErr } = await supabase
+        // Ensure the session JWT is fresh before mutating. A stale
+        // auth.uid() causes RLS to silently filter every UPDATE to 0
+        // rows, making the save appear to do nothing (#445).
+        const { data: { user: viewer } } = await supabase.auth.getUser();
+        if (!viewer) {
+          throw new Error(
+            lang === 'es'
+              ? 'Sesión expirada. Vuelve a iniciar sesión para guardar cambios.'
+              : 'Session expired. Sign in again to save changes.',
+          );
+        }
+
+        // Use .select() so PostgREST returns the matched rows. If RLS
+        // filters the owner out (stale JWT edge-case), data will be an
+        // empty array and we surface a clear error instead of silently
+        // succeeding with 0 rows updated.
+        const { data: obsRows, error: obsErr } = await supabase
           .from('observations')
           .update(payload)
-          .eq('id', obsId);
+          .eq('id', obsId)
+          .select('id');
         if (obsErr) throw obsErr;
+        if (!obsRows || obsRows.length === 0) {
+          throw new Error(
+            lang === 'es'
+              ? 'No se pudo actualizar la observación. Verifica que sigues siendo el propietario e intenta de nuevo.'
+              : 'Could not update observation. Verify you are still the owner and try again.',
+          );
+        }
 
         const sci = sciInput?.value.trim();
         if (sci) {
           // Apply taxonomy synonym correction for known outdated names (#345)
           const correctedSci = correctIdentificationName(sci);
-          // Demote the current primary identification. Capture the error -
-          // if RLS rejects this (stale session, wrong owner), we must not
-          // proceed to the insert or the unique partial index will reject it.
+          // Demote the current primary identification. When no prior
+          // primary exists (e.g. brand-new observation that never went
+          // through the identify cascade), the UPDATE simply matches 0
+          // rows — this is expected and not an error (#445).
           const { error: demoteErr } = await supabase.from('identifications')
             .update({ is_primary: false })
             .eq('observation_id', obsId)
             .eq('is_primary', true);
+          // Only throw on actual RLS / network errors, not on 0-row matches.
           if (demoteErr) throw demoteErr;
-
-          let viewerId: string | null = null;
-          try {
-            const { data: { user: viewer } } = await supabase.auth.getUser();
-            viewerId = viewer?.id ?? null;
-          } catch {
-            // Auth fetch failed - proceed without viewer ID rather than hang
-          }
 
           const { error: idErr } = await supabase.from('identifications').insert({
             observation_id: obsId,
@@ -261,7 +279,7 @@ export async function wireManagePanelDetails(
             is_primary: true,
             validated_by: null,
             validated_at: new Date().toISOString(),
-            raw_response: { manual_override: true, by: viewerId },
+            raw_response: { manual_override: true, by: viewer.id },
           });
           if (idErr) throw idErr;
         }
@@ -283,7 +301,14 @@ export async function wireManagePanelDetails(
       }));
     } catch (err) {
       if (errEl) {
-        errEl.textContent = err instanceof Error ? err.message : String(err);
+        // PostgrestError is a plain object (not an Error instance), so
+        // String(err) produces "[object Object]". Extract .message first.
+        const msg = err instanceof Error
+          ? err.message
+          : (typeof err === 'object' && err !== null && 'message' in err)
+            ? String((err as { message: unknown }).message)
+            : String(err);
+        errEl.textContent = msg;
         errEl.classList.remove('hidden');
       }
     } finally {
@@ -307,7 +332,12 @@ export async function wireManagePanelDetails(
       window.location.href = `/${lang}/${lang === 'es' ? 'perfil/observaciones' : 'profile/observations'}/`;
     } catch (err) {
       if (errEl) {
-        errEl.textContent = err instanceof Error ? err.message : String(err);
+        const msg = err instanceof Error
+          ? err.message
+          : (typeof err === 'object' && err !== null && 'message' in err)
+            ? String((err as { message: unknown }).message)
+            : String(err);
+        errEl.textContent = msg;
         errEl.classList.remove('hidden');
       }
       deleteBtn.disabled = false;
