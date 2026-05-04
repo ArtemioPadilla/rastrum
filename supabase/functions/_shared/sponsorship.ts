@@ -73,14 +73,13 @@ export async function resolveSponsorship(
 export async function decryptCredential(
   supabase: SupabaseClient, vaultSecretId: string
 ): Promise<string> {
-  const { data, error } = await supabase
-    .schema('vault' as never)
-    .from('decrypted_secrets')
-    .select('decrypted_secret')
-    .eq('id', vaultSecretId)
-    .single();
+  // Direct `.schema('vault').from('decrypted_secrets')` access fails
+  // with "Invalid schema: vault" — the vault schema isn't in the API
+  // exposed-schemas list (and surfacing it would over-expose raw
+  // secret rows). Route through the SECURITY DEFINER RPC instead.
+  const { data, error } = await supabase.rpc('read_vault_secret', { p_secret_id: vaultSecretId });
   if (error) throw new Error(`vault decrypt failed: ${error.message}`);
-  const secret = (data as { decrypted_secret?: string } | null)?.decrypted_secret;
+  const secret = data as string | null;
   if (!secret) throw new Error('vault returned empty secret');
   return secret;
 }
