@@ -228,6 +228,30 @@ const lang: 'en' | 'es' = 'en';
             .eq('source', 'birdnet_lite')
             .maybeSingle();
 
+          // #584: hydrate the CascadeTrace component from any primary
+          // identification's raw_response. Best-effort — the panel hides
+          // itself when no trace data is available.
+          try {
+            const { data: anyId } = await supabase
+              .from('identifications')
+              .select('source, scientific_name, confidence, raw_response')
+              .eq('observation_id', id)
+              .eq('is_primary', true)
+              .maybeSingle();
+            if (anyId) {
+              const { fromIdentificationRow } = await import('../../../lib/cascade-trace');
+              const trace = fromIdentificationRow(anyId as { source: string; scientific_name: string; confidence: number; raw_response: unknown });
+              if (trace) {
+                const win = window as unknown as { __rastrumCascadeTrace?: Record<string, unknown> };
+                win.__rastrumCascadeTrace = win.__rastrumCascadeTrace ?? {};
+                win.__rastrumCascadeTrace['obs-cascade'] = trace;
+                document.dispatchEvent(new CustomEvent('rastrum:cascade-trace-ready', { detail: { traceId: 'obs-cascade' } }));
+              }
+            }
+          } catch (err) {
+            console.warn('[rastrum] cascade-trace hydration failed', err);
+          }
+
           if (ident?.raw_response) {
             type RawResponse = {
               segments?: Array<{ startSec: number; endSec: number; top: Array<{ scientific_name: string; common_name_en: string | null; score: number }> }>;

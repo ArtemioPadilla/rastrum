@@ -1,0 +1,206 @@
+---
+/**
+ * CascadeTrace.astro — visualises the AI cascade decision tree (#584).
+ *
+ * Two render modes:
+ *   - inline (default): vertical timeline, full detail. Used in /share/obs/.
+ *   - compact: single-row summary with optional expand. Used in chat / lists.
+ *
+ * Data is provided via the `data-cascade-trace` attribute on the wrapper
+ * element OR by setting `window.__rastrumCascadeTrace[id] = data` and
+ * dispatching `rastrum:cascade-trace-ready`. Adapters in
+ * src/lib/cascade-trace.ts produce the CascadeTraceData shape.
+ */
+
+interface Props {
+  lang: 'en' | 'es';
+  variant?: 'inline' | 'compact';
+  /** Stable id used to scope the trace data on the page (so multiple
+   *  CascadeTrace instances don't collide). */
+  traceId: string;
+  /** When true, renders the wrapper hidden until trace data is set. */
+  hideUntilReady?: boolean;
+}
+
+const { lang, variant = 'inline', traceId, hideUntilReady = true } = Astro.props;
+const isEs = lang === 'es';
+
+const labels = {
+  title:    isEs ? 'Trazo del cascade' : 'Cascade trace',
+  noData:   isEs ? 'Sin datos del cascade.' : 'No cascade data.',
+  threshold:isEs ? 'umbral aceptación' : 'accept threshold',
+  acceptedShort: isEs ? 'Aceptado' : 'Accepted',
+  rejectedShort: isEs ? 'Por debajo del umbral' : 'Below threshold',
+  skippedShort:  isEs ? 'No elegible' : 'Not eligible',
+  failedShort:   isEs ? 'Falló'  : 'Failed',
+  abortedShort:  isEs ? 'Cancelado' : 'Aborted',
+  notRunShort:   isEs ? 'No ejecutado' : 'Not run',
+  expand:   isEs ? 'Detalles' : 'Details',
+  hide:     isEs ? 'Ocultar' : 'Hide',
+};
+---
+
+<div
+  class:list={['cascade-trace', `cascade-trace--${variant}`, hideUntilReady ? 'hidden' : '']}
+  data-cascade-trace
+  data-trace-id={traceId}
+  data-variant={variant}
+  data-lang={lang}
+  data-label-accepted={labels.acceptedShort}
+  data-label-rejected={labels.rejectedShort}
+  data-label-skipped={labels.skippedShort}
+  data-label-failed={labels.failedShort}
+  data-label-aborted={labels.abortedShort}
+  data-label-not-run={labels.notRunShort}
+  data-label-threshold={labels.threshold}
+  data-label-expand={labels.expand}
+  data-label-hide={labels.hide}
+>
+  {variant === 'inline' && (
+    <h3 class="text-xs uppercase tracking-wider font-semibold text-zinc-600 dark:text-zinc-400 mb-2">
+      {labels.title}
+    </h3>
+  )}
+  <div class="cascade-trace-body" data-cascade-trace-body>
+    <p class="text-xs italic text-zinc-500" data-cascade-trace-empty>{labels.noData}</p>
+  </div>
+</div>
+
+<style>
+  .cascade-trace--inline {
+    @apply rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-3 space-y-2;
+  }
+  .cascade-trace--compact {
+    @apply text-xs;
+  }
+  .ct-row {
+    @apply flex items-center gap-2 text-xs py-1;
+  }
+  .ct-row .ct-icon {
+    @apply inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] flex-shrink-0;
+  }
+  .ct-row.ct-accepted .ct-icon { @apply bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300; }
+  .ct-row.ct-rejected .ct-icon { @apply bg-amber-100   text-amber-700   dark:bg-amber-900/40   dark:text-amber-300; }
+  .ct-row.ct-failed   .ct-icon { @apply bg-red-100     text-red-700     dark:bg-red-900/40     dark:text-red-300; }
+  .ct-row.ct-skipped  .ct-icon { @apply bg-zinc-100    text-zinc-500    dark:bg-zinc-800       dark:text-zinc-400; }
+  .ct-row.ct-aborted  .ct-icon { @apply bg-indigo-100  text-indigo-700  dark:bg-indigo-900/40  dark:text-indigo-300; }
+  .ct-row.ct-not_run  .ct-icon { @apply bg-zinc-100    text-zinc-400    dark:bg-zinc-800       dark:text-zinc-500; }
+  .ct-bar { @apply flex-1 h-1.5 rounded bg-zinc-100 dark:bg-zinc-800 overflow-hidden; }
+  .ct-bar > span { @apply block h-full; }
+  .ct-row.ct-accepted .ct-bar > span { @apply bg-emerald-500; }
+  .ct-row.ct-rejected .ct-bar > span { @apply bg-amber-500; }
+  .ct-row.ct-failed   .ct-bar > span { @apply bg-red-400; }
+</style>
+
+<script>
+import { type CascadeTraceData, type CascadeAttemptUI } from '../lib/cascade-trace';
+
+declare global {
+  interface Window {
+    __rastrumCascadeTrace?: Record<string, CascadeTraceData>;
+  }
+}
+
+const ICONS: Record<string, string> = {
+  accepted: '✓',
+  rejected: '⚠',
+  failed:   '✗',
+  skipped:  '–',
+  aborted:  '⊘',
+  not_run:  '·',
+};
+
+function escapeHtml(s: string): string {
+  return s.replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]!));
+}
+
+function rowHtml(att: CascadeAttemptUI, dataset: DOMStringMap): string {
+  const labelMap: Record<string, string> = {
+    accepted: dataset.labelAccepted ?? 'Accepted',
+    rejected: dataset.labelRejected ?? 'Below threshold',
+    skipped:  dataset.labelSkipped  ?? 'Not eligible',
+    failed:   dataset.labelFailed   ?? 'Failed',
+    aborted:  dataset.labelAborted  ?? 'Aborted',
+    not_run:  dataset.labelNotRun   ?? 'Not run',
+  };
+  const stateLabel = labelMap[att.state] ?? att.state;
+  const conf = att.confidence != null ? Math.round(att.confidence * 100) : null;
+  const barWidth = conf != null ? Math.min(100, Math.max(0, conf)) : 0;
+  const reason = att.reason ? `<span class="text-zinc-500 dark:text-zinc-400 italic ml-2">— ${escapeHtml(att.reason)}</span>` : '';
+  const result = att.result?.scientific_name
+    ? `<span class="italic text-emerald-700 dark:text-emerald-400 ml-1">${escapeHtml(att.result.scientific_name)}</span>`
+    : '';
+
+  return `
+    <div class="ct-row ct-${att.state}">
+      <span class="ct-icon" aria-hidden="true">${ICONS[att.state] ?? '·'}</span>
+      <span class="font-medium text-zinc-800 dark:text-zinc-200">
+        ${att.brand ? `<span aria-hidden="true">${escapeHtml(att.brand)}</span> ` : ''}${escapeHtml(att.display_name)}
+      </span>
+      <span class="text-zinc-500 dark:text-zinc-400 text-[10px] capitalize">${stateLabel}</span>
+      ${conf != null ? `
+        <div class="ct-bar"><span style="width: ${barWidth}%"></span></div>
+        <span class="text-zinc-500 tabular-nums w-10 text-right">${conf}%</span>
+      ` : '<span class="ct-bar"></span>'}
+      ${result}
+      ${reason}
+    </div>
+  `;
+}
+
+function compactSummary(data: CascadeTraceData): string {
+  const winner = data.attempts.find(a => a.state === 'accepted');
+  if (!winner) {
+    return `<span class="text-zinc-500">${data.attempts.map(a => `${a.brand ?? ''}${a.display_name}`).join(' → ')}</span>`;
+  }
+  const conf = winner.confidence != null ? ` ${Math.round(winner.confidence * 100)}%` : '';
+  return `<span class="text-emerald-700 dark:text-emerald-400 font-medium">${winner.brand ?? ''} ${winner.display_name}${conf}</span>`;
+}
+
+function render(el: HTMLElement, data: CascadeTraceData): void {
+  const body = el.querySelector('[data-cascade-trace-body]');
+  if (!body) return;
+  const variant = el.dataset.variant ?? 'inline';
+
+  if (variant === 'compact') {
+    body.innerHTML = compactSummary(data);
+    el.classList.remove('hidden');
+    return;
+  }
+
+  const rows = data.attempts.map(a => rowHtml(a, el.dataset)).join('');
+  const thresholdHint = `<p class="text-[10px] text-zinc-400 dark:text-zinc-500 mt-2">${el.dataset.labelThreshold ?? 'accept threshold'}: ${Math.round(data.threshold * 100)}%</p>`;
+  body.innerHTML = rows + thresholdHint;
+  el.classList.remove('hidden');
+}
+
+function hydrate(el: HTMLElement): void {
+  const id = el.dataset.traceId;
+  if (!id) return;
+  const data = window.__rastrumCascadeTrace?.[id];
+  if (!data) return;
+  render(el, data);
+}
+
+function init(): void {
+  for (const el of Array.from(document.querySelectorAll<HTMLElement>('[data-cascade-trace]'))) {
+    hydrate(el);
+  }
+}
+
+document.addEventListener('rastrum:cascade-trace-ready', (e: Event) => {
+  const ev = e as CustomEvent<{ traceId?: string }>;
+  if (ev.detail?.traceId) {
+    const el = document.querySelector<HTMLElement>(`[data-cascade-trace][data-trace-id="${ev.detail.traceId}"]`);
+    if (el) hydrate(el);
+  } else {
+    init();
+  }
+});
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+</script>
