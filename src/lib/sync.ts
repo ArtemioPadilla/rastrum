@@ -269,32 +269,13 @@ async function triggerEnvEnrichment(observationId: string): Promise<void> {
   });
 }
 
-const LOCAL_AI_OPTIN = 'rastrum.localAiOptIn';
-const LOCAL_AI_DOWNLOAD_WARNED = 'rastrum.localAiDownloadWarned';
-
-/**
- * WebLLM is ON by default (issue #12 — privacy-first, offline-capable).
- * Users can opt OUT in profile settings if bandwidth is a concern.
- * On first use, a download warning is shown (see ObservationForm).
- */
-function isLocalAIEnabled(): boolean {
-  if (typeof localStorage === 'undefined') return true; // SSR: default on
-  // Legacy opt-in key still respected for users who explicitly enabled it
-  if (localStorage.getItem(LOCAL_AI_OPTIN) === 'true') return true;
-  // New default: on unless user explicitly opted out
-  return localStorage.getItem(LOCAL_AI_OPTIN) !== 'false';
-}
-
-export function hasShownLocalAIDownloadWarning(): boolean {
-  if (typeof localStorage === 'undefined') return false;
-  return localStorage.getItem(LOCAL_AI_DOWNLOAD_WARNED) === 'true';
-}
-
-export function markLocalAIDownloadWarningShown(): void {
-  if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(LOCAL_AI_DOWNLOAD_WARNED, 'true');
-  }
-}
+// Local-AI prefs extracted to ./local-ai-prefs.ts (#583). Re-exported for
+// backwards compat with consumers (ObservationForm) importing from sync.ts.
+export {
+  isLocalAIEnabled,
+  hasShownLocalAIDownloadWarning,
+  markLocalAIDownloadWarningShown,
+} from './local-ai-prefs';
 
 /**
  * Run the identifier cascade against the freshly-synced observation.
@@ -333,33 +314,9 @@ async function triggerIdentify(observationId: string): Promise<void> {
   const { bootstrapIdentifiers, runCascade } = await import('./identifiers');
   bootstrapIdentifiers();
 
-  // WebLLM (Phi-3.5-vision) is ON by default — local, private, no key needed.
-  // Exclude it only if user explicitly opted out (bandwidth concern).
-  // Claude is excluded when no BYO key is set — avoids silent crashes.
-  const { getKey } = await import('./byo-keys');
-  const hasAnthropicKey = !!getKey('claude_haiku', 'anthropic');
-  const localAIEnabled = isLocalAIEnabled();
-
-  const excluded: string[] = [];
-  // Large models (Phi-3.5 2.4 GB, BirdNET ~50 MB) gate on localAIEnabled.
-  // EfficientNet-Lite0 is only ~2.8 MB — run it whenever it's downloaded,
-  // regardless of the localAI bandwidth toggle.
-  if (!localAIEnabled) excluded.push('webllm_phi35_vision', 'birdnet_lite');
-  const { getOnnxBaseCacheStatus, getOnnxBaseWeightsBaseUrl } = await (await import('./identifiers/onnx-base-cache'));
-  const efficientNetCached = getOnnxBaseWeightsBaseUrl()
-    ? await getOnnxBaseCacheStatus().then(s => s.modelCached && s.labelsCached).catch(() => false)
-    : false;
-  if (!efficientNetCached) excluded.push('onnx_efficientnet_lite0');
-  if (!hasAnthropicKey) excluded.push('claude_haiku');
-
-  // Camera-trap photos prefer the MegaDetector + SpeciesNet pipeline.
-  // When PUBLIC_MEGADETECTOR_ENDPOINT is unset the plugin reports
-  // model_not_bundled and the cascade transparently falls through to
-  // the standard cost-sorted race (PlantNet ∥ Claude ∥ on-device).
-  const preferred: string[] = [];
-  if (mediaKind === 'photo' && evidenceType === 'camera_trap') {
-    preferred.push('camera_trap_megadetector');
-  }
+  // Single source of truth for cascade options — see src/lib/identify-options.ts.
+  const { buildCascadeOptions } = await import('./identify-options');
+  const opts = await buildCascadeOptions({ mediaKind, evidenceType });
 
   // Plugins read their own keys from byo-keys.ts at identify-time, so we
   // don't pre-collect them here. Pass an empty byo_keys object as a default.
@@ -373,9 +330,7 @@ async function triggerIdentify(observationId: string): Promise<void> {
     },
     {
       media: mediaKind,
-      taxa: mediaKind === 'audio' ? 'Animalia.Aves' : undefined,
-      excluded,
-      preferred,
+      ...opts,
     },
   );
 

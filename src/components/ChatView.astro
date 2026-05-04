@@ -760,6 +760,11 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
     const { bootstrapIdentifiers, runCascade } = await import('../lib/identifiers');
     bootstrapIdentifiers();
     const mediaKind = att.kind === 'photo' ? 'photo' : 'audio';
+    // Unified cascade options helper (#583); chat keeps its explicit
+    // Phi-vision exclusion — Phi is surfaced via the slower "looking
+    // more carefully" step below, not the primary pass.
+    const { buildCascadeOptions } = await import('../lib/identify-options');
+    const opts = await buildCascadeOptions({ mediaKind });
     const result = await runCascade(
       {
         media: { kind: 'blob', blob: att.blob, mime: att.mimeType },
@@ -768,11 +773,8 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
       },
       {
         media: mediaKind,
-        taxa: mediaKind === 'audio' ? 'Animalia.Aves' : undefined,
-        // Phi-vision is the slow expensive fallback — exclude it from the
-        // primary cascade pass; we surface it explicitly via the "looking
-        // more carefully" step below if the cascade returns nothing.
-        excluded: ['webllm_phi35_vision'],
+        ...opts,
+        excluded: [...opts.excluded, 'webllm_phi35_vision'],
       },
     );
     const best = result.best ? toCandidate(result.best) : null;

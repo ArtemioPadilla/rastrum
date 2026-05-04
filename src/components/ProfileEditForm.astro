@@ -1287,22 +1287,9 @@ const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } })
 
   refreshPmtiles().catch(() => {});
 
-  // ── Pipeline disabled list (persisted in localStorage) ──
-  const DISABLED_KEY = 'rastrum.pipeline.disabled';
-  function getDisabledPlugins(): string[] {
-    try {
-      return JSON.parse(localStorage.getItem(DISABLED_KEY) ?? '[]');
-    } catch { return []; }
-  }
-  function setDisabledPlugins(ids: string[]): void {
-    try { localStorage.setItem(DISABLED_KEY, JSON.stringify(ids)); } catch { /* ignore */ }
-  }
-  function togglePluginDisabled(id: string): void {
-    const list = getDisabledPlugins();
-    const idx = list.indexOf(id);
-    if (idx >= 0) list.splice(idx, 1); else list.push(id);
-    setDisabledPlugins(list);
-  }
+  // Pipeline disabled list — extracted to src/lib/identifier-prefs.ts (#583)
+  // so every cascade call site honors the toggle uniformly.
+  const { getDisabledPlugins, togglePluginDisabled } = await import('../lib/identifier-prefs');
 
   function updatePipelineFlow(plugins: Array<{ id: string; name: string; brand?: string }>) {
     const flowItems = document.getElementById('pipeline-flow-items');
