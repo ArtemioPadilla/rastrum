@@ -45,6 +45,11 @@ const labels = {
   communityIds:      v.community_ids,
   noSuggestions:     v.no_suggestions,
   suggestBtn:        v.suggest_btn,
+  askAiBtn:          v.ask_ai_btn,
+  askAiRunning:      v.ask_ai_running,
+  askAiNoPhoto:      v.ask_ai_no_photo,
+  askAiNoResult:     v.ask_ai_no_result,
+  askAiSubmit:       v.ask_ai_submit,
   signInToSuggest:   v.signin_to_suggest,
   ownerNote:         v.owner_note,
   editLocation:      tr.obs_detail.edit_location,
@@ -179,6 +184,25 @@ const labels = {
             <button id="ci-suggest-btn" type="button" class="hidden rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 text-xs font-semibold text-white">
               {labels.suggestBtn}
             </button>
+            <button
+              id="ci-ask-ai-btn"
+              type="button"
+              class="hidden rounded-lg border border-emerald-600/60 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+              data-label-running={labels.askAiRunning}
+              data-label-idle={labels.askAiBtn}
+              data-label-no-photo={labels.askAiNoPhoto}
+              data-label-no-result={labels.askAiNoResult}
+              data-label-submit={labels.askAiSubmit}
+            >
+              {labels.askAiBtn}
+            </button>
+            <div id="ci-ai-result" class="hidden w-full mt-2 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 p-3 text-sm space-y-2">
+              <p id="ci-ai-result-text" class="font-medium italic text-emerald-700 dark:text-emerald-400"></p>
+              <p id="ci-ai-result-meta" class="text-xs text-zinc-500 dark:text-zinc-400"></p>
+              <button id="ci-ai-submit-btn" type="button" class="hidden rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 text-xs font-semibold text-white">
+                {labels.askAiSubmit}
+              </button>
+            </div>
             <a id="ci-signin-link" href="/en/sign-in/" class="hidden rounded-lg border border-emerald-600/60 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20">
               {labels.signInToSuggest}
             </a>
