@@ -11,7 +11,16 @@
 // ── Types ──────────────────────────────────────────────────────────────────
 
 export type FileKind = 'photo' | 'audio' | 'video' | 'unknown';
-export type NodeState = 'pending' | 'running' | 'done' | 'failed' | 'skipped';
+/**
+ * #592: extended states surface real cascade outcomes:
+ *   running   — plugin in flight
+ *   done      — accepted (confidence ≥ ACCEPT_THRESHOLD)
+ *   rejected  — ran but below threshold; cascade continued
+ *   failed    — threw an unrecognised error
+ *   aborted   — cancelled mid-flight (e.g. higher-priority winner)
+ *   skipped   — not eligible (no key, no download, etc.)
+ */
+export type NodeState = 'pending' | 'running' | 'done' | 'failed' | 'skipped' | 'rejected' | 'aborted';
 export type NodeKind = 'input' | 'identify' | 'merge' | 'location' | 'save';
 
 export interface PipelineResult {
@@ -254,4 +263,93 @@ export async function clearPipelineState(id: string): Promise<void> {
       tx.onerror = () => reject(tx.error);
     });
   } catch { /* ignore */ }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// #592 — startCascadeWithGraph: bridges runCascade's live onAttempt events
+// to PipelineGraph nodes, so the identify column reflects the real cascade
+// decision tree instead of pickRunner's hardcoded one-runner-per-file
+// approximation.
+//
+// Each onAttempt event creates or updates a node id `identify-${fileId}-${pluginId}`
+// and dispatches `rastrum:pipeline-update` with the full node array so
+// PipelineGraph re-renders.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import type { CascadeAttemptEvent } from './identifiers/cascade';
+import type { IdentifyInput } from './identifiers/types';
+import type { CascadeOptions } from './identifiers/cascade';
+
+export interface CascadeWithGraphInput {
+  fileId: string;
+  input: IdentifyInput;
+  options: Omit<CascadeOptions, 'onAttempt'>;
+  baseNodes: PipelineNode[];
+}
+
+function attemptStateToNodeState(state: CascadeAttemptEvent['state']): NodeState {
+  switch (state) {
+    case 'starting':  return 'running';
+    case 'accepted':  return 'done';
+    case 'rejected':  return 'rejected';
+    case 'failed':    return 'failed';
+    case 'skipped':   return 'skipped';
+    case 'filtered':  return 'aborted';
+  }
+}
+
+export async function startCascadeWithGraph(
+  args: CascadeWithGraphInput,
+): Promise<{ best: PipelineResult | null; nodes: PipelineNode[] }> {
+  const { runCascade } = await import('./identifiers');
+  const cascadeNodes = new Map<string, PipelineNode>();
+
+  function emit(): void {
+    if (typeof document === 'undefined') return;
+    const all = [...args.baseNodes, ...cascadeNodes.values()];
+    document.dispatchEvent(new CustomEvent('rastrum:pipeline-update', { detail: { nodes: all } }));
+  }
+
+  const result = await runCascade(args.input, {
+    ...args.options,
+    onAttempt: (ev) => {
+      const id = `identify-${args.fileId}-${ev.id}`;
+      const existing = cascadeNodes.get(id);
+      const node: PipelineNode = existing ?? {
+        id,
+        label: ev.id,
+        kind: 'identify',
+        state: 'pending',
+        fileId: args.fileId,
+        runner: ev.id,
+        dependsOn: [`input-${args.fileId}`],
+      };
+      node.state = attemptStateToNodeState(ev.state);
+      if (ev.state === 'starting') node.startedAt = Date.now();
+      else if (ev.state === 'accepted' || ev.state === 'rejected' || ev.state === 'failed' || ev.state === 'filtered') {
+        node.completedAt = Date.now();
+      }
+      if (ev.result) {
+        node.output = {
+          scientific_name: ev.result.scientific_name,
+          common_name_en: ev.result.common_name_en,
+          confidence: ev.result.confidence,
+          source: ev.result.source,
+        };
+      }
+      if (ev.error) node.error = ev.error;
+      if (ev.reason) node.error = node.error ?? ev.reason;
+      cascadeNodes.set(id, node);
+      emit();
+    },
+  });
+
+  const best = result.best ? {
+    scientific_name: result.best.scientific_name,
+    common_name_en: result.best.common_name_en,
+    confidence: result.best.confidence,
+    source: result.best.source,
+  } : null;
+
+  return { best, nodes: [...args.baseNodes, ...cascadeNodes.values()] };
 }

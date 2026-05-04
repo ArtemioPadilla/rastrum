@@ -68,12 +68,16 @@ const tooltip = document.getElementById('pg-tooltip');
 const emptyMsg = document.getElementById('pg-empty-msg');
 
 // Color palette (dark-mode safe via CSS vars via hardcoded safe values)
-const COLORS = {
-  pending:  { fill: '#d4d4d8', stroke: '#a1a1aa', text: '#71717a' },  // zinc-300/400/500
-  running:  { fill: '#93c5fd', stroke: '#3b82f6', text: '#1d4ed8' },  // blue
-  done:     { fill: '#6ee7b7', stroke: '#10b981', text: '#065f46' },  // emerald
-  failed:   { fill: '#fca5a5', stroke: '#ef4444', text: '#991b1b' },  // red
-  skipped:  { fill: '#e4e4e7', stroke: '#d4d4d8', text: '#a1a1aa' },  // dim zinc
+const COLORS: Record<string, { fill: string; stroke: string; text: string }> = {
+  pending:  { fill: '#d4d4d8', stroke: '#a1a1aa', text: '#71717a' },
+  running:  { fill: '#93c5fd', stroke: '#3b82f6', text: '#1d4ed8' },
+  done:     { fill: '#6ee7b7', stroke: '#10b981', text: '#065f46' },
+  failed:   { fill: '#fca5a5', stroke: '#ef4444', text: '#991b1b' },
+  skipped:  { fill: '#e4e4e7', stroke: '#d4d4d8', text: '#a1a1aa' },
+  // #592: ran but below ACCEPT_THRESHOLD; cascade continued
+  rejected: { fill: '#fde68a', stroke: '#f59e0b', text: '#92400e' },
+  // #592: cancelled mid-flight (FilteredFrameError, race lost)
+  aborted:  { fill: '#e0e7ff', stroke: '#6366f1', text: '#3730a3' },
 };
 
 interface LayoutNode {
@@ -218,10 +222,12 @@ function renderGraph(nodes: PipelineNode[]) {
 }
 
 function stateIcon(state: string): string {
-  if (state === 'done')    return '✓';
-  if (state === 'failed')  return '✗';
-  if (state === 'running') return '⟳';
-  if (state === 'skipped') return '–';
+  if (state === 'done')     return '✓';
+  if (state === 'failed')   return '✗';
+  if (state === 'running')  return '⟳';
+  if (state === 'skipped')  return '–';
+  if (state === 'rejected') return '⚠';
+  if (state === 'aborted')  return '⊘';
   return '';
 }
 
