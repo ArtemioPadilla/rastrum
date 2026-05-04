@@ -79,17 +79,19 @@ export interface CascadeResult {
   filtered?: { source: string; label: 'empty' | 'human' | 'vehicle'; raw?: unknown };
 }
 
-export async function runCascade(input: IdentifyInput, opts: CascadeOptions): Promise<CascadeResult> {
-  let candidates = registry.findFor({ media: opts.media, taxa: opts.taxa });
-  if (opts.excluded?.length) {
-    candidates = candidates.filter(c => !opts.excluded!.includes(c.id));
-  }
-
+/**
+ * Pure sort helper exposed for #594 — the AI tab's pipeline-flow chip
+ * strip uses this to show the real cascade order with license badges.
+ */
+export function sortForCascade<T extends { id: string; capabilities: { license: string; confidence_ceiling?: number } }>(
+  candidates: T[],
+  opts: { preferred?: string[] },
+): T[] {
   const preferIdx = (id: string) => opts.preferred?.indexOf(id) ?? -1;
-  candidates.sort((a, b) => {
+  const sorted = [...candidates];
+  sorted.sort((a, b) => {
     const pa = preferIdx(a.id), pb = preferIdx(b.id);
     if (pa !== -1 || pb !== -1) {
-      // preferred items first, in declared order
       if (pa === -1) return 1;
       if (pb === -1) return -1;
       return pa - pb;
@@ -101,6 +103,16 @@ export async function runCascade(input: IdentifyInput, opts: CascadeOptions): Pr
     const kb = b.capabilities.confidence_ceiling ?? 1;
     return kb - ka;
   });
+  return sorted;
+}
+
+export async function runCascade(input: IdentifyInput, opts: CascadeOptions): Promise<CascadeResult> {
+  let candidates = registry.findFor({ media: opts.media, taxa: opts.taxa });
+  if (opts.excluded?.length) {
+    candidates = candidates.filter(c => !opts.excluded!.includes(c.id));
+  }
+
+  candidates = sortForCascade(candidates, { preferred: opts.preferred });
 
   const attempts: CascadeResult['attempts'] = [];
   let best: IDResult | null = null;

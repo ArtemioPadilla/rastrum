@@ -1400,7 +1400,13 @@ const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } })
   // so every cascade call site honors the toggle uniformly.
   const { getDisabledPlugins, togglePluginDisabled } = await import('../lib/identifier-prefs');
 
-  function updatePipelineFlow(plugins: Array<{ id: string; name: string; brand?: string }>) {
+  /**
+   * #594: render the pipeline-flow chip strip using the REAL cascade sort
+   * (license-cost ascending, confidence_ceiling tiebreaker), not registration
+   * order. Two flows shown — one for photo, one for audio — since the sort
+   * differs per media type.
+   */
+  async function updatePipelineFlow(plugins: Array<{ id: string; name: string; brand?: string; capabilities: { media: string[]; license: string; confidence_ceiling?: number } }>) {
     const flowItems = document.getElementById('pipeline-flow-items');
     if (!flowItems) return;
     const disabled = getDisabledPlugins();
@@ -1409,11 +1415,31 @@ const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } })
       flowItems.textContent = isEsLang ? 'Ninguno activo' : 'None active';
       return;
     }
-    const arrow = isEsLang ? ' → ' : ' → ';
-    flowItems.innerHTML = active.map(p => {
-      const label = (p.brand ? p.brand + ' ' : '') + p.name;
-      return `<span class="inline-flex items-center gap-0.5 rounded bg-emerald-50 dark:bg-emerald-900/20 px-1.5 py-0.5 text-emerald-700 dark:text-emerald-400 font-medium">${label}</span>`;
-    }).join(`<span class="text-zinc-400">${arrow}</span>`);
+    const { sortForCascade } = await import('../lib/identifiers/cascade');
+    const arrow = ' → ';
+    const licenseBadge = (l: string): string => {
+      const map: Record<string, string> = {
+        'free':       isEsLang ? 'gratis'   : 'free',
+        'free-nc':    isEsLang ? 'no com.'  : 'free-nc',
+        'free-quota': isEsLang ? 'cuota'    : 'quota',
+        'byo-key':    isEsLang ? 'tu key'   : 'BYO',
+        'paid':       isEsLang ? 'pago'     : 'paid',
+      };
+      return map[l] ?? l;
+    };
+    const renderRow = (sortKey: 'photo' | 'audio'): string => {
+      const matching = active.filter(p => p.capabilities.media.includes(sortKey));
+      if (!matching.length) return '';
+      const sorted = sortForCascade(matching, {});
+      const chips = sorted.map(p => {
+        const label = (p.brand ? p.brand + ' ' : '') + p.name;
+        const badge = `<small class="text-emerald-600 dark:text-emerald-500 ml-1 text-[9px] uppercase tracking-wide">${licenseBadge(p.capabilities.license)}</small>`;
+        return `<span class="inline-flex items-center gap-0.5 rounded bg-emerald-50 dark:bg-emerald-900/20 px-1.5 py-0.5 text-emerald-700 dark:text-emerald-400 font-medium">${label}${badge}</span>`;
+      }).join(`<span class="text-zinc-400">${arrow}</span>`);
+      const icon = sortKey === 'photo' ? '📷' : '🔊';
+      return `<div class="flex items-center gap-1.5 flex-wrap"><span class="text-zinc-500 text-[10px]">${icon}</span>${chips}</div>`;
+    };
+    flowItems.innerHTML = `<div class="flex flex-col gap-1.5">${renderRow('photo')}${renderRow('audio')}</div>`;
   }
 
   // ── Identifier registry list (modular platform) with guided setup ──
@@ -1610,8 +1636,17 @@ const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } })
       });
     });
 
-    // Update pipeline flow visualization
-    updatePipelineFlow(plugins.map(p => ({ id: p.id, name: p.name, brand: p.brand })));
+    // Update pipeline flow visualization (#594 — real cascade order with license badges)
+    updatePipelineFlow(plugins.map(p => ({
+      id: p.id,
+      name: p.name,
+      brand: p.brand,
+      capabilities: {
+        media: p.capabilities.media,
+        license: p.capabilities.license,
+        confidence_ceiling: p.capabilities.confidence_ceiling,
+      },
+    })));
   }
   paintRegistry().catch(() => {});
 
