@@ -88,7 +88,7 @@ const lang: 'en' | 'es' = 'en';
         .from('observations')
         .select(`
           id, observed_at, obscure_level, state_province, habitat, weather, establishment_means, observer_id, notes,
-          last_material_edit_at, location, location_obscured,
+          last_material_edit_at, location, location_obscured, evidence_type,
           places:place_id(id, slug, name, place_type),
           identifications(scientific_name, is_primary, is_research_grade),
           users:observer_id(display_name, username, profile_public)
@@ -107,6 +107,13 @@ const lang: 'en' | 'es' = 'en';
       document.getElementById('obs')?.classList.remove('hidden');
       const speciesName = ident?.scientific_name ?? 'Unknown species';
       document.getElementById('species')!.textContent = speciesName;
+
+      // Expose evidence_type for the Ask-my-AI cascade so buildCascadeOptions
+      // can prefer MegaDetector for camera-trap photos (#583).
+      const askAiBtnInit = document.getElementById('ci-ask-ai-btn');
+      if (askAiBtnInit && obs.evidence_type) {
+        askAiBtnInit.dataset.evidenceType = obs.evidence_type as string;
+      }
 
       const shareBtn = document.getElementById('obs-share-btn');
       if (shareBtn) {
@@ -546,13 +553,17 @@ const lang: 'en' | 'es' = 'en';
               }
             }
 
+            const { buildCascadeOptions } = await import('../../../lib/identify-options');
+            const evidenceType = askAiBtn.dataset.evidenceType;
+            const opts = await buildCascadeOptions({ mediaKind: 'photo', evidenceType });
+
             const result = await runCascade(
               {
                 media: { kind: 'blob', blob, mime: blob.type || 'image/jpeg' },
                 mediaKind: 'photo',
                 byo_keys: byoKeys,
               },
-              { media: 'photo' },
+              { media: 'photo', ...opts },
             );
 
             if (result.best) {
