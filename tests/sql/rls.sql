@@ -77,10 +77,10 @@ BEGIN
     VALUES (gen_random_uuid(), uid_user, ARRAY['Animalia'], 'I study animals', 'pending')
   ON CONFLICT DO NOTHING;
 
-  -- Karma events for admin + user.
+  -- Karma events for admin. The user's observation_synced rows are
+  -- created by the AFTER INSERT trigger on observations seeded below.
   INSERT INTO public.karma_events (user_id, delta, reason)
-    VALUES (uid_admin, 5,  'consensus_win'),
-           (uid_user,  1,  'observation_synced');
+    VALUES (uid_admin, 5,  'consensus_win');
 
   -- Ban row for banned user.
   -- Schema columns: id, user_id, banned_by, reason, expires_at, revoked_at, ...
@@ -251,14 +251,20 @@ END $$;
 -- Plain user sees only their own karma events.
 SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000003';
 
--- Test 11 of 21: karma_events: user sees only their own row
+-- Test 11 of 21: karma_events: user sees only their own rows
 DO $$
 DECLARE
   cnt int;
+  foreign_cnt int;
 BEGIN
   SELECT count(*)::int INTO cnt FROM public.karma_events;
-  IF cnt IS DISTINCT FROM 1 THEN
-    RAISE EXCEPTION 'FAIL [Test 11 of 21: karma_events: user sees only their own row]: expected %, got %', 1, cnt;
+  IF cnt IS DISTINCT FROM 2 THEN
+    RAISE EXCEPTION 'FAIL [Test 11 of 21: karma_events: user sees only their own rows]: expected %, got %', 2, cnt;
+  END IF;
+  SELECT count(*)::int INTO foreign_cnt
+    FROM public.karma_events WHERE user_id <> '00000000-0000-0000-0000-000000000003'::uuid;
+  IF foreign_cnt IS DISTINCT FROM 0 THEN
+    RAISE EXCEPTION 'FAIL [Test 11 of 21: karma_events: user sees only their own rows]: foreign rows visible (count = %)', foreign_cnt;
   END IF;
 END $$;
 
