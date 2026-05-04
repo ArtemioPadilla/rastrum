@@ -4,7 +4,7 @@ Everything we have been asked enough times to write down. If your question is
 not here, [open an issue](https://github.com/ArtemioPadilla/rastrum/issues)
 and we'll add it.
 
-Last updated: 2026-04-25.
+Last updated: 2026-05-04.
 
 ---
 
@@ -39,6 +39,7 @@ you:
 - Sharing — others can see and comment on your observations.
 - Activity feed and badges.
 - API tokens for programmatic access.
+- Karma points for contributions to the community.
 
 A "convert guest to account" flow runs the first time you sign in: any local
 observations get attached to your new account.
@@ -102,6 +103,18 @@ as "low confidence" and don't promote the observation to research-grade.
 Above 0.4 it's still your job to look at the photo and decide whether the
 guess matches what you saw.
 
+### What's the new SpeciesNet on-device classifier?
+
+As of v1.2 (shipped 2026-05-04), Rastrum includes a distilled **SpeciesNet
+on-device animal classifier** (Module 18). It runs locally in the browser
+using ONNX Runtime Web — no network request, no API key required. It covers
+the most commonly observed vertebrates and expands the offline identification
+surface beyond BirdNET's audio-only scope.
+
+To activate it the first time, open `Profile → Edit → AI settings → Download
+SpeciesNet`. The download is ~120 MB. After that it runs on every new
+observation photo automatically.
+
 ### Can I correct an identification?
 
 Yes. On the observation form (or after the fact, on the observation detail
@@ -147,6 +160,107 @@ Likely causes:
 
 ---
 
+## Camera stations
+
+### What are camera stations?
+
+Camera stations (Module 31, shipped v1.2) let you register a physical
+camera trap deployment and attach your observations to it. Each station
+tracks:
+
+- Location and deployment period (start / end dates).
+- A sampling-effort record so diversity indices stay comparable across
+  different trap densities and durations.
+
+You set the station inside the observation form via the new **camera station
+selector**. Period management (creating, editing, and closing a deployment
+period) is available from `Profile → Camera stations`.
+
+### Can I bulk-import camera trap photos?
+
+Yes. `rastrum-import` (CLI, Module 30) ingests a folder of camera trap
+images, clusters them by EXIF timestamp, runs MegaDetector v5 + SpeciesNet
+(operator endpoint), and creates one observation per cluster. Run
+`rastrum-import --help` for usage.
+
+---
+
+## Explore and maps
+
+### What are species profile pages?
+
+Introduced in v1.2 (M34 Phase 1), each identified species now has its own
+page at `/en/explore/species/<slug>/`. The page shows:
+
+- Taxonomy and common names (EN + ES).
+- Distribution map built from community observations.
+- Reference media.
+- Observation history from the community.
+
+You can reach species pages by clicking any species name in the explore
+grid, on observation cards, or in identification results.
+
+### What are the interactive audio thumbnails?
+
+Observations with audio recordings now show a play button inline — on the
+explore map, profile grid, and species pages. Tap to preview the audio
+without opening the full observation detail. The player uses wavesurfer.js
+and never re-downloads the clip if it was already cached.
+
+### What are the clickable map pins?
+
+The explore map (`/explore/`) now shows thumbnail popup cards when you click
+a pin. Each popup includes the species name, date, observer username, and a
+small photo thumbnail. Click the card to go to the full observation.
+
+Sensitive observations (NOM-059 / CITES) still display with obscured
+coordinates; the popup shows a ± 10 km radius indicator instead of a precise
+pin.
+
+### What is the community heatmap?
+
+The community map (`/community/map/`) displays a heatmap of observer
+centroids (the geographic centre of each user's observations). It shows
+where community activity is concentrated — useful for coordinators
+planning outreach or new collection sites.
+
+Access requires being signed in. Coordinates are aggregated to the centroid
+level; individual observation locations are not exposed through this view.
+
+---
+
+## Karma and community
+
+### What is karma?
+
+Karma is a lightweight reputation score that reflects your contributions
+to the Rastrum community. Points accrue from:
+
+- Submitting observations.
+- Being the first person to record a species in Rastrum (`first_in_rastrum`
+  badge category).
+- Syncing observations after offline capture (`observation_synced` event).
+- Donating to AI sponsorship pools (see below).
+- Expert validations and community consensus confirmations.
+
+Your karma score appears on your public profile and on the community
+leaderboard (`/community/observers/`).
+
+### What are AI sponsorship pools?
+
+AI sponsorship pools (Module 27) let users share their Anthropic API
+credentials with other Rastrum users who don't have one. The pool owner
+sets a cost cap per 100 calls. Contributors donate to the pool; the
+platform draws from the pool when a non-keyed user requests identification.
+
+- Create or join a pool from `Profile → AI sponsorships`.
+- Donating to a pool earns karma points.
+- A per-pool donation page is available at `/community/donate/<pool>/`.
+- Cost transparency: the model picker shows cost-per-100-calls so pool
+  owners can make informed choices.
+
+---
+
 ## Privacy and data
 
 ### Where do my photos go?
@@ -163,8 +277,8 @@ identification:
   to Anthropic (only when you supply your own key). They are never sent to
   Anthropic by default.
 - **On-device models** (BirdNET, EfficientNet-Lite0, Phi-3.5-vision,
-  Llama-3.2-1B) never see the network for the data — only the one-time
-  download of the model itself.
+  Llama-3.2-1B, SpeciesNet) never see the network for the data — only the
+  one-time download of the model itself.
 
 See the [privacy page](/en/privacy/) for the full breakdown.
 
@@ -226,15 +340,28 @@ If you sign in *after* losing it, the unsynced records are gone.
 
 ---
 
+## Push notifications
+
+### How do I opt into streak reminders?
+
+Go to `Profile → Notifications` and enable **Streak reminders**. Rastrum
+will send a push notification when your observation streak is at risk (no
+observation logged today). You can opt out at any time from the same toggle.
+
+Push notifications require browser permission. If you previously denied it,
+you'll need to reset it from your browser settings.
+
+---
+
 ## Technical
 
 ### Where can I report bugs?
 
 Two places:
 
-- The **Report issue** button at the bottom-right of every page (it
-  pre-populates a GitHub issue with your locale, page, and basic device
-  info).
+- The **Report issue** button at the bottom-right of every page — including
+  `/console/*` admin and moderator dashboards — (it pre-populates a GitHub
+  issue with your locale, page, and basic device info).
 - Directly at <https://github.com/ArtemioPadilla/rastrum/issues>.
 
 For a more discussion-shaped question (feature requests, "how do I…"),
@@ -268,4 +395,4 @@ for diagnosis steps.
 Open an issue at <https://github.com/ArtemioPadilla/rastrum/issues> and we
 will reply (and add the answer here if it's a recurring question).
 
-Last updated: 2026-04-25.
+Last updated: 2026-05-04.
