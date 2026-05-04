@@ -43,6 +43,7 @@ export interface ObservationDraft {
   habitat?: HabitatType | null;
   weather?: WeatherTag | null;
   evidenceType?: EvidenceType;
+  cameraStationId?: string | null;
   license?: 'CC BY 4.0' | 'CC BY-NC 4.0' | 'CC0' | null;
   notes?: string | null;
   contentSensitive?: boolean;
@@ -87,6 +88,7 @@ export function buildObservation(draft: ObservationDraft): Observation {
     habitat:       draft.habitat       ?? null,
     weather:       draft.weather       ?? null,
     evidenceType:  draft.evidenceType  ?? 'direct_sighting',
+    cameraStationId: draft.cameraStationId ?? null,
     license:       draft.license       ?? null,
     contentSensitive: draft.contentSensitive ?? false,
     notes:         draft.notes         ?? null,

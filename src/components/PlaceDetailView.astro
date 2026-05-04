@@ -1,0 +1,339 @@
+---
+/**
+ * PlaceDetailView — client-hydrated place detail page.
+ * Reads slug from the last path segment.
+ * Pattern: same as ShareObsView / src/pages/share/obs/index.astro
+ */
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+---
+<div id="place-detail-root">
+  <!-- Loading state -->
+  <div id="place-loading" class="max-w-4xl mx-auto px-4 py-6 space-y-4 animate-pulse">
+    <!-- Skeleton header -->
+    <div class="h-5 w-24 rounded bg-zinc-200 dark:bg-zinc-700"></div>
+    <div class="h-8 w-2/3 rounded bg-zinc-200 dark:bg-zinc-700"></div>
+    <div class="h-4 w-1/3 rounded bg-zinc-200 dark:bg-zinc-700"></div>
+    <!-- Skeleton stats -->
+    <div class="flex gap-6 py-3 border-y border-zinc-100 dark:border-zinc-800">
+      <div class="h-4 w-20 rounded bg-zinc-200 dark:bg-zinc-700"></div>
+      <div class="h-4 w-20 rounded bg-zinc-200 dark:bg-zinc-700"></div>
+      <div class="h-4 w-20 rounded bg-zinc-200 dark:bg-zinc-700"></div>
+    </div>
+    <!-- Skeleton map -->
+    <div class="rounded-lg bg-zinc-200 dark:bg-zinc-700" style="height:min(50vh,360px)"></div>
+  </div>
+
+  <!-- Error state -->
+  <div id="place-error" class="hidden py-16 text-center">
+    <p class="text-zinc-500 text-lg" id="place-error-text">Place not found.</p>
+    <a href="javascript:history.back()" class="mt-4 inline-block text-sm text-emerald-600 hover:underline">← Go back</a>
+  </div>
+
+  <!-- Content (hidden until loaded) -->
+  <div id="place-content" class="hidden max-w-4xl mx-auto px-4 py-6 space-y-6">
+
+    <!-- Header -->
+    <div>
+      <div class="flex flex-wrap items-center gap-2 mb-1">
+        <span id="place-type-badge" class="text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300"></span>
+        <span id="place-source-badge" class="text-xs font-medium px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"></span>
+      </div>
+      <h1 id="place-name" class="text-2xl font-bold text-zinc-900 dark:text-zinc-100"></h1>
+      <p id="place-location-line" class="text-sm text-zinc-500 mt-0.5"></p>
+      <p id="place-description" class="text-sm text-zinc-600 dark:text-zinc-400 mt-2 hidden"></p>
+    </div>
+
+    <!-- Stats bar -->
+    <div class="flex flex-wrap gap-4 text-sm text-zinc-600 dark:text-zinc-400 border-y border-zinc-200 dark:border-zinc-800 py-3">
+      <span>🔭 <strong id="stat-obs" class="text-zinc-900 dark:text-zinc-100">—</strong> <span id="stat-obs-label">obs</span></span>
+      <span>🌿 <strong id="stat-species" class="text-zinc-900 dark:text-zinc-100">—</strong> <span id="stat-species-label">spp</span></span>
+      <span>👥 <strong id="stat-observers" class="text-zinc-900 dark:text-zinc-100">—</strong> <span id="stat-observers-label">observers</span></span>
+      <span id="stat-dates" class="hidden text-xs self-center"></span>
+    </div>
+
+    <!-- Map -->
+    <div id="place-map" class="rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800" style="height:min(50vh,360px)"></div>
+
+    <!-- Tabs -->
+    <div>
+      <div class="flex gap-1 border-b border-zinc-200 dark:border-zinc-800 mb-4 overflow-x-auto">
+        <button data-tab="recent"    class="place-tab active px-4 py-2 text-sm font-medium whitespace-nowrap" id="tab-btn-recent"></button>
+        <button data-tab="species"   class="place-tab px-4 py-2 text-sm font-medium whitespace-nowrap" id="tab-btn-species"></button>
+        <button data-tab="observers" class="place-tab px-4 py-2 text-sm font-medium whitespace-nowrap" id="tab-btn-observers"></button>
+        <button data-tab="nearby"    class="place-tab px-4 py-2 text-sm font-medium whitespace-nowrap" id="tab-btn-nearby"></button>
+      </div>
+
+      <!-- Recent observations -->
+      <div id="tab-recent" class="place-tab-panel">
+        <div id="recent-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-3"></div>
+        <p id="recent-empty" class="hidden text-sm text-zinc-400 py-4"></p>
+      </div>
+
+      <!-- Top species -->
+      <div id="tab-species" class="place-tab-panel hidden">
+        <ol id="species-list" class="space-y-2"></ol>
+        <p id="species-empty" class="hidden text-sm text-zinc-400 py-4"></p>
+      </div>
+
+      <!-- Top observers -->
+      <div id="tab-observers" class="place-tab-panel hidden">
+        <ol id="observers-list" class="space-y-2"></ol>
+      </div>
+
+      <!-- Nearby places -->
+      <div id="tab-nearby" class="place-tab-panel hidden">
+        <div id="nearby-list" class="space-y-2"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { parseLocationToGeoJSON } from '../lib/geo';
+
+  const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
+
+  // i18n strings (inline — avoids async import complexity)
+  const tr = lang === 'es' ? {
+    loading: 'Cargando...',
+    not_found: 'Lugar no encontrado.',
+    obs: 'observaciones', species: 'especies', observers: 'observadores',
+    tab_recent: 'Recientes', tab_species: 'Especies',
+    tab_observers: 'Observadores', tab_nearby: 'Cerca',
+    type: { protected_area: 'Área Protegida', h3_cell: 'Zona H3', custom: 'Lugar Custom', community: 'Comunitario' },
+    source: { wdpa: 'WDPA', user: 'Usuario', auto_h3: 'Auto', nominatim: 'OSM' },
+    no_obs: 'Sin observaciones aún.', no_species: 'Sin especies identificadas.',
+    obs_label: (n: number) => `${n} obs`,
+  } : {
+    loading: 'Loading...',
+    not_found: 'Place not found.',
+    obs: 'observations', species: 'species', observers: 'observers',
+    tab_recent: 'Recent', tab_species: 'Species',
+    tab_observers: 'Observers', tab_nearby: 'Nearby',
+    type: { protected_area: 'Protected Area', h3_cell: 'H3 Zone', custom: 'Custom Place', community: 'Community' },
+    source: { wdpa: 'WDPA', user: 'User', auto_h3: 'Auto', nominatim: 'OSM' },
+    no_obs: 'No observations yet.', no_species: 'No species identified.',
+    obs_label: (n: number) => `${n} obs`,
+  };
+
+  // Read slug from query param (?slug=X) — static site can't use [slug].astro
+  const slug = new URLSearchParams(window.location.search).get('slug') ?? '';
+
+  // Don't run if no slug — this component may be rendered alongside
+  // ExplorePlacesView on the index page; running load() without a slug
+  // causes unnecessary errors and may abort sibling scripts.
+  if (!slug) {
+    // Hide skeleton immediately so ExplorePlacesView can use the loading state area
+    document.getElementById('place-loading')?.classList.add('hidden');
+  } else {
+
+  async function load() {
+    const supabase = getSupabase();
+    // skeleton is already visible on load
+
+    // Fetch place with geometry via RPC (geometry is EWKB from REST, use RPC for GeoJSON)
+    const { data: place, error } = await supabase
+      .rpc('place_geojson_by_slug', { p_slug: slug });
+
+    if (error || !place) {
+      document.getElementById('place-loading')!.classList.add('hidden');
+      document.getElementById('place-error')!.classList.remove('hidden');
+      document.getElementById('place-error-text')!.textContent = tr.not_found;
+      return;
+    }
+
+    document.getElementById('place-loading')!.classList.add('hidden');
+    document.getElementById('place-content')!.classList.remove('hidden');
+
+    // Header
+    const typeBadge = document.getElementById('place-type-badge')!;
+    typeBadge.textContent = tr.type[place.place_type as keyof typeof tr.type] ?? place.place_type;
+
+    const sourceBadge = document.getElementById('place-source-badge')!;
+    sourceBadge.textContent = tr.source[place.source as keyof typeof tr.source] ?? place.source;
+
+    document.getElementById('place-name')!.textContent = place.name;
+
+    const locLine = [place.state_province, place.country_code].filter(Boolean).join(', ');
+    if (locLine) document.getElementById('place-location-line')!.textContent = locLine;
+
+    if (place.description) {
+      const desc = document.getElementById('place-description')!;
+      desc.textContent = place.description;
+      desc.classList.remove('hidden');
+    }
+
+    // Stats
+    document.getElementById('stat-obs')!.textContent = (place.obs_count ?? 0).toLocaleString();
+    document.getElementById('stat-species')!.textContent = (place.species_count ?? 0).toLocaleString();
+    document.getElementById('stat-observers')!.textContent = (place.observer_count ?? 0).toLocaleString();
+    document.getElementById('stat-obs-label')!.textContent = tr.obs;
+    document.getElementById('stat-species-label')!.textContent = tr.species;
+    document.getElementById('stat-observers-label')!.textContent = tr.observers;
+
+    if (place.first_obs_at || place.last_obs_at) {
+      const datesEl = document.getElementById('stat-dates')!;
+      const fmt = (d: string) => new Date(d).toLocaleDateString(lang === 'es' ? 'es-MX' : 'en-US', { year: 'numeric', month: 'short' });
+      datesEl.textContent = [place.first_obs_at && fmt(place.first_obs_at), place.last_obs_at && fmt(place.last_obs_at)].filter(Boolean).join(' – ');
+      datesEl.classList.remove('hidden');
+    }
+
+    // Tabs i18n
+    document.getElementById('tab-btn-recent')!.textContent = tr.tab_recent;
+    document.getElementById('tab-btn-species')!.textContent = tr.tab_species;
+    document.getElementById('tab-btn-observers')!.textContent = tr.tab_observers;
+    document.getElementById('tab-btn-nearby')!.textContent = tr.tab_nearby;
+
+    // Tab switching
+    document.querySelectorAll<HTMLButtonElement>('.place-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.place-tab').forEach(b => b.classList.remove('active', 'border-b-2', 'border-emerald-600', 'text-emerald-700'));
+        document.querySelectorAll('.place-tab-panel').forEach(p => p.classList.add('hidden'));
+        btn.classList.add('active', 'border-b-2', 'border-emerald-600', 'text-emerald-700', 'dark:text-emerald-400');
+        const tab = btn.dataset.tab!;
+        document.getElementById(`tab-${tab}`)!.classList.remove('hidden');
+        if (tab === 'species') loadSpecies(place.id);
+        if (tab === 'observers') loadObservers(place.id);
+        if (tab === 'nearby') loadNearby(place.id);
+      });
+    });
+    // Activate first tab style
+    const firstTab = document.querySelector<HTMLButtonElement>('.place-tab[data-tab="recent"]');
+    firstTab?.classList.add('border-b-2', 'border-emerald-600', 'text-emerald-700', 'dark:text-emerald-400');
+
+    // Map
+    if (place.geometry_geojson) {
+      initMap(place);
+    }
+
+    // Load recent obs
+    loadRecentObs(place.id);
+  }
+
+  async function initMap(place: { geometry_geojson: { coordinates: unknown }; centroid_geojson: { coordinates: [number, number] } | null }) {
+    const maplibregl = await import('maplibre-gl');
+    const mapEl = document.getElementById('place-map')!;
+    const centroid = place.centroid_geojson?.coordinates ?? [0, 0];
+
+    const map = new maplibregl.Map({
+      container: mapEl as HTMLElement,
+      style: 'https://tiles.openfreemap.org/styles/liberty',
+      center: [centroid[0], centroid[1]],
+      zoom: 9,
+      attributionControl: false,
+    });
+
+    map.on('load', () => {
+      map.addSource('place-boundary', {
+        type: 'geojson',
+        data: { type: 'Feature', geometry: place.geometry_geojson as GeoJSON.Geometry, properties: {} } as GeoJSON.Feature,
+      });
+      map.addLayer({ id: 'place-fill', type: 'fill', source: 'place-boundary', paint: { 'fill-color': '#10b981', 'fill-opacity': 0.15 } });
+      map.addLayer({ id: 'place-outline', type: 'line', source: 'place-boundary', paint: { 'line-color': '#059669', 'line-width': 2 } });
+
+      // Fit to bounds
+      try {
+        const bounds = new maplibregl.LngLatBounds();
+        const coords = (place.geometry_geojson as { coordinates: [number, number][][] }).coordinates;
+        if (Array.isArray(coords)) {
+          const flat = coords.flat(Infinity) as [number, number][];
+          flat.forEach((c: [number, number]) => bounds.extend(c));
+          map.fitBounds(bounds, { padding: 40, maxZoom: 13 });
+        }
+      } catch { /* non-fatal */ }
+    });
+  }
+
+  async function loadRecentObs(placeId: string) {
+    const supabase = getSupabase();
+    const { data } = await supabase
+      .from('observations')
+      .select('id, observed_at, primary_taxon_id, taxa:primary_taxon_id(scientific_name, common_name_es), media_files(url, is_primary, thumbnail_url)')
+      .eq('place_id', placeId)
+      .eq('sync_status', 'synced')
+      .order('observed_at', { ascending: false })
+      .limit(12);
+
+    const grid = document.getElementById('recent-grid')!;
+    const empty = document.getElementById('recent-empty')!;
+
+    if (!data || data.length === 0) {
+      empty.textContent = tr.no_obs;
+      empty.classList.remove('hidden');
+      return;
+    }
+
+    const obsDetailBase = lang === 'es' ? '/es/observacion/' : '/en/observation/';
+    grid.innerHTML = data.map(o => {
+      const media = Array.isArray(o.media_files) ? o.media_files.find((m: { is_primary: boolean }) => m.is_primary) ?? o.media_files[0] : null;
+      const imgUrl = media?.thumbnail_url ?? media?.url ?? '';
+      const taxon = Array.isArray(o.taxa) ? o.taxa[0] : o.taxa;
+      const name = taxon?.common_name_es ?? taxon?.scientific_name ?? '—';
+      return `<a href="/share/obs/?id=${o.id}" class="block rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800 hover:border-emerald-400 transition-colors">
+        ${imgUrl ? `<img src="${imgUrl}" alt="${name}" class="w-full h-24 object-cover">` : '<div class="w-full h-24 bg-zinc-100 dark:bg-zinc-800"></div>'}
+        <div class="p-1.5 text-xs text-zinc-600 dark:text-zinc-400 truncate">${name}</div>
+      </a>`;
+    }).join('');
+  }
+
+  async function loadSpecies(placeId: string) {
+    const supabase = getSupabase();
+    const { data } = await supabase.rpc('place_top_species', { p_place_id: placeId, p_limit: 20 });
+    const list = document.getElementById('species-list')!;
+    const empty = document.getElementById('species-empty')!;
+    if (!data || data.length === 0) { empty.textContent = tr.no_species; empty.classList.remove('hidden'); return; }
+    const speciesBase = lang === 'es' ? '/es/explorar/especies/' : '/en/explore/species/';
+    list.innerHTML = data.map((s: { slug: string; scientific_name: string; common_name_es: string; obs_count: number }, i: number) =>
+      `<li class="flex items-center justify-between py-1.5 border-b border-zinc-100 dark:border-zinc-800 last:border-0">
+        <a href="${speciesBase}${s.slug}/" class="text-sm text-zinc-800 dark:text-zinc-200 hover:text-emerald-600">
+          <span class="text-zinc-400 mr-2">${i + 1}.</span>
+          <em>${s.scientific_name}</em>${s.common_name_es ? ` — ${s.common_name_es}` : ''}
+        </a>
+        <span class="text-xs text-zinc-400">${tr.obs_label(Number(s.obs_count))}</span>
+      </li>`
+    ).join('');
+  }
+
+  async function loadObservers(placeId: string) {
+    const supabase = getSupabase();
+    const { data } = await supabase.rpc('place_top_observers', { p_place_id: placeId, p_limit: 10 });
+    const list = document.getElementById('observers-list')!;
+    if (!data || data.length === 0) return;
+    list.innerHTML = data.map((u: { avatar_url: string; display_name: string; obs_count: number }, i: number) =>
+      `<li class="flex items-center gap-3 py-1.5 border-b border-zinc-100 dark:border-zinc-800 last:border-0">
+        <span class="text-zinc-400 text-sm w-5 text-right">${i + 1}.</span>
+        ${u.avatar_url ? `<img src="${u.avatar_url}" class="w-7 h-7 rounded-full object-cover">` : '<div class="w-7 h-7 rounded-full bg-zinc-200 dark:bg-zinc-700"></div>'}
+        <span class="flex-1 text-sm text-zinc-800 dark:text-zinc-200">${u.display_name ?? '—'}</span>
+        <span class="text-xs text-zinc-400">${tr.obs_label(Number(u.obs_count))}</span>
+      </li>`
+    ).join('');
+  }
+
+  async function loadNearby(placeId: string) {
+    const supabase = getSupabase();
+    // Get current place centroid first
+    const { data: places } = await supabase
+      .from('places')
+      .select('id, slug, name, place_type, obs_count')
+      .neq('id', placeId)
+      .not('obs_count', 'eq', 0)
+      .order('obs_count', { ascending: false })
+      .limit(5);
+
+    const list = document.getElementById('nearby-list')!;
+    if (!places || places.length === 0) return;
+    const base = lang === 'es' ? '/es/explorar/lugares/?slug=' : '/en/explore/places/?slug=';
+    list.innerHTML = places.map((p: { slug: string; name: string; obs_count: number }) =>
+      `<a href="${base}${p.slug}/" class="flex items-center justify-between py-2 border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:text-emerald-600">
+        <span class="text-sm">📍 ${p.name}</span>
+        <span class="text-xs text-zinc-400">${tr.obs_label(p.obs_count)}</span>
+      </a>`
+    ).join('');
+  }
+
+  load();
+  } // end if (slug)
+</script>

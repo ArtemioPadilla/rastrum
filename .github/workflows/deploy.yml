@@ -32,6 +32,19 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Generate version from git
+        id: pkg
+        run: |
+          # CalVer: YYYY.M.patch where patch = commits in the current month.
+          # Example: 2026.5.3 = third deploy of May 2026.
+          YEAR=$(date -u +%Y)
+          MONTH=$(date -u +%-m)
+          MONTH_START=$(date -u -d "$(date -u +%Y-%m-01)" +%Y-%m-%dT00:00:00Z 2>/dev/null || date -u -j -f '%Y-%m-%dT%H:%M:%SZ' "$(date -u +%Y-%m-)01T00:00:00Z" +%Y-%m-%dT00:00:00Z)
+          PATCH=$(git log --oneline --after="${MONTH_START}" HEAD | wc -l | tr -d ' ')
+          # Patch is 0-indexed commits count; min 0, ensures bumping on every push
+          VERSION="${YEAR}.${MONTH}.${PATCH}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "[version] Generated: $VERSION"
       - name: Typecheck
         run: npx tsc --noEmit
 
@@ -53,6 +66,7 @@ jobs:
           PUBLIC_MEGADETECTOR_WEIGHTS_URL: ${{ secrets.PUBLIC_MEGADETECTOR_WEIGHTS_URL }}
           PUBLIC_MEGADETECTOR_ENDPOINT: ${{ secrets.PUBLIC_MEGADETECTOR_ENDPOINT }}
           PUBLIC_BUILD_SHA:           ${{ github.sha }}
+          PUBLIC_VERSION:             ${{ steps.pkg.outputs.version }}
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

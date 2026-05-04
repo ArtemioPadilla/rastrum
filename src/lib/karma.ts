@@ -1,3 +1,6 @@
+import { getConservationMultiplier, conservationBonusText } from './karma-conservation';
+import type { IUCNCategory, NOM059Category } from './karma-conservation';
+
 export type Bucket = 1 | 2 | 3 | 4 | 5;
 
 export interface RarityBucket {
@@ -42,6 +45,8 @@ export interface VoteMicrocopyInput {
   confidence: 0.5 | 0.7 | 0.9;
   inGrace: boolean;
   graceDaysLeft?: number;
+  iucnCategory?: IUCNCategory | null;
+  nom059Category?: NOM059Category;
 }
 
 export function microcopyForVote(i: VoteMicrocopyInput): string {
@@ -59,8 +64,16 @@ export function microcopyForVote(i: VoteMicrocopyInput): string {
   }
 
   const level = i.expertiseLevel ?? (i.lang === 'es' ? 'sin especialidad' : 'no expertise');
+
+  const conservation = getConservationMultiplier(
+    i.iucnCategory ?? null,
+    i.nom059Category ?? null,
+  );
+  const bonusText = conservationBonusText(conservation.multiplier, conservation.source, i.lang);
+  const bonusSuffix = bonusText ? ` · ${bonusText}` : '';
+
   if (i.lang === 'es') {
-    return `Rareza ${stars} — tu voto pesa ${i.expertiseWeight.toFixed(1)}× en ${level} · acertar: ${formatDelta(win)} / fallar: ${formatDelta(loss)}.`;
+    return `Rareza ${stars} — tu voto pesa ${i.expertiseWeight.toFixed(1)}× en ${level} · acertar: ${formatDelta(win)} / fallar: ${formatDelta(loss)}.${bonusSuffix}`;
   }
-  return `Rarity ${stars} — your vote weighs ${i.expertiseWeight.toFixed(1)}× in ${level} · win: ${formatDelta(win)} / lose: ${formatDelta(loss)}.`;
+  return `Rarity ${stars} — your vote weighs ${i.expertiseWeight.toFixed(1)}× in ${level} · win: ${formatDelta(win)} / lose: ${formatDelta(loss)}.${bonusSuffix}`;
 }

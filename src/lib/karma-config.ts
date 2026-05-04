@@ -69,6 +69,22 @@ export const KARMA_REASONS: KarmaReason[] = [
     description_en: 'Admin-issued karma adjustment. Delta varies per case.',
     description_es: 'Ajuste de karma emitido por un administrador. El delta varía por caso.',
   },
+  {
+    id: 'pool_donation',
+    label_en: 'Pool donation',
+    label_es: 'Donación a pool',
+    delta: 20,
+    description_en: 'Awarded when a sponsor donates calls to a platform pool.',
+    description_es: 'Otorgado cuando un patrocinador dona llamadas a un pool.',
+  },
+  {
+    id: 'pool_call_sponsor_drip',
+    label_en: 'Pool call (sponsor drip)',
+    label_es: 'Llamada de pool (goteo patrocinador)',
+    delta: 0.5,
+    description_en: 'Small karma drip to the sponsor each time a beneficiary uses a pool call.',
+    description_es: 'Pequeño goteo de karma al patrocinador cada vez que un beneficiario usa una llamada del pool.',
+  },
 ];
 
 export interface RarityMultiplier {

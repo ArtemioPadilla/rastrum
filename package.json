@@ -1,22 +1,24 @@
 {
   "name": "rastrum",
   "type": "module",
-  "version": "0.0.1",
+  "version": "2026.5.0",
   "engines": {
     "node": ">=22.12.0"
   },
   "scripts": {
     "dev": "astro dev",
-    "build": "npm run build:og && node scripts/build-search-index.js && astro build && node scripts/sitemap-hreflang.js",
+    "build": "node scripts/inject-version.js && npm run build:og && node scripts/build-search-index.js && astro build && node scripts/sitemap-hreflang.js",
     "build:og": "npx --yes tsx scripts/generate-og.ts",
     "preview": "astro preview",
     "astro": "astro",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test",
+    "test:e2e": "playwright test --project=chromium --project=mobile-chrome",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:mobile": "playwright test --project=mobile-chrome",
+    "test:e2e:journeys": "playwright test --project=journey-chromium --project=journey-mobile",
+    "test:e2e:all": "playwright test",
     "test:lhci": "lhci autorun",
     "test:audit": "npm run build && npm run test:e2e && npm run test:lhci",
     "typecheck": "tsc --noEmit"
