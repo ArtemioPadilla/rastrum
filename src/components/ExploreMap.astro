@@ -208,7 +208,7 @@ const tr = t(lang);
     // RLS still gates the rows.
     const { data, error } = await supabase
       .from('observations')
-      .select('id, location, location_obscured, obscure_level, observed_at, taxa:primary_taxon_id(kingdom)')
+      .select('id, location, location_obscured, obscure_level, observed_at, taxa:primary_taxon_id(kingdom), identifications(scientific_name, is_primary), media_files(url, thumbnail_url, is_primary, media_type)')
       .eq('sync_status', 'synced')
       .limit(500);
 
@@ -235,12 +235,23 @@ const tr = t(lang);
       const observedMonth = observedAt ? new Date(observedAt).getUTCMonth() : null;
       const taxon = (row as { taxa?: { kingdom?: string | null } | null }).taxa;
       const kingdom = taxon?.kingdom ?? 'Unknown';
+      const idents = (row as { identifications?: Array<{ scientific_name?: string; is_primary?: boolean }> }).identifications;
+      const primaryIdent = Array.isArray(idents) ? idents.find(i => i.is_primary) ?? idents[0] : null;
+      const species = primaryIdent?.scientific_name ?? (isEs ? 'Sin identificar' : 'Unidentified');
+      const mediaArr = (row as { media_files?: Array<{ url?: string; thumbnail_url?: string; is_primary?: boolean; media_type?: string }> }).media_files;
+      const photos = Array.isArray(mediaArr) ? mediaArr.filter(m => !m.media_type || m.media_type === 'photo') : [];
+      const thumb = (photos.find(m => m.is_primary) ?? photos[0])?.thumbnail_url
+        ?? (photos.find(m => m.is_primary) ?? photos[0])?.url ?? '';
+      const dateStr = observedAt ? new Date(observedAt).toLocaleDateString(isEs ? 'es-MX' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '';
       features.push({
         type: 'Feature',
         geometry: geom,
         properties: {
           id: row.id,
           kingdom,
+          species,
+          thumb,
+          date: dateStr,
           observed_month: observedMonth,
           pending: false,
         },
@@ -363,6 +374,52 @@ const tr = t(lang);
         'circle-stroke-color': isDark ? '#0f172a' : '#ffffff',
       },
     });
+
+    // ── Observation interactivity ───────────────────────────────────────────
+    const shareBase = '/share/obs/';
+
+    // Click on individual pin → popup with thumbnail, species, date, link
+    map.on('click', 'pin', (e) => {
+      const feat = e.features?.[0];
+      if (!feat) return;
+      const props = feat.properties as Record<string, string | boolean>;
+      if (props.pending === true || props.pending === 'true') return;
+      const coords = (feat.geometry as GeoJSON.Point).coordinates.slice() as [number, number];
+      const thumbUrl = props.thumb ?? '';
+      const speciesName = props.species ?? '';
+      const date = props.date ?? '';
+      const obsId = props.id ?? '';
+      const imgHtml = thumbUrl
+        ? `<img src="${thumbUrl}" alt="" style="width:100%;height:120px;object-fit:cover;border-radius:6px 6px 0 0;display:block" loading="lazy"/>`
+        : `<div style="width:100%;height:60px;background:${isDark ? '#1e293b' : '#f4f4f5'};border-radius:6px 6px 0 0;display:flex;align-items:center;justify-content:center;color:${isDark ? '#64748b' : '#a1a1aa'};font-size:20px">🌿</div>`;
+      const html = `<div style="min-width:180px;max-width:220px;font-family:system-ui;overflow:hidden;border-radius:6px">${imgHtml}<div style="padding:8px 10px"><div style="font-size:13px;font-weight:600;font-style:italic;color:${isDark ? '#f1f5f9' : '#18181b'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${speciesName}</div>${date ? `<div style="font-size:11px;color:${isDark ? '#94a3b8' : '#71717a'};margin-top:2px">${date}</div>` : ''}<a href="${shareBase}?id=${obsId}" style="display:inline-block;margin-top:6px;font-size:11px;color:#10b981;text-decoration:none;font-weight:500">${isEs ? 'Ver observación →' : 'View observation →'}</a></div></div>`;
+      new maplibregl.Popup({ closeButton: true, maxWidth: '240px', offset: 12 })
+        .setLngLat(coords)
+        .setHTML(html)
+        .addTo(map);
+    });
+
+    // Click on cluster → zoom in to expand
+    map.on('click', 'clusters', (e) => {
+      const feat = e.features?.[0];
+      if (!feat) return;
+      const clusterId = feat.properties?.cluster_id as number | undefined;
+      const src = map.getSource('observations') as maplibregl.GeoJSONSource;
+      if (clusterId != null) {
+        src.getClusterExpansionZoom(clusterId).then((zoom) => {
+          map.easeTo({
+            center: (feat.geometry as GeoJSON.Point).coordinates as [number, number],
+            zoom: zoom,
+          });
+        });
+      }
+    });
+
+    // Pointer cursor on hover
+    map.on('mouseenter', 'pin', () => { map.getCanvas().style.cursor = 'pointer'; });
+    map.on('mouseleave', 'pin', () => { map.getCanvas().style.cursor = ''; });
+    map.on('mouseenter', 'clusters', () => { map.getCanvas().style.cursor = 'pointer'; });
+    map.on('mouseleave', 'clusters', () => { map.getCanvas().style.cursor = ''; });
 
     // ── Places layer (toggle) ────────────────────────────────────────────────
     const toggleBtn = document.getElementById('places-layer-toggle') as HTMLButtonElement | null;
