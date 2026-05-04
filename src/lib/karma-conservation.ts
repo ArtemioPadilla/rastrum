@@ -1,6 +1,9 @@
 /**
- * Conservation status multipliers for karma rewards.
- * Observations of threatened species earn bonus karma.
+ * Conservation status multipliers — lookup table only.
+ * Not currently consumed by the karma path: award_karma() in SQL does
+ * not read iucn/nom-059 status, so microcopyForVote() doesn't either
+ * (avoids predicting a bonus the SQL won't deliver). Phase 3 will wire
+ * these multipliers into the SQL function.
  */
 
 export type IUCNCategory = 'LC' | 'NT' | 'VU' | 'EN' | 'CR' | 'EW' | 'EX' | 'DD' | 'NE';
