@@ -7272,29 +7272,24 @@ GRANT EXECUTE ON FUNCTION public.recompute_species_hero(uuid) TO authenticated;
 -- ═══════════════════════════════════════════════════════════════════════════
 
 -- Top taxa identified via a specific pool (last 30 days)
+-- NOTE: pool_consumption tracks daily call counts per user but does not
+-- link to specific observations. Until ai_usage gains a pool_id +
+-- observation_id column, this function returns an empty set. The
+-- PoolDashboardView handles this gracefully with a "coming soon" message.
 CREATE OR REPLACE FUNCTION public.pool_top_taxa(p_pool_id uuid)
 RETURNS TABLE(scientific_name text, call_count bigint)
 LANGUAGE sql STABLE SECURITY DEFINER AS $$
-  SELECT i.scientific_name, COUNT(*) as call_count
-  FROM public.ai_usage u
-  JOIN public.identifications i ON i.observation_id = u.observation_id
-  WHERE u.pool_id = p_pool_id
-    AND u.created_at >= (now() - interval '30 days')
-  GROUP BY i.scientific_name
-  ORDER BY call_count DESC
-  LIMIT 10;
+  SELECT NULL::text, NULL::bigint WHERE false;
 $$;
 
 -- Daily usage for a pool (current month)
 CREATE OR REPLACE FUNCTION public.pool_daily_usage(p_pool_id uuid)
 RETURNS TABLE(usage_date date, calls bigint)
 LANGUAGE sql STABLE SECURITY DEFINER AS $$
-  SELECT DATE(u.created_at) as usage_date, COUNT(*) as calls
-  FROM public.ai_usage u
-  WHERE u.pool_id = p_pool_id
-    AND u.created_at >= date_trunc('month', now())
-  GROUP BY DATE(u.created_at)
-  ORDER BY usage_date;
+  SELECT pc.day AS usage_date, pc.count::bigint AS calls
+  FROM public.pool_consumption pc
+  WHERE pc.day >= date_trunc('month', now())::date
+  ORDER BY pc.day;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.pool_top_taxa(uuid) TO authenticated;
