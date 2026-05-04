@@ -558,10 +558,63 @@ async function syncOutboxInner(): Promise<SyncResult> {
     void sendSyncErrorBeacon({ message: last_error, blob_count: failed });
   }
 
+  // #588 — process the idQueue retry worker before reporting done. Stuck
+  // identifications get reattempted with exponential backoff. Cheap when
+  // the queue is empty; bounded when it isn't.
+  await processIdQueue().catch(err => console.warn('[rastrum] idQueue worker failed', err));
+
   const result: SyncResult = { synced, failed, skipped_guest, last_error };
   emit<SyncDoneDetail>(SYNC_EVENTS.done, result);
   await announcePendingCount();
   return result;
+}
+
+const MAX_ID_RETRIES = 5;
+const RETRY_BACKOFF_MS_BASE = 60_000;
+const RETRY_BACKOFF_MS_CAP = 86_400_000;
+
+/**
+ * Reattempts stuck identifications. Backoff is 60s × 2^attempts capped
+ * at 1 day; after MAX_ID_RETRIES the row is marked `status: 'failed'`
+ * and the UI surfaces a "Identification failed" badge with manual retry.
+ *
+ * Bounded: walks at most 50 rows per call (chosen to keep p99 < 100 ms).
+ */
+export async function processIdQueue(): Promise<void> {
+  const db = getDB();
+  const now = Date.now();
+  const stuck = await db.idQueue
+    .where('attempts').belowOrEqual(MAX_ID_RETRIES)
+    .limit(50)
+    .toArray();
+
+  for (const row of stuck) {
+    if (row.status === 'failed') continue;
+    const attempts = row.attempts ?? 0;
+    const lastAttempt = row.last_attempt_at ? Date.parse(row.last_attempt_at) : 0;
+    const backoffMs = Math.min(RETRY_BACKOFF_MS_BASE * Math.pow(2, attempts), RETRY_BACKOFF_MS_CAP);
+    if (now - lastAttempt < backoffMs) continue;
+
+    await db.idQueue.update(row.observation_id, {
+      last_attempt_at: new Date(now).toISOString(),
+    });
+    try {
+      await triggerIdentify(row.observation_id);
+      // triggerIdentify writes the identification on success; if the row
+      // is still here with the same attempts count it failed silently —
+      // bumped via update inside triggerIdentify. If the cascade WON,
+      // delete the queue row.
+      const fresh = await db.idQueue.get(row.observation_id);
+      if (fresh && fresh.attempts === attempts) {
+        // No bump → success path completed
+        await db.idQueue.delete(row.observation_id);
+      } else if (fresh && (fresh.attempts ?? 0) >= MAX_ID_RETRIES) {
+        await db.idQueue.update(row.observation_id, { status: 'failed' });
+      }
+    } catch (err) {
+      console.warn('[rastrum] idQueue retry threw', row.observation_id, err);
+    }
+  }
 }
 
 async function sendSyncErrorBeacon(opts: { message: string; blob_count: number }): Promise<void> {

@@ -40,6 +40,12 @@ export interface IDQueueRecord {
   queued_at: string;
   attempts: number;
   last_error?: string;
+  /** ISO timestamp of the most recent retry. Used by processIdQueue() (#588)
+   *  to apply exponential backoff (60s × 2^attempts, capped 1 day). */
+  last_attempt_at?: string;
+  /** Marked when attempts exceeds MAX_ID_RETRIES — surfaces as a
+   *  "Identification failed" badge in the UI. Manual retry resets to 0. */
+  status?: 'pending' | 'failed';
 }
 
 /**
@@ -85,6 +91,14 @@ export class RastrumDB extends Dexie {
       observations: 'id, observer_kind, sync_status, created_at',
       mediaBlobs:   'id, observation_id, uploaded',
       idQueue:      'observation_id, queued_at',
+      chatTurns:    'id, role, created_at',
+    });
+    // Schema v3 (#588) — index attempts + last_attempt_at + status so the
+    // retry worker can scan stuck rows without a full table walk.
+    this.version(3).stores({
+      observations: 'id, observer_kind, sync_status, created_at',
+      mediaBlobs:   'id, observation_id, uploaded',
+      idQueue:      'observation_id, queued_at, attempts, last_attempt_at, status',
       chatTurns:    'id, role, created_at',
     });
   }
