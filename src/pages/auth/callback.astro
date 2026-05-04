@@ -74,10 +74,30 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
         return;
       }
 
+      // Whether or not we hold a code, the singleton's _initialize() may have
+      // already exchanged it (BaseLayout chrome scripts — Header, MobileBottomBar,
+      // BellIcon, MobileDrawer — call getSupabase() at module-load and trigger
+      // initialize() before our run() reaches its strip+exchange step). getSession
+      // awaits initialize internally, so if a session exists by now the exchange
+      // already happened and we just redirect.
+      const { data: { session: existing } } = await supabase.auth.getSession();
+      if (existing) {
+        redirectToHome();
+        return;
+      }
+
       // PKCE flow — preferred since we now set flowType: 'pkce' in supabase.ts
       if (code) {
         const { error } = await exchangeCode(code);
-        if (error) { showError(error.message); return; }
+        if (error) {
+          // Last-chance recovery: the verifier may have just been consumed
+          // by a parallel _initialize() that completed between our getSession
+          // above and this exchange call. Check session one more time.
+          const { data: { session: post } } = await supabase.auth.getSession();
+          if (post) { redirectToHome(); return; }
+          showError(error.message);
+          return;
+        }
         redirectToHome();
         return;
       }
@@ -90,14 +110,6 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
           refresh_token: refreshToken,
         });
         if (error) { showError(error.message); return; }
-        redirectToHome();
-        return;
-      }
-
-      // No code, no tokens — maybe detectSessionInUrl already consumed them
-      // before we could, or the user navigated here directly.
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
         redirectToHome();
         return;
       }
