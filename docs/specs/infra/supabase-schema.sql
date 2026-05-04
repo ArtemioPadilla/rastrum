@@ -4299,8 +4299,8 @@ SELECT
   id, username, display_name, avatar_url, country_code,
   expert_taxa, is_expert,
   observation_count, species_count, obs_count_7d, obs_count_30d,
-  karma_total,
-  last_observation_at, joined_at
+  last_observation_at, joined_at,
+  karma_total
 FROM public.users
 WHERE hide_from_leaderboards = false;
 -- 2026-04-30: dropped `profile_public = true AND` — M28 visibility is now
@@ -4321,8 +4321,8 @@ SELECT
   id, username, display_name, avatar_url, country_code,
   expert_taxa, is_expert,
   observation_count, species_count, obs_count_7d, obs_count_30d,
-  karma_total,
-  centroid_geog, last_observation_at, joined_at
+  centroid_geog, last_observation_at, joined_at,
+  karma_total
 FROM public.users
 WHERE hide_from_leaderboards = false;
 -- 2026-04-30: same change as community_observers above — M28-only opt-out.
