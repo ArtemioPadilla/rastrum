@@ -175,6 +175,7 @@ const sgReport = sgTree.socialgraph.report.button;
     const audioMedia = (r.media_files ?? []).filter(m => m?.media_type === 'audio');
     const photo = photoMedia.find(m => m?.is_primary)?.url ?? photoMedia.find(m => !!m?.url)?.url ?? '';
     const hasAudioOnly = !photo && audioMedia.length > 0;
+    const firstAudioUrl = hasAudioOnly ? (audioMedia[0]?.url ?? '') : '';
     const ago = formatTimeAgo(r.observed_at, lang);
     const isPublic = canShowRealName(observer, viewerAuthed);
     const observerName = isPublic ? (observer?.display_name || observer?.username || '') : '';
@@ -233,7 +234,7 @@ const sgReport = sgTree.socialgraph.report.button;
           ${photo
             ? `<img src="${escapeText(photo)}" alt="${escapeText(sci)}" loading="lazy" class="w-full h-full object-cover" />`
             : hasAudioOnly
-              ? `<div class="w-full h-full flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-900"><svg class="w-3/4 h-12 opacity-70" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="wg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#10b981"/><stop offset="100%" stop-color="#047857"/></linearGradient></defs><rect x="2" y="14" width="3" height="12" rx="1" fill="url(#wg)" opacity=".5"/><rect x="8" y="8" width="3" height="24" rx="1" fill="url(#wg)" opacity=".6"/><rect x="14" y="4" width="3" height="32" rx="1" fill="url(#wg)" opacity=".8"/><rect x="20" y="10" width="3" height="20" rx="1" fill="url(#wg)" opacity=".7"/><rect x="26" y="6" width="3" height="28" rx="1" fill="url(#wg)" opacity=".9"/><rect x="32" y="12" width="3" height="16" rx="1" fill="url(#wg)" opacity=".6"/><rect x="38" y="2" width="3" height="36" rx="1" fill="url(#wg)"/><rect x="44" y="8" width="3" height="24" rx="1" fill="url(#wg)" opacity=".7"/><rect x="50" y="14" width="3" height="12" rx="1" fill="url(#wg)" opacity=".5"/><rect x="56" y="6" width="3" height="28" rx="1" fill="url(#wg)" opacity=".8"/><rect x="62" y="10" width="3" height="20" rx="1" fill="url(#wg)" opacity=".9"/><rect x="68" y="4" width="3" height="32" rx="1" fill="url(#wg)" opacity=".7"/><rect x="74" y="12" width="3" height="16" rx="1" fill="url(#wg)" opacity=".6"/><rect x="80" y="8" width="3" height="24" rx="1" fill="url(#wg)" opacity=".8"/><rect x="86" y="14" width="3" height="12" rx="1" fill="url(#wg)" opacity=".5"/><rect x="92" y="10" width="3" height="20" rx="1" fill="url(#wg)" opacity=".6"/></svg><span class="text-[10px] font-medium uppercase tracking-wider text-emerald-400/70">${lang === 'es' ? 'Audio' : 'Audio'}</span></div>`
+              ? `<div class="w-full h-full audio-thumb-mount" data-audio-url="${escapeText(firstAudioUrl)}"></div>`
               : ''}
         </div>
         <div class="p-3 space-y-1">
@@ -428,6 +429,16 @@ const sgReport = sgTree.socialgraph.report.button;
             }).join(''),
           );
           wireOverflowMenus(listEl);
+          // Hydrate audio thumbnails
+          listEl.querySelectorAll<HTMLElement>('.audio-thumb-mount:not([data-mounted])').forEach((el) => {
+            el.dataset.mounted = '1';
+            const url = el.dataset.audioUrl;
+            if (url) {
+              import('../lib/audio-thumb').then(({ mountAudioThumb }) => {
+                mountAudioThumb(el, url, { compact: false });
+              });
+            }
+          });
         }
         offset += page.length;
         if (page.length < PAGE_SIZE) exhausted = true;

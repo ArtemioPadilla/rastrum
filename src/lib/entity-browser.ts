@@ -563,6 +563,17 @@ export class EntityBrowser<Row extends { id?: string; [k: string]: unknown }> {
     }
     tbody.innerHTML = html.join('');
 
+    // Hydrate audio thumbnails rendered by column renderers
+    tbody.querySelectorAll<HTMLElement>('.audio-thumb-mount:not([data-mounted])').forEach(el => {
+      el.dataset.mounted = '1';
+      const url = el.dataset.audioUrl;
+      if (url) {
+        import('./audio-thumb').then(({ mountAudioThumb }) => {
+          mountAudioThumb(el, url, { compact: true });
+        });
+      }
+    });
+
     tbody.querySelectorAll<HTMLElement>('[data-toggle-row]').forEach(btn => {
       btn.addEventListener('click', () => {
         const id = btn.dataset.toggleRow!;
