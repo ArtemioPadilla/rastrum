@@ -200,6 +200,12 @@ serve(async (req) => {
       .single();
     if (insErr) {
       await supabase.rpc('delete_vault_secret', { p_secret_id: vaultRow });
+      // Postgres unique violation (sponsor_credentials_user_id_label_key)
+      // — surface a friendly 409 so the client can prompt for a rename
+      // instead of dumping the raw "duplicate key value" message.
+      if (insErr.code === '23505') {
+        return jsonResponse(409, { error: 'label_already_in_use', detail: `A credential with the label "${label}" already exists. Pick a different label or delete the existing one from your credentials list.` });
+      }
       return jsonResponse(500, { error: 'credential_insert_failed', detail: insErr.message });
     }
 
