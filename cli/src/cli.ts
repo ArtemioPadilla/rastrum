@@ -31,6 +31,8 @@ export interface RunOpts {
   stationKey?: string;
   /** Print 1-line per file instead of just summary every 10. */
   verbose: boolean;
+  /** Print one line per cascade attempt (provider + confidence + error). #591. */
+  showCascade?: boolean;
 }
 
 export interface RunResult {
@@ -127,11 +129,19 @@ async function processOne(
   // 4. Optional identify pass.
   if (!opts.skipIdentify) {
     try {
-      await client.identify({
+      const id = await client.identify({
         image_url: presigned.public_url,
         lat: exif.lat,
         lng: exif.lng,
+        include_trace: opts.showCascade,
       });
+      if (opts.showCascade && id.cascade_attempts) {
+        for (const a of id.cascade_attempts) {
+          const conf = a.confidence != null ? a.confidence.toFixed(2) : '–';
+          const err = a.error ? ` (${a.error})` : '';
+          logLine(`  ↳ ${a.provider}: ${conf}${err}`);
+        }
+      }
     } catch (err) {
       // Non-fatal — the observation already exists; the user can re-ID later.
       logLine(`WARN   ${entry.path}  (identify failed, continuing: ${(err as Error).message})`);
@@ -214,6 +224,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
     projectSlug,
     stationKey,
     verbose: args.verbose === true || args.v === true,
+    showCascade: args['show-cascade'] === true || args.showCascade === true,
   };
 }
 

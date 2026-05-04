@@ -78,7 +78,7 @@ const TOOLS: Tool[] = [
   {
     name: 'identify_species',
     description:
-      'Run the Rastrum identification cascade (PlantNet → Claude Haiku 4.5 → on-device fallbacks) on a photo URL. Returns the top scientific-name match with a confidence score and source.',
+      'Run the Rastrum identification cascade (PlantNet → Claude Haiku 4.5 → on-device fallbacks) on a photo URL. Returns the top scientific-name match with a confidence score, source, and a cascade_attempts array showing each provider that tried (#591).',
     scope: 'identify',
     inputSchema: {
       type: 'object',

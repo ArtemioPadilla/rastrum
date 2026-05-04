@@ -731,9 +731,11 @@ serve(async (req) => {
   }
 
   const responsePayload: Record<string, unknown> = { ...result };
-  if (cascadeAttempts) {
-    responsePayload.cascade_attempts = cascadeAttempts;
-  }
+  // #591: always include cascade_attempts for trace replay. Stub a single-
+  // attempt array when the runner didn't go through the cascade path
+  // (force_provider, default-race that didn't track attempts).
+  responsePayload.cascade_attempts = cascadeAttempts
+    ?? [{ provider: result.source, confidence: result.confidence }];
 
   return corsResponse(JSON.stringify(responsePayload), {
     headers: { 'content-type': 'application/json' },

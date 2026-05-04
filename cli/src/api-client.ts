@@ -31,9 +31,10 @@ export interface ObserveResponse {
 export class ApiClient {
   constructor(private readonly opts: ApiClientOpts) {}
 
-  private async post<T>(path: string, body: unknown): Promise<T> {
+  private async post<T>(path: string, body: unknown, query?: Record<string, string>): Promise<T> {
     const f = this.opts.fetchImpl ?? fetch;
-    const res = await f(`${this.opts.baseUrl}/api/${path}`, {
+    const qs = query ? '?' + new URLSearchParams(query).toString() : '';
+    const res = await f(`${this.opts.baseUrl}/api/${path}${qs}`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${this.opts.token}`,
@@ -75,8 +76,11 @@ export class ApiClient {
     lat?: number | null;
     lng?: number | null;
     user_hint?: string;
-  }): Promise<unknown> {
-    return this.post('identify', input);
+    /** When true, append ?include_trace=true to receive cascade_attempts (#591). */
+    include_trace?: boolean;
+  }): Promise<{ scientific_name?: string; confidence?: number; source?: string; cascade_attempts?: Array<{ provider: string; confidence: number | null; error?: string }> }> {
+    const { include_trace, ...body } = input;
+    return this.post('identify', body, include_trace ? { include_trace: 'true' } : undefined);
   }
 }
 
