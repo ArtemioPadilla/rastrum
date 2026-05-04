@@ -384,3 +384,17 @@ SELECT cron.schedule(
   '0 */6 * * *',
   $$ REFRESH MATERIALIZED VIEW CONCURRENTLY public.karma_leaderboard_30d $$
 );
+
+-- #581 — every-6h cleanup of anon_rate_limit rows older than 2 hours.
+-- The longest window currently used is 1 hour (identify EF anon limit);
+-- 2-hour TTL leaves margin if we add longer-window endpoints later.
+DO $$
+BEGIN
+  PERFORM cron.unschedule('anon-rate-limit-cleanup')
+    FROM cron.job WHERE jobname = 'anon-rate-limit-cleanup';
+  PERFORM cron.schedule(
+    'anon-rate-limit-cleanup',
+    '0 */6 * * *',
+    $body$DELETE FROM public.anon_rate_limit WHERE ts < now() - interval '2 hours'$body$
+  );
+END $$;
