@@ -19,6 +19,14 @@ const i18nBag = {
   request_approve:            tr.sponsoring.request_approve,
   request_reject:             tr.sponsoring.request_reject,
   add_credential:             tr.sponsoring.add_credential,
+  test_btn:                   tr.sponsoring.test_btn,
+  testing:                    tr.sponsoring.testing,
+  saving:                     tr.sponsoring.saving,
+  test_success_tmpl:          tr.sponsoring.test_success,
+  test_failed_tmpl:           tr.sponsoring.test_failed,
+  test_not_supported:         tr.sponsoring.test_not_supported,
+  test_paste_first:           tr.sponsoring.test_paste_first,
+  validate_btn:               tr.sponsoring.validate_btn,
   pool_dashboard_view:        tr.sponsoring.pool_dashboard.view,
   confirm_reject_request:     lang === 'es' ? '¿Rechazar esta solicitud?' : 'Reject this request?',
   paused_reason: {
@@ -106,7 +114,7 @@ const langJson = JSON.stringify(lang);
       </div>
       <div>
         <label class="block text-sm font-medium" for="pool-model-input">{lang === 'es' ? 'Modelo' : 'Model'}</label>
-        <input id="pool-model-input" type="text" required class="mt-1 block w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-mono bg-white dark:bg-zinc-900" placeholder="gpt-4o-mini" data-defaults='{"api_key":"claude-haiku-4-5","oauth_token":"claude-haiku-4-5","bedrock":"claude-haiku-4-5","openai_api_key":"gpt-4o-mini","azure_openai":"gpt-4o-mini","gemini_api_key":"gemini-2.0-flash-exp","vertex_ai":"gemini-2.0-flash-exp"}' />
+        <input id="pool-model-input" type="text" required class="mt-1 block w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-mono bg-white dark:bg-zinc-900" placeholder="claude-haiku-4-5" data-defaults='{"api_key":"claude-haiku-4-5","oauth_token":"claude-haiku-4-5","bedrock":"claude-haiku-4-5","openai_api_key":"gpt-5.4-mini","azure_openai":"gpt-5.4-mini","gemini_api_key":"gemini-2.0-flash-exp","vertex_ai":"gemini-2.0-flash-exp"}' />
         <div id="pool-model-cost" class="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400"></div>
       </div>
       <div>
@@ -220,13 +228,13 @@ const langJson = JSON.stringify(lang);
         <label class="block text-sm font-medium" for="cred-model-input">{lang === 'es' ? 'Modelo preferido' : 'Preferred model'}</label>
         <input id="cred-model-input" name="preferred_model" type="text" list="cred-model-suggestions" autocomplete="off"
           class="mt-1 block w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-mono bg-white dark:bg-zinc-900" placeholder="claude-haiku-4-5"
-          data-defaults='{"api_key":"claude-haiku-4-5","oauth_token":"claude-haiku-4-5","bedrock":"claude-haiku-4-5","openai_api_key":"gpt-4o-mini","azure_openai":"gpt-4o-mini","gemini_api_key":"gemini-2.0-flash-exp","vertex_ai":"gemini-2.0-flash-exp"}'
-          data-suggestions='{"api_key":["claude-haiku-4-5","claude-sonnet-4-5","claude-opus-4-5","claude-haiku-4-6","claude-sonnet-4-6"],"oauth_token":["claude-haiku-4-5","claude-sonnet-4-5","claude-opus-4-5"],"bedrock":["claude-haiku-4-5","claude-sonnet-4-5","claude-opus-4-5","amazon.titan-text-express-v1"],"openai_api_key":["gpt-4o-mini","gpt-4o","gpt-4.1","gpt-4.1-mini","o1-mini","o3-mini"],"azure_openai":["gpt-4o-mini","gpt-4o","gpt-4","gpt-35-turbo"],"gemini_api_key":["gemini-2.0-flash-exp","gemini-2.0-flash","gemini-1.5-flash","gemini-1.5-pro","gemini-2.5-pro-preview"],"vertex_ai":["gemini-2.0-flash-exp","gemini-2.0-flash","gemini-1.5-flash","gemini-1.5-pro"]}' />
+          data-defaults='{"api_key":"claude-haiku-4-5","oauth_token":"claude-haiku-4-5","bedrock":"claude-haiku-4-5","openai_api_key":"gpt-5.4-mini","azure_openai":"gpt-5.4-mini","gemini_api_key":"gemini-2.0-flash-exp","vertex_ai":"gemini-2.0-flash-exp"}'
+          data-suggestions='{"api_key":["claude-haiku-4-5","claude-sonnet-4-5","claude-opus-4-5","claude-haiku-4-6","claude-sonnet-4-6"],"oauth_token":["claude-haiku-4-5","claude-sonnet-4-5","claude-opus-4-5"],"bedrock":["claude-haiku-4-5","claude-sonnet-4-5","claude-opus-4-5","amazon.titan-text-express-v1"],"openai_api_key":["gpt-5.4-mini","gpt-5-mini-2025-08-07","gpt-5-nano-2025-08-07","gpt-5","gpt-4o-mini","gpt-4o"],"azure_openai":["gpt-5.4-mini","gpt-5-mini-2025-08-07","gpt-5","gpt-4o-mini","gpt-4o"],"gemini_api_key":["gemini-2.0-flash-exp","gemini-2.0-flash","gemini-1.5-flash","gemini-1.5-pro","gemini-2.5-pro-preview"],"vertex_ai":["gemini-2.0-flash-exp","gemini-2.0-flash","gemini-1.5-flash","gemini-1.5-pro"]}' />
         <datalist id="cred-model-suggestions"></datalist>
         <a id="cred-model-docs-link" href="#" target="_blank" rel="noopener" class="mt-0.5 block text-xs text-emerald-700 dark:text-emerald-400 hover:underline hidden">
           {lang === 'es' ? 'Ver modelos disponibles →' : 'Browse available models →'}
         </a>
-        <p class="mt-1 text-xs text-zinc-500">{lang === 'es' ? 'Defaults: claude-haiku-4-5 (Anthropic/Bedrock), gpt-4o-mini (OpenAI/Azure), gemini-2.0-flash-exp (Gemini/Vertex). Bedrock auto-traduce el shorthand de Anthropic.' : 'Defaults: claude-haiku-4-5 (Anthropic/Bedrock), gpt-4o-mini (OpenAI/Azure), gemini-2.0-flash-exp (Gemini/Vertex). Bedrock auto-translates Anthropic shorthand.'}</p>
+        <p class="mt-1 text-xs text-zinc-500">{lang === 'es' ? 'Defaults: claude-haiku-4-5 (Anthropic/Bedrock), gpt-5.4-mini (OpenAI/Azure), gemini-2.0-flash-exp (Gemini/Vertex). Bedrock auto-traduce el shorthand de Anthropic.' : 'Defaults: claude-haiku-4-5 (Anthropic/Bedrock), gpt-5.4-mini (OpenAI/Azure), gemini-2.0-flash-exp (Gemini/Vertex). Bedrock auto-translates Anthropic shorthand.'}</p>
         <div id="cred-model-cost" class="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400"></div>
       </div>
       <div id="cred-endpoint-row" class="hidden">
@@ -235,10 +243,14 @@ const langJson = JSON.stringify(lang);
         <p id="cred-endpoint-help" class="mt-1 text-xs text-zinc-500"></p>
       </div>
 
-      <div class="flex gap-2 justify-end">
-        <p id="cred-submit-error" class="hidden text-xs text-red-600 dark:text-red-400 mb-2"></p>
-        <button type="button" id="cred-cancel" class="px-3 py-1.5 text-sm rounded border border-zinc-300 dark:border-zinc-700">{cancelLabel}</button>
-        <button type="submit" id="cred-submit" class="px-3 py-1.5 text-sm rounded bg-emerald-700 text-white">{tr.sponsoring.validate_btn}</button>
+      <div class="space-y-2">
+        <p id="cred-test-result" class="hidden text-xs"></p>
+        <p id="cred-submit-error" class="hidden text-xs text-red-600 dark:text-red-400"></p>
+        <div class="flex gap-2 justify-end">
+          <button type="button" id="cred-cancel" class="px-3 py-1.5 text-sm rounded border border-zinc-300 dark:border-zinc-700">{cancelLabel}</button>
+          <button type="button" id="cred-test" class="px-3 py-1.5 text-sm rounded border border-emerald-600 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 disabled:opacity-50 disabled:cursor-wait">{tr.sponsoring.test_btn}</button>
+          <button type="submit" id="cred-submit" class="px-3 py-1.5 text-sm rounded bg-emerald-700 text-white disabled:opacity-50 disabled:cursor-wait">{tr.sponsoring.validate_btn}</button>
+        </div>
       </div>
     </form>
   </dialog>
@@ -311,6 +323,14 @@ const langJson = JSON.stringify(lang);
     request_approve: string;
     request_reject: string;
     add_credential: string;
+    test_btn: string;
+    testing: string;
+    saving: string;
+    test_success_tmpl: string;
+    test_failed_tmpl: string;
+    test_not_supported: string;
+    test_paste_first: string;
+    validate_btn: string;
     pool_dashboard_view: string;
     confirm_reject_request: string;
     paused_reason: {
@@ -461,11 +481,67 @@ const langJson = JSON.stringify(lang);
     if (preview) preview.textContent = '';
     const errEl = document.getElementById('cred-submit-error');
     if (errEl) errEl.classList.add('hidden');
+    const testRes = document.getElementById('cred-test-result');
+    if (testRes) { testRes.textContent = ''; testRes.classList.add('hidden'); }
     syncModelPlaceholder(); // sets correct placeholder for api_key (Anthropic default)
     syncEndpointRow();
     addCredDialog?.showModal();
   });
   document.getElementById('cred-cancel')?.addEventListener('click', () => addCredDialog?.close());
+
+  // Test button — probe the secret WITHOUT saving. Calls the new
+  // /credentials/validate endpoint which runs a minimal liveness ping
+  // against the provider (Anthropic / OpenAI / Gemini); Bedrock /
+  // Azure / Vertex return `test_not_supported_for_provider` and we
+  // surface that as an amber hint.
+  document.getElementById('cred-test')?.addEventListener('click', async () => {
+    const secret = (document.getElementById('cred-secret-input') as HTMLInputElement).value.trim();
+    const kindSel = document.getElementById('cred-kind-select') as HTMLSelectElement | null;
+    const kind = (kindSel?.value ?? 'api_key') as
+      'api_key'|'oauth_token'|'bedrock'|'openai_api_key'|'azure_openai'|'gemini_api_key'|'vertex_ai';
+    const modelInput = document.getElementById('cred-model-input') as HTMLInputElement | null;
+    const modelDefaults = JSON.parse(modelInput?.dataset.defaults ?? '{}') as Record<string, string>;
+    const preferred_model = modelInput?.value.trim() || modelDefaults[kind] || 'claude-haiku-4-5';
+    const errEl  = document.getElementById('cred-submit-error');
+    const resEl  = document.getElementById('cred-test-result');
+    const testBtn = document.getElementById('cred-test') as HTMLButtonElement | null;
+    if (errEl) errEl.classList.add('hidden');
+    if (!secret) {
+      if (resEl) {
+        resEl.textContent = tr.test_paste_first;
+        resEl.className = 'text-xs text-amber-600 dark:text-amber-400';
+      }
+      return;
+    }
+    const originalText = testBtn?.textContent ?? '';
+    if (testBtn) { testBtn.disabled = true; testBtn.textContent = tr.testing; }
+    if (resEl) { resEl.textContent = ''; resEl.classList.add('hidden'); }
+    try {
+      const { validateUnsavedCredential } = await import('../lib/sponsorships');
+      const r = await validateUnsavedCredential({ secret, kind, preferred_model });
+      if (resEl) {
+        resEl.classList.remove('hidden');
+        if (r.error === 'test_not_supported_for_provider') {
+          resEl.textContent = `⚠ ${tr.test_not_supported}`;
+          resEl.className = 'text-xs text-amber-600 dark:text-amber-400';
+        } else if (r.ok) {
+          resEl.textContent = `✓ ${tr.test_success_tmpl.replace('{ms}', String(r.latency_ms))}`;
+          resEl.className = 'text-xs text-emerald-700 dark:text-emerald-400';
+        } else {
+          resEl.textContent = `✗ ${tr.test_failed_tmpl.replace('{error}', r.error ?? 'unknown')}`;
+          resEl.className = 'text-xs text-red-600 dark:text-red-400';
+        }
+      }
+    } catch (e) {
+      if (resEl) {
+        resEl.classList.remove('hidden');
+        resEl.textContent = `✗ ${(e as Error).message}`;
+        resEl.className = 'text-xs text-red-600 dark:text-red-400';
+      }
+    } finally {
+      if (testBtn) { testBtn.disabled = false; testBtn.textContent = originalText; }
+    }
+  });
   // M32 (#152): auto-detect kind from secret prefix; fall back to
   // user-selected dropdown for Bedrock / Azure / Vertex (JSON envelopes
   // share no prefix). The endpoint row only shows for kinds that need it.
@@ -562,6 +638,13 @@ const langJson = JSON.stringify(lang);
     const preferred_model = modelVal || modelDefaults[kind] || 'claude-haiku-4-5';
     const endpoint        = (document.getElementById('cred-endpoint-input') as HTMLInputElement).value.trim() || null;
     if (!label || !secret) return;
+    const submitBtn = document.getElementById('cred-submit') as HTMLButtonElement | null;
+    const testBtn   = document.getElementById('cred-test')   as HTMLButtonElement | null;
+    const originalSubmitText = submitBtn?.textContent ?? '';
+    const errEl = document.getElementById('cred-submit-error');
+    if (errEl) errEl.classList.add('hidden');
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = tr.saving; }
+    if (testBtn)   { testBtn.disabled = true; }
     try {
       await createCredential({ label, secret, kind, preferred_model, endpoint });
       window.posthog?.capture('sponsorship_credential_added', { kind });
@@ -573,10 +656,12 @@ const langJson = JSON.stringify(lang);
       addCredDialog?.close();
       await refreshCreds();
     } catch (err) {
-      const errEl = document.getElementById('cred-submit-error');
       const msg = (err as Error).message;
       if (errEl) { errEl.textContent = `Error: ${msg}`; errEl.classList.remove('hidden'); }
       else alert(`Error: ${msg}`);
+    } finally {
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = originalSubmitText; }
+      if (testBtn)   { testBtn.disabled = false; }
     }
   });
 
