@@ -36,6 +36,7 @@ const tr = t(lang);
   import maplibregl from 'maplibre-gl';
   import { Protocol } from 'pmtiles';
   import { getSupabase } from '../lib/supabase';
+  import { parseLocationToGeoJSON } from '../lib/geo';
   import {
     decideTileSource,
     getPmtilesCacheStatus,
@@ -43,6 +44,7 @@ const tr = t(lang);
   } from '../lib/offline-map';
 
   const isEs = document.documentElement.lang === 'es';
+  const isDark = document.documentElement.classList.contains('dark');
   const tr = (en: string, es: string): string => (isEs ? es : en);
 
   const container = document.getElementById('map');
@@ -69,7 +71,9 @@ const tr = t(lang);
   const pmProtocol = new Protocol();
   maplibregl.addProtocol('pmtiles', pmProtocol.tile);
 
-  const REMOTE_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
+  const REMOTE_STYLE_LIGHT = 'https://tiles.openfreemap.org/styles/liberty';
+  const REMOTE_STYLE_DARK  = 'https://tiles.openfreemap.org/styles/dark';
+  const REMOTE_STYLE = isDark ? REMOTE_STYLE_DARK : REMOTE_STYLE_LIGHT;
 
   /**
    * Inline minimal pmtiles style spec. We don't pull in
@@ -89,34 +93,34 @@ const tr = t(lang);
         },
       },
       layers: [
-        { id: 'background', type: 'background', paint: { 'background-color': '#f4f4f5' } },
+        { id: 'background', type: 'background', paint: { 'background-color': isDark ? '#0f172a' : '#f4f4f5' } },
         {
           id: 'water',
           type: 'fill',
           source: 'protomaps',
           'source-layer': 'water',
-          paint: { 'fill-color': '#bfdbfe' },
+          paint: { 'fill-color': isDark ? '#1e293b' : '#bfdbfe' },
         },
         {
           id: 'landuse',
           type: 'fill',
           source: 'protomaps',
           'source-layer': 'landuse',
-          paint: { 'fill-color': '#e7e5e4', 'fill-opacity': 0.5 },
+          paint: { 'fill-color': isDark ? '#1e293b' : '#e7e5e4', 'fill-opacity': 0.5 },
         },
         {
           id: 'roads',
           type: 'line',
           source: 'protomaps',
           'source-layer': 'roads',
-          paint: { 'line-color': '#a1a1aa', 'line-width': 0.6 },
+          paint: { 'line-color': isDark ? '#334155' : '#a1a1aa', 'line-width': 0.6 },
         },
         {
           id: 'boundaries',
           type: 'line',
           source: 'protomaps',
           'source-layer': 'boundaries',
-          paint: { 'line-color': '#71717a', 'line-width': 0.4, 'line-dasharray': [2, 2] },
+          paint: { 'line-color': isDark ? '#475569' : '#71717a', 'line-width': 0.4, 'line-dasharray': [2, 2] },
         },
       ],
     };
@@ -215,15 +219,18 @@ const tr = t(lang);
 
     const features: GeoJSON.Feature[] = [];
     for (const row of data ?? []) {
+      // PostgREST returns geography columns as EWKB hex strings, not
+      // GeoJSON objects. Use parseLocationToGeoJSON to decode them.
       // Prefer location_obscured for sensitive observations (non-owner
       // viewers should see the coarsened point, not precise coords).
-      // Fall back to precise location when obscure_level is 'none' or
-      // when location_obscured is unavailable.
-      const precise = (row as { location: unknown }).location as GeoJSON.Point | null;
-      const obscured = (row as { location_obscured: unknown }).location_obscured as GeoJSON.Point | null;
+      const rawPrecise = (row as Record<string, unknown>).location;
+      const rawObscured = (row as Record<string, unknown>).location_obscured;
       const level = (row as { obscure_level?: string }).obscure_level;
-      const geom = (level && level !== 'none' && obscured?.coordinates) ? obscured : precise;
-      if (!geom?.coordinates) continue;
+      const precise = parseLocationToGeoJSON(rawPrecise);
+      const obscured = parseLocationToGeoJSON(rawObscured);
+      const parsed = (level && level !== 'none' && obscured?.coordinates) ? obscured : precise;
+      if (!parsed?.coordinates) continue;
+      const geom: GeoJSON.Point = { type: 'Point', coordinates: parsed.coordinates };
       const observedAt = (row as { observed_at?: string | null }).observed_at ?? null;
       const observedMonth = observedAt ? new Date(observedAt).getUTCMonth() : null;
       const taxon = (row as { taxa?: { kingdom?: string | null } | null }).taxa;
@@ -353,7 +360,7 @@ const tr = t(lang);
         ],
         'circle-radius': 7,
         'circle-stroke-width': 2,
-        'circle-stroke-color': '#ffffff',
+        'circle-stroke-color': isDark ? '#0f172a' : '#ffffff',
       },
     });
 
