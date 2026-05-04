@@ -611,10 +611,13 @@ serve(async (req) => {
     result = cascaded.result;
   }
 
-  // If Claude won and a sponsorship paid for it, record usage + threshold notify.
+  // If a sponsorship paid for the winning ID, record usage + threshold notify.
+  // Gate on source !== 'plantnet' so we cover Anthropic-direct, Bedrock, Vertex,
+  // OpenAI, Azure, Gemini — anything that consumed the sponsored credential.
+  // PlantNet has its own quota and never pulls from sponsorship.
   if (
     result
-    && result.source === 'claude_haiku'
+    && result.source !== 'plantnet'
     && sponsorshipCtx
     && beneficiaryId
   ) {
