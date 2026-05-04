@@ -100,7 +100,8 @@ const sharePathBase = '/share/obs/';
     /** Render the 80×80 media thumbnail based on media type. */
     function mediaThumbnail(url: string | null, type: string | null): string {
       if (!url) return '';
-      if (type === 'audio') {
+      const isAudio = type === 'audio' || /\.(mp3|ogg|wav|m4a|webm)$/i.test(url);
+      if (isAudio) {
         return `<div class="w-full h-full flex flex-col items-center justify-center gap-1 p-1">
           <span class="text-xl" aria-hidden="true">🔊</span>
           <audio controls src="${escapeText(url)}" class="w-full" style="height:24px;max-width:72px;min-width:0;" preload="none" onclick="event.stopPropagation()" ontouchstart="event.stopPropagation()"></audio>
