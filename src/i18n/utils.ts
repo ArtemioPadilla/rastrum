@@ -63,6 +63,7 @@ export const routes: Record<string, Record<Locale, string>> = {
   // Community discovery (M28)
   community:           { en: '/community',           es: '/comunidad' },
   communityObservers:  { en: '/community/observers', es: '/comunidad/observadores' },
+  communityDonate:     { en: '/community/donate',    es: '/comunidad/donar' },
   privacy: { en: '/privacy', es: '/privacidad' },
   terms: { en: '/terms', es: '/terminos' },
   faq: { en: '/faq', es: '/preguntas-frecuentes' },
@@ -161,6 +162,7 @@ export const routeTree: Record<string, RouteNode> = {
   // Community discovery (M28)
   community:          { labels: { en: 'Community',  es: 'Comunidad' } },
   communityObservers: { labels: { en: 'Observers',  es: 'Observadores' }, parent: 'community' },
+  communityDonate:    { labels: { en: 'Donate',     es: 'Donar' },        parent: 'community' },
   about:       { labels: { en: 'About',         es: 'Acerca' } },
   docs:        { labels: { en: 'Docs',          es: 'Docs' } },
   signIn:      { labels: { en: 'Sign in',       es: 'Ingresar' } },

@@ -1,0 +1,13 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import PoolDonateView from '../../../components/PoolDonateView.astro';
+import { t } from '../../../i18n/utils';
+
+const lang = 'en';
+const tr = t(lang);
+const sp = (tr as unknown as { sponsoring: { donate_title: string; donate_subtitle: string } }).sponsoring;
+---
+
+<BaseLayout title={`${sp.donate_title} — Rastrum`} description={sp.donate_subtitle} lang={lang}>
+  <PoolDonateView lang={lang} />
+</BaseLayout>

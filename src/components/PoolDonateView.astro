@@ -1,0 +1,254 @@
+---
+import { t } from '../i18n/utils';
+
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+
+interface SponsoringStrings {
+  donate_title: string;
+  donate_subtitle: string;
+  donate_pool_label: string;
+  donate_model: string;
+  donate_capacity: string;
+  donate_calls_label: string;
+  donate_calls_hint: string;
+  donate_credential_label: string;
+  donate_confirm: string;
+  donate_success: string;
+  donate_error: string;
+  donate_no_pools: string;
+  donate_no_credentials: string;
+  donate_sign_in: string;
+}
+const sp = (tr as unknown as { sponsoring: SponsoringStrings }).sponsoring;
+const cancelLabel = lang === 'es' ? 'Cancelar' : 'Cancel';
+---
+
+<section class="max-w-4xl mx-auto p-6 space-y-8">
+  <header>
+    <h1 class="text-2xl md:text-3xl font-bold text-zinc-900 dark:text-zinc-100">{sp.donate_title}</h1>
+    <p class="mt-2 text-zinc-600 dark:text-zinc-400">{sp.donate_subtitle}</p>
+  </header>
+
+  <!-- Sign-in prompt (hidden when authenticated) -->
+  <div id="donate-sign-in" class="hidden rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 p-5 text-center">
+    <p class="text-amber-800 dark:text-amber-300 font-medium">{sp.donate_sign_in}</p>
+  </div>
+
+  <!-- Loading state -->
+  <div id="donate-loading" class="hidden text-center py-12">
+    <div class="inline-block w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" role="status">
+      <span class="sr-only">Loading…</span>
+    </div>
+  </div>
+
+  <!-- Empty state -->
+  <div id="donate-empty" class="hidden rounded-xl border border-zinc-200 dark:border-zinc-800 p-8 text-center">
+    <p class="text-zinc-500 dark:text-zinc-400">{sp.donate_no_pools}</p>
+  </div>
+
+  <!-- Pool list -->
+  <div id="donate-pools" class="hidden space-y-4"></div>
+
+  <!-- Donate dialog -->
+  <dialog id="donate-dialog" class="w-full max-w-md rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 shadow-xl backdrop:bg-black/40">
+    <form method="dialog" id="donate-form" class="space-y-5">
+      <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">{sp.donate_confirm}</h2>
+
+      <input type="hidden" id="donate-pool-id" name="pool_id" />
+
+      <div>
+        <label for="donate-credential" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{sp.donate_credential_label}</label>
+        <select id="donate-credential" name="credential_id" required
+          class="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+        </select>
+        <p id="donate-no-creds-hint" class="hidden mt-1 text-xs text-amber-600 dark:text-amber-400">{sp.donate_no_credentials}</p>
+      </div>
+
+      <div>
+        <label for="donate-calls" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{sp.donate_calls_label}</label>
+        <input id="donate-calls" name="calls" type="number" min="10" max="10000" value="100" required
+          class="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500" />
+        <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{sp.donate_calls_hint}</p>
+      </div>
+
+      <!-- Feedback -->
+      <div id="donate-feedback" class="hidden rounded-lg px-4 py-2 text-sm"></div>
+
+      <div class="flex justify-end gap-3 pt-2">
+        <button type="button" id="donate-cancel-btn"
+          class="px-4 py-2 text-sm rounded-lg border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800">
+          {cancelLabel}
+        </button>
+        <button type="submit" id="donate-submit-btn"
+          class="px-4 py-2 text-sm rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium">
+          {sp.donate_confirm}
+        </button>
+      </div>
+    </form>
+  </dialog>
+</section>
+
+<script define:vars={{
+  poolLabel: sp.donate_pool_label,
+  modelLabel: sp.donate_model,
+  capacityLabel: sp.donate_capacity,
+  confirmLabel: sp.donate_confirm,
+  successMsg: sp.donate_success,
+  errorMsg: sp.donate_error,
+  noCredsMsg: sp.donate_no_credentials,
+}}>
+  (async function initDonate() {
+    const signInEl   = document.getElementById('donate-sign-in');
+    const loadingEl  = document.getElementById('donate-loading');
+    const emptyEl    = document.getElementById('donate-empty');
+    const poolsEl    = document.getElementById('donate-pools');
+    const dialog     = document.getElementById('donate-dialog');
+    const form       = document.getElementById('donate-form');
+    const poolIdIn   = document.getElementById('donate-pool-id');
+    const credSelect = document.getElementById('donate-credential');
+    const callsIn    = document.getElementById('donate-calls');
+    const feedback   = document.getElementById('donate-feedback');
+    const submitBtn  = document.getElementById('donate-submit-btn');
+    const cancelBtn  = document.getElementById('donate-cancel-btn');
+    const noCredsEl  = document.getElementById('donate-no-creds-hint');
+
+    // Dynamic imports to keep the page lightweight for anonymous visitors
+    const { getSupabase } = await import('../lib/supabase');
+    const { data: { session } } = await getSupabase().auth.getSession();
+
+    if (!session) {
+      signInEl?.classList.remove('hidden');
+      return;
+    }
+
+    loadingEl?.classList.remove('hidden');
+
+    const { listActivePools, listCredentials, donateToPool } = await import('../lib/sponsorships');
+
+    let pools = [];
+    let credentials = [];
+    try {
+      [pools, credentials] = await Promise.all([listActivePools(), listCredentials()]);
+    } catch {
+      loadingEl?.classList.add('hidden');
+      emptyEl?.classList.remove('hidden');
+      return;
+    }
+
+    loadingEl?.classList.add('hidden');
+
+    if (pools.length === 0) {
+      emptyEl?.classList.remove('hidden');
+      return;
+    }
+
+    // Render pool cards
+    poolsEl?.classList.remove('hidden');
+    pools.forEach(function(pool) {
+      const pct = pool.total_cap > 0 ? Math.min(100, Math.round((pool.used / pool.total_cap) * 100)) : 0;
+      const card = document.createElement('div');
+      card.className = 'rounded-xl border border-zinc-200 dark:border-zinc-800 p-5 space-y-3';
+      card.innerHTML =
+        '<div class="flex items-center justify-between gap-4">' +
+          '<div class="min-w-0">' +
+            '<h3 class="font-semibold text-zinc-900 dark:text-zinc-100 truncate">' + poolLabel + ': ' + escapeHtml(pool.credential_label) + '</h3>' +
+            '<p class="text-sm text-zinc-500 dark:text-zinc-400">' + modelLabel + ': ' + escapeHtml(pool.preferred_model) + '</p>' +
+          '</div>' +
+          '<button type="button" data-pool-id="' + pool.id + '" class="donate-btn shrink-0 px-4 py-2 text-sm rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 font-medium">' +
+            confirmLabel +
+          '</button>' +
+        '</div>' +
+        '<div>' +
+          '<div class="flex justify-between text-xs text-zinc-500 dark:text-zinc-400 mb-1">' +
+            '<span>' + capacityLabel + '</span>' +
+            '<span>' + pool.used.toLocaleString() + ' / ' + pool.total_cap.toLocaleString() + ' (' + pct + '%)</span>' +
+          '</div>' +
+          '<div class="w-full h-2 rounded-full bg-zinc-200 dark:bg-zinc-700 overflow-hidden">' +
+            '<div class="h-full rounded-full transition-all ' +
+              (pct >= 90 ? 'bg-red-500' : pct >= 70 ? 'bg-amber-500' : 'bg-emerald-500') +
+              '" style="width:' + pct + '%"></div>' +
+          '</div>' +
+        '</div>';
+      poolsEl?.appendChild(card);
+    });
+
+    // Wire donate buttons
+    document.querySelectorAll('.donate-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        const pid = btn.getAttribute('data-pool-id');
+        if (!pid || !dialog) return;
+        poolIdIn.value = pid;
+
+        // Populate credential dropdown
+        credSelect.innerHTML = '';
+        if (credentials.length === 0) {
+          noCredsEl?.classList.remove('hidden');
+          submitBtn.disabled = true;
+        } else {
+          noCredsEl?.classList.add('hidden');
+          submitBtn.disabled = false;
+          credentials.forEach(function(c) {
+            const opt = document.createElement('option');
+            opt.value = c.id;
+            opt.textContent = c.label;
+            credSelect.appendChild(opt);
+          });
+        }
+
+        feedback?.classList.add('hidden');
+        callsIn.value = '100';
+        dialog.showModal();
+      });
+    });
+
+    cancelBtn?.addEventListener('click', function() { dialog?.close(); });
+
+    form?.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const pid = poolIdIn?.value;
+      const cid = credSelect?.value;
+      const calls = parseInt(callsIn?.value || '0', 10);
+      if (!pid || !cid || calls < 10 || calls > 10000) return;
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = '…';
+      feedback?.classList.add('hidden');
+
+      try {
+        const result = await donateToPool({ pool_id: pid, credential_id: cid, calls: calls });
+        if (result.ok) {
+          showFeedback(true, successMsg);
+          setTimeout(function() { dialog?.close(); location.reload(); }, 1500);
+        } else {
+          showFeedback(false, result.error || errorMsg);
+          submitBtn.disabled = false;
+          submitBtn.textContent = confirmLabel;
+        }
+      } catch {
+        showFeedback(false, errorMsg);
+        submitBtn.disabled = false;
+        submitBtn.textContent = confirmLabel;
+      }
+    });
+
+    function showFeedback(ok, msg) {
+      if (!feedback) return;
+      feedback.classList.remove('hidden', 'bg-emerald-50', 'dark:bg-emerald-900/20', 'text-emerald-800', 'dark:text-emerald-300',
+        'bg-red-50', 'dark:bg-red-900/20', 'text-red-800', 'dark:text-red-300');
+      if (ok) {
+        feedback.classList.add('bg-emerald-50', 'dark:bg-emerald-900/20', 'text-emerald-800', 'dark:text-emerald-300');
+      } else {
+        feedback.classList.add('bg-red-50', 'dark:bg-red-900/20', 'text-red-800', 'dark:text-red-300');
+      }
+      feedback.textContent = msg;
+    }
+
+    function escapeHtml(str) {
+      var d = document.createElement('div');
+      d.textContent = str;
+      return d.innerHTML;
+    }
+  })();
+</script>
