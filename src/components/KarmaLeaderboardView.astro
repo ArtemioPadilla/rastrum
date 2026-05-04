@@ -2,12 +2,14 @@
 /**
  * KarmaLeaderboardView — shared EN+ES page body for /community/leaderboard/.
  *
- * Shows top 20 users by karma_total (descending). Queries the
- * `community_observers` view which already filters out users with
- * `hide_from_leaderboards = true`.
+ * Two periods, URL-driven via `?period=30d|all`:
+ *   - 30d (default): queries `karma_leaderboard_30d` materialized view.
+ *   - all          : queries `community_observers` for all-time karma_total.
  *
- * Client-rendered (CSR) like CommunityView — the audience is signed-in
- * observers checking their standing.
+ * Both data sources filter `hide_from_leaderboards = false` at the SQL
+ * layer (the MV WHERE clause + the view definition). Client-rendered
+ * (CSR) like CommunityView — the audience is signed-in observers
+ * checking their standing.
  */
 import { t, getLocalizedPath, routes, type Locale } from '../i18n/utils';
 
@@ -26,6 +28,9 @@ interface LeaderboardCopy {
   leaderboard_karma: string;
   leaderboard_species: string;
   leaderboard_empty: string;
+  leaderboard_period_30d: string;
+  leaderboard_period_all: string;
+  leaderboard_period_aria: string;
   loading: string;
 }
 const cm = (tr as unknown as { community: LeaderboardCopy }).community;
@@ -53,6 +58,31 @@ const stringsJson = JSON.stringify({
     <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-1">{cm.leaderboard_subtitle}</p>
   </div>
 
+  <div
+    class="mb-4 inline-flex rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-0.5 text-xs"
+    role="tablist"
+    aria-label={cm.leaderboard_period_aria}
+  >
+    <button
+      type="button"
+      role="tab"
+      data-period-tab="30d"
+      aria-pressed="true"
+      class="px-3 py-1.5 rounded-md font-medium transition"
+    >
+      {cm.leaderboard_period_30d}
+    </button>
+    <button
+      type="button"
+      role="tab"
+      data-period-tab="all"
+      aria-pressed="false"
+      class="px-3 py-1.5 rounded-md font-medium transition"
+    >
+      {cm.leaderboard_period_all}
+    </button>
+  </div>
+
   <div id="leaderboard-loading" class="text-sm text-zinc-500 italic">
     {cm.loading}
   </div>
@@ -78,6 +108,7 @@ const stringsJson = JSON.stringify({
 
 <script>
   import { getSupabase } from '../lib/supabase';
+  import { periodFromSearch, searchForPeriod, type LeaderboardPeriod } from '../lib/leaderboard-url';
 
   interface LeaderboardStrings {
     lang: 'en' | 'es';
@@ -95,10 +126,14 @@ const stringsJson = JSON.stringify({
   const emptyEl = document.getElementById('leaderboard-empty');
   const tableWrap = document.getElementById('leaderboard-table-wrap');
   const tbody = document.getElementById('leaderboard-body');
+  const tabs = root.querySelectorAll<HTMLButtonElement>('[data-period-tab]');
 
   if (!loadingEl || !emptyEl || !tableWrap || !tbody) {
     throw new Error('KarmaLeaderboardView: missing required DOM nodes');
   }
+
+  const ACTIVE_TAB = 'bg-emerald-600 text-white shadow-sm';
+  const INACTIVE_TAB = 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800';
 
   function escapeHtml(s: string): string {
     return String(s ?? '').replace(/[&<>"']/g, (c) => ({
@@ -111,8 +146,8 @@ const stringsJson = JSON.stringify({
     username: string | null;
     display_name: string | null;
     avatar_url: string | null;
-    karma_total: number;
-    species_count: number;
+    karma: number;
+    species_count: number | null;
   }
 
   function renderRow(row: LeaderboardRow, rank: number): HTMLTableRowElement {
@@ -140,46 +175,118 @@ const stringsJson = JSON.stringify({
           </div>
         </a>
       </td>
-      <td class="py-3 px-2 text-right font-semibold text-emerald-700 dark:text-emerald-400">${Math.round(row.karma_total)}</td>
-      <td class="py-3 pl-2 text-right text-zinc-600 dark:text-zinc-300">${row.species_count}</td>
+      <td class="py-3 px-2 text-right font-semibold text-emerald-700 dark:text-emerald-400">${Math.round(row.karma)}</td>
+      <td class="py-3 pl-2 text-right text-zinc-600 dark:text-zinc-300">${row.species_count ?? 0}</td>
     `;
     return tr;
   }
 
-  void (async () => {
+  function paintTabs(period: LeaderboardPeriod) {
+    tabs.forEach((tab) => {
+      const own = tab.dataset.periodTab as LeaderboardPeriod;
+      const active = own === period;
+      tab.setAttribute('aria-pressed', active ? 'true' : 'false');
+      tab.className = `px-3 py-1.5 rounded-md font-medium transition ${active ? ACTIVE_TAB : INACTIVE_TAB}`;
+    });
+  }
+
+  function showLoading() {
+    loadingEl!.classList.remove('hidden', 'text-red-600');
+    loadingEl!.classList.add('text-zinc-500');
+    loadingEl!.textContent = STRINGS.loading;
+    emptyEl!.classList.add('hidden');
+    tableWrap!.classList.add('hidden');
+    tbody!.innerHTML = '';
+  }
+
+  async function loadFor(period: LeaderboardPeriod) {
+    showLoading();
     try {
       const supabase = getSupabase();
-      const { data, error } = await supabase
-        .from('community_observers')
-        .select('id, username, display_name, avatar_url, karma_total, species_count')
-        .order('karma_total', { ascending: false, nullsFirst: false })
-        .limit(20);
-
-      loadingEl.classList.add('hidden');
-
-      if (error) {
-        loadingEl.classList.remove('hidden');
-        loadingEl.textContent = error.message;
-        loadingEl.classList.add('text-red-600');
-        loadingEl.classList.remove('text-zinc-500');
-        return;
+      let rows: LeaderboardRow[] = [];
+      if (period === '30d') {
+        const { data, error } = await supabase
+          .from('karma_leaderboard_30d')
+          .select('user_id, username, display_name, avatar_url, karma_30d, species_count')
+          .order('karma_30d', { ascending: false, nullsFirst: false })
+          .limit(20);
+        if (error) throw new Error(error.message);
+        rows = (data ?? []).map((r: {
+          user_id: string;
+          username: string | null;
+          display_name: string | null;
+          avatar_url: string | null;
+          karma_30d: number | null;
+          species_count: number | null;
+        }) => ({
+          id: r.user_id,
+          username: r.username,
+          display_name: r.display_name,
+          avatar_url: r.avatar_url,
+          karma: Number(r.karma_30d ?? 0),
+          species_count: r.species_count,
+        }));
+      } else {
+        const { data, error } = await supabase
+          .from('community_observers')
+          .select('id, username, display_name, avatar_url, karma_total, species_count')
+          .order('karma_total', { ascending: false, nullsFirst: false })
+          .limit(20);
+        if (error) throw new Error(error.message);
+        rows = (data ?? []).map((r: {
+          id: string;
+          username: string | null;
+          display_name: string | null;
+          avatar_url: string | null;
+          karma_total: number | null;
+          species_count: number | null;
+        }) => ({
+          id: r.id,
+          username: r.username,
+          display_name: r.display_name,
+          avatar_url: r.avatar_url,
+          karma: Number(r.karma_total ?? 0),
+          species_count: r.species_count,
+        }));
       }
 
-      const rows = (data ?? []) as LeaderboardRow[];
+      loadingEl!.classList.add('hidden');
       if (rows.length === 0) {
-        emptyEl.classList.remove('hidden');
+        emptyEl!.classList.remove('hidden');
         return;
       }
-
       for (let i = 0; i < rows.length; i++) {
-        tbody.appendChild(renderRow(rows[i], i + 1));
+        tbody!.appendChild(renderRow(rows[i], i + 1));
       }
-      tableWrap.classList.remove('hidden');
+      tableWrap!.classList.remove('hidden');
     } catch (err) {
-      loadingEl.classList.remove('hidden');
-      loadingEl.textContent = err instanceof Error ? err.message : String(err);
-      loadingEl.classList.add('text-red-600');
-      loadingEl.classList.remove('text-zinc-500');
+      loadingEl!.classList.remove('hidden');
+      loadingEl!.textContent = err instanceof Error ? err.message : String(err);
+      loadingEl!.classList.add('text-red-600');
+      loadingEl!.classList.remove('text-zinc-500');
     }
-  })();
+  }
+
+  function applyPeriod(period: LeaderboardPeriod, push: boolean) {
+    paintTabs(period);
+    if (push) {
+      const next = searchForPeriod(window.location.search, period);
+      const url = `${window.location.pathname}${next}${window.location.hash}`;
+      window.history.pushState({ period }, '', url);
+    }
+    void loadFor(period);
+  }
+
+  tabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      const period = tab.dataset.periodTab as LeaderboardPeriod;
+      applyPeriod(period, true);
+    });
+  });
+
+  window.addEventListener('popstate', () => {
+    applyPeriod(periodFromSearch(window.location.search), false);
+  });
+
+  applyPeriod(periodFromSearch(window.location.search), false);
 </script>
