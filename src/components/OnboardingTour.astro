@@ -589,6 +589,21 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
     try { sb = getSupabase(); } catch { return; }
     const { data: { user } } = await sb.auth.getUser();
     if (!user) return;
+    // Cross-device dedupe: if this user already configured privacy on another
+    // browser/session, the server holds profile_privacy. Treat that as proof
+    // the tour ran before and skip — otherwise users hit the privacy step
+    // every time their localStorage is cleared (incognito, ITP, new device).
+    try {
+      const { data: profile } = await sb
+        .from('users')
+        .select('profile_privacy')
+        .eq('id', user.id)
+        .maybeSingle<{ profile_privacy: Record<string, string> | null }>();
+      if (profile?.profile_privacy && Object.keys(profile.profile_privacy).length > 0) {
+        markSeen();
+        return;
+      }
+    } catch { /* env not configured / column missing — fall through and show */ }
     setTimeout(() => show(), 600);
   }
 
