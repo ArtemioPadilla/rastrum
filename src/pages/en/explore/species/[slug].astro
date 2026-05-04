@@ -1,0 +1,15 @@
+---
+import BaseLayout from '../../../../layouts/BaseLayout.astro';
+import SpeciesProfileView from '../../../../components/SpeciesProfileView.astro';
+
+export function getStaticPaths() {
+  return [];
+}
+
+const { slug } = Astro.params;
+const lang = 'en';
+---
+
+<BaseLayout title="Species — Rastrum" description="Species profile on Rastrum." lang={lang}>
+  <SpeciesProfileView lang={lang} />
+</BaseLayout>

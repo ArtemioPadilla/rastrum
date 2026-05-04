@@ -7176,3 +7176,62 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.places_near(double precision, double precision, int, int)
   TO authenticated, anon;
+
+-- ── M34 Phase 1: Species profile page RPCs ──────────────────────────────────
+
+-- get_species_stats: aggregated stats for a single taxon
+CREATE OR REPLACE FUNCTION public.get_species_stats(p_taxon_id uuid)
+RETURNS json LANGUAGE sql STABLE SECURITY DEFINER AS $$
+  SELECT json_build_object(
+    'obs_count', COUNT(DISTINCT o.id),
+    'observer_count', COUNT(DISTINCT o.observer_id),
+    'last_observed_at', MAX(o.observed_at),
+    'consensus_pct', ROUND(
+      100.0 * COUNT(DISTINCT o.id) FILTER (
+        WHERE EXISTS (
+          SELECT 1 FROM identifications i
+          WHERE i.observation_id = o.id AND i.is_primary AND i.scientific_name = t.scientific_name
+        )
+      ) / NULLIF(COUNT(DISTINCT o.id), 0), 1
+    ),
+    'state_counts', (
+      SELECT json_agg(json_build_object('state', state_province, 'count', n))
+      FROM (
+        SELECT state_province, COUNT(*) as n
+        FROM observations
+        WHERE primary_taxon_id = p_taxon_id AND sync_status = 'synced' AND state_province IS NOT NULL
+        GROUP BY state_province ORDER BY n DESC LIMIT 5
+      ) s
+    )
+  )
+  FROM observations o
+  JOIN taxa t ON t.id = p_taxon_id
+  WHERE o.primary_taxon_id = p_taxon_id AND o.sync_status = 'synced';
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_species_stats(uuid) TO authenticated, anon;
+
+-- recompute_species_hero: pick the best photo for a taxon (most best_shot reactions, then newest)
+CREATE OR REPLACE FUNCTION public.recompute_species_hero(p_taxon_id uuid)
+RETURNS void LANGUAGE plpgsql AS $$
+DECLARE
+  v_media_id uuid;
+  v_obs_id uuid;
+BEGIN
+  SELECT mf.id, o.id INTO v_media_id, v_obs_id
+  FROM media_files mf
+  JOIN observations o ON o.id = mf.observation_id
+  LEFT JOIN reactions r ON r.target_id = mf.id AND r.reaction_type = 'best_shot'
+  WHERE o.primary_taxon_id = p_taxon_id
+    AND o.sync_status = 'synced'
+    AND mf.deleted_at IS NULL
+    AND mf.media_type = 'photo'
+  GROUP BY mf.id, o.id
+  ORDER BY COUNT(r.id) DESC, o.observed_at DESC
+  LIMIT 1;
+  UPDATE taxa SET hero_media_id = v_media_id, hero_observation_id = v_obs_id, hero_updated_at = now()
+  WHERE id = p_taxon_id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.recompute_species_hero(uuid) TO authenticated;
