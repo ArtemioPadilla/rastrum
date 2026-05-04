@@ -8,6 +8,7 @@ import PhotoGallery from './PhotoGallery.astro';
 import MapPicker from './MapPicker.astro';
 import ObsManagePanel from './ObsManagePanel.astro';
 import AudioPlayer from './AudioPlayer.astro';
+import CascadeTrace from './CascadeTrace.astro';
 import { t } from '../i18n/utils';
 
 interface Props {
@@ -169,6 +170,8 @@ const labels = {
             <dd id="observer" class="font-medium">—</dd>
           </div>
         </dl>
+
+        <CascadeTrace lang={lang} variant="inline" traceId="obs-cascade" />
 
         <section id="community-ids" class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 space-y-3">
           <div class="flex items-start justify-between gap-2 flex-wrap">
