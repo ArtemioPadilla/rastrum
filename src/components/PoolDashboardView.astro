@@ -1,0 +1,208 @@
+---
+import { t } from '../i18n/utils';
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+const poolTr = tr.sponsoring.pool_dashboard;
+---
+
+<section id="pool-dashboard-section" class="space-y-4">
+  <div class="flex items-center justify-between gap-2 flex-wrap">
+    <div>
+      <h2 class="text-lg font-semibold">{poolTr.title}</h2>
+      <p class="text-xs text-zinc-500 dark:text-zinc-400">{poolTr.subtitle}</p>
+    </div>
+    <button id="pool-dash-refresh" type="button"
+      class="text-xs text-emerald-700 dark:text-emerald-400 hover:text-emerald-900 dark:hover:text-emerald-200 px-2 py-1 rounded border border-zinc-300 dark:border-zinc-700 min-h-[28px]"
+      aria-label={lang === 'es' ? 'Actualizar' : 'Refresh'}>
+      ↻
+    </button>
+  </div>
+
+  <div id="pool-dash-loading" class="text-sm text-zinc-500 dark:text-zinc-400">
+    {lang === 'es' ? 'Cargando…' : 'Loading…'}
+  </div>
+
+  <div id="pool-dash-empty" class="hidden text-sm text-zinc-500 dark:text-zinc-400">
+    {lang === 'es' ? 'Aún no has donado al pool.' : 'You haven\'t donated to the pool yet.'}
+  </div>
+
+  <div id="pool-dash-cards" class="grid grid-cols-1 gap-6"></div>
+</section>
+
+<script type="application/json" id="pool-dash-i18n" set:html={JSON.stringify({
+  capacity: poolTr.capacity,
+  used: poolTr.used,
+  unique_users: poolTr.unique_users,
+  top_taxa: poolTr.top_taxa,
+  top_taxa_coming: poolTr.top_taxa_coming,
+  daily_usage: poolTr.daily_usage,
+  no_taxa: poolTr.no_taxa,
+  no_usage: poolTr.no_usage,
+})} />
+
+<script>
+  import { listMyPools } from '../lib/sponsorships';
+  import { fetchPoolAnalytics } from '../lib/pool-analytics';
+  import type { PoolAnalytics } from '../lib/pool-analytics';
+
+  type DashI18n = {
+    capacity: string;
+    used: string;
+    unique_users: string;
+    top_taxa: string;
+    top_taxa_coming: string;
+    daily_usage: string;
+    no_taxa: string;
+    no_usage: string;
+  };
+
+  const i18n: DashI18n = JSON.parse(
+    (document.getElementById('pool-dash-i18n') as HTMLScriptElement | null)?.textContent ?? '{}'
+  ) as DashI18n;
+
+  const escHtml = (s: string): string => s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+  function statusBadgeClass(status: string): string {
+    if (status === 'active')  return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300';
+    if (status === 'paused')  return 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300';
+    return 'bg-zinc-200 text-zinc-700 dark:bg-zinc-800/60 dark:text-zinc-300';
+  }
+
+  function renderCapacityBar(used: number, total: number, pct: number): string {
+    const clampedPct = Math.min(100, Math.round(pct));
+    const barColor = pct >= 90 ? 'bg-red-500' : pct >= 70 ? 'bg-amber-500' : 'bg-emerald-600';
+    return `
+      <div>
+        <div class="flex items-center justify-between text-xs text-zinc-600 dark:text-zinc-400 mb-1">
+          <span class="font-medium">${escHtml(i18n.capacity)}</span>
+          <span>${used} / ${total} (${clampedPct}%)</span>
+        </div>
+        <div class="h-2 w-full rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
+          <div class="h-full ${barColor} transition-all" style="width: ${clampedPct}%"></div>
+        </div>
+      </div>`;
+  }
+
+  function renderUniqueUsers(count: number): string {
+    return `
+      <div class="flex items-center justify-between text-xs text-zinc-600 dark:text-zinc-400">
+        <span class="font-medium">${escHtml(i18n.unique_users)}</span>
+        <span class="tabular-nums">${count}</span>
+      </div>`;
+  }
+
+  function renderTopTaxa(taxa: PoolAnalytics['topTaxa']): string {
+    if (taxa.length === 0) {
+      return `<p class="text-xs text-zinc-500 dark:text-zinc-400 italic">${escHtml(i18n.top_taxa_coming)}</p>`;
+    }
+    const items = taxa.map((taxon, idx) => {
+      const rank = idx + 1;
+      const common = taxon.common_name ? ` <span class="text-zinc-500">(${escHtml(taxon.common_name)})</span>` : '';
+      const kingdom = taxon.kingdom ? ` <span class="text-[10px] text-zinc-400 uppercase">${escHtml(taxon.kingdom)}</span>` : '';
+      return `<li class="flex items-center justify-between text-sm">
+        <span><span class="text-zinc-400 mr-1.5">${rank}.</span> <span class="italic">${escHtml(taxon.scientific_name)}</span>${common}${kingdom}</span>
+        <span class="text-zinc-500 tabular-nums">${taxon.count}</span>
+      </li>`;
+    }).join('');
+    return `<ol class="space-y-1">${items}</ol>`;
+  }
+
+  function renderDailyUsage(daily: PoolAnalytics['dailyUsage']): string {
+    if (daily.length === 0) {
+      return `<p class="text-xs text-zinc-500 dark:text-zinc-400 italic">${escHtml(i18n.no_usage)}</p>`;
+    }
+    const maxCalls = Math.max(...daily.map(d => d.calls), 1);
+    const bars = daily.map(d => {
+      const heightPct = Math.max(4, Math.round((d.calls / maxCalls) * 100));
+      const dayLabel = d.date.slice(8);
+      return `<div class="flex flex-col items-center gap-0.5 flex-1 min-w-0" title="${escHtml(d.date)}: ${d.calls}">
+        <div class="w-full max-w-[12px] rounded-t bg-emerald-500 dark:bg-emerald-400" style="height: ${heightPct}%"></div>
+        <span class="text-[9px] text-zinc-400 leading-none">${dayLabel}</span>
+      </div>`;
+    }).join('');
+    return `<div class="flex items-end gap-px h-16">${bars}</div>`;
+  }
+
+  function renderPoolCard(pool: { id: string; status: string; preferred_model: string }, analytics: PoolAnalytics): string {
+    return `
+      <div class="rounded-xl border border-zinc-200 dark:border-zinc-800 p-4 space-y-4" data-pool-dash-id="${escHtml(pool.id)}">
+        <div class="flex items-center justify-between gap-2 flex-wrap">
+          <div class="flex items-center gap-2">
+            <span class="text-sm font-mono font-medium text-zinc-700 dark:text-zinc-300">${escHtml(pool.preferred_model)}</span>
+            <span class="text-[10px] px-1.5 py-0.5 rounded uppercase tracking-wider ${statusBadgeClass(pool.status)}">${escHtml(pool.status)}</span>
+          </div>
+          <span class="text-[10px] font-mono text-zinc-400">${escHtml(pool.id.slice(0, 8))}…</span>
+        </div>
+        ${renderCapacityBar(analytics.used, analytics.totalCap, analytics.pctUsed)}
+        ${renderUniqueUsers(analytics.uniqueUsers)}
+        <div>
+          <h4 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">${escHtml(i18n.top_taxa)}</h4>
+          ${renderTopTaxa(analytics.topTaxa)}
+        </div>
+        <div>
+          <h4 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">${escHtml(i18n.daily_usage)}</h4>
+          ${renderDailyUsage(analytics.dailyUsage)}
+        </div>
+      </div>`;
+  }
+
+  async function loadDashboard() {
+    const loadingEl = document.getElementById('pool-dash-loading');
+    const emptyEl   = document.getElementById('pool-dash-empty');
+    const cardsEl   = document.getElementById('pool-dash-cards');
+    if (!cardsEl) return;
+
+    loadingEl?.classList.remove('hidden');
+    emptyEl?.classList.add('hidden');
+    cardsEl.innerHTML = '';
+
+    try {
+      const pools = await listMyPools();
+      if (pools.length === 0) {
+        loadingEl?.classList.add('hidden');
+        emptyEl?.classList.remove('hidden');
+        return;
+      }
+
+      const { getSupabase } = await import('../lib/supabase');
+      const sb = getSupabase();
+
+      const cards: string[] = [];
+      for (const pool of pools) {
+        const analytics = await fetchPoolAnalytics(sb, pool.id);
+        if (analytics) {
+          cards.push(renderPoolCard(pool, analytics));
+        }
+      }
+
+      loadingEl?.classList.add('hidden');
+      if (cards.length === 0) {
+        emptyEl?.classList.remove('hidden');
+      } else {
+        cardsEl.innerHTML = cards.join('');
+      }
+    } catch {
+      loadingEl?.classList.add('hidden');
+      emptyEl?.classList.remove('hidden');
+    }
+  }
+
+  document.getElementById('pool-dash-refresh')?.addEventListener('click', () => {
+    loadDashboard();
+  });
+
+  // Allow external trigger from pool list "View dashboard" buttons
+  document.addEventListener('pool-dash:load', () => {
+    const section = document.getElementById('pool-dashboard-section');
+    section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    loadDashboard();
+  });
+
+  loadDashboard();
+</script>
