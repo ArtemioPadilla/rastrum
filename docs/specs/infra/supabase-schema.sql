@@ -4749,6 +4749,52 @@ ON CONFLICT (reason) DO UPDATE
       description_es = EXCLUDED.description_es;
   -- delta is intentionally NOT updated on conflict — preserves any future runtime edits.
 
+-- profile_karma_breakdown: per-reason aggregation of recent karma_events
+-- for use by the profile page's expandable breakdown widget.
+-- Self-only: only the calling user can see their own breakdown, except
+-- admins (has_role(auth.uid(), 'admin')) which can see any user's.
+-- The denormalised label join makes this one round-trip from the client.
+CREATE OR REPLACE FUNCTION public.profile_karma_breakdown(
+  p_user_id uuid,
+  p_window  interval DEFAULT '7 days'
+)
+RETURNS TABLE (
+  reason    text,
+  label_en  text,
+  label_es  text,
+  count     bigint,
+  sum_delta numeric
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  IF p_user_id IS DISTINCT FROM auth.uid()
+     AND NOT public.has_role(auth.uid(), 'admin')
+  THEN
+    RAISE EXCEPTION 'profile_karma_breakdown: forbidden';
+  END IF;
+
+  RETURN QUERY
+  SELECT
+    ke.reason,
+    COALESCE(kc.label_en, ke.reason)              AS label_en,
+    COALESCE(kc.label_es, ke.reason)              AS label_es,
+    COUNT(*)::bigint                              AS count,
+    COALESCE(SUM(ke.delta), 0)::numeric           AS sum_delta
+  FROM public.karma_events ke
+  LEFT JOIN public.karma_config kc ON kc.reason = ke.reason
+  WHERE ke.user_id = p_user_id
+    AND ke.created_at >= now() - p_window
+  GROUP BY ke.reason, kc.label_en, kc.label_es
+  ORDER BY sum_delta DESC, count DESC;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.profile_karma_breakdown(uuid, interval) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.profile_karma_breakdown(uuid, interval) TO authenticated;
+
 -- 3. karma_rarity_multipliers — DB-backed rarity multipliers.
 
 CREATE TABLE IF NOT EXISTS public.karma_rarity_multipliers (

@@ -10,11 +10,43 @@ interface Props {
   defer?: boolean;
 }
 
-const { lang, ownerOnly = false, defer = false } = Astro.props;
+const { lang, viewer, ownerOnly = false, defer = false } = Astro.props;
 const tr = t(lang);
-const k = (tr as unknown as { karma: Record<string, string> }).karma;
-const ownerPill = (tr as unknown as { privacy?: { owner_only_badge?: string } }).privacy?.owner_only_badge ?? (lang === 'es' ? '🔒 Solo tú lo ves' : '🔒 Only you see this');
+
+interface KarmaCopy {
+  section_title?: string;
+  total_label?: string;
+  weekly_delta?: string;
+  next_threshold?: string;
+  expertise_heading?: string;
+  expertise_empty?: string;
+  show_breakdown?: string;
+  hide_breakdown?: string;
+  breakdown_loading?: string;
+  breakdown_empty?: string;
+  breakdown_count_one?: string;
+  breakdown_count_other?: string;
+}
+interface PrivacyCopy { owner_only_badge?: string }
+
+const k = (tr as unknown as { karma?: KarmaCopy }).karma ?? {};
+const ownerPill = (tr as unknown as { privacy?: PrivacyCopy }).privacy?.owner_only_badge
+  ?? (lang === 'es' ? '🔒 Solo tú lo ves' : '🔒 Only you see this');
 const sectionClass = `rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 mb-6${defer ? ' hidden' : ''}`;
+
+const showBreakdownAffordance = viewer === 'self' || ownerOnly;
+
+const stringsJson = JSON.stringify({
+  lang,
+  showLabel:    k.show_breakdown    ?? 'Show breakdown',
+  hideLabel:    k.hide_breakdown    ?? 'Hide breakdown',
+  loadingLabel: k.breakdown_loading ?? 'Loading breakdown…',
+  emptyLabel:   k.breakdown_empty   ?? 'No karma activity in the last 7 days.',
+  countOne:     k.breakdown_count_one   ?? '{n} event',
+  countOther:   k.breakdown_count_other ?? '{n} events',
+  weeklyDelta:  k.weekly_delta      ?? '{n} this week',
+  nextThreshold: k.next_threshold   ?? '{n} to next milestone',
+});
 ---
 
 <section
@@ -22,11 +54,13 @@ const sectionClass = `rounded-xl border border-zinc-200 dark:border-zinc-800 bg-
   data-target-user-id={Astro.props.targetUserId}
   data-defer={defer ? '1' : '0'}
   data-karma-hydrated="0"
+  data-breakdown-enabled={showBreakdownAffordance ? '1' : '0'}
+  data-strings={stringsJson}
   class={sectionClass}
 >
   <header class="flex items-baseline justify-between mb-3">
     <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
-      {k?.section_title ?? (lang === 'es' ? 'Karma y experiencia' : 'Karma & expertise')}
+      {k.section_title ?? (lang === 'es' ? 'Karma y experiencia' : 'Karma & expertise')}
     </h2>
     {ownerOnly && (
       <span class="text-[10px] font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded">
@@ -35,24 +69,88 @@ const sectionClass = `rounded-xl border border-zinc-200 dark:border-zinc-800 bg-
     )}
   </header>
 
-  <div class="flex items-baseline gap-3 mb-3">
+  <div class="flex items-baseline gap-3 mb-2">
     <span data-karma-total class="text-3xl font-bold text-emerald-700 dark:text-emerald-400">—</span>
-    <span class="text-xs text-zinc-500 dark:text-zinc-400">{k?.total_label ?? 'karma'}</span>
+    <span class="text-xs text-zinc-500 dark:text-zinc-400">{k.total_label ?? 'karma'}</span>
   </div>
+
+  {showBreakdownAffordance && (
+    <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3 text-xs text-zinc-600 dark:text-zinc-400">
+      <span data-karma-weekly class="hidden font-medium text-emerald-700 dark:text-emerald-400"></span>
+      <span data-karma-next class="hidden"></span>
+    </div>
+  )}
 
   <div>
     <h3 class="text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-      {k?.expertise_heading ?? (lang === 'es' ? 'Experiencia destacada' : 'Top expertise')}
+      {k.expertise_heading ?? (lang === 'es' ? 'Experiencia destacada' : 'Top expertise')}
     </h3>
     <ul data-expertise class="space-y-1 text-sm">
-      <li class="text-xs text-zinc-500 italic">{k?.expertise_empty ?? '…'}</li>
+      <li class="text-xs text-zinc-500 italic">{k.expertise_empty ?? '…'}</li>
     </ul>
   </div>
+
+  {showBreakdownAffordance && (
+    <div class="mt-4 border-t border-zinc-100 dark:border-zinc-800/70 pt-3">
+      <button
+        type="button"
+        data-karma-breakdown-toggle
+        aria-expanded="false"
+        aria-controls="karma-breakdown-list"
+        class="text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 rounded"
+      >
+        <span data-karma-breakdown-toggle-label>▾ {k.show_breakdown ?? 'Show breakdown'}</span>
+      </button>
+      <div
+        id="karma-breakdown-list"
+        data-karma-breakdown-panel
+        hidden
+        class="mt-2 space-y-1 text-sm"
+      >
+        <p data-karma-breakdown-status class="text-xs text-zinc-500 italic">{k.breakdown_loading ?? 'Loading breakdown…'}</p>
+        <ul data-karma-breakdown-rows class="hidden space-y-1"></ul>
+      </div>
+    </div>
+  )}
 </section>
 
 <script>
   import { getSupabase } from '../../lib/supabase';
-  import { escAttr } from '../../lib/karma';
+  import { escAttr, formatDelta } from '../../lib/karma';
+  import { distanceToNextMilestone } from '../../lib/karma-milestones';
+
+  interface Strings {
+    lang: 'en' | 'es';
+    showLabel: string;
+    hideLabel: string;
+    loadingLabel: string;
+    emptyLabel: string;
+    countOne: string;
+    countOther: string;
+    weeklyDelta: string;
+    nextThreshold: string;
+  }
+
+  interface BreakdownRow {
+    reason: string;
+    label_en: string;
+    label_es: string;
+    count: number;
+    sum_delta: number;
+  }
+
+  function fmt(template: string, n: string | number): string {
+    return template.replace('{n}', String(n));
+  }
+
+  function pickLabel(row: BreakdownRow, lang: 'en' | 'es'): string {
+    return lang === 'es' ? (row.label_es ?? row.reason) : (row.label_en ?? row.reason);
+  }
+
+  function pickCountText(strings: Strings, n: number): string {
+    const tpl = n === 1 ? strings.countOne : strings.countOther;
+    return fmt(tpl, n);
+  }
 
   async function hydrate(el: HTMLElement) {
     if (el.dataset.karmaHydrated === '1') return;
@@ -81,7 +179,8 @@ const sectionClass = `rounded-xl border border-zinc-200 dark:border-zinc-800 bg-
     if (!data) return;
 
     el.dataset.karmaHydrated = '1';
-    totalEl.textContent = String(Math.round(data.karma_total ?? 0));
+    const karmaTotal = data.karma_total ?? 0;
+    totalEl.textContent = String(Math.round(karmaTotal));
     const rows = data.top_expertise ?? [];
     if (rows.length) {
       listEl.innerHTML = rows
@@ -89,7 +188,87 @@ const sectionClass = `rounded-xl border border-zinc-200 dark:border-zinc-800 bg-
         .join('');
     }
     if (deferred) el.classList.remove('hidden');
+
+    if (el.dataset.breakdownEnabled === '1') {
+      wireBreakdown(el, supabase, userId, karmaTotal);
+    }
+
     document.dispatchEvent(new CustomEvent('rastrum:karma-hydrated', { detail: { targetUserId: userId } }));
+  }
+
+  function wireBreakdown(
+    section: HTMLElement,
+    supabase: ReturnType<typeof getSupabase>,
+    userId: string,
+    karmaTotal: number,
+  ) {
+    const button = section.querySelector<HTMLButtonElement>('[data-karma-breakdown-toggle]');
+    const labelEl = section.querySelector<HTMLElement>('[data-karma-breakdown-toggle-label]');
+    const panel = section.querySelector<HTMLElement>('[data-karma-breakdown-panel]');
+    const status = section.querySelector<HTMLElement>('[data-karma-breakdown-status]');
+    const rowsEl = section.querySelector<HTMLUListElement>('[data-karma-breakdown-rows]');
+    const weeklyEl = section.querySelector<HTMLElement>('[data-karma-weekly]');
+    const nextEl = section.querySelector<HTMLElement>('[data-karma-next]');
+    const strings = JSON.parse(section.dataset.strings ?? '{}') as Strings;
+    if (!button || !labelEl || !panel || !status || !rowsEl) return;
+
+    const distance = distanceToNextMilestone(karmaTotal);
+    if (nextEl && distance !== null) {
+      nextEl.textContent = fmt(strings.nextThreshold, formatDelta(distance));
+      nextEl.classList.remove('hidden');
+    }
+
+    let loaded = false;
+
+    async function load() {
+      if (loaded) return;
+      loaded = true;
+      const { data, error } = await supabase.rpc('profile_karma_breakdown', {
+        p_user_id: userId,
+        p_window: '7 days',
+      });
+      if (error) {
+        status!.textContent = error.message;
+        return;
+      }
+      const list = (data ?? []) as BreakdownRow[];
+      const weeklyTotal = list.reduce((acc, r) => acc + Number(r.sum_delta ?? 0), 0);
+      if (weeklyEl) {
+        weeklyEl.textContent = fmt(strings.weeklyDelta, formatDelta(weeklyTotal));
+        weeklyEl.classList.remove('hidden');
+      }
+      if (list.length === 0) {
+        status!.textContent = strings.emptyLabel;
+        return;
+      }
+      status!.classList.add('hidden');
+      rowsEl!.classList.remove('hidden');
+      rowsEl!.innerHTML = list
+        .map((r) => {
+          const label = pickLabel(r, strings.lang);
+          const count = pickCountText(strings, Number(r.count ?? 0));
+          const delta = formatDelta(Number(r.sum_delta ?? 0));
+          const deltaClass = Number(r.sum_delta ?? 0) >= 0
+            ? 'text-emerald-700 dark:text-emerald-400'
+            : 'text-red-700 dark:text-red-400';
+          return `<li class="flex items-center gap-2 text-xs">
+            <span class="text-zinc-700 dark:text-zinc-200">${escAttr(label)}</span>
+            <span class="text-zinc-400">·</span>
+            <span class="text-zinc-500">${escAttr(count)}</span>
+            <span class="ml-auto font-mono ${deltaClass}">${escAttr(delta)}</span>
+          </li>`;
+        })
+        .join('');
+    }
+
+    button.addEventListener('click', () => {
+      const open = button.getAttribute('aria-expanded') === 'true';
+      const next = !open;
+      button.setAttribute('aria-expanded', String(next));
+      labelEl.textContent = (next ? '▴ ' : '▾ ') + (next ? strings.hideLabel : strings.showLabel);
+      panel.hidden = !next;
+      if (next) load();
+    });
   }
 
   function hydrateAll() {
