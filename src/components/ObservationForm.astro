@@ -76,6 +76,12 @@ const uploadProgressTpl    = observeStrings.upload_progress_label   ?? (isEs ? '
 const idAgainLabel         = observeStrings.id_again                ?? (isEs ? 'Identificar de otra forma' : 'Identify another way');
 const idAgainRunningLabel  = observeStrings.id_again_running        ?? (isEs ? 'Reintentando identificación…' : 'Re-running identification…');
 const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? 'No se obtuvo otro resultado.' : 'No new result.');
+
+const cameraStationLabel       = observeStrings.camera_station_label       ?? (isEs ? 'Estación de cámara' : 'Camera station');
+const cameraStationPlaceholder = observeStrings.camera_station_placeholder ?? (isEs ? 'Selecciona una estación…' : 'Select a station…');
+const cameraStationHint        = observeStrings.camera_station_hint        ?? (isEs ? 'Vincula esta observación a una estación de cámara de tus proyectos.' : 'Tag this observation to a camera station from your projects.');
+const cameraStationNone        = observeStrings.camera_station_none        ?? (isEs ? 'Ninguna' : 'None');
+const cameraStationLoading     = observeStrings.camera_station_loading     ?? (isEs ? 'Cargando estaciones…' : 'Loading stations…');
 ---
 
 <div class="max-w-xl mx-auto">
@@ -386,6 +392,22 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
         <option value="sound">{lang === 'es' ? 'Sonido' : 'Sound'}</option>
         <option value="camera_trap">{lang === 'es' ? 'Cámara trampa' : 'Camera trap'}</option>
       </select>
+    </div>
+
+    <!-- Camera station (shown when evidence_type is camera_trap or manually revealed) -->
+    <div id="camera-station-wrap" class="hidden" data-identify-hide>
+      <label for="obs-camera-station" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{cameraStationLabel}</label>
+      <select
+        id="obs-camera-station"
+        class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm"
+        data-placeholder={cameraStationPlaceholder}
+        data-none={cameraStationNone}
+        data-loading={cameraStationLoading}
+      >
+        <option value="">{cameraStationPlaceholder}</option>
+      </select>
+      <input type="hidden" id="camera-station-id" name="camera_station_id" value="" />
+      <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{cameraStationHint}</p>
     </div>
 
     <!-- Location -->
@@ -2384,6 +2406,7 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
       weather: ((form.elements.namedItem('weather') as HTMLSelectElement).value || null) as Observation['weather'],
       establishmentMeans: (form.querySelector<HTMLInputElement>('input[name="establishment_means"]:checked')?.value ?? 'wild') as 'wild' | 'cultivated' | 'captive' | 'uncertain',
       evidenceType: ((form.elements.namedItem('evidence_type') as HTMLSelectElement).value || 'direct_sighting') as Observation['evidenceType'],
+      cameraStationId: (document.getElementById('camera-station-id') as HTMLInputElement | null)?.value || null,
       notes: ((form.elements.namedItem('notes') as HTMLTextAreaElement).value || null),
       asDraft,
     };
@@ -2833,4 +2856,97 @@ const idAgainFailedLabel   = observeStrings.id_again_failed         ?? (isEs ? '
       refreshTranslateDisabled();
     }
   });
+
+  // ── Camera station selector (shown when evidence_type = camera_trap) ──
+  (function wireCameraStationSelector() {
+    const evidenceSelect = document.getElementById('obs-evidence-type') as HTMLSelectElement | null;
+    const stationWrap = document.getElementById('camera-station-wrap');
+    const stationSelect = document.getElementById('obs-camera-station') as HTMLSelectElement | null;
+    const stationHidden = document.getElementById('camera-station-id') as HTMLInputElement | null;
+    if (!evidenceSelect || !stationWrap || !stationSelect || !stationHidden) return;
+
+    type StationRow = { id: string; station_key: string; name: string };
+    let cachedStations: StationRow[] | null = null;
+    let fetching = false;
+
+    function syncHiddenInput() {
+      if (stationHidden) stationHidden.value = stationSelect.value;
+    }
+
+    stationSelect.addEventListener('change', syncHiddenInput);
+
+    async function populateStations() {
+      if (cachedStations) return;
+      if (fetching) return;
+      fetching = true;
+
+      const placeholder = stationSelect.dataset.placeholder ?? '';
+      const noneLabel = stationSelect.dataset.none ?? 'None';
+      const loadingLabel = stationSelect.dataset.loading ?? 'Loading…';
+
+      stationSelect.innerHTML = '';
+      const loadingOpt = document.createElement('option');
+      loadingOpt.value = '';
+      loadingOpt.textContent = loadingLabel;
+      loadingOpt.disabled = true;
+      loadingOpt.selected = true;
+      stationSelect.appendChild(loadingOpt);
+
+      try {
+        const { getSupabase } = await import('../lib/supabase');
+        const supabase = getSupabase();
+        const { data, error } = await supabase
+          .from('camera_stations')
+          .select('id, station_key, name')
+          .order('name');
+
+        if (error) throw error;
+        cachedStations = (data ?? []) as StationRow[];
+      } catch {
+        cachedStations = [];
+      } finally {
+        fetching = false;
+      }
+
+      stationSelect.innerHTML = '';
+
+      const defaultOpt = document.createElement('option');
+      defaultOpt.value = '';
+      defaultOpt.textContent = placeholder;
+      stationSelect.appendChild(defaultOpt);
+
+      const noneOpt = document.createElement('option');
+      noneOpt.value = '';
+      noneOpt.textContent = noneLabel;
+      stationSelect.appendChild(noneOpt);
+
+      for (const s of cachedStations) {
+        const opt = document.createElement('option');
+        opt.value = s.id;
+        opt.textContent = s.name ? `${s.station_key} — ${s.name}` : s.station_key;
+        stationSelect.appendChild(opt);
+      }
+
+      syncHiddenInput();
+    }
+
+    function onEvidenceChange() {
+      const isCameraTrap = evidenceSelect.value === 'camera_trap';
+      if (isCameraTrap) {
+        stationWrap.classList.remove('hidden');
+        populateStations();
+      } else {
+        stationWrap.classList.add('hidden');
+        stationSelect.value = '';
+        syncHiddenInput();
+      }
+    }
+
+    evidenceSelect.addEventListener('change', onEvidenceChange);
+
+    // Handle restored form state (auto-save may have set evidence_type to camera_trap)
+    if (evidenceSelect.value === 'camera_trap') {
+      onEvidenceChange();
+    }
+  })();
 </script>
