@@ -232,18 +232,34 @@ async function syncOne(record: ObservationRecord): Promise<void> {
     // the UNIQUE(observation_id) WHERE is_primary partial index — demoting
     // lower-confidence existing primary rows instead of fighting the
     // constraint.
-    const { error: clientIdErr } = await supabase.rpc('upsert_primary_identification', {
-      p_observation_id: record.id,
-      p_scientific_name: clientId.scientificName,
-      p_taxon_id: taxonId,
-      p_confidence: Math.max(0, Math.min(1, clientId.confidence ?? 0)),
-      p_source: clientId.source ?? 'human',
-      p_raw_response: {
-        common_name_en: clientId.commonNameEn,
-        common_name_es: clientId.commonNameEs,
-        client_persisted: true,
-      },
-    });
+    //
+    // #618: wrap with an 8-second timeout. PostgREST returns 404 when the RPC
+    // doesn't exist yet (e.g. schema not yet applied), and some network
+    // conditions can stall the fetch indefinitely. Without a per-call timeout
+    // syncOne() hangs, which means the form's 15-second outer race can never
+    // fire — the observation button stays "Guardando…" forever.
+    let clientIdErr: unknown = null;
+    try {
+      const rpcPromise = supabase.rpc('upsert_primary_identification', {
+        p_observation_id: record.id,
+        p_scientific_name: clientId.scientificName,
+        p_taxon_id: taxonId,
+        p_confidence: Math.max(0, Math.min(1, clientId.confidence ?? 0)),
+        p_source: clientId.source ?? 'human',
+        p_raw_response: {
+          common_name_en: clientId.commonNameEn,
+          common_name_es: clientId.commonNameEs,
+          client_persisted: true,
+        },
+      });
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('upsert_primary_identification timeout after 8s')), 8_000)
+      );
+      const result = await Promise.race([rpcPromise, timeoutPromise]);
+      if (result.error) clientIdErr = result.error;
+    } catch (err) {
+      clientIdErr = err;
+    }
     if (clientIdErr) {
       console.warn('[rastrum] client identification persist failed', clientIdErr);
       // Fall through to server cascade as a backstop.
@@ -376,21 +392,33 @@ async function triggerIdentify(observationId: string): Promise<void> {
   // #589: route through upsert_primary_identification RPC for UNIQUE-safe insert.
   // #586: persist full cascade trace (attempts + winner + raw provider response)
   // for forensics and future re-rank passes. Bounded to 4 KB.
+  // #618: same 8-second timeout as the client-id path above.
   const { serializeClientCascade } = await import('./cascade-trace');
   const trace = serializeClientCascade(cascadeResult);
-  const { error: insertErr } = await supabase.rpc('upsert_primary_identification', {
-    p_observation_id: observationId,
-    p_scientific_name: correctedName,
-    p_taxon_id: null,
-    p_confidence: r.confidence,
-    p_source: r.source,
-    p_raw_response: trace as unknown as object,
-  });
+  let insertErr: unknown = null;
+  try {
+    const rpcPromise2 = supabase.rpc('upsert_primary_identification', {
+      p_observation_id: observationId,
+      p_scientific_name: correctedName,
+      p_taxon_id: null,
+      p_confidence: r.confidence,
+      p_source: r.source,
+      p_raw_response: trace as unknown as object,
+    });
+    const timeout2 = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('upsert_primary_identification timeout after 8s')), 8_000)
+    );
+    const result2 = await Promise.race([rpcPromise2, timeout2]);
+    if (result2.error) insertErr = result2.error;
+  } catch (err) {
+    insertErr = err;
+  }
 
   if (insertErr) {
+    const msg = insertErr instanceof Error ? insertErr.message : String((insertErr as {message?: string}).message ?? insertErr);
     await db.idQueue.update(observationId, {
       attempts: ((await db.idQueue.get(observationId))?.attempts ?? 0) + 1,
-      last_error: 'identification insert failed: ' + insertErr.message,
+      last_error: 'identification insert failed: ' + msg,
     });
     return;
   }
