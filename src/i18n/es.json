@@ -27,6 +27,8 @@
       "community_nearby": "Cerca",
       "community_experts": "Expertos por taxón",
       "community_country": "Por país",
+      "community_map": "Mapa",
+      "community_leaderboard": "Tabla de líderes",
       "nearby_signin_tooltip": "Inicia sesión para encontrar observadores cerca",
       "projects": "Proyectos (polígonos ANP)"
     },
@@ -402,7 +404,21 @@
       }
     },
     "leaderboards_optout_link": "Ocultarme de las clasificaciones de la comunidad",
-    "edit_profile_optout": "Perfil → Editar"
+    "edit_profile_optout": "Perfil → Editar",
+    "map_title": "Mapa de la comunidad",
+    "map_subtitle": "Actividad de observadores en América Latina",
+    "map_observers_in_view": "{count} observadores en vista",
+    "map_min_cluster": "Las áreas con menos de 3 observadores se ocultan por privacidad.",
+    "map_sign_in_hint": "Inicia sesión para ver el mapa de calor completo.",
+    "map_loading": "Cargando datos de observadores…",
+    "map_no_data": "Aún no hay datos de observadores disponibles.",
+    "leaderboard_title": "Tabla de Karma",
+    "leaderboard_subtitle": "Mejores observadores por puntuación de karma",
+    "leaderboard_rank": "Posición",
+    "leaderboard_observer": "Observador",
+    "leaderboard_karma": "Karma",
+    "leaderboard_species": "Especies",
+    "leaderboard_empty": "Aún no hay observadores. ¡Sé el primero!"
   },
   "profile": {
     "title": "Perfil",
@@ -629,6 +645,11 @@
     "photo_dedupe_warn": "Subiste una foto similar el {date}. ¿Continuar o reemplazar?",
     "photo_dedupe_continue": "Continuar",
     "photo_dedupe_replace": "Reemplazar",
+    "camera_station_label": "Estación de cámara",
+    "camera_station_placeholder": "Selecciona una estación…",
+    "camera_station_hint": "Vincula esta observación a una estación de cámara de tus proyectos.",
+    "camera_station_none": "Ninguna",
+    "camera_station_loading": "Cargando estaciones…",
     "habitat_options": {
       "forest_pine_oak": "Bosque pino-encino",
       "forest_oak": "Bosque de encino",
@@ -724,7 +745,8 @@
       "privacy_20km": "Aproximar a ~20 km",
       "privacy_5km": "Aproximar a ~5 km",
       "privacy_hide": "Ocultar ubicación completamente",
-      "delete_obs": "Eliminar observación"
+      "delete_obs": "Eliminar observación",
+      "place_chip_label": "Ver lugar"
     },
     "edit_location": "Editar ubicación",
     "coords_precise_label": "Precisas (sólo tú las ves)",
@@ -1328,9 +1350,9 @@
     "sponsored_by_label": "Patrocinado por",
     "sponsored_by_multi": "Patrocinado por {first} +{rest} más",
     "tour_welcome_title": "Bienvenido a Patrocinios IA",
-    "tour_welcome_intro": "Comparte tu credencial Anthropic con amigos específicos. Tour de 30 segundos:",
-    "tour_step_1": "1️⃣ Agrega una credencial — pega tu key sk-ant-api03-… o sk-ant-oat01-…. Se cifra en Vault, nunca aparece en logs.",
-    "tour_step_2": "2️⃣ Agrega beneficiaries por nombre de usuario con cuota mensual. Identifican con Claude usando tu key, tú controlas la cuota.",
+    "tour_welcome_intro": "Comparte cualquier credencial de IA con amigos específicos — Anthropic, OpenAI, Gemini, Bedrock, Azure o Vertex. Tour de 30 segundos:",
+    "tour_step_1": "1️⃣ Agrega una credencial — pega tu API key (Anthropic sk-ant-…, OpenAI sk-…, Gemini AIza…) o un JSON envelope (Bedrock / Azure / Vertex). Se cifra en Vault, nunca aparece en logs.",
+    "tour_step_2": "2️⃣ Agrega beneficiaries por nombre de usuario con cuota mensual. Identifican con IA usando tu key — tú controlas la cuota y el modelo.",
     "tour_step_3": "3️⃣ Gana karma — +20 por patrocinio activo, +1 por call usado. Capped para evitar farming. Ve la card de analytics abajo.",
     "tour_dismiss": "Entendido",
     "tour_show_again": "Mostrar tour otra vez",
@@ -1349,7 +1371,10 @@
     "request_reject": "Rechazar",
     "request_withdraw": "Retirar",
     "my_requests_section": "Mis solicitudes de patrocinio",
-    "my_requests_empty": "Aún no has pedido patrocinio."
+    "my_requests_empty": "Aún no has pedido patrocinio.",
+    "model_cost_heading": "Costo estimado por 100 llamadas",
+    "model_cost_note": "Los costos son aproximados y dependen del tamaño de imagen y longitud de respuesta.",
+    "model_cost_per_100": "por 100 llamadas"
   },
   "expert": {
     "apply_title": "Postularse como experto",
@@ -1486,6 +1511,49 @@
     "view_roadmap": "Hoja de Ruta",
     "view_spec": "Spec Completo"
   },
+  "docs_sponsorships": {
+    "title": "Patrocinios IA",
+    "subtitle": "Cómo funciona la identificación AI financiada por la comunidad",
+    "what_heading": "¿Qué son los patrocinios IA?",
+    "what_body": "Rastrum permite que miembros de la comunidad compartan sus credenciales de proveedores de IA para que todos puedan identificar especies — incluso sin su propia API key.",
+    "sponsor_heading": "Conviértete en sponsor",
+    "sponsor_body": "Ve a Perfil → Patrocinios, agrega tu credencial API, luego invita beneficiarios o dona a un pool de plataforma.",
+    "sponsor_step_1": "Ve a Perfil → Patrocinios IA y agrega una credencial Anthropic (API key sk-ant-api03-… o long-lived token sk-ant-oat01-…).",
+    "sponsor_step_2": "La credencial se guarda cifrada en Supabase Vault. Solo el Edge Function de Rastrum la puede descifrar al momento de la llamada. Nunca aparece en logs ni en el navegador.",
+    "sponsor_step_3": "Agrega a tus amigos por nombre de usuario, define una cuota mensual (default 200 calls/mes, máx 10,000), y elige la prioridad si tienes múltiples credenciales.",
+    "sponsor_step_4": "Cuando un amigo identifica una foto, Rastrum usa tu credencial automáticamente. Tú ganas karma social por compartir.",
+    "request_heading": "Solicitar un patrocinio",
+    "request_body": "Si no tienes una API key, puedes solicitar un patrocinio de un sponsor activo o usar un pool de plataforma.",
+    "request_detail": "Pídele a alguien que ya está en Rastrum — un amigo, un experto que sigues, alguien de tu comunidad — que te patrocine. También puedes enviar una solicitud formal desde Perfil → Patrocinado Por → pestaña Solicitar.",
+    "pool_heading": "Pools de plataforma",
+    "pool_body": "Los pools de plataforma son recursos compartidos financiados por la comunidad. Cualquier sponsor puede donar llamadas; cualquier usuario puede consumirlas (con límites diarios).",
+    "pool_detail": "Operadores o instituciones donan credenciales a un pool compartido. Los créditos se distribuyen equitativamente entre usuarios sin BYO key, con un límite diario por usuario para prevenir abuso.",
+    "privacy_heading": "Garantías de privacidad",
+    "privacy_body": "Las API keys se cifran en Supabase Vault. Nunca se registran en logs, nunca se almacenan en el navegador y nunca son visibles para los beneficiarios. Las BYO keys siempre tienen prioridad sobre los patrocinios.",
+    "privacy_sponsor_public": "Tu lista de beneficiarios es pública por defecto en tu perfil (puedes ocultarla por patrocinio).",
+    "privacy_beneficiary_private": "Quién te patrocina es privado por defecto en tu perfil (puedes hacerlo público por patrocinio).",
+    "privacy_mutual_optin": "Para que la relación sea visible públicamente, ambas partes tienen que dar su consentimiento.",
+    "cost_heading": "Estimaciones de costo",
+    "cost_body": "Los costos dependen del modelo. Claude Haiku 4.5 cuesta ~$0.30 por 100 llamadas. Consulta el selector de modelos para estimaciones actuales.",
+    "cost_detail": "Las identificaciones cuentan contra tu cuota Anthropic, no contra Rastrum. Si usas un long-lived token (OAT) contra tu suscripción Pro/Max, las llamadas son efectivamente gratuitas dentro de tu plan.",
+    "rules_heading": "Reglas de uso",
+    "rule_byo_wins": "BYO siempre gana",
+    "rule_byo_wins_detail": "Si un usuario configura su propia API key, esa se usa primero. El patrocinio solo aplica cuando no hay BYO.",
+    "rule_monthly_cap": "Cuota mensual estricta",
+    "rule_monthly_cap_detail": "Cuando un beneficiario llega al 80%, te llegará un aviso. Al 100%, su acceso a Claude se corta hasta el primero del mes siguiente.",
+    "rule_auto_pause": "Auto-pausa por abuso",
+    "rule_auto_pause_detail": "Si un beneficiario hace más de 30 calls en 10 minutos, su patrocinio se pausa automáticamente y te llegará un email para revisar.",
+    "rule_karma": "Karma limitado",
+    "rule_karma_detail": "+20 karma al activar un patrocinio. +1 karma por call usado, hasta el cap mensual. Sin karma para auto-patrocinios o si el beneficiario tiene menos de 10 karma propio (anti-Sybil).",
+    "faq_heading": "Preguntas frecuentes",
+    "faq_photos_q": "¿Pueden ver mis fotos los sponsors?",
+    "faq_photos_a": "No directamente. Los sponsors ven cuántas calls hiciste y cuándo, pero no las imágenes ni las identificaciones. Si tu observación es pública (default), cualquiera puede verla — pero eso no es específico al patrocinio.",
+    "faq_revoke_q": "¿Qué pasa si mi sponsor revoca el patrocinio?",
+    "faq_revoke_a": "Las identificaciones futuras dejan de usar su credencial. PlantNet (gratis) y Phi-3.5 on-device siguen funcionando. Configura tu propia API key para tener acceso continuo a Claude.",
+    "faq_self_q": "¿Puedo patrocinarme a mí mismo?",
+    "faq_self_a": "Sí, eso es útil para usar la misma UI para tu propio uso. No genera karma (sería farming), pero todo lo demás funciona normal.",
+    "spec_link": "Spec técnica:"
+  },
   "import": {
     "title": "Importación masiva de fotos",
     "subtitle": "Suelta muchas fotos a la vez. Leemos GPS + fecha del EXIF, las revisas fila por fila y luego importamos.",
@@ -1594,6 +1662,27 @@
       "recent_photos": "Fotos recientes",
       "no_coordinates": "Aún no hay observaciones públicas con coordenadas.",
       "page_title": "{name} — Rastrum"
+    },
+    "places": {
+      "title": "Lugares",
+      "subtitle": "Explora áreas protegidas, zonas H3 y lugares comunitarios en Rastrum.",
+      "search_placeholder": "Buscar por nombre…",
+      "filter_all": "Todos los tipos",
+      "filter_protected_area": "Áreas protegidas",
+      "filter_h3_cell": "Zonas H3",
+      "filter_custom": "Personalizados",
+      "filter_community": "Comunitarios",
+      "empty": "No hay lugares que coincidan con tu búsqueda.",
+      "loading": "Cargando lugares…",
+      "obs_count": "{count} obs",
+      "species_count": "{count} spp",
+      "type_protected_area": "Área protegida",
+      "type_h3_cell": "Zona H3",
+      "type_custom": "Personalizado",
+      "type_community": "Comunitario",
+      "prev": "Anterior",
+      "next": "Siguiente",
+      "page_of": "Página {page} de {total}"
     }
   },
   "karma": {
@@ -1606,7 +1695,11 @@
     "verified_badge": "verificado",
     "rank_in_region": "ranking {n} en {region}",
     "pool_donation_karma": "+{delta} karma por donar a un pool",
-    "pool_drip_karma": "+{delta} karma por uso del pool"
+    "pool_drip_karma": "+{delta} karma por uso del pool",
+    "conservation_bonus": "Bono de conservación",
+    "conservation_bonus_hint": "Las observaciones de especies amenazadas otorgan karma extra.",
+    "iucn_label": "Lista Roja UICN",
+    "nom059_label": "NOM-059-SEMARNAT"
   },
   "validation": {
     "queue_title": "Cola de validación",
@@ -1909,6 +2002,7 @@
     "watchlists": "Listas de vigilancia",
     "projects": "Proyectos",
     "taxonChanges": "Cambios de taxón",
+    "feedback": "Retroalimentación",
     "modOverview": "Resumen",
     "modFlagQueue": "Cola de banderas",
     "modComments": "Comentarios",
@@ -2893,6 +2987,20 @@
     "stations_error_invalid_key": "La clave debe tener 1–64 caracteres alfanuméricos, guiones o guiones bajos.",
     "stations_error_invalid_coords": "Las coordenadas deben ser latitud/longitud válidas en WGS84.",
     "stations_error_save_failed": "No se pudo guardar la estación.",
+    "periods_heading": "Periodos activos",
+    "period_active": "Activo",
+    "period_closed": "Cerrado",
+    "period_start": "Fecha de inicio",
+    "period_end": "Fecha de fin",
+    "period_notes": "Notas",
+    "period_close_btn": "Cerrar periodo",
+    "period_close_confirm": "¿Cerrar este periodo? La fecha de fin se establecerá a hoy.",
+    "period_open_btn": "Abrir nuevo periodo",
+    "period_open_success": "Periodo abierto.",
+    "period_close_success": "Periodo cerrado.",
+    "period_no_periods": "Aún no hay periodos registrados.",
+    "period_error_open_failed": "No se pudo abrir el periodo.",
+    "period_error_close_failed": "No se pudo cerrar el periodo.",
     "kml_upload_label": "Subir límite KML",
     "kml_upload_button": "Elegir archivo KML",
     "kml_parse_success": "{name} — {n} vértices",
@@ -2931,5 +3039,74 @@
     "quick_confirm": "Confirmar y guardar",
     "quick_edit": "Editar en formulario completo",
     "quick_discard": "Descartar"
+  },
+  "guides": {
+    "how_it_works": "¿Cómo funciona?",
+    "step_of": "Paso {current} de {total}",
+    "next": "Siguiente",
+    "done": "Listo",
+    "skip": "Saltar guía",
+    "observe": {
+      "step1_title": "Sube una foto",
+      "step1_body": "Arrastra una foto aquí o toca para abrir tu cámara. Rastrum identifica especies con fotos, audio y video.",
+      "step2_title": "Ve la identificación",
+      "step2_body": "Nuestro cascade de IA consulta múltiples fuentes. La mejor coincidencia aparece aquí con un puntaje de confianza.",
+      "step3_title": "Confirma o corrige",
+      "step3_body": "Si la sugerencia es correcta, confírmala. Si no, busca la especie correcta.",
+      "step4_title": "Guarda tu observación",
+      "step4_body": "Tu observación se guarda localmente primero, luego se sincroniza con el servidor cuando estés en línea."
+    },
+    "explore": {
+      "step1_title": "Explora observaciones",
+      "step1_body": "Cambia entre observaciones recientes, lista de especies, vista de mapa y tu lista de seguimiento.",
+      "step2_title": "Explora el mapa",
+      "step2_body": "Ve observaciones en un mapa interactivo. Acércate para encontrar lo que hay cerca de ti.",
+      "step3_title": "Filtra y busca",
+      "step3_body": "Reduce resultados por especie, región, fecha o calidad de observación."
+    },
+    "validate": {
+      "step1_title": "La cola de validación",
+      "step1_body": "Estas observaciones necesitan ayuda de la comunidad. Observaciones sin identificar o con baja confianza aparecen aquí.",
+      "step2_title": "Sugiere una identificación",
+      "step2_body": "Si reconoces la especie, haz clic para sugerir. Los votos de expertos cuentan 3x en su especialidad.",
+      "step3_title": "Busca el taxón",
+      "step3_body": "Escribe el nombre científico. El autocompletado busca en nuestra base de datos taxonómica."
+    },
+    "export": {
+      "step1_title": "Elige un formato",
+      "step1_body": "Darwin Core es el estándar internacional para datos de biodiversidad. CSV funciona para hojas de cálculo.",
+      "step2_title": "Elige un preset",
+      "step2_body": "Los presets SNIB y CONANP coinciden con los requisitos de reporte del gobierno mexicano.",
+      "step3_title": "Descarga",
+      "step3_body": "Tu exportación incluye todas las observaciones seleccionadas con sus identificaciones y metadatos."
+    },
+    "community": {
+      "step1_title": "Encuentra observadores",
+      "step1_body": "Filtra por país, experiencia taxonómica, o encuentra personas observando cerca de ti.",
+      "step2_title": "Ve un perfil",
+      "step2_body": "Ve sus observaciones, conteo de especies y áreas de experiencia.",
+      "step3_title": "Sigue",
+      "step3_body": "Sigue observadores para ver su actividad en tu feed. Recibirán una notificación."
+    },
+    "console": {
+      "step1_title": "Pestañas de consola",
+      "step1_body": "Las herramientas de admin, moderador y experto están organizadas por rol. Ves las pestañas que corresponden a tus permisos.",
+      "step2_title": "Salud del sistema",
+      "step2_body": "Revisa cron jobs, entrega de webhooks, tasas de error y alertas de anomalías de un vistazo.",
+      "step3_title": "Atajos de teclado",
+      "step3_body": "Presiona 'g' y luego una letra para saltar entre pestañas. 'g+u' para usuarios, 'g+h' para salud, etc."
+    }
+  },
+  "feedback": {
+    "post_onboarding": "¿Cómo fue la experiencia de configuración?",
+    "first_observation": "¿Guardar tu observación fue fácil?",
+    "post_guide": "¿Fue útil esta guía?",
+    "explore_empty": "¿Qué te gustaría encontrar aquí?",
+    "explore_empty_opt1": "Observaciones cerca de mí",
+    "explore_empty_opt2": "Una especie específica",
+    "explore_empty_opt3": "Otros observadores para seguir",
+    "first_validation": "¿Fue sencillo sugerir una identificación?",
+    "dismiss": "Cerrar",
+    "thanks": "¡Gracias por tu retroalimentación!"
   }
 }

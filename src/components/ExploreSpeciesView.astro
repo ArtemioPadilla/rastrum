@@ -57,6 +57,51 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
 
   <!-- Index mode -->
   <div class="es-index">
+    <!-- M34: View switcher tabs -->
+    <div id="es-view-tabs" class="flex gap-1 border-b border-zinc-200 dark:border-zinc-800 mb-4" role="tablist">
+      <button id="es-tab-grid" data-view="grid" role="tab" aria-selected="true"
+        class="px-3 py-2 text-sm font-medium border-b-2 border-emerald-700 text-emerald-700 dark:text-emerald-400 dark:border-emerald-400">
+        {lang === 'es' ? 'Cuadrícula' : 'Grid'}
+      </button>
+      <button id="es-tab-radial" data-view="radial" role="tab" aria-selected="false"
+        class="px-3 py-2 text-sm font-medium border-b-2 border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200">
+        {lang === 'es' ? 'Árbol' : 'Tree'}
+      </button>
+      <button id="es-tab-search" data-view="search" role="tab" aria-selected="false"
+        class="px-3 py-2 text-sm font-medium border-b-2 border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200">
+        {lang === 'es' ? 'Buscar' : 'Search'}
+      </button>
+    </div>
+
+    <!-- M34: Search panel (hidden by default) -->
+    <div id="es-panel-search" class="hidden">
+      <input
+        id="es-search-input"
+        type="search"
+        placeholder={lang === 'es' ? 'Buscar especie...' : 'Search species...'}
+        class="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+      />
+      <ul id="es-search-results" class="mt-2 space-y-1"></ul>
+      <p id="es-search-empty" class="hidden text-sm text-zinc-500 dark:text-zinc-400 py-4 text-center">
+        {lang === 'es' ? 'Sin resultados' : 'No results'}
+      </p>
+    </div>
+
+    <!-- M34: Radial/sunburst panel (hidden by default) -->
+    <div id="es-panel-radial" class="hidden">
+      <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
+        {lang === 'es' ? 'Toca un segmento para explorar. Doble toque en especie para ver su perfil.' : 'Tap a segment to explore. Double-tap a species to view its profile.'}
+      </p>
+      <div id="es-sunburst-container" class="relative w-full" style="aspect-ratio: 1;">
+        <svg id="es-sunburst" width="100%" height="100%" viewBox="-1 -1 2 2" style="display:block;"></svg>
+        <div id="es-sunburst-center" class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+          <p id="es-sunburst-name" class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 text-center px-8"></p>
+          <p id="es-sunburst-count" class="text-xs text-zinc-500 dark:text-zinc-400"></p>
+        </div>
+      </div>
+      <nav id="es-sunburst-breadcrumb" class="mt-2 text-xs text-zinc-500 dark:text-zinc-400 flex flex-wrap gap-1"></nav>
+    </div>
+
     <label class="block mb-4">
       <span class="sr-only">{page.search_placeholder}</span>
       <input
@@ -173,10 +218,36 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
     return (n === 1 ? one : other).replace('{count}', String(n));
   }
 
+  // ── M34: Module-level state shared between renderIndex and view-switcher ─
+  type TaxaEnriched = {
+    id: string;
+    scientific_name: string;
+    common_name_es: string | null;
+    common_name_en: string | null;
+    kingdom: string | null;
+    phylum: string | null;
+    class: string | null;
+    order: string | null;
+    family: string | null;
+    genus: string | null;
+    slug: string | null;
+    observation_count: number;
+  };
+  let allTaxa: TaxaEnriched[] = [];
+  let _indexBase = '';
+
+  function showDetail(idOrSlug: string) {
+    // Navigate to the detail pane by slug or fall back to scientific_name
+    const taxon = allTaxa.find(t => t.id === idOrSlug || t.slug === idOrSlug);
+    const slug = taxon ? (taxon.slug ?? taxon.scientific_name) : idOrSlug;
+    window.location.href = `${_indexBase}?slug=${encodeURIComponent(slug)}`;
+  }
+
   async function wire(root: HTMLElement) {
     const lang = (root.dataset.lang === 'es' ? 'es' : 'en') as Lang;
     const shareBase = root.dataset.shareBase ?? '/share/obs/';
     const indexBase = root.dataset.indexBase ?? `/${lang}/explore/species/`;
+    _indexBase = indexBase; // expose for M34 showDetail()
 
     const indexPane = root.querySelector('.es-index') as HTMLElement | null;
     const detailPane = root.querySelector('.es-detail') as HTMLElement | null;
@@ -263,14 +334,15 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
     type TaxaRow = Pick<
       Taxon,
       'id' | 'scientific_name' | 'common_name_es' | 'common_name_en'
+      | 'kingdom' | 'phylum' | 'class' | 'order' | 'family' | 'genus'
       | 'nom059_status' | 'cites_appendix' | 'iucn_category' | 'is_endemic_mexico'
-    >;
+    > & { slug?: string | null; observation_count?: number };
 
     let taxaRows: TaxaRow[] = [];
     try {
       const { data, error } = await supabase
         .from('taxa')
-        .select('id, scientific_name, common_name_es, common_name_en, nom059_status, cites_appendix, iucn_category, is_endemic_mexico')
+        .select('id, scientific_name, common_name_es, common_name_en, kingdom, phylum, class, "order", family, genus, nom059_status, cites_appendix, iucn_category, is_endemic_mexico, slug')
         .in('id', taxonIds);
       if (error) throw error;
       taxaRows = (data ?? []) as unknown as TaxaRow[];
@@ -289,6 +361,22 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
         count: counts.get(t.id) ?? 0,
       }))
       .sort((a, b) => b.count - a.count || a.scientific_name.localeCompare(b.scientific_name));
+
+    // M34: expose full taxa list for sunburst + search panels
+    allTaxa = enriched.map(t => ({
+      id: t.id,
+      scientific_name: t.scientific_name,
+      common_name_es: t.common_name_es,
+      common_name_en: t.common_name_en,
+      kingdom: (t as Record<string,unknown>).kingdom as string | null ?? null,
+      phylum: (t as Record<string,unknown>).phylum as string | null ?? null,
+      class: (t as Record<string,unknown>).class as string | null ?? null,
+      order: (t as Record<string,unknown>).order as string | null ?? null,
+      family: (t as Record<string,unknown>).family as string | null ?? null,
+      genus: (t as Record<string,unknown>).genus as string | null ?? null,
+      slug: (t as Record<string,unknown>).slug as string | null ?? null,
+      observation_count: t.count,
+    }));
 
     hideSkeleton();
     if (enriched.length === 0) {
@@ -356,6 +444,194 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
           }
         }, 200);
       });
+    }
+
+    // ── M34: View switcher (grid / radial / search) ────────────────────
+    const esTabs = root?.querySelectorAll<HTMLButtonElement>('[data-view]');
+    const esPanelSearch = document.getElementById('es-panel-search');
+    const esPanelRadial = document.getElementById('es-panel-radial');
+    const isEs = lang === 'es';
+
+    function switchEsView(view: string) {
+      esTabs?.forEach(btn => {
+        const active = btn.dataset.view === view;
+        btn.setAttribute('aria-selected', String(active));
+        // Reset classes
+        btn.className = 'px-3 py-2 text-sm font-medium border-b-2 ';
+        if (active) {
+          btn.className += 'border-emerald-700 text-emerald-700 dark:text-emerald-400 dark:border-emerald-400';
+        } else {
+          btn.className += 'border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200';
+        }
+      });
+
+      // Show/hide panels
+      const gridWrapper = listEl?.closest('div');
+      const gridLabel = root?.querySelector<HTMLElement>('label.block');
+      const gridSkeleton = root?.querySelector<HTMLElement>('.es-skeleton');
+      const gridList = root?.querySelector<HTMLElement>('.es-list');
+      const gridEmpty = root?.querySelector<HTMLElement>('.es-empty');
+      const gridError = root?.querySelector<HTMLElement>('.es-error');
+      const gridEls = [gridLabel, gridSkeleton, gridList, gridEmpty, gridError];
+      gridEls.forEach(el => { if (el) el.classList.toggle('hidden', view !== 'grid'); });
+      esPanelSearch?.classList.toggle('hidden', view !== 'search');
+      esPanelRadial?.classList.toggle('hidden', view !== 'radial');
+
+      if (view === 'search') initM34Search();
+      if (view === 'radial') initSunburst();
+    }
+
+    esTabs?.forEach(btn => {
+      btn.addEventListener('click', () => switchEsView(btn.dataset.view ?? 'grid'));
+    });
+    // Ensure grid view is active on first load (panels start hidden via HTML
+    // but gridEls need explicit show so the initial state is consistent)
+    switchEsView('grid');
+
+    // ── M34: Search ────────────────────────────────────────
+    let searchInitialized = false;
+    function initM34Search() {
+      if (searchInitialized) return;
+      searchInitialized = true;
+      const searchInput = document.getElementById('es-search-input') as HTMLInputElement | null;
+      const searchResults = document.getElementById('es-search-results');
+      const searchEmpty = document.getElementById('es-search-empty');
+      if (!searchInput || !searchResults) return;
+
+      function renderSearchResults(filtered: typeof allTaxa) {
+        searchResults!.innerHTML = '';
+        searchEmpty?.classList.toggle('hidden', filtered.length > 0);
+        filtered.slice(0, 30).forEach(t => {
+          const li = document.createElement('li');
+          li.className = 'rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-2 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 text-sm';
+          const cName = (isEs ? t.common_name_es : t.common_name_en) ?? '';
+          li.innerHTML = `<span class="font-medium italic text-zinc-900 dark:text-zinc-100">${escapeText(t.scientific_name)}</span>${cName ? ` <span class="text-zinc-500">· ${escapeText(cName)}</span>` : ''}`;
+          li.addEventListener('click', () => showDetail(t.id));
+          searchResults!.appendChild(li);
+        });
+      }
+
+      let debounceTimer: ReturnType<typeof setTimeout>;
+      searchInput.addEventListener('input', () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          const q = searchInput.value.toLowerCase().trim();
+          if (!q) { renderSearchResults([]); searchEmpty?.classList.add('hidden'); return; }
+          const filtered = allTaxa.filter(t =>
+            t.scientific_name.toLowerCase().includes(q) ||
+            (t.common_name_es ?? '').toLowerCase().includes(q) ||
+            (t.common_name_en ?? '').toLowerCase().includes(q)
+          );
+          renderSearchResults(filtered);
+        }, 250);
+      });
+    }
+
+    // ── M34: Sunburst ──────────────────────────────────────────
+    let sunburstInitialized = false;
+    function initSunburst() {
+      if (sunburstInitialized || allTaxa.length === 0) return;
+      sunburstInitialized = true;
+      const svg = document.getElementById('es-sunburst') as SVGSVGElement | null;
+      const nameEl = document.getElementById('es-sunburst-name');
+      const countEl = document.getElementById('es-sunburst-count');
+      if (!svg) return;
+
+      const KINGDOM_COLORS: Record<string, string> = {
+        'Animalia': '#2563eb', 'Plantae': '#16a34a', 'Fungi': '#ea580c',
+        'Chromista': '#7c3aed', 'Bacteria': '#dc2626', 'Protozoa': '#0891b2',
+      };
+      const DEFAULT_COLOR = '#71717a';
+
+      type SunNode = { name: string; rank: string; count: number; slug?: string; taxonId?: string; kingdom?: string; children: SunNode[] };
+
+      function buildTree(rows: typeof allTaxa): SunNode {
+        const treeRoot: SunNode = { name: 'All species', rank: 'root', count: 0, children: [] };
+        rows.forEach(t => {
+          const path = [
+            { rank: 'kingdom', name: t.kingdom ?? '?' },
+            { rank: 'phylum',  name: t.phylum ?? '?' },
+            { rank: 'class',   name: t.class ?? '?' },
+            { rank: 'order',   name: t.order ?? '?' },
+            { rank: 'family',  name: t.family ?? '?' },
+            { rank: 'genus',   name: t.genus ?? '?' },
+            { rank: 'species', name: t.scientific_name, slug: t.slug ?? undefined, taxonId: t.id },
+          ];
+          let cur = treeRoot;
+          path.forEach(p => {
+            if (!p.name || p.name === '?') return;
+            let child = cur.children.find(c => c.name === p.name && c.rank === p.rank);
+            if (!child) {
+              child = { name: p.name, rank: p.rank, count: 0, kingdom: path[0].name, children: [] };
+              if ((p as {slug?: string}).slug) child.slug = (p as {slug?: string}).slug;
+              if ((p as {taxonId?: string}).taxonId) child.taxonId = (p as {taxonId?: string}).taxonId;
+              cur.children.push(child);
+            }
+            child.count += t.observation_count ?? 1;
+            cur = child;
+          });
+          treeRoot.count += t.observation_count ?? 1;
+        });
+        return treeRoot;
+      }
+
+      function arcPath(r0: number, r1: number, a0: number, a1: number): string {
+        if (a1 - a0 > 2 * Math.PI - 0.001) a1 = a0 + 2 * Math.PI - 0.001;
+        const cos0 = Math.cos(a0), sin0 = Math.sin(a0);
+        const cos1 = Math.cos(a1), sin1 = Math.sin(a1);
+        const largeArc = a1 - a0 > Math.PI ? 1 : 0;
+        const ix0 = r0*cos0, iy0 = r0*sin0;
+        const ox0 = r1*cos0, oy0 = r1*sin0;
+        const ox1 = r1*cos1, oy1 = r1*sin1;
+        const ix1 = r0*cos1, iy1 = r0*sin1;
+        return `M${ix0},${iy0} L${ox0},${oy0} A${r1},${r1} 0 ${largeArc} 1 ${ox1},${oy1} L${ix1},${iy1} A${r0},${r0} 0 ${largeArc} 0 ${ix0},${iy0} Z`;
+      }
+
+      const treeData = buildTree(allTaxa);
+
+      function renderLevel(node: SunNode, depth: number, startAngle: number, endAngle: number, maxDepth = 4) {
+        if (depth > maxDepth || node.children.length === 0) return;
+        const r0 = depth * 0.18;
+        const r1 = r0 + 0.17;
+        let angle = startAngle;
+        node.children.forEach(child => {
+          const frac = node.count > 0 ? child.count / node.count : 0;
+          const sweep = (endAngle - startAngle) * frac;
+          if (sweep < 0.01) { angle += sweep; return; }
+          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          const color = KINGDOM_COLORS[child.kingdom ?? child.name] ?? DEFAULT_COLOR;
+          path.setAttribute('d', arcPath(r0, r1, angle, angle + sweep));
+          path.setAttribute('fill', color);
+          path.setAttribute('fill-opacity', String(0.9 - depth * 0.1));
+          path.setAttribute('stroke', '#fff');
+          path.setAttribute('stroke-width', '0.005');
+          // Only leaf nodes (species) navigate to the detail page.
+          // Intermediate nodes (kingdom → genus) update the center label only
+          // so the user can explore the hierarchy without accidental navigation.
+          const isLeaf = child.children.length === 0;
+          path.style.cursor = isLeaf ? 'pointer' : 'default';
+          path.addEventListener('click', () => {
+            if (nameEl) nameEl.textContent = child.name;
+            if (countEl) countEl.textContent = `${child.count} obs`;
+            if (isLeaf && child.taxonId) showDetail(child.taxonId);
+          });
+          svg!.appendChild(path);
+          renderLevel(child, depth + 1, angle, angle + sweep, maxDepth);
+          angle += sweep;
+        });
+      }
+
+      svg.innerHTML = '';
+      renderLevel(treeData, 1, -Math.PI / 2, 3 * Math.PI / 2);
+
+      // Center circle
+      const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      circle.setAttribute('cx', '0'); circle.setAttribute('cy', '0'); circle.setAttribute('r', '0.17');
+      circle.setAttribute('fill', 'transparent');
+      svg.appendChild(circle);
+
+      if (nameEl) nameEl.textContent = isEs ? 'Todas las especies' : 'All species';
+      if (countEl) countEl.textContent = `${allTaxa.length} ${isEs ? 'especies' : 'species'}`;
     }
   }
 

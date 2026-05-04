@@ -318,3 +318,55 @@ SELECT cron.schedule('gc_orphan_media', '30 4 * * 0',
       )
     )
   )$$);
+
+-- ─────────────────────────────────────────────────────────────────
+-- v10 (2026-05-03): added 'retry-unidentified' (every 30 min)
+--   Finds synced observations without any identification and
+--   re-queues the identify cascade for each. Cost 0 to schedule —
+--   identify itself selects cheapest available provider. Caps at
+--   20 observations per run to avoid thundering herd.
+--   Deployed --no-verify-jwt (cron-only).
+-- ─────────────────────────────────────────────────────────────────
+SELECT cron.unschedule('retry-unidentified')
+  WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'retry-unidentified');
+SELECT cron.schedule('retry-unidentified', '*/30 * * * *',
+  $$SELECT net.http_post(
+    url     := 'https://reppvlqejgoqvitturxp.supabase.co/functions/v1/retry-unidentified',
+    headers := '{"Content-Type":"application/json"}'::jsonb,
+    body    := '{}'::jsonb
+  )$$);
+
+-- ─────────────────────────────────────────────────────────────────
+-- v11 (2026-05-03): M-Loc-1 — 'refresh-place-stats' (every hour at :45)
+--   Recomputes denormalized obs_count, species_count, observer_count,
+--   first_obs_at, last_obs_at on public.places from synced observations
+--   that have a place_id. Runs at :45 to avoid the :05/:25 cluster.
+-- ─────────────────────────────────────────────────────────────────
+SELECT cron.unschedule('refresh-place-stats')
+  WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'refresh-place-stats');
+SELECT cron.schedule(
+  'refresh-place-stats',
+  '45 * * * *',
+  $$
+  UPDATE public.places p
+     SET obs_count      = s.obs_count,
+         species_count  = s.species_count,
+         observer_count = s.observer_count,
+         first_obs_at   = s.first_obs_at,
+         last_obs_at    = s.last_obs_at,
+         updated_at     = now()
+    FROM (
+      SELECT place_id,
+             COUNT(*)                        AS obs_count,
+             COUNT(DISTINCT primary_taxon_id) AS species_count,
+             COUNT(DISTINCT observer_id)      AS observer_count,
+             MIN(observed_at)                 AS first_obs_at,
+             MAX(observed_at)                 AS last_obs_at
+        FROM public.observations
+       WHERE sync_status = 'synced'
+         AND place_id IS NOT NULL
+       GROUP BY place_id
+    ) s
+   WHERE p.id = s.place_id;
+  $$
+);

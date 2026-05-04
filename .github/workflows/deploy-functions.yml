@@ -45,6 +45,7 @@ on:
           - react
           - report
           - tokens
+          - retry-unidentified
       sync_secrets:
         description: 'Sync GitHub Actions secrets → Supabase Edge Function secrets before deploy'
         required: false
@@ -128,9 +129,10 @@ jobs:
             else
               echo "→ deploying: $FNS"
             fi
-            # On push, never resync secrets — that's a privileged op reserved
-            # for explicit dispatch.
-            echo "sync_secrets=false" >> "$GITHUB_OUTPUT"
+            # On push, always sync secrets — ensures Supabase has the latest
+            # values whenever a function is deployed (prevents 500s from stale
+            # or missing env vars after first-time function deploys).
+            echo "sync_secrets=true" >> "$GITHUB_OUTPUT"
           fi
           echo "fns=$FNS" >> "$GITHUB_OUTPUT"
 
@@ -208,7 +210,7 @@ jobs:
           # anon key, which Edge Functions reject when JWT verification is
           # enabled. These MUST be deployed with --no-verify-jwt.
           # Update this list when adding new cron-triggered functions.
-          CRON_ONLY="recompute-streaks award-badges gc-orphan-media plantnet-monitor recompute-user-stats streak-push"
+          CRON_ONLY="recompute-streaks award-badges gc-orphan-media plantnet-monitor recompute-user-stats streak-push retry-unidentified"
           echo "cron_only=$CRON_ONLY" >> "$GITHUB_OUTPUT"
 
       - name: Deploy

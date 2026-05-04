@@ -417,6 +417,7 @@ const fileHint    = document.getElementById('obs2-file-hint');
       { label: 'BirdNET (birds)', labelEs: 'BirdNET (aves)', ok: runners.birdnet },
       { label: 'Claude Vision', labelEs: 'Claude Vision', ok: runners.claude },
       { label: 'Phi Vision (local)', labelEs: 'Phi Vision (local)', ok: runners.phi },
+      { label: 'EfficientNet (local)', labelEs: 'EfficientNet (local)', ok: runners.efficientNet },
     ];
     const allOk = items.every(i => i.ok);
     // Hide setup link if all configured
@@ -552,7 +553,16 @@ async function detectRunners() {
     }
   } catch { /* unavailable */ }
 
-  return { plantnet: plantnetKey, birdnet: birdnetStatus, claude: claudeKey, phi };
+  // EfficientNet-Lite0: runs whenever downloaded (~2.8 MB), no extra toggle needed.
+  let efficientNet = false;
+  try {
+    const { getOnnxBaseCacheStatus, getOnnxBaseWeightsBaseUrl } = await import('../lib/identifiers/onnx-base-cache');
+    efficientNet = getOnnxBaseWeightsBaseUrl()
+      ? await getOnnxBaseCacheStatus().then(s => s.modelCached && s.labelsCached).catch(() => false)
+      : false;
+  } catch { /* unavailable */ }
+
+  return { plantnet: plantnetKey, birdnet: birdnetStatus, claude: claudeKey, phi, efficientNet };
 }
 
 // ── Pipeline runner ────────────────────────────────────────────────────────
@@ -592,6 +602,26 @@ async function runPipeline(state: PipelineState) {
           if (await resolvePlantNetKey()) runners.plantnet = (await import('../lib/identify-runners')).makePlantNetRunner(lang as 'en' | 'es');
           if (await hasAnthropicKey()) runners.claude_haiku = makeClaudeRunner(lang as 'en' | 'es');
         }
+
+        // EfficientNet-Lite0: always add as fallback if downloaded (~2.8 MB, no key needed).
+        // It runs in-parallel as a zero-cost fallback alongside cloud runners.
+        try {
+          const { getOnnxBaseCacheStatus, getOnnxBaseWeightsBaseUrl } = await import('../lib/identifiers/onnx-base-cache');
+          const enCached = getOnnxBaseWeightsBaseUrl()
+            ? await getOnnxBaseCacheStatus().then(s => s.modelCached && s.labelsCached).catch(() => false)
+            : false;
+          if (enCached) {
+            const { onnxBaseIdentifier } = await import('../lib/identifiers/onnx-base');
+            runners.onnx_efficientnet_lite0 = async (file: File) => {
+              const result = await onnxBaseIdentifier.identify({
+                media: { kind: 'blob', blob: file },
+                mediaKind: 'photo',
+                locale: lang as 'en' | 'es',
+              });
+              return result;
+            };
+          }
+        } catch { /* EfficientNet unavailable, skip */ }
 
         if (Object.keys(runners).length === 0) {
           setNodeState(state, node.id, 'skipped', undefined, 'No runner available');
