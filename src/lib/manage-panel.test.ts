@@ -4,6 +4,7 @@ import {
   isoToLocalDatetimeInput,
   localDatetimeInputToIso,
   pointGeographyLiteral,
+  pointGeographyGeoJSON,
 } from './manage-panel';
 
 describe('manage-panel helpers', () => {
@@ -94,6 +95,34 @@ describe('manage-panel helpers', () => {
       const t = new Date(p.updated_at).getTime();
       expect(t).toBeGreaterThanOrEqual(before);
       expect(t).toBeLessThanOrEqual(after);
+    });
+  });
+
+  describe('pointGeographyGeoJSON', () => {
+    it('emits a GeoJSON Point with [lng, lat] coordinates — used for supabase-js UPDATE', () => {
+      // CDMX: lat=19.4326, lng=-99.1332
+      // GeoJSON spec: coordinates are [longitude, latitude]
+      const pt = pointGeographyGeoJSON(19.4326, -99.1332);
+      expect(pt).toEqual({ type: 'Point', coordinates: [-99.1332, 19.4326] });
+    });
+
+    it('handles whole-number coords', () => {
+      expect(pointGeographyGeoJSON(0, 0)).toEqual({ type: 'Point', coordinates: [0, 0] });
+    });
+
+    it('rejects out-of-range latitudes', () => {
+      expect(() => pointGeographyGeoJSON(90.1, 0)).toThrow('coords_invalid');
+      expect(() => pointGeographyGeoJSON(-90.1, 0)).toThrow('coords_invalid');
+    });
+
+    it('rejects out-of-range longitudes', () => {
+      expect(() => pointGeographyGeoJSON(0, 180.1)).toThrow('coords_invalid');
+      expect(() => pointGeographyGeoJSON(0, -180.1)).toThrow('coords_invalid');
+    });
+
+    it('rejects non-finite numbers', () => {
+      expect(() => pointGeographyGeoJSON(Number.NaN, 0)).toThrow('coords_invalid');
+      expect(() => pointGeographyGeoJSON(0, Number.POSITIVE_INFINITY)).toThrow('coords_invalid');
     });
   });
 

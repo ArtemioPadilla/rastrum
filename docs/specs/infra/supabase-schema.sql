@@ -659,6 +659,7 @@ WHERE i.taxon_id IS NULL
 CREATE OR REPLACE FUNCTION public.sync_primary_identification()
 RETURNS trigger AS $$
 DECLARE
+  v_taxon_id      uuid;
   v_obscure_level text;
   v_raw_loc       geography(Point, 4326);
 BEGIN
@@ -666,14 +667,27 @@ BEGIN
     RETURN NEW;
   END IF;
 
+  -- Resolve taxon_id: use the explicit value if present, otherwise look up
+  -- by scientific_name. This handles Edge Function / client inserts that
+  -- supply scientific_name but not taxon_id (identify EF, sync.ts client).
+  -- Without this fallback, observations.primary_taxon_id stays NULL and
+  -- the /explore/species/ grid shows no species. See issue #475.
+  v_taxon_id := NEW.taxon_id;
+  IF v_taxon_id IS NULL AND NEW.scientific_name IS NOT NULL THEN
+    SELECT id INTO v_taxon_id
+    FROM public.taxa
+    WHERE scientific_name = NEW.scientific_name
+    LIMIT 1;
+  END IF;
+
   SELECT obscure_level INTO v_obscure_level
-  FROM public.taxa WHERE id = NEW.taxon_id;
+  FROM public.taxa WHERE id = v_taxon_id;
 
   SELECT location INTO v_raw_loc
   FROM public.observations WHERE id = NEW.observation_id;
 
   UPDATE public.observations
-  SET primary_taxon_id = NEW.taxon_id,
+  SET primary_taxon_id = v_taxon_id,
       obscure_level    = COALESCE(v_obscure_level, 'none'),
       location_obscured = CASE
         WHEN v_obscure_level IS NULL OR v_obscure_level = 'none' THEN NULL
@@ -684,6 +698,14 @@ BEGIN
       END,
       updated_at = now()
   WHERE id = NEW.observation_id;
+
+  -- Also patch the identification row so taxon_id is persisted for future
+  -- trigger runs (e.g. if is_primary flips again on the same row).
+  IF v_taxon_id IS NOT NULL AND NEW.taxon_id IS NULL THEN
+    UPDATE public.identifications
+    SET taxon_id = v_taxon_id
+    WHERE id = NEW.id;
+  END IF;
 
   RETURN NEW;
 END;
@@ -3986,7 +4008,8 @@ ALTER TABLE public.karma_events ADD CONSTRAINT karma_events_reason_check
   CHECK (reason IN (
     'consensus_win','consensus_loss','first_in_rastrum',
     'observation_synced','comment_reaction','manual_adjust',
-    'ai_sponsorship_active','ai_sponsorship_revoked','ai_sponsor_call'
+    'ai_sponsorship_active','ai_sponsorship_revoked','ai_sponsor_call',
+    'pool_donation','pool_call_sponsor_drip'
   ));
 
 -- 11. add_karma_simple — generic karma helper.
@@ -4612,6 +4635,16 @@ ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'sponsorship_request_create';
 ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'sponsorship_request_approve';
 ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'sponsorship_request_reject';
 ALTER TYPE public.audit_op ADD VALUE IF NOT EXISTS 'sponsorship_request_withdraw';
+-- ── Sponsoring table grants — service_role needs explicit GRANT even with BYPASSRLS ──
+-- The Edge Function (sponsorships/index.ts) uses the service_role key. In Supabase,
+-- service_role bypasses RLS but still requires table-level GRANT from the schema owner.
+-- Without these, all sponsoring Edge Function calls get "permission denied for table …".
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.sponsor_credentials    TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.sponsorships           TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.sponsorship_requests   TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.ai_usage               TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.ai_errors_log          TO service_role;
+
 -- ════════════════════════════════════════════════════════════════════════════
 -- PR8 — admin console hardening
 -- ════════════════════════════════════════════════════════════════════════════
@@ -4700,7 +4733,9 @@ VALUES
   ('consensus_loss',     -2,   'Consensus loss',        'Consenso perdido',          'Base penalty before rarity/confidence multipliers (capped at 2×).',               'Penalización base antes de multiplicadores (máx 2×).'),
   ('first_in_rastrum',   10,   'First in Rastrum',      'Primero en Rastrum',        'Awarded for the first observation of a taxon ever recorded on the platform.',     'Otorgado por la primera observación de un taxón registrada en la plataforma.'),
   ('comment_reaction',   0.5,  'Comment reaction',      'Reacción en comentario',    'Awarded when another user reacts positively to a comment.',                       'Otorgado cuando otro usuario reacciona positivamente a un comentario.'),
-  ('manual_adjust',      NULL, 'Manual adjustment',     'Ajuste manual',             'Admin-issued karma adjustment. Delta varies per case.',                           'Ajuste de karma emitido por un administrador. El delta varía por caso.')
+  ('manual_adjust',      NULL, 'Manual adjustment',     'Ajuste manual',             'Admin-issued karma adjustment. Delta varies per case.',                           'Ajuste de karma emitido por un administrador. El delta varía por caso.'),
+  ('pool_donation',      20,   'Pool donation',         'Donación a pool',           'Awarded when a sponsor donates calls to a platform pool.',                        'Otorgado cuando un patrocinador dona llamadas a un pool.'),
+  ('pool_call_sponsor_drip', 0.5, 'Pool call (sponsor drip)', 'Llamada de pool (goteo patrocinador)', 'Small karma drip to the sponsor each time a beneficiary uses a pool call.', 'Pequeño goteo de karma al patrocinador cada vez que un beneficiario usa una llamada del pool.')
 ON CONFLICT (reason) DO UPDATE
   SET label_en       = EXCLUDED.label_en,
       label_es       = EXCLUDED.label_es,
@@ -6286,6 +6321,18 @@ $$;
 REVOKE ALL ON FUNCTION public.consume_pool_slot(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.consume_pool_slot(uuid) TO service_role;
 
+-- ── Pool donation karma — +20 on INSERT to sponsor_pools ────────────
+-- Awards pool_donation karma to the sponsor when they create a new pool.
+CREATE OR REPLACE FUNCTION public.award_pool_donation_karma() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  PERFORM public.add_karma_simple(NEW.sponsor_id, 20, 'pool_donation');
+  RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS sponsor_pools_award_donation_karma ON public.sponsor_pools;
+CREATE TRIGGER sponsor_pools_award_donation_karma AFTER INSERT ON public.sponsor_pools
+  FOR EACH ROW EXECUTE FUNCTION public.award_pool_donation_karma();
+
 -- ============================================================
 -- CAMERA STATIONS (M31, issue #112) — sampling-effort metadata for camera traps
 -- ============================================================
@@ -6733,3 +6780,399 @@ ALTER TABLE public.identifications
 -- The higher of the two multipliers wins.
 ALTER TABLE public.taxa ADD COLUMN IF NOT EXISTS iucn_category text;
 ALTER TABLE public.taxa ADD COLUMN IF NOT EXISTS nom059_status text;
+
+-- ── M34: Species Explorer — taxa enhancements ──────────────────────────────
+-- hero_media_id: community-voted best photo for the species
+-- hero_observation_id: the observation that provides the hero photo
+-- hero_updated_at: when the hero was last recomputed
+-- slug: URL-safe species identifier (lower, spaces→dashes)
+ALTER TABLE public.taxa ADD COLUMN IF NOT EXISTS hero_media_id uuid REFERENCES public.media_files(id) ON DELETE SET NULL;
+ALTER TABLE public.taxa ADD COLUMN IF NOT EXISTS hero_observation_id uuid REFERENCES public.observations(id) ON DELETE SET NULL;
+ALTER TABLE public.taxa ADD COLUMN IF NOT EXISTS hero_updated_at timestamptz;
+ALTER TABLE public.taxa ADD COLUMN IF NOT EXISTS slug text;
+
+-- Back-fill slugs for existing taxa (idempotent)
+UPDATE public.taxa
+SET slug = lower(regexp_replace(scientific_name, '\s+', '-', 'g'))
+WHERE slug IS NULL AND scientific_name IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS taxa_slug_idx ON public.taxa(slug)
+  WHERE slug IS NOT NULL;
+
+-- Materialized view for the taxonomy sunburst
+CREATE MATERIALIZED VIEW IF NOT EXISTS public.species_taxonomy_counts AS
+SELECT
+  t.id                            AS taxon_id,
+  t.kingdom,
+  t.phylum,
+  t.class,
+  t."order",
+  t.family,
+  t.genus,
+  t.scientific_name,
+  t.common_name_es,
+  t.common_name_en,
+  t.slug,
+  t.hero_media_id,
+  COUNT(DISTINCT o.id)            AS observation_count,
+  COUNT(DISTINCT o.observer_id)   AS observer_count
+FROM public.taxa t
+JOIN public.observations o ON o.primary_taxon_id = t.id
+WHERE o.sync_status = 'synced'
+GROUP BY
+  t.id, t.kingdom, t.phylum, t.class, t."order",
+  t.family, t.genus, t.scientific_name, t.common_name_es, t.common_name_en,
+  t.slug, t.hero_media_id
+WITH DATA;
+
+CREATE UNIQUE INDEX IF NOT EXISTS species_taxonomy_counts_taxon_id_idx
+  ON public.species_taxonomy_counts (taxon_id);
+
+-- Allow best_shot reactions (community hero photo nominations)
+DO $$ BEGIN
+  ALTER TABLE public.reactions
+    DROP CONSTRAINT IF EXISTS reactions_reaction_type_check;
+  ALTER TABLE public.reactions
+    ADD CONSTRAINT reactions_reaction_type_check
+    CHECK (reaction_type IN ('thumbs_up','thumbs_down','heart','expert','best_shot'));
+EXCEPTION WHEN others THEN NULL; END $$;
+
+-- ── Location update via RPC ──────────────────────────────────────────────────
+-- PostgREST cannot cast jsonb → geography implicitly (requires owning both
+-- types, which the DB role does not). Instead of a CAST, we expose an RPC
+-- function that accepts lat/lng as floats and builds the geography internally.
+-- The client calls rpc('update_observation_location', {p_obs_id, p_lat, p_lng}).
+-- SECURITY DEFINER so the function runs as the function owner (bypasses RLS
+-- for the geography construction only); the WHERE clause still enforces
+-- observer_id = auth.uid() so users can only move their own observations.
+
+CREATE OR REPLACE FUNCTION public.update_observation_location(
+  p_obs_id uuid,
+  p_lat    double precision,
+  p_lng    double precision
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  -- RLS-equivalent guard: only the owner can move their observation.
+  -- The function is SECURITY DEFINER so geography construction works,
+  -- but we explicitly check auth.uid() = observer_id for safety.
+  UPDATE public.observations
+  SET
+    location        = ST_SetSRID(ST_MakePoint(p_lng, p_lat), 4326)::geography,
+    location_source = 'manual',
+    updated_at      = now()
+  WHERE id          = p_obs_id
+    AND observer_id = (SELECT auth.uid());
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'rls_filtered'
+      USING HINT = 'Observation not found or you are not the owner.';
+  END IF;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.update_observation_location(uuid, double precision, double precision)
+  TO authenticated;
+
+
+
+-- ════════════════════════════════════════════════════════════════════════
+-- M-Loc-1: Places infrastructure
+-- ════════════════════════════════════════════════════════════════════════
+-- Adds:
+--   - public.places table with GIST/GIN indexes and RLS
+--   - observations.place_id FK column + index
+--   - assign_observation_place trigger (BEFORE INSERT OR UPDATE OF location)
+--   - H3 fallback: auto-creates a place_type='h3_cell' row when no named
+--     place covers the location
+-- Blocked by: none (foundational)
+-- Blocks: M-Loc-2, M-Loc-3, M-Loc-4, M-Loc-5
+-- ════════════════════════════════════════════════════════════════════════
+
+-- ── places table ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.places (
+  id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  slug            text UNIQUE NOT NULL,
+  name            text NOT NULL,
+  name_local      text,
+  place_type      text NOT NULL
+                  CHECK (place_type IN ('protected_area','h3_cell','custom','community')),
+  geometry        geography(Geometry,4326) NOT NULL,
+  h3_cells        text[],
+  h3_resolution   int,
+  source          text NOT NULL
+                  CHECK (source IN ('wdpa','user','auto_h3','nominatim')),
+  source_id       text,
+  country_code    text,
+  state_province  text,
+  description     text,
+  created_by      uuid REFERENCES public.users(id),
+  obs_count       int NOT NULL DEFAULT 0,
+  species_count   int NOT NULL DEFAULT 0,
+  observer_count  int NOT NULL DEFAULT 0,
+  first_obs_at    timestamptz,
+  last_obs_at     timestamptz,
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  updated_at      timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_places_geometry  ON public.places USING GIST(geometry);
+CREATE INDEX IF NOT EXISTS idx_places_h3_cells  ON public.places USING GIN(h3_cells);
+CREATE INDEX IF NOT EXISTS idx_places_type      ON public.places(place_type);
+CREATE INDEX IF NOT EXISTS idx_places_obs_count ON public.places(obs_count DESC);
+
+ALTER TABLE public.places ENABLE ROW LEVEL SECURITY;
+
+-- Everyone can read places (public catalogue)
+DROP POLICY IF EXISTS places_public_read  ON public.places;
+CREATE POLICY places_public_read  ON public.places FOR SELECT USING (true);
+
+-- Only the row owner can update custom/community places
+DROP POLICY IF EXISTS places_owner_update ON public.places;
+CREATE POLICY places_owner_update ON public.places FOR UPDATE TO authenticated
+  USING (created_by = (SELECT auth.uid()))
+  WITH CHECK (created_by = (SELECT auth.uid()));
+
+-- Authenticated users may insert custom or community places
+DROP POLICY IF EXISTS places_user_insert  ON public.places;
+CREATE POLICY places_user_insert  ON public.places FOR INSERT TO authenticated
+  WITH CHECK (place_type IN ('custom','community') AND created_by = (SELECT auth.uid()));
+
+-- ── observations.place_id FK ──────────────────────────────────────────────────
+ALTER TABLE public.observations ADD COLUMN IF NOT EXISTS place_id uuid REFERENCES public.places(id);
+CREATE INDEX IF NOT EXISTS idx_obs_place ON public.observations(place_id) WHERE place_id IS NOT NULL;
+
+-- ── assign_observation_place trigger ─────────────────────────────────────────
+-- Fires BEFORE INSERT OR UPDATE OF location so the trigger can rewrite
+-- NEW.place_id before the row lands in the table (no extra UPDATE round-trip).
+--
+-- Logic:
+--   1. If location is NULL → leave place_id unchanged, return NEW.
+--   2. Look for the smallest named place (place_type ≠ 'h3_cell') that
+--      contains the point.  ST_Within on the GIST index is sub-ms at
+--      the expected volume (<10 k places for MX).
+--   3. If none found → compute a deterministic slug from rounded lat/lng,
+--      upsert an auto_h3 place_type='h3_cell' row (ST_Buffer 5 km), and
+--      use its id.
+--
+-- H3 extension: if h3-pg is available the slug uses the real H3 cell ID
+-- at resolution 7 instead of the lat/lng rounding approximation.
+-- Degrade gracefully when the extension is absent.
+--
+-- SECURITY DEFINER: needed to INSERT into places (service-role bypass)
+-- without exposing a writable service-role key to the trigger body.
+-- The WHERE clause on the UPDATE guard still enforces observer ownership.
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.assign_observation_place()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_place_id     uuid;
+  v_lat          double precision;
+  v_lng          double precision;
+  v_slug         text;
+  v_h3_available boolean := false;
+  v_cell_id      text;
+BEGIN
+  -- 1. No location → nothing to do
+  IF NEW.location IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  -- 2. Find the most-specific named place (smallest area, not an h3_cell)
+  SELECT id INTO v_place_id
+    FROM public.places
+   WHERE place_type != 'h3_cell'
+     AND ST_Within(NEW.location::geometry, geometry::geometry)
+   ORDER BY ST_Area(geometry::geometry) ASC
+   LIMIT 1;
+
+  IF v_place_id IS NOT NULL THEN
+    NEW.place_id := v_place_id;
+    RETURN NEW;
+  END IF;
+
+  -- 3. No named place found → upsert an H3 fallback cell
+  v_lat := ST_Y(NEW.location::geometry);
+  v_lng := ST_X(NEW.location::geometry);
+
+  -- Try to use h3-pg for a real cell ID if available
+  BEGIN
+    SELECT EXISTS (
+      SELECT 1 FROM pg_extension WHERE extname = 'h3'
+    ) INTO v_h3_available;
+  EXCEPTION WHEN OTHERS THEN
+    v_h3_available := false;
+  END;
+
+  IF v_h3_available THEN
+    BEGIN
+      -- h3_lat_lng_to_cell returns an h3index (bigint or text depending on version)
+      SELECT h3_lat_lng_to_cell(v_lat, v_lng, 7)::text INTO v_cell_id;
+      v_slug := 'h3_' || v_cell_id;
+    EXCEPTION WHEN OTHERS THEN
+      -- Extension present but function signature differs — fall back gracefully
+      v_h3_available := false;
+    END;
+  END IF;
+
+  IF NOT v_h3_available OR v_cell_id IS NULL THEN
+    -- Lat/lng rounding approximation (~5 km grid at equator, resolution 7 equivalent)
+    v_slug := 'h3_' ||
+              replace(to_char(round(v_lat::numeric, 2), 'FM999990.00'), '.', 'p')
+              || '_' ||
+              replace(to_char(round(v_lng::numeric, 2), 'FM999990.00'), '.', 'p');
+    -- Normalize sign: negative becomes 'm' prefix
+    v_slug := replace(v_slug, 'h3_-', 'h3_m');
+    v_slug := replace(v_slug, '__m', '_m');
+  END IF;
+
+  -- Upsert the H3 cell row (idempotent on slug)
+  INSERT INTO public.places (
+    slug,
+    name,
+    place_type,
+    geometry,
+    source,
+    country_code
+  )
+  VALUES (
+    v_slug,
+    'Zona H3 ' || v_slug,
+    'h3_cell',
+    -- ~5 km buffer around the point
+    ST_Buffer(
+      ST_SetSRID(ST_MakePoint(v_lng, v_lat), 4326)::geography,
+      5000
+    ),
+    'auto_h3',
+    NULL  -- country_code backfilled separately if needed
+  )
+  ON CONFLICT (slug) DO NOTHING
+  RETURNING id INTO v_place_id;
+
+  -- If DO NOTHING fired (row already existed) fetch the id
+  IF v_place_id IS NULL THEN
+    SELECT id INTO v_place_id FROM public.places WHERE slug = v_slug;
+  END IF;
+
+  NEW.place_id := v_place_id;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS assign_observation_place_trigger ON public.observations;
+CREATE TRIGGER assign_observation_place_trigger
+  BEFORE INSERT OR UPDATE OF location ON public.observations
+  FOR EACH ROW
+  EXECUTE FUNCTION public.assign_observation_place();
+
+-- ── M-Loc-3: Place detail RPCs ────────────────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION public.place_top_species(
+  p_place_id uuid,
+  p_limit    int DEFAULT 20
+)
+RETURNS TABLE (
+  taxon_id       uuid,
+  scientific_name text,
+  common_name_es  text,
+  slug            text,
+  obs_count       bigint
+)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+  SELECT t.id, t.scientific_name, t.common_name_es, t.slug, COUNT(*) AS obs_count
+  FROM public.observations o
+  JOIN public.taxa t ON t.id = o.primary_taxon_id
+  WHERE o.place_id = p_place_id AND o.sync_status = 'synced'
+  GROUP BY t.id, t.scientific_name, t.common_name_es, t.slug
+  ORDER BY obs_count DESC
+  LIMIT p_limit;
+$$;
+
+CREATE OR REPLACE FUNCTION public.place_top_observers(
+  p_place_id uuid,
+  p_limit    int DEFAULT 10
+)
+RETURNS TABLE (
+  user_id      uuid,
+  display_name text,
+  avatar_url   text,
+  obs_count    bigint
+)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+  SELECT u.id, u.display_name, u.avatar_url, COUNT(*) AS obs_count
+  FROM public.observations o
+  JOIN public.users u ON u.id = o.observer_id
+  WHERE o.place_id = p_place_id AND o.sync_status = 'synced'
+  GROUP BY u.id, u.display_name, u.avatar_url
+  ORDER BY obs_count DESC
+  LIMIT p_limit;
+$$;
+
+CREATE OR REPLACE FUNCTION public.place_geojson_by_slug(p_slug text)
+RETURNS json
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+  SELECT row_to_json(t) FROM (
+    SELECT
+      id, slug, name, name_local, place_type, source,
+      country_code, state_province, description,
+      obs_count, species_count, observer_count,
+      first_obs_at, last_obs_at,
+      ST_AsGeoJSON(geometry)::json AS geometry_geojson,
+      ST_AsGeoJSON(ST_Centroid(geometry::geometry))::json AS centroid_geojson
+    FROM public.places
+    WHERE slug = p_slug
+    LIMIT 1
+  ) t;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.place_top_species(uuid, int) TO authenticated, anon;
+GRANT EXECUTE ON FUNCTION public.place_top_observers(uuid, int) TO authenticated, anon;
+GRANT EXECUTE ON FUNCTION public.place_geojson_by_slug(text) TO authenticated, anon;
+
+-- ── M-Loc-4/5: places_near RPC ────────────────────────────────────────────────
+-- Returns places sorted by distance from a given lat/lng point.
+-- Used by the "Near me" button on the places index page.
+
+CREATE OR REPLACE FUNCTION public.places_near(
+  p_lat    double precision,
+  p_lng    double precision,
+  p_limit  int DEFAULT 20,
+  p_offset int DEFAULT 0
+)
+RETURNS TABLE (
+  id           uuid,
+  slug         text,
+  name         text,
+  place_type   text,
+  obs_count    int,
+  species_count int,
+  distance_m   double precision
+)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+  SELECT
+    id, slug, name, place_type, obs_count, species_count,
+    ST_Distance(
+      geometry,
+      ST_SetSRID(ST_MakePoint(p_lng, p_lat), 4326)::geography
+    ) AS distance_m
+  FROM public.places
+  WHERE obs_count > 0
+  ORDER BY distance_m ASC
+  LIMIT p_limit OFFSET p_offset;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.places_near(double precision, double precision, int, int)
+  TO authenticated, anon;

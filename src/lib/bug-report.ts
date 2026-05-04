@@ -34,9 +34,11 @@ export interface BugReportOptions {
 export async function buildBugReportUrl(opts: BugReportOptions): Promise<string> {
   const { title, errorMsg, obsId, obsName, extra } = opts;
 
-  // App version from meta tag (injected at build time)
+  // App version from meta tags (injected at build time via BaseLayout)
   const appVersion =
     document.querySelector<HTMLMetaElement>('meta[name="app-version"]')?.content ?? 'unknown';
+  const buildSha =
+    document.querySelector<HTMLMetaElement>('meta[name="build-sha"]')?.content ?? 'unknown';
 
   // Service worker version
   let swVersion = 'none';
@@ -59,7 +61,8 @@ export async function buildBugReportUrl(opts: BugReportOptions): Promise<string>
     URL:          location.href,
     'User Agent': navigator.userAgent,
     Locale:       navigator.language,
-    Build:        appVersion,
+    Version:      appVersion,
+    'Build SHA':  buildSha,
     'SW version': swVersion,
     Online:       String(navigator.onLine),
     Viewport:     `${window.innerWidth}x${window.innerHeight}`,

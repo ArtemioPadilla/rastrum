@@ -635,6 +635,30 @@ serve(async (req) => {
     }
   }
 
+  // Pool call sponsor drip: award 0.5 karma to the pool's sponsor each
+  // time a beneficiary successfully uses a pool-funded identification.
+  if (result && poolUsed) {
+    try {
+      const { data: poolRow, error: poolLookupErr } = await db()
+        .from('sponsor_pools')
+        .select('sponsor_id')
+        .eq('id', poolUsed.poolId)
+        .single();
+      if (poolLookupErr) {
+        console.warn(`[identify] pool sponsor lookup failed: ${poolLookupErr.message}`);
+      } else if (poolRow) {
+        const sponsorId = (poolRow as { sponsor_id: string }).sponsor_id;
+        await db().rpc('add_karma_simple', {
+          p_user_id: sponsorId,
+          p_delta: 0.5,
+          p_reason: 'pool_call_sponsor_drip',
+        });
+      }
+    } catch (err) {
+      console.warn(`[identify] pool sponsor karma drip failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
   if (!result) {
     const hasAnyClaudeCred = !!claudeCred;
     const errorPayload: Record<string, unknown> = {
@@ -656,9 +680,43 @@ serve(async (req) => {
 
   if (body.observation_id !== 'cascade-only') {
     if (serviceRole && supabaseUrl) {
+      // Upsert the taxon so observations.primary_taxon_id can be resolved.
+      // The identify cascade returns enough metadata (scientific_name, kingdom,
+      // family, common names) to create a minimal taxa row. On conflict we
+      // update the common names in case they improved (PlantNet → Claude or
+      // vice-versa). We do NOT overwrite kingdom/family since those come from
+      // authoritative sources (PlantNet / GBIF) and should not be clobbered.
+      let taxonId: string | null = null;
+      try {
+        const taxonPayload = {
+          scientific_name: result.scientific_name,
+          common_name_es: result.common_name_es ?? null,
+          common_name_en: result.common_name_en ?? null,
+          kingdom: result.kingdom !== 'Unknown' ? result.kingdom : null,
+          family: result.family ?? null,
+          taxon_rank: 'species',
+        };
+        const { data: taxonRow, error: taxonErr } = await db()
+          .from('taxa')
+          .upsert(taxonPayload, {
+            onConflict: 'scientific_name',
+            ignoreDuplicates: false,
+          })
+          .select('id')
+          .maybeSingle();
+        if (taxonErr) {
+          console.warn('[identify] taxa upsert failed (non-fatal)', taxonErr.message);
+        } else if (taxonRow?.id) {
+          taxonId = taxonRow.id as string;
+        }
+      } catch (e) {
+        console.warn('[identify] taxa upsert exception (non-fatal)', e);
+      }
+
       await db().from('identifications').insert({
         observation_id: body.observation_id,
         scientific_name: result.scientific_name,
+        taxon_id: taxonId,
         confidence: result.confidence,
         source: result.source,
         raw_response: result.raw as object,

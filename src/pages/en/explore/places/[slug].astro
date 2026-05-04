@@ -1,0 +1,25 @@
+---
+import BaseLayout from '../../../../layouts/BaseLayout.astro';
+
+export function getStaticPaths() {
+  // No pre-rendered paths — this page is accessed dynamically.
+  return [];
+}
+
+const { slug } = Astro.params;
+const lang = 'en';
+---
+
+<BaseLayout title="Place — Rastrum" description="Place detail on Rastrum." lang={lang}>
+  <div class="max-w-2xl mx-auto py-16 px-4 text-center">
+    <h1 class="text-2xl font-bold text-zinc-900 dark:text-zinc-100 mb-3">
+      Place detail coming soon
+    </h1>
+    <p class="text-zinc-500 dark:text-zinc-400 text-sm">
+      Detailed place pages are on the way. Stay tuned!
+    </p>
+    {slug && (
+      <p class="mt-4 text-xs text-zinc-400 dark:text-zinc-600 font-mono">{slug}</p>
+    )}
+  </div>
+</BaseLayout>

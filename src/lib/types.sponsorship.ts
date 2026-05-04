@@ -7,6 +7,7 @@ export interface SponsorCredential {
   label:         string;
   provider:      AiProvider;
   kind:          AiCredentialKind;
+  preferred_model: string;
   validated_at:  string | null;
   last_used_at:  string | null;
   revoked_at:    string | null;

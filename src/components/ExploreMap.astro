@@ -15,6 +15,15 @@ const tr = t(lang);
   <div class="relative">
     <div id="map" class="w-full h-[70vh] rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900"></div>
     <div id="map-skeleton" class="absolute inset-0 w-full h-full rounded-lg bg-zinc-200 dark:bg-zinc-800 animate-pulse" aria-hidden="true"></div>
+    <!-- Places layer toggle -->
+    <button
+      id="places-layer-toggle"
+      class="hidden absolute top-3 right-3 z-10 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-sm hover:border-emerald-400 transition-colors"
+      data-active="false"
+    >
+      <span>🗺️</span>
+      <span id="places-toggle-label">{lang === 'es' ? 'Mostrar áreas' : 'Show areas'}</span>
+    </button>
   </div>
   <p id="map-source-note" class="hidden mt-2 text-[11px] text-zinc-500 dark:text-zinc-400"></p>
   <p id="map-offline-hint" class="hidden mt-2 text-xs text-amber-700 dark:text-amber-400"></p>
@@ -339,6 +348,69 @@ const tr = t(lang);
         'circle-stroke-width': 2,
         'circle-stroke-color': '#ffffff',
       },
+    });
+
+    // ── Places layer (toggle) ────────────────────────────────────────────────
+    const toggleBtn = document.getElementById('places-layer-toggle') as HTMLButtonElement | null;
+    const toggleLabel = document.getElementById('places-toggle-label');
+    const placeBase = isEs ? '/es/explorar/lugares/?slug=' : '/en/explore/places/?slug=';
+    let placesLoaded = false;
+
+    // Show toggle button once map is ready
+    toggleBtn?.classList.remove('hidden');
+
+    toggleBtn?.addEventListener('click', async () => {
+      const isActive = toggleBtn.dataset.active === 'true';
+
+      if (!placesLoaded) {
+        // Load places GeoJSON from RPC on first activation
+        const supabase = getSupabase();
+        const { data: geojson } = await supabase.rpc('places_map_geojson', { p_limit: 150 });
+        if (geojson) {
+          map.addSource('places-source', { type: 'geojson', data: geojson });
+          map.addLayer({
+            id: 'places-fill',
+            type: 'fill',
+            source: 'places-source',
+            paint: { 'fill-color': '#10b981', 'fill-opacity': 0.12 },
+          });
+          map.addLayer({
+            id: 'places-outline',
+            type: 'line',
+            source: 'places-source',
+            paint: { 'line-color': '#059669', 'line-width': 1.5 },
+          });
+
+          // Popup on click
+          map.on('click', 'places-fill', (e) => {
+            const props = e.features?.[0]?.properties as { name?: string; obs_count?: number; slug?: string } | undefined;
+            if (!props?.slug) return;
+            new maplibregl.Popup({ closeButton: true, maxWidth: '240px' })
+              .setLngLat(e.lngLat)
+              .setHTML(`<div class="text-sm font-medium">${props.name ?? props.slug}</div><div class="text-xs text-zinc-500 mt-0.5">${props.obs_count ?? 0} obs</div><a href="${placeBase}${props.slug}" class="text-xs text-emerald-600 hover:underline mt-1 block">${isEs ? 'Ver lugar →' : 'View place →'}</a>`)
+              .addTo(map);
+          });
+          map.on('mouseenter', 'places-fill', () => { map.getCanvas().style.cursor = 'pointer'; });
+          map.on('mouseleave', 'places-fill', () => { map.getCanvas().style.cursor = ''; });
+
+          placesLoaded = true;
+        }
+      }
+
+      // Toggle visibility
+      const visibility = isActive ? 'none' : 'visible';
+      ['places-fill', 'places-outline'].forEach(layerId => {
+        if (map.getLayer(layerId)) map.setLayoutProperty(layerId, 'visibility', visibility);
+      });
+
+      toggleBtn.dataset.active = isActive ? 'false' : 'true';
+      if (toggleLabel) {
+        toggleLabel.textContent = isActive
+          ? (isEs ? 'Mostrar áreas' : 'Show areas')
+          : (isEs ? 'Ocultar áreas' : 'Hide areas');
+      }
+      toggleBtn.classList.toggle('border-emerald-400', !isActive);
+      toggleBtn.classList.toggle('text-emerald-700', !isActive);
     });
   });
 </script>

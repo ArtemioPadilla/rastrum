@@ -63,6 +63,7 @@ const tr = t(lang);
       if (dismissed) return;
       pendingSw = sw;
       toast.classList.remove('hidden');
+      autoApply(sw);
     }
 
     reloadBtn.addEventListener('click', function () {
@@ -78,6 +79,16 @@ const tr = t(lang);
       dismissed = true;
       toast.classList.add('hidden');
     });
+
+    // Auto-apply the update after 10s if user hasn't dismissed
+    // (they may not have noticed the toast)
+    function autoApply(sw) {
+      setTimeout(function () {
+        if (dismissed) return;
+        if (sw) sw.postMessage('SKIP_WAITING');
+        setTimeout(function () { location.reload(); }, 250);
+      }, 10000);
+    }
 
     navigator.serviceWorker.getRegistration().then(function (reg) {
       if (!reg) return;
@@ -99,10 +110,15 @@ const tr = t(lang);
         });
       });
 
-      // Poll once every 30 minutes for an update — covers users who
-      // leave the tab open all day. The browser also checks on each
-      // navigation, but long-lived tabs won't navigate.
-      setInterval(function () { reg.update().catch(function () {}); }, 30 * 60 * 1000);
+      // Poll every 5 minutes for an update — covers users who leave the tab
+      // open (browser also checks on each navigation). 5 min means updates
+      // reach users within one session without waiting for a full reload cycle.
+      setInterval(function () { reg.update().catch(function () {}); }, 5 * 60 * 1000);
+
+      // Also check immediately on page focus (user switches back to tab after update deployed)
+      document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) reg.update().catch(function () {});
+      });
     });
 
     // When the new SW takes over (after our reload or any other reason),

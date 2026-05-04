@@ -40,6 +40,18 @@ export default defineConfig({
       use: { ...devices['Pixel 5'] },
       testMatch: /(mobile|smoke)\.spec\.ts/,
     },
+    {
+      name: 'journey-chromium',
+      use: { ...devices['Desktop Chrome'] },
+      testMatch: /journey-(?!mobile).*\.spec\.ts/,
+      timeout: 60_000,
+    },
+    {
+      name: 'journey-mobile',
+      use: { ...devices['Pixel 5'] },
+      testMatch: /journey-mobile.*\.spec\.ts/,
+      timeout: 60_000,
+    },
   ],
   // Skip the local preview server when targeting a remote base URL — the
   // nightly smoke workflow runs against production and shouldn't waste

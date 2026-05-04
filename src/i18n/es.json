@@ -405,13 +405,13 @@
     },
     "leaderboards_optout_link": "Ocultarme de las clasificaciones de la comunidad",
     "edit_profile_optout": "Perfil → Editar",
-    "map_title": "Mapa de la Comunidad",
-    "map_subtitle": "Actividad de observadores en Latinoamérica",
-    "map_observers_in_view": "{count} observadores a la vista",
+    "map_title": "Mapa de la comunidad",
+    "map_subtitle": "Actividad de observadores en América Latina",
+    "map_observers_in_view": "{count} observadores en vista",
     "map_min_cluster": "Las áreas con menos de 3 observadores se ocultan por privacidad.",
-    "map_sign_in_hint": "Inicia sesión para ver el mapa completo.",
+    "map_sign_in_hint": "Inicia sesión para ver el mapa de calor completo.",
     "map_loading": "Cargando datos de observadores…",
-    "map_no_data": "Aún no hay datos de observadores.",
+    "map_no_data": "Aún no hay datos de observadores disponibles.",
     "leaderboard_title": "Tabla de Karma",
     "leaderboard_subtitle": "Mejores observadores por puntuación de karma",
     "leaderboard_rank": "Posición",
@@ -740,7 +740,8 @@
       "privacy_20km": "Aproximar a ~20 km",
       "privacy_5km": "Aproximar a ~5 km",
       "privacy_hide": "Ocultar ubicación completamente",
-      "delete_obs": "Eliminar observación"
+      "delete_obs": "Eliminar observación",
+      "place_chip_label": "Ver lugar"
     },
     "edit_location": "Editar ubicación",
     "coords_precise_label": "Precisas (sólo tú las ves)",
@@ -1344,9 +1345,9 @@
     "sponsored_by_label": "Patrocinado por",
     "sponsored_by_multi": "Patrocinado por {first} +{rest} más",
     "tour_welcome_title": "Bienvenido a Patrocinios IA",
-    "tour_welcome_intro": "Comparte tu credencial Anthropic con amigos específicos. Tour de 30 segundos:",
-    "tour_step_1": "1️⃣ Agrega una credencial — pega tu key sk-ant-api03-… o sk-ant-oat01-…. Se cifra en Vault, nunca aparece en logs.",
-    "tour_step_2": "2️⃣ Agrega beneficiaries por nombre de usuario con cuota mensual. Identifican con Claude usando tu key, tú controlas la cuota.",
+    "tour_welcome_intro": "Comparte cualquier credencial de IA con amigos específicos — Anthropic, OpenAI, Gemini, Bedrock, Azure o Vertex. Tour de 30 segundos:",
+    "tour_step_1": "1️⃣ Agrega una credencial — pega tu API key (Anthropic sk-ant-…, OpenAI sk-…, Gemini AIza…) o un JSON envelope (Bedrock / Azure / Vertex). Se cifra en Vault, nunca aparece en logs.",
+    "tour_step_2": "2️⃣ Agrega beneficiaries por nombre de usuario con cuota mensual. Identifican con IA usando tu key — tú controlas la cuota y el modelo.",
     "tour_step_3": "3️⃣ Gana karma — +20 por patrocinio activo, +1 por call usado. Capped para evitar farming. Ve la card de analytics abajo.",
     "tour_dismiss": "Entendido",
     "tour_show_again": "Mostrar tour otra vez",
@@ -1365,7 +1366,10 @@
     "request_reject": "Rechazar",
     "request_withdraw": "Retirar",
     "my_requests_section": "Mis solicitudes de patrocinio",
-    "my_requests_empty": "Aún no has pedido patrocinio."
+    "my_requests_empty": "Aún no has pedido patrocinio.",
+    "model_cost_heading": "Costo estimado por 100 llamadas",
+    "model_cost_note": "Los costos son aproximados y dependen del tamaño de imagen y longitud de respuesta.",
+    "model_cost_per_100": "por 100 llamadas"
   },
   "expert": {
     "apply_title": "Postularse como experto",
@@ -1610,6 +1614,27 @@
       "recent_photos": "Fotos recientes",
       "no_coordinates": "Aún no hay observaciones públicas con coordenadas.",
       "page_title": "{name} — Rastrum"
+    },
+    "places": {
+      "title": "Lugares",
+      "subtitle": "Explora áreas protegidas, zonas H3 y lugares comunitarios en Rastrum.",
+      "search_placeholder": "Buscar por nombre…",
+      "filter_all": "Todos los tipos",
+      "filter_protected_area": "Áreas protegidas",
+      "filter_h3_cell": "Zonas H3",
+      "filter_custom": "Personalizados",
+      "filter_community": "Comunitarios",
+      "empty": "No hay lugares que coincidan con tu búsqueda.",
+      "loading": "Cargando lugares…",
+      "obs_count": "{count} obs",
+      "species_count": "{count} spp",
+      "type_protected_area": "Área protegida",
+      "type_h3_cell": "Zona H3",
+      "type_custom": "Personalizado",
+      "type_community": "Comunitario",
+      "prev": "Anterior",
+      "next": "Siguiente",
+      "page_of": "Página {page} de {total}"
     }
   },
   "karma": {
@@ -1621,6 +1646,8 @@
     "expertise_empty": "Aún sin especialidad — observa para construirla.",
     "verified_badge": "verificado",
     "rank_in_region": "ranking {n} en {region}",
+    "pool_donation_karma": "+{delta} karma por donar a un pool",
+    "pool_drip_karma": "+{delta} karma por uso del pool",
     "conservation_bonus": "Bono de conservación",
     "conservation_bonus_hint": "Las observaciones de especies amenazadas otorgan karma extra.",
     "iucn_label": "Lista Roja UICN",
@@ -1927,6 +1954,7 @@
     "watchlists": "Listas de vigilancia",
     "projects": "Proyectos",
     "taxonChanges": "Cambios de taxón",
+    "feedback": "Retroalimentación",
     "modOverview": "Resumen",
     "modFlagQueue": "Cola de banderas",
     "modComments": "Comentarios",
@@ -2278,6 +2306,8 @@
     "karma_note_first_in_rastrum": "Primera observación de este taxón en Rastrum.",
     "karma_note_comment_reaction": "Reacción positiva recibida en un comentario.",
     "karma_note_manual_adjust": "Ajuste manual de admin vía award_karma().",
+    "karma_note_pool_donation": "Patrocinador donó llamadas a un pool de la plataforma.",
+    "karma_note_pool_call_sponsor_drip": "Pequeño goteo de karma al patrocinador por llamada de pool consumida.",
     "karma_rarity_heading": "Multiplicadores de rareza (sobre el Δ base)",
     "karma_bucket": "Cubo",
     "karma_rarity_note": "Cubo 1 = común (≥80° percentil de observaciones). Cubo 5 = extremadamente raro (<5° percentil).",
@@ -2961,5 +2991,74 @@
     "quick_confirm": "Confirmar y guardar",
     "quick_edit": "Editar en formulario completo",
     "quick_discard": "Descartar"
+  },
+  "guides": {
+    "how_it_works": "¿Cómo funciona?",
+    "step_of": "Paso {current} de {total}",
+    "next": "Siguiente",
+    "done": "Listo",
+    "skip": "Saltar guía",
+    "observe": {
+      "step1_title": "Sube una foto",
+      "step1_body": "Arrastra una foto aquí o toca para abrir tu cámara. Rastrum identifica especies con fotos, audio y video.",
+      "step2_title": "Ve la identificación",
+      "step2_body": "Nuestro cascade de IA consulta múltiples fuentes. La mejor coincidencia aparece aquí con un puntaje de confianza.",
+      "step3_title": "Confirma o corrige",
+      "step3_body": "Si la sugerencia es correcta, confírmala. Si no, busca la especie correcta.",
+      "step4_title": "Guarda tu observación",
+      "step4_body": "Tu observación se guarda localmente primero, luego se sincroniza con el servidor cuando estés en línea."
+    },
+    "explore": {
+      "step1_title": "Explora observaciones",
+      "step1_body": "Cambia entre observaciones recientes, lista de especies, vista de mapa y tu lista de seguimiento.",
+      "step2_title": "Explora el mapa",
+      "step2_body": "Ve observaciones en un mapa interactivo. Acércate para encontrar lo que hay cerca de ti.",
+      "step3_title": "Filtra y busca",
+      "step3_body": "Reduce resultados por especie, región, fecha o calidad de observación."
+    },
+    "validate": {
+      "step1_title": "La cola de validación",
+      "step1_body": "Estas observaciones necesitan ayuda de la comunidad. Observaciones sin identificar o con baja confianza aparecen aquí.",
+      "step2_title": "Sugiere una identificación",
+      "step2_body": "Si reconoces la especie, haz clic para sugerir. Los votos de expertos cuentan 3x en su especialidad.",
+      "step3_title": "Busca el taxón",
+      "step3_body": "Escribe el nombre científico. El autocompletado busca en nuestra base de datos taxonómica."
+    },
+    "export": {
+      "step1_title": "Elige un formato",
+      "step1_body": "Darwin Core es el estándar internacional para datos de biodiversidad. CSV funciona para hojas de cálculo.",
+      "step2_title": "Elige un preset",
+      "step2_body": "Los presets SNIB y CONANP coinciden con los requisitos de reporte del gobierno mexicano.",
+      "step3_title": "Descarga",
+      "step3_body": "Tu exportación incluye todas las observaciones seleccionadas con sus identificaciones y metadatos."
+    },
+    "community": {
+      "step1_title": "Encuentra observadores",
+      "step1_body": "Filtra por país, experiencia taxonómica, o encuentra personas observando cerca de ti.",
+      "step2_title": "Ve un perfil",
+      "step2_body": "Ve sus observaciones, conteo de especies y áreas de experiencia.",
+      "step3_title": "Sigue",
+      "step3_body": "Sigue observadores para ver su actividad en tu feed. Recibirán una notificación."
+    },
+    "console": {
+      "step1_title": "Pestañas de consola",
+      "step1_body": "Las herramientas de admin, moderador y experto están organizadas por rol. Ves las pestañas que corresponden a tus permisos.",
+      "step2_title": "Salud del sistema",
+      "step2_body": "Revisa cron jobs, entrega de webhooks, tasas de error y alertas de anomalías de un vistazo.",
+      "step3_title": "Atajos de teclado",
+      "step3_body": "Presiona 'g' y luego una letra para saltar entre pestañas. 'g+u' para usuarios, 'g+h' para salud, etc."
+    }
+  },
+  "feedback": {
+    "post_onboarding": "¿Cómo fue la experiencia de configuración?",
+    "first_observation": "¿Guardar tu observación fue fácil?",
+    "post_guide": "¿Fue útil esta guía?",
+    "explore_empty": "¿Qué te gustaría encontrar aquí?",
+    "explore_empty_opt1": "Observaciones cerca de mí",
+    "explore_empty_opt2": "Una especie específica",
+    "explore_empty_opt3": "Otros observadores para seguir",
+    "first_validation": "¿Fue sencillo sugerir una identificación?",
+    "dismiss": "Cerrar",
+    "thanks": "¡Gracias por tu retroalimentación!"
   }
 }

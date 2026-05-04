@@ -195,9 +195,35 @@ async function syncOne(record: ObservationRecord): Promise<void> {
   const hasIdentification = clientId.scientificName || (clientId.confidence > 0 && clientId.source !== 'human');
   if (hasIdentification && (clientId.status === 'accepted' || clientId.status === 'needs_review')) {
     const supabase = getSupabase();
+
+    // Upsert taxa row so observations.primary_taxon_id can be resolved by
+    // the sync_primary_identification trigger. On conflict (scientific_name
+    // already exists) update common names only — kingdom/family come from
+    // authoritative upstream sources.
+    let taxonId: string | null = null;
+    if (clientId.scientificName) {
+      try {
+        const taxonPayload: Record<string, unknown> = {
+          scientific_name: clientId.scientificName,
+          common_name_es: clientId.commonNameEs ?? null,
+          common_name_en: clientId.commonNameEn ?? null,
+          taxon_rank: 'species',
+        };
+        const { data: taxonRow } = await supabase
+          .from('taxa')
+          .upsert(taxonPayload, { onConflict: 'scientific_name', ignoreDuplicates: false })
+          .select('id')
+          .maybeSingle();
+        if (taxonRow?.id) taxonId = taxonRow.id as string;
+      } catch {
+        // taxa upsert is non-fatal — trigger fallback handles scientific_name lookup
+      }
+    }
+
     const { error: clientIdErr } = await supabase.from('identifications').insert({
       observation_id: record.id,
       scientific_name: clientId.scientificName,
+      taxon_id: taxonId,
       confidence: Math.max(0, Math.min(1, clientId.confidence ?? 0)),
       source: clientId.source ?? 'human',
       is_primary: true,
@@ -314,7 +340,15 @@ async function triggerIdentify(observationId: string): Promise<void> {
   const localAIEnabled = isLocalAIEnabled();
 
   const excluded: string[] = [];
-  if (!localAIEnabled) excluded.push('webllm_phi35_vision', 'onnx_efficientnet_lite0', 'birdnet_lite');
+  // Large models (Phi-3.5 2.4 GB, BirdNET ~50 MB) gate on localAIEnabled.
+  // EfficientNet-Lite0 is only ~2.8 MB — run it whenever it's downloaded,
+  // regardless of the localAI bandwidth toggle.
+  if (!localAIEnabled) excluded.push('webllm_phi35_vision', 'birdnet_lite');
+  const { getOnnxBaseCacheStatus, getOnnxBaseWeightsBaseUrl } = await (await import('./identifiers/onnx-base-cache'));
+  const efficientNetCached = getOnnxBaseWeightsBaseUrl()
+    ? await getOnnxBaseCacheStatus().then(s => s.modelCached && s.labelsCached).catch(() => false)
+    : false;
+  if (!efficientNetCached) excluded.push('onnx_efficientnet_lite0');
   if (!hasAnthropicKey) excluded.push('claude_haiku');
 
   // Camera-trap photos prefer the MegaDetector + SpeciesNet pipeline.

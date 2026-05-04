@@ -6,7 +6,7 @@
 //
 // Material-edit detection happens server-side via the
 // `observations_material_edit_check` BEFORE UPDATE trigger (PR2). The
-// client only issues plain `update(...)` calls — no application-side
+// client only issues plain `update(...)` calls - no application-side
 // flagging is needed.
 
 import { getSupabase } from './supabase';
@@ -103,11 +103,11 @@ export async function wireManagePanelDetails(
   const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
   const copy: SaveCopy = lang === 'es'
     ? {
-        saving: 'Guardando…',
+        saving: 'Guardando...',
         delete_confirm: '¿Eliminar esta observación? Esta acción no se puede deshacer. Las fotos, identificaciones y metadatos se eliminarán.',
       }
     : {
-        saving: 'Saving…',
+        saving: 'Saving...',
         delete_confirm: 'Delete this observation? This cannot be undone. Photos, identifications, and metadata will all be removed.',
       };
 
@@ -124,7 +124,7 @@ export async function wireManagePanelDetails(
   const deleteBtn  = document.getElementById('m-delete')        as HTMLButtonElement | null;
   const form       = document.getElementById('manage-form')     as HTMLFormElement | null;
 
-  if (sciInput)   sciInput.value   = '';
+  if (sciInput)   sciInput.value   = (_ident?.scientific_name as string | null) ?? '';
   if (notesEl)    notesEl.value    = (obs.notes as string | null) ?? '';
   if (obsEl)      obsEl.value      = (obs.obscure_level as string) ?? 'none';
   if (observedAt) observedAt.value = isoToLocalDatetimeInput(obs.observed_at as string | null | undefined);
@@ -163,7 +163,7 @@ export async function wireManagePanelDetails(
                 status: 'accepted' as const,
                 confidence: 0.95,
               };
-              // Always flip to 'pending' — records stuck in 'error' or 'draft'
+              // Always flip to 'pending' - records stuck in 'error' or 'draft'
               // must also re-enter the sync queue after a species correction.
               await db.observations.update(obsId, {
                 data: record.data,
@@ -178,8 +178,8 @@ export async function wireManagePanelDetails(
               // Show offline indicator
               if (savedEl) {
                 savedEl.textContent = lang === 'es'
-                  ? '✓ Guardado localmente — se sincronizará cuando haya conexión'
-                  : '✓ Saved locally — will sync when online';
+                  ? '✓ Guardado localmente - se sincronizará cuando haya conexión'
+                  : '✓ Saved locally - will sync when online';
               }
             } else {
               throw new Error('Observation not found in local database');
@@ -195,8 +195,8 @@ export async function wireManagePanelDetails(
         } else {
           if (errEl) {
             errEl.textContent = lang === 'es'
-              ? 'Sin conexión — solo se puede guardar el nombre de especie offline'
-              : 'Offline — only species name can be saved offline';
+              ? 'Sin conexión - solo se puede guardar el nombre de especie offline'
+              : 'Offline - only species name can be saved offline';
             errEl.classList.remove('hidden');
           }
         }
@@ -236,7 +236,7 @@ export async function wireManagePanelDetails(
         if (sci) {
           // Apply taxonomy synonym correction for known outdated names (#345)
           const correctedSci = correctIdentificationName(sci);
-          // Demote the current primary identification. Capture the error —
+          // Demote the current primary identification. Capture the error -
           // if RLS rejects this (stale session, wrong owner), we must not
           // proceed to the insert or the unique partial index will reject it.
           const { error: demoteErr } = await supabase.from('identifications')
@@ -250,7 +250,7 @@ export async function wireManagePanelDetails(
             const { data: { user: viewer } } = await supabase.auth.getUser();
             viewerId = viewer?.id ?? null;
           } catch {
-            // Auth fetch failed — proceed without viewer ID rather than hang
+            // Auth fetch failed - proceed without viewer ID rather than hang
           }
 
           const { error: idErr } = await supabase.from('identifications').insert({
@@ -371,7 +371,7 @@ export async function wireManagePanelPhotos(obsId: string): Promise<void> {
         delete_confirm_title:  'Eliminar foto',
         delete_confirm_label:  'Eliminar',
         upload_failed:         'Subida de foto fallida. Intenta de nuevo.',
-        uploading:             'Subiendo…',
+        uploading:             'Subiendo...',
         delete_photo_aria:     'Eliminar foto',
       }
     : {
@@ -380,7 +380,7 @@ export async function wireManagePanelPhotos(obsId: string): Promise<void> {
         delete_confirm_title:  'Delete photo',
         delete_confirm_label:  'Delete',
         upload_failed:         'Photo upload failed. Please try again.',
-        uploading:             'Uploading…',
+        uploading:             'Uploading...',
         delete_photo_aria:     'Delete photo',
       };
 
@@ -532,10 +532,25 @@ export async function wireManagePanelPhotos(obsId: string): Promise<void> {
 }
 
 /**
- * Build the WKT geography literal Postgres expects for a `geography(POINT,4326)`
- * column. Note longitude precedes latitude per PostGIS / GeoJSON convention,
- * matching how `src/lib/sync.ts` and `ObservationForm.astro` write coords.
+ * Build a GeoJSON Point object for PostgREST / supabase-js UPDATE calls on
+ * `geography(Point,4326)` columns. PostgREST accepts WKT on INSERT via the
+ * PostgREST type-casting path, but UPDATE through supabase-js serialises the
+ * value as JSON - sending a raw WKT string results in a no-op write (the
+ * column stays at its old value). GeoJSON is the safe format for both paths.
+ *
+ * Note: longitude precedes latitude per GeoJSON spec.
  */
+export function pointGeographyGeoJSON(lat: number, lng: number): { type: 'Point'; coordinates: [number, number] } {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    throw new Error('coords_invalid');
+  }
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    throw new Error('coords_invalid');
+  }
+  return { type: 'Point', coordinates: [lng, lat] };
+}
+
+/** @deprecated Use pointGeographyGeoJSON - WKT silently no-ops on UPDATE via supabase-js */
 export function pointGeographyLiteral(lat: number, lng: number): string {
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
     throw new Error('coords_invalid');
@@ -596,55 +611,91 @@ export async function wireManagePanelLocation(
   const savedEl  = document.getElementById('m-loc-saved');
   const errEl    = document.getElementById('m-loc-error');
 
-  window.addEventListener('rastrum:mappicker-save', async (ev) => {
+  // GPS button - use device location
+  const gpsBtn = document.getElementById('m-loc-gps') as HTMLButtonElement | null;
+  if (gpsBtn && 'geolocation' in navigator) {
+    gpsBtn.classList.remove('hidden');
+    gpsBtn.addEventListener('click', () => {
+      const gpsStatus = document.getElementById('m-loc-gps-status');
+      gpsBtn.disabled = true;
+      if (gpsStatus) { gpsStatus.textContent = isEs ? 'Obteniendo ubicación...' : 'Getting location...'; gpsStatus.classList.remove('hidden'); }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          gpsBtn.disabled = false;
+          if (gpsStatus) gpsStatus.classList.add('hidden');
+          const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          window.dispatchEvent(new CustomEvent('rastrum:mappicker-set-initial', { detail: { id: 'obs-detail-edit', coords } }));
+          window.dispatchEvent(new CustomEvent('rastrum:mappicker-set', { detail: { id: 'obs-detail-edit', coords } }));
+        },
+        (err) => {
+          gpsBtn.disabled = false;
+          if (gpsStatus) { gpsStatus.textContent = isEs ? 'No se pudo obtener la ubicación GPS.' : 'Could not get GPS location.'; }
+          console.warn('[manage-panel] GPS error', err);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+      );
+    });
+  }
+
+  // Use a named handler so we can remove any previously registered listener
+  // before adding a new one. wireManagePanelLocation can be called more than
+  // once (page navigation, panel re-init), and window.addEventListener without
+  // cleanup stacks duplicate listeners - each one fires on the same event,
+  // causing concurrent refreshSession() + RPC calls that deadlock the
+  // supabase-js auth mutex and trigger save_timeout.
+  const existingHandler = (window as Window & { __rastrum_loc_handler?: EventListener }).__rastrum_loc_handler;
+  if (existingHandler) window.removeEventListener('rastrum:mappicker-save', existingHandler);
+
+  const locHandler: EventListener = async (ev) => {
     const e = ev as CustomEvent<{ id: string; coords: { lat: number; lng: number } }>;
     if (e.detail.id !== 'obs-detail-edit') return;
     errEl?.classList.add('hidden');
     savedEl?.classList.add('hidden');
     savingEl?.classList.remove('hidden');
     try {
-      const literal = pointGeographyLiteral(e.detail.coords.lat, e.detail.coords.lng);
-      // Hard 15 s timeout — if PostgREST never returns (RLS recursion regressed,
-      // CORS preflight stalled, auth refresh deadlock, etc.) the user gets a
-      // visible error instead of a button stuck on "saving…" forever.
-      // Returning the explicit `select()` makes PostgREST send back the updated
-      // row, which forces the round-trip to complete instead of fire-and-forget.
-      const updatePromise = supabase
-        .from('observations')
-        .update({ location: literal, updated_at: new Date().toISOString() })
-        .eq('id', obsId)
-        .select('id, location')
-        .maybeSingle();
+      // PostgREST cannot implicitly cast jsonb → geography (requires owning both
+      // types). Use the RPC function instead — it accepts lat/lng as floats
+      // and builds the geography internally with ST_MakePoint.
+      //
+      // Do NOT call refreshSession() before the RPC — supabase-js has an
+      // internal auth lock mutex that serializes all auth calls. The page
+      // already calls getUser() in multiple places concurrently; adding a
+      // refreshSession() here causes the RPC's own internal auth-token
+      // lookup to queue behind the mutex and the fetch never starts within
+      // the 15 s window. supabase-js refreshes tokens automatically on
+      // every request when needed — no manual refresh required.
+      //
+      // Hard 15 s timeout on the RPC.
       const timeout = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('save_timeout')), 15_000),
       );
-      const result = await Promise.race([updatePromise, timeout]) as { data: unknown; error: { message?: string; code?: string } | null };
+      // Log params before calling RPC
+      console.log('[manage-panel] calling update_observation_location', {
+        p_obs_id: obsId,
+        p_lat: e.detail.coords.lat,
+        p_lng: e.detail.coords.lng,
+      });
+      const updatePromise = supabase.rpc('update_observation_location', {
+        p_obs_id: obsId,
+        p_lat:    e.detail.coords.lat,
+        p_lng:    e.detail.coords.lng,
+      });
+      const result = await Promise.race([updatePromise, timeout]) as { error: { message?: string; code?: string } | null };
       if (result.error) {
-        console.error('[manage-panel] location update failed', { obsId, err: result.error });
-        throw new Error(result.error.message || result.error.code || 'update_failed');
-      }
-      if (!result.data) {
-        // Empty body = RLS filtered the UPDATE (no rows matched observer_id).
-        // Don't claim success — the row didn't change.
-        console.warn('[manage-panel] location update returned 0 rows (RLS filtered)', { obsId });
-        throw new Error('rls_filtered');
-      }
-
-      // Verify the returned row actually has the new coordinates. PostgREST
-      // returns geography as GeoJSON; if the coordinates don't match what we
-      // sent, the update silently failed (e.g. type cast issue).
-      const returned = result.data as { location?: { coordinates?: [number, number] } | null };
-      const retCoords = returned?.location?.coordinates;
-      if (Array.isArray(retCoords) && retCoords.length >= 2) {
-        const retLng = retCoords[0];
-        const retLat = retCoords[1];
-        const EPS = 0.0001;
-        if (Math.abs(retLat - e.detail.coords.lat) > EPS || Math.abs(retLng - e.detail.coords.lng) > EPS) {
-          console.error('[manage-panel] location update returned stale coords', {
-            obsId, sent: e.detail.coords, got: { lat: retLat, lng: retLng },
-          });
-          throw new Error('update_stale');
-        }
+        // Log full error details so the console report includes the actual
+        // Supabase/PostgREST message instead of "[object Object]"
+        const errMsg = result.error.message ?? result.error.code ?? 'unknown';
+        const errCode = (result.error as { code?: string }).code ?? '';
+        const errDetails = (result.error as { details?: string }).details ?? '';
+        const errHint = (result.error as { hint?: string }).hint ?? '';
+        console.error('[manage-panel] location update failed', {
+          obsId,
+          message: errMsg,
+          code: errCode,
+          details: errDetails,
+          hint: errHint,
+        });
+        throw new Error(`${errCode ? errCode + ': ' : ''}${errMsg}`);
       }
 
       window.dispatchEvent(new CustomEvent('rastrum:mappicker-set', {
@@ -653,34 +704,43 @@ export async function wireManagePanelLocation(
       window.dispatchEvent(new CustomEvent('rastrum:mappicker-set-initial', {
         detail: { id: 'obs-detail-edit', coords: e.detail.coords },
       }));
-      // Also update the main page's view-mode mini-map and coords readout
-      // so the left-aside map reflects the new location without a reload.
+      // Also update the main obs-detail header map and coords text
       window.dispatchEvent(new CustomEvent('rastrum:mappicker-set', {
         detail: { id: 'obs-detail', coords: e.detail.coords },
       }));
+      const coordStr = `${e.detail.coords.lat.toFixed(4)}, ${e.detail.coords.lng.toFixed(4)}`;
+      // Update both the manage-panel coords text and the main header coords
       const coordsEl = document.querySelector<HTMLElement>('[data-loc-coords]');
-      if (coordsEl) coordsEl.textContent = `${e.detail.coords.lat.toFixed(4)}, ${e.detail.coords.lng.toFixed(4)}`;
-      const mainCoordsEl = document.querySelector<HTMLElement>('[data-obs-coords]');
-      if (mainCoordsEl) mainCoordsEl.textContent = `${e.detail.coords.lat.toFixed(4)}, ${e.detail.coords.lng.toFixed(4)}`;
+      if (coordsEl) coordsEl.textContent = coordStr;
+      const obsCoords = document.querySelector<HTMLElement>('[data-obs-coords]');
+      if (obsCoords) obsCoords.textContent = coordStr;
+      // Remove any "Location not available" placeholder in the header
+      const noLocEl = document.querySelector<HTMLElement>('[data-no-location]');
+      if (noLocEl) noLocEl.classList.add('hidden');
       savedEl?.classList.remove('hidden');
     } catch (err) {
-      const code = err instanceof Error ? err.message : String(err);
-      console.error('[manage-panel] location save error', { obsId, code, err });
+      // Serialize error properly - supabase-js PostgrestError is a POJO, not an Error
+      // instance, so err instanceof Error is false and String(err) = "[object Object]".
+      // Use JSON.stringify with a fallback to expose the full error object in the log.
+      const safeStr = (v: unknown): string => {
+        if (v instanceof Error) return v.message;
+        try { return JSON.stringify(v); } catch { return String(v); }
+      };
+      const code = err instanceof Error ? err.message : safeStr(err);
+      console.error('[manage-panel] location save error', safeStr(err));
       if (errEl) {
-        if (code === 'coords_invalid') {
+        // PostgREST 403 = RLS blocked the UPDATE. Most common cause: JWT expired.
+        const is403 = code.includes('403') || code.includes('PGRST116') || code.includes('rls_filtered') || code.includes('JWT expired') || code.includes('permission denied');
+        if (code === 'coords_invalid' || code.includes('coords_invalid')) {
           errEl.textContent = errCopy.invalidCoords;
-        } else if (code === 'save_timeout') {
+        } else if (code === 'save_timeout' || code.includes('save_timeout')) {
           errEl.textContent = isEs
             ? 'Tiempo de espera agotado. Revisa tu conexión o intenta de nuevo.'
             : 'Save timed out. Check your connection and try again.';
-        } else if (code === 'rls_filtered') {
+        } else if (is403) {
           errEl.textContent = isEs
-            ? 'No tienes permiso para editar esta observación.'
-            : 'You do not have permission to edit this observation.';
-        } else if (code === 'update_stale') {
-          errEl.textContent = isEs
-            ? 'La ubicación no se guardó correctamente. Intenta de nuevo.'
-            : 'Location did not save correctly. Please try again.';
+            ? 'Sesión expirada. Vuelve a iniciar sesión para guardar cambios.'
+            : 'Session expired. Sign in again to save changes.';
         } else {
           errEl.textContent = `${errCopy.saveFailed} (${code})`;
         }
@@ -689,5 +749,9 @@ export async function wireManagePanelLocation(
     } finally {
       savingEl?.classList.add('hidden');
     }
-  });
+  };
+
+  // Register and store the handler so future calls can remove the old one
+  window.addEventListener('rastrum:mappicker-save', locHandler);
+  (window as Window & { __rastrum_loc_handler?: EventListener }).__rastrum_loc_handler = locHandler;
 }

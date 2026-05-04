@@ -15,6 +15,11 @@ interface ImportMetaEnv {
   readonly PUBLIC_VAPID_PUBLIC_KEY?: string;
   readonly PUBLIC_BUILD_SHA?: string;
   /**
+   * App version string (year.month.N format, e.g. "2026.5.0").
+   * Set from package.json in CI; falls back to "dev" locally.
+   */
+  readonly PUBLIC_VERSION?: string;
+  /**
    * Stable per-deploy version string. Used as a CORS preflight cache
    * buster (sent as `x-rastrum-build` on `get-upload-url` calls). Set
    * in CI from the deploy SHA; falls back to today's ISO date when
