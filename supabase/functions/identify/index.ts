@@ -108,6 +108,8 @@ type CascadeAttempt = {
   error?: string;
 };
 
+import { isPlantLikeHint } from './_helpers.ts';
+
 const CONFIDENCE_THRESHOLD = 0.7;
 const RACE_TIMEOUT_MS = 30_000;
 
@@ -546,7 +548,7 @@ serve(async (req) => {
     // apply excluded_providers filter, then preferred_providers ordering.
     // Mirrors the client-side cascade from src/lib/identifiers/cascade.ts.
     const allRunners: Record<string, ServerRunner> = {};
-    const isPlantLike = body.user_hint === 'plant' || body.user_hint === 'fungi' || body.user_hint === 'unknown' || !body.user_hint;
+    const isPlantLike = isPlantLikeHint(body.user_hint);
     if (isPlantLike) {
       allRunners.plantnet = (signal) => callPlantNet(imageBytes, byoPlantnet, signal);
     }
@@ -593,7 +595,7 @@ serve(async (req) => {
     // are aborted. user_hint is used to bias the threshold slightly later
     // (today it just gates which runners we even start).
     const runners: Record<string, ServerRunner> = {};
-    const isPlantLike = body.user_hint === 'plant' || body.user_hint === 'fungi' || !body.user_hint;
+    const isPlantLike = isPlantLikeHint(body.user_hint);
     if (isPlantLike) {
       runners.plantnet = (signal) => callPlantNet(imageBytes, byoPlantnet, signal);
     }
@@ -611,10 +613,13 @@ serve(async (req) => {
     result = cascaded.result;
   }
 
-  // If Claude won and a sponsorship paid for it, record usage + threshold notify.
+  // If a sponsorship paid for the winning ID, record usage + threshold notify.
+  // Gate on source !== 'plantnet' so we cover Anthropic-direct, Bedrock, Vertex,
+  // OpenAI, Azure, Gemini — anything that consumed the sponsored credential.
+  // PlantNet has its own quota and never pulls from sponsorship.
   if (
     result
-    && result.source === 'claude_haiku'
+    && result.source !== 'plantnet'
     && sponsorshipCtx
     && beneficiaryId
   ) {

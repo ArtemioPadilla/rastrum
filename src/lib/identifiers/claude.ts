@@ -1,15 +1,45 @@
 /**
  * Claude Haiku 4.5 plugin (server-side via the identify Edge Function).
  *
- * Anthropic key is either:
- *  - The server's ANTHROPIC_API_KEY secret (operator pays), or
- *  - The user's BYO key (passed via byo_keys.anthropic).
+ * Credential resolution at the EF (post-M27 sponsorship migration):
+ *  1. BYO key forwarded via `client_keys.anthropic`.
+ *  2. Active sponsorship for the signed-in user (Vault-backed).
+ *  3. Platform pool slot (atomic via consume_pool_slot RPC).
+ *  4. None — runner skipped, EF returns no_id_engine_available.
+ *
+ * The operator-key fallback (Deno.env.ANTHROPIC_API_KEY) was removed
+ * intentionally — see supabase/functions/identify/index.ts file header.
  */
 import { getSupabase } from '../supabase';
 import { getKey } from '../byo-keys';
 import type { Identifier, IDResult, IdentifyInput } from './types';
 
 const PLUGIN_ID = 'claude_haiku';
+
+const SPONSOR_CACHE_KEY = 'rastrum.has_anthropic_sponsorship';
+const SPONSOR_CACHE_TTL_MS = 30_000;
+
+function readSponsorshipCache(): boolean | null {
+  if (typeof localStorage === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(SPONSOR_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { ts: number; value: boolean };
+    if (Date.now() - parsed.ts > SPONSOR_CACHE_TTL_MS) return null;
+    return parsed.value;
+  } catch {
+    return null;
+  }
+}
+
+function writeSponsorshipCache(value: boolean): void {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(SPONSOR_CACHE_KEY, JSON.stringify({ ts: Date.now(), value }));
+  } catch {
+    // localStorage full or denied — fail open, just skip caching
+  }
+}
 
 export const claudeIdentifier: Identifier = {
   id: PLUGIN_ID,
@@ -40,7 +70,27 @@ export const claudeIdentifier: Identifier = {
   ],
   async isAvailable() {
     if (getKey(PLUGIN_ID, 'anthropic')) return { ready: true };
-    return { ready: true };  // server fallback may exist
+    const cached = readSponsorshipCache();
+    if (cached !== null) {
+      return cached ? { ready: true } : { ready: false, reason: 'needs_key' };
+    }
+    try {
+      const supabase = getSupabase();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        writeSponsorshipCache(false);
+        return { ready: false, reason: 'needs_key' };
+      }
+      const { data, error } = await supabase.rpc('has_active_sponsorship', { p_provider: 'anthropic' });
+      if (error || !data) {
+        writeSponsorshipCache(false);
+        return { ready: false, reason: 'needs_key' };
+      }
+      writeSponsorshipCache(true);
+      return { ready: true };
+    } catch {
+      return { ready: false, reason: 'needs_key' };
+    }
   },
   async testConnection() {
     const key = getKey(PLUGIN_ID, 'anthropic');

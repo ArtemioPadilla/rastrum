@@ -7611,3 +7611,39 @@ EXCEPTION WHEN OTHERS THEN
   -- A pre-existing concurrent refresh from cron may collide; ignore.
   NULL;
 END $$;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- #595 — has_active_sponsorship(provider): cheap metadata read for the
+-- client to gate Claude isAvailable() on whether the signed-in user has
+-- coverage. SECURITY DEFINER, no decryption, no JOIN to vault. Returns
+-- true if the user has either:
+--   (a) an active personal sponsorship for this provider, OR
+--   (b) an active platform pool with capacity (total_cap > used).
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.has_active_sponsorship(p_provider public.ai_provider)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT auth.uid() IS NOT NULL AND (
+    EXISTS (
+      SELECT 1 FROM public.sponsorships s
+      JOIN public.sponsor_credentials c ON c.id = s.credential_id
+      WHERE s.beneficiary_id = auth.uid()
+        AND s.provider       = p_provider
+        AND s.status         = 'active'
+        AND c.revoked_at IS NULL
+    )
+    OR EXISTS (
+      SELECT 1 FROM public.sponsor_pools p
+      JOIN public.sponsor_credentials c ON c.id = p.credential_id
+      WHERE c.provider       = p_provider
+        AND p.status         = 'active'
+        AND p.used < p.total_cap
+        AND c.revoked_at IS NULL
+    )
+  );
+$$;
+
+REVOKE ALL ON FUNCTION public.has_active_sponsorship(public.ai_provider) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.has_active_sponsorship(public.ai_provider) TO authenticated;
