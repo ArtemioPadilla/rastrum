@@ -140,7 +140,22 @@ const lang: 'en' | 'es' = 'en';
       } catch { /* signed out viewer */ }
       const fallback = (document.documentElement.lang === 'es') ? 'Anónimo' : 'Anonymous';
       const name = user?.display_name || user?.username || '—';
-      document.getElementById('observer')!.textContent = (isPublic || viewerIsObserver) ? name : fallback;
+      const observerEl = document.getElementById('observer')!;
+      const showReal = isPublic || viewerIsObserver;
+      const displayName = showReal ? name : fallback;
+      const username = user?.username;
+      if (showReal && username) {
+        const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
+        const profilePath = lang === 'es' ? '/es/u/' : '/en/u/';
+        const link = document.createElement('a');
+        link.href = `${profilePath}?username=${encodeURIComponent(username)}`;
+        link.textContent = displayName;
+        link.className = 'text-emerald-700 dark:text-emerald-400 hover:underline';
+        observerEl.textContent = '';
+        observerEl.appendChild(link);
+      } else {
+        observerEl.textContent = displayName;
+      }
 
       // Hydrate PhotoGallery with non-deleted photos (PR2 added deleted_at).
       // The gallery's static SSR markup is empty; this dispatch fills it.
@@ -573,6 +588,97 @@ const lang: 'en' | 'es' = 'en';
         const lang = isEs ? 'es' : 'en';
         signInLink.href = `/${lang}/${lang === 'es' ? 'ingresar' : 'sign-in'}/`;
         signInLink.classList.remove('hidden');
+      }
+
+      // ── Ask my AI button ──
+      const askAiBtn = document.getElementById('ci-ask-ai-btn') as HTMLButtonElement | null;
+      const aiResultEl = document.getElementById('ci-ai-result');
+      const aiResultText = document.getElementById('ci-ai-result-text');
+      const aiResultMeta = document.getElementById('ci-ai-result-meta');
+      const aiSubmitBtn = document.getElementById('ci-ai-submit-btn') as HTMLButtonElement | null;
+
+      if (askAiBtn && user) {
+        askAiBtn.classList.remove('hidden');
+        let lastAiResult: { scientific_name: string; confidence: number; source: string } | null = null;
+
+        askAiBtn.addEventListener('click', async () => {
+          const idleLabel = askAiBtn.dataset.labelIdle ?? 'Ask my AI';
+          const runningLabel = askAiBtn.dataset.labelRunning ?? 'Identifying…';
+          const noPhotoLabel = askAiBtn.dataset.labelNoPhoto ?? 'No photo available.';
+          const noResultLabel = askAiBtn.dataset.labelNoResult ?? 'AI could not identify.';
+
+          const heroImg = document.querySelector<HTMLImageElement>('[data-photo-hero] img');
+          if (!heroImg?.src) {
+            askAiBtn.textContent = noPhotoLabel;
+            setTimeout(() => { askAiBtn.textContent = idleLabel; }, 3000);
+            return;
+          }
+
+          askAiBtn.disabled = true;
+          askAiBtn.textContent = runningLabel;
+          aiResultEl?.classList.add('hidden');
+
+          try {
+            const resp = await fetch(heroImg.src);
+            const blob = await resp.blob();
+
+            const { bootstrapIdentifiers, runCascade } = await import('../../../lib/identifiers');
+            const { listConfiguredPluginIds, getAllKeysForPlugin } = await import('../../../lib/byo-keys');
+            bootstrapIdentifiers();
+
+            const byoKeys: Record<string, string> = {};
+            for (const pluginId of listConfiguredPluginIds()) {
+              const keys = getAllKeysForPlugin(pluginId);
+              for (const [k, v] of Object.entries(keys)) {
+                byoKeys[`${pluginId}.${k}`] = v;
+              }
+            }
+
+            const result = await runCascade(
+              {
+                media: { kind: 'blob', blob, mime: blob.type || 'image/jpeg' },
+                mediaKind: 'photo',
+                byo_keys: byoKeys,
+              },
+              { media: 'photo' },
+            );
+
+            if (result.best) {
+              lastAiResult = {
+                scientific_name: result.best.scientific_name,
+                confidence: result.best.confidence,
+                source: result.best.source,
+              };
+              if (aiResultText) aiResultText.textContent = result.best.scientific_name;
+              if (aiResultMeta) {
+                aiResultMeta.textContent = `${Math.round(result.best.confidence * 100)}% — ${result.best.source}`;
+              }
+              aiResultEl?.classList.remove('hidden');
+              aiSubmitBtn?.classList.remove('hidden');
+            } else {
+              askAiBtn.textContent = noResultLabel;
+              setTimeout(() => { askAiBtn.textContent = idleLabel; }, 3000);
+            }
+          } catch {
+            askAiBtn.textContent = isEs ? 'Error al identificar' : 'Identification failed';
+            setTimeout(() => { askAiBtn.textContent = idleLabel; }, 3000);
+          } finally {
+            askAiBtn.disabled = false;
+            if (lastAiResult) {
+              askAiBtn.textContent = idleLabel;
+            }
+          }
+        });
+
+        aiSubmitBtn?.addEventListener('click', () => {
+          if (!lastAiResult) return;
+          const opener = (window as unknown as { __rastrumOpenSuggestId?: (id: string, n: string | null) => void }).__rastrumOpenSuggestId;
+          if (typeof opener === 'function') {
+            opener(obsId, document.getElementById('observer')?.textContent ?? null);
+            const nameInput = document.getElementById('sid-name') as HTMLInputElement | null;
+            if (nameInput) nameInput.value = lastAiResult.scientific_name;
+          }
+        });
       }
 
       async function refresh() {
