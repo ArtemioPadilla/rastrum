@@ -31,6 +31,30 @@ const LICENSE_COST: Record<string, number> = {
   'paid': 4,
 };
 
+/**
+ * Live attempt event — fired by runCascade for each plugin's lifecycle
+ * transitions when `onAttempt` is supplied. Lets the UI render the cascade
+ * decision tree in real time (#592).
+ *
+ * State transitions:
+ *   skipped — isAvailable returned ready=false (no key, no download, etc.)
+ *   starting — about to call plugin.identify
+ *   accepted — confidence ≥ ACCEPT_THRESHOLD (cascade stops after this)
+ *   rejected — ran but below threshold; cascade continues
+ *   failed — threw an unrecognized error
+ *   filtered — threw FilteredFrameError; cascade hard-stops
+ */
+export type CascadeAttemptState =
+  | 'skipped' | 'starting' | 'accepted' | 'rejected' | 'failed' | 'filtered';
+
+export interface CascadeAttemptEvent {
+  id: string;
+  state: CascadeAttemptState;
+  result?: IDResult;
+  error?: string;
+  reason?: string;
+}
+
 export interface CascadeOptions {
   media: MediaKind;
   /** Hint such as 'Plantae' / 'Animalia.Aves' */
@@ -39,6 +63,8 @@ export interface CascadeOptions {
   preferred?: string[];
   /** Skip identifiers entirely (e.g. user disabled them in profile). */
   excluded?: string[];
+  /** Live event hook — fires for every plugin lifecycle transition (#592). */
+  onAttempt?: (event: CascadeAttemptEvent) => void;
 }
 
 export interface CascadeResult {
@@ -89,34 +115,40 @@ export async function runCascade(input: IdentifyInput, opts: CascadeOptions): Pr
   for (const plugin of candidates) {
     const av = await plugin.isAvailable();
     if (!av.ready) {
-      attempts.push({ id: plugin.id, ok: false, error: av.reason + (av.message ? `: ${av.message}` : '') });
+      const reason = av.reason + (av.message ? `: ${av.message}` : '');
+      attempts.push({ id: plugin.id, ok: false, error: reason });
+      opts.onAttempt?.({ id: plugin.id, state: 'skipped', reason: av.reason });
       continue;
     }
     try {
+      opts.onAttempt?.({ id: plugin.id, state: 'starting' });
       const result = await plugin.identify({
         ...input,
         prior_candidates: priorCandidates,
         mediaCrop,
       });
       attempts.push({ id: plugin.id, ok: true, result });
-      // Always cap to the plugin's ceiling.
       const ceiling = plugin.capabilities.confidence_ceiling ?? 1;
       if (result.confidence > ceiling) result.confidence = ceiling;
       if (!best || result.confidence > best.confidence) best = result;
       priorCandidates.push({ scientific_name: result.scientific_name, confidence: result.confidence });
-      if (result.confidence >= ACCEPT_THRESHOLD) break;   // good enough
+      if (result.confidence >= ACCEPT_THRESHOLD) {
+        opts.onAttempt?.({ id: plugin.id, state: 'accepted', result });
+        break;
+      }
+      opts.onAttempt?.({ id: plugin.id, state: 'rejected', result });
     } catch (e) {
-      attempts.push({ id: plugin.id, ok: false, error: e instanceof Error ? e.message : String(e) });
-      // Hard-stop signal: empty/human/vehicle frame from MegaDetector.
-      // Don't burn cloud quota on plugins that have nothing to identify.
+      const errMsg = e instanceof Error ? e.message : String(e);
+      attempts.push({ id: plugin.id, ok: false, error: errMsg });
       if (isFilteredFrameError(e)) {
+        opts.onAttempt?.({ id: plugin.id, state: 'filtered', reason: e.filtered_label });
         return {
           best: null,
           attempts,
           filtered: { source: e.source, label: e.filtered_label, raw: e.raw },
         };
       }
-      // Forward an attached bbox to the next plugin as a crop hint.
+      opts.onAttempt?.({ id: plugin.id, state: 'failed', error: errMsg });
       const errBbox = (e as { animal_bbox?: number[] }).animal_bbox;
       if (Array.isArray(errBbox) && errBbox.length === 4) {
         mediaCrop = {
