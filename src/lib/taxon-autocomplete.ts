@@ -30,54 +30,80 @@ export interface TaxonSuggestion {
   source: 'rastrum' | 'gbif';
 }
 
-/** In-memory cache: query → results */
+/** In-memory cache: query → results (module-level, shared across instances) */
 const cache = new Map<string, TaxonSuggestion[]>();
 
-const DEBOUNCE_MS = 300;
-const MIN_CHARS = 2;
-const MAX_RESULTS = 8;
+export const DEBOUNCE_MS = 300;
+export const MIN_CHARS = 2;
+export const MAX_RESULTS = 8;
 const GBIF_SUGGEST_URL = 'https://api.gbif.org/v1/species/suggest';
 
-let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+/**
+ * Creates a per-instance debounced suggest function.
+ *
+ * Each call to `createSuggestTaxa()` returns an independent function with its
+ * own debounce timer — safe to use when multiple TaxonAutocomplete instances
+ * exist on the same page (e.g. observation form + edit modal).
+ *
+ * Returns `{ suggest, cancel }` where:
+ *  - `suggest(query, lang, onResults)` — fire suggestions (debounced)
+ *  - `cancel()` — cancel any pending call
+ */
+export function createSuggestTaxa() {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let cancelled = false;
+
+  function cancel() {
+    cancelled = true;
+    if (timer !== null) { clearTimeout(timer); timer = null; }
+  }
+
+  function suggest(
+    query: string,
+    lang: 'es' | 'en',
+    onResults: (results: TaxonSuggestion[]) => void
+  ): void {
+    cancel();
+    cancelled = false;
+
+    if (query.trim().length < MIN_CHARS) {
+      onResults([]);
+      return;
+    }
+
+    timer = setTimeout(async () => {
+      if (cancelled) return;
+
+      const cacheKey = `${lang}:${query.toLowerCase()}`;
+      if (cache.has(cacheKey)) {
+        onResults(cache.get(cacheKey)!);
+        return;
+      }
+
+      const results = await fetchSuggestions(query, lang);
+      if (cancelled) return;
+
+      cache.set(cacheKey, results);
+      onResults(results);
+    }, DEBOUNCE_MS);
+  }
+
+  return { suggest, cancel };
+}
 
 /**
- * Debounced entry point. Calls `onResults` with up to MAX_RESULTS suggestions.
- * Returns a cancel function.
+ * Convenience singleton — kept for backwards compat with existing callers.
+ * For multi-instance scenarios prefer `createSuggestTaxa()`.
+ * @deprecated Use createSuggestTaxa() for new code.
  */
 export function suggestTaxa(
   query: string,
   lang: 'es' | 'en',
   onResults: (results: TaxonSuggestion[]) => void
 ): () => void {
-  if (debounceTimer !== null) clearTimeout(debounceTimer);
-
-  if (query.trim().length < MIN_CHARS) {
-    onResults([]);
-    return () => {};
-  }
-
-  let cancelled = false;
-
-  debounceTimer = setTimeout(async () => {
-    if (cancelled) return;
-
-    const cacheKey = `${lang}:${query.toLowerCase()}`;
-    if (cache.has(cacheKey)) {
-      onResults(cache.get(cacheKey)!);
-      return;
-    }
-
-    const results = await fetchSuggestions(query, lang);
-    if (cancelled) return;
-
-    cache.set(cacheKey, results);
-    onResults(results);
-  }, DEBOUNCE_MS);
-
-  return () => {
-    cancelled = true;
-    if (debounceTimer !== null) clearTimeout(debounceTimer);
-  };
+  const instance = createSuggestTaxa();
+  instance.suggest(query, lang, onResults);
+  return instance.cancel;
 }
 
 async function fetchSuggestions(
@@ -104,7 +130,7 @@ async function fetchSuggestions(
   return merged.slice(0, MAX_RESULTS);
 }
 
-/** Query Rastrum `taxa` table via Supabase client. */
+/** Query Rastrum `taxa` table via Supabase client. Enriches `inUserHistory` from observations. */
 async function fetchFromRastrum(query: string): Promise<TaxonSuggestion[]> {
   // Lazy import to keep this module usable outside Astro SSR
   const { getSupabase } = await import('./supabase');
@@ -112,6 +138,9 @@ async function fetchFromRastrum(query: string): Promise<TaxonSuggestion[]> {
   if (!supabase) return [];
 
   const q = query.trim();
+
+  // Resolve current user (may be null for guests)
+  const { data: { user } } = await supabase.auth.getUser().catch(() => ({ data: { user: null } }));
 
   // Two queries in parallel:
   // 1. Prefix match on scientific_name (catches "Alamania pu...")
@@ -134,10 +163,25 @@ async function fetchFromRastrum(query: string): Promise<TaxonSuggestion[]> {
         .limit(MAX_RESULTS)
     : null;
 
-  const [prefixRes, genusRes] = await Promise.all([
+  // User history query — fetch distinct scientific names the user has observed
+  const historyQuery = user
+    ? supabase
+        .from('observations')
+        .select('primary_scientific_name')
+        .eq('user_id', user.id)
+        .ilike('primary_scientific_name', `${q}%`)
+        .limit(MAX_RESULTS)
+    : null;
+
+  const [prefixRes, genusRes, historyRes] = await Promise.all([
     prefixQuery,
     genusQuery ?? Promise.resolve({ data: [] as any[], error: null }),
+    historyQuery ?? Promise.resolve({ data: [] as any[], error: null }),
   ]);
+
+  const userSpecies = new Set<string>(
+    (historyRes.data ?? []).map((r: any) => (r.primary_scientific_name ?? '').toLowerCase())
+  );
 
   const rows: any[] = [
     ...(prefixRes.data ?? []),
@@ -158,7 +202,7 @@ async function fetchFromRastrum(query: string): Promise<TaxonSuggestion[]> {
     commonNameEs: r.common_name_es ?? null,
     commonNameEn: r.common_name_en ?? null,
     observationCount: r.observation_count ?? null,
-    inUserHistory: false, // enriched separately if needed
+    inUserHistory: userSpecies.has(r.scientific_name?.toLowerCase() ?? ''),
     source: 'rastrum' as const,
   }));
 }

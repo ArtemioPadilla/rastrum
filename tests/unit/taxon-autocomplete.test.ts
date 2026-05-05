@@ -2,7 +2,7 @@
  * Unit tests for taxon-autocomplete — issue #617
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { suggestTaxa, clearTaxonCache } from '../../src/lib/taxon-autocomplete';
+import { suggestTaxa, createSuggestTaxa, clearTaxonCache } from '../../src/lib/taxon-autocomplete';
 
 // ── Mock fetch ────────────────────────────────────────────────────────────────
 const originalFetch = global.fetch;
@@ -15,31 +15,47 @@ function mockFetch(gbifItems: any[] = []) {
 }
 
 // ── Mock Supabase ─────────────────────────────────────────────────────────────
+/** Chainable Supabase query builder stub */
+function makeQueryStub(resolveWith: any) {
+  const stub: any = {
+    select: () => stub,
+    ilike:  () => stub,
+    order:  () => stub,
+    eq:     () => stub,
+    limit:  () => Promise.resolve(resolveWith),
+  };
+  return stub;
+}
+
 vi.mock('../../src/lib/supabase', () => ({
   getSupabase: () => ({
-    from: (table: string) => ({
-      select: () => ({
-        ilike: (_col: string, _pat: string) => ({
-          order: () => ({
-            limit: () =>
-              Promise.resolve({
-                data: [
-                  {
-                    scientific_name: 'Alamania punicea',
-                    common_name_es: 'Orquídea de agave',
-                    common_name_en: null,
-                    observation_count: 12,
-                  },
-                ],
-                error: null,
-              }),
-          }),
-        }),
-      }),
-    }),
+    auth: {
+      getUser: () => Promise.resolve({ data: { user: { id: 'user-123' } } }),
+    },
+    from: (table: string) => {
+      if (table === 'taxa') {
+        return makeQueryStub({
+          data: [
+            {
+              scientific_name: 'Alamania punicea',
+              common_name_es: 'Orquídea de agave',
+              common_name_en: null,
+              observation_count: 12,
+            },
+          ],
+          error: null,
+        });
+      }
+      if (table === 'observations') {
+        return makeQueryStub({
+          data: [{ primary_scientific_name: 'Alamania punicea' }],
+          error: null,
+        });
+      }
+      return makeQueryStub({ data: [], error: null });
+    },
   }),
 }));
-
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('suggestTaxa', () => {
@@ -60,17 +76,18 @@ describe('suggestTaxa', () => {
     expect(onResults).toHaveBeenCalledWith([]);
   });
 
-  it('debounces — only fires once after 300ms idle', async () => {
+  it('debounces — only fires once after 300ms idle (per-instance)', async () => {
     mockFetch([]);
     const onResults = vi.fn();
+    // Use createSuggestTaxa() to test per-instance debounce
+    const { suggest } = createSuggestTaxa();
 
-    suggestTaxa('Al', 'es', onResults);
-    suggestTaxa('Ala', 'es', onResults);
-    suggestTaxa('Alam', 'es', onResults);
+    suggest('Al', 'es', onResults);
+    suggest('Ala', 'es', onResults);
+    suggest('Alam', 'es', onResults);
 
     await vi.runAllTimersAsync();
-    // Should have been called once after last query settles
-    // (the first two calls were cancelled by debounce)
+    // All 3 calls share the same instance timer — only the last one fires
     expect(onResults).toHaveBeenCalledTimes(1);
   });
 
@@ -150,5 +167,18 @@ describe('suggestTaxa', () => {
 
     const results = onResults.mock.calls.at(-1)![0];
     expect(results.length).toBeLessThanOrEqual(8);
+  });
+
+  it('marks inUserHistory=true for species the user has observed', async () => {
+    mockFetch([]); // no GBIF hits
+    const onResults = vi.fn();
+
+    suggestTaxa('Alamania', 'es', onResults);
+    await vi.runAllTimersAsync();
+
+    const results = onResults.mock.calls.at(-1)![0] as any[];
+    const hit = results.find((r: any) => r.scientificName === 'Alamania punicea');
+    expect(hit).toBeDefined();
+    expect(hit.inUserHistory).toBe(true);
   });
 });

@@ -42,6 +42,7 @@ const isEs = lang === 'es';
   <ul
     id={`${inputId}-dropdown`}
     role="listbox"
+    aria-label={lang === 'es' ? 'Sugerencias de taxón' : 'Taxon suggestions'}
     class="taxon-dropdown absolute z-50 left-0 right-0 mt-1 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-lg overflow-hidden hidden"
   >
     <!-- Items injected by JS -->
@@ -79,6 +80,8 @@ const isEs = lang === 'es';
 </style>
 
 <script>
+import { createSuggestTaxa } from '../lib/taxon-autocomplete';
+
 (function () {
   // Wait for DOM
   document.addEventListener('DOMContentLoaded', initAll);
@@ -96,24 +99,22 @@ const isEs = lang === 'es';
     const status   = container.querySelector<HTMLElement>('[aria-live]');
     if (!input || !dropdown || !status) return;
 
-    let cancelPrev: (() => void) | null = null;
     let activeIndex = -1;
     let currentResults: any[] = [];
+
+    // Per-instance debounced suggester (fix: no shared module-level timer)
+    const { suggest, cancel: cancelSuggest } = createSuggestTaxa();
 
     // ── Input handler ──────────────────────────────────────────────────────
     input.addEventListener('input', () => {
       const q = input.value;
-      if (cancelPrev) cancelPrev();
-      if (q.trim().length < 2) { hide(); return; }
+      if (q.trim().length < 2) { cancelSuggest(); hide(); return; }
 
-      // Dynamic import keeps the heavy GBIF logic out of the initial bundle
-      import('/src/lib/taxon-autocomplete.ts').then(({ suggestTaxa }) => {
-        cancelPrev = suggestTaxa(q, lang, (results) => {
-          currentResults = results;
-          activeIndex = -1;
-          render(results);
-        });
-      }).catch(() => {/* offline or module not resolved */});
+      suggest(q, lang, (results) => {
+        currentResults = results;
+        activeIndex = -1;
+        render(results);
+      });
     });
 
     // ── Keyboard navigation ────────────────────────────────────────────────
@@ -164,7 +165,7 @@ const isEs = lang === 'es';
         if (r.observationCount !== null && r.observationCount > 0) {
           const cnt = document.createElement('span');
           cnt.className = 'taxon-count';
-          cnt.textContent = `${r.observationCount}`;
+          cnt.textContent = lang === 'es' ? `${r.observationCount} obs` : `${r.observationCount} obs`;
           cnt.title = lang === 'es' ? `${r.observationCount} registros en Rastrum` : `${r.observationCount} records in Rastrum`;
           li.appendChild(cnt);
         }
