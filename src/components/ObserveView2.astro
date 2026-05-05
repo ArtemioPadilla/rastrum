@@ -2,6 +2,7 @@
 import DropZone from "./DropZone.astro";
 import PipelineGraph from "./PipelineGraph.astro";
 import MapPicker from "./MapPicker.astro";
+import TaxonAutocomplete from "./TaxonAutocomplete.astro";
 import { t } from "../i18n/utils";
 import { HABITATS, WEATHERS } from "../lib/observation-enums";
 
@@ -137,12 +138,7 @@ const weathers = WEATHERS;
         {isEs ? "Editar identificación" : "Edit identification"}
       </button>
       <div id="obs2-id-manual" class="hidden mt-2">
-        <input
-          id="obs2-taxon-input"
-          type="text"
-          class="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm"
-          placeholder={isEs ? "Nombre científico (opcional)" : "Scientific name (optional)"}
-        />
+        <TaxonAutocomplete inputId="obs2-taxon-input" lang={lang} />
       </div>
     </div>
 
