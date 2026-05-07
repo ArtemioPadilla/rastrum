@@ -30,11 +30,26 @@ The SW handles three kinds of request:
   unhashed paths): **stale-while-revalidate**. Serve from cache
   immediately, refresh in the background.
 
-Third-party hosts (Supabase, Anthropic, PlantNet, OpenFreeMap,
-`media.rastrum.org`, `tiles.rastrum.org`) are explicitly **not**
+Third-party hosts (Supabase, Anthropic, PlantNet, OpenFreeMap) and
+most paths under `media.rastrum.org` are explicitly **not**
 intercepted — failures bubble up to the app code so the outbox kicks
 in. See the `if (url.hostname.includes(...))` block at the top of the
 fetch handler.
+
+The one exception is `media.rastrum.org/maps/*.pmtiles`. Those
+requests are served from the page-managed `rastrum/pmtiles` cache
+when the user has downloaded the offline map (see
+`src/lib/offline-map.ts`). The SW slices the cached 200 Response
+into 206 Partial Content responses to satisfy MapLibre's byte-range
+fetches. Without this, the cached archive is orphaned: the page can
+write it, but nothing reads it back, so every map load still hits
+the network. The slicing algorithm is pinned by
+`tests/unit/sw-pmtiles-range.test.ts`.
+
+The `rastrum/pmtiles` and `rastrum-share-target-v1` caches are
+**persistent** — the `activate` handler skips them when pruning old
+caches. Bumping VERSION wipes the shell cache but leaves a user's
+downloaded offline map intact.
 
 ---
 
