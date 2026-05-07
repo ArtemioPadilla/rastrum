@@ -35,6 +35,7 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
   }
+  try {
   const url = new URL(req.url);
   const obsId = url.searchParams.get('obs_id') ?? url.searchParams.get('id');
   const format = url.searchParams.get('format') ?? 'html';   // html | svg
@@ -173,4 +174,11 @@ serve(async (req) => {
       'cache-control': 'public, max-age=300',
     }),
   });
+  } catch (e) {
+    console.error('[share-card] unhandled error', e);
+    return new Response(JSON.stringify({ error: 'internal_error', detail: (e as Error).message }), {
+      status: 500,
+      headers: { 'content-type': 'application/json', ...CORS_HEADERS },
+    });
+  }
 });
