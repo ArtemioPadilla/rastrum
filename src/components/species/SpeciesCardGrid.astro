@@ -1,0 +1,10 @@
+---
+interface Props {
+  /** Tailwind class string for the outer grid; defaults to a 2/3/4-column responsive grid */
+  cols?: string;
+}
+const { cols = 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3' } = Astro.props;
+---
+<ul class={cols} role="list">
+  <slot />
+</ul>
