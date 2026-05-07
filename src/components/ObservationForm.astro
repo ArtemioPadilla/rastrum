@@ -282,6 +282,24 @@ const cameraStationLoading     = observeStrings.camera_station_loading     ?? (i
         </div>
       </div>
 
+      <!-- Gemma-vision offer card (parallel to phi-offer; ~500 MB vs ~4 GB) -->
+      <div id="gemma-offer" class="hidden rounded-lg border border-emerald-300/50 dark:border-emerald-700/40 bg-emerald-50/40 dark:bg-emerald-900/10 p-4 mb-3 space-y-3">
+        <p class="text-sm font-semibold text-zinc-800 dark:text-zinc-200">{idStrings.gemma_offer_title}</p>
+        <p class="text-sm text-zinc-700 dark:text-zinc-300">{idStrings.gemma_offer_body}</p>
+        <div class="flex flex-wrap gap-2">
+          <button id="gemma-download-btn" type="button" class="min-h-11 inline-flex items-center gap-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-2 text-sm font-semibold text-white">{idStrings.gemma_download}</button>
+          <button id="gemma-skip-btn" type="button" data-gemma-skip-hint={idStrings.gemma_skip_hint} class="min-h-11 inline-flex items-center gap-2 rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40">{idStrings.gemma_skip}</button>
+        </div>
+      </div>
+
+      <!-- Gemma-vision download progress -->
+      <div id="gemma-progress" class="hidden rounded-lg border border-emerald-300/40 bg-white dark:bg-zinc-900 p-3 mb-3">
+        <p class="text-xs text-zinc-600 dark:text-zinc-300 mb-1" id="gemma-progress-label">{idStrings.gemma_progress}</p>
+        <div class="w-full h-2 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
+          <div id="gemma-progress-bar" class="h-full bg-emerald-600" style="width:0%"></div>
+        </div>
+      </div>
+
       <!-- Result card -->
       <div id="id-result-card" class="hidden rounded-xl border border-zinc-200 dark:border-zinc-800 p-4 mb-2 bg-white dark:bg-zinc-900/40">
         <div class="flex items-baseline justify-between gap-2 flex-wrap">
@@ -736,6 +754,12 @@ const cameraStationLoading     = observeStrings.camera_station_loading     ?? (i
   const phiProgress     = document.getElementById('phi-progress');
   const phiProgressBar  = document.getElementById('phi-progress-bar');
   const phiProgressLbl  = document.getElementById('phi-progress-label');
+  const gemmaOffer        = document.getElementById('gemma-offer');
+  const gemmaDownloadBtn  = document.getElementById('gemma-download-btn');
+  const gemmaSkipBtn      = document.getElementById('gemma-skip-btn');
+  const gemmaProgress     = document.getElementById('gemma-progress');
+  const gemmaProgressBar  = document.getElementById('gemma-progress-bar');
+  const gemmaProgressLbl  = document.getElementById('gemma-progress-label');
   const isEs            = document.documentElement.lang === 'es';
 
   // Source registry — display name, license, doc-spec link, short description.
@@ -912,6 +936,8 @@ const cameraStationLoading     = observeStrings.camera_station_loading     ?? (i
     result_unknown:  isEs ? 'No se pudo identificar esta foto con confianza.' : 'Could not identify this photo confidently.',
     phi_running:     isEs ? 'Identificando con IA en el dispositivo…' : 'Identifying with on-device AI…',
     phi_skip_hint:   phiSkipBtn?.dataset.phiSkipHint ?? (isEs ? 'Puedes descargar el modelo más tarde desde Perfil → Editar → Configuración de IA, o escribe el nombre de la especie manualmente.' : 'You can download the model later from Profile → Edit → AI settings, or just type the species name manually.'),
+    gemma_running:   isEs ? 'Identificando con IA en el dispositivo…' : 'Identifying with on-device AI…',
+    gemma_skip_hint: gemmaSkipBtn?.dataset.gemmaSkipHint ?? (isEs ? 'Puedes descargar el modelo más tarde desde Perfil → Editar → Configuración de IA, o escribe el nombre de la especie manualmente.' : 'You can download the model later from Profile → Edit → AI settings, or just type the species name manually.'),
   };
 
   let currentAlternates: Array<{ scientific_name: string; common_name: string | null; score: number }> = [];
@@ -1184,9 +1210,10 @@ const cameraStationLoading     = observeStrings.camera_station_loading     ?? (i
     }
 
     if (Object.keys(runners).length === 0) {
-      // No identifier available — show offer for Phi-vision (always free).
+      // No identifier available — pitch on-device download (Gemma preferred
+      // when both opted in; Phi fallback). See offerOnDeviceVision().
       idSpinner?.classList.add('hidden');
-      offerPhiVision();
+      await offerOnDeviceVision();
       return;
     }
 
@@ -1201,17 +1228,14 @@ const cameraStationLoading     = observeStrings.camera_station_loading     ?? (i
     } else if (out.kind === 'uncertain') {
       paintCard(out.result, true);
     } else {
-      // All failed — if Phi isn't cached, offer it as a recovery path.
-      try {
-        const { getModelCacheStatus, VISION_MODEL_ID, localAISupported } = await import('../lib/local-ai');
-        if (localAISupported()) {
-          const status = await getModelCacheStatus(VISION_MODEL_ID);
-          if (!status.cached) {
-            offerPhiVision();
-            return;
-          }
-        }
-      } catch { /* fall through to error banner */ }
+      // All failed — pitch on-device download (Gemma preferred when both
+      // opted in; Phi fallback). offerOnDeviceVision() skips a runner
+      // that's already cached and stays silent if neither is opted in.
+      await offerOnDeviceVision();
+      const offered =
+        (gemmaOffer && !gemmaOffer.classList.contains('hidden')) ||
+        (phiOffer && !phiOffer.classList.contains('hidden'));
+      if (offered) return;
       // Tailor the failure message to what the cascade actually had to
       // work with. The generic "todos fallaron" message is misleading
       // when the real cause is "PlantNet only handles plants and no
@@ -1276,6 +1300,56 @@ const cameraStationLoading     = observeStrings.camera_station_loading     ?? (i
       if (localStorage.getItem('rastrum.prefs.usePhiVision') !== 'true') return;
     } catch { /* ignore */ }
     phiOffer.classList.remove('hidden');
+  }
+
+  function offerGemmaVision() {
+    if (!gemmaOffer) return;
+    try {
+      if (localStorage.getItem(LOCAL_AI_OPTIN) === 'false') return;
+      if (localStorage.getItem('rastrum.prefs.useGemmaVision') !== 'true') return;
+    } catch { /* ignore */ }
+    gemmaOffer.classList.remove('hidden');
+  }
+
+  // Dispatcher (issue #646): pick which on-device runtime to pitch based
+  // on opt-in state. When both are opted in, prefer Gemma (~500 MB)
+  // over Phi (~4 GB). Skip offering a runtime that's already cached —
+  // the cascade should have used it. When neither is opted in, no
+  // banner — fall through to the idAllFailed text which already names
+  // both options.
+  async function offerOnDeviceVision(): Promise<void> {
+    let phiOptIn = false;
+    let gemmaOptIn = false;
+    try {
+      phiOptIn = localStorage.getItem('rastrum.prefs.usePhiVision') === 'true';
+      gemmaOptIn = localStorage.getItem('rastrum.prefs.useGemmaVision') === 'true';
+    } catch { /* ignore */ }
+    if (!phiOptIn && !gemmaOptIn) return;
+
+    let phiCached = false;
+    let gemmaCached = false;
+    if (phiOptIn) {
+      try {
+        const { getModelCacheStatus, VISION_MODEL_ID, localAISupported } = await import('../lib/local-ai');
+        if (localAISupported()) {
+          phiCached = (await getModelCacheStatus(VISION_MODEL_ID)).cached;
+        }
+      } catch { /* WebLLM unavailable — treat as not cached */ }
+    }
+    if (gemmaOptIn) {
+      try {
+        const { getGemmaCacheStatus, gemmaSupported } = await import('../lib/onnx-vision');
+        if (gemmaSupported()) {
+          gemmaCached = (await getGemmaCacheStatus()).cached;
+        }
+      } catch { /* transformers.js unavailable — treat as not cached */ }
+    }
+
+    if (gemmaOptIn && !gemmaCached) {
+      offerGemmaVision();
+    } else if (phiOptIn && !phiCached) {
+      offerPhiVision();
+    }
   }
 
   phiSkipBtn?.addEventListener('click', () => {
@@ -1348,6 +1422,73 @@ const cameraStationLoading     = observeStrings.camera_station_loading     ?? (i
       }
     } finally {
       phiBusy = false;
+    }
+  });
+
+  gemmaSkipBtn?.addEventListener('click', () => {
+    gemmaOffer?.classList.add('hidden');
+    if (idAllFailed) {
+      idAllFailed.textContent = idStringsRT.gemma_skip_hint;
+      idAllFailed.classList.remove('hidden');
+    }
+  });
+
+  let gemmaBusy = false;
+  window.addEventListener('beforeunload', (e: BeforeUnloadEvent) => {
+    if (!gemmaBusy) return;
+    e.preventDefault();
+    e.returnValue = '';
+  });
+
+  gemmaDownloadBtn?.addEventListener('click', async () => {
+    if (!lastFile) return;
+    gemmaOffer?.classList.add('hidden');
+    gemmaProgress?.classList.remove('hidden');
+    if (gemmaProgressBar) gemmaProgressBar.style.width = '0%';
+    gemmaBusy = true;
+
+    try {
+      const { loadGemmaVisionEngine } = await import('../lib/onnx-vision');
+      await loadGemmaVisionEngine((p) => {
+        const pct = Math.round((p.progress ?? 0) * 100);
+        if (gemmaProgressBar) gemmaProgressBar.style.width = `${pct}%`;
+        if (gemmaProgressLbl) gemmaProgressLbl.textContent = `${pct}% — ${p.text ?? ''}`;
+      });
+      gemmaProgress?.classList.add('hidden');
+      idSpinner?.classList.remove('hidden');
+      const idSpinnerLabel = document.getElementById('id-spinner-label');
+      if (idSpinnerLabel) idSpinnerLabel.textContent = idStringsRT.gemma_running;
+
+      const { makeGemmaRunner } = await import('../lib/identify-runners');
+      const runner = makeGemmaRunner(isEs ? 'es' : 'en');
+      const ctrl = new AbortController();
+      const out = await runner(lastFile, ctrl.signal);
+      idSpinner?.classList.add('hidden');
+      if (out && out.scientific_name) {
+        paintCard(out, out.confidence < 0.5);
+      } else if (out && out.note) {
+        paintCard({
+          source: 'onnx_gemma4_vision',
+          scientific_name: isEs ? 'Identificación' : 'Identification',
+          common_name: null,
+          confidence: 0.3,
+          alternates: [],
+          note: out.note,
+        }, true);
+      } else {
+        if (idAllFailed) {
+          idAllFailed.textContent = idStringsRT.result_unknown;
+          idAllFailed.classList.remove('hidden');
+        }
+      }
+    } catch (err) {
+      gemmaProgress?.classList.add('hidden');
+      if (idAllFailed) {
+        idAllFailed.textContent = err instanceof Error ? err.message : String(err);
+        idAllFailed.classList.remove('hidden');
+      }
+    } finally {
+      gemmaBusy = false;
     }
   });
 
