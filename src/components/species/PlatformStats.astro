@@ -1,0 +1,40 @@
+---
+import type { Locale } from '../../i18n/utils';
+import { t } from '../../i18n/utils';
+
+interface Props {
+  lang: Locale;
+  totalSpecies: number;
+  totalObservers: number;
+  totalObs: number;
+  newSpeciesThisWeek: number;
+}
+
+const { lang, totalSpecies, totalObservers, totalObs, newSpeciesThisWeek } = Astro.props;
+const tr = t(lang) as unknown as { explore_species_hero: Record<string, string> };
+const eh = tr.explore_species_hero ?? {};
+
+function fmt(n: number): string {
+  if (n >= 10000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+  if (n >= 1000) return n.toLocaleString();
+  return String(n);
+}
+---
+<div class="grid grid-cols-2 gap-2">
+  <div class="rounded-xl border border-emerald-200 bg-gradient-to-b from-emerald-50 to-white p-4 text-center">
+    <div class="text-3xl font-extrabold text-emerald-700 leading-none tracking-tight">{fmt(totalSpecies)}</div>
+    <div class="text-[11px] uppercase tracking-wider text-emerald-600 mt-1 font-semibold">{eh.species_label ?? 'Species'}</div>
+  </div>
+  <div class="rounded-xl border border-emerald-200 bg-gradient-to-b from-emerald-50 to-white p-4 text-center">
+    <div class="text-3xl font-extrabold text-emerald-700 leading-none tracking-tight">{fmt(totalObservers)}</div>
+    <div class="text-[11px] uppercase tracking-wider text-emerald-600 mt-1 font-semibold">{eh.observers_label ?? 'Observers'}</div>
+  </div>
+  <div class="rounded-xl border border-emerald-200 bg-gradient-to-b from-emerald-50 to-white p-4 text-center">
+    <div class="text-3xl font-extrabold text-emerald-700 leading-none tracking-tight">{fmt(totalObs)}</div>
+    <div class="text-[11px] uppercase tracking-wider text-emerald-600 mt-1 font-semibold">{eh.obs_label ?? 'Observations'}</div>
+  </div>
+  <div class="rounded-xl border border-sky-200 bg-gradient-to-b from-sky-50 to-white p-4 text-center">
+    <div class="text-3xl font-extrabold text-sky-700 leading-none tracking-tight">+{newSpeciesThisWeek}</div>
+    <div class="text-[11px] uppercase tracking-wider text-sky-600 mt-1 font-semibold">{eh.delta_label ?? 'This week'}</div>
+  </div>
+</div>
