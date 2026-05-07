@@ -149,12 +149,45 @@ to a single shared key and only the last-clicked row stays open.
 ### Filtering on a baseline predicate
 
 Some browsers need an always-on baseline (e.g. taxon-changes filters
-admin_audit to `op IN ('taxon_conservation_set', …)`). Pattern:
-prepend a synthetic `FilterSpec` with `key: '__op_baseline'` to the
-filters array, and inject a hidden `<input id="<prefix>-f-__op_baseline" value="1" />`
-so `applyFilters()` runs the predicate. The synthetic filter doesn't
-render a form element (the `<ConsoleEntityBrowser>` only enumerates the
-declared `filters` prop).
+admin_audit to `op IN ('taxon_conservation_set', …)`). Pass the
+predicate as `BrowserConfig.baseline`:
+
+```ts
+new EntityBrowser<Row>({
+  // …
+  baseline: (q: SupabaseQuery): SupabaseQuery => q.in('op', TAXON_OPS),
+});
+```
+
+It is applied after `.order()` and before any user filter, runs
+synchronously, and never persists to the URL. The earlier "synthetic
+`__op_baseline` filter + hidden input" workaround is gone — it ran
+through `applyFilters` whose `await f.apply(...)` triggered the
+PostgrestFilterBuilder thenable and stripped `.range()` off the chain.
+
+### The thenable trap (FilterSpec.apply contract)
+
+`PostgrestFilterBuilder` is itself thenable: its `.then()` method
+fires the HTTP request. That means a sync apply that does
+`return q.eq(...)` cannot be naively `await`ed (await would execute
+the query early and return the response body), and an async apply
+that does `return q.eq(...)` is auto-unwrapped by the Promise
+machinery for the same reason.
+
+`applyFilters` handles this for sync apply by inspecting the return
+value (presence of `.range`) and using it without `await`. Async apply
+must wrap its result in `{ q }` so the resolved Promise payload is a
+plain object, not a thenable:
+
+```ts
+apply: async (q, v): Promise<{ q: SupabaseQuery | null }> => {
+  const id = await resolveUserId(v);
+  return { q: id ? q.eq('actor_id', id) : null };
+}
+```
+
+`applyFilters` itself returns `Promise<{ q: SupabaseQuery | null }>`
+for the same reason — callers unpack with `(await applyFilters(…)).q`.
 
 ### Lazy aggregate facets in drill-downs
 

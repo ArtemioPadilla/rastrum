@@ -119,9 +119,9 @@ const labels = {
       key: 'owner',
       label: 'Owner',
       kind: 'autocomplete',
-      apply: async (q: SupabaseQuery, v: string): Promise<SupabaseQuery | null> => {
+      apply: async (q: SupabaseQuery, v: string): Promise<{ q: SupabaseQuery | null }> => {
         const id = await resolveUserId(v);
-        return id ? q.eq('owner_user_id', id) : null;
+        return { q: id ? q.eq('owner_user_id', id) : null };
       },
     },
     { key: 'visibility', label: 'Visibility', kind: 'select', apply: filterPredicates.eq('visibility') },
