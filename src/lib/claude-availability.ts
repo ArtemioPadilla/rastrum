@@ -19,5 +19,11 @@ export async function claudeAvailable(): Promise<boolean> {
     hasAnthropicKey().catch(() => false),
     getClaudeEligibility().catch(() => ({ has_sponsor: false, has_pool: false, pool_used_today: 0, pool_cap_today: 0 })),
   ]);
-  return byo || elig.has_sponsor || elig.has_pool;
+  // Reviewer note on PR #652: the RPC's `has_pool` returns true purely on global pool
+  // capacity, so a caller who has already exhausted today's daily_user_cap would still
+  // see ✅ in the banner. The EF is the source of truth (returns "cap exhausted") but
+  // reflecting it here avoids the UI/backend skew. cap_today === 0 means "no eligible
+  // pool to draw from at all."
+  const poolUsable = elig.has_pool && elig.pool_cap_today > 0 && elig.pool_used_today < elig.pool_cap_today;
+  return byo || elig.has_sponsor || poolUsable;
 }
