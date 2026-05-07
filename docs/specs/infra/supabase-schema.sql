@@ -7935,6 +7935,69 @@ GRANT EXECUTE ON FUNCTION public.touch_user_activity() TO authenticated;
 
 -- 2026-05-04: trigger db-apply to deploy upsert_primary_identification (#618)
 
+-- ── 2026-05-07: Claude availability check for the client capability banner ──
+-- The ObserveView2 banner used to gate `runners.claude` on `hasAnthropicKey()`
+-- only — i.e. a BYO key in the browser. That hid the fact that an active
+-- beneficiary sponsorship or any active platform pool with capacity also
+-- unlocks Claude Vision (server-side resolution in the identify EF).
+--
+-- `sponsor_pools` RLS is owner-only, so the client can't introspect "is
+-- there any pool I could draw from?" directly. This SECURITY DEFINER
+-- function reports the two server-side eligibility flags + the caller's
+-- pool consumption today, in one round-trip. Service-role-equivalent
+-- privilege via the function — but it never returns row-level data, only
+-- aggregate booleans + counts scoped to the caller.
+CREATE OR REPLACE FUNCTION public.claude_eligibility()
+RETURNS TABLE (
+  has_sponsor    boolean,
+  has_pool       boolean,
+  pool_used_today integer,
+  pool_cap_today  integer
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_uid uuid := auth.uid();
+BEGIN
+  IF v_uid IS NULL THEN
+    RETURN QUERY SELECT false, false, 0, 0;
+    RETURN;
+  END IF;
+
+  RETURN QUERY
+  SELECT
+    EXISTS (
+      SELECT 1
+        FROM public.sponsorships s
+        JOIN public.sponsor_credentials c ON c.id = s.credential_id
+       WHERE s.beneficiary_id = v_uid
+         AND s.status = 'active'
+         AND c.revoked_at IS NULL
+    ) AS has_sponsor,
+    EXISTS (
+      SELECT 1
+        FROM public.sponsor_pools sp
+        JOIN public.sponsor_credentials c ON c.id = sp.credential_id
+       WHERE sp.status = 'active'
+         AND sp.used   < sp.total_cap
+         AND c.revoked_at IS NULL
+    ) AS has_pool,
+    COALESCE(
+      (SELECT count FROM public.pool_consumption
+        WHERE user_id = v_uid AND day = current_date),
+      0
+    ) AS pool_used_today,
+    COALESCE(
+      (SELECT MIN(daily_user_cap) FROM public.sponsor_pools
+        WHERE status = 'active' AND used < total_cap),
+      0
+    ) AS pool_cap_today;
+END $$;
+
+REVOKE ALL ON FUNCTION public.claude_eligibility() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.claude_eligibility() TO authenticated;
 
 -- mv_platform_stats: 4 platform-health counters surfaced on the Especies
 -- hero. Refreshed hourly via pg_cron. Single-row MV; UNIQUE index on

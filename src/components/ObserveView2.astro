@@ -418,7 +418,10 @@ const fileHint    = document.getElementById('obs2-file-hint');
     const items = [
       { label: 'PlantNet (plants)', labelEs: 'PlantNet (plantas)', ok: runners.plantnet },
       { label: 'BirdNET (birds)', labelEs: 'BirdNET (aves)', ok: runners.birdnet },
-      { label: 'Claude Vision', labelEs: 'Claude Vision', ok: runners.claude },
+      // Multi-provider since M32: the EF resolves Anthropic / OpenAI / Bedrock / Azure /
+      // Gemini / Vertex via the BYO → sponsor → pool chain, so labelling this row "Claude"
+      // misrepresented what's actually available. The user-visible label is now provider-agnostic.
+      { label: 'Cloud AI Vision', labelEs: 'IA en la nube', ok: runners.claude },
       { label: 'Phi Vision (local)', labelEs: 'Phi Vision (local)', ok: runners.phi },
       { label: 'Gemma 4 (local)', labelEs: 'Gemma 4 (local)', ok: runners.gemma },
       { label: 'EfficientNet (local)', labelEs: 'EfficientNet (local)', ok: runners.efficientNet },
@@ -539,14 +542,20 @@ async function detectRunners() {
   const { getBirdNETCacheStatus, getBirdNETWeightsBaseUrl } = await import('../lib/identifiers/birdnet-cache');
   const { resolvePlantNetKey } = await import('../lib/identify-runners');
   const { hasAnthropicKey } = await import('../lib/anthropic-key');
+  const { getClaudeEligibility } = await import('../lib/sponsorships');
 
-  const [birdnetStatus, plantnetKey, claudeKey] = await Promise.all([
+  const [birdnetStatus, plantnetKey, claudeKey, eligibility] = await Promise.all([
     getBirdNETWeightsBaseUrl()
       ? getBirdNETCacheStatus().then(s => s.modelCached && s.labelsCached).catch(() => false)
       : Promise.resolve(false),
     resolvePlantNetKey().then(k => !!k).catch(() => false),
     hasAnthropicKey().catch(() => false),
+    // Server-side: active beneficiary sponsorship OR any active pool with
+    // capacity unlocks Claude even without a BYO key. Silently fall back
+    // to "no eligibility" if the user isn't signed in or the RPC errors.
+    getClaudeEligibility().catch(() => ({ has_sponsor: false, has_pool: false, pool_used_today: 0, pool_cap_today: 0 })),
   ]);
+  const claudeAvailable = claudeKey || eligibility.has_sponsor || eligibility.has_pool;
 
   let phi = false;
   try {
@@ -575,7 +584,7 @@ async function detectRunners() {
     }
   } catch { /* unavailable */ }
 
-  return { plantnet: plantnetKey, birdnet: birdnetStatus, claude: claudeKey, phi, gemma, efficientNet };
+  return { plantnet: plantnetKey, birdnet: birdnetStatus, claude: claudeAvailable, phi, gemma, efficientNet };
 }
 
 // ── Pipeline runner ────────────────────────────────────────────────────────
@@ -583,6 +592,7 @@ async function runPipeline(state: PipelineState) {
   const { runParallelIdentify } = await import('../lib/identify-cascade-client');
   const { makePlantNetRunner, makeClaudeRunner, makePhiRunner, resolvePlantNetKey } = await import('../lib/identify-runners');
   const { hasAnthropicKey } = await import('../lib/anthropic-key');
+  const { claudeAvailable } = await import('../lib/claude-availability');
 
   // Resolve AI mode (#296)
   let aiMode = readAiMode();
@@ -613,7 +623,8 @@ async function runPipeline(state: PipelineState) {
           if (hasKeysForPlugin('claude_haiku') && await hasAnthropicKey()) runners.claude_haiku = makeClaudeRunner(lang as 'en' | 'es');
         } else {
           if (await resolvePlantNetKey()) runners.plantnet = (await import('../lib/identify-runners')).makePlantNetRunner(lang as 'en' | 'es');
-          if (await hasAnthropicKey()) runners.claude_haiku = makeClaudeRunner(lang as 'en' | 'es');
+          // Sponsored mode: BYO key OR server-side sponsor/pool unlocks Claude.
+          if (await claudeAvailable()) runners.claude_haiku = makeClaudeRunner(lang as 'en' | 'es');
         }
 
         // Phi vision (opt-in): runs in parallel as an additional on-device runner.
