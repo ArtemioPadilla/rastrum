@@ -125,23 +125,30 @@ const weathers = WEATHERS;
     </h2>
 
     <!-- Identification result card -->
-    <div id="obs2-id-card" class="hidden rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 p-4">
-      <div class="flex items-start justify-between gap-2">
-        <div>
-          <p id="obs2-species" class="font-semibold italic text-zinc-900 dark:text-zinc-100"></p>
-          <p id="obs2-common" class="text-sm text-zinc-500 dark:text-zinc-400"></p>
+    <div id="obs2-id-card" class="rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 p-4">
+      <!-- AI result (hidden when no bestResult) -->
+      <div id="obs2-id-result" class="hidden">
+        <div class="flex items-start justify-between gap-2">
+          <div>
+            <p id="obs2-species" class="font-semibold italic text-zinc-900 dark:text-zinc-100"></p>
+            <p id="obs2-common" class="text-sm text-zinc-500 dark:text-zinc-400"></p>
+          </div>
+          <span id="obs2-conf" class="text-xs font-mono text-emerald-600 dark:text-emerald-400 shrink-0"></span>
         </div>
-        <span id="obs2-conf" class="text-xs font-mono text-emerald-600 dark:text-emerald-400 shrink-0"></span>
+        <button type="button" id="obs2-id-edit" class="mt-2 text-xs text-zinc-400 underline">
+          {isEs ? "Editar identificación" : "Edit identification"}
+        </button>
       </div>
-      <button type="button" id="obs2-id-edit" class="mt-2 text-xs text-zinc-400 underline">
-        {isEs ? "Editar identificación" : "Edit identification"}
-      </button>
-      <div id="obs2-id-manual" class="hidden mt-2">
+      <!-- Manual entry — always visible, label changes with context -->
+      <div id="obs2-id-manual" class="mt-2">
+        <label for="obs2-taxon-input" id="obs2-taxon-label" class="block text-xs text-zinc-500 dark:text-zinc-400 mb-1">
+          {isEs ? "Nombre científico (opcional)" : "Scientific name (optional)"}
+        </label>
         <input
           id="obs2-taxon-input"
           type="text"
           class="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm"
-          placeholder={isEs ? "Nombre científico (opcional)" : "Scientific name (optional)"}
+          placeholder={isEs ? "ej. Quercus robur" : "e.g. Quercus robur"}
         />
       </div>
     </div>
@@ -799,14 +806,20 @@ function startGPS() {
 // ── Show post form ─────────────────────────────────────────────────────────
 function showPostForm() {
   postForm?.classList.remove('hidden');
+  // id card is always shown so user can always enter/edit species
   if (bestResult) {
-    idCard?.classList.remove('hidden');
+    document.getElementById('obs2-id-result')?.classList.remove('hidden');
     if (speciesEl) speciesEl.textContent = bestResult.scientific_name;
     if (commonEl) commonEl.textContent = bestResult.common_name_en ?? '';
     if (confEl) confEl.textContent = `${Math.round(bestResult.confidence * 100)}%`;
+    // Pre-fill manual input with AI result; user can override
+    const taxonInputEl = document.getElementById('obs2-taxon-input') as HTMLInputElement | null;
+    if (taxonInputEl && !taxonInputEl.value) taxonInputEl.value = bestResult.scientific_name;
+    const labelEl = document.getElementById('obs2-taxon-label');
+    if (labelEl) labelEl.textContent = isEs ? 'Editar identificación' : 'Edit identification';
   }
 
-  // Edit identification toggle
+  // Edit identification toggle — only wired when AI result is present
   document.getElementById('obs2-id-edit')?.addEventListener('click', () => {
     document.getElementById('obs2-id-manual')?.classList.toggle('hidden');
   });
@@ -904,7 +917,25 @@ postForm?.addEventListener('submit', async (e) => {
       license: licenseTyped,
     });
 
-    await syncOutbox().catch(() => {});
+    // Fire sync without blocking success UX. Use ifAvailable so we don't
+    // stall on an existing lock held by a background sync — the pending row
+    // will be picked up by the next sync cycle regardless.
+    void (async () => {
+      try {
+        const { syncOutbox: syncFn } = await import('../lib/sync');
+        const locks = (typeof navigator !== 'undefined'
+          ? (navigator as Navigator & { locks?: LockManager }).locks
+          : undefined);
+        if (locks?.request) {
+          await locks.request('rastrum-sync-outbox', { ifAvailable: true }, async (lock: Lock | null) => {
+            if (!lock) return; // another sync already in flight — it will flush the new row
+            return syncFn();
+          });
+        } else {
+          await syncFn();
+        }
+      } catch { /* non-fatal — outbox row is persisted, sync retries on next visit */ }
+    })();
 
     // Update pipeline
     const saveNode = pipelineState.nodes.find(n => n.kind === 'save');
@@ -912,7 +943,7 @@ postForm?.addEventListener('submit', async (e) => {
     pipelineState.status = 'done';
     await savePipelineState(pipelineState).catch(() => {});
 
-    // Show success
+    // Show success — hide form, reveal card, toast
     postForm?.classList.add('hidden');
     successEl?.classList.remove('hidden');
     const linkEl = document.getElementById('obs2-success-link');
@@ -920,6 +951,14 @@ postForm?.addEventListener('submit', async (e) => {
       const href = `/share/obs/?id=${obs.id}`;
       linkEl.innerHTML = `<a href="${href}" class="text-emerald-700 dark:text-emerald-400 underline text-sm">${isEs ? 'Ver observaci\u00f3n' : 'View observation'}</a>`;
     }
+    // Toast confirmation
+    const toastEl = document.createElement('div');
+    toastEl.setAttribute('role', 'status');
+    toastEl.setAttribute('aria-live', 'polite');
+    toastEl.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-xl bg-emerald-700 text-white px-5 py-3 text-sm shadow-lg max-w-[340px] text-center pointer-events-none transition-opacity duration-300';
+    toastEl.textContent = isEs ? '¡Observación guardada!' : 'Observation saved!';
+    document.body.appendChild(toastEl);
+    setTimeout(() => { toastEl.style.opacity = '0'; setTimeout(() => toastEl.remove(), 300); }, 3000);
   } catch (err) {
     if (errorEl) {
       errorEl.textContent = (err as Error).message ?? (isEs ? 'Error al guardar' : 'Error saving');
@@ -937,7 +976,12 @@ document.getElementById('obs2-new-btn')?.addEventListener('click', () => {
   pipelineSection?.classList.add('hidden');
   postForm?.classList.add('hidden');
   successEl?.classList.add('hidden');
-  if (idCard) idCard.classList.add('hidden');
+  // Reset id card: hide the AI result section, clear taxon input, restore label
+  document.getElementById('obs2-id-result')?.classList.add('hidden');
+  const taxonReset = document.getElementById('obs2-taxon-input') as HTMLInputElement | null;
+  if (taxonReset) taxonReset.value = '';
+  const labelReset = document.getElementById('obs2-taxon-label');
+  if (labelReset) labelReset.textContent = isEs ? 'Nombre científico (opcional)' : 'Scientific name (optional)';
   window.scrollTo(0, 0);
 });
 
