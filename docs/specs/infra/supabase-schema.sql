@@ -2828,6 +2828,11 @@ WHERE public.can_see_facet(u.id, 'karma_total', (SELECT auth.uid()));
 
 GRANT SELECT ON public.profile_karma TO anon, authenticated;
 
+-- M34 dependency — forward-declare taxa.slug before profile_pokedex / taxa_thumbnails
+-- reference it. The canonical ALTER lives later in the file (idempotent), but
+-- db-validate's top-to-bottom replay needs the column to exist here.
+ALTER TABLE public.taxa ADD COLUMN IF NOT EXISTS slug text;
+
 -- Pokédex — every taxon the user has observed, joined to taxon_rarity.
 -- M34 (2026-05-06): added common_name_*, slug, endemic_mx, nom059_status,
 -- thumbnail_url for the visual redesign. Existing column order preserved.
@@ -2896,11 +2901,6 @@ GRANT SELECT ON public.profile_pokedex TO anon, authenticated;
 -- suggest_pokedex_target, and extends profile_pokedex.
 -- Spec: docs/superpowers/specs/2026-05-06-pokedex-especies-visual-design.md
 -- ═════════════════════════════════════════════════════════════════════
-
--- M34 dependencies — forward-declare taxa columns the views below reference.
--- These ALTERs run later in the file too (idempotent), but we need them here
--- so db-validate's top-to-bottom replay can resolve t.slug references.
-ALTER TABLE public.taxa ADD COLUMN IF NOT EXISTS slug text;
 
 -- taxa_thumbnails: one representative photo URL per taxon, picked from the
 -- most-recent synced primary identification's primary photo. Used by
