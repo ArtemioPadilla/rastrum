@@ -7967,3 +7967,57 @@ SELECT cron.unschedule('refresh-platform-stats')
   WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'refresh-platform-stats');
 SELECT cron.schedule('refresh-platform-stats', '0 * * * *',
   $$REFRESH MATERIALIZED VIEW CONCURRENTLY public.mv_platform_stats$$);
+
+
+-- suggest_pokedex_target(viewer_id): pick one species the viewer hasn't
+-- observed yet, preferring their most-active kingdom, common rarity, with
+-- at least one photo in the catalog. Stable per user per day. Used by
+-- PokedexHero tile 3 ("Para cazar").
+CREATE OR REPLACE FUNCTION public.suggest_pokedex_target(viewer_id uuid)
+RETURNS TABLE (
+  taxon_id        uuid,
+  scientific_name text,
+  common_name_es  text,
+  common_name_en  text,
+  slug            text,
+  kingdom         text,
+  thumbnail_url   text
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  WITH owned AS (
+    SELECT taxon_id FROM public.profile_pokedex WHERE user_id = viewer_id
+  ),
+  user_top_kingdom AS (
+    SELECT kingdom, COUNT(*) AS c
+      FROM public.profile_pokedex
+     WHERE user_id = viewer_id AND kingdom IS NOT NULL
+     GROUP BY kingdom
+     ORDER BY c DESC
+     LIMIT 1
+  )
+  SELECT
+    t.id,
+    t.scientific_name,
+    t.common_name_es,
+    t.common_name_en,
+    t.slug,
+    t.kingdom,
+    (SELECT tt.thumbnail_url FROM public.taxa_thumbnails tt WHERE tt.taxon_id = t.id) AS thumbnail_url
+  FROM public.taxa t
+  LEFT JOIN public.taxon_rarity tr ON tr.taxon_id = t.id
+  WHERE t.id NOT IN (SELECT taxon_id FROM owned)
+    AND t.kingdom = COALESCE((SELECT kingdom FROM user_top_kingdom), 'Animalia')
+    AND COALESCE(tr.bucket, 1) <= 2
+    AND EXISTS (
+      SELECT 1 FROM public.taxa_thumbnails tt
+       WHERE tt.taxon_id = t.id AND tt.thumbnail_url IS NOT NULL
+    )
+  ORDER BY md5(t.id::text || viewer_id::text || to_char(now(), 'YYYY-MM-DD'))
+  LIMIT 1;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.suggest_pokedex_target(uuid) TO authenticated;
