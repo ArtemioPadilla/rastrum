@@ -1,0 +1,119 @@
+---
+import type { Locale } from '../../i18n/utils';
+import { t } from '../../i18n/utils';
+
+interface Stats {
+  total: number;
+  kingdoms: number;
+  rares: number;
+  obs: number;
+  streakDays: number;
+}
+
+interface RareCatch {
+  scientificName: string;
+  commonName: string | null;
+  thumbnailUrl: string | null;
+  rarityBucket: number | null;
+  kingdom: string | null;
+}
+
+interface Suggestion {
+  scientificName: string;
+  commonName: string | null;
+  thumbnailUrl: string | null;
+  ctaHref: string;
+}
+
+interface Props {
+  lang: Locale;
+  stats: Stats;
+  rare: RareCatch | null;
+  suggestion: Suggestion | null;
+  firstVisit: boolean;
+  observeHref: string;
+}
+
+const { lang, stats, rare, suggestion, firstVisit, observeHref } = Astro.props;
+const tr = t(lang) as unknown as {
+  pokedex: { hero: Record<string, string> };
+};
+const h = tr.pokedex.hero;
+---
+
+<div class="ph-grid grid gap-3.5 mt-3.5" style="grid-template-columns: 1.2fr 2fr 1.4fr;">
+  <!-- Tile 1: Total / first-visit -->
+  <div class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 p-4 flex flex-col justify-center">
+    {firstVisit ? (
+      <>
+        <div class="text-base font-bold text-zinc-900 dark:text-zinc-100">{h.first_visit_title}</div>
+        <a href={observeHref} class="mt-2 inline-block text-sm text-emerald-700 dark:text-emerald-400 font-semibold hover:underline">{h.first_visit_cta} →</a>
+      </>
+    ) : (
+      <>
+        <div class="text-5xl font-extrabold leading-none tracking-tight text-emerald-700 dark:text-emerald-400">{stats.total}</div>
+        <div class="text-[11px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400 mt-1 font-semibold">{h.species_label}</div>
+        <div class="flex gap-3.5 mt-3 flex-wrap text-xs text-zinc-600 dark:text-zinc-300">
+          <span><b class="text-zinc-900 dark:text-zinc-100">{stats.kingdoms}</b> {h.kingdoms_label}</span>
+          <span><b class="text-zinc-900 dark:text-zinc-100">{stats.rares}</b> {h.rares_label}</span>
+          <span><b class="text-zinc-900 dark:text-zinc-100">{stats.obs}</b> {h.obs_label}</span>
+          {stats.streakDays > 0 && (
+            <span>🔥 <b class="text-zinc-900 dark:text-zinc-100">{stats.streakDays}</b></span>
+          )}
+        </div>
+      </>
+    )}
+  </div>
+
+  <!-- Tile 2: Highest rarity -->
+  <div class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 p-4 flex items-center" data-tile="rare">
+    {rare ? (
+      <div class="flex gap-3 items-center w-full">
+        {rare.thumbnailUrl ? (
+          <img src={rare.thumbnailUrl} alt={rare.scientificName} loading="eager"
+               class="flex-none w-24 h-24 rounded-lg object-cover" style="box-shadow: 0 0 0 3px #fbbf24, 0 4px 12px rgba(180,83,9,0.25);" />
+        ) : (
+          <div class="flex-none w-24 h-24 rounded-lg bg-amber-100 flex items-center justify-center text-amber-600 text-2xl">★</div>
+        )}
+        <div class="min-w-0">
+          <div class="text-[10px] uppercase tracking-widest text-amber-700 font-bold">{h.highest_rarity_label}</div>
+          <div class="text-base font-bold italic text-zinc-900 dark:text-zinc-100 truncate">{rare.scientificName}</div>
+          {rare.commonName && <div class="text-sm text-zinc-600 dark:text-zinc-300 truncate">{rare.commonName}{rare.kingdom ? ` · ${rare.kingdom}` : ''}</div>}
+          <div class="text-amber-600 mt-1 tracking-widest text-sm">{'★'.repeat(rare.rarityBucket ?? 1)}{'☆'.repeat(5 - (rare.rarityBucket ?? 1))}</div>
+        </div>
+      </div>
+    ) : (
+      <div class="text-sm text-zinc-400 italic">—</div>
+    )}
+  </div>
+
+  <!-- Tile 3: To catch -->
+  <div class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 p-4 flex flex-col justify-center" data-tile="suggest">
+    {suggestion ? (
+      <>
+        <div class="flex gap-3 items-center">
+          {suggestion.thumbnailUrl ? (
+            <img src={suggestion.thumbnailUrl} alt={suggestion.scientificName} loading="lazy"
+                 class="flex-none rounded-lg object-cover" style="width:60px;height:60px;filter: grayscale(1) contrast(.5) brightness(.85); opacity:.55; border: 2px dashed #94a3b8;" />
+          ) : (
+            <div class="flex-none rounded-lg border-2 border-dashed border-zinc-400 bg-zinc-100 flex items-center justify-center text-zinc-400 text-2xl" style="width:60px;height:60px;">?</div>
+          )}
+          <div class="min-w-0">
+            <div class="text-[10px] uppercase tracking-widest text-zinc-500 font-bold">{h.to_catch_label}</div>
+            <div class="text-sm font-semibold italic text-zinc-900 dark:text-zinc-100 truncate">{suggestion.scientificName}</div>
+            <div class="text-[11px] text-zinc-500 mt-0.5">{h.to_catch_why}</div>
+          </div>
+        </div>
+        <a href={suggestion.ctaHref} class="mt-2 text-xs text-emerald-700 dark:text-emerald-400 font-semibold hover:underline">{h.to_catch_cta}</a>
+      </>
+    ) : (
+      <div class="text-sm text-zinc-400 italic">—</div>
+    )}
+  </div>
+</div>
+
+<style>
+  @media (max-width: 820px) {
+    .ph-grid { grid-template-columns: 1fr !important; }
+  }
+</style>
