@@ -7922,3 +7922,48 @@ REVOKE ALL ON FUNCTION public.touch_user_activity() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.touch_user_activity() TO authenticated;
 
 -- 2026-05-04: trigger db-apply to deploy upsert_primary_identification (#618)
+
+
+-- mv_platform_stats: 4 platform-health counters surfaced on the Especies
+-- hero. Refreshed hourly via pg_cron. Single-row MV; UNIQUE index on
+-- computed_at lets us REFRESH CONCURRENTLY.
+CREATE MATERIALIZED VIEW IF NOT EXISTS public.mv_platform_stats AS
+SELECT
+  (SELECT COUNT(DISTINCT i.taxon_id)
+     FROM public.identifications i
+     JOIN public.observations o ON o.id = i.observation_id
+    WHERE i.is_primary = true
+      AND o.sync_status = 'synced')                                    AS total_species,
+  (SELECT COUNT(DISTINCT o.observer_id)
+     FROM public.observations o
+    WHERE o.sync_status = 'synced')                                    AS total_observers,
+  (SELECT COUNT(*)
+     FROM public.observations o
+    WHERE o.sync_status = 'synced')                                    AS total_obs,
+  (SELECT COUNT(DISTINCT i.taxon_id)
+     FROM public.identifications i
+     JOIN public.observations o ON o.id = i.observation_id
+    WHERE i.is_primary = true
+      AND o.sync_status = 'synced'
+      AND date_trunc('week', o.observed_at) = date_trunc('week', now())
+      AND NOT EXISTS (
+        SELECT 1
+          FROM public.identifications i2
+          JOIN public.observations o2 ON o2.id = i2.observation_id
+         WHERE i2.taxon_id = i.taxon_id
+           AND i2.is_primary = true
+           AND o2.sync_status = 'synced'
+           AND o2.observed_at < date_trunc('week', now())
+      ))                                                               AS new_species_this_week,
+  now()                                                                AS computed_at;
+
+CREATE UNIQUE INDEX IF NOT EXISTS mv_platform_stats_unique
+  ON public.mv_platform_stats (computed_at);
+
+GRANT SELECT ON public.mv_platform_stats TO anon, authenticated;
+
+-- M34 cron: refresh mv_platform_stats hourly. Idempotent — unschedule first.
+SELECT cron.unschedule('refresh-platform-stats')
+  WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'refresh-platform-stats');
+SELECT cron.schedule('refresh-platform-stats', '0 * * * *',
+  $$REFRESH MATERIALIZED VIEW CONCURRENTLY public.mv_platform_stats$$);
