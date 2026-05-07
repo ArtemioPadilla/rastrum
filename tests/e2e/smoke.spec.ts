@@ -114,13 +114,13 @@ test('share/obs/ is locale-neutral and renders for any id', async ({ page }) => 
   }
 });
 
-// M34: Pokédex page renders either the hero (logged-in users with captures)
-// or the first-visit copy (anon / new users). Both states satisfy the regex.
-test('Pokédex hero or first-visit copy renders', async ({ page }) => {
+// M34: Pokédex page renders the H1. The h1 is server-rendered with
+// pokedex.title from i18n ("Tu Pokédex" / "Your Pokédex") regardless of
+// auth state — the data-pokedex-title attribute uniquely identifies it
+// (avoids ambiguity with the menu link of the same text).
+test('Pokédex page renders title', async ({ page }) => {
   await page.goto('/es/perfil/dex/');
-  await expect(
-    page.locator('text=/Empieza tu Pokédex|Tu Pokédex/').first()
-  ).toBeVisible();
+  await expect(page.locator('[data-pokedex-title]')).toBeVisible();
 });
 
 // M34: Especies hero (title + filter chips) renders on the public catalog.

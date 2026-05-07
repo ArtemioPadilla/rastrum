@@ -283,6 +283,13 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
 
     const hideSkeleton = () => skeletonEl?.classList.add('hidden');
 
+    // Wire filter chips eagerly — they're pure URL-state and must respond
+    // even when the data fetch below fails (e.g. CI preview with no Supabase
+    // keys). applyAllFilters() is a no-op when no cards are rendered yet.
+    let currentChips: ChipsState = parseChips(window.location.search);
+    wireChipClicks();
+    paintChipPressedState();
+
     let supabase;
     try {
       supabase = getSupabase();
@@ -546,8 +553,6 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
     void loadAndRenderHero();
 
     // ── M34: Chip filters ──────────────────────────────────
-    let currentChips: ChipsState = parseChips(window.location.search);
-
     function applyAllFilters() {
       const cards = listEl?.querySelectorAll<HTMLElement>('li > [data-taxon-id]') ?? [];
       let visibleCount = 0;
