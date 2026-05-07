@@ -2897,6 +2897,11 @@ GRANT SELECT ON public.profile_pokedex TO anon, authenticated;
 -- Spec: docs/superpowers/specs/2026-05-06-pokedex-especies-visual-design.md
 -- ═════════════════════════════════════════════════════════════════════
 
+-- M34 dependencies — forward-declare taxa columns the views below reference.
+-- These ALTERs run later in the file too (idempotent), but we need them here
+-- so db-validate's top-to-bottom replay can resolve t.slug references.
+ALTER TABLE public.taxa ADD COLUMN IF NOT EXISTS slug text;
+
 -- taxa_thumbnails: one representative photo URL per taxon, picked from the
 -- most-recent synced primary identification's primary photo. Used by
 -- ExploreSpeciesView and FeaturedSpeciesCard.
@@ -2949,7 +2954,7 @@ WITH eligible AS (
   AND (
     COALESCE(tr.bucket, 1) >= 4
     OR t.is_endemic_mexico = true
-    OR t.nom059_status IN ('sujeta_proteccion', 'amenazada', 'peligro_extincion')
+    OR t.nom059_status IN ('E', 'A', 'Pr')
   )
 )
 SELECT
