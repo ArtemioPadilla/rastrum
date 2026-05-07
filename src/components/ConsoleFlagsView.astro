@@ -20,8 +20,10 @@ const isEs = lang === 'es';
       </h2>
       <div class="flex items-center gap-2">
         <select id="flags-status-filter" class="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-1.5 text-sm">
-          <option value="pending">{isEs ? 'Pendientes' : 'Pending'}</option>
+          <option value="open">{isEs ? 'Abiertos' : 'Open'}</option>
+          <option value="triaged">{isEs ? 'En revisión' : 'Triaged'}</option>
           <option value="resolved">{isEs ? 'Resueltos' : 'Resolved'}</option>
+          <option value="dismissed">{isEs ? 'Descartados' : 'Dismissed'}</option>
           <option value="all">{isEs ? 'Todos' : 'All'}</option>
         </select>
         <button id="flags-refresh" type="button" class="rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
@@ -80,8 +82,10 @@ const isEs = lang === 'es';
 
   function statusPill(s: string): string {
     const cls: Record<string, string> = {
-      pending: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
-      resolved: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
+      open:      'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
+      triaged:   'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
+      resolved:  'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
+      dismissed: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300',
     };
     return `<span class="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded ${cls[s] ?? 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300'}">${escapeHtml(s)}</span>`;
   }
@@ -97,7 +101,7 @@ const isEs = lang === 'es';
     try {
       const supabase = getSupabase();
       let query = supabase
-        .from('flags')
+        .from('reports')
         .select('*, users!reporter_id(display_name, username)', { count: 'exact' })
         .order('created_at', { ascending: false })
         .range(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE - 1);
@@ -127,7 +131,7 @@ const isEs = lang === 'es';
           isEs ? 'es' : 'en',
           { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' },
         );
-        const statusColor = flag.status === 'pending'
+        const statusColor = flag.status === 'open' || flag.status === 'triaged'
           ? 'text-amber-600'
           : 'text-emerald-600';
 
@@ -188,7 +192,7 @@ const isEs = lang === 'es';
     if (!myRoles.has('admin')) { show('flags-not-auth'); return; }
     shell?.classList.remove('hidden');
     const params = new URLSearchParams(window.location.search);
-    if (filterEl && params.has('status')) filterEl.value = params.get('status') ?? 'pending';
+    if (filterEl && params.has('status')) filterEl.value = params.get('status') ?? 'open';
     await loadFlags();
   })().catch(() => { show('flags-not-auth'); });
 </script>
