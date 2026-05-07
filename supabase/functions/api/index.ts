@@ -313,7 +313,7 @@ Deno.serve(async (req: Request) => {
   return json({ error: 'Not found' }, 404);
   } catch (e) {
     console.error('[api] unhandled error', e);
-    return json({ error: 'internal_error', detail: (e as Error).message }, 500);
+    return json({ error: 'internal_error' }, 500);
   }
 });
 

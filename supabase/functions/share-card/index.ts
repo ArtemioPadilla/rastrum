@@ -176,9 +176,9 @@ serve(async (req) => {
   });
   } catch (e) {
     console.error('[share-card] unhandled error', e);
-    return new Response(JSON.stringify({ error: 'internal_error', detail: (e as Error).message }), {
+    return new Response(JSON.stringify({ error: 'internal_error' }), {
       status: 500,
-      headers: { 'content-type': 'application/json', ...CORS_HEADERS },
+      headers: withCors({ 'content-type': 'application/json' }),
     });
   }
 });

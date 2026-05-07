@@ -796,6 +796,6 @@ serve(async (req) => {
     // Unhandled error — return a CORS-safe 500 so the browser sees the real
     // status instead of a bare network failure ("Failed to fetch").
     console.error('[sponsorships] unhandled error', e);
-    return jsonResponse(500, { error: 'internal_error', detail: (e as Error).message });
+    return jsonResponse(500, { error: 'internal_error' });
   }
 });
