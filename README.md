@@ -24,7 +24,7 @@ Rastrum is fully open source under the MIT license. The frontend ships as a stat
 
 ### Photo Identification
 
-Upload a photo of a plant, animal, or fungus and receive ranked species suggestions powered by an ensemble pipeline (PlantNet, BirdNET-Lite, EfficientNet-Lite0 ONNX, and Claude Haiku vision, with WebLLM Phi-3.5-vision as an in-browser fallback). The system also accepts photos of indirect evidence — tracks, scat, burrows, nests, and feeding signs — and routes them through a specialized identification flow.
+Upload a photo of a plant, animal, or fungus and receive ranked species suggestions powered by an ensemble pipeline (PlantNet, BirdNET-Lite, EfficientNet-Lite0 ONNX, and Claude Haiku vision, with two opt-in parallel in-browser fallbacks: WebLLM Phi-3.5-vision and transformers.js Gemma 4 E2B). The system also accepts photos of indirect evidence — tracks, scat, burrows, nests, and feeding signs — and routes them through a specialized identification flow.
 
 ### Audio Identification
 
@@ -82,7 +82,7 @@ Both gate on the same scope strings (`observe`, `identify`, `export`).
 | Map | MapLibre + pmtiles (`PUBLIC_PMTILES_MX_URL`) | Offline-capable vector tiles, MX archive on R2 |
 | Photo ID — cloud | PlantNet API + Claude Haiku 4.5 | Plant/fungus + general species ID |
 | Photo ID — on-device | EfficientNet-Lite0 ONNX (`onnxruntime-web`) | Offline-first base classifier |
-| Photo ID — in-browser LLM | WebLLM Phi-3.5-vision-instruct | Fallback when no cloud key |
+| Photo ID — in-browser LLM | WebLLM Phi-3.5-vision-instruct + transformers.js Gemma 4 E2B | Two opt-in parallel runtimes (independent WebGPU code paths) |
 | Translation / field notes | WebLLM Llama-3.2-1B | Local translation + auto-narrative |
 | Audio ID | BirdNET-Lite ONNX (Cornell Lab, NC license) | Bird vocalization classification |
 | Camera trap | MegaDetector v5 + SpeciesNet | Operator-hosted endpoint |

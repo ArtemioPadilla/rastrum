@@ -107,7 +107,8 @@ correct" work without special-casing.
 |---|---|---|---|---|---|
 | `plantnet`             | server | photo  | Plantae | free-quota | 500/day free |
 | `claude_haiku`         | server | photo  | * | byo-key/paid | BYO key supported |
-| `webllm_phi35_vision`  | client | photo  | * | free | confidence cap 0.35 |
+| `webllm_phi35_vision`  | client | photo  | * | free | MIT, ~4 GB on-device, confidence cap 0.35; opt-in via `rastrum.prefs.usePhiVision` |
+| `onnx_gemma4_vision`   | client | photo  | * | free | Apache 2.0, ~500 MB on-device via transformers.js + ONNX, confidence cap 0.35; opt-in via `rastrum.prefs.useGemmaVision` (parallel runtime to Phi for resilience) |
 | `birdnet_lite`         | client | audio  | Animalia.Aves | free-nc | weights not yet bundled |
 | `onnx_efficientnet_lite0` | client | photo | * | free | weights not yet bundled |
 

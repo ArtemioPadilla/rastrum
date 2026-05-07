@@ -40,8 +40,13 @@ that just flew by?" use case.
 ```
 attachment (photo|audio Blob)
        │
-       ├── runCascade({ media, mediaKind, byo_keys: {} },
-       │              { excluded: ['webllm_phi35_vision'] })
+       ├── runCascade({ media, mediaKind, byo_keys: {} }, opts)
+       │   ├── opts honors per-plugin isAvailable() — Phi + Gemma each
+       │   │   self-gate on their opt-in pref so they only run when the
+       │   │   user has explicitly enabled them in Profile → Edit.
+       │   └── (PR #644) the chat picker can also force a single plugin
+       │       (PlantNet / Claude / Phi / Gemma / EfficientNet) or fan
+       │       out to "Compare all" — bypassing the cascade.
        │       → { best, alternates }
        │
        ├── if best.confidence ≥ 0.4
@@ -83,10 +88,12 @@ observations agree on the quality bar.
    user-side bubble with the attachment thumbnail and text, and a
    placeholder bot bubble.
 3. **Cascade.** `runAttachmentCascade(att)` calls `runCascade()` from
-   `src/lib/identifiers/cascade.ts` with `excluded: ['webllm_phi35_vision']`
-   so the slow Phi pass doesn't happen on the primary path. For audio
-   the `taxa: 'Animalia.Aves'` filter is set (BirdNET only handles
-   birds today).
+   `src/lib/identifiers/cascade.ts` with the unified `buildCascadeOptions`
+   result. Phi and Gemma are *not* hardcoded-excluded any more (PR #644
+   dropped that hack); both runtimes self-gate via their `isAvailable()`
+   on a per-runtime opt-in pref, so they only run when the user has
+   explicitly enabled them. For audio, `taxa: 'Animalia.Aves'` is set
+   (BirdNET only handles birds today).
 4. **Interpret.** If `best.confidence ≥ 0.4`, the page builds a
    `buildCascadeInterpretationPrompt(...)` and streams the Llama reply
    into the placeholder bubble. The bubble also gets a "Save as
@@ -184,7 +191,8 @@ is intentionally not unit-tested. Light Playwright smoke coverage in
   calls `requestPersistentStorage()` indirectly via
   `local-ai.ts` to resist iOS eviction.
 - The cascade fan-out for photos is unchanged from `/observe` — same
-  per-call PlantNet / Anthropic costs. Setting `excluded:
-  ['webllm_phi35_vision']` keeps the slow Phi pass off the primary
-  path, which matters on low-end Android.
+  per-call PlantNet / Anthropic costs. Phi and Gemma stay off the
+  primary path by being opt-in only (their respective `isAvailable()`
+  return `disabled` unless the user has flipped the toggle in
+  Profile → Edit), which matters on low-end Android.
 - No server cost: the chat path never hits an Edge Function.

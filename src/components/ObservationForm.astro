@@ -775,6 +775,17 @@ const cameraStationLoading     = observeStrings.camera_station_loading     ?? (i
       spec: archInBrowserUrl,
       isInterpreter: true,
     },
+    onnx_gemma4_vision: {
+      name: 'Gemma 4 E2B',
+      meta: isEs
+        ? 'Gemma 4 E2B — VLM general de Google en el dispositivo, vía transformers.js + ONNX. Apache 2.0. Confianza limitada por diseño.'
+        : 'Gemma 4 E2B — Google on-device general VLM, via transformers.js + ONNX. Apache 2.0. Confidence is hard-capped by design.',
+      desc: isEs
+        ? 'IA en tu dispositivo (runtime alterno a Phi). Funciona sin internet.'
+        : 'On-device AI (alternate runtime to Phi). Works without internet.',
+      spec: archInBrowserUrl,
+      isInterpreter: true,
+    },
     birdnet: {
       name: 'BirdNET',
       meta: isEs
@@ -1105,7 +1116,7 @@ const cameraStationLoading     = observeStrings.camera_station_loading     ?? (i
 
     // Build the runner set based on what's actually available.
     const { runParallelIdentify } = await import('../lib/identify-cascade-client');
-    const { makePlantNetRunner, makeClaudeRunner, makePhiRunner, resolvePlantNetKey } = await import('../lib/identify-runners');
+    const { makePlantNetRunner, makeClaudeRunner, makePhiRunner, makeGemmaRunner, resolvePlantNetKey } = await import('../lib/identify-runners');
     const { hasAnthropicKey } = await import('../lib/anthropic-key');
 
     const runners: Record<string, import('../lib/identify-cascade-client').IdentifierRunner> = {};
@@ -1140,6 +1151,24 @@ const cameraStationLoading     = observeStrings.camera_station_loading     ?? (i
       }
     } catch { /* WebLLM unavailable in this environment */ }
 
+    // Gemma 4 vision: parallel runtime to Phi (transformers.js + ONNX). Same
+    // opt-in pattern + own session-broken flag. Both can be enabled
+    // simultaneously — runParallelIdentify races them and uses whichever
+    // returns a confident answer first. When one runtime crashes on a
+    // given GPU/driver, the other often still works (independent kernels).
+    try {
+      const gemmaOptedIn = (typeof localStorage !== 'undefined')
+        ? localStorage.getItem('rastrum.prefs.useGemmaVision') === 'true'
+        : false;
+      if (gemmaOptedIn) {
+        const { getGemmaCacheStatus, gemmaSupported } = await import('../lib/onnx-vision');
+        if (gemmaSupported()) {
+          const status = await getGemmaCacheStatus();
+          if (status.cached) runners.onnx_gemma4_vision = makeGemmaRunner(locale);
+        }
+      }
+    } catch { /* transformers.js unavailable in this environment */ }
+
     // "Identify another way" — exclude the previous winner's runner so the
     // cascade resolves to the next-best provider. The map below covers
     // the result.source values used in paintCard.
@@ -1148,6 +1177,7 @@ const cameraStationLoading     = observeStrings.camera_station_loading     ?? (i
         plantnet: 'plantnet',
         claude_haiku: 'claude_haiku',
         webllm_phi35_vision: 'webllm_phi35_vision',
+        onnx_gemma4_vision: 'onnx_gemma4_vision',
       };
       const runnerId = sourceToRunnerId[excludeSource] ?? excludeSource;
       if (runners[runnerId]) delete runners[runnerId];
@@ -1193,6 +1223,7 @@ const cameraStationLoading     = observeStrings.camera_station_loading     ?? (i
           hadPlantNet: !!runners.plantnet,
           hadClaude: !!runners.claude_haiku,
           hadPhi: !!runners.webllm_phi35_vision,
+          hadGemma: !!runners.onnx_gemma4_vision,
         });
         idAllFailed.classList.remove('hidden');
       }
@@ -1210,18 +1241,20 @@ const cameraStationLoading     = observeStrings.camera_station_loading     ?? (i
     hadPlantNet: boolean;
     hadClaude: boolean;
     hadPhi: boolean;
+    hadGemma: boolean;
   }): string {
+    const hadOnDeviceVLM = ctx.hadPhi || ctx.hadGemma;
     const isAnimal = ctx.hint && ctx.hint !== 'Plantae' && ctx.hint !== 'Fungi';
-    const onlyPlantNet = ctx.hadPlantNet && !ctx.hadClaude && !ctx.hadPhi;
+    const onlyPlantNet = ctx.hadPlantNet && !ctx.hadClaude && !hadOnDeviceVLM;
     if (isAnimal && onlyPlantNet) {
       return isEs
-        ? 'Para identificar animales necesitamos un modelo más allá de PlantNet. Configura tu llave de Claude Haiku (Perfil → Editar) o activa el modelo en el dispositivo (~2.4 GB) para que funcione sin conexión.'
-        : "We need a non-plant identifier for animals. Add your Claude Haiku key (Profile → Edit) or enable the on-device model (~2.4 GB) for offline use.";
+        ? 'Para identificar animales necesitamos un modelo más allá de PlantNet. Configura tu llave de Claude Haiku (Perfil → Editar) o activa un modelo en el dispositivo (Phi ~4 GB o Gemma ~500 MB) para que funcione sin conexión.'
+        : "We need a non-plant identifier for animals. Add your Claude Haiku key (Profile → Edit) or enable an on-device model (Phi ~4 GB or Gemma ~500 MB) for offline use.";
     }
-    if (!ctx.hadClaude && !ctx.hadPhi && !ctx.hadPlantNet) {
+    if (!ctx.hadClaude && !hadOnDeviceVLM && !ctx.hadPlantNet) {
       return isEs
-        ? 'No hay ningún identificador disponible. Configura una llave en Perfil → Editar, o activa el modelo en el dispositivo.'
-        : 'No identifier is available. Configure a key in Profile → Edit, or enable the on-device model.';
+        ? 'No hay ningún identificador disponible. Configura una llave en Perfil → Editar, o activa un modelo en el dispositivo.'
+        : 'No identifier is available. Configure a key in Profile → Edit, or enable an on-device model.';
     }
     if (ctx.hint === 'Animalia.Aves' && !ctx.hadClaude) {
       return isEs
@@ -1234,7 +1267,13 @@ const cameraStationLoading     = observeStrings.camera_station_loading     ?? (i
   function offerPhiVision() {
     if (!phiOffer) return;
     try {
+      // Bandwidth opt-out wins over everything.
       if (localStorage.getItem(LOCAL_AI_OPTIN) === 'false') return;
+      // Per-Phi opt-in (PR #637): if the user explicitly toggled Phi off,
+      // don't pitch them the download. Banner stays hidden; they fall
+      // through to the `idAllFailed` text which already mentions both
+      // on-device options by name (PR #645).
+      if (localStorage.getItem('rastrum.prefs.usePhiVision') !== 'true') return;
     } catch { /* ignore */ }
     phiOffer.classList.remove('hidden');
   }
@@ -1447,6 +1486,7 @@ const cameraStationLoading     = observeStrings.camera_station_loading     ?? (i
       case 'claude_sonnet':
         return 'claude_sonnet';
       case 'webllm_phi35_vision':
+      case 'onnx_gemma4_vision':
       case 'onnx_efficientnet_lite0':
       case 'birdnet_lite':
         return 'onnx_offline';

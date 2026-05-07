@@ -170,6 +170,7 @@ const DISPLAY: Record<string, { name: string; brand: string }> = {
   plantnet:                  { name: 'PlantNet',          brand: '🪴' },
   claude_haiku:              { name: 'Claude Haiku',      brand: '✨' },
   webllm_phi35_vision:       { name: 'Phi-3.5-vision',    brand: '📱' },
+  onnx_gemma4_vision:        { name: 'Gemma 4 E2B',       brand: '✨' },
   birdnet_lite:              { name: 'BirdNET-Lite',      brand: '🐦' },
   onnx_efficientnet_lite0:   { name: 'EfficientNet-Lite0',brand: '🌎' },
   camera_trap_megadetector:  { name: 'MegaDetector',      brand: '🎯' },

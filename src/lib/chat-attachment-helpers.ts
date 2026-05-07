@@ -236,6 +236,7 @@ export function pluginIdToObservationSource(pluginId: string):
     case 'claude_sonnet':
       return 'claude_sonnet';
     case 'webllm_phi35_vision':
+    case 'onnx_gemma4_vision':
     case 'onnx_efficientnet_lite0':
     case 'birdnet_lite':
       return 'onnx_offline';

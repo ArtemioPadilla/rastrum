@@ -420,6 +420,7 @@ const fileHint    = document.getElementById('obs2-file-hint');
       { label: 'BirdNET (birds)', labelEs: 'BirdNET (aves)', ok: runners.birdnet },
       { label: 'Claude Vision', labelEs: 'Claude Vision', ok: runners.claude },
       { label: 'Phi Vision (local)', labelEs: 'Phi Vision (local)', ok: runners.phi },
+      { label: 'Gemma 4 (local)', labelEs: 'Gemma 4 (local)', ok: runners.gemma },
       { label: 'EfficientNet (local)', labelEs: 'EfficientNet (local)', ok: runners.efficientNet },
     ];
     const allOk = items.every(i => i.ok);
@@ -565,7 +566,16 @@ async function detectRunners() {
       : false;
   } catch { /* unavailable */ }
 
-  return { plantnet: plantnetKey, birdnet: birdnetStatus, claude: claudeKey, phi, efficientNet };
+  let gemma = false;
+  try {
+    const { getGemmaCacheStatus, gemmaSupported } = await import('../lib/onnx-vision');
+    if (gemmaSupported()) {
+      const s = await getGemmaCacheStatus();
+      gemma = s.cached && (localStorage.getItem('rastrum.prefs.useGemmaVision') === 'true');
+    }
+  } catch { /* unavailable */ }
+
+  return { plantnet: plantnetKey, birdnet: birdnetStatus, claude: claudeKey, phi, gemma, efficientNet };
 }
 
 // ── Pipeline runner ────────────────────────────────────────────────────────
@@ -605,6 +615,35 @@ async function runPipeline(state: PipelineState) {
           if (await resolvePlantNetKey()) runners.plantnet = (await import('../lib/identify-runners')).makePlantNetRunner(lang as 'en' | 'es');
           if (await hasAnthropicKey()) runners.claude_haiku = makeClaudeRunner(lang as 'en' | 'es');
         }
+
+        // Phi vision (opt-in): runs in parallel as an additional on-device runner.
+        try {
+          const phiOptedIn = (typeof localStorage !== 'undefined')
+            ? localStorage.getItem('rastrum.prefs.usePhiVision') === 'true'
+            : false;
+          if (phiOptedIn) {
+            const { getModelCacheStatus, VISION_MODEL_ID, localAISupported } = await import('../lib/local-ai');
+            if (localAISupported()) {
+              const status = await getModelCacheStatus(VISION_MODEL_ID);
+              if (status.cached) runners.webllm_phi35_vision = makePhiRunner(lang as 'en' | 'es');
+            }
+          }
+        } catch { /* WebLLM unavailable, skip */ }
+
+        // Gemma 4 vision (opt-in, parallel runtime to Phi).
+        try {
+          const gemmaOptedIn = (typeof localStorage !== 'undefined')
+            ? localStorage.getItem('rastrum.prefs.useGemmaVision') === 'true'
+            : false;
+          if (gemmaOptedIn) {
+            const { getGemmaCacheStatus, gemmaSupported } = await import('../lib/onnx-vision');
+            if (gemmaSupported()) {
+              const { makeGemmaRunner } = await import('../lib/identify-runners');
+              const status = await getGemmaCacheStatus();
+              if (status.cached) runners.onnx_gemma4_vision = makeGemmaRunner(lang as 'en' | 'es');
+            }
+          }
+        } catch { /* transformers.js unavailable, skip */ }
 
         // EfficientNet-Lite0: always add as fallback if downloaded (~2.8 MB, no key needed).
         // It runs in-parallel as a zero-cost fallback alongside cloud runners.

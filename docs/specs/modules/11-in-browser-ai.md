@@ -8,20 +8,41 @@
 
 ## Overview
 
-Rastrum integrates the [MLC WebLLM runtime](https://github.com/mlc-ai/web-llm)
-to run small language and vision-language models **fully on-device**, using
-WebGPU. Two purposes:
+Rastrum integrates **two parallel on-device runtimes** that run small
+language and vision-language models fully in the browser via WebGPU:
+
+1. **MLC WebLLM** ([repo](https://github.com/mlc-ai/web-llm)) — runs
+   `Phi-3.5-vision-instruct` (vision) and `Llama-3.2-1B-Instruct` (text
+   helpers). Implemented in `src/lib/local-ai.ts`. Vision plugin in
+   `src/lib/identifiers/phi-vision.ts`.
+2. **transformers.js + ONNX Runtime Web** (`@huggingface/transformers`) —
+   added in PR #645 as a parallel runtime to Phi. Runs Gemma 4 E2B vision
+   (Apache 2.0, ~500 MB, ~1.3 GB VRAM at inference). Implemented in
+   `src/lib/onnx-vision.ts`. Vision plugin in
+   `src/lib/identifiers/gemma-vision.ts`.
+
+The two vision runtimes coexist intentionally — they take different
+WebGPU code paths (TVM-compiled MLC kernels vs. ONNX Runtime), so when
+one crashes on a given GPU/driver combo the other often still works.
+Both surface as separate identifier plugins (`webllm_phi35_vision`,
+`onnx_gemma4_vision`) with their own opt-in toggle in Profile → Edit.
+The full failure-mode + fallback story is in
+[`docs/runbooks/on-device-vision-fallback.md`](../../runbooks/on-device-vision-fallback.md).
+
+Purposes:
 
 1. **Identification fallback** when the user has neither a server-side
    `ANTHROPIC_API_KEY` (operator-set) nor a client-side BYO key
-   (user-provided in profile/edit). Uses `Phi-3.5-vision-instruct`.
+   (user-provided in profile/edit). Either Phi-3.5-vision or Gemma 4 E2B
+   can serve, depending on which the user has opted into.
 2. **Text helpers** for translation (ES↔EN), narrative field-note
    generation, and local search over the user's own observation history.
-   Uses `Llama-3.2-1B-Instruct`.
+   Uses `Llama-3.2-1B-Instruct` (MLC only; transformers.js is vision-only
+   in this project).
 
-Implemented in `src/lib/local-ai.ts`. Wired into `src/lib/sync.ts`'s
-identify pipeline and into `src/components/ProfileEditForm.astro` (the
-opt-in UI).
+Wired into `src/lib/sync.ts`'s identify pipeline and into
+`src/components/ProfileEditForm.astro` (separate opt-in cards per
+runtime).
 
 ---
 

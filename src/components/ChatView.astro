@@ -92,6 +92,7 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
         <button type="button" data-model="plantnet" class="chat-chip rounded-full border px-2.5 py-1 leading-none">PlantNet</button>
         <button type="button" data-model="claude_haiku" class="chat-chip rounded-full border px-2.5 py-1 leading-none">Claude</button>
         <button type="button" data-model="webllm_phi35_vision" class="chat-chip rounded-full border px-2.5 py-1 leading-none">Phi</button>
+        <button type="button" data-model="onnx_gemma4_vision" class="chat-chip rounded-full border px-2.5 py-1 leading-none">Gemma</button>
         <button type="button" data-model="onnx_efficientnet_lite0" class="chat-chip rounded-full border px-2.5 py-1 leading-none">EfficientNet</button>
         <button type="button" data-model="compare" class="chat-chip rounded-full border px-2.5 py-1 leading-none">{tr.chat.model_compare}</button>
       </div>
@@ -286,13 +287,14 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
     | 'plantnet'
     | 'claude_haiku'
     | 'webllm_phi35_vision'
+    | 'onnx_gemma4_vision'
     | 'onnx_efficientnet_lite0'
     | 'compare';
   const MODEL_PICKER_KEY = 'rastrum.chat.modelPicker';
   function readModelPick(): ModelPickerChoice {
     if (typeof localStorage === 'undefined') return 'auto';
     const v = localStorage.getItem(MODEL_PICKER_KEY) as ModelPickerChoice | null;
-    const allowed: ModelPickerChoice[] = ['auto','plantnet','claude_haiku','webllm_phi35_vision','onnx_efficientnet_lite0','compare'];
+    const allowed: ModelPickerChoice[] = ['auto','plantnet','claude_haiku','webllm_phi35_vision','onnx_gemma4_vision','onnx_efficientnet_lite0','compare'];
     return v && allowed.includes(v) ? v : 'auto';
   }
   function writeModelPick(v: ModelPickerChoice): void {

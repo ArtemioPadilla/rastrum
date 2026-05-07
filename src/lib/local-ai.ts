@@ -102,11 +102,25 @@ export async function loadTextEngine(onProgress: (p: LoadProgress) => void): Pro
   return textEngine;
 }
 
-/** Free the GPU memory used by both models. */
+/**
+ * Free the GPU memory used by both models — Phi/Llama via WebLLM and the
+ * parallel Gemma 4 runtime via transformers.js. We dynamic-import the
+ * onnx-vision module so Profile → Edit pages that haven't touched Gemma
+ * don't drag the transformers.js bundle into their initial chunk.
+ */
 export async function unloadAll(): Promise<void> {
+  const gemmaUnload = (async () => {
+    try {
+      const { unloadGemma } = await import('./onnx-vision');
+      await unloadGemma();
+    } catch {
+      // transformers.js not loaded in this session — nothing to free.
+    }
+  })();
   await Promise.allSettled([
     visionEngine?.unload(),
     textEngine?.unload(),
+    gemmaUnload,
   ]);
   visionEngine = null;
   textEngine = null;
@@ -232,9 +246,21 @@ export async function clearAllModelCaches(): Promise<{ deleted: number; cachesRe
     const removed = await caches.delete(name);
     if (removed) {
       cachesRemoved++;
-      // We don't know how many entries were inside — just report the buckets
       deleted = -1;
     }
+  }
+  // Gemma weights live in the standard transformers.js Cache API bucket
+  // — separate from WebLLM's OPFS-backed names. Nuke that too so the
+  // "Delete all on-device AI data" button actually deletes ALL.
+  try {
+    const { clearGemmaCache } = await import('./onnx-vision');
+    const r = await clearGemmaCache();
+    if (r.deleted > 0) {
+      cachesRemoved++;
+      deleted = -1;
+    }
+  } catch {
+    // transformers.js not loaded — nothing to clear.
   }
   return { deleted, cachesRemoved };
 }

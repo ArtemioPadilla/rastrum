@@ -238,3 +238,94 @@ export function makePhiRunner(
     };
   };
 }
+
+// ─────────────── Gemma 4 vision (on-device, transformers.js + ONNX) ───────────────
+
+export function makeGemmaRunner(
+  locale: Locale,
+  onProgress?: (text: string, fraction: number) => void,
+): IdentifierRunner {
+  return async (file, signal) => {
+    if (typeof window !== 'undefined' && (window as { __rastrumGemmaBroken?: boolean }).__rastrumGemmaBroken) {
+      throw new Error('gemma-vision disabled this session (prior WebGPU error)');
+    }
+    const { loadGemmaVisionEngine, getGemmaCacheStatus } = await import('./onnx-vision');
+    const status = await getGemmaCacheStatus();
+    if (!status.cached) throw new Error('gemma-vision not cached');
+    if (signal.aborted) throw new Error('aborted');
+
+    const tx = await import('@huggingface/transformers');
+    const load_image = (tx as unknown as { load_image: (src: string) => Promise<unknown> }).load_image;
+
+    const { processor: proc, model: mdl } = await loadGemmaVisionEngine((p) => {
+      onProgress?.(p.text, p.progress);
+    });
+    if (signal.aborted) throw new Error('aborted');
+
+    const dataUrl = await fileToDataUrl(file);
+    const promptText = buildClaudePrompt(locale);
+
+    const messages = [{
+      role: 'user',
+      content: [
+        { type: 'image' },
+        { type: 'text', text: promptText },
+      ],
+    }];
+
+    let raw: string;
+    try {
+      const procFn = proc as unknown as ((p: string, i: unknown, opts?: Record<string, unknown>) => Promise<unknown>) & {
+        apply_chat_template: (messages: unknown, opts: Record<string, unknown>) => string;
+        tokenizer: { batch_decode?: (ids: unknown, opts?: Record<string, unknown>) => string[] };
+      };
+      const chatPrompt = procFn.apply_chat_template(messages, {
+        enable_thinking: false,
+        add_generation_prompt: true,
+      });
+      const image = await load_image(dataUrl);
+      const inputs = await procFn(chatPrompt, image, { add_special_tokens: false });
+      const generated = await mdl.generate({
+        ...(inputs as Record<string, unknown>),
+        max_new_tokens: 400,
+        do_sample: false,
+      });
+      const ids = (generated as { sequences?: unknown }).sequences ?? generated;
+      const decoded = procFn.tokenizer.batch_decode?.(ids, { skip_special_tokens: true }) ?? [''];
+      const full = Array.isArray(decoded) ? decoded[0] ?? '' : String(decoded ?? '');
+      const lastMarker = full.lastIndexOf('model\n');
+      raw = (lastMarker >= 0 ? full.slice(lastMarker + 'model\n'.length) : full).trim();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/WebGPU|GPUValidation|BindGroup|Binding size|CommandBuffer|JSEP|ORT/i.test(msg)) {
+        if (typeof window !== 'undefined') {
+          (window as { __rastrumGemmaBroken?: boolean }).__rastrumGemmaBroken = true;
+        }
+      }
+      throw err;
+    }
+
+    const parsed = parseVisionJson(raw);
+    if (!parsed) {
+      return {
+        source: 'onnx_gemma4_vision',
+        scientific_name: '',
+        common_name: null,
+        confidence: 0,
+        alternates: [],
+        note: raw || null,
+        raw,
+      } as UnifiedIdResult;
+    }
+    const capped = Math.min(parsed.confidence, 0.4);
+    return {
+      source: 'onnx_gemma4_vision',
+      scientific_name: parsed.scientific_name,
+      common_name: parsed.common_name,
+      confidence: capped,
+      alternates: parsed.alternates,
+      note: parsed.note ?? undefined,
+      raw,
+    };
+  };
+}
