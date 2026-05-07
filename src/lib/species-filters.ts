@@ -1,3 +1,5 @@
+import { NOM059_THREATENED } from './species-display';
+
 export type ChipsState = {
   endemic: boolean;
   nom059: boolean;
@@ -16,8 +18,6 @@ export type SpeciesRow = {
 const KNOWN_KINGDOMS = new Set([
   'Animalia', 'Plantae', 'Fungi', 'Chromista', 'Protozoa', 'Bacteria', 'Archaea',
 ]);
-
-const NOM059_THREATENED = new Set(['sujeta_proteccion', 'amenazada', 'peligro_extincion']);
 
 function truthy(v: string | null): boolean {
   return v === '1' || v === 'true';

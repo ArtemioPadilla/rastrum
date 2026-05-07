@@ -3,7 +3,7 @@ import { pillForSpecies, type SpeciesPillInput, type Pill } from '../../src/lib/
 
 describe('pillForSpecies', () => {
   it('returns rarity pill when rarity_bucket >= 4', () => {
-    const input: SpeciesPillInput = { rarity_bucket: 5, endemic_mx: true, nom059_status: 'amenazada' };
+    const input: SpeciesPillInput = { rarity_bucket: 5, endemic_mx: true, nom059_status: 'A' };
     expect(pillForSpecies(input)).toEqual<Pill>({ kind: 'rarity-rare', label: 'rarity_5', tone: 'amber' });
   });
 
@@ -14,7 +14,7 @@ describe('pillForSpecies', () => {
   });
 
   it('returns nom059 pill when threatened and not rare and not endemic', () => {
-    expect(pillForSpecies({ rarity_bucket: 2, endemic_mx: false, nom059_status: 'amenazada' })).toEqual<Pill>({
+    expect(pillForSpecies({ rarity_bucket: 2, endemic_mx: false, nom059_status: 'A' })).toEqual<Pill>({
       kind: 'nom059', label: 'nom059', tone: 'orange',
     });
   });
@@ -34,6 +34,6 @@ describe('pillForSpecies', () => {
   });
 
   it('rarity beats endemic and nom059', () => {
-    expect(pillForSpecies({ rarity_bucket: 5, endemic_mx: true, nom059_status: 'peligro_extincion' })?.kind).toBe('rarity-rare');
+    expect(pillForSpecies({ rarity_bucket: 5, endemic_mx: true, nom059_status: 'E' })?.kind).toBe('rarity-rare');
   });
 });

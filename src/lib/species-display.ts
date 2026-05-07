@@ -13,11 +13,11 @@ export type Pill = {
   tone: PillTone;
 };
 
-const NOM059_THREATENED = new Set([
-  'sujeta_proteccion',
-  'amenazada',
-  'peligro_extincion',
-]);
+// NOM-059 short codes per docs/specs/infra/supabase-schema.sql line 177
+// E = en peligro de extinción, A = amenazada, Pr = sujeta a protección especial.
+// 'P' (probablemente extinta) is intentionally excluded — too rare to flag for
+// the "threatened" pill. Exported because species-filters.ts imports it.
+export const NOM059_THREATENED = new Set(['E', 'A', 'Pr']);
 
 export function pillForSpecies(input: SpeciesPillInput): Pill | null {
   const bucket = input.rarity_bucket ?? 1;

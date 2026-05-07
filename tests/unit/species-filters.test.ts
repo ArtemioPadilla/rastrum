@@ -47,7 +47,7 @@ describe('serializeChips', () => {
 describe('filterByChips', () => {
   const rows: SpeciesRow[] = [
     { taxon_id: 'a', kingdom: 'Animalia', endemic_mx: true,  nom059_status: null,        rarity_bucket: 2 },
-    { taxon_id: 'b', kingdom: 'Plantae',  endemic_mx: false, nom059_status: 'amenazada', rarity_bucket: 4 },
+    { taxon_id: 'b', kingdom: 'Plantae',  endemic_mx: false, nom059_status: 'A', rarity_bucket: 4 },
     { taxon_id: 'c', kingdom: 'Animalia', endemic_mx: false, nom059_status: null,        rarity_bucket: 1 },
     { taxon_id: 'd', kingdom: 'Fungi',    endemic_mx: false, nom059_status: null,        rarity_bucket: 5 },
   ];

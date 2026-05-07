@@ -565,7 +565,7 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
         }
         if (currentChips.nom059) {
           const nom = card.getAttribute('data-nom059') ?? '';
-          if (!['sujeta_proteccion', 'amenazada', 'peligro_extincion'].includes(nom)) visible = false;
+          if (!['E', 'A', 'Pr'].includes(nom)) visible = false;
         }
         const q = (searchEl?.value ?? '').trim().toLowerCase();
         if (q && !search.includes(q)) visible = false;
