@@ -15,6 +15,13 @@ const CORS_HEADERS = {
 };
 
 function jsonResponse(status: number, body: unknown): Response {
+  // Per Fetch spec, statuses 101/103/204/205/304 are "null body status" —
+  // constructing `new Response(JSON.stringify(...), { status: 204 })` throws
+  // "Response with null body status cannot have body", which the outer
+  // try/catch then surfaces as a 500. Drop the body for those statuses.
+  if (status === 204 || status === 205 || status === 304 || status === 101 || status === 103) {
+    return new Response(null, { status, headers: CORS_HEADERS });
+  }
   return new Response(JSON.stringify(body), {
     status,
     headers: { 'content-type': 'application/json', ...CORS_HEADERS },
