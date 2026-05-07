@@ -24,8 +24,8 @@ const eh = tr.explore_species_hero;
   <h1 class="text-3xl font-bold tracking-tight">{eh.title}</h1>
   <p class="text-zinc-600 dark:text-zinc-400 max-w-[60ch]">{eh.subtitle}</p>
 </header>
-<div class="grid gap-4 es-hero-row" style="grid-template-columns: 1.7fr 1fr;" data-es-hero-row>
-  {featured ? <FeaturedSpeciesCard lang={lang} {...featured} /> : <div></div>}
+<div class={`grid gap-4 es-hero-row ${featured ? '' : 'es-hero-row-no-featured'}`} style={featured ? 'grid-template-columns: 1.7fr 1fr;' : 'grid-template-columns: 1fr;'} data-es-hero-row>
+  {featured && <FeaturedSpeciesCard lang={lang} {...featured} />}
   <PlatformStats lang={lang} {...stats} />
 </div>
 <style>

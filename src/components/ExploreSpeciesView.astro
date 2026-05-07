@@ -521,6 +521,7 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
           if (heroRow && featured) {
             const featDiv = heroRow.firstElementChild;
             if (featDiv && featDiv.tagName === 'DIV' && !featDiv.children.length) {
+              heroRow.style.gridTemplateColumns = '1.7fr 1fr';
               const f = featured as { scientific_name: string; common_name_es: string | null; common_name_en: string | null; slug: string | null; thumbnail_url: string | null; is_endemic_mexico: boolean | null; nom059_status: string | null; rarity_bucket: number | null };
               const cName = lang === 'es' ? f.common_name_es : f.common_name_en;
               const detailHref = `${indexBase}?slug=${encodeURIComponent(f.scientific_name)}`;
