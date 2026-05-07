@@ -7530,7 +7530,12 @@ LANGUAGE sql STABLE SECURITY DEFINER AS $$
   SELECT NULL::text, NULL::bigint WHERE false;
 $$;
 
--- Daily usage for a pool (current month)
+-- Daily usage for a pool. Original broken body — kept here so the schema
+-- replays in order against a fresh DB (pool_usage_daily is declared later
+-- in the file). The FIXED body that joins pool_usage_daily + sponsor_pools
+-- and filters by caller ownership lives at the bottom of the file in the
+-- 2026-05-07 trailer; CREATE OR REPLACE FUNCTION is idempotent and the
+-- last definition wins, so consumers get the corrected behavior.
 CREATE OR REPLACE FUNCTION public.pool_daily_usage(p_pool_id uuid)
 RETURNS TABLE(usage_date date, calls bigint)
 LANGUAGE sql STABLE SECURITY DEFINER AS $$
@@ -7999,6 +8004,94 @@ END $$;
 REVOKE ALL ON FUNCTION public.claude_eligibility() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.claude_eligibility() TO authenticated;
 
+-- ── 2026-05-07: Per-pool daily usage aggregate for the donor dashboard ─────
+-- pool_consumption is keyed by (user_id, day) — used for daily-cap enforcement
+-- and for the consumer-facing "you used N/M today" indicator. It deliberately
+-- has no pool_id because consume_pool_slot can hop between pools as one fills.
+--
+-- Donors need the orthogonal slice: "how is my own pool being used over time?"
+-- This table captures it without leaking consumer identity (no user_id).
+CREATE TABLE IF NOT EXISTS public.pool_usage_daily (
+  pool_id uuid    NOT NULL REFERENCES public.sponsor_pools(id) ON DELETE CASCADE,
+  day     date    NOT NULL,
+  count   integer NOT NULL DEFAULT 0 CHECK (count >= 0),
+  PRIMARY KEY (pool_id, day)
+);
+
+CREATE INDEX IF NOT EXISTS idx_pool_usage_daily_pool ON public.pool_usage_daily(pool_id, day DESC);
+
+ALTER TABLE public.pool_usage_daily ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS pool_usage_daily_owner_read ON public.pool_usage_daily;
+CREATE POLICY pool_usage_daily_owner_read ON public.pool_usage_daily
+  FOR SELECT TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.sponsor_pools sp
+       WHERE sp.id = pool_usage_daily.pool_id
+         AND sp.sponsor_id = auth.uid()
+    )
+  );
+
+GRANT SELECT                         ON public.pool_usage_daily TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.pool_usage_daily TO service_role;
+
+-- Updated consume_pool_slot: now also bumps the per-pool daily aggregate.
+-- Same return type as before — no DROP needed.
+CREATE OR REPLACE FUNCTION public.consume_pool_slot(p_user_id uuid)
+RETURNS TABLE (pool_id uuid, credential_id uuid, preferred_model text)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_today    date := current_date;
+  v_used_today integer;
+  v_pool_id  uuid;
+  v_cred_id  uuid;
+  v_model    text;
+  v_cap      integer;
+BEGIN
+  SELECT sp.id, sp.credential_id, sp.preferred_model, sp.daily_user_cap
+    INTO v_pool_id, v_cred_id, v_model, v_cap
+    FROM public.sponsor_pools sp
+   WHERE sp.status = 'active' AND sp.used < sp.total_cap
+   ORDER BY sp.created_at ASC
+   FOR UPDATE SKIP LOCKED
+   LIMIT 1;
+  IF v_pool_id IS NULL THEN
+    RETURN;
+  END IF;
+
+  SELECT COALESCE(count, 0) INTO v_used_today
+    FROM public.pool_consumption
+   WHERE user_id = p_user_id AND day = v_today;
+  IF v_used_today >= v_cap THEN
+    RETURN;
+  END IF;
+
+  UPDATE public.sponsor_pools SET used = used + 1, updated_at = now()
+   WHERE id = v_pool_id;
+
+  INSERT INTO public.pool_consumption (user_id, day, count)
+       VALUES (p_user_id, v_today, 1)
+  ON CONFLICT (user_id, day) DO UPDATE SET count = pool_consumption.count + 1;
+
+  -- Per-pool daily aggregate for the donor dashboard.
+  INSERT INTO public.pool_usage_daily (pool_id, day, count)
+       VALUES (v_pool_id, v_today, 1)
+  ON CONFLICT (pool_id, day) DO UPDATE SET count = pool_usage_daily.count + 1;
+
+  UPDATE public.sponsor_pools SET status = 'exhausted'
+   WHERE id = v_pool_id AND used >= total_cap AND status = 'active';
+
+  RETURN QUERY SELECT v_pool_id, v_cred_id, v_model;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.consume_pool_slot(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.consume_pool_slot(uuid) TO service_role;
+
 -- mv_platform_stats: 4 platform-health counters surfaced on the Especies
 -- hero. Refreshed hourly via pg_cron. Single-row MV; UNIQUE index on
 -- computed_at lets us REFRESH CONCURRENTLY.
@@ -8105,3 +8198,20 @@ AS $$
 $$;
 
 GRANT EXECUTE ON FUNCTION public.suggest_pokedex_target(uuid) TO authenticated;
+
+-- ── 2026-05-07: pool_daily_usage final body (overrides earlier stub) ──
+-- Earlier in this file the function is declared with a placeholder body
+-- so the schema replays top-to-bottom on a fresh DB (pool_usage_daily is
+-- created in this same trailer block). This trailing CREATE OR REPLACE
+-- supplies the real body — same function signature, idempotent.
+CREATE OR REPLACE FUNCTION public.pool_daily_usage(p_pool_id uuid)
+RETURNS TABLE(usage_date date, calls bigint)
+LANGUAGE sql STABLE SECURITY DEFINER AS $$
+  SELECT pud.day AS usage_date, pud.count::bigint AS calls
+    FROM public.pool_usage_daily pud
+    JOIN public.sponsor_pools sp ON sp.id = pud.pool_id
+   WHERE pud.pool_id = p_pool_id
+     AND sp.sponsor_id = auth.uid()
+     AND pud.day >= (current_date - interval '30 days')::date
+   ORDER BY pud.day;
+$$;

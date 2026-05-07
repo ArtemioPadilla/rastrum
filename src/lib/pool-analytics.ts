@@ -18,17 +18,23 @@ export interface PoolAnalytics {
   }>;
 }
 
-/** Shape returned by the pool_top_taxa RPC. */
+/** Shape returned by the pool_top_taxa RPC. The RPC column is
+ *  `call_count` — keep both fields here so the dashboard renders
+ *  whichever the server emits (the stub currently returns nothing,
+ *  so no rows hit either path; future implementation will pick one). */
 interface RpcTaxaRow {
   scientific_name: string;
-  common_name: string | null;
-  kingdom: string;
-  count: number;
+  common_name?: string | null;
+  kingdom?: string;
+  count?: number;
+  call_count?: number;
 }
 
-/** Shape returned by the pool_daily_usage RPC. */
+/** Shape returned by the pool_daily_usage RPC. The RPC column is
+ *  `usage_date`; pre-2026-05-07 the client expected `date` and the
+ *  chart silently rendered with `undefined` x-axis values. */
 interface RpcDailyRow {
-  date: string;
+  usage_date: string;
   calls: number;
 }
 
@@ -76,11 +82,11 @@ export async function fetchPoolAnalytics(
       scientific_name: row.scientific_name,
       common_name: row.common_name ?? null,
       kingdom: row.kingdom ?? '',
-      count: row.count,
+      count: row.count ?? row.call_count ?? 0,
     }));
 
   const dailyUsage: PoolAnalytics['dailyUsage'] = ((daily as RpcDailyRow[] | null) ?? [])
-    .map((row) => ({ date: row.date, calls: row.calls }));
+    .map((row) => ({ date: row.usage_date, calls: row.calls }));
 
   return {
     poolId: typedPool.id,
