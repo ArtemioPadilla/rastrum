@@ -173,4 +173,9 @@ SELECT
 FROM pg_tables
 WHERE schemaname = 'public';
 
+-- Verify has_active_sponsorship exists (client-side isAvailable check).
+SELECT proname FROM pg_proc
+  JOIN pg_namespace ON pg_namespace.oid = pg_proc.pronamespace
+  WHERE nspname = 'public' AND proname = 'has_active_sponsorship';
+
 SELECT 'sentinel ok' AS status;
