@@ -17,13 +17,19 @@ const repoSlug = 'ArtemioPadilla/rastrum';
   type="button"
   aria-label={tr.report.button_label}
   title={tr.report.button_label}
-  class="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] sm:bottom-4 right-4 z-40 w-14 h-14 rounded-full flex items-center justify-center shadow-lg bg-white text-emerald-700 ring-1 ring-emerald-600/20 hover:bg-emerald-50 hover:ring-emerald-600/40 dark:bg-zinc-900 dark:text-emerald-400 dark:ring-emerald-500/30 dark:hover:bg-zinc-800 dark:hover:ring-emerald-500/50 transition-all hover:scale-105 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
+  class="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] sm:bottom-4 right-4 z-40 w-14 h-14 rounded-full relative flex items-center justify-center shadow-lg bg-white text-emerald-700 ring-1 ring-emerald-600/20 hover:bg-emerald-50 hover:ring-emerald-600/40 dark:bg-zinc-900 dark:text-emerald-400 dark:ring-emerald-500/30 dark:hover:bg-zinc-800 dark:hover:ring-emerald-500/50 transition-all hover:scale-105 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
 >
   <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
     <path stroke-linecap="round" stroke-linejoin="round"
       d="M7.5 8.25h9m-9 3.75h6m-7.5 4.5L4.5 19V5.25A1.25 1.25 0 0 1 5.75 4h12.5A1.25 1.25 0 0 1 19.5 5.25v9.5A1.25 1.25 0 0 1 18.25 16h-9.5L6 18l-1.5-1.5z" />
   </svg>
   <span class="sr-only">{tr.report.button_label}</span>
+  <!-- Error badge: shown automatically when console errors or failed requests are captured -->
+  <span
+    id="report-fab-badge"
+    aria-label={tr.report.badge_errors_label ?? 'errors detected'}
+    class="hidden absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-white dark:ring-zinc-900 pointer-events-none"
+  ></span>
 </button>
 
 <dialog
@@ -214,7 +220,7 @@ const repoSlug = 'ArtemioPadilla/rastrum';
       diag.console.push({ ts: new Date().toISOString(), level: level, msg: msg.slice(0, 500) });
       if (diag.console.length > MAX) diag.console.shift();
     }
-    console.error = function () { capture('error', arguments); origError.apply(console, arguments); };
+    console.error = function () { capture('error', arguments); origError.apply(console, arguments); W.__rastrum_updateFabBadge && W.__rastrum_updateFabBadge(); };
     console.warn  = function () { capture('warn',  arguments); origWarn.apply(console, arguments); };
     console.log   = function () { capture('log',   arguments); origLog.apply(console, arguments); };
 
@@ -226,12 +232,14 @@ const repoSlug = 'ArtemioPadilla/rastrum';
         src: ev.filename ? (ev.filename + ':' + ev.lineno + ':' + ev.colno) : ''
       });
       if (diag.errors.length > MAX) diag.errors.shift();
+      W.__rastrum_updateFabBadge && W.__rastrum_updateFabBadge();
     });
     W.addEventListener('unhandledrejection', function (ev) {
       var r = ev.reason;
       var msg = r instanceof Error ? (r.message + '\n' + (r.stack || '')) : String(r || 'Unhandled rejection');
       diag.errors.push({ ts: new Date().toISOString(), msg: msg.slice(0, 300), src: 'promise' });
       if (diag.errors.length > MAX) diag.errors.shift();
+      W.__rastrum_updateFabBadge && W.__rastrum_updateFabBadge();
     });
 
     // 3. Network error capture (wrap fetch)
@@ -256,6 +264,7 @@ const repoSlug = 'ArtemioPadilla/rastrum';
                 statusText: res.statusText || ''
               });
               if (diag.network.length > MAX) diag.network.shift();
+              W.__rastrum_updateFabBadge && W.__rastrum_updateFabBadge();
             }
           }
           return res;
@@ -268,6 +277,7 @@ const repoSlug = 'ArtemioPadilla/rastrum';
             statusText: err && err.message ? err.message.slice(0, 100) : 'Network error'
           });
           if (diag.network.length > MAX) diag.network.shift();
+          W.__rastrum_updateFabBadge && W.__rastrum_updateFabBadge();
           throw err;
         });
       };
@@ -469,10 +479,40 @@ const repoSlug = 'ArtemioPadilla/rastrum';
     setTimeout(function () { copyLabelEl.textContent = copyLabel; }, 1800);
   }
 
+  // ── FAB badge — shows red dot when errors are captured ─────────────────
+  var fabBadge = document.getElementById('report-fab-badge');
+  function updateFabBadge() {
+    var diag = window.__rastrum_diag;
+    // Count only 'error' level console items + unhandled errors + network failures
+    // (warn/log are informational and don't warrant a badge)
+    var errorCount = 0;
+    if (diag) {
+      errorCount += diag.errors.length;
+      errorCount += diag.network.length;
+      for (var i = 0; i < diag.console.length; i++) {
+        if (diag.console[i].level === 'error') errorCount++;
+      }
+    }
+    if (fabBadge) {
+      if (errorCount > 0) {
+        fabBadge.textContent = errorCount > 99 ? '99+' : String(errorCount);
+        fabBadge.classList.remove('hidden');
+      } else {
+        fabBadge.classList.add('hidden');
+      }
+    }
+  }
+  // Register on window so the inline capture hooks can call it
+  window.__rastrum_updateFabBadge = updateFabBadge;
+  // Initial paint (in case errors were captured before wiring ran)
+  updateFabBadge();
+
   // ── Open / close ─────────────────────────────────────────────────────
   function openModal() {
     refreshDiagnostics();
     syncBugFields();
+    // Clear FAB badge when user opens the report panel
+    if (fabBadge) fabBadge.classList.add('hidden');
     if (typeof dlg.showModal === 'function') dlg.showModal();
     else dlg.setAttribute('open', '');
   }
