@@ -95,6 +95,16 @@ const langJson = JSON.stringify(lang);
         ? 'Dona N llamadas a un pool compartido. Cualquier usuario puede consumirlo (con un cap diario por persona). Tú sólo ves estadísticas agregadas — los beneficiarios son anónimos.'
         : 'Donate N calls to a shared pool. Any user can consume it (with a per-person daily cap). You only see aggregate stats — beneficiaries stay anonymous.'}
     </p>
+
+    <!-- Personal pool consumption today (PR-B): hidden until the RPC resolves -->
+    <div id="pool-self-usage" class="hidden rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 px-3 py-2 text-xs text-emerald-800 dark:text-emerald-300 max-w-md">
+      <span class="font-medium">{lang === 'es' ? 'Tu uso del pool hoy:' : 'Your pool usage today:'}</span>
+      <span id="pool-self-usage-value" class="ml-1 font-mono"></span>
+      <span id="pool-self-usage-bar-wrap" class="mt-1.5 block h-1 w-full rounded-full bg-emerald-200 dark:bg-emerald-900/60 overflow-hidden">
+        <span id="pool-self-usage-bar" class="block h-full bg-emerald-600 dark:bg-emerald-500" style="width:0%"></span>
+      </span>
+    </div>
+
     <ul id="pools-list" class="divide-y divide-zinc-200 dark:divide-zinc-800"></ul>
     <p id="pools-empty" class="hidden text-sm text-zinc-500 dark:text-zinc-400">
       {lang === 'es' ? 'Aún no has donado al pool.' : 'You haven’t donated to the pool yet.'}
@@ -807,6 +817,27 @@ const langJson = JSON.stringify(lang);
   });
 
   void refreshPools();
+
+  // PR-B: render "you've used N/M of your daily pool cap today" via the
+  // claude_eligibility RPC. Silent if the user has no pools to draw from
+  // (cap_today === 0) — keeping the section uncluttered for users who
+  // haven't engaged with the pool flow yet.
+  void (async () => {
+    const wrap = document.getElementById('pool-self-usage');
+    const valueEl = document.getElementById('pool-self-usage-value');
+    const barEl = document.getElementById('pool-self-usage-bar') as HTMLElement | null;
+    if (!wrap || !valueEl || !barEl) return;
+    try {
+      const { getClaudeEligibility } = await import('../lib/sponsorships');
+      const elig = await getClaudeEligibility();
+      if (!elig.has_pool || elig.pool_cap_today <= 0) return;  // nothing to show
+      const used = Math.max(0, Math.min(elig.pool_used_today, elig.pool_cap_today));
+      const pct = Math.round((used / elig.pool_cap_today) * 100);
+      valueEl.textContent = `${used} / ${elig.pool_cap_today} (${pct}%)`;
+      barEl.style.width = `${pct}%`;
+      wrap.classList.remove('hidden');
+    } catch { /* not authed or RPC missing — keep hidden */ }
+  })();
 
   document.getElementById('creds-list')?.addEventListener('click', async (e) => {
     const target = e.target as HTMLElement;
