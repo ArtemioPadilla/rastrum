@@ -4504,18 +4504,25 @@ GRANT SELECT ON public.community_observers TO anon, authenticated;
 -- feature. Anon callers cannot read centroid via any path; the lack of
 -- a GRANT to anon is the security gate (mirrored in UI by the sign-in
 -- requirement).
+-- Column order note: karma_total is appended LAST (after centroid_lat /
+-- centroid_lng) because Postgres CREATE OR REPLACE VIEW only allows
+-- adding columns at the end. Inserting karma_total mid-list is treated
+-- as a rename of the column at that position and breaks db-apply on
+-- databases that already have centroid_lat/lng but no karma_total
+-- (the production state since 2026-05-04). Same rule as
+-- community_observers above.
 CREATE OR REPLACE VIEW public.community_observers_with_centroid AS
 SELECT
   id, username, display_name, avatar_url, country_code,
   expert_taxa, is_expert,
   observation_count, species_count, obs_count_7d, obs_count_30d,
   centroid_geog, last_observation_at, joined_at,
-  karma_total,
   -- Scalar lat/lng for clients that can't decode the geography WKB
   -- (the /community/map/ heatmap reads these directly). PostGIS
   -- geography → geometry cast is a zero-copy reinterpret for points.
   ST_Y(centroid_geog::geometry) AS centroid_lat,
-  ST_X(centroid_geog::geometry) AS centroid_lng
+  ST_X(centroid_geog::geometry) AS centroid_lng,
+  karma_total
 FROM public.users
 WHERE hide_from_leaderboards = false;
 -- 2026-04-30: same change as community_observers above — M28-only opt-out.
@@ -7932,6 +7939,70 @@ REVOKE ALL ON FUNCTION public.touch_user_activity() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.touch_user_activity() TO authenticated;
 
 -- 2026-05-04: trigger db-apply to deploy upsert_primary_identification (#618)
+
+-- ── 2026-05-07: Claude availability check for the client capability banner ──
+-- The ObserveView2 banner used to gate `runners.claude` on `hasAnthropicKey()`
+-- only — i.e. a BYO key in the browser. That hid the fact that an active
+-- beneficiary sponsorship or any active platform pool with capacity also
+-- unlocks Claude Vision (server-side resolution in the identify EF).
+--
+-- `sponsor_pools` RLS is owner-only, so the client can't introspect "is
+-- there any pool I could draw from?" directly. This SECURITY DEFINER
+-- function reports the two server-side eligibility flags + the caller's
+-- pool consumption today, in one round-trip. Service-role-equivalent
+-- privilege via the function — but it never returns row-level data, only
+-- aggregate booleans + counts scoped to the caller.
+CREATE OR REPLACE FUNCTION public.claude_eligibility()
+RETURNS TABLE (
+  has_sponsor    boolean,
+  has_pool       boolean,
+  pool_used_today integer,
+  pool_cap_today  integer
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_uid uuid := auth.uid();
+BEGIN
+  IF v_uid IS NULL THEN
+    RETURN QUERY SELECT false, false, 0, 0;
+    RETURN;
+  END IF;
+
+  RETURN QUERY
+  SELECT
+    EXISTS (
+      SELECT 1
+        FROM public.sponsorships s
+        JOIN public.sponsor_credentials c ON c.id = s.credential_id
+       WHERE s.beneficiary_id = v_uid
+         AND s.status = 'active'
+         AND c.revoked_at IS NULL
+    ) AS has_sponsor,
+    EXISTS (
+      SELECT 1
+        FROM public.sponsor_pools sp
+        JOIN public.sponsor_credentials c ON c.id = sp.credential_id
+       WHERE sp.status = 'active'
+         AND sp.used   < sp.total_cap
+         AND c.revoked_at IS NULL
+    ) AS has_pool,
+    COALESCE(
+      (SELECT count FROM public.pool_consumption
+        WHERE user_id = v_uid AND day = current_date),
+      0
+    ) AS pool_used_today,
+    COALESCE(
+      (SELECT MIN(daily_user_cap) FROM public.sponsor_pools
+        WHERE status = 'active' AND used < total_cap),
+      0
+    ) AS pool_cap_today;
+END $$;
+
+REVOKE ALL ON FUNCTION public.claude_eligibility() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.claude_eligibility() TO authenticated;
 
 -- ── 2026-05-07: Per-pool daily usage aggregate for the donor dashboard ─────
 -- pool_consumption is keyed by (user_id, day) — used for daily-cap enforcement

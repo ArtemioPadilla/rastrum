@@ -1117,7 +1117,7 @@ const cameraStationLoading     = observeStrings.camera_station_loading     ?? (i
     // Build the runner set based on what's actually available.
     const { runParallelIdentify } = await import('../lib/identify-cascade-client');
     const { makePlantNetRunner, makeClaudeRunner, makePhiRunner, makeGemmaRunner, resolvePlantNetKey } = await import('../lib/identify-runners');
-    const { hasAnthropicKey } = await import('../lib/anthropic-key');
+    const { claudeAvailable } = await import('../lib/claude-availability');
 
     const runners: Record<string, import('../lib/identify-cascade-client').IdentifierRunner> = {};
     const locale = isEs ? 'es' : 'en';
@@ -1125,7 +1125,7 @@ const cameraStationLoading     = observeStrings.camera_station_loading     ?? (i
     if (await resolvePlantNetKey()) {
       runners.plantnet = makePlantNetRunner(locale);
     }
-    if (await hasAnthropicKey()) {
+    if (await claudeAvailable()) {
       runners.claude_haiku = makeClaudeRunner(locale);
     }
     // Phi-vision: only include if cached (otherwise we offer the download below).

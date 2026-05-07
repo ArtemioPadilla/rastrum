@@ -270,6 +270,27 @@ export async function withdrawRequest(id: string): Promise<void> {
   if (!r.ok && r.status !== 204) throw new Error(`withdrawRequest: ${r.status}`);
 }
 
+// ── Claude eligibility — what does the server side tell me? ──────
+// The capability banner used to gate Claude on a BYO key only; a user
+// with an active beneficiary sponsorship or sitting on top of an active
+// platform pool would falsely see ❌ and the cascade would skip Claude
+// client-side, never letting the EF resolve sponsor/pool. RPC is the
+// single source of truth.
+export interface ClaudeEligibility {
+  has_sponsor:      boolean;
+  has_pool:         boolean;
+  pool_used_today:  number;
+  pool_cap_today:   number;
+}
+
+export async function getClaudeEligibility(): Promise<ClaudeEligibility> {
+  const sb = getSupabase();
+  const { data, error } = await sb.rpc('claude_eligibility');
+  if (error) throw new Error(error.message);
+  const row = (Array.isArray(data) ? data[0] : data) as ClaudeEligibility | undefined;
+  return row ?? { has_sponsor: false, has_pool: false, pool_used_today: 0, pool_cap_today: 0 };
+}
+
 // ── M32 #247: community pool donations ───────────────────────────
 export async function listActivePools(): Promise<(SponsorPool & { credential_label: string })[]> {
   const sb = getSupabase();
