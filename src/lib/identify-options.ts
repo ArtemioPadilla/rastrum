@@ -33,9 +33,13 @@ export async function buildCascadeOptions(ctx: IdentifyContext): Promise<Identif
     if (!excluded.includes(id)) excluded.push(id);
   }
 
-  // 2. WebLLM Phi + BirdNET gated on local-AI bandwidth opt-in
+  // 2. WebLLM Phi + Gemma + BirdNET gated on local-AI bandwidth opt-in.
+  // Both vision runtimes are big downloads (~4 GB / ~500 MB) and deserve
+  // the same bandwidth gate — without this, Gemma would still try to
+  // download even when the user has explicitly disabled local AI.
   if (!isLocalAIEnabled()) {
     if (!excluded.includes('webllm_phi35_vision')) excluded.push('webllm_phi35_vision');
+    if (!excluded.includes('onnx_gemma4_vision')) excluded.push('onnx_gemma4_vision');
     if (!excluded.includes('birdnet_lite')) excluded.push('birdnet_lite');
   }
 

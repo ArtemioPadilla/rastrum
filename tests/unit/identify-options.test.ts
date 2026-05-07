@@ -49,10 +49,11 @@ describe('buildCascadeOptions (#583)', () => {
     expect(r.excluded).not.toContain('claude_haiku');
   });
 
-  it('excludes Phi + BirdNET when localAI is opted out', async () => {
+  it('excludes Phi + Gemma + BirdNET when localAI is opted out', async () => {
     localStorage.setItem('rastrum.localAiOptIn', 'false');
     const r = await buildCascadeOptions({ mediaKind: 'photo' });
     expect(r.excluded).toContain('webllm_phi35_vision');
+    expect(r.excluded).toContain('onnx_gemma4_vision');
     expect(r.excluded).toContain('birdnet_lite');
   });
 

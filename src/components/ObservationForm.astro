@@ -775,6 +775,17 @@ const cameraStationLoading     = observeStrings.camera_station_loading     ?? (i
       spec: archInBrowserUrl,
       isInterpreter: true,
     },
+    onnx_gemma4_vision: {
+      name: 'Gemma 4 E2B',
+      meta: isEs
+        ? 'Gemma 4 E2B — VLM general de Google en el dispositivo, vía transformers.js + ONNX. Apache 2.0. Confianza limitada por diseño.'
+        : 'Gemma 4 E2B — Google on-device general VLM, via transformers.js + ONNX. Apache 2.0. Confidence is hard-capped by design.',
+      desc: isEs
+        ? 'IA en tu dispositivo (runtime alterno a Phi). Funciona sin internet.'
+        : 'On-device AI (alternate runtime to Phi). Works without internet.',
+      spec: archInBrowserUrl,
+      isInterpreter: true,
+    },
     birdnet: {
       name: 'BirdNET',
       meta: isEs
@@ -1166,6 +1177,7 @@ const cameraStationLoading     = observeStrings.camera_station_loading     ?? (i
         plantnet: 'plantnet',
         claude_haiku: 'claude_haiku',
         webllm_phi35_vision: 'webllm_phi35_vision',
+        onnx_gemma4_vision: 'onnx_gemma4_vision',
       };
       const runnerId = sourceToRunnerId[excludeSource] ?? excludeSource;
       if (runners[runnerId]) delete runners[runnerId];
@@ -1465,6 +1477,7 @@ const cameraStationLoading     = observeStrings.camera_station_loading     ?? (i
       case 'claude_sonnet':
         return 'claude_sonnet';
       case 'webllm_phi35_vision':
+      case 'onnx_gemma4_vision':
       case 'onnx_efficientnet_lite0':
       case 'birdnet_lite':
         return 'onnx_offline';
