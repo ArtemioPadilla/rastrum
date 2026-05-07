@@ -50,14 +50,14 @@ narrative source.
 | # | Module | Target | Status | Spec |
 |---|---|---|---|---|
 | 08 | Profile, Activity & Gamification (staged across v0.1–v1.0) | v0.1 → v1.0 | shipped (all four slices) | [`08-profile-activity-gamification.md`](08-profile-activity-gamification.md) |
-| 11 | In-Browser AI (WebLLM Phi-3.5-vision + Llama-3.2-1B) | v0.3 → v0.5 | shipped | [`11-in-browser-ai.md`](11-in-browser-ai.md) |
+| 11 | In-Browser AI (WebLLM Phi-3.5-vision + Llama-3.2-1B; transformers.js Gemma 4 E2B as parallel runtime) | v0.3 → v0.5 | shipped | [`11-in-browser-ai.md`](11-in-browser-ai.md) + [`runbooks/on-device-vision-fallback.md`](../../runbooks/on-device-vision-fallback.md) |
 
 ## v0.5 — Beta — partially shipped
 
 | # | Module | Target | Status | Spec |
 |---|---|---|---|---|
 | 12 | BirdNET Audio ID (Cornell Lab, NC license) | v0.5 → v1.0 | shipped (BirdNET-Lite ONNX, weights on R2) | [`12-birdnet-audio.md`](12-birdnet-audio.md) |
-| 13 | Identifier Registry (plugin platform) | v0.5 | shipped (7 plugins registered) | [`13-identifier-registry.md`](13-identifier-registry.md) |
+| 13 | Identifier Registry (plugin platform) | v0.5 | shipped (8 plugins registered) | [`13-identifier-registry.md`](13-identifier-registry.md) |
 | 14 | User API Tokens (`rst_*`, scoped, SHA-256 hashed) | v0.5 | shipped | [`14-user-api-tokens.md`](14-user-api-tokens.md) |
 
 ## v1.0 — Public launch — shipped
