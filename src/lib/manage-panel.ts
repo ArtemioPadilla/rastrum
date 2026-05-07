@@ -441,10 +441,10 @@ export async function wireManagePanelPhotos(obsId: string): Promise<void> {
       const cascadeBadge = p.is_primary
         ? '<span class="absolute top-1 left-1 rounded bg-emerald-700/85 text-white text-[10px] font-semibold px-1.5 py-0.5 uppercase tracking-wide">★</span>'
         : '';
-      return `<div class="relative group">
-        <img src="${srcAt}" alt="" class="aspect-square w-full object-cover rounded-md border border-zinc-200 dark:border-zinc-800" loading="lazy" decoding="async" />
+      return `<div class="relative group overflow-hidden rounded-md">
+        <img src="${srcAt}" alt="" class="aspect-square w-full object-cover border border-zinc-200 dark:border-zinc-800" loading="lazy" decoding="async" />
         ${cascadeBadge}
-        <button type="button" data-delete-photo="${idAt}" aria-label="${aria}" class="absolute top-1 right-1 rounded-full bg-black/60 hover:bg-red-600 text-white w-6 h-6 inline-flex items-center justify-center text-xs leading-none transition-colors">×</button>
+        <button type="button" data-delete-photo="${idAt}" aria-label="${aria}" class="absolute top-1 right-1 rounded-full bg-black/70 hover:bg-red-600 active:bg-red-700 text-white w-10 h-10 inline-flex items-center justify-center text-base leading-none transition-colors touch-manipulation">×</button>
       </div>`;
     }).join('');
     grid!.querySelectorAll<HTMLButtonElement>('[data-delete-photo]').forEach((btn) => {

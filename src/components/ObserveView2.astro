@@ -2,6 +2,7 @@
 import DropZone from "./DropZone.astro";
 import PipelineGraph from "./PipelineGraph.astro";
 import MapPicker from "./MapPicker.astro";
+import TaxonAutocomplete from "./TaxonAutocomplete.astro";
 import { t } from "../i18n/utils";
 import { HABITATS, WEATHERS } from "../lib/observation-enums";
 
@@ -139,17 +140,12 @@ const weathers = WEATHERS;
           {isEs ? "Editar identificación" : "Edit identification"}
         </button>
       </div>
-      <!-- Manual entry — always visible, label changes with context -->
+      <!-- Manual entry — always visible so user can enter species even when AI returns nothing -->
       <div id="obs2-id-manual" class="mt-2">
         <label for="obs2-taxon-input" id="obs2-taxon-label" class="block text-xs text-zinc-500 dark:text-zinc-400 mb-1">
           {isEs ? "Nombre científico (opcional)" : "Scientific name (optional)"}
         </label>
-        <input
-          id="obs2-taxon-input"
-          type="text"
-          class="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm"
-          placeholder={isEs ? "ej. Quercus robur" : "e.g. Quercus robur"}
-        />
+        <TaxonAutocomplete inputId="obs2-taxon-input" lang={lang} />
       </div>
     </div>
 
