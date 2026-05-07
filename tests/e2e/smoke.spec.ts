@@ -113,3 +113,26 @@ test('share/obs/ is locale-neutral and renders for any id', async ({ page }) => 
     expect(res?.status(), `expected non-200 for ${bad}`).not.toBe(200);
   }
 });
+
+// M34: Pokédex page renders the H1. The h1 is server-rendered with
+// pokedex.title from i18n ("Tu Pokédex" / "Your Pokédex") regardless of
+// auth state — the data-pokedex-title attribute uniquely identifies it
+// (avoids ambiguity with the menu link of the same text).
+test('Pokédex page renders title', async ({ page }) => {
+  await page.goto('/es/perfil/dex/');
+  await expect(page.locator('[data-pokedex-title]')).toBeVisible();
+});
+
+// M34: Especies hero (title + filter chips) renders on the public catalog.
+test('Especies hero + filter chips render', async ({ page }) => {
+  await page.goto('/es/explorar/especies/');
+  await expect(page.getByRole('heading', { name: 'Especies' })).toBeVisible();
+  await expect(page.locator('[data-filter-chips]')).toBeVisible();
+});
+
+// M34: clicking a filter chip serializes its state to the URL.
+test('Especies endemic chip toggle updates URL', async ({ page }) => {
+  await page.goto('/es/explorar/especies/');
+  await page.click('[data-filter-chips] [data-chip="endemic"]');
+  await expect(page).toHaveURL(/[?&]endemic=1/);
+});
