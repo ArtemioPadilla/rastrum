@@ -446,6 +446,10 @@ const langJson = JSON.stringify(lang);
     if (!credsList || !credsSection) return;
     let creds: Awaited<ReturnType<typeof listCredentials>> = [];
     try { creds = await listCredentials(); } catch { /* not authed or fn unavailable */ }
+    // The API returns revoked credentials too (audit-friendly). The sponsor-add
+    // and approve-request selects already filter `!revoked_at`; the main list
+    // must do the same so a Delete click visibly removes the row.
+    creds = creds.filter(c => !c.revoked_at);
     credsList.innerHTML = '';
     if (creds.length === 0) {
       const emptyMsg = (credsSection as HTMLElement).dataset.emptyMsg ?? '';
@@ -701,6 +705,7 @@ const langJson = JSON.stringify(lang);
     // Populate the credential dropdown with the sponsor's active creds.
     let creds: Awaited<ReturnType<typeof listCredentials>> = [];
     try { creds = await listCredentials(); } catch { alert('Could not load credentials.'); return; }
+    creds = creds.filter(c => !c.revoked_at);
     const sel = document.getElementById('pool-cred-select') as HTMLSelectElement | null;
     if (!sel) return;
     sel.innerHTML = creds.map((c) => `<option value="${escHtml(c.id)}" data-model="${escHtml(c.preferred_model ?? '')}" data-kind="${escHtml(c.kind ?? '')}">${escHtml(c.label)}</option>`).join('');
