@@ -1,0 +1,79 @@
+---
+import type { Locale } from '../../i18n/utils';
+import { t } from '../../i18n/utils';
+import { pillForSpecies, type Pill } from '../../lib/species-display';
+
+interface Props {
+  lang: Locale;
+  taxonId: string;
+  scientificName: string;
+  commonName: string | null;
+  slug: string | null;
+  kingdom: string | null;
+  thumbnailUrl: string | null;
+  rarityBucket: number | null;
+  endemicMx: boolean | null;
+  nom059Status: string | null;
+  /** Format: "3 obs · Aves" — caller controls the meta line content */
+  metaLine: string;
+  /** Show the small green ✓ overlay (Especies cards when species is in viewer's dex) */
+  inDex?: boolean;
+  /** Optional href; when set, the card is wrapped in <a>. */
+  href?: string | null;
+}
+
+const {
+  lang, taxonId, scientificName, commonName, thumbnailUrl,
+  rarityBucket, endemicMx, nom059Status, metaLine, inDex = false, href = null,
+} = Astro.props;
+
+const tr = t(lang) as unknown as {
+  species_card: Record<string, string>;
+};
+const sc = tr.species_card;
+
+const pill: Pill | null = pillForSpecies({
+  rarity_bucket: rarityBucket,
+  endemic_mx: endemicMx,
+  nom059_status: nom059Status,
+});
+
+const pillLabel = pill ? sc[pill.label] ?? pill.label : null;
+
+const toneClass: Record<string, string> = {
+  'amber':       'bg-white/95 text-amber-700',
+  'amber-light': 'bg-white/95 text-amber-600',
+  'lime':        'bg-lime-100/95 text-lime-900',
+  'orange':      'bg-white/95 text-orange-700',
+};
+
+const Tag = href ? 'a' : 'div';
+const tagAttrs = href ? { href } : {};
+---
+<Tag {...tagAttrs} class="block group rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 overflow-hidden hover:border-emerald-400 dark:hover:border-emerald-700 transition-colors" data-taxon-id={taxonId}>
+  <div class="relative aspect-[16/10] bg-gradient-to-br from-emerald-50 to-cyan-50 dark:from-zinc-800 dark:to-zinc-900">
+    {thumbnailUrl ? (
+      <img
+        src={thumbnailUrl}
+        alt={scientificName}
+        loading="lazy"
+        class="absolute inset-0 w-full h-full object-cover"
+      />
+    ) : (
+      <span class="absolute inset-0 flex items-center justify-center text-xs text-zinc-400">{sc.no_photo}</span>
+    )}
+    {pill && pillLabel && (
+      <span class={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-[11px] font-bold shadow-sm ${toneClass[pill.tone]}`}>
+        {pill.tone === 'amber' || pill.tone === 'amber-light' ? '★ ' : ''}{pillLabel}
+      </span>
+    )}
+    {inDex && (
+      <span class="absolute top-2 right-2 w-6 h-6 rounded-full bg-emerald-600 text-white text-xs flex items-center justify-center shadow-sm" aria-label={sc.in_dex} title={sc.in_dex}>✓</span>
+    )}
+  </div>
+  <div class="p-3">
+    <p class="text-sm italic font-bold text-emerald-700 dark:text-emerald-400 truncate">{scientificName}</p>
+    {commonName && <p class="text-sm text-zinc-700 dark:text-zinc-300 truncate">{commonName}</p>}
+    <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1.5">{metaLine}</p>
+  </div>
+</Tag>

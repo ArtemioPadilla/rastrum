@@ -2828,29 +2828,153 @@ WHERE public.can_see_facet(u.id, 'karma_total', (SELECT auth.uid()));
 
 GRANT SELECT ON public.profile_karma TO anon, authenticated;
 
+-- M34 dependency — forward-declare taxa.slug before profile_pokedex / taxa_thumbnails
+-- reference it. The canonical ALTER lives later in the file (idempotent), but
+-- db-validate's top-to-bottom replay needs the column to exist here.
+ALTER TABLE public.taxa ADD COLUMN IF NOT EXISTS slug text;
+
 -- Pokédex — every taxon the user has observed, joined to taxon_rarity.
+-- M34 (2026-05-06): added common_name_*, slug, endemic_mx, nom059_status,
+-- thumbnail_url for the visual redesign. Existing column order preserved.
 CREATE OR REPLACE VIEW public.profile_pokedex AS
+WITH base AS (
+  SELECT
+    o.observer_id    AS user_id,
+    i.taxon_id,
+    COALESCE(t.scientific_name, i.scientific_name) AS scientific_name,
+    t.kingdom,
+    tr.bucket        AS rarity_bucket,
+    MIN(o.observed_at)    AS first_observed_at,
+    -- sample_obs_id picks the user's earliest observation of this taxon as
+    -- the source of the dex thumbnail. Same MIN(uuid::text)::uuid trick as
+    -- profile_top_species — Postgres has no min(uuid).
+    MIN(o.id::text)::uuid AS sample_obs_id,
+    COUNT(*)::int    AS obs_count,
+    t.common_name_es,
+    t.common_name_en,
+    t.slug,
+    t.is_endemic_mexico   AS endemic_mx,
+    t.nom059_status
+  FROM public.observations o
+  JOIN public.identifications i
+    ON i.observation_id = o.id AND i.is_primary = true
+  LEFT JOIN public.taxa t          ON t.id = i.taxon_id
+  LEFT JOIN public.taxon_rarity tr ON tr.taxon_id = i.taxon_id
+  WHERE
+    o.sync_status = 'synced'
+    AND o.obscure_level <> 'private'
+    AND i.scientific_name IS NOT NULL
+    AND public.can_see_facet(o.observer_id, 'pokedex', (SELECT auth.uid()))
+  GROUP BY
+    o.observer_id, i.taxon_id,
+    COALESCE(t.scientific_name, i.scientific_name),
+    t.kingdom, tr.bucket,
+    t.common_name_es, t.common_name_en, t.slug,
+    t.is_endemic_mexico, t.nom059_status
+)
 SELECT
-  o.observer_id   AS user_id,
-  i.taxon_id,
-  COALESCE(t.scientific_name, i.scientific_name) AS scientific_name,
-  t.kingdom,
-  tr.bucket       AS rarity_bucket,
-  MIN(o.observed_at) AS first_observed_at,
-  COUNT(*)::int   AS obs_count
-FROM public.observations o
-JOIN public.identifications i
-  ON i.observation_id = o.id AND i.is_primary = true
-LEFT JOIN public.taxa t               ON t.id = i.taxon_id
-LEFT JOIN public.taxon_rarity tr      ON tr.taxon_id = i.taxon_id
-WHERE
-  o.sync_status = 'synced'
-  AND o.obscure_level <> 'private'
-  AND i.scientific_name IS NOT NULL
-  AND public.can_see_facet(o.observer_id, 'pokedex', (SELECT auth.uid()))
-GROUP BY o.observer_id, i.taxon_id, COALESCE(t.scientific_name, i.scientific_name), t.kingdom, tr.bucket;
+  b.user_id,
+  b.taxon_id,
+  b.scientific_name,
+  b.kingdom,
+  b.rarity_bucket,
+  b.first_observed_at,
+  b.obs_count,
+  b.common_name_es,
+  b.common_name_en,
+  b.slug,
+  b.endemic_mx,
+  b.nom059_status,
+  (SELECT mf.url
+     FROM public.media_files mf
+    WHERE mf.observation_id = b.sample_obs_id
+    ORDER BY mf.is_primary DESC NULLS LAST, mf.created_at ASC
+    LIMIT 1) AS thumbnail_url
+FROM base b;
 
 GRANT SELECT ON public.profile_pokedex TO anon, authenticated;
+
+
+-- ═════════════════════════════════════════════════════════════════════
+-- Module 34 — Pokédex/Especies visual redesign (2026-05-06)
+-- Adds: taxa_thumbnails, featured_species_current, mv_platform_stats,
+-- suggest_pokedex_target, and extends profile_pokedex.
+-- Spec: docs/superpowers/specs/2026-05-06-pokedex-especies-visual-design.md
+-- ═════════════════════════════════════════════════════════════════════
+
+-- taxa_thumbnails: one representative photo URL per taxon, picked from the
+-- most-recent synced primary identification's primary photo. Used by
+-- ExploreSpeciesView and FeaturedSpeciesCard.
+CREATE OR REPLACE VIEW public.taxa_thumbnails AS
+SELECT
+  t.id AS taxon_id,
+  (SELECT mf.url
+     FROM public.media_files mf
+     JOIN public.observations o ON o.id = mf.observation_id
+     JOIN public.identifications i ON i.observation_id = o.id
+    WHERE i.is_primary = true
+      AND i.taxon_id = t.id
+      AND o.sync_status = 'synced'
+      AND o.obscure_level <> 'full'
+    ORDER BY mf.is_primary DESC NULLS LAST, mf.created_at DESC
+    LIMIT 1) AS thumbnail_url
+FROM public.taxa t;
+
+GRANT SELECT ON public.taxa_thumbnails TO anon, authenticated;
+
+-- featured_species_current: weekly-stable random pick of one species that's
+-- rare/endemic/protected AND has at least one synced obs with a photo in
+-- the last 90 days. Selection is deterministic per ISO week, so the same
+-- species shows for everyone Mon–Sun. Used by EspeciesHero.
+CREATE OR REPLACE VIEW public.featured_species_current AS
+WITH eligible AS (
+  SELECT
+    t.id            AS taxon_id,
+    t.scientific_name,
+    t.common_name_es,
+    t.common_name_en,
+    t.slug,
+    t.kingdom,
+    t.is_endemic_mexico,
+    t.nom059_status,
+    tr.bucket       AS rarity_bucket
+  FROM public.taxa t
+  LEFT JOIN public.taxon_rarity tr ON tr.taxon_id = t.id
+  WHERE EXISTS (
+    SELECT 1
+      FROM public.media_files mf
+      JOIN public.observations o   ON o.id = mf.observation_id
+      JOIN public.identifications i ON i.observation_id = o.id
+     WHERE i.is_primary = true
+       AND i.taxon_id = t.id
+       AND o.sync_status = 'synced'
+       AND o.obscure_level <> 'full'
+       AND o.observed_at > now() - interval '90 days'
+  )
+  AND (
+    COALESCE(tr.bucket, 1) >= 4
+    OR t.is_endemic_mexico = true
+    OR t.nom059_status IN ('E', 'A', 'Pr')
+  )
+)
+SELECT
+  e.*,
+  (SELECT mf.url
+     FROM public.media_files mf
+     JOIN public.observations o   ON o.id = mf.observation_id
+     JOIN public.identifications i ON i.observation_id = o.id
+    WHERE i.is_primary = true
+      AND i.taxon_id = e.taxon_id
+      AND o.sync_status = 'synced'
+      AND o.obscure_level <> 'full'
+    ORDER BY mf.is_primary DESC NULLS LAST, mf.created_at DESC
+    LIMIT 1) AS thumbnail_url
+FROM eligible e
+ORDER BY md5(e.taxon_id::text || to_char(date_trunc('week', now()), 'YYYY-IW'))
+LIMIT 1;
+
+GRANT SELECT ON public.featured_species_current TO anon, authenticated;
+
 
 -- ═════════════════════════════════════════════════════════════════════
 -- Module 27 — Establishment Means (organism origin)
@@ -7868,3 +7992,109 @@ END $$;
 REVOKE ALL ON FUNCTION public.claude_eligibility() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.claude_eligibility() TO authenticated;
 
+-- mv_platform_stats: 4 platform-health counters surfaced on the Especies
+-- hero. Refreshed hourly via pg_cron. Single-row MV; UNIQUE index on
+-- computed_at lets us REFRESH CONCURRENTLY.
+CREATE MATERIALIZED VIEW IF NOT EXISTS public.mv_platform_stats AS
+SELECT
+  (SELECT COUNT(DISTINCT i.taxon_id)
+     FROM public.identifications i
+     JOIN public.observations o ON o.id = i.observation_id
+    WHERE i.is_primary = true
+      AND o.sync_status = 'synced')                                    AS total_species,
+  (SELECT COUNT(DISTINCT o.observer_id)
+     FROM public.observations o
+    WHERE o.sync_status = 'synced')                                    AS total_observers,
+  (SELECT COUNT(*)
+     FROM public.observations o
+    WHERE o.sync_status = 'synced')                                    AS total_obs,
+  (SELECT COUNT(DISTINCT i.taxon_id)
+     FROM public.identifications i
+     JOIN public.observations o ON o.id = i.observation_id
+    WHERE i.is_primary = true
+      AND o.sync_status = 'synced'
+      AND date_trunc('week', o.observed_at) = date_trunc('week', now())
+      AND NOT EXISTS (
+        SELECT 1
+          FROM public.identifications i2
+          JOIN public.observations o2 ON o2.id = i2.observation_id
+         WHERE i2.taxon_id = i.taxon_id
+           AND i2.is_primary = true
+           AND o2.sync_status = 'synced'
+           AND o2.observed_at < date_trunc('week', now())
+      ))                                                               AS new_species_this_week,
+  now()                                                                AS computed_at;
+
+CREATE UNIQUE INDEX IF NOT EXISTS mv_platform_stats_unique
+  ON public.mv_platform_stats (computed_at);
+
+GRANT SELECT ON public.mv_platform_stats TO anon, authenticated;
+
+-- M34 cron: refresh mv_platform_stats hourly. Idempotent — unschedule first.
+SELECT cron.unschedule('refresh-platform-stats')
+  WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'refresh-platform-stats');
+SELECT cron.schedule('refresh-platform-stats', '0 * * * *',
+  $$REFRESH MATERIALIZED VIEW CONCURRENTLY public.mv_platform_stats$$);
+
+
+-- suggest_pokedex_target(viewer_id): pick one species the viewer hasn't
+-- observed yet, preferring their most-active kingdom, common rarity, with
+-- at least one photo in the catalog. Stable per user per day. Used by
+-- PokedexHero tile 3 ("Para cazar").
+CREATE OR REPLACE FUNCTION public.suggest_pokedex_target(viewer_id uuid)
+RETURNS TABLE (
+  taxon_id        uuid,
+  scientific_name text,
+  common_name_es  text,
+  common_name_en  text,
+  slug            text,
+  kingdom         text,
+  thumbnail_url   text
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  -- Resolve effective viewer: only the authenticated caller's own dex.
+  -- The viewer_id parameter must match auth.uid(); otherwise return 0 rows.
+  WITH effective AS (
+    SELECT auth.uid() AS uid
+     WHERE auth.uid() IS NOT NULL
+       AND auth.uid() = viewer_id
+  ),
+  owned AS (
+    SELECT taxon_id FROM public.profile_pokedex
+     WHERE user_id = (SELECT uid FROM effective)
+  ),
+  user_top_kingdom AS (
+    SELECT kingdom, COUNT(*) AS c
+      FROM public.profile_pokedex
+     WHERE user_id = (SELECT uid FROM effective) AND kingdom IS NOT NULL
+     GROUP BY kingdom
+     ORDER BY c DESC
+     LIMIT 1
+  )
+  SELECT
+    t.id,
+    t.scientific_name,
+    t.common_name_es,
+    t.common_name_en,
+    t.slug,
+    t.kingdom,
+    (SELECT tt.thumbnail_url FROM public.taxa_thumbnails tt WHERE tt.taxon_id = t.id) AS thumbnail_url
+  FROM public.taxa t
+  LEFT JOIN public.taxon_rarity tr ON tr.taxon_id = t.id
+  WHERE EXISTS (SELECT 1 FROM effective)
+    AND t.id NOT IN (SELECT taxon_id FROM owned)
+    AND t.kingdom = COALESCE((SELECT kingdom FROM user_top_kingdom), 'Animalia')
+    AND COALESCE(tr.bucket, 1) <= 2
+    AND EXISTS (
+      SELECT 1 FROM public.taxa_thumbnails tt
+       WHERE tt.taxon_id = t.id AND tt.thumbnail_url IS NOT NULL
+    )
+  ORDER BY md5(t.id::text || (SELECT uid FROM effective)::text || to_char(now(), 'YYYY-MM-DD'))
+  LIMIT 1;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.suggest_pokedex_target(uuid) TO authenticated;
