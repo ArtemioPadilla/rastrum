@@ -1223,6 +1223,7 @@ const cameraStationLoading     = observeStrings.camera_station_loading     ?? (i
           hadPlantNet: !!runners.plantnet,
           hadClaude: !!runners.claude_haiku,
           hadPhi: !!runners.webllm_phi35_vision,
+          hadGemma: !!runners.onnx_gemma4_vision,
         });
         idAllFailed.classList.remove('hidden');
       }
@@ -1240,18 +1241,20 @@ const cameraStationLoading     = observeStrings.camera_station_loading     ?? (i
     hadPlantNet: boolean;
     hadClaude: boolean;
     hadPhi: boolean;
+    hadGemma: boolean;
   }): string {
+    const hadOnDeviceVLM = ctx.hadPhi || ctx.hadGemma;
     const isAnimal = ctx.hint && ctx.hint !== 'Plantae' && ctx.hint !== 'Fungi';
-    const onlyPlantNet = ctx.hadPlantNet && !ctx.hadClaude && !ctx.hadPhi;
+    const onlyPlantNet = ctx.hadPlantNet && !ctx.hadClaude && !hadOnDeviceVLM;
     if (isAnimal && onlyPlantNet) {
       return isEs
-        ? 'Para identificar animales necesitamos un modelo más allá de PlantNet. Configura tu llave de Claude Haiku (Perfil → Editar) o activa el modelo en el dispositivo (~2.4 GB) para que funcione sin conexión.'
-        : "We need a non-plant identifier for animals. Add your Claude Haiku key (Profile → Edit) or enable the on-device model (~2.4 GB) for offline use.";
+        ? 'Para identificar animales necesitamos un modelo más allá de PlantNet. Configura tu llave de Claude Haiku (Perfil → Editar) o activa un modelo en el dispositivo (Phi ~4 GB o Gemma ~500 MB) para que funcione sin conexión.'
+        : "We need a non-plant identifier for animals. Add your Claude Haiku key (Profile → Edit) or enable an on-device model (Phi ~4 GB or Gemma ~500 MB) for offline use.";
     }
-    if (!ctx.hadClaude && !ctx.hadPhi && !ctx.hadPlantNet) {
+    if (!ctx.hadClaude && !hadOnDeviceVLM && !ctx.hadPlantNet) {
       return isEs
-        ? 'No hay ningún identificador disponible. Configura una llave en Perfil → Editar, o activa el modelo en el dispositivo.'
-        : 'No identifier is available. Configure a key in Profile → Edit, or enable the on-device model.';
+        ? 'No hay ningún identificador disponible. Configura una llave en Perfil → Editar, o activa un modelo en el dispositivo.'
+        : 'No identifier is available. Configure a key in Profile → Edit, or enable an on-device model.';
     }
     if (ctx.hint === 'Animalia.Aves' && !ctx.hadClaude) {
       return isEs

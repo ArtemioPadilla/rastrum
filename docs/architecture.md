@@ -112,7 +112,7 @@ activity_events row (visible in /profile/ feed)
 
 The identification pipeline runs differently depending on where it's triggered. See [`docs/specs/modules/21-identify.md`](specs/modules/21-identify.md) for the full contract.
 
-**Client-side (Identify page — `/en/identify/`):** PlantNet, Claude, and Phi-vision fire in parallel. The first provider to return a result above its confidence threshold wins and cancels the others. If all fail, Phi-vision prompts the user to opt in to the local model download.
+**Client-side (Identify page — `/en/identify/`):** PlantNet, Claude, Phi-vision, and Gemma-vision fire in parallel. The first provider to return a result above its confidence threshold wins and cancels the others. If all fail, Phi-vision prompts the user to opt in to the local model download (Gemma is also available as a parallel runtime via Profile → Edit).
 
 **Server-side (sync.ts → `identify` Edge Function):** the same parallel race via `cascade.ts`. Available providers are sorted by license cost and fired concurrently; the first result above the accept threshold wins:
 
@@ -121,8 +121,9 @@ runCascade() — parallel race, cost-sorted
   ┌─────────────────────────────────────────────────────┐
   │  PlantNet API        (free-quota · cloud)           │
   │  Claude Haiku 4.5    (byo-key · cloud)              │  run concurrently
-  │  EfficientNet-Lite0  (free-nc · on-device ONNX)     │  via Promise.race
-  │  Phi-3.5-vision      (free-nc · on-device WebLLM)   │
+  │  EfficientNet-Lite0  (free · on-device ONNX)        │  via Promise.race
+  │  Phi-3.5-vision      (free · on-device WebLLM)      │  (opt-in)
+  │  Gemma 4 E2B         (free · on-device ONNX/tx-js)  │  (opt-in)
   └──────────────────────────┬──────────────────────────┘
                              │
                   first confidence ≥ 0.7 wins
@@ -164,12 +165,20 @@ B2G dashboard would require a separate commercial license.
 
 #### In-browser AI {#in-browser-ai}
 
-EfficientNet-Lite0 ONNX and Phi-3.5-vision are the on-device fallbacks at the
-bottom of both cascade modes. EfficientNet is always available (preloaded ONNX
-via `onnxruntime-web`). Phi-3.5-vision requires a first-run download
-(~2.7 GB cached via the Cache API) and is gated by `localStorage.rastrum.localAiOptIn`.
-Both run entirely in the browser — no server round-trip, no key needed.
-See `src/lib/local-ai.ts` and `src/lib/identifiers/phi-vision.ts`.
+EfficientNet-Lite0 ONNX, Phi-3.5-vision, and Gemma 4 E2B are the on-device
+fallbacks at the bottom of both cascade modes. EfficientNet is always
+available (preloaded ONNX via `onnxruntime-web`). Phi-3.5-vision (~4 GB
+via WebLLM/MLC) and Gemma 4 E2B (~500 MB via transformers.js + ONNX
+Runtime Web) are **two parallel WebGPU runtimes** — when one crashes on
+a given GPU/driver combo (the failure modes are independent), the other
+often still works. Both require a first-run download cached via the
+Cache API; both are opt-in via Profile → Edit (separate toggles:
+`rastrum.prefs.usePhiVision`, `rastrum.prefs.useGemmaVision`) plus the
+shared bandwidth gate `rastrum.localAiOptIn`. All run entirely in the
+browser — no server round-trip, no key needed. See `src/lib/local-ai.ts`,
+`src/lib/onnx-vision.ts`, `src/lib/identifiers/phi-vision.ts`,
+`src/lib/identifiers/gemma-vision.ts`, and the runbook
+[`docs/runbooks/on-device-vision-fallback.md`](runbooks/on-device-vision-fallback.md).
 
 ### 4. Sync after offline
 
