@@ -10,6 +10,13 @@
 //
 // Bump VERSION to invalidate every cached entry on the next visit.
 const VERSION = 'rastrum-shell-2026.5.1';
+
+// Page-managed cache (written by src/lib/offline-map.ts) holding the
+// full pmtiles archive as a single 200 Response. The fetch handler
+// below serves Range requests from this entry by slicing the body.
+const PMTILES_CACHE_NAME = 'rastrum/pmtiles';
+const SHARE_TARGET_CACHE = 'rastrum-share-target-v1';
+const SHARE_TARGET_PATH  = '/share-target';
 const SHELL = [
   '/',
   '/en/',
@@ -25,10 +32,19 @@ self.addEventListener('install', (event) => {
   );
 });
 
+// Caches owned by the page (not the SW shell). They persist across SW
+// upgrades — deleting them would wipe a user's downloaded offline map
+// or in-flight share-target stash.
+const PERSISTENT_CACHES = new Set([PMTILES_CACHE_NAME, SHARE_TARGET_CACHE]);
+
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter(k => k !== VERSION).map(k => caches.delete(k)))
+      Promise.all(
+        keys
+          .filter(k => k !== VERSION && !PERSISTENT_CACHES.has(k))
+          .map(k => caches.delete(k))
+      )
     ).then(() => self.clients.claim())
   );
 });
@@ -98,12 +114,61 @@ function isHtmlNavigation(req, url) {
   return url.pathname.endsWith('/') || url.pathname.endsWith('.html');
 }
 
+// Serve pmtiles range requests from the offline-map cache. The cache
+// holds a single 200 Response with the full archive body; pmtiles
+// makes byte-range fetches, so we slice the cached body and return a
+// 206 Partial Content. On cache miss we fall through to network.
+//
+// Spec: tests/unit/sw-pmtiles-range.test.ts pins the slicing algorithm.
+async function servePmtilesRange(req, url) {
+  try {
+    const cache = await caches.open(PMTILES_CACHE_NAME);
+    const cached = await cache.match(url.href);
+    if (!cached) return fetch(req);
+
+    const range = req.headers.get('range');
+    if (!range) return cached;
+
+    const m = /^bytes=(\d+)-(\d+)$/.exec(range);
+    if (!m) return cached;
+
+    const start = parseInt(m[1], 10);
+    const end   = parseInt(m[2], 10);
+    const buf   = await cached.arrayBuffer();
+    const total = buf.byteLength;
+    if (start >= total) {
+      return new Response(null, {
+        status: 416,
+        statusText: 'Range Not Satisfiable',
+        headers: { 'Content-Range': `bytes */${total}` },
+      });
+    }
+    const sliceEnd = Math.min(end + 1, total);
+    const slice = buf.slice(start, sliceEnd);
+
+    const headers = new Headers();
+    const contentType = cached.headers.get('content-type');
+    if (contentType) headers.set('Content-Type', contentType);
+    const etag = cached.headers.get('etag');
+    if (etag) headers.set('ETag', etag);
+    headers.set('Content-Range', `bytes ${start}-${sliceEnd - 1}/${total}`);
+    headers.set('Content-Length', String(slice.byteLength));
+    headers.set('Accept-Ranges', 'bytes');
+
+    return new Response(slice, {
+      status: 206,
+      statusText: 'Partial Content',
+      headers,
+    });
+  } catch {
+    return fetch(req);
+  }
+}
+
 // ── Web Share Target ──
 // When the OS share sheet POSTs to /share-target, stash the file in Cache
 // Storage and redirect to the /share-target page (GET) where the client
 // retrieves it and hands it off to the observation form.
-const SHARE_TARGET_CACHE = 'rastrum-share-target-v1';
-const SHARE_TARGET_PATH  = '/share-target';
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;
@@ -147,16 +212,24 @@ self.addEventListener('fetch', (event) => {
   }
 
   // R2 user-media (observation photos/audio) — skip caching, let network handle.
-  // Model weights and tiles hosted on rastrum.app ARE cached below.
-  const isUserMedia = (url.hostname === 'media.rastrum.app' || url.hostname === 'media.rastrum.org')
+  const isUserMedia = url.hostname === 'media.rastrum.org'
     && url.pathname.startsWith('/observations/');
   if (isUserMedia) return;
 
-  // Only intercept same-origin + known rastrum.app asset hosts.
-  const isRastrumAsset = url.origin === location.origin
-    || url.hostname === 'media.rastrum.app'
-    || url.hostname === 'tiles.rastrum.app';
-  if (!isRastrumAsset) return;
+  // Offline-map (pmtiles) — serve range requests from the page-managed
+  // cache so MapLibre doesn't hit the network on every map load when
+  // the archive has been downloaded via Profile → Edit → Offline maps.
+  // Falls through to network on cache miss.
+  const isPmtiles = url.hostname === 'media.rastrum.org'
+    && /^\/maps\/.+\.pmtiles$/.test(url.pathname);
+  if (isPmtiles) {
+    event.respondWith(servePmtilesRange(req, url));
+    return;
+  }
+
+  // Only intercept same-origin from here. Other media.rastrum.org paths
+  // pass through (matches the runbook contract for third-party hosts).
+  if (url.origin !== location.origin) return;
 
   // HTML navigations: network-first — always pull the latest so new JS
   // hashes land. Fall back to whatever is in the cache (or '/') offline.
