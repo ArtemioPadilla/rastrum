@@ -4504,18 +4504,25 @@ GRANT SELECT ON public.community_observers TO anon, authenticated;
 -- feature. Anon callers cannot read centroid via any path; the lack of
 -- a GRANT to anon is the security gate (mirrored in UI by the sign-in
 -- requirement).
+-- Column order note: karma_total is appended LAST (after centroid_lat /
+-- centroid_lng) because Postgres CREATE OR REPLACE VIEW only allows
+-- adding columns at the end. Inserting karma_total mid-list is treated
+-- as a rename of the column at that position and breaks db-apply on
+-- databases that already have centroid_lat/lng but no karma_total
+-- (the production state since 2026-05-04). Same rule as
+-- community_observers above.
 CREATE OR REPLACE VIEW public.community_observers_with_centroid AS
 SELECT
   id, username, display_name, avatar_url, country_code,
   expert_taxa, is_expert,
   observation_count, species_count, obs_count_7d, obs_count_30d,
   centroid_geog, last_observation_at, joined_at,
-  karma_total,
   -- Scalar lat/lng for clients that can't decode the geography WKB
   -- (the /community/map/ heatmap reads these directly). PostGIS
   -- geography → geometry cast is a zero-copy reinterpret for points.
   ST_Y(centroid_geog::geometry) AS centroid_lat,
-  ST_X(centroid_geog::geometry) AS centroid_lng
+  ST_X(centroid_geog::geometry) AS centroid_lng,
+  karma_total
 FROM public.users
 WHERE hide_from_leaderboards = false;
 -- 2026-04-30: same change as community_observers above — M28-only opt-out.
