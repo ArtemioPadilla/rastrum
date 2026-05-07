@@ -1,10 +1,12 @@
 ---
-import { t } from '../i18n/utils';
+import { t, routes } from '../i18n/utils';
 import { MODEL_COSTS, formatCostBadge } from '../lib/model-costs';
 import PoolDashboardView from './PoolDashboardView.astro';
 interface Props { lang: 'en' | 'es' }
 const { lang } = Astro.props;
 const tr = t(lang);
+const crosslink = (tr as unknown as { ai_sponsor_crosslink: { from_sponsor_label: string; from_sponsor_link: string } }).ai_sponsor_crosslink;
+const profileEditHref = `/${lang}${routes.profileEdit[lang]}/`;
 const cancelLabel = lang === 'es' ? 'Cancelar' : 'Cancel';
 const okLabel = lang === 'es' ? 'Aceptar' : 'OK';
 const statusHeading = lang === 'es' ? 'Estado' : 'Status';
@@ -79,6 +81,13 @@ const langJson = JSON.stringify(lang);
       {tr.sponsoring.add_credential}
     </button>
     <ul id="creds-list" class="divide-y divide-zinc-200 dark:divide-zinc-800"></ul>
+    <!-- Cross-link back to AI Settings, only when no credentials yet (issue #656) -->
+    <aside id="creds-empty-crosslink" class="hidden border-l-2 border-emerald-300 dark:border-emerald-700/60 pl-3 py-1 text-xs text-zinc-600 dark:text-zinc-400">
+      {crosslink.from_sponsor_label}{' '}
+      <a href={profileEditHref} class="font-medium text-emerald-700 dark:text-emerald-400 hover:underline">
+        {crosslink.from_sponsor_link} →
+      </a>
+    </aside>
   </section>
 
   <!-- M32 (#152): donate to platform pool -->
@@ -461,11 +470,14 @@ const langJson = JSON.stringify(lang);
     // must do the same so a Delete click visibly removes the row.
     creds = creds.filter(c => !c.revoked_at);
     credsList.innerHTML = '';
+    const emptyCrosslink = document.getElementById('creds-empty-crosslink');
     if (creds.length === 0) {
       const emptyMsg = (credsSection as HTMLElement).dataset.emptyMsg ?? '';
       credsList.innerHTML = `<li class="py-3 text-sm text-zinc-500">${escHtml(emptyMsg)}</li>`;
+      emptyCrosslink?.classList.remove('hidden');
       return;
     }
+    emptyCrosslink?.classList.add('hidden');
     for (const c of creds) {
       const li = document.createElement('li');
       li.className = 'py-3 flex items-center justify-between';
