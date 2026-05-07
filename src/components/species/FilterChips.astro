@@ -18,6 +18,8 @@ const eh = tr.explore_species_hero;
 </div>
 
 <style>
-  .es-chip { padding: 4px 12px; font-size: 12px; border: 1px solid #e2e8f0; border-radius: 9999px; background: #fff; color: #475569; cursor: pointer; }
-  .es-chip[aria-pressed="true"] { background: #047857; color: #fff; border-color: #047857; }
+  [data-filter-chips] button { padding: 4px 12px; font-size: 12px; border-radius: 9999px; border-width: 1px; cursor: pointer; }
+  [data-filter-chips] button[aria-pressed="false"] { background: #fff; color: #475569; border-color: #e2e8f0; }
+  :global(.dark) [data-filter-chips] button[aria-pressed="false"] { background: #18181b; color: #d4d4d8; border-color: #3f3f46; }
+  [data-filter-chips] button[aria-pressed="true"] { background: #047857; color: #fff; border-color: #047857; }
 </style>
