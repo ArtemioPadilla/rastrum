@@ -1,8 +1,8 @@
 # Module 03 — Offline-First / PWA / Sync
 
 **Version target:** v0.1
-**Status:** shipped — Dexie outbox + `syncOutbox()` + identify trigger live; service worker shell-cached.
-**Last verified:** 2026-04-26 — `src/lib/db.ts` (RastrumDB), `src/lib/sync.ts`, `public/sw.js` running in production. Workbox-style background sync queue intentionally deferred (visibilitychange + online events suffice).
+**Status:** shipped — Dexie outbox + `syncOutbox()` + identify trigger live; service worker shell-cached; offline pmtiles archive served from page-managed Cache API via SW range-slicing.
+**Last verified:** 2026-05-06 — `src/lib/db.ts` (RastrumDB), `src/lib/sync.ts`, `public/sw.js` running in production. Workbox-style background sync queue intentionally deferred (visibilitychange + online events suffice).
 
 ---
 
@@ -40,7 +40,13 @@ All observations are written to IndexedDB first, synced to Supabase when connect
 
 ## Service Worker
 
-Using Workbox (via `@vite-pwa/astro` or manual):
+The shipped implementation is hand-rolled in [`public/sw.js`](../../../public/sw.js) — a flat classic SW (no Workbox bundle, no build step). Operator runbook at [`docs/runbooks/sw-cache.md`](../../runbooks/sw-cache.md). The Workbox sketch below is historical: it documents the strategy shape we landed on, not the current code. Three implementation details that don't appear in the sketch:
+
+- **Hand-rolled cache buckets per strategy** — `caches.open(VERSION)` for the shell (network-first HTML, cache-first hashed assets, SWR for unhashed paths), versioned via the `VERSION` constant. Bumping `VERSION` invalidates the shell on the next visit.
+- **Page-managed offline-map cache** — `src/lib/offline-map.ts` writes the full ~50 MB Mexico pmtiles archive into `caches.open('rastrum/pmtiles')` as a single 200 Response when the user clicks "Download offline map" in Profile → Edit. The SW intercepts `media.rastrum.org/maps/*.pmtiles` requests and slices the cached body into 206 Partial Content responses to satisfy MapLibre's byte-range fetches; falls through to network on cache miss. The slicing algorithm is pinned by [`tests/unit/sw-pmtiles-range.test.ts`](../../../tests/unit/sw-pmtiles-range.test.ts).
+- **`PERSISTENT_CACHES` allowlist** — `rastrum/pmtiles` and `rastrum-share-target-v1` are page-managed caches that the SW deliberately preserves across `VERSION` upgrades. Without this, every SW upgrade silently wiped a user's downloaded offline map (fixed in PR #636).
+
+Historical Workbox sketch (kept for design context):
 
 ```typescript
 // sw.ts

@@ -577,6 +577,13 @@ Runbooks: [`docs/runbooks/multi-provider-vision.md`](docs/runbooks/multi-provide
 | E2E test fails after adding doc page to MegaMenu | New link duplicates text in mobile drawer, Playwright strict mode violation | Use `locator('p').filter()` instead of `getByText()` for group headings. |
 | `flowType: 'pkce'` not set | Supabase defaulted to implicit flow with hash fragments | Set `flowType: 'pkce'` in `supabase.ts` — PKCE uses `?code=` (single-use, server-exchanged). |
 
+### Pitfalls discovered 2026-05-06
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Map page hits network for pmtiles even after user clicked "Download offline map" | Cache API entry written by `src/lib/offline-map.ts` was orphaned — MapLibre's pmtiles protocol uses `fetch()` directly, never consults the Cache API; the SW didn't intercept after the `.app → .org` migration | SW now intercepts `media.rastrum.org/maps/*.pmtiles` and slices the cached 200 into 206 Partial Content. Algorithm pinned by `tests/unit/sw-pmtiles-range.test.ts`. Fixed in PR #636. |
+| Downloaded offline map (and in-flight share-target stash) silently wiped on every SW upgrade | `activate` handler deleted any cache whose name wasn't the current `VERSION`; `rastrum/pmtiles` and `rastrum-share-target-v1` are page-managed and got nuked too | `PERSISTENT_CACHES` allowlist in `public/sw.js` now skips those caches when pruning. Fixed in PR #636. |
+
 ---
 
 ## Things you should NOT do without asking
