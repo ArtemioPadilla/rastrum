@@ -1267,7 +1267,13 @@ const cameraStationLoading     = observeStrings.camera_station_loading     ?? (i
   function offerPhiVision() {
     if (!phiOffer) return;
     try {
+      // Bandwidth opt-out wins over everything.
       if (localStorage.getItem(LOCAL_AI_OPTIN) === 'false') return;
+      // Per-Phi opt-in (PR #637): if the user explicitly toggled Phi off,
+      // don't pitch them the download. Banner stays hidden; they fall
+      // through to the `idAllFailed` text which already mentions both
+      // on-device options by name (PR #645).
+      if (localStorage.getItem('rastrum.prefs.usePhiVision') !== 'true') return;
     } catch { /* ignore */ }
     phiOffer.classList.remove('hidden');
   }
