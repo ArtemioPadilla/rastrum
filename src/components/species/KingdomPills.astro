@@ -1,0 +1,51 @@
+---
+interface Kingdom { name: string; count: number; }
+interface Props {
+  kingdoms: Kingdom[];
+  total: number;
+  activeKingdom: string | null;
+  langAllLabel: string;
+}
+const { kingdoms, total, activeKingdom, langAllLabel } = Astro.props;
+
+const dotByKingdom: Record<string, string> = {
+  Animalia:  'bg-red-600',
+  Plantae:   'bg-green-600',
+  Fungi:     'bg-purple-500',
+  Chromista: 'bg-sky-500',
+  Protozoa:  'bg-amber-500',
+  Bacteria:  'bg-pink-500',
+  Archaea:   'bg-stone-500',
+};
+---
+<div class="flex flex-wrap gap-2 mt-4 pt-4 border-t border-dashed border-zinc-200 dark:border-zinc-800" role="group" data-kingdom-pills>
+  <button
+    type="button"
+    class:list={[
+      'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs border font-medium',
+      activeKingdom === null
+        ? 'bg-emerald-700 text-white border-emerald-700'
+        : 'bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700',
+    ]}
+    aria-pressed={activeKingdom === null}
+    data-kingdom=""
+  >
+    <b>{langAllLabel}</b> · {total}
+  </button>
+  {kingdoms.map((k) => (
+    <button
+      type="button"
+      class:list={[
+        'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs border font-medium',
+        activeKingdom === k.name
+          ? 'bg-emerald-700 text-white border-emerald-700'
+          : 'bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700',
+      ]}
+      aria-pressed={activeKingdom === k.name}
+      data-kingdom={k.name}
+    >
+      <span class:list={['w-2 h-2 rounded-full', dotByKingdom[k.name] ?? 'bg-zinc-400']}></span>
+      {k.name} <b>{k.count}</b>
+    </button>
+  ))}
+</div>

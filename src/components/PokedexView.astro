@@ -16,6 +16,9 @@ interface Props {
 const { lang, visitor = false } = Astro.props;
 const tr = t(lang);
 const px = (tr as unknown as { pokedex: Record<string, unknown> }).pokedex;
+const sc = (tr as unknown as { species_card: Record<string, string> }).species_card ?? {};
+const heroT = (px?.hero as Record<string, string> | undefined) ?? {};
+
 const title       = px?.title       as string;
 const subtitle    = px?.subtitle    as string;
 const subheading  = px?.subheading  as string | undefined;
@@ -29,9 +32,9 @@ const visitorNotFoundCta = px?.visitor_not_found_cta as string | undefined;
 const visitorBack     = px?.visitor_back_to_profile as string | undefined;
 const visitorPageTitle = px?.visitor_page_title as string | undefined;
 const visitorLoadError = px?.visitor_load_error as string | undefined;
-const bucketMap   = (px?.bucket as Record<string, string> | undefined) ?? {};
-const bucketLabels = JSON.stringify(bucketMap);
 const exploreRecentHref = `/${lang}/${lang === 'es' ? 'explorar/recientes' : 'explore/recent'}/`;
+const observeHref       = `/${lang}/${lang === 'es' ? 'observar' : 'observe'}/`;
+const exploreHref       = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/species'}/`;
 ---
 
 <section
@@ -46,6 +49,26 @@ const exploreRecentHref = `/${lang}/${lang === 'es' ? 'explorar/recientes' : 'ex
   data-label-visitor-not-found={visitorNotFound ?? ''}
   data-label-visitor-page-title={visitorPageTitle ?? ''}
   data-label-empty-owner={empty}
+  data-label-card-no-photo={sc.no_photo ?? ''}
+  data-label-card-in-dex={sc.in_dex ?? ''}
+  data-label-card-rarity-3={sc.rarity_3 ?? ''}
+  data-label-card-rarity-4={sc.rarity_4 ?? ''}
+  data-label-card-rarity-5={sc.rarity_5 ?? ''}
+  data-label-card-endemic-mx={sc.endemic_mx ?? ''}
+  data-label-card-nom059={sc.nom059 ?? ''}
+  data-label-hero-species={heroT.species_label ?? ''}
+  data-label-hero-kingdoms={heroT.kingdoms_label ?? ''}
+  data-label-hero-rares={heroT.rares_label ?? ''}
+  data-label-hero-obs={heroT.obs_label ?? ''}
+  data-label-hero-rare={heroT.highest_rarity_label ?? ''}
+  data-label-hero-catch={heroT.to_catch_label ?? ''}
+  data-label-hero-catch-why={heroT.to_catch_why ?? ''}
+  data-label-hero-catch-cta={heroT.to_catch_cta ?? ''}
+  data-label-hero-all={heroT.kingdom_all ?? ''}
+  data-label-hero-first-title={heroT.first_visit_title ?? ''}
+  data-label-hero-first-cta={heroT.first_visit_cta ?? ''}
+  data-href-observe={observeHref}
+  data-href-explore={exploreHref}
 >
   <header class="mb-5">
     <h1 data-pokedex-title class="text-2xl md:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
@@ -75,15 +98,27 @@ const exploreRecentHref = `/${lang}/${lang === 'es' ? 'explorar/recientes' : 'ex
     <p id="pokedex-error" class="hidden text-sm text-red-700 dark:text-red-400 text-center py-8 rounded-lg border border-red-300 dark:border-red-800">{visitorLoadError}</p>
   )}
 
-  <div id="pokedex-groups" class="space-y-6" data-bucket-labels={bucketLabels}></div>
+  <div id="pokedex-hero" class="hidden"></div>
+  <div id="pokedex-pills" class="hidden"></div>
+  <div id="pokedex-grid" class="hidden mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3"></div>
 </section>
+
+<style>
+  .ph-grid { display: grid; gap: 14px; grid-template-columns: 1.2fr 2fr 1.4fr; margin-top: 14px; }
+  @media (max-width: 820px) {
+    .ph-grid { grid-template-columns: 1fr !important; }
+  }
+</style>
 
 <script>
   import { getSupabase } from '../lib/supabase';
-  import { rarityTier, escAttr, type Bucket } from '../lib/karma';
+  import { escAttr } from '../lib/karma';
+  import { renderSpeciesCard, type CardLabels } from '../lib/species-card-html';
 
   const root      = document.querySelector<HTMLElement>('[data-pokedex-root]');
-  const groupsEl  = document.getElementById('pokedex-groups');
+  const heroEl    = document.getElementById('pokedex-hero');
+  const pillsEl   = document.getElementById('pokedex-pills');
+  const gridEl    = document.getElementById('pokedex-grid');
   const loading   = document.getElementById('pokedex-loading');
   const emptyEl   = document.getElementById('pokedex-empty');
   const notFound  = document.getElementById('pokedex-not-found');
@@ -103,17 +138,23 @@ const exploreRecentHref = `/${lang}/${lang === 'es' ? 'explorar/recientes' : 'ex
     rarity_bucket: number | null;
     first_observed_at: string;
     obs_count: number;
+    common_name_es: string | null;
+    common_name_en: string | null;
+    slug: string | null;
+    endemic_mx: boolean | null;
+    nom059_status: string | null;
+    thumbnail_url: string | null;
   };
 
-  function bucketLabel(bucket: number | null): string {
-    if (!groupsEl) return '';
-    let labels: Record<string, string> = {};
-    try {
-      labels = JSON.parse(groupsEl.dataset.bucketLabels ?? '{}') as Record<string, string>;
-    } catch { /* noop */ }
-    const key = String(Math.max(1, Math.min(5, bucket ?? 1)));
-    return labels[key] ?? '';
-  }
+  type SuggestRow = {
+    taxon_id: string;
+    scientific_name: string;
+    common_name_es: string | null;
+    common_name_en: string | null;
+    slug: string | null;
+    kingdom: string | null;
+    thumbnail_url: string | null;
+  };
 
   function readUsername(): string {
     const params = new URLSearchParams(window.location.search);
@@ -132,10 +173,23 @@ const exploreRecentHref = `/${lang}/${lang === 'es' ? 'explorar/recientes' : 'ex
     document.title = titleTpl.replaceAll('{handle}', handle);
   }
 
+  function cardLabels(): CardLabels {
+    const r = root!;
+    return {
+      rarity_5: r.dataset.labelCardRarity5 ?? '',
+      rarity_4: r.dataset.labelCardRarity4 ?? '',
+      rarity_3: r.dataset.labelCardRarity3 ?? '',
+      endemic_mx: r.dataset.labelCardEndemicMx ?? '',
+      nom059: r.dataset.labelCardNom059 ?? '',
+      no_photo: r.dataset.labelCardNoPhoto ?? '',
+      in_dex: r.dataset.labelCardInDex ?? '',
+    };
+  }
+
   async function loadFromView(supabase: ReturnType<typeof getSupabase>, userId: string): Promise<DexRow[] | null> {
     const { data, error } = await supabase
       .from('profile_pokedex')
-      .select('taxon_id, scientific_name, kingdom, rarity_bucket, first_observed_at, obs_count')
+      .select('taxon_id, scientific_name, kingdom, rarity_bucket, first_observed_at, obs_count, common_name_es, common_name_en, slug, endemic_mx, nom059_status, thumbnail_url')
       .eq('user_id', userId);
     if (error) return null;
     return (data ?? []) as DexRow[];
@@ -178,54 +232,210 @@ const exploreRecentHref = `/${lang}/${lang === 'es' ? 'explorar/recientes' : 'ex
       rarity_bucket: v.taxonId ? (rarityMap.get(v.taxonId) ?? 1) : 1,
       first_observed_at: v.first,
       obs_count: v.count,
+      common_name_es: null,
+      common_name_en: null,
+      slug: null,
+      endemic_mx: null,
+      nom059_status: null,
+      thumbnail_url: null,
     }));
   }
 
-  function render(rows: DexRow[]) {
-    if (!groupsEl) return;
-    if (!rows.length) {
-      if (mode === 'visitor' && emptyEl) {
-        const tpl = root?.dataset.labelVisitorEmpty ?? '';
-        // fallback to owner-empty copy if visitor copy missing
-        emptyEl.textContent = tpl || (root?.dataset.labelEmptyOwner ?? '');
+  async function loadSuggestion(supabase: ReturnType<typeof getSupabase>, viewerId: string): Promise<SuggestRow | null> {
+    try {
+      const { data } = await supabase.rpc('suggest_pokedex_target', { viewer_id: viewerId });
+      if (Array.isArray(data) && data.length > 0) return data[0] as SuggestRow;
+    } catch { /* swallow — tile 3 hides */ }
+    return null;
+  }
+
+  function commonNameOf(r: DexRow | SuggestRow): string | null {
+    return lang === 'es' ? r.common_name_es : r.common_name_en;
+  }
+
+  function obsCountLabel(n: number): string {
+    if (isEs) return n === 1 ? `${n} observación` : `${n} observaciones`;
+    return n === 1 ? `${n} observation` : `${n} observations`;
+  }
+
+  function renderHeroHtml(rows: DexRow[], suggestion: SuggestRow | null, isVisitor: boolean): string {
+    const r = root!;
+    const total = rows.length;
+    const kingdoms = new Set(rows.map((x) => x.kingdom).filter((k): k is string => !!k)).size;
+    const rares = rows.filter((x) => (x.rarity_bucket ?? 1) >= 4).length;
+    const obs = rows.reduce((sum, x) => sum + (x.obs_count ?? 0), 0);
+    const firstVisit = total === 0 && !isVisitor;
+
+    const rare = total > 0
+      ? [...rows].sort((a, b) => {
+          const rb = (b.rarity_bucket ?? 1) - (a.rarity_bucket ?? 1);
+          if (rb !== 0) return rb;
+          return a.first_observed_at.localeCompare(b.first_observed_at);
+        })[0]
+      : null;
+
+    const tile1 = firstVisit
+      ? `<div class="text-base font-bold text-zinc-900 dark:text-zinc-100">${escAttr(r.dataset.labelHeroFirstTitle ?? '')}</div>
+         <a href="${escAttr(r.dataset.hrefObserve ?? '')}" class="mt-2 inline-block text-sm text-emerald-700 dark:text-emerald-400 font-semibold hover:underline">${escAttr(r.dataset.labelHeroFirstCta ?? '')} →</a>`
+      : `<div class="text-5xl font-extrabold leading-none tracking-tight text-emerald-700 dark:text-emerald-400">${total}</div>
+         <div class="text-[11px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400 mt-1 font-semibold">${escAttr(r.dataset.labelHeroSpecies ?? '')}</div>
+         <div class="flex gap-3.5 mt-3 flex-wrap text-xs text-zinc-600 dark:text-zinc-300">
+           <span><b class="text-zinc-900 dark:text-zinc-100">${kingdoms}</b> ${escAttr(r.dataset.labelHeroKingdoms ?? '')}</span>
+           <span><b class="text-zinc-900 dark:text-zinc-100">${rares}</b> ${escAttr(r.dataset.labelHeroRares ?? '')}</span>
+           <span><b class="text-zinc-900 dark:text-zinc-100">${obs}</b> ${escAttr(r.dataset.labelHeroObs ?? '')}</span>
+         </div>`;
+
+    const tile2 = rare
+      ? `<div class="flex gap-3 items-center w-full">
+           ${rare.thumbnail_url
+             ? `<img src="${escAttr(rare.thumbnail_url)}" alt="${escAttr(rare.scientific_name)}" loading="eager" class="flex-none w-24 h-24 rounded-lg object-cover" style="box-shadow: 0 0 0 3px #fbbf24, 0 4px 12px rgba(180,83,9,0.25);">`
+             : `<div class="flex-none w-24 h-24 rounded-lg bg-amber-100 flex items-center justify-center text-amber-600 text-2xl">★</div>`}
+           <div class="min-w-0">
+             <div class="text-[10px] uppercase tracking-widest text-amber-700 font-bold">${escAttr(r.dataset.labelHeroRare ?? '')}</div>
+             <div class="text-base font-bold italic text-zinc-900 dark:text-zinc-100 truncate">${escAttr(rare.scientific_name)}</div>
+             ${commonNameOf(rare) ? `<div class="text-sm text-zinc-600 dark:text-zinc-300 truncate">${escAttr(commonNameOf(rare)!)}${rare.kingdom ? ` · ${escAttr(rare.kingdom)}` : ''}</div>` : ''}
+             <div class="text-amber-600 mt-1 tracking-widest text-sm">${'★'.repeat(rare.rarity_bucket ?? 1)}${'☆'.repeat(5 - (rare.rarity_bucket ?? 1))}</div>
+           </div>
+         </div>`
+      : `<div class="text-sm text-zinc-400 italic">—</div>`;
+
+    const tile3 = !isVisitor && suggestion
+      ? `<div class="flex gap-3 items-center">
+           ${suggestion.thumbnail_url
+             ? `<img src="${escAttr(suggestion.thumbnail_url)}" alt="${escAttr(suggestion.scientific_name)}" loading="lazy" class="flex-none rounded-lg object-cover" style="width:60px;height:60px;filter: grayscale(1) contrast(.5) brightness(.85); opacity:.55; border: 2px dashed #94a3b8;">`
+             : `<div class="flex-none rounded-lg border-2 border-dashed border-zinc-400 bg-zinc-100 flex items-center justify-center text-zinc-400 text-2xl" style="width:60px;height:60px;">?</div>`}
+           <div class="min-w-0">
+             <div class="text-[10px] uppercase tracking-widest text-zinc-500 font-bold">${escAttr(r.dataset.labelHeroCatch ?? '')}</div>
+             <div class="text-sm font-semibold italic text-zinc-900 dark:text-zinc-100 truncate">${escAttr(suggestion.scientific_name)}</div>
+             <div class="text-[11px] text-zinc-500 mt-0.5">${escAttr(r.dataset.labelHeroCatchWhy ?? '')}</div>
+           </div>
+         </div>
+         <a href="${escAttr(r.dataset.hrefExplore ?? '')}" class="mt-2 text-xs text-emerald-700 dark:text-emerald-400 font-semibold hover:underline">${escAttr(r.dataset.labelHeroCatchCta ?? '')}</a>`
+      : '';
+
+    const tile3Wrapper = tile3
+      ? `<div class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 p-4 flex flex-col justify-center" data-tile="suggest">${tile3}</div>`
+      : '';
+
+    return `<div class="ph-grid">
+      <div class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 p-4 flex flex-col justify-center">${tile1}</div>
+      <div class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 p-4 flex items-center" data-tile="rare">${tile2}</div>
+      ${tile3Wrapper}
+    </div>`;
+  }
+
+  function renderPillsHtml(rows: DexRow[]): string {
+    const r = root!;
+    const allLabel = r.dataset.labelHeroAll ?? 'All';
+    const total = rows.length;
+    const counts = new Map<string, number>();
+    for (const x of rows) {
+      const k = x.kingdom ?? 'Unknown';
+      counts.set(k, (counts.get(k) ?? 0) + 1);
+    }
+    const dotByKingdom: Record<string, string> = {
+      Animalia:  'bg-red-600',
+      Plantae:   'bg-green-600',
+      Fungi:     'bg-purple-500',
+      Chromista: 'bg-sky-500',
+      Protozoa:  'bg-amber-500',
+      Bacteria:  'bg-pink-500',
+      Archaea:   'bg-stone-500',
+    };
+    const items = Array.from(counts.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+    const inactiveCls = 'bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700';
+    const activeCls = 'bg-emerald-700 text-white border-emerald-700';
+    const allBtn = `<button type="button" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs border font-medium ${activeCls}" aria-pressed="true" data-kingdom=""><b>${escAttr(allLabel)}</b> · ${total}</button>`;
+    const itemBtns = items.map(([name, count]) => {
+      const dot = dotByKingdom[name] ?? 'bg-zinc-400';
+      return `<button type="button" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs border font-medium ${inactiveCls}" aria-pressed="false" data-kingdom="${escAttr(name)}"><span class="w-2 h-2 rounded-full ${dot}"></span>${escAttr(name)} <b>${count}</b></button>`;
+    }).join('');
+    return `<div class="flex flex-wrap gap-2 mt-4 pt-4 border-t border-dashed border-zinc-200 dark:border-zinc-800" role="group" data-kingdom-pills>${allBtn}${itemBtns}</div>`;
+  }
+
+  function wireKingdomPills() {
+    if (!pillsEl || !gridEl) return;
+    const buttons = pillsEl.querySelectorAll<HTMLButtonElement>('[data-kingdom]');
+    const inactiveCls = ['bg-white', 'dark:bg-zinc-900', 'text-zinc-700', 'dark:text-zinc-300', 'border-zinc-200', 'dark:border-zinc-700'];
+    const activeCls = ['bg-emerald-700', 'text-white', 'border-emerald-700'];
+    buttons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const k = btn.dataset.kingdom ?? '';
+        buttons.forEach((b) => {
+          b.setAttribute('aria-pressed', 'false');
+          b.classList.remove(...activeCls);
+          b.classList.add(...inactiveCls);
+        });
+        btn.setAttribute('aria-pressed', 'true');
+        btn.classList.remove(...inactiveCls);
+        btn.classList.add(...activeCls);
+        gridEl!.querySelectorAll<HTMLElement>('[data-taxon-id]').forEach((card) => {
+          const cardKingdom = card.getAttribute('data-kingdom') ?? '';
+          (card as HTMLElement).style.display = !k || cardKingdom === k ? '' : 'none';
+        });
+      });
+    });
+  }
+
+  function renderCards(rows: DexRow[]): string {
+    if (!gridEl) return '';
+    const labels = cardLabels();
+    const sorted = [...rows].sort((a, b) => {
+      const rb = (b.rarity_bucket ?? 1) - (a.rarity_bucket ?? 1);
+      if (rb !== 0) return rb;
+      return b.obs_count - a.obs_count;
+    });
+    return sorted.map((rrow) => {
+      const meta = `${obsCountLabel(rrow.obs_count)}${rrow.kingdom ? ` · ${rrow.kingdom}` : ''}`;
+      const cardHtml = renderSpeciesCard({
+        taxonId: rrow.taxon_id,
+        scientificName: rrow.scientific_name,
+        commonName: commonNameOf(rrow),
+        thumbnailUrl: rrow.thumbnail_url,
+        rarity_bucket: rrow.rarity_bucket,
+        endemic_mx: rrow.endemic_mx,
+        nom059_status: rrow.nom059_status,
+        metaLine: meta,
+        href: `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/species'}/?slug=${encodeURIComponent(rrow.scientific_name)}`,
+      }, labels);
+      // The first child needs a data-kingdom attribute so the pill filter can hide it
+      const k = rrow.kingdom ?? '';
+      return `<li>${cardHtml.replace(/^<(a|div)/, `<$1 data-kingdom="${escAttr(k)}"`)}</li>`;
+    }).join('');
+  }
+
+  function renderAll(rows: DexRow[], suggestion: SuggestRow | null, isVisitor: boolean) {
+    if (!heroEl || !pillsEl || !gridEl) return;
+
+    if (rows.length === 0) {
+      // First-visit owner state: still render hero (tile 1 in first-visit mode)
+      if (!isVisitor) {
+        heroEl.innerHTML = renderHeroHtml(rows, suggestion, false);
+        heroEl.classList.remove('hidden');
+      } else {
+        if (emptyEl) {
+          const tpl = root?.dataset.labelVisitorEmpty ?? '';
+          emptyEl.textContent = tpl || (root?.dataset.labelEmptyOwner ?? '');
+        }
+        emptyEl?.classList.remove('hidden');
       }
-      emptyEl?.classList.remove('hidden');
       loading?.classList.add('hidden');
       return;
     }
-    const byKingdom = new Map<string, DexRow[]>();
-    for (const r of rows) {
-      const k = r.kingdom ?? 'Unknown';
-      if (!byKingdom.has(k)) byKingdom.set(k, []);
-      byKingdom.get(k)!.push(r);
-    }
-    const kingdoms = Array.from(byKingdom.keys()).sort();
 
-    groupsEl.innerHTML = kingdoms.map((k) => {
-      const items = byKingdom.get(k)!.sort((a, b) => b.obs_count - a.obs_count);
-      const cards = items.map((v) => {
-        const stars = rarityTier((v.rarity_bucket ?? 1) as Bucket);
-        const date = new Date(v.first_observed_at).toLocaleDateString();
-        const countLabel = v.obs_count === 1
-          ? (isEs ? `${v.obs_count} observación` : `${v.obs_count} observation`)
-          : (isEs ? `${v.obs_count} observaciones` : `${v.obs_count} observations`);
-        const tier = bucketLabel(v.rarity_bucket);
-        return `<li class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-3 text-sm">
-          <div class="font-medium italic text-emerald-700 dark:text-emerald-400">${escAttr(v.scientific_name)}</div>
-          <div class="mt-1 text-xs text-zinc-500">${stars}${tier ? ` · ${escAttr(tier)}` : ''} · ${countLabel}</div>
-          <div class="text-[11px] text-zinc-400 mt-0.5">${escAttr(date)}</div>
-        </li>`;
-      }).join('');
-      return `<div>
-        <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2">${escAttr(k)}</h2>
-        <ul class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">${cards}</ul>
-      </div>`;
-    }).join('');
+    heroEl.innerHTML  = renderHeroHtml(rows, suggestion, isVisitor);
+    pillsEl.innerHTML = renderPillsHtml(rows);
+    gridEl.innerHTML  = `<ul class="contents">${renderCards(rows)}</ul>`;
+
+    heroEl.classList.remove('hidden');
+    pillsEl.classList.remove('hidden');
+    gridEl.classList.remove('hidden');
+    wireKingdomPills();
     loading?.classList.add('hidden');
   }
 
   async function runOwner() {
-    if (!groupsEl) return;
+    if (!gridEl) return;
     let supabase;
     try { supabase = getSupabase(); } catch {
       loading?.classList.add('hidden');
@@ -240,11 +450,12 @@ const exploreRecentHref = `/${lang}/${lang === 'es' ? 'explorar/recientes' : 'ex
     }
     let rows = await loadFromView(supabase, user.id);
     if (rows === null) rows = await loadFallback(supabase, user.id);
-    render(rows);
+    const suggestion = await loadSuggestion(supabase, user.id);
+    renderAll(rows, suggestion, false);
   }
 
   async function runVisitor() {
-    if (!groupsEl) return;
+    if (!gridEl) return;
     const username = readUsername();
     if (!username || !/^[a-zA-Z0-9_]{3,30}$/.test(username)) {
       loading?.classList.add('hidden');
@@ -253,7 +464,6 @@ const exploreRecentHref = `/${lang}/${lang === 'es' ? 'explorar/recientes' : 'ex
     }
     let supabase;
     try { supabase = getSupabase(); } catch {
-      // Misconfigured client = error path, not "not found".
       loading?.classList.add('hidden');
       errorEl?.classList.remove('hidden');
       return;
@@ -264,8 +474,6 @@ const exploreRecentHref = `/${lang}/${lang === 'es' ? 'explorar/recientes' : 'ex
       .select('id, username')
       .eq('username', username)
       .maybeSingle<{ id: string; username: string | null }>();
-    // maybeSingle treats "0 rows" as data=null + error=null. PGRST116 on a
-    // narrower path also flags zero rows. Anything else is a real error.
     if (lookupErr && lookupErr.code !== 'PGRST116') {
       loading?.classList.add('hidden');
       errorEl?.classList.remove('hidden');
@@ -293,7 +501,7 @@ const exploreRecentHref = `/${lang}/${lang === 'es' ? 'explorar/recientes' : 'ex
     }
     let rows = await loadFromView(supabase, profile.id);
     if (rows === null) rows = await loadFallback(supabase, profile.id);
-    render(rows);
+    renderAll(rows, null, true);
   }
 
   if (mode === 'visitor') {
