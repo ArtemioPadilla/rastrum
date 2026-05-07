@@ -418,7 +418,10 @@ const fileHint    = document.getElementById('obs2-file-hint');
     const items = [
       { label: 'PlantNet (plants)', labelEs: 'PlantNet (plantas)', ok: runners.plantnet },
       { label: 'BirdNET (birds)', labelEs: 'BirdNET (aves)', ok: runners.birdnet },
-      { label: 'Claude Vision', labelEs: 'Claude Vision', ok: runners.claude },
+      // Multi-provider since M32: the EF resolves Anthropic / OpenAI / Bedrock / Azure /
+      // Gemini / Vertex via the BYO → sponsor → pool chain, so labelling this row "Claude"
+      // misrepresented what's actually available. The user-visible label is now provider-agnostic.
+      { label: 'Cloud AI Vision', labelEs: 'IA en la nube', ok: runners.claude },
       { label: 'Phi Vision (local)', labelEs: 'Phi Vision (local)', ok: runners.phi },
       { label: 'Gemma 4 (local)', labelEs: 'Gemma 4 (local)', ok: runners.gemma },
       { label: 'EfficientNet (local)', labelEs: 'EfficientNet (local)', ok: runners.efficientNet },
