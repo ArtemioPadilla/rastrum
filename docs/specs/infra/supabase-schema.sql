@@ -4510,12 +4510,18 @@ SELECT
   expert_taxa, is_expert,
   observation_count, species_count, obs_count_7d, obs_count_30d,
   centroid_geog, last_observation_at, joined_at,
-  karma_total,
   -- Scalar lat/lng for clients that can't decode the geography WKB
   -- (the /community/map/ heatmap reads these directly). PostGIS
   -- geography → geometry cast is a zero-copy reinterpret for points.
   ST_Y(centroid_geog::geometry) AS centroid_lat,
-  ST_X(centroid_geog::geometry) AS centroid_lng
+  ST_X(centroid_geog::geometry) AS centroid_lng,
+  -- karma_total stays LAST per the append-only rule documented on
+  -- community_observers. PR #547 already fixed this; b6755ed re-introduced
+  -- the trap by appending centroid_lat/lng *after* karma_total without
+  -- moving karma_total to the new tail. Production now errors with
+  -- `cannot change name of view column "centroid_lat" to "karma_total"`
+  -- because prod's column 15 is centroid_lat. This restores the order.
+  karma_total
 FROM public.users
 WHERE hide_from_leaderboards = false;
 -- 2026-04-30: same change as community_observers above — M28-only opt-out.
