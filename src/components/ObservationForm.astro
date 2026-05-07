@@ -1105,7 +1105,7 @@ const cameraStationLoading     = observeStrings.camera_station_loading     ?? (i
 
     // Build the runner set based on what's actually available.
     const { runParallelIdentify } = await import('../lib/identify-cascade-client');
-    const { makePlantNetRunner, makeClaudeRunner, makePhiRunner, resolvePlantNetKey } = await import('../lib/identify-runners');
+    const { makePlantNetRunner, makeClaudeRunner, makePhiRunner, makeGemmaRunner, resolvePlantNetKey } = await import('../lib/identify-runners');
     const { hasAnthropicKey } = await import('../lib/anthropic-key');
 
     const runners: Record<string, import('../lib/identify-cascade-client').IdentifierRunner> = {};
@@ -1139,6 +1139,24 @@ const cameraStationLoading     = observeStrings.camera_station_loading     ?? (i
         }
       }
     } catch { /* WebLLM unavailable in this environment */ }
+
+    // Gemma 4 vision: parallel runtime to Phi (transformers.js + ONNX). Same
+    // opt-in pattern + own session-broken flag. Both can be enabled
+    // simultaneously — runParallelIdentify races them and uses whichever
+    // returns a confident answer first. When one runtime crashes on a
+    // given GPU/driver, the other often still works (independent kernels).
+    try {
+      const gemmaOptedIn = (typeof localStorage !== 'undefined')
+        ? localStorage.getItem('rastrum.prefs.useGemmaVision') === 'true'
+        : false;
+      if (gemmaOptedIn) {
+        const { getGemmaCacheStatus, gemmaSupported } = await import('../lib/onnx-vision');
+        if (gemmaSupported()) {
+          const status = await getGemmaCacheStatus();
+          if (status.cached) runners.onnx_gemma4_vision = makeGemmaRunner(locale);
+        }
+      }
+    } catch { /* transformers.js unavailable in this environment */ }
 
     // "Identify another way" — exclude the previous winner's runner so the
     // cascade resolves to the next-best provider. The map below covers

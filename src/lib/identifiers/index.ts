@@ -13,6 +13,7 @@ import { registry } from './registry';
 import { plantNetIdentifier } from './plantnet';
 import { claudeIdentifier } from './claude';
 import { phiVisionIdentifier } from './phi-vision';
+import { gemmaVisionIdentifier } from './gemma-vision';
 import { birdnetIdentifier } from './birdnet';
 import { onnxBaseIdentifier } from './onnx-base';
 import { cameraTrapMegadetectorIdentifier } from './camera-trap-megadetector';
@@ -24,6 +25,7 @@ export function bootstrapIdentifiers() {
   registry.register(plantNetIdentifier);
   registry.register(claudeIdentifier);
   registry.register(phiVisionIdentifier);
+  registry.register(gemmaVisionIdentifier);
   registry.register(birdnetIdentifier);
   registry.register(onnxBaseIdentifier);
   registry.register(cameraTrapMegadetectorIdentifier);

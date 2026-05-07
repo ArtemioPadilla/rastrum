@@ -45,6 +45,7 @@ high-level system view.
 | Runbook | Covers |
 |---|---|
 | [`add-identifier.md`](add-identifier.md) | Three-step recipe to add a new model / service to the cascade. |
+| [`on-device-vision-fallback.md`](on-device-vision-fallback.md) | Phi (MLC) + Gemma (transformers.js) dual-runtime resilience story; opt-in flags; what to do when one crashes. |
 
 ## Karma + reputation (Module 23)
 
