@@ -22,9 +22,7 @@ const tr = t(lang) as unknown as { species_card: Record<string, string>; explore
 const sc = tr.species_card;
 const eh = tr.explore_species_hero ?? {};
 
-const detailHref = slug
-  ? `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/species'}/?slug=${encodeURIComponent(slug)}`
-  : '#';
+const detailHref = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/species'}/?slug=${encodeURIComponent(scientificName)}`;
 ---
 <a href={detailHref} class="relative block rounded-2xl overflow-hidden min-h-[280px] text-white" data-featured-species>
   {thumbnailUrl && (

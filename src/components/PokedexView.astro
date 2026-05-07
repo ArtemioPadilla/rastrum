@@ -396,7 +396,7 @@ const exploreHref       = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'exp
         endemic_mx: rrow.endemic_mx,
         nom059_status: rrow.nom059_status,
         metaLine: meta,
-        href: rrow.slug ? `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/species'}/?slug=${encodeURIComponent(rrow.slug)}` : null,
+        href: `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/species'}/?slug=${encodeURIComponent(rrow.scientific_name)}`,
       }, labels);
       // The first child needs a data-kingdom attribute so the pill filter can hide it
       const k = rrow.kingdom ?? '';

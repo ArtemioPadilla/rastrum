@@ -523,7 +523,7 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
             if (featDiv && featDiv.tagName === 'DIV' && !featDiv.children.length) {
               const f = featured as { scientific_name: string; common_name_es: string | null; common_name_en: string | null; slug: string | null; thumbnail_url: string | null; is_endemic_mexico: boolean | null; nom059_status: string | null; rarity_bucket: number | null };
               const cName = lang === 'es' ? f.common_name_es : f.common_name_en;
-              const detailHref = f.slug ? `${indexBase}?slug=${encodeURIComponent(f.slug)}` : '#';
+              const detailHref = `${indexBase}?slug=${encodeURIComponent(f.scientific_name)}`;
               const featLabel = root.dataset.labelHeroFeatured ?? 'Featured';
               const endemicLbl = root.dataset.labelCardEndemicMx ?? 'Endemic';
               const nomLbl = root.dataset.labelCardNom059 ?? 'NOM-059';
