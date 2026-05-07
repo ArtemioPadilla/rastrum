@@ -2853,6 +2853,33 @@ GROUP BY o.observer_id, i.taxon_id, COALESCE(t.scientific_name, i.scientific_nam
 GRANT SELECT ON public.profile_pokedex TO anon, authenticated;
 
 -- ═════════════════════════════════════════════════════════════════════
+-- Module 34 — Pokédex/Especies visual redesign (2026-05-06)
+-- Adds: taxa_thumbnails, featured_species_current, mv_platform_stats,
+-- suggest_pokedex_target, and extends profile_pokedex.
+-- Spec: docs/superpowers/specs/2026-05-06-pokedex-especies-visual-design.md
+-- ═════════════════════════════════════════════════════════════════════
+
+-- taxa_thumbnails: one representative photo URL per taxon, picked from the
+-- most-recent synced primary identification's primary photo. Used by
+-- ExploreSpeciesView and FeaturedSpeciesCard.
+CREATE OR REPLACE VIEW public.taxa_thumbnails AS
+SELECT
+  t.id AS taxon_id,
+  (SELECT mf.url
+     FROM public.media_files mf
+     JOIN public.observations o ON o.id = mf.observation_id
+     JOIN public.identifications i ON i.observation_id = o.id
+    WHERE i.is_primary = true
+      AND i.taxon_id = t.id
+      AND o.sync_status = 'synced'
+      AND o.obscure_level <> 'full'
+    ORDER BY mf.is_primary DESC NULLS LAST, mf.created_at DESC
+    LIMIT 1) AS thumbnail_url
+FROM public.taxa t;
+
+GRANT SELECT ON public.taxa_thumbnails TO anon, authenticated;
+
+-- ═════════════════════════════════════════════════════════════════════
 -- Module 27 — Establishment Means (organism origin)
 -- Requested by Eugenio Padilla, 2026-04-28.
 -- Darwin Core: establishmentMeans / occurrenceStatus field.
