@@ -1,0 +1,232 @@
+---
+/**
+ * TaxonAutocomplete — issue #617
+ *
+ * Drop-in replacement for a plain <input> in the observation form.
+ * Shows live genus/species suggestions as the user types, using:
+ *   1. Rastrum `taxa` table (Supabase, LAC-relevant, with obs counts)
+ *   2. GBIF Species Suggest API (online fallback, global coverage)
+ *
+ * Props:
+ *   inputId    — id for the <input> element (wired by parent JS)
+ *   lang       — 'es' | 'en'
+ *   placeholder — optional override
+ */
+interface Props {
+  inputId?: string;
+  lang: 'es' | 'en';
+  placeholder?: string;
+}
+const {
+  inputId = 'obs2-taxon-input',
+  lang,
+  placeholder = lang === 'es' ? 'Nombre científico (opcional)' : 'Scientific name (optional)',
+} = Astro.props;
+const isEs = lang === 'es';
+---
+
+<div class="taxon-autocomplete relative" data-lang={lang}>
+  <input
+    id={inputId}
+    type="text"
+    autocomplete="off"
+    spellcheck="false"
+    class="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm"
+    placeholder={placeholder}
+    aria-autocomplete="list"
+    aria-haspopup="listbox"
+    aria-expanded="false"
+    role="combobox"
+  />
+  <!-- Dropdown -->
+  <ul
+    id={`${inputId}-dropdown`}
+    role="listbox"
+    aria-label={lang === 'es' ? 'Sugerencias de taxón' : 'Taxon suggestions'}
+    class="taxon-dropdown absolute z-50 left-0 right-0 mt-1 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-lg overflow-hidden hidden"
+  >
+    <!-- Items injected by JS -->
+  </ul>
+  <!-- Status for screen readers -->
+  <div id={`${inputId}-status`} class="sr-only" aria-live="polite" aria-atomic="true"></div>
+</div>
+
+<style>
+.taxon-dropdown li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  border-bottom: 1px solid rgb(228 228 231 / 0.5);
+  transition: background 0.1s;
+}
+.taxon-dropdown li:last-child { border-bottom: none; }
+.taxon-dropdown li:hover,
+.taxon-dropdown li[aria-selected="true"] {
+  background: rgb(16 185 129 / 0.08);
+}
+.dark .taxon-dropdown li:hover,
+.dark .taxon-dropdown li[aria-selected="true"] {
+  background: rgb(16 185 129 / 0.15);
+}
+.taxon-sci-name { font-style: italic; font-size: 0.875rem; color: inherit; flex: 1; min-width: 0; }
+.taxon-common   { font-size: 0.75rem; color: rgb(113 113 122); white-space: nowrap; }
+.dark .taxon-common { color: rgb(161 161 170); }
+.taxon-count    { font-size: 0.7rem; color: rgb(16 185 129); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.taxon-source-badge { font-size: 0.6rem; padding: 0.1rem 0.3rem; border-radius: 0.25rem; background: rgb(228 228 231); color: rgb(82 82 91); white-space: nowrap; }
+.dark .taxon-source-badge { background: rgb(63 63 70); color: rgb(161 161 170); }
+.taxon-star { color: rgb(245 158 11); font-size: 0.75rem; }
+</style>
+
+<script>
+import { createSuggestTaxa } from '../lib/taxon-autocomplete';
+
+(function () {
+  // Wait for DOM
+  document.addEventListener('DOMContentLoaded', initAll);
+  // Also init immediately in case DOMContentLoaded already fired (Astro partial hydration)
+  if (document.readyState !== 'loading') initAll();
+
+  function initAll() {
+    document.querySelectorAll<HTMLElement>('.taxon-autocomplete').forEach(init);
+  }
+
+  function init(container: HTMLElement) {
+    const lang = (container.dataset.lang ?? 'es') as 'es' | 'en';
+    const input = container.querySelector<HTMLInputElement>('input[type="text"]');
+    const dropdown = container.querySelector<HTMLElement>('[role="listbox"]');
+    const status   = container.querySelector<HTMLElement>('[aria-live]');
+    if (!input || !dropdown || !status) return;
+
+    let activeIndex = -1;
+    let currentResults: any[] = [];
+
+    // Per-instance debounced suggester (fix: no shared module-level timer)
+    const { suggest, cancel: cancelSuggest } = createSuggestTaxa();
+
+    // ── Input handler ──────────────────────────────────────────────────────
+    input.addEventListener('input', () => {
+      const q = input.value;
+      if (q.trim().length < 2) { cancelSuggest(); hide(); return; }
+
+      suggest(q, lang, (results) => {
+        currentResults = results;
+        activeIndex = -1;
+        render(results);
+      });
+    });
+
+    // ── Keyboard navigation ────────────────────────────────────────────────
+    input.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (!isOpen()) return;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setActive(Math.min(activeIndex + 1, currentResults.length - 1));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setActive(Math.max(activeIndex - 1, -1));
+      } else if (e.key === 'Enter') {
+        if (activeIndex >= 0) { e.preventDefault(); select(activeIndex); }
+      } else if (e.key === 'Escape') {
+        hide();
+      }
+    });
+
+    // Close on outside click
+    document.addEventListener('click', (e) => {
+      if (!container.contains(e.target as Node)) hide();
+    });
+
+    // ── Render ─────────────────────────────────────────────────────────────
+    function render(results: any[]) {
+      dropdown.innerHTML = '';
+      if (!results.length) { hide(); return; }
+
+      results.forEach((r, i) => {
+        const li = document.createElement('li');
+        li.setAttribute('role', 'option');
+        li.setAttribute('id', `${input.id}-opt-${i}`);
+        li.setAttribute('aria-selected', 'false');
+
+        const sci = document.createElement('span');
+        sci.className = 'taxon-sci-name';
+        sci.textContent = r.scientificName;
+
+        li.appendChild(sci);
+
+        if (r.commonNameEs || r.commonNameEn) {
+          const common = document.createElement('span');
+          common.className = 'taxon-common';
+          common.textContent = lang === 'es' ? (r.commonNameEs ?? r.commonNameEn) : (r.commonNameEn ?? r.commonNameEs);
+          li.appendChild(common);
+        }
+
+        if (r.observationCount !== null && r.observationCount > 0) {
+          const cnt = document.createElement('span');
+          cnt.className = 'taxon-count';
+          cnt.textContent = lang === 'es' ? `${r.observationCount} obs` : `${r.observationCount} obs`;
+          cnt.title = lang === 'es' ? `${r.observationCount} registros en Rastrum` : `${r.observationCount} records in Rastrum`;
+          li.appendChild(cnt);
+        }
+
+        if (r.inUserHistory) {
+          const star = document.createElement('span');
+          star.className = 'taxon-star';
+          star.textContent = '★';
+          star.title = lang === 'es' ? 'Ya observaste esta especie' : 'You have observed this species';
+          li.appendChild(star);
+        }
+
+        if (r.source === 'gbif') {
+          const badge = document.createElement('span');
+          badge.className = 'taxon-source-badge';
+          badge.textContent = 'GBIF';
+          li.appendChild(badge);
+        }
+
+        li.addEventListener('mousedown', (e) => { e.preventDefault(); select(i); });
+        dropdown.appendChild(li);
+      });
+
+      dropdown.classList.remove('hidden');
+      input.setAttribute('aria-expanded', 'true');
+      const n = results.length;
+      status.textContent = lang === 'es'
+        ? `${n} sugerencia${n !== 1 ? 's' : ''}`
+        : `${n} suggestion${n !== 1 ? 's' : ''}`;
+    }
+
+    function setActive(idx: number) {
+      const items = dropdown.querySelectorAll<HTMLElement>('[role="option"]');
+      items.forEach((el, i) => el.setAttribute('aria-selected', i === idx ? 'true' : 'false'));
+      activeIndex = idx;
+      if (idx >= 0) input.setAttribute('aria-activedescendant', `${input.id}-opt-${idx}`);
+    }
+
+    function select(idx: number) {
+      const r = currentResults[idx];
+      if (!r) return;
+      input.value = r.scientificName;
+      // Mark identification source as manual via a dataset flag that ObserveView2 checks
+      input.dataset.idSource = 'manual';
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+      hide();
+      status.textContent = '';
+    }
+
+    function hide() {
+      dropdown.classList.add('hidden');
+      dropdown.innerHTML = '';
+      input.setAttribute('aria-expanded', 'false');
+      input.removeAttribute('aria-activedescendant');
+      activeIndex = -1;
+      currentResults = [];
+    }
+
+    function isOpen() {
+      return !dropdown.classList.contains('hidden');
+    }
+  }
+})();
+</script>
