@@ -21,7 +21,7 @@ const isEs = lang === 'es';
       <div class="flex items-center gap-2">
         <select id="flags-status-filter" class="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-1.5 text-sm">
           <option value="open">{isEs ? 'Abiertos' : 'Open'}</option>
-          <option value="triaged">{isEs ? 'En revisión' : 'Triaged'}</option>
+          <option value="triaged">{isEs ? 'Revisados' : 'Triaged'}</option>
           <option value="resolved">{isEs ? 'Resueltos' : 'Resolved'}</option>
           <option value="dismissed">{isEs ? 'Descartados' : 'Dismissed'}</option>
           <option value="all">{isEs ? 'Todos' : 'All'}</option>
@@ -82,10 +82,10 @@ const isEs = lang === 'es';
 
   function statusPill(s: string): string {
     const cls: Record<string, string> = {
-      open:      'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
-      triaged:   'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
-      resolved:  'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
-      dismissed: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300',
+      open: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
+      triaged: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
+      resolved: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
+      dismissed: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400',
     };
     return `<span class="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded ${cls[s] ?? 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300'}">${escapeHtml(s)}</span>`;
   }
