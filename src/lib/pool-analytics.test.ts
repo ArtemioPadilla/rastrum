@@ -52,6 +52,10 @@ describe('fetchPoolAnalytics', () => {
     expect(result!.topTaxa).toHaveLength(2);
     expect(result!.topTaxa[0].scientific_name).toBe('Quercus robur');
     expect(result!.dailyUsage).toHaveLength(2);
+    // Regression: pre-2026-05-07 the client read `row.date` from a row
+    // shaped `{ usage_date, calls }`, so every chart bar had `date: undefined`.
+    expect(result!.dailyUsage[0].date).toBe('2026-05-01');
+    expect(result!.dailyUsage[0].calls).toBe(3);
   });
 
   it('returns null when pool is not found', async () => {
