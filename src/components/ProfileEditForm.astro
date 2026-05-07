@@ -290,6 +290,14 @@ const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } })
             </div>
           </div>
           <p id="vision-progress" class="hidden mt-2 text-xs text-zinc-600 dark:text-zinc-400 font-mono"></p>
+
+          <label class="mt-3 flex items-start gap-2 cursor-pointer">
+            <input type="checkbox" id="phi-vision-enable" class="mt-0.5" />
+            <div>
+              <p class="text-xs text-zinc-700 dark:text-zinc-300">{tr.auth.phi_vision_enable_label}</p>
+              <p class="text-[11px] text-amber-700 dark:text-amber-400 mt-0.5">{tr.auth.phi_vision_enable_warning}</p>
+            </div>
+          </label>
         </div>
 
         <!-- Text -->
@@ -883,6 +891,22 @@ const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } })
     optinBox.addEventListener('change', () => {
       if (optinBox.checked) localStorage.setItem(LAI_OPTIN, 'true');
       else                  localStorage.removeItem(LAI_OPTIN);
+    });
+  }
+
+  // Phi-3.5-vision is gated behind explicit opt-in. The MLC q4f16_1
+  // build crashes with WebGPU "Binding size 1 isn't a multiple of 4"
+  // errors on certain GPU/driver combos (esp. Apple Silicon Metal,
+  // Chromium 147+). Until MLC ships an alignment-fixed artifact, this
+  // toggle keeps Phi off-by-default; flipping it makes the model
+  // available to ObservationForm + the obs2 capability banner.
+  const PHI_OPTIN = 'rastrum.prefs.usePhiVision';
+  const phiBox = document.getElementById('phi-vision-enable') as HTMLInputElement | null;
+  if (phiBox) {
+    phiBox.checked = localStorage.getItem(PHI_OPTIN) === 'true';
+    phiBox.addEventListener('change', () => {
+      if (phiBox.checked) localStorage.setItem(PHI_OPTIN, 'true');
+      else                localStorage.removeItem(PHI_OPTIN);
     });
   }
 
