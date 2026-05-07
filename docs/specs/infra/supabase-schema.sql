@@ -7988,13 +7988,21 @@ STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  WITH owned AS (
-    SELECT taxon_id FROM public.profile_pokedex WHERE user_id = viewer_id
+  -- Resolve effective viewer: only the authenticated caller's own dex.
+  -- The viewer_id parameter must match auth.uid(); otherwise return 0 rows.
+  WITH effective AS (
+    SELECT auth.uid() AS uid
+     WHERE auth.uid() IS NOT NULL
+       AND auth.uid() = viewer_id
+  ),
+  owned AS (
+    SELECT taxon_id FROM public.profile_pokedex
+     WHERE user_id = (SELECT uid FROM effective)
   ),
   user_top_kingdom AS (
     SELECT kingdom, COUNT(*) AS c
       FROM public.profile_pokedex
-     WHERE user_id = viewer_id AND kingdom IS NOT NULL
+     WHERE user_id = (SELECT uid FROM effective) AND kingdom IS NOT NULL
      GROUP BY kingdom
      ORDER BY c DESC
      LIMIT 1
@@ -8009,14 +8017,15 @@ AS $$
     (SELECT tt.thumbnail_url FROM public.taxa_thumbnails tt WHERE tt.taxon_id = t.id) AS thumbnail_url
   FROM public.taxa t
   LEFT JOIN public.taxon_rarity tr ON tr.taxon_id = t.id
-  WHERE t.id NOT IN (SELECT taxon_id FROM owned)
+  WHERE EXISTS (SELECT 1 FROM effective)
+    AND t.id NOT IN (SELECT taxon_id FROM owned)
     AND t.kingdom = COALESCE((SELECT kingdom FROM user_top_kingdom), 'Animalia')
     AND COALESCE(tr.bucket, 1) <= 2
     AND EXISTS (
       SELECT 1 FROM public.taxa_thumbnails tt
        WHERE tt.taxon_id = t.id AND tt.thumbnail_url IS NOT NULL
     )
-  ORDER BY md5(t.id::text || viewer_id::text || to_char(now(), 'YYYY-MM-DD'))
+  ORDER BY md5(t.id::text || (SELECT uid FROM effective)::text || to_char(now(), 'YYYY-MM-DD'))
   LIMIT 1;
 $$;
 
