@@ -3222,6 +3222,15 @@ DROP POLICY IF EXISTS reports_owner_write ON public.reports;
 CREATE POLICY reports_owner_write ON public.reports FOR INSERT
   WITH CHECK (reporter_id = auth.uid());
 
+-- Admins and moderators can read all reports (powers the /consola/banderas/ view).
+DROP POLICY IF EXISTS reports_admin_read ON public.reports;
+CREATE POLICY reports_admin_read ON public.reports FOR SELECT
+  TO authenticated
+  USING (
+    public.has_role(auth.uid(), 'admin')
+    OR public.has_role(auth.uid(), 'moderator')
+  );
+
 -- 12) notifications
 CREATE TABLE IF NOT EXISTS public.notifications (
   id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
