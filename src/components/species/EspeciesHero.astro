@@ -1,0 +1,35 @@
+---
+import type { Locale } from '../../i18n/utils';
+import { t } from '../../i18n/utils';
+import FeaturedSpeciesCard from './FeaturedSpeciesCard.astro';
+import PlatformStats from './PlatformStats.astro';
+
+interface Featured {
+  scientificName: string;
+  commonName: string | null;
+  slug: string | null;
+  thumbnailUrl: string | null;
+  endemicMx: boolean | null;
+  nom059Status: string | null;
+  rarityBucket: number | null;
+}
+interface Stats { totalSpecies: number; totalObservers: number; totalObs: number; newSpeciesThisWeek: number; }
+
+interface Props { lang: Locale; featured: Featured | null; stats: Stats; }
+const { lang, featured, stats } = Astro.props;
+const tr = t(lang) as unknown as { explore_species_hero: Record<string, string> };
+const eh = tr.explore_species_hero;
+---
+<header class="space-y-3 py-6">
+  <h1 class="text-3xl font-bold tracking-tight">{eh.title}</h1>
+  <p class="text-zinc-600 dark:text-zinc-400 max-w-[60ch]">{eh.subtitle}</p>
+</header>
+<div class={`grid gap-4 es-hero-row ${featured ? '' : 'es-hero-row-no-featured'}`} style={featured ? 'grid-template-columns: 1.7fr 1fr;' : 'grid-template-columns: 1fr;'} data-es-hero-row>
+  {featured && <FeaturedSpeciesCard lang={lang} {...featured} />}
+  <PlatformStats lang={lang} {...stats} />
+</div>
+<style>
+  @media (max-width: 820px) {
+    [data-es-hero-row] { grid-template-columns: 1fr !important; }
+  }
+</style>

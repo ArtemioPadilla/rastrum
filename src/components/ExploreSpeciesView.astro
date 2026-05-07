@@ -13,6 +13,10 @@
  */
 import { t } from '../i18n/utils';
 import Skeleton from './Skeleton.astro';
+import EspeciesHero from './species/EspeciesHero.astro';
+import FilterChips from './species/FilterChips.astro';
+import { renderSpeciesCard, type CardLabels } from '../lib/species-card-html';
+import { parseChips, serializeChips, type ChipsState } from '../lib/species-filters';
 
 interface Props {
   lang: 'en' | 'es';
@@ -21,6 +25,8 @@ interface Props {
 const { lang } = Astro.props;
 const tr = t(lang);
 const page = tr.explore_pages.species;
+const sc = (tr as unknown as { species_card: Record<string, string> }).species_card ?? {};
+const eh = (tr as unknown as { explore_species_hero: Record<string, string> }).explore_species_hero ?? {};
 // Share route is locale-neutral: src/pages/share/obs/index.astro is the
 // only file. Building it as `/${lang}/share/obs/` 404s in production.
 const shareBase = `/share/obs/`;
@@ -49,14 +55,24 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
   data-label-recent-photos={page.recent_photos}
   data-label-no-coords={page.no_coordinates}
   data-label-page-title={page.page_title}
+  data-label-card-no-photo={sc.no_photo ?? ''}
+  data-label-card-in-dex={sc.in_dex ?? ''}
+  data-label-card-rarity-3={sc.rarity_3 ?? ''}
+  data-label-card-rarity-4={sc.rarity_4 ?? ''}
+  data-label-card-rarity-5={sc.rarity_5 ?? ''}
+  data-label-card-endemic-mx={sc.endemic_mx ?? ''}
+  data-label-card-nom059={sc.nom059 ?? ''}
+  data-label-hero-featured={eh.featured_label ?? ''}
+  data-label-hero-species={eh.species_label ?? ''}
+  data-label-hero-observers={eh.observers_label ?? ''}
+  data-label-hero-obs={eh.obs_label ?? ''}
+  data-label-hero-delta={eh.delta_label ?? ''}
 >
-  <header class="space-y-3 py-6">
-    <h1 class="es-title text-3xl font-bold tracking-tight">{page.title}</h1>
-    <p class="es-subtitle text-zinc-600 dark:text-zinc-400">{page.subtitle}</p>
-  </header>
-
   <!-- Index mode -->
   <div class="es-index">
+  <EspeciesHero lang={lang} featured={null} stats={{ totalSpecies: 0, totalObservers: 0, totalObs: 0, newSpeciesThisWeek: 0 }} />
+  <FilterChips lang={lang} />
+  <div id="es-hero-data" class="hidden" data-loaded="false"></div>
     <!-- M34: View switcher tabs -->
     <div id="es-view-tabs" class="flex gap-1 border-b border-zinc-200 dark:border-zinc-800 mb-4" role="tablist">
       <button id="es-tab-grid" data-view="grid" role="tab" aria-selected="true"
@@ -67,24 +83,6 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
         class="px-3 py-2 text-sm font-medium border-b-2 border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200">
         {lang === 'es' ? 'Árbol' : 'Tree'}
       </button>
-      <button id="es-tab-search" data-view="search" role="tab" aria-selected="false"
-        class="px-3 py-2 text-sm font-medium border-b-2 border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200">
-        {lang === 'es' ? 'Buscar' : 'Search'}
-      </button>
-    </div>
-
-    <!-- M34: Search panel (hidden by default) -->
-    <div id="es-panel-search" class="hidden">
-      <input
-        id="es-search-input"
-        type="search"
-        placeholder={lang === 'es' ? 'Buscar especie...' : 'Search species...'}
-        class="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-      />
-      <ul id="es-search-results" class="mt-2 space-y-1"></ul>
-      <p id="es-search-empty" class="hidden text-sm text-zinc-500 dark:text-zinc-400 py-4 text-center">
-        {lang === 'es' ? 'Sin resultados' : 'No results'}
-      </p>
     </div>
 
     <!-- M34: Radial/sunburst panel (hidden by default) -->
@@ -178,6 +176,8 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
 <script>
   import maplibregl from 'maplibre-gl';
   import { getSupabase } from '../lib/supabase';
+  import { renderSpeciesCard, type CardLabels } from '../lib/species-card-html';
+  import { parseChips, serializeChips, type ChipsState } from '../lib/species-filters';
 
   type Lang = 'en' | 'es';
 
@@ -253,8 +253,6 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
 
     const indexPane = root.querySelector('.es-index') as HTMLElement | null;
     const detailPane = root.querySelector('.es-detail') as HTMLElement | null;
-    const titleEl = root.querySelector('.es-title') as HTMLElement | null;
-    const subtitleEl = root.querySelector('.es-subtitle') as HTMLElement | null;
 
     const params = new URLSearchParams(window.location.search);
     const slug = params.get('slug');
@@ -262,9 +260,6 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
     if (slug) {
       indexPane?.classList.add('hidden');
       detailPane?.classList.remove('hidden');
-      // Hide redundant intro on detail.
-      titleEl?.classList.add('hidden');
-      subtitleEl?.classList.add('hidden');
       await renderDetail(root, lang, decodeURIComponent(slug), shareBase);
     } else {
       detailPane?.classList.add('hidden');
@@ -287,6 +282,13 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
     const errLabel = root.dataset.labelError ?? 'Failed to load';
 
     const hideSkeleton = () => skeletonEl?.classList.add('hidden');
+
+    // Wire filter chips eagerly — they're pure URL-state and must respond
+    // even when the data fetch below fails (e.g. CI preview with no Supabase
+    // keys). applyAllFilters() is a no-op when no cards are rendered yet.
+    let currentChips: ChipsState = parseChips(window.location.search);
+    wireChipClicks();
+    paintChipPressedState();
 
     let supabase;
     try {
@@ -357,6 +359,42 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
       return;
     }
 
+    const thumbMap = new Map<string, string>();
+    {
+      const { data: thumbs } = await supabase
+        .from('taxa_thumbnails')
+        .select('taxon_id, thumbnail_url')
+        .in('taxon_id', taxonIds);
+      for (const tt of (thumbs ?? []) as Array<{ taxon_id: string; thumbnail_url: string | null }>) {
+        if (tt.thumbnail_url) thumbMap.set(tt.taxon_id, tt.thumbnail_url);
+      }
+    }
+
+    let inDexSet = new Set<string>();
+    {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: dex } = await supabase
+            .from('profile_pokedex')
+            .select('taxon_id')
+            .eq('user_id', user.id);
+          inDexSet = new Set(((dex ?? []) as Array<{ taxon_id: string }>).map(d => d.taxon_id));
+        }
+      } catch { /* anon viewers see no ✓ marker */ }
+    }
+
+    let rarityMap = new Map<string, number>();
+    {
+      const { data: rar } = await supabase
+        .from('taxon_rarity')
+        .select('taxon_id, bucket')
+        .in('taxon_id', taxonIds);
+      for (const r of (rar ?? []) as Array<{ taxon_id: string; bucket: number | null }>) {
+        if (r.bucket != null) rarityMap.set(r.taxon_id, r.bucket);
+      }
+    }
+
     const enriched = taxaRows
       .map(t => ({
         ...t,
@@ -386,38 +424,41 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
       return;
     }
 
-    function badgePillsForCard(t: TaxaRow): string {
-      const pills: string[] = [];
-      if (t.nom059_status) {
-        pills.push(`<span class="inline-flex items-center rounded-full bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:text-amber-300">NOM-059 · ${escapeText(t.nom059_status)}</span>`);
-      }
-      if (t.cites_appendix) {
-        pills.push(`<span class="inline-flex items-center rounded-full bg-rose-100 dark:bg-rose-900/30 px-2 py-0.5 text-[10px] font-semibold text-rose-800 dark:text-rose-300">CITES · ${escapeText(t.cites_appendix)}</span>`);
-      }
-      if (t.iucn_category) {
-        pills.push(`<span class="inline-flex items-center rounded-full bg-sky-100 dark:bg-sky-900/30 px-2 py-0.5 text-[10px] font-semibold text-sky-800 dark:text-sky-300">IUCN · ${escapeText(t.iucn_category)}</span>`);
-      }
-      return pills.join(' ');
+    function cardLabels(): CardLabels {
+      return {
+        rarity_5: root.dataset.labelCardRarity5 ?? '',
+        rarity_4: root.dataset.labelCardRarity4 ?? '',
+        rarity_3: root.dataset.labelCardRarity3 ?? '',
+        endemic_mx: root.dataset.labelCardEndemicMx ?? '',
+        nom059: root.dataset.labelCardNom059 ?? '',
+        no_photo: root.dataset.labelCardNoPhoto ?? '',
+        in_dex: root.dataset.labelCardInDex ?? '',
+      };
     }
 
     function cardMarkup(t: TaxaRow & { count: number }): string {
       const common = commonName(t, lang);
       const countLabel = pluralise(t.count, oneTpl, otherTpl);
       const href = `${indexBase}?slug=${encodeURIComponent(t.scientific_name)}`;
-      return `<li>
-        <a
-          href="${href}"
-          class="es-card block rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-3 hover:border-emerald-400 dark:hover:border-emerald-700 transition-colors"
-          data-search="${escapeText((t.scientific_name + ' ' + (t.common_name_es ?? '') + ' ' + (t.common_name_en ?? '')).toLowerCase())}"
-        >
-          <p class="text-sm italic font-semibold text-zinc-900 dark:text-zinc-100 truncate">${escapeText(t.scientific_name)}</p>
-          ${common ? `<p class="text-xs text-zinc-600 dark:text-zinc-300 truncate">${escapeText(common)}</p>` : ''}
-          <div class="mt-2 flex items-center gap-2 flex-wrap">
-            <span class="inline-flex items-center rounded-full bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-[11px] font-medium text-zinc-700 dark:text-zinc-300">${escapeText(countLabel)}</span>
-            ${badgePillsForCard(t)}
-          </div>
-        </a>
-      </li>`;
+      const cardHtml = renderSpeciesCard({
+        taxonId: t.id,
+        scientificName: t.scientific_name,
+        commonName: common || null,
+        thumbnailUrl: thumbMap.get(t.id) ?? null,
+        rarity_bucket: rarityMap.get(t.id) ?? null,
+        endemic_mx: t.is_endemic_mexico ?? null,
+        nom059_status: t.nom059_status ?? null,
+        metaLine: countLabel,
+        inDex: inDexSet.has(t.id),
+        href,
+      }, cardLabels());
+      const search = (t.scientific_name + ' ' + (t.common_name_es ?? '') + ' ' + (t.common_name_en ?? '')).toLowerCase();
+      const k = (t as Record<string, unknown>).kingdom as string ?? '';
+      const enhanced = cardHtml.replace(
+        /^<(a|div)/,
+        `<$1 data-search="${escapeText(search)}" data-kingdom="${escapeText(k)}" data-endemic-mx="${t.is_endemic_mexico ? 'true' : 'false'}" data-rarity="${rarityMap.get(t.id) ?? 1}" data-nom059="${escapeText(t.nom059_status ?? '')}"`
+      );
+      return `<li>${enhanced}</li>`;
     }
 
     if (listEl) {
@@ -429,29 +470,14 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
       searchEl.addEventListener('input', () => {
         if (timer) window.clearTimeout(timer);
         timer = window.setTimeout(() => {
-          const q = (searchEl.value ?? '').trim().toLowerCase();
-          const cards = listEl?.querySelectorAll<HTMLElement>('li > a.es-card');
-          let visible = 0;
-          cards?.forEach(card => {
-            const haystack = card.dataset.search ?? '';
-            const li = card.parentElement as HTMLElement | null;
-            const match = !q || haystack.includes(q);
-            if (li) li.style.display = match ? '' : 'none';
-            if (match) visible++;
-          });
-          if (visible === 0 && q) {
-            emptyEl?.classList.remove('hidden');
-          } else {
-            emptyEl?.classList.add('hidden');
-          }
+          applyAllFilters();
         }, 200);
       });
     }
 
-    // ── M34: View switcher (grid / radial / search) ────────────────────
+    // ── M34: View switcher (grid / radial) ────────────────────
     const esTabs = root?.querySelectorAll<HTMLButtonElement>('[data-view]');
     const esPanelGrid = document.getElementById('es-panel-grid');
-    const esPanelSearch = document.getElementById('es-panel-search');
     const esPanelRadial = document.getElementById('es-panel-radial');
     const isEs = lang === 'es';
 
@@ -459,7 +485,6 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
       esTabs?.forEach(btn => {
         const active = btn.dataset.view === view;
         btn.setAttribute('aria-selected', String(active));
-        // Reset classes
         btn.className = 'px-3 py-2 text-sm font-medium border-b-2 ';
         if (active) {
           btn.className += 'border-emerald-700 text-emerald-700 dark:text-emerald-400 dark:border-emerald-400';
@@ -468,61 +493,131 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
         }
       });
 
-      // Toggle whole panels — never touch the stateful skeleton/empty/error
-      // children, which are owned by the data-load state machine.
       esPanelGrid?.classList.toggle('hidden', view !== 'grid');
-      esPanelSearch?.classList.toggle('hidden', view !== 'search');
       esPanelRadial?.classList.toggle('hidden', view !== 'radial');
 
-      if (view === 'search') initM34Search();
       if (view === 'radial') initSunburst();
     }
 
     esTabs?.forEach(btn => {
       btn.addEventListener('click', () => switchEsView(btn.dataset.view ?? 'grid'));
     });
-    // Ensure grid view is active on first load (panels start hidden via HTML
-    // but gridEls need explicit show so the initial state is consistent)
     switchEsView('grid');
 
-    // ── M34: Search ────────────────────────────────────────
-    let searchInitialized = false;
-    function initM34Search() {
-      if (searchInitialized) return;
-      searchInitialized = true;
-      const searchInput = document.getElementById('es-search-input') as HTMLInputElement | null;
-      const searchResults = document.getElementById('es-search-results');
-      const searchEmpty = document.getElementById('es-search-empty');
-      if (!searchInput || !searchResults) return;
+    // ── M34: Hero data load ─────────────────────────────────
+    async function loadAndRenderHero() {
+      const heroDataEl = document.getElementById('es-hero-data');
+      if (!heroDataEl || heroDataEl.dataset.loaded === 'true') return;
+      try {
+        const [{ data: featured }, { data: stats }] = await Promise.all([
+          supabase.from('featured_species_current').select('*').limit(1).maybeSingle(),
+          supabase.from('mv_platform_stats').select('*').limit(1).maybeSingle(),
+        ]);
+        if (featured || stats) {
+          const heroRow = document.querySelector<HTMLElement>('[data-es-hero-row]');
+          if (heroRow && stats) {
+            const fmt = (n: number): string => n >= 10000 ? (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k' : n >= 1000 ? n.toLocaleString() : String(n);
+            const counters = heroRow.querySelectorAll<HTMLElement>('.text-3xl');
+            if (counters.length >= 4) {
+              counters[0].textContent = fmt((stats as { total_species: number }).total_species ?? 0);
+              counters[1].textContent = fmt((stats as { total_observers: number }).total_observers ?? 0);
+              counters[2].textContent = fmt((stats as { total_obs: number }).total_obs ?? 0);
+              counters[3].textContent = `+${(stats as { new_species_this_week: number }).new_species_this_week ?? 0}`;
+            }
+          }
+          if (heroRow && featured) {
+            const featDiv = heroRow.firstElementChild;
+            if (featDiv && featDiv.tagName === 'DIV' && !featDiv.children.length) {
+              heroRow.style.gridTemplateColumns = '1.7fr 1fr';
+              const f = featured as { scientific_name: string; common_name_es: string | null; common_name_en: string | null; slug: string | null; thumbnail_url: string | null; is_endemic_mexico: boolean | null; nom059_status: string | null; rarity_bucket: number | null };
+              const cName = lang === 'es' ? f.common_name_es : f.common_name_en;
+              const detailHref = `${indexBase}?slug=${encodeURIComponent(f.scientific_name)}`;
+              const featLabel = root.dataset.labelHeroFeatured ?? 'Featured';
+              const endemicLbl = root.dataset.labelCardEndemicMx ?? 'Endemic';
+              const nomLbl = root.dataset.labelCardNom059 ?? 'NOM-059';
+              const rare4Lbl = root.dataset.labelCardRarity4 ?? 'Rare';
+              const rare5Lbl = root.dataset.labelCardRarity5 ?? 'Exceptional';
+              const newEl = document.createElement('a');
+              newEl.href = escapeText(detailHref);
+              newEl.className = 'relative block rounded-2xl overflow-hidden min-h-[280px] text-white';
+              newEl.setAttribute('data-featured-species', '');
+              newEl.innerHTML = `${f.thumbnail_url ? `<img src="${escapeText(f.thumbnail_url)}" alt="${escapeText(f.scientific_name)}" loading="eager" class="absolute inset-0 w-full h-full object-cover">` : ''}<div class="absolute inset-0" style="background: linear-gradient(115deg, rgba(15,23,42,.85) 0%, rgba(15,23,42,.55) 50%, transparent 80%);"></div><div class="relative h-full p-6 flex flex-col justify-between min-h-[280px]"><div><span class="inline-block text-[10px] tracking-[0.15em] uppercase font-bold px-2.5 py-1 rounded-full bg-white/15 border border-white/25 text-amber-100 backdrop-blur-md">${escapeText(featLabel)}</span><h3 class="italic text-2xl font-extrabold mt-3.5">${escapeText(f.scientific_name)}</h3>${cName ? `<p class="text-sm text-zinc-300 mt-1">${escapeText(cName)}</p>` : ''}</div><div class="flex flex-wrap gap-1.5 mt-auto">${f.is_endemic_mexico ? `<span class="px-2.5 py-1 text-[11px] font-semibold rounded-full" style="background: rgba(132,204,22,0.2); border: 1px solid rgba(132,204,22,0.4); color: #d9f99d;">🇲🇽 ${escapeText(endemicLbl)}</span>` : ''}${f.nom059_status ? `<span class="px-2.5 py-1 text-[11px] font-semibold rounded-full" style="background: rgba(251,191,36,0.18); border: 1px solid rgba(251,191,36,0.4); color: #fde68a;">${escapeText(nomLbl)}</span>` : ''}${f.rarity_bucket != null && f.rarity_bucket >= 4 ? `<span class="px-2.5 py-1 text-[11px] font-semibold rounded-full" style="background: rgba(245,158,11,0.18); border: 1px solid rgba(245,158,11,0.4); color: #fcd34d;">★ ${escapeText(f.rarity_bucket >= 5 ? rare5Lbl : rare4Lbl)}</span>` : ''}</div></div>`;
+              featDiv.replaceWith(newEl);
+            }
+          }
+          heroDataEl.dataset.loaded = 'true';
+        }
+      } catch { /* hero stays as zero-state — acceptable */ }
+    }
 
-      function renderSearchResults(filtered: typeof allTaxa) {
-        searchResults!.innerHTML = '';
-        searchEmpty?.classList.toggle('hidden', filtered.length > 0);
-        filtered.slice(0, 30).forEach(t => {
-          const li = document.createElement('li');
-          li.className = 'rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-2 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 text-sm';
-          const cName = (isEs ? t.common_name_es : t.common_name_en) ?? '';
-          li.innerHTML = `<span class="font-medium italic text-zinc-900 dark:text-zinc-100">${escapeText(t.scientific_name)}</span>${cName ? ` <span class="text-zinc-500">· ${escapeText(cName)}</span>` : ''}`;
-          li.addEventListener('click', () => showDetail(t.id));
-          searchResults!.appendChild(li);
-        });
+    void loadAndRenderHero();
+
+    // ── M34: Chip filters ──────────────────────────────────
+    function applyAllFilters() {
+      const cards = listEl?.querySelectorAll<HTMLElement>('li > [data-taxon-id]') ?? [];
+      let visibleCount = 0;
+      cards.forEach((card) => {
+        const li = card.parentElement as HTMLElement;
+        const k = card.getAttribute('data-kingdom') ?? '';
+        const search = card.getAttribute('data-search') ?? '';
+        const endemicAttr = card.getAttribute('data-endemic-mx') === 'true';
+        let visible = true;
+        if (currentChips.kingdom && k !== currentChips.kingdom) visible = false;
+        if (currentChips.endemic && !endemicAttr) visible = false;
+        if (currentChips.rare) {
+          const rb = parseInt(card.getAttribute('data-rarity') ?? '1', 10);
+          if (rb < 4) visible = false;
+        }
+        if (currentChips.nom059) {
+          const nom = card.getAttribute('data-nom059') ?? '';
+          if (!['E', 'A', 'Pr'].includes(nom)) visible = false;
+        }
+        const q = (searchEl?.value ?? '').trim().toLowerCase();
+        if (q && !search.includes(q)) visible = false;
+        li.style.display = visible ? '' : 'none';
+        if (visible) visibleCount++;
+      });
+      if (visibleCount === 0 && (currentChips.endemic || currentChips.nom059 || currentChips.rare || currentChips.kingdom || (searchEl?.value ?? '').trim())) {
+        emptyEl?.classList.remove('hidden');
+      } else {
+        emptyEl?.classList.add('hidden');
       }
+      paintChipPressedState();
+    }
 
-      let debounceTimer: ReturnType<typeof setTimeout>;
-      searchInput.addEventListener('input', () => {
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
-          const q = searchInput.value.toLowerCase().trim();
-          if (!q) { renderSearchResults([]); searchEmpty?.classList.add('hidden'); return; }
-          const filtered = allTaxa.filter(t =>
-            t.scientific_name.toLowerCase().includes(q) ||
-            (t.common_name_es ?? '').toLowerCase().includes(q) ||
-            (t.common_name_en ?? '').toLowerCase().includes(q)
-          );
-          renderSearchResults(filtered);
-        }, 250);
+    function paintChipPressedState() {
+      const chips = document.querySelectorAll<HTMLButtonElement>('[data-filter-chips] [data-chip]');
+      chips.forEach((btn) => {
+        const c = btn.dataset.chip ?? '';
+        let pressed = false;
+        if (c === 'all') pressed = !currentChips.endemic && !currentChips.nom059 && !currentChips.rare && !currentChips.kingdom;
+        else if (c === 'endemic') pressed = currentChips.endemic;
+        else if (c === 'nom059')  pressed = currentChips.nom059;
+        else if (c === 'rare')    pressed = currentChips.rare;
+        else if (c.startsWith('kingdom:')) pressed = currentChips.kingdom === c.slice('kingdom:'.length);
+        btn.setAttribute('aria-pressed', pressed ? 'true' : 'false');
       });
     }
+
+    function wireChipClicks() {
+      const chips = document.querySelectorAll<HTMLButtonElement>('[data-filter-chips] [data-chip]');
+      chips.forEach((btn) => btn.addEventListener('click', () => {
+        const c = btn.dataset.chip ?? '';
+        if (c === 'all') {
+          currentChips = { endemic: false, nom059: false, rare: false, kingdom: null };
+        } else if (c === 'endemic' || c === 'nom059' || c === 'rare') {
+          currentChips = { ...currentChips, [c]: !currentChips[c] };
+        } else if (c.startsWith('kingdom:')) {
+          const k = c.slice('kingdom:'.length);
+          currentChips = { ...currentChips, kingdom: currentChips.kingdom === k ? null : k };
+        }
+        history.replaceState({}, '', `${window.location.pathname}${serializeChips(currentChips)}`);
+        applyAllFilters();
+      }));
+    }
+
+    wireChipClicks();
+    applyAllFilters();
 
     // ── M34: Sunburst ──────────────────────────────────────────
     let sunburstInitialized = false;

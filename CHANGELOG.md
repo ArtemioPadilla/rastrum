@@ -6,6 +6,22 @@ Versions use CalVer `YYYY.M.N`.
 
 ---
 
+## [2026.5.2] — 2026-05-07
+
+### Added
+
+- **Pokédex visual redesign (M34 Phase 2)** — `/perfil/dex/` rebuilt photo-first. New 3-tile hero on desktop (total + kingdoms/rares/obs/streak | rarest catch with gold ring | "Para cazar" suggestion in greyscale silhouette), collapses to 1-column stack below 820 px. Kingdom pill row acts as both stat strip and active filter (color-coded dot per kingdom). Cards switched to direction D — photo top + scientific name + common name + rarity/endemic/NOM-059 pill + meta line. First-visit owner state with CTA to `/observar`. Visitor mode hides tile 3. Backed by `suggest_pokedex_target(uuid)` SECURITY DEFINER RPC (auth.uid() enforced) and the extended `profile_pokedex` view (added thumbnail_url, common_name_es/en, slug, endemic_mx, nom059_status). (#650)
+- **Especies catalog redesign (M34 Phase 2)** — `/explorar/especies/` index mode rebuilt with featured species hero + platform stats panel (species / observers / observations / +N this week) + composable filter chips (Endemics / NOM-059 / Rare / per-kingdom) with URL state. Buscar tab dropped — the always-visible search input on the grid panel covers it. Cards switched to direction D with thumbnails. When viewer is logged in, cards show a green ✓ overlay for species already in their dex. Backed by `featured_species_current` view (deterministic per ISO week), `mv_platform_stats` MV (hourly cron refresh), and `taxa_thumbnails` view. (#650)
+- **`SpeciesCard` shared component family** — `src/components/species/{SpeciesCard,KingdomPills,FeaturedSpeciesCard,PlatformStats,EspeciesHero,FilterChips}.astro` plus the `renderSpeciesCard()` JS-string mirror in `src/lib/species-card-html.ts` so both client-rendered views (Pokédex, Especies grid) emit DOM-identical cards. Pure pill-priority resolver `pillForSpecies()` (rarity ≥ 4 → endemic → NOM-059 threatened → rarity = 3 → none) and chip URL-state serializer `parseChips/serializeChips/filterByChips` with 18 unit tests. (#650)
+
+### Fixed
+
+- **NOM-059 status comparisons** — `species-display.ts`, `species-filters.ts`, and the `featured_species_current` view all now use the actual short codes `'E' | 'A' | 'Pr'` (per the `taxa.nom059_status` CHECK constraint at line 177 of the schema) instead of long-form names that would never match real data. (#650)
+- **`profile_pokedex` thumbnail lookup** — extended view exposes `thumbnail_url` via correlated subquery against the user's earliest synced primary observation per taxon. Filters out `obscure_level = 'private'` rows. Append-only column extension preserves existing column positions 1–7. (#650)
+- **Schema apply ordering** — forward-declared `taxa.slug` ALTER inside the M34 banner so `db-validate.yml` top-to-bottom replay resolves slug references before the canonical ALTER at line 7032. (#650)
+
+---
+
 ## [2026.5.1] — 2026-05-07
 
 ### Added
