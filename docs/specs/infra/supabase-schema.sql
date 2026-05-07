@@ -7523,22 +7523,19 @@ LANGUAGE sql STABLE SECURITY DEFINER AS $$
   SELECT NULL::text, NULL::bigint WHERE false;
 $$;
 
--- Daily usage for a pool (current month). Pre-2026-05-07 this body was
--- broken: it ignored p_pool_id (returned aggregate consumption across
--- ALL pools, joining pool_consumption — which is keyed by user, not pool —
--- and any caller could query any pool's "shape"). Now reads from the
--- per-pool aggregate table populated by consume_pool_slot, and only
--- returns rows when the caller owns the pool.
+-- Daily usage for a pool. Original broken body — kept here so the schema
+-- replays in order against a fresh DB (pool_usage_daily is declared later
+-- in the file). The FIXED body that joins pool_usage_daily + sponsor_pools
+-- and filters by caller ownership lives at the bottom of the file in the
+-- 2026-05-07 trailer; CREATE OR REPLACE FUNCTION is idempotent and the
+-- last definition wins, so consumers get the corrected behavior.
 CREATE OR REPLACE FUNCTION public.pool_daily_usage(p_pool_id uuid)
 RETURNS TABLE(usage_date date, calls bigint)
 LANGUAGE sql STABLE SECURITY DEFINER AS $$
-  SELECT pud.day AS usage_date, pud.count::bigint AS calls
-    FROM public.pool_usage_daily pud
-    JOIN public.sponsor_pools sp ON sp.id = pud.pool_id
-   WHERE pud.pool_id = p_pool_id
-     AND sp.sponsor_id = auth.uid()
-     AND pud.day >= (current_date - interval '30 days')::date
-   ORDER BY pud.day;
+  SELECT pc.day AS usage_date, pc.count::bigint AS calls
+  FROM public.pool_consumption pc
+  WHERE pc.day >= date_trunc('month', now())::date
+  ORDER BY pc.day;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.pool_top_taxa(uuid) TO authenticated;
@@ -8130,3 +8127,20 @@ AS $$
 $$;
 
 GRANT EXECUTE ON FUNCTION public.suggest_pokedex_target(uuid) TO authenticated;
+
+-- ── 2026-05-07: pool_daily_usage final body (overrides earlier stub) ──
+-- Earlier in this file the function is declared with a placeholder body
+-- so the schema replays top-to-bottom on a fresh DB (pool_usage_daily is
+-- created in this same trailer block). This trailing CREATE OR REPLACE
+-- supplies the real body — same function signature, idempotent.
+CREATE OR REPLACE FUNCTION public.pool_daily_usage(p_pool_id uuid)
+RETURNS TABLE(usage_date date, calls bigint)
+LANGUAGE sql STABLE SECURITY DEFINER AS $$
+  SELECT pud.day AS usage_date, pud.count::bigint AS calls
+    FROM public.pool_usage_daily pud
+    JOIN public.sponsor_pools sp ON sp.id = pud.pool_id
+   WHERE pud.pool_id = p_pool_id
+     AND sp.sponsor_id = auth.uid()
+     AND pud.day >= (current_date - interval '30 days')::date
+   ORDER BY pud.day;
+$$;
