@@ -2829,28 +2829,66 @@ WHERE public.can_see_facet(u.id, 'karma_total', (SELECT auth.uid()));
 GRANT SELECT ON public.profile_karma TO anon, authenticated;
 
 -- Pokédex — every taxon the user has observed, joined to taxon_rarity.
+-- M34 (2026-05-06): added common_name_*, slug, endemic_mx, nom059_status,
+-- thumbnail_url for the visual redesign. Existing column order preserved.
 CREATE OR REPLACE VIEW public.profile_pokedex AS
+WITH base AS (
+  SELECT
+    o.observer_id    AS user_id,
+    i.taxon_id,
+    COALESCE(t.scientific_name, i.scientific_name) AS scientific_name,
+    t.kingdom,
+    tr.bucket        AS rarity_bucket,
+    MIN(o.observed_at)    AS first_observed_at,
+    -- sample_obs_id picks the user's earliest observation of this taxon as
+    -- the source of the dex thumbnail. Same MIN(uuid::text)::uuid trick as
+    -- profile_top_species — Postgres has no min(uuid).
+    MIN(o.id::text)::uuid AS sample_obs_id,
+    COUNT(*)::int    AS obs_count,
+    t.common_name_es,
+    t.common_name_en,
+    t.slug,
+    t.is_endemic_mexico   AS endemic_mx,
+    t.nom059_status
+  FROM public.observations o
+  JOIN public.identifications i
+    ON i.observation_id = o.id AND i.is_primary = true
+  LEFT JOIN public.taxa t          ON t.id = i.taxon_id
+  LEFT JOIN public.taxon_rarity tr ON tr.taxon_id = i.taxon_id
+  WHERE
+    o.sync_status = 'synced'
+    AND o.obscure_level <> 'private'
+    AND i.scientific_name IS NOT NULL
+    AND public.can_see_facet(o.observer_id, 'pokedex', (SELECT auth.uid()))
+  GROUP BY
+    o.observer_id, i.taxon_id,
+    COALESCE(t.scientific_name, i.scientific_name),
+    t.kingdom, tr.bucket,
+    t.common_name_es, t.common_name_en, t.slug,
+    t.is_endemic_mexico, t.nom059_status
+)
 SELECT
-  o.observer_id   AS user_id,
-  i.taxon_id,
-  COALESCE(t.scientific_name, i.scientific_name) AS scientific_name,
-  t.kingdom,
-  tr.bucket       AS rarity_bucket,
-  MIN(o.observed_at) AS first_observed_at,
-  COUNT(*)::int   AS obs_count
-FROM public.observations o
-JOIN public.identifications i
-  ON i.observation_id = o.id AND i.is_primary = true
-LEFT JOIN public.taxa t               ON t.id = i.taxon_id
-LEFT JOIN public.taxon_rarity tr      ON tr.taxon_id = i.taxon_id
-WHERE
-  o.sync_status = 'synced'
-  AND o.obscure_level <> 'private'
-  AND i.scientific_name IS NOT NULL
-  AND public.can_see_facet(o.observer_id, 'pokedex', (SELECT auth.uid()))
-GROUP BY o.observer_id, i.taxon_id, COALESCE(t.scientific_name, i.scientific_name), t.kingdom, tr.bucket;
+  b.user_id,
+  b.taxon_id,
+  b.scientific_name,
+  b.kingdom,
+  b.rarity_bucket,
+  b.first_observed_at,
+  b.obs_count,
+  b.common_name_es,
+  b.common_name_en,
+  b.slug,
+  b.endemic_mx,
+  b.nom059_status,
+  (SELECT mf.url
+     FROM public.media_files mf
+    WHERE mf.observation_id = b.sample_obs_id
+    ORDER BY mf.is_primary DESC NULLS LAST, mf.created_at ASC
+    LIMIT 1) AS thumbnail_url
+FROM base b;
 
 GRANT SELECT ON public.profile_pokedex TO anon, authenticated;
+
 
 -- ═════════════════════════════════════════════════════════════════════
 -- Module 34 — Pokédex/Especies visual redesign (2026-05-06)
