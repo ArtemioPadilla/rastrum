@@ -4021,6 +4021,20 @@ $$;
 REVOKE ALL ON FUNCTION public.resolve_sponsorship(uuid, public.ai_provider) FROM public;
 GRANT EXECUTE ON FUNCTION public.resolve_sponsorship(uuid, public.ai_provider) TO service_role;
 
+-- has_active_sponsorship: lightweight boolean wrapper used by the client-side
+-- claude.ts isAvailable() check. Returns TRUE when at least one active,
+-- non-exhausted sponsorship exists for the calling user and given provider.
+DROP FUNCTION IF EXISTS public.has_active_sponsorship(public.ai_provider);
+CREATE OR REPLACE FUNCTION public.has_active_sponsorship(
+  p_provider public.ai_provider
+) RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.resolve_sponsorship(auth.uid(), p_provider) LIMIT 1
+  );
+$$;
+REVOKE ALL ON FUNCTION public.has_active_sponsorship(public.ai_provider) FROM public;
+GRANT EXECUTE ON FUNCTION public.has_active_sponsorship(public.ai_provider) TO authenticated;
+
 -- 10. Extend karma_events.reason CHECK to include sponsorship reasons.
 ALTER TABLE public.karma_events DROP CONSTRAINT IF EXISTS karma_events_reason_check;
 ALTER TABLE public.karma_events ADD CONSTRAINT karma_events_reason_check
