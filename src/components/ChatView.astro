@@ -80,6 +80,22 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
         >×</button>
       </div>
 
+      <!-- Model picker — shown only when a photo attachment is staged. -->
+      <div
+        id="chat-model-picker"
+        class="hidden flex flex-wrap gap-1.5 items-center text-[11px]"
+        role="radiogroup"
+        aria-label={tr.chat.model_picker_label}
+      >
+        <span class="text-zinc-500 dark:text-zinc-400 mr-1">{tr.chat.model_picker_label}:</span>
+        <button type="button" data-model="auto" class="chat-chip rounded-full border px-2.5 py-1 leading-none">{tr.chat.model_auto}</button>
+        <button type="button" data-model="plantnet" class="chat-chip rounded-full border px-2.5 py-1 leading-none">PlantNet</button>
+        <button type="button" data-model="claude_haiku" class="chat-chip rounded-full border px-2.5 py-1 leading-none">Claude</button>
+        <button type="button" data-model="webllm_phi35_vision" class="chat-chip rounded-full border px-2.5 py-1 leading-none">Phi</button>
+        <button type="button" data-model="onnx_efficientnet_lite0" class="chat-chip rounded-full border px-2.5 py-1 leading-none">EfficientNet</button>
+        <button type="button" data-model="compare" class="chat-chip rounded-full border px-2.5 py-1 leading-none">{tr.chat.model_compare}</button>
+      </div>
+
       <!-- Buttons + textarea row -->
       <div class="flex flex-col sm:flex-row sm:items-end gap-2">
         <!-- Attachment buttons: above on mobile, inline on sm+ -->
@@ -192,6 +208,10 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
     data-suggestions-label={tr.chat.suggestions.label}
     data-voice-input-label={tr.chat.voice_input_label}
     data-voice-input-stop-label={tr.chat.voice_input_stop_label}
+    data-compare-running={tr.chat.compare_running}
+    data-compare-heading={tr.chat.compare_heading}
+    data-compare-unavailable={tr.chat.compare_unavailable}
+    data-compare-no-id={tr.chat.compare_no_id}
   ></div>
 </div>
 
@@ -244,8 +264,39 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
       attachmentBlobUrl: string;
       attachmentMime: string;
     };
+    /** Side-by-side comparison results — one entry per probed model. */
+    compareResult?: {
+      attachmentKind: 'photo' | 'audio';
+      attachmentBlobUrl: string;
+      attachmentMime: string;
+      entries: Array<{
+        id: string;
+        name: string;
+        ok: boolean;
+        result?: CascadeCandidate;
+        error?: string;
+      }>;
+    };
     /** Streaming/loading flag so the bubble can show a spinner placeholder. */
     pending?: boolean;
+  }
+
+  type ModelPickerChoice =
+    | 'auto'
+    | 'plantnet'
+    | 'claude_haiku'
+    | 'webllm_phi35_vision'
+    | 'onnx_efficientnet_lite0'
+    | 'compare';
+  const MODEL_PICKER_KEY = 'rastrum.chat.modelPicker';
+  function readModelPick(): ModelPickerChoice {
+    if (typeof localStorage === 'undefined') return 'auto';
+    const v = localStorage.getItem(MODEL_PICKER_KEY) as ModelPickerChoice | null;
+    const allowed: ModelPickerChoice[] = ['auto','plantnet','claude_haiku','webllm_phi35_vision','onnx_efficientnet_lite0','compare'];
+    return v && allowed.includes(v) ? v : 'auto';
+  }
+  function writeModelPick(v: ModelPickerChoice): void {
+    if (typeof localStorage !== 'undefined') localStorage.setItem(MODEL_PICKER_KEY, v);
   }
 
   const isEs = (document.documentElement.lang === 'es');
@@ -280,6 +331,7 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
   const attachMeta      = document.getElementById('chat-attachment-meta');
   const attachRemove    = document.getElementById('chat-attachment-remove');
   const attachErr       = document.getElementById('chat-attach-error');
+  const modelPickerEl   = document.getElementById('chat-model-picker');
   const visionDialog    = document.getElementById('chat-vision-dialog') as HTMLDialogElement | null;
   const voiceBtn        = document.getElementById('chat-voice-btn') as HTMLButtonElement | null;
   const voiceBtnLabel   = voiceBtn?.querySelector('[data-voice-label]') as HTMLElement | null;
@@ -342,6 +394,7 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
          </span>`
       : escapeHtml(turn.content);
     const cascadeHtml = (!isUser && turn.cascadeResult && !turn.pending) ? renderCascadeFooter(turn, idx) : '';
+    const compareHtml = (!isUser && turn.compareResult && !turn.pending) ? renderCompareFooter(turn, idx) : '';
     const suggestionsHtml = (!isUser && !turn.pending && idx === conversation.length - 1)
       ? renderSuggestionChips(turn, idx)
       : '';
@@ -354,7 +407,40 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
           <span data-bubble-text>${bodyContent}</span>
         </div>
         ${cascadeHtml}
+        ${compareHtml}
         ${suggestionsHtml}
+      </div>
+    `;
+  }
+
+  function renderCompareFooter(turn: ChatTurn, idx: number): string {
+    const cr = turn.compareResult;
+    if (!cr || cr.entries.length === 0) return '';
+    const heading = i18nGet('compare-heading');
+    const cards = cr.entries.map((e) => {
+      if (e.ok && e.result) {
+        const pct = Math.round((e.result.confidence ?? 0) * 100);
+        const sci = e.result.scientific_name
+          ? `<span class="italic">${escapeHtml(e.result.scientific_name)}</span>`
+          : `<span class="text-zinc-500">${escapeHtml(i18nGet('compare-no-id'))}</span>`;
+        return `
+          <li class="rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-2 py-1.5">
+            <p class="text-[10px] uppercase tracking-wider text-zinc-500 mb-0.5">${escapeHtml(e.name)}</p>
+            <p class="text-xs">${sci} <span class="text-[10px] text-zinc-500">${pct}%</span></p>
+          </li>
+        `;
+      }
+      return `
+        <li class="rounded-md border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/40 px-2 py-1.5 opacity-70">
+          <p class="text-[10px] uppercase tracking-wider text-zinc-500 mb-0.5">${escapeHtml(e.name)}</p>
+          <p class="text-[11px] text-zinc-600 dark:text-zinc-400">${escapeHtml(e.error ?? i18nGet('compare-unavailable'))}</p>
+        </li>
+      `;
+    }).join('');
+    return `
+      <div class="mt-2" data-compare="${idx}">
+        <p class="text-[10px] uppercase tracking-wider text-zinc-500 mb-1">${escapeHtml(heading)}</p>
+        <ul class="grid gap-1.5 grid-cols-1 sm:grid-cols-2">${cards}</ul>
       </div>
     `;
   }
@@ -482,6 +568,7 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
     if (pendingAttachment?.objectUrl) URL.revokeObjectURL(pendingAttachment.objectUrl);
     pendingAttachment = null;
     attachChip?.classList.add('hidden');
+    modelPickerEl?.classList.add('hidden');
     if (attachThumb) attachThumb.innerHTML = '';
     if (attachLabel) attachLabel.textContent = '';
     if (attachMeta) attachMeta.textContent = '';
@@ -494,6 +581,12 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
     pendingAttachment = { kind, blob, objectUrl, mimeType, durationSec };
     if (!attachChip || !attachThumb || !attachLabel || !attachMeta) return;
     attachChip.classList.remove('hidden');
+    // Picker is photo-only — for audio there's no choice to make (BirdNET).
+    if (kind === 'photo') {
+      modelPickerEl?.classList.remove('hidden');
+    } else {
+      modelPickerEl?.classList.add('hidden');
+    }
     if (kind === 'photo') {
       attachThumb.innerHTML = `<img src="${escapeHtml(objectUrl)}" alt="" class="w-full h-full object-cover" />`;
       attachLabel.textContent = i18nGet('attach-photo-label');
@@ -506,6 +599,30 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
   }
 
   attachRemove?.addEventListener('click', () => clearAttachmentChip());
+
+  // ── Model picker ──
+  function paintModelPicker(active: ModelPickerChoice) {
+    if (!modelPickerEl) return;
+    modelPickerEl.querySelectorAll<HTMLButtonElement>('.chat-chip').forEach((btn) => {
+      const isActive = btn.dataset.model === active;
+      btn.classList.toggle('bg-emerald-700', isActive);
+      btn.classList.toggle('text-white', isActive);
+      btn.classList.toggle('border-emerald-700', isActive);
+      btn.classList.toggle('border-zinc-300', !isActive);
+      btn.classList.toggle('dark:border-zinc-700', !isActive);
+      btn.classList.toggle('text-zinc-700', !isActive);
+      btn.classList.toggle('dark:text-zinc-300', !isActive);
+      btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
+  }
+  paintModelPicker(readModelPick());
+  modelPickerEl?.querySelectorAll<HTMLButtonElement>('.chat-chip').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const choice = (btn.dataset.model ?? 'auto') as ModelPickerChoice;
+      writeModelPick(choice);
+      paintModelPicker(choice);
+    });
+  });
 
   // ── File pickers ──
   photoBtn?.addEventListener('click', () => photoInput?.click());
@@ -760,15 +877,15 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
     const { bootstrapIdentifiers, runCascade } = await import('../lib/identifiers');
     bootstrapIdentifiers();
     const mediaKind = att.kind === 'photo' ? 'photo' : 'audio';
-    // Unified cascade options helper (#583); chat keeps its explicit
-    // Phi-vision exclusion — Phi is surfaced via the slower "looking
-    // more carefully" step below, not the primary pass.
     const { buildCascadeOptions } = await import('../lib/identify-options');
     // #593: derive user_hint from conversation context (current turn
     // keywords + propagated kingdom from prior winning IDs).
     const { deriveHintFromConversation } = await import('../lib/chat-hint');
     const userHint = deriveHintFromConversation(currentTurnText, conversation);
     const opts = await buildCascadeOptions({ mediaKind, userHint });
+    // Phi-vision is now self-gated via isAvailable() (opt-in pref) — no
+    // need to exclude it explicitly. Users who don't opt in won't see Phi
+    // run; users who opt in get it as part of the natural cascade.
     const result = await runCascade(
       {
         media: { kind: 'blob', blob: att.blob, mime: att.mimeType },
@@ -778,7 +895,6 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
       {
         media: mediaKind,
         ...opts,
-        excluded: [...opts.excluded, 'webllm_phi35_vision'],
       },
     );
     const best = result.best ? toCandidate(result.best) : null;
@@ -787,6 +903,79 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
       .map(a => toCandidate(a.result!))
       .filter(c => c.scientific_name);
     return { best, alternates };
+  }
+
+  /**
+   * Force a single registered identifier to run on the attachment, bypassing
+   * the cascade entirely. Returns the result as a CascadeCandidate or throws
+   * with a human-readable error (so the caller can render it inline).
+   */
+  async function runForcedIdentify(att: ChatAttachment, providerId: string): Promise<CascadeCandidate> {
+    const { bootstrapIdentifiers } = await import('../lib/identifiers');
+    bootstrapIdentifiers();
+    const { registry } = await import('../lib/identifiers/registry');
+    const plugin = registry.get(providerId);
+    if (!plugin) throw new Error(`unknown identifier: ${providerId}`);
+    const av = await plugin.isAvailable();
+    if (!av.ready) {
+      throw new Error(av.message ?? av.reason ?? 'unavailable');
+    }
+    const mediaKind = att.kind === 'photo' ? 'photo' : 'audio';
+    const result = await plugin.identify({
+      media: { kind: 'blob', blob: att.blob, mime: att.mimeType },
+      mediaKind,
+      byo_keys: {},
+    });
+    return toCandidate(result);
+  }
+
+  /**
+   * Compare-all: fan out to every registered identifier that matches the
+   * media type and return per-plugin results in parallel. Plugins whose
+   * isAvailable() returns false are still surfaced so the user sees why
+   * (e.g. needs key, needs download, opt-in required).
+   */
+  async function runCompareOnAttachment(att: ChatAttachment): Promise<Array<{
+    id: string;
+    name: string;
+    ok: boolean;
+    result?: CascadeCandidate;
+    error?: string;
+  }>> {
+    const { bootstrapIdentifiers } = await import('../lib/identifiers');
+    bootstrapIdentifiers();
+    const { registry } = await import('../lib/identifiers/registry');
+    const mediaKind = att.kind === 'photo' ? 'photo' : 'audio';
+    const plugins = registry.findFor({ media: mediaKind });
+
+    const probes = await Promise.all(plugins.map(async (p) => {
+      const av = await p.isAvailable().catch((e: unknown) => ({
+        ready: false as const,
+        reason: 'error',
+        message: e instanceof Error ? e.message : String(e),
+      }));
+      return { plugin: p, av };
+    }));
+
+    const runs = await Promise.allSettled(probes.map(async ({ plugin, av }) => {
+      if (!av.ready) {
+        return { id: plugin.id, name: plugin.name, ok: false, error: av.message ?? av.reason ?? 'unavailable' };
+      }
+      try {
+        const r = await plugin.identify({
+          media: { kind: 'blob', blob: att.blob, mime: att.mimeType },
+          mediaKind,
+          byo_keys: {},
+        });
+        return { id: plugin.id, name: plugin.name, ok: true, result: toCandidate(r) };
+      } catch (e) {
+        return { id: plugin.id, name: plugin.name, ok: false, error: e instanceof Error ? e.message : String(e) };
+      }
+    }));
+
+    return runs.map((r, i) => r.status === 'fulfilled'
+      ? r.value
+      : { id: probes[i].plugin.id, name: probes[i].plugin.name, ok: false, error: r.reason instanceof Error ? r.reason.message : String(r.reason) });
   }
 
   function toCandidate(r: {
@@ -929,6 +1118,7 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
     // can stage another while this turn streams.
     pendingAttachment = null;
     attachChip?.classList.add('hidden');
+    modelPickerEl?.classList.add('hidden');
     if (attachThumb) attachThumb.innerHTML = '';
     if (attachLabel) attachLabel.textContent = '';
     if (attachMeta) attachMeta.textContent = '';
@@ -937,6 +1127,63 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
     persistUserTurn(text, att);
     inputEl.value = '';
     autosize();
+
+    // Picker: only meaningful for photos. Audio always rides the cascade.
+    const pickerChoice: ModelPickerChoice = (att?.kind === 'photo') ? readModelPick() : 'auto';
+
+    if (att && pickerChoice === 'compare') {
+      conversation.push({ role: 'assistant', content: i18nGet('compare-running'), pending: true });
+      paintConversation();
+      const placeholderIdx = conversation.length - 1;
+      try {
+        const entries = await runCompareOnAttachment(att);
+        conversation[placeholderIdx].compareResult = {
+          attachmentKind: att.kind,
+          attachmentBlobUrl: att.objectUrl,
+          attachmentMime: att.mimeType,
+          entries,
+        };
+        conversation[placeholderIdx].content = '';
+        conversation[placeholderIdx].pending = false;
+      } catch (err) {
+        conversation[placeholderIdx].content = (isEs ? 'Error: ' : 'Error: ') + (err instanceof Error ? err.message : String(err));
+        conversation[placeholderIdx].pending = false;
+      }
+      paintConversation();
+      persistAssistantTurn(conversation[placeholderIdx]);
+      busy = false;
+      sendBtn.disabled = false;
+      sendLabel.textContent = SEND_DEFAULT;
+      return;
+    }
+
+    if (att && pickerChoice !== 'auto') {
+      conversation.push({ role: 'assistant', content: i18nGet('identifying'), pending: true });
+      paintConversation();
+      const placeholderIdx = conversation.length - 1;
+      try {
+        const result = await runForcedIdentify(att, pickerChoice);
+        conversation[placeholderIdx].cascadeResult = {
+          best: result,
+          attachmentKind: att.kind,
+          attachmentBlobUrl: att.objectUrl,
+          attachmentMime: att.mimeType,
+        };
+        conversation[placeholderIdx].content = '';
+        conversation[placeholderIdx].pending = false;
+        paintConversation();
+        await streamLlamaInterpretation(placeholderIdx, att, text, result, []);
+      } catch (err) {
+        conversation[placeholderIdx].content = (isEs ? 'Modelo no disponible: ' : 'Model unavailable: ') + (err instanceof Error ? err.message : String(err));
+        conversation[placeholderIdx].pending = false;
+        paintConversation();
+        persistAssistantTurn(conversation[placeholderIdx]);
+      }
+      busy = false;
+      sendBtn.disabled = false;
+      sendLabel.textContent = SEND_DEFAULT;
+      return;
+    }
 
     if (att) {
       // Add a placeholder bot turn while the cascade runs.
