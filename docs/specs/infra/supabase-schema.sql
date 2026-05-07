@@ -2917,6 +2917,60 @@ FROM public.taxa t;
 
 GRANT SELECT ON public.taxa_thumbnails TO anon, authenticated;
 
+-- featured_species_current: weekly-stable random pick of one species that's
+-- rare/endemic/protected AND has at least one synced obs with a photo in
+-- the last 90 days. Selection is deterministic per ISO week, so the same
+-- species shows for everyone Mon–Sun. Used by EspeciesHero.
+CREATE OR REPLACE VIEW public.featured_species_current AS
+WITH eligible AS (
+  SELECT
+    t.id            AS taxon_id,
+    t.scientific_name,
+    t.common_name_es,
+    t.common_name_en,
+    t.slug,
+    t.kingdom,
+    t.is_endemic_mexico,
+    t.nom059_status,
+    tr.bucket       AS rarity_bucket
+  FROM public.taxa t
+  LEFT JOIN public.taxon_rarity tr ON tr.taxon_id = t.id
+  WHERE EXISTS (
+    SELECT 1
+      FROM public.media_files mf
+      JOIN public.observations o   ON o.id = mf.observation_id
+      JOIN public.identifications i ON i.observation_id = o.id
+     WHERE i.is_primary = true
+       AND i.taxon_id = t.id
+       AND o.sync_status = 'synced'
+       AND o.obscure_level <> 'full'
+       AND o.observed_at > now() - interval '90 days'
+  )
+  AND (
+    COALESCE(tr.bucket, 1) >= 4
+    OR t.is_endemic_mexico = true
+    OR t.nom059_status IN ('sujeta_proteccion', 'amenazada', 'peligro_extincion')
+  )
+)
+SELECT
+  e.*,
+  (SELECT mf.url
+     FROM public.media_files mf
+     JOIN public.observations o   ON o.id = mf.observation_id
+     JOIN public.identifications i ON i.observation_id = o.id
+    WHERE i.is_primary = true
+      AND i.taxon_id = e.taxon_id
+      AND o.sync_status = 'synced'
+      AND o.obscure_level <> 'full'
+    ORDER BY mf.is_primary DESC NULLS LAST, mf.created_at DESC
+    LIMIT 1) AS thumbnail_url
+FROM eligible e
+ORDER BY md5(e.taxon_id::text || to_char(date_trunc('week', now()), 'YYYY-IW'))
+LIMIT 1;
+
+GRANT SELECT ON public.featured_species_current TO anon, authenticated;
+
+
 -- ═════════════════════════════════════════════════════════════════════
 -- Module 27 — Establishment Means (organism origin)
 -- Requested by Eugenio Padilla, 2026-04-28.
