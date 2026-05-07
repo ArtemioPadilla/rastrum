@@ -88,6 +88,10 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
   }
+  // Wrap the entire handler so unhandled throws still return CORS headers.
+  // Without this, Deno returns a bare 500 with no Access-Control-* headers
+  // and the browser reports a generic "Failed to fetch" instead of the real error.
+  try {
 
   // Support X-HTTP-Method-Override for environments that block DELETE/PUT (mobile carriers)
   const methodOverride = req.headers.get('X-HTTP-Method-Override');
@@ -788,4 +792,10 @@ serve(async (req) => {
   }
 
   return jsonResponse(404, { error: 'not_found', path, method: method });
+  } catch (e) {
+    // Unhandled error — return a CORS-safe 500 so the browser sees the real
+    // status instead of a bare network failure ("Failed to fetch").
+    console.error('[sponsorships] unhandled error', e);
+    return jsonResponse(500, { error: 'internal_error', detail: (e as Error).message });
+  }
 });

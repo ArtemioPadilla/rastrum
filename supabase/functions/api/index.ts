@@ -52,6 +52,7 @@ async function verifyToken(
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  try {
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
@@ -310,6 +311,10 @@ Deno.serve(async (req: Request) => {
   }
 
   return json({ error: 'Not found' }, 404);
+  } catch (e) {
+    console.error('[api] unhandled error', e);
+    return json({ error: 'internal_error', detail: (e as Error).message }, 500);
+  }
 });
 
 function json(body: unknown, status = 200): Response {
