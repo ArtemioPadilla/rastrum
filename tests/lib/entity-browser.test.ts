@@ -109,7 +109,7 @@ describe('entity-browser: applyFilters', () => {
     expect(calls[1].method).toBe('ilike');
   });
 
-  it('returns null short-circuit when an apply returns null', async () => {
+  it('returns wrapped null short-circuit when an apply returns null', async () => {
     const { q } = mockQuery();
     const shortFilter: FilterSpec[] = [
       {
@@ -120,13 +120,114 @@ describe('entity-browser: applyFilters', () => {
       },
     ];
     const result = await applyFilters(q, shortFilter, { identifier: 'unknown-user' });
-    expect(result).toBeNull();
+    expect(result).toEqual({ q: null });
   });
 
   it('skips filters whose value is undefined', async () => {
     const { q, calls } = mockQuery();
     await applyFilters(q, filters, {});
     expect(calls).toHaveLength(0);
+  });
+
+  /**
+   * Regression for #260 / #275 — PostgrestFilterBuilder is itself thenable
+   * (its `.then()` triggers the HTTP request), so naively `await`ing the
+   * result of an apply that returns a sync builder, or of an `async` apply
+   * that does `return q.eq(...)`, would resolve to the response object and
+   * strip `.range()` off the chain. applyFilters must NOT trigger the
+   * thenable when the apply hands back a builder.
+   */
+  describe('thenable safety', () => {
+    it('does not invoke .then() when a sync apply returns a builder', async () => {
+      // Use a mutable counter the proxy can write to.
+      const counter = { thenCalls: 0 };
+      const calls: Call[] = [];
+      const q: SupabaseQuery = new Proxy({}, {
+        get(_t, prop) {
+          if (prop === 'then') {
+            return (resolve: (v: unknown) => void) => {
+              counter.thenCalls += 1;
+              resolve({ data: 'response', count: 0 });
+            };
+          }
+          if (typeof prop === 'symbol') return undefined;
+          return (...args: unknown[]) => {
+            calls.push({ method: prop as string, args });
+            return q;
+          };
+        },
+      }) as unknown as SupabaseQuery;
+
+      const syncFilter: FilterSpec[] = [
+        { key: 'k', label: 'k', kind: 'select', apply: filterPredicates.eq('col') },
+      ];
+      const result = await applyFilters(q, syncFilter, { k: 'v' });
+
+      expect(counter.thenCalls).toBe(0);
+      expect(result.q).toBe(q);
+      expect(calls).toEqual([{ method: 'eq', args: ['col', 'v'] }]);
+    });
+
+    it('does not invoke .then() when an async apply returns a wrapped builder', async () => {
+      const counter = { thenCalls: 0 };
+      const calls: Call[] = [];
+      const q: SupabaseQuery = new Proxy({}, {
+        get(_t, prop) {
+          if (prop === 'then') {
+            return (resolve: (v: unknown) => void) => {
+              counter.thenCalls += 1;
+              resolve({ data: 'response', count: 0 });
+            };
+          }
+          if (typeof prop === 'symbol') return undefined;
+          return (...args: unknown[]) => {
+            calls.push({ method: prop as string, args });
+            return q;
+          };
+        },
+      }) as unknown as SupabaseQuery;
+
+      const asyncFilter: FilterSpec[] = [
+        {
+          key: 'actor',
+          label: 'actor',
+          kind: 'autocomplete',
+          apply: async (qq, v) => {
+            await Promise.resolve();
+            return { q: qq.eq('actor_id', v) };
+          },
+        },
+      ];
+      const result = await applyFilters(q, asyncFilter, { actor: 'abc' });
+
+      expect(counter.thenCalls).toBe(0);
+      expect(result.q).toBe(q);
+      expect(calls).toEqual([{ method: 'eq', args: ['actor_id', 'abc'] }]);
+    });
+
+    it('short-circuits when wrapped result has q: null', async () => {
+      const calls: Call[] = [];
+      const q: SupabaseQuery = new Proxy({}, {
+        get(_t, prop) {
+          if (prop === 'then' || typeof prop === 'symbol') return undefined;
+          return (...args: unknown[]) => {
+            calls.push({ method: prop as string, args });
+            return q;
+          };
+        },
+      }) as unknown as SupabaseQuery;
+
+      const filterList: FilterSpec[] = [
+        {
+          key: 'actor',
+          label: 'actor',
+          kind: 'autocomplete',
+          apply: async () => ({ q: null }),
+        },
+      ];
+      const result = await applyFilters(q, filterList, { actor: 'unknown' });
+      expect(result.q).toBeNull();
+    });
   });
 });
 

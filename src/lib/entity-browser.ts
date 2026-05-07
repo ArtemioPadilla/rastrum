@@ -41,8 +41,21 @@ export interface FilterSpec {
    * supabase-js predicate builder — receives the running query and the
    * current filter value (string), returns the modified query.
    * Predicates short-circuit to an empty rowset by returning null.
+   *
+   * IMPORTANT: PostgrestFilterBuilder is itself thenable (it has a `.then`
+   * method that triggers the HTTP request). That means an `async` apply
+   * that does `return q.eq(...)` will be auto-unwrapped by the Promise
+   * machinery — `await` resolves to the response object, not the builder.
+   * For sync apply functions we read the return value without awaiting,
+   * which is safe; for async apply functions the contract requires
+   * wrapping the result as `{ q }` so the Promise resolution sees a plain
+   * object and does not recurse into the thenable. See `applyFilters`.
    */
-  apply: (query: SupabaseQuery, value: string) => Promise<SupabaseQuery | null> | (SupabaseQuery | null);
+  apply: (query: SupabaseQuery, value: string) =>
+    | SupabaseQuery
+    | null
+    | { q: SupabaseQuery | null }
+    | Promise<{ q: SupabaseQuery | null }>;
 }
 
 /** Render-side type for one column. `render` returns a trusted HTML fragment (escape your inputs). */
@@ -97,6 +110,13 @@ export interface BrowserConfig<Row extends { id?: string; [k: string]: unknown }
   loadingText: string;
   /** Locale (en | es). */
   lang: 'en' | 'es';
+  /**
+   * Always-on baseline predicate applied after `.order()` and before any
+   * user filter. Pure synchronous — must not await. Used by views that
+   * need to scope a shared backing table down to a fixed subset (e.g. the
+   * taxon-changes browser scoping `admin_audit` to taxon-touching ops).
+   */
+  baseline?: (q: SupabaseQuery) => SupabaseQuery;
 }
 
 // Minimal supabase-js PostgrestFilterBuilder slice — typed as `unknown` so this
@@ -119,20 +139,45 @@ export type SupabaseQuery = {
  * Filter-to-supabase-query translator. Pure — takes an empty query, applies
  * each filter that has a non-empty value, returns the resulting query.
  * Used by EntityBrowser internally and exported for unit-testing.
+ *
+ * Thenable trap: PostgrestFilterBuilder has a `.then()` method that fires
+ * the HTTP request, so `await <builder>` would execute the query early and
+ * resolve to a response object stripped of `.range()`. The return value is
+ * therefore wrapped in `{ q }` — plain objects are not thenable, so the
+ * caller's `await` does not recurse into the builder. Inside the loop we
+ * also never blindly await an apply result; we inspect its shape first and
+ * only await real Promises whose payload is a plain `{ q }` wrapper. See
+ * the FilterSpec.apply doc comment for the contract.
  */
 export async function applyFilters(
   query: SupabaseQuery,
   filters: FilterSpec[],
   values: Record<string, string>,
-): Promise<SupabaseQuery | null> {
+): Promise<{ q: SupabaseQuery | null }> {
   let q: SupabaseQuery | null = query;
   for (const f of filters) {
     const v = values[f.key];
     if (!v || v === '') continue;
-    q = await f.apply(q, v);
-    if (q === null) return null;
+    const raw = f.apply(q, v);
+    let next: SupabaseQuery | null;
+    if (raw === null) {
+      next = null;
+    } else if (typeof (raw as { range?: unknown }).range === 'function') {
+      // Sync builder return — taken as-is, never awaited.
+      next = raw as SupabaseQuery;
+    } else {
+      // `{ q }` wrapper, sync or in a Promise. Plain objects are not
+      // thenable, so awaiting the wrapper does not recurse into the
+      // builder it contains.
+      const wrapped = await (raw as
+        | { q: SupabaseQuery | null }
+        | Promise<{ q: SupabaseQuery | null }>);
+      next = wrapped.q;
+    }
+    if (next === null) return { q: null };
+    q = next;
   }
-  return q;
+  return { q };
 }
 
 /** Common filter primitives for use in FilterSpec.apply callbacks. */
@@ -439,7 +484,8 @@ export class EntityBrowser<Row extends { id?: string; [k: string]: unknown }> {
         .select(this.cfg.selectClause, { count: 'exact' });
       q = built as unknown as SupabaseQuery;
       q = q.order(this.cfg.orderBy, { ascending: false });
-      q = await applyFilters(q, this.cfg.filters, values);
+      if (this.cfg.baseline) q = this.cfg.baseline(q);
+      q = (await applyFilters(q, this.cfg.filters, values)).q;
       if (q === null) {
         // Filter resolved to "no possible rows" (e.g. unknown username)
         this.hide('skeleton');
@@ -447,22 +493,12 @@ export class EntityBrowser<Row extends { id?: string; [k: string]: unknown }> {
         this.renderPagination();
         return;
       }
-      // Defensive: a buggy FilterSpec.apply that doesn't return the running
-      // query will silently strip .range() off `q`. Detect it loudly here
-      // instead of throwing the cryptic minified `r.range is not a function`.
-      // TODO(#260): this is a defensive guard, NOT a root-cause fix. PR #258
-      // hit this in production but static analysis of every FilterSpec.apply
-      // showed each one returning the query (or null) correctly. When this
-      // warn fires in production, capture the offending filter keys + the
-      // active view's prefix from the log and trace which apply mutates `q`
-      // into a non-builder shape. Prime suspects: autocomplete-resolved
-      // filters that swap to a different supabase-js builder type, or any
-      // future filter that does an inline `await q.from(...)` (which kills
-      // the chain).
+      // Sanity guard: now that applyFilters never blindly awaits a thenable
+      // builder this should never fire, but keep it as a regression alarm.
       if (typeof (q as { range?: unknown }).range !== 'function') {
         const offendingKeys = Object.keys(values).filter(k => values[k]);
         console.warn(
-          `entity-browser[${this.cfg.prefix}]: a filter.apply returned a non-query value (likely missing return). Active filters:`,
+          `entity-browser[${this.cfg.prefix}]: filter chain lost the builder shape. Active filters:`,
           offendingKeys,
         );
         throw new Error('Filter chain produced an invalid query. Clear filters and retry.');

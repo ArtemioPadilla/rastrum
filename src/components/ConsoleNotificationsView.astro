@@ -115,9 +115,9 @@ const labels = {
       key: 'recipient',
       label: 'Recipient',
       kind: 'autocomplete',
-      apply: async (q: SupabaseQuery, v: string): Promise<SupabaseQuery | null> => {
+      apply: async (q: SupabaseQuery, v: string): Promise<{ q: SupabaseQuery | null }> => {
         const id = await resolveUserId(v);
-        return id ? q.eq('user_id', id) : null;
+        return { q: id ? q.eq('user_id', id) : null };
       },
     },
     {

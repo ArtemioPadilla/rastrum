@@ -126,9 +126,9 @@ const labels = {
       key: 'actor',
       label: 'Actor',
       kind: 'autocomplete',
-      apply: async (q: SupabaseQuery, v: string): Promise<SupabaseQuery | null> => {
+      apply: async (q: SupabaseQuery, v: string): Promise<{ q: SupabaseQuery | null }> => {
         const id = await resolveUserId(v);
-        return id ? q.eq('actor_id', id) : null;
+        return { q: id ? q.eq('actor_id', id) : null };
       },
     },
     { key: 'from', label: 'From', kind: 'date', apply: filterPredicates.gteDate('created_at') },
@@ -211,31 +211,14 @@ const labels = {
     }
     document.getElementById('txc-shell')?.classList.remove('hidden');
 
-    // Pre-baseline filter: limit admin_audit to taxon-related ops. We model
-    // this as a synthetic filter so it shows up in the chain before the
-    // user-selected ones, and it persists across pagination.
-    const taxonOpsFilter: FilterSpec = {
-      key: '__op_baseline',
-      label: '',
-      kind: 'select',
-      apply: (q: SupabaseQuery): SupabaseQuery => q.in('op', TAXON_OPS),
-    };
-    // Always-on baseline: applied via a wrapping filter list whose value is
-    // hard-coded to a non-empty sentinel so applyFilters() runs the
-    // predicate. We don't render the underlying form element.
-    const baselineHidden = document.createElement('input');
-    baselineHidden.type = 'hidden';
-    baselineHidden.id = 'txc-f-__op_baseline';
-    baselineHidden.value = '1';
-    document.getElementById('txc-shell')?.appendChild(baselineHidden);
-
     const browser = new EntityBrowser<Row>({
       prefix: 'txc',
       tableName: 'admin_audit',
       selectClause: 'id, created_at, actor_id, op, target_type, target_id, before, after, reason',
       orderBy: 'created_at',
       columns,
-      filters: [taxonOpsFilter, ...filters],
+      filters,
+      baseline: (q: SupabaseQuery): SupabaseQuery => q.in('op', TAXON_OPS),
       resolveUsersFromRow: r => [r.actor_id],
       resolveTaxaFromRow: r => (r.target_id && isUuid(r.target_id) ? [r.target_id] : []),
       rowIdFromRow: r => String(r.id),

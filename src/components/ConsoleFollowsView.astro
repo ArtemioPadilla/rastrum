@@ -121,18 +121,18 @@ const labels = {
       key: 'follower',
       label: 'Follower',
       kind: 'autocomplete',
-      apply: async (q: SupabaseQuery, v: string): Promise<SupabaseQuery | null> => {
+      apply: async (q: SupabaseQuery, v: string): Promise<{ q: SupabaseQuery | null }> => {
         const id = await resolveUserId(v);
-        return id ? q.eq('follower_id', id) : null;
+        return { q: id ? q.eq('follower_id', id) : null };
       },
     },
     {
       key: 'followee',
       label: 'Followee',
       kind: 'autocomplete',
-      apply: async (q: SupabaseQuery, v: string): Promise<SupabaseQuery | null> => {
+      apply: async (q: SupabaseQuery, v: string): Promise<{ q: SupabaseQuery | null }> => {
         const id = await resolveUserId(v);
-        return id ? q.eq('followee_id', id) : null;
+        return { q: id ? q.eq('followee_id', id) : null };
       },
     },
     { key: 'status', label: 'Status', kind: 'select', apply: filterPredicates.eq('status') },
