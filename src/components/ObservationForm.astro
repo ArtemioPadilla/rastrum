@@ -83,6 +83,14 @@ const cameraStationPlaceholder = observeStrings.camera_station_placeholder ?? (i
 const cameraStationHint        = observeStrings.camera_station_hint        ?? (isEs ? 'Vincula esta observación a una estación de cámara de tus proyectos.' : 'Tag this observation to a camera station from your projects.');
 const cameraStationNone        = observeStrings.camera_station_none        ?? (isEs ? 'Ninguna' : 'None');
 const cameraStationLoading     = observeStrings.camera_station_loading     ?? (isEs ? 'Cargando estaciones…' : 'Loading stations…');
+
+const uploadTree = (tr as unknown as { upload?: { praise?: Record<string, string> } }).upload;
+const praiseStrings: Record<string, string> = uploadTree?.praise ?? {};
+const praiseGoodLight        = praiseStrings.good_light        ?? (isEs ? 'Buena luz' : 'Good light');
+const praisePortraitAperture = praiseStrings.portrait_aperture ?? (isEs ? 'Profundidad de retrato' : 'Portrait depth');
+const praiseSharpAction      = praiseStrings.sharp_action      ?? (isEs ? 'Captura nítida' : 'Sharp action');
+const praiseBalancedExposure = praiseStrings.balanced_exposure ?? (isEs ? 'Exposición equilibrada' : 'Balanced exposure');
+const praiseLongLens         = praiseStrings.long_lens         ?? (isEs ? 'Detalle con teleobjetivo' : 'Long-lens detail');
 ---
 
 <div class="max-w-xl mx-auto">
@@ -129,7 +137,15 @@ const cameraStationLoading     = observeStrings.camera_station_loading     ?? (i
     <!-- Photos (multi) -->
     <div>
       <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">{tr.observe.photo_label}</label>
-      <div id="photo-grid" class="hidden mb-3 grid grid-cols-3 gap-2"></div>
+      <div
+        id="photo-grid"
+        class="hidden mb-3 grid grid-cols-3 gap-2"
+        data-praise-good-light={praiseGoodLight}
+        data-praise-portrait-aperture={praisePortraitAperture}
+        data-praise-sharp-action={praiseSharpAction}
+        data-praise-balanced-exposure={praiseBalancedExposure}
+        data-praise-long-lens={praiseLongLens}
+      ></div>
 
       <!-- Primary camera row -->
       <div class="flex gap-2 flex-wrap">
@@ -635,6 +651,7 @@ const cameraStationLoading     = observeStrings.camera_station_loading     ?? (i
     VIDEO_THUMB_PARAMS,
     computeThumbDims,
   } from '../lib/media-helpers';
+  import { pickPraise, type PraiseKey } from '../lib/photo-praise';
 
   const form         = document.getElementById('obs-form') as HTMLFormElement | null;
 
@@ -717,7 +734,7 @@ const cameraStationLoading     = observeStrings.camera_station_loading     ?? (i
     capturedFrom: 'gps' | 'exif' | 'manual';
   } | null;
 
-  type PhotoEntry = { file: File; blobId: string };
+  type PhotoEntry = { file: File; blobId: string; praiseKey: PraiseKey | null };
   type AudioEntry = { blob: Blob; blobId: string; mimeType: string; durationSec: number };
   type VideoEntry = {
     blob: Blob;
@@ -746,16 +763,36 @@ const cameraStationLoading     = observeStrings.camera_station_loading     ?? (i
     gpsStatus.className = 'text-zinc-900 dark:text-zinc-100 font-mono text-xs';
   }
 
+  const PRAISE_DATA_KEY: Record<PraiseKey, string> = {
+    good_light: 'praiseGoodLight',
+    portrait_aperture: 'praisePortraitAperture',
+    sharp_action: 'praiseSharpAction',
+    balanced_exposure: 'praiseBalancedExposure',
+    long_lens: 'praiseLongLens',
+  };
+
+  function praiseLabel(key: PraiseKey): string {
+    const grid = photoGrid as HTMLElement | null;
+    return grid?.dataset[PRAISE_DATA_KEY[key]] ?? '';
+  }
+
   function repaintGrid() {
     if (!photoGrid) return;
     photoGrid.classList.toggle('hidden', photos.length === 0);
-    photoGrid.innerHTML = photos.map((p, i) => `
+    photoGrid.innerHTML = photos.map((p, i) => {
+      const praiseText = p.praiseKey ? praiseLabel(p.praiseKey) : '';
+      const praise = praiseText
+        ? `<span data-praise class="absolute bottom-1 left-1 right-1 text-[10px] px-1.5 py-0.5 rounded bg-black/60 text-white truncate text-center">${escapeHtml(praiseText)}</span>`
+        : '';
+      return `
       <div class="relative aspect-square rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800">
         <img src="${URL.createObjectURL(p.file)}" alt="" class="w-full h-full object-cover" />
         ${i === 0 ? '<span class="absolute top-1 left-1 text-[10px] px-1.5 py-0.5 rounded bg-emerald-600 text-white">primary</span>' : ''}
         <button data-rm="${i}" type="button" class="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white text-xs flex items-center justify-center" aria-label="remove">×</button>
+        ${praise}
       </div>
-    `).join('');
+    `;
+    }).join('');
     photoGrid.querySelectorAll<HTMLButtonElement>('button[data-rm]').forEach(btn => {
       btn.addEventListener('click', () => {
         const idx = Number(btn.dataset.rm);
@@ -1549,10 +1586,37 @@ const cameraStationLoading     = observeStrings.camera_station_loading     ?? (i
     }
 
     for (const file of compressed) {
-      photos.push({ file, blobId: crypto.randomUUID() });
+      photos.push({ file, blobId: crypto.randomUUID(), praiseKey: null });
       if (photos.length === 1) triggerClientIdentify(file);
     }
     repaintGrid();
+
+    // Compute EXIF-driven praise per photo. Async (decodes the JPEG
+    // header), so we paint the grid first and update praise badges as
+    // they resolve. Empty/missing EXIF → praiseKey stays null and
+    // nothing is shown — see acceptance criteria on issue #733.
+    void resolvePraiseForRecentlyAdded(compressed.length);
+  }
+
+  async function resolvePraiseForRecentlyAdded(addedCount: number): Promise<void> {
+    const startIdx = photos.length - addedCount;
+    if (startIdx < 0) return;
+    let changed = false;
+    for (let i = startIdx; i < photos.length; i++) {
+      const entry = photos[i];
+      if (!entry || entry.praiseKey !== null) continue;
+      try {
+        const exif = await parseExif(entry.file, { tiff: true, exif: true });
+        const key = pickPraise(exif as Record<string, unknown> | undefined);
+        if (key && photos[i] === entry) {
+          entry.praiseKey = key;
+          changed = true;
+        }
+      } catch {
+        // EXIF parse failed (HEIC without lib, no metadata, etc.) — silent.
+      }
+    }
+    if (changed) repaintGrid();
   }
 
   // ── Perceptual-hash dedupe (ux-photo-dedupe) ─────────────────────────
@@ -1721,8 +1785,9 @@ const cameraStationLoading     = observeStrings.camera_station_loading     ?? (i
 
       if (pending.kind === 'photo') {
         const file = new File([blob], filename, { type: pending.mime_type });
-        photos.push({ file, blobId: crypto.randomUUID() });
+        photos.push({ file, blobId: crypto.randomUUID(), praiseKey: null });
         repaintGrid();
+        void resolvePraiseForRecentlyAdded(1);
         await fillFromExif(file).catch(() => {});
       } else {
         audios.push({
