@@ -208,6 +208,28 @@ export async function deletePool(id: string): Promise<void> {
   if (!r.ok && r.status !== 204) throw new Error(`deletePool: ${await readErrorBody(r)}`);
 }
 
+export interface PoolBeneficiary {
+  user_id:      string;
+  username:     string;
+  display_name: string | null;
+  total_calls:  number;
+  last_seen:    string;
+}
+
+export interface PoolBeneficiariesPage {
+  items:     PoolBeneficiary[];
+  page:      number;
+  page_size: number;
+  total:     number;
+  has_more:  boolean;
+}
+
+export async function listPoolBeneficiaries(poolId: string, page = 0): Promise<PoolBeneficiariesPage> {
+  const r = await authedFetch(`/pools/${poolId}/beneficiaries?page=${page}`);
+  if (!r.ok) throw new Error(`listPoolBeneficiaries: ${await readErrorBody(r)}`);
+  return r.json();
+}
+
 export async function listSponsorships(role: 'sponsor' | 'beneficiary'): Promise<Sponsorship[]> {
   const r = await authedFetch(`/sponsorships?role=${role}`);
   if (!r.ok) throw new Error(`listSponsorships: ${await readErrorBody(r)}`);

@@ -30,6 +30,16 @@ const i18nBag = {
   test_paste_first:           tr.sponsoring.test_paste_first,
   validate_btn:               tr.sponsoring.validate_btn,
   pool_dashboard_view:        tr.sponsoring.pool_dashboard.view,
+  pool_mgmt_edit:             tr.sponsoring.pool_management.edit,
+  pool_mgmt_delete:           tr.sponsoring.pool_management.delete,
+  pool_mgmt_delete_confirm:   tr.sponsoring.pool_management.delete_confirm,
+  pool_mgmt_beneficiaries:    tr.sponsoring.pool_management.beneficiaries,
+  pool_mgmt_empty:            tr.sponsoring.pool_management.beneficiaries_empty,
+  pool_mgmt_loading:          tr.sponsoring.pool_management.beneficiaries_loading,
+  pool_mgmt_save:             tr.sponsoring.pool_management.save,
+  pool_mgmt_saving:           tr.sponsoring.pool_management.saving,
+  pool_mgmt_cap_below:        tr.sponsoring.pool_management.error_cap_below_used,
+  pool_mgmt_error_generic:    tr.sponsoring.pool_management.error_generic,
   confirm_reject_request:     lang === 'es' ? '¿Rechazar esta solicitud?' : 'Reject this request?',
   personal_toggle_label:      tr.ai_personal_credential.toggle_label,
   personal_toggle_hint:       tr.ai_personal_credential.toggle_hint,
@@ -155,6 +165,58 @@ const langJson = JSON.stringify(lang);
         <button type="submit" id="pool-submit" class="px-3 py-1.5 text-sm rounded bg-emerald-700 text-white">{lang === 'es' ? 'Crear pool' : 'Create pool'}</button>
       </div>
     </form>
+  </dialog>
+
+  <!-- #468: Edit pool dialog -->
+  <dialog id="edit-pool-dialog" class="rounded-xl p-6 max-w-md w-full backdrop:bg-black/50 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100">
+    <h3 class="text-lg font-semibold mb-2">{tr.sponsoring.pool_management.edit_title}</h3>
+    <form method="dialog" class="space-y-3">
+      <input id="edit-pool-id" type="hidden" />
+      <div>
+        <label class="block text-sm font-medium" for="edit-pool-cap">{tr.sponsoring.pool_management.field_total_cap}</label>
+        <input id="edit-pool-cap" type="number" min="1" max="1000000" required class="mt-1 block w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm bg-white dark:bg-zinc-900" />
+        <p id="edit-pool-cap-hint" class="mt-1 text-xs text-zinc-500"></p>
+      </div>
+      <div>
+        <label class="block text-sm font-medium" for="edit-pool-model">{tr.sponsoring.pool_management.field_preferred_model}</label>
+        <input id="edit-pool-model" type="text" required class="mt-1 block w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm font-mono bg-white dark:bg-zinc-900" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium" for="edit-pool-daily">{tr.sponsoring.pool_management.field_daily_user_cap}</label>
+        <input id="edit-pool-daily" type="number" min="1" max="1000" required class="mt-1 block w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm bg-white dark:bg-zinc-900" />
+      </div>
+      <p id="edit-pool-error" class="hidden text-xs text-red-600 dark:text-red-400"></p>
+      <div class="flex gap-2 justify-end">
+        <button type="button" id="edit-pool-cancel" class="px-3 py-1.5 text-sm rounded border border-zinc-300 dark:border-zinc-700">{tr.sponsoring.pool_management.cancel}</button>
+        <button type="submit" id="edit-pool-submit" class="px-3 py-1.5 text-sm rounded bg-emerald-700 text-white disabled:opacity-50 disabled:cursor-wait">{tr.sponsoring.pool_management.save}</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- #468: Pool beneficiaries dialog -->
+  <dialog id="pool-beneficiaries-dialog" class="rounded-xl p-6 max-w-2xl w-full backdrop:bg-black/50 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100">
+    <h3 class="text-lg font-semibold mb-2">{tr.sponsoring.pool_management.beneficiaries_title}</h3>
+    <input id="ben-pool-id" type="hidden" />
+    <div id="pool-bens-loading" class="hidden text-sm text-zinc-500">{tr.sponsoring.pool_management.beneficiaries_loading}</div>
+    <p id="pool-bens-empty" class="hidden text-sm text-zinc-500 dark:text-zinc-400">{tr.sponsoring.pool_management.beneficiaries_empty}</p>
+    <table id="pool-bens-table" class="hidden min-w-full text-sm">
+      <thead>
+        <tr class="text-left text-zinc-500">
+          <th class="py-2 pr-4">{tr.sponsoring.pool_management.col_user}</th>
+          <th class="py-2 pr-4">{tr.sponsoring.pool_management.col_calls}</th>
+          <th class="py-2 pr-4">{tr.sponsoring.pool_management.col_last_seen}</th>
+        </tr>
+      </thead>
+      <tbody id="pool-bens-tbody"></tbody>
+    </table>
+    <div id="pool-bens-pager" class="mt-4 flex items-center justify-between">
+      <span id="pool-bens-page-label" class="text-xs text-zinc-500"></span>
+      <div class="flex gap-2">
+        <button id="pool-bens-prev" type="button" class="px-3 py-1.5 text-sm rounded border border-zinc-300 dark:border-zinc-700 disabled:opacity-50">{tr.sponsoring.pool_management.page_prev}</button>
+        <button id="pool-bens-next" type="button" class="px-3 py-1.5 text-sm rounded border border-zinc-300 dark:border-zinc-700 disabled:opacity-50">{tr.sponsoring.pool_management.page_next}</button>
+        <button id="pool-bens-close" type="button" class="px-3 py-1.5 text-sm rounded border border-zinc-300 dark:border-zinc-700">{tr.sponsoring.pool_management.close}</button>
+      </div>
+    </div>
   </dialog>
 
   <!-- Section A.5: Pending requests from beneficiaries -->
@@ -337,6 +399,7 @@ const langJson = JSON.stringify(lang);
     setCredentialPersonal,
     detectKind,
     listMyPools, createPool, setPoolStatus, updatePool, deletePool,
+    listPoolBeneficiaries,
   } from '../lib/sponsorships';
 
   type I18nBag = {
@@ -358,6 +421,16 @@ const langJson = JSON.stringify(lang);
     test_paste_first: string;
     validate_btn: string;
     pool_dashboard_view: string;
+    pool_mgmt_edit: string;
+    pool_mgmt_delete: string;
+    pool_mgmt_delete_confirm: string;
+    pool_mgmt_beneficiaries: string;
+    pool_mgmt_empty: string;
+    pool_mgmt_loading: string;
+    pool_mgmt_save: string;
+    pool_mgmt_saving: string;
+    pool_mgmt_cap_below: string;
+    pool_mgmt_error_generic: string;
     confirm_reject_request: string;
     personal_toggle_label: string;
     personal_toggle_hint: string;
@@ -378,6 +451,9 @@ const langJson = JSON.stringify(lang);
   ) as I18nBag;
 
   const poolDashViewLabel = tr.pool_dashboard_view ?? 'View';
+  const poolEditLabel     = tr.pool_mgmt_edit ?? 'Edit';
+  const poolDeleteLabel   = tr.pool_mgmt_delete ?? 'Delete';
+  const poolBensLabel     = tr.pool_mgmt_beneficiaries ?? 'Beneficiaries';
 
   const HAIKU_45_INPUT_USD_PER_1K  = 0.001;
   const HAIKU_45_OUTPUT_USD_PER_1K = 0.005;
@@ -822,12 +898,14 @@ const langJson = JSON.stringify(lang);
           <div class="flex items-center gap-1 flex-wrap justify-end">
           <div class="flex items-center gap-1">
             <button data-pool-view="${escHtml(p.id)}" class="text-xs text-sky-700 hover:text-sky-900 dark:text-sky-400 dark:hover:text-sky-200 px-2 py-1">${escHtml(poolDashViewLabel)}</button>
+            <button data-pool-bens="${escHtml(p.id)}" class="text-xs px-2 py-1 rounded border border-sky-400 text-sky-700 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/20">${escHtml(poolBensLabel)}</button>
+            <button data-pool-edit="${escHtml(p.id)}" data-pool-cap="${p.total_cap}" data-pool-used="${p.used}" data-pool-model="${escHtml(p.preferred_model)}" data-pool-daily="${p.daily_user_cap}" class="text-xs px-2 py-1 rounded border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800">${escHtml(poolEditLabel)}</button>
             ${p.status === 'active'
               ? `<button data-pool-pause="${escHtml(p.id)}" class="text-xs px-2 py-1 rounded border border-amber-400 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20">Pause</button>`
               : p.status === 'paused'
                 ? `<button data-pool-resume="${escHtml(p.id)}" class="text-xs px-2 py-1 rounded border border-emerald-500 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20">Resume</button>`
                 : ''}
-            <button data-pool-delete="${escHtml(p.id)}" class="text-xs px-2 py-1 rounded border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">Delete</button>
+            <button data-pool-delete="${escHtml(p.id)}" class="text-xs px-2 py-1 rounded border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">${escHtml(poolDeleteLabel)}</button>
           </div>
         </li>
       `;
@@ -844,12 +922,146 @@ const langJson = JSON.stringify(lang);
         await setPoolStatus(target.dataset.poolResume, 'active');
         await refreshPools();
       } else if (target.dataset.poolDelete) {
-        if (await showConfirm('Delete this pool? This cannot be undone.')) {
+        if (await showConfirm(tr.pool_mgmt_delete_confirm)) {
           await deletePool(target.dataset.poolDelete);
           await refreshPools();
         }
+      } else if (target.dataset.poolEdit) {
+        openEditPoolDialog({
+          id:    target.dataset.poolEdit,
+          cap:   Number(target.dataset.poolCap   ?? 0),
+          used:  Number(target.dataset.poolUsed  ?? 0),
+          model: target.dataset.poolModel ?? '',
+          daily: Number(target.dataset.poolDaily ?? 10),
+        });
+      } else if (target.dataset.poolBens) {
+        await openPoolBeneficiariesDialog(target.dataset.poolBens);
       }
     } catch (err) { alert(`Error: ${(err as Error).message}`); }
+  });
+
+  // ── #468: Edit pool dialog ────────────────────────────────────────
+  const editPoolDialog = document.getElementById('edit-pool-dialog') as HTMLDialogElement | null;
+  function openEditPoolDialog(input: { id: string; cap: number; used: number; model: string; daily: number }): void {
+    if (!editPoolDialog) return;
+    (document.getElementById('edit-pool-id')    as HTMLInputElement).value = input.id;
+    (document.getElementById('edit-pool-cap')   as HTMLInputElement).value = String(input.cap);
+    (document.getElementById('edit-pool-cap')   as HTMLInputElement).min   = String(input.used);
+    (document.getElementById('edit-pool-model') as HTMLInputElement).value = input.model;
+    (document.getElementById('edit-pool-daily') as HTMLInputElement).value = String(input.daily);
+    const hint = document.getElementById('edit-pool-cap-hint');
+    if (hint) hint.textContent = pageLang === 'es'
+      ? `Mínimo: ${input.used} (ya consumido).`
+      : `Minimum: ${input.used} (already used).`;
+    const errEl = document.getElementById('edit-pool-error');
+    errEl?.classList.add('hidden');
+    if (errEl) errEl.textContent = '';
+    editPoolDialog.showModal();
+  }
+  document.getElementById('edit-pool-cancel')?.addEventListener('click', () => editPoolDialog?.close());
+  editPoolDialog?.querySelector('form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id    = (document.getElementById('edit-pool-id')    as HTMLInputElement).value;
+    const cap   = Number((document.getElementById('edit-pool-cap')   as HTMLInputElement).value);
+    const model = (document.getElementById('edit-pool-model') as HTMLInputElement).value.trim();
+    const daily = Number((document.getElementById('edit-pool-daily') as HTMLInputElement).value);
+    if (!id || !Number.isFinite(cap) || !model) return;
+    const submit = document.getElementById('edit-pool-submit') as HTMLButtonElement;
+    const errEl  = document.getElementById('edit-pool-error');
+    submit.disabled = true;
+    submit.textContent = tr.pool_mgmt_saving;
+    try {
+      await updatePool(id, { total_cap: cap, preferred_model: model, daily_user_cap: daily });
+      editPoolDialog?.close();
+      await refreshPools();
+    } catch (err) {
+      const msg = (err as Error).message;
+      if (errEl) {
+        errEl.classList.remove('hidden');
+        const usedMatch = /already used (\d+)/.exec(msg);
+        errEl.textContent = usedMatch
+          ? tr.pool_mgmt_cap_below.replace('{0}', usedMatch[1])
+          : `${tr.pool_mgmt_error_generic} ${msg}`;
+      }
+    } finally {
+      submit.disabled = false;
+      submit.textContent = tr.pool_mgmt_save;
+    }
+  });
+
+  // ── #468: Pool beneficiaries dialog ──────────────────────────────
+  const bensDialog = document.getElementById('pool-beneficiaries-dialog') as HTMLDialogElement | null;
+  let bensCurrentPage = 0;
+  let bensCurrentPoolId = '';
+
+  async function loadBeneficiariesPage(): Promise<void> {
+    const tbody     = document.getElementById('pool-bens-tbody');
+    const table     = document.getElementById('pool-bens-table');
+    const empty     = document.getElementById('pool-bens-empty');
+    const loading   = document.getElementById('pool-bens-loading');
+    const pageLabel = document.getElementById('pool-bens-page-label');
+    const prevBtn   = document.getElementById('pool-bens-prev')   as HTMLButtonElement | null;
+    const nextBtn   = document.getElementById('pool-bens-next')   as HTMLButtonElement | null;
+    if (!tbody || !table || !empty || !loading) return;
+    loading.classList.remove('hidden');
+    table.classList.add('hidden');
+    empty.classList.add('hidden');
+    try {
+      const result = await listPoolBeneficiaries(bensCurrentPoolId, bensCurrentPage);
+      loading.classList.add('hidden');
+      if (result.items.length === 0 && bensCurrentPage === 0) {
+        empty.classList.remove('hidden');
+        if (pageLabel) pageLabel.textContent = '';
+        if (prevBtn) prevBtn.disabled = true;
+        if (nextBtn) nextBtn.disabled = true;
+        tbody.innerHTML = '';
+        return;
+      }
+      table.classList.remove('hidden');
+      tbody.innerHTML = result.items.map((b) => {
+        const display = b.display_name || b.username;
+        return `
+          <tr class="border-t border-zinc-200 dark:border-zinc-800">
+            <td class="py-2 pr-4">
+              <a href="/${pageLang}/${pageLang === 'es' ? 'perfil' : 'profile'}/u/${escHtml(b.username)}/" class="text-sky-700 dark:text-sky-400 hover:underline">${escHtml(display)}</a>
+              <span class="ml-1 text-xs text-zinc-500">@${escHtml(b.username)}</span>
+            </td>
+            <td class="py-2 pr-4 font-mono text-sm">${b.total_calls}</td>
+            <td class="py-2 pr-4 text-xs text-zinc-500">${escHtml(b.last_seen)}</td>
+          </tr>
+        `;
+      }).join('');
+      const start = result.page * result.page_size + 1;
+      const end   = Math.min(start + result.items.length - 1, result.total);
+      if (pageLabel) pageLabel.textContent = `${start}–${end} / ${result.total}`;
+      if (prevBtn) prevBtn.disabled = result.page === 0;
+      if (nextBtn) nextBtn.disabled = !result.has_more;
+    } catch (err) {
+      loading.classList.add('hidden');
+      empty.classList.remove('hidden');
+      empty.textContent = `${tr.pool_mgmt_error_generic} ${(err as Error).message}`;
+    }
+  }
+
+  async function openPoolBeneficiariesDialog(poolId: string): Promise<void> {
+    if (!bensDialog) return;
+    bensCurrentPoolId = poolId;
+    bensCurrentPage = 0;
+    (document.getElementById('ben-pool-id') as HTMLInputElement).value = poolId;
+    bensDialog.showModal();
+    await loadBeneficiariesPage();
+  }
+
+  document.getElementById('pool-bens-close')?.addEventListener('click', () => bensDialog?.close());
+  document.getElementById('pool-bens-prev')?.addEventListener('click', async () => {
+    if (bensCurrentPage > 0) {
+      bensCurrentPage -= 1;
+      await loadBeneficiariesPage();
+    }
+  });
+  document.getElementById('pool-bens-next')?.addEventListener('click', async () => {
+    bensCurrentPage += 1;
+    await loadBeneficiariesPage();
   });
 
   void refreshPools();

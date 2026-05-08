@@ -129,15 +129,38 @@ daily cap only consults `day = current_date`.
 
 ## Privacy invariant
 
-Sponsors **never** see which user_ids consumed their pool. The
-`pool_consumption` table is queryable by service_role only (writes)
-and self-only (reads). No RPC joins `pool_consumption` to
-`auth.users`. Aggregate-only sponsor dashboards must use
-`observations` joined to `taxa`.
+Sponsors **never** see which user_ids consumed their pool via the
+legacy `pool_consumption` table (queryable by service_role only and
+self-only).
 
-If a sponsor demands beneficiary-level visibility for compliance
-reasons (e.g. NPO grant reporting), open a separate spec — v1
-deliberately doesn't support this.
+Issue #468 (PR landing 2026-05-07) added an explicit sponsor-side
+beneficiary list backed by a new `pool_user_usage(pool_id, user_id,
+day, count)` table. Reads gated by:
+
+- RLS owner-read: `EXISTS (sponsor_pools sp WHERE sp.id = pool_user_usage.pool_id AND sp.sponsor_id = auth.uid())`
+- `pool_beneficiaries(p_pool_id, p_since)` RPC (`SECURITY DEFINER`)
+  re-checks `sponsor_id = auth.uid()` before returning rows.
+
+The list shows username + display_name + total_calls + last_seen,
+limited to a rolling 30-day window. Donors can use this to identify
+heavy beneficiaries for follow-up; it is NOT a real-time observability
+tool.
+
+## Soft-delete
+
+`sponsor_pools.deleted_at` (added in PR for #468) is a tombstone
+column. Pools with `deleted_at IS NOT NULL` are excluded from
+`consume_pool_slot()`, the read RLS policy, and `claude_eligibility()`.
+History (`pool_user_usage`, `pool_usage_daily`, audit) is preserved
+because hard-delete would cascade those rows away.
+
+To resurrect a soft-deleted pool (manual ops only):
+
+```sql
+UPDATE public.sponsor_pools
+   SET deleted_at = NULL, status = 'paused'
+ WHERE id = '<uuid>' AND sponsor_id = auth.uid();
+```
 
 ## Common failures
 
