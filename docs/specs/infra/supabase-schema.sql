@@ -8524,6 +8524,76 @@ ON CONFLICT (threshold) DO UPDATE SET
   icon     = EXCLUDED.icon;
 
 -- ═══════════════════════════════════════════════════════════════════════════
+-- cascade_config — runtime-tunable cascade thresholds (issue #615)
+-- ═══════════════════════════════════════════════════════════════════════════
+-- Single source of truth for thresholds the cascade engine reads at
+-- decision time. Today only the disambiguation gap rule lives here, but
+-- the table is generic so future thresholds (accept floor, retry caps,
+-- ...) can land without a migration.
+--
+-- Read by `src/lib/disambiguation.ts` on the client and the `identify`
+-- Edge Function on the server. Public read so anonymous callers hit the
+-- same gap rule the signed-in cascade does.
+
+CREATE TABLE IF NOT EXISTS public.cascade_config (
+  key            text PRIMARY KEY,
+  value          numeric NOT NULL,
+  description_en text,
+  description_es text,
+  updated_at     timestamptz NOT NULL DEFAULT now(),
+  updated_by     uuid REFERENCES public.users(id)
+);
+
+ALTER TABLE public.cascade_config ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS cascade_config_public_read ON public.cascade_config;
+CREATE POLICY cascade_config_public_read ON public.cascade_config
+  FOR SELECT TO anon, authenticated USING (true);
+
+GRANT SELECT ON public.cascade_config TO anon, authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.cascade_config TO service_role;
+
+INSERT INTO public.cascade_config (key, value, description_en, description_es) VALUES
+  ('disambiguation_gap_threshold',  0.15,
+   'Trigger disambiguation when (top1.confidence - top2.confidence) < this value.',
+   'Activa la desambiguación cuando (top1.confianza - top2.confianza) < este valor.'),
+  ('disambiguation_min_confidence', 0.30,
+   'Floor — both top candidates must clear this for the disambiguation banner to fire.',
+   'Umbral mínimo — ambos candidatos top deben superar este valor para activar el banner.')
+ON CONFLICT (key) DO UPDATE
+  SET description_en = EXCLUDED.description_en,
+      description_es = EXCLUDED.description_es;
+  -- value is intentionally NOT updated on conflict — preserves runtime tuning.
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- taxon_pair_disambiguations — LLM-generated diagnostic prompts (issue #615)
+-- ═══════════════════════════════════════════════════════════════════════════
+-- Cache for "which photo angle separates Salvia mexicana from Salvia
+-- elegans?" prompts. Pair key is canonicalised (alphabetical) so
+-- (A, B) and (B, A) hit the same row. Public read so anonymous callers
+-- can reuse cached prompts without re-spending pool/sponsorship tokens.
+
+CREATE TABLE IF NOT EXISTS public.taxon_pair_disambiguations (
+  taxon_a    text NOT NULL,
+  taxon_b    text NOT NULL,
+  prompt_en  text NOT NULL,
+  prompt_es  text NOT NULL,
+  source     text NOT NULL DEFAULT 'claude',
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (taxon_a, taxon_b),
+  CONSTRAINT taxon_pair_disambiguations_canonical CHECK (taxon_a <= taxon_b)
+);
+
+ALTER TABLE public.taxon_pair_disambiguations ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS taxon_pair_disambiguations_public_read ON public.taxon_pair_disambiguations;
+CREATE POLICY taxon_pair_disambiguations_public_read ON public.taxon_pair_disambiguations
+  FOR SELECT TO anon, authenticated USING (true);
+
+GRANT SELECT ON public.taxon_pair_disambiguations TO anon, authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.taxon_pair_disambiguations TO service_role;
+
+-- ═══════════════════════════════════════════════════════════════════════════
 -- nearby_similar_species — Pokédex-style "what else is around" card (#616)
 -- ═══════════════════════════════════════════════════════════════════════════
 -- Returns up to N sibling-genus species observed within p_radius_m of the

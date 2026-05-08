@@ -57,6 +57,21 @@ import { checkAnonRateLimit } from '../_shared/anon-rate-limit.ts';
 type IdentifyRequest = {
   observation_id: string;
   image_url: string;
+  /**
+   * When `mode = 'disambiguate'`, the request skips photo identification
+   * entirely and instead asks Claude for a single-sentence diagnostic
+   * prompt that distinguishes `taxon_a` from `taxon_b` (issue #615).
+   * The prompt is cached server-side in `taxon_pair_disambiguations`
+   * keyed by the canonicalised pair, so subsequent callers hit the
+   * cache instead of re-spending pool/sponsor tokens.
+   *
+   * Required when set: `taxon_a`, `taxon_b`. `image_url` is ignored
+   * (we accept any URL string to satisfy the existing required-field
+   * check, and bail before fetching).
+   */
+  mode?: 'disambiguate';
+  taxon_a?: string;
+  taxon_b?: string;
   user_hint?: 'plant' | 'animal' | 'fungi' | 'unknown';
   location?: { lat: number; lng: number };
   /**
@@ -411,6 +426,289 @@ async function runServerCascade(
   return { result: null, errors, attempts };
 }
 
+// ─────────────── Disambiguation prompt (#615) ───────────────
+
+interface CachedPromptRow { prompt_en: string; prompt_es: string }
+
+function canonicalPair(a: string, b: string): { taxon_a: string; taxon_b: string } {
+  const ta = a.trim();
+  const tb = b.trim();
+  return ta <= tb ? { taxon_a: ta, taxon_b: tb } : { taxon_a: tb, taxon_b: ta };
+}
+
+const DISAMBIGUATION_FALLBACK_EN =
+  'These two species look very similar in the photo. A clearer, well-lit close-up of leaves, flowers, or other diagnostic features will help separate them.';
+const DISAMBIGUATION_FALLBACK_ES =
+  'Estas dos especies se parecen mucho en la foto. Un primer plano nítido y bien iluminado de hojas, flores u otros rasgos distintivos ayudará a diferenciarlas.';
+
+async function callClaudeForDisambiguation(
+  cred: ResolvedCredential,
+  taxonA: string,
+  taxonB: string,
+): Promise<{ prompt_en: string; prompt_es: string } | null> {
+  const SYSTEM = [
+    'You are a field-guide expert for Latin American biodiversity.',
+    'Given two scientific names, produce a single-sentence instruction',
+    'telling the photographer what additional photo (organ, angle, or',
+    'feature) would best distinguish them. Output strict JSON with two',
+    'keys: prompt_en (English) and prompt_es (Spanish). No markdown,',
+    'no preamble. Each prompt ≤ 240 characters.',
+  ].join(' ');
+  const user = `Taxon A: ${taxonA}\nTaxon B: ${taxonB}\nReturn JSON: {"prompt_en":"...","prompt_es":"..."}`;
+
+  let provider;
+  try {
+    provider = buildProvider(cred);
+  } catch {
+    return null;
+  }
+
+  const headers: Record<string, string> = {
+    'anthropic-version': '2023-06-01',
+    'content-type':      'application/json',
+  };
+  if (cred.kind === 'oauth_token') headers['Authorization'] = `Bearer ${cred.secret}`;
+  else                              headers['x-api-key']     = cred.secret;
+
+  if (cred.kind !== 'api_key' && cred.kind !== 'oauth_token') {
+    return await callClaudeForDisambiguationViaProvider(provider, SYSTEM, user);
+  }
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        model: cred.model || 'claude-haiku-4-5',
+        max_tokens: 256,
+        system: SYSTEM,
+        messages: [{ role: 'user', content: [{ type: 'text', text: user }] }],
+      }),
+    });
+    if (!res.ok) return null;
+    const json = await res.json() as { content?: Array<{ type: string; text?: string }> };
+    const text = json.content?.find(c => c.type === 'text')?.text ?? '';
+    return parseDisambiguationJson(text);
+  } catch {
+    return null;
+  }
+}
+
+async function callClaudeForDisambiguationViaProvider(
+  provider: ReturnType<typeof buildProvider>,
+  systemPrompt: string,
+  userText: string,
+): Promise<{ prompt_en: string; prompt_es: string } | null> {
+  // Provider abstraction expects an image input; for non-direct paths
+  // (Bedrock/Vertex/Azure/Gemini/OpenAI) we pass a 1×1 transparent PNG
+  // so the provider's signature stays consistent. Each provider strips
+  // image content when it isn't load-bearing for the call.
+  const ONE_PIXEL_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+  try {
+    const res = await provider.identify({
+      imageBase64: ONE_PIXEL_PNG,
+      mimeType: 'image/png',
+      systemPrompt,
+      userText,
+    });
+    if (!res) return null;
+    const raw = res.raw as { content?: Array<{ type: string; text?: string }> };
+    const text = raw?.content?.find(c => c.type === 'text')?.text ?? '';
+    return parseDisambiguationJson(text);
+  } catch {
+    return null;
+  }
+}
+
+function parseDisambiguationJson(text: string): { prompt_en: string; prompt_es: string } | null {
+  if (!text) return null;
+  const stripped = text.replace(/^```(?:json)?\s*|\s*```\s*$/g, '').trim();
+  const match = stripped.match(/\{[\s\S]*\}/);
+  if (!match) return null;
+  try {
+    const parsed = JSON.parse(match[0]) as { prompt_en?: unknown; prompt_es?: unknown };
+    const en = typeof parsed.prompt_en === 'string' ? parsed.prompt_en.trim() : '';
+    const es = typeof parsed.prompt_es === 'string' ? parsed.prompt_es.trim() : '';
+    if (!en || !es) return null;
+    return { prompt_en: en.slice(0, 280), prompt_es: es.slice(0, 280) };
+  } catch {
+    return null;
+  }
+}
+
+async function handleDisambiguate(
+  req: Request,
+  body: IdentifyRequest,
+  hasAuth: boolean,
+  serviceRole: string | undefined,
+  supabaseUrl: string | undefined,
+): Promise<Response> {
+  const taxonA = (body.taxon_a ?? '').trim();
+  const taxonB = (body.taxon_b ?? '').trim();
+  if (!taxonA || !taxonB) {
+    return corsResponse(JSON.stringify({ error: 'missing_taxa' }), {
+      status: 400,
+      headers: { 'content-type': 'application/json' },
+    });
+  }
+  if (taxonA === taxonB) {
+    return corsResponse(JSON.stringify({ error: 'identical_taxa' }), {
+      status: 400,
+      headers: { 'content-type': 'application/json' },
+    });
+  }
+
+  const { taxon_a, taxon_b } = canonicalPair(taxonA, taxonB);
+
+  if (!serviceRole || !supabaseUrl) {
+    return corsResponse(
+      JSON.stringify({
+        prompt_en: DISAMBIGUATION_FALLBACK_EN,
+        prompt_es: DISAMBIGUATION_FALLBACK_ES,
+        cached: false,
+        fallback: true,
+      }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    );
+  }
+
+  const supabase = createClient(supabaseUrl, serviceRole);
+
+  const { data: cached } = await supabase
+    .from('taxon_pair_disambiguations')
+    .select('prompt_en, prompt_es')
+    .eq('taxon_a', taxon_a)
+    .eq('taxon_b', taxon_b)
+    .maybeSingle();
+  if (cached) {
+    const row = cached as CachedPromptRow;
+    return corsResponse(JSON.stringify({
+      prompt_en: row.prompt_en,
+      prompt_es: row.prompt_es,
+      cached: true,
+    }), { status: 200, headers: { 'content-type': 'application/json' } });
+  }
+
+  // Resolve a Claude credential (BYO → personal → sponsorship → pool).
+  // Reuses the same chain the photo cascade uses; the disambiguation
+  // call counts against the same quota.
+  let beneficiaryId: string | null = null;
+  if (hasAuth) {
+    const jwt = req.headers.get('authorization')!.slice('Bearer '.length).trim();
+    try {
+      const { data, error } = await supabase.auth.getUser(jwt);
+      if (!error && data.user) beneficiaryId = data.user.id;
+    } catch {
+      beneficiaryId = null;
+    }
+  }
+
+  const byoAnthropic = body.client_keys?.anthropic ?? body.client_anthropic_key;
+  let resolvedCred: ResolvedCredential | null = null;
+
+  if (beneficiaryId) {
+    try {
+      const personal = await resolvePersonalCredential(supabase, beneficiaryId);
+      if (personal) {
+        resolvedCred = {
+          kind:     personal.kind as ResolvedCredential['kind'],
+          secret:   personal.secret,
+          model:    personal.model,
+          endpoint: personal.endpoint,
+        };
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  if (!resolvedCred && byoAnthropic) {
+    resolvedCred = { kind: 'api_key', secret: byoAnthropic, model: 'claude-haiku-4-5', endpoint: null };
+  }
+
+  if (!resolvedCred && beneficiaryId) {
+    try {
+      const rl = await checkAndBumpRateLimit(supabase, beneficiaryId, 'anthropic');
+      if (rl.allowed) {
+        const ctx = await resolveSponsorship(supabase, beneficiaryId, 'anthropic');
+        if (ctx) {
+          const secret = await decryptCredential(supabase, ctx.vaultSecretId);
+          resolvedCred = {
+            kind:     ctx.kind as ResolvedCredential['kind'],
+            secret,
+            model:    ctx.preferredModel,
+            endpoint: ctx.endpoint,
+          };
+        } else {
+          const { data: poolRows } = await supabase.rpc('consume_pool_slot', { p_user_id: beneficiaryId });
+          if (Array.isArray(poolRows) && poolRows.length > 0) {
+            const slot = poolRows[0] as { credential_id: string; preferred_model: string };
+            const { data: credRow } = await supabase
+              .from('sponsor_credentials')
+              .select('kind, vault_secret_id, endpoint')
+              .eq('id', slot.credential_id)
+              .single();
+            if (credRow) {
+              const row = credRow as { kind: CredentialKind; vault_secret_id: string; endpoint: string | null };
+              const secret = await decryptCredential(supabase, row.vault_secret_id);
+              resolvedCred = {
+                kind:     row.kind as ResolvedCredential['kind'],
+                secret,
+                model:    slot.preferred_model,
+                endpoint: row.endpoint,
+              };
+            }
+          }
+        }
+      }
+    } catch {
+      // fall through to fallback prompt
+    }
+  }
+
+  if (!resolvedCred) {
+    return corsResponse(JSON.stringify({
+      prompt_en: DISAMBIGUATION_FALLBACK_EN,
+      prompt_es: DISAMBIGUATION_FALLBACK_ES,
+      cached: false,
+      fallback: true,
+      reason: 'no_credential',
+    }), { status: 200, headers: { 'content-type': 'application/json' } });
+  }
+
+  const generated = await callClaudeForDisambiguation(resolvedCred, taxonA, taxonB);
+  if (!generated) {
+    return corsResponse(JSON.stringify({
+      prompt_en: DISAMBIGUATION_FALLBACK_EN,
+      prompt_es: DISAMBIGUATION_FALLBACK_ES,
+      cached: false,
+      fallback: true,
+      reason: 'llm_failed',
+    }), { status: 200, headers: { 'content-type': 'application/json' } });
+  }
+
+  // Cache for next caller. Best-effort — a unique-violation race is fine
+  // (the loser just won't seed; the winner's row is what subsequent
+  // callers read).
+  try {
+    await supabase.from('taxon_pair_disambiguations').upsert({
+      taxon_a,
+      taxon_b,
+      prompt_en: generated.prompt_en,
+      prompt_es: generated.prompt_es,
+      source: 'claude',
+    }, { onConflict: 'taxon_a,taxon_b' });
+  } catch (err) {
+    console.warn(`[identify/disambiguate] cache upsert failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  return corsResponse(JSON.stringify({
+    prompt_en: generated.prompt_en,
+    prompt_es: generated.prompt_es,
+    cached: false,
+  }), { status: 200, headers: { 'content-type': 'application/json' } });
+}
+
 // ─────────────── HTTP handler ───────────────
 
 const CORS_HEADERS = {
@@ -478,17 +776,24 @@ serve(async (req) => {
     return corsResponse('Missing observation_id or image_url', { status: 400 });
   }
 
-  const imageBytes = await fetchImageAsBytes(body.image_url);
-  const mimeType = 'image/jpeg';
-
-  const byoPlantnet = body.client_keys?.plantnet;
-  const byoAnthropic = body.client_keys?.anthropic ?? body.client_anthropic_key;
-
   // Service-role client for sponsorship lookups, vault decryption, usage
   // writes, and the eventual identifications insert. Created lazily so
   // anonymous BYO calls (no JWT, no sponsorship) don't pay the round trip.
   const serviceRole = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
+
+  // Disambiguation branch (#615): generate a single-sentence diagnostic
+  // prompt for the given taxon pair instead of running the photo cascade.
+  // Lives in this EF so it shares BYO/sponsor/pool credential resolution.
+  if (body.mode === 'disambiguate') {
+    return await handleDisambiguate(req, body, hasAuth, serviceRole, supabaseUrl);
+  }
+
+  const imageBytes = await fetchImageAsBytes(body.image_url);
+  const mimeType = 'image/jpeg';
+
+  const byoPlantnet = body.client_keys?.plantnet;
+  const byoAnthropic = body.client_keys?.anthropic ?? body.client_anthropic_key;
   let serviceDb: SupabaseClient | null = null;
   function db(): SupabaseClient {
     if (!serviceDb) {
