@@ -70,9 +70,16 @@ const psp = (tr as unknown as { profile_streak_push: { section_title: string; se
       sppWarn.classList.remove('hidden');
     }
 
+    // Resolve dependencies once on script init. ES module imports are
+    // memoized by the runtime so the click handler doesn't need its own
+    // dynamic import each time.
+    const [pushLib, supabaseLib] = await Promise.all([
+      import('../lib/push'),
+      import('../lib/supabase'),
+    ]);
+
     async function refreshSpp() {
-      const { isStreakPushEnabled } = await import('../lib/push');
-      const on = await isStreakPushEnabled();
+      const on = await pushLib.isStreakPushEnabled();
       if (on) {
         setSppLabel(SPP_TXT.disable);
         setSppStatus('✓ ' + SPP_TXT.enabled);
@@ -89,8 +96,7 @@ const psp = (tr as unknown as { profile_streak_push: { section_title: string; se
       sppBtn.disabled = true;
       const turningOn = sppBtn.dataset.state !== 'on';
       setSppLabel(turningOn ? SPP_TXT.enabling : SPP_TXT.disabling);
-      const lib = await import('../lib/push');
-      const r = turningOn ? await lib.enableStreakPush() : await lib.disableStreakPush();
+      const r = turningOn ? await pushLib.enableStreakPush() : await pushLib.disableStreakPush();
       sppBtn.disabled = false;
       if (!r.ok) {
         const reasonMap = {
@@ -100,8 +106,7 @@ const psp = (tr as unknown as { profile_streak_push: { section_title: string; se
         };
         setSppWarn(reasonMap[r.reason ?? 'unknown'] ?? r.message ?? '');
       } else {
-        const { getSupabase } = await import('../lib/supabase');
-        const supabase = getSupabase();
+        const supabase = supabaseLib.getSupabase();
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
           await supabase.from('users').update({ streak_digest_opt_in: turningOn }).eq('id', user.id);

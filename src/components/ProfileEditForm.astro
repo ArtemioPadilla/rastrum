@@ -1835,9 +1835,8 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
   }
   paintRegistry().catch(() => {});
 
-  // Streak push reminder toggle moved into StreakRemindersSection.astro
-  // (mounted on the legacy /profile/edit page when section='all', and on the
-  // /settings/preferences/ tab directly).
+  // Streak push reminder toggle moved into StreakRemindersSection.astro,
+  // mounted directly on the /settings/preferences/ tab.
 
   // ── Identity linking (issue #286) ──────────────────────────────────────────
   const identityList = document.getElementById('identity-list');
