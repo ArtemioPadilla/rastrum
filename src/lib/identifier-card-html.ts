@@ -46,7 +46,7 @@ function bytesHuman(n: number): string {
   if (!n) return '0 B';
   const u = ['B', 'KB', 'MB', 'GB', 'TB'];
   let i = 0; let v = n;
-  while (v >= 1000 && i < u.length - 1) { v /= 1000; i++; }
+  while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
   return `${v.toFixed(v < 10 ? 1 : 0)} ${u[i]}`;
 }
 
@@ -90,14 +90,14 @@ function pillFor(state: CardState, t: Strings): string {
   }
 }
 
-/** Known download sizes for on-device plugins (shown in the Download button). */
+/** Approximate cached/download sizes for on-device plugins (binary units). */
 const KNOWN_MODEL_BYTES: Record<string, number> = {
-  webllm_phi35_vision: 4_000_000_000,
-  onnx_gemma4_vision: 2_000_000_000,
-  birdnet_lite: 50_000_000,
-  onnx_efficientnet_lite0: 25_000_000,
-  camera_trap_megadetector: 250_000_000,
-  speciesnet_distilled: 400_000_000,
+  webllm_phi35_vision: 4_294_967_296,    // 4.0 GiB
+  onnx_gemma4_vision: 3_435_973_837,     // ≈ 3.2 GB binary (matches existing UI)
+  birdnet_lite: 52_428_800,              // 50 MiB
+  onnx_efficientnet_lite0: 18_874_368,   // 18 MB (matches existing UI showing 18 MB)
+  camera_trap_megadetector: 140_509_184, // ≈ 134 MB (matches existing UI)
+  speciesnet_distilled: 104_857_600,     // 100 MiB
 };
 
 function actionsFor(p: PluginCardProps, t: Strings): string {

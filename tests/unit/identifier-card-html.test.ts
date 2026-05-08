@@ -40,7 +40,7 @@ function props(overrides: Partial<PluginCardProps> = {}): PluginCardProps {
     plugin: phi,
     state: { kind: 'active' },
     isDisabled: false,
-    cacheStatus: { modelId: 'webllm_phi35_vision', cached: true, approxBytes: 4_000_000_000, entries: 15 },
+    cacheStatus: { modelId: 'webllm_phi35_vision', cached: true, approxBytes: 4_294_967_296, entries: 15 },
     byoKeysSet: {},
     sponsorship: null,
     ...overrides,
