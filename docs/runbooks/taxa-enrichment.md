@@ -52,11 +52,14 @@ blocks on enrichment.
 ### Automatic — nightly
 
 `.github/workflows/enrich-taxa.yml` runs at **06:00 UTC** daily, batch
-mode, `limit=100`. Catches:
+mode, `limit=250`. Catches:
 
 - Taxa from before this PR shipped (kingdom NULL).
 - Taxa where the on-identify call failed (network, GBIF 5xx).
 - Taxa where GBIF added/changed a record after the initial enrichment.
+
+After the initial backfill the nightly run finishes in seconds —
+day-to-day drift is dominated by genuinely new species observed.
 
 ### Manual
 
@@ -65,7 +68,9 @@ gh workflow run enrich-taxa.yml -f limit=500
 ```
 
 Use this once after deploying the EF for the first-time backfill (most
-taxa are NULL). 500 rows take ~110 s wall clock at the polite GBIF rate.
+taxa are NULL). 500 rows take ~110 s wall clock at the polite GBIF rate
+(`curl --max-time 1200` gives 10× headroom for slow GBIF / 429 retries).
+The EF caps `limit` at 500 internally regardless of input.
 
 ## How it merges with existing data
 

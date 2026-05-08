@@ -758,7 +758,13 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
       const LEFT_PAD = 12;
       const TOP_PAD = 14;
       const LEAF_LABEL_PAD = 12;
-      const RIGHT_PAD = 240; // room for italic species labels
+      // Conservative average glyph width for italic species labels; long
+      // multi-rank names ("Quercus castanea var. castanea") need ~7 px per
+      // glyph at font-size 12. Capped so a single weird name doesn't make
+      // the whole SVG horizontally enormous.
+      const GLYPH_PX = 7;
+      const RIGHT_PAD_MIN = 200;
+      const RIGHT_PAD_MAX = 480;
 
       type Pos = TaxonNode & { _x: number; _y: number };
       const leaves: Pos[] = [];
@@ -767,6 +773,14 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
         else n.children.forEach(collectLeaves);
       }
       collectLeaves(tree);
+
+      // Reserve right-side padding for the longest leaf label so species
+      // names don't visually clip past the SVG viewBox.
+      const longestLeaf = leaves.reduce((m, l) => Math.max(m, l.name.length), 0);
+      const RIGHT_PAD = Math.min(
+        RIGHT_PAD_MAX,
+        Math.max(RIGHT_PAD_MIN, longestLeaf * GLYPH_PX + LEAF_LABEL_PAD * 2),
+      );
 
       // Assign y by leaf order, then bubble up internal nodes' y as the
       // average of their children's positions. x is depth-driven.

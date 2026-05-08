@@ -87,10 +87,15 @@ async function selectBatch(db: SupabaseClient, limit: number): Promise<TaxaRow[]
   // Pick the rows missing the most lineage first — kingdom IS NULL is the
   // strongest signal of an un-enriched row, but we also re-visit rows that
   // got kingdom but no genus.
+  //
+  // Empty-string `scientific_name` rows would just waste a GBIF lookup
+  // (lookupGbif returns null silently); skip them so the run's
+  // attempted/enriched counters stay meaningful.
   const { data } = await db.from('taxa')
     .select('id, scientific_name, kingdom, phylum, class, "order", family, genus')
     .or('kingdom.is.null,genus.is.null')
     .not('scientific_name', 'is', null)
+    .neq('scientific_name', '')
     .order('kingdom', { ascending: true, nullsFirst: true })
     .limit(capped);
   return ((data as unknown as TaxaRow[]) ?? []);

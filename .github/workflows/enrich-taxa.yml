@@ -5,13 +5,17 @@ name: Enrich taxa lineage from GBIF
 # lineage columns (kingdom/phylum/class/order/family/genus) are filled in.
 #
 # Two triggers:
-# 1. **Nightly cron** (06:00 UTC) — limit 100, keeps fresh inserts hydrated.
-# 2. **Manual dispatch** — operator can pass a larger limit for a one-shot
-#    backfill of historical rows.
+# 1. **Nightly cron** (06:00 UTC) — limit 250, big enough to drain a fresh
+#    deployment's first day of new species while staying well under the
+#    workflow timeout. After the initial backfill completes, day-to-day
+#    drift is much smaller than this and the run finishes in a few seconds.
+# 2. **Manual dispatch** — operator can pass a larger limit (up to 500,
+#    enforced by the EF) for a one-shot historical backfill.
 #
 # The EF is deployed --no-verify-jwt and gates on X-Cron-Secret.
 # GBIF is rate-limited to ~4.5 req/s inside the EF (220ms between calls)
-# so 100 rows take ~22 s; 500 rows take ~110 s.
+# so 250 rows take ~55 s; 500 rows take ~110 s. curl --max-time has 10x
+# headroom for the worst case (GBIF 429 retries / general slowness).
 
 on:
   schedule:
@@ -21,7 +25,7 @@ on:
       limit:
         description: 'Max taxa to enrich this run (1–500)'
         required: false
-        default: '100'
+        default: '250'
 
 permissions:
   contents: read
@@ -37,14 +41,14 @@ jobs:
         run: |
           set -euo pipefail
           url="https://${PROJECT_REF}.supabase.co/functions/v1/enrich-taxon"
-          limit="${{ inputs.limit || '100' }}"
+          limit="${{ inputs.limit || '250' }}"
           echo "POST $url (batch, limit=$limit)"
           response=$(curl -sS -X POST \
             -H "Content-Type: application/json" \
             -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}" \
             -d "{\"batch\": true, \"limit\": $limit}" \
             -w '\n%{http_code}' \
-            --max-time 600 \
+            --max-time 1200 \
             "$url")
           body="${response%$'\n'*}"
           status="${response##*$'\n'}"
