@@ -1,0 +1,92 @@
+---
+/**
+ * Active observers micro-banner — issue #743.
+ *
+ * Mounts at the top of /observe. After hydrate, fetches the viewer's
+ * country + region via `loadViewerRegion()` and the count of distinct
+ * observers in that country who logged at least one synced observation
+ * since the start of the current UTC day.
+ *
+ * Privacy invariants:
+ *   - Reads `community_active_observers_today(p_country)` RPC, which
+ *     joins observations + users under their existing RLS. The count
+ *     is a non-PII aggregate; no observer IDs leave the server.
+ *   - Anon visitors (no auth user) and signed-in users without a
+ *     `region_primary` get no banner — never shows "in NULL".
+ *
+ * Singular / plural / empty copy lives in three distinct keys under
+ * `observe.active_banner.*` so each locale picks the right grammatical
+ * form.
+ */
+import { t } from '../i18n/utils';
+
+interface Props { lang: 'en' | 'es'; }
+const { lang } = Astro.props;
+const isEs = lang === 'es';
+const tr = t(lang);
+const banner = (tr.observe as Record<string, unknown>).active_banner as {
+  today_n: string;
+  today_one: string;
+  empty: string;
+  aria_label: string;
+};
+const observersHref = isEs ? '/es/comunidad/observadores' : '/en/community/observers';
+---
+
+<a
+  id="active-observers-banner"
+  href={observersHref}
+  aria-label={banner.aria_label}
+  class="hidden rounded-full border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 px-3 py-1.5 text-xs text-emerald-800 dark:text-emerald-200 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors w-fit"
+  data-lang={lang}
+  data-copy-today-n={banner.today_n}
+  data-copy-today-one={banner.today_one}
+  data-copy-empty={banner.empty}
+>
+  <span id="active-observers-banner-text">{banner.empty.replace('{region}', '')}</span>
+</a>
+
+<script>
+  import { loadViewerRegion, loadActiveObserversToday } from '../lib/community';
+  import { formatActiveObserversBanner } from '../lib/active-observers';
+  import { serializeFilters, DEFAULT_FILTERS } from '../lib/community-url';
+
+  async function hydrate(): Promise<void> {
+    const el = document.getElementById('active-observers-banner') as HTMLAnchorElement | null;
+    if (!el) return;
+
+    const copyTodayN = el.dataset.copyTodayN ?? '';
+    const copyTodayOne = el.dataset.copyTodayOne ?? '';
+    const copyEmpty = el.dataset.copyEmpty ?? '';
+
+    let region: { countryCode: string | null; regionPrimary: string | null };
+    try {
+      region = await loadViewerRegion();
+    } catch {
+      return;
+    }
+
+    if (!region.regionPrimary || !region.countryCode) {
+      // Anon visitor or user without a region set — graceful no-banner
+      // fallback so we never display "in NULL".
+      return;
+    }
+
+    const count = await loadActiveObserversToday(region.countryCode);
+    const result = formatActiveObserversBanner(
+      { count, region: region.regionPrimary },
+      { today_n: copyTodayN, today_one: copyTodayOne, empty: copyEmpty },
+    );
+
+    if (!result.text) return;
+
+    const textEl = document.getElementById('active-observers-banner-text');
+    if (textEl) textEl.textContent = result.text;
+
+    const qs = serializeFilters({ ...DEFAULT_FILTERS, country: region.countryCode });
+    el.href = `${el.pathname}${qs}`;
+    el.classList.remove('hidden');
+  }
+
+  hydrate();
+</script>
