@@ -618,38 +618,121 @@ serve(async (req) => {
 
   // POST /requests — beneficiary creates a request to a sponsor by username
   // PATCH /pools/:id — update cap, daily_user_cap, preferred_model
+  // Validates that total_cap >= used so we never shrink a pool below its
+  // already-consumed slots (would break the `used < total_cap` invariant
+  // consume_pool_slot relies on).
   {
     const m = path.match(/^\/pools\/([0-9a-f-]{36})$/);
     if (m && method === 'PATCH') {
       const poolId = m[1];
-      const { data: pool } = await supabase.from('sponsor_pools').select('credential_id').eq('id', poolId).single();
+      const { data: pool } = await supabase
+        .from('sponsor_pools')
+        .select('sponsor_id, used, deleted_at')
+        .eq('id', poolId)
+        .single();
       if (!pool) return jsonResponse(404, { error: 'not_found' });
-      const { data: cred } = await supabase.from('sponsor_credentials').select('user_id').eq('id', (pool as { credential_id: string }).credential_id).single();
-      if (!cred || (cred as { user_id: string }).user_id !== ctx.userId) return jsonResponse(403, { error: 'forbidden' });
+      if ((pool as { sponsor_id: string }).sponsor_id !== ctx.userId) return jsonResponse(403, { error: 'forbidden' });
+      if ((pool as { deleted_at: string | null }).deleted_at) return jsonResponse(404, { error: 'not_found' });
       const body = await req.json().catch(() => ({}));
       const patch: Record<string, unknown> = {};
-      if (typeof body.total_cap === 'number') patch.total_cap = body.total_cap;
-      if (typeof body.daily_user_cap === 'number') patch.daily_user_cap = body.daily_user_cap;
-      if (typeof body.preferred_model === 'string') patch.preferred_model = body.preferred_model;
+      if (typeof body.total_cap === 'number') {
+        const used = (pool as { used: number }).used;
+        if (body.total_cap < used) {
+          return jsonResponse(400, {
+            error: 'cap_below_used',
+            detail: `Cannot shrink total_cap to ${body.total_cap}: pool has already used ${used} calls.`,
+            used,
+          });
+        }
+        if (body.total_cap < 1 || body.total_cap > 1_000_000) return jsonResponse(400, { error: 'cap_out_of_range' });
+        patch.total_cap = body.total_cap;
+      }
+      if (typeof body.daily_user_cap === 'number') {
+        if (body.daily_user_cap < 1 || body.daily_user_cap > 1000) return jsonResponse(400, { error: 'daily_cap_out_of_range' });
+        patch.daily_user_cap = body.daily_user_cap;
+      }
+      if (typeof body.preferred_model === 'string') {
+        if (body.preferred_model.length < 1 || body.preferred_model.length > 64) return jsonResponse(400, { error: 'model_length_1_64' });
+        patch.preferred_model = body.preferred_model;
+      }
       if (typeof body.status === 'string' && ['active','paused'].includes(body.status)) patch.status = body.status;
+      if (Object.keys(patch).length === 0) return jsonResponse(400, { error: 'no_valid_fields' });
+      patch.updated_at = new Date().toISOString();
       const { error } = await supabase.from('sponsor_pools').update(patch).eq('id', poolId);
       if (error) return jsonResponse(500, { error: 'update_failed', detail: error.message });
+      await supabase.from('admin_audit').insert({
+        actor_id:    ctx.userId,
+        op:          'ai_pool_update',
+        target_type: 'sponsor_pool',
+        target_id:   poolId,
+        reason:      'sponsor_updated_pool',
+        after:       patch,
+      });
       return jsonResponse(200, { ok: true });
     }
   }
 
-  // DELETE /pools/:id — remove pool (sets status to revoked or hard-deletes)
+  // DELETE /pools/:id — soft-delete via deleted_at column. Hard-delete
+  // would cascade pool_user_usage + pool_usage_daily rows away (FK
+  // ON DELETE CASCADE) and orphan beneficiaries' historic usage records.
   {
     const m = path.match(/^\/pools\/([0-9a-f-]{36})$/);
     if (m && method === 'DELETE') {
       const poolId = m[1];
-      const { data: pool } = await supabase.from('sponsor_pools').select('credential_id').eq('id', poolId).single();
+      const { data: pool } = await supabase
+        .from('sponsor_pools')
+        .select('sponsor_id, deleted_at')
+        .eq('id', poolId)
+        .single();
       if (!pool) return jsonResponse(404, { error: 'not_found' });
-      const { data: cred } = await supabase.from('sponsor_credentials').select('user_id').eq('id', (pool as { credential_id: string }).credential_id).single();
-      if (!cred || (cred as { user_id: string }).user_id !== ctx.userId) return jsonResponse(403, { error: 'forbidden' });
-      const { error } = await supabase.from('sponsor_pools').delete().eq('id', poolId);
+      if ((pool as { sponsor_id: string }).sponsor_id !== ctx.userId) return jsonResponse(403, { error: 'forbidden' });
+      if ((pool as { deleted_at: string | null }).deleted_at) return jsonResponse(204, null);
+      const { error } = await supabase
+        .from('sponsor_pools')
+        .update({ deleted_at: new Date().toISOString(), status: 'paused', updated_at: new Date().toISOString() })
+        .eq('id', poolId);
       if (error) return jsonResponse(500, { error: 'delete_failed', detail: error.message });
+      await supabase.from('admin_audit').insert({
+        actor_id:    ctx.userId,
+        op:          'ai_pool_delete',
+        target_type: 'sponsor_pool',
+        target_id:   poolId,
+        reason:      'sponsor_deleted_pool',
+      });
       return jsonResponse(204, null);
+    }
+  }
+
+  // GET /pools/:id/beneficiaries?page=N — paginated list of users who have
+  // drawn calls from this pool in the last 30 days. Owner-only via
+  // pool_beneficiaries() SECURITY DEFINER + sponsor_id = auth.uid().
+  {
+    const m = path.match(/^\/pools\/([0-9a-f-]{36})\/beneficiaries$/);
+    if (m && method === 'GET') {
+      const poolId = m[1];
+      const { data: pool } = await supabase
+        .from('sponsor_pools')
+        .select('sponsor_id, deleted_at')
+        .eq('id', poolId)
+        .single();
+      if (!pool) return jsonResponse(404, { error: 'not_found' });
+      if ((pool as { sponsor_id: string }).sponsor_id !== ctx.userId) return jsonResponse(403, { error: 'forbidden' });
+      const page = Math.max(0, Number(url.searchParams.get('page') ?? '0'));
+      const pageSize = 50;
+      const since = new Date(Date.now() - 30 * 24 * 60 * 60_000).toISOString().slice(0, 10);
+      const { data: rows, error: rpcErr } = await supabase.rpc('pool_beneficiaries', {
+        p_pool_id: poolId, p_since: since,
+      });
+      if (rpcErr) return jsonResponse(500, { error: 'rpc_failed', detail: rpcErr.message });
+      const all = (rows ?? []) as Array<{ user_id: string; username: string; display_name: string | null; total_calls: number; last_seen: string }>;
+      const start = page * pageSize;
+      return jsonResponse(200, {
+        items: all.slice(start, start + pageSize),
+        page,
+        page_size: pageSize,
+        total: all.length,
+        has_more: start + pageSize < all.length,
+      });
     }
   }
 

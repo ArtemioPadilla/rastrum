@@ -8249,3 +8249,213 @@ LANGUAGE sql STABLE SECURITY DEFINER AS $$
      AND pud.day >= (current_date - interval '30 days')::date
    ORDER BY pud.day;
 $$;
+
+-- ============================================================
+-- M32 / #468: Pool management — soft-delete + per-pool per-user usage
+-- ============================================================
+-- Soft-delete column on sponsor_pools. Hard-delete would orphan pool_usage_daily
+-- and pool_user_usage rows (FK ON DELETE CASCADE), losing the ledger that
+-- beneficiaries and donors both rely on. Soft-delete preserves history while
+-- excluding the pool from `consume_pool_slot()` and donor-side reads.
+ALTER TABLE public.sponsor_pools
+  ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
+
+CREATE INDEX IF NOT EXISTS idx_sponsor_pools_not_deleted
+  ON public.sponsor_pools (sponsor_id) WHERE deleted_at IS NULL;
+
+-- Extend the existing read policy to filter soft-deleted rows.
+DROP POLICY IF EXISTS sponsor_pools_owner_read ON public.sponsor_pools;
+CREATE POLICY sponsor_pools_owner_read ON public.sponsor_pools
+  FOR SELECT TO authenticated
+  USING (sponsor_id = auth.uid() AND deleted_at IS NULL);
+
+-- Per-pool per-user usage ledger. pool_consumption is keyed by (user_id, day)
+-- and has no pool_id (the daily-cap check spans pools); pool_usage_daily is
+-- keyed by (pool_id, day) and has no user_id (privacy-aggregate). Neither
+-- supports the "who has consumed from THIS pool" query the donor management
+-- UI needs. New table fills the gap with a 30-day rolling retention.
+CREATE TABLE IF NOT EXISTS public.pool_user_usage (
+  pool_id  uuid    NOT NULL REFERENCES public.sponsor_pools(id) ON DELETE CASCADE,
+  user_id  uuid    NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  day      date    NOT NULL,
+  count    integer NOT NULL DEFAULT 0 CHECK (count >= 0),
+  PRIMARY KEY (pool_id, user_id, day)
+);
+
+CREATE INDEX IF NOT EXISTS idx_pool_user_usage_pool_day
+  ON public.pool_user_usage (pool_id, day DESC);
+
+ALTER TABLE public.pool_user_usage ENABLE ROW LEVEL SECURITY;
+
+-- Donor (pool sponsor) reads. Service role bypasses RLS for the EF write path.
+DROP POLICY IF EXISTS pool_user_usage_owner_read ON public.pool_user_usage;
+CREATE POLICY pool_user_usage_owner_read ON public.pool_user_usage
+  FOR SELECT TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.sponsor_pools sp
+       WHERE sp.id = pool_user_usage.pool_id
+         AND sp.sponsor_id = auth.uid()
+    )
+  );
+
+GRANT SELECT                         ON public.pool_user_usage TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.pool_user_usage TO service_role;
+
+-- Updated consume_pool_slot: also bumps pool_user_usage and ignores
+-- soft-deleted pools. Same return type — no DROP needed.
+CREATE OR REPLACE FUNCTION public.consume_pool_slot(p_user_id uuid)
+RETURNS TABLE (pool_id uuid, credential_id uuid, preferred_model text)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_today    date := current_date;
+  v_used_today integer;
+  v_pool_id  uuid;
+  v_cred_id  uuid;
+  v_model    text;
+  v_cap      integer;
+BEGIN
+  SELECT sp.id, sp.credential_id, sp.preferred_model, sp.daily_user_cap
+    INTO v_pool_id, v_cred_id, v_model, v_cap
+    FROM public.sponsor_pools sp
+   WHERE sp.status = 'active'
+     AND sp.used < sp.total_cap
+     AND sp.deleted_at IS NULL
+   ORDER BY sp.created_at ASC
+   FOR UPDATE SKIP LOCKED
+   LIMIT 1;
+  IF v_pool_id IS NULL THEN
+    RETURN;
+  END IF;
+
+  SELECT COALESCE(count, 0) INTO v_used_today
+    FROM public.pool_consumption
+   WHERE user_id = p_user_id AND day = v_today;
+  IF v_used_today >= v_cap THEN
+    RETURN;
+  END IF;
+
+  UPDATE public.sponsor_pools SET used = used + 1, updated_at = now()
+   WHERE id = v_pool_id;
+
+  INSERT INTO public.pool_consumption (user_id, day, count)
+       VALUES (p_user_id, v_today, 1)
+  ON CONFLICT (user_id, day) DO UPDATE SET count = pool_consumption.count + 1;
+
+  INSERT INTO public.pool_usage_daily (pool_id, day, count)
+       VALUES (v_pool_id, v_today, 1)
+  ON CONFLICT (pool_id, day) DO UPDATE SET count = pool_usage_daily.count + 1;
+
+  INSERT INTO public.pool_user_usage (pool_id, user_id, day, count)
+       VALUES (v_pool_id, p_user_id, v_today, 1)
+  ON CONFLICT (pool_id, user_id, day) DO UPDATE SET count = pool_user_usage.count + 1;
+
+  UPDATE public.sponsor_pools SET status = 'exhausted'
+   WHERE id = v_pool_id AND used >= total_cap AND status = 'active';
+
+  RETURN QUERY SELECT v_pool_id, v_cred_id, v_model;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.consume_pool_slot(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.consume_pool_slot(uuid) TO service_role;
+
+-- pool_beneficiaries(p_pool_id, p_since): aggregated per-user consumption
+-- from this pool over the past N days. Used by the donor-side beneficiary
+-- list in /sponsorships/pools/:id/beneficiaries. SECURITY DEFINER + the
+-- explicit sponsor_id = auth.uid() check is the privacy gate; the function
+-- doesn't expose any consumer info to non-owners.
+CREATE OR REPLACE FUNCTION public.pool_beneficiaries(
+  p_pool_id uuid,
+  p_since   date DEFAULT (current_date - interval '30 days')::date
+) RETURNS TABLE (
+  user_id      uuid,
+  username     text,
+  display_name text,
+  total_calls  bigint,
+  last_seen    date
+) LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public AS $$
+  WITH owner_check AS (
+    SELECT 1
+      FROM public.sponsor_pools sp
+     WHERE sp.id = p_pool_id
+       AND sp.sponsor_id = auth.uid()
+  )
+  SELECT
+    puu.user_id,
+    u.username,
+    u.display_name,
+    SUM(puu.count)::bigint AS total_calls,
+    MAX(puu.day)           AS last_seen
+  FROM public.pool_user_usage puu
+  JOIN public.users u ON u.id = puu.user_id
+  WHERE EXISTS (SELECT 1 FROM owner_check)
+    AND puu.pool_id = p_pool_id
+    AND puu.day >= p_since
+  GROUP BY puu.user_id, u.username, u.display_name
+  ORDER BY total_calls DESC, last_seen DESC;
+$$;
+
+REVOKE ALL ON FUNCTION public.pool_beneficiaries(uuid, date) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.pool_beneficiaries(uuid, date) TO authenticated;
+
+-- Re-create claude_eligibility so that soft-deleted pools no longer
+-- contribute to has_pool / pool_cap_today. Same signature, same return
+-- type — the body is the only change.
+CREATE OR REPLACE FUNCTION public.claude_eligibility()
+RETURNS TABLE (
+  has_sponsor    boolean,
+  has_pool       boolean,
+  pool_used_today integer,
+  pool_cap_today  integer
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_uid uuid := auth.uid();
+BEGIN
+  IF v_uid IS NULL THEN
+    RETURN QUERY SELECT false, false, 0, 0;
+    RETURN;
+  END IF;
+
+  RETURN QUERY
+  SELECT
+    EXISTS (
+      SELECT 1
+        FROM public.sponsorships s
+        JOIN public.sponsor_credentials c ON c.id = s.credential_id
+       WHERE s.beneficiary_id = v_uid
+         AND s.status = 'active'
+         AND c.revoked_at IS NULL
+    ) AS has_sponsor,
+    EXISTS (
+      SELECT 1
+        FROM public.sponsor_pools sp
+        JOIN public.sponsor_credentials c ON c.id = sp.credential_id
+       WHERE sp.status = 'active'
+         AND sp.used   < sp.total_cap
+         AND sp.deleted_at IS NULL
+         AND c.revoked_at IS NULL
+    ) AS has_pool,
+    COALESCE(
+      (SELECT count FROM public.pool_consumption
+        WHERE user_id = v_uid AND day = current_date),
+      0
+    ) AS pool_used_today,
+    COALESCE(
+      (SELECT MIN(daily_user_cap) FROM public.sponsor_pools
+        WHERE status = 'active' AND used < total_cap AND deleted_at IS NULL),
+      0
+    ) AS pool_cap_today;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.claude_eligibility() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.claude_eligibility() TO authenticated;
