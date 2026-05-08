@@ -30,6 +30,11 @@ let client: SupabaseClient | null = null;
  * (hydrated islands or <script> blocks) — Astro SSG pages themselves never
  * need this at build time.
  */
+/** Returns the Supabase project URL — safe to call from client-side scripts. */
+export function getSupabaseUrl(): string {
+  return url ?? '';
+}
+
 export function getSupabase(): SupabaseClient {
   if (client) return client;
   // No `lock` option: supabase-js auto-selects its proper `navigatorLock`
