@@ -447,7 +447,7 @@ async function sha256Hex(s: string): Promise<string> {
   return bytesToHex(new Uint8Array(buf));
 }
 async function hmacRaw(key: string | Uint8Array, msg: string): Promise<Uint8Array> {
-  const keyBytes = typeof key === 'string' ? new TextEncoder().encode(key) : key;
+  const keyBytes = typeof key === 'string' ? new TextEncoder().encode(key) : new Uint8Array(key);
   const k = await crypto.subtle.importKey(
     'raw', keyBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
   );
