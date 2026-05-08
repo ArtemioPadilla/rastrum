@@ -81,6 +81,10 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
       </button>
       <button id="es-tab-radial" data-view="radial" role="tab" aria-selected="false"
         class="px-3 py-2 text-sm font-medium border-b-2 border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200">
+        {lang === 'es' ? 'Radial' : 'Radial'}
+      </button>
+      <button id="es-tab-tree" data-view="tree" role="tab" aria-selected="false"
+        class="px-3 py-2 text-sm font-medium border-b-2 border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200">
         {lang === 'es' ? 'Árbol' : 'Tree'}
       </button>
     </div>
@@ -98,6 +102,16 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
         </div>
       </div>
       <nav id="es-sunburst-breadcrumb" class="mt-2 text-xs text-zinc-500 dark:text-zinc-400 flex flex-wrap gap-1"></nav>
+    </div>
+
+    <!-- M34: Dendrogram tree panel (hidden by default) -->
+    <div id="es-panel-tree" class="hidden">
+      <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
+        {lang === 'es' ? 'Jerarquía taxonómica. Toca una especie para ver su perfil.' : 'Taxonomic hierarchy. Tap a species to view its profile.'}
+      </p>
+      <div class="overflow-auto rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-3" style="max-height: 70vh;">
+        <svg id="es-dendrogram" style="display:block; min-width: 100%;" role="img" aria-label="Taxonomic dendrogram"></svg>
+      </div>
     </div>
 
     <div id="es-panel-grid">
@@ -178,7 +192,7 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
   import { getSupabase } from '../lib/supabase';
   import { renderSpeciesCard, type CardLabels } from '../lib/species-card-html';
   import { parseChips, serializeChips, type ChipsState } from '../lib/species-filters';
-  import { deriveGenus, colorForName } from '../lib/species-display';
+  import { deriveGenus, colorForName, buildTaxonomicTree, taxonomicDepth, type TaxonNode } from '../lib/species-display';
 
   type Lang = 'en' | 'es';
 
@@ -496,10 +510,11 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
       });
     }
 
-    // ── M34: View switcher (grid / radial) ────────────────────
+    // ── M34: View switcher (grid / radial / tree) ─────────────
     const esTabs = root?.querySelectorAll<HTMLButtonElement>('[data-view]');
     const esPanelGrid = document.getElementById('es-panel-grid');
     const esPanelRadial = document.getElementById('es-panel-radial');
+    const esPanelTree = document.getElementById('es-panel-tree');
     const isEs = lang === 'es';
 
     function switchEsView(view: string) {
@@ -516,8 +531,10 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
 
       esPanelGrid?.classList.toggle('hidden', view !== 'grid');
       esPanelRadial?.classList.toggle('hidden', view !== 'radial');
+      esPanelTree?.classList.toggle('hidden', view !== 'tree');
 
       if (view === 'radial') initSunburst();
+      if (view === 'tree') initDendrogram();
     }
 
     esTabs?.forEach(btn => {
@@ -639,6 +656,13 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
 
     applyAllFilters();
 
+    // Shared kingdom palette for sunburst + dendrogram. `colorForName()`
+    // is the fallback when a node's kingdom isn't one of these six.
+    const KINGDOM_COLORS: Record<string, string> = {
+      'Animalia': '#2563eb', 'Plantae': '#16a34a', 'Fungi': '#ea580c',
+      'Chromista': '#7c3aed', 'Bacteria': '#dc2626', 'Protozoa': '#0891b2',
+    };
+
     // ── M34: Sunburst ──────────────────────────────────────────
     let sunburstInitialized = false;
     function initSunburst() {
@@ -649,45 +673,8 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
       const countEl = document.getElementById('es-sunburst-count');
       if (!svg) return;
 
-      const KINGDOM_COLORS: Record<string, string> = {
-        'Animalia': '#2563eb', 'Plantae': '#16a34a', 'Fungi': '#ea580c',
-        'Chromista': '#7c3aed', 'Bacteria': '#dc2626', 'Protozoa': '#0891b2',
-      };
-
       const INNER_HOLE = 0.30;
       const OUTER_LIMIT = 0.95;
-
-      type SunNode = { name: string; rank: string; count: number; slug?: string; taxonId?: string; kingdom?: string; children: SunNode[] };
-
-      function buildTree(rows: typeof allTaxa): SunNode {
-        const treeRoot: SunNode = { name: 'All species', rank: 'root', count: 0, children: [] };
-        rows.forEach(t => {
-          const path = [
-            { rank: 'kingdom', name: t.kingdom ?? '?' },
-            { rank: 'phylum',  name: t.phylum ?? '?' },
-            { rank: 'class',   name: t.class ?? '?' },
-            { rank: 'order',   name: t.order ?? '?' },
-            { rank: 'family',  name: t.family ?? '?' },
-            { rank: 'genus',   name: t.genus ?? '?' },
-            { rank: 'species', name: t.scientific_name, slug: t.slug ?? undefined, taxonId: t.id },
-          ];
-          let cur = treeRoot;
-          path.forEach(p => {
-            if (!p.name || p.name === '?') return;
-            let child = cur.children.find(c => c.name === p.name && c.rank === p.rank);
-            if (!child) {
-              child = { name: p.name, rank: p.rank, count: 0, kingdom: path[0].name, children: [] };
-              if ((p as {slug?: string}).slug) child.slug = (p as {slug?: string}).slug;
-              if ((p as {taxonId?: string}).taxonId) child.taxonId = (p as {taxonId?: string}).taxonId;
-              cur.children.push(child);
-            }
-            child.count += t.observation_count ?? 1;
-            cur = child;
-          });
-          treeRoot.count += t.observation_count ?? 1;
-        });
-        return treeRoot;
-      }
 
       function arcPath(r0: number, r1: number, a0: number, a1: number): string {
         if (a1 - a0 > 2 * Math.PI - 0.001) a1 = a0 + 2 * Math.PI - 0.001;
@@ -701,20 +688,13 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
         return `M${ix0},${iy0} L${ox0},${oy0} A${r1},${r1} 0 ${largeArc} 1 ${ox1},${oy1} L${ix1},${iy1} A${r0},${r0} 0 ${largeArc} 0 ${ix0},${iy0} Z`;
       }
 
-      const treeData = buildTree(allTaxa);
-
+      const treeData = buildTaxonomicTree(allTaxa);
       // Real tree depth (1 if only species-level, up to 7 with full lineage).
       // Used to size rings so they fill the chart instead of leaving a void.
-      function treeDepth(node: SunNode): number {
-        if (!node.children.length) return 0;
-        let m = 0;
-        for (const c of node.children) m = Math.max(m, treeDepth(c));
-        return 1 + m;
-      }
-      const actualDepth = Math.max(1, treeDepth(treeData));
+      const actualDepth = Math.max(1, taxonomicDepth(treeData));
       const ringWidth = (OUTER_LIMIT - INNER_HOLE) / actualDepth;
 
-      function renderLevel(node: SunNode, depth: number, startAngle: number, endAngle: number, maxDepth = actualDepth) {
+      function renderLevel(node: TaxonNode, depth: number, startAngle: number, endAngle: number, maxDepth = actualDepth) {
         if (depth > maxDepth || node.children.length === 0) return;
         const r0 = INNER_HOLE + (depth - 1) * ringWidth;
         const r1 = r0 + ringWidth;
@@ -759,6 +739,134 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
 
       if (nameEl) nameEl.textContent = isEs ? 'Todas las especies' : 'All species';
       if (countEl) countEl.textContent = `${allTaxa.length} ${isEs ? 'especies' : 'species'}`;
+    }
+
+    // ── M34: Dendrogram (horizontal tree) ──────────────────────
+    let dendrogramInitialized = false;
+    function initDendrogram() {
+      if (dendrogramInitialized || allTaxa.length === 0) return;
+      dendrogramInitialized = true;
+      const svg = document.getElementById('es-dendrogram') as SVGSVGElement | null;
+      if (!svg) return;
+
+      const tree = buildTaxonomicTree(allTaxa);
+      const depth = Math.max(1, taxonomicDepth(tree));
+
+      // Layout constants (SVG user units; the outer container scales).
+      const ROW_HEIGHT = 22;
+      const COL_WIDTH = 130;
+      const LEFT_PAD = 12;
+      const TOP_PAD = 14;
+      const LEAF_LABEL_PAD = 12;
+      const RIGHT_PAD = 240; // room for italic species labels
+
+      // Internal layout state attached to nodes (positions in SVG units).
+      type Pos = TaxonNode & { _x: number; _y: number };
+      const leaves: Pos[] = [];
+      function collectLeaves(n: TaxonNode) {
+        if (!n.children.length) leaves.push(n as Pos);
+        else n.children.forEach(collectLeaves);
+      }
+      collectLeaves(tree);
+
+      // Assign y by leaf order, then bubble up internal nodes' y as the
+      // average of their children's positions. x is depth-driven.
+      function assignPositions(n: TaxonNode, d: number): number {
+        const pos = n as Pos;
+        pos._x = LEFT_PAD + d * COL_WIDTH;
+        if (!n.children.length) {
+          // y was set by the leaf-index pass below; fall back to 0.
+          return pos._y;
+        }
+        const ys = n.children.map(c => assignPositions(c, d + 1));
+        pos._y = (ys[0] + ys[ys.length - 1]) / 2;
+        return pos._y;
+      }
+      leaves.forEach((leaf, i) => { leaf._y = TOP_PAD + (i + 0.5) * ROW_HEIGHT; });
+      assignPositions(tree, 0);
+
+      const totalWidth = LEFT_PAD + depth * COL_WIDTH + RIGHT_PAD;
+      const totalHeight = TOP_PAD * 2 + leaves.length * ROW_HEIGHT;
+      svg.setAttribute('viewBox', `0 0 ${totalWidth} ${totalHeight}`);
+      svg.setAttribute('width', String(totalWidth));
+      svg.setAttribute('height', String(totalHeight));
+      svg.innerHTML = '';
+      const NS = 'http://www.w3.org/2000/svg';
+
+      // Connectors: orthogonal "elbow" from parent to each child.
+      function renderConnectors(n: TaxonNode) {
+        const pPos = n as Pos;
+        n.children.forEach(c => {
+          const cPos = c as Pos;
+          const midX = (pPos._x + cPos._x) / 2;
+          const path = document.createElementNS(NS, 'path');
+          path.setAttribute('d', `M${pPos._x},${pPos._y} H${midX} V${cPos._y} H${cPos._x}`);
+          path.setAttribute('stroke', 'currentColor');
+          path.setAttribute('stroke-opacity', '0.30');
+          path.setAttribute('stroke-width', '1.5');
+          path.setAttribute('fill', 'none');
+          svg.appendChild(path);
+          renderConnectors(c);
+        });
+      }
+      renderConnectors(tree);
+
+      // Nodes: dot + label. Leaves are clickable + italic; internal nodes
+      // get a smaller dot and a non-italic label to the left of the dot.
+      function renderNodes(n: TaxonNode, isRoot: boolean) {
+        const pos = n as Pos;
+        const isLeaf = n.children.length === 0;
+        const kingdomKey = n.kingdom ?? n.name;
+        const color = isRoot
+          ? '#71717a'
+          : (KINGDOM_COLORS[kingdomKey] ?? colorForName(n.name));
+
+        const dot = document.createElementNS(NS, 'circle');
+        dot.setAttribute('cx', String(pos._x));
+        dot.setAttribute('cy', String(pos._y));
+        dot.setAttribute('r', isLeaf ? '4' : '3');
+        dot.setAttribute('fill', color);
+        if (isLeaf && n.taxonId) {
+          dot.style.cursor = 'pointer';
+          dot.addEventListener('click', () => showDetail(n.taxonId!));
+        }
+        svg.appendChild(dot);
+
+        // Skip the root label — its name "All species" duplicates the page
+        // title and clutters the leftmost column.
+        if (isRoot) {
+          n.children.forEach(c => renderNodes(c, false));
+          return;
+        }
+
+        const text = document.createElementNS(NS, 'text');
+        if (isLeaf) {
+          text.setAttribute('x', String(pos._x + LEAF_LABEL_PAD));
+          text.setAttribute('y', String(pos._y));
+          text.setAttribute('text-anchor', 'start');
+          text.setAttribute('font-style', 'italic');
+          text.setAttribute('font-weight', '600');
+          text.style.cursor = 'pointer';
+          if (n.taxonId) text.addEventListener('click', () => showDetail(n.taxonId!));
+        } else {
+          text.setAttribute('x', String(pos._x - 6));
+          text.setAttribute('y', String(pos._y - 4));
+          text.setAttribute('text-anchor', 'end');
+          text.setAttribute('font-weight', '500');
+        }
+        text.setAttribute('dominant-baseline', 'middle');
+        text.setAttribute('font-size', '12');
+        text.setAttribute('fill', 'currentColor');
+        text.textContent = n.name;
+        svg.appendChild(text);
+
+        n.children.forEach(c => renderNodes(c, false));
+      }
+
+      // Inherit text colour from the surrounding theme so dark mode works
+      // without extra fill juggling.
+      svg.style.color = 'inherit';
+      renderNodes(tree, true);
     }
   }
 

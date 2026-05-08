@@ -3,9 +3,27 @@ import {
   pillForSpecies,
   deriveGenus,
   colorForName,
+  buildTaxonomicTree,
+  taxonomicDepth,
   type SpeciesPillInput,
   type Pill,
+  type TaxonInput,
 } from '../../src/lib/species-display';
+
+function taxon(over: Partial<TaxonInput> = {}): TaxonInput {
+  return {
+    id: over.id ?? 'a',
+    scientific_name: over.scientific_name ?? 'Aratinga canicularis',
+    kingdom: over.kingdom ?? null,
+    phylum: over.phylum ?? null,
+    class: over.class ?? null,
+    order: over.order ?? null,
+    family: over.family ?? null,
+    genus: over.genus ?? null,
+    slug: over.slug ?? null,
+    observation_count: over.observation_count ?? 1,
+  };
+}
 
 describe('pillForSpecies', () => {
   it('returns rarity pill when rarity_bucket >= 4', () => {
@@ -100,5 +118,76 @@ describe('colorForName', () => {
 
   it('handles empty string without crashing', () => {
     expect(colorForName('')).toMatch(/^hsl\(0, 62%, 52%\)$/);
+  });
+});
+
+describe('buildTaxonomicTree', () => {
+  it('returns a root with no children for an empty input', () => {
+    const tree = buildTaxonomicTree([]);
+    expect(tree.rank).toBe('root');
+    expect(tree.children).toHaveLength(0);
+    expect(tree.count).toBe(0);
+  });
+
+  it('skips null ranks and only descends through populated levels', () => {
+    const tree = buildTaxonomicTree([taxon({ id: 'x', scientific_name: 'Foo bar' })]);
+    expect(tree.children).toHaveLength(1);
+    const species = tree.children[0];
+    expect(species.rank).toBe('species');
+    expect(species.name).toBe('Foo bar');
+    expect(species.taxonId).toBe('x');
+  });
+
+  it('groups species by populated genus', () => {
+    const tree = buildTaxonomicTree([
+      taxon({ id: 'a', scientific_name: 'Canis familiaris', genus: 'Canis' }),
+      taxon({ id: 'b', scientific_name: 'Canis latrans', genus: 'Canis' }),
+      taxon({ id: 'c', scientific_name: 'Aratinga canicularis', genus: 'Aratinga' }),
+    ]);
+    expect(tree.children).toHaveLength(2);
+    const canis = tree.children.find(c => c.name === 'Canis')!;
+    expect(canis.rank).toBe('genus');
+    expect(canis.children).toHaveLength(2);
+    expect(canis.count).toBe(2);
+  });
+
+  it('builds a deep lineage when all ranks are populated', () => {
+    const tree = buildTaxonomicTree([taxon({
+      kingdom: 'Animalia', phylum: 'Chordata', class: 'Mammalia',
+      order: 'Carnivora', family: 'Canidae', genus: 'Canis',
+      scientific_name: 'Canis familiaris', observation_count: 5,
+    })]);
+    expect(taxonomicDepth(tree)).toBe(7);
+    expect(tree.count).toBe(5);
+    expect(tree.children[0].kingdom).toBe('Animalia');
+  });
+
+  it('aggregates observation counts up the tree', () => {
+    const tree = buildTaxonomicTree([
+      taxon({ id: 'a', scientific_name: 'X y', genus: 'X', observation_count: 3 }),
+      taxon({ id: 'b', scientific_name: 'X z', genus: 'X', observation_count: 2 }),
+    ]);
+    expect(tree.count).toBe(5);
+    expect(tree.children[0].count).toBe(5);
+  });
+});
+
+describe('taxonomicDepth', () => {
+  it('returns 0 for a leaf', () => {
+    const tree = buildTaxonomicTree([]);
+    expect(taxonomicDepth(tree)).toBe(0);
+  });
+
+  it('returns 1 for root → species (sparse data)', () => {
+    const tree = buildTaxonomicTree([taxon()]);
+    expect(taxonomicDepth(tree)).toBe(1);
+  });
+
+  it('handles asymmetric trees (uses the deepest branch)', () => {
+    const tree = buildTaxonomicTree([
+      taxon({ id: 'a', scientific_name: 'Solo species' }),
+      taxon({ id: 'b', kingdom: 'Animalia', genus: 'Canis', scientific_name: 'Canis familiaris' }),
+    ]);
+    expect(taxonomicDepth(tree)).toBe(3);
   });
 });
