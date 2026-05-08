@@ -143,6 +143,24 @@ describe('renderPluginCard', () => {
     expect(html).toContain('Cancel');
   });
 
+  it('renders Use sponsorship deep-link when Claude has no key and no sponsorship', () => {
+    const html = renderPluginCard(props({ plugin: claude, state: { kind: 'no-key' }, sponsorship: null }));
+    expect(html).toContain('Use sponsorship');
+    expect(html).toMatch(/href="\/en\/profile\/sponsored-by\/"/);
+  });
+
+  it('does NOT render Use sponsorship for non-Claude no-key plugins', () => {
+    const otherCloud: Identifier = { ...claude, id: 'plantnet', name: 'PlantNet' };
+    const html = renderPluginCard(props({ plugin: otherCloud, state: { kind: 'no-key' }, sponsorship: null }));
+    expect(html).not.toContain('Use sponsorship');
+  });
+
+  it('renders Spanish Use sponsorship deep-link with locale slug when lang=es', () => {
+    const html = renderPluginCard(props({ lang: 'es', plugin: claude, state: { kind: 'no-key' }, sponsorship: null }));
+    expect(html).toContain('Usar patrocinio');
+    expect(html).toMatch(/href="\/es\/perfil\/patrocinado-por\/"/);
+  });
+
   it('renders Spanish strings when lang=es', () => {
     const html = renderPluginCard(props({ lang: 'es' }));
     expect(html).toContain('Activo');
