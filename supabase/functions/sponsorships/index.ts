@@ -2,6 +2,7 @@ import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { detectKind, detectAnyKind, validateAnthropicCredential } from '../_shared/anthropic-validate.ts';
 import { decryptCredential } from '../_shared/sponsorship.ts';
+import { assertValidModel, type CredentialKind } from '../_shared/vision-provider.ts';
 
 const SUPABASE_URL            = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE   = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -173,6 +174,17 @@ serve(async (req) => {
     const kind = (kindHint && kindHint in KIND_TO_PROVIDER) ? kindHint : detectAnyKind(secret);
     if (!kind) return jsonResponse(400, { error: 'unrecognized_secret_prefix' });
     const provider = KIND_TO_PROVIDER[kind];
+
+    // Validate preferred_model against registered providers (#669).
+    // Free-text would silently fail later at consume_pool_slot();
+    // surfacing here returns the accepted list for the client to echo.
+    if (preferredModel) {
+      try {
+        assertValidModel(kind as CredentialKind, preferredModel);
+      } catch (e) {
+        return jsonResponse(400, { error: 'invalid_model', valid: (e as Error & { valid?: readonly string[] }).valid ?? [] });
+      }
+    }
 
     // Only validate Anthropic credentials (api_key / oauth_token) at creation time.
     // Other providers (OpenAI, Gemini, Bedrock, Azure, Vertex) are stored as-is —
@@ -627,7 +639,7 @@ serve(async (req) => {
       const poolId = m[1];
       const { data: pool } = await supabase
         .from('sponsor_pools')
-        .select('sponsor_id, used, deleted_at')
+        .select('sponsor_id, used, deleted_at, credential_id')
         .eq('id', poolId)
         .single();
       if (!pool) return jsonResponse(404, { error: 'not_found' });
@@ -653,6 +665,21 @@ serve(async (req) => {
       }
       if (typeof body.preferred_model === 'string') {
         if (body.preferred_model.length < 1 || body.preferred_model.length > 64) return jsonResponse(400, { error: 'model_length_1_64' });
+        // #669: validate the model id against the credential's kind so a
+        // typo is caught here instead of silently failing at consume_pool_slot.
+        const { data: cred } = await supabase
+          .from('sponsor_credentials')
+          .select('kind')
+          .eq('id', (pool as { credential_id: string }).credential_id)
+          .single();
+        const credKind = (cred as { kind?: string } | null)?.kind;
+        if (credKind) {
+          try {
+            assertValidModel(credKind as CredentialKind, body.preferred_model);
+          } catch (e) {
+            return jsonResponse(400, { error: 'invalid_model', valid: (e as Error & { valid?: readonly string[] }).valid ?? [] });
+          }
+        }
         patch.preferred_model = body.preferred_model;
       }
       if (typeof body.status === 'string' && ['active','paused'].includes(body.status)) patch.status = body.status;

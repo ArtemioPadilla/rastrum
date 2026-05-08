@@ -75,6 +75,109 @@ export interface VisionProvider {
 }
 
 /**
+ * Source of truth for the model identifiers each `CredentialKind`
+ * accepts as `preferred_model`. Used by `assertValidModel()` to
+ * reject a typo at the EF boundary instead of silently storing it
+ * and failing later at `consume_pool_slot()` / `buildProvider()`.
+ *
+ * The lists mirror what `buildProvider()` actually dispatches to,
+ * plus the per-provider suggestions surfaced in `SponsoringView`'s
+ * `data-suggestions`. Add a model id here whenever a provider
+ * grows a new accepted shorthand.
+ *
+ * `azure_openai` and `vertex_ai` are intentionally not validated
+ * (see `SKIP_MODEL_VALIDATION` below).
+ */
+export const VALID_MODELS: Record<Exclude<CredentialKind, 'azure_openai' | 'vertex_ai'>, readonly string[]> = {
+  // Anthropic-direct (api_key) and Claude Pro/Max OAuth (oauth_token)
+  // share the same model id space.
+  api_key: [
+    'claude-haiku-4-5',
+    'claude-haiku-4-6',
+    'claude-sonnet-4-5',
+    'claude-sonnet-4-6',
+    'claude-opus-4',
+    'claude-opus-4-5',
+  ],
+  oauth_token: [
+    'claude-haiku-4-5',
+    'claude-sonnet-4-5',
+    'claude-opus-4-5',
+  ],
+  // Bedrock accepts the Anthropic shorthand (bedrockModelId() auto-
+  // translates) and any pre-prefixed Bedrock model id (`us.…`,
+  // `eu.…`, `apac.…`, or contains `:`). Pre-prefixed ids are
+  // accepted as-is by `isAcceptedBedrockId()` below.
+  bedrock: [
+    'claude-haiku-4-5',
+    'claude-sonnet-4-5',
+    'claude-opus-4',
+    'claude-opus-4-5',
+    'amazon.titan-text-express-v1',
+  ],
+  openai_api_key: [
+    'gpt-4o',
+    'gpt-4o-mini',
+    'gpt-5',
+    'gpt-5-mini-2025-08-07',
+    'gpt-5-nano-2025-08-07',
+    'gpt-5.4-mini',
+  ],
+  gemini_api_key: [
+    'gemini-1.5-flash',
+    'gemini-1.5-pro',
+    'gemini-2.0-flash',
+    'gemini-2.0-flash-exp',
+    'gemini-2.5-pro-preview',
+  ],
+};
+
+/**
+ * Credential kinds where `preferred_model` is intentionally
+ * accepted as free text:
+ *
+ *   - `azure_openai`: the model is implicit in the deployment URL
+ *     (`/openai/deployments/<deployment>/…`); the `model` field is
+ *     a deployment alias chosen by the operator and there is no
+ *     authoritative list at the platform level.
+ *   - `vertex_ai`: the `model` field is a Vertex resource path like
+ *     `projects/.../models/...` chosen at deployment time; not a
+ *     fixed identifier.
+ */
+export const SKIP_MODEL_VALIDATION: ReadonlySet<CredentialKind> = new Set([
+  'azure_openai',
+  'vertex_ai',
+]);
+
+/** Bedrock pre-prefixed regional id, e.g. `us.anthropic.claude-haiku-4-5-v1:0`. */
+function isAcceptedBedrockId(model: string): boolean {
+  return model.includes(':') || /^(us|eu|apac)\./.test(model);
+}
+
+/**
+ * Throw if `model` is not a registered identifier for `kind`.
+ *
+ * Null / undefined / empty `model` is accepted: callers pass it
+ * through and the provider falls back to its built-in default
+ * (e.g. `bedrockModelId('')` → `us.anthropic.claude-haiku-4-5-v1:0`).
+ *
+ * The thrown `Error` has a `valid` property listing the accepted
+ * ids so the caller can echo the list back to the client. EF
+ * handlers wrap this in `400 {error:'invalid_model', valid:[…]}`.
+ */
+export function assertValidModel(kind: CredentialKind, model: string | null | undefined): void {
+  if (model === null || model === undefined || model === '') return;
+  if (SKIP_MODEL_VALIDATION.has(kind)) return;
+  if (kind === 'bedrock' && isAcceptedBedrockId(model)) return;
+  const valid = VALID_MODELS[kind as keyof typeof VALID_MODELS];
+  if (!valid || !valid.includes(model)) {
+    const err = new Error(`invalid_model: ${model} not valid for ${kind}`) as Error & { valid?: readonly string[] };
+    err.valid = valid ?? [];
+    throw err;
+  }
+}
+
+/**
  * Build a provider for a given credential. Pure dispatcher — does
  * NOT touch network. Throws on unknown kinds so the cascade fails
  * fast instead of silently dropping a sponsorship credential.
