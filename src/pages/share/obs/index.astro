@@ -157,8 +157,11 @@ const lang: 'en' | 'es' = 'en';
           document.querySelector<HTMLMetaElement>('meta[name="twitter:image"]')?.setAttribute('content', imgUrl);
           document.querySelector<HTMLMetaElement>('meta[property="og:title"]')?.setAttribute('content', speciesName + ' — Rastrum');
           document.querySelector<HTMLMetaElement>('meta[name="twitter:title"]')?.setAttribute('content', speciesName + ' — Rastrum');
+          // og:url → share-card URL (social previewers use this to unfurl the right page)
           document.querySelector<HTMLMetaElement>('meta[property="og:url"]')?.setAttribute('content', shareCardUrl);
-          document.querySelector<HTMLLinkElement>('link[rel="canonical"]')?.setAttribute('href', shareCardUrl);
+          // canonical stays pointing to rastrum.org — canonical is for Google,
+          // not social previewers. Changing it to the edge-function URL would
+          // confuse Search crawlers. (Nyx review note on PR #715)
         }
       }
       const date = new Date(obs.observed_at as string);
