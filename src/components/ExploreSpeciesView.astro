@@ -296,6 +296,11 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
     const otherTpl = root.dataset.labelObsCountOther ?? '{count} obs';
     const errLabel = root.dataset.labelError ?? 'Failed to load';
 
+    // Cap the species grid at the most-observed N taxa. The MV itself has
+    // no upper bound; this limit is purely about how many cards the page
+    // renders. Bumped if the catalog outgrows it OR if we add pagination.
+    const SPECIES_GRID_LIMIT = 500;
+
     const hideSkeleton = () => skeletonEl?.classList.add('hidden');
 
     // Wire filter chips eagerly — they're pure URL-state and must respond
@@ -324,7 +329,7 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
         .from('mv_taxon_obs_counts')
         .select('taxon_id, obs_count')
         .order('obs_count', { ascending: false })
-        .limit(500);
+        .limit(SPECIES_GRID_LIMIT);
       if (error) throw error;
       mvRows = (data ?? []) as unknown as MvRow[];
     } catch (e) {
