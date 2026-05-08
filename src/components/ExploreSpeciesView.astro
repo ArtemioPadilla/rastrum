@@ -792,7 +792,7 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
           // mobile gets the same content via tap (the click handler above).
           path.addEventListener('mouseenter', () => {
             if (nameEl) nameEl.textContent = child.name;
-            if (countEl) countEl.textContent = `${child.count} ${isEs ? 'obs' : 'obs'}`;
+            if (countEl) countEl.textContent = `${child.count} obs`;
           });
           svg!.appendChild(path);
           addSegmentLabel(child.name, isLeaf, angle + sweep / 2, sweep, r0, r1);
