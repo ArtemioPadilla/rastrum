@@ -51,6 +51,8 @@
 
 A TypeScript template function `renderPluginCard(props): string` lives in `src/lib/identifier-card-html.ts`. It produces the HTML for a card given resolved state. This matches the existing pattern in `ProfileEditForm.astro:1623-1719` where cards are built as template strings and joined into the `<ul id="identifier-list">` via `list.innerHTML`. We extract it so the template is testable and reusable; we do **not** introduce an `<Astro>` component because the cards live entirely inside a client-side `<script>` block (no SSR pass).
 
+**XSS:** all plugin-controlled strings — `plugin.name`, `plugin.description`, `plugin.brand`, `plugin.capabilities.taxa[*]`, `availability.message`, `sponsorship.sponsor_handle` — pass through a single `escape()` helper before reaching innerHTML. Numeric fields (sponsorship counts, cache bytes) are formatted via `String(n)` / `bytesHuman(n)` and stay numeric; no quote characters can survive. Tests in `identifier-card-html.test.ts` assert that `<script>` and `<img onerror=...>` payloads injected into plugin name/description/sponsor handle are HTML-encoded in the output.
+
 ```ts
 export interface PluginCardProps {
   lang: 'en' | 'es';
@@ -65,7 +67,23 @@ export interface PluginCardProps {
 export function renderPluginCard(props: PluginCardProps): string;
 ```
 
-`<SyntheticCard>` for Llama and offline-maps is the same template called with a synthesized minimal `Identifier` shape (`runtime: 'client'`, no `keySpec`, no `setupSteps`); the renderer detects the `synthetic: true` flag on the plugin and omits the Enable/Disable toggle.
+**Llama-3.2-1B and the offline map** aren't in the identifier registry — they're just downloads on the same surface. Rather than overload `Identifier` with a `synthetic: true` flag (review feedback from #673), they get a separate, smaller helper:
+
+```ts
+export interface LocalDataCardProps {
+  lang: 'en' | 'es';
+  id: string;                       // 'llama-3.2-1b' | 'offline-map-mx'
+  name: string;
+  description: string;              // single-line caption
+  brand?: string;                   // emoji
+  cacheStatus: ModelCacheStatus | null;
+  /** Element id prefix that the on-device JS expects (e.g. 'text', 'pmtiles'). */
+  domIdPrefix: string;
+}
+export function renderLocalDataCard(props: LocalDataCardProps): string;
+```
+
+It produces the same Tailwind-styled card shape as `renderPluginCard` but with no toggle, no key form, and no sponsorship affordance — just download/delete/progress controls keyed by `domIdPrefix` so the existing on-device JS keeps binding to `text-download` / `pmtiles-download` etc.
 
 ### State derivation (single source of truth)
 
@@ -87,17 +105,23 @@ export function deriveCardState(input: Props): CardState;
 
 ### Storage migration
 
+**Preserving the old opt-in semantics is critical** (review feedback from #673). OLD behavior: `webllm_phi35_vision` only ran when `localStorage.rastrum.prefs.usePhiVision === 'true'` exactly. Any other value — `'false'`, missing, malformed — meant *not running*. The migration MUST preserve that: every user who is *not* running Phi today must continue *not* running it tomorrow.
+
+Concretely: treat `null` (key never set) and `'false'` (explicit opt-out) identically — both add the plugin id to `disabledPlugins`. Only `'true'` keeps the plugin out of `disabledPlugins`. This avoids surprise activations.
+
+To avoid polluting brand-new browsers (no legacy keys at all) with synthetic disable entries, the migration short-circuits if none of the three legacy keys is present in localStorage. New users hit the new UI directly and get the standard `Disable` toggle UX without baggage.
+
 Today's keys, with their fates:
 
 | Key | Today | After |
 |---|---|---|
 | `rastrum.disabledPlugins` | array of plugin ids the cascade should skip | **Source of truth.** Unchanged. |
 | `rastrum.localAiOptIn` | umbrella opt-in for "use on-device when no cloud key" | **Removed.** Each plugin's own enable state is sufficient. |
-| `rastrum.prefs.usePhiVision` | per-plugin enable for Phi | **Removed.** Migrated at startup: if `usePhiVision === 'true'`, leave Phi out of `disabledPlugins`; else add `webllm_phi35_vision` to `disabledPlugins`. Then delete the old key. |
+| `rastrum.prefs.usePhiVision` | per-plugin enable for Phi | **Removed.** Migrated at startup: if `usePhiVision === 'true'`, leave Phi out of `disabledPlugins`; if `'false'` *or any other value present*, add `webllm_phi35_vision` to `disabledPlugins`. Then delete the old key. |
 | `rastrum.prefs.useGemmaVision` | per-plugin enable for Gemma | **Removed.** Same migration as Phi → `onnx_gemma4_vision`. |
 | `rastrum.byoKeys` | per-plugin BYO keys | **Unchanged.** |
 
-Migration runs once on first AI-tab load after the upgrade. Idempotent: if the old keys are absent, the migration is a no-op.
+Migration runs once on first AI-tab load after the upgrade. Idempotent: re-running is a no-op because the legacy keys are deleted on first run. Brand-new browsers skip migration entirely (no legacy keys present).
 
 ### File touches
 

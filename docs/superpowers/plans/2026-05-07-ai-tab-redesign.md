@@ -16,9 +16,9 @@
 
 **New files:**
 - `src/lib/identifier-state.ts` (~120 lines) — `CardState` discriminated union, `deriveCardState()` pure function, `runStorageMigration()` one-shot.
-- `src/lib/identifier-card-html.ts` (~280 lines) — `renderPluginCard()` template function, escape helper, per-state markup branches.
-- `tests/unit/identifier-state.test.ts` — tests for both functions.
-- `tests/unit/identifier-card-html.test.ts` — snapshot-style assertions per state.
+- `src/lib/identifier-card-html.ts` (~320 lines) — `renderPluginCard()` template function, `renderLocalDataCard()` helper for Llama / offline map (review feedback from #673 — replaces the `synthetic: true` Identifier flag with a separate function), shared `escape()` helper, per-state markup branches.
+- `tests/unit/identifier-state.test.ts` — tests for both functions, including null-vs-false migration parity.
+- `tests/unit/identifier-card-html.test.ts` — snapshot-style assertions per state, including XSS escape coverage on every plugin-controlled string (review feedback from #673).
 
 **Heavy edits:**
 - `src/components/ProfileEditForm.astro` — `paintRegistry` rewrite, deletion of static on-device cards (lines ~277–509 in current file, ~277–509 will all change), wrap on-device JS (lines ~826–1554) in `wireOnDeviceControls(root)` function.
@@ -150,7 +150,7 @@ describe('deriveCardState', () => {
 });
 
 describe('runStorageMigration', () => {
-  it('is a no-op when no legacy keys are present', () => {
+  it('is a no-op when no legacy keys are present (brand-new browser)', () => {
     runStorageMigration();
     expect(localStorage.getItem('rastrum.disabledPlugins')).toBeNull();
   });
@@ -171,14 +171,24 @@ describe('runStorageMigration', () => {
     expect(localStorage.getItem('rastrum.prefs.usePhiVision')).toBeNull();
   });
 
-  it('migrates useGemmaVision the same way', () => {
+  it('treats missing usePhiVision (null) the same as false when other legacy keys are present', () => {
+    // Review feedback from #673: a user who only set localAiOptIn but never
+    // touched usePhiVision had Phi out of the cascade under OLD rules.
+    // Migration must preserve that: Phi → disabledPlugins.
+    localStorage.setItem('rastrum.localAiOptIn', 'true');
+    runStorageMigration();
+    expect(JSON.parse(localStorage.getItem('rastrum.disabledPlugins') ?? '[]'))
+      .toContain('webllm_phi35_vision');
+  });
+
+  it('migrates useGemmaVision=false the same way', () => {
     localStorage.setItem('rastrum.prefs.useGemmaVision', 'false');
     runStorageMigration();
     expect(JSON.parse(localStorage.getItem('rastrum.disabledPlugins') ?? '[]'))
       .toContain('onnx_gemma4_vision');
   });
 
-  it('removes localAiOptIn key (no behavioral mapping needed)', () => {
+  it('removes localAiOptIn key after processing (no behavioral mapping)', () => {
     localStorage.setItem('rastrum.localAiOptIn', 'true');
     runStorageMigration();
     expect(localStorage.getItem('rastrum.localAiOptIn')).toBeNull();
@@ -290,14 +300,34 @@ const LEGACY_PLUGIN_MAP: Record<string, string> = {
 };
 
 /**
- * Idempotent. Reads the three legacy preference keys; if a key is set
- * to 'false', it adds the corresponding plugin id to `disabledPlugins`.
- * Always deletes the legacy keys after reading. Safe to call on every
- * AI tab paint — after the first run there's nothing to do.
+ * Idempotent. Migrates the three legacy preference keys to
+ * `rastrum.disabledPlugins`. Preserves OLD opt-in semantics: a plugin
+ * that was NOT running under OLD rules continues NOT running under
+ * NEW rules.
+ *
+ * OLD rules: Phi/Gemma ran only when their respective prefs key was
+ * exactly 'true'. Any other value (`'false'`, missing, malformed) →
+ * not running.
+ *
+ * Migration:
+ *   - If usePhiVision === 'true': leave Phi out of disabledPlugins.
+ *   - Otherwise (including null when other legacy keys are present):
+ *     add webllm_phi35_vision to disabledPlugins.
+ *   - Same for useGemmaVision → onnx_gemma4_vision.
+ *   - localAiOptIn carries no per-plugin info; just retire it.
+ *
+ * Short-circuits for brand-new browsers (no legacy keys at all) so we
+ * don't pollute their state with synthetic disable entries.
  */
 export function runStorageMigration(): void {
-  // Snapshot current disabled list (default empty) and convert to a Set
-  // so we can dedupe.
+  // Short-circuit if nothing to migrate (new browser).
+  const hasAnyLegacyKey =
+    localStorage.getItem(LEGACY_KEY_LOCAL_AI_OPTIN) !== null ||
+    localStorage.getItem(LEGACY_KEY_USE_PHI) !== null ||
+    localStorage.getItem(LEGACY_KEY_USE_GEMMA) !== null;
+  if (!hasAnyLegacyKey) return;
+
+  // Snapshot current disabled list (default empty); use Set to dedupe.
   const raw = localStorage.getItem(DISABLED_PLUGINS_KEY);
   let disabled: Set<string>;
   try {
@@ -306,29 +336,20 @@ export function runStorageMigration(): void {
     disabled = new Set<string>();
   }
 
-  let changed = false;
+  // Per-plugin: explicit 'true' = keep enabled; everything else (incl.
+  // null when a sibling key was set, see hasAnyLegacyKey above) = disable.
   for (const [legacyKey, pluginId] of Object.entries(LEGACY_PLUGIN_MAP)) {
     const value = localStorage.getItem(legacyKey);
-    if (value === null) continue;
-    // Only 'true' means "user wanted this enabled". Any other value (the
-    // 'false' the toggle wrote, or anything malformed) means disabled.
-    if (value !== 'true' && !disabled.has(pluginId)) {
+    if (value !== 'true') {
       disabled.add(pluginId);
-      changed = true;
     }
     localStorage.removeItem(legacyKey);
-    changed = true;
   }
 
-  // The umbrella opt-in carries no per-plugin info; just retire it.
-  if (localStorage.getItem(LEGACY_KEY_LOCAL_AI_OPTIN) !== null) {
-    localStorage.removeItem(LEGACY_KEY_LOCAL_AI_OPTIN);
-    changed = true;
-  }
+  // Umbrella opt-in carries no per-plugin info; just retire it.
+  localStorage.removeItem(LEGACY_KEY_LOCAL_AI_OPTIN);
 
-  if (changed) {
-    localStorage.setItem(DISABLED_PLUGINS_KEY, JSON.stringify([...disabled]));
-  }
+  localStorage.setItem(DISABLED_PLUGINS_KEY, JSON.stringify([...disabled]));
 }
 ```
 
@@ -521,6 +542,53 @@ describe('renderPluginCard', () => {
     const html = renderPluginCard(props({ lang: 'es' }));
     expect(html).toContain('Activo');
     expect(html).toContain('Desactivar');
+  });
+});
+
+describe('renderLocalDataCard', () => {
+  const llamaCached = {
+    lang: 'en' as const,
+    id: 'llama-3.2-1b',
+    name: 'Llama-3.2-1B',
+    description: 'Text helper for translation and offline chat. Not part of species identification.',
+    brand: '🗨',
+    cacheStatus: { cached: true, approxBytes: 663_000_000, entries: 25 },
+    domIdPrefix: 'text',
+  };
+
+  it('renders cached state with name + description + delete button', () => {
+    const { renderLocalDataCard } = require('../../src/lib/identifier-card-html');
+    const html = renderLocalDataCard(llamaCached);
+    expect(html).toContain('Llama-3.2-1B');
+    expect(html).toContain('Text helper');
+    expect(html).toContain('id="text-delete"');
+    expect(html).toContain('id="text-download"');
+    // No toggle for non-plugin items
+    expect(html).not.toContain('data-toggle-plugin');
+    // No sponsorship affordance
+    expect(html).not.toContain('via sponsorship');
+  });
+
+  it('renders not-cached state with primary Download CTA', () => {
+    const { renderLocalDataCard } = require('../../src/lib/identifier-card-html');
+    const html = renderLocalDataCard({
+      ...llamaCached,
+      cacheStatus: { cached: false, approxBytes: 0, entries: 0 },
+    });
+    expect(html).toContain('Download');
+    expect(html).not.toContain('id="text-delete"');
+  });
+
+  it('escapes user-controlled fields', () => {
+    const { renderLocalDataCard } = require('../../src/lib/identifier-card-html');
+    const html = renderLocalDataCard({
+      ...llamaCached,
+      name: '<script>',
+      description: '<img src=x onerror=alert(1)>',
+    });
+    expect(html).not.toContain('<script>');
+    expect(html).not.toContain('<img src=x');
+    expect(html).toContain('&lt;script&gt;');
   });
 });
 ```
@@ -737,6 +805,59 @@ export function renderPluginCard(p: PluginCardProps): string {
         </div>
         <div class="flex flex-wrap gap-2 flex-none">
           ${actionsFor(p, t)}
+        </div>
+      </div>
+    </li>
+  `.trim();
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Local-data cards (Llama text helper, offline maps). Not in the
+// identifier registry — separate helper to keep renderPluginCard
+// focused on plugins. Replaces the `synthetic: true` Identifier flag
+// considered in earlier drafts (review feedback from #673).
+// ─────────────────────────────────────────────────────────────────────
+
+export interface LocalDataCardProps {
+  lang: 'en' | 'es';
+  id: string;
+  name: string;
+  description: string;
+  brand?: string;
+  cacheStatus: ModelCacheStatus | null;
+  /** Element id prefix the on-device JS expects ('text', 'pmtiles', etc.). */
+  domIdPrefix: string;
+}
+
+export function renderLocalDataCard(p: LocalDataCardProps): string {
+  const t = STRINGS[p.lang];
+  const cached = p.cacheStatus?.cached === true;
+  const sizeLabel = cached ? bytesHuman(p.cacheStatus!.approxBytes) : '';
+
+  const downloadBtn = cached
+    ? `<button type="button" id="${escape(p.domIdPrefix)}-download" class="rounded-lg border border-emerald-600/60 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20">Re-download</button>`
+    : `<button type="button" id="${escape(p.domIdPrefix)}-download" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 text-xs font-semibold text-white">${t.download}</button>`;
+
+  const deleteBtn = cached
+    ? `<button type="button" id="${escape(p.domIdPrefix)}-delete" class="rounded-lg border border-red-300 dark:border-red-900/50 px-3 py-1.5 text-xs font-medium text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">${t.delete}</button>`
+    : '';
+
+  const status = cached ? `${sizeLabel} cached` : 'Not downloaded';
+
+  return `
+    <li class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+      <div class="flex items-start justify-between gap-3 flex-wrap">
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-2 flex-wrap">
+            ${p.brand ? `<span class="text-base">${escape(p.brand)}</span>` : ''}
+            <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">${escape(p.name)}</p>
+          </div>
+          <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">${escape(p.description)}</p>
+          <p class="text-[10px] text-zinc-400 dark:text-zinc-500 mt-1 font-mono">${escape(status)}</p>
+        </div>
+        <div class="flex flex-wrap gap-2 flex-none">
+          ${downloadBtn}
+          ${deleteBtn}
         </div>
       </div>
     </li>
@@ -964,7 +1085,7 @@ In `src/components/ProfileEditForm.astro`, replace the entire `async function pa
       { bootstrapIdentifiers },
       byo,
       { runStorageMigration, deriveCardState },
-      { renderPluginCard },
+      { renderPluginCard, renderLocalDataCard },
       { getModelCacheStatus },
       sponsorshipMod,
     ] = await Promise.all([
@@ -1071,11 +1192,44 @@ In `src/components/ProfileEditForm.astro`, replace the entire `async function pa
       `;
     }
 
+    // Llama and offline-map are not in the registry. Render them as
+    // local-data cards under their own "Other local data" section.
+    const TEXT_MODEL_ID = 'Llama-3.2-1B-Instruct-q4f16_1-MLC';
+    const llamaCache = await getModelCacheStatus(TEXT_MODEL_ID).catch(() => null);
+    const pmtilesCache = await (async () => {
+      // pmtiles cache lives in lib/offline-map.ts; if it exposes a status
+      // helper, use it; otherwise treat as not-cached. Keep this best-effort.
+      try {
+        const m = await import('../lib/offline-map');
+        if (typeof m.getPmtilesCacheStatus === 'function') return await m.getPmtilesCacheStatus();
+      } catch { /* lib may not export it — non-blocking */ }
+      return null;
+    })();
+
+    const otherLocalData = `
+      ${renderLocalDataCard({
+        lang, id: 'llama-3.2-1b', name: 'Llama-3.2-1B', brand: '🗨',
+        description: isEs
+          ? 'Ayudante de texto para traducción y chat sin conexión. No participa en la identificación de especies.'
+          : 'Text helper for translation and offline chat. Not part of species identification.',
+        cacheStatus: llamaCache, domIdPrefix: 'text',
+      })}
+      ${renderLocalDataCard({
+        lang, id: 'offline-map-mx', name: isEs ? 'Mapa sin conexión — México' : 'Offline map — Mexico', brand: '🗺',
+        description: isEs ? 'Carga el mapa base sin red.' : 'Renders the basemap without a network connection.',
+        cacheStatus: pmtilesCache, domIdPrefix: 'pmtiles',
+      })}
+    `;
+
     list.innerHTML = `
       ${renderSection('photo_specialists', 'section_photo_specialists', grouped.get('photo_specialists')!)}
       ${renderSection('photo_generalists', 'section_photo_generalists', grouped.get('photo_generalists')!)}
       ${renderSection('experimental',      'section_photo_generalists', grouped.get('experimental')!)}
       ${renderSection('audio',             'section_audio',             grouped.get('audio')!)}
+      <li class="rastrum-section-header" role="presentation">
+        <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mt-4 mb-2">${escapeAttr(t('section_other_local_data'))}</h3>
+      </li>
+      ${otherLocalData}
     `;
 
     // Hide quick-setup banner when at least one non-PlantNet plugin is ready.
@@ -1456,6 +1610,15 @@ In dev server (`npm run dev`):
    - `rastrum.prefs.usePhiVision` does NOT exist (migrated away).
    - `rastrum.localAiOptIn` does NOT exist.
 7. Click `Disable`. State pill flips to `⏸ Disabled`. `rastrum.disabledPlugins` now contains `webllm_phi35_vision`.
+
+- [ ] **Step 3b: Migration regression smoke (review feedback from #673)**
+
+In a fresh browser profile or after `localStorage.clear()`:
+1. Set `localStorage.rastrum.localAiOptIn = 'true'` and reload `/en/profile/settings/ai/`.
+2. After paint, open DevTools → Application → Local Storage. Confirm:
+   - `rastrum.localAiOptIn` is GONE (deleted by migration).
+   - `rastrum.disabledPlugins` exists and CONTAINS `webllm_phi35_vision` AND `onnx_gemma4_vision`.
+3. The Phi/Gemma cards should show `⏸ Disabled` — preserving OLD behavior where these plugins were not in the cascade for this user. Without the null-vs-false fix, they'd show `Active` and start running unprompted.
 
 - [ ] **Step 4: Test dark mode**
 
