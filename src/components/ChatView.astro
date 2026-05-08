@@ -88,13 +88,13 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
         aria-label={tr.chat.model_picker_label}
       >
         <span class="text-zinc-500 dark:text-zinc-400 mr-1">{tr.chat.model_picker_label}:</span>
-        <button type="button" data-model="auto" class="chat-chip rounded-full border px-2.5 py-1 leading-none">{tr.chat.model_auto}</button>
-        <button type="button" data-model="plantnet" class="chat-chip rounded-full border px-2.5 py-1 leading-none">PlantNet</button>
-        <button type="button" data-model="claude_haiku" class="chat-chip rounded-full border px-2.5 py-1 leading-none">Claude</button>
-        <button type="button" data-model="webllm_phi35_vision" class="chat-chip rounded-full border px-2.5 py-1 leading-none">Phi</button>
-        <button type="button" data-model="onnx_gemma4_vision" class="chat-chip rounded-full border px-2.5 py-1 leading-none">Gemma</button>
-        <button type="button" data-model="onnx_efficientnet_lite0" class="chat-chip rounded-full border px-2.5 py-1 leading-none">EfficientNet</button>
-        <button type="button" data-model="compare" class="chat-chip rounded-full border px-2.5 py-1 leading-none">{tr.chat.model_compare}</button>
+        <button type="button" data-model="auto" class="chat-chip">{tr.chat.model_auto}</button>
+        <button type="button" data-model="plantnet" class="chat-chip">PlantNet</button>
+        <button type="button" data-model="claude_haiku" class="chat-chip">Claude</button>
+        <button type="button" data-model="webllm_phi35_vision" class="chat-chip">Phi</button>
+        <button type="button" data-model="onnx_gemma4_vision" class="chat-chip">Gemma</button>
+        <button type="button" data-model="onnx_efficientnet_lite0" class="chat-chip">EfficientNet</button>
+        <button type="button" data-model="compare" class="chat-chip">{tr.chat.model_compare}</button>
       </div>
 
       <!-- Buttons + textarea row -->
@@ -1433,3 +1433,9 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
     if (voiceBtnLabel) voiceBtnLabel.textContent = label;
   }
 </script>
+
+<style>
+  .chat-chip {
+    @apply min-h-11 inline-flex items-center justify-center rounded-full border px-2.5 py-1 leading-none;
+  }
+</style>
