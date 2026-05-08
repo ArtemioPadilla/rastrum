@@ -173,6 +173,47 @@ Optional (collapse by default on mobile):
 
 ---
 
+## Quick Observation Mode (issue #721)
+
+The standard form requires ≥5 taps before sync (pick photos → wait GPS →
+fill habitat/notes → license → submit). For casual one-time observers
+that drop-off is the single biggest funnel leak. The Quick Observation
+flow collapses it to a single tap.
+
+**Entry points:**
+- `/observe?quick=1` — direct URL.
+- Mobile bottom-bar FAB **long-press** (≥500 ms) — short-tap retains
+  the existing `/observe` behaviour.
+
+**Flow:**
+1. Camera input fires automatically on mount (system camera).
+2. On `change`, EXIF GPS is parsed in parallel with a live `getQuickGps()`
+   request (12 s timeout). EXIF wins when present.
+3. The photo + (best-effort) GPS land in the Dexie outbox via
+   `buildQuickObservationDraft()` + `saveObservationToOutbox()`. When
+   no fix has resolved, the row is saved with `asDraft: true` and the
+   sync engine's existing `promoteDraftsWithGps()` worker flips it to
+   `pending` once a fix arrives.
+4. The identifier cascade runs async via `triggerIdentify` post-sync —
+   no confirm step.
+5. A 2 s toast shows "Observation saved" (or "Draft saved — we’ll
+   attach the location when it resolves") then the user is redirected
+   home.
+
+**Recovery:** because every quick observation lands in the existing
+outbox with the same shape, ObsManagePanel can enrich it later (habitat,
+notes, license, etc.) — no separate edit UI needed.
+
+**Telemetry:** `posthog.capture('quick_observation_saved', { had_gps,
+media_kind })` on success, fire-and-forget. Drives the quick-vs-slow
+conversion comparison promised in the issue scope.
+
+Fogg Principle of Reduction (Persuasive Tech, ch. 3, p. 33):
+*"Using computing technology to reduce complex behavior to simple tasks
+increases the benefit/cost ratio of the behavior."*
+
+---
+
 ## Form Validation
 
 ```typescript
