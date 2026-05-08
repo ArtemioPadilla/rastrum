@@ -377,6 +377,7 @@ const s = tr.search;
     window.addEventListener('rastrum:palette-action', (e: Event) => {
       const detail = (e as CustomEvent<{ action: string }>).detail;
       if (detail.action === 'toggle-theme') {
+        document.documentElement.classList.remove('field');
         const dark = document.documentElement.classList.toggle('dark');
         try { localStorage.setItem('theme', dark ? 'dark' : 'light'); } catch { /* ignore */ }
       } else if (detail.action === 'switch-lang') {

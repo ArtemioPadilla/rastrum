@@ -155,14 +155,96 @@ const resolvedOgImage = ogImage ?? `${SITE_URL}/og/${ogLang}/${ogSlugForPath(cur
     <PostHog />
     <script is:inline>
       (function() {
-        const theme = localStorage.getItem('theme');
-        if (theme === 'light') {
-          document.documentElement.classList.remove('dark');
-        } else {
-          document.documentElement.classList.add('dark');
-        }
+        var stored = localStorage.getItem('theme');
+        var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var eff;
+        if (stored === 'field')      eff = 'field';
+        else if (stored === 'light') eff = 'light';
+        else if (stored === 'dark')  eff = 'dark';
+        else                         eff = prefersDark ? 'dark' : 'light';
+        var el = document.documentElement.classList;
+        if (eff === 'field')      { el.add('dark'); el.add('field'); }
+        else if (eff === 'dark')  { el.add('dark'); el.remove('field'); }
+        else                      { el.remove('dark'); el.remove('field'); }
       })();
     </script>
+    <style is:global>
+      /*
+        Field theme — high-contrast, OLED-true black for direct-sunlight use.
+        Layered on top of the .dark base so any element styled only with
+        `dark:*` Tailwind variants stays readable; we then crush the palette
+        to pure black/white and disable gradients for crisp edges in glare.
+      */
+      html.field {
+        background: #000 !important;
+        color: #fff !important;
+        color-scheme: dark;
+      }
+      html.field body { background: #000 !important; color: #fff !important; }
+      html.field *,
+      html.field *::before,
+      html.field *::after {
+        background-image: none !important;
+        text-shadow: none !important;
+        box-shadow: none !important;
+      }
+      html.field *:not(svg):not(path):not(circle):not(rect):not(line):not(polyline):not(polygon):not(g) {
+        color: #fff !important;
+      }
+      html.field a,
+      html.field button,
+      html.field [role="link"],
+      html.field [role="button"] {
+        color: #fff !important;
+      }
+      html.field [class*="bg-emerald-"],
+      html.field [class*="bg-zinc-"],
+      html.field [class*="bg-white"],
+      html.field [class*="bg-slate-"],
+      html.field [class*="bg-stone-"],
+      html.field [class*="bg-teal-"],
+      html.field [class*="bg-sky-"] {
+        background-color: #000 !important;
+      }
+      html.field [class*="border-"] {
+        border-color: #fff !important;
+      }
+      /* Keep emerald accent strokes on critical CTAs (FAB, sign-in) so the
+         primary action remains pickable; we re-color the surface, not text. */
+      html.field #mbb-fab,
+      html.field [data-rastrum-cta="primary"] {
+        background-color: #fff !important;
+        color: #000 !important;
+        border: 2px solid #fff !important;
+      }
+      html.field #mbb-fab svg,
+      html.field [data-rastrum-cta="primary"] svg { color: #000 !important; }
+
+      /* 1.25x hit-target sizing on the mobile bottom bar + form inputs.
+         48px (Tailwind h-12 ≈ touch baseline) becomes 60px. */
+      html.field #mobile-bottom-bar { height: auto; }
+      html.field #mobile-bottom-bar > div { height: 5rem !important; }
+      html.field #mbb-fab { width: 4.5rem !important; height: 4.5rem !important; }
+      html.field input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+      html.field select,
+      html.field textarea,
+      html.field button:not(#mbb-fab) {
+        min-height: 3rem !important;
+        font-size: 1rem !important;
+      }
+      html.field input,
+      html.field select,
+      html.field textarea {
+        background: #000 !important;
+        color: #fff !important;
+        border: 2px solid #fff !important;
+      }
+      /* Visible focus ring at AA contrast on black. */
+      html.field :focus-visible {
+        outline: 3px solid #fff !important;
+        outline-offset: 2px !important;
+      }
+    </style>
     <script is:inline>
       // Register the service worker in production only. `import.meta.env.DEV`
       // is replaced at build time; in dev we skip to avoid aggressive caching.
@@ -171,6 +253,44 @@ const resolvedOgImage = ogImage ?? `${SITE_URL}/og/${ogLang}/${ogSlugForPath(cur
           navigator.serviceWorker.register('/sw.js').catch(() => {});
         });
       }
+    </script>
+    <script is:inline>
+      /*
+        Ambient-light auto-engage for the Field theme. Only fires when the
+        user's stored preference is 'auto' (the default) — explicit
+        light/dark/field choices win. AmbientLightSensor ships in Chromium
+        behind a flag in many builds, so this is best-effort: the absence
+        of the API just means manual override is the only path. We never
+        prompt for permission unconditionally — the sensor is constructed
+        in a try/catch and we listen for SecurityError to back off silently.
+      */
+      (function () {
+        var FIELD_LUX = 5000;
+        var stored = localStorage.getItem('theme');
+        if (stored && stored !== 'auto') return;
+        if (typeof AmbientLightSensor === 'undefined') return;
+        try {
+          var sensor = new AmbientLightSensor({ frequency: 1 });
+          sensor.addEventListener('reading', function () {
+            var lux = sensor.illuminance;
+            if (typeof lux !== 'number') return;
+            var current = localStorage.getItem('theme');
+            if (current && current !== 'auto') return;
+            var el = document.documentElement.classList;
+            if (lux > FIELD_LUX) {
+              el.add('dark'); el.add('field');
+            } else if (el.contains('field')) {
+              el.remove('field');
+              var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+              if (!prefersDark) el.remove('dark');
+            }
+          });
+          sensor.addEventListener('error', function () { /* permission denied or unavailable */ });
+          sensor.start();
+        } catch (e) {
+          /* ReferenceError, SecurityError, NotSupportedError — manual-only fallback */
+        }
+      })();
     </script>
   </head>
   <body class="min-h-screen bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 transition-colors pb-20 sm:pb-0">
