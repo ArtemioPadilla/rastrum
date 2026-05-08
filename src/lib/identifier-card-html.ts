@@ -53,7 +53,7 @@ function bytesHuman(n: number): string {
 interface Strings {
   active: string; disabled: string; no_key: string; not_downloaded: string; unsupported: string;
   enable: string; disable: string; download: string; redownload: string; cancel: string; delete: string;
-  add_key: string; use_own_key: string; via_sponsorship: string; sponsored_by: string; ids_today: string;
+  add_key: string; use_own_key: string; use_sponsorship: string; via_sponsorship: string; sponsored_by: string; ids_today: string;
 }
 
 const STRINGS: Record<'en' | 'es', Strings> = {
@@ -62,6 +62,7 @@ const STRINGS: Record<'en' | 'es', Strings> = {
     unsupported: '⚠ Unsupported', enable: 'Enable', disable: 'Disable', download: 'Download',
     redownload: 'Re-download', cancel: 'Cancel',
     delete: 'Delete', add_key: 'Add key', use_own_key: 'Use my own key',
+    use_sponsorship: 'Use sponsorship',
     via_sponsorship: 'via sponsorship', sponsored_by: 'sponsored by', ids_today: 'IDs today',
   },
   es: {
@@ -69,6 +70,7 @@ const STRINGS: Record<'en' | 'es', Strings> = {
     unsupported: '⚠ No soportado', enable: 'Activar', disable: 'Desactivar', download: 'Descargar',
     redownload: 'Volver a descargar', cancel: 'Cancelar',
     delete: 'Eliminar', add_key: 'Agregar API key', use_own_key: 'Usar tu propia API key',
+    use_sponsorship: 'Usar patrocinio',
     via_sponsorship: 'vía patrocinio', sponsored_by: 'patrocinado por', ids_today: 'IDs hoy',
   },
 };
@@ -149,8 +151,14 @@ function actionsFor(p: PluginCardProps, t: Strings): string {
       const idBase = dlPrefix ?? '';
       return `${dangerBtn(t.delete, 'id', `${idBase}-delete`)} ${toggleBtn(t.enable)}`;
     }
-    case 'no-key':
+    case 'no-key': {
+      if (p.plugin.id === 'claude_haiku') {
+        const sponsorshipHref = `/${p.lang}/profile/sponsored-by/`;
+        const sponsorshipLink = `<a href="${escape(sponsorshipHref)}" class="rounded-lg border border-zinc-300 dark:border-zinc-700 px-2 py-1 text-[10px] font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40">${t.use_sponsorship}</a>`;
+        return `${sponsorshipLink} ${primaryBtn(t.add_key, 'data-add-key', id)}`;
+      }
       return primaryBtn(t.add_key, 'data-add-key', id);
+    }
     case 'not-downloaded': {
       const knownBytes = KNOWN_MODEL_BYTES[p.plugin.id] ?? p.cacheStatus?.approxBytes ?? 0;
       const sizeLabel = bytesHuman(knownBytes) || '?';
