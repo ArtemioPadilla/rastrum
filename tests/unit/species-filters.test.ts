@@ -3,6 +3,8 @@ import {
   parseChips,
   serializeChips,
   filterByChips,
+  parseSort,
+  buildSpeciesUrl,
   type ChipsState,
   type SpeciesRow,
 } from '../../src/lib/species-filters';
@@ -74,5 +76,48 @@ describe('filterByChips', () => {
   it('kingdom filter only', () => {
     const out = filterByChips(rows, { endemic: false, nom059: false, rare: false, kingdom: 'Plantae' });
     expect(out.map(r => r.taxon_id)).toEqual(['b']);
+  });
+});
+
+describe('parseSort', () => {
+  it('returns DEFAULT_SORT for empty search', () => {
+    expect(parseSort('')).toBe('obs');
+  });
+
+  it('parses sort=recent', () => {
+    expect(parseSort('?sort=recent')).toBe('recent');
+  });
+
+  it('parses sort=alpha', () => {
+    expect(parseSort('?sort=alpha')).toBe('alpha');
+  });
+
+  it('rejects unknown values and returns default', () => {
+    expect(parseSort('?sort=bogus')).toBe('obs');
+  });
+
+  it('handles search without leading question mark', () => {
+    expect(parseSort('sort=recent')).toBe('recent');
+  });
+});
+
+describe('buildSpeciesUrl', () => {
+  it('returns empty string for fully-default state', () => {
+    const chips: ChipsState = { endemic: false, nom059: false, rare: false, kingdom: null };
+    expect(buildSpeciesUrl(chips, 'obs')).toBe('');
+  });
+
+  it('serializes only non-default sort', () => {
+    const chips: ChipsState = { endemic: false, nom059: false, rare: false, kingdom: null };
+    expect(buildSpeciesUrl(chips, 'recent')).toBe('?sort=recent');
+  });
+
+  it('combines chips and sort with &', () => {
+    const chips: ChipsState = { endemic: true, nom059: false, rare: false, kingdom: null };
+    const out = buildSpeciesUrl(chips, 'alpha');
+    expect(out).toContain('endemic=1');
+    expect(out).toContain('sort=alpha');
+    expect(out.startsWith('?')).toBe(true);
+    expect((out.match(/&/g) ?? []).length).toBe(1);
   });
 });

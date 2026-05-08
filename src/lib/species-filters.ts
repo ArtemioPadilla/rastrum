@@ -44,6 +44,24 @@ export function serializeChips(s: ChipsState): string {
   return out ? `?${out}` : '';
 }
 
+export type SortMode = 'obs' | 'recent' | 'alpha';
+
+export const DEFAULT_SORT: SortMode = 'obs';
+
+export function parseSort(qs: string): SortMode {
+  const p = new URLSearchParams(qs.startsWith('?') ? qs.slice(1) : qs);
+  const v = p.get('sort');
+  if (v === 'recent' || v === 'alpha' || v === 'obs') return v;
+  return DEFAULT_SORT;
+}
+
+export function buildSpeciesUrl(s: ChipsState, sort: SortMode): string {
+  const chipFrag = serializeChips(s);
+  if (sort === DEFAULT_SORT) return chipFrag;
+  const sep = chipFrag === '' ? '?' : '&';
+  return `${chipFrag}${sep}sort=${sort}`;
+}
+
 export function filterByChips<T extends SpeciesRow>(rows: T[], s: ChipsState): T[] {
   return rows.filter((r) => {
     if (s.kingdom && r.kingdom !== s.kingdom) return false;
