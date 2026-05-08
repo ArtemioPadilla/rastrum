@@ -126,7 +126,7 @@ export const docPages = [
   'architecture', 'indigenous', 'funding', 'contribute',
   'faq', 'privacy', 'terms', 'console', 'sponsorships', 'mcp',
   'changelog', 'community', 'camera-stations', 'sponsor-pools',
-  'obs-detail',
+  'obs-detail', 'status',
 ] as const;
 
 export type DocPage = (typeof docPages)[number];
@@ -345,6 +345,10 @@ export const docPageMeta = {
   'obs-detail': {
     en: "Observation detail page: photo gallery, interactive map, community identifications, owner management tools, and public sharing with OG cards.",
     es: "Página de detalle de observación: galería de fotos, mapa interactivo, identificaciones comunitarias, herramientas de gestión y compartir público con tarjetas OG.",
+  },
+  status: {
+    en: "Public triage SLA dashboard: open issues, median time-to-first-comment over the last 30 days, and recent resolution count.",
+    es: "Tablero público de SLA de triage: issues abiertas, tiempo medio a primer comentario en los últimos 30 días y resoluciones recientes.",
   },
 } as const satisfies Record<DocPage, { en: string; es: string }>;
 
