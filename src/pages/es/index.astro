@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import SeasonalAccent from '../../components/SeasonalAccent.astro';
 import { t, getLocalizedPath, getDocPath, routes } from '../../i18n/utils';
 
 const lang = 'es';
@@ -9,6 +10,7 @@ const tr = t(lang);
 <BaseLayout title={`${tr.site.title} — ${tr.home.hero_title}`} description={tr.site.description} lang={lang}>
   <!-- Hero -->
   <section class="text-center py-16 sm:py-24 space-y-6">
+    <SeasonalAccent class="mb-2 flex justify-center" />
     <h1 class="text-4xl sm:text-5xl font-bold tracking-tight max-w-3xl mx-auto">
       {tr.home.hero_title}
     </h1>

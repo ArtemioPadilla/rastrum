@@ -5,6 +5,7 @@ import ProfileEditForm from '../../../../components/ProfileEditForm.astro';
 import StreakRemindersSection from '../../../../components/StreakRemindersSection.astro';
 import PrivacyMatrix from '../../../../components/PrivacyMatrix.astro';
 import BlockedUsersList from '../../../../components/BlockedUsersList.astro';
+import SeasonalThemePicker from '../../../../components/SeasonalThemePicker.astro';
 import { t, getLocalizedPath, routes } from '../../../../i18n/utils';
 
 export function getStaticPaths() {
@@ -88,6 +89,9 @@ const mcpUrl = 'https://reppvlqejgoqvitturxp.supabase.co/functions/v1/mcp';
           </div>
           <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">{settings.preferences.theme_field_hint}</p>
         </section>
+
+        <!-- Appearance (seasonal theme — issue #731) -->
+        <SeasonalThemePicker lang={lang} />
 
         <!-- BYO API Keys -->
         <section>

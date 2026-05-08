@@ -67,6 +67,7 @@ high-level system view.
 |---|---|
 | [`onboarding-events.md`](onboarding-events.md) | DOM events + Anthropic-key probe + first-run telemetry. |
 | [`posthog.md`](posthog.md) | PostHog snippet wiring, captured events, reverse-proxy verification, token rotation. |
+| [`themes.md`](themes.md) | Seasonal + regional theme variants (`monarca` / `lluvias` / `secas` / `default`) — auto-resolution, manual override, and how to add a new season. |
 | [`ci-smoke-checks.md`](ci-smoke-checks.md) | `infra/smoke-model-assets.sh` post-deploy + nightly probe. |
 | [`sw-cache.md`](sw-cache.md) | Service-worker cache layout, invalidation, debugging stale assets. |
 | [`resend-smtp.md`](resend-smtp.md) | Custom SMTP setup (Resend) for magic-link + sponsor threshold emails. |
