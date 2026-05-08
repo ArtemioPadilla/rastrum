@@ -26,6 +26,12 @@ export interface ActiveSponsorship {
   used_today: number | null;
 }
 
+export interface PlantNetQuota {
+  used_today: number;
+  daily_limit: number;
+  reset_at?: string;
+}
+
 export interface PluginCardProps {
   lang: 'en' | 'es';
   plugin: Identifier;
@@ -36,6 +42,8 @@ export interface PluginCardProps {
   byoKeysSet: Record<string, boolean>;
   /** Only meaningful for plugin.id === 'claude_haiku'. */
   sponsorship: ActiveSponsorship | null;
+  /** Only meaningful for plugin.id === 'plantnet'. */
+  plantnetQuota?: PlantNetQuota | null;
 }
 
 function escape(s: string): string {
@@ -54,6 +62,8 @@ interface Strings {
   active: string; disabled: string; no_key: string; not_downloaded: string; unsupported: string;
   enable: string; disable: string; download: string; redownload: string; cancel: string; delete: string;
   add_key: string; use_own_key: string; use_sponsorship: string; via_sponsorship: string; sponsored_by: string; ids_today: string;
+  configure: string; configure_edit: string; save: string; test: string; clear: string;
+  validating: string; saved: string; save_anyway: string;
 }
 
 const STRINGS: Record<'en' | 'es', Strings> = {
@@ -64,6 +74,8 @@ const STRINGS: Record<'en' | 'es', Strings> = {
     delete: 'Delete', add_key: 'Add key', use_own_key: 'Use my own key',
     use_sponsorship: 'Use sponsorship',
     via_sponsorship: 'via sponsorship', sponsored_by: 'sponsored by', ids_today: 'IDs today',
+    configure: 'Configure', configure_edit: 'Configure · edit', save: 'Save', test: 'Test',
+    clear: 'Clear', validating: 'Validating…', saved: '✓ Saved', save_anyway: 'Save without testing',
   },
   es: {
     active: 'Activo', disabled: '⏸ Desactivado', no_key: 'Sin API key', not_downloaded: 'Sin descargar',
@@ -72,6 +84,8 @@ const STRINGS: Record<'en' | 'es', Strings> = {
     delete: 'Eliminar', add_key: 'Agregar API key', use_own_key: 'Usar tu propia API key',
     use_sponsorship: 'Usar patrocinio',
     via_sponsorship: 'vía patrocinio', sponsored_by: 'patrocinado por', ids_today: 'IDs hoy',
+    configure: 'Configurar', configure_edit: 'Configurar · editar', save: 'Guardar', test: 'Probar',
+    clear: 'Limpiar', validating: 'Validando…', saved: '✓ Guardado', save_anyway: 'Guardar sin probar',
   },
 };
 
@@ -94,15 +108,6 @@ function pillFor(state: CardState, t: Strings): string {
   }
 }
 
-/** Approximate cached/download sizes for on-device plugins (binary units). */
-const KNOWN_MODEL_BYTES: Record<string, number> = {
-  webllm_phi35_vision: 4_294_967_296,    // 4.0 GiB
-  onnx_gemma4_vision: 3_435_973_837,     // ≈ 3.2 GB binary (matches existing UI)
-  birdnet_lite: 52_428_800,              // 50 MiB
-  onnx_efficientnet_lite0: 18_874_368,   // 18 MB (matches existing UI showing 18 MB)
-  camera_trap_megadetector: 140_509_184, // ≈ 134 MB (matches existing UI)
-  speciesnet_distilled: 104_857_600,     // 100 MiB
-};
 
 function actionsFor(p: PluginCardProps, t: Strings): string {
   const id = escape(p.plugin.id);
@@ -161,7 +166,7 @@ function actionsFor(p: PluginCardProps, t: Strings): string {
       return primaryBtn(t.add_key, 'data-add-key', id);
     }
     case 'not-downloaded': {
-      const knownBytes = KNOWN_MODEL_BYTES[p.plugin.id] ?? p.cacheStatus?.approxBytes ?? 0;
+      const knownBytes = p.plugin.capabilities.approxDownloadBytes ?? p.cacheStatus?.approxBytes ?? 0;
       const sizeLabel = bytesHuman(knownBytes) || '?';
       const idBase = dlPrefix ?? '';
       return `<button type="button" id="${idBase}-download" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 text-xs font-semibold text-white">${t.download} · ${escape(sizeLabel)}</button>`;
@@ -173,6 +178,79 @@ function actionsFor(p: PluginCardProps, t: Strings): string {
     case 'unsupported':
       return '';
   }
+}
+
+/**
+ * Renders the inline key-configuration form for plugins with keySpec.
+ * The <details> is collapsed by default. The data-add-key / data-edit-key
+ * handler in ProfileEditForm.astro programmatically opens it and focuses
+ * the first input instead of using window.prompt().
+ *
+ * Attributes used by ProfileEditForm.astro's delegated handlers:
+ *   data-key-input[data-plugin]   — password input per key spec
+ *   data-key-save[data-plugin]    — Save button (runs validation + persist)
+ *   data-key-test[data-plugin]    — Test button (only when testConnection exists)
+ *   data-key-clear[data-plugin]   — Clear / remove stored key
+ *   data-key-status[data-plugin]  — Status pill updated by handlers
+ *   data-key-form[data-plugin]    — The <details> element itself
+ */
+function keyForm(p: PluginCardProps, t: Strings, hasKey: boolean): string {
+  if (!p.plugin.keySpec?.length) return '';
+  const id = escape(p.plugin.id);
+  const summaryLabel = hasKey ? escape(t.configure_edit) : escape(t.configure);
+  const hasTestConnection = typeof (p.plugin as { testConnection?: unknown }).testConnection === 'function';
+
+  const inputs = p.plugin.keySpec.map((spec) => {
+    const current = ''; // value is always empty on render — filled by JS after open
+    const hintHtml = spec.hint
+      ? `<p class="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">${escape(spec.hint)}</p>`
+      : '';
+    const setupLink = p.plugin.setupSteps?.find((s) => s.link)?.link ?? '';
+    const linkHtml = setupLink
+      ? `<a href="${escape(setupLink)}" target="_blank" rel="noopener noreferrer" class="text-[10px] text-emerald-600 dark:text-emerald-400 underline hover:no-underline">Get key ↗</a>`
+      : '';
+    return `
+      <div class="flex flex-col gap-1">
+        <label class="text-[11px] font-medium text-zinc-600 dark:text-zinc-400 flex items-center justify-between">
+          <span>${escape(spec.label)}</span>
+          ${linkHtml}
+        </label>
+        <input
+          type="password"
+          data-key-input
+          data-plugin="${id}"
+          data-key-name="${escape(spec.name)}"
+          value="${escape(current)}"
+          placeholder="${escape(spec.placeholder ?? '')}"
+          autocomplete="off"
+          class="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2.5 py-1.5 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+        />
+        ${hintHtml}
+      </div>
+    `.trim();
+  }).join('');
+
+  const testBtn = hasTestConnection
+    ? `<button type="button" data-key-test="${id}" class="rounded-lg border border-zinc-300 dark:border-zinc-700 px-2 py-1 text-[10px] font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40">${t.test}</button>`
+    : '';
+
+  return `
+    <details data-key-form="${id}" class="mt-2">
+      <summary class="cursor-pointer text-[11px] font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 select-none list-none flex items-center gap-1">
+        <svg class="w-3 h-3 transition-transform [[open]_&]:rotate-90" viewBox="0 0 8 12" fill="currentColor" aria-hidden="true"><path d="M2 0L8 6L2 12V0Z"/></svg>
+        ${summaryLabel}
+      </summary>
+      <div class="mt-2 flex flex-col gap-2">
+        ${inputs}
+        <div class="flex items-center gap-2 flex-wrap">
+          <button type="button" data-key-save="${id}" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 text-xs font-semibold text-white">${escape(t.save)}</button>
+          ${testBtn}
+          <button type="button" data-key-clear="${id}" class="rounded-lg border border-red-300 dark:border-red-900/50 px-2 py-1 text-[10px] font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">${escape(t.clear)}</button>
+          <span data-key-status="${id}" class="text-[10px] text-zinc-500 dark:text-zinc-400"></span>
+        </div>
+      </div>
+    </details>
+  `.trim();
 }
 
 function metaLine(p: PluginCardProps): string {
@@ -195,6 +273,12 @@ function sponsorshipLine(p: PluginCardProps, t: Strings): string {
   return `<span class="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-violet-100 dark:bg-violet-900/30 text-violet-800 dark:text-violet-300 ml-1">${t.via_sponsorship}</span><div class="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">${t.sponsored_by} ${handle}${usage}</div>`;
 }
 
+function plantnetQuotaChip(p: PluginCardProps, t: Strings): string {
+  if (p.plugin.id !== 'plantnet' || !p.plantnetQuota) return '';
+  const { used_today, daily_limit } = p.plantnetQuota;
+  return `<span class="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 ml-1">${used_today} / ${daily_limit} ${t.ids_today}</span>`;
+}
+
 export function renderPluginCard(p: PluginCardProps): string {
   const t = STRINGS[p.lang];
   const liClass = p.state.kind === 'disabled'
@@ -205,6 +289,9 @@ export function renderPluginCard(p: PluginCardProps): string {
     ? `<p class="text-[10px] text-zinc-500 italic mt-1">${escape(p.state.message)}</p>`
     : '';
 
+  const hasKey = p.plugin.keySpec?.some((s) => !!p.byoKeysSet[s.name]) ?? false;
+  const form = keyForm(p, t, hasKey);
+
   return `
     <li class="${liClass}">
       <div class="flex items-start justify-between gap-3 flex-wrap">
@@ -214,10 +301,12 @@ export function renderPluginCard(p: PluginCardProps): string {
             <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">${escape(p.plugin.name)}</p>
             ${pillFor(p.state, t)}
             ${sponsorshipLine(p, t)}
+            ${plantnetQuotaChip(p, t)}
           </div>
           <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">${escape(p.plugin.description)}</p>
           <p class="text-[10px] text-zinc-400 dark:text-zinc-500 mt-1 font-mono">${escape(metaLine(p))}</p>
           ${message}
+          ${form}
         </div>
         <div class="flex flex-wrap gap-2 flex-none">
           ${actionsFor(p, t)}

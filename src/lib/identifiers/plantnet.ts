@@ -8,6 +8,7 @@
  */
 import { getSupabase } from '../supabase';
 import { getKey } from '../byo-keys';
+import { incrementPlantNetQuota } from '../plantnet-quota';
 import type { Identifier, IDResult, IdentifyInput } from './types';
 
 const PLUGIN_ID = 'plantnet';
@@ -74,6 +75,7 @@ export const plantNetIdentifier: Identifier = {
     if (error) throw error;
     const r = data as Partial<IDResult> & { error?: string };
     if (r.error) throw new Error(r.error);
+    incrementPlantNetQuota();
     return {
       scientific_name: r.scientific_name ?? '',
       common_name_en: r.common_name_en ?? null,
