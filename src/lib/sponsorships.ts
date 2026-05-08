@@ -178,6 +178,26 @@ export async function deleteCredential(id: string): Promise<void> {
   if (!r.ok && r.status !== 204) throw new Error(`deleteCredential: ${r.status}`);
 }
 
+/**
+ * #655: toggle the per-credential `use_personally` flag. When enabled,
+ * the identify EF resolves this credential for the owner's own
+ * identifications BEFORE consulting the BYO localStorage key.
+ *
+ * Calls the SECURITY DEFINER `set_credential_personal` RPC, which
+ * enforces `user_id = auth.uid()` server-side.
+ */
+export async function setCredentialPersonal(
+  credentialId: string,
+  usePersonally: boolean,
+): Promise<void> {
+  const sb = getSupabase();
+  const { error } = await sb.rpc('set_credential_personal', {
+    p_credential_id: credentialId,
+    p_use_personally: usePersonally,
+  });
+  if (error) throw new Error(error.message);
+}
+
 export async function updatePool(id: string, patch: { total_cap?: number; daily_user_cap?: number; preferred_model?: string; status?: 'active' | 'paused' }): Promise<void> {
   const r = await authedFetch(`/pools/${id}`, { method: 'PATCH', body: JSON.stringify(patch) });
   if (!r.ok) throw new Error(`updatePool: ${await readErrorBody(r)}`);

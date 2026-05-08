@@ -15,10 +15,14 @@
  *   `src/lib/identify-cascade-client.ts`.)
  *
  *   Key resolution rule (server-side, post-sponsorship migration):
- *     1. BYO key from `client_keys.anthropic` / `client_anthropic_key` wins.
- *     2. Otherwise, if a JWT user is present, resolve a sponsorship via
+ *     1. Owner-personal Vault credential (#655) — when the JWT user owns
+ *        a `sponsor_credentials` row with `use_personally = true`, decrypt
+ *        and use it WITHOUT recording sponsorship_usage / consuming a pool
+ *        slot. It's the owner's own credit, no quota.
+ *     2. BYO key from `client_keys.anthropic` / `client_anthropic_key`.
+ *     3. Otherwise, if a JWT user is present, resolve a sponsorship via
  *        `_shared/sponsorship.ts` (rate-limit, decrypt vault, record usage).
- *     3. Otherwise the Claude runner is skipped (returns null) — the
+ *     4. Otherwise the Claude runner is skipped (returns null) — the
  *        operator-key fallback (`Deno.env.get('ANTHROPIC_API_KEY')`) is
  *        intentionally NOT consulted; sponsorships replace that path.
  *
@@ -113,6 +117,51 @@ import { isPlantLikeHint } from './_helpers.ts';
 
 const CONFIDENCE_THRESHOLD = 0.7;
 const RACE_TIMEOUT_MS = 30_000;
+
+interface PersonalCredential {
+  secret: string;
+  kind: CredentialKind;
+  model: string;
+  endpoint: string | null;
+}
+
+/**
+ * #655: resolve the JWT user's own Vault credential when they have one
+ * marked `use_personally = true`. This bypasses sponsorship_usage and
+ * pool consumption — the owner pays for their own calls. Returns null
+ * when the user has no personal credential set up.
+ *
+ * Currently scoped to `provider = 'anthropic'` to match the existing
+ * cascade contract; pool/sponsorship + the Claude runner are the only
+ * paths that consume server-side credentials today.
+ */
+async function resolvePersonalCredential(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<PersonalCredential | null> {
+  const { data, error } = await supabase
+    .from('sponsor_credentials')
+    .select('id, kind, vault_secret_id, preferred_model, endpoint')
+    .eq('user_id', userId)
+    .eq('use_personally', true)
+    .eq('provider', 'anthropic')
+    .is('revoked_at', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error || !data) return null;
+  const row = data as {
+    id: string; kind: CredentialKind; vault_secret_id: string;
+    preferred_model: string | null; endpoint: string | null;
+  };
+  const secret = await decryptCredential(supabase, row.vault_secret_id);
+  return {
+    secret,
+    kind: row.kind,
+    model: row.preferred_model ?? 'claude-haiku-4-5',
+    endpoint: row.endpoint,
+  };
+}
 
 // ─────────────── pure helpers ───────────────
 
@@ -458,20 +507,43 @@ serve(async (req) => {
   }
 
   // Decide what credential the Claude runner gets. Order:
-  //   1. BYO key forwarded by the client.
-  //   2. Sponsor-supplied credential resolved via _shared/sponsorship.ts.
-  //   3. Platform pool (M27.2, #115) — round-robin across active pools,
+  //   1. Owner-personal Vault credential (#655) — `use_personally = true`,
+  //      owned by the JWT user. Skips sponsorship_usage + pool consumption
+  //      because it's the owner's own credit.
+  //   2. BYO key forwarded by the client.
+  //   3. Sponsor-supplied credential resolved via _shared/sponsorship.ts.
+  //   4. Platform pool (M27.2, #115) — round-robin across active pools,
   //      enforced by `consume_pool_slot()` SQL RPC.
-  //   4. Nothing — the Claude runner is skipped (no operator-key fallback).
+  //   5. Nothing — the Claude runner is skipped (no operator-key fallback).
   let claudeCred: { secret: string; kind: CredentialKind } | null = null;
   let resolvedClaudeCred: ResolvedCredential | null = null;
   let sponsorshipCtx: ResolvedSponsorship | null = null;
   let sponsorshipSkipReason: string | null = null;
   let poolUsed: { poolId: string; credentialId: string } | null = null;
+  let usedPersonalCredential = false;
 
-  if (byoAnthropic) {
+  // Step 1: owner-personal Vault credential (#655).
+  if (beneficiaryId) {
+    try {
+      const personal = await resolvePersonalCredential(db(), beneficiaryId);
+      if (personal) {
+        claudeCred = { secret: personal.secret, kind: personal.kind };
+        resolvedClaudeCred = {
+          kind:     personal.kind as ResolvedCredential['kind'],
+          secret:   personal.secret,
+          model:    personal.model,
+          endpoint: personal.endpoint,
+        };
+        usedPersonalCredential = true;
+      }
+    } catch (err) {
+      console.warn(`[identify] personal credential resolution failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  if (!usedPersonalCredential && byoAnthropic) {
     claudeCred = { secret: byoAnthropic, kind: 'api_key' };
-  } else if (beneficiaryId) {
+  } else if (!usedPersonalCredential && beneficiaryId) {
     try {
       const rl = await checkAndBumpRateLimit(db(), beneficiaryId, 'anthropic');
       if (!rl.allowed) {

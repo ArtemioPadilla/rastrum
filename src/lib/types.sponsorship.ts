@@ -12,6 +12,9 @@ export interface SponsorCredential {
   last_used_at:  string | null;
   revoked_at:    string | null;
   created_at:    string;
+  /** #655: when true, the identify EF resolves this credential for the
+   *  owner's own identifications BEFORE the BYO localStorage key. */
+  use_personally?: boolean;
 }
 
 export interface Sponsorship {
