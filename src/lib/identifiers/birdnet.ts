@@ -112,6 +112,7 @@ export const birdnetIdentifier: Identifier = {
     runtime: 'client',
     license: 'free-nc',
     cost_per_id_usd: 0,
+    approxDownloadBytes: 52_428_800,
   },
   async isAvailable() {
     if (!getBirdNETWeightsBaseUrl()) {

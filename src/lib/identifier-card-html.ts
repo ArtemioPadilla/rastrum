@@ -108,15 +108,6 @@ function pillFor(state: CardState, t: Strings): string {
   }
 }
 
-/** Approximate cached/download sizes for on-device plugins (binary units). */
-const KNOWN_MODEL_BYTES: Record<string, number> = {
-  webllm_phi35_vision: 4_294_967_296,    // 4.0 GiB
-  onnx_gemma4_vision: 3_435_973_837,     // ≈ 3.2 GB binary (matches existing UI)
-  birdnet_lite: 52_428_800,              // 50 MiB
-  onnx_efficientnet_lite0: 18_874_368,   // 18 MB (matches existing UI showing 18 MB)
-  camera_trap_megadetector: 140_509_184, // ≈ 134 MB (matches existing UI)
-  speciesnet_distilled: 104_857_600,     // 100 MiB
-};
 
 function actionsFor(p: PluginCardProps, t: Strings): string {
   const id = escape(p.plugin.id);
@@ -175,7 +166,7 @@ function actionsFor(p: PluginCardProps, t: Strings): string {
       return primaryBtn(t.add_key, 'data-add-key', id);
     }
     case 'not-downloaded': {
-      const knownBytes = KNOWN_MODEL_BYTES[p.plugin.id] ?? p.cacheStatus?.approxBytes ?? 0;
+      const knownBytes = p.plugin.capabilities.approxDownloadBytes ?? p.cacheStatus?.approxBytes ?? 0;
       const sizeLabel = bytesHuman(knownBytes) || '?';
       const idBase = dlPrefix ?? '';
       return `<button type="button" id="${idBase}-download" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 text-xs font-semibold text-white">${t.download} · ${escape(sizeLabel)}</button>`;

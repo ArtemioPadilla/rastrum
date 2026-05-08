@@ -161,6 +161,7 @@ export const cameraTrapMegadetectorIdentifier: Identifier = {
     // ceiling so the cascade always tries a downstream species model
     // when an animal IS detected.
     confidence_ceiling: 0.4,
+    approxDownloadBytes: 140_509_184,
   },
 
   async isAvailable() {

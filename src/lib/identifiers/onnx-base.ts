@@ -143,6 +143,7 @@ export const onnxBaseIdentifier: Identifier = {
     // scientific binomials, so this plugin is hint-only — surfaces top-k
     // alternates in the UI but never wins the cascade.
     confidence_ceiling: 0.4,
+    approxDownloadBytes: 18_874_368,
   },
   async isAvailable() {
     if (!getOnnxBaseWeightsBaseUrl()) {

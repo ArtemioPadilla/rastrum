@@ -182,6 +182,7 @@ export const speciesnetIdentifier: Identifier = {
     license: 'free',
     confidence_ceiling: 0.85,
     cost_per_id_usd: 0,
+    approxDownloadBytes: 104_857_600,
   },
 
   async isAvailable() {
