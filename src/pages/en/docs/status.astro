@@ -1,0 +1,13 @@
+---
+import DocLayout from '../../../layouts/DocLayout.astro';
+import TriageStatusView from '../../../components/TriageStatusView.astro';
+import { t } from '../../../i18n/utils';
+
+const lang = 'en';
+const tr = t(lang);
+const triage = (tr.docs as unknown as { triage: { title: string } }).triage;
+---
+
+<DocLayout title={triage.title} lang={lang} section="status" editPath="src/pages/en/docs/status.astro">
+  <TriageStatusView lang={lang} />
+</DocLayout>

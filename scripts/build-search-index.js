@@ -80,6 +80,7 @@ const docPages = [
   { key: 'faq',           en: 'FAQ',           es: 'Preguntas frecuentes', group: 'Product' },
   { key: 'privacy',       en: 'Privacy',       es: 'Privacidad',          group: 'Community' },
   { key: 'terms',         en: 'Terms',         es: 'Términos',            group: 'Community' },
+  { key: 'status',        en: 'Triage status', es: 'Estado de triage',    group: 'Community' },
 ];
 
 // ---------------------------------------------------------------------------
