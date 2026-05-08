@@ -155,6 +155,12 @@ describe('renderPluginCard', () => {
     expect(html).not.toContain('Use sponsorship');
   });
 
+  it('renders Spanish Use sponsorship deep-link with locale slug when lang=es', () => {
+    const html = renderPluginCard(props({ lang: 'es', plugin: claude, state: { kind: 'no-key' }, sponsorship: null }));
+    expect(html).toContain('Usar patrocinio');
+    expect(html).toMatch(/href="\/es\/perfil\/patrocinado-por\/"/);
+  });
+
   it('renders Spanish strings when lang=es', () => {
     const html = renderPluginCard(props({ lang: 'es' }));
     expect(html).toContain('Activo');

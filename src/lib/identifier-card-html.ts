@@ -153,7 +153,8 @@ function actionsFor(p: PluginCardProps, t: Strings): string {
     }
     case 'no-key': {
       if (p.plugin.id === 'claude_haiku') {
-        const sponsorshipHref = `/${p.lang}/profile/sponsored-by/`;
+        const sponsorshipSlug = p.lang === 'es' ? '/perfil/patrocinado-por/' : '/profile/sponsored-by/';
+        const sponsorshipHref = `/${p.lang}${sponsorshipSlug}`;
         const sponsorshipLink = `<a href="${escape(sponsorshipHref)}" class="rounded-lg border border-zinc-300 dark:border-zinc-700 px-2 py-1 text-[10px] font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40">${t.use_sponsorship}</a>`;
         return `${sponsorshipLink} ${primaryBtn(t.add_key, 'data-add-key', id)}`;
       }
