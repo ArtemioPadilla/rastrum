@@ -8,6 +8,19 @@ export interface KarmaToast {
   timestamp: number;
 }
 
+export interface KarmaMilestone {
+  threshold: number;
+  label_en: string;
+  label_es: string;
+  icon: string;
+}
+
+export interface MilestoneToast {
+  threshold: number;
+  label: string;
+  icon: string;
+}
+
 interface KarmaEventRow {
   id: number | string;
   user_id: string;
@@ -17,11 +30,15 @@ interface KarmaEventRow {
 }
 
 const TOAST_DURATION_MS = 4000;
+const MILESTONE_TOAST_DURATION_MS = 8000;
 let toastContainer: HTMLElement | null = null;
 
 const reasonLabelMap: Record<string, { en: string; es: string }> = Object.fromEntries(
   KARMA_REASONS.map((r) => [r.id, { en: r.label_en, es: r.label_es }]),
 );
+
+let cachedMilestones: KarmaMilestone[] | null = null;
+let milestonesPromise: Promise<KarmaMilestone[]> | null = null;
 
 function resolveLabel(reason: string, lang: 'en' | 'es'): string {
   const entry = reasonLabelMap[reason];
@@ -67,11 +84,99 @@ export function showKarmaToast(toast: KarmaToast): void {
 }
 
 /**
+ * Fire a celebratory milestone toast. Distinct gold visual, longer duration,
+ * larger size to differentiate from the regular delta toast.
+ */
+export function showMilestoneToast(toast: MilestoneToast): void {
+  if (!toastContainer) {
+    toastContainer = document.createElement('div');
+    toastContainer.id = 'karma-toast-container';
+    toastContainer.className = 'fixed bottom-20 right-4 z-50 flex flex-col gap-2 pointer-events-none';
+    document.body.appendChild(toastContainer);
+  }
+
+  const el = document.createElement('div');
+  el.dataset.milestone = String(toast.threshold);
+  el.className =
+    'pointer-events-auto px-5 py-3 rounded-xl shadow-xl text-base font-semibold transition-all duration-300 ' +
+    'bg-amber-500 text-white ring-2 ring-yellow-400 dark:bg-amber-600 dark:ring-yellow-300';
+  el.textContent = `${toast.icon} ${toast.label}`;
+  el.style.opacity = '0';
+  el.style.transform = 'translateY(10px) scale(0.97)';
+  toastContainer.appendChild(el);
+
+  requestAnimationFrame(() => {
+    el.style.opacity = '1';
+    el.style.transform = 'translateY(0) scale(1)';
+  });
+
+  setTimeout(() => {
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(-10px) scale(0.97)';
+    setTimeout(() => el.remove(), 300);
+  }, MILESTONE_TOAST_DURATION_MS);
+}
+
+/**
+ * Determine which milestone (if any) the user crossed. Returns the highest
+ * single milestone in (prevTotal, newTotal]. If two thresholds fall in that
+ * window we fire the highest one — observers crossing 100 and 500 in a single
+ * event get the bigger celebration.
+ */
+export function findCrossedMilestone(
+  prevTotal: number,
+  newTotal: number,
+  milestones: KarmaMilestone[],
+): KarmaMilestone | null {
+  if (!Number.isFinite(prevTotal) || !Number.isFinite(newTotal) || newTotal <= prevTotal) {
+    return null;
+  }
+  let crossed: KarmaMilestone | null = null;
+  for (const m of milestones) {
+    if (m.threshold > prevTotal && m.threshold <= newTotal) {
+      if (!crossed || m.threshold > crossed.threshold) crossed = m;
+    }
+  }
+  return crossed;
+}
+
+export async function loadMilestones(supabase: SupabaseClient): Promise<KarmaMilestone[]> {
+  if (cachedMilestones) return cachedMilestones;
+  if (milestonesPromise) return milestonesPromise;
+  milestonesPromise = (async () => {
+    try {
+      const { data, error } = await supabase
+        .from('karma_milestones')
+        .select('threshold, label_en, label_es, icon')
+        .order('threshold', { ascending: true });
+      if (error) throw error;
+      const rows = (data ?? []).map((r) => ({
+        threshold: Number(r.threshold),
+        label_en: String(r.label_en),
+        label_es: String(r.label_es),
+        icon: String(r.icon ?? '🏆'),
+      }));
+      cachedMilestones = rows;
+      return rows;
+    } catch {
+      return [];
+    } finally {
+      milestonesPromise = null;
+    }
+  })();
+  return milestonesPromise;
+}
+
+/**
  * Subscribe to realtime karma_events INSERTs for `userId` and fire a toast
  * for each. Returns an `unsubscribe` callback that is safe to invoke
  * multiple times. The Realtime channel is filtered server-side by
  * `user_id=eq.<userId>`, mirroring the `karma_events_self_read` RLS
  * policy so a viewer cannot subscribe to another user's stream.
+ *
+ * Tracks a running karma total client-side (seeded from users.karma_total
+ * on subscribe) so each INSERT can compute prev/new without a per-event
+ * round-trip — and fire a milestone toast when a threshold is crossed.
  */
 type KarmaChannel = {
   on: (
@@ -86,9 +191,19 @@ export function subscribeToKarmaEvents(
   userId: string,
   supabase: SupabaseClient,
 ): () => void {
-  // supabase-js v2 types model postgres_changes only via overloads that
-  // depend on a generic Database schema; the runtime signature is the
-  // looser KarmaChannel shape above.
+  let runningTotal: number | null = null;
+  void loadMilestones(supabase);
+  void (async () => {
+    try {
+      const { data } = await supabase.from('users').select('karma_total').eq('id', userId).maybeSingle();
+      const v = (data as { karma_total?: number | null } | null)?.karma_total;
+      if (typeof v === 'number') runningTotal = v;
+    } catch {
+      // Best-effort; if the query fails we simply skip milestone detection
+      // until a manual reset.
+    }
+  })();
+
   const channel = (supabase.channel(`karma_events:${userId}`) as unknown as KarmaChannel)
     .on(
       'postgres_changes',
@@ -108,6 +223,24 @@ export function subscribeToKarmaEvents(
           label: resolveLabel(row.reason, lang),
           timestamp: Date.parse(row.created_at) || Date.now(),
         });
+
+        if (row.delta > 0 && runningTotal !== null) {
+          const prevTotal = runningTotal;
+          const newTotal = prevTotal + row.delta;
+          runningTotal = newTotal;
+          if (cachedMilestones) {
+            const crossed = findCrossedMilestone(prevTotal, newTotal, cachedMilestones);
+            if (crossed) {
+              showMilestoneToast({
+                threshold: crossed.threshold,
+                label: lang === 'es' ? crossed.label_es : crossed.label_en,
+                icon: crossed.icon,
+              });
+            }
+          }
+        } else if (runningTotal !== null) {
+          runningTotal += row.delta;
+        }
       },
     )
     .subscribe();
@@ -126,4 +259,13 @@ export function subscribeToKarmaEvents(
 
 export function _resetToastContainer(): void {
   toastContainer = null;
+}
+
+export function _resetMilestonesCache(): void {
+  cachedMilestones = null;
+  milestonesPromise = null;
+}
+
+export function _setMilestonesCacheForTest(milestones: KarmaMilestone[] | null): void {
+  cachedMilestones = milestones;
 }
