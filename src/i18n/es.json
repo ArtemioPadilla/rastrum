@@ -207,7 +207,62 @@
       "PlantNet API + BirdNET + Claude Vision",
       "Tailwind CSS",
       "PWA-ready"
-    ]
+    ],
+    "people": {
+      "title": "Quiénes somos",
+      "lede": "Un equipo pequeño y honesto. Te decimos quiénes somos porque nos estás confiando tu ubicación, tus fotos y tu tiempo.",
+      "members": [
+        {
+          "name": "Artemio Padilla",
+          "role": "Desarrollador y mantenedor solo",
+          "bio": "Construye y mantiene Rastrum en noches y fines de semana. Vive en México. Disponible vía GitHub Issues o Discussions.",
+          "github": "ArtemioPadilla"
+        }
+      ],
+      "join_cta": "¿Quieres que tu nombre aparezca aquí? Aceptamos código, traducciones, revisión taxonómica, pruebas en campo y reportes de errores.",
+      "join_link": "Cómo contribuir",
+      "no_photo_note": "Las fotos son opcionales y no se requieren para contribuir."
+    },
+    "funding": {
+      "title": "Cómo se financia",
+      "lede": "Creemos que debes saber exactamente quién paga lo que usas.",
+      "status_title": "Situación actual",
+      "status_body": "Rastrum actualmente no tiene financiamiento. No hay empresa, ni inversionistas, ni publicidad. Los costos de hosting e infraestructura los cubre el operador de su propio bolsillo. El insumo más grande es el tiempo voluntario.",
+      "what_costs_title": "Cuánto cuesta operarlo",
+      "what_costs": [
+        "Supabase capa gratuita (base de datos, auth, storage) — actualmente $0 USD/mes",
+        "Cloudflare R2 (medios + alojamiento de modelos ML) — pocos dólares al mes",
+        "Dominio (rastrum.org) — aproximadamente $12 USD por año",
+        "Llamadas de IA para identificación — pago por uso vía tus propias claves BYO, o cupos donados a un fondo comunitario"
+      ],
+      "byo_keys_note": "Por defecto, la identificación con IA (Claude Vision, PlantNet) usa tus propias claves API. Tus fotos van a esos proveedores bajo tu cuenta; nunca guardamos las claves del lado del servidor. La página de Privacidad describe el flujo completo.",
+      "ledger_note": "Si el proyecto empieza a recibir dinero externo, esta sección se convierte en un libro mayor público. Nos comprometemos a publicar cada costo recurrente y cada donación como partidas individuales."
+    },
+    "governance": {
+      "title": "Gobernanza y licencias",
+      "lede": "Las decisiones se toman en abierto, por las personas que hacen el trabajo.",
+      "license_title": "Licencia",
+      "license_body": "El código está bajo licencia MIT. El servidor (Edge Functions desplegadas) es AGPL-3.0 — si corres una instancia pública de Rastrum con modificaciones, debes compartirlas. Cada observación lleva su propia licencia Creative Commons, elegida por quien la contribuye (CC BY, CC BY-NC o CC0).",
+      "decisions_title": "Cómo se toman las decisiones",
+      "decisions_body": "Los temas del roadmap viven como GitHub Issues con etiquetas públicas. Cualquiera puede abrir un issue, comentar o enviar un pull request. Los cambios arquitectónicos pasan por una especificación escrita en docs/specs/modules/ antes de aterrizar como código. El mantenedor tiene la última palabra cuando no surge consenso, pero el sesgo siempre es publicar el camino más debatido.",
+      "contribute_title": "Cómo contribuir",
+      "contribute_body": "Código, traducciones, revisión taxonómica, pruebas en campo, reportes de errores y donaciones pequeñas de cómputo al fondo comunitario son bienvenidas y se valoran por igual.",
+      "contribute_link": "Lee la guía para colaboradores",
+      "code_of_conduct": "Código de conducta"
+    },
+    "stats": {
+      "title": "En cifras hoy",
+      "lede": "Conteos en vivo de observaciones públicas. Se actualizan cada vez que se construye el sitio.",
+      "observations_label": "Observaciones públicas",
+      "observers_label": "Perfiles públicos de observadores",
+      "species_label": "Especies distintas registradas",
+      "unavailable": "Las cifras en vivo aparecerán aquí cuando la canalización de build pueda alcanzar la base de datos.",
+      "generated_prefix": "Última actualización"
+    },
+    "press": {
+      "title": "Prensa y menciones",
+      "empty": "Aún no hay cobertura en prensa. Si escribes sobre Rastrum, nos encantaría saberlo — abre un issue y agregamos el enlace aquí."
+    }
   },
   "footer": {
     "license": "Licencia AGPL-3.0",
