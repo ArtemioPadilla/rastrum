@@ -33,6 +33,7 @@ high-level system view.
 | [`camera-stations.md`](camera-stations.md) | M31 — camera station schema + `station_trap_nights()` for sampling effort. |
 | [`multi-provider-vision.md`](multi-provider-vision.md) | M32 — six vision providers (Anthropic, Bedrock, OpenAI, Azure, Gemini, Vertex). |
 | [`sponsor-pools.md`](sponsor-pools.md) | M27/M32 — platform-wide call pool + `consume_pool_slot` RPC. |
+| [`taxa-enrichment.md`](taxa-enrichment.md) | `enrich-taxon` EF + GBIF lineage backfill (kingdom→genus). |
 
 ## Observation flow (Modules 02 / 03)
 

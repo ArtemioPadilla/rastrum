@@ -804,6 +804,25 @@ serve(async (req) => {
         p_source: result.source,
         p_raw_response: result.raw as object,
       });
+
+      // Fire-and-forget GBIF lineage enrichment for the upserted taxon.
+      // The identify cascade only writes kingdom + family at insert; this
+      // backfills phylum/class/order/genus from GBIF so the species/tree
+      // visualisations can group properly. We never block the response on
+      // this — failures are logged and absorbed.
+      if (taxonId) {
+        const efUrl = `${supabaseUrl}/functions/v1/enrich-taxon`;
+        fetch(efUrl, {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'authorization': `Bearer ${serviceRole}`,
+          },
+          body: JSON.stringify({ taxon_id: taxonId }),
+        }).catch((err) => {
+          console.warn(`[identify] enrich-taxon dispatch failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
+        });
+      }
     }
   }
 
