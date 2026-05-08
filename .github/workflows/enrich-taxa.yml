@@ -1,0 +1,71 @@
+name: Enrich taxa lineage from GBIF
+
+# Calls the deployed `enrich-taxon` Edge Function in batch mode. For each
+# taxa row missing kingdom (or genus), GBIF species/match is queried and
+# lineage columns (kingdom/phylum/class/order/family/genus) are filled in.
+#
+# Two triggers:
+# 1. **Nightly cron** (06:00 UTC) — limit 100, keeps fresh inserts hydrated.
+# 2. **Manual dispatch** — operator can pass a larger limit for a one-shot
+#    backfill of historical rows.
+#
+# The EF is deployed --no-verify-jwt and gates on X-Cron-Secret.
+# GBIF is rate-limited to ~4.5 req/s inside the EF (220ms between calls)
+# so 100 rows take ~22 s; 500 rows take ~110 s.
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: 'Max taxa to enrich this run (1–500)'
+        required: false
+        default: '100'
+
+permissions:
+  contents: read
+
+jobs:
+  enrich:
+    name: Fire enrich-taxon (batch)
+    runs-on: ubuntu-latest
+    env:
+      PROJECT_REF: reppvlqejgoqvitturxp
+    steps:
+      - name: Invoke enrich-taxon Edge Function
+        run: |
+          set -euo pipefail
+          url="https://${PROJECT_REF}.supabase.co/functions/v1/enrich-taxon"
+          limit="${{ inputs.limit || '100' }}"
+          echo "POST $url (batch, limit=$limit)"
+          response=$(curl -sS -X POST \
+            -H "Content-Type: application/json" \
+            -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}" \
+            -d "{\"batch\": true, \"limit\": $limit}" \
+            -w '\n%{http_code}' \
+            --max-time 600 \
+            "$url")
+          body="${response%$'\n'*}"
+          status="${response##*$'\n'}"
+
+          echo "::group::Response"
+          echo "HTTP $status"
+          echo "$body"
+          echo "::endgroup::"
+
+          if [ "$status" != "200" ]; then
+            echo "::error::Edge Function returned HTTP $status"
+            exit 1
+          fi
+
+          enriched=$(echo "$body" | grep -oE '"enriched"[[:space:]]*:[[:space:]]*[0-9]+' | grep -oE '[0-9]+' || echo '?')
+          attempted=$(echo "$body" | grep -oE '"attempted"[[:space:]]*:[[:space:]]*[0-9]+' | grep -oE '[0-9]+' || echo '?')
+          elapsed=$(echo "$body" | grep -oE '"elapsed_ms"[[:space:]]*:[[:space:]]*[0-9]+' | grep -oE '[0-9]+' || echo '?')
+          echo "::notice::Enriched $enriched / $attempted taxa in ${elapsed}ms"
+
+          {
+            echo "## Taxa enrichment — run complete"
+            echo ""
+            echo "Fired \`enrich-taxon\` (batch) against \`${PROJECT_REF}\`. \`$enriched\` of \`$attempted\` taxa hydrated in \`${elapsed}ms\` (limit=\`$limit\`)."
+          } >> "$GITHUB_STEP_SUMMARY"
