@@ -48,6 +48,13 @@ const placesIndexBase = `/${lang}/${lang === 'es' ? 'explorar/lugares' : 'explor
   data-label-prev={page.prev}
   data-label-next={page.next}
   data-label-page-of={page.page_of}
+  data-label-near-me={page.near_me}
+  data-label-near-me-active={page.near_me_active}
+  data-label-near-me-clear={page.near_me_clear}
+  data-label-near-me-locating={page.near_me_locating}
+  data-label-near-me-denied={page.near_me_denied}
+  data-label-near-me-unavailable={page.near_me_unavailable}
+  data-label-near-me-error={page.near_me_error}
 >
 
   <!-- INDEX MODE (shown when no ?slug= present) -->
@@ -88,6 +95,28 @@ const placesIndexBase = `/${lang}/${lang === 'es' ? 'explorar/lugares' : 'explor
         <option value="custom">{page.filter_custom}</option>
         <option value="community">{page.filter_community}</option>
       </select>
+      <button
+        id="places-near-me"
+        type="button"
+        class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50"
+        aria-pressed="false"
+      >
+        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.244-4.243a8 8 0 1111.314 0z" />
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+        <span id="places-near-me-label">{page.near_me}</span>
+      </button>
+    </div>
+
+    <!-- Near-me status row (hidden until activated) -->
+    <div id="places-near-status" class="hidden mb-4 flex items-center gap-2 text-xs">
+      <span id="places-near-status-text" class="text-emerald-700 dark:text-emerald-400"></span>
+      <button
+        id="places-near-clear"
+        type="button"
+        class="text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 underline"
+      >{page.near_me_clear}</button>
     </div>
 
     <!-- Loading state -->
@@ -128,16 +157,20 @@ const placesIndexBase = `/${lang}/${lang === 'es' ? 'explorar/lugares' : 'explor
 
 <script>
   import { getSupabase } from '../lib/supabase';
+  import {
+    loadPlacesGps,
+    savePlacesGps,
+    clearPlacesGps,
+    formatDistance,
+    type PlacesGps,
+  } from '../lib/places-url';
 
   const PAGE_SIZE = 20;
 
   const root = document.getElementById('explore-places-root');
   if (!root) {
-    console.error('[places-index] root element not found — script aborted');
     throw new Error('explore-places-root not found');
   }
-
-  console.log('[places-index] script started, root found');
 
   // Labels from data attrs
   const labels = {
@@ -147,6 +180,12 @@ const placesIndexBase = `/${lang}/${lang === 'es' ? 'explorar/lugares' : 'explor
     prev:            root.dataset.labelPrev!,
     next:            root.dataset.labelNext!,
     pageOf:          root.dataset.labelPageOf!,
+    nearMe:          root.dataset.labelNearMe!,
+    nearMeActive:    root.dataset.labelNearMeActive!,
+    nearMeLocating:  root.dataset.labelNearMeLocating!,
+    nearMeDenied:    root.dataset.labelNearMeDenied!,
+    nearMeUnavailable: root.dataset.labelNearMeUnavailable!,
+    nearMeError:     root.dataset.labelNearMeError!,
     types: {
       protected_area: root.dataset.labelTypeProtectedArea!,
       h3_cell:        root.dataset.labelTypeH3Cell!,
@@ -154,6 +193,8 @@ const placesIndexBase = `/${lang}/${lang === 'es' ? 'explorar/lugares' : 'explor
       community:      root.dataset.labelTypeCommunity!,
     } as Record<string, string>,
   };
+
+  const isEsLang = root.dataset.lang === 'es';
 
   const placesBase = root.dataset.placesBase!;
 
@@ -175,7 +216,15 @@ const placesIndexBase = `/${lang}/${lang === 'es' ? 'explorar/lugares' : 'explor
   let totalCount   = 0;
   let searchQuery  = '';
   let typeFilter   = '';
+  let nearGps: PlacesGps | null = loadPlacesGps();
   let debounceTimer: ReturnType<typeof setTimeout>;
+
+  // Near-me UI elements
+  const nearBtn        = document.getElementById('places-near-me') as HTMLButtonElement;
+  const nearLabel      = document.getElementById('places-near-me-label')!;
+  const nearStatusRow  = document.getElementById('places-near-status')!;
+  const nearStatusText = document.getElementById('places-near-status-text')!;
+  const nearClearBtn   = document.getElementById('places-near-clear') as HTMLButtonElement;
 
   function totalPages() {
     return Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
@@ -209,12 +258,16 @@ const placesIndexBase = `/${lang}/${lang === 'es' ? 'explorar/lugares' : 'explor
     place_type: string;
     obs_count: number;
     species_count: number;
+    distance_m?: number | null;
   }): string {
     const typeName   = labels.types[place.place_type] ?? place.place_type;
     const badgeClass = typeBadgeClass(place.place_type);
     const obsLabel   = formatLabel(labels.obsCount, { count: (place.obs_count ?? 0).toLocaleString() });
     const sppLabel   = formatLabel(labels.speciesCount, { count: (place.species_count ?? 0).toLocaleString() });
     const href       = `${placesBase}?slug=${encodeURIComponent(place.slug)}`;
+    const distChip   = typeof place.distance_m === 'number'
+      ? `<span class="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400 font-medium">📍 ${escHtml(formatDistance(place.distance_m, isEsLang ? 'es' : 'en'))}</span>`
+      : '';
 
     return `<a
       href="${href}"
@@ -226,9 +279,10 @@ const placesIndexBase = `/${lang}/${lang === 'es' ? 'explorar/lugares' : 'explor
         </h2>
         <span class="shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${badgeClass}">${escHtml(typeName)}</span>
       </div>
-      <div class="flex items-center gap-3 text-xs text-zinc-500 dark:text-zinc-400">
+      <div class="flex flex-wrap items-center gap-3 text-xs text-zinc-500 dark:text-zinc-400">
         <span>🔭 ${escHtml(obsLabel)}</span>
         <span>🌿 ${escHtml(sppLabel)}</span>
+        ${distChip}
       </div>
     </a>`;
   }
@@ -240,53 +294,173 @@ const placesIndexBase = `/${lang}/${lang === 'es' ? 'explorar/lugares' : 'explor
     paginationEl.classList.add('hidden');
 
     try {
+      const supabase = getSupabase();
 
-    const supabase = getSupabase();
-    const offset   = currentPage * PAGE_SIZE;
+      // Near-me path: call places_near RPC, distance-sorted.
+      // Type/search filters and pagination are applied client-side
+      // because the RPC's surface is intentionally narrow (privacy +
+      // simplicity); the result set is capped at 100 candidates which
+      // is plenty for the v1 UX.
+      if (nearGps) {
+        const { data, error } = await supabase.rpc('places_near', {
+          p_lat: nearGps.lat,
+          p_lng: nearGps.lng,
+          p_limit: 100,
+          p_offset: 0,
+        });
 
-    let query = supabase
-      .from('places')
-      .select('id,slug,name,place_type,obs_count,species_count,observer_count,last_obs_at', { count: 'exact' })
-      .order('obs_count', { ascending: false })
-      .range(offset, offset + PAGE_SIZE - 1);
+        loadingEl.classList.add('hidden');
 
-    if (typeFilter)   query = query.eq('place_type', typeFilter);
-    if (searchQuery)  query = query.ilike('name', `%${searchQuery}%`);
+        if (error) {
+          emptyEl.textContent = `Error: ${error.message ?? 'unknown'}`;
+          emptyEl.classList.remove('hidden');
+          return;
+        }
 
-    const { data, count, error } = await query;
+        type NearRow = {
+          id: string; slug: string; name: string; place_type: string;
+          obs_count: number; species_count: number; distance_m: number;
+        };
+        let rows = (data ?? []) as NearRow[];
+        if (typeFilter) rows = rows.filter(r => r.place_type === typeFilter);
+        if (searchQuery) {
+          const q = searchQuery.toLowerCase();
+          rows = rows.filter(r => r.name.toLowerCase().includes(q));
+        }
 
-    loadingEl.classList.add('hidden');
+        totalCount = rows.length;
+        const offset = currentPage * PAGE_SIZE;
+        const pageRows = rows.slice(offset, offset + PAGE_SIZE);
 
-    if (error) {
-      console.error('[places-index] fetch error', error);
-      emptyEl.textContent = `Error: ${error.message ?? 'unknown'}`;
-      emptyEl.classList.remove('hidden');
-      return;
-    }
-    if (!data || data.length === 0) {
-      emptyEl.textContent = labels.empty;
-      emptyEl.classList.remove('hidden');
-      return;
-    }
+        if (pageRows.length === 0) {
+          emptyEl.textContent = labels.empty;
+          emptyEl.classList.remove('hidden');
+          return;
+        }
 
-    totalCount = count ?? data.length;
+        gridEl.innerHTML = pageRows.map(renderCard).join('');
+        gridEl.classList.remove('hidden');
+      } else {
+        const offset = currentPage * PAGE_SIZE;
 
-    gridEl.innerHTML = data.map(renderCard).join('');
-    gridEl.classList.remove('hidden');
+        let query = supabase
+          .from('places')
+          .select('id,slug,name,place_type,obs_count,species_count,observer_count,last_obs_at', { count: 'exact' })
+          .order('obs_count', { ascending: false })
+          .range(offset, offset + PAGE_SIZE - 1);
 
-    const pages = totalPages();
-    if (pages > 1) {
-      pageLabel.textContent  = formatLabel(labels.pageOf, { page: currentPage + 1, total: pages });
-      prevBtn.disabled       = currentPage === 0;
-      nextBtn.disabled       = currentPage >= pages - 1;
-      paginationEl.classList.remove('hidden');
-    }
+        if (typeFilter)   query = query.eq('place_type', typeFilter);
+        if (searchQuery)  query = query.ilike('name', `%${searchQuery}%`);
+
+        const { data, count, error } = await query;
+
+        loadingEl.classList.add('hidden');
+
+        if (error) {
+          emptyEl.textContent = `Error: ${error.message ?? 'unknown'}`;
+          emptyEl.classList.remove('hidden');
+          return;
+        }
+        if (!data || data.length === 0) {
+          emptyEl.textContent = labels.empty;
+          emptyEl.classList.remove('hidden');
+          return;
+        }
+
+        totalCount = count ?? data.length;
+        gridEl.innerHTML = data.map(renderCard).join('');
+        gridEl.classList.remove('hidden');
+      }
+
+      const pages = totalPages();
+      if (pages > 1) {
+        pageLabel.textContent  = formatLabel(labels.pageOf, { page: currentPage + 1, total: pages });
+        prevBtn.disabled       = currentPage === 0;
+        nextBtn.disabled       = currentPage >= pages - 1;
+        paginationEl.classList.remove('hidden');
+      }
     } catch (err) {
-      console.error('[places-index] unexpected error', err);
       loadingEl.classList.add('hidden');
       emptyEl.textContent = `Error loading places: ${(err as Error)?.message ?? err}`;
       emptyEl.classList.remove('hidden');
     }
+  }
+
+  function setNearStatus(message: string, visible: boolean) {
+    nearStatusText.textContent = message;
+    nearStatusRow.classList.toggle('hidden', !visible);
+  }
+
+  function syncNearButton() {
+    const active = nearGps !== null;
+    nearBtn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    nearLabel.textContent = active ? labels.nearMeActive : labels.nearMe;
+    nearBtn.classList.toggle('bg-emerald-600', active);
+    nearBtn.classList.toggle('text-white', active);
+    nearBtn.classList.toggle('border-emerald-600', active);
+    nearBtn.classList.toggle('text-emerald-700', !active);
+    nearBtn.classList.toggle('dark:text-emerald-300', !active);
+  }
+
+  function activateNear(gps: PlacesGps) {
+    nearGps = gps;
+    savePlacesGps(gps);
+    syncNearButton();
+    setNearStatus(labels.nearMeActive, true);
+    currentPage = 0;
+    fetchPage();
+  }
+
+  function deactivateNear(message?: string) {
+    nearGps = null;
+    clearPlacesGps();
+    syncNearButton();
+    if (message) {
+      setNearStatus(message, true);
+    } else {
+      setNearStatus('', false);
+    }
+    currentPage = 0;
+    fetchPage();
+  }
+
+  function requestNearMe() {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      setNearStatus(labels.nearMeUnavailable, true);
+      return;
+    }
+    nearBtn.disabled = true;
+    setNearStatus(labels.nearMeLocating, true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        nearBtn.disabled = false;
+        activateNear({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+      },
+      (err) => {
+        nearBtn.disabled = false;
+        const denied = err && err.code === 1;
+        setNearStatus(denied ? labels.nearMeDenied : labels.nearMeError, true);
+        nearGps = null;
+        clearPlacesGps();
+        syncNearButton();
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 },
+    );
+  }
+
+  nearBtn.addEventListener('click', () => {
+    if (nearGps) {
+      deactivateNear();
+    } else {
+      requestNearMe();
+    }
+  });
+  nearClearBtn.addEventListener('click', () => deactivateNear());
+
+  // Restore Near-me from previous tab session
+  if (nearGps) {
+    syncNearButton();
+    setNearStatus(labels.nearMeActive, true);
   }
 
   function resetAndFetch() {
@@ -303,7 +477,6 @@ const placesIndexBase = `/${lang}/${lang === 'es' ? 'explorar/lugares' : 'explor
       detailEl.classList.remove('hidden');
     } else {
       // Index mode
-      console.log('[places-index] index mode, calling fetchPage');
       indexEl.classList.remove('hidden');
       detailEl.classList.add('hidden');
       fetchPage();
@@ -323,12 +496,12 @@ const placesIndexBase = `/${lang}/${lang === 'es' ? 'explorar/lugares' : 'explor
 
   function showAC(results: { slug: string; name: string; place_type: string; obs_count: number }[]) {
     if (!results.length) { hideAC(); return; }
-    const placeBase = isEs ? '/es/explorar/lugares/?slug=' : '/en/explore/places/?slug=';
+    const placeBase = isEsLang ? '/es/explorar/lugares/?slug=' : '/en/explore/places/?slug=';
     const typeLabelFn = (t: string) => ({
-      protected_area: isEs ? 'Área Protegida' : 'Protected Area',
-      h3_cell: isEs ? 'Zona H3' : 'H3 Zone',
-      custom: isEs ? 'Custom' : 'Custom',
-      community: isEs ? 'Comunitario' : 'Community',
+      protected_area: isEsLang ? 'Área Protegida' : 'Protected Area',
+      h3_cell: isEsLang ? 'Zona H3' : 'H3 Zone',
+      custom: isEsLang ? 'Custom' : 'Custom',
+      community: isEsLang ? 'Comunitario' : 'Community',
     }[t] ?? t);
 
     autocompleteEl.innerHTML = results.map((p, i) =>
