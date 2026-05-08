@@ -254,10 +254,15 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
   let _indexBase = '';
 
   function showDetail(idOrSlug: string) {
-    // Navigate to the detail pane by slug or fall back to scientific_name
+    // The detail pane (renderDetail below) queries `taxa` by
+    // `scientific_name === slug`. So the URL slug param MUST be the
+    // scientific name — NOT the kebab-cased `taxa.slug` column. This
+    // matters because the radial + dendrogram views call showDetail()
+    // with a taxonId, and naïvely passing through `taxon.slug` produced
+    // 404s when the slug was already populated to "alamania-punicea".
     const taxon = allTaxa.find(t => t.id === idOrSlug || t.slug === idOrSlug);
-    const slug = taxon ? (taxon.slug ?? taxon.scientific_name) : idOrSlug;
-    window.location.href = `${_indexBase}?slug=${encodeURIComponent(slug)}`;
+    const sciName = taxon?.scientific_name ?? idOrSlug;
+    window.location.href = `${_indexBase}?slug=${encodeURIComponent(sciName)}`;
   }
 
   async function wire(root: HTMLElement) {
@@ -732,13 +737,75 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
       const actualDepth = Math.max(1, taxonomicDepth(treeData));
       const ringWidth = (OUTER_LIMIT - INNER_HOLE) / actualDepth;
 
+      // Sunburst sweep is sized by **leaf count** under each subtree, not
+      // by observation count. Every species gets equal arc — a navigation
+      // tool that shows every taxon equally clickable, not a data-density
+      // visualisation where common species would overwhelm rare ones.
+      // Internal nodes (genus/family/...) sweep ∝ number of species in them.
+      const leafCounts = new WeakMap<TaxonNode, number>();
+      function computeLeafCount(n: TaxonNode): number {
+        if (leafCounts.has(n)) return leafCounts.get(n)!;
+        const c = n.children.length === 0
+          ? 1
+          : n.children.reduce((sum, ch) => sum + computeLeafCount(ch), 0);
+        leafCounts.set(n, c);
+        return c;
+      }
+      computeLeafCount(treeData);
+
+      // Label tuning — radial labels read from inside out, flipped on the
+      // left half so they're never upside-down. Skip when the segment's arc
+      // is too narrow for any meaningful label.
+      const TEXT_FONT          = 0.045;
+      const TEXT_GLYPH_W       = 0.6;   // approx. char width as fraction of font-size
+      const TEXT_RADIAL_FRAC   = 0.85;  // chars must fit in this fraction of the ring
+      const TEXT_MIN_SWEEP_RAD = 0.18;  // ~10° — below this, label is illegible
+
+      function addSegmentLabel(name: string, isLeaf: boolean, midAngle: number, sweep: number, r0: number, r1: number) {
+        if (sweep < TEXT_MIN_SWEEP_RAD) return;
+        const ringW = r1 - r0;
+        const maxChars = Math.max(3, Math.floor((ringW * TEXT_RADIAL_FRAC) / (TEXT_GLYPH_W * TEXT_FONT)));
+        const label = name.length > maxChars ? name.slice(0, maxChars - 1) + '…' : name;
+
+        const r = (r0 + r1) / 2;
+        const midAngleDeg = midAngle * 180 / Math.PI;
+        // D3-style radial-label transform: rotate the local frame so the
+        // segment aligns with +X, translate outward to mid-radius, then flip
+        // 180° on the half where text would otherwise be upside-down (left
+        // side / lower half in our −π/2 → 3π/2 sweep). Result: labels always
+        // read from inner-radius toward outer-radius, never upside-down.
+        const norm = ((midAngleDeg % 360) + 360) % 360;
+        const flipDeg = (norm > 90 && norm < 270) ? 180 : 0;
+
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('transform',
+          `rotate(${midAngleDeg.toFixed(2)}) translate(${r.toFixed(3)},0) rotate(${flipDeg})`);
+        text.setAttribute('font-size', String(TEXT_FONT));
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('dominant-baseline', 'middle');
+        text.setAttribute('fill', '#fff');
+        text.setAttribute('font-weight', '600');
+        // paint-order:stroke draws the dark outline behind the white fill so
+        // labels stay legible on every kingdom colour.
+        text.setAttribute('paint-order', 'stroke');
+        text.setAttribute('stroke', 'rgba(0,0,0,0.55)');
+        text.setAttribute('stroke-width', '0.006');
+        if (isLeaf) text.setAttribute('font-style', 'italic');
+        text.style.pointerEvents = 'none';
+        text.style.userSelect = 'none';
+        text.textContent = label;
+        svg!.appendChild(text);
+      }
+
       function renderLevel(node: TaxonNode, depth: number, startAngle: number, endAngle: number, maxDepth = actualDepth) {
         if (depth > maxDepth || node.children.length === 0) return;
         const r0 = INNER_HOLE + (depth - 1) * ringWidth;
         const r1 = r0 + ringWidth;
         let angle = startAngle;
+        const parentLeaves = leafCounts.get(node) ?? 1;
         node.children.forEach((child) => {
-          const frac = node.count > 0 ? child.count / node.count : 0;
+          const childLeaves = leafCounts.get(child) ?? 1;
+          const frac = parentLeaves > 0 ? childLeaves / parentLeaves : 0;
           const sweep = (endAngle - startAngle) * frac;
           if (sweep < 0.01) { angle += sweep; return; }
           const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -759,7 +826,14 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
             if (countEl) countEl.textContent = `${child.count} obs`;
             if (isLeaf && child.taxonId) showDetail(child.taxonId);
           });
+          // Hover updates the centre label without committing — desktop only;
+          // mobile gets the same content via tap (the click handler above).
+          path.addEventListener('mouseenter', () => {
+            if (nameEl) nameEl.textContent = child.name;
+            if (countEl) countEl.textContent = `${child.count} obs`;
+          });
           svg!.appendChild(path);
+          addSegmentLabel(child.name, isLeaf, angle + sweep / 2, sweep, r0, r1);
           renderLevel(child, depth + 1, angle, angle + sweep, maxDepth);
           angle += sweep;
         });
