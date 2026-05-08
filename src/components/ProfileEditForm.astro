@@ -818,6 +818,11 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
   // 'rastrum.byoAnthropicKey' is auto-migrated by lib/byo-keys.ts on
   // first read.
 
+  // Wrapped so paintRegistry() can call it again after replacing the registry list
+  // innerHTML, ensuring on-device download bindings re-attach to the freshly-rendered
+  // DOM. Defensive null checks (via ?. and early returns) make it safe to call when
+  // targets don't exist yet (e.g., the first call before Task 5 removes static markup).
+  async function wireOnDeviceControls() {
   // ── AI settings: WebLLM opt-in + per-model download / delete ──
   const LAI_OPTIN = 'rastrum.localAiOptIn';
   const optinBox = document.getElementById('local-ai-optin') as HTMLInputElement | null;
@@ -1578,6 +1583,8 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
     };
     flowItems.innerHTML = `<div class="flex flex-col gap-1.5">${renderRow('photo')}${renderRow('audio')}</div>`;
   }
+  } // end wireOnDeviceControls
+  wireOnDeviceControls().catch(() => {});
 
   // ── Identifier registry list (modular platform) with guided setup ──
   async function paintRegistry() {
