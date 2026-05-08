@@ -65,6 +65,8 @@ jobs:
           PUBLIC_PMTILES_MX_URL:      ${{ secrets.PUBLIC_PMTILES_MX_URL }}
           PUBLIC_MEGADETECTOR_WEIGHTS_URL: ${{ secrets.PUBLIC_MEGADETECTOR_WEIGHTS_URL }}
           PUBLIC_MEGADETECTOR_ENDPOINT: ${{ secrets.PUBLIC_MEGADETECTOR_ENDPOINT }}
+          PUBLIC_POSTHOG_PROJECT_TOKEN: ${{ secrets.PUBLIC_POSTHOG_PROJECT_TOKEN }}
+          PUBLIC_POSTHOG_HOST:        ${{ secrets.PUBLIC_POSTHOG_HOST }}
           PUBLIC_BUILD_SHA:           ${{ github.sha }}
           PUBLIC_VERSION:             ${{ steps.pkg.outputs.version }}
 
