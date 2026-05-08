@@ -26,6 +26,12 @@ export interface ActiveSponsorship {
   used_today: number | null;
 }
 
+export interface PlantNetQuota {
+  used_today: number;
+  daily_limit: number;
+  reset_at?: string;
+}
+
 export interface PluginCardProps {
   lang: 'en' | 'es';
   plugin: Identifier;
@@ -36,6 +42,8 @@ export interface PluginCardProps {
   byoKeysSet: Record<string, boolean>;
   /** Only meaningful for plugin.id === 'claude_haiku'. */
   sponsorship: ActiveSponsorship | null;
+  /** Only meaningful for plugin.id === 'plantnet'. */
+  plantnetQuota?: PlantNetQuota | null;
 }
 
 function escape(s: string): string {
@@ -195,6 +203,12 @@ function sponsorshipLine(p: PluginCardProps, t: Strings): string {
   return `<span class="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-violet-100 dark:bg-violet-900/30 text-violet-800 dark:text-violet-300 ml-1">${t.via_sponsorship}</span><div class="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">${t.sponsored_by} ${handle}${usage}</div>`;
 }
 
+function plantnetQuotaChip(p: PluginCardProps, t: Strings): string {
+  if (p.plugin.id !== 'plantnet' || !p.plantnetQuota) return '';
+  const { used_today, daily_limit } = p.plantnetQuota;
+  return `<span class="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 ml-1">${used_today} / ${daily_limit} ${t.ids_today}</span>`;
+}
+
 export function renderPluginCard(p: PluginCardProps): string {
   const t = STRINGS[p.lang];
   const liClass = p.state.kind === 'disabled'
@@ -214,6 +228,7 @@ export function renderPluginCard(p: PluginCardProps): string {
             <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">${escape(p.plugin.name)}</p>
             ${pillFor(p.state, t)}
             ${sponsorshipLine(p, t)}
+            ${plantnetQuotaChip(p, t)}
           </div>
           <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">${escape(p.plugin.description)}</p>
           <p class="text-[10px] text-zinc-400 dark:text-zinc-500 mt-1 font-mono">${escape(metaLine(p))}</p>

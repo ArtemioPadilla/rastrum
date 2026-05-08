@@ -1420,6 +1420,7 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
       { renderPluginCard, renderLocalDataCard },
       { getModelCacheStatus },
       sponsorshipMod,
+      plantnetQuotaMod,
     ] = await Promise.all([
       import('../lib/identifiers'),
       import('../lib/byo-keys'),
@@ -1427,6 +1428,7 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
       import('../lib/identifier-card-html'),
       import('../lib/local-ai'),
       import('../lib/sponsorships').catch(() => ({ getActiveAnthropicSponsorship: async () => null })),
+      import('../lib/plantnet-quota').catch(() => ({ getPlantNetQuota: () => null })),
     ]);
     runStorageMigration();
 
@@ -1521,6 +1523,7 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
           cacheStatus: cache,
           byoKeysSet: {},
           sponsorship: p.id === 'claude_haiku' ? (sponsorship as Parameters<typeof renderPluginCard>[0]['sponsorship']) : null,
+          plantnetQuota: p.id === 'plantnet' ? plantnetQuotaMod.getPlantNetQuota() : null,
         });
       }).join('');
       return `

@@ -34,6 +34,22 @@ const claude: Identifier = {
   identify: async () => { throw new Error('not used in tests'); },
 };
 
+const plantnet: Identifier = {
+  id: 'plantnet',
+  name: 'PlantNet',
+  brand: '🌿',
+  description: 'Plant identification by Pl@ntNet.',
+  capabilities: {
+    runtime: 'server',
+    media: ['photo'],
+    taxa: ['Plantae'],
+    license: 'free-quota',
+    cost_per_id_usd: 0,
+  },
+  isAvailable: async () => ({ ready: true }),
+  identify: async () => { throw new Error('not used in tests'); },
+};
+
 function props(overrides: Partial<PluginCardProps> = {}): PluginCardProps {
   return {
     lang: 'en',
@@ -159,6 +175,27 @@ describe('renderPluginCard', () => {
     const html = renderPluginCard(props({ lang: 'es', plugin: claude, state: { kind: 'no-key' }, sponsorship: null }));
     expect(html).toContain('Usar patrocinio');
     expect(html).toMatch(/href="\/es\/perfil\/patrocinado-por\/"/);
+  });
+
+  it('renders PlantNet quota chip when usage is known', () => {
+    const html = renderPluginCard(props({
+      plugin: plantnet,
+      state: { kind: 'active' },
+      cacheStatus: null,
+      plantnetQuota: { used_today: 347, daily_limit: 500 },
+    }));
+    expect(html).toMatch(/347\s*\/\s*500/);
+    expect(html).toContain('IDs today');
+  });
+
+  it('does NOT show quota chip when plantnetQuota is null', () => {
+    const html = renderPluginCard(props({
+      plugin: plantnet,
+      state: { kind: 'active' },
+      cacheStatus: null,
+      plantnetQuota: null,
+    }));
+    expect(html).not.toMatch(/IDs today/);
   });
 
   it('renders Spanish strings when lang=es', () => {
