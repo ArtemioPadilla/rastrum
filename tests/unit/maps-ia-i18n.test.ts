@@ -11,6 +11,7 @@ describe('maps IA cleanup — i18n parity', () => {
   }
 
   const requiredKeys = [
+    'nav.map',
     'nav.explore_dropdown.map',
     'nav.explore_megamenu.community_map',
     'map.title',
@@ -35,12 +36,14 @@ describe('maps IA cleanup — i18n parity', () => {
   }
 
   it('EN map labels are no longer the bare "Map"', () => {
+    expect(get(en, 'nav.map')).not.toBe('Map');
     expect(get(en, 'nav.explore_dropdown.map')).not.toBe('Map');
     expect(get(en, 'nav.explore_megamenu.community_map')).not.toBe('Map');
     expect(get(en, 'map.title')).not.toBe('Map');
   });
 
   it('ES map labels are no longer the bare "Mapa"', () => {
+    expect(get(es, 'nav.map')).not.toBe('Mapa');
     expect(get(es, 'nav.explore_dropdown.map')).not.toBe('Mapa');
     expect(get(es, 'nav.explore_megamenu.community_map')).not.toBe('Mapa');
     expect(get(es, 'map.title')).not.toBe('Mapa');
