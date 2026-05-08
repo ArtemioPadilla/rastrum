@@ -17,6 +17,12 @@ const onb = (tr as unknown as { onboarding: Record<string, string> }).onboarding
 const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } }).privacy;
 const crosslink = (tr as unknown as { ai_sponsor_crosslink: { from_ai_label: string; from_ai_link: string } }).ai_sponsor_crosslink;
 const sponsoringHref = `/${lang}${routes.sponsoring[lang]}/`;
+
+// SpeciesNet on-device card is only meaningful once the operator hosts the
+// model artifact and points PUBLIC_SPECIESNET_WEIGHTS_URL at it. Until then
+// the plugin returns `model_not_bundled` from isAvailable(); hide the static
+// download card entirely so the AI tab doesn't show an unreachable affordance.
+const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
 ---
 
 <div class="max-w-2xl mx-auto">
@@ -174,26 +180,6 @@ const sponsoringHref = `/${lang}${routes.sponsoring[lang]}/`;
   </section>
   )}
 
-  <!-- ── Streak push reminders (ux-streak-push) ── -->
-  <section class="mt-10 border-t border-zinc-200 dark:border-zinc-800 pt-8">
-    <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2">
-      {tr.profile_streak_push.section_title}
-    </h2>
-    <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">{tr.profile_streak_push.section_hint}</p>
-
-    <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3 flex items-start gap-3 flex-wrap">
-      <button
-        id="streak-push-toggle"
-        type="button"
-        class="rounded-lg border border-emerald-600/60 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 text-sm font-medium text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 disabled:opacity-50"
-      >
-        <span data-spp-label>{tr.profile_streak_push.enable}</span>
-      </button>
-      <p id="streak-push-status" class="text-xs text-zinc-500"></p>
-    </div>
-    <p id="streak-push-warning" class="hidden mt-2 text-xs text-amber-700 dark:text-amber-400"></p>
-  </section>
-
   {showAI && (
   <!-- ── Pipeline de identificación ── -->
   <section class="mt-10 border-t border-zinc-200 dark:border-zinc-800 pt-8">
@@ -267,7 +253,96 @@ const sponsoringHref = `/${lang}${routes.sponsoring[lang]}/`;
     <input id="anthropic-key" type="hidden" />
     <span id="ak-saved" class="hidden"></span>
 
-    <!-- On-device AI controls -->
+    <!-- EfficientNet-Lite0 (on-device photo) -->
+    <div class="mt-6 pt-5 border-t border-zinc-100 dark:border-zinc-800/60">
+      <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">{tr.auth.onnx_base_section}</h3>
+      <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">{tr.auth.onnx_base_hint}</p>
+      <p id="onnx-base-url-missing" class="hidden text-xs text-amber-700 dark:text-amber-400 mb-2">{tr.auth.onnx_base_weights_url_missing}</p>
+
+      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+        <div class="flex items-start justify-between gap-3 flex-wrap">
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">EfficientNet-Lite0</p>
+            <p class="text-xs text-zinc-500" id="onnx-base-status">—</p>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button id="onnx-base-download" type="button" class="rounded-lg border border-emerald-600/60 px-3 py-1.5 text-xs sm:text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 disabled:opacity-50">
+              <span data-onnxlabel>{tr.auth.onnx_base_download}</span>
+            </button>
+            <button id="onnx-base-delete" type="button" class="hidden rounded-lg border border-red-300 dark:border-red-900/50 px-3 py-1.5 text-xs sm:text-sm font-medium text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">
+              {tr.auth.onnx_base_delete}
+            </button>
+          </div>
+        </div>
+        <p id="onnx-base-progress" class="hidden mt-2 text-xs text-zinc-600 dark:text-zinc-400 font-mono"></p>
+        <p class="mt-3 text-[11px] text-zinc-500 dark:text-zinc-400">{tr.auth.onnx_base_attribution}</p>
+      </div>
+    </div>
+
+    <!-- MegaDetector v5a (on-device camera trap) -->
+    <div class="mt-6 pt-5 border-t border-zinc-100 dark:border-zinc-800/60">
+      <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
+        {lang === 'es' ? '🎥 MegaDetector v5a (cámara trampa)' : '🎥 MegaDetector v5a (camera trap)'}
+      </h3>
+      <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">
+        {lang === 'es'
+          ? 'Detecta animales en fotos de cámara trampa directamente en tu dispositivo. ~134 MB, una sola descarga.'
+          : 'Detects animals in camera trap photos entirely on your device. ~134 MB, one-time download.'}
+      </p>
+      <p id="megadetector-url-missing" class="hidden text-xs text-amber-700 dark:text-amber-400 mb-2">
+        {lang === 'es' ? 'URL del modelo no configurada. Contacta al administrador.' : 'Model URL not configured. Contact the administrator.'}
+      </p>
+
+      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+        <div class="flex items-start justify-between gap-3 flex-wrap">
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">MegaDetector v5a (INT8 ONNX)</p>
+            <p class="text-xs text-zinc-500" id="megadetector-status">&mdash;</p>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button id="megadetector-download" type="button" class="rounded-lg border border-emerald-600/60 px-3 py-1.5 text-xs sm:text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 disabled:opacity-50">
+              <span data-mdlabel>{lang === 'es' ? 'Descargar (~134 MB)' : 'Download (~134 MB)'}</span>
+            </button>
+            <button id="megadetector-delete" type="button" class="hidden rounded-lg border border-red-300 dark:border-red-900/50 px-3 py-1.5 text-xs sm:text-sm font-medium text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">
+              {lang === 'es' ? 'Eliminar' : 'Delete'}
+            </button>
+          </div>
+        </div>
+        <p id="megadetector-progress" class="hidden mt-2 text-xs text-zinc-600 dark:text-zinc-400 font-mono"></p>
+        <p class="mt-3 text-[11px] text-zinc-500 dark:text-zinc-400">
+          {lang === 'es' ? 'Microsoft AI for Good · Licencia MIT · Solo detección (sin clasificación de especie)' : 'Microsoft AI for Good · MIT License · Detection only (no species classification)'}
+        </p>
+      </div>
+    </div>
+
+    <!-- BirdNET-Lite (on-device audio) -->
+    <div class="mt-6 pt-5 border-t border-zinc-100 dark:border-zinc-800/60">
+      <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">{tr.auth.birdnet_section}</h3>
+      <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">{tr.auth.birdnet_hint}</p>
+      <p id="birdnet-url-missing" class="hidden text-xs text-amber-700 dark:text-amber-400 mb-2">{tr.auth.birdnet_weights_url_missing}</p>
+
+      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+        <div class="flex items-start justify-between gap-3 flex-wrap">
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">BirdNET-Lite v2.4</p>
+            <p class="text-xs text-zinc-500" id="birdnet-status">—</p>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button id="birdnet-download" type="button" class="rounded-lg border border-emerald-600/60 px-3 py-1.5 text-xs sm:text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 disabled:opacity-50">
+              <span data-bnlabel>{tr.auth.birdnet_download}</span>
+            </button>
+            <button id="birdnet-delete" type="button" class="hidden rounded-lg border border-red-300 dark:border-red-900/50 px-3 py-1.5 text-xs sm:text-sm font-medium text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">
+              {tr.auth.birdnet_delete}
+            </button>
+          </div>
+        </div>
+        <p id="birdnet-progress" class="hidden mt-2 text-xs text-zinc-600 dark:text-zinc-400 font-mono"></p>
+        <p class="mt-3 text-[11px] text-zinc-500 dark:text-zinc-400">{tr.auth.birdnet_attribution}</p>
+        <p class="mt-1 text-[11px] text-amber-700 dark:text-amber-400">{tr.auth.birdnet_nc_warning}</p>
+      </div>
+    </div>
+
+    <!-- On-device AI controls (heavy WebGPU models) -->
     <div id="on-device-ai-section" class="mt-6 pt-5 border-t border-zinc-100 dark:border-zinc-800/60">
       <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">{tr.auth.local_ai_section}</h3>
       <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">{tr.auth.local_ai_hint}</p>
@@ -367,96 +442,8 @@ const sponsoringHref = `/${lang}${routes.sponsoring[lang]}/`;
       </div>
     </div>
 
-    <!-- BirdNET-Lite (on-device audio) -->
-    <div class="mt-6 pt-5 border-t border-zinc-100 dark:border-zinc-800/60">
-      <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">{tr.auth.birdnet_section}</h3>
-      <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">{tr.auth.birdnet_hint}</p>
-      <p id="birdnet-url-missing" class="hidden text-xs text-amber-700 dark:text-amber-400 mb-2">{tr.auth.birdnet_weights_url_missing}</p>
-
-      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
-        <div class="flex items-start justify-between gap-3 flex-wrap">
-          <div class="min-w-0">
-            <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">BirdNET-Lite v2.4</p>
-            <p class="text-xs text-zinc-500" id="birdnet-status">—</p>
-          </div>
-          <div class="flex flex-wrap gap-2">
-            <button id="birdnet-download" type="button" class="rounded-lg border border-emerald-600/60 px-3 py-1.5 text-xs sm:text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 disabled:opacity-50">
-              <span data-bnlabel>{tr.auth.birdnet_download}</span>
-            </button>
-            <button id="birdnet-delete" type="button" class="hidden rounded-lg border border-red-300 dark:border-red-900/50 px-3 py-1.5 text-xs sm:text-sm font-medium text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">
-              {tr.auth.birdnet_delete}
-            </button>
-          </div>
-        </div>
-        <p id="birdnet-progress" class="hidden mt-2 text-xs text-zinc-600 dark:text-zinc-400 font-mono"></p>
-        <p class="mt-3 text-[11px] text-zinc-500 dark:text-zinc-400">{tr.auth.birdnet_attribution}</p>
-        <p class="mt-1 text-[11px] text-amber-700 dark:text-amber-400">{tr.auth.birdnet_nc_warning}</p>
-      </div>
-    </div>
-
-    <!-- MegaDetector v5a (on-device camera trap) -->
-    <div class="mt-6 pt-5 border-t border-zinc-100 dark:border-zinc-800/60">
-      <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
-        {lang === 'es' ? '🎥 MegaDetector v5a (cámara trampa)' : '🎥 MegaDetector v5a (camera trap)'}
-      </h3>
-      <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">
-        {lang === 'es'
-          ? 'Detecta animales en fotos de cámara trampa directamente en tu dispositivo. ~134 MB, una sola descarga.'
-          : 'Detects animals in camera trap photos entirely on your device. ~134 MB, one-time download.'}
-      </p>
-      <p id="megadetector-url-missing" class="hidden text-xs text-amber-700 dark:text-amber-400 mb-2">
-        {lang === 'es' ? 'URL del modelo no configurada. Contacta al administrador.' : 'Model URL not configured. Contact the administrator.'}
-      </p>
-
-      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
-        <div class="flex items-start justify-between gap-3 flex-wrap">
-          <div class="min-w-0">
-            <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">MegaDetector v5a (INT8 ONNX)</p>
-            <p class="text-xs text-zinc-500" id="megadetector-status">&mdash;</p>
-          </div>
-          <div class="flex flex-wrap gap-2">
-            <button id="megadetector-download" type="button" class="rounded-lg border border-emerald-600/60 px-3 py-1.5 text-xs sm:text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 disabled:opacity-50">
-              <span data-mdlabel>{lang === 'es' ? 'Descargar (~134 MB)' : 'Download (~134 MB)'}</span>
-            </button>
-            <button id="megadetector-delete" type="button" class="hidden rounded-lg border border-red-300 dark:border-red-900/50 px-3 py-1.5 text-xs sm:text-sm font-medium text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">
-              {lang === 'es' ? 'Eliminar' : 'Delete'}
-            </button>
-          </div>
-        </div>
-        <p id="megadetector-progress" class="hidden mt-2 text-xs text-zinc-600 dark:text-zinc-400 font-mono"></p>
-        <p class="mt-3 text-[11px] text-zinc-500 dark:text-zinc-400">
-          {lang === 'es' ? 'Microsoft AI for Good · Licencia MIT · Solo detección (sin clasificación de especie)' : 'Microsoft AI for Good · MIT License · Detection only (no species classification)'}
-        </p>
-      </div>
-    </div>
-
-    <!-- EfficientNet-Lite0 (on-device photo) -->
-    <div class="mt-6 pt-5 border-t border-zinc-100 dark:border-zinc-800/60">
-      <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">{tr.auth.onnx_base_section}</h3>
-      <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">{tr.auth.onnx_base_hint}</p>
-      <p id="onnx-base-url-missing" class="hidden text-xs text-amber-700 dark:text-amber-400 mb-2">{tr.auth.onnx_base_weights_url_missing}</p>
-
-      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
-        <div class="flex items-start justify-between gap-3 flex-wrap">
-          <div class="min-w-0">
-            <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">EfficientNet-Lite0</p>
-            <p class="text-xs text-zinc-500" id="onnx-base-status">—</p>
-          </div>
-          <div class="flex flex-wrap gap-2">
-            <button id="onnx-base-download" type="button" class="rounded-lg border border-emerald-600/60 px-3 py-1.5 text-xs sm:text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 disabled:opacity-50">
-              <span data-onnxlabel>{tr.auth.onnx_base_download}</span>
-            </button>
-            <button id="onnx-base-delete" type="button" class="hidden rounded-lg border border-red-300 dark:border-red-900/50 px-3 py-1.5 text-xs sm:text-sm font-medium text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">
-              {tr.auth.onnx_base_delete}
-            </button>
-          </div>
-        </div>
-        <p id="onnx-base-progress" class="hidden mt-2 text-xs text-zinc-600 dark:text-zinc-400 font-mono"></p>
-        <p class="mt-3 text-[11px] text-zinc-500 dark:text-zinc-400">{tr.auth.onnx_base_attribution}</p>
-      </div>
-    </div>
-
-    <!-- SpeciesNet (on-device species classifier) — companion to MegaDetector -->
+    {speciesnetHosted && (
+    <!-- SpeciesNet (on-device species classifier) — companion to MegaDetector. Gated on operator-supplied PUBLIC_SPECIESNET_WEIGHTS_URL. -->
     <div class="mt-6 pt-5 border-t border-zinc-100 dark:border-zinc-800/60">
       <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">{tr.auth.speciesnet_section}</h3>
       <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">{tr.auth.speciesnet_hint}</p>
@@ -481,6 +468,7 @@ const sponsoringHref = `/${lang}${routes.sponsoring[lang]}/`;
         <p class="mt-3 text-[11px] text-zinc-500 dark:text-zinc-400">{tr.auth.speciesnet_attribution}</p>
       </div>
     </div>
+    )}
 
     <!-- Offline maps — Mexico (pmtiles) -->
     <div class="mt-6 pt-5 border-t border-zinc-100 dark:border-zinc-800/60">
@@ -526,6 +514,7 @@ const sponsoringHref = `/${lang}${routes.sponsoring[lang]}/`;
     </form>
   </dialog>
 
+  {showSecurity && (
   <!-- ── Security ── -->
   <section class="mt-10 border-t border-zinc-200 dark:border-zinc-800 pt-8">
     <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-4">
@@ -552,6 +541,7 @@ const sponsoringHref = `/${lang}${routes.sponsoring[lang]}/`;
       </div>
     </div>
   </section>
+  )}
 </div>
 
 <script>
@@ -1602,6 +1592,47 @@ const sponsoringHref = `/${lang}${routes.sponsoring[lang]}/`;
     const isEs = document.documentElement.lang === 'es';
     const disabled = getDisabledPlugins();
 
+    // Pre-resolve availability once so we can filter, sort, and reuse downstream.
+    const availabilityEntries = await Promise.all(
+      plugins.map(async p => [p.id, await p.isAvailable()] as const),
+    );
+    const availability = new Map(availabilityEntries);
+
+    // Plugins gated on a missing operator-supplied weights URL can never run
+    // until that env var is set. Hide them from this UI entirely instead of
+    // showing a "Coming soon" card the user can't act on.
+    const visiblePlugins = plugins.filter(
+      p => availability.get(p.id)?.reason !== 'model_not_bundled',
+    );
+
+    // Display order: cloud first, then on-device light → heavy. Falls back to
+    // 50 for any new plugin so it lands between cloud and the heavy models
+    // until someone places it explicitly.
+    const DISPLAY_ORDER: Record<string, number> = {
+      plantnet: 10,
+      claude_haiku: 11,
+      onnx_efficientnet_lite0: 20,
+      camera_trap_megadetector: 21,
+      birdnet_lite: 22,
+      webllm_phi35_vision: 30,
+      onnx_gemma4_vision: 31,
+      speciesnet_distilled: 99,
+    };
+    const sortedPlugins = [...visiblePlugins].sort((a, b) =>
+      (DISPLAY_ORDER[a.id] ?? 50) - (DISPLAY_ORDER[b.id] ?? 50),
+    );
+
+    // Maps each on-device plugin to the static download card's anchor below
+    // so the registry card can deep-link instead of restating the steps that
+    // would land the user back on this same page.
+    const ON_DEVICE_DOWNLOAD_ANCHOR: Record<string, string> = {
+      webllm_phi35_vision: 'vision-download',
+      onnx_gemma4_vision: 'gemma-vision-download',
+      birdnet_lite: 'birdnet-download',
+      onnx_efficientnet_lite0: 'onnx-base-download',
+      camera_trap_megadetector: 'megadetector-download',
+    };
+
     const licenseLabel = (l: string): string => ({
       'free':       isEs ? 'Gratis' : 'Free',
       'free-nc':    isEs ? 'No comercial' : 'Non-commercial',
@@ -1620,8 +1651,8 @@ const sponsoringHref = `/${lang}${routes.sponsoring[lang]}/`;
       return s.replace(/[<>&'"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&#39;','"':'&quot;'}[c]!));
     }
 
-    const cards = await Promise.all(plugins.map(async p => {
-      const av = await p.isAvailable();
+    const cards = await Promise.all(sortedPlugins.map(async p => {
+      const av = availability.get(p.id) ?? { ready: false, reason: 'unsupported' as const };
       const ready = av.ready;
       const reasonText = ready ? '' : ({
         needs_key:        isEs ? 'Falta API key' : 'API key needed',
@@ -1686,9 +1717,16 @@ const sponsoringHref = `/${lang}${routes.sponsoring[lang]}/`;
             </div>
           </div>
         </details>
-      ` : (p.setupSteps?.length
-        ? `<details class="mt-2"><summary class="cursor-pointer text-xs font-medium text-emerald-700 dark:text-emerald-400 select-none">${isEs ? 'Cómo activar' : 'How to enable'}</summary><ol class="mt-2 space-y-1 ml-1">${stepsHtml}</ol></details>`
-        : '');
+      ` : (
+        // For on-device plugins (no API keys), the setup steps would just say
+        // "Profile → Edit → AI settings → Download" — that's the page the user
+        // is already on. Replace with a deep-link to the matching download card.
+        ON_DEVICE_DOWNLOAD_ANCHOR[p.id]
+          ? `<p class="mt-2 text-xs"><a href="#${ON_DEVICE_DOWNLOAD_ANCHOR[p.id]}" class="text-emerald-700 dark:text-emerald-400 hover:underline font-medium">${isEs ? 'Gestionar descarga ↓' : 'Manage download ↓'}</a></p>`
+          : (p.setupSteps?.length
+            ? `<details class="mt-2"><summary class="cursor-pointer text-xs font-medium text-emerald-700 dark:text-emerald-400 select-none">${isEs ? 'Cómo activar' : 'How to enable'}</summary><ol class="mt-2 space-y-1 ml-1">${stepsHtml}</ol></details>`
+            : '')
+      );
 
       const isDisabled = disabled.includes(p.id);
       const toggleLabel = isDisabled
@@ -1721,13 +1759,11 @@ const sponsoringHref = `/${lang}${routes.sponsoring[lang]}/`;
 
     list.innerHTML = cards.join('');
 
-    // Hide quick-setup banner when at least one non-PlantNet identifier is ready
-    const readyCount = plugins.filter(p => p.id !== 'plantnet').filter(async p => (await p.isAvailable()).ready).length;
+    // Hide quick-setup banner when at least one non-PlantNet identifier is ready.
     const banner = document.getElementById('quick-setup-banner');
-    // Use synchronous check from already-resolved cards
-    const anyNonPlantNetReady = plugins
-      .filter(p => p.id !== 'plantnet')
-      .some(p => cards[plugins.indexOf(p)]?.includes('LISTO') || cards[plugins.indexOf(p)]?.includes('READY'));
+    const anyNonPlantNetReady = visiblePlugins.some(
+      p => p.id !== 'plantnet' && availability.get(p.id)?.ready === true,
+    );
     if (anyNonPlantNetReady && banner) banner.classList.add('hidden');
 
     // Wire up Save / Test / Clear handlers (delegated)
@@ -1783,8 +1819,10 @@ const sponsoringHref = `/${lang}${routes.sponsoring[lang]}/`;
       });
     });
 
-    // Update pipeline flow visualization (#594 — real cascade order with license badges)
-    updatePipelineFlow(plugins.map(p => ({
+    // Update pipeline flow visualization (#594 — real cascade order with license badges).
+    // Use visiblePlugins so plugins gated on missing operator config (e.g. SpeciesNet
+    // without PUBLIC_SPECIESNET_WEIGHTS_URL) don't appear in the order preview.
+    updatePipelineFlow(visiblePlugins.map(p => ({
       id: p.id,
       name: p.name,
       brand: p.brand,
@@ -1797,86 +1835,8 @@ const sponsoringHref = `/${lang}${routes.sponsoring[lang]}/`;
   }
   paintRegistry().catch(() => {});
 
-  // ── Streak push reminder toggle (ux-streak-push) ──
-  const sppBtn = document.getElementById('streak-push-toggle') as HTMLButtonElement | null;
-  const sppLabel = sppBtn?.querySelector('[data-spp-label]') as HTMLElement | null;
-  const sppStatus = document.getElementById('streak-push-status');
-  const sppWarn = document.getElementById('streak-push-warning');
-
-  const SPP_TXT = isEsLang
-    ? {
-        enable: 'Activar recordatorios push de racha',
-        enabling: 'Suscribiendo…',
-        enabled: 'Recordatorios push activados.',
-        disable: 'Desactivar',
-        disabling: 'Desactivando…',
-        permission_blocked: 'Las notificaciones del navegador están bloqueadas. Actívalas en la configuración del sitio y vuelve a intentar.',
-        unsupported: 'Este navegador no soporta web push (prueba Chrome en Android o Safari 16.4+ en iOS).',
-        vapid_missing: 'El push aún no está configurado — el operador debe publicar primero una llave VAPID.',
-      }
-    : {
-        enable: 'Enable streak push reminders',
-        enabling: 'Subscribing…',
-        enabled: 'Push reminders enabled.',
-        disable: 'Disable',
-        disabling: 'Disabling…',
-        permission_blocked: 'Browser notifications are blocked. Enable them in your browser site settings, then try again.',
-        unsupported: "This browser doesn't support web push (try Chrome on Android or Safari 16.4+ on iOS).",
-        vapid_missing: "Push isn't configured yet — the operator must publish a VAPID key first.",
-      };
-
-  function setSppLabel(txt: string) { if (sppLabel) sppLabel.textContent = txt; }
-  function setSppStatus(txt: string) { if (sppStatus) sppStatus.textContent = txt; }
-  function setSppWarn(txt: string | null) {
-    if (!sppWarn) return;
-    if (!txt) { sppWarn.classList.add('hidden'); sppWarn.textContent = ''; return; }
-    sppWarn.textContent = txt;
-    sppWarn.classList.remove('hidden');
-  }
-
-  async function refreshSpp() {
-    if (!sppBtn) return;
-    const { isStreakPushEnabled } = await import('../lib/push');
-    const on = await isStreakPushEnabled();
-    if (on) {
-      setSppLabel(SPP_TXT.disable);
-      setSppStatus('✓ ' + SPP_TXT.enabled);
-      sppBtn.dataset.state = 'on';
-    } else {
-      setSppLabel(SPP_TXT.enable);
-      setSppStatus('');
-      sppBtn.dataset.state = 'off';
-    }
-    setSppWarn(null);
-  }
-
-  sppBtn?.addEventListener('click', async () => {
-    if (!sppBtn) return;
-    sppBtn.disabled = true;
-    const state = sppBtn.dataset.state;
-    const turningOn = state !== 'on';
-    setSppLabel(turningOn ? SPP_TXT.enabling : SPP_TXT.disabling);
-    const lib = await import('../lib/push');
-    const r = turningOn ? await lib.enableStreakPush() : await lib.disableStreakPush();
-    sppBtn.disabled = false;
-    if (!r.ok) {
-      const reasonMap: Record<string, string> = {
-        unsupported: SPP_TXT.unsupported,
-        permission_blocked: SPP_TXT.permission_blocked,
-        vapid_missing: SPP_TXT.vapid_missing,
-      };
-      setSppWarn(reasonMap[r.reason ?? 'unknown'] ?? r.message ?? '');
-    } else {
-      const supabase = getSupabase();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await supabase.from('users').update({ streak_digest_opt_in: turningOn }).eq('id', user.id);
-      }
-    }
-    await refreshSpp();
-  });
-
-  refreshSpp().catch(() => {});
+  // Streak push reminder toggle moved into StreakRemindersSection.astro,
+  // mounted directly on the /settings/preferences/ tab.
 
   // ── Identity linking (issue #286) ──────────────────────────────────────────
   const identityList = document.getElementById('identity-list');
