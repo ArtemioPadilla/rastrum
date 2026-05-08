@@ -178,6 +178,7 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
   import { getSupabase } from '../lib/supabase';
   import { renderSpeciesCard, type CardLabels } from '../lib/species-card-html';
   import { parseChips, serializeChips, type ChipsState } from '../lib/species-filters';
+  import { deriveGenus, colorForName } from '../lib/species-display';
 
   type Lang = 'en' | 'es';
 
@@ -402,17 +403,8 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
       }))
       .sort((a, b) => b.count - a.count || a.scientific_name.localeCompare(b.scientific_name));
 
-    // Derive genus from `Genus species` binomial when the column is null —
-    // most existing taxa rows lack lineage because the identify EF only
-    // writes kingdom/family. This keeps the sunburst groupable by genus.
-    function deriveGenus(name: string): string | null {
-      const first = name.trim().split(/\s+/)[0];
-      if (!first || first.length < 2) return null;
-      if (!/^[A-Z][a-z]+$/.test(first)) return null;
-      return first;
-    }
-
     // M34: expose full taxa list for sunburst + search panels
+    // (`deriveGenus` lives in species-display.ts so it's reusable + tested.)
     allTaxa = enriched.map(t => {
       const rawGenus = (t as Record<string,unknown>).genus as string | null ?? null;
       return {
@@ -478,19 +470,21 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
       listEl.innerHTML = enriched.map(cardMarkup).join('');
     }
 
-    // Hide kingdom chips that match zero loaded taxa — when the DB lacks
-    // lineage data they're noise that can't filter anything.
-    {
+    // Show kingdom chips iff at least one loaded taxon carries that
+    // kingdom — when the DB lacks lineage data they're noise that can't
+    // filter anything. Idempotent + data-driven: safe to re-run if
+    // `allTaxa` ever changes (pagination, search refetch, etc.).
+    function refreshKingdomChipVisibility() {
       const kingdomCounts = new Map<string, number>();
-      for (const t of enriched) {
-        const k = (t as Record<string, unknown>).kingdom as string | null;
-        if (k) kingdomCounts.set(k, (kingdomCounts.get(k) ?? 0) + 1);
+      for (const t of allTaxa) {
+        if (t.kingdom) kingdomCounts.set(t.kingdom, (kingdomCounts.get(t.kingdom) ?? 0) + 1);
       }
       document.querySelectorAll<HTMLButtonElement>('[data-filter-chips] [data-chip^="kingdom:"]').forEach((btn) => {
         const k = (btn.dataset.chip ?? '').slice('kingdom:'.length);
-        if ((kingdomCounts.get(k) ?? 0) === 0) btn.classList.add('hidden');
+        btn.classList.toggle('hidden', (kingdomCounts.get(k) ?? 0) === 0);
       });
     }
+    refreshKingdomChipVisibility();
 
     if (searchEl) {
       let timer: number | null = null;
@@ -659,17 +653,6 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
         'Animalia': '#2563eb', 'Plantae': '#16a34a', 'Fungi': '#ea580c',
         'Chromista': '#7c3aed', 'Bacteria': '#dc2626', 'Protozoa': '#0891b2',
       };
-      // Used when a node has no recognised kingdom — picks a stable colour
-      // from a palette so the chart isn't a wall of grey.
-      const FALLBACK_PALETTE = [
-        '#0ea5e9', '#10b981', '#f59e0b', '#a855f7', '#ef4444',
-        '#06b6d4', '#ec4899', '#84cc16', '#6366f1', '#f97316',
-      ];
-      function hashName(s: string): number {
-        let h = 0;
-        for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
-        return Math.abs(h);
-      }
 
       const INNER_HOLE = 0.30;
       const OUTER_LIMIT = 0.95;
@@ -736,14 +719,13 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
         const r0 = INNER_HOLE + (depth - 1) * ringWidth;
         const r1 = r0 + ringWidth;
         let angle = startAngle;
-        node.children.forEach((child, idx) => {
+        node.children.forEach((child) => {
           const frac = node.count > 0 ? child.count / node.count : 0;
           const sweep = (endAngle - startAngle) * frac;
           if (sweep < 0.01) { angle += sweep; return; }
           const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
           const kingdomKey = child.kingdom ?? child.name;
-          const color = KINGDOM_COLORS[kingdomKey]
-            ?? FALLBACK_PALETTE[hashName(child.name || String(idx)) % FALLBACK_PALETTE.length];
+          const color = KINGDOM_COLORS[kingdomKey] ?? colorForName(child.name);
           path.setAttribute('d', arcPath(r0, r1, angle, angle + sweep));
           path.setAttribute('fill', color);
           path.setAttribute('fill-opacity', String(Math.max(0.55, 0.95 - (depth - 1) * 0.08)));
