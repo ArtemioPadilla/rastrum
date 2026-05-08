@@ -35,3 +35,32 @@ export function pillForSpecies(input: SpeciesPillInput): Pill | null {
   }
   return null;
 }
+
+// Most existing taxa rows lack a populated `genus` column because the
+// identify EF only writes kingdom/family at insert. Derive it from the
+// `Genus species` binomial as a safe client-side fallback.
+//
+// Conservative regex: only accepts a Capitalised followed by lowercase
+// (`Aratinga`, `Canis`). Rejects abbreviations (`sp.`), hybrids
+// (`×Genus`), parenthesised subgenera, and noise. Returns null when in
+// doubt — callers treat null as "no genus information".
+export function deriveGenus(name: string): string | null {
+  const first = name.trim().split(/\s+/)[0];
+  if (!first || first.length < 2) return null;
+  if (!/^[A-Z][a-z]+$/.test(first)) return null;
+  return first;
+}
+
+// Stable colour for arbitrary taxon names when no known kingdom mapping
+// applies. Uses golden-ratio hue stepping over HSL so distinct names get
+// distinct hues regardless of how many appear (no collisions on a tiny
+// fixed palette). Saturation/lightness are tuned for legibility on both
+// light and dark sunburst backgrounds.
+//
+// Stable: same input → same output across sessions and rebuilds.
+export function colorForName(name: string): string {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = ((h << 5) - h + name.charCodeAt(i)) | 0;
+  const hue = ((Math.abs(h) * 137) % 360);
+  return `hsl(${hue}, 62%, 52%)`;
+}
