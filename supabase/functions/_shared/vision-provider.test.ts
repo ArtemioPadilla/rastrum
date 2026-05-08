@@ -1,5 +1,6 @@
-import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { bedrockModelId, buildProvider, parseModelJson, parseBedrockSecret, toVisionResult } from './vision-provider.ts';
+import { assertEquals, assertRejects } from 'https://deno.land/std@0.224.0/assert/mod.ts';
+import { bedrockModelId, buildProvider, parseModelJson, parseBedrockSecret, toVisionResult, CredentialUnauthorizedError } from './vision-provider.ts';
+import type { ResolvedCredential, VisionInput } from './vision-provider.ts';
 import { defaultModelFor, detectKind } from './vision-validate.ts';
 
 Deno.test('buildProvider — exhaustive switch handles every kind without throwing', () => {
@@ -131,4 +132,110 @@ Deno.test('VisionInput — crop_bbox is accepted when provided', () => {
     crop_bbox: [50, 100, 200, 300],
   };
   assertEquals(input.crop_bbox, [50, 100, 200, 300]);
+});
+
+// ── CredentialUnauthorizedError / 401 fallback tests (#693) ──────────
+
+Deno.test('CredentialUnauthorizedError — is instanceof Error and carries kind', () => {
+  const err = new CredentialUnauthorizedError('api_key');
+  assertEquals(err instanceof Error, true);
+  assertEquals(err instanceof CredentialUnauthorizedError, true);
+  assertEquals(err.kind, 'api_key');
+  assertEquals(err.name, 'CredentialUnauthorizedError');
+  assertEquals(err.message.includes('api_key'), true);
+});
+
+Deno.test('AnthropicProvider — throws CredentialUnauthorizedError on HTTP 401', async () => {
+  // Stub globalThis.fetch to return a 401.
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response('Unauthorized', { status: 401 });
+  try {
+    const cred: ResolvedCredential = { kind: 'api_key', secret: 'sk-invalid', model: 'claude-haiku-4-5', endpoint: null };
+    const provider = buildProvider(cred);
+    await assertRejects(
+      () => provider.identify({ imageBase64: 'abc', mimeType: 'image/jpeg', systemPrompt: 'test', userText: 'id' }),
+      CredentialUnauthorizedError,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+Deno.test('AnthropicProvider — returns null (not throw) on non-401 HTTP error', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response('Server Error', { status: 500 });
+  try {
+    const cred: ResolvedCredential = { kind: 'api_key', secret: 'sk-test', model: 'claude-haiku-4-5', endpoint: null };
+    const provider = buildProvider(cred);
+    const result = await provider.identify({ imageBase64: 'abc', mimeType: 'image/jpeg', systemPrompt: 'test', userText: 'id' });
+    assertEquals(result, null);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+Deno.test('fallthrough simulation — caller catches CredentialUnauthorizedError and retries next credential', async () => {
+  // Simulates the cascade fallback: first credential 401s, second succeeds.
+  const callLog: string[] = [];
+  const credentials: ResolvedCredential[] = [
+    { kind: 'api_key', secret: 'revoked-key', model: 'claude-haiku-4-5', endpoint: null },
+    { kind: 'api_key', secret: 'valid-key',   model: 'claude-haiku-4-5', endpoint: null },
+  ];
+
+  // Stub fetch: 401 for revoked-key, 200 with valid JSON for valid-key.
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (_input: RequestInfo | URL, init?: RequestInit) => {
+    // Distinguish by the x-api-key header set by AnthropicProvider.
+    const headers = init?.headers as Record<string, string> | undefined ?? {};
+    const key = headers['x-api-key'] ?? '';
+    callLog.push(key);
+    if (key === 'revoked-key') return new Response('Unauthorized', { status: 401 });
+    // Return a minimal valid response for valid-key.
+    return new Response(JSON.stringify({
+      content: [{ type: 'text', text: '{"scientific_name":"Quercus robur","confidence":0.9,"kingdom":"Plantae"}' }],
+    }), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+
+  try {
+    let result = null;
+    for (const cred of credentials) {
+      const provider = buildProvider(cred);
+      try {
+        result = await provider.identify({ imageBase64: 'abc', mimeType: 'image/jpeg', systemPrompt: 'test', userText: 'id' });
+        break;
+      } catch (err) {
+        if (err instanceof CredentialUnauthorizedError) continue;
+        throw err;
+      }
+    }
+    assertEquals(callLog, ['revoked-key', 'valid-key']);
+    assertEquals(result?.scientific_name, 'Quercus robur');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+Deno.test('all credentials 401 — fallthrough loop returns null', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response('Unauthorized', { status: 401 });
+  try {
+    const credentials: ResolvedCredential[] = [
+      { kind: 'api_key', secret: 'key-a', model: 'claude-haiku-4-5', endpoint: null },
+      { kind: 'api_key', secret: 'key-b', model: 'claude-haiku-4-5', endpoint: null },
+    ];
+    let result = null;
+    for (const cred of credentials) {
+      const provider = buildProvider(cred);
+      try {
+        result = await provider.identify({ imageBase64: 'abc', mimeType: 'image/jpeg', systemPrompt: 'test', userText: 'id' });
+        break;
+      } catch (err) {
+        if (err instanceof CredentialUnauthorizedError) continue;
+        throw err;
+      }
+    }
+    assertEquals(result, null);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
