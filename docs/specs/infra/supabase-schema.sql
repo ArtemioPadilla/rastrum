@@ -3949,12 +3949,46 @@ ALTER TABLE public.sponsor_credentials
   -- M32 v1.1 (#159): track when a Vertex AI access token expires
   -- so the `vertex_token_expiry_monitor` cron can notify the
   -- sponsor 5 minutes before. NULL for non-Vertex credentials.
-  ADD COLUMN IF NOT EXISTS token_expires_at timestamptz;
+  ADD COLUMN IF NOT EXISTS token_expires_at timestamptz,
+  -- #655: when true, the `identify` EF resolves this credential for the
+  -- owner's own identifications BEFORE the BYO localStorage key — own
+  -- credit, no sponsorship_usage tracking, no pool consumption.
+  ADD COLUMN IF NOT EXISTS use_personally boolean NOT NULL DEFAULT false;
+
+CREATE INDEX IF NOT EXISTS sponsor_credentials_personal_idx
+  ON public.sponsor_credentials (user_id)
+  WHERE use_personally = true AND revoked_at IS NULL;
 
 ALTER TABLE public.sponsor_credentials ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS sponsor_credentials_owner_read ON public.sponsor_credentials;
 CREATE POLICY sponsor_credentials_owner_read ON public.sponsor_credentials
   FOR SELECT TO authenticated USING (user_id = auth.uid());
+
+-- #655: SECURITY DEFINER RPC that toggles `use_personally` after
+-- enforcing owner = caller. We don't expose UPDATE via RLS to
+-- authenticated; sponsor_credentials writes go through the
+-- `sponsorships` Edge Function (service_role) or this RPC.
+CREATE OR REPLACE FUNCTION public.set_credential_personal(
+  p_credential_id uuid,
+  p_use_personally boolean
+) RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  UPDATE public.sponsor_credentials
+     SET use_personally = p_use_personally
+   WHERE id = p_credential_id
+     AND user_id = auth.uid()
+     AND revoked_at IS NULL;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'credential not found or not owned by caller'
+      USING ERRCODE = 'check_violation';
+  END IF;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.set_credential_personal(uuid, boolean) FROM public;
+GRANT EXECUTE ON FUNCTION public.set_credential_personal(uuid, boolean) TO authenticated;
 
 -- 3. sponsorships — relación sponsor→beneficiary→credential. Self-sponsoring
 --    está permitido (no CHECK sponsor_id <> beneficiary_id) para que el sponsor

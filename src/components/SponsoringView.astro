@@ -31,6 +31,12 @@ const i18nBag = {
   validate_btn:               tr.sponsoring.validate_btn,
   pool_dashboard_view:        tr.sponsoring.pool_dashboard.view,
   confirm_reject_request:     lang === 'es' ? '¿Rechazar esta solicitud?' : 'Reject this request?',
+  personal_toggle_label:      tr.ai_personal_credential.toggle_label,
+  personal_toggle_hint:       tr.ai_personal_credential.toggle_hint,
+  personal_badge:             tr.ai_personal_credential.badge,
+  personal_enabled_toast:     tr.ai_personal_credential.enabled_toast,
+  personal_disabled_toast:    tr.ai_personal_credential.disabled_toast,
+  personal_error:             tr.ai_personal_credential.error,
   paused_reason: {
     rate_limit:         tr.sponsoring.paused_reason_rate_limit,
     cred_invalid:       tr.sponsoring.paused_reason_cred_invalid,
@@ -328,6 +334,7 @@ const langJson = JSON.stringify(lang);
   import {
     listCredentials, createCredential, rotateCredential, deleteCredential,
     listSponsorships, createSponsorship, unpauseSponsorship, revokeSponsorship, testCredential,
+    setCredentialPersonal,
     detectKind,
     listMyPools, createPool, setPoolStatus, updatePool, deletePool,
   } from '../lib/sponsorships';
@@ -352,6 +359,12 @@ const langJson = JSON.stringify(lang);
     validate_btn: string;
     pool_dashboard_view: string;
     confirm_reject_request: string;
+    personal_toggle_label: string;
+    personal_toggle_hint: string;
+    personal_badge: string;
+    personal_enabled_toast: string;
+    personal_disabled_toast: string;
+    personal_error: string;
     paused_reason: {
       rate_limit: string;
       cred_invalid: string;
@@ -480,14 +493,25 @@ const langJson = JSON.stringify(lang);
     emptyCrosslink?.classList.add('hidden');
     for (const c of creds) {
       const li = document.createElement('li');
-      li.className = 'py-3 flex items-center justify-between';
+      li.className = 'py-3 flex flex-wrap items-center justify-between gap-2';
       const validated = c.validated_at ? `validated ${fmtDate(c.validated_at)}` : 'never validated';
+      const isPersonal = c.use_personally === true;
+      const personalBadge = isPersonal
+        ? `<span class="ml-2 px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 text-[10px] font-medium uppercase tracking-wide">${escHtml(tr.personal_badge)}</span>`
+        : '';
       li.innerHTML = `
-        <div>
-          <div class="font-medium">${escHtml(c.label)} <span class="text-xs text-zinc-500">${escHtml(c.kind)} · ${escHtml(c.preferred_model ?? "")}</span></div>
+        <div class="min-w-0 flex-1">
+          <div class="font-medium">${escHtml(c.label)} <span class="text-xs text-zinc-500">${escHtml(c.kind)} · ${escHtml(c.preferred_model ?? "")}</span>${personalBadge}</div>
           <div class="text-xs text-zinc-500">${escHtml(validated)}</div>
+          <label class="mt-1.5 inline-flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400 cursor-pointer">
+            <input type="checkbox" data-personal-toggle="${escHtml(c.id)}" ${isPersonal ? 'checked' : ''} class="rounded border-zinc-300 dark:border-zinc-700 text-emerald-600 focus:ring-emerald-500" />
+            <span>
+              <span class="font-medium">${escHtml(tr.personal_toggle_label)}</span>
+              <span class="block text-[11px] text-zinc-500 dark:text-zinc-400">${escHtml(tr.personal_toggle_hint)}</span>
+            </span>
+          </label>
         </div>
-        <div class="flex gap-2 items-center">
+        <div class="flex gap-2 items-center shrink-0">
           <button data-test="${escHtml(c.id)}" class="text-xs px-2 py-1 rounded border border-emerald-600 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30">Test</button>
           <button data-rotate="${escHtml(c.id)}" class="text-xs px-2 py-1 rounded border border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800">Rotate</button>
           <button data-delete="${escHtml(c.id)}" class="text-xs px-2 py-1 rounded border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">Delete</button>
@@ -850,6 +874,40 @@ const langJson = JSON.stringify(lang);
       wrap.classList.remove('hidden');
     } catch { /* not authed or RPC missing — keep hidden */ }
   })();
+
+  // #655: per-credential personal-use toggle. Updates the boolean via
+  // SECURITY DEFINER RPC; the identify EF will resolve this credential
+  // BEFORE the BYO localStorage key on the next /identify call.
+  function announceStatus(msg: string): void {
+    let region = document.getElementById('sponsoring-status') as HTMLElement | null;
+    if (!region) {
+      region = document.createElement('div');
+      region.id = 'sponsoring-status';
+      region.setAttribute('aria-live', 'polite');
+      region.className = 'sr-only';
+      document.body.appendChild(region);
+    }
+    region.textContent = msg;
+  }
+  document.getElementById('creds-list')?.addEventListener('change', async (e) => {
+    const target = e.target as HTMLElement;
+    const credId = target.dataset?.personalToggle;
+    if (!credId) return;
+    const checkbox = target as HTMLInputElement;
+    const previous = !checkbox.checked;
+    checkbox.disabled = true;
+    try {
+      await setCredentialPersonal(credId, checkbox.checked);
+      announceStatus(checkbox.checked ? tr.personal_enabled_toast : tr.personal_disabled_toast);
+      await refreshCreds();
+    } catch (err) {
+      checkbox.checked = previous;
+      const detail = err instanceof Error ? err.message : String(err);
+      alert(`${tr.personal_error} (${detail})`);
+    } finally {
+      checkbox.disabled = false;
+    }
+  });
 
   document.getElementById('creds-list')?.addEventListener('click', async (e) => {
     const target = e.target as HTMLElement;

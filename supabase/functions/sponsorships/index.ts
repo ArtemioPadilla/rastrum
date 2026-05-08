@@ -250,7 +250,7 @@ serve(async (req) => {
   if (method === 'GET' && path === '/credentials') {
     const { data, error } = await supabase
       .from('sponsor_credentials')
-      .select('id, label, provider, kind, preferred_model, validated_at, last_used_at, revoked_at, created_at')
+      .select('id, label, provider, kind, preferred_model, validated_at, last_used_at, revoked_at, created_at, use_personally')
       .eq('user_id', ctx.userId)
       .order('created_at', { ascending: false });
     if (error) {
