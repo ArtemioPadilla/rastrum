@@ -15,10 +15,14 @@
  *   `src/lib/identify-cascade-client.ts`.)
  *
  *   Key resolution rule (server-side, post-sponsorship migration):
- *     1. Owner-personal Vault credential (#655) — when the JWT user owns
- *        a `sponsor_credentials` row with `use_personally = true`, decrypt
- *        and use it WITHOUT recording sponsorship_usage / consuming a pool
- *        slot. It's the owner's own credit, no quota.
+ *     1. Owner-personal Vault credential (#655, #664) — when the JWT
+ *        user owns a `sponsor_credentials` row with
+ *        `use_personally = true`, decrypt and use it WITHOUT recording
+ *        sponsorship_usage / consuming a pool slot. It's the owner's
+ *        own credit, no quota. Applies to ALL provider kinds (api_key,
+ *        oauth_token, bedrock, vertex_ai, openai_api_key, azure_openai,
+ *        gemini_api_key) — the `buildProvider(credential)` dispatcher
+ *        handles per-kind transport.
  *     2. BYO key from `client_keys.anthropic` / `client_anthropic_key`.
  *     3. Otherwise, if a JWT user is present, resolve a sponsorship via
  *        `_shared/sponsorship.ts` (rate-limit, decrypt vault, record usage).
@@ -126,14 +130,18 @@ interface PersonalCredential {
 }
 
 /**
- * #655: resolve the JWT user's own Vault credential when they have one
- * marked `use_personally = true`. This bypasses sponsorship_usage and
- * pool consumption — the owner pays for their own calls. Returns null
- * when the user has no personal credential set up.
+ * #655 + #664: resolve the JWT user's own Vault credential when they
+ * have one marked `use_personally = true`. This bypasses
+ * sponsorship_usage and pool consumption — the owner pays for their
+ * own calls. Returns null when the user has no personal credential
+ * set up.
  *
- * Currently scoped to `provider = 'anthropic'` to match the existing
- * cascade contract; pool/sponsorship + the Claude runner are the only
- * paths that consume server-side credentials today.
+ * #664: resolution is provider-agnostic — any owned, non-revoked
+ * credential of any `kind` (api_key / oauth_token / bedrock /
+ * vertex_ai / openai_api_key / azure_openai / gemini_api_key) is
+ * picked up. The `buildProvider(credential)` dispatcher in
+ * `_shared/vision-provider.ts` handles the per-kind transport, so
+ * the cascade just needs the row.
  */
 async function resolvePersonalCredential(
   supabase: SupabaseClient,
@@ -144,7 +152,6 @@ async function resolvePersonalCredential(
     .select('id, kind, vault_secret_id, preferred_model, endpoint')
     .eq('user_id', userId)
     .eq('use_personally', true)
-    .eq('provider', 'anthropic')
     .is('revoked_at', null)
     .order('created_at', { ascending: false })
     .limit(1)
@@ -507,9 +514,9 @@ serve(async (req) => {
   }
 
   // Decide what credential the Claude runner gets. Order:
-  //   1. Owner-personal Vault credential (#655) — `use_personally = true`,
-  //      owned by the JWT user. Skips sponsorship_usage + pool consumption
-  //      because it's the owner's own credit.
+  //   1. Owner-personal Vault credential (#655, #664) — `use_personally = true`,
+  //      owned by the JWT user, of any provider kind. Skips sponsorship_usage
+  //      + pool consumption because it's the owner's own credit.
   //   2. BYO key forwarded by the client.
   //   3. Sponsor-supplied credential resolved via _shared/sponsorship.ts.
   //   4. Platform pool (M27.2, #115) — round-robin across active pools,
