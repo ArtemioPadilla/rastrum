@@ -175,6 +175,68 @@ export async function loadViewerCommunityMeta(): Promise<ViewerCommunityMeta> {
   }
 }
 
+/**
+ * Viewer "home region" used by the active-observers micro-banner on
+ * /observe (issue #743). region_primary is the free-text label the
+ * banner displays ("Oaxaca"); country_code is the ISO-3166 alpha-2
+ * we filter by — the only column the M28 community page understands.
+ *
+ * Returns nulls for anon visitors or users who haven't picked a region.
+ * Callers MUST gracefully fall back to "no banner" when either field
+ * is null — the banner never displays raw NULL.
+ */
+export interface ViewerRegion {
+  countryCode: string | null;
+  regionPrimary: string | null;
+}
+
+export async function loadViewerRegion(): Promise<ViewerRegion> {
+  try {
+    const supabase = getSupabase();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { countryCode: null, regionPrimary: null };
+    const { data } = await supabase
+      .from('users')
+      .select('country_code, region_primary')
+      .eq('id', user.id)
+      .maybeSingle();
+    return {
+      countryCode: (data?.country_code as string | null | undefined) ?? null,
+      regionPrimary: (data?.region_primary as string | null | undefined) ?? null,
+    };
+  } catch {
+    return { countryCode: null, regionPrimary: null };
+  }
+}
+
+/**
+ * Count distinct observers with at least one synced observation since
+ * the start of the current UTC day, scoped to a country. Uses the
+ * `community_active_observers_today(p_country)` SQL RPC, which reads
+ * RLS-protected tables (`observations` public-read + `users` with
+ * hide_from_leaderboards = false) — no PII leaks via the count alone.
+ *
+ * Returns 0 on any error so the banner gracefully falls back to the
+ * empty-state copy rather than showing a stale or broken UI.
+ */
+export async function loadActiveObserversToday(countryCode: string | null): Promise<number> {
+  try {
+    const supabase = getSupabase();
+    const { data, error } = await supabase.rpc('community_active_observers_today', {
+      p_country: countryCode,
+    });
+    if (error) return 0;
+    if (typeof data === 'number') return data;
+    if (typeof data === 'string') {
+      const n = parseInt(data, 10);
+      return Number.isFinite(n) ? n : 0;
+    }
+    return 0;
+  } catch {
+    return 0;
+  }
+}
+
 export interface IsoCountry {
   code: string;
   name: string;

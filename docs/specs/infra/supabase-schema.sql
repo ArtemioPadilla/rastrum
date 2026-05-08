@@ -8683,3 +8683,32 @@ $$;
 
 REVOKE ALL ON FUNCTION public.nearby_similar_species(uuid, numeric, int, int) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.nearby_similar_species(uuid, numeric, int, int) TO anon, authenticated;
+
+-- =====================================================================
+-- M28 — Active observers today (issue #743)
+--
+-- Returns the number of distinct observers in the given country who
+-- have at least one synced observation since the start of the current
+-- UTC day. Drives the "Hoy N personas observan en <region>" micro-banner
+-- on /observe. Anon callers can read it (the count is non-PII), but the
+-- function is SECURITY INVOKER so RLS on `observations` (public-read)
+-- and `users` (hide_from_leaderboards = false) still applies. The
+-- caller passes an ISO-3166 alpha-2 country code; NULL collapses to
+-- a global count.
+-- =====================================================================
+CREATE OR REPLACE FUNCTION public.community_active_observers_today(
+  p_country text DEFAULT NULL
+)
+RETURNS integer
+LANGUAGE sql STABLE PARALLEL SAFE AS $$
+  SELECT COUNT(DISTINCT o.observer_id)::int
+    FROM public.observations o
+    JOIN public.users u ON u.id = o.observer_id
+   WHERE o.sync_status = 'synced'
+     AND o.observed_at >= date_trunc('day', now() AT TIME ZONE 'UTC')
+     AND u.hide_from_leaderboards = false
+     AND (p_country IS NULL OR u.country_code = p_country);
+$$;
+
+REVOKE ALL ON FUNCTION public.community_active_observers_today(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.community_active_observers_today(text) TO anon, authenticated;

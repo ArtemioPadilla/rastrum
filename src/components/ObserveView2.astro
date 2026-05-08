@@ -3,6 +3,7 @@ import DropZone from "./DropZone.astro";
 import PipelineGraph from "./PipelineGraph.astro";
 import MapPicker from "./MapPicker.astro";
 import TaxonAutocomplete from "./TaxonAutocomplete.astro";
+import ActiveObserversBanner from "./ActiveObserversBanner.astro";
 import { t } from "../i18n/utils";
 import { HABITATS, WEATHERS } from "../lib/observation-enums";
 
@@ -17,6 +18,10 @@ const weathers = WEATHERS;
 ---
 
 <div class="max-w-2xl mx-auto space-y-6">
+  <!-- Active observers micro-banner (issue #743) — at the top so the
+       social-presence cue lands before the form. -->
+  <ActiveObserversBanner lang={lang} />
+
   <!-- Header -->
   <div class="flex items-start justify-between gap-4">
     <h1 class="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
