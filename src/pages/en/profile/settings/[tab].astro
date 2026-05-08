@@ -2,6 +2,7 @@
 import BaseLayout from '../../../../layouts/BaseLayout.astro';
 import SettingsShell from '../../../../components/SettingsShell.astro';
 import ProfileEditForm from '../../../../components/ProfileEditForm.astro';
+import StreakRemindersSection from '../../../../components/StreakRemindersSection.astro';
 import PrivacyMatrix from '../../../../components/PrivacyMatrix.astro';
 import BlockedUsersList from '../../../../components/BlockedUsersList.astro';
 import { t, getLocalizedPath, routes } from '../../../../i18n/utils';
@@ -129,10 +130,10 @@ const mcpUrl = 'https://reppvlqejgoqvitturxp.supabase.co/functions/v1/mcp';
           </label>
         </section>
 
-        <!-- Notifications (placeholder) -->
+        <!-- Notifications -->
         <section>
           <h2 class="text-base font-semibold text-zinc-900 dark:text-zinc-100 mb-3">{settings.preferences.notifications_title}</h2>
-          <p class="text-sm text-zinc-500 dark:text-zinc-400">{settings.preferences.notifications_placeholder}</p>
+          <StreakRemindersSection lang={lang} />
         </section>
       </div>
     )}
