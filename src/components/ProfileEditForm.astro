@@ -310,7 +310,7 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
   )}
 </div>
 
-<script type="application/json" id="rastrum-section-labels" hidden>{JSON.stringify(sectionLabels)}</script>
+<script type="application/json" id="rastrum-section-labels" hidden set:html={JSON.stringify(sectionLabels)} />
 
 <script>
   import { getSupabase } from '../lib/supabase';
