@@ -90,7 +90,7 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
       <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
         {lang === 'es' ? 'Toca un segmento para explorar. Doble toque en especie para ver su perfil.' : 'Tap a segment to explore. Double-tap a species to view its profile.'}
       </p>
-      <div id="es-sunburst-container" class="relative w-full" style="aspect-ratio: 1;">
+      <div id="es-sunburst-container" class="relative w-full max-w-md mx-auto" style="aspect-ratio: 1;">
         <svg id="es-sunburst" width="100%" height="100%" viewBox="-1 -1 2 2" style="display:block;"></svg>
         <div id="es-sunburst-center" class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
           <p id="es-sunburst-name" class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 text-center px-8"></p>
@@ -402,21 +402,34 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
       }))
       .sort((a, b) => b.count - a.count || a.scientific_name.localeCompare(b.scientific_name));
 
+    // Derive genus from `Genus species` binomial when the column is null —
+    // most existing taxa rows lack lineage because the identify EF only
+    // writes kingdom/family. This keeps the sunburst groupable by genus.
+    function deriveGenus(name: string): string | null {
+      const first = name.trim().split(/\s+/)[0];
+      if (!first || first.length < 2) return null;
+      if (!/^[A-Z][a-z]+$/.test(first)) return null;
+      return first;
+    }
+
     // M34: expose full taxa list for sunburst + search panels
-    allTaxa = enriched.map(t => ({
-      id: t.id,
-      scientific_name: t.scientific_name,
-      common_name_es: t.common_name_es,
-      common_name_en: t.common_name_en,
-      kingdom: (t as Record<string,unknown>).kingdom as string | null ?? null,
-      phylum: (t as Record<string,unknown>).phylum as string | null ?? null,
-      class: (t as Record<string,unknown>).class as string | null ?? null,
-      order: (t as Record<string,unknown>).order as string | null ?? null,
-      family: (t as Record<string,unknown>).family as string | null ?? null,
-      genus: (t as Record<string,unknown>).genus as string | null ?? null,
-      slug: (t as Record<string,unknown>).slug as string | null ?? null,
-      observation_count: t.count,
-    }));
+    allTaxa = enriched.map(t => {
+      const rawGenus = (t as Record<string,unknown>).genus as string | null ?? null;
+      return {
+        id: t.id,
+        scientific_name: t.scientific_name,
+        common_name_es: t.common_name_es,
+        common_name_en: t.common_name_en,
+        kingdom: (t as Record<string,unknown>).kingdom as string | null ?? null,
+        phylum: (t as Record<string,unknown>).phylum as string | null ?? null,
+        class: (t as Record<string,unknown>).class as string | null ?? null,
+        order: (t as Record<string,unknown>).order as string | null ?? null,
+        family: (t as Record<string,unknown>).family as string | null ?? null,
+        genus: rawGenus ?? deriveGenus(t.scientific_name),
+        slug: (t as Record<string,unknown>).slug as string | null ?? null,
+        observation_count: t.count,
+      };
+    });
 
     hideSkeleton();
     if (enriched.length === 0) {
@@ -463,6 +476,20 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
 
     if (listEl) {
       listEl.innerHTML = enriched.map(cardMarkup).join('');
+    }
+
+    // Hide kingdom chips that match zero loaded taxa — when the DB lacks
+    // lineage data they're noise that can't filter anything.
+    {
+      const kingdomCounts = new Map<string, number>();
+      for (const t of enriched) {
+        const k = (t as Record<string, unknown>).kingdom as string | null;
+        if (k) kingdomCounts.set(k, (kingdomCounts.get(k) ?? 0) + 1);
+      }
+      document.querySelectorAll<HTMLButtonElement>('[data-filter-chips] [data-chip^="kingdom:"]').forEach((btn) => {
+        const k = (btn.dataset.chip ?? '').slice('kingdom:'.length);
+        if ((kingdomCounts.get(k) ?? 0) === 0) btn.classList.add('hidden');
+      });
     }
 
     if (searchEl) {
@@ -616,7 +643,6 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
       }));
     }
 
-    wireChipClicks();
     applyAllFilters();
 
     // ── M34: Sunburst ──────────────────────────────────────────
@@ -633,7 +659,20 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
         'Animalia': '#2563eb', 'Plantae': '#16a34a', 'Fungi': '#ea580c',
         'Chromista': '#7c3aed', 'Bacteria': '#dc2626', 'Protozoa': '#0891b2',
       };
-      const DEFAULT_COLOR = '#71717a';
+      // Used when a node has no recognised kingdom — picks a stable colour
+      // from a palette so the chart isn't a wall of grey.
+      const FALLBACK_PALETTE = [
+        '#0ea5e9', '#10b981', '#f59e0b', '#a855f7', '#ef4444',
+        '#06b6d4', '#ec4899', '#84cc16', '#6366f1', '#f97316',
+      ];
+      function hashName(s: string): number {
+        let h = 0;
+        for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+        return Math.abs(h);
+      }
+
+      const INNER_HOLE = 0.30;
+      const OUTER_LIMIT = 0.95;
 
       type SunNode = { name: string; rank: string; count: number; slug?: string; taxonId?: string; kingdom?: string; children: SunNode[] };
 
@@ -681,27 +720,40 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
 
       const treeData = buildTree(allTaxa);
 
-      function renderLevel(node: SunNode, depth: number, startAngle: number, endAngle: number, maxDepth = 4) {
+      // Real tree depth (1 if only species-level, up to 7 with full lineage).
+      // Used to size rings so they fill the chart instead of leaving a void.
+      function treeDepth(node: SunNode): number {
+        if (!node.children.length) return 0;
+        let m = 0;
+        for (const c of node.children) m = Math.max(m, treeDepth(c));
+        return 1 + m;
+      }
+      const actualDepth = Math.max(1, treeDepth(treeData));
+      const ringWidth = (OUTER_LIMIT - INNER_HOLE) / actualDepth;
+
+      function renderLevel(node: SunNode, depth: number, startAngle: number, endAngle: number, maxDepth = actualDepth) {
         if (depth > maxDepth || node.children.length === 0) return;
-        const r0 = depth * 0.18;
-        const r1 = r0 + 0.17;
+        const r0 = INNER_HOLE + (depth - 1) * ringWidth;
+        const r1 = r0 + ringWidth;
         let angle = startAngle;
-        node.children.forEach(child => {
+        node.children.forEach((child, idx) => {
           const frac = node.count > 0 ? child.count / node.count : 0;
           const sweep = (endAngle - startAngle) * frac;
           if (sweep < 0.01) { angle += sweep; return; }
           const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-          const color = KINGDOM_COLORS[child.kingdom ?? child.name] ?? DEFAULT_COLOR;
+          const kingdomKey = child.kingdom ?? child.name;
+          const color = KINGDOM_COLORS[kingdomKey]
+            ?? FALLBACK_PALETTE[hashName(child.name || String(idx)) % FALLBACK_PALETTE.length];
           path.setAttribute('d', arcPath(r0, r1, angle, angle + sweep));
           path.setAttribute('fill', color);
-          path.setAttribute('fill-opacity', String(0.9 - depth * 0.1));
+          path.setAttribute('fill-opacity', String(Math.max(0.55, 0.95 - (depth - 1) * 0.08)));
           path.setAttribute('stroke', '#fff');
           path.setAttribute('stroke-width', '0.005');
           // Only leaf nodes (species) navigate to the detail page.
           // Intermediate nodes (kingdom → genus) update the center label only
           // so the user can explore the hierarchy without accidental navigation.
           const isLeaf = child.children.length === 0;
-          path.style.cursor = isLeaf ? 'pointer' : 'default';
+          path.style.cursor = 'pointer';
           path.addEventListener('click', () => {
             if (nameEl) nameEl.textContent = child.name;
             if (countEl) countEl.textContent = `${child.count} obs`;
@@ -716,9 +768,10 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
       svg.innerHTML = '';
       renderLevel(treeData, 1, -Math.PI / 2, 3 * Math.PI / 2);
 
-      // Center circle
+      // Center circle (matches inner-hole radius).
       const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      circle.setAttribute('cx', '0'); circle.setAttribute('cy', '0'); circle.setAttribute('r', '0.17');
+      circle.setAttribute('cx', '0'); circle.setAttribute('cy', '0');
+      circle.setAttribute('r', String(INNER_HOLE - 0.01));
       circle.setAttribute('fill', 'transparent');
       svg.appendChild(circle);
 
