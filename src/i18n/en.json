@@ -215,7 +215,62 @@
       "PlantNet API + BirdNET + Claude Vision",
       "Tailwind CSS",
       "PWA-ready"
-    ]
+    ],
+    "people": {
+      "title": "Who is behind Rastrum",
+      "lede": "A small, honest team. We tell you who we are because you're trusting us with your location, your photos, and your time.",
+      "members": [
+        {
+          "name": "Artemio Padilla",
+          "role": "Solo dev and maintainer",
+          "bio": "Builds and maintains Rastrum on nights and weekends. Based in Mexico. Reachable via GitHub Issues or Discussions.",
+          "github": "ArtemioPadilla"
+        }
+      ],
+      "join_cta": "Want your name here? We accept code, translations, taxonomic review, field testing, and bug reports.",
+      "join_link": "How to contribute",
+      "no_photo_note": "Photos are optional and not required to contribute."
+    },
+    "funding": {
+      "title": "How it's funded",
+      "lede": "We believe you should know exactly who pays for what you use.",
+      "status_title": "Current status",
+      "status_body": "Rastrum is currently unfunded. There is no company, no investors, and no advertising. Hosting and infrastructure costs are covered by the operator out of pocket. Volunteer time is the largest input.",
+      "what_costs_title": "What it costs to run",
+      "what_costs": [
+        "Supabase Free tier (database, auth, storage) — currently $0/mo",
+        "Cloudflare R2 (media + ML model hosting) — single-digit dollars per month",
+        "Domain (rastrum.org) — about $12 per year",
+        "AI identification calls — pay-as-you-go via your own BYO API keys, or sponsored slots in a community pool"
+      ],
+      "byo_keys_note": "AI identification (Claude Vision, PlantNet) uses your own API keys by default. Your photos are sent to those providers under your account; we never store the keys server-side. See the Privacy page for the full data flow.",
+      "ledger_note": "When the project starts taking outside money, this section becomes a public ledger. We commit to publishing every recurring cost and every donation source as line items."
+    },
+    "governance": {
+      "title": "Governance and licensing",
+      "lede": "Decisions are made in the open, by the people who do the work.",
+      "license_title": "License",
+      "license_body": "Code is MIT-licensed. The server (deployed Edge Functions) is AGPL-3.0 — if you run a public Rastrum instance with modifications, you must share those modifications. Each observation carries its own Creative Commons license, chosen by the contributor (CC BY, CC BY-NC, or CC0).",
+      "decisions_title": "How decisions get made",
+      "decisions_body": "Roadmap items live as GitHub Issues with public labels. Anyone can open an issue, comment, or send a pull request. Architectural changes go through a written spec under docs/specs/modules/ before code lands. The maintainer has the final call when no consensus emerges, but the bias is always toward shipping the most-debated path.",
+      "contribute_title": "How to contribute",
+      "contribute_body": "Code, translations, taxonomic review, field testing, bug reports, and small donations of compute via the platform sponsorship pool are all welcome and equally valued.",
+      "contribute_link": "Read the contributor guide",
+      "code_of_conduct": "Code of Conduct"
+    },
+    "stats": {
+      "title": "By the numbers today",
+      "lede": "Live counts from public observations. Updated each time the site is built.",
+      "observations_label": "Public observations",
+      "observers_label": "Public observer profiles",
+      "species_label": "Distinct species recorded",
+      "unavailable": "Live numbers will appear here once the build pipeline can reach the database.",
+      "generated_prefix": "Last updated"
+    },
+    "press": {
+      "title": "Press and mentions",
+      "empty": "No press coverage yet. If you write about Rastrum, we'd love to hear about it — open an issue and we'll add the link here."
+    }
   },
   "footer": {
     "license": "AGPL-3.0 License",

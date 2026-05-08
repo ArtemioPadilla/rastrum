@@ -1,0 +1,399 @@
+---
+import { t, getDocPath } from '../i18n/utils';
+import { readFileSync, existsSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const tr = t(lang);
+const isEs = lang === 'es';
+
+interface AboutStats {
+  total_observations: number | null;
+  total_observers: number | null;
+  total_species: number | null;
+  generated_at: string;
+  available: boolean;
+}
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const STATS_PATH = join(__dirname, '..', '..', 'public', 'data', 'about-stats.json');
+
+let stats: AboutStats = {
+  total_observations: null,
+  total_observers: null,
+  total_species: null,
+  generated_at: new Date().toISOString(),
+  available: false,
+};
+
+if (existsSync(STATS_PATH)) {
+  try {
+    stats = JSON.parse(readFileSync(STATS_PATH, 'utf-8')) as AboutStats;
+  } catch {
+    // Keep default placeholder values.
+  }
+}
+
+interface PeopleTr {
+  title: string;
+  lede: string;
+  members: Array<{ name: string; role: string; bio: string; github?: string }>;
+  join_cta: string;
+  join_link: string;
+  no_photo_note: string;
+}
+interface FundingTr {
+  title: string;
+  lede: string;
+  status_title: string;
+  status_body: string;
+  what_costs_title: string;
+  what_costs: string[];
+  byo_keys_note: string;
+  ledger_note: string;
+}
+interface GovernanceTr {
+  title: string;
+  lede: string;
+  license_title: string;
+  license_body: string;
+  decisions_title: string;
+  decisions_body: string;
+  contribute_title: string;
+  contribute_body: string;
+  contribute_link: string;
+  code_of_conduct: string;
+}
+interface StatsTr {
+  title: string;
+  lede: string;
+  observations_label: string;
+  observers_label: string;
+  species_label: string;
+  unavailable: string;
+  generated_prefix: string;
+}
+interface PressTr { title: string; empty: string }
+
+const aboutTree = tr.about as unknown as Record<string, unknown>;
+const people = aboutTree.people as unknown as PeopleTr;
+const funding = aboutTree.funding as unknown as FundingTr;
+const governance = aboutTree.governance as unknown as GovernanceTr;
+const statsTr = aboutTree.stats as unknown as StatsTr;
+const press = aboutTree.press as unknown as PressTr;
+
+interface RoadmapPhase { version: string; name: string; items: string[] }
+interface HowStep { title: string; description: string }
+interface TechItem { name: string; description: string }
+const roadmapPhases = (tr.roadmap as unknown as { phases: RoadmapPhase[] }).phases;
+const howSteps = (tr.how_it_works as unknown as { steps: HowStep[] }).steps;
+const impactItems = (tr.impact as unknown as { items: string[] }).items;
+const techItems = (tr.tech as unknown as { items: TechItem[] }).items;
+
+const numFmt = new Intl.NumberFormat(isEs ? 'es-MX' : 'en-US');
+function fmt(n: number | null): string {
+  if (n === null) return '—';
+  return numFmt.format(n);
+}
+
+const dateFmt = new Intl.DateTimeFormat(isEs ? 'es-MX' : 'en-US', {
+  year: 'numeric', month: 'short', day: 'numeric',
+});
+const generatedDate = new Date(stats.generated_at);
+const generatedLabel = isNaN(generatedDate.getTime()) ? '' : dateFmt.format(generatedDate);
+
+const contributeHref = getDocPath(lang, 'contribute');
+const fundingHref = getDocPath(lang, 'funding');
+const githubHref = 'https://github.com/ArtemioPadilla/rastrum';
+const cocHref = 'https://github.com/ArtemioPadilla/rastrum/blob/main/CODE_OF_CONDUCT.md';
+const licenseHref = 'https://github.com/ArtemioPadilla/rastrum/blob/main/LICENSE';
+---
+
+<!-- Hero -->
+<section class="relative -mx-4 px-4 py-16 md:py-24 text-center border-b border-zinc-200 dark:border-zinc-800">
+  <div class="max-w-3xl mx-auto space-y-6">
+    <h1 class="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+      {tr.about.title}
+    </h1>
+    <p class="text-lg md:text-xl text-emerald-600 dark:text-emerald-400 font-medium">
+      {tr.about.description}
+    </p>
+    <p class="text-zinc-600 dark:text-zinc-400 text-base md:text-lg leading-relaxed max-w-2xl mx-auto">
+      {tr.vision.statement}
+    </p>
+  </div>
+</section>
+
+<!-- Vision -->
+<section class="py-16 border-b border-zinc-200 dark:border-zinc-800">
+  <h2 class="text-2xl md:text-3xl font-bold text-zinc-900 dark:text-zinc-100 mb-10">{tr.vision.title}</h2>
+  <div class="grid md:grid-cols-2 gap-8 md:gap-12">
+    <div class="space-y-4">
+      <h3 class="text-xl font-semibold text-emerald-600 dark:text-emerald-400">{tr.vision.problem_title}</h3>
+      <p class="text-zinc-600 dark:text-zinc-400 leading-relaxed">{tr.vision.problem}</p>
+    </div>
+    <div class="space-y-4">
+      <h3 class="text-xl font-semibold text-emerald-600 dark:text-emerald-400">{tr.vision.solution_title}</h3>
+      <p class="text-zinc-600 dark:text-zinc-400 leading-relaxed">{tr.vision.solution}</p>
+    </div>
+  </div>
+</section>
+
+<!-- Quiénes somos / Who is behind Rastrum -->
+<section class="py-16 border-b border-zinc-200 dark:border-zinc-800" id="people">
+  <h2 class="text-2xl md:text-3xl font-bold text-zinc-900 dark:text-zinc-100 mb-3">{people.title}</h2>
+  <p class="text-zinc-600 dark:text-zinc-400 leading-relaxed max-w-3xl mb-8">{people.lede}</p>
+  <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+    {people.members.map((m) => (
+      <div class="p-5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+        <div class="flex items-center gap-3 mb-3">
+          <div class="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-semibold text-lg" aria-hidden="true">
+            {m.name.split(/\s+/).map((p) => p[0]).slice(0, 2).join('').toUpperCase()}
+          </div>
+          <div>
+            <h3 class="text-base font-semibold text-zinc-900 dark:text-zinc-100">{m.name}</h3>
+            <p class="text-xs text-emerald-600 dark:text-emerald-400">{m.role}</p>
+          </div>
+        </div>
+        <p class="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed mb-3">{m.bio}</p>
+        {m.github && (
+          <a
+            href={`https://github.com/${m.github}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="inline-flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M12 .297a12 12 0 00-3.79 23.4c.6.111.82-.261.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 17.07 3.633 16.7 3.633 16.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.694.825.576A12 12 0 0012 .297z"/>
+            </svg>
+            @{m.github}
+          </a>
+        )}
+      </div>
+    ))}
+  </div>
+  <p class="text-xs text-zinc-500 dark:text-zinc-500 mb-4">{people.no_photo_note}</p>
+  <p class="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
+    {people.join_cta}
+    {' '}
+    <a href={contributeHref} class="text-emerald-600 dark:text-emerald-400 hover:underline">{people.join_link}</a>.
+  </p>
+</section>
+
+<!-- Cómo se financia / Funding -->
+<section class="py-16 border-b border-zinc-200 dark:border-zinc-800" id="funding">
+  <h2 class="text-2xl md:text-3xl font-bold text-zinc-900 dark:text-zinc-100 mb-3">{funding.title}</h2>
+  <p class="text-zinc-600 dark:text-zinc-400 leading-relaxed max-w-3xl mb-8">{funding.lede}</p>
+
+  <div class="grid md:grid-cols-2 gap-6 mb-6">
+    <div class="p-5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3">
+      <h3 class="text-base font-semibold text-emerald-600 dark:text-emerald-400">{funding.status_title}</h3>
+      <p class="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">{funding.status_body}</p>
+    </div>
+    <div class="p-5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3">
+      <h3 class="text-base font-semibold text-emerald-600 dark:text-emerald-400">{funding.what_costs_title}</h3>
+      <ul class="space-y-2 text-sm text-zinc-600 dark:text-zinc-400">
+        {funding.what_costs.map((cost: string) => (
+          <li class="flex items-start gap-2">
+            <span class="w-1 h-1 rounded-full bg-emerald-500 mt-2 shrink-0" aria-hidden="true"></span>
+            <span class="leading-relaxed">{cost}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </div>
+  <p class="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed mb-3">{funding.byo_keys_note}</p>
+  <p class="text-xs text-zinc-500 dark:text-zinc-500 leading-relaxed">
+    {funding.ledger_note}
+    {' '}
+    <a href={fundingHref} class="text-emerald-600 dark:text-emerald-400 hover:underline">{tr.footer.links.funding}</a>.
+  </p>
+</section>
+
+<!-- Gobernanza / Governance -->
+<section class="py-16 border-b border-zinc-200 dark:border-zinc-800" id="governance">
+  <h2 class="text-2xl md:text-3xl font-bold text-zinc-900 dark:text-zinc-100 mb-3">{governance.title}</h2>
+  <p class="text-zinc-600 dark:text-zinc-400 leading-relaxed max-w-3xl mb-8">{governance.lede}</p>
+  <div class="grid md:grid-cols-3 gap-4">
+    <div class="p-5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-2">
+      <h3 class="text-base font-semibold text-emerald-600 dark:text-emerald-400">{governance.license_title}</h3>
+      <p class="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">{governance.license_body}</p>
+      <a href={licenseHref} target="_blank" rel="noopener noreferrer" class="inline-block text-xs text-emerald-600 dark:text-emerald-400 hover:underline pt-1">LICENSE</a>
+    </div>
+    <div class="p-5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-2">
+      <h3 class="text-base font-semibold text-emerald-600 dark:text-emerald-400">{governance.decisions_title}</h3>
+      <p class="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">{governance.decisions_body}</p>
+      <a href={`${githubHref}/issues`} target="_blank" rel="noopener noreferrer" class="inline-block text-xs text-emerald-600 dark:text-emerald-400 hover:underline pt-1">GitHub Issues</a>
+    </div>
+    <div class="p-5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-2">
+      <h3 class="text-base font-semibold text-emerald-600 dark:text-emerald-400">{governance.contribute_title}</h3>
+      <p class="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">{governance.contribute_body}</p>
+      <div class="flex flex-wrap gap-3 pt-1">
+        <a href={contributeHref} class="text-xs text-emerald-600 dark:text-emerald-400 hover:underline">{governance.contribute_link}</a>
+        <a href={cocHref} target="_blank" rel="noopener noreferrer" class="text-xs text-emerald-600 dark:text-emerald-400 hover:underline">{governance.code_of_conduct}</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- En cifras hoy / Live stats -->
+<section class="py-16 border-b border-zinc-200 dark:border-zinc-800" id="stats">
+  <h2 class="text-2xl md:text-3xl font-bold text-zinc-900 dark:text-zinc-100 mb-3">{statsTr.title}</h2>
+  <p class="text-zinc-600 dark:text-zinc-400 leading-relaxed max-w-3xl mb-8">{statsTr.lede}</p>
+  {stats.available ? (
+    <>
+      <div class="grid sm:grid-cols-3 gap-4 mb-4">
+        <div class="p-6 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-center">
+          <p class="text-3xl md:text-4xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{fmt(stats.total_observations)}</p>
+          <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-2 uppercase tracking-wider">{statsTr.observations_label}</p>
+        </div>
+        <div class="p-6 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-center">
+          <p class="text-3xl md:text-4xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{fmt(stats.total_observers)}</p>
+          <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-2 uppercase tracking-wider">{statsTr.observers_label}</p>
+        </div>
+        <div class="p-6 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-center">
+          <p class="text-3xl md:text-4xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{fmt(stats.total_species)}</p>
+          <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-2 uppercase tracking-wider">{statsTr.species_label}</p>
+        </div>
+      </div>
+      {generatedLabel && (
+        <p class="text-xs text-zinc-500 dark:text-zinc-500 text-right">{statsTr.generated_prefix}: {generatedLabel}</p>
+      )}
+    </>
+  ) : (
+    <div class="p-6 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-center text-sm text-zinc-500 dark:text-zinc-400">
+      {statsTr.unavailable}
+    </div>
+  )}
+</section>
+
+<!-- How It Works -->
+<section class="py-16 border-b border-zinc-200 dark:border-zinc-800">
+  <h2 class="text-2xl md:text-3xl font-bold text-zinc-900 dark:text-zinc-100 mb-10">{tr.how_it_works.title}</h2>
+  <div class="grid md:grid-cols-3 gap-6 relative">
+    {howSteps.map((step, i: number) => (
+      <div class="relative flex flex-col items-center text-center p-6 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+        {i < 2 && (
+          <div class="hidden md:block absolute -right-3 top-1/2 -translate-y-1/2 z-10">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" class="text-emerald-500" aria-hidden="true">
+              <path d="M5 12h14m0 0l-4-4m4 4l-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        )}
+        <div class="w-14 h-14 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mb-4 text-emerald-600 dark:text-emerald-400 font-bold">
+          {String(i + 1).padStart(2, '0')}
+        </div>
+        <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-2">{step.title}</h3>
+        <p class="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">{step.description}</p>
+      </div>
+    ))}
+  </div>
+</section>
+
+<!-- Roadmap -->
+<section class="py-16 border-b border-zinc-200 dark:border-zinc-800">
+  <h2 class="text-2xl md:text-3xl font-bold text-zinc-900 dark:text-zinc-100 mb-10">{tr.roadmap.title}</h2>
+  <div class="space-y-0">
+    {roadmapPhases.map((phase, i: number) => (
+      <div class="relative pl-8 pb-10 last:pb-0">
+        {i < roadmapPhases.length - 1 && (
+          <div class:list={[
+            "absolute left-[11px] top-6 w-0.5 h-full",
+            i === 0 ? "bg-emerald-500/50" : "bg-zinc-300 dark:bg-zinc-700"
+          ]} aria-hidden="true" />
+        )}
+        <div class:list={[
+          "absolute left-0 top-1.5 w-6 h-6 rounded-full border-2 flex items-center justify-center",
+          i === 0
+            ? "border-emerald-500 bg-emerald-500/20"
+            : "border-zinc-400 dark:border-zinc-600 bg-zinc-100 dark:bg-zinc-800"
+        ]} aria-hidden="true">
+          {i === 0 && (
+            <div class="w-2 h-2 rounded-full bg-emerald-500"></div>
+          )}
+        </div>
+        <div class="space-y-2">
+          <div class="flex items-center gap-3">
+            <span class:list={[
+              "text-xs font-mono px-2 py-0.5 rounded",
+              i === 0
+                ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500"
+            ]}>{phase.version}</span>
+            <h3 class:list={[
+              "font-semibold",
+              i === 0 ? "text-zinc-900 dark:text-zinc-100" : "text-zinc-500 dark:text-zinc-400"
+            ]}>{phase.name}</h3>
+          </div>
+          <ul class="space-y-1 ml-1">
+            {phase.items.map((item: string) => (
+              <li class="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
+                <span class:list={[
+                  "w-1 h-1 rounded-full shrink-0",
+                  i === 0 ? "bg-emerald-500" : "bg-zinc-400 dark:bg-zinc-600"
+                ]} aria-hidden="true"></span>
+                {item}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    ))}
+  </div>
+</section>
+
+<!-- Conservation Impact -->
+<section class="py-16 border-b border-zinc-200 dark:border-zinc-800">
+  <h2 class="text-2xl md:text-3xl font-bold text-zinc-900 dark:text-zinc-100 mb-10">{tr.impact.title}</h2>
+  <div class="grid sm:grid-cols-2 gap-4">
+    {impactItems.map((item: string) => (
+      <div class="flex items-start gap-3 p-4 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" class="text-emerald-500 shrink-0 mt-0.5" aria-hidden="true">
+          <path d="M17 8C17 8 12 2 7 8c0 0-2 3 0 6s5 5 5 8c0-3 3-5 5-8s0-6 0-6z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M12 22v-6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span class="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed">{item}</span>
+      </div>
+    ))}
+  </div>
+</section>
+
+<!-- Tech Stack -->
+<section class="py-16 border-b border-zinc-200 dark:border-zinc-800">
+  <h2 class="text-2xl md:text-3xl font-bold text-zinc-900 dark:text-zinc-100 mb-10">{tr.tech.title}</h2>
+  <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    {techItems.map((tech) => (
+      <div class="p-5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:border-emerald-500/30 transition-colors">
+        <h3 class="text-base font-semibold text-zinc-900 dark:text-zinc-100 mb-1">{tech.name}</h3>
+        <p class="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">{tech.description}</p>
+      </div>
+    ))}
+  </div>
+</section>
+
+<!-- Press / mentions -->
+<section class="py-16 border-b border-zinc-200 dark:border-zinc-800" id="press">
+  <h2 class="text-2xl md:text-3xl font-bold text-zinc-900 dark:text-zinc-100 mb-3">{press.title}</h2>
+  <p class="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed max-w-3xl">{press.empty}</p>
+</section>
+
+<!-- Open Source / GitHub CTA -->
+<section class="py-16">
+  <div class="text-center max-w-2xl mx-auto space-y-6">
+    <h2 class="text-2xl md:text-3xl font-bold text-zinc-900 dark:text-zinc-100">{tr.team.title}</h2>
+    <p class="text-zinc-600 dark:text-zinc-400 leading-relaxed">{tr.team.description}</p>
+    <a
+      href={githubHref}
+      target="_blank"
+      rel="noopener noreferrer"
+      class="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-medium transition-colors"
+    >
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" class="shrink-0" aria-hidden="true">
+        <path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.205 11.387.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 17.07 3.633 16.7 3.633 16.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.694.825.576C20.565 21.795 24 17.295 24 12 24 5.37 18.63 0 12 0z"/>
+      </svg>
+      GitHub
+    </a>
+  </div>
+</section>
