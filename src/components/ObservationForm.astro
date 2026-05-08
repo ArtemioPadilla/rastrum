@@ -1,6 +1,7 @@
 ---
 import { t } from '../i18n/utils';
 import MapPicker from './MapPicker.astro';
+import DisambiguationBanner from './DisambiguationBanner.astro';
 import {
   HABITATS,
   WEATHERS,
@@ -299,6 +300,8 @@ const cameraStationLoading     = observeStrings.camera_station_loading     ?? (i
           <div id="gemma-progress-bar" class="h-full bg-emerald-600" style="width:0%"></div>
         </div>
       </div>
+
+      <DisambiguationBanner lang={lang} />
 
       <!-- Result card -->
       <div id="id-result-card" class="hidden rounded-xl border border-zinc-200 dark:border-zinc-800 p-4 mb-2 bg-white dark:bg-zinc-900/40">
@@ -1024,6 +1027,37 @@ const cameraStationLoading     = observeStrings.camera_station_loading     ?? (i
       idSaveInline?.classList.remove('hidden');
     } else {
       idSaveInline?.classList.add('hidden');
+    }
+
+    // #615: gap-rule disambiguation. When the top-2 candidates are
+    // close in confidence, surface the disambiguation banner above the
+    // result card. The banner self-fetches the diagnostic prompt; we
+    // only need to dispatch the (top1, top2) pair.
+    void maybeFireDisambiguation(r);
+  }
+
+  async function maybeFireDisambiguation(r: CascadeUnified) {
+    try {
+      const { shouldDisambiguate, loadThresholds } = await import('../lib/disambiguation');
+      const thresholds = await loadThresholds();
+      const alternatesAsCandidates = (r.alternates ?? []).map(a => ({
+        scientific_name: a.scientific_name,
+        confidence: a.score,
+      }));
+      const verdict = shouldDisambiguate(
+        { scientific_name: r.scientific_name, confidence: r.confidence },
+        alternatesAsCandidates,
+        thresholds,
+      );
+      if (verdict.trigger && verdict.top1 && verdict.top2) {
+        document.dispatchEvent(new CustomEvent('rastrum:disambiguation-show', {
+          detail: { top1: verdict.top1, top2: verdict.top2 },
+        }));
+      } else {
+        document.dispatchEvent(new CustomEvent('rastrum:disambiguation-hide'));
+      }
+    } catch {
+      // best-effort — never block the UI on a disambiguation hiccup
     }
   }
 
@@ -2420,6 +2454,15 @@ const cameraStationLoading     = observeStrings.camera_station_loading     ?? (i
   });
   document.getElementById('gallery-btn')?.addEventListener('click', () => {
     galleryInput?.click();
+  });
+
+  // #615: disambiguation banner "Take another photo" CTA. Re-opens the
+  // capture path so the user can append a diagnostic shot. Multi-photo
+  // re-cascade (passing both photos to the cascade) lands in v1.1 — for
+  // now the new photo replaces the cascade input the same way a manual
+  // re-upload does.
+  document.addEventListener('rastrum:disambiguation-retry', () => {
+    cameraInput?.click();
   });
 
   // -------------------------------------------------------------------------
