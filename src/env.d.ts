@@ -13,6 +13,8 @@ interface ImportMetaEnv {
   readonly PUBLIC_PLANTNET_KEY?: string;
   readonly PUBLIC_ANTHROPIC_KEY?: string;
   readonly PUBLIC_VAPID_PUBLIC_KEY?: string;
+  readonly PUBLIC_POSTHOG_PROJECT_TOKEN?: string;
+  readonly PUBLIC_POSTHOG_HOST?: string;
   readonly PUBLIC_BUILD_SHA?: string;
   /**
    * App version string (year.month.N format, e.g. "2026.5.0").
