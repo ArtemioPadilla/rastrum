@@ -8522,3 +8522,94 @@ ON CONFLICT (threshold) DO UPDATE SET
   label_en = EXCLUDED.label_en,
   label_es = EXCLUDED.label_es,
   icon     = EXCLUDED.icon;
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- nearby_similar_species — Pokédex-style "what else is around" card (#616)
+-- ═══════════════════════════════════════════════════════════════════════════
+-- Returns up to N sibling-genus species observed within p_radius_m of the
+-- given observation's location, in the past p_window_days, ordered by
+-- recency. Used by NearbySimilarCard.astro on /share/obs/?id=<uuid>.
+--
+-- Privacy invariants:
+--   • Excludes obscure_level = 'full' (private) entirely.
+--   • Excludes location_obscured IS NOT NULL rows from public callers
+--     so we never anchor a cluster on a sensitive-species coarsened
+--     centroid (the obscured point is intentionally low-precision).
+--   • Excludes the source observation's own taxon (we want SIBLINGS).
+--   • Excludes the source observation itself.
+--
+-- Returns one row per sibling species with the most recent observation in
+-- the window and the count seen. Distance is computed against the source
+-- observation's RAW location (the function reads it via SECURITY DEFINER
+-- so the caller doesn't need observer-grade privileges to identify the
+-- anchor — but every returned neighbour was selected via the same public
+-- gate as obs_public_read).
+CREATE OR REPLACE FUNCTION public.nearby_similar_species(
+  p_obs_id      uuid,
+  p_radius_m    numeric DEFAULT 5000,
+  p_window_days int     DEFAULT 90,
+  p_limit       int     DEFAULT 3
+)
+RETURNS TABLE (
+  taxon_id        uuid,
+  scientific_name text,
+  common_name_en  text,
+  common_name_es  text,
+  slug            text,
+  obs_count       bigint,
+  last_observed_at timestamptz,
+  distance_m      numeric
+)
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public AS $$
+  WITH src AS (
+    SELECT
+      o.id,
+      o.location,
+      o.primary_taxon_id,
+      t.genus
+    FROM public.observations o
+    JOIN public.taxa t ON t.id = o.primary_taxon_id
+    WHERE o.id = p_obs_id
+      AND o.location IS NOT NULL
+      AND t.genus IS NOT NULL
+  ),
+  neighbours AS (
+    SELECT
+      o.id            AS obs_id,
+      o.observed_at,
+      i.taxon_id,
+      ST_Distance(o.location, src.location) AS distance_m
+    FROM src
+    JOIN public.observations o
+      ON ST_DWithin(o.location, src.location, p_radius_m)
+    JOIN public.identifications i
+      ON i.observation_id = o.id AND i.is_primary = true
+    JOIN public.taxa t
+      ON t.id = i.taxon_id
+    WHERE o.id <> src.id
+      AND o.observed_at >= now() - make_interval(days => p_window_days)
+      AND o.obscure_level = 'none'
+      AND o.location_obscured IS NULL
+      AND t.genus = src.genus
+      AND i.taxon_id <> src.primary_taxon_id
+      AND i.is_research_grade = true
+  )
+  SELECT
+    n.taxon_id,
+    t.scientific_name,
+    t.common_name_en,
+    t.common_name_es,
+    t.slug,
+    COUNT(*)::bigint                 AS obs_count,
+    MAX(n.observed_at)               AS last_observed_at,
+    MIN(n.distance_m)::numeric       AS distance_m
+  FROM neighbours n
+  JOIN public.taxa t ON t.id = n.taxon_id
+  GROUP BY n.taxon_id, t.scientific_name, t.common_name_en, t.common_name_es, t.slug
+  ORDER BY MAX(n.observed_at) DESC
+  LIMIT p_limit;
+$$;
+
+REVOKE ALL ON FUNCTION public.nearby_similar_species(uuid, numeric, int, int) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.nearby_similar_species(uuid, numeric, int, int) TO anon, authenticated;

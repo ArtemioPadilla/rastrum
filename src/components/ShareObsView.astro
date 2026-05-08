@@ -5,6 +5,7 @@ import ShareButton from './ShareButton.astro';
 import SuggestIdModal from './SuggestIdModal.astro';
 import ReactionStrip from './ReactionStrip.astro';
 import PhotoGallery from './PhotoGallery.astro';
+import NearbySimilarCard from './NearbySimilarCard.astro';
 import MapPicker from './MapPicker.astro';
 import ObsManagePanel from './ObsManagePanel.astro';
 import AudioPlayer from './AudioPlayer.astro';
@@ -210,6 +211,8 @@ const labels = {
           </div>
           <ul id="ci-list" class="space-y-1.5 text-sm"></ul>
         </section>
+
+        <NearbySimilarCard lang={lang} />
 
         <ObsManagePanel lang={lang} />
 
