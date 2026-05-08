@@ -5,6 +5,22 @@ import ShareObsView from '../../../components/ShareObsView.astro';
 // SSG: query string is unknown at build time. Components read observation_id
 // from data attributes set by the load() script below. Page is locale-neutral
 // (CLAUDE.md regression note: there is no /en/share/obs/ or /es/share/obs/).
+//
+// OG / social unfurl strategy (#714):
+// Social crawlers (WhatsApp, Twitter, Slack, iMessage) do not execute JS, so
+// they see the generic static og:image/title baked at build time.  The
+// share-card Edge Function at /functions/v1/share-card?obs_id=<uuid> returns
+// a server-rendered HTML page with dynamic OG tags AND an SVG card image — it
+// is the correct URL to share for rich link previews.
+//
+// We solve this client-side:
+//   1. The share button is wired to the share-card URL (not window.location)
+//      so the URL a user copies/pastes IS the share-card URL.
+//   2. An inline <script> in <head> rewrites og:image / og:title / og:url at
+//      runtime so that if the raw /share/obs/?id=… URL IS shared, at least
+//      apps that render JS (Notion, Discord desktop, etc.) get the right meta.
+//      Pure HTTP crawlers (WhatsApp) still see the static fallback — full fix
+//      requires either Cloudflare Worker routing or SSR (tracked in #714).
 const lang: 'en' | 'es' = 'en';
 ---
 
@@ -12,7 +28,7 @@ const lang: 'en' | 'es' = 'en';
   <ShareObsView lang={lang} />
 
   <script>
-    import { getSupabase } from '../../../lib/supabase';
+    import { getSupabase, getSupabaseUrl } from '../../../lib/supabase';
     import { labelFor } from '../../../lib/observation-enums';
     import { wireManagePanelDetails, wireManagePanelLocation, wireManagePanelPhotos } from '../../../lib/manage-panel';
     import { t } from '../../../i18n/utils';
@@ -117,12 +133,33 @@ const lang: 'en' | 'es' = 'en';
 
       const shareBtn = document.getElementById('obs-share-btn');
       if (shareBtn) {
-        shareBtn.dataset.shareTitle = speciesName + ' — Rastrum';
         const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
+        shareBtn.dataset.shareTitle = speciesName + ' — Rastrum';
         shareBtn.dataset.shareText  = lang === 'es'
           ? `Observación de ${speciesName} en Rastrum`
           : `Observation of ${speciesName} on Rastrum`;
-        shareBtn.dataset.shareUrl   = window.location.href;
+        // #714: point the share URL at the share-card Edge Function so that
+        // social crawlers receive server-rendered OG meta + SVG card image
+        // instead of the generic static fallback served by GitHub Pages.
+        const supabaseUrl = getSupabaseUrl();
+        const shareCardUrl = supabaseUrl
+          ? `${supabaseUrl}/functions/v1/share-card?obs_id=${encodeURIComponent(id)}`
+          : window.location.href;
+        shareBtn.dataset.shareUrl = shareCardUrl;
+
+        // Also rewrite the og: tags in <head> at runtime so JS-capable
+        // previewers (Notion, Discord desktop) see the dynamic card.
+        const imgUrl = supabaseUrl
+          ? `${supabaseUrl}/functions/v1/share-card?obs_id=${encodeURIComponent(id)}&format=svg`
+          : null;
+        if (imgUrl) {
+          document.querySelector<HTMLMetaElement>('meta[property="og:image"]')?.setAttribute('content', imgUrl);
+          document.querySelector<HTMLMetaElement>('meta[name="twitter:image"]')?.setAttribute('content', imgUrl);
+          document.querySelector<HTMLMetaElement>('meta[property="og:title"]')?.setAttribute('content', speciesName + ' — Rastrum');
+          document.querySelector<HTMLMetaElement>('meta[name="twitter:title"]')?.setAttribute('content', speciesName + ' — Rastrum');
+          document.querySelector<HTMLMetaElement>('meta[property="og:url"]')?.setAttribute('content', shareCardUrl);
+          document.querySelector<HTMLLinkElement>('link[rel="canonical"]')?.setAttribute('href', shareCardUrl);
+        }
       }
       const date = new Date(obs.observed_at as string);
       document.getElementById('date')!.textContent = date.toLocaleDateString();
