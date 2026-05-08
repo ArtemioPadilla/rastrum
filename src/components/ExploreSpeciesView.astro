@@ -16,7 +16,7 @@ import Skeleton from './Skeleton.astro';
 import EspeciesHero from './species/EspeciesHero.astro';
 import FilterChips from './species/FilterChips.astro';
 import { renderSpeciesCard, type CardLabels } from '../lib/species-card-html';
-import { parseChips, serializeChips, type ChipsState } from '../lib/species-filters';
+import { parseChips, serializeChips, buildSpeciesUrl, type ChipsState } from '../lib/species-filters';
 
 interface Props {
   lang: 'en' | 'es';
@@ -191,7 +191,7 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
   import maplibregl from 'maplibre-gl';
   import { getSupabase } from '../lib/supabase';
   import { renderSpeciesCard, type CardLabels } from '../lib/species-card-html';
-  import { parseChips, serializeChips, type ChipsState } from '../lib/species-filters';
+  import { parseChips, parseSort, buildSpeciesUrl, type ChipsState, type SortMode } from '../lib/species-filters';
   import { deriveGenus, colorForName, buildTaxonomicTree, taxonomicDepth, type TaxonNode } from '../lib/species-display';
 
   type Lang = 'en' | 'es';
@@ -254,10 +254,15 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
   let _indexBase = '';
 
   function showDetail(idOrSlug: string) {
-    // Navigate to the detail pane by slug or fall back to scientific_name
+    // The detail pane (renderDetail below) queries `taxa` by
+    // `scientific_name === slug`. So the URL slug param MUST be the
+    // scientific name — NOT the kebab-cased `taxa.slug` column. This
+    // matters because the radial + dendrogram views call showDetail()
+    // with a taxonId, and naïvely passing through `taxon.slug` produced
+    // 404s when the slug was already populated to "alamania-punicea".
     const taxon = allTaxa.find(t => t.id === idOrSlug || t.slug === idOrSlug);
-    const slug = taxon ? (taxon.slug ?? taxon.scientific_name) : idOrSlug;
-    window.location.href = `${_indexBase}?slug=${encodeURIComponent(slug)}`;
+    const sciName = taxon?.scientific_name ?? idOrSlug;
+    window.location.href = `${_indexBase}?slug=${encodeURIComponent(sciName)}`;
   }
 
   async function wire(root: HTMLElement) {
@@ -296,14 +301,22 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
     const otherTpl = root.dataset.labelObsCountOther ?? '{count} obs';
     const errLabel = root.dataset.labelError ?? 'Failed to load';
 
+    // Cap the species grid at the most-observed N taxa. The MV itself has
+    // no upper bound; this limit is purely about how many cards the page
+    // renders. Bumped if the catalog outgrows it OR if we add pagination.
+    const SPECIES_GRID_LIMIT = 500;
+
     const hideSkeleton = () => skeletonEl?.classList.add('hidden');
 
     // Wire filter chips eagerly — they're pure URL-state and must respond
     // even when the data fetch below fails (e.g. CI preview with no Supabase
     // keys). applyAllFilters() is a no-op when no cards are rendered yet.
     let currentChips: ChipsState = parseChips(window.location.search);
+    let currentSort: SortMode = parseSort(window.location.search);
     wireChipClicks();
+    wireSortClicks();
     paintChipPressedState();
+    paintSortPressedState();
 
     let supabase;
     try {
@@ -317,17 +330,16 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
       return;
     }
 
-    type ObsBucketRow = { primary_taxon_id: string | null };
-    let obsRows: ObsBucketRow[] = [];
+    type MvRow = { taxon_id: string; obs_count: number | string; last_observed_at: string | null };
+    let mvRows: MvRow[] = [];
     try {
       const { data, error } = await supabase
-        .from('observations')
-        .select('primary_taxon_id')
-        .eq('sync_status', 'synced')
-        .not('primary_taxon_id', 'is', null)
-        .limit(2000);
+        .from('mv_taxon_obs_counts')
+        .select('taxon_id, obs_count, last_observed_at')
+        .order('obs_count', { ascending: false })
+        .limit(SPECIES_GRID_LIMIT);
       if (error) throw error;
-      obsRows = (data ?? []) as unknown as ObsBucketRow[];
+      mvRows = (data ?? []) as unknown as MvRow[];
     } catch (e) {
       hideSkeleton();
       if (errEl) {
@@ -338,11 +350,20 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
     }
 
     const counts = new Map<string, number>();
-    for (const r of obsRows) {
-      if (!r.primary_taxon_id) continue;
-      counts.set(r.primary_taxon_id, (counts.get(r.primary_taxon_id) ?? 0) + 1);
+    // Most-recent-observation timestamp per taxon, keyed by taxon_id.
+    // Sourced from `mv_taxon_obs_counts.last_observed_at` (refreshed
+    // hourly with the rest of the MV) so the 'recent' sort chip can
+    // sort by actual observation recency, not by obs-count fallback.
+    const recencyMs = new Map<string, number>();
+    for (const r of mvRows) {
+      if (!r.taxon_id) continue;
+      counts.set(r.taxon_id, Number(r.obs_count));
+      if (r.last_observed_at) {
+        const t = Date.parse(r.last_observed_at);
+        if (!Number.isNaN(t)) recencyMs.set(r.taxon_id, t);
+      }
     }
-    const taxonIds = Array.from(counts.keys());
+    const taxonIds = mvRows.map(r => r.taxon_id).filter((id): id is string => !!id);
 
     if (taxonIds.length === 0) {
       hideSkeleton();
@@ -410,12 +431,25 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
       }
     }
 
-    const enriched = taxaRows
-      .map(t => ({
-        ...t,
-        count: counts.get(t.id) ?? 0,
-      }))
-      .sort((a, b) => b.count - a.count || a.scientific_name.localeCompare(b.scientific_name));
+    type Enriched = TaxaRow & { count: number };
+    function sortEnriched(rows: Enriched[], mode: SortMode): Enriched[] {
+      if (mode === 'alpha') {
+        return [...rows].sort((a, b) => a.scientific_name.localeCompare(b.scientific_name));
+      }
+      if (mode === 'recent') {
+        // Most-recently observed first; rows missing recency data fall to
+        // the bottom (-Infinity) so the sort is stable and predictable.
+        return [...rows].sort((a, b) => {
+          const ar = recencyMs.get(a.id) ?? -Infinity;
+          const br = recencyMs.get(b.id) ?? -Infinity;
+          return br - ar || a.scientific_name.localeCompare(b.scientific_name);
+        });
+      }
+      return [...rows].sort((a, b) => b.count - a.count || a.scientific_name.localeCompare(b.scientific_name));
+    }
+    let cachedEnriched: Enriched[] = taxaRows.map(t => ({ ...t, count: counts.get(t.id) ?? 0 }));
+    const enriched = sortEnriched(cachedEnriched, currentSort);
+    cachedEnriched = enriched;
 
     // M34: expose full taxa list for sunburst + search panels
     // (`deriveGenus` lives in species-display.ts so it's reusable + tested.)
@@ -649,7 +683,31 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
           const k = c.slice('kingdom:'.length);
           currentChips = { ...currentChips, kingdom: currentChips.kingdom === k ? null : k };
         }
-        history.replaceState({}, '', `${window.location.pathname}${serializeChips(currentChips)}`);
+        history.replaceState({}, '', `${window.location.pathname}${buildSpeciesUrl(currentChips, currentSort)}`);
+        applyAllFilters();
+      }));
+    }
+
+    function paintSortPressedState() {
+      document.querySelectorAll<HTMLButtonElement>('[data-sort-chips] [data-sort]').forEach((btn) => {
+        const pressed = (btn.dataset.sort ?? '') === currentSort;
+        btn.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+      });
+    }
+
+    function wireSortClicks() {
+      const buttons = document.querySelectorAll<HTMLButtonElement>('[data-sort-chips] [data-sort]');
+      buttons.forEach((btn) => btn.addEventListener('click', () => {
+        const mode = (btn.dataset.sort ?? 'obs') as SortMode;
+        if (mode === currentSort) return;
+        currentSort = mode;
+        history.replaceState({}, '', `${window.location.pathname}${buildSpeciesUrl(currentChips, currentSort)}`);
+        if (listEl) {
+          const sorted = sortEnriched(cachedEnriched, currentSort);
+          cachedEnriched = sorted;
+          listEl.innerHTML = sorted.map(cardMarkup).join('');
+        }
+        paintSortPressedState();
         applyAllFilters();
       }));
     }
@@ -694,13 +752,75 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
       const actualDepth = Math.max(1, taxonomicDepth(treeData));
       const ringWidth = (OUTER_LIMIT - INNER_HOLE) / actualDepth;
 
+      // Sunburst sweep is sized by **leaf count** under each subtree, not
+      // by observation count. Every species gets equal arc — a navigation
+      // tool that shows every taxon equally clickable, not a data-density
+      // visualisation where common species would overwhelm rare ones.
+      // Internal nodes (genus/family/...) sweep ∝ number of species in them.
+      const leafCounts = new WeakMap<TaxonNode, number>();
+      function computeLeafCount(n: TaxonNode): number {
+        if (leafCounts.has(n)) return leafCounts.get(n)!;
+        const c = n.children.length === 0
+          ? 1
+          : n.children.reduce((sum, ch) => sum + computeLeafCount(ch), 0);
+        leafCounts.set(n, c);
+        return c;
+      }
+      computeLeafCount(treeData);
+
+      // Label tuning — radial labels read from inside out, flipped on the
+      // left half so they're never upside-down. Skip when the segment's arc
+      // is too narrow for any meaningful label.
+      const TEXT_FONT          = 0.045;
+      const TEXT_GLYPH_W       = 0.6;   // approx. char width as fraction of font-size
+      const TEXT_RADIAL_FRAC   = 0.85;  // chars must fit in this fraction of the ring
+      const TEXT_MIN_SWEEP_RAD = 0.18;  // ~10° — below this, label is illegible
+
+      function addSegmentLabel(name: string, isLeaf: boolean, midAngle: number, sweep: number, r0: number, r1: number) {
+        if (sweep < TEXT_MIN_SWEEP_RAD) return;
+        const ringW = r1 - r0;
+        const maxChars = Math.max(3, Math.floor((ringW * TEXT_RADIAL_FRAC) / (TEXT_GLYPH_W * TEXT_FONT)));
+        const label = name.length > maxChars ? name.slice(0, maxChars - 1) + '…' : name;
+
+        const r = (r0 + r1) / 2;
+        const midAngleDeg = midAngle * 180 / Math.PI;
+        // D3-style radial-label transform: rotate the local frame so the
+        // segment aligns with +X, translate outward to mid-radius, then flip
+        // 180° on the half where text would otherwise be upside-down (left
+        // side / lower half in our −π/2 → 3π/2 sweep). Result: labels always
+        // read from inner-radius toward outer-radius, never upside-down.
+        const norm = ((midAngleDeg % 360) + 360) % 360;
+        const flipDeg = (norm > 90 && norm < 270) ? 180 : 0;
+
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('transform',
+          `rotate(${midAngleDeg.toFixed(2)}) translate(${r.toFixed(3)},0) rotate(${flipDeg})`);
+        text.setAttribute('font-size', String(TEXT_FONT));
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('dominant-baseline', 'middle');
+        text.setAttribute('fill', '#fff');
+        text.setAttribute('font-weight', '600');
+        // paint-order:stroke draws the dark outline behind the white fill so
+        // labels stay legible on every kingdom colour.
+        text.setAttribute('paint-order', 'stroke');
+        text.setAttribute('stroke', 'rgba(0,0,0,0.55)');
+        text.setAttribute('stroke-width', '0.006');
+        if (isLeaf) text.setAttribute('font-style', 'italic');
+        text.style.pointerEvents = 'none';
+        text.style.userSelect = 'none';
+        text.textContent = label;
+        svg!.appendChild(text);
+      }
+
       function renderLevel(node: TaxonNode, depth: number, startAngle: number, endAngle: number, maxDepth = actualDepth) {
         if (depth > maxDepth || node.children.length === 0) return;
         const r0 = INNER_HOLE + (depth - 1) * ringWidth;
         const r1 = r0 + ringWidth;
         let angle = startAngle;
+        const parentLeaves = leafCounts.get(node) ?? 1;
         node.children.forEach((child) => {
-          const frac = node.count > 0 ? child.count / node.count : 0;
+          const childLeaves = leafCounts.get(child) ?? 1;
+          const frac = parentLeaves > 0 ? childLeaves / parentLeaves : 0;
           const sweep = (endAngle - startAngle) * frac;
           if (sweep < 0.01) { angle += sweep; return; }
           const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -721,7 +841,14 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
             if (countEl) countEl.textContent = `${child.count} obs`;
             if (isLeaf && child.taxonId) showDetail(child.taxonId);
           });
+          // Hover updates the centre label without committing — desktop only;
+          // mobile gets the same content via tap (the click handler above).
+          path.addEventListener('mouseenter', () => {
+            if (nameEl) nameEl.textContent = child.name;
+            if (countEl) countEl.textContent = `${child.count} obs`;
+          });
           svg!.appendChild(path);
+          addSegmentLabel(child.name, isLeaf, angle + sweep / 2, sweep, r0, r1);
           renderLevel(child, depth + 1, angle, angle + sweep, maxDepth);
           angle += sweep;
         });

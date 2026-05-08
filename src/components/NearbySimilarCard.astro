@@ -1,0 +1,146 @@
+---
+/**
+ * NearbySimilarCard — "Pokédex" teaser shown below the photo gallery on
+ * `/share/obs/?id=<uuid>`. Lists up to 3 sibling-genus species observed
+ * within 5 km in the last 90 days, ordered by recency.
+ *
+ * Self-hydrating: the component renders a hidden shell, then on mount
+ * calls the `nearby_similar_species(p_obs_id)` SECURITY DEFINER RPC
+ * (see docs/specs/infra/supabase-schema.sql). The RPC clamps to
+ * `obscure_level = 'none'` + `location_obscured IS NULL` so no
+ * NOM-059 / CITES coordinates leak.
+ *
+ * Spec: issue #616 (Pokédex mode v1).
+ */
+import { t } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+const { lang } = Astro.props;
+
+interface NearbySimilarI18n {
+  title: string;
+  subtitle: string;
+  seen_n_times: string;
+  seen_once: string;
+  n_km_away: string;
+  n_m_away: string;
+  view_species: string;
+  empty_state: string;
+}
+const tr = t(lang) as unknown as { nearby_similar: NearbySimilarI18n };
+const ns = tr.nearby_similar;
+---
+
+<section
+  data-nearby-similar
+  data-lang={lang}
+  data-i18n-seen-n-times={ns.seen_n_times}
+  data-i18n-seen-once={ns.seen_once}
+  data-i18n-n-km-away={ns.n_km_away}
+  data-i18n-n-m-away={ns.n_m_away}
+  data-i18n-view-species={ns.view_species}
+  class="hidden mt-6 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4"
+  aria-labelledby="nearby-similar-heading"
+>
+  <h2
+    id="nearby-similar-heading"
+    class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider"
+  >{ns.title}</h2>
+  <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{ns.subtitle}</p>
+
+  <ul data-nearby-similar-list class="mt-3 space-y-2 text-sm"></ul>
+
+  <template data-nearby-similar-row-tmpl>
+    <li class="flex items-center justify-between gap-3 py-1.5 border-b border-zinc-100 dark:border-zinc-800/60 last:border-b-0">
+      <a class="flex-1 min-w-0 group" data-row-link>
+        <span class="block italic font-medium text-emerald-700 dark:text-emerald-400 group-hover:underline truncate" data-row-sci></span>
+        <span class="block text-xs text-zinc-500 dark:text-zinc-400 truncate" data-row-common></span>
+      </a>
+      <span class="flex-none text-[11px] text-zinc-600 dark:text-zinc-300 text-right whitespace-nowrap" data-row-pill></span>
+    </li>
+  </template>
+</section>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import {
+    formatPill,
+    speciesHref,
+    type NearbySimilarRow,
+    type NearbySimilarCopy,
+  } from '../lib/nearby-similar';
+
+  function readCopy(root: HTMLElement): NearbySimilarCopy {
+    const ds = root.dataset;
+    return {
+      title: '',
+      subtitle: '',
+      seen_n_times: ds.i18nSeenNTimes ?? 'seen {n}×',
+      seen_once:    ds.i18nSeenOnce   ?? 'seen once',
+      n_km_away:    ds.i18nNKmAway    ?? '{n} km away',
+      n_m_away:     ds.i18nNMAway     ?? '{n} m away',
+      view_species: ds.i18nViewSpecies ?? 'View species',
+      empty_state:  '',
+    };
+  }
+
+  async function hydrate(root: HTMLElement, obsId: string) {
+    const lang = (root.dataset.lang === 'es' ? 'es' : 'en') as 'en' | 'es';
+    const copy = readCopy(root);
+
+    let supabase;
+    try { supabase = getSupabase(); } catch { return; }
+
+    type RpcReturn = { data: NearbySimilarRow[] | null; error: { message: string } | null };
+    const { data, error } = (await supabase.rpc('nearby_similar_species', {
+      p_obs_id: obsId,
+    })) as RpcReturn;
+    if (error || !Array.isArray(data) || data.length === 0) {
+      return;
+    }
+
+    const list = root.querySelector<HTMLElement>('[data-nearby-similar-list]');
+    const tmpl = root.querySelector<HTMLTemplateElement>('[data-nearby-similar-row-tmpl]');
+    if (!list || !tmpl) return;
+
+    for (const row of data) {
+      const node = tmpl.content.firstElementChild?.cloneNode(true) as HTMLElement | null;
+      if (!node) continue;
+      const link = node.querySelector('[data-row-link]') as HTMLAnchorElement | null;
+      const sci  = node.querySelector('[data-row-sci]')  as HTMLElement | null;
+      const com  = node.querySelector('[data-row-common]') as HTMLElement | null;
+      const pill = node.querySelector('[data-row-pill]') as HTMLElement | null;
+
+      const common = lang === 'es' ? row.common_name_es : row.common_name_en;
+      if (sci)  sci.textContent  = row.scientific_name;
+      if (com)  com.textContent  = common ?? '';
+      if (pill) pill.textContent = formatPill(row, copy);
+      if (link) {
+        link.href = speciesHref(row, lang);
+        link.setAttribute('aria-label', copy.view_species + ': ' + row.scientific_name);
+      }
+      list.appendChild(node);
+    }
+
+    root.classList.remove('hidden');
+  }
+
+  // Defer the RPC until the browser is idle so we don't block first paint.
+  // The card's shell is `hidden` until results land, so it never causes
+  // layout shift on the photo gallery above.
+  const root = document.querySelector<HTMLElement>('[data-nearby-similar]');
+  const params = new URLSearchParams(window.location.search);
+  const obsId = params.get('id');
+  if (root && obsId) {
+    const fire = () => hydrate(root, obsId).catch(() => { /* silent — card hides itself */ });
+    type IdleWindow = Window & { requestIdleCallback?: (cb: () => void) => number };
+    const w = window as IdleWindow;
+    if (typeof w.requestIdleCallback === 'function') {
+      w.requestIdleCallback(fire);
+    } else {
+      setTimeout(fire, 0);
+    }
+  }
+</script>
