@@ -1,10 +1,22 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   showKarmaToast,
+  showMilestoneToast,
+  findCrossedMilestone,
   subscribeToKarmaEvents,
   _resetToastContainer,
+  _resetMilestonesCache,
+  _setMilestonesCacheForTest,
   type KarmaToast,
+  type KarmaMilestone,
 } from './karma-toast';
+
+const SEED_MILESTONES: KarmaMilestone[] = [
+  { threshold: 100, label_en: 'First 100 karma', label_es: 'Primer 100 de karma', icon: '✨' },
+  { threshold: 500, label_en: '500 karma observer', label_es: 'Observador con 500 de karma', icon: '🌱' },
+  { threshold: 1000, label_en: '1,000 karma — research-grade ally', label_es: '1.000 de karma — aliado', icon: '🌳' },
+  { threshold: 5000, label_en: '5,000 karma — power observer', label_es: '5.000 de karma — observador experto', icon: '🌟' },
+];
 
 function makeToast(overrides: Partial<KarmaToast> = {}): KarmaToast {
   return {
@@ -82,11 +94,37 @@ interface FakeChannel {
   subscribe: () => FakeChannel;
 }
 
-function makeFakeSupabase() {
+function makeFakeSupabase(opts: { karmaTotal?: number | null; milestones?: KarmaMilestone[] | null } = {}) {
   const channels: Array<FakeChannel & { name: string }> = [];
   const removed: string[] = [];
 
+  function makeUsersBuilder() {
+    return {
+      select() { return this; },
+      eq() { return this; },
+      async maybeSingle() {
+        return { data: opts.karmaTotal === undefined ? null : { karma_total: opts.karmaTotal }, error: null };
+      },
+    };
+  }
+
+  function makeMilestonesBuilder() {
+    const rows = opts.milestones ?? null;
+    return {
+      select() { return this; },
+      async order() {
+        if (rows === null) return { data: null, error: { message: 'no rows' } };
+        return { data: rows, error: null };
+      },
+    };
+  }
+
   const supabase = {
+    from(table: string) {
+      if (table === 'users') return makeUsersBuilder();
+      if (table === 'karma_milestones') return makeMilestonesBuilder();
+      throw new Error(`unexpected table: ${table}`);
+    },
     channel(name: string) {
       const ch: FakeChannel & { name: string } = {
         name,
@@ -231,5 +269,147 @@ describe('subscribeToKarmaEvents', () => {
     expect(() => unsubscribe()).not.toThrow();
     expect(channels.length).toBe(1);
     expect(throwingSupabase.removeChannel).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('findCrossedMilestone', () => {
+  it('returns the 100 milestone when prev=99 and new=101', () => {
+    const m = findCrossedMilestone(99, 101, SEED_MILESTONES);
+    expect(m?.threshold).toBe(100);
+  });
+
+  it('returns the 500 milestone when prev=499 and new=500 (exact hit)', () => {
+    const m = findCrossedMilestone(499, 500, SEED_MILESTONES);
+    expect(m?.threshold).toBe(500);
+  });
+
+  it('returns only the 500 milestone (highest in window) when prev=499 and new=600 — not 100', () => {
+    const m = findCrossedMilestone(499, 600, SEED_MILESTONES);
+    expect(m?.threshold).toBe(500);
+  });
+
+  it('returns the 1000 milestone when crossing both 500 and 1000 in one event', () => {
+    const m = findCrossedMilestone(499, 1001, SEED_MILESTONES);
+    expect(m?.threshold).toBe(1000);
+  });
+
+  it('returns null on no crossing', () => {
+    expect(findCrossedMilestone(50, 80, SEED_MILESTONES)).toBeNull();
+    expect(findCrossedMilestone(100, 100, SEED_MILESTONES)).toBeNull();
+    expect(findCrossedMilestone(120, 110, SEED_MILESTONES)).toBeNull();
+  });
+
+  it('does not fire for negative deltas', () => {
+    expect(findCrossedMilestone(105, 95, SEED_MILESTONES)).toBeNull();
+  });
+});
+
+describe('showMilestoneToast', () => {
+  beforeEach(() => {
+    _resetToastContainer();
+    document.body.innerHTML = '';
+  });
+
+  afterEach(() => {
+    _resetToastContainer();
+    document.body.innerHTML = '';
+  });
+
+  it('renders a gold-accented toast with icon and label', () => {
+    showMilestoneToast({ threshold: 100, label: 'First 100 karma', icon: '✨' });
+    const el = document.querySelector('#karma-toast-container > [data-milestone="100"]') as HTMLElement | null;
+    expect(el).not.toBeNull();
+    expect(el?.className).toContain('bg-amber-500');
+    expect(el?.className).toContain('ring-yellow-400');
+    expect(el?.textContent).toContain('First 100 karma');
+    expect(el?.textContent).toContain('✨');
+  });
+});
+
+describe('subscribeToKarmaEvents — milestone toasts', () => {
+  beforeEach(() => {
+    _resetToastContainer();
+    _resetMilestonesCache();
+    document.body.innerHTML = '';
+    document.documentElement.lang = 'en';
+  });
+
+  afterEach(() => {
+    _resetToastContainer();
+    _resetMilestonesCache();
+    document.body.innerHTML = '';
+    document.documentElement.lang = '';
+  });
+
+  it('fires the 100 milestone when prev=99, delta=2 (new=101)', async () => {
+    _setMilestonesCacheForTest(SEED_MILESTONES);
+    const { supabase, channels } = makeFakeSupabase({ karmaTotal: 99, milestones: SEED_MILESTONES });
+    subscribeToKarmaEvents('u1', supabase as unknown as Parameters<typeof subscribeToKarmaEvents>[1]);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    channels[0].handler?.({
+      new: {
+        id: 1, user_id: 'u1', delta: 2, reason: 'consensus_win',
+        created_at: new Date().toISOString(),
+      },
+    });
+
+    const el = document.querySelector('[data-milestone="100"]') as HTMLElement | null;
+    expect(el).not.toBeNull();
+    expect(el?.textContent).toContain('First 100 karma');
+  });
+
+  it('fires the 500 milestone on exact-hit (prev=499, delta=1)', async () => {
+    _setMilestonesCacheForTest(SEED_MILESTONES);
+    const { supabase, channels } = makeFakeSupabase({ karmaTotal: 499, milestones: SEED_MILESTONES });
+    subscribeToKarmaEvents('u1', supabase as unknown as Parameters<typeof subscribeToKarmaEvents>[1]);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    channels[0].handler?.({
+      new: {
+        id: 2, user_id: 'u1', delta: 1, reason: 'consensus_win',
+        created_at: new Date().toISOString(),
+      },
+    });
+
+    const el = document.querySelector('[data-milestone="500"]') as HTMLElement | null;
+    expect(el).not.toBeNull();
+  });
+
+  it('fires only the 500 milestone (not 100) when prev=499 and new=600', async () => {
+    _setMilestonesCacheForTest(SEED_MILESTONES);
+    const { supabase, channels } = makeFakeSupabase({ karmaTotal: 499, milestones: SEED_MILESTONES });
+    subscribeToKarmaEvents('u1', supabase as unknown as Parameters<typeof subscribeToKarmaEvents>[1]);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    channels[0].handler?.({
+      new: {
+        id: 3, user_id: 'u1', delta: 101, reason: 'consensus_win',
+        created_at: new Date().toISOString(),
+      },
+    });
+
+    expect(document.querySelector('[data-milestone="500"]')).not.toBeNull();
+    expect(document.querySelector('[data-milestone="100"]')).toBeNull();
+  });
+
+  it('does not fire on negative delta', async () => {
+    _setMilestonesCacheForTest(SEED_MILESTONES);
+    const { supabase, channels } = makeFakeSupabase({ karmaTotal: 105, milestones: SEED_MILESTONES });
+    subscribeToKarmaEvents('u1', supabase as unknown as Parameters<typeof subscribeToKarmaEvents>[1]);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    channels[0].handler?.({
+      new: {
+        id: 4, user_id: 'u1', delta: -10, reason: 'consensus_loss',
+        created_at: new Date().toISOString(),
+      },
+    });
+
+    expect(document.querySelector('[data-milestone]')).toBeNull();
   });
 });
