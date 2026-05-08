@@ -13,6 +13,7 @@ const phi: Identifier = {
     taxa: ['*'],
     license: 'free',
     confidence_ceiling: 0.35,
+    approxDownloadBytes: 4_294_967_296,
   },
   isAvailable: async () => ({ ready: true }),
   identify: async () => { throw new Error('not used in tests'); },
