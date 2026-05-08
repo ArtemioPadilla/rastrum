@@ -134,10 +134,30 @@ describe('renderPluginCard', () => {
     expect(html).toContain('&lt;script&gt;');
   });
 
+  it('renders downloading state with cancel button and progress pill', () => {
+    const html = renderPluginCard(props({
+      state: { kind: 'downloading', pct: 42, mb: { current: 1.7, total: 4.0 } },
+    }));
+    expect(html).toContain('42%');
+    expect(html).toContain('id="vision-cancel"');
+    expect(html).toContain('Cancel');
+  });
+
   it('renders Spanish strings when lang=es', () => {
     const html = renderPluginCard(props({ lang: 'es' }));
     expect(html).toContain('Activo');
     expect(html).toContain('Desactivar');
+  });
+
+  it('renders Spanish cancel and redownload strings when lang=es', () => {
+    const downloading = renderPluginCard(props({
+      lang: 'es',
+      state: { kind: 'downloading', pct: 10, mb: { current: 0.4, total: 4.0 } },
+    }));
+    expect(downloading).toContain('Cancelar');
+
+    const active = renderPluginCard(props({ lang: 'es' }));
+    expect(active).toContain('Volver a descargar');
   });
 });
 

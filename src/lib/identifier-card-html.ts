@@ -52,20 +52,22 @@ function bytesHuman(n: number): string {
 
 interface Strings {
   active: string; disabled: string; no_key: string; not_downloaded: string; unsupported: string;
-  enable: string; disable: string; download: string; delete: string; add_key: string;
-  use_own_key: string; via_sponsorship: string; sponsored_by: string; ids_today: string;
+  enable: string; disable: string; download: string; redownload: string; cancel: string; delete: string;
+  add_key: string; use_own_key: string; via_sponsorship: string; sponsored_by: string; ids_today: string;
 }
 
 const STRINGS: Record<'en' | 'es', Strings> = {
   en: {
     active: 'Active', disabled: '⏸ Disabled', no_key: 'No key', not_downloaded: 'Not downloaded',
     unsupported: '⚠ Unsupported', enable: 'Enable', disable: 'Disable', download: 'Download',
+    redownload: 'Re-download', cancel: 'Cancel',
     delete: 'Delete', add_key: 'Add key', use_own_key: 'Use my own key',
     via_sponsorship: 'via sponsorship', sponsored_by: 'sponsored by', ids_today: 'IDs today',
   },
   es: {
     active: 'Activo', disabled: '⏸ Desactivado', no_key: 'Sin API key', not_downloaded: 'Sin descargar',
     unsupported: '⚠ No soportado', enable: 'Activar', disable: 'Desactivar', download: 'Descargar',
+    redownload: 'Volver a descargar', cancel: 'Cancelar',
     delete: 'Eliminar', add_key: 'Agregar API key', use_own_key: 'Usar tu propia API key',
     via_sponsorship: 'vía patrocinio', sponsored_by: 'patrocinado por', ids_today: 'IDs hoy',
   },
@@ -113,13 +115,13 @@ function actionsFor(p: PluginCardProps, t: Strings): string {
   const dlPrefix = onDeviceIds[p.plugin.id];
 
   const primaryBtn = (label: string, dataAttr: string, value: string) =>
-    `<button type="button" ${dataAttr}="${value}" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 text-xs font-semibold text-white">${label}</button>`;
+    `<button type="button" ${escape(dataAttr)}="${escape(value)}" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 text-xs font-semibold text-white">${label}</button>`;
 
   const ghostBtn = (label: string, dataAttr: string, value: string) =>
-    `<button type="button" ${dataAttr}="${value}" class="rounded-lg border border-zinc-300 dark:border-zinc-700 px-2 py-1 text-[10px] font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40">${label}</button>`;
+    `<button type="button" ${escape(dataAttr)}="${escape(value)}" class="rounded-lg border border-zinc-300 dark:border-zinc-700 px-2 py-1 text-[10px] font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40">${label}</button>`;
 
   const dangerBtn = (label: string, dataAttr: string, value: string) =>
-    `<button type="button" ${dataAttr}="${value}" class="rounded-lg border border-red-300 dark:border-red-900/50 px-2 py-1 text-[10px] font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">${label}</button>`;
+    `<button type="button" ${escape(dataAttr)}="${escape(value)}" class="rounded-lg border border-red-300 dark:border-red-900/50 px-2 py-1 text-[10px] font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">${label}</button>`;
 
   const toggleBtn = (label: string) =>
     `<button type="button" data-toggle-plugin="${id}" class="rounded-lg border border-emerald-600/60 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 px-2 py-1 text-[10px] font-medium">${label}</button>`;
@@ -135,7 +137,7 @@ function actionsFor(p: PluginCardProps, t: Strings): string {
       }
       const idBase = dlPrefix ?? '';
       return `
-        <button type="button" id="${idBase}-download" class="rounded-lg border border-emerald-600/60 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20">Re-download</button>
+        <button type="button" id="${idBase}-download" class="rounded-lg border border-emerald-600/60 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20">${t.redownload}</button>
         <button type="button" id="${idBase}-delete" class="rounded-lg border border-red-300 dark:border-red-900/50 px-3 py-1.5 text-xs font-medium text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">${t.delete}</button>
         ${toggleBtn(t.disable)}
       `;
@@ -157,7 +159,7 @@ function actionsFor(p: PluginCardProps, t: Strings): string {
     }
     case 'downloading': {
       const idBase = dlPrefix ?? '';
-      return `<button type="button" id="${idBase}-cancel" class="rounded-lg border border-zinc-300 dark:border-zinc-700 px-2 py-1 text-[10px]">Cancel</button>`;
+      return `<button type="button" id="${idBase}-cancel" class="rounded-lg border border-zinc-300 dark:border-zinc-700 px-2 py-1 text-[10px]">${t.cancel}</button>`;
     }
     case 'unsupported':
       return '';
@@ -240,7 +242,7 @@ export function renderLocalDataCard(p: LocalDataCardProps): string {
   const sizeLabel = cached ? bytesHuman(p.cacheStatus!.approxBytes) : '';
 
   const downloadBtn = cached
-    ? `<button type="button" id="${escape(p.domIdPrefix)}-download" class="rounded-lg border border-emerald-600/60 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20">Re-download</button>`
+    ? `<button type="button" id="${escape(p.domIdPrefix)}-download" class="rounded-lg border border-emerald-600/60 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20">${t.redownload}</button>`
     : `<button type="button" id="${escape(p.domIdPrefix)}-download" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 text-xs font-semibold text-white">${t.download}</button>`;
 
   const deleteBtn = cached
