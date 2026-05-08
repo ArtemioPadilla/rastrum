@@ -33,3 +33,13 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+interface PostHog {
+  __loaded?: boolean;
+  capture(event: string, properties?: Record<string, unknown>): void;
+  identify(distinctId: string, properties?: Record<string, unknown>): void;
+}
+
+interface Window {
+  posthog?: PostHog;
+}
