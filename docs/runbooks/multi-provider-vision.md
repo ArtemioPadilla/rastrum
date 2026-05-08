@@ -127,40 +127,10 @@ if (!r.valid) throw new Error(r.error);
 ## Resolution order in `identify`
 
 ```
-1. Owner-personal Vault credential (#655, #664) — `use_personally = true`
-   on a `sponsor_credentials` row owned by the JWT user. Picked up
-   regardless of provider kind (api_key / oauth_token / bedrock /
-   vertex_ai / openai_api_key / azure_openai / gemini_api_key).
-   Bypasses `sponsorship_usage` tracking + `consume_pool_slot` —
-   owner's own credit, no quota.
-2. BYO key (client_keys.anthropic) — Anthropic-only (legacy direct path)
-3. User's personal sponsorship → uses preferred_model + endpoint via buildProvider()
-4. Platform pool — consume_pool_slot() round-robin
-5. Skip Claude (PlantNet only)
-```
-
-### Personal-credential bypass invariants (#664)
-
-When a personal credential resolves the cascade, the EF MUST NOT call:
-
-- `recordUsage()` / `maybeNotifyThreshold()` / `autoPauseSponsorship()`
-  in `_shared/sponsorship.ts` — these are sponsorship-quota hooks.
-- `consume_pool_slot()` SQL RPC — that's pool quota.
-- The pool-call sponsor karma drip (`add_karma_simple`).
-
-Operator-side smoke test (Bedrock, but works for any kind): register
-a Vault credential, toggle "Use personally" via
-`set_credential_personal('<cred-uuid>', true)`, identify a photo
-while signed in as the owner. Verify:
-
-```sql
-SELECT count(*) FROM ai_usage
- WHERE beneficiary_id = '<owner-uuid>'
-   AND created_at > now() - interval '1 minute';
--- Expected: 0 (personal calls don't write ai_usage)
-
-SELECT used FROM sponsor_pools WHERE id = '<active-pool-uuid>';
--- Expected: unchanged from pre-call snapshot
+1. BYO key (client_keys.anthropic) — always wins (legacy direct path)
+2. User's personal sponsorship → uses preferred_model + endpoint via buildProvider()
+3. Platform pool — consume_pool_slot() round-robin
+4. Skip Claude (PlantNet only)
 ```
 
 ## Pool resolution debugging
