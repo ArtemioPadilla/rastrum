@@ -818,6 +818,10 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
   // 'rastrum.byoAnthropicKey' is auto-migrated by lib/byo-keys.ts on
   // first read.
 
+  // Pipeline disabled list — extracted to src/lib/identifier-prefs.ts (#583)
+  // so every cascade call site honors the toggle uniformly.
+  const { getDisabledPlugins, togglePluginDisabled } = await import('../lib/identifier-prefs');
+
   // Wrapped so paintRegistry() can call it again after replacing the registry list
   // innerHTML, ensuring on-device download bindings re-attach to the freshly-rendered
   // DOM. Defensive null checks (via ?. and early returns) make it safe to call when
@@ -1538,9 +1542,8 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
 
   refreshPmtiles().catch(() => {});
 
-  // Pipeline disabled list — extracted to src/lib/identifier-prefs.ts (#583)
-  // so every cascade call site honors the toggle uniformly.
-  const { getDisabledPlugins, togglePluginDisabled } = await import('../lib/identifier-prefs');
+  } // end wireOnDeviceControls
+  wireOnDeviceControls().catch(() => {});
 
   /**
    * #594: render the pipeline-flow chip strip using the REAL cascade sort
@@ -1583,8 +1586,6 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
     };
     flowItems.innerHTML = `<div class="flex flex-col gap-1.5">${renderRow('photo')}${renderRow('audio')}</div>`;
   }
-  } // end wireOnDeviceControls
-  wireOnDeviceControls().catch(() => {});
 
   // ── Identifier registry list (modular platform) with guided setup ──
   async function paintRegistry() {
