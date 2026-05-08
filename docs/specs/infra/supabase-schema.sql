@@ -8170,6 +8170,36 @@ SELECT cron.unschedule('refresh-platform-stats')
 SELECT cron.schedule('refresh-platform-stats', '0 * * * *',
   $$REFRESH MATERIALIZED VIEW CONCURRENTLY public.mv_platform_stats$$);
 
+-- ─────────────────────────────────────────────────────────────────────────
+-- mv_taxon_obs_counts — per-species observation counts.
+-- Lets /explore/species/ render the index without scanning the full
+-- observations table client-side. Refreshed hourly via pg_cron.
+-- Single-row-per-taxon MV; UNIQUE index on taxon_id lets us
+-- REFRESH CONCURRENTLY.
+-- ─────────────────────────────────────────────────────────────────────────
+CREATE MATERIALIZED VIEW IF NOT EXISTS public.mv_taxon_obs_counts AS
+SELECT
+  o.primary_taxon_id                      AS taxon_id,
+  COUNT(*)::bigint                        AS obs_count,
+  MAX(o.observed_at)                      AS last_observed_at
+FROM public.observations o
+WHERE o.sync_status = 'synced'
+  AND o.primary_taxon_id IS NOT NULL
+GROUP BY o.primary_taxon_id;
+
+CREATE UNIQUE INDEX IF NOT EXISTS mv_taxon_obs_counts_unique
+  ON public.mv_taxon_obs_counts (taxon_id);
+
+GRANT SELECT ON public.mv_taxon_obs_counts TO anon, authenticated;
+
+-- Refresh hourly (offset 5 minutes from mv_platform_stats so the two
+-- aren't competing for write locks on the same minute). Idempotent —
+-- unschedule first.
+SELECT cron.unschedule('refresh-taxon-obs-counts')
+  WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'refresh-taxon-obs-counts');
+SELECT cron.schedule('refresh-taxon-obs-counts', '5 * * * *',
+  $$REFRESH MATERIALIZED VIEW CONCURRENTLY public.mv_taxon_obs_counts$$);
+
 
 -- suggest_pokedex_target(viewer_id): pick one species the viewer hasn't
 -- observed yet, preferring their most-active kingdom, common rarity, with

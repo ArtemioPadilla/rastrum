@@ -317,17 +317,16 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
       return;
     }
 
-    type ObsBucketRow = { primary_taxon_id: string | null };
-    let obsRows: ObsBucketRow[] = [];
+    type MvRow = { taxon_id: string; obs_count: number | string };
+    let mvRows: MvRow[] = [];
     try {
       const { data, error } = await supabase
-        .from('observations')
-        .select('primary_taxon_id')
-        .eq('sync_status', 'synced')
-        .not('primary_taxon_id', 'is', null)
-        .limit(2000);
+        .from('mv_taxon_obs_counts')
+        .select('taxon_id, obs_count')
+        .order('obs_count', { ascending: false })
+        .limit(500);
       if (error) throw error;
-      obsRows = (data ?? []) as unknown as ObsBucketRow[];
+      mvRows = (data ?? []) as unknown as MvRow[];
     } catch (e) {
       hideSkeleton();
       if (errEl) {
@@ -338,11 +337,11 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
     }
 
     const counts = new Map<string, number>();
-    for (const r of obsRows) {
-      if (!r.primary_taxon_id) continue;
-      counts.set(r.primary_taxon_id, (counts.get(r.primary_taxon_id) ?? 0) + 1);
+    for (const r of mvRows) {
+      if (!r.taxon_id) continue;
+      counts.set(r.taxon_id, Number(r.obs_count));
     }
-    const taxonIds = Array.from(counts.keys());
+    const taxonIds = mvRows.map(r => r.taxon_id).filter((id): id is string => !!id);
 
     if (taxonIds.length === 0) {
       hideSkeleton();
