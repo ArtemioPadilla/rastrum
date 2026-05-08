@@ -53,6 +53,7 @@ high-level system view.
 | Runbook | Covers |
 |---|---|
 | [`karma-phase-1-post-merge-verification.md`](karma-phase-1-post-merge-verification.md) | Phase 1 deploy verification — schema + cache + recompute cron. |
+| [`falta-dex.md`](falta-dex.md) | M08 — taxonomic gaps panel + region pool baseline (Option A: own data) + showMissing localStorage. |
 
 ## Social graph (Module 26)
 
