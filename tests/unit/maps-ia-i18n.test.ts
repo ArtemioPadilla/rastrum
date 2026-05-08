@@ -48,4 +48,37 @@ describe('maps IA cleanup — i18n parity', () => {
     expect(get(es, 'nav.explore_megamenu.community_map')).not.toBe('Mapa');
     expect(get(es, 'map.title')).not.toBe('Mapa');
   });
+
+  // `nav.map` (Footer) and `nav.explore_dropdown.map` (Header MegaMenu) both
+  // link to /explore/map/ and so must show the SAME label. Drift here would
+  // make the same page show different names depending on which surface the
+  // user clicked from. Mirror invariant for both locales + assert vs the
+  // page's own h1 (`map.title`) to catch a third-place drift.
+  it('EN: nav.map, nav.explore_dropdown.map, map.title agree', () => {
+    const a = get(en, 'nav.map');
+    const b = get(en, 'nav.explore_dropdown.map');
+    const c = get(en, 'map.title');
+    expect(a).toBe(b);
+    expect(a).toBe(c);
+  });
+
+  it('ES: nav.map, nav.explore_dropdown.map, map.title agree', () => {
+    const a = get(es, 'nav.map');
+    const b = get(es, 'nav.explore_dropdown.map');
+    const c = get(es, 'map.title');
+    expect(a).toBe(b);
+    expect(a).toBe(c);
+  });
+
+  // Same invariant for the observers map: nav.explore_megamenu.community_map
+  // (Header) and community.map_title (the page itself) must agree.
+  it('EN: community_map MegaMenu label matches community.map_title', () => {
+    expect(get(en, 'nav.explore_megamenu.community_map'))
+      .toBe(get(en, 'community.map_title'));
+  });
+
+  it('ES: community_map MegaMenu label matches community.map_title', () => {
+    expect(get(es, 'nav.explore_megamenu.community_map'))
+      .toBe(get(es, 'community.map_title'));
+  });
 });
