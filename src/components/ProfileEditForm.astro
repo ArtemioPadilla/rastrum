@@ -1512,13 +1512,17 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
               cacheStatus: cache,
               byoKeysSet: byo.hasKeysForPlugin(p.id),
             });
+        const rawKeys = byo.getAllKeysForPlugin(p.id);
+        const byoKeysSet: Record<string, boolean> = Object.fromEntries(
+          Object.entries(rawKeys).map(([k, v]) => [k, Boolean(v)])
+        );
         return renderPluginCard({
           lang,
           plugin: p,
           state,
           isDisabled,
           cacheStatus: cache,
-          byoKeysSet: {},
+          byoKeysSet,
           sponsorship: p.id === 'claude_haiku' ? (sponsorship as Parameters<typeof renderPluginCard>[0]['sponsorship']) : null,
         });
       }).join('');
@@ -1592,20 +1596,103 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
       });
     });
 
-    // Wire Add key / Edit key buttons (delegated). Uses window.prompt as v1
-    // minimum; richer inline form is a follow-up.
+    // Wire Add key / Edit key buttons — open the inline <details> form.
     list.querySelectorAll<HTMLButtonElement>('[data-add-key], [data-edit-key]').forEach((btn) => {
-      btn.addEventListener('click', async () => {
+      btn.addEventListener('click', () => {
         const id = btn.dataset.addKey ?? btn.dataset.editKey!;
+        const details = list.querySelector<HTMLDetailsElement>(`[data-key-form="${CSS.escape(id)}"]`);
+        if (!details) return;
+        details.open = true;
+        const firstInput = details.querySelector<HTMLInputElement>('[data-key-input]');
+        if (firstInput) {
+          // Pre-fill with the current stored value so the user can see/edit it.
+          const plugin = reg.get(id);
+          if (plugin?.keySpec?.[0]) {
+            firstInput.value = byo.getKey(id, plugin.keySpec[0].name) ?? '';
+          }
+          firstInput.focus();
+        }
+      });
+    });
+
+    // Wire Save buttons for inline key forms.
+    list.querySelectorAll<HTMLButtonElement>('[data-key-save]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.keySave!;
         const plugin = reg.get(id);
         if (!plugin?.keySpec?.length) return;
-        const newKey = window.prompt(plugin.keySpec[0].label, byo.getKey(id, plugin.keySpec[0].name) ?? '');
-        if (newKey == null) return;
-        if (newKey.trim()) {
-          byo.setKey(id, plugin.keySpec[0].name, newKey.trim());
-        } else {
-          byo.clearKey(id, plugin.keySpec[0].name);
+        const statusEl = list.querySelector<HTMLElement>(`[data-key-status="${CSS.escape(id)}"]`);
+        const inputs = list.querySelectorAll<HTMLInputElement>(`[data-key-input][data-plugin="${CSS.escape(id)}"]`);
+        const value = inputs[0]?.value?.trim() ?? '';
+
+        if (!value) {
+          plugin.keySpec.forEach((spec) => byo.clearKey(id, spec.name));
+          if (statusEl) statusEl.textContent = '';
+          await paintRegistry();
+          return;
         }
+
+        // Validate Anthropic keys before persisting.
+        if (id === 'claude_haiku') {
+          if (statusEl) {
+            statusEl.textContent = 'Validating…';
+            statusEl.className = 'text-[10px] text-zinc-500 dark:text-zinc-400';
+          }
+          const { validateAnthropicKey } = await import('../lib/anthropic-key');
+          const result = await validateAnthropicKey(value);
+          if (!result.valid) {
+            if (statusEl) {
+              statusEl.textContent = `✗ ${result.message ?? 'Invalid key'}`;
+              statusEl.className = 'text-[10px] text-red-600 dark:text-red-400';
+            }
+            return;
+          }
+        }
+
+        // Persist all key inputs for this plugin.
+        inputs.forEach((input) => {
+          const name = input.dataset.keyName!;
+          if (input.value.trim()) {
+            byo.setKey(id, name, input.value.trim());
+          }
+        });
+
+        if (statusEl) {
+          statusEl.textContent = '✓ Saved';
+          statusEl.className = 'text-[10px] text-emerald-600 dark:text-emerald-400';
+        }
+        setTimeout(() => paintRegistry(), 800);
+      });
+    });
+
+    // Wire Test buttons for plugins that expose testConnection().
+    list.querySelectorAll<HTMLButtonElement>('[data-key-test]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.keyTest!;
+        const plugin = reg.get(id);
+        if (typeof plugin?.testConnection !== 'function') return;
+        const statusEl = list.querySelector<HTMLElement>(`[data-key-status="${CSS.escape(id)}"]`);
+        if (statusEl) {
+          statusEl.textContent = 'Testing…';
+          statusEl.className = 'text-[10px] text-zinc-500 dark:text-zinc-400';
+        }
+        const result = await plugin.testConnection();
+        if (statusEl) {
+          statusEl.textContent = result.ok ? `✓ ${result.message ?? 'OK'}` : `✗ ${result.message ?? 'Failed'}`;
+          statusEl.className = result.ok
+            ? 'text-[10px] text-emerald-600 dark:text-emerald-400'
+            : 'text-[10px] text-red-600 dark:text-red-400';
+        }
+      });
+    });
+
+    // Wire Clear buttons for inline key forms.
+    list.querySelectorAll<HTMLButtonElement>('[data-key-clear]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.keyClear!;
+        const plugin = reg.get(id);
+        if (!plugin?.keySpec?.length) return;
+        plugin.keySpec.forEach((spec) => byo.clearKey(id, spec.name));
         await paintRegistry();
       });
     });

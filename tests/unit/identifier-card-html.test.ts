@@ -177,6 +177,109 @@ describe('renderPluginCard', () => {
     const active = renderPluginCard(props({ lang: 'es' }));
     expect(active).toContain('Volver a descargar');
   });
+
+  // Inline key-form tests (issue #691)
+  it('renders Configure details summary and password input for Claude (no-key)', () => {
+    const html = renderPluginCard(props({
+      plugin: claude,
+      state: { kind: 'no-key' },
+      cacheStatus: null,
+      byoKeysSet: {},
+    }));
+    expect(html).toContain('data-key-form="claude_haiku"');
+    expect(html).toMatch(/<summary[^>]*>[\s\S]*Configure[\s\S]*<\/summary>/);
+    expect(html).toContain('data-key-input');
+    expect(html).toContain('data-plugin="claude_haiku"');
+    expect(html).toContain('type="password"');
+    expect(html).toContain('placeholder="sk-ant-…"');
+  });
+
+  it('renders Configure · edit when key is already set (byoKeysSet)', () => {
+    const html = renderPluginCard(props({
+      plugin: claude,
+      state: { kind: 'active' },
+      cacheStatus: null,
+      byoKeysSet: { anthropic: true },
+    }));
+    expect(html).toContain('Configure · edit');
+  });
+
+  it('renders Save and Clear buttons in key form', () => {
+    const html = renderPluginCard(props({
+      plugin: claude,
+      state: { kind: 'no-key' },
+      cacheStatus: null,
+      byoKeysSet: {},
+    }));
+    expect(html).toContain('data-key-save="claude_haiku"');
+    expect(html).toContain('data-key-clear="claude_haiku"');
+    expect(html).toContain('data-key-status="claude_haiku"');
+  });
+
+  it('renders Test button for plugins with testConnection', () => {
+    const claudeWithTest: Identifier = {
+      ...claude,
+      testConnection: async () => ({ ok: true }),
+    };
+    const html = renderPluginCard(props({
+      plugin: claudeWithTest,
+      state: { kind: 'no-key' },
+      cacheStatus: null,
+      byoKeysSet: {},
+    }));
+    expect(html).toContain('data-key-test="claude_haiku"');
+  });
+
+  it('omits Test button for plugins without testConnection', () => {
+    const claudeNoTest: Identifier = { ...claude };
+    delete (claudeNoTest as { testConnection?: unknown }).testConnection;
+    const html = renderPluginCard(props({
+      plugin: claudeNoTest,
+      state: { kind: 'no-key' },
+      cacheStatus: null,
+      byoKeysSet: {},
+    }));
+    expect(html).not.toContain('data-key-test=');
+  });
+
+  it('omits key form for plugins without keySpec', () => {
+    const html = renderPluginCard(props({
+      plugin: phi,
+      state: { kind: 'active' },
+      byoKeysSet: {},
+    }));
+    expect(html).not.toContain('data-key-form=');
+    expect(html).not.toContain('data-key-save=');
+  });
+
+  it('renders Get key link from setupSteps that have a link', () => {
+    const claudeWithSteps: Identifier = {
+      ...claude,
+      setupSteps: [
+        { text: 'Sign in', link: 'https://console.anthropic.com' },
+      ],
+    };
+    const html = renderPluginCard(props({
+      plugin: claudeWithSteps,
+      state: { kind: 'no-key' },
+      cacheStatus: null,
+      byoKeysSet: {},
+    }));
+    expect(html).toContain('Get key ↗');
+    expect(html).toContain('https://console.anthropic.com');
+  });
+
+  it('renders Configure summary in Spanish when lang=es', () => {
+    const html = renderPluginCard(props({
+      lang: 'es',
+      plugin: claude,
+      state: { kind: 'no-key' },
+      cacheStatus: null,
+      byoKeysSet: {},
+    }));
+    expect(html).toContain('Configurar');
+    expect(html).toContain('data-key-save="claude_haiku"');
+  });
 });
 
 describe('renderLocalDataCard', () => {
