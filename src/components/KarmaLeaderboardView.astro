@@ -43,6 +43,8 @@ interface LeaderboardCopy {
   leaderboard_experts_empty: string;
   leaderboard_experts_score: string;
   leaderboard_experts_taxon_loading: string;
+  leaderboard_experts_taxon_none: string;
+  leaderboard_experts_no_data: string;
   loading: string;
 }
 const cm = (tr as unknown as { community: LeaderboardCopy }).community;
@@ -61,6 +63,8 @@ const stringsJson = JSON.stringify({
   regionEmpty: cm.leaderboard_region_empty,
   regionAll: cm.leaderboard_region_all,
   taxaLoading: cm.leaderboard_experts_taxon_loading,
+  taxonNoneOption: cm.leaderboard_experts_taxon_none,
+  expertsNoData: cm.leaderboard_experts_no_data,
   profileBase,
 });
 ---
@@ -180,6 +184,8 @@ const stringsJson = JSON.stringify({
     regionEmpty: string;
     regionAll: string;
     taxaLoading: string;
+    taxonNoneOption: string;
+    expertsNoData: string;
   }
 
   const root = document.getElementById('leaderboard-root');
@@ -247,6 +253,7 @@ const stringsJson = JSON.stringify({
 
   let regionsLoaded = false;
   let taxaLoaded = false;
+  let taxaEmpty = false;
   let lastTaxon = '';
 
   function renderRow(row: LeaderboardRow, rank: number, view: LeaderboardView): HTMLTableRowElement {
@@ -420,6 +427,23 @@ const stringsJson = JSON.stringify({
       taxa.sort((a, b) => a.scientific_name.localeCompare(b.scientific_name));
 
       while (taxonSel!.options.length > 0) taxonSel!.remove(0);
+
+      if (taxa.length === 0) {
+        taxaEmpty = true;
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = STRINGS.taxonNoneOption;
+        opt.disabled = true;
+        opt.selected = true;
+        opt.style.fontStyle = 'italic';
+        taxonSel!.appendChild(opt);
+        taxonSel!.disabled = true;
+        lastTaxon = '';
+        return;
+      }
+
+      taxaEmpty = false;
+      taxonSel!.disabled = false;
       for (const t of taxa) {
         const common = STRINGS.lang === 'es'
           ? (t.common_name_es ?? t.common_name_en ?? '')
@@ -524,7 +548,7 @@ const stringsJson = JSON.stringify({
     showLoading();
     try {
       if (!taxonId) {
-        showEmpty(STRINGS.expertsEmpty);
+        showEmpty(taxaEmpty ? STRINGS.expertsNoData : STRINGS.expertsEmpty);
         return;
       }
       const supabase = getSupabase();
