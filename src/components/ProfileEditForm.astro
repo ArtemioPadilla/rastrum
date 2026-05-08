@@ -1,5 +1,5 @@
 ---
-import { t } from '../i18n/utils';
+import { t, routes } from '../i18n/utils';
 
 interface Props {
   lang: 'en' | 'es';
@@ -15,6 +15,8 @@ const showSecurity = section === 'all' || section === 'security';
 const pip = (tr as unknown as { pipeline: Record<string, string> }).pipeline;
 const onb = (tr as unknown as { onboarding: Record<string, string> }).onboarding;
 const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } }).privacy;
+const crosslink = (tr as unknown as { ai_sponsor_crosslink: { from_ai_label: string; from_ai_link: string } }).ai_sponsor_crosslink;
+const sponsoringHref = `/${lang}${routes.sponsoring[lang]}/`;
 ---
 
 <div class="max-w-2xl mx-auto">
@@ -252,6 +254,14 @@ const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } })
         <li class="text-sm text-zinc-500 italic">{lang === 'es' ? 'Cargando…' : 'Loading…'}</li>
       </ul>
     </div>
+
+    <!-- Cross-link to sponsorships surface (issue #656) -->
+    <aside class="mb-6 border-l-2 border-emerald-300 dark:border-emerald-700/60 pl-3 py-1 text-xs text-zinc-600 dark:text-zinc-400">
+      {crosslink.from_ai_label}{' '}
+      <a href={sponsoringHref} class="font-medium text-emerald-700 dark:text-emerald-400 hover:underline">
+        {crosslink.from_ai_link} →
+      </a>
+    </aside>
 
     <!-- Legacy hidden field for BYO key migration -->
     <input id="anthropic-key" type="hidden" />
