@@ -49,9 +49,11 @@ import {
 import {
   buildProvider,
   DEFAULT_SYSTEM_PROMPT,
+  CredentialUnauthorizedError,
   type ResolvedCredential,
   type VisionResult,
 } from '../_shared/vision-provider.ts';
+import { reportFunctionError } from '../admin/_shared/error-reporter.ts';
 import { checkAnonRateLimit } from '../_shared/anon-rate-limit.ts';
 
 type IdentifyRequest = {
@@ -323,6 +325,8 @@ async function callViaProvider(
       crop_bbox: context.crop_bbox,
     });
   } catch (err) {
+    // Re-throw 401s so the cascade can fall through to the next credential.
+    if (err instanceof CredentialUnauthorizedError) throw err;
     console.warn(`[identify] provider.identify failed kind=${cred.kind}: ${err instanceof Error ? err.message : String(err)}`);
     return null;
   }
@@ -818,44 +822,67 @@ serve(async (req) => {
     }
   }
 
-  // Decide what credential the Claude runner gets. Order:
-  //   1. Owner-personal Vault credential (#655, #664) — `use_personally = true`,
-  //      owned by the JWT user, of any provider kind. Skips sponsorship_usage
-  //      + pool consumption because it's the owner's own credit.
-  //   2. BYO key forwarded by the client.
-  //   3. Sponsor-supplied credential resolved via _shared/sponsorship.ts.
-  //   4. Platform pool (M27.2, #115) — round-robin across active pools,
-  //      enforced by `consume_pool_slot()` SQL RPC.
-  //   5. Nothing — the Claude runner is skipped (no operator-key fallback).
-  let claudeCred: { secret: string; kind: CredentialKind } | null = null;
-  let resolvedClaudeCred: ResolvedCredential | null = null;
-  let sponsorshipCtx: ResolvedSponsorship | null = null;
-  let sponsorshipSkipReason: string | null = null;
-  let poolUsed: { poolId: string; credentialId: string } | null = null;
-  let usedPersonalCredential = false;
+  // Credential resolution — ordered fallback chain (#693).
+  //
+  // Each supplier is lazy: it's only invoked when the previous credential
+  // returned 401. The pool slot is consumed atomically at resolve-time via
+  // `consume_pool_slot()`; if the pool credential then 401s, we surface a
+  // hard failure (the slot is already spent, and the issue spec says pool
+  // is the last resort).
+  //
+  // Resolution order:
+  //   1. Owner-personal Vault credential (#655, #664) — `use_personally = true`.
+  //   2. BYO key forwarded by the client (client_keys.anthropic).
+  //   3. Sponsor-supplied credential via _shared/sponsorship.ts.
+  //   4. Platform pool — round-robin via `consume_pool_slot()` RPC.
+  //   5. Nothing — the Claude runner is skipped.
 
-  // Step 1: owner-personal Vault credential (#655).
+  interface CredentialWithMeta {
+    cred: ResolvedCredential;
+    sponsorCtx: ResolvedSponsorship | null;
+    poolInfo: { poolId: string; credentialId: string } | null;
+    label: string;   // for logging only — never contains the secret
+  }
+
+  // Step 1: personal Vault credential (#655).
+  let personalCred: CredentialWithMeta | null = null;
   if (beneficiaryId) {
     try {
       const personal = await resolvePersonalCredential(db(), beneficiaryId);
       if (personal) {
-        claudeCred = { secret: personal.secret, kind: personal.kind };
-        resolvedClaudeCred = {
-          kind:     personal.kind as ResolvedCredential['kind'],
-          secret:   personal.secret,
-          model:    personal.model,
-          endpoint: personal.endpoint,
+        personalCred = {
+          cred: {
+            kind:     personal.kind as ResolvedCredential['kind'],
+            secret:   personal.secret,
+            model:    personal.model,
+            endpoint: personal.endpoint,
+          },
+          sponsorCtx: null,
+          poolInfo: null,
+          label: 'personal',
         };
-        usedPersonalCredential = true;
       }
     } catch (err) {
       console.warn(`[identify] personal credential resolution failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
-  if (!usedPersonalCredential && byoAnthropic) {
-    claudeCred = { secret: byoAnthropic, kind: 'api_key' };
-  } else if (!usedPersonalCredential && beneficiaryId) {
+  // Lazy suppliers for steps 2–4. Each returns null if the slot is
+  // unavailable (no sponsorship, no pool capacity, rate-limited, etc.).
+  let sponsorshipSkipReason: string | null = null;
+
+  const byoSupplier = (): CredentialWithMeta | null => {
+    if (!byoAnthropic) return null;
+    return {
+      cred: { kind: 'api_key', secret: byoAnthropic, model: 'claude-haiku-4-5', endpoint: null },
+      sponsorCtx: null,
+      poolInfo: null,
+      label: 'byo',
+    };
+  };
+
+  const sponsorshipSupplier = async (): Promise<CredentialWithMeta | null> => {
+    if (!beneficiaryId) return null;
     try {
       const rl = await checkAndBumpRateLimit(db(), beneficiaryId, 'anthropic');
       if (!rl.allowed) {
@@ -864,74 +891,166 @@ serve(async (req) => {
           const ctxNow = await resolveSponsorship(db(), beneficiaryId, 'anthropic');
           if (ctxNow) await autoPauseSponsorship(db(), ctxNow.sponsorshipId, rl.reason, beneficiaryId);
         }
-      } else {
-        // Sponsored users add ~3 DB round-trips vs BYO: resolve, decrypt vault, rate-limit bump.
-        // Acceptable at v1 scale; profile if /identify p95 latency regresses.
-        sponsorshipCtx = await resolveSponsorship(db(), beneficiaryId, 'anthropic');
-        if (sponsorshipCtx) {
-          const secret = await decryptCredential(db(), sponsorshipCtx.vaultSecretId);
-          claudeCred = { secret, kind: sponsorshipCtx.kind };
-          resolvedClaudeCred = {
-            kind:     sponsorshipCtx.kind as ResolvedCredential['kind'],
-            secret,
-            model:    sponsorshipCtx.preferredModel,
-            endpoint: sponsorshipCtx.endpoint,
-          };
-        } else {
-          // Step 3: platform pool. Atomic increment of pool.used + per-user
-          // daily count via consume_pool_slot RPC. Returns null when no pool
-          // has capacity OR the user has hit their daily cap.
-          const { data: poolRows, error: poolErr } = await db().rpc('consume_pool_slot', {
-            p_user_id: beneficiaryId,
-          });
-          if (poolErr) {
-            console.warn(`[identify] consume_pool_slot failed: ${poolErr.message}`);
-          } else if (Array.isArray(poolRows) && poolRows.length > 0) {
-            const slot = poolRows[0] as {
-              pool_id: string; credential_id: string; preferred_model: string;
-            };
-            // Look up the credential to fetch vault_secret_id + kind + endpoint.
-            const { data: credRow, error: credErr } = await db()
-              .from('sponsor_credentials')
-              .select('kind, vault_secret_id, endpoint')
-              .eq('id', slot.credential_id)
-              .single();
-            if (credErr) {
-              console.warn(`[identify] pool credential lookup failed: ${credErr.message}`);
-            } else if (credRow) {
-              const secret = await decryptCredential(db(), (credRow as { vault_secret_id: string }).vault_secret_id);
-              const kind = (credRow as { kind: CredentialKind }).kind;
-              claudeCred = { secret, kind };
-              resolvedClaudeCred = {
-                kind:     kind as ResolvedCredential['kind'],
-                secret,
-                model:    slot.preferred_model,
-                endpoint: (credRow as { endpoint: string | null }).endpoint,
-              };
-              poolUsed = { poolId: slot.pool_id, credentialId: slot.credential_id };
-            }
-          }
-        }
+        return null;
       }
+      const ctx = await resolveSponsorship(db(), beneficiaryId, 'anthropic');
+      if (!ctx) return null;
+      const secret = await decryptCredential(db(), ctx.vaultSecretId);
+      return {
+        cred: {
+          kind:     ctx.kind as ResolvedCredential['kind'],
+          secret,
+          model:    ctx.preferredModel,
+          endpoint: ctx.endpoint,
+        },
+        sponsorCtx: ctx,
+        poolInfo: null,
+        label: 'sponsorship',
+      };
     } catch (err) {
-      // allowed: log level + no secret
       console.warn(`[identify] sponsorship resolution failed: ${err instanceof Error ? err.message : String(err)}`);
+      return null;
     }
+  };
+
+  const poolSupplier = async (): Promise<CredentialWithMeta | null> => {
+    if (!beneficiaryId) return null;
+    try {
+      const { data: poolRows, error: poolErr } = await db().rpc('consume_pool_slot', {
+        p_user_id: beneficiaryId,
+      });
+      if (poolErr) {
+        console.warn(`[identify] consume_pool_slot failed: ${poolErr.message}`);
+        return null;
+      }
+      if (!Array.isArray(poolRows) || poolRows.length === 0) return null;
+      const slot = poolRows[0] as {
+        pool_id: string; credential_id: string; preferred_model: string;
+      };
+      const { data: credRow, error: credErr } = await db()
+        .from('sponsor_credentials')
+        .select('kind, vault_secret_id, endpoint')
+        .eq('id', slot.credential_id)
+        .single();
+      if (credErr) {
+        console.warn(`[identify] pool credential lookup failed: ${credErr.message}`);
+        return null;
+      }
+      if (!credRow) return null;
+      const secret = await decryptCredential(db(), (credRow as { vault_secret_id: string }).vault_secret_id);
+      const kind = (credRow as { kind: CredentialKind }).kind;
+      return {
+        cred: {
+          kind:     kind as ResolvedCredential['kind'],
+          secret,
+          model:    slot.preferred_model,
+          endpoint: (credRow as { endpoint: string | null }).endpoint,
+        },
+        sponsorCtx: null,
+        poolInfo: { poolId: slot.pool_id, credentialId: slot.credential_id },
+        label: 'pool',
+      };
+    } catch (err) {
+      console.warn(`[identify] pool resolution failed: ${err instanceof Error ? err.message : String(err)}`);
+      return null;
+    }
+  };
+
+  // Build the ordered chain. Personal cred is already resolved; BYO is
+  // trivial; sponsorship and pool are async lazy suppliers.
+  // We use a discriminated union so TypeScript can distinguish sync vs async.
+  type CredSupplier =
+    | { kind: 'resolved'; value: CredentialWithMeta | null }
+    | { kind: 'sync';     fn: () => CredentialWithMeta | null }
+    | { kind: 'async';    fn: () => Promise<CredentialWithMeta | null> };
+
+  const credChain: CredSupplier[] = [
+    { kind: 'resolved', value: personalCred },
+    { kind: 'sync',     fn: byoSupplier },
+    { kind: 'async',    fn: sponsorshipSupplier },
+    { kind: 'async',    fn: poolSupplier },
+  ];
+
+  /**
+   * Try each credential supplier in order. On 401, log a structured
+   * warning (no secret) and continue to the next. Returns the first
+   * successful result plus which credential won.
+   */
+  async function callClaudeWithFallback(
+    imgBytes: Uint8Array,
+    mime: string,
+    context: Omit<ClaudeContext, 'credential' | 'resolvedCredential'>,
+    chain: CredSupplier[],
+  ): Promise<{ result: IDResult | null; winner: CredentialWithMeta | null }> {
+    for (const supplier of chain) {
+      let meta: CredentialWithMeta | null;
+      if (supplier.kind === 'resolved') {
+        meta = supplier.value;
+      } else if (supplier.kind === 'sync') {
+        meta = supplier.fn();
+      } else {
+        meta = await supplier.fn();
+      }
+      if (!meta) continue;
+
+      try {
+        const r = await callClaudeHaiku(imgBytes, mime, {
+          ...context,
+          credential: { secret: meta.cred.secret, kind: meta.cred.kind as CredentialKind },
+          resolvedCredential: meta.cred,
+        });
+        return { result: r, winner: meta };
+      } catch (err) {
+        if (err instanceof CredentialUnauthorizedError) {
+          console.warn(`[identify] credential 401 on label=${meta.label} kind=${meta.cred.kind} — falling through to next (user_id=${beneficiaryId ?? 'anon'})`);
+          // Best-effort structured log — never blocks.
+          if (serviceRole && supabaseUrl) {
+            reportFunctionError(
+              db(),
+              'identify',
+              'byo_401_fallthrough',
+              beneficiaryId,
+              { credential_label: meta.label, credential_kind: meta.cred.kind },
+            ).catch(() => {/* swallow — reporter is best-effort */});
+          }
+          continue;
+        }
+        throw err;
+      }
+    }
+    return { result: null, winner: null };
   }
+
+  // Snapshot the resolved state after identification so usage recording
+  // and pool-drip work correctly regardless of which credential won.
+  let sponsorshipCtx: ResolvedSponsorship | null = null;
+  let poolUsed: { poolId: string; credentialId: string } | null = null;
+  // hasAnyCred: true when at least one supplier would have produced a
+  // credential, used for the error hint message.
+  const hasAnyCred = personalCred !== null || !!byoAnthropic || !!beneficiaryId;
 
   let result: IDResult | null = null;
   let cascadeAttempts: CascadeAttempt[] | null = null;
+  let providerUsed: string | null = null;
+
+  const claudeContext: Omit<ClaudeContext, 'credential' | 'resolvedCredential'> = {
+    lat: body.location?.lat,
+    lng: body.location?.lng,
+    crop_bbox: body.crop_bbox,
+  };
 
   if (body.force_provider === 'plantnet') {
     result = await callPlantNet(imageBytes, byoPlantnet);
   } else if (body.force_provider === 'claude_haiku') {
-    result = await callClaudeHaiku(imageBytes, mimeType, {
-      lat: body.location?.lat,
-      lng: body.location?.lng,
-      credential: claudeCred ?? undefined,
-      resolvedCredential: resolvedClaudeCred ?? undefined,
-      crop_bbox: body.crop_bbox,
-    });
+    const { result: r, winner } = await callClaudeWithFallback(
+      imageBytes, mimeType, claudeContext, credChain,
+    );
+    result = r;
+    if (winner) {
+      sponsorshipCtx = winner.sponsorCtx;
+      poolUsed = winner.poolInfo;
+      providerUsed = winner.label;
+    }
   } else if (body.cascade) {
     // Cascade mode: build the runners map dynamically based on user_hint,
     // apply excluded_providers filter, then preferred_providers ordering.
@@ -941,15 +1060,19 @@ serve(async (req) => {
     if (isPlantLike) {
       allRunners.plantnet = (signal) => callPlantNet(imageBytes, byoPlantnet, signal);
     }
-    if (claudeCred) {
-      allRunners.claude_haiku = (signal) => callClaudeHaiku(imageBytes, mimeType, {
-        lat: body.location?.lat,
-        lng: body.location?.lng,
-        credential: claudeCred ?? undefined,
-        resolvedCredential: resolvedClaudeCred ?? undefined,
-        signal,
-      });
-    }
+    // Claude runner uses the fallback chain — the signal is forwarded for
+    // abort on cascade timeout, but credential fallback is still sequential.
+    allRunners.claude_haiku = async (signal) => {
+      const { result: r, winner } = await callClaudeWithFallback(
+        imageBytes, mimeType, { ...claudeContext, signal }, credChain,
+      );
+      if (winner) {
+        sponsorshipCtx = winner.sponsorCtx;
+        poolUsed = winner.poolInfo;
+        providerUsed = winner.label;
+      }
+      return r;
+    };
     allRunners.onnx_base = (signal) => callOnnxBase(imageBytes, signal);
     // Future: add new server-side plugins here.
 
@@ -979,23 +1102,25 @@ serve(async (req) => {
     result = cascaded.result;
     cascadeAttempts = cascaded.attempts;
   } else {
-    // Default: race PlantNet, Claude Haiku, and (placeholder) ONNX-base in
-    // parallel. The first to return confidence ≥ threshold wins; the rest
-    // are aborted. user_hint is used to bias the threshold slightly later
-    // (today it just gates which runners we even start).
+    // Default: race PlantNet, Claude Haiku (with credential fallback chain),
+    // and (placeholder) ONNX-base in parallel. The first to return confidence
+    // ≥ threshold wins; the rest are aborted.
     const runners: Record<string, ServerRunner> = {};
     const isPlantLike = isPlantLikeHint(body.user_hint);
     if (isPlantLike) {
       runners.plantnet = (signal) => callPlantNet(imageBytes, byoPlantnet, signal);
     }
-    runners.claude_haiku = (signal) => callClaudeHaiku(imageBytes, mimeType, {
-      lat: body.location?.lat,
-      lng: body.location?.lng,
-      credential: claudeCred ?? undefined,
-      resolvedCredential: resolvedClaudeCred ?? undefined,
-      crop_bbox: body.crop_bbox,
-      signal,
-    });
+    runners.claude_haiku = async (signal) => {
+      const { result: r, winner } = await callClaudeWithFallback(
+        imageBytes, mimeType, { ...claudeContext, signal }, credChain,
+      );
+      if (winner) {
+        sponsorshipCtx = winner.sponsorCtx;
+        poolUsed = winner.poolInfo;
+        providerUsed = winner.label;
+      }
+      return r;
+    };
     runners.onnx_base = (signal) => callOnnxBase(imageBytes, signal);
 
     const cascaded = await runServerCascade(runners);
@@ -1054,10 +1179,9 @@ serve(async (req) => {
   }
 
   if (!result) {
-    const hasAnyClaudeCred = !!claudeCred;
     const errorPayload: Record<string, unknown> = {
-      error: hasAnyClaudeCred ? 'identification_failed' : 'no_id_engine_available',
-      hint: hasAnyClaudeCred
+      error: hasAnyCred ? 'identification_failed' : 'no_id_engine_available',
+      hint: hasAnyCred
         ? 'PlantNet returned nothing and Claude failed to parse the response.'
         : sponsorshipSkipReason
           ? `Claude skipped (${sponsorshipSkipReason}). Supply a BYO key, accept a sponsorship, or wait for the rate-limit window to reset.`
@@ -1144,6 +1268,9 @@ serve(async (req) => {
   // (force_provider, default-race that didn't track attempts).
   responsePayload.cascade_attempts = cascadeAttempts
     ?? [{ provider: result.source, confidence: result.confidence }];
+  // #693: surface which credential tier ultimately succeeded so the UI can
+  // render correctly (e.g. "Identified via sponsorship" after BYO key 401).
+  if (providerUsed) responsePayload.credential_used = providerUsed;
 
   return corsResponse(JSON.stringify(responsePayload), {
     headers: { 'content-type': 'application/json' },
