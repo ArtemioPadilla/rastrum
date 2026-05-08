@@ -4,7 +4,7 @@ import {
   serializeChips,
   filterByChips,
   parseSort,
-  serializeFilters,
+  buildSpeciesUrl,
   type ChipsState,
   type SpeciesRow,
 } from '../../src/lib/species-filters';
@@ -101,20 +101,20 @@ describe('parseSort', () => {
   });
 });
 
-describe('serializeFilters', () => {
+describe('buildSpeciesUrl', () => {
   it('returns empty string for fully-default state', () => {
     const chips: ChipsState = { endemic: false, nom059: false, rare: false, kingdom: null };
-    expect(serializeFilters(chips, 'obs')).toBe('');
+    expect(buildSpeciesUrl(chips, 'obs')).toBe('');
   });
 
   it('serializes only non-default sort', () => {
     const chips: ChipsState = { endemic: false, nom059: false, rare: false, kingdom: null };
-    expect(serializeFilters(chips, 'recent')).toBe('?sort=recent');
+    expect(buildSpeciesUrl(chips, 'recent')).toBe('?sort=recent');
   });
 
   it('combines chips and sort with &', () => {
     const chips: ChipsState = { endemic: true, nom059: false, rare: false, kingdom: null };
-    const out = serializeFilters(chips, 'alpha');
+    const out = buildSpeciesUrl(chips, 'alpha');
     expect(out).toContain('endemic=1');
     expect(out).toContain('sort=alpha');
     expect(out.startsWith('?')).toBe(true);

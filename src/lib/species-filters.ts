@@ -55,7 +55,7 @@ export function parseSort(qs: string): SortMode {
   return DEFAULT_SORT;
 }
 
-export function serializeFilters(s: ChipsState, sort: SortMode): string {
+export function buildSpeciesUrl(s: ChipsState, sort: SortMode): string {
   const chipFrag = serializeChips(s);
   if (sort === DEFAULT_SORT) return chipFrag;
   const sep = chipFrag === '' ? '?' : '&';

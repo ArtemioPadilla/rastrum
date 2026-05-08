@@ -16,7 +16,7 @@ import Skeleton from './Skeleton.astro';
 import EspeciesHero from './species/EspeciesHero.astro';
 import FilterChips from './species/FilterChips.astro';
 import { renderSpeciesCard, type CardLabels } from '../lib/species-card-html';
-import { parseChips, serializeChips, type ChipsState } from '../lib/species-filters';
+import { parseChips, serializeChips, buildSpeciesUrl, type ChipsState } from '../lib/species-filters';
 
 interface Props {
   lang: 'en' | 'es';
@@ -191,7 +191,7 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
   import maplibregl from 'maplibre-gl';
   import { getSupabase } from '../lib/supabase';
   import { renderSpeciesCard, type CardLabels } from '../lib/species-card-html';
-  import { parseChips, parseSort, serializeFilters, type ChipsState, type SortMode } from '../lib/species-filters';
+  import { parseChips, parseSort, buildSpeciesUrl, type ChipsState, type SortMode } from '../lib/species-filters';
   import { deriveGenus, colorForName, buildTaxonomicTree, taxonomicDepth, type TaxonNode } from '../lib/species-display';
 
   type Lang = 'en' | 'es';
@@ -659,7 +659,7 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
           const k = c.slice('kingdom:'.length);
           currentChips = { ...currentChips, kingdom: currentChips.kingdom === k ? null : k };
         }
-        history.replaceState({}, '', `${window.location.pathname}${serializeFilters(currentChips, currentSort)}`);
+        history.replaceState({}, '', `${window.location.pathname}${buildSpeciesUrl(currentChips, currentSort)}`);
         applyAllFilters();
       }));
     }
@@ -677,7 +677,7 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
         const mode = (btn.dataset.sort ?? 'obs') as SortMode;
         if (mode === currentSort) return;
         currentSort = mode;
-        history.replaceState({}, '', `${window.location.pathname}${serializeFilters(currentChips, currentSort)}`);
+        history.replaceState({}, '', `${window.location.pathname}${buildSpeciesUrl(currentChips, currentSort)}`);
         if (listEl) {
           const sorted = sortEnriched(cachedEnriched, currentSort);
           cachedEnriched = sorted;
