@@ -699,6 +699,22 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
       const actualDepth = Math.max(1, taxonomicDepth(treeData));
       const ringWidth = (OUTER_LIMIT - INNER_HOLE) / actualDepth;
 
+      // Sunburst sweep is sized by **leaf count** under each subtree, not
+      // by observation count. Every species gets equal arc — a navigation
+      // tool that shows every taxon equally clickable, not a data-density
+      // visualisation where common species would overwhelm rare ones.
+      // Internal nodes (genus/family/...) sweep ∝ number of species in them.
+      const leafCounts = new WeakMap<TaxonNode, number>();
+      function computeLeafCount(n: TaxonNode): number {
+        if (leafCounts.has(n)) return leafCounts.get(n)!;
+        const c = n.children.length === 0
+          ? 1
+          : n.children.reduce((sum, ch) => sum + computeLeafCount(ch), 0);
+        leafCounts.set(n, c);
+        return c;
+      }
+      computeLeafCount(treeData);
+
       // Label tuning — radial labels read from inside out, flipped on the
       // left half so they're never upside-down. Skip when the segment's arc
       // is too narrow for any meaningful label.
@@ -748,8 +764,10 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
         const r0 = INNER_HOLE + (depth - 1) * ringWidth;
         const r1 = r0 + ringWidth;
         let angle = startAngle;
+        const parentLeaves = leafCounts.get(node) ?? 1;
         node.children.forEach((child) => {
-          const frac = node.count > 0 ? child.count / node.count : 0;
+          const childLeaves = leafCounts.get(child) ?? 1;
+          const frac = parentLeaves > 0 ? childLeaves / parentLeaves : 0;
           const sweep = (endAngle - startAngle) * frac;
           if (sweep < 0.01) { angle += sweep; return; }
           const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
