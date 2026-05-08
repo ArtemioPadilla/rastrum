@@ -44,11 +44,11 @@ describe('onnx-vision module', () => {
 describe('gemma-vision identifier', () => {
   beforeEach(() => { store.clear(); });
 
-  it('isAvailable returns disabled when opt-in pref is unset', async () => {
+  it('isAvailable returns unsupported when WebGPU is missing (no legacy opt-in gate)', async () => {
     const { gemmaVisionIdentifier } = await import('../../src/lib/identifiers/gemma-vision');
     const av = await gemmaVisionIdentifier.isAvailable();
     expect(av.ready).toBe(false);
-    if (!av.ready) expect(av.reason).toBe('disabled');
+    if (!av.ready) expect(av.reason).toBe('unsupported');
   });
 
   it('plugin id collision-protected via registry', async () => {

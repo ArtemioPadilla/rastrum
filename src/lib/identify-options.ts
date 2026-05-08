@@ -4,14 +4,13 @@
  *
  * Without this helper, sync.ts / share/obs / chat / observe each
  * re-implemented exclusion + preferred logic divergently — so user
- * preferences (disabled plugins, BYO key, local-AI opt-out, EfficientNet
- * cache state) didn't propagate consistently.
+ * preferences (disabled plugins, BYO key, EfficientNet cache state)
+ * didn't propagate consistently.
  */
 
 import { getKey } from './byo-keys';
 import { getOnnxBaseCacheStatus, getOnnxBaseWeightsBaseUrl } from './identifiers/onnx-base-cache';
 import { getDisabledPlugins } from './identifier-prefs';
-import { isLocalAIEnabled } from './local-ai-prefs';
 
 export interface IdentifyContext {
   mediaKind: 'photo' | 'audio' | 'video';
@@ -33,17 +32,7 @@ export async function buildCascadeOptions(ctx: IdentifyContext): Promise<Identif
     if (!excluded.includes(id)) excluded.push(id);
   }
 
-  // 2. WebLLM Phi + Gemma + BirdNET gated on local-AI bandwidth opt-in.
-  // Both vision runtimes are big downloads (~4 GB / ~500 MB) and deserve
-  // the same bandwidth gate — without this, Gemma would still try to
-  // download even when the user has explicitly disabled local AI.
-  if (!isLocalAIEnabled()) {
-    if (!excluded.includes('webllm_phi35_vision')) excluded.push('webllm_phi35_vision');
-    if (!excluded.includes('onnx_gemma4_vision')) excluded.push('onnx_gemma4_vision');
-    if (!excluded.includes('birdnet_lite')) excluded.push('birdnet_lite');
-  }
-
-  // 3. EfficientNet only when its weights are cached
+  // 2. EfficientNet only when its weights are cached
   const efficientNetCached = getOnnxBaseWeightsBaseUrl()
     ? await getOnnxBaseCacheStatus().then(s => s.modelCached && s.labelsCached).catch(() => false)
     : false;
@@ -51,18 +40,18 @@ export async function buildCascadeOptions(ctx: IdentifyContext): Promise<Identif
     excluded.push('onnx_efficientnet_lite0');
   }
 
-  // 4. Claude needs a BYO key (sponsorship gate happens server-side, see #595)
+  // 3. Claude needs a BYO key (sponsorship gate happens server-side, see #595)
   if (!getKey('claude_haiku', 'anthropic') && !excluded.includes('claude_haiku')) {
     excluded.push('claude_haiku');
   }
 
-  // 5. Camera-trap evidence biases the cascade toward MegaDetector
+  // 4. Camera-trap evidence biases the cascade toward MegaDetector
   const preferred: string[] = [];
   if (ctx.mediaKind === 'photo' && ctx.evidenceType === 'camera_trap') {
     preferred.push('camera_trap_megadetector');
   }
 
-  // 6. Audio defaults to Aves until non-bird audio plugins arrive
+  // 5. Audio defaults to Aves until non-bird audio plugins arrive
   const taxa = ctx.mediaKind === 'audio' ? 'Animalia.Aves' : undefined;
 
   return { excluded, preferred, taxa };

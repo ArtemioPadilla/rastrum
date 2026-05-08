@@ -298,7 +298,6 @@ async function triggerEnvEnrichment(observationId: string): Promise<void> {
 // Local-AI prefs extracted to ./local-ai-prefs.ts (#583). Re-exported for
 // backwards compat with consumers (ObservationForm) importing from sync.ts.
 export {
-  isLocalAIEnabled,
   hasShownLocalAIDownloadWarning,
   markLocalAIDownloadWarningShown,
 } from './local-ai-prefs';

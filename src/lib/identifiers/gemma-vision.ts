@@ -33,9 +33,6 @@ export const gemmaVisionIdentifier: Identifier = {
     cost_per_id_usd: 0,
   },
   async isAvailable() {
-    if (typeof localStorage !== 'undefined' && localStorage.getItem('rastrum.prefs.useGemmaVision') !== 'true') {
-      return { ready: false, reason: 'disabled', message: 'Enable in Profile → AI settings' };
-    }
     const { gemmaSupported } = await import('../onnx-vision');
     if (!gemmaSupported()) {
       const mem = typeof navigator !== 'undefined' ? (navigator as Navigator & { deviceMemory?: number }).deviceMemory : undefined;
