@@ -252,249 +252,6 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
     <!-- Legacy hidden field for BYO key migration -->
     <input id="anthropic-key" type="hidden" />
     <span id="ak-saved" class="hidden"></span>
-
-    <!-- EfficientNet-Lite0 (on-device photo) -->
-    <div class="mt-6 pt-5 border-t border-zinc-100 dark:border-zinc-800/60">
-      <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">{tr.auth.onnx_base_section}</h3>
-      <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">{tr.auth.onnx_base_hint}</p>
-      <p id="onnx-base-url-missing" class="hidden text-xs text-amber-700 dark:text-amber-400 mb-2">{tr.auth.onnx_base_weights_url_missing}</p>
-
-      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
-        <div class="flex items-start justify-between gap-3 flex-wrap">
-          <div class="min-w-0">
-            <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">EfficientNet-Lite0</p>
-            <p class="text-xs text-zinc-500" id="onnx-base-status">—</p>
-          </div>
-          <div class="flex flex-wrap gap-2">
-            <button id="onnx-base-download" type="button" class="rounded-lg border border-emerald-600/60 px-3 py-1.5 text-xs sm:text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 disabled:opacity-50">
-              <span data-onnxlabel>{tr.auth.onnx_base_download}</span>
-            </button>
-            <button id="onnx-base-delete" type="button" class="hidden rounded-lg border border-red-300 dark:border-red-900/50 px-3 py-1.5 text-xs sm:text-sm font-medium text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">
-              {tr.auth.onnx_base_delete}
-            </button>
-          </div>
-        </div>
-        <p id="onnx-base-progress" class="hidden mt-2 text-xs text-zinc-600 dark:text-zinc-400 font-mono"></p>
-        <p class="mt-3 text-[11px] text-zinc-500 dark:text-zinc-400">{tr.auth.onnx_base_attribution}</p>
-      </div>
-    </div>
-
-    <!-- MegaDetector v5a (on-device camera trap) -->
-    <div class="mt-6 pt-5 border-t border-zinc-100 dark:border-zinc-800/60">
-      <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
-        {lang === 'es' ? '🎥 MegaDetector v5a (cámara trampa)' : '🎥 MegaDetector v5a (camera trap)'}
-      </h3>
-      <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">
-        {lang === 'es'
-          ? 'Detecta animales en fotos de cámara trampa directamente en tu dispositivo. ~134 MB, una sola descarga.'
-          : 'Detects animals in camera trap photos entirely on your device. ~134 MB, one-time download.'}
-      </p>
-      <p id="megadetector-url-missing" class="hidden text-xs text-amber-700 dark:text-amber-400 mb-2">
-        {lang === 'es' ? 'URL del modelo no configurada. Contacta al administrador.' : 'Model URL not configured. Contact the administrator.'}
-      </p>
-
-      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
-        <div class="flex items-start justify-between gap-3 flex-wrap">
-          <div class="min-w-0">
-            <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">MegaDetector v5a (INT8 ONNX)</p>
-            <p class="text-xs text-zinc-500" id="megadetector-status">&mdash;</p>
-          </div>
-          <div class="flex flex-wrap gap-2">
-            <button id="megadetector-download" type="button" class="rounded-lg border border-emerald-600/60 px-3 py-1.5 text-xs sm:text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 disabled:opacity-50">
-              <span data-mdlabel>{lang === 'es' ? 'Descargar (~134 MB)' : 'Download (~134 MB)'}</span>
-            </button>
-            <button id="megadetector-delete" type="button" class="hidden rounded-lg border border-red-300 dark:border-red-900/50 px-3 py-1.5 text-xs sm:text-sm font-medium text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">
-              {lang === 'es' ? 'Eliminar' : 'Delete'}
-            </button>
-          </div>
-        </div>
-        <p id="megadetector-progress" class="hidden mt-2 text-xs text-zinc-600 dark:text-zinc-400 font-mono"></p>
-        <p class="mt-3 text-[11px] text-zinc-500 dark:text-zinc-400">
-          {lang === 'es' ? 'Microsoft AI for Good · Licencia MIT · Solo detección (sin clasificación de especie)' : 'Microsoft AI for Good · MIT License · Detection only (no species classification)'}
-        </p>
-      </div>
-    </div>
-
-    <!-- BirdNET-Lite (on-device audio) -->
-    <div class="mt-6 pt-5 border-t border-zinc-100 dark:border-zinc-800/60">
-      <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">{tr.auth.birdnet_section}</h3>
-      <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">{tr.auth.birdnet_hint}</p>
-      <p id="birdnet-url-missing" class="hidden text-xs text-amber-700 dark:text-amber-400 mb-2">{tr.auth.birdnet_weights_url_missing}</p>
-
-      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
-        <div class="flex items-start justify-between gap-3 flex-wrap">
-          <div class="min-w-0">
-            <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">BirdNET-Lite v2.4</p>
-            <p class="text-xs text-zinc-500" id="birdnet-status">—</p>
-          </div>
-          <div class="flex flex-wrap gap-2">
-            <button id="birdnet-download" type="button" class="rounded-lg border border-emerald-600/60 px-3 py-1.5 text-xs sm:text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 disabled:opacity-50">
-              <span data-bnlabel>{tr.auth.birdnet_download}</span>
-            </button>
-            <button id="birdnet-delete" type="button" class="hidden rounded-lg border border-red-300 dark:border-red-900/50 px-3 py-1.5 text-xs sm:text-sm font-medium text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">
-              {tr.auth.birdnet_delete}
-            </button>
-          </div>
-        </div>
-        <p id="birdnet-progress" class="hidden mt-2 text-xs text-zinc-600 dark:text-zinc-400 font-mono"></p>
-        <p class="mt-3 text-[11px] text-zinc-500 dark:text-zinc-400">{tr.auth.birdnet_attribution}</p>
-        <p class="mt-1 text-[11px] text-amber-700 dark:text-amber-400">{tr.auth.birdnet_nc_warning}</p>
-      </div>
-    </div>
-
-    <!-- On-device AI controls (heavy WebGPU models) -->
-    <div id="on-device-ai-section" class="mt-6 pt-5 border-t border-zinc-100 dark:border-zinc-800/60">
-      <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">{tr.auth.local_ai_section}</h3>
-      <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">{tr.auth.local_ai_hint}</p>
-      <p id="local-ai-unsup" class="hidden text-xs text-amber-700 dark:text-amber-400">{tr.auth.local_ai_unsupported}</p>
-
-      <label class="flex items-start gap-3 cursor-pointer mt-2">
-        <input type="checkbox" id="local-ai-optin" class="mt-1" />
-        <div>
-          <p class="text-sm text-zinc-700 dark:text-zinc-300">{tr.auth.local_ai_opt_in}</p>
-          <p class="text-xs text-amber-700 dark:text-amber-400 mt-1">{tr.auth.local_ai_warning}</p>
-        </div>
-      </label>
-
-      <!-- Per-model cards -->
-      <div class="mt-4 space-y-3">
-        <!-- Vision -->
-        <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
-          <div class="flex items-start justify-between gap-3 flex-wrap">
-            <div class="min-w-0">
-              <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">Phi-3.5-vision</p>
-              <p class="text-xs text-zinc-500" id="vision-status">—</p>
-            </div>
-            <div class="flex flex-wrap gap-2">
-              <button id="vision-download" type="button" data-model="vision" class="rounded-lg border border-emerald-600/60 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 disabled:opacity-50">
-                <span data-vlabel>{tr.auth.local_ai_download_vision}</span>
-              </button>
-              <button id="vision-delete" type="button" data-model="vision" class="hidden rounded-lg border border-red-300 dark:border-red-900/50 px-3 py-1.5 text-xs font-medium text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">
-                {tr.auth.local_ai_delete}
-              </button>
-            </div>
-          </div>
-          <p id="vision-progress" class="hidden mt-2 text-xs text-zinc-600 dark:text-zinc-400 font-mono"></p>
-
-          <label class="mt-3 flex items-start gap-2 cursor-pointer">
-            <input type="checkbox" id="phi-vision-enable" class="mt-0.5" />
-            <div>
-              <p class="text-xs text-zinc-700 dark:text-zinc-300">{tr.auth.phi_vision_enable_label}</p>
-              <p class="text-[11px] text-amber-700 dark:text-amber-400 mt-0.5">{tr.auth.phi_vision_enable_warning}</p>
-            </div>
-          </label>
-        </div>
-
-        <!-- Gemma 4 vision (parallel runtime via transformers.js) -->
-        <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
-          <div class="flex items-start justify-between gap-3 flex-wrap">
-            <div class="min-w-0">
-              <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">Gemma 4 E2B (vision)</p>
-              <p class="text-xs text-zinc-500" id="gemma-vision-status">—</p>
-            </div>
-            <div class="flex flex-wrap gap-2">
-              <button id="gemma-vision-download" type="button" class="rounded-lg border border-emerald-600/60 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 disabled:opacity-50">
-                <span data-gvlabel>{tr.auth.gemma_vision_download}</span>
-              </button>
-              <button id="gemma-vision-delete" type="button" class="hidden rounded-lg border border-red-300 dark:border-red-900/50 px-3 py-1.5 text-xs font-medium text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">
-                {tr.auth.local_ai_delete}
-              </button>
-            </div>
-          </div>
-          <p id="gemma-vision-progress" class="hidden mt-2 text-xs text-zinc-600 dark:text-zinc-400 font-mono"></p>
-
-          <label class="mt-3 flex items-start gap-2 cursor-pointer">
-            <input type="checkbox" id="gemma-vision-enable" class="mt-0.5" />
-            <div>
-              <p class="text-xs text-zinc-700 dark:text-zinc-300">{tr.auth.gemma_vision_enable_label}</p>
-              <p class="text-[11px] text-amber-700 dark:text-amber-400 mt-0.5">{tr.auth.gemma_vision_enable_warning}</p>
-            </div>
-          </label>
-        </div>
-
-        <!-- Text -->
-        <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
-          <div class="flex items-start justify-between gap-3 flex-wrap">
-            <div class="min-w-0">
-              <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">Llama-3.2-1B</p>
-              <p class="text-xs text-zinc-500" id="text-status">—</p>
-            </div>
-            <div class="flex flex-wrap gap-2">
-              <button id="text-download" type="button" data-model="text" class="rounded-lg border border-emerald-600/60 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 disabled:opacity-50">
-                <span data-tlabel>{tr.auth.local_ai_download_text}</span>
-              </button>
-              <button id="text-delete" type="button" data-model="text" class="hidden rounded-lg border border-red-300 dark:border-red-900/50 px-3 py-1.5 text-xs font-medium text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">
-                {tr.auth.local_ai_delete}
-              </button>
-            </div>
-          </div>
-          <p id="text-progress" class="hidden mt-2 text-xs text-zinc-600 dark:text-zinc-400 font-mono"></p>
-        </div>
-
-        <!-- Storage estimate + clear all -->
-        <div class="flex items-center justify-between text-xs text-zinc-500">
-          <span id="storage-estimate">—</span>
-          <div class="flex gap-3">
-            <button id="ai-unload" type="button" class="hover:underline">{tr.auth.local_ai_unload}</button>
-            <button id="ai-clear-all" type="button" class="text-red-600 dark:text-red-400 hover:underline">{tr.auth.confirm_clear_all_title}</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    {speciesnetHosted && (
-    <!-- SpeciesNet (on-device species classifier) — companion to MegaDetector. Gated on operator-supplied PUBLIC_SPECIESNET_WEIGHTS_URL. -->
-    <div class="mt-6 pt-5 border-t border-zinc-100 dark:border-zinc-800/60">
-      <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">{tr.auth.speciesnet_section}</h3>
-      <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">{tr.auth.speciesnet_hint}</p>
-      <p id="speciesnet-url-missing" class="hidden text-xs text-amber-700 dark:text-amber-400 mb-2">{tr.auth.speciesnet_weights_url_missing}</p>
-
-      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
-        <div class="flex items-start justify-between gap-3 flex-wrap">
-          <div class="min-w-0">
-            <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">SpeciesNet (distilled)</p>
-            <p class="text-xs text-zinc-500" id="speciesnet-status">—</p>
-          </div>
-          <div class="flex flex-wrap gap-2">
-            <button id="speciesnet-download" type="button" class="rounded-lg border border-emerald-600/60 px-3 py-1.5 text-xs sm:text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 disabled:opacity-50">
-              <span data-snlabel>{tr.auth.speciesnet_download}</span>
-            </button>
-            <button id="speciesnet-delete" type="button" class="hidden rounded-lg border border-red-300 dark:border-red-900/50 px-3 py-1.5 text-xs sm:text-sm font-medium text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">
-              {tr.auth.speciesnet_delete}
-            </button>
-          </div>
-        </div>
-        <p id="speciesnet-progress" class="hidden mt-2 text-xs text-zinc-600 dark:text-zinc-400 font-mono"></p>
-        <p class="mt-3 text-[11px] text-zinc-500 dark:text-zinc-400">{tr.auth.speciesnet_attribution}</p>
-      </div>
-    </div>
-    )}
-
-    <!-- Offline maps — Mexico (pmtiles) -->
-    <div class="mt-6 pt-5 border-t border-zinc-100 dark:border-zinc-800/60">
-      <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">{tr.map.offline_section}</h3>
-      <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">{tr.map.offline_hint}</p>
-      <p id="pmtiles-url-missing" class="hidden text-xs text-amber-700 dark:text-amber-400 mb-2">{tr.map.offline_url_missing}</p>
-
-      <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
-        <div class="flex items-start justify-between gap-3 flex-wrap">
-          <div class="min-w-0">
-            <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{tr.map.offline_section}</p>
-            <p class="text-xs text-zinc-500" id="pmtiles-status">—</p>
-          </div>
-          <div class="flex flex-wrap gap-2">
-            <button id="pmtiles-download" type="button" class="rounded-lg border border-emerald-600/60 px-3 py-1.5 text-xs sm:text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 disabled:opacity-50">
-              <span data-pmlabel>{tr.map.offline_download_button}</span>
-            </button>
-            <button id="pmtiles-delete" type="button" class="hidden rounded-lg border border-red-300 dark:border-red-900/50 px-3 py-1.5 text-xs sm:text-sm font-medium text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">
-              {tr.map.offline_delete_button}
-            </button>
-          </div>
-        </div>
-        <p id="pmtiles-progress" class="hidden mt-2 text-xs text-zinc-600 dark:text-zinc-400 font-mono"></p>
-        <p class="mt-3 text-[11px] text-zinc-500 dark:text-zinc-400">{tr.map.offline_attribution}</p>
-      </div>
-    </div>
   </section>
   )}
 
@@ -818,9 +575,16 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
   // 'rastrum.byoAnthropicKey' is auto-migrated by lib/byo-keys.ts on
   // first read.
 
-  // ── AI settings: WebLLM opt-in + per-model download / delete ──
-  const LAI_OPTIN = 'rastrum.localAiOptIn';
-  const optinBox = document.getElementById('local-ai-optin') as HTMLInputElement | null;
+  // Pipeline disabled list — extracted to src/lib/identifier-prefs.ts (#583)
+  // so every cascade call site honors the toggle uniformly.
+  const { getDisabledPlugins, togglePluginDisabled } = await import('../lib/identifier-prefs');
+
+  // Wrapped so paintRegistry() can call it again after replacing the registry list
+  // innerHTML, ensuring on-device download bindings re-attach to the freshly-rendered
+  // DOM. Defensive null checks (via ?. and early returns) make it safe to call when
+  // targets don't exist yet (e.g., the first call before Task 5 removes static markup).
+  async function wireOnDeviceControls() {
+  // ── AI settings: per-model download / delete ──
   const unsupNote = document.getElementById('local-ai-unsup');
 
   const dlg = document.getElementById('confirm-dialog') as HTMLDialogElement | null;
@@ -913,30 +677,6 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
     }
   }
 
-  if (optinBox) {
-    optinBox.checked = localStorage.getItem(LAI_OPTIN) === 'true';
-    optinBox.addEventListener('change', () => {
-      if (optinBox.checked) localStorage.setItem(LAI_OPTIN, 'true');
-      else                  localStorage.removeItem(LAI_OPTIN);
-    });
-  }
-
-  // Phi-3.5-vision is gated behind explicit opt-in. The MLC q4f16_1
-  // build crashes with WebGPU "Binding size 1 isn't a multiple of 4"
-  // errors on certain GPU/driver combos (esp. Apple Silicon Metal,
-  // Chromium 147+). Until MLC ships an alignment-fixed artifact, this
-  // toggle keeps Phi off-by-default; flipping it makes the model
-  // available to ObservationForm + the obs2 capability banner.
-  const PHI_OPTIN = 'rastrum.prefs.usePhiVision';
-  const phiBox = document.getElementById('phi-vision-enable') as HTMLInputElement | null;
-  if (phiBox) {
-    phiBox.checked = localStorage.getItem(PHI_OPTIN) === 'true';
-    phiBox.addEventListener('change', () => {
-      if (phiBox.checked) localStorage.setItem(PHI_OPTIN, 'true');
-      else                localStorage.removeItem(PHI_OPTIN);
-    });
-  }
-
   function progressPainter(modelKey: ModelKey) {
     const el = document.getElementById(`${modelKey}-progress`);
     return (p: { progress: number; text: string }) => {
@@ -1025,23 +765,13 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
   refreshAll().catch(() => {});
 
   // ── Gemma 4 vision (on-device, transformers.js) — independent of WebLLM cache ──
-  const GEMMA_OPTIN_KEY = 'rastrum.prefs.useGemmaVision';
   const gvDownloadBtn = document.getElementById('gemma-vision-download') as HTMLButtonElement | null;
   const gvDeleteBtn   = document.getElementById('gemma-vision-delete') as HTMLButtonElement | null;
   const gvStatus      = document.getElementById('gemma-vision-status');
   const gvProgress    = document.getElementById('gemma-vision-progress');
   const gvLabel       = gvDownloadBtn?.querySelector('[data-gvlabel]') as HTMLElement | null;
-  const gvOptin       = document.getElementById('gemma-vision-enable') as HTMLInputElement | null;
   const GV_DEFAULT_LABEL = gvLabel?.textContent ?? '';
   const GV_REDOWNLOAD_LABEL = isEsLang ? 'Volver a descargar' : 'Re-download';
-
-  if (gvOptin) {
-    gvOptin.checked = localStorage.getItem(GEMMA_OPTIN_KEY) === 'true';
-    gvOptin.addEventListener('change', () => {
-      if (gvOptin.checked) localStorage.setItem(GEMMA_OPTIN_KEY, 'true');
-      else                 localStorage.removeItem(GEMMA_OPTIN_KEY);
-    });
-  }
 
   async function refreshGemma() {
     if (!gvDownloadBtn || !gvDeleteBtn || !gvStatus || !gvLabel) return;
@@ -1533,9 +1263,8 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
 
   refreshPmtiles().catch(() => {});
 
-  // Pipeline disabled list — extracted to src/lib/identifier-prefs.ts (#583)
-  // so every cascade call site honors the toggle uniformly.
-  const { getDisabledPlugins, togglePluginDisabled } = await import('../lib/identifier-prefs');
+  } // end wireOnDeviceControls
+  wireOnDeviceControls().catch(() => {});
 
   /**
    * #594: render the pipeline-flow chip strip using the REAL cascade sort
@@ -1579,250 +1308,220 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
     flowItems.innerHTML = `<div class="flex flex-col gap-1.5">${renderRow('photo')}${renderRow('audio')}</div>`;
   }
 
-  // ── Identifier registry list (modular platform) with guided setup ──
+  // ── Identifier registry list (modular platform) — unified cards ──
   async function paintRegistry() {
     const list = document.getElementById('identifier-list');
     if (!list) return;
-    const [{ bootstrapIdentifiers }, byo] = await Promise.all([
+
+    const [
+      { bootstrapIdentifiers },
+      byo,
+      { runStorageMigration, deriveCardState },
+      { renderPluginCard, renderLocalDataCard },
+      { getModelCacheStatus },
+      sponsorshipMod,
+    ] = await Promise.all([
       import('../lib/identifiers'),
       import('../lib/byo-keys'),
+      import('../lib/identifier-state'),
+      import('../lib/identifier-card-html'),
+      import('../lib/local-ai'),
+      import('../lib/sponsorships').catch(() => ({ getActiveAnthropicSponsorship: async () => null })),
     ]);
+    runStorageMigration();
+
     const reg = bootstrapIdentifiers();
     const plugins = reg.list();
     const isEs = document.documentElement.lang === 'es';
+    const lang: 'en' | 'es' = isEs ? 'es' : 'en';
+
+    // Section header strings — inline since section keys are pipeline.section_*
+    // and there is no client-side i18n runtime; mirror i18n/en.json + es.json.
+    const SECTION_LABELS: Record<string, string> = isEs ? {
+      section_photo_specialists: '📷 Identificadores de foto · Especialistas',
+      section_photo_generalists: '📷 Identificadores de foto · Generalistas',
+      section_audio: '🔊 Identificadores de audio',
+      section_other_local_data: '🗂 Otros datos locales',
+      experimental_warning: 'Experimental — pueden bloquearse en algunos dispositivos y la confianza se limita a 0.35. Prueba Phi o Gemma; si uno falla, prueba el otro.',
+    } : {
+      section_photo_specialists: '📷 Photo identifiers · Specialists',
+      section_photo_generalists: '📷 Photo identifiers · Generalists',
+      section_audio: '🔊 Audio identifiers',
+      section_other_local_data: '🗂 Other local data',
+      experimental_warning: 'Experimental — these may crash on some devices, and confidence is hard-capped at 0.35. Try Phi or Gemma; if one crashes, try the other.',
+    };
+
+    // Pre-resolve availability + cache + sponsorship in parallel.
+    const ON_DEVICE_MODEL_IDS: Record<string, string> = {
+      webllm_phi35_vision: 'Phi-3.5-vision-instruct-q4f16_1-MLC',
+      onnx_gemma4_vision: 'gemma-3n-e2b-vision',
+      birdnet_lite: 'BirdNET-Lite-v2.4',
+      onnx_efficientnet_lite0: 'efficientnet-lite0',
+      camera_trap_megadetector: 'megadetector-v5a',
+      speciesnet_distilled: 'speciesnet-v1',
+    };
+
+    const [availabilities, cacheStatuses, sponsorship] = await Promise.all([
+      Promise.all(plugins.map(async (p) => [p.id, await p.isAvailable()] as const)),
+      Promise.all(plugins.map(async (p) => {
+        const modelId = ON_DEVICE_MODEL_IDS[p.id];
+        return [p.id, modelId ? await getModelCacheStatus(modelId).catch(() => null) : null] as const;
+      })),
+      (sponsorshipMod as { getActiveAnthropicSponsorship?: () => Promise<unknown> }).getActiveAnthropicSponsorship?.().catch(() => null) ?? null,
+    ]);
+
+    const availabilityMap = new Map(availabilities);
+    const cacheMap = new Map(cacheStatuses);
     const disabled = getDisabledPlugins();
 
-    // Pre-resolve availability once so we can filter, sort, and reuse downstream.
-    const availabilityEntries = await Promise.all(
-      plugins.map(async p => [p.id, await p.isAvailable()] as const),
-    );
-    const availability = new Map(availabilityEntries);
-
-    // Plugins gated on a missing operator-supplied weights URL can never run
-    // until that env var is set. Hide them from this UI entirely instead of
-    // showing a "Coming soon" card the user can't act on.
-    const visiblePlugins = plugins.filter(
-      p => availability.get(p.id)?.reason !== 'model_not_bundled',
+    // Filter out plugins that can never run in this deployment.
+    const visiblePlugins = plugins.filter((p) =>
+      availabilityMap.get(p.id)?.reason !== 'model_not_bundled'
     );
 
-    // Display order: cloud first, then on-device light → heavy. Falls back to
-    // 50 for any new plugin so it lands between cloud and the heavy models
-    // until someone places it explicitly.
-    const DISPLAY_ORDER: Record<string, number> = {
-      plantnet: 10,
-      claude_haiku: 11,
-      onnx_efficientnet_lite0: 20,
-      camera_trap_megadetector: 21,
-      birdnet_lite: 22,
-      webllm_phi35_vision: 30,
-      onnx_gemma4_vision: 31,
-      speciesnet_distilled: 99,
+    // Group by section.
+    type Section = 'photo_specialists' | 'photo_generalists' | 'audio' | 'experimental';
+    const SECTION_OF: Record<string, Section> = {
+      plantnet: 'photo_specialists',
+      camera_trap_megadetector: 'photo_specialists',
+      claude_haiku: 'photo_generalists',
+      onnx_efficientnet_lite0: 'photo_generalists',
+      birdnet_lite: 'audio',
+      webllm_phi35_vision: 'experimental',
+      onnx_gemma4_vision: 'experimental',
     };
-    const sortedPlugins = [...visiblePlugins].sort((a, b) =>
-      (DISPLAY_ORDER[a.id] ?? 50) - (DISPLAY_ORDER[b.id] ?? 50),
-    );
+    const SECTION_ORDER: Section[] = ['photo_specialists', 'photo_generalists', 'experimental', 'audio'];
 
-    // Maps each on-device plugin to the static download card's anchor below
-    // so the registry card can deep-link instead of restating the steps that
-    // would land the user back on this same page.
-    const ON_DEVICE_DOWNLOAD_ANCHOR: Record<string, string> = {
-      webllm_phi35_vision: 'vision-download',
-      onnx_gemma4_vision: 'gemma-vision-download',
-      birdnet_lite: 'birdnet-download',
-      onnx_efficientnet_lite0: 'onnx-base-download',
-      camera_trap_megadetector: 'megadetector-download',
-    };
-
-    const licenseLabel = (l: string): string => ({
-      'free':       isEs ? 'Gratis' : 'Free',
-      'free-nc':    isEs ? 'No comercial' : 'Non-commercial',
-      'free-quota': isEs ? 'Cuota gratuita' : 'Free quota',
-      'byo-key':    isEs ? 'Tu propia API key' : 'BYO API key',
-      'paid':       isEs ? 'De pago' : 'Paid',
-    }[l] ?? l);
-
-    const runtimeLabel = (r: string): string => r === 'client'
-      ? (isEs ? 'En el dispositivo' : 'On-device')
-      : (isEs ? 'En la nube' : 'Cloud');
-
-    const mediaLabel = (m: string[]): string => m.map(x => ({photo:'📷',audio:'🔊',video:'🎞'}[x] ?? x)).join(' ');
-
-    function escape(s: string): string {
-      return s.replace(/[<>&'"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&#39;','"':'&quot;'}[c]!));
+    const grouped = new Map<Section, typeof visiblePlugins>();
+    for (const s of SECTION_ORDER) grouped.set(s, []);
+    for (const p of visiblePlugins) {
+      const section = SECTION_OF[p.id] ?? 'photo_generalists';
+      grouped.get(section)!.push(p);
     }
 
-    const cards = await Promise.all(sortedPlugins.map(async p => {
-      const av = availability.get(p.id) ?? { ready: false, reason: 'unsupported' as const };
-      const ready = av.ready;
-      const reasonText = ready ? '' : ({
-        needs_key:        isEs ? 'Falta API key' : 'API key needed',
-        needs_download:   isEs ? 'Descarga pendiente' : 'Download required',
-        unsupported:      isEs ? 'No soportado' : 'Unsupported',
-        model_not_bundled:isEs ? 'Próximamente' : 'Coming soon',
-        disabled:         isEs ? 'Desactivado' : 'Disabled',
-      }[av.reason] ?? av.reason);
-      const tags = [
-        runtimeLabel(p.capabilities.runtime),
-        mediaLabel(p.capabilities.media),
-        p.capabilities.taxa.join(', '),
-        licenseLabel(p.capabilities.license),
-        p.capabilities.confidence_ceiling ? `cap ≤ ${p.capabilities.confidence_ceiling.toFixed(2)}` : null,
-      ].filter(Boolean) as string[];
+    function escapeAttr(s: string): string {
+      return s.replace(/[<>&'"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&#39;', '"': '&quot;' }[c]!));
+    }
 
-      const hasKeySpec = (p.keySpec?.length ?? 0) > 0;
-      const keysSet   = hasKeySpec && byo.hasKeysForPlugin(p.id);
-      const stepsHtml = (p.setupSteps ?? []).map((s, i) => `
-        <li class="text-xs text-zinc-700 dark:text-zinc-300">
-          <span class="font-mono text-zinc-400 mr-1">${i + 1}.</span>
-          ${s.link ? `<a href="${escape(s.link)}" target="_blank" rel="noopener" class="underline text-emerald-700 dark:text-emerald-400">${escape(s.text)}</a>` : escape(s.text)}
-          ${s.details ? `<p class="text-[10px] text-zinc-500 ml-4 mt-0.5">${escape(s.details)}</p>` : ''}
-        </li>
-      `).join('');
-      // Per-plugin inputs are wrapped in a no-submit <form> so each
-      // password field has the implicit-form ancestor Chrome / password
-      // managers expect (otherwise emits "Password field is not contained
-      // in a form" warnings × N keySpecs). The form's onsubmit blocks
-      // the default action since saves go through a separate handler.
-      const inputsHtml = (p.keySpec ?? []).length === 0 ? '' : `
-        <form class="space-y-2" autocomplete="off" onsubmit="event.preventDefault(); return false;" data-plugin-key-form="${escape(p.id)}">
-          ${(p.keySpec ?? []).map(k => {
-            const current = byo.getKey(p.id, k.name) ?? '';
-            return `
-              <div class="mt-2">
-                <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">${escape(k.label)}${k.optional ? ' <span class="text-zinc-400 font-normal">(optional)</span>' : ''}</label>
-                <input type="password" autocomplete="off"
-                       data-key-input data-plugin="${escape(p.id)}" data-key-name="${escape(k.name)}"
-                       value="${escape(current)}"
-                       placeholder="${escape(k.placeholder ?? '')}"
-                       class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm font-mono" />
-                ${k.hint ? `<p class="text-[10px] text-zinc-500 mt-0.5">${escape(k.hint)}</p>` : ''}
-              </div>
-            `;
-          }).join('')}
-        </form>`;
-
-      const configureBlock = hasKeySpec ? `
-        <details class="mt-2 group">
-          <summary class="cursor-pointer text-xs font-medium text-emerald-700 dark:text-emerald-400 select-none">
-            ${keysSet ? (isEs ? 'Configurada · editar' : 'Configured · edit') : (isEs ? 'Configurar' : 'Configure')}
-          </summary>
-          <div class="mt-3 pt-3 border-t border-zinc-200 dark:border-zinc-800 space-y-3">
-            ${stepsHtml ? `<ol class="space-y-1 ml-1">${stepsHtml}</ol>` : ''}
-            ${inputsHtml}
-            <div class="flex items-center gap-2 pt-1 flex-wrap">
-              <button type="button" data-save="${escape(p.id)}" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 text-xs font-semibold text-white">${isEs ? 'Guardar' : 'Save'}</button>
-              ${p.testConnection ? `<button type="button" data-test="${escape(p.id)}" class="rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40">${isEs ? 'Probar' : 'Test'}</button>` : ''}
-              <button type="button" data-clear="${escape(p.id)}" class="text-xs text-red-600 dark:text-red-400 hover:underline">${isEs ? 'Borrar' : 'Clear'}</button>
-              <span data-status="${escape(p.id)}" class="text-xs ml-auto"></span>
-            </div>
-          </div>
-        </details>
-      ` : (
-        // For on-device plugins (no API keys), the setup steps would just say
-        // "Profile → Edit → AI settings → Download" — that's the page the user
-        // is already on. Replace with a deep-link to the matching download card.
-        ON_DEVICE_DOWNLOAD_ANCHOR[p.id]
-          ? `<p class="mt-2 text-xs"><a href="#${ON_DEVICE_DOWNLOAD_ANCHOR[p.id]}" class="text-emerald-700 dark:text-emerald-400 hover:underline font-medium">${isEs ? 'Gestionar descarga ↓' : 'Manage download ↓'}</a></p>`
-          : (p.setupSteps?.length
-            ? `<details class="mt-2"><summary class="cursor-pointer text-xs font-medium text-emerald-700 dark:text-emerald-400 select-none">${isEs ? 'Cómo activar' : 'How to enable'}</summary><ol class="mt-2 space-y-1 ml-1">${stepsHtml}</ol></details>`
-            : '')
-      );
-
-      const isDisabled = disabled.includes(p.id);
-      const toggleLabel = isDisabled
-        ? (isEs ? 'Activar' : 'Enable')
-        : (isEs ? 'Desactivar' : 'Disable');
-      const toggleColor = isDisabled
-        ? 'border-zinc-300 dark:border-zinc-700 text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800/40'
-        : 'border-emerald-600/60 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20';
-
+    function renderSection(section: Section, headerKey: string, sectionPlugins: typeof visiblePlugins): string {
+      if (!sectionPlugins.length) return '';
+      const warning = section === 'experimental'
+        ? `<p class="text-xs text-amber-700 dark:text-amber-400 mb-2">${escapeAttr(SECTION_LABELS.experimental_warning)}</p>`
+        : '';
+      const cards = sectionPlugins.map((p) => {
+        const av = availabilityMap.get(p.id) ?? { ready: false, reason: 'unsupported' as const };
+        const cache = cacheMap.get(p.id) ?? null;
+        const isDisabled = disabled.includes(p.id);
+        const state = deriveCardState({
+          pluginId: p.id,
+          runtime: p.capabilities.runtime,
+          availability: av,
+          isDisabled,
+          cacheStatus: cache,
+          byoKeysSet: byo.hasKeysForPlugin(p.id),
+        });
+        return renderPluginCard({
+          lang,
+          plugin: p,
+          state,
+          isDisabled,
+          cacheStatus: cache,
+          byoKeysSet: {},
+          sponsorship: p.id === 'claude_haiku' ? (sponsorship as Parameters<typeof renderPluginCard>[0]['sponsorship']) : null,
+        });
+      }).join('');
       return `
-        <li class="rounded-lg border ${isDisabled ? 'border-zinc-200/60 dark:border-zinc-800/60 opacity-60' : 'border-zinc-200 dark:border-zinc-800'} p-3">
-          <div class="flex items-start justify-between gap-3 flex-wrap">
-            <div class="min-w-0 flex-1">
-              <div class="flex items-center gap-2 flex-wrap">
-                ${p.brand ? `<span class="text-base">${escape(p.brand)}</span>` : ''}
-                <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">${escape(p.name)}</p>
-                <span class="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded ${ready && !isDisabled ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'}">${isDisabled ? (isEs ? 'Desactivado' : 'Disabled') : (ready ? (isEs ? 'Listo' : 'Ready') : reasonText)}</span>
-                ${keysSet ? `<span class="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-400">✓ ${isEs ? 'Key' : 'Key'}</span>` : ''}
-              </div>
-              <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">${escape(p.description)}</p>
-              <p class="text-[10px] text-zinc-400 dark:text-zinc-500 mt-1 font-mono">${tags.join(' · ')}</p>
-              ${!ready && av.message ? `<p class="text-[10px] text-zinc-500 italic mt-1">${escape(av.message)}</p>` : ''}
-              ${configureBlock}
-            </div>
-            <button type="button" data-toggle-plugin="${escape(p.id)}" class="rounded-lg border ${toggleColor} px-2 py-1 text-[10px] font-medium flex-none">${toggleLabel}</button>
-          </div>
+        <li class="rastrum-section-header" role="presentation">
+          <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mt-4 mb-2">${escapeAttr(SECTION_LABELS[headerKey] ?? headerKey)}</h3>
+          ${warning}
         </li>
+        ${cards}
       `;
-    }));
+    }
 
-    list.innerHTML = cards.join('');
+    // Llama and offline-map are not in the registry. Render them as
+    // local-data cards under their own "Other local data" section.
+    const TEXT_MODEL_ID = 'Llama-3.2-1B-Instruct-q4f16_1-MLC';
+    const llamaCache = await getModelCacheStatus(TEXT_MODEL_ID).catch(() => null);
+    const pmtilesCache = await (async () => {
+      // pmtiles cache lives in lib/offline-map.ts; if it exposes a status
+      // helper, use it; otherwise treat as not-cached. Keep this best-effort.
+      try {
+        const m = await import('../lib/offline-map');
+        if (typeof m.getPmtilesCacheStatus === 'function') return await m.getPmtilesCacheStatus();
+      } catch { /* lib may not export it — non-blocking */ }
+      return null;
+    })();
 
-    // Hide quick-setup banner when at least one non-PlantNet identifier is ready.
+    const otherLocalData = `
+      ${renderLocalDataCard({
+        lang, id: 'llama-3.2-1b', name: 'Llama-3.2-1B', brand: '🗨',
+        description: isEs
+          ? 'Ayudante de texto para traducción y chat sin conexión. No participa en la identificación de especies.'
+          : 'Text helper for translation and offline chat. Not part of species identification.',
+        cacheStatus: llamaCache, domIdPrefix: 'text',
+      })}
+      ${renderLocalDataCard({
+        lang, id: 'offline-map-mx',
+        name: isEs ? 'Mapa sin conexión — México' : 'Offline map — Mexico',
+        brand: '🗺',
+        description: isEs ? 'Carga el mapa base sin red.' : 'Renders the basemap without a network connection.',
+        cacheStatus: pmtilesCache as Parameters<typeof renderLocalDataCard>[0]['cacheStatus'],
+        domIdPrefix: 'pmtiles',
+      })}
+    `;
+
+    list.innerHTML = `
+      ${renderSection('photo_specialists', 'section_photo_specialists', grouped.get('photo_specialists')!)}
+      ${renderSection('photo_generalists', 'section_photo_generalists', grouped.get('photo_generalists')!)}
+      ${renderSection('experimental',      'section_photo_generalists', grouped.get('experimental')!)}
+      ${renderSection('audio',             'section_audio',             grouped.get('audio')!)}
+      <li class="rastrum-section-header" role="presentation">
+        <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mt-4 mb-2">${escapeAttr(SECTION_LABELS.section_other_local_data)}</h3>
+      </li>
+      ${otherLocalData}
+    `;
+
+    // Hide quick-setup banner when at least one non-PlantNet plugin is ready.
     const banner = document.getElementById('quick-setup-banner');
     const anyNonPlantNetReady = visiblePlugins.some(
-      p => p.id !== 'plantnet' && availability.get(p.id)?.ready === true,
+      (p) => p.id !== 'plantnet' && availabilityMap.get(p.id)?.ready === true
     );
     if (anyNonPlantNetReady && banner) banner.classList.add('hidden');
 
-    // Wire up Save / Test / Clear handlers (delegated)
-    list.querySelectorAll<HTMLButtonElement>('[data-save]').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const pluginId = btn.dataset.save!;
-        const inputs = list.querySelectorAll<HTMLInputElement>(`[data-key-input][data-plugin="${pluginId}"]`);
-        const { setKey } = await import('../lib/byo-keys');
-        inputs.forEach(i => setKey(pluginId, i.dataset.keyName!, i.value));
-        const status = list.querySelector(`[data-status="${pluginId}"]`);
-        if (status) {
-          status.textContent = isEs ? '✓ Guardada' : '✓ Saved';
-          status.className = 'text-xs ml-auto text-emerald-600 dark:text-emerald-400';
-          setTimeout(() => paintRegistry(), 800);
-        }
-      });
-    });
-    list.querySelectorAll<HTMLButtonElement>('[data-test]').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const pluginId = btn.dataset.test!;
-        const status = list.querySelector(`[data-status="${pluginId}"]`);
-        if (status) { status.textContent = isEs ? 'Probando…' : 'Testing…'; status.className = 'text-xs ml-auto text-zinc-500'; }
-        // Save first so the probe sees the latest typed key
-        const inputs = list.querySelectorAll<HTMLInputElement>(`[data-key-input][data-plugin="${pluginId}"]`);
-        const { setKey } = await import('../lib/byo-keys');
-        inputs.forEach(i => setKey(pluginId, i.dataset.keyName!, i.value));
-        const plugin = reg.get(pluginId);
-        if (!plugin?.testConnection) return;
-        const r = await plugin.testConnection();
-        if (status) {
-          status.textContent = (r.ok ? '✓ ' : '✗ ') + (r.message ?? '');
-          status.className = `text-xs ml-auto ${r.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`;
-        }
-      });
-    });
-    list.querySelectorAll<HTMLButtonElement>('[data-clear]').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const pluginId = btn.dataset.clear!;
-        const plugin = reg.get(pluginId);
-        if (!plugin?.keySpec) return;
-        const { clearKey } = await import('../lib/byo-keys');
-        plugin.keySpec.forEach(k => clearKey(pluginId, k.name));
-        await paintRegistry();
-      });
-    });
-
-    // Wire up enable/disable toggle buttons
-    list.querySelectorAll<HTMLButtonElement>('[data-toggle-plugin]').forEach(btn => {
+    // Wire toggle buttons (delegated via data attribute).
+    list.querySelectorAll<HTMLButtonElement>('[data-toggle-plugin]').forEach((btn) => {
       btn.addEventListener('click', () => {
-        const pluginId = btn.dataset.togglePlugin!;
-        togglePluginDisabled(pluginId);
+        const id = btn.dataset.togglePlugin!;
+        togglePluginDisabled(id);
         paintRegistry();
       });
     });
 
-    // Update pipeline flow visualization (#594 — real cascade order with license badges).
-    // Use visiblePlugins so plugins gated on missing operator config (e.g. SpeciesNet
-    // without PUBLIC_SPECIESNET_WEIGHTS_URL) don't appear in the order preview.
-    updatePipelineFlow(visiblePlugins.map(p => ({
+    // Wire Add key / Edit key buttons (delegated). Uses window.prompt as v1
+    // minimum; richer inline form is a follow-up.
+    list.querySelectorAll<HTMLButtonElement>('[data-add-key], [data-edit-key]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.addKey ?? btn.dataset.editKey!;
+        const plugin = reg.get(id);
+        if (!plugin?.keySpec?.length) return;
+        const newKey = window.prompt(plugin.keySpec[0].label, byo.getKey(id, plugin.keySpec[0].name) ?? '');
+        if (newKey == null) return;
+        if (newKey.trim()) {
+          byo.setKey(id, plugin.keySpec[0].name, newKey.trim());
+        } else {
+          byo.clearKey(id, plugin.keySpec[0].name);
+        }
+        await paintRegistry();
+      });
+    });
+
+    // Re-bind the on-device download / delete / progress controls onto
+    // their (now-painted) elements.
+    wireOnDeviceControls();
+
+    // Update pipeline-flow visualization.
+    updatePipelineFlow(visiblePlugins.map((p) => ({
       id: p.id,
       name: p.name,
       brand: p.brand,

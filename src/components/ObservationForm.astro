@@ -643,17 +643,53 @@ const cameraStationLoading     = observeStrings.camera_station_loading     ?? (i
   const webllmOk      = document.getElementById('webllm-ok');
   const webllmSkip    = document.getElementById('webllm-skip');
   const { hasShownLocalAIDownloadWarning, markLocalAIDownloadWarningShown } = await import('../lib/sync');
-  const LOCAL_AI_OPTIN = 'rastrum.localAiOptIn';
 
-  if (!hasShownLocalAIDownloadWarning() && localStorage.getItem(LOCAL_AI_OPTIN) !== 'false') {
+  // Registry-based replacement for localStorage probes used by the
+  // pre-redesign AI tab. Returns true if the plugin is downloaded,
+  // opted-in (not in disabledPlugins), and supported on this device.
+  async function pluginReady(pluginId: string): Promise<boolean> {
+    const [{ bootstrapIdentifiers }, prefs] = await Promise.all([
+      import('../lib/identifiers'),
+      import('../lib/identifier-prefs'),
+    ]);
+    const reg = bootstrapIdentifiers();
+    const p = reg.get(pluginId);
+    if (!p) return false;
+    if (prefs.getDisabledPlugins().includes(pluginId)) return false;
+    const av = await p.isAvailable();
+    return av.ready;
+  }
+
+  // Returns true when the plugin is opted-in and supported but hasn't been
+  // downloaded yet. Used by offerOnDeviceVision to pitch the download only
+  // when the user has explicitly enabled the plugin.
+  async function pluginNeedsDownload(pluginId: string): Promise<boolean> {
+    const [{ bootstrapIdentifiers }, prefs] = await Promise.all([
+      import('../lib/identifiers'),
+      import('../lib/identifier-prefs'),
+    ]);
+    const reg = bootstrapIdentifiers();
+    const p = reg.get(pluginId);
+    if (!p) return false;
+    if (prefs.getDisabledPlugins().includes(pluginId)) return false;
+    const av = await p.isAvailable();
+    if (av.ready) return false;
+    return av.reason === 'needs_download';
+  }
+
+  if (!hasShownLocalAIDownloadWarning() && !(await pluginReady('webllm_phi35_vision')) && !(await pluginReady('onnx_gemma4_vision'))) {
     webllmWarning?.classList.remove('hidden');
   }
   webllmOk?.addEventListener('click', () => {
     markLocalAIDownloadWarningShown();
     webllmWarning?.classList.add('hidden');
   });
-  webllmSkip?.addEventListener('click', () => {
-    localStorage.setItem(LOCAL_AI_OPTIN, 'false');
+  webllmSkip?.addEventListener('click', async () => {
+    const { setDisabledPlugins, getDisabledPlugins } = await import('../lib/identifier-prefs');
+    const disabled = getDisabledPlugins();
+    if (!disabled.includes('webllm_phi35_vision')) disabled.push('webllm_phi35_vision');
+    if (!disabled.includes('onnx_gemma4_vision')) disabled.push('onnx_gemma4_vision');
+    setDisabledPlugins(disabled);
     markLocalAIDownloadWarningShown();
     webllmWarning?.classList.add('hidden');
   });
@@ -1188,46 +1224,22 @@ const cameraStationLoading     = observeStrings.camera_station_loading     ?? (i
     if (await claudeAvailable()) {
       runners.claude_haiku = makeClaudeRunner(locale);
     }
-    // Phi-vision: only include if cached (otherwise we offer the download below).
-    // Phi-3.5-vision is strict opt-in. The MLC q4f16_1 build crashes
-    // with a flood of WebGPU "Binding size 1 isn't a multiple of 4"
-    // errors on certain GPU/driver combos (esp. Apple Silicon Metal,
-    // Chromium 147+). Until MLC ships an alignment-fixed artifact, we
-    // only enable Phi when the user has explicitly opted in via
-    // localStorage.rastrum.prefs.usePhiVision = 'true' AND the model
-    // is already cached on disk. The session-broken flag inside the
-    // runner kicks in if Phi crashes mid-session, so subsequent calls
-    // skip it cleanly.
-    try {
-      const optedIn = (typeof localStorage !== 'undefined')
-        ? localStorage.getItem('rastrum.prefs.usePhiVision') === 'true'
-        : false;
-      if (optedIn) {
-        const { getModelCacheStatus, VISION_MODEL_ID, localAISupported } = await import('../lib/local-ai');
-        if (localAISupported()) {
-          const status = await getModelCacheStatus(VISION_MODEL_ID);
-          if (status.cached) runners.webllm_phi35_vision = makePhiRunner(locale);
-        }
-      }
-    } catch { /* WebLLM unavailable in this environment */ }
+    // Phi-vision: only include if opted-in, supported, and cached (pluginReady
+    // encapsulates all three checks via the identifier registry). The
+    // session-broken flag inside the runner kicks in if Phi crashes
+    // mid-session, so subsequent calls skip it cleanly.
+    if (await pluginReady('webllm_phi35_vision')) {
+      runners.webllm_phi35_vision = makePhiRunner(locale);
+    }
 
     // Gemma 4 vision: parallel runtime to Phi (transformers.js + ONNX). Same
     // opt-in pattern + own session-broken flag. Both can be enabled
     // simultaneously — runParallelIdentify races them and uses whichever
     // returns a confident answer first. When one runtime crashes on a
     // given GPU/driver, the other often still works (independent kernels).
-    try {
-      const gemmaOptedIn = (typeof localStorage !== 'undefined')
-        ? localStorage.getItem('rastrum.prefs.useGemmaVision') === 'true'
-        : false;
-      if (gemmaOptedIn) {
-        const { getGemmaCacheStatus, gemmaSupported } = await import('../lib/onnx-vision');
-        if (gemmaSupported()) {
-          const status = await getGemmaCacheStatus();
-          if (status.cached) runners.onnx_gemma4_vision = makeGemmaRunner(locale);
-        }
-      }
-    } catch { /* transformers.js unavailable in this environment */ }
+    if (await pluginReady('onnx_gemma4_vision')) {
+      runners.onnx_gemma4_vision = makeGemmaRunner(locale);
+    }
 
     // "Identify another way" — exclude the previous winner's runner so the
     // cascade resolves to the next-best provider. The map below covers
@@ -1324,24 +1336,11 @@ const cameraStationLoading     = observeStrings.camera_station_loading     ?? (i
 
   function offerPhiVision() {
     if (!phiOffer) return;
-    try {
-      // Bandwidth opt-out wins over everything.
-      if (localStorage.getItem(LOCAL_AI_OPTIN) === 'false') return;
-      // Per-Phi opt-in (PR #637): if the user explicitly toggled Phi off,
-      // don't pitch them the download. Banner stays hidden; they fall
-      // through to the `idAllFailed` text which already mentions both
-      // on-device options by name (PR #645).
-      if (localStorage.getItem('rastrum.prefs.usePhiVision') !== 'true') return;
-    } catch { /* ignore */ }
     phiOffer.classList.remove('hidden');
   }
 
   function offerGemmaVision() {
     if (!gemmaOffer) return;
-    try {
-      if (localStorage.getItem(LOCAL_AI_OPTIN) === 'false') return;
-      if (localStorage.getItem('rastrum.prefs.useGemmaVision') !== 'true') return;
-    } catch { /* ignore */ }
     gemmaOffer.classList.remove('hidden');
   }
 
@@ -1352,36 +1351,15 @@ const cameraStationLoading     = observeStrings.camera_station_loading     ?? (i
   // banner — fall through to the idAllFailed text which already names
   // both options.
   async function offerOnDeviceVision(): Promise<void> {
-    let phiOptIn = false;
-    let gemmaOptIn = false;
-    try {
-      phiOptIn = localStorage.getItem('rastrum.prefs.usePhiVision') === 'true';
-      gemmaOptIn = localStorage.getItem('rastrum.prefs.useGemmaVision') === 'true';
-    } catch { /* ignore */ }
-    if (!phiOptIn && !gemmaOptIn) return;
-
-    let phiCached = false;
-    let gemmaCached = false;
-    if (phiOptIn) {
-      try {
-        const { getModelCacheStatus, VISION_MODEL_ID, localAISupported } = await import('../lib/local-ai');
-        if (localAISupported()) {
-          phiCached = (await getModelCacheStatus(VISION_MODEL_ID)).cached;
-        }
-      } catch { /* WebLLM unavailable — treat as not cached */ }
-    }
-    if (gemmaOptIn) {
-      try {
-        const { getGemmaCacheStatus, gemmaSupported } = await import('../lib/onnx-vision');
-        if (gemmaSupported()) {
-          gemmaCached = (await getGemmaCacheStatus()).cached;
-        }
-      } catch { /* transformers.js unavailable — treat as not cached */ }
-    }
-
-    if (gemmaOptIn && !gemmaCached) {
+    const [phiNeeds, gemmaNeeds] = await Promise.all([
+      pluginNeedsDownload('webllm_phi35_vision'),
+      pluginNeedsDownload('onnx_gemma4_vision'),
+    ]);
+    if (!phiNeeds && !gemmaNeeds) return;
+    // Prefer offering Gemma (~500 MB) over Phi (~4 GB).
+    if (gemmaNeeds) {
       offerGemmaVision();
-    } else if (phiOptIn && !phiCached) {
+    } else {
       offerPhiVision();
     }
   }

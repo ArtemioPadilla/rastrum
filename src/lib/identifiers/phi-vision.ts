@@ -25,13 +25,6 @@ export const phiVisionIdentifier: Identifier = {
     cost_per_id_usd: 0,
   },
   async isAvailable() {
-    // The MLC q4f16_1 build crashes on certain GPU/driver combos (see
-    // ObservationForm.astro:1121 comment). Gate on the explicit opt-in
-    // toggle (Profile → Edit → AI settings) so Phi never runs unless
-    // the user has accepted the instability tradeoff.
-    if (typeof localStorage !== 'undefined' && localStorage.getItem('rastrum.prefs.usePhiVision') !== 'true') {
-      return { ready: false, reason: 'disabled', message: 'Enable in Profile → AI settings' };
-    }
     const { localAISupported } = await import('../local-ai');
     if (!localAISupported()) {
       const mem = typeof navigator !== 'undefined' ? (navigator as Navigator & { deviceMemory?: number }).deviceMemory : undefined;

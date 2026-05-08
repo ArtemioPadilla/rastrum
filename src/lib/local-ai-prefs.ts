@@ -1,22 +1,11 @@
 /**
- * Local-AI bandwidth opt-in pref (#583).
+ * Local-AI download-warning pref (#583).
  *
- * Extracted from sync.ts so multiple cascade call sites share the same
- * gate without duplicating localStorage logic.
- *
- * WebLLM (Phi-3.5-vision) is ON by default (issue #12 — privacy-first,
- * offline-capable). Users can opt OUT in profile settings if bandwidth
- * is a concern.
+ * Tracks whether the user has already seen the bandwidth warning so
+ * the UI doesn't nag repeatedly.
  */
 
-const LOCAL_AI_OPTIN = 'rastrum.localAiOptIn';
 const LOCAL_AI_DOWNLOAD_WARNED = 'rastrum.localAiDownloadWarned';
-
-export function isLocalAIEnabled(): boolean {
-  if (typeof localStorage === 'undefined') return true;
-  if (localStorage.getItem(LOCAL_AI_OPTIN) === 'true') return true;
-  return localStorage.getItem(LOCAL_AI_OPTIN) !== 'false';
-}
 
 export function hasShownLocalAIDownloadWarning(): boolean {
   if (typeof localStorage === 'undefined') return false;
