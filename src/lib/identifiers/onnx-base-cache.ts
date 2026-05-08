@@ -109,9 +109,11 @@ export interface OnnxBaseDownloadProgress {
 /**
  * Download model + labels into the EfficientNet cache, streaming
  * progress. Throws a clear error when `PUBLIC_ONNX_BASE_URL` is not set.
+ * Pass an AbortSignal to support cancellation via cancelModelDownload().
  */
 export async function downloadOnnxBaseWeights(
   onProgress: (p: OnnxBaseDownloadProgress) => void = () => {},
+  signal?: AbortSignal,
 ): Promise<void> {
   const base = getOnnxBaseWeightsBaseUrl();
   if (!base) {
@@ -128,8 +130,8 @@ export async function downloadOnnxBaseWeights(
   const labelsHref = `${base}/${ONNX_BASE_LABELS_FILE}`;
 
   // Labels first — they're tiny and a quick connectivity check.
-  await streamInto(cache, labelsHref, 'labels', 0, 1, onProgress);
-  await streamInto(cache, modelHref,  'model',  0, 1, onProgress);
+  await streamInto(cache, labelsHref, 'labels', 0, 1, onProgress, signal);
+  await streamInto(cache, modelHref,  'model',  0, 1, onProgress, signal);
 }
 
 async function streamInto(
@@ -139,8 +141,9 @@ async function streamInto(
   baseProgress: number,
   span: number,
   onProgress: (p: OnnxBaseDownloadProgress) => void,
+  signal?: AbortSignal,
 ): Promise<void> {
-  const res = await fetch(url, { mode: 'cors' });
+  const res = await fetch(url, { mode: 'cors', signal });
   if (!res.ok || !res.body) {
     throw new Error(`Failed to fetch ${url}: HTTP ${res.status}`);
   }
