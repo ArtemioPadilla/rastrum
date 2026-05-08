@@ -287,6 +287,7 @@ const docColumns = [
 <script is:inline>
   // Theme + lang toggles (desktop chrome — kept until PR 3 moves them into the footer/Preferences)
   document.getElementById('theme-toggle')?.addEventListener('click', () => {
+    document.documentElement.classList.remove('field');
     const dark = document.documentElement.classList.toggle('dark');
     localStorage.setItem('theme', dark ? 'dark' : 'light');
   });

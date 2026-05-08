@@ -252,6 +252,7 @@ const getDocLabel = (key: string) => (tr.docs.sections as Record<string, string>
   });
 
   themeBtn?.addEventListener('click', () => {
+    document.documentElement.classList.remove('field');
     const dark = document.documentElement.classList.toggle('dark');
     localStorage.setItem('theme', dark ? 'dark' : 'light');
   });

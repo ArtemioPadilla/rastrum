@@ -123,12 +123,17 @@ const knownPills: Set<UserRole> | null = allRoles ?? null;
     <link rel="icon" type="image/svg+xml" href={`${import.meta.env.BASE_URL}favicon.svg`} />
     <script is:inline>
       (function() {
-        const theme = localStorage.getItem('theme');
-        if (theme === 'light') {
-          document.documentElement.classList.remove('dark');
-        } else {
-          document.documentElement.classList.add('dark');
-        }
+        var stored = localStorage.getItem('theme');
+        var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var eff;
+        if (stored === 'field')      eff = 'field';
+        else if (stored === 'light') eff = 'light';
+        else if (stored === 'dark')  eff = 'dark';
+        else                         eff = prefersDark ? 'dark' : 'light';
+        var el = document.documentElement.classList;
+        if (eff === 'field')      { el.add('dark'); el.add('field'); }
+        else if (eff === 'dark')  { el.add('dark'); el.remove('field'); }
+        else                      { el.remove('dark'); el.remove('field'); }
       })();
     </script>
   </head>
