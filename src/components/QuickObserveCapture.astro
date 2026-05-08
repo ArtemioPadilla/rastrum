@@ -1,0 +1,231 @@
+---
+/**
+ * QuickObserveCapture.astro — one-tap observation flow (issue #721).
+ *
+ * Mounted by the locale observe page when `?quick=1` is present in the URL.
+ * Behaviour:
+ *   1. Triggers the system camera input on mount.
+ *   2. On `change`, parses EXIF GPS + kicks off live geolocation in parallel.
+ *   3. Saves the photo to the Dexie outbox immediately (draft if no GPS yet,
+ *      pending otherwise — sync engine promotes drafts when GPS resolves).
+ *   4. Shows a 2-second toast then redirects home.
+ *
+ * The identify cascade runs async via the existing post-sync trigger; no
+ * confirm step, no waiting on the network.
+ */
+import { t } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+
+const { lang } = Astro.props;
+const tr = t(lang);
+const q = tr.quick_observe as unknown as Record<string, string>;
+
+const heading       = q.heading;
+const subheading    = q.subheading;
+const cancelLabel   = q.cancel;
+const openCamera    = q.open_camera;
+const savedToast    = q.saved_toast;
+const draftToast    = q.draft_toast;
+const errorToast    = q.error_toast;
+const noPhotoNotice = q.no_photo;
+const tipLabel      = q.tip;
+const savingLabel   = q.saving;
+const homeHref      = lang === 'es' ? '/es/' : '/en/';
+---
+
+<section
+  id="quick-observe-root"
+  class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white dark:bg-zinc-950 px-4"
+  data-saved-toast={savedToast}
+  data-draft-toast={draftToast}
+  data-error-toast={errorToast}
+  data-no-photo-toast={noPhotoNotice}
+  data-saving-label={savingLabel}
+  data-home-href={homeHref}
+>
+  <input
+    id="quick-observe-camera-input"
+    type="file"
+    accept="image/*"
+    capture="environment"
+    class="sr-only"
+    aria-label={openCamera}
+  />
+
+  <div class="max-w-md w-full text-center space-y-5">
+    <div class="mx-auto w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center">
+      <svg class="w-8 h-8 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 0 1 2-2h2l1.5-2h7L17 7h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+        <circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="1.6" />
+      </svg>
+    </div>
+
+    <div>
+      <h1 class="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">{heading}</h1>
+      <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{subheading}</p>
+    </div>
+
+    <p id="quick-observe-tip" class="text-xs text-zinc-400 dark:text-zinc-500">{tipLabel}</p>
+
+    <div class="flex flex-col gap-2">
+      <button
+        id="quick-observe-camera-btn"
+        type="button"
+        class="w-full min-h-12 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-base flex items-center justify-center gap-2 active:scale-95 transition-transform"
+      >
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 0 1 2-2h2l1.5-2h7L17 7h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+          <circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="2" />
+        </svg>
+        {openCamera}
+      </button>
+      <a
+        href={homeHref}
+        id="quick-observe-cancel"
+        class="text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 underline underline-offset-2"
+      >{cancelLabel}</a>
+    </div>
+
+    <div
+      id="quick-observe-status"
+      class="hidden flex items-center justify-center gap-2 text-sm text-emerald-700 dark:text-emerald-300"
+      role="status"
+      aria-live="polite"
+    >
+      <span class="inline-block w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></span>
+      <span id="quick-observe-status-text"></span>
+    </div>
+  </div>
+
+  <div
+    id="quick-observe-toast"
+    class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] max-w-[90vw] rounded-full px-4 py-2 text-sm font-medium shadow-lg"
+    role="status"
+    aria-live="polite"
+  ></div>
+</section>
+
+<script>
+  import { parse as parseExif } from 'exifr';
+  import { resolveObserverRef, saveObservationToOutbox } from '../lib/observe';
+  import { syncOutbox } from '../lib/sync';
+  import { buildQuickObservationDraft, getQuickGps, isNullIsland, type QuickGpsInput } from '../lib/quick-observe';
+
+  // Only activate this surface when the page mounts in quick mode. Without
+  // this gate the auto-click would fire on every /observe load and block the
+  // default view from interaction.
+  const isQuick = (() => {
+    try { return new URLSearchParams(window.location.search).get('quick') === '1'; }
+    catch { return false; }
+  })();
+
+  const root      = document.getElementById('quick-observe-root');
+  const camInput  = document.getElementById('quick-observe-camera-input') as HTMLInputElement | null;
+  const camBtn    = document.getElementById('quick-observe-camera-btn') as HTMLButtonElement | null;
+  const status    = document.getElementById('quick-observe-status');
+  const statusTxt = document.getElementById('quick-observe-status-text');
+  const toast     = document.getElementById('quick-observe-toast');
+
+  if (isQuick && root && camInput && camBtn && toast) {
+    const saved   = root.dataset.savedToast   ?? 'Saved';
+    const draft   = root.dataset.draftToast   ?? 'Draft saved';
+    const errored = root.dataset.errorToast   ?? 'Could not save';
+    const noPhoto = root.dataset.noPhotoToast ?? 'No photo captured';
+    const saving  = root.dataset.savingLabel  ?? 'Saving…';
+    const home    = root.dataset.homeHref     ?? '/';
+
+    function showToast(message: string, kind: 'success' | 'info' | 'error') {
+      if (!toast) return;
+      toast.textContent = message;
+      const palette =
+        kind === 'success' ? 'bg-emerald-600 text-white'
+        : kind === 'error' ? 'bg-red-600 text-white'
+        : 'bg-zinc-800 text-white';
+      toast.className = `fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] max-w-[90vw] rounded-full px-4 py-2 text-sm font-medium shadow-lg ${palette}`;
+    }
+
+    function setStatus(text: string) {
+      if (!status || !statusTxt) return;
+      statusTxt.textContent = text;
+      status.classList.remove('hidden');
+    }
+
+    async function exifLocation(file: File): Promise<QuickGpsInput | null> {
+      try {
+        const exif = await parseExif(file, { gps: true, tiff: true, exif: true }) as Record<string, unknown> | undefined;
+        if (!exif) return null;
+        const lat = pickNumber(exif.latitude, exif.Latitude, exif.GPSLatitude);
+        const lng = pickNumber(exif.longitude, exif.Longitude, exif.GPSLongitude);
+        if (lat == null || lng == null) return null;
+        if (isNullIsland(lat, lng)) return null;
+        const altitudeM = pickNumber(exif.GPSAltitude, exif.altitude, exif.Altitude);
+        return { lat, lng, accuracyM: 15, altitudeM, source: 'exif' };
+      } catch {
+        return null;
+      }
+    }
+
+    function pickNumber(...candidates: unknown[]): number | null {
+      for (const c of candidates) {
+        if (typeof c === 'number' && Number.isFinite(c)) return c;
+      }
+      return null;
+    }
+
+    async function handleCapture(file: File) {
+      setStatus(saving);
+      try {
+        const observerRefP = resolveObserverRef();
+        const exifP        = exifLocation(file);
+        const gpsP         = getQuickGps();
+
+        const observerRef = await observerRefP;
+        const exif        = await exifP;
+        const location    = exif ?? await gpsP;
+
+        const draftRow = buildQuickObservationDraft({
+          observerRef,
+          file: { blob: file, mimeType: file.type || 'image/jpeg', sizeBytes: file.size },
+          location,
+        });
+        await saveObservationToOutbox(draftRow);
+        syncOutbox().catch(() => { /* fire and forget */ });
+
+        showToast(draftRow.asDraft ? draft : saved, 'success');
+        try {
+          (window as unknown as { posthog?: { capture: (event: string, props?: Record<string, unknown>) => void } })
+            .posthog?.capture('quick_observation_saved', {
+              had_gps: !draftRow.asDraft,
+              media_kind: draftRow.media[0]?.mediaType ?? 'photo',
+            });
+        } catch { /* posthog absent */ }
+        window.setTimeout(() => { window.location.href = home; }, 2_000);
+      } catch (err) {
+        console.warn('[rastrum] quick observation save failed', err);
+        showToast(errored, 'error');
+      }
+    }
+
+    camInput.addEventListener('change', () => {
+      const f = camInput.files?.[0];
+      if (!f) {
+        showToast(noPhoto, 'info');
+        camInput.value = '';
+        return;
+      }
+      void handleCapture(f);
+      camInput.value = '';
+    });
+    camBtn.addEventListener('click', () => camInput.click());
+
+    // Auto-trigger the camera once on mount. iOS/Android both require a user
+    // gesture for input.click() — the bottom-bar tap that brought us here
+    // counts on most browsers; if it doesn't, the button stays as a fallback.
+    requestAnimationFrame(() => {
+      try { camInput.click(); } catch { /* ignored — user can tap the button */ }
+    });
+  }
+</script>

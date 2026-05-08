@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import ObserveView2 from '../../components/ObserveView2.astro';
+import QuickObserveCapture from '../../components/QuickObserveCapture.astro';
 import { t } from '../../i18n/utils';
 
 const lang = 'es';
@@ -12,5 +13,18 @@ const tr = t(lang);
   description="Identifica especies o registra observaciones de biodiversidad. Sube fotos, audio o video — IA con PlantNet, BirdNET y Claude Vision. Offline-first, sincroniza con GBIF y CONABIO."
   lang={lang}
 >
-  <ObserveView2 lang={lang} />
+  <div id="observe-default-view"><ObserveView2 lang={lang} /></div>
+  <div id="observe-quick-view" class="hidden"><QuickObserveCapture lang={lang} /></div>
+  <script is:inline>
+    (function () {
+      try {
+        var qs = new URLSearchParams(window.location.search);
+        if (qs.get('quick') !== '1') return;
+        var def = document.getElementById('observe-default-view');
+        var qk  = document.getElementById('observe-quick-view');
+        if (def) def.classList.add('hidden');
+        if (qk)  qk.classList.remove('hidden');
+      } catch { /* malformed search */ }
+    })();
+  </script>
 </BaseLayout>

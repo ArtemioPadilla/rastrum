@@ -68,7 +68,9 @@ const recentActive = isActiveSection(currentPath, 'exploreRecent', lang);
         href={fab.href}
         data-tour="fab"
         data-on-observe={fab.onObserve ? 'true' : undefined}
+        data-quick-href={getLocalizedPath(lang, routes.observe[locale] + '/?quick=1')}
         aria-label={tr.nav.bottom.fab_observe_label}
+        title={tr.nav.bottom.fab_quick_hint}
         class="absolute left-1/2 -translate-x-1/2 -top-7 w-14 h-14 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center shadow-lg ring-4 ring-white dark:ring-zinc-950 motion-reduce:transition-none transition-transform active:scale-95"
       >
         <svg aria-hidden="true" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 0 1 2-2h2l1.5-2h7L17 7h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>
@@ -128,12 +130,47 @@ const recentActive = isActiveSection(currentPath, 'exploreRecent', lang);
   FAB camera shortcut. When the user is already on /observe and taps the
   FAB, intercept the click and trigger the DropZone capture input directly
   instead of navigating to the same page.
+
+  Long-press (>500ms, mouse or touch) routes to /observe?quick=1 — the
+  one-tap Quick Observation flow (issue #721).
 -->
 <script is:inline>
   (function () {
     var fab = document.getElementById('mbb-fab');
-    if (!fab || fab.dataset.onObserve !== 'true') return;
+    if (!fab) return;
+
+    var LONG_PRESS_MS = 500;
+    var pressTimer = null;
+    var isLongPress = false;
+
+    function startPress() {
+      isLongPress = false;
+      if (pressTimer) clearTimeout(pressTimer);
+      pressTimer = setTimeout(function () {
+        isLongPress = true;
+        var quickHref = fab.dataset.quickHref;
+        if (!quickHref) return;
+        if (navigator.vibrate) {
+          try { navigator.vibrate(30); } catch (e) { /* unsupported */ }
+        }
+        window.location.href = quickHref;
+      }, LONG_PRESS_MS);
+    }
+
+    function endPress() {
+      if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+    }
+
+    fab.addEventListener('touchstart', startPress, { passive: true });
+    fab.addEventListener('touchend', endPress);
+    fab.addEventListener('touchcancel', endPress);
+    fab.addEventListener('mousedown', startPress);
+    fab.addEventListener('mouseup', endPress);
+    fab.addEventListener('mouseleave', endPress);
+
     fab.addEventListener('click', function (e) {
+      if (isLongPress) { e.preventDefault(); isLongPress = false; return; }
+      if (fab.dataset.onObserve !== 'true') return;
       var capInput = document.getElementById('dz-capture-input');
       if (!capInput) return;
       e.preventDefault();
