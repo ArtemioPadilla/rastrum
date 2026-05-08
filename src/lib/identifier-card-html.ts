@@ -243,6 +243,8 @@ export interface LocalDataCardProps {
   cacheStatus: ModelCacheStatus | null;
   /** Element id prefix the on-device JS expects ('text', 'pmtiles', etc.). */
   domIdPrefix: string;
+  /** When true, renders a Cancel button instead of the Download button. */
+  downloading?: boolean;
 }
 
 export function renderLocalDataCard(p: LocalDataCardProps): string {
@@ -250,11 +252,13 @@ export function renderLocalDataCard(p: LocalDataCardProps): string {
   const cached = p.cacheStatus?.cached === true;
   const sizeLabel = cached ? bytesHuman(p.cacheStatus!.approxBytes) : '';
 
-  const downloadBtn = cached
-    ? `<button type="button" id="${escape(p.domIdPrefix)}-download" class="rounded-lg border border-emerald-600/60 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20">${t.redownload}</button>`
-    : `<button type="button" id="${escape(p.domIdPrefix)}-download" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 text-xs font-semibold text-white">${t.download}</button>`;
+  const downloadBtn = p.downloading
+    ? `<button type="button" id="${escape(p.domIdPrefix)}-cancel" class="rounded-lg border border-zinc-300 dark:border-zinc-700 px-2 py-1 text-[10px]">${t.cancel}</button>`
+    : cached
+      ? `<button type="button" id="${escape(p.domIdPrefix)}-download" class="rounded-lg border border-emerald-600/60 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20">${t.redownload}</button>`
+      : `<button type="button" id="${escape(p.domIdPrefix)}-download" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 text-xs font-semibold text-white">${t.download}</button>`;
 
-  const deleteBtn = cached
+  const deleteBtn = cached && !p.downloading
     ? `<button type="button" id="${escape(p.domIdPrefix)}-delete" class="rounded-lg border border-red-300 dark:border-red-900/50 px-3 py-1.5 text-xs font-medium text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">${t.delete}</button>`
     : '';
 

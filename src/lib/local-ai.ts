@@ -44,6 +44,64 @@ let textEngine: MLCEngineInterface | null = null;
 let createEngine: typeof CreateMLCEngineFn | null = null;
 
 /**
+ * Per-modelId registry of AbortControllers for fetch-based downloads (BirdNET,
+ * EfficientNet, MegaDetector, SpeciesNet). Used by cancelModelDownload().
+ *
+ * WebLLM models (Phi, Llama, Gemma) don't expose an AbortSignal through
+ * CreateMLCEngine, so we track a cancelled flag per modelId instead. The next
+ * progress callback checks the flag and the caller clears the partial cache.
+ */
+const downloadControllers = new Map<string, AbortController>();
+const cancelledFlags = new Set<string>();
+
+/**
+ * Register an AbortController for a fetch-based model download.
+ * Called by the cache loaders (birdnet-cache, onnx-base-cache, etc.)
+ * after creating their AbortController so cancelModelDownload() can abort it.
+ * Each call replaces any previous controller for the same modelId.
+ */
+export function registerDownloadController(modelId: string, controller: AbortController): void {
+  downloadControllers.set(modelId, controller);
+}
+
+/**
+ * Returns true if a WebLLM-style cancel was requested for this modelId.
+ * Callers (loadVisionEngine / loadTextEngine) should check this in their
+ * progress callback and abort loading. The flag is cleared automatically
+ * by cancelModelDownload() after being read here, or by a fresh load start.
+ */
+export function isDownloadCancelled(modelId: string): boolean {
+  return cancelledFlags.has(modelId);
+}
+
+/**
+ * Cancel an in-flight model download and clear any partial cache.
+ *
+ * - For fetch-based models (BirdNET, EfficientNet, MegaDetector, SpeciesNet):
+ *   aborts the registered AbortController so the fetch stream throws AbortError.
+ * - For WebLLM models (Phi-3.5-vision, Llama-3.2-1B, Gemma via transformers.js):
+ *   sets a cancelled flag checked by the progress callback; the load will fail on
+ *   the next tick. This is a best-effort path — WebLLM's CreateMLCEngine does not
+ *   expose an AbortSignal, so we cannot stop the in-flight GPU kernel compilation,
+ *   only mark the session as cancelled so the UI transitions back to not-downloaded.
+ *   Partial OPFS data is cleared via clearModelCache() regardless.
+ */
+export async function cancelModelDownload(modelId: string): Promise<void> {
+  // Abort fetch-based downloads immediately.
+  const controller = downloadControllers.get(modelId);
+  if (controller) {
+    controller.abort();
+    downloadControllers.delete(modelId);
+  }
+  // Mark WebLLM-style loads as cancelled (checked by progress callbacks).
+  cancelledFlags.add(modelId);
+  // Always clear partial cache so the card returns to not-downloaded state.
+  await clearModelCache(modelId);
+  // The cancelled flag is left in the set; it's cleaned up by the next
+  // loadVisionEngine / loadTextEngine call for this modelId (fresh start).
+}
+
+/**
  * Returns true when WebLLM can probably run on this device.
  * Hard requirement: WebGPU. Soft requirement: ≥6 GB device memory.
  * Mobile devices with ≤4 GB RAM will crash when loading the ~4 GB
@@ -73,15 +131,22 @@ async function ensureCreator() {
 export async function loadVisionEngine(onProgress: (p: LoadProgress) => void): Promise<MLCEngineInterface> {
   if (visionEngine) return visionEngine;
   if (!localAISupported()) throw new Error('WebGPU not available — local AI unavailable on this browser.');
+  // Clear any stale cancelled flag from a previous cancel on this modelId.
+  cancelledFlags.delete(VISION_MODEL_ID);
   // Lock OPFS storage against eviction before downloading multi-GB weights
   await requestPersistentStorage().catch(() => {});
   const create = await ensureCreator();
   visionEngine = await create(VISION_MODEL_ID, {
-    initProgressCallback: (p) => onProgress({
-      progress: p.progress ?? 0,
-      text: p.text ?? '',
-      timeElapsedMs: (p.timeElapsed ?? 0) * 1000,
-    }),
+    initProgressCallback: (p) => {
+      if (cancelledFlags.has(VISION_MODEL_ID)) {
+        throw new Error('Download cancelled');
+      }
+      onProgress({
+        progress: p.progress ?? 0,
+        text: p.text ?? '',
+        timeElapsedMs: (p.timeElapsed ?? 0) * 1000,
+      });
+    },
   });
   return visionEngine;
 }
@@ -90,14 +155,21 @@ export async function loadVisionEngine(onProgress: (p: LoadProgress) => void): P
 export async function loadTextEngine(onProgress: (p: LoadProgress) => void): Promise<MLCEngineInterface> {
   if (textEngine) return textEngine;
   if (!localAISupported()) throw new Error('WebGPU not available — local AI unavailable on this browser.');
+  // Clear any stale cancelled flag from a previous cancel on this modelId.
+  cancelledFlags.delete(TEXT_MODEL_ID);
   await requestPersistentStorage().catch(() => {});
   const create = await ensureCreator();
   textEngine = await create(TEXT_MODEL_ID, {
-    initProgressCallback: (p) => onProgress({
-      progress: p.progress ?? 0,
-      text: p.text ?? '',
-      timeElapsedMs: (p.timeElapsed ?? 0) * 1000,
-    }),
+    initProgressCallback: (p) => {
+      if (cancelledFlags.has(TEXT_MODEL_ID)) {
+        throw new Error('Download cancelled');
+      }
+      onProgress({
+        progress: p.progress ?? 0,
+        text: p.text ?? '',
+        timeElapsedMs: (p.timeElapsed ?? 0) * 1000,
+      });
+    },
   });
   return textEngine;
 }
@@ -207,6 +279,9 @@ export async function getModelCacheStatus(modelId: string): Promise<ModelCacheSt
  */
 export async function clearModelCache(modelId: string): Promise<{ deleted: number }> {
   if (typeof caches === 'undefined') return { deleted: 0 };
+  // Clean up any lingering controller/flag state for this modelId.
+  downloadControllers.delete(modelId);
+  cancelledFlags.delete(modelId);
   // If the model is currently loaded into GPU memory, unload it first so
   // we don't hand back stale memory references after the disk wipe.
   if (modelId === VISION_MODEL_ID && visionEngine) {
