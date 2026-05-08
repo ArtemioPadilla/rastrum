@@ -7,19 +7,30 @@ const { lang } = Astro.props;
 const tr = t(lang) as unknown as { explore_species_hero: Record<string, string> };
 const eh = tr.explore_species_hero;
 ---
-<div class="flex flex-wrap gap-1.5 mt-2.5" data-filter-chips role="group" aria-label="Filters">
-  <button type="button" class="es-chip" data-chip="all" aria-pressed="true">{eh.chip_all}</button>
-  <button type="button" class="es-chip" data-chip="endemic" aria-pressed="false">🇲🇽 {eh.chip_endemic}</button>
-  <button type="button" class="es-chip" data-chip="nom059" aria-pressed="false">⚠ {eh.chip_nom059}</button>
-  <button type="button" class="es-chip" data-chip="rare" aria-pressed="false">★ {eh.chip_rare}</button>
-  <button type="button" class="es-chip" data-chip="kingdom:Animalia" aria-pressed="false">Animalia</button>
-  <button type="button" class="es-chip" data-chip="kingdom:Plantae" aria-pressed="false">Plantae</button>
-  <button type="button" class="es-chip" data-chip="kingdom:Fungi" aria-pressed="false">Fungi</button>
+<div class="flex flex-wrap items-center gap-3 mt-2.5">
+  <div class="flex flex-wrap gap-1.5" data-filter-chips role="group" aria-label="Filters">
+    <button type="button" class="es-chip" data-chip="all" aria-pressed="true">{eh.chip_all}</button>
+    <button type="button" class="es-chip" data-chip="endemic" aria-pressed="false">🇲🇽 {eh.chip_endemic}</button>
+    <button type="button" class="es-chip" data-chip="nom059" aria-pressed="false">⚠ {eh.chip_nom059}</button>
+    <button type="button" class="es-chip" data-chip="rare" aria-pressed="false">★ {eh.chip_rare}</button>
+    <button type="button" class="es-chip" data-chip="kingdom:Animalia" aria-pressed="false">Animalia</button>
+    <button type="button" class="es-chip" data-chip="kingdom:Plantae" aria-pressed="false">Plantae</button>
+    <button type="button" class="es-chip" data-chip="kingdom:Fungi" aria-pressed="false">Fungi</button>
+  </div>
+  <div class="ml-auto flex flex-wrap items-center gap-1.5" data-sort-chips role="group" aria-label={eh.sort_label ?? 'Sort'}>
+    <button type="button" class="es-chip" data-sort="obs" aria-pressed="true">{eh.sort_obs}</button>
+    <button type="button" class="es-chip" data-sort="recent" aria-pressed="false">{eh.sort_recent}</button>
+    <button type="button" class="es-chip" data-sort="alpha" aria-pressed="false">{eh.sort_alpha}</button>
+  </div>
 </div>
 
 <style>
-  [data-filter-chips] button { padding: 4px 12px; font-size: 12px; border-radius: 9999px; border-width: 1px; cursor: pointer; }
-  [data-filter-chips] button[aria-pressed="false"] { background: #fff; color: #475569; border-color: #e2e8f0; }
-  :global(.dark) [data-filter-chips] button[aria-pressed="false"] { background: #18181b; color: #d4d4d8; border-color: #3f3f46; }
-  [data-filter-chips] button[aria-pressed="true"] { background: #047857; color: #fff; border-color: #047857; }
+  [data-filter-chips] button,
+  [data-sort-chips] button { padding: 4px 12px; font-size: 12px; border-radius: 9999px; border-width: 1px; cursor: pointer; }
+  [data-filter-chips] button[aria-pressed="false"],
+  [data-sort-chips] button[aria-pressed="false"] { background: #fff; color: #475569; border-color: #e2e8f0; }
+  :global(.dark) [data-filter-chips] button[aria-pressed="false"],
+  :global(.dark) [data-sort-chips] button[aria-pressed="false"] { background: #18181b; color: #d4d4d8; border-color: #3f3f46; }
+  [data-filter-chips] button[aria-pressed="true"],
+  [data-sort-chips] button[aria-pressed="true"] { background: #047857; color: #fff; border-color: #047857; }
 </style>

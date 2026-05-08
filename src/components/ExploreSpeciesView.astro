@@ -191,7 +191,7 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
   import maplibregl from 'maplibre-gl';
   import { getSupabase } from '../lib/supabase';
   import { renderSpeciesCard, type CardLabels } from '../lib/species-card-html';
-  import { parseChips, serializeChips, type ChipsState } from '../lib/species-filters';
+  import { parseChips, parseSort, serializeFilters, type ChipsState, type SortMode } from '../lib/species-filters';
   import { deriveGenus, colorForName, buildTaxonomicTree, taxonomicDepth, type TaxonNode } from '../lib/species-display';
 
   type Lang = 'en' | 'es';
@@ -302,8 +302,11 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
     // even when the data fetch below fails (e.g. CI preview with no Supabase
     // keys). applyAllFilters() is a no-op when no cards are rendered yet.
     let currentChips: ChipsState = parseChips(window.location.search);
+    let currentSort: SortMode = parseSort(window.location.search);
     wireChipClicks();
+    wireSortClicks();
     paintChipPressedState();
+    paintSortPressedState();
 
     let supabase;
     try {
@@ -410,12 +413,19 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
       }
     }
 
-    const enriched = taxaRows
-      .map(t => ({
-        ...t,
-        count: counts.get(t.id) ?? 0,
-      }))
-      .sort((a, b) => b.count - a.count || a.scientific_name.localeCompare(b.scientific_name));
+    type Enriched = TaxaRow & { count: number };
+    function sortEnriched(rows: Enriched[], mode: SortMode): Enriched[] {
+      if (mode === 'alpha') {
+        return [...rows].sort((a, b) => a.scientific_name.localeCompare(b.scientific_name));
+      }
+      // 'recent' currently falls back to obs count — last_observed_at is added
+      // by the parallel PR feat/mv-taxon-obs-counts; this branch becomes a real
+      // recency sort once that column is available.
+      return [...rows].sort((a, b) => b.count - a.count || a.scientific_name.localeCompare(b.scientific_name));
+    }
+    let cachedEnriched: Enriched[] = taxaRows.map(t => ({ ...t, count: counts.get(t.id) ?? 0 }));
+    const enriched = sortEnriched(cachedEnriched, currentSort);
+    cachedEnriched = enriched;
 
     // M34: expose full taxa list for sunburst + search panels
     // (`deriveGenus` lives in species-display.ts so it's reusable + tested.)
@@ -649,7 +659,31 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
           const k = c.slice('kingdom:'.length);
           currentChips = { ...currentChips, kingdom: currentChips.kingdom === k ? null : k };
         }
-        history.replaceState({}, '', `${window.location.pathname}${serializeChips(currentChips)}`);
+        history.replaceState({}, '', `${window.location.pathname}${serializeFilters(currentChips, currentSort)}`);
+        applyAllFilters();
+      }));
+    }
+
+    function paintSortPressedState() {
+      document.querySelectorAll<HTMLButtonElement>('[data-sort-chips] [data-sort]').forEach((btn) => {
+        const pressed = (btn.dataset.sort ?? '') === currentSort;
+        btn.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+      });
+    }
+
+    function wireSortClicks() {
+      const buttons = document.querySelectorAll<HTMLButtonElement>('[data-sort-chips] [data-sort]');
+      buttons.forEach((btn) => btn.addEventListener('click', () => {
+        const mode = (btn.dataset.sort ?? 'obs') as SortMode;
+        if (mode === currentSort) return;
+        currentSort = mode;
+        history.replaceState({}, '', `${window.location.pathname}${serializeFilters(currentChips, currentSort)}`);
+        if (listEl) {
+          const sorted = sortEnriched(cachedEnriched, currentSort);
+          cachedEnriched = sorted;
+          listEl.innerHTML = sorted.map(cardMarkup).join('');
+        }
+        paintSortPressedState();
         applyAllFilters();
       }));
     }
