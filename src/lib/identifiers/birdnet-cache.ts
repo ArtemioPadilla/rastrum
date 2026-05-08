@@ -112,9 +112,11 @@ export interface BirdNETDownloadProgress {
 /**
  * Download model + labels into the BirdNET cache, streaming progress.
  * Throws a clear error when `PUBLIC_BIRDNET_WEIGHTS_URL` is not set.
+ * Pass an AbortSignal to support cancellation via cancelModelDownload().
  */
 export async function downloadBirdNETWeights(
   onProgress: (p: BirdNETDownloadProgress) => void = () => {},
+  signal?: AbortSignal,
 ): Promise<void> {
   const base = getBirdNETWeightsBaseUrl();
   if (!base) {
@@ -131,8 +133,8 @@ export async function downloadBirdNETWeights(
   const labelsHref = `${base}/${BIRDNET_LABELS_FILE}`;
 
   // Labels first — they're tiny and a quick connectivity check.
-  await streamInto(cache, labelsHref, 'labels', 0, 1, onProgress);
-  await streamInto(cache, modelHref,  'model',  0, 1, onProgress);
+  await streamInto(cache, labelsHref, 'labels', 0, 1, onProgress, signal);
+  await streamInto(cache, modelHref,  'model',  0, 1, onProgress, signal);
 }
 
 async function streamInto(
@@ -142,8 +144,9 @@ async function streamInto(
   baseProgress: number,
   span: number,
   onProgress: (p: BirdNETDownloadProgress) => void,
+  signal?: AbortSignal,
 ): Promise<void> {
-  const res = await fetch(url, { mode: 'cors' });
+  const res = await fetch(url, { mode: 'cors', signal });
   if (!res.ok || !res.body) {
     throw new Error(`Failed to fetch ${url}: HTTP ${res.status}`);
   }

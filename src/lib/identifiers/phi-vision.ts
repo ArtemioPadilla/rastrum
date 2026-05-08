@@ -23,6 +23,7 @@ export const phiVisionIdentifier: Identifier = {
     license: 'free',
     confidence_ceiling: 0.35,
     cost_per_id_usd: 0,
+    approxDownloadBytes: 4_294_967_296,
   },
   async isAvailable() {
     const { localAISupported } = await import('../local-ai');

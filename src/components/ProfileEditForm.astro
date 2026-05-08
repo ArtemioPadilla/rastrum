@@ -18,6 +18,15 @@ const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } })
 const crosslink = (tr as unknown as { ai_sponsor_crosslink: { from_ai_label: string; from_ai_link: string } }).ai_sponsor_crosslink;
 const sponsoringHref = `/${lang}${routes.sponsoring[lang]}/`;
 
+// Section labels from i18n — passed to client script via hidden JSON element.
+const sectionLabels = {
+  section_photo_specialists: pip.section_photo_specialists,
+  section_photo_generalists: pip.section_photo_generalists,
+  section_audio: pip.section_audio,
+  section_other_local_data: pip.section_other_local_data,
+  experimental_warning: pip.experimental_warning,
+};
+
 // SpeciesNet on-device card is only meaningful once the operator hosts the
 // model artifact and points PUBLIC_SPECIESNET_WEIGHTS_URL at it. Until then
 // the plugin returns `model_not_bundled` from isAvailable(); hide the static
@@ -301,6 +310,8 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
   )}
 </div>
 
+<script type="application/json" id="rastrum-section-labels" hidden set:html={JSON.stringify(sectionLabels)} />
+
 <script>
   import { getSupabase } from '../lib/supabase';
   import { shouldShowInferredCountryBadge, buildCommunityDiscoveryPayload } from '../lib/profile-edit';
@@ -579,6 +590,10 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
   // so every cascade call site honors the toggle uniformly.
   const { getDisabledPlugins, togglePluginDisabled } = await import('../lib/identifier-prefs');
 
+  // Track which plugin IDs are currently downloading so paintRegistry can
+  // render the Cancel button (downloading card state) instead of the Download button.
+  const downloadingPlugins = new Set<string>();
+
   // Wrapped so paintRegistry() can call it again after replacing the registry list
   // innerHTML, ensuring on-device download bindings re-attach to the freshly-rendered
   // DOM. Defensive null checks (via ?. and early returns) make it safe to call when
@@ -707,7 +722,10 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
       });
       if (!ok || !btn) return;
 
-      btn.disabled = true;
+      // vision → 'webllm_phi35_vision' (plugin registry id); text → 'text' (local-data domIdPrefix)
+      const pluginId = key === 'vision' ? 'webllm_phi35_vision' : 'text';
+      downloadingPlugins.add(pluginId);
+      await paintRegistry();
       try {
         const lib = await getLib();
         const loader = key === 'vision' ? lib.loadVisionEngine : lib.loadTextEngine;
@@ -716,10 +734,23 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
         const status = document.getElementById(`${key}-status`);
         if (status) status.textContent = (e instanceof Error ? e.message : 'Failed');
       } finally {
-        btn.disabled = false;
-        await refreshModel(key);
+        downloadingPlugins.delete(pluginId);
+        await paintRegistry();
         await refreshStorageEstimate();
       }
+    });
+
+    // Cancel button — WebLLM cancel uses a cancelled-flag checked in the progress callback.
+    // The button is only rendered when the card is in downloading state (after paintRegistry
+    // re-renders), so wireOnDeviceControls re-binds it on each paintRegistry call.
+    const pluginIdForCancel = key === 'vision' ? 'webllm_phi35_vision' : 'text';
+    const cancelBtn = document.getElementById(`${key}-cancel`) as HTMLButtonElement | null;
+    cancelBtn?.addEventListener('click', async () => {
+      const lib = await getLib();
+      await lib.cancelModelDownload(MODELS[key].id);
+      downloadingPlugins.delete(pluginIdForCancel);
+      await paintRegistry();
+      await refreshStorageEstimate();
     });
   });
 
@@ -808,19 +839,20 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
       okLabel: tr('Download','Descargar'),
     });
     if (!ok) return;
-    gvDownloadBtn.disabled = true;
-    gvProgress.classList.remove('hidden');
+    downloadingPlugins.add('onnx_gemma4_vision');
+    await paintRegistry();
     try {
       const lib = await import('../lib/onnx-vision');
       await lib.loadGemmaVisionEngine((p) => {
-        gvProgress.textContent = `${Math.round((p.progress ?? 0) * 100)}%  ${p.text ?? ''}`;
+        const prog = document.getElementById('gemma-vision-progress');
+        if (prog) prog.textContent = `${Math.round((p.progress ?? 0) * 100)}%  ${p.text ?? ''}`;
       });
-      gvProgress.textContent = tr('Ready','Listo');
     } catch (e) {
-      gvStatus.textContent = e instanceof Error ? e.message : 'Failed';
+      const gvSt = document.getElementById('gemma-vision-status');
+      if (gvSt) gvSt.textContent = e instanceof Error ? e.message : 'Failed';
     } finally {
-      gvDownloadBtn.disabled = false;
-      await refreshGemma();
+      downloadingPlugins.delete('onnx_gemma4_vision');
+      await paintRegistry();
       await refreshStorageEstimate();
     }
   });
@@ -835,6 +867,18 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
     const lib = await import('../lib/onnx-vision');
     await lib.clearGemmaCache();
     await refreshGemma();
+    await refreshStorageEstimate();
+  });
+
+  // Cancel button — Gemma uses a cancelled-flag path (transformers.js has no abort API).
+  // Re-bound on each wireOnDeviceControls call; appears in the DOM only when downloading.
+  const gvCancelBtn = document.getElementById('gemma-vision-cancel') as HTMLButtonElement | null;
+  gvCancelBtn?.addEventListener('click', async () => {
+    const lib = await getLib();
+    const ov = await import('../lib/onnx-vision');
+    await lib.cancelModelDownload(ov.GEMMA_VISION_MODEL_ID);
+    downloadingPlugins.delete('onnx_gemma4_vision');
+    await paintRegistry();
     await refreshStorageEstimate();
   });
 
@@ -894,19 +938,33 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
       okLabel: tr('Download','Descargar'),
     });
     if (!ok) return;
-    bnDownloadBtn.disabled = true;
-    bnProgress?.classList.remove('hidden');
+    downloadingPlugins.add('birdnet_lite');
+    await paintRegistry();
     try {
       const lib = await getBnLib();
+      const aiLib = await getLib();
+      const bnController = new AbortController();
+      aiLib.registerDownloadController('birdnet_lite', bnController);
       await lib.downloadBirdNETWeights((p) => {
-        if (bnProgress) bnProgress.textContent = `${Math.round((p.progress ?? 0) * 100)}%  ${p.text ?? ''}`;
-      });
+        const prog = document.getElementById('birdnet-progress');
+        if (prog) prog.textContent = `${Math.round((p.progress ?? 0) * 100)}%  ${p.text ?? ''}`;
+      }, bnController.signal);
     } catch (e) {
-      if (bnStatus) bnStatus.textContent = e instanceof Error ? e.message : 'Failed';
+      const st = document.getElementById('birdnet-status');
+      if (st) st.textContent = e instanceof Error ? e.message : 'Failed';
     } finally {
-      bnDownloadBtn.disabled = false;
-      await refreshBirdNET();
+      downloadingPlugins.delete('birdnet_lite');
+      await paintRegistry();
     }
+  });
+
+  // Cancel button for BirdNET — re-bound on each wireOnDeviceControls call; appears in DOM only while downloading.
+  const bnCancelBtn = document.getElementById('birdnet-cancel') as HTMLButtonElement | null;
+  bnCancelBtn?.addEventListener('click', async () => {
+    const lib = await getLib();
+    await lib.cancelModelDownload('birdnet_lite');
+    downloadingPlugins.delete('birdnet_lite');
+    await paintRegistry();
   });
 
   bnDeleteBtn?.addEventListener('click', async () => {
@@ -978,19 +1036,33 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
       okLabel: isEsLang ? 'Descargar' : 'Download',
     });
     if (!ok) return;
-    mdDownloadBtn.disabled = true;
-    mdProgress?.classList.remove('hidden');
+    downloadingPlugins.add('camera_trap_megadetector');
+    await paintRegistry();
     try {
       const lib = await getMdLib();
+      const aiLib = await getLib();
+      const mdController = new AbortController();
+      aiLib.registerDownloadController('camera_trap_megadetector', mdController);
       await lib.downloadMegadetectorWeights((p: { progress?: number; text?: string }) => {
-        if (mdProgress) mdProgress.textContent = `${Math.round((p.progress ?? 0) * 100)}%  ${p.text ?? ''}`;
-      });
+        const prog = document.getElementById('megadetector-progress');
+        if (prog) prog.textContent = `${Math.round((p.progress ?? 0) * 100)}%  ${p.text ?? ''}`;
+      }, mdController.signal);
     } catch (e) {
-      if (mdStatus) mdStatus.textContent = e instanceof Error ? e.message : 'Failed';
+      const st = document.getElementById('megadetector-status');
+      if (st) st.textContent = e instanceof Error ? e.message : 'Failed';
     } finally {
-      mdDownloadBtn.disabled = false;
-      await refreshMegadetector();
+      downloadingPlugins.delete('camera_trap_megadetector');
+      await paintRegistry();
     }
+  });
+
+  // Cancel button for MegaDetector — re-bound on each wireOnDeviceControls call; appears in DOM only while downloading.
+  const mdCancelBtn = document.getElementById('megadetector-cancel') as HTMLButtonElement | null;
+  mdCancelBtn?.addEventListener('click', async () => {
+    const lib = await getLib();
+    await lib.cancelModelDownload('camera_trap_megadetector');
+    downloadingPlugins.delete('camera_trap_megadetector');
+    await paintRegistry();
   });
 
   mdDeleteBtn?.addEventListener('click', async () => {
@@ -1061,19 +1133,33 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
       okLabel: tr('Download','Descargar'),
     });
     if (!ok) return;
-    enDownloadBtn.disabled = true;
-    enProgress?.classList.remove('hidden');
+    downloadingPlugins.add('onnx_efficientnet_lite0');
+    await paintRegistry();
     try {
       const lib = await getEnLib();
+      const aiLib = await getLib();
+      const enController = new AbortController();
+      aiLib.registerDownloadController('onnx_efficientnet_lite0', enController);
       await lib.downloadOnnxBaseWeights((p) => {
-        if (enProgress) enProgress.textContent = `${Math.round((p.progress ?? 0) * 100)}%  ${p.text ?? ''}`;
-      });
+        const prog = document.getElementById('onnx-base-progress');
+        if (prog) prog.textContent = `${Math.round((p.progress ?? 0) * 100)}%  ${p.text ?? ''}`;
+      }, enController.signal);
     } catch (e) {
-      if (enStatus) enStatus.textContent = e instanceof Error ? e.message : 'Failed';
+      const st = document.getElementById('onnx-base-status');
+      if (st) st.textContent = e instanceof Error ? e.message : 'Failed';
     } finally {
-      enDownloadBtn.disabled = false;
-      await refreshOnnxBase();
+      downloadingPlugins.delete('onnx_efficientnet_lite0');
+      await paintRegistry();
     }
+  });
+
+  // Cancel button for EfficientNet — re-bound on each wireOnDeviceControls call; appears in DOM only while downloading.
+  const enCancelBtn = document.getElementById('onnx-base-cancel') as HTMLButtonElement | null;
+  enCancelBtn?.addEventListener('click', async () => {
+    const lib = await getLib();
+    await lib.cancelModelDownload('onnx_efficientnet_lite0');
+    downloadingPlugins.delete('onnx_efficientnet_lite0');
+    await paintRegistry();
   });
 
   enDeleteBtn?.addEventListener('click', async () => {
@@ -1144,19 +1230,33 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
       okLabel: tr('Download','Descargar'),
     });
     if (!ok) return;
-    snDownloadBtn.disabled = true;
-    snProgress?.classList.remove('hidden');
+    downloadingPlugins.add('speciesnet_distilled');
+    await paintRegistry();
     try {
       const lib = await getSnLib();
+      const aiLib = await getLib();
+      const snController = new AbortController();
+      aiLib.registerDownloadController('speciesnet_distilled', snController);
       await lib.downloadSpeciesNetWeights((p) => {
-        if (snProgress) snProgress.textContent = `${Math.round((p.progress ?? 0) * 100)}%  ${p.text ?? ''}`;
-      });
+        const prog = document.getElementById('speciesnet-progress');
+        if (prog) prog.textContent = `${Math.round((p.progress ?? 0) * 100)}%  ${p.text ?? ''}`;
+      }, snController.signal);
     } catch (e) {
-      if (snStatus) snStatus.textContent = e instanceof Error ? e.message : 'Failed';
+      const st = document.getElementById('speciesnet-status');
+      if (st) st.textContent = e instanceof Error ? e.message : 'Failed';
     } finally {
-      snDownloadBtn.disabled = false;
-      await refreshSpeciesNet();
+      downloadingPlugins.delete('speciesnet_distilled');
+      await paintRegistry();
     }
+  });
+
+  // Cancel button for SpeciesNet — re-bound on each wireOnDeviceControls call; appears in DOM only while downloading.
+  const snCancelBtn = document.getElementById('speciesnet-cancel') as HTMLButtonElement | null;
+  snCancelBtn?.addEventListener('click', async () => {
+    const lib = await getLib();
+    await lib.cancelModelDownload('speciesnet_distilled');
+    downloadingPlugins.delete('speciesnet_distilled');
+    await paintRegistry();
   });
 
   snDeleteBtn?.addEventListener('click', async () => {
@@ -1320,6 +1420,7 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
       { renderPluginCard, renderLocalDataCard },
       { getModelCacheStatus },
       sponsorshipMod,
+      plantnetQuotaMod,
     ] = await Promise.all([
       import('../lib/identifiers'),
       import('../lib/byo-keys'),
@@ -1327,6 +1428,7 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
       import('../lib/identifier-card-html'),
       import('../lib/local-ai'),
       import('../lib/sponsorships').catch(() => ({ getActiveAnthropicSponsorship: async () => null })),
+      import('../lib/plantnet-quota').catch(() => ({ getPlantNetQuota: () => null })),
     ]);
     runStorageMigration();
 
@@ -1335,21 +1437,11 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
     const isEs = document.documentElement.lang === 'es';
     const lang: 'en' | 'es' = isEs ? 'es' : 'en';
 
-    // Section header strings — inline since section keys are pipeline.section_*
-    // and there is no client-side i18n runtime; mirror i18n/en.json + es.json.
-    const SECTION_LABELS: Record<string, string> = isEs ? {
-      section_photo_specialists: '📷 Identificadores de foto · Especialistas',
-      section_photo_generalists: '📷 Identificadores de foto · Generalistas',
-      section_audio: '🔊 Identificadores de audio',
-      section_other_local_data: '🗂 Otros datos locales',
-      experimental_warning: 'Experimental — pueden bloquearse en algunos dispositivos y la confianza se limita a 0.35. Prueba Phi o Gemma; si uno falla, prueba el otro.',
-    } : {
-      section_photo_specialists: '📷 Photo identifiers · Specialists',
-      section_photo_generalists: '📷 Photo identifiers · Generalists',
-      section_audio: '🔊 Audio identifiers',
-      section_other_local_data: '🗂 Other local data',
-      experimental_warning: 'Experimental — these may crash on some devices, and confidence is hard-capped at 0.35. Try Phi or Gemma; if one crashes, try the other.',
-    };
+    // Load section labels from the hidden JSON element (populated in frontmatter from i18n).
+    const jsonEl = document.getElementById('rastrum-section-labels') as HTMLScriptElement | null;
+    const sectionLabels: Record<string, string> = jsonEl?.textContent
+      ? JSON.parse(jsonEl.textContent)
+      : {};
 
     // Pre-resolve availability + cache + sponsorship in parallel.
     const ON_DEVICE_MODEL_IDS: Record<string, string> = {
@@ -1406,33 +1498,41 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
     function renderSection(section: Section, headerKey: string, sectionPlugins: typeof visiblePlugins): string {
       if (!sectionPlugins.length) return '';
       const warning = section === 'experimental'
-        ? `<p class="text-xs text-amber-700 dark:text-amber-400 mb-2">${escapeAttr(SECTION_LABELS.experimental_warning)}</p>`
+        ? `<p class="text-xs text-amber-700 dark:text-amber-400 mb-2">${escapeAttr(sectionLabels.experimental_warning)}</p>`
         : '';
       const cards = sectionPlugins.map((p) => {
         const av = availabilityMap.get(p.id) ?? { ready: false, reason: 'unsupported' as const };
         const cache = cacheMap.get(p.id) ?? null;
         const isDisabled = disabled.includes(p.id);
-        const state = deriveCardState({
-          pluginId: p.id,
-          runtime: p.capabilities.runtime,
-          availability: av,
-          isDisabled,
-          cacheStatus: cache,
-          byoKeysSet: byo.hasKeysForPlugin(p.id),
-        });
+        // Show the Cancel button (downloading state) while a download is in flight.
+        const state = downloadingPlugins.has(p.id)
+          ? { kind: 'downloading' as const, pct: 0, mb: { current: 0, total: 0 } }
+          : deriveCardState({
+              pluginId: p.id,
+              runtime: p.capabilities.runtime,
+              availability: av,
+              isDisabled,
+              cacheStatus: cache,
+              byoKeysSet: byo.hasKeysForPlugin(p.id),
+            });
+        const rawKeys = byo.getAllKeysForPlugin(p.id);
+        const byoKeysSet: Record<string, boolean> = Object.fromEntries(
+          Object.entries(rawKeys).map(([k, v]) => [k, Boolean(v)])
+        );
         return renderPluginCard({
           lang,
           plugin: p,
           state,
           isDisabled,
           cacheStatus: cache,
-          byoKeysSet: {},
+          byoKeysSet,
           sponsorship: p.id === 'claude_haiku' ? (sponsorship as Parameters<typeof renderPluginCard>[0]['sponsorship']) : null,
+          plantnetQuota: p.id === 'plantnet' ? plantnetQuotaMod.getPlantNetQuota() : null,
         });
       }).join('');
       return `
         <li class="rastrum-section-header" role="presentation">
-          <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mt-4 mb-2">${escapeAttr(SECTION_LABELS[headerKey] ?? headerKey)}</h3>
+          <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mt-4 mb-2">${escapeAttr(sectionLabels[headerKey] ?? headerKey)}</h3>
           ${warning}
         </li>
         ${cards}
@@ -1460,6 +1560,7 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
           ? 'Ayudante de texto para traducción y chat sin conexión. No participa en la identificación de especies.'
           : 'Text helper for translation and offline chat. Not part of species identification.',
         cacheStatus: llamaCache, domIdPrefix: 'text',
+        downloading: downloadingPlugins.has('text'),
       })}
       ${renderLocalDataCard({
         lang, id: 'offline-map-mx',
@@ -1468,6 +1569,7 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
         description: isEs ? 'Carga el mapa base sin red.' : 'Renders the basemap without a network connection.',
         cacheStatus: pmtilesCache as Parameters<typeof renderLocalDataCard>[0]['cacheStatus'],
         domIdPrefix: 'pmtiles',
+        downloading: downloadingPlugins.has('pmtiles'),
       })}
     `;
 
@@ -1477,7 +1579,7 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
       ${renderSection('experimental',      'section_photo_generalists', grouped.get('experimental')!)}
       ${renderSection('audio',             'section_audio',             grouped.get('audio')!)}
       <li class="rastrum-section-header" role="presentation">
-        <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mt-4 mb-2">${escapeAttr(SECTION_LABELS.section_other_local_data)}</h3>
+        <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mt-4 mb-2">${escapeAttr(sectionLabels.section_other_local_data)}</h3>
       </li>
       ${otherLocalData}
     `;
@@ -1498,20 +1600,103 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
       });
     });
 
-    // Wire Add key / Edit key buttons (delegated). Uses window.prompt as v1
-    // minimum; richer inline form is a follow-up.
+    // Wire Add key / Edit key buttons — open the inline <details> form.
     list.querySelectorAll<HTMLButtonElement>('[data-add-key], [data-edit-key]').forEach((btn) => {
-      btn.addEventListener('click', async () => {
+      btn.addEventListener('click', () => {
         const id = btn.dataset.addKey ?? btn.dataset.editKey!;
+        const details = list.querySelector<HTMLDetailsElement>(`[data-key-form="${CSS.escape(id)}"]`);
+        if (!details) return;
+        details.open = true;
+        const firstInput = details.querySelector<HTMLInputElement>('[data-key-input]');
+        if (firstInput) {
+          // Pre-fill with the current stored value so the user can see/edit it.
+          const plugin = reg.get(id);
+          if (plugin?.keySpec?.[0]) {
+            firstInput.value = byo.getKey(id, plugin.keySpec[0].name) ?? '';
+          }
+          firstInput.focus();
+        }
+      });
+    });
+
+    // Wire Save buttons for inline key forms.
+    list.querySelectorAll<HTMLButtonElement>('[data-key-save]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.keySave!;
         const plugin = reg.get(id);
         if (!plugin?.keySpec?.length) return;
-        const newKey = window.prompt(plugin.keySpec[0].label, byo.getKey(id, plugin.keySpec[0].name) ?? '');
-        if (newKey == null) return;
-        if (newKey.trim()) {
-          byo.setKey(id, plugin.keySpec[0].name, newKey.trim());
-        } else {
-          byo.clearKey(id, plugin.keySpec[0].name);
+        const statusEl = list.querySelector<HTMLElement>(`[data-key-status="${CSS.escape(id)}"]`);
+        const inputs = list.querySelectorAll<HTMLInputElement>(`[data-key-input][data-plugin="${CSS.escape(id)}"]`);
+        const value = inputs[0]?.value?.trim() ?? '';
+
+        if (!value) {
+          plugin.keySpec.forEach((spec) => byo.clearKey(id, spec.name));
+          if (statusEl) statusEl.textContent = '';
+          await paintRegistry();
+          return;
         }
+
+        // Validate Anthropic keys before persisting.
+        if (id === 'claude_haiku') {
+          if (statusEl) {
+            statusEl.textContent = 'Validating…';
+            statusEl.className = 'text-[10px] text-zinc-500 dark:text-zinc-400';
+          }
+          const { validateAnthropicKey } = await import('../lib/anthropic-key');
+          const result = await validateAnthropicKey(value);
+          if (!result.valid) {
+            if (statusEl) {
+              statusEl.textContent = `✗ ${result.message ?? 'Invalid key'}`;
+              statusEl.className = 'text-[10px] text-red-600 dark:text-red-400';
+            }
+            return;
+          }
+        }
+
+        // Persist all key inputs for this plugin.
+        inputs.forEach((input) => {
+          const name = input.dataset.keyName!;
+          if (input.value.trim()) {
+            byo.setKey(id, name, input.value.trim());
+          }
+        });
+
+        if (statusEl) {
+          statusEl.textContent = '✓ Saved';
+          statusEl.className = 'text-[10px] text-emerald-600 dark:text-emerald-400';
+        }
+        setTimeout(() => paintRegistry(), 800);
+      });
+    });
+
+    // Wire Test buttons for plugins that expose testConnection().
+    list.querySelectorAll<HTMLButtonElement>('[data-key-test]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.keyTest!;
+        const plugin = reg.get(id);
+        if (typeof plugin?.testConnection !== 'function') return;
+        const statusEl = list.querySelector<HTMLElement>(`[data-key-status="${CSS.escape(id)}"]`);
+        if (statusEl) {
+          statusEl.textContent = 'Testing…';
+          statusEl.className = 'text-[10px] text-zinc-500 dark:text-zinc-400';
+        }
+        const result = await plugin.testConnection();
+        if (statusEl) {
+          statusEl.textContent = result.ok ? `✓ ${result.message ?? 'OK'}` : `✗ ${result.message ?? 'Failed'}`;
+          statusEl.className = result.ok
+            ? 'text-[10px] text-emerald-600 dark:text-emerald-400'
+            : 'text-[10px] text-red-600 dark:text-red-400';
+        }
+      });
+    });
+
+    // Wire Clear buttons for inline key forms.
+    list.querySelectorAll<HTMLButtonElement>('[data-key-clear]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.keyClear!;
+        const plugin = reg.get(id);
+        if (!plugin?.keySpec?.length) return;
+        plugin.keySpec.forEach((spec) => byo.clearKey(id, spec.name));
         await paintRegistry();
       });
     });

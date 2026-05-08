@@ -31,6 +31,7 @@ export const gemmaVisionIdentifier: Identifier = {
     license: 'free',
     confidence_ceiling: 0.35,
     cost_per_id_usd: 0,
+    approxDownloadBytes: 3_435_973_837,
   },
   async isAvailable() {
     const { gemmaSupported } = await import('../onnx-vision');

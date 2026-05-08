@@ -75,6 +75,19 @@ export interface VisionProvider {
 }
 
 /**
+ * Thrown by a VisionProvider when the upstream API rejects the
+ * credential with HTTP 401 (key revoked, expired, or never valid).
+ * The cascade catches this specifically so it can fall through to
+ * the next credential rather than treating it as a hard failure.
+ */
+export class CredentialUnauthorizedError extends Error {
+  constructor(public readonly kind: CredentialKind) {
+    super(`credential_unauthorized: ${kind}`);
+    this.name = 'CredentialUnauthorizedError';
+  }
+}
+
+/**
  * Source of truth for the model identifiers each `CredentialKind`
  * accepts as `preferred_model`. Used by `assertValidModel()` to
  * reject a typo at the EF boundary instead of silently storing it
@@ -289,6 +302,7 @@ class AnthropicProvider implements VisionProvider {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST', headers, body: JSON.stringify(body), signal: input.signal,
     });
+    if (res.status === 401) throw new CredentialUnauthorizedError(this.cred.kind);
     if (!res.ok) return null;
     const json = await res.json() as { content: Array<{ type: string; text?: string }> };
     const text = json.content?.find(c => c.type === 'text')?.text;
@@ -335,6 +349,7 @@ class BedrockProvider implements VisionProvider {
       sessionToken: creds.sessionToken,
     });
     const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body), signal: input.signal });
+    if (res.status === 401 || res.status === 403) throw new CredentialUnauthorizedError(this.cred.kind);
     if (!res.ok) return null;
     const json = await res.json() as { content?: Array<{ type: string; text?: string }> };
     const text = json.content?.find(c => c.type === 'text')?.text;
@@ -470,7 +485,7 @@ class OpenAIProvider implements VisionProvider {
       'Authorization': `Bearer ${this.cred.secret}`,
       'Content-Type':  'application/json',
     };
-    return await callOpenAICompatible(url, headers, this.cred.model, input, 'openai');
+    return await callOpenAICompatible(url, headers, this.cred.model, input, this.cred.kind, 'openai');
   }
 }
 
@@ -488,7 +503,7 @@ class AzureOpenAIProvider implements VisionProvider {
       'api-key':      this.cred.secret,
       'Content-Type': 'application/json',
     };
-    return await callOpenAICompatible(url, headers, this.cred.model || 'azure', input, 'azure_openai');
+    return await callOpenAICompatible(url, headers, this.cred.model || 'azure', input, this.cred.kind, 'azure_openai');
   }
 }
 
@@ -497,6 +512,7 @@ async function callOpenAICompatible(
   headers: Record<string, string>,
   model: string,
   input: VisionInput,
+  kind: CredentialKind,
   source: string,
 ): Promise<VisionResult | null> {
   const body = {
@@ -514,6 +530,7 @@ async function callOpenAICompatible(
     ],
   };
   const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body), signal: input.signal });
+  if (res.status === 401) throw new CredentialUnauthorizedError(kind);
   if (!res.ok) return null;
   const json = await res.json() as { choices?: Array<{ message?: { content?: string } }> };
   const text = json.choices?.[0]?.message?.content;
@@ -527,7 +544,7 @@ class GeminiProvider implements VisionProvider {
 
   async identify(input: VisionInput): Promise<VisionResult | null> {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(this.cred.model)}:generateContent?key=${encodeURIComponent(this.cred.secret)}`;
-    return await callGeminiCompatible(url, {}, input, 'gemini');
+    return await callGeminiCompatible(url, {}, input, this.cred.kind, 'gemini');
   }
 }
 
@@ -550,7 +567,7 @@ class VertexAIProvider implements VisionProvider {
       'Authorization': `Bearer ${accessToken}`,
       'Content-Type':  'application/json',
     };
-    return await callGeminiCompatible(url, headers, input, 'vertex_ai');
+    return await callGeminiCompatible(url, headers, input, this.cred.kind, 'vertex_ai');
   }
 
   private async resolveAccessToken(): Promise<string | null> {
@@ -573,6 +590,7 @@ async function callGeminiCompatible(
   url: string,
   headers: Record<string, string>,
   input: VisionInput,
+  kind: CredentialKind,
   source: string,
 ): Promise<VisionResult | null> {
   const body = {
@@ -592,6 +610,7 @@ async function callGeminiCompatible(
     body: JSON.stringify(body),
     signal: input.signal,
   });
+  if (res.status === 401 || res.status === 403) throw new CredentialUnauthorizedError(kind);
   if (!res.ok) return null;
   const json = await res.json() as {
     candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;

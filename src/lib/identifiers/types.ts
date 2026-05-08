@@ -86,6 +86,8 @@ export interface IdentifierCapabilities {
   confidence_ceiling?: number;
   /** Approximate $ cost per identification (operator-side). 0 if free. */
   cost_per_id_usd?: number;
+  /** Approximate size of the model artifact in bytes (binary). Used to label download buttons. */
+  approxDownloadBytes?: number;
 }
 
 /** Per-plugin status surfaced to the UI. */
