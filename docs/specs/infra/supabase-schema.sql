@@ -8249,3 +8249,36 @@ LANGUAGE sql STABLE SECURITY DEFINER AS $$
      AND pud.day >= (current_date - interval '30 days')::date
    ORDER BY pud.day;
 $$;
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- karma_milestones — celebratory thresholds (issue #557)
+-- ═══════════════════════════════════════════════════════════════════════════
+-- Admin-tunable thresholds that fire a celebratory toast when crossed.
+-- Read by src/lib/karma-toast.ts on every realtime karma INSERT to decide
+-- whether the new total just crossed any threshold.
+CREATE TABLE IF NOT EXISTS public.karma_milestones (
+  threshold  numeric PRIMARY KEY,
+  label_en   text NOT NULL,
+  label_es   text NOT NULL,
+  icon       text NOT NULL DEFAULT '🏆',
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.karma_milestones ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS karma_milestones_public_read ON public.karma_milestones;
+CREATE POLICY karma_milestones_public_read ON public.karma_milestones
+  FOR SELECT TO anon, authenticated USING (true);
+
+GRANT SELECT ON public.karma_milestones TO anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.karma_milestones TO service_role;
+
+INSERT INTO public.karma_milestones (threshold, label_en, label_es, icon) VALUES
+  (100,  'First 100 karma',                     'Primer 100 de karma',                          '✨'),
+  (500,  '500 karma observer',                  'Observador con 500 de karma',                  '🌱'),
+  (1000, '1,000 karma — research-grade ally',   '1.000 de karma — aliado de grado de investigación', '🌳'),
+  (5000, '5,000 karma — power observer',        '5.000 de karma — observador experto',          '🌟')
+ON CONFLICT (threshold) DO UPDATE SET
+  label_en = EXCLUDED.label_en,
+  label_es = EXCLUDED.label_es,
+  icon     = EXCLUDED.icon;

@@ -2,14 +2,18 @@
 /**
  * KarmaLeaderboardView — shared EN+ES page body for /community/leaderboard/.
  *
- * Two periods, URL-driven via `?period=30d|all`:
+ * Three views, URL-driven via `?period=30d|all` or `?view=experts`:
  *   - 30d (default): queries `karma_leaderboard_30d` materialized view.
  *   - all          : queries `community_observers` for all-time karma_total.
+ *   - experts      : queries `user_expertise` joined to `community_observers`,
+ *                    filtered by `?taxon=<uuid>`.
  *
- * Both data sources filter `hide_from_leaderboards = false` at the SQL
- * layer (the MV WHERE clause + the view definition). Client-rendered
- * (CSR) like CommunityView — the audience is signed-in observers
- * checking their standing.
+ * Region picker (`?region=<ISO-2>`) filters 30d + all-time tabs by the
+ * observer's stored country_code. No GPS — country only, no lat/lng leaks.
+ *
+ * All sources filter `hide_from_leaderboards = false` at the SQL layer.
+ * Client-rendered (CSR) like CommunityView — the audience is signed-in
+ * observers checking their standing.
  */
 import { t, getLocalizedPath, routes, type Locale } from '../i18n/utils';
 
@@ -30,7 +34,17 @@ interface LeaderboardCopy {
   leaderboard_empty: string;
   leaderboard_period_30d: string;
   leaderboard_period_all: string;
+  leaderboard_period_experts: string;
   leaderboard_period_aria: string;
+  leaderboard_region_label: string;
+  leaderboard_region_all: string;
+  leaderboard_region_empty: string;
+  leaderboard_taxon_label: string;
+  leaderboard_experts_empty: string;
+  leaderboard_experts_score: string;
+  leaderboard_experts_taxon_loading: string;
+  leaderboard_experts_taxon_none: string;
+  leaderboard_experts_no_data: string;
   loading: string;
 }
 const cm = (tr as unknown as { community: LeaderboardCopy }).community;
@@ -44,6 +58,13 @@ const stringsJson = JSON.stringify({
   observerLabel: cm.leaderboard_observer,
   karmaLabel: cm.leaderboard_karma,
   speciesLabel: cm.leaderboard_species,
+  scoreLabel: cm.leaderboard_experts_score,
+  expertsEmpty: cm.leaderboard_experts_empty,
+  regionEmpty: cm.leaderboard_region_empty,
+  regionAll: cm.leaderboard_region_all,
+  taxaLoading: cm.leaderboard_experts_taxon_loading,
+  taxonNoneOption: cm.leaderboard_experts_taxon_none,
+  expertsNoData: cm.leaderboard_experts_no_data,
   profileBase,
 });
 ---
@@ -58,29 +79,64 @@ const stringsJson = JSON.stringify({
     <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-1">{cm.leaderboard_subtitle}</p>
   </div>
 
-  <div
-    class="mb-4 inline-flex rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-0.5 text-xs"
-    role="tablist"
-    aria-label={cm.leaderboard_period_aria}
-  >
-    <button
-      type="button"
-      role="tab"
-      data-period-tab="30d"
-      aria-pressed="true"
-      class="px-3 py-1.5 rounded-md font-medium transition"
+  <div class="mb-4 flex flex-wrap items-center gap-3">
+    <div
+      class="inline-flex rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-0.5 text-xs"
+      role="tablist"
+      aria-label={cm.leaderboard_period_aria}
     >
-      {cm.leaderboard_period_30d}
-    </button>
-    <button
-      type="button"
-      role="tab"
-      data-period-tab="all"
-      aria-pressed="false"
-      class="px-3 py-1.5 rounded-md font-medium transition"
-    >
-      {cm.leaderboard_period_all}
-    </button>
+      <button
+        type="button"
+        role="tab"
+        data-view-tab="30d"
+        aria-pressed="true"
+        class="px-3 py-1.5 rounded-md font-medium transition"
+      >
+        {cm.leaderboard_period_30d}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        data-view-tab="all"
+        aria-pressed="false"
+        class="px-3 py-1.5 rounded-md font-medium transition"
+      >
+        {cm.leaderboard_period_all}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        data-view-tab="experts"
+        aria-pressed="false"
+        class="px-3 py-1.5 rounded-md font-medium transition"
+      >
+        {cm.leaderboard_period_experts}
+      </button>
+    </div>
+
+    <div data-region-wrap class="inline-flex items-center gap-2 text-xs">
+      <label for="leaderboard-region" class="text-zinc-600 dark:text-zinc-400 font-medium">
+        {cm.leaderboard_region_label}
+      </label>
+      <select
+        id="leaderboard-region"
+        class="rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-2 py-1.5 text-xs"
+      >
+        <option value="">{cm.leaderboard_region_all}</option>
+      </select>
+    </div>
+
+    <div data-taxon-wrap class="hidden inline-flex items-center gap-2 text-xs">
+      <label for="leaderboard-taxon" class="text-zinc-600 dark:text-zinc-400 font-medium">
+        {cm.leaderboard_taxon_label}
+      </label>
+      <select
+        id="leaderboard-taxon"
+        class="rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-2 py-1.5 text-xs"
+      >
+        <option value="">{cm.leaderboard_experts_taxon_loading}</option>
+      </select>
+    </div>
   </div>
 
   <div id="leaderboard-loading" class="text-sm text-zinc-500 italic">
@@ -97,8 +153,9 @@ const stringsJson = JSON.stringify({
         <tr class="border-b border-zinc-200 dark:border-zinc-800 text-left text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
           <th class="py-2 pr-2 w-12">{cm.leaderboard_rank}</th>
           <th class="py-2 px-2">{cm.leaderboard_observer}</th>
-          <th class="py-2 px-2 text-right">{cm.leaderboard_karma}</th>
-          <th class="py-2 pl-2 text-right">{cm.leaderboard_species}</th>
+          <th data-col-karma class="py-2 px-2 text-right">{cm.leaderboard_karma}</th>
+          <th data-col-species class="py-2 pl-2 text-right">{cm.leaderboard_species}</th>
+          <th data-col-score class="py-2 px-2 text-right hidden">{cm.leaderboard_experts_score}</th>
         </tr>
       </thead>
       <tbody id="leaderboard-body"></tbody>
@@ -108,13 +165,27 @@ const stringsJson = JSON.stringify({
 
 <script>
   import { getSupabase } from '../lib/supabase';
-  import { periodFromSearch, searchForPeriod, type LeaderboardPeriod } from '../lib/leaderboard-url';
+  import {
+    viewFromSearch,
+    searchForView,
+    regionFromSearch,
+    searchForRegion,
+    taxonFromSearch,
+    searchForTaxon,
+    type LeaderboardView,
+  } from '../lib/leaderboard-url';
 
   interface LeaderboardStrings {
     lang: 'en' | 'es';
     loading: string;
     emptyMsg: string;
     profileBase: string;
+    expertsEmpty: string;
+    regionEmpty: string;
+    regionAll: string;
+    taxaLoading: string;
+    taxonNoneOption: string;
+    expertsNoData: string;
   }
 
   const root = document.getElementById('leaderboard-root');
@@ -126,14 +197,43 @@ const stringsJson = JSON.stringify({
   const emptyEl = document.getElementById('leaderboard-empty');
   const tableWrap = document.getElementById('leaderboard-table-wrap');
   const tbody = document.getElementById('leaderboard-body');
-  const tabs = root.querySelectorAll<HTMLButtonElement>('[data-period-tab]');
+  const tabs = root.querySelectorAll<HTMLButtonElement>('[data-view-tab]');
+  const regionWrap = root.querySelector<HTMLElement>('[data-region-wrap]');
+  const regionSel = document.getElementById('leaderboard-region') as HTMLSelectElement | null;
+  const taxonWrap = root.querySelector<HTMLElement>('[data-taxon-wrap]');
+  const taxonSel = document.getElementById('leaderboard-taxon') as HTMLSelectElement | null;
+  const colKarmaEl = root.querySelector<HTMLElement>('[data-col-karma]');
+  const colSpeciesEl = root.querySelector<HTMLElement>('[data-col-species]');
+  const colScoreEl = root.querySelector<HTMLElement>('[data-col-score]');
 
-  if (!loadingEl || !emptyEl || !tableWrap || !tbody) {
+  if (!loadingEl || !emptyEl || !tableWrap || !tbody || !regionSel || !taxonSel) {
     throw new Error('KarmaLeaderboardView: missing required DOM nodes');
   }
 
   const ACTIVE_TAB = 'bg-emerald-600 text-white shadow-sm';
   const INACTIVE_TAB = 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800';
+
+  const REGION_NAMES = (() => {
+    if (typeof Intl === 'undefined' || typeof Intl.DisplayNames !== 'function') return null;
+    try {
+      return new Intl.DisplayNames([STRINGS.lang], { type: 'region' });
+    } catch {
+      return null;
+    }
+  })();
+
+  function regionLabel(code: string): string {
+    if (!code) return STRINGS.regionAll;
+    if (REGION_NAMES) {
+      try {
+        const v = REGION_NAMES.of(code);
+        if (v) return v;
+      } catch {
+        // ignore — Intl.DisplayNames may reject malformed codes.
+      }
+    }
+    return code;
+  }
 
   function escapeHtml(s: string): string {
     return String(s ?? '').replace(/[&<>"']/g, (c) => ({
@@ -148,9 +248,15 @@ const stringsJson = JSON.stringify({
     avatar_url: string | null;
     karma: number;
     species_count: number | null;
+    score?: number | null;
   }
 
-  function renderRow(row: LeaderboardRow, rank: number): HTMLTableRowElement {
+  let regionsLoaded = false;
+  let taxaLoaded = false;
+  let taxaEmpty = false;
+  let lastTaxon = '';
+
+  function renderRow(row: LeaderboardRow, rank: number, view: LeaderboardView): HTMLTableRowElement {
     const handle = row.username ?? row.id.slice(0, 8);
     const displayName = row.display_name ?? handle;
     const profileHref = `${STRINGS.profileBase}/?username=${encodeURIComponent(handle)}`;
@@ -162,32 +268,61 @@ const stringsJson = JSON.stringify({
       ? ['🥇', '🥈', '🥉'][rank - 1]
       : String(rank);
 
+    const avatarCell = row.avatar_url
+      ? `<img src="${escapeHtml(row.avatar_url)}" alt="" loading="lazy" class="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 object-cover flex-none">`
+      : `<div class="w-8 h-8 rounded-full bg-emerald-700 text-white flex items-center justify-center font-semibold text-xs flex-none">${escapeHtml(displayName.slice(0, 1).toUpperCase())}</div>`;
+
+    const scoreCell = view === 'experts'
+      ? `<td class="py-3 px-2 text-right font-semibold text-emerald-700 dark:text-emerald-400">${(Number(row.score ?? 0)).toFixed(1)}</td>`
+      : '';
+    const karmaCell = view !== 'experts'
+      ? `<td class="py-3 px-2 text-right font-semibold text-emerald-700 dark:text-emerald-400">${Math.round(row.karma)}</td>`
+      : '';
+    const speciesCell = view !== 'experts'
+      ? `<td class="py-3 pl-2 text-right text-zinc-600 dark:text-zinc-300">${row.species_count ?? 0}</td>`
+      : '';
+
     tr.innerHTML = `
       <td class="py-3 pr-2 text-center font-medium text-zinc-600 dark:text-zinc-300">${rankMedal}</td>
       <td class="py-3 px-2">
         <a href="${profileHref}" class="flex items-center gap-3 group">
-          ${row.avatar_url
-            ? `<img src="${escapeHtml(row.avatar_url)}" alt="" loading="lazy" class="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 object-cover flex-none">`
-            : `<div class="w-8 h-8 rounded-full bg-emerald-700 text-white flex items-center justify-center font-semibold text-xs flex-none">${escapeHtml(displayName.slice(0, 1).toUpperCase())}</div>`}
+          ${avatarCell}
           <div class="min-w-0">
             <span class="block text-sm font-medium text-zinc-800 dark:text-zinc-100 truncate group-hover:text-emerald-600 dark:group-hover:text-emerald-400">@${escapeHtml(handle)}</span>
             ${row.display_name ? `<span class="block text-xs text-zinc-500 dark:text-zinc-400 truncate">${escapeHtml(row.display_name)}</span>` : ''}
           </div>
         </a>
       </td>
-      <td class="py-3 px-2 text-right font-semibold text-emerald-700 dark:text-emerald-400">${Math.round(row.karma)}</td>
-      <td class="py-3 pl-2 text-right text-zinc-600 dark:text-zinc-300">${row.species_count ?? 0}</td>
+      ${karmaCell}
+      ${speciesCell}
+      ${scoreCell}
     `;
     return tr;
   }
 
-  function paintTabs(period: LeaderboardPeriod) {
+  function paintTabs(view: LeaderboardView) {
     tabs.forEach((tab) => {
-      const own = tab.dataset.periodTab as LeaderboardPeriod;
-      const active = own === period;
+      const own = tab.dataset.viewTab as LeaderboardView;
+      const active = own === view;
       tab.setAttribute('aria-pressed', active ? 'true' : 'false');
       tab.className = `px-3 py-1.5 rounded-md font-medium transition ${active ? ACTIVE_TAB : INACTIVE_TAB}`;
     });
+  }
+
+  function paintFilters(view: LeaderboardView) {
+    if (view === 'experts') {
+      regionWrap?.classList.add('hidden');
+      taxonWrap?.classList.remove('hidden');
+      colKarmaEl?.classList.add('hidden');
+      colSpeciesEl?.classList.add('hidden');
+      colScoreEl?.classList.remove('hidden');
+    } else {
+      regionWrap?.classList.remove('hidden');
+      taxonWrap?.classList.add('hidden');
+      colKarmaEl?.classList.remove('hidden');
+      colSpeciesEl?.classList.remove('hidden');
+      colScoreEl?.classList.add('hidden');
+    }
   }
 
   function showLoading() {
@@ -199,15 +334,151 @@ const stringsJson = JSON.stringify({
     tbody!.innerHTML = '';
   }
 
-  async function loadFor(period: LeaderboardPeriod) {
+  function showEmpty(msg?: string) {
+    loadingEl!.classList.add('hidden');
+    emptyEl!.textContent = msg ?? STRINGS.emptyMsg;
+    emptyEl!.classList.remove('hidden');
+    tableWrap!.classList.add('hidden');
+  }
+
+  async function loadRegions(): Promise<void> {
+    if (regionsLoaded) return;
+    regionsLoaded = true;
+    try {
+      const supabase = getSupabase();
+      const { data } = await supabase
+        .from('community_observers')
+        .select('country_code')
+        .not('country_code', 'is', null)
+        .limit(2000);
+      const counts = new Map<string, number>();
+      for (const row of (data ?? []) as Array<{ country_code: string | null }>) {
+        const cc = (row.country_code ?? '').toUpperCase();
+        if (!/^[A-Z]{2}$/.test(cc)) continue;
+        counts.set(cc, (counts.get(cc) ?? 0) + 1);
+      }
+      const ordered = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 50);
+      const current = regionSel!.value;
+      while (regionSel!.options.length > 1) regionSel!.remove(1);
+      for (const [code] of ordered) {
+        const opt = document.createElement('option');
+        opt.value = code;
+        opt.textContent = `${regionLabel(code)} (${code})`;
+        regionSel!.appendChild(opt);
+      }
+      if (current && [...regionSel!.options].some((o) => o.value === current)) {
+        regionSel!.value = current;
+      } else if (current) {
+        // URL-set region wasn't in the top 50 — append it so the chip stays visible.
+        const opt = document.createElement('option');
+        opt.value = current;
+        opt.textContent = `${regionLabel(current)} (${current})`;
+        regionSel!.appendChild(opt);
+        regionSel!.value = current;
+      }
+    } catch {
+      regionsLoaded = false;
+    }
+  }
+
+  interface TaxonRow {
+    id: string;
+    scientific_name: string;
+    common_name_en: string | null;
+    common_name_es: string | null;
+  }
+
+  async function loadTaxa(): Promise<void> {
+    if (taxaLoaded) return;
+    taxaLoaded = true;
+    try {
+      const supabase = getSupabase();
+      const { data: ueData } = await supabase
+        .from('user_expertise')
+        .select('taxon_id, score')
+        .order('score', { ascending: false })
+        .limit(500);
+      const seen = new Map<string, number>();
+      for (const row of (ueData ?? []) as Array<{ taxon_id: string; score: number | null }>) {
+        if (!row.taxon_id) continue;
+        seen.set(row.taxon_id, Math.max(seen.get(row.taxon_id) ?? 0, Number(row.score ?? 0)));
+      }
+      const topIds = [...seen.entries()].sort((a, b) => b[1] - a[1]).slice(0, 50).map(([id]) => id);
+
+      let taxa: TaxonRow[] = [];
+      if (topIds.length > 0) {
+        const { data: tData } = await supabase
+          .from('taxa')
+          .select('id, scientific_name, common_name_en, common_name_es')
+          .in('id', topIds);
+        taxa = (tData ?? []) as TaxonRow[];
+      }
+
+      const { data: aves } = await supabase
+        .from('taxa')
+        .select('id, scientific_name, common_name_en, common_name_es')
+        .eq('scientific_name', 'Aves')
+        .limit(1);
+      const avesRow = (aves ?? [])[0] as TaxonRow | undefined;
+      if (avesRow && !taxa.some((t) => t.id === avesRow.id)) {
+        taxa.unshift(avesRow);
+      }
+
+      taxa.sort((a, b) => a.scientific_name.localeCompare(b.scientific_name));
+
+      while (taxonSel!.options.length > 0) taxonSel!.remove(0);
+
+      if (taxa.length === 0) {
+        taxaEmpty = true;
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = STRINGS.taxonNoneOption;
+        opt.disabled = true;
+        opt.selected = true;
+        opt.style.fontStyle = 'italic';
+        taxonSel!.appendChild(opt);
+        taxonSel!.disabled = true;
+        lastTaxon = '';
+        return;
+      }
+
+      taxaEmpty = false;
+      taxonSel!.disabled = false;
+      for (const t of taxa) {
+        const common = STRINGS.lang === 'es'
+          ? (t.common_name_es ?? t.common_name_en ?? '')
+          : (t.common_name_en ?? t.common_name_es ?? '');
+        const opt = document.createElement('option');
+        opt.value = t.id;
+        opt.textContent = common ? `${t.scientific_name} — ${common}` : t.scientific_name;
+        taxonSel!.appendChild(opt);
+      }
+
+      const wantTaxon = taxonFromSearch(window.location.search);
+      if (wantTaxon && [...taxonSel!.options].some((o) => o.value === wantTaxon)) {
+        taxonSel!.value = wantTaxon;
+      } else if (avesRow) {
+        taxonSel!.value = avesRow.id;
+      } else if (taxa.length > 0) {
+        taxonSel!.value = taxa[0].id;
+      }
+      lastTaxon = taxonSel!.value;
+    } catch {
+      taxaLoaded = false;
+    }
+  }
+
+  async function loadKarma(view: 'all' | '30d', region: string): Promise<void> {
     showLoading();
     try {
       const supabase = getSupabase();
       let rows: LeaderboardRow[] = [];
-      if (period === '30d') {
-        const { data, error } = await supabase
+      if (view === '30d') {
+        let q = supabase
           .from('karma_leaderboard_30d')
-          .select('user_id, username, display_name, avatar_url, karma_30d, species_count')
+          .select('user_id, username, display_name, avatar_url, country_code, karma_30d, species_count');
+        if (region) q = q.eq('country_code', region);
+        const { data, error } = await q
           .order('karma_30d', { ascending: false, nullsFirst: false })
           .limit(20);
         if (error) throw new Error(error.message);
@@ -227,9 +498,11 @@ const stringsJson = JSON.stringify({
           species_count: r.species_count,
         }));
       } else {
-        const { data, error } = await supabase
+        let q = supabase
           .from('community_observers')
-          .select('id, username, display_name, avatar_url, karma_total, species_count')
+          .select('id, username, display_name, avatar_url, country_code, karma_total, species_count');
+        if (region) q = q.eq('country_code', region);
+        const { data, error } = await q
           .order('karma_total', { ascending: false, nullsFirst: false })
           .limit(20);
         if (error) throw new Error(error.message);
@@ -252,11 +525,15 @@ const stringsJson = JSON.stringify({
 
       loadingEl!.classList.add('hidden');
       if (rows.length === 0) {
-        emptyEl!.classList.remove('hidden');
+        if (region) {
+          showEmpty(STRINGS.regionEmpty.replace('{region}', regionLabel(region)));
+        } else {
+          showEmpty();
+        }
         return;
       }
       for (let i = 0; i < rows.length; i++) {
-        tbody!.appendChild(renderRow(rows[i], i + 1));
+        tbody!.appendChild(renderRow(rows[i], i + 1, view));
       }
       tableWrap!.classList.remove('hidden');
     } catch (err) {
@@ -267,26 +544,146 @@ const stringsJson = JSON.stringify({
     }
   }
 
-  function applyPeriod(period: LeaderboardPeriod, push: boolean) {
-    paintTabs(period);
-    if (push) {
-      const next = searchForPeriod(window.location.search, period);
-      const url = `${window.location.pathname}${next}${window.location.hash}`;
-      window.history.pushState({ period }, '', url);
+  async function loadExperts(taxonId: string): Promise<void> {
+    showLoading();
+    try {
+      if (!taxonId) {
+        showEmpty(taxaEmpty ? STRINGS.expertsNoData : STRINGS.expertsEmpty);
+        return;
+      }
+      const supabase = getSupabase();
+      const { data, error } = await supabase
+        .from('user_expertise')
+        .select('user_id, score')
+        .eq('taxon_id', taxonId)
+        .order('score', { ascending: false })
+        .limit(20);
+      if (error) throw new Error(error.message);
+
+      const expertise = (data ?? []) as Array<{ user_id: string; score: number | null }>;
+      if (expertise.length === 0) {
+        showEmpty(STRINGS.expertsEmpty);
+        return;
+      }
+
+      const userIds = expertise.map((e) => e.user_id);
+      const { data: usersData } = await supabase
+        .from('community_observers')
+        .select('id, username, display_name, avatar_url, species_count')
+        .in('id', userIds);
+      const userMap = new Map<string, {
+        id: string;
+        username: string | null;
+        display_name: string | null;
+        avatar_url: string | null;
+        species_count: number | null;
+      }>();
+      for (const u of (usersData ?? []) as Array<{
+        id: string;
+        username: string | null;
+        display_name: string | null;
+        avatar_url: string | null;
+        species_count: number | null;
+      }>) {
+        userMap.set(u.id, u);
+      }
+
+      const rows: LeaderboardRow[] = [];
+      for (const e of expertise) {
+        const u = userMap.get(e.user_id);
+        if (!u) continue;
+        rows.push({
+          id: u.id,
+          username: u.username,
+          display_name: u.display_name,
+          avatar_url: u.avatar_url,
+          karma: 0,
+          species_count: u.species_count,
+          score: Number(e.score ?? 0),
+        });
+      }
+
+      loadingEl!.classList.add('hidden');
+      if (rows.length === 0) {
+        showEmpty(STRINGS.expertsEmpty);
+        return;
+      }
+      for (let i = 0; i < rows.length; i++) {
+        tbody!.appendChild(renderRow(rows[i], i + 1, 'experts'));
+      }
+      tableWrap!.classList.remove('hidden');
+    } catch (err) {
+      loadingEl!.classList.remove('hidden');
+      loadingEl!.textContent = err instanceof Error ? err.message : String(err);
+      loadingEl!.classList.add('text-red-600');
+      loadingEl!.classList.remove('text-zinc-500');
     }
-    void loadFor(period);
+  }
+
+  async function applyState(view: LeaderboardView, push: boolean) {
+    paintTabs(view);
+    paintFilters(view);
+
+    if (view === 'experts') {
+      await loadTaxa();
+      const taxonId = taxonSel!.value;
+      lastTaxon = taxonId;
+      if (push) {
+        const next = applyAll(window.location.search, view, '', taxonId);
+        const url = `${window.location.pathname}${next}${window.location.hash}`;
+        window.history.pushState({ view, taxon: taxonId }, '', url);
+      }
+      void loadExperts(taxonId);
+    } else {
+      void loadRegions();
+      const region = regionFromSearch(window.location.search);
+      regionSel!.value = region;
+      if (push) {
+        const next = applyAll(window.location.search, view, region, '');
+        const url = `${window.location.pathname}${next}${window.location.hash}`;
+        window.history.pushState({ view, region }, '', url);
+      }
+      void loadKarma(view, region);
+    }
+  }
+
+  function applyAll(currentSearch: string, view: LeaderboardView, region: string, taxon: string): string {
+    let s = searchForView(currentSearch, view);
+    s = searchForRegion(s, region);
+    s = searchForTaxon(s, taxon);
+    return s;
   }
 
   tabs.forEach((tab) => {
     tab.addEventListener('click', () => {
-      const period = tab.dataset.periodTab as LeaderboardPeriod;
-      applyPeriod(period, true);
+      const view = tab.dataset.viewTab as LeaderboardView;
+      void applyState(view, true);
     });
   });
 
-  window.addEventListener('popstate', () => {
-    applyPeriod(periodFromSearch(window.location.search), false);
+  regionSel.addEventListener('change', () => {
+    const region = regionSel.value;
+    const view = viewFromSearch(window.location.search);
+    if (view === 'experts') return;
+    const next = applyAll(window.location.search, view, region, '');
+    const url = `${window.location.pathname}${next}${window.location.hash}`;
+    window.history.pushState({ view, region }, '', url);
+    void loadKarma(view, region);
   });
 
-  applyPeriod(periodFromSearch(window.location.search), false);
+  taxonSel.addEventListener('change', () => {
+    const taxon = taxonSel.value;
+    if (taxon === lastTaxon) return;
+    lastTaxon = taxon;
+    const next = applyAll(window.location.search, 'experts', '', taxon);
+    const url = `${window.location.pathname}${next}${window.location.hash}`;
+    window.history.pushState({ view: 'experts', taxon }, '', url);
+    void loadExperts(taxon);
+  });
+
+  window.addEventListener('popstate', () => {
+    void applyState(viewFromSearch(window.location.search), false);
+  });
+
+  void applyState(viewFromSearch(window.location.search), false);
 </script>
