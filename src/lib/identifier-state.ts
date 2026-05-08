@@ -9,7 +9,7 @@
  * Also owns the one-shot localStorage migration that retires the
  * pre-redesign keys (`rastrum.localAiOptIn`,
  * `rastrum.prefs.usePhiVision`, `rastrum.prefs.useGemmaVision`) in
- * favor of the single `rastrum.disabledPlugins` source of truth.
+ * favor of the single `rastrum.pipeline.disabled` source of truth.
  */
 import type { IdentifierAvailability } from './identifiers/types';
 import type { ModelCacheStatus } from './local-ai';
@@ -21,8 +21,6 @@ export interface DerivedStateInput {
   isDisabled: boolean;
   /** null for cloud plugins; ModelCacheStatus for on-device. */
   cacheStatus: ModelCacheStatus | null;
-  /** True when the plugin needs a key and the user has saved one. */
-  byoKeysSet: boolean;
 }
 
 export type CardState =
@@ -63,7 +61,7 @@ export function deriveCardState(input: DerivedStateInput): CardState {
 const LEGACY_KEY_LOCAL_AI_OPTIN = 'rastrum.localAiOptIn';
 const LEGACY_KEY_USE_PHI = 'rastrum.prefs.usePhiVision';
 const LEGACY_KEY_USE_GEMMA = 'rastrum.prefs.useGemmaVision';
-const DISABLED_PLUGINS_KEY = 'rastrum.disabledPlugins';
+const DISABLED_PLUGINS_KEY = 'rastrum.pipeline.disabled';
 
 const LEGACY_PLUGIN_MAP: Record<string, string> = {
   [LEGACY_KEY_USE_PHI]: 'webllm_phi35_vision',
@@ -77,6 +75,7 @@ const LEGACY_PLUGIN_MAP: Record<string, string> = {
  * rules. Short-circuits for brand-new browsers (no legacy keys at all).
  */
 export function runStorageMigration(): void {
+  if (typeof localStorage === 'undefined') return;
   const hasAnyLegacyKey =
     localStorage.getItem(LEGACY_KEY_LOCAL_AI_OPTIN) !== null ||
     localStorage.getItem(LEGACY_KEY_USE_PHI) !== null ||
@@ -86,7 +85,10 @@ export function runStorageMigration(): void {
   const raw = localStorage.getItem(DISABLED_PLUGINS_KEY);
   let disabled: Set<string>;
   try {
-    disabled = new Set<string>(JSON.parse(raw ?? '[]'));
+    const parsed = JSON.parse(raw ?? '[]');
+    disabled = new Set<string>(
+      Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : [],
+    );
   } catch {
     disabled = new Set<string>();
   }

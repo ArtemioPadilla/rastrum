@@ -25,7 +25,6 @@ function input(overrides: Partial<DerivedStateInput> = {}): DerivedStateInput {
     availability: { ready: true },
     isDisabled: false,
     cacheStatus: { modelId: 'webllm_phi35_vision', cached: true, approxBytes: 4_000_000_000, entries: 15 },
-    byoKeysSet: false,
     ...overrides,
   };
 }
@@ -78,13 +77,13 @@ describe('deriveCardState', () => {
 describe('runStorageMigration', () => {
   it('is a no-op when no legacy keys are present (brand-new browser)', () => {
     runStorageMigration();
-    expect(localStorage.getItem('rastrum.disabledPlugins')).toBeNull();
+    expect(localStorage.getItem('rastrum.pipeline.disabled')).toBeNull();
   });
 
   it('migrates usePhiVision=false → adds webllm_phi35_vision to disabledPlugins', () => {
     localStorage.setItem('rastrum.prefs.usePhiVision', 'false');
     runStorageMigration();
-    expect(JSON.parse(localStorage.getItem('rastrum.disabledPlugins') ?? '[]'))
+    expect(JSON.parse(localStorage.getItem('rastrum.pipeline.disabled') ?? '[]'))
       .toContain('webllm_phi35_vision');
     expect(localStorage.getItem('rastrum.prefs.usePhiVision')).toBeNull();
   });
@@ -92,7 +91,7 @@ describe('runStorageMigration', () => {
   it('migrates usePhiVision=true → does NOT add to disabledPlugins, removes legacy key', () => {
     localStorage.setItem('rastrum.prefs.usePhiVision', 'true');
     runStorageMigration();
-    expect(JSON.parse(localStorage.getItem('rastrum.disabledPlugins') ?? '[]'))
+    expect(JSON.parse(localStorage.getItem('rastrum.pipeline.disabled') ?? '[]'))
       .not.toContain('webllm_phi35_vision');
     expect(localStorage.getItem('rastrum.prefs.usePhiVision')).toBeNull();
   });
@@ -103,14 +102,14 @@ describe('runStorageMigration', () => {
     // Migration must preserve that: Phi → disabledPlugins.
     localStorage.setItem('rastrum.localAiOptIn', 'true');
     runStorageMigration();
-    expect(JSON.parse(localStorage.getItem('rastrum.disabledPlugins') ?? '[]'))
+    expect(JSON.parse(localStorage.getItem('rastrum.pipeline.disabled') ?? '[]'))
       .toContain('webllm_phi35_vision');
   });
 
   it('migrates useGemmaVision=false the same way', () => {
     localStorage.setItem('rastrum.prefs.useGemmaVision', 'false');
     runStorageMigration();
-    expect(JSON.parse(localStorage.getItem('rastrum.disabledPlugins') ?? '[]'))
+    expect(JSON.parse(localStorage.getItem('rastrum.pipeline.disabled') ?? '[]'))
       .toContain('onnx_gemma4_vision');
   });
 
@@ -124,16 +123,28 @@ describe('runStorageMigration', () => {
     localStorage.setItem('rastrum.prefs.usePhiVision', 'false');
     runStorageMigration();
     runStorageMigration();
-    const list = JSON.parse(localStorage.getItem('rastrum.disabledPlugins') ?? '[]');
+    const list = JSON.parse(localStorage.getItem('rastrum.pipeline.disabled') ?? '[]');
     expect(list.filter((id: string) => id === 'webllm_phi35_vision')).toHaveLength(1);
   });
 
   it('preserves existing disabledPlugins entries', () => {
-    localStorage.setItem('rastrum.disabledPlugins', JSON.stringify(['claude_haiku']));
+    localStorage.setItem('rastrum.pipeline.disabled', JSON.stringify(['claude_haiku']));
     localStorage.setItem('rastrum.prefs.usePhiVision', 'false');
     runStorageMigration();
-    const list = JSON.parse(localStorage.getItem('rastrum.disabledPlugins') ?? '[]');
+    const list = JSON.parse(localStorage.getItem('rastrum.pipeline.disabled') ?? '[]');
     expect(list).toContain('claude_haiku');
+    expect(list).toContain('webllm_phi35_vision');
+  });
+
+  it('handles non-array JSON in disabledPlugins (does not drop migrated entries)', () => {
+    // Defensive: if a previous bug wrote a non-array (e.g., null, {}, 42),
+    // we treat it as empty and proceed with migration — without crashing
+    // and without silently dropping the new migrated entry.
+    localStorage.setItem('rastrum.pipeline.disabled', '{}');
+    localStorage.setItem('rastrum.prefs.usePhiVision', 'false');
+    runStorageMigration();
+    const list = JSON.parse(localStorage.getItem('rastrum.pipeline.disabled') ?? '[]');
+    expect(Array.isArray(list)).toBe(true);
     expect(list).toContain('webllm_phi35_vision');
   });
 });
