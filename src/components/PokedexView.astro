@@ -18,6 +18,7 @@ const tr = t(lang);
 const px = (tr as unknown as { pokedex: Record<string, unknown> }).pokedex;
 const sc = (tr as unknown as { species_card: Record<string, string> }).species_card ?? {};
 const heroT = (px?.hero as Record<string, string> | undefined) ?? {};
+const missingT = (px?.missing as Record<string, string> | undefined) ?? {};
 
 const title       = px?.title       as string;
 const subtitle    = px?.subtitle    as string;
@@ -69,6 +70,15 @@ const exploreHref       = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'exp
   data-label-hero-first-cta={heroT.first_visit_cta ?? ''}
   data-href-observe={observeHref}
   data-href-explore={exploreHref}
+  data-label-missing-show={missingT.show ?? ''}
+  data-label-missing-hide={missingT.hide ?? ''}
+  data-label-missing-count-template={missingT.count_template ?? ''}
+  data-label-missing-count-fallback={missingT.count_fallback ?? ''}
+  data-label-missing-disclaimer={missingT.disclaimer ?? ''}
+  data-label-missing-cta={missingT.cta ?? ''}
+  data-label-missing-no-region={missingT.no_region ?? ''}
+  data-label-missing-empty={missingT.empty ?? ''}
+  data-label-missing-card-tag={missingT.card_tag ?? ''}
 >
   <header class="mb-5">
     <h1 data-pokedex-title class="text-2xl md:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
@@ -100,7 +110,9 @@ const exploreHref       = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'exp
 
   <div id="pokedex-hero" class="hidden"></div>
   <div id="pokedex-pills" class="hidden"></div>
+  <div id="pokedex-missing-toolbar" class="hidden mt-4 flex flex-wrap items-center gap-3 text-xs"></div>
   <div id="pokedex-grid" class="hidden mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3"></div>
+  <p id="pokedex-missing-disclaimer" class="hidden mt-3 text-[11px] text-zinc-500 dark:text-zinc-500"></p>
 </section>
 
 <style>
@@ -114,6 +126,11 @@ const exploreHref       = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'exp
   import { getSupabase } from '../lib/supabase';
   import { escAttr } from '../lib/karma';
   import { renderSpeciesCard, type CardLabels } from '../lib/species-card-html';
+  import {
+    loadShowMissing,
+    saveShowMissing,
+    formatRegionCount,
+  } from '../lib/pokedex-missing';
 
   const root      = document.querySelector<HTMLElement>('[data-pokedex-root]');
   const heroEl    = document.getElementById('pokedex-hero');
@@ -124,6 +141,8 @@ const exploreHref       = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'exp
   const notFound  = document.getElementById('pokedex-not-found');
   const privateEl = document.getElementById('pokedex-private');
   const errorEl   = document.getElementById('pokedex-error');
+  const missingToolbarEl   = document.getElementById('pokedex-missing-toolbar');
+  const missingDisclaimerEl = document.getElementById('pokedex-missing-disclaimer');
   const titleEl    = root?.querySelector<HTMLElement>('[data-pokedex-title]');
   const subtitleEl = root?.querySelector<HTMLElement>('[data-pokedex-subtitle]');
   const backLink   = root?.querySelector<HTMLAnchorElement>('[data-pokedex-back-link]');
@@ -155,6 +174,28 @@ const exploreHref       = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'exp
     kingdom: string | null;
     thumbnail_url: string | null;
   };
+
+  type MissingRow = {
+    taxon_id: string;
+    scientific_name: string;
+    kingdom: string | null;
+    rarity_bucket: number | null;
+    obs_count: number;
+    common_name_es: string | null;
+    common_name_en: string | null;
+    slug: string | null;
+    endemic_mx: boolean | null;
+    nom059_status: string | null;
+    thumbnail_url: string | null;
+  };
+
+  type FaltaState = {
+    rows: DexRow[];
+    missing: MissingRow[];
+    regionPoolSize: number | null;
+    showMissing: boolean;
+  };
+  let state: FaltaState | null = null;
 
   function readUsername(): string {
     const params = new URLSearchParams(window.location.search);
@@ -247,6 +288,58 @@ const exploreHref       = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'exp
       if (Array.isArray(data) && data.length > 0) return data[0] as SuggestRow;
     } catch { /* swallow — tile 3 hides */ }
     return null;
+  }
+
+  type FaltaPayload = { missing: MissingRow[]; regionPoolSize: number | null };
+
+  async function loadFalta(
+    supabase: ReturnType<typeof getSupabase>,
+    userId: string,
+  ): Promise<FaltaPayload> {
+    try {
+      const { data, error } = await supabase.rpc('profile_pokedex_with_missing', {
+        p_user_id: userId,
+        p_region_country: null,
+        p_missing_limit: 60,
+      });
+      if (error || !Array.isArray(data)) return { missing: [], regionPoolSize: null };
+      type Row = MissingRow & { is_missing: boolean };
+      const missing = (data as Row[])
+        .filter((r) => r.is_missing === true)
+        .map<MissingRow>((r) => ({
+          taxon_id: r.taxon_id,
+          scientific_name: r.scientific_name,
+          kingdom: r.kingdom,
+          rarity_bucket: r.rarity_bucket,
+          obs_count: r.obs_count,
+          common_name_es: r.common_name_es,
+          common_name_en: r.common_name_en,
+          slug: r.slug,
+          endemic_mx: r.endemic_mx,
+          nom059_status: r.nom059_status,
+          thumbnail_url: r.thumbnail_url,
+        }));
+      // Best-effort denominator. Country code lookup goes through the
+      // companion RPC; failure is non-fatal and the toolbar collapses
+      // to the fallback copy ("N species observed").
+      let regionPoolSize: number | null = null;
+      try {
+        const { data: profileRow } = await supabase
+          .from('users')
+          .select('country_code')
+          .eq('id', userId)
+          .maybeSingle<{ country_code: string | null }>();
+        const cc = profileRow?.country_code ?? null;
+        if (cc) {
+          const { data: poolSize } = await supabase
+            .rpc('region_species_pool_size', { p_region_country: cc });
+          if (typeof poolSize === 'number') regionPoolSize = poolSize;
+        }
+      } catch { /* swallow — denominator hidden */ }
+      return { missing, regionPoolSize };
+    } catch {
+      return { missing: [], regionPoolSize: null };
+    }
   }
 
   function commonNameOf(r: DexRow | SuggestRow): string | null {
@@ -377,6 +470,118 @@ const exploreHref       = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'exp
     });
   }
 
+  function commonNameOfMissing(r: MissingRow): string | null {
+    return lang === 'es' ? r.common_name_es : r.common_name_en;
+  }
+
+  function renderMissingCards(missing: MissingRow[]): string {
+    if (!gridEl || missing.length === 0) return '';
+    const r = root!;
+    const cardTag = r.dataset.labelMissingCardTag ?? '';
+    const cta     = r.dataset.labelMissingCta ?? '';
+    return missing.map((m) => {
+      const k = m.kingdom ?? '';
+      const common = commonNameOfMissing(m);
+      const href = m.slug
+        ? `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/species'}/?slug=${encodeURIComponent(m.slug)}`
+        : `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/species'}/?slug=${encodeURIComponent(m.scientific_name)}`;
+      // Silhouette-style placeholder: dashed grey border, "?" badge,
+      // greyscaled thumbnail (if any) at low opacity. The card is a
+      // proper <a> so keyboard nav + screen-reader semantics stay.
+      const meta = (() => {
+        const star = '★'.repeat(m.rarity_bucket ?? 1) + '☆'.repeat(5 - (m.rarity_bucket ?? 1));
+        return star;
+      })();
+      const thumb = m.thumbnail_url
+        ? `<img src="${escAttr(m.thumbnail_url)}" alt="${escAttr(m.scientific_name)}" loading="lazy" class="absolute inset-0 w-full h-full object-cover" style="filter: grayscale(1) contrast(.55) brightness(.9); opacity:.5;">`
+        : `<span class="absolute inset-0 flex items-center justify-center text-3xl text-zinc-400">?</span>`;
+      return `<li><a href="${escAttr(href)}" class="block group rounded-xl border-2 border-dashed border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/40 overflow-hidden hover:border-emerald-400 dark:hover:border-emerald-700 transition-colors" data-taxon-id="${escAttr(m.taxon_id)}" data-kingdom="${escAttr(k)}" data-missing="1" aria-label="${escAttr(m.scientific_name)} — ${escAttr(cardTag)}">
+        <div class="relative aspect-[16/10] bg-gradient-to-br from-zinc-100 to-zinc-200 dark:from-zinc-800 dark:to-zinc-900">
+          ${thumb}
+          <span class="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[11px] font-bold shadow-sm bg-white/95 text-zinc-700">?</span>
+          <span class="absolute top-2 right-2 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-zinc-700/80 text-white">${escAttr(cardTag)}</span>
+        </div>
+        <div class="p-3">
+          <p class="text-sm italic font-bold text-zinc-700 dark:text-zinc-200 truncate">${escAttr(m.scientific_name)}</p>
+          ${common ? `<p class="text-sm text-zinc-500 dark:text-zinc-400 truncate">${escAttr(common)}</p>` : ''}
+          <p class="text-amber-600 mt-1 tracking-widest text-xs">${meta}</p>
+          <p class="text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold mt-1.5 group-hover:underline">${escAttr(cta)} →</p>
+        </div>
+      </a></li>`;
+    }).join('');
+  }
+
+  function renderMissingToolbar() {
+    if (!missingToolbarEl || !state) return;
+    const r = root!;
+    const showMissing = state.showMissing;
+    const observedCount = state.rows.length;
+    const total = state.regionPoolSize;
+    const tplCount    = r.dataset.labelMissingCountTemplate ?? '';
+    const tplFallback = r.dataset.labelMissingCountFallback ?? '';
+    const noRegion    = r.dataset.labelMissingNoRegion ?? '';
+
+    const countLine = total != null
+      ? formatRegionCount(observedCount, total, { template: tplCount, fallback: tplFallback })
+      : (state.missing.length === 0 && observedCount > 0
+          ? noRegion
+          : formatRegionCount(observedCount, null, { template: tplCount, fallback: tplFallback }));
+
+    const toggleLabel = showMissing
+      ? (r.dataset.labelMissingHide ?? 'Hide missing')
+      : (r.dataset.labelMissingShow ?? 'Show missing');
+
+    const disabled = state.missing.length === 0 ? 'disabled aria-disabled="true"' : '';
+
+    missingToolbarEl.innerHTML = `
+      <span class="text-zinc-600 dark:text-zinc-400">${escAttr(countLine)}</span>
+      <button type="button"
+              data-pokedex-toggle-missing
+              class="ml-auto inline-flex items-center gap-1 px-3 py-1 rounded-full border font-medium transition-colors ${showMissing ? 'bg-emerald-700 text-white border-emerald-700' : 'bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700'} disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-pressed="${showMissing}"
+              ${disabled}>
+        ${escAttr(toggleLabel)}
+      </button>`;
+    missingToolbarEl.classList.remove('hidden');
+
+    const btn = missingToolbarEl.querySelector<HTMLButtonElement>('[data-pokedex-toggle-missing]');
+    btn?.addEventListener('click', onToggleMissing);
+
+    // Disclaimer copy — show only when the missing surface is active.
+    if (missingDisclaimerEl) {
+      if (showMissing && state.missing.length > 0) {
+        missingDisclaimerEl.textContent = r.dataset.labelMissingDisclaimer ?? '';
+        missingDisclaimerEl.classList.remove('hidden');
+      } else {
+        missingDisclaimerEl.classList.add('hidden');
+      }
+    }
+  }
+
+  function onToggleMissing() {
+    if (!state) return;
+    state.showMissing = !state.showMissing;
+    saveShowMissing(state.showMissing);
+    rerenderGrid();
+    renderMissingToolbar();
+  }
+
+  function rerenderGrid() {
+    if (!gridEl || !state) return;
+    const presentHtml = renderCards(state.rows);
+    const missingHtml = state.showMissing ? renderMissingCards(state.missing) : '';
+    gridEl.innerHTML = `<ul class="contents">${presentHtml}${missingHtml}</ul>`;
+    // Re-apply current kingdom-pill filter if any.
+    const activePill = pillsEl?.querySelector<HTMLElement>('[data-kingdom][aria-pressed="true"]');
+    const k = activePill?.dataset.kingdom ?? '';
+    if (k) {
+      gridEl.querySelectorAll<HTMLElement>('[data-taxon-id]').forEach((card) => {
+        const cardKingdom = card.getAttribute('data-kingdom') ?? '';
+        card.style.display = cardKingdom === k ? '' : 'none';
+      });
+    }
+  }
+
   function renderCards(rows: DexRow[]): string {
     if (!gridEl) return '';
     const labels = cardLabels();
@@ -404,14 +609,34 @@ const exploreHref       = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'exp
     }).join('');
   }
 
-  function renderAll(rows: DexRow[], suggestion: SuggestRow | null, isVisitor: boolean) {
+  function renderAll(
+    rows: DexRow[],
+    suggestion: SuggestRow | null,
+    isVisitor: boolean,
+    falta?: FaltaPayload,
+  ) {
     if (!heroEl || !pillsEl || !gridEl) return;
+
+    // Owner-only: hydrate the falta-dex state so the toolbar can drive
+    // the show/hide toggle on every render. Visitor view stays as-is.
+    if (!isVisitor && falta) {
+      state = {
+        rows,
+        missing: falta.missing,
+        regionPoolSize: falta.regionPoolSize,
+        showMissing: loadShowMissing(),
+      };
+    } else {
+      state = null;
+    }
 
     if (rows.length === 0) {
       // First-visit owner state: still render hero (tile 1 in first-visit mode)
       if (!isVisitor) {
         heroEl.innerHTML = renderHeroHtml(rows, suggestion, false);
         heroEl.classList.remove('hidden');
+        // Falta-dex toolbar is meaningless on a 0-row dex (no
+        // observations yet → no comparison frame). Hide it.
       } else {
         if (emptyEl) {
           const tpl = root?.dataset.labelVisitorEmpty ?? '';
@@ -425,12 +650,15 @@ const exploreHref       = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'exp
 
     heroEl.innerHTML  = renderHeroHtml(rows, suggestion, isVisitor);
     pillsEl.innerHTML = renderPillsHtml(rows);
-    gridEl.innerHTML  = `<ul class="contents">${renderCards(rows)}</ul>`;
+    const presentHtml = renderCards(rows);
+    const missingHtml = state?.showMissing ? renderMissingCards(state.missing) : '';
+    gridEl.innerHTML  = `<ul class="contents">${presentHtml}${missingHtml}</ul>`;
 
     heroEl.classList.remove('hidden');
     pillsEl.classList.remove('hidden');
     gridEl.classList.remove('hidden');
     wireKingdomPills();
+    if (!isVisitor) renderMissingToolbar();
     loading?.classList.add('hidden');
   }
 
@@ -451,7 +679,8 @@ const exploreHref       = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'exp
     let rows = await loadFromView(supabase, user.id);
     if (rows === null) rows = await loadFallback(supabase, user.id);
     const suggestion = await loadSuggestion(supabase, user.id);
-    renderAll(rows, suggestion, false);
+    const falta = await loadFalta(supabase, user.id);
+    renderAll(rows, suggestion, false, falta);
   }
 
   async function runVisitor() {

@@ -8712,3 +8712,192 @@ $$;
 
 REVOKE ALL ON FUNCTION public.community_active_observers_today(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.community_active_observers_today(text) TO anon, authenticated;
+-- M08 — Falta-dex / taxonomic gaps (issue #726, supersedes #561 phase-1)
+--
+-- Returns the union of (a) species the user has ALREADY observed —
+-- mirroring `profile_pokedex` columns — and (b) species *missing* from
+-- their dex but observed in their region by other Rastrum users at
+-- research grade. Missing rows are ordered by rarity bucket DESC then
+-- regional obs_count ASC (rarest + scarcest first), so the gamification
+-- rewards effort proportional to challenge.
+--
+-- Baseline source (Option A — own observation data as proxy):
+--   The "expected pool" for a country is the set of taxa with at least
+--   one synced, research-grade, public observation made by an observer
+--   whose `country_code` matches. This avoids a GBIF ETL for v1 and is
+--   honest about its limits — the i18n copy says so. Option B (curated
+--   GBIF baseline per state/ecoregion) remains the v1.1 follow-up.
+--
+-- Region resolution: defaults to `users.country_code` of the target
+-- user. If still NULL, the function returns only present rows (no
+-- region pool to draw missing slots from).
+--
+-- The viewer is gated by `can_see_facet(target, 'pokedex', viewer)` —
+-- same predicate as `profile_pokedex`. Public/private profile rules
+-- propagate naturally because the missing-pool excludes hidden
+-- observers' contributions only if they hide their *observations*; the
+-- pool is derived from public observation rows already.
+-- =====================================================================
+CREATE OR REPLACE FUNCTION public.profile_pokedex_with_missing(
+  p_user_id         uuid,
+  p_region_country  text DEFAULT NULL,
+  p_missing_limit   int  DEFAULT 60
+)
+RETURNS TABLE (
+  user_id           uuid,
+  taxon_id          uuid,
+  scientific_name   text,
+  kingdom           text,
+  rarity_bucket     smallint,
+  first_observed_at timestamptz,
+  obs_count         int,
+  common_name_es    text,
+  common_name_en    text,
+  slug              text,
+  endemic_mx        boolean,
+  nom059_status     text,
+  thumbnail_url     text,
+  is_missing        boolean
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_country text;
+  v_can_see boolean;
+BEGIN
+  -- Facet gate — anonymous callers and viewers blocked by privacy
+  -- settings get the same answer as profile_pokedex would: zero rows.
+  SELECT public.can_see_facet(p_user_id, 'pokedex', auth.uid())
+    INTO v_can_see;
+  IF v_can_see IS NOT TRUE THEN
+    RETURN;
+  END IF;
+
+  -- Resolve region: explicit param wins, else derive from the target
+  -- user's stored country_code. Two-letter ISO check mirrors the
+  -- column constraint on users.country_code.
+  v_country := COALESCE(
+    NULLIF(upper(p_region_country), ''),
+    (SELECT u.country_code FROM public.users u WHERE u.id = p_user_id)
+  );
+
+  -- Cap missing-limit defensively — the UI grid is bounded.
+  IF p_missing_limit IS NULL OR p_missing_limit <= 0 THEN
+    p_missing_limit := 60;
+  ELSIF p_missing_limit > 200 THEN
+    p_missing_limit := 200;
+  END IF;
+
+  RETURN QUERY
+  -- Present rows — pulled directly from the existing view so this
+  -- function stays in lock-step with the dex shape.
+  SELECT
+    pp.user_id,
+    pp.taxon_id,
+    pp.scientific_name,
+    pp.kingdom,
+    pp.rarity_bucket,
+    pp.first_observed_at,
+    pp.obs_count,
+    pp.common_name_es,
+    pp.common_name_en,
+    pp.slug,
+    pp.endemic_mx,
+    pp.nom059_status,
+    pp.thumbnail_url,
+    false AS is_missing
+  FROM public.profile_pokedex pp
+  WHERE pp.user_id = p_user_id
+
+  UNION ALL
+
+  -- Missing rows — region-pool species the user has not observed.
+  -- Region pool: synced research-grade public observations with
+  -- a taxon, observed by users whose country_code matches v_country.
+  -- Excludes private observations and rows already in the dex.
+  -- Wrapped in a subquery so ORDER BY + LIMIT scope to the missing
+  -- branch only, not the UNION result.
+  SELECT * FROM (
+    SELECT
+      p_user_id                AS user_id,
+      t.id                     AS taxon_id,
+      t.scientific_name,
+      t.kingdom,
+      tr.bucket                AS rarity_bucket,
+      NULL::timestamptz        AS first_observed_at,
+      region_pool.regional_obs_count::int AS obs_count,
+      t.common_name_es,
+      t.common_name_en,
+      t.slug,
+      t.is_endemic_mexico      AS endemic_mx,
+      t.nom059_status,
+      (SELECT tt.thumbnail_url
+         FROM public.taxa_thumbnails tt
+        WHERE tt.taxon_id = t.id) AS thumbnail_url,
+      true                     AS is_missing
+    FROM (
+      SELECT i.taxon_id, COUNT(*)::bigint AS regional_obs_count
+        FROM public.observations o
+        JOIN public.identifications i
+          ON i.observation_id = o.id AND i.is_primary = true
+        JOIN public.users u
+          ON u.id = o.observer_id
+       WHERE v_country IS NOT NULL
+         AND u.country_code = v_country
+         AND o.sync_status = 'synced'
+         AND o.obscure_level <> 'private'
+         AND i.is_research_grade = true
+         AND i.taxon_id IS NOT NULL
+       GROUP BY i.taxon_id
+    ) AS region_pool
+    JOIN public.taxa t ON t.id = region_pool.taxon_id
+    LEFT JOIN public.taxon_rarity tr ON tr.taxon_id = t.id
+    WHERE v_country IS NOT NULL
+      AND t.taxon_rank = 'species'
+      AND NOT EXISTS (
+        SELECT 1 FROM public.profile_pokedex pp
+         WHERE pp.user_id = p_user_id
+           AND pp.taxon_id = t.id
+      )
+    ORDER BY tr.bucket DESC NULLS LAST,
+             region_pool.regional_obs_count ASC
+    LIMIT p_missing_limit
+  ) AS missing;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.profile_pokedex_with_missing(uuid, text, int) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.profile_pokedex_with_missing(uuid, text, int)
+  TO anon, authenticated;
+
+-- Companion helper — region pool size (denominator for "X of Y species
+-- in your region"). Cached behaviour is fine: STABLE in a single txn.
+-- Anonymous-friendly: the count itself is non-PII.
+CREATE OR REPLACE FUNCTION public.region_species_pool_size(
+  p_region_country text
+)
+RETURNS integer
+LANGUAGE sql
+STABLE
+PARALLEL SAFE
+AS $$
+  SELECT COUNT(DISTINCT i.taxon_id)::int
+    FROM public.observations o
+    JOIN public.identifications i
+      ON i.observation_id = o.id AND i.is_primary = true
+    JOIN public.users u
+      ON u.id = o.observer_id
+   WHERE p_region_country IS NOT NULL
+     AND u.country_code = upper(p_region_country)
+     AND o.sync_status = 'synced'
+     AND o.obscure_level <> 'private'
+     AND i.is_research_grade = true
+     AND i.taxon_id IS NOT NULL;
+$$;
+
+REVOKE ALL ON FUNCTION public.region_species_pool_size(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.region_species_pool_size(text)
+  TO anon, authenticated;
