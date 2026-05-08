@@ -65,15 +65,27 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Fail when ALL providers failed
+      - name: Gate — fail only on real provider failures
         if: always()
         run: |
           if [ ! -f smoke-results.txt ]; then
-            echo "no results file — failing"
+            echo "no results file — script never ran"
             exit 1
           fi
-          # The script writes one line per provider: PASS|FAIL <provider> <message>
-          if ! grep -q '^PASS' smoke-results.txt; then
-            echo "all providers failed — abstraction-level regression"
+          # The script writes one line per provider: PASS|FAIL|SKIP <name> [<msg>]
+          # Three cases:
+          #   ≥1 PASS                     → green
+          #   ≥1 FAIL and 0 PASS          → real abstraction regression, fail
+          #   only SKIPs (0 PASS, 0 FAIL) → no secrets configured, no-op,
+          #                                 don't false-fail the workflow
+          if grep -q '^PASS' smoke-results.txt; then
+            echo "at least one provider passed"
+            exit 0
+          fi
+          if grep -q '^FAIL' smoke-results.txt; then
+            echo "providers ran but all failed — abstraction-level regression"
             exit 1
           fi
+          echo "no provider secrets configured — smoke is a no-op."
+          echo "configure VISION_PROVIDERS_TEST_* secrets to enable real probes."
+          exit 0
