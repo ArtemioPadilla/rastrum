@@ -18,6 +18,15 @@ const privacyTr = (tr as unknown as { privacy: { manage_in_tab_note: string } })
 const crosslink = (tr as unknown as { ai_sponsor_crosslink: { from_ai_label: string; from_ai_link: string } }).ai_sponsor_crosslink;
 const sponsoringHref = `/${lang}${routes.sponsoring[lang]}/`;
 
+// Section labels from i18n — passed to client script via hidden JSON element.
+const sectionLabels = {
+  section_photo_specialists: pip.section_photo_specialists,
+  section_photo_generalists: pip.section_photo_generalists,
+  section_audio: pip.section_audio,
+  section_other_local_data: pip.section_other_local_data,
+  experimental_warning: pip.experimental_warning,
+};
+
 // SpeciesNet on-device card is only meaningful once the operator hosts the
 // model artifact and points PUBLIC_SPECIESNET_WEIGHTS_URL at it. Until then
 // the plugin returns `model_not_bundled` from isAvailable(); hide the static
@@ -300,6 +309,8 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
   </section>
   )}
 </div>
+
+<script type="application/json" id="rastrum-section-labels" hidden>{JSON.stringify(sectionLabels)}</script>
 
 <script>
   import { getSupabase } from '../lib/supabase';
@@ -1424,21 +1435,11 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
     const isEs = document.documentElement.lang === 'es';
     const lang: 'en' | 'es' = isEs ? 'es' : 'en';
 
-    // Section header strings — inline since section keys are pipeline.section_*
-    // and there is no client-side i18n runtime; mirror i18n/en.json + es.json.
-    const SECTION_LABELS: Record<string, string> = isEs ? {
-      section_photo_specialists: '📷 Identificadores de foto · Especialistas',
-      section_photo_generalists: '📷 Identificadores de foto · Generalistas',
-      section_audio: '🔊 Identificadores de audio',
-      section_other_local_data: '🗂 Otros datos locales',
-      experimental_warning: 'Experimental — pueden bloquearse en algunos dispositivos y la confianza se limita a 0.35. Prueba Phi o Gemma; si uno falla, prueba el otro.',
-    } : {
-      section_photo_specialists: '📷 Photo identifiers · Specialists',
-      section_photo_generalists: '📷 Photo identifiers · Generalists',
-      section_audio: '🔊 Audio identifiers',
-      section_other_local_data: '🗂 Other local data',
-      experimental_warning: 'Experimental — these may crash on some devices, and confidence is hard-capped at 0.35. Try Phi or Gemma; if one crashes, try the other.',
-    };
+    // Load section labels from the hidden JSON element (populated in frontmatter from i18n).
+    const jsonEl = document.getElementById('rastrum-section-labels') as HTMLScriptElement | null;
+    const sectionLabels: Record<string, string> = jsonEl?.textContent
+      ? JSON.parse(jsonEl.textContent)
+      : {};
 
     // Pre-resolve availability + cache + sponsorship in parallel.
     const ON_DEVICE_MODEL_IDS: Record<string, string> = {
@@ -1495,7 +1496,7 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
     function renderSection(section: Section, headerKey: string, sectionPlugins: typeof visiblePlugins): string {
       if (!sectionPlugins.length) return '';
       const warning = section === 'experimental'
-        ? `<p class="text-xs text-amber-700 dark:text-amber-400 mb-2">${escapeAttr(SECTION_LABELS.experimental_warning)}</p>`
+        ? `<p class="text-xs text-amber-700 dark:text-amber-400 mb-2">${escapeAttr(sectionLabels.experimental_warning)}</p>`
         : '';
       const cards = sectionPlugins.map((p) => {
         const av = availabilityMap.get(p.id) ?? { ready: false, reason: 'unsupported' as const };
@@ -1524,7 +1525,7 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
       }).join('');
       return `
         <li class="rastrum-section-header" role="presentation">
-          <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mt-4 mb-2">${escapeAttr(SECTION_LABELS[headerKey] ?? headerKey)}</h3>
+          <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mt-4 mb-2">${escapeAttr(sectionLabels[headerKey] ?? headerKey)}</h3>
           ${warning}
         </li>
         ${cards}
@@ -1571,7 +1572,7 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
       ${renderSection('experimental',      'section_photo_generalists', grouped.get('experimental')!)}
       ${renderSection('audio',             'section_audio',             grouped.get('audio')!)}
       <li class="rastrum-section-header" role="presentation">
-        <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mt-4 mb-2">${escapeAttr(SECTION_LABELS.section_other_local_data)}</h3>
+        <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mt-4 mb-2">${escapeAttr(sectionLabels.section_other_local_data)}</h3>
       </li>
       ${otherLocalData}
     `;
