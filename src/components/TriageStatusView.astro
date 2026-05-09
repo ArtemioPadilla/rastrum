@@ -3,21 +3,12 @@ import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { t } from '../i18n/utils';
+import { isPlaceholderStats, type TriageStats } from '../lib/triage-stats';
 
 interface Props { lang: 'en' | 'es' }
 const { lang } = Astro.props;
 const tr = t(lang);
 const triage = (tr.docs as unknown as { triage: Record<string, string> }).triage;
-
-interface TriageStats {
-  generated_at: string;
-  repo: string;
-  window_days: number;
-  open_count: number;
-  resolved_30d: number;
-  median_first_comment_h: number | null;
-  sample_size: number;
-}
 
 const FALLBACK: TriageStats = {
   generated_at: '1970-01-01T00:00:00.000Z',
@@ -61,12 +52,21 @@ function formatNumber(n: number, locale: 'en' | 'es'): string {
   return n.toLocaleString(locale === 'es' ? 'es-MX' : 'en-US');
 }
 
-const medianLabel = stats.median_first_comment_h === null
-  ? triage.stat_median_none
-  : `${formatNumber(stats.median_first_comment_h, lang)} ${triage.stat_median_unit_h}`;
+const isStub = isPlaceholderStats(stats);
+
+// When the JSON is a placeholder (1970 sentinel, or all-zeros from a
+// failed fetch with no cache), don't lie with `0` — render an em-dash so
+// readers know "data temporarily unavailable" and click through to GitHub.
+const openLabel = isStub ? '—' : formatNumber(stats.open_count, lang);
+const resolvedLabel = isStub ? '—' : formatNumber(stats.resolved_30d, lang);
+const medianLabel = isStub
+  ? '—'
+  : stats.median_first_comment_h === null
+    ? triage.stat_median_none
+    : `${formatNumber(stats.median_first_comment_h, lang)} ${triage.stat_median_unit_h}`;
+const sampleLabel = isStub ? '—' : formatNumber(stats.sample_size, lang);
 
 const generatedLabel = formatGenerated(stats.generated_at, lang);
-const isStub = stats.generated_at.startsWith('1970-');
 
 const repoUrl = `https://github.com/${stats.repo}`;
 const issuesNew = `${repoUrl}/issues/new/choose`;
@@ -86,7 +86,7 @@ const issuesClosed = `${repoUrl}/issues?q=is%3Aissue+is%3Aclosed`;
         {triage.stat_open}
       </p>
       <p class="text-3xl font-bold text-zinc-900 dark:text-zinc-100 tabular-nums">
-        {formatNumber(stats.open_count, lang)}
+        {openLabel}
       </p>
       <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-2">{triage.stat_open_help}</p>
     </a>
@@ -107,7 +107,7 @@ const issuesClosed = `${repoUrl}/issues?q=is%3Aissue+is%3Aclosed`;
         {triage.stat_resolved}
       </p>
       <p class="text-3xl font-bold text-zinc-900 dark:text-zinc-100 tabular-nums">
-        {formatNumber(stats.resolved_30d, lang)}
+        {resolvedLabel}
       </p>
       <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-2">{triage.stat_resolved_help}</p>
     </a>
@@ -155,7 +155,7 @@ const issuesClosed = `${repoUrl}/issues?q=is%3Aissue+is%3Aclosed`;
     </div>
     <div>
       <dt class="font-semibold text-zinc-700 dark:text-zinc-300">{triage.data_sample_size}</dt>
-      <dd>{formatNumber(stats.sample_size, lang)}</dd>
+      <dd class={isStub ? 'italic' : ''}>{sampleLabel}</dd>
     </div>
   </dl>
   <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-2">{triage.data_source}</p>
