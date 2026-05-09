@@ -68,8 +68,8 @@ function lunarPhaseMoment(k: number, phase: LunarPhase): number {
 /**
  * Return today's lunar event kind in the given timezone, or null.
  *
- * - 'full'    : full moon within ±12 h of local midnight
- * - 'new'     : new moon within ±12 h of local midnight
+ * - 'full'    : full moon within [localMidnight - 12h, localMidnight + 36h]
+ * - 'new'     : new moon within [localMidnight - 12h, localMidnight + 36h]
  * - 'eclipse' : total lunar eclipse (magnitude > 0.5) on this date
  *
  * Eclipse detection uses a simple criterion: full moon whose F argument
