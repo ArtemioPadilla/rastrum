@@ -85,6 +85,45 @@ const obs = (tr as unknown as { observe: Record<string, string> }).observe;
           </svg>
         </button>
       </div>
+
+      <div class="space-y-2 pt-1">
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label for="rastrum-crop-brightness" class="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+              {obs.crop_brightness_label}
+            </label>
+            <span id="rastrum-crop-brightness-val" class="text-xs font-mono text-zinc-500 dark:text-zinc-400" aria-live="polite">0</span>
+          </div>
+          <input
+            id="rastrum-crop-brightness"
+            type="range"
+            min="-100"
+            max="100"
+            step="1"
+            value="0"
+            class="w-full min-h-[44px] accent-emerald-600"
+            aria-label={obs.crop_brightness_label}
+          />
+        </div>
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label for="rastrum-crop-contrast" class="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+              {obs.crop_contrast_label}
+            </label>
+            <span id="rastrum-crop-contrast-val" class="text-xs font-mono text-zinc-500 dark:text-zinc-400" aria-live="polite">0</span>
+          </div>
+          <input
+            id="rastrum-crop-contrast"
+            type="range"
+            min="-100"
+            max="100"
+            step="1"
+            value="0"
+            class="w-full min-h-[44px] accent-emerald-600"
+            aria-label={obs.crop_contrast_label}
+          />
+        </div>
+      </div>
     </div>
 
     <footer class="px-5 py-4 border-t border-zinc-100 dark:border-zinc-800 flex items-center gap-2 justify-end flex-wrap">
@@ -108,7 +147,7 @@ const obs = (tr as unknown as { observe: Record<string, string> }).observe;
 </div>
 
 <script>
-  import { cropAndRotate, normalizeCropRect, rotatedDims } from '../lib/photo-crop';
+  import { cropAndRotate, normalizeCropRect, rotatedDims, buildFilterString } from '../lib/photo-crop';
   import type { Rotation } from '../lib/photo-crop';
 
   const root = document.getElementById('rastrum-crop-modal') as HTMLElement | null;
@@ -121,6 +160,10 @@ const obs = (tr as unknown as { observe: Record<string, string> }).observe;
     const rotLBtn   = document.getElementById('rastrum-crop-rotate-left')  as HTMLButtonElement | null;
     const rotRBtn   = document.getElementById('rastrum-crop-rotate-right') as HTMLButtonElement | null;
     const resetBtn  = document.getElementById('rastrum-crop-reset')        as HTMLButtonElement | null;
+    const brightInput = document.getElementById('rastrum-crop-brightness')     as HTMLInputElement | null;
+    const brightVal   = document.getElementById('rastrum-crop-brightness-val') as HTMLElement | null;
+    const contrInput  = document.getElementById('rastrum-crop-contrast')       as HTMLInputElement | null;
+    const contrVal    = document.getElementById('rastrum-crop-contrast-val')   as HTMLElement | null;
 
     type State = {
       file: File;
@@ -130,6 +173,8 @@ const obs = (tr as unknown as { observe: Record<string, string> }).observe;
       crop: { x: number; y: number; w: number; h: number };
       // The most recent display→source scale. Recomputed on each redraw.
       scale: number;
+      brightness: number;
+      contrast: number;
     };
     let state: State | null = null;
     let prevFocus: Element | null = null;
@@ -159,7 +204,13 @@ const obs = (tr as unknown as { observe: Record<string, string> }).observe;
         rotation: 0,
         crop: { x: 0, y: 0, w: bitmap.width, h: bitmap.height },
         scale: 1,
+        brightness: 0,
+        contrast: 0,
       };
+      if (brightInput) brightInput.value = '0';
+      if (brightVal) brightVal.textContent = '0';
+      if (contrInput) contrInput.value = '0';
+      if (contrVal) contrVal.textContent = '0';
       root?.classList.remove('hidden');
       requestAnimationFrame(() => {
         useBtn?.focus();
@@ -201,6 +252,8 @@ const obs = (tr as unknown as { observe: Record<string, string> }).observe;
       ctx.clearRect(0, 0, dispW, dispH);
       // Draw rotated source.
       ctx.save();
+      const filter = buildFilterString(state.brightness, state.contrast);
+      if (filter !== 'none') ctx.filter = filter;
       switch (state.rotation) {
         case 90:
           ctx.translate(dispW, 0);
@@ -254,6 +307,12 @@ const obs = (tr as unknown as { observe: Record<string, string> }).observe;
       if (!state) return;
       state.rotation = 0;
       state.crop = { x: 0, y: 0, w: state.bitmap.width, h: state.bitmap.height };
+      state.brightness = 0;
+      state.contrast = 0;
+      if (brightInput) brightInput.value = '0';
+      if (brightVal) brightVal.textContent = '0';
+      if (contrInput) contrInput.value = '0';
+      if (contrVal) contrVal.textContent = '0';
       redraw();
     }
 
@@ -380,11 +439,13 @@ const obs = (tr as unknown as { observe: Record<string, string> }).observe;
         close();
         return;
       }
-      const { file, rotation, crop } = state;
+      const { file, rotation, crop, brightness, contrast } = state;
       try {
         const out = await cropAndRotate(file, {
           rect: { x: crop.x, y: crop.y, width: crop.w, height: crop.h },
           rotation,
+          brightness,
+          contrast,
         });
         emit('use', out);
       } catch (err) {
@@ -392,6 +453,21 @@ const obs = (tr as unknown as { observe: Record<string, string> }).observe;
         emit('skip', file);
       }
       close();
+    });
+
+    brightInput?.addEventListener('input', () => {
+      if (!state || !brightInput) return;
+      const v = Number(brightInput.value);
+      state.brightness = Number.isFinite(v) ? v : 0;
+      if (brightVal) brightVal.textContent = String(state.brightness);
+      redraw();
+    });
+    contrInput?.addEventListener('input', () => {
+      if (!state || !contrInput) return;
+      const v = Number(contrInput.value);
+      state.contrast = Number.isFinite(v) ? v : 0;
+      if (contrVal) contrVal.textContent = String(state.contrast);
+      redraw();
     });
 
     function focusableEls(): HTMLElement[] {
