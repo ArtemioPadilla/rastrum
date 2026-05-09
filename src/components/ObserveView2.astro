@@ -4,6 +4,7 @@ import PipelineGraph from "./PipelineGraph.astro";
 import MapPicker from "./MapPicker.astro";
 import TaxonAutocomplete from "./TaxonAutocomplete.astro";
 import ActiveObserversBanner from "./ActiveObserversBanner.astro";
+import ContextualSpeciesChips from "./ContextualSpeciesChips.astro";
 import { t } from "../i18n/utils";
 import { HABITATS, WEATHERS } from "../lib/observation-enums";
 
@@ -82,6 +83,10 @@ const weathers = WEATHERS;
       </div>
     </div>
   </div>
+
+  <!-- Contextual species suggestions (issue #723) — appears above the upload
+       once a location is known. Chip taps pre-fill the manual ID input. -->
+  <ContextualSpeciesChips lang={lang} targetInputId="obs2-taxon-input" />
 
   <!-- Drop Zone -->
   <DropZone lang={lang} />
@@ -829,6 +834,10 @@ function startGPS() {
       // Notify map picker
       window.dispatchEvent(new CustomEvent('rastrum:mappicker-set', {
         detail: { id: 'obs2-map', coords: { lat: location.lat, lng: location.lng } },
+      }));
+      // Notify contextual chip strip (#723) — only on the first GPS fix per visit.
+      window.dispatchEvent(new CustomEvent('rastrum:observe-location-ready', {
+        detail: { lat: location.lat, lng: location.lng },
       }));
       // Update location node
       if (pipelineState) {
