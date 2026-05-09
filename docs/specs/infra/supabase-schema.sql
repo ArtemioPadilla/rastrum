@@ -10119,3 +10119,50 @@ AS $$
 $$;
 
 GRANT EXECUTE ON FUNCTION public.count_distinct_observed_species() TO anon, authenticated;
+
+-- #798 — after_rain kairos trigger
+-- Extends kairos_subscriptions.kind CHECK to include 'after_rain'.
+-- Adds weather_snapshots table (geohash5 grid, populated by
+-- enrich-environment) and recent_rainfall_12h view.
+-- ─────────────────────────────────────────────────────────────────────
+
+-- Extend the kind CHECK constraint (drop + recreate idempotently).
+ALTER TABLE public.kairos_subscriptions
+  DROP CONSTRAINT IF EXISTS kairos_subscriptions_kind_check;
+ALTER TABLE public.kairos_subscriptions
+  ADD CONSTRAINT kairos_subscriptions_kind_check
+  CHECK (kind IN ('golden_hour', 'after_rain'));
+
+-- weather_snapshots: one row per (geohash5, hour-bucket).
+-- Populated by enrich-environment; consumed by kairos-fire (after_rain).
+CREATE TABLE IF NOT EXISTS public.weather_snapshots (
+  id               bigserial PRIMARY KEY,
+  geohash5         text        NOT NULL,
+  precipitation_mm numeric     NOT NULL DEFAULT 0,
+  recorded_at      timestamptz NOT NULL DEFAULT now(),
+  created_at       timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_weather_snapshots_geohash5_recorded_at
+  ON public.weather_snapshots(geohash5, recorded_at DESC);
+
+ALTER TABLE public.weather_snapshots ENABLE ROW LEVEL SECURITY;
+
+-- Only service_role can write snapshots; no direct user access.
+GRANT SELECT ON public.weather_snapshots TO service_role;
+GRANT INSERT ON public.weather_snapshots TO service_role;
+
+-- recent_rainfall_12h: total precipitation in the last 12 h per geohash5.
+-- SECURITY INVOKER so RLS on weather_snapshots applies to the caller.
+DROP VIEW IF EXISTS public.recent_rainfall_12h;
+CREATE VIEW public.recent_rainfall_12h
+  WITH (security_invoker = true) AS
+SELECT
+  geohash5,
+  SUM(precipitation_mm) AS total_mm,
+  MAX(recorded_at)      AS latest_at
+FROM public.weather_snapshots
+WHERE recorded_at >= (now() - INTERVAL '12 hours')
+GROUP BY geohash5;
+
+GRANT SELECT ON public.recent_rainfall_12h TO service_role;
