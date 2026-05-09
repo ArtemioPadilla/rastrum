@@ -45,6 +45,9 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
+          # NDK 26.1.10909125 is the version Tauri v2 stable currently expects.
+          # Bump in lockstep with @tauri-apps/cli major upgrades — verify against
+          # https://v2.tauri.app/start/prerequisites/#android before changing.
           packages: 'platform-tools platforms;android-34 build-tools;34.0.0 ndk;26.1.10909125'
 
       - name: Setup Rust toolchain
