@@ -112,7 +112,7 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
 </section>
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getSupabase, getCachedUser } from '../lib/supabase';
   import { buildGreeting } from '../lib/home-greeting';
   import { formatTimeAgo } from '../lib/social';
   import { fetchSuggestions, type SpeciesSuggestion } from '../lib/suggestions';
@@ -382,7 +382,7 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
       return;
     }
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCachedUser();
     if (!user) {
       // Signed-out: render anonymous "Recent observations" only — but skip
       // the personalized hero entirely. Hide the greeting wrapper and show
