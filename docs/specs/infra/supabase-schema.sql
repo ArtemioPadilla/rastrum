@@ -1126,11 +1126,15 @@ SECURITY DEFINER
 SET search_path = public, extensions, pg_temp
 AS $$
 BEGIN
+  -- Midnight is evaluated in the observer's timezone (falls back to UTC when
+  -- users.timezone is NULL). Mirrors the pattern in detect_admin_anomalies()
+  -- so a user observing at 1am their local time qualifies regardless of UTC.
   RETURN QUERY
     SELECT DISTINCT o.observer_id
       FROM public.observations o
+      LEFT JOIN public.users u ON u.id = o.observer_id
      WHERE o.sync_status = 'synced'
-       AND EXTRACT(HOUR FROM o.observed_at AT TIME ZONE 'UTC') BETWEEN 0 AND 4
+       AND EXTRACT(HOUR FROM o.observed_at AT TIME ZONE COALESCE(u.timezone, 'UTC')) BETWEEN 0 AND 4
        AND (p_user_id IS NULL OR o.observer_id = p_user_id);
 END
 $$;
