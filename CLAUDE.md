@@ -3,8 +3,9 @@
 > Briefing for AI coding agents (Claude Code, Copilot, Cursor, Codex, …)
 > working in this repo. Read this before making changes.
 >
-> **Last full doc sync:** 2026-05-01 (v1.2 + 42 field-bug/admin/docs PRs from
-> 2026-05-01 session — see docs/changelog for details).
+> **Last full doc sync:** 2026-05-08 (v1.1.5 Persuasive Tech Audit — Tier S +
+> Tier A merged, Ola 2b in flight; see `docs/progress.json` v1.1.5 phase).
+> Prior sync: 2026-05-01 (v1.2 + 42 field-bug/admin/docs PRs).
 
 ---
 
@@ -542,6 +543,53 @@ Pause/Resume. Vertex AI tokens auto-rotate via service-account JWT
 Spec: [`docs/specs/modules/32-multi-provider-vision.md`](docs/specs/modules/32-multi-provider-vision.md).
 Runbooks: [`docs/runbooks/multi-provider-vision.md`](docs/runbooks/multi-provider-vision.md),
 [`docs/runbooks/sponsor-pools.md`](docs/runbooks/sponsor-pools.md).
+
+### Persuasive Tech (Fogg) — v1.1.5 conventions
+
+The v1.1.5 phase applied B.J. Fogg's *Persuasive Technology* chapter-by-chapter
+to existing surfaces. Two patterns are now load-bearing across the codebase:
+
+1. **`src/lib/algorithms.ts` is the single source of truth for ranked
+   surfaces.** Every place that ranks something (`community_observers`,
+   `explore_recent`, `explore_species_recent`, future feeds) registers
+   one `AlgorithmId` entry holding inputs/window/settings copy in EN+ES,
+   and renders a `<WhyAmISeeingThis algorithm="..." lang />` pill. The
+   pill opens a single global `WhyAmISeeingThisDialog` (mounted once in
+   `BaseLayout`, mirroring the `ReportDialog` pattern). **Do NOT add a
+   new ranked surface without registering an entry** — the four
+   principles documented at `/docs/algorithms/` ("no black box", "no
+   hidden profiling", "a lever for every input", "no engagement bait")
+   are part of the contract.
+
+2. **Theme is a four-state machine** (`light | dark | auto | field`),
+   not a boolean. The first-paint inline script in both `BaseLayout`
+   and `ConsoleLayout` resolves the stored value through `src/lib/theme.ts`
+   (`parseStoredTheme` → `resolveEffective` → `applyEffective`) before
+   any pixels paint. Field is layered **on top of `.dark`** (so any
+   `dark:*` Tailwind utility stays readable) plus a `<style is:global>`
+   block that crushes the palette to pure black/white. The two-state
+   header / footer / drawer / command-palette toggles must clear `.field`
+   on use so an explicit Light/Dark click escapes Field. Adding a 5th
+   state breaks the inline boot script's switch — extend, don't replace.
+
+3. **Honest-norms invariant.** Any UI that shows a peer comparison
+   (peer_norms bars, percentile cards, falta-dex region pool counts)
+   must hide when `n < 50` (`MIN_N_THRESHOLD`) and never raw-rank.
+   "Datos insuficientes" / "not enough data" is the v1 fallback — Fogg's
+   normative influence applied honestly, never as a default-flip. The
+   threshold lives in `src/lib/{peer-norms,percentile}.ts` so EN/ES
+   never disagree.
+
+4. **Photo praise is taxon-agnostic and EXIF-only.** `pickPraise(exif)`
+   in `src/lib/photo-praise.ts` runs at upload time when the cascade
+   hasn't seen the photo yet — so the praise is *technical* (sharp
+   action / good light / portrait aperture / long lens / balanced
+   exposure) and never aesthetic. Returns `null` when EXIF is missing
+   or when the photo doesn't meet any of the 5 thresholds (don't lie).
+
+Full per-PR context: `docs/progress.json` v1.1.5 phase + the per-PR
+runbooks (`docs/runbooks/falta-dex.md`, `docs/runbooks/contextual-suggestions.md`,
+`docs/runbooks/themes.md` once #769 lands).
 
 ---
 
