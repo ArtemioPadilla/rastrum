@@ -10104,6 +10104,14 @@ $$;
 -- Returns up to 10 species the viewer could find nearby that they
 -- haven't observed yet, ranked by nearby platform activity.
 -- ============================================================
+
+-- Supporting index: speeds up the correlated photo_url subquery inside
+-- suggest_nearby_species. Covers the common access pattern:
+-- media_files WHERE observation_id = X AND is_primary = true.
+CREATE INDEX IF NOT EXISTS idx_media_files_obs_primary
+  ON public.media_files(observation_id, is_primary)
+  WHERE is_primary = true;
+
 CREATE OR REPLACE FUNCTION public.suggest_nearby_species(
   p_user_id   uuid,
   p_lat       double precision,
@@ -10142,7 +10150,13 @@ RETURNS TABLE (
             ST_SetSRID(ST_MakePoint(p_lng, p_lat), 4326)::geography,
             p_radius_km * 1000
           )
-      AND EXTRACT(MONTH FROM o.observed_at) BETWEEN p_month - 1 AND p_month + 1
+      AND EXTRACT(MONTH FROM o.observed_at) = ANY(
+            ARRAY[
+              ((p_month - 2 + 12) % 12) + 1,
+              p_month,
+              (p_month % 12) + 1
+            ]
+          )
       AND i.taxon_id IS NOT NULL
       AND i.taxon_id NOT IN (SELECT taxon_id FROM user_observed)
     GROUP BY i.taxon_id
