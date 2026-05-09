@@ -124,24 +124,38 @@ const levels: Array<{ key: 'public' | 'signed_in' | 'private'; label: string }> 
         </button>
         <div id={`pm-section-body-${section.key}`} data-section-body class="px-4 pb-3 space-y-3">
           {section.rows.map(facet => (
-            <div data-facet-row={facet} class="flex items-start gap-3 sm:gap-4 py-2 border-t border-zinc-100 dark:border-zinc-800/60 first:border-t-0">
+            <div data-facet-row={facet} class="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4 py-2 border-t border-zinc-100 dark:border-zinc-800/60 first:border-t-0">
               <div class="flex-1 min-w-0">
                 <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{pm.facet[facet]?.label ?? facet}</p>
                 <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">{pm.facet[facet]?.description ?? ''}</p>
               </div>
-              <div role="radiogroup" aria-label={pm.facet[facet]?.label ?? facet} class="inline-flex rounded-lg border border-zinc-300 dark:border-zinc-700 overflow-hidden text-xs font-medium shrink-0">
-                {levels.map(level => (
-                  <button
-                    type="button"
-                    role="radio"
-                    aria-checked="false"
-                    data-facet={facet}
-                    data-level={level.key}
-                    class="px-2.5 py-1.5 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 border-r border-zinc-300 dark:border-zinc-700 last:border-r-0"
-                  >
-                    {level.label}
-                  </button>
-                ))}
+              <div class="shrink-0 flex flex-col items-start sm:items-end gap-1.5">
+                <div role="radiogroup" aria-label={pm.facet[facet]?.label ?? facet} class="inline-flex rounded-lg border border-zinc-300 dark:border-zinc-700 overflow-hidden text-xs font-medium">
+                  {levels.map(level => (
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked="false"
+                      data-facet={facet}
+                      data-level={level.key}
+                      class="px-2.5 py-1.5 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 border-r border-zinc-300 dark:border-zinc-700 last:border-r-0"
+                    >
+                      {level.label}
+                    </button>
+                  ))}
+                </div>
+                <ul
+                  class="flex flex-wrap gap-x-3 gap-y-1 text-xs"
+                  data-peer-norms-list
+                  data-scope={`privacy:${facet}`}
+                >
+                  {levels.map(level => (
+                    <li class="flex items-center gap-1.5" data-key={level.key}>
+                      <span class="text-zinc-500 dark:text-zinc-400">{level.label}</span>
+                      <span data-peer-norm-bar class="text-zinc-400 dark:text-zinc-500 italic">…</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             </div>
           ))}
@@ -177,6 +191,13 @@ const levels: Array<{ key: 'public' | 'signed_in' | 'private'; label: string }> 
     </form>
   </dialog>
 </section>
+
+<script
+  type="application/json"
+  id="rastrum-privacy-peer-norm-copy"
+  hidden
+  set:html={JSON.stringify((tr as unknown as { peer_norms: Record<string, string> }).peer_norms)}
+/>
 
 <script>
   import { getSupabase } from '../lib/supabase';
@@ -246,6 +267,62 @@ const levels: Array<{ key: 'public' | 'signed_in' | 'private'; label: string }> 
 
     bindAccordions(rootEl);
     bindBeforeUnloadFlush(rootEl, () => user.id);
+
+    // Best-effort peer-norm bars; non-blocking and silent on failure.
+    const country = await readUserCountry(supabase, user.id);
+    void hydratePeerNormBars(rootEl, country);
+  }
+
+  async function readUserCountry(
+    supabase: ReturnType<typeof getSupabase>,
+    userId: string,
+  ): Promise<string | null> {
+    try {
+      const { data } = await supabase
+        .from('users')
+        .select('country_code')
+        .eq('id', userId)
+        .maybeSingle<{ country_code: string | null }>();
+      const v = (data?.country_code ?? '').trim().toUpperCase();
+      return /^[A-Z]{2}$/.test(v) ? v : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function hydratePeerNormBars(rootEl: HTMLElement, country: string | null) {
+    const lists = rootEl.querySelectorAll<HTMLElement>('[data-peer-norms-list]');
+    if (!lists.length) return;
+    const { fetchPeerNorm, renderPeerNormHtml } = await import('../lib/peer-norms');
+    const isEs = rootEl.dataset.lang === 'es';
+    const copyJson = JSON.parse(
+      document.getElementById('rastrum-privacy-peer-norm-copy')?.textContent ?? '{}'
+    ) as { with_pct_country?: string; with_pct_global?: string; insufficient?: string };
+    const fallback = isEs
+      ? { with_pct_country: '{pct}% en {country}', with_pct_global: '{pct}% global', insufficient: 'datos insuficientes' }
+      : { with_pct_country: '{pct}% in {country}', with_pct_global: '{pct}% globally', insufficient: 'not enough data' };
+    const copy = {
+      withPct: (pct: string) => {
+        const tmpl = country
+          ? (copyJson.with_pct_country ?? fallback.with_pct_country)
+          : (copyJson.with_pct_global ?? fallback.with_pct_global);
+        return tmpl.replace('{pct}', pct).replace('{country}', country ?? '');
+      },
+      insufficient: copyJson.insufficient ?? fallback.insufficient,
+    };
+    await Promise.all(Array.from(lists).map(async list => {
+      const scope = list.dataset.scope as `license` | `privacy:${string}` | undefined;
+      if (!scope) return;
+      const items = list.querySelectorAll<HTMLElement>('li[data-key]');
+      await Promise.all(Array.from(items).map(async item => {
+        const key = item.dataset.key;
+        if (!key) return;
+        const slot = item.querySelector<HTMLElement>('[data-peer-norm-bar]');
+        if (!slot) return;
+        const result = await fetchPeerNorm(scope, country, key);
+        slot.innerHTML = renderPeerNormHtml(result, copy);
+      }));
+    }));
   }
 
   function paintMatrix(rootEl: HTMLElement, matrix: PrivacyMatrix) {

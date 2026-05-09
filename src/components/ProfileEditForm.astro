@@ -97,6 +97,25 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
           <option value="CC0">CC0</option>
         </select>
         <p class="mt-1 text-xs text-zinc-500">{tr.profile.license_hint}</p>
+        <ul
+          class="mt-2 space-y-1 text-xs"
+          aria-label={(tr as unknown as { peer_norms: { aria_label: string } }).peer_norms.aria_label}
+          data-peer-norms-list
+          data-scope="license"
+        >
+          <li class="flex items-center justify-between gap-3" data-key="CC BY 4.0">
+            <span class="text-zinc-600 dark:text-zinc-400">CC BY 4.0</span>
+            <span data-peer-norm-bar class="text-xs text-zinc-400 dark:text-zinc-500 italic">…</span>
+          </li>
+          <li class="flex items-center justify-between gap-3" data-key="CC BY-NC 4.0">
+            <span class="text-zinc-600 dark:text-zinc-400">CC BY-NC 4.0</span>
+            <span data-peer-norm-bar class="text-xs text-zinc-400 dark:text-zinc-500 italic">…</span>
+          </li>
+          <li class="flex items-center justify-between gap-3" data-key="CC0">
+            <span class="text-zinc-600 dark:text-zinc-400">CC0</span>
+            <span data-peer-norm-bar class="text-xs text-zinc-400 dark:text-zinc-500 italic">…</span>
+          </li>
+        </ul>
       </div>
     </div>
 
@@ -311,6 +330,12 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
 </div>
 
 <script type="application/json" id="rastrum-section-labels" hidden set:html={JSON.stringify(sectionLabels)} />
+<script
+  type="application/json"
+  id="rastrum-peer-norm-copy"
+  hidden
+  set:html={JSON.stringify((tr as unknown as { peer_norms: Record<string, string> }).peer_norms)}
+/>
 
 <script>
   import { getSupabase } from '../lib/supabase';
@@ -417,6 +442,7 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
     const countrySelect = form.elements.namedItem('country_code') as HTMLSelectElement | null;
     countrySelect?.addEventListener('change', () => {
       inferredBadge?.classList.add('hidden');
+      hydratePeerNormBars().catch(() => {});
     });
 
     syncCommunityVisibleEnabled(Boolean(profile.profile_public));
@@ -516,7 +542,62 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
     }
   });
 
-  load().catch(console.error);
+  load().then(() => hydratePeerNormBars().catch(() => {})).catch(console.error);
+
+  async function hydratePeerNormBars(): Promise<void> {
+    const lists = document.querySelectorAll<HTMLElement>('[data-peer-norms-list]');
+    if (!lists.length) return;
+    const { fetchPeerNorm, renderPeerNormHtml } = await import('../lib/peer-norms');
+    const isEs = document.documentElement.lang === 'es';
+    const country = readSelectedCountry();
+    const copy = peerNormCopy(isEs, country);
+    await Promise.all(Array.from(lists).map(async list => {
+      const scope = (list.dataset.scope ?? '') as `license` | `privacy:${string}`;
+      if (!scope) return;
+      const items = list.querySelectorAll<HTMLElement>('li[data-key]');
+      await Promise.all(Array.from(items).map(async item => {
+        const key = item.dataset.key;
+        if (!key) return;
+        const slot = item.querySelector<HTMLElement>('[data-peer-norm-bar]');
+        if (!slot) return;
+        const result = await fetchPeerNorm(scope, country, key);
+        slot.innerHTML = renderPeerNormHtml(result, copy);
+      }));
+    }));
+  }
+
+  function readSelectedCountry(): string | null {
+    const select = document.querySelector<HTMLSelectElement>('select[name="country_code"]');
+    const v = (select?.value ?? '').trim().toUpperCase();
+    return /^[A-Z]{2}$/.test(v) ? v : null;
+  }
+
+  function peerNormCopy(isEs: boolean, country: string | null) {
+    type PeerNormI18n = {
+      peer_norms: {
+        with_pct_country: string;
+        with_pct_global: string;
+        insufficient: string;
+      };
+    };
+    const labels = JSON.parse(
+      document.getElementById('rastrum-peer-norm-copy')?.textContent ?? '{}'
+    ) as Partial<PeerNormI18n['peer_norms']> & { country_label?: string };
+    const fallback = isEs
+      ? { with_pct_country: '{pct}% en {country}', with_pct_global: '{pct}% global', insufficient: 'datos insuficientes' }
+      : { with_pct_country: '{pct}% in {country}', with_pct_global: '{pct}% globally', insufficient: 'not enough data' };
+    return {
+      withPct: (pct: string) => {
+        const tmpl = country
+          ? (labels.with_pct_country ?? fallback.with_pct_country)
+          : (labels.with_pct_global ?? fallback.with_pct_global);
+        return tmpl
+          .replace('{pct}', pct)
+          .replace('{country}', country ?? '');
+      },
+      insufficient: labels.insufficient ?? fallback.insufficient,
+    };
+  }
 
   // ── Security: passkey + sign-out-everywhere ──
   const passkeyBtn  = document.getElementById('passkey-btn') as HTMLButtonElement | null;

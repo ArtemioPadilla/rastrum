@@ -46,6 +46,23 @@ The license does **not** extend to:
 - Taxonomic backbone data (GBIF / POWO / IOC — carry their own licenses).
 - Environmental enrichment (OpenMeteo, NDVI — carry their own terms).
 
+### Peer norms at the moment of choice (#745)
+
+The license selector on `/profile/preferences` (and, when shipped, the
+per-observation `license-per-record-ui`) renders a small bar next to each
+option showing the percentage of fellow observers in the user's country who
+chose that license — e.g. *"82% of MX observers choose this"*.
+
+The numbers come from the `license_norm` materialised view, refreshed every
+Monday at 06:00 UTC by the `refresh-norms-weekly` pg_cron job. The lookup
+is a single-row `peer_norm_pct(scope, country, key)` SQL function (SECURITY
+INVOKER, granted to anon + authenticated). Per the principle of normative
+influence (Fogg, *Persuasive Technology* ch. 8), this is **informational
+only** — the default option does not change, and we hide the bar entirely
+when the country denominator falls below 50 observations to avoid noisy
+norms. Same pattern is reused on the M25 privacy matrix (`privacy_norm`
+view).
+
 ---
 
 ## ML Training Gates (v2.0 regional pipeline)

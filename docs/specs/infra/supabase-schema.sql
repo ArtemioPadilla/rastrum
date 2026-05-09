@@ -9413,3 +9413,121 @@ $$;
 REVOKE ALL ON FUNCTION public.compute_user_impact(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.compute_user_impact(uuid)
   TO authenticated, service_role;
+-- M07 / #745 — Peer norms for license + privacy choice
+-- =====================================================================
+-- Two materialised views aggregate community-wide choices:
+--   - license_norm:  per (country, license) observation count
+--   - privacy_norm:  per (country, facet, visibility) observer count
+-- A SECURITY INVOKER lookup (peer_norm_pct) returns the percentage for a
+-- given (scope, country, key). The UI renders a small bar next to each
+-- option using "X% de observadores en MX eligen esto" copy. Refreshed
+-- weekly (Mondays 06:00 UTC) — these counts move slowly and a fresh
+-- read every page-load would burn quota for cold-cache benefits.
+--
+-- Honesty rules:
+--   * Anonymous observers and private profiles still count for license_norm
+--     (the license sits on the observation, not the user surface).
+--   * privacy_norm counts only observers whose `profile_privacy` is set
+--     (i.e. anyone with a row in users) — opting out of leaderboards does
+--     NOT remove you from the denominator (see below — observer counts).
+--   * The bar should be hidden when n < 50 (UI gate, not a SQL gate; the
+--     view still ships the count so the client decides).
+
+CREATE MATERIALIZED VIEW IF NOT EXISTS public.license_norm AS
+SELECT
+  COALESCE(u.country_code, 'XX') AS country_code,
+  COALESCE(o.license, u.observer_license) AS license,
+  COUNT(*)::bigint AS n
+FROM public.observations o
+JOIN public.users u ON u.id = o.observer_id
+WHERE o.sync_status = 'synced'
+GROUP BY 1, 2;
+
+CREATE UNIQUE INDEX IF NOT EXISTS license_norm_unique
+  ON public.license_norm (country_code, license);
+
+GRANT SELECT ON public.license_norm TO anon, authenticated;
+
+-- privacy_norm: pivot the profile_privacy jsonb into (facet, visibility)
+-- pairs. Each user contributes one row per facet. Facets we don't recognise
+-- still flow through (forward-compat for new facets shipped before a
+-- migration).
+CREATE MATERIALIZED VIEW IF NOT EXISTS public.privacy_norm AS
+SELECT
+  COALESCE(u.country_code, 'XX')   AS country_code,
+  pf.key                            AS facet,
+  pf.value #>> '{}'                 AS visibility,
+  COUNT(*)::bigint                  AS n
+FROM public.users u,
+     LATERAL jsonb_each(u.profile_privacy) AS pf(key, value)
+WHERE u.profile_privacy IS NOT NULL
+GROUP BY 1, 2, 3;
+
+CREATE UNIQUE INDEX IF NOT EXISTS privacy_norm_unique
+  ON public.privacy_norm (country_code, facet, visibility);
+
+GRANT SELECT ON public.privacy_norm TO anon, authenticated;
+
+-- peer_norm_pct(scope, country, key): single-row helper the UI hits per
+-- option. Returns a row with both pct (0-100) and n so the client can
+-- decide whether to render the bar (n >= 50) or fall back to copy.
+--
+-- scope must be 'license' or 'privacy:<facet>' (e.g. 'privacy:profile').
+-- country is an ISO-3166 alpha-2 (e.g. 'MX'); pass NULL to mean "global"
+-- (sum all rows). key is the option being asked about (license string or
+-- visibility level).
+CREATE OR REPLACE FUNCTION public.peer_norm_pct(
+  p_scope   text,
+  p_country text,
+  p_key     text
+)
+RETURNS TABLE (pct numeric, n bigint, total bigint)
+LANGUAGE plpgsql
+STABLE
+SECURITY INVOKER
+AS $$
+DECLARE
+  v_country text := upper(NULLIF(trim(p_country), ''));
+  v_facet   text;
+  v_n       bigint := 0;
+  v_total   bigint := 0;
+BEGIN
+  IF p_scope = 'license' THEN
+    SELECT COALESCE(SUM(n) FILTER (WHERE license = p_key), 0),
+           COALESCE(SUM(n), 0)
+      INTO v_n, v_total
+      FROM public.license_norm
+     WHERE v_country IS NULL OR country_code = v_country;
+  ELSIF p_scope LIKE 'privacy:%' THEN
+    v_facet := substr(p_scope, 9);
+    SELECT COALESCE(SUM(n) FILTER (WHERE visibility = p_key), 0),
+           COALESCE(SUM(n), 0)
+      INTO v_n, v_total
+      FROM public.privacy_norm
+     WHERE facet = v_facet
+       AND (v_country IS NULL OR country_code = v_country);
+  ELSE
+    RETURN QUERY SELECT 0::numeric, 0::bigint, 0::bigint;
+    RETURN;
+  END IF;
+
+  IF v_total = 0 THEN
+    RETURN QUERY SELECT 0::numeric, 0::bigint, 0::bigint;
+  ELSE
+    RETURN QUERY SELECT
+      ROUND((v_n::numeric / v_total::numeric) * 100, 1),
+      v_n,
+      v_total;
+  END IF;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.peer_norm_pct(text, text, text)
+  TO anon, authenticated;
+
+-- Weekly refresh (Mondays 06:00 UTC). Idempotent — unschedule first.
+SELECT cron.unschedule('refresh-norms-weekly')
+  WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'refresh-norms-weekly');
+SELECT cron.schedule('refresh-norms-weekly', '0 6 * * 1',
+  $$REFRESH MATERIALIZED VIEW public.license_norm;
+    REFRESH MATERIALIZED VIEW public.privacy_norm;$$);
