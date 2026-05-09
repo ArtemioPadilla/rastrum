@@ -8,6 +8,7 @@ interface Props {
 const { lang } = Astro.props;
 const tr = t(lang);
 const widgets = tr.home.widgets;
+const suggestions = widgets.suggestions;
 const recentHref = lang === 'es' ? '/es/explorar/recientes/' : '/en/explore/recent/';
 ---
 
@@ -43,6 +44,32 @@ const recentHref = lang === 'es' ? '/es/explorar/recientes/' : '/en/explore/rece
     </span>
   </div>
 
+  <!-- #710 Suggestions widget (signed-in users with location only) -->
+  <div
+    class="home-widgets-suggestions hidden"
+    data-label-heading={suggestions.heading}
+    data-label-subtitle={suggestions.subtitle}
+    data-label-nearby-count-one={suggestions.nearby_count_one}
+    data-label-nearby-count-other={suggestions.nearby_count_other}
+    data-label-refresh={suggestions.refresh}
+    data-label-dismiss-aria={suggestions.dismiss_aria}
+    data-label-no-location={suggestions.no_location}
+    data-label-loading={suggestions.loading}
+    data-label-empty={suggestions.empty}
+  >
+    <div class="flex items-baseline justify-between gap-3 mb-3">
+      <h2 class="text-sm font-semibold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">{suggestions.heading}</h2>
+      <button
+        type="button"
+        class="hw-suggestions-refresh text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:underline"
+      >{suggestions.refresh}</button>
+    </div>
+    <p class="hw-suggestions-subtitle text-xs text-zinc-500 dark:text-zinc-400 mb-3"></p>
+    <p class="hw-suggestions-loading text-sm text-zinc-500 dark:text-zinc-400">{suggestions.loading}</p>
+    <p class="hw-suggestions-empty hidden text-sm text-zinc-500 dark:text-zinc-400">{suggestions.empty}</p>
+    <ul class="hw-suggestions-list grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3"></ul>
+  </div>
+
   <div class="home-widgets-nearby">
     <div class="flex items-baseline justify-between gap-3 mb-3">
       <h2 class="hw-nearby-title text-sm font-semibold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">{widgets.nearby_title_local}</h2>
@@ -61,6 +88,7 @@ const recentHref = lang === 'es' ? '/es/explorar/recientes/' : '/en/explore/rece
   import { getSupabase } from '../lib/supabase';
   import { buildGreeting } from '../lib/home-greeting';
   import { formatTimeAgo } from '../lib/social';
+  import { fetchSuggestions, type SpeciesSuggestion } from '../lib/suggestions';
 
   type Lang = 'en' | 'es';
 
@@ -159,6 +187,158 @@ const recentHref = lang === 'es' ? '/es/explorar/recientes/' : '/en/explore/rece
     return name ? `${localized}, ${name}` : localized;
   }
 
+  // ── Suggestions (issue #710) ─────────────────────────────────────────────
+
+  const DISMISSED_KEY = 'rastrum.suggestions.dismissed';
+
+  function getDismissed(): Set<string> {
+    try {
+      const raw = sessionStorage.getItem(DISMISSED_KEY);
+      return raw ? new Set<string>(JSON.parse(raw)) : new Set<string>();
+    } catch {
+      return new Set<string>();
+    }
+  }
+
+  function saveDismissed(set: Set<string>): void {
+    try {
+      sessionStorage.setItem(DISMISSED_KEY, JSON.stringify([...set]));
+    } catch { /* quota exceeded — ignore */ }
+  }
+
+  function suggestionCard(s: SpeciesSuggestion, lang: Lang, sugRoot: HTMLElement): string {
+    const dismissed = getDismissed();
+    if (dismissed.has(s.taxon_id)) return '';
+
+    const countTpl = s.nearby_count === 1
+      ? (sugRoot.dataset.labelNearbyCountOne ?? '{{count}} nearby observation')
+      : (sugRoot.dataset.labelNearbyCountOther ?? '{{count}} nearby observations');
+    const countLabel = countTpl.replace('{{count}}', String(s.nearby_count));
+
+    const dismissTpl = sugRoot.dataset.labelDismissAria ?? 'Not interested in {{name}}';
+    const dismissLabel = dismissTpl.replace('{{name}}', s.scientific_name);
+
+    const common = lang === 'es'
+      ? (s.common_name_es ?? s.common_name_en ?? '')
+      : (s.common_name_en ?? s.common_name_es ?? '');
+
+    const commonHtml = common
+      ? `<p class="text-xs text-zinc-600 dark:text-zinc-300 truncate">${escapeText(common)}</p>`
+      : '';
+
+    const imgHtml = s.photo_url
+      ? `<img src="${escapeText(s.photo_url)}" alt="${escapeText(s.scientific_name)}" loading="lazy" class="w-full h-full object-cover" />`
+      : '';
+
+    return `<li data-taxon-id="${escapeText(s.taxon_id)}">
+      <div class="relative overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 group">
+        <div class="aspect-square w-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+          ${imgHtml}
+        </div>
+        <div class="p-2.5">
+          <p class="text-xs italic font-semibold text-zinc-900 dark:text-zinc-100 truncate">${escapeText(s.scientific_name)}</p>
+          ${commonHtml}
+          <p class="text-[11px] text-emerald-700 dark:text-emerald-400 mt-1">${escapeText(countLabel)}</p>
+        </div>
+        <button
+          type="button"
+          data-dismiss="${escapeText(s.taxon_id)}"
+          aria-label="${escapeText(dismissLabel)}"
+          class="absolute top-1.5 right-1.5 rounded-full p-1 text-zinc-400 dark:text-zinc-500 bg-white/80 dark:bg-zinc-900/80 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity hover:text-zinc-700 dark:hover:text-zinc-200"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4" aria-hidden="true">
+            <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+          </svg>
+        </button>
+      </div>
+    </li>`;
+  }
+
+  function monthName(lang: Lang): string {
+    return new Date().toLocaleString(lang === 'es' ? 'es-MX' : 'en-US', { month: 'long' });
+  }
+
+  async function paintSuggestions(
+    root: HTMLElement,
+    lang: Lang,
+    userId: string,
+    seed: number
+  ): Promise<void> {
+    const sugRoot = root.querySelector<HTMLElement>('.home-widgets-suggestions');
+    if (!sugRoot) return;
+
+    const listEl = sugRoot.querySelector<HTMLUListElement>('.hw-suggestions-list');
+    const loadingEl = sugRoot.querySelector<HTMLElement>('.hw-suggestions-loading');
+    const emptyEl = sugRoot.querySelector<HTMLElement>('.hw-suggestions-empty');
+    const subtitleEl = sugRoot.querySelector<HTMLElement>('.hw-suggestions-subtitle');
+    if (!listEl) return;
+
+    // Update subtitle month name
+    if (subtitleEl) {
+      const tpl = sugRoot.dataset.labelSubtitle ?? '';
+      subtitleEl.textContent = tpl.replace('{{month}}', monthName(lang));
+    }
+
+    loadingEl?.classList.remove('hidden');
+    emptyEl?.classList.add('hidden');
+    listEl.innerHTML = '';
+
+    // Request geolocation
+    let lat: number, lng: number;
+    try {
+      const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          timeout: 8000,
+          maximumAge: 5 * 60 * 1000, // 5 min cache
+        });
+      });
+      lat = pos.coords.latitude;
+      lng = pos.coords.longitude;
+    } catch {
+      // Permission denied or unavailable — keep widget hidden
+      loadingEl?.classList.add('hidden');
+      return;
+    }
+
+    try {
+      // seed param forces a different result set on refresh (use limit oversample trick)
+      const limit = 10 + (seed % 5); // vary limit slightly to get different rows
+      const all = await fetchSuggestions(userId, lat, lng, { limit });
+      const dismissed = getDismissed();
+      const filtered = all.filter(s => !dismissed.has(s.taxon_id)).slice(0, 5);
+
+      loadingEl?.classList.add('hidden');
+
+      if (filtered.length === 0) {
+        emptyEl?.classList.remove('hidden');
+        return;
+      }
+
+      listEl.innerHTML = filtered.map(s => suggestionCard(s, lang, sugRoot)).join('');
+      sugRoot.classList.remove('hidden');
+
+      // Wire up dismiss buttons
+      listEl.querySelectorAll<HTMLButtonElement>('button[data-dismiss]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const taxonId = btn.dataset.dismiss ?? '';
+          const dismissed = getDismissed();
+          dismissed.add(taxonId);
+          saveDismissed(dismissed);
+          const li = btn.closest('li');
+          if (li) li.remove();
+          if (listEl.children.length === 0) {
+            emptyEl?.classList.remove('hidden');
+          }
+        });
+      });
+    } catch {
+      loadingEl?.classList.add('hidden');
+      emptyEl?.classList.remove('hidden');
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+
   async function init() {
     const root = document.querySelector<HTMLElement>('.home-widgets');
     if (!root) return;
@@ -227,6 +407,19 @@ const recentHref = lang === 'es' ? '/es/explorar/recientes/' : '/en/explore/rece
     }
 
     await paintNearby(root, lang, country, profile?.region_primary ?? null);
+
+    // Fire suggestions widget (no await — it runs in parallel via geolocation)
+    let suggestionSeed = 0;
+    paintSuggestions(root, lang, user.id, suggestionSeed).catch(() => {/* optional widget */});
+
+    // Wire up the Refresh button
+    const sugRoot = root.querySelector<HTMLElement>('.home-widgets-suggestions');
+    sugRoot?.querySelector<HTMLButtonElement>('.hw-suggestions-refresh')?.addEventListener('click', () => {
+      suggestionSeed = (suggestionSeed + 1) % 100;
+      // Clear dismissed on refresh
+      try { sessionStorage.removeItem(DISMISSED_KEY); } catch { /* ignore */ }
+      paintSuggestions(root, lang, user.id, suggestionSeed).catch(() => {/* optional */});
+    });
   }
 
   async function paintNearby(root: HTMLElement, lang: Lang, country: string | null, _region: string | null): Promise<void> {
