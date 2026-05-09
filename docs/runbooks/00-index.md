@@ -47,6 +47,7 @@ high-level system view.
 |---|---|
 | [`add-identifier.md`](add-identifier.md) | Three-step recipe to add a new model / service to the cascade. |
 | [`on-device-vision-fallback.md`](on-device-vision-fallback.md) | Phi (MLC) + Gemma (transformers.js) dual-runtime resilience story; opt-in flags; what to do when one crashes. |
+| [`contextual-suggestions.md`](contextual-suggestions.md) | Issue #723 — `probable_taxa_at()` RPC + chip strip on `/observe`. |
 
 ## Karma + reputation (Module 23)
 

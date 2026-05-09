@@ -1,0 +1,361 @@
+---
+/**
+ * Contextual species chip strip — issue #723.
+ *
+ * Surfaces 5–10 species likely to be encountered at the user's current
+ * location + month, fetched from `probable_taxa_at()`. Tap → pre-fills
+ * the manual ID input (via the `targetInputId` prop). Honest copy: the
+ * suggestions are derived from community observation density, not a
+ * curated baseline (Option A, mirroring falta-dex).
+ *
+ * Hydration model:
+ *   - Hidden by default; reveals once `rastrum:observe-location-ready`
+ *     fires (or after a successful navigator.geolocation read).
+ *   - Anonymous + signed-in alike — the RPC is anon-friendly. The
+ *     "you don't have this in your dex yet" badge only shows for
+ *     signed-in users (the RPC returns NULL for anon).
+ *   - Falls back silently when the RPC returns no rows or errors.
+ */
+import { t } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+  /** id of the <input> that should receive the picked taxon name */
+  targetInputId?: string;
+}
+
+const { lang, targetInputId = 'obs2-taxon-input' } = Astro.props;
+const tr = t(lang);
+const isEs = lang === 'es';
+const observeStr = tr.observe as Record<string, unknown>;
+const ctx = (observeStr.contextual ?? {}) as {
+  heading?: string;
+  caveat?: string;
+  loading?: string;
+  empty?: string;
+  not_in_dex?: string;
+  use_label?: string;
+  refresh?: string;
+};
+const headingText = ctx.heading ?? (isEs ? 'Probables aquí' : 'Probable here');
+const caveatText = ctx.caveat ?? (isEs
+  ? 'Estimación basada en observaciones de la comunidad. La precisión mejora con más datos.'
+  : 'Estimate based on community observations. Accuracy improves with more data.');
+const loadingText = ctx.loading ?? (isEs ? 'Buscando especies cercanas…' : 'Looking up nearby species…');
+const emptyText = ctx.empty ?? (isEs
+  ? 'Aún no hay suficientes datos cerca para sugerir especies.'
+  : 'Not enough data nearby yet to suggest species.');
+const notInDexText = ctx.not_in_dex ?? (isEs ? 'aún no en tu dex' : 'not in your dex yet');
+const useLabel = ctx.use_label ?? (isEs ? 'Usar como identificación' : 'Use as identification');
+---
+
+<section
+  id="obs2-contextual-chips"
+  class="hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/40 p-4 space-y-3"
+  data-lang={lang}
+  data-target-input={targetInputId}
+  aria-label={headingText}
+>
+  <div class="flex items-start justify-between gap-3">
+    <div class="space-y-0.5">
+      <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+        {headingText}
+      </h2>
+      <p class="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+        {caveatText}
+      </p>
+    </div>
+  </div>
+
+  <div id="obs2-contextual-status" class="text-xs text-zinc-400 dark:text-zinc-500">
+    {loadingText}
+  </div>
+
+  <ul
+    id="obs2-contextual-list"
+    role="list"
+    class="hidden grid grid-cols-2 sm:grid-cols-3 gap-2"
+  >
+    <!-- Cards rendered by client script -->
+  </ul>
+
+  <div id="obs2-contextual-empty" class="hidden text-xs text-zinc-500 dark:text-zinc-400">
+    {emptyText}
+  </div>
+</section>
+
+<style>
+  #obs2-contextual-list .ctx-chip {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.5rem;
+    border: 1px solid rgb(228 228 231);
+    border-radius: 0.75rem;
+    background: rgb(255 255 255);
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.12s, border-color 0.12s, transform 0.05s;
+  }
+  .dark #obs2-contextual-list .ctx-chip {
+    border-color: rgb(63 63 70);
+    background: rgb(24 24 27 / 0.6);
+  }
+  #obs2-contextual-list .ctx-chip:hover {
+    border-color: rgb(16 185 129);
+    background: rgb(236 253 245);
+  }
+  .dark #obs2-contextual-list .ctx-chip:hover {
+    border-color: rgb(16 185 129);
+    background: rgb(6 78 59 / 0.35);
+  }
+  #obs2-contextual-list .ctx-chip:active { transform: scale(0.98); }
+  .ctx-chip-thumb {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    border-radius: 0.5rem;
+    object-fit: cover;
+    background: rgb(244 244 245);
+  }
+  .dark .ctx-chip-thumb { background: rgb(39 39 42); }
+  .ctx-chip-thumb-fallback {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    border-radius: 0.5rem;
+    background: linear-gradient(135deg, rgb(209 250 229), rgb(167 243 208));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+  }
+  .dark .ctx-chip-thumb-fallback {
+    background: linear-gradient(135deg, rgb(6 78 59 / 0.6), rgb(4 47 46 / 0.6));
+  }
+  .ctx-chip-sci {
+    font-style: italic;
+    font-size: 0.75rem;
+    color: rgb(24 24 27);
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+  }
+  .dark .ctx-chip-sci { color: rgb(228 228 231); }
+  .ctx-chip-common {
+    font-size: 0.75rem;
+    color: rgb(82 82 91);
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+  }
+  .dark .ctx-chip-common { color: rgb(161 161 170); }
+  .ctx-chip-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex-wrap: wrap;
+  }
+  .ctx-chip-pill {
+    font-size: 0.625rem;
+    padding: 0.05rem 0.35rem;
+    border-radius: 9999px;
+    background: rgb(228 228 231);
+    color: rgb(82 82 91);
+    white-space: nowrap;
+  }
+  .dark .ctx-chip-pill { background: rgb(63 63 70); color: rgb(161 161 170); }
+  .ctx-chip-pill-missing {
+    background: rgb(254 243 199);
+    color: rgb(146 64 14);
+  }
+  .dark .ctx-chip-pill-missing {
+    background: rgb(120 53 15 / 0.4);
+    color: rgb(252 211 77);
+  }
+</style>
+
+<script>
+  import { fetchProbableTaxa, pickCommonName, formatDistancePill, suggestCacheKey } from '../lib/contextual-suggest';
+  import type { ProbableTaxon } from '../lib/contextual-suggest';
+
+  const root = document.getElementById('obs2-contextual-chips');
+  if (root) initChips(root);
+
+  function initChips(container: HTMLElement) {
+    const lang = (container.dataset.lang ?? 'es') as 'en' | 'es';
+    const targetInputId = container.dataset.targetInput ?? 'obs2-taxon-input';
+    const statusEl = container.querySelector<HTMLElement>('#obs2-contextual-status');
+    const listEl = container.querySelector<HTMLUListElement>('#obs2-contextual-list');
+    const emptyEl = container.querySelector<HTMLElement>('#obs2-contextual-empty');
+    if (!statusEl || !listEl || !emptyEl) return;
+
+    let loaded = false;
+
+    // Wait for an explicit GPS event from the form, OR fall back to
+    // navigator.geolocation if no event arrives within a short window
+    // (covers the case where the user uses the map picker rather than
+    // accepting GPS).
+    const gpsListener = (e: Event) => {
+      const ev = e as CustomEvent<{ lat: number; lng: number }>;
+      const { lat, lng } = ev.detail ?? { lat: 0, lng: 0 };
+      load(lat, lng);
+    };
+    window.addEventListener('rastrum:observe-location-ready', gpsListener as EventListener, { once: true });
+
+    // Soft fallback — if no event in 12 s, try geolocation directly so
+    // users who view the page but don't drop a file still see chips.
+    const fallbackTimer = setTimeout(() => {
+      if (loaded) return;
+      if (typeof navigator === 'undefined' || !navigator.geolocation) return;
+      navigator.geolocation.getCurrentPosition(
+        (pos) => load(pos.coords.latitude, pos.coords.longitude),
+        () => { /* permission denied / unavailable — stay hidden */ },
+        { enableHighAccuracy: false, timeout: 8000, maximumAge: 600_000 },
+      );
+    }, 12000);
+
+    async function load(lat: number, lng: number) {
+      if (loaded) return;
+      loaded = true;
+      clearTimeout(fallbackTimer);
+
+      // Reveal container so the user sees the loading state, even if
+      // the RPC is slow.
+      container.classList.remove('hidden');
+
+      const month = new Date().getMonth() + 1;
+
+      // sessionStorage cache to avoid re-querying within a single visit.
+      let rows: ProbableTaxon[] | null = null;
+      try {
+        const key = suggestCacheKey({ lat, lng, month });
+        const cached = sessionStorage.getItem(key);
+        if (cached) {
+          const parsed = JSON.parse(cached) as ProbableTaxon[];
+          if (Array.isArray(parsed)) rows = parsed;
+        }
+      } catch { /* sessionStorage unavailable; ignore */ }
+
+      if (!rows) {
+        rows = await fetchProbableTaxa({ lat, lng, month, limit: 10 });
+        try {
+          const key = suggestCacheKey({ lat, lng, month });
+          sessionStorage.setItem(key, JSON.stringify(rows));
+        } catch { /* quota exceeded; ignore */ }
+      }
+
+      statusEl.classList.add('hidden');
+      if (rows.length === 0) {
+        emptyEl.classList.remove('hidden');
+        return;
+      }
+
+      renderChips(rows);
+    }
+
+    function renderChips(rows: ProbableTaxon[]) {
+      listEl!.classList.remove('hidden');
+      listEl!.innerHTML = '';
+
+      const notInDexLabel = lang === 'es' ? 'aún no en tu dex' : 'not in your dex yet';
+      const useLabelTpl = lang === 'es' ? 'Usar {name} como identificación' : 'Use {name} as identification';
+
+      for (const r of rows) {
+        const li = document.createElement('li');
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'ctx-chip';
+        const commonName = pickCommonName(r, lang);
+        button.setAttribute('aria-label', useLabelTpl.replace('{name}', r.scientific_name));
+        button.dataset.taxonId = r.taxon_id;
+        button.dataset.scientificName = r.scientific_name;
+
+        if (r.thumbnail_url) {
+          const img = document.createElement('img');
+          img.className = 'ctx-chip-thumb';
+          img.src = r.thumbnail_url;
+          img.alt = '';
+          img.loading = 'lazy';
+          img.decoding = 'async';
+          // Fall back to placeholder if image errors
+          img.addEventListener('error', () => {
+            const fb = document.createElement('div');
+            fb.className = 'ctx-chip-thumb-fallback';
+            fb.textContent = '🌿';
+            fb.setAttribute('aria-hidden', 'true');
+            img.replaceWith(fb);
+          }, { once: true });
+          button.appendChild(img);
+        } else {
+          const fb = document.createElement('div');
+          fb.className = 'ctx-chip-thumb-fallback';
+          fb.textContent = '🌿';
+          fb.setAttribute('aria-hidden', 'true');
+          button.appendChild(fb);
+        }
+
+        const sci = document.createElement('span');
+        sci.className = 'ctx-chip-sci';
+        sci.textContent = r.scientific_name;
+        button.appendChild(sci);
+
+        if (commonName && commonName !== r.scientific_name) {
+          const com = document.createElement('span');
+          com.className = 'ctx-chip-common';
+          com.textContent = commonName;
+          button.appendChild(com);
+        }
+
+        const meta = document.createElement('div');
+        meta.className = 'ctx-chip-meta';
+
+        const distLabel = formatDistancePill(r.last_seen_distance_km, lang);
+        if (distLabel) {
+          const pill = document.createElement('span');
+          pill.className = 'ctx-chip-pill';
+          pill.textContent = distLabel;
+          meta.appendChild(pill);
+        }
+
+        if (r.has_observed_by_viewer === false) {
+          const pill = document.createElement('span');
+          pill.className = 'ctx-chip-pill ctx-chip-pill-missing';
+          pill.textContent = notInDexLabel;
+          meta.appendChild(pill);
+        }
+
+        if (meta.children.length > 0) button.appendChild(meta);
+
+        button.addEventListener('click', () => onPick(r));
+        li.appendChild(button);
+        listEl!.appendChild(li);
+      }
+    }
+
+    function onPick(r: ProbableTaxon) {
+      const input = document.getElementById(targetInputId) as HTMLInputElement | null;
+      if (!input) return;
+      input.value = r.scientific_name;
+      input.dataset.idSource = 'manual';
+      input.dataset.taxonId = r.taxon_id;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+      input.focus({ preventScroll: true });
+
+      // Visual confirmation: dim the rest, highlight picked.
+      listEl!.querySelectorAll<HTMLElement>('.ctx-chip').forEach((el) => {
+        el.classList.toggle('ring-2', el.dataset.taxonId === r.taxon_id);
+        el.classList.toggle('ring-emerald-500', el.dataset.taxonId === r.taxon_id);
+      });
+
+      // Notify any other listeners (analytics, identify mode, etc).
+      document.dispatchEvent(new CustomEvent('rastrum:contextual-pick', {
+        detail: { taxon_id: r.taxon_id, scientific_name: r.scientific_name },
+      }));
+    }
+  }
+</script>

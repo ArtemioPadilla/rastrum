@@ -8738,3 +8738,123 @@ $$;
 REVOKE ALL ON FUNCTION public.region_species_pool_size(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.region_species_pool_size(text)
   TO anon, authenticated;
+
+-- =====================================================================
+-- M01 contextual species suggestions (issue #723)
+--
+-- "What is likely here right now?" — given a lat/lng + month, returns
+-- the top-N taxa observed within ~50 km whose primary identifications
+-- fall in the same month-window (±1 month, wrapping). Mirrors the
+-- falta-dex Option A approach: Rastrum's own observations as proxy
+-- for a baseline. v1.1 follow-up can swap in a curated GBIF baseline.
+--
+-- Privacy: SECURITY INVOKER — RLS on `observations` + `identifications`
+-- gates rows. Anonymous callers see public observations only; authed
+-- callers additionally see their own private rows (which is fine for a
+-- "probable here" suggestion list).
+--
+-- The `has_observed_by_viewer` column is auth.uid()-aware: NULL for
+-- anonymous callers, true/false for authenticated callers based on
+-- whether they themselves have a primary ID for that taxon.
+-- =====================================================================
+CREATE OR REPLACE FUNCTION public.probable_taxa_at(
+  p_lat   numeric,
+  p_lng   numeric,
+  p_month int,
+  p_limit int DEFAULT 10
+)
+RETURNS TABLE (
+  taxon_id               uuid,
+  scientific_name        text,
+  common_name_es         text,
+  common_name_en         text,
+  slug                   text,
+  thumbnail_url          text,
+  n_obs                  int,
+  last_seen_distance_km  numeric,
+  has_observed_by_viewer boolean
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY INVOKER
+SET search_path = public
+AS $$
+DECLARE
+  v_point   geography;
+  v_viewer  uuid;
+  v_months  int[];
+BEGIN
+  IF p_lat IS NULL OR p_lng IS NULL OR p_month IS NULL THEN
+    RETURN;
+  END IF;
+  IF p_lat < -90 OR p_lat > 90 OR p_lng < -180 OR p_lng > 180 THEN
+    RETURN;
+  END IF;
+  IF p_month < 1 OR p_month > 12 THEN
+    RETURN;
+  END IF;
+
+  IF p_limit IS NULL OR p_limit <= 0 THEN
+    p_limit := 10;
+  ELSIF p_limit > 50 THEN
+    p_limit := 50;
+  END IF;
+
+  v_point  := ST_SetSRID(ST_MakePoint(p_lng, p_lat), 4326)::geography;
+  v_viewer := auth.uid();
+
+  -- Wrap month window (±1) at year boundaries: month 1 → {12,1,2}.
+  v_months := ARRAY[
+    ((p_month - 2 + 12) % 12) + 1,
+    p_month,
+    (p_month % 12) + 1
+  ]::int[];
+
+  RETURN QUERY
+  WITH nearby AS (
+    SELECT
+      i.taxon_id,
+      ST_Distance(o.location, v_point) AS distance_m,
+      o.observer_id
+    FROM public.observations o
+    JOIN public.identifications i
+      ON i.observation_id = o.id AND i.is_primary = true
+    WHERE o.location IS NOT NULL
+      AND i.taxon_id IS NOT NULL
+      AND ST_DWithin(o.location, v_point, 50000)
+      AND EXTRACT(MONTH FROM o.observed_at AT TIME ZONE 'UTC')::int = ANY(v_months)
+      AND (i.is_research_grade = true OR o.primary_taxon_id IS NOT NULL)
+  ),
+  ranked AS (
+    SELECT
+      n.taxon_id,
+      COUNT(*)::int                  AS n_obs,
+      MIN(n.distance_m) / 1000.0     AS last_seen_distance_km,
+      bool_or(n.observer_id = v_viewer) AS observed_by_viewer
+    FROM nearby n
+    GROUP BY n.taxon_id
+    ORDER BY COUNT(*) DESC, MIN(n.distance_m) ASC
+    LIMIT p_limit
+  )
+  SELECT
+    t.id                        AS taxon_id,
+    t.scientific_name,
+    t.common_name_es,
+    t.common_name_en,
+    t.slug,
+    th.thumbnail_url,
+    r.n_obs,
+    ROUND(r.last_seen_distance_km::numeric, 1) AS last_seen_distance_km,
+    CASE WHEN v_viewer IS NULL THEN NULL ELSE COALESCE(r.observed_by_viewer, false) END
+                                AS has_observed_by_viewer
+  FROM ranked r
+  JOIN public.taxa t   ON t.id = r.taxon_id
+  LEFT JOIN public.taxa_thumbnails th ON th.taxon_id = t.id
+  WHERE t.taxon_rank = 'species'
+  ORDER BY r.n_obs DESC, r.last_seen_distance_km ASC;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.probable_taxa_at(numeric, numeric, int, int) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.probable_taxa_at(numeric, numeric, int, int)
+  TO anon, authenticated;
