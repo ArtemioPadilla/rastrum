@@ -9958,3 +9958,33 @@ $$;
 -- between the line ~563 grant and this remediation block (e.g., via a
 -- `CREATE OR REPLACE FUNCTION` declared above) gets re-granted explicitly.
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO authenticated;
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- 6. PostGIS spatial_ref_sys — enable RLS with a permissive read policy
+-- ─────────────────────────────────────────────────────────────────────────
+-- Advisor flags `public.spatial_ref_sys` as a public-exposed table without
+-- RLS. The data is non-sensitive SRID/projection metadata (same on every
+-- PostGIS install), but our "every public table has RLS" invariant should
+-- be uniform across the schema rather than carve-outs.
+--
+-- The table is PostGIS-owned; the apply role may or may not be able to
+-- ALTER it. The DO blocks swallow insufficient_privilege so the apply
+-- doesn't fail — in that case the advisor entry persists and the
+-- operator falls back to dashboard-level acceptance.
+DO $$
+BEGIN
+  ALTER TABLE public.spatial_ref_sys ENABLE ROW LEVEL SECURITY;
+EXCEPTION WHEN insufficient_privilege THEN
+  RAISE NOTICE 'spatial_ref_sys is owned by a higher role; skipping RLS toggle. Mark advisor entry accepted in dashboard.';
+END
+$$;
+
+DROP POLICY IF EXISTS spatial_ref_sys_world_read ON public.spatial_ref_sys;
+DO $$
+BEGIN
+  CREATE POLICY spatial_ref_sys_world_read ON public.spatial_ref_sys
+    FOR SELECT USING (true);
+EXCEPTION WHEN insufficient_privilege THEN
+  RAISE NOTICE 'apply role cannot CREATE POLICY on spatial_ref_sys; advisor entry will persist.';
+END
+$$;
