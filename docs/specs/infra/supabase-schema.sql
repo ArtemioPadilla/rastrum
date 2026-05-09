@@ -62,7 +62,12 @@ ALTER TABLE public.users
   -- notices). Set by an admin after ID verification (no self-serve).
   ADD COLUMN IF NOT EXISTS credentialed_researcher boolean NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS credentialed_at       timestamptz,
-  ADD COLUMN IF NOT EXISTS credentialed_by       uuid REFERENCES public.users(id);
+  ADD COLUMN IF NOT EXISTS credentialed_by       uuid REFERENCES public.users(id),
+  -- v1.1: granular notification preferences. Per-toggle key/value JSON
+  -- (push_after_rain, push_migration_window, email_weekly_digest, …).
+  -- Read/written only by the row owner — gated by users_self_read /
+  -- users_self_update policies, never exposed via users_public_read.
+  ADD COLUMN IF NOT EXISTS notification_prefs    jsonb NOT NULL DEFAULT '{}'::jsonb;
 
 -- Auto-create user profile on sign-up. Pulls avatar + display name from
 -- the OAuth provider's metadata when present:

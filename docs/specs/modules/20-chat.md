@@ -1,8 +1,53 @@
-# Module 20 — Conversational Chat (cascade interpreter + vision fallback)
+# Module 20 — Conversational Chat (cascade interpreter + vision fallback + entity context)
 
-**Status:** v1.0 (shipped 2026-04-25)
-**Code:** `src/components/ChatView.astro`, `src/lib/chat-attachment-helpers.ts`
-**Routes:** `/{en,es}/chat/`
+**Status:** v1.1 (Gemma 4 text + entity context shipped 2026-05-09); v1.0 (shipped 2026-04-25)
+**Code:** `src/components/ChatView.astro`, `src/lib/chat-attachment-helpers.ts`, `src/lib/chat-engine.ts`, `src/lib/chat-tools.ts`, `src/lib/chat-entities/`, `src/lib/chat-bubble-html.ts`, `src/lib/parse-attach-querystring.ts`
+**Routes:** `/{en,es}/chat/` (with optional `?attach=<kind>:<id>` deep link)
+**Spec/Plan:** `docs/superpowers/specs/2026-05-09-chat-improvements-design.md`, `docs/superpowers/plans/2026-05-09-chat-improvements.md`
+**Runbook:** `docs/runbooks/chat-improvements.md`
+
+## v1.1 additions (2026-05-09)
+
+- **Gemma 4 E2B text backbone** — defaults over Llama-3.2-1B when WebGPU + ≥6 GB device memory; falls back to Llama on engine load failure (banner shown). Same weights as the existing vision identifier — one ~500 MB download powers both.
+- **Two-button consent gate** — side-by-side cards let the user pick Gemma 4 (recommended, ~500 MB, stronger reasoning, also for photos) or Llama 3.2 1B (lighter, ~880 MB, text only) from /chat/ directly. `refreshState` checks BOTH caches.
+- **Generic entity-context registry** (`src/lib/chat-entities/`) — `EntitySpec` interface mirrors the `Identifier` plugin pattern. Six built-ins: `observation`, `species`, `project`, `camera_station`, `observer`, `self_profile`. Each wraps a `supabase.rpc('chat_entity_card', { p_kind, p_id })` call returning a stable `EntityCard` JSONB.
+- **Typed JSON tool layer** (`src/lib/chat-tools.ts`) — five read-only tools backed by Supabase RPCs (`chat_find_observations`, `chat_find_species`, `chat_find_projects`, `chat_find_camera_stations`, `chat_find_observers`). Hand-rolled validators (no Zod). 1-round cap per turn.
+- **Streaming tool-call loop** (`src/lib/chat-engine.ts`) — model emits `{"tool":"…","args":{…}}` at the start of output; runtime detects, validates, dispatches, feeds the result back, re-prompts once.
+- **Deep-link buttons** (`AskRastrumButton.astro`) — `💬 Ask Rastrum` on share-obs, public profile, project detail, species profile. Builds `/{lang}/chat/?attach=<kind>:<id>`; ChatView consumes the query string once and rewrites the URL via `history.replaceState`.
+- **In-chat picker** (`ChatEntityPicker.astro`) — popover with 6 tabs and search, opens from the composer's `📋 Context` button.
+- **Empty-state suggestion chips** — four pill buttons under the placeholder seed the input and submit on click.
+- **Header model badge** — pill resolved client-side from cache status: "Gemma 4 · on-device" / "Llama 1B · on-device".
+- **Mobile drawer** — Chat link added (was missing on `<sm` viewports).
+
+### v1.1 SQL schema (in `docs/specs/infra/supabase-schema.sql`)
+
+Twelve SECURITY INVOKER functions, all `LANGUAGE sql STABLE` (or `LANGUAGE plpgsql STABLE` for the dispatcher) with `SET search_path = public, extensions, pg_temp` and `REVOKE EXECUTE FROM PUBLIC` + `GRANT EXECUTE TO authenticated`:
+
+- `chat_entity_card(p_kind text, p_id text) → jsonb` — dispatcher routing by kind, swallows invalid uuid via `EXCEPTION WHEN invalid_text_representation`.
+- `chat_obs_card(p_id uuid)` / `chat_species_card(p_query text)` / `chat_project_card(p_query text)` / `chat_camera_station_card(p_id uuid)` / `chat_observer_card(p_id uuid)` / `chat_self_profile_card(p_id uuid)` — per-kind builders.
+- `chat_find_observations(p_filters jsonb, p_limit int)` / `chat_find_species` / `chat_find_projects` / `chat_find_camera_stations` / `chat_find_observers` — read-only filtered searches.
+
+### v1.1 privacy invariants
+
+- **Observation cards respect obscure_level.** Precise lat/lng returned only when `auth.uid() = observer_id`; everyone else gets the obscured centroid. `coords_obscured` field uses `IS DISTINCT FROM` for NULL-safe comparison.
+- **`chat_self_profile_card` is self-only.** Filter `WHERE id = p_id AND id = auth.uid()`. Other-user lookups return NULL.
+- **Observer cards via `community_observers` view** — never raw `users` (no centroid, no email, no `hide_from_leaderboards = true`).
+- **Tool args are validated, never interpolated.** Hand-rolled validators reject non-objects, wrong types, missing required fields. RPCs receive typed args.
+
+### v1.1 deferred to v1.2
+
+- Multi-round tool-calling (chains).
+- Guided writes ("apply this fix" buttons) — needs typed action contract + audit log + undo.
+- `location` entity kind — waits for `public.locations` from the locations-first-class spec.
+- ChatView decomposition (1,441 LOC → 4 sibling components).
+- Per-row Ask Rastrum buttons on MyObs cards.
+- E2E specs for deep-link + picker.
+- Streaming token-deltas from Gemma 4 (currently one chunk per turn).
+
+---
+
+## v1.0 (original — cascade interpreter + vision fallback)
+
 
 The chat page is a single-screen "ask Rastrum about this" surface. Users
 attach a photo or short audio clip, optionally type a free-form question,
