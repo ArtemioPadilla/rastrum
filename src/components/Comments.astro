@@ -122,10 +122,11 @@ const sgReportLabel = sgTree.socialgraph.report.button;
   import { getSupabase } from '../lib/supabase';
   import { buildCommentTree, formatTimeAgo, sanitizeCommentBody, type CommentRow, type CommentNode } from '../lib/social';
   import { wireOverflowMenu } from '../lib/overflow-menu';
+  import { tierForKarma } from '../lib/karma-frame';
 
   const PAGE_SIZE = 20;
 
-  type AuthorMap = Record<string, { username: string | null; display_name: string | null; avatar_url: string | null }>;
+  type AuthorMap = Record<string, { username: string | null; display_name: string | null; avatar_url: string | null; karma_total: number }>;
 
   function initials(name: string) {
     return (name || '?').trim().slice(0, 2).toUpperCase();
@@ -148,7 +149,11 @@ const sgReportLabel = sgTree.socialgraph.report.button;
     const author = authors[node.author_id];
     const name = author?.display_name || author?.username || (lang === 'es' ? 'Observador' : 'Observer');
     const handle = author?.username ?? '';
-    const avatar = author?.avatar_url || avatarSvg(name);
+    const commentKarmaTier = tierForKarma(author?.karma_total ?? 0);
+    const commentRingClass = commentKarmaTier.staticRingClass ?? commentKarmaTier.ringClass;
+    const avatarHtml = author?.avatar_url
+      ? `<span class="inline-block rounded-full ring-offset-1 ring-offset-white dark:ring-offset-zinc-900 ${escapeText(commentRingClass)}"><img src="${escapeText(author.avatar_url)}" alt="" class="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 block" /></span>`
+      : `<img src="${avatarSvg(name)}" alt="" class="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 shrink-0" />`;
     const ago = formatTimeAgo(node.created_at, lang);
     const editedBadge = node.edited_at ? `<span class="text-xs text-zinc-400 ml-1">(${labels.edited})</span>` : '';
     const isOwner = currentUserId && currentUserId === node.author_id;
@@ -183,7 +188,7 @@ const sgReportLabel = sgTree.socialgraph.report.button;
     return `
       <li class="comment-item ${indent}" data-comment-id="${node.id}">
         <article class="flex gap-3">
-          <img src="${avatar}" alt="" class="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 shrink-0" />
+          ${avatarHtml}
           <div class="flex-1 min-w-0">
             <header class="flex items-start gap-2 text-sm">
               <div class="flex-1 min-w-0">
@@ -267,13 +272,14 @@ const sgReportLabel = sgTree.socialgraph.report.button;
       if (!missing.length) return;
       const { data } = await supabase
         .from('users')
-        .select('id, username, display_name, avatar_url')
+        .select('id, username, display_name, avatar_url, karma_total')
         .in('id', missing);
       for (const u of data ?? []) {
         authors[u.id as string] = {
           username: u.username as string | null,
           display_name: u.display_name as string | null,
           avatar_url: u.avatar_url as string | null,
+          karma_total: (u as unknown as { karma_total?: number | null }).karma_total ?? 0,
         };
       }
     }

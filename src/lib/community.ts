@@ -27,6 +27,7 @@ export interface CommunityObserver {
   obs_count_30d: number;
   last_observation_at: string | null;
   joined_at: string;
+  karma_total: number | null;
 }
 
 export const COMMUNITY_PAGE_SIZE = 20;
