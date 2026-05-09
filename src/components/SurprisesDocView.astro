@@ -1,0 +1,109 @@
+---
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+const isEs = lang === 'es';
+---
+
+<article class="prose prose-zinc dark:prose-invert max-w-none">
+  <h1>{isEs ? 'Sorpresas de campo' : 'Field surprises'}</h1>
+  <p class="lead text-lg text-zinc-600 dark:text-zinc-400">
+    {isEs
+      ? 'De vez en cuando, Rastrum puede mostrarte una pequeña tarjeta tras una observación: un dato curioso, un aviso de especie rara o cuántos otros observadores estuvieron activos hoy en tu región. Esta página explica exactamente cómo se decide y cómo apagarlo.'
+      : 'Now and then, after you log an observation, Rastrum may show you a small card: a fact, a rare-species call-out, or how many other observers were active today in your region. This page explains exactly how that is decided — and how to turn it off.'}
+  </p>
+
+  <h2>{isEs ? 'Por qué existe esto' : 'Why this exists'}</h2>
+  <p>
+    {isEs
+      ? 'B.J. Fogg describe en Persuasive Technology (cap. 9) que las recompensas variables ocultas — del estilo "tragamonedas" — son un patrón oscuro. Pero las recompensas variables transparentes, donde tú conoces las reglas, no son manipulación: son simple sorpresa-y-deleite. Esta página existe para mantener Rastrum del lado correcto de esa línea.'
+      : 'B.J. Fogg describes in Persuasive Technology (ch. 9) that hidden variable rewards — slot-machine style — are a dark pattern. But transparent variable rewards, where you know the rules, are not manipulation: they are surprise-and-delight. This page exists so Rastrum stays on the right side of that line.'}
+  </p>
+  <p>
+    {isEs
+      ? 'El catálogo es FIJO en el código (no se puede agregar un tipo de sorpresa sin un PR). El tope diario es FIJO. La opción está APAGADA por defecto.'
+      : 'The catalog is FIXED in the code (no surprise type can be added without a PR). The daily cap is FIXED. The toggle is OFF by default.'}
+  </p>
+
+  <h2>{isEs ? 'El catálogo (3 tipos)' : 'The catalog (3 kinds)'}</h2>
+
+  <h3><code>dato_curioso</code> &mdash; {isEs ? 'dato curioso' : 'did you know?'}</h3>
+  <ul>
+    <li><strong>{isEs ? 'Cuándo se dispara' : 'When it fires'}:</strong> {isEs
+      ? 'aleatorio, ~10 % de las observaciones sincronizadas que tengan una especie identificada con un dato curado disponible en tu idioma.'
+      : 'random, ~10 % of synced observations that have an identified species with a curated fact available in your locale.'}</li>
+    <li><strong>{isEs ? 'Aleatoriedad' : 'Randomness'}:</strong> {isEs
+      ? 'el sorteo se hace con un PRNG sembrado por el ID de la observación, así que reabrir la app no cambia el resultado.'
+      : 'the dice roll is made with a PRNG seeded by the observation ID, so re-opening the app does not change the outcome.'}</li>
+    <li><strong>{isEs ? 'Datos' : 'Facts'}:</strong> {isEs
+      ? 'curados a mano por especie en src/lib/surprise-facts.ts. Cuando no tenemos un dato para esa especie usamos el pool genérico.'
+      : 'hand-curated per species in src/lib/surprise-facts.ts. When no fact is on file for that species we use a generic pool.'}</li>
+  </ul>
+
+  <h3><code>rarito</code> &mdash; {isEs ? 'observación rara' : 'rare find'}</h3>
+  <ul>
+    <li><strong>{isEs ? 'Cuándo se dispara' : 'When it fires'}:</strong> {isEs
+      ? 'determinista. Si la especie identificada cae en el bucket "rare" del cálculo nocturno de rareza (top ~5 %), aparece esta tarjeta. Sin azar.'
+      : 'deterministic. If the identified species lands in the "rare" bucket of the nightly rarity recompute (top ~5 %), this card shows. No randomness.'}</li>
+    <li><strong>{isEs ? 'Prioridad' : 'Priority'}:</strong> {isEs
+      ? 'rarito gana sobre los otros tipos cuando se dispara — es la información más informativa de las tres.'
+      : 'rarito wins over the others when it fires — it is the most informative of the three.'}</li>
+  </ul>
+
+  <h3><code>comunidad_activa_hoy</code> &mdash; {isEs ? 'comunidad activa hoy' : 'community active today'}</h3>
+  <ul>
+    <li><strong>{isEs ? 'Cuándo se dispara' : 'When it fires'}:</strong> {isEs
+      ? 'determinista, máximo 1 vez al día. Solo cuando hay 2 o más observadores activos en tu país hoy.'
+      : 'deterministic, max once per day. Only when there are 2 or more active observers in your country today.'}</li>
+    <li><strong>{isEs ? 'Cómo se calcula' : 'How it is computed'}:</strong> {isEs
+      ? 'la función SQL community_active_observers_today() cuenta observadores únicos con observaciones sincronizadas hoy en tu país (ISO-3166), excluyendo perfiles que se ocultaron de leaderboards.'
+      : 'the SQL function community_active_observers_today() counts unique observers with synced observations today in your country (ISO-3166), excluding profiles that opted out of leaderboards.'}</li>
+  </ul>
+
+  <h2>{isEs ? 'Tope diario' : 'Daily cap'}</h2>
+  <p>
+    {isEs
+      ? 'Como máximo se muestra UNA sorpresa al día, sin importar cuántas observaciones registres. El tope se aplica en dos lugares: localStorage del navegador (cap rápido) y la función SQL record_surprise_event() en Postgres (a prueba de carreras entre pestañas).'
+      : 'At most ONE surprise per day, no matter how many observations you log. The cap is enforced in two places: browser localStorage (fast cap) and the SQL function record_surprise_event() in Postgres (race-proof across tabs).'}
+  </p>
+
+  <h2>{isEs ? 'Privacidad' : 'Privacy'}</h2>
+  <ul>
+    <li>{isEs
+      ? 'La tabla surprise_events tiene RLS read-own. Solo tú ves tus propias filas.'
+      : 'The surprise_events table is RLS read-own. Only you see your own rows.'}</li>
+    <li>{isEs
+      ? 'No se envía nada a sponsors, terceros ni se publica nunca en tu perfil.'
+      : 'Nothing is sent to sponsors, third parties, nor ever published on your profile.'}</li>
+    <li>{isEs
+      ? 'El conteo de observadores activos se calcula con datos ya públicos (mismo origen que el directorio de la comunidad).'
+      : 'The active-observers count is computed from already-public data (same source as the community directory).'}</li>
+  </ul>
+
+  <h2>{isEs ? 'Cómo apagarlo' : 'How to turn it off'}</h2>
+  <p>
+    {isEs
+      ? 'Ve a Perfil → Ajustes → Preferencias → "Sorpresas de campo" y desactiva el checkbox. El cambio surte efecto inmediatamente.'
+      : 'Go to Profile → Settings → Preferences → "Field surprises" and uncheck the box. The change takes effect immediately.'}
+  </p>
+
+  <h2>{isEs ? 'Lo que NO hace' : 'What this is NOT'}</h2>
+  <ul>
+    <li><strong>{isEs ? 'No es loot' : 'Not loot'}</strong>. {isEs
+      ? 'No hay desbloqueables, monedas, ni "racha de sorpresas". Una sorpresa es un mensaje, no un premio canjeable.'
+      : 'There are no unlockables, currencies, or "surprise streaks". A surprise is a message, not a redeemable prize.'}</li>
+    <li><strong>{isEs ? 'No reemplaza badges' : 'Does not replace badges'}</strong>. {isEs
+      ? 'Los logros y rachas siguen existiendo independientes. Las sorpresas no afectan tu karma, racha ni dex.'
+      : 'Achievements and streaks remain independent. Surprises do not affect your karma, streak, or dex.'}</li>
+    <li><strong>{isEs ? 'No es publicidad' : 'Not advertising'}</strong>. {isEs
+      ? 'Ningún tipo de sorpresa promociona productos, sponsors ni un próximo evento.'
+      : 'No surprise kind promotes products, sponsors, or an upcoming event.'}</li>
+  </ul>
+
+  <p class="text-sm text-zinc-500 mt-8">
+    {isEs ? 'Issue: ' : 'Issue: '}
+    <a href="https://github.com/ArtemioPadilla/rastrum/issues/727" class="underline">#727</a>
+    {' · '}
+    {isEs ? 'Código: ' : 'Code: '}
+    <a href="https://github.com/ArtemioPadilla/rastrum/blob/main/src/lib/surprises.ts" class="underline">src/lib/surprises.ts</a>
+  </p>
+</article>

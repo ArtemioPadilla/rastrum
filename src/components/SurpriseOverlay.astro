@@ -1,0 +1,159 @@
+---
+/**
+ * SurpriseOverlay — modal shown after a synced observation when a
+ * `surprise` candidate is picked (see src/lib/surprises.ts).
+ *
+ * Mounts globally in BaseLayout. The trigger (in src/lib/sync.ts)
+ * dispatches `rastrum:surprise-show` with the resolved candidate;
+ * this component listens on `window` and renders the card.
+ *
+ * Esc / backdrop click closes. Focus trap mirrors ReportDialog. The
+ * "What is this?" link points to /docs/surprises (EN/ES) so the user
+ * can audit the rules.
+ *
+ * #727. Variable rewards under Fogg ch. 9 ethics: rules disclosed,
+ * opt-in default-off, single-source catalog. No hidden behaviour.
+ */
+import { t, getDocPath } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+const { lang } = Astro.props;
+const tr = t(lang);
+const sup = (tr as unknown as { surprises: { overlay_close: string; overlay_what_is_this: string; overlay_aria_label: string } }).surprises;
+const docHref = lang === 'es' ? getDocPath('es', 'surprises') : getDocPath('en', 'surprises');
+---
+
+<div
+  id="rastrum-surprise-overlay"
+  class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-zinc-950/60 backdrop-blur-sm px-4"
+  data-lang={lang}
+  data-doc-href={docHref}
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="rastrum-surprise-title"
+  aria-label={sup.overlay_aria_label}
+>
+  <div
+    class="w-full max-w-md rounded-2xl bg-white dark:bg-zinc-900 ring-1 ring-zinc-200 dark:ring-zinc-800 shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200"
+  >
+    <div class="px-5 pt-5 pb-2 flex items-start gap-3">
+      <div
+        data-rs-icon
+        class="shrink-0 mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 text-lg"
+        aria-hidden="true"
+      >&#10022;</div>
+      <div class="min-w-0 flex-1">
+        <h2 id="rastrum-surprise-title" class="text-base font-semibold text-zinc-900 dark:text-zinc-100" data-rs-title>
+          &mdash;
+        </h2>
+        <p class="mt-1 text-sm text-zinc-700 dark:text-zinc-300" data-rs-body>&mdash;</p>
+      </div>
+    </div>
+
+    <footer class="px-5 py-3 flex items-center justify-between gap-2 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-950/30">
+      <a
+        data-rs-doc
+        href={docHref}
+        class="text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:underline"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        {sup.overlay_what_is_this}
+      </a>
+      <button
+        type="button"
+        data-rs-close
+        class="inline-flex min-h-[36px] items-center justify-center rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-1.5 text-sm font-semibold text-white transition-colors"
+      >
+        {sup.overlay_close}
+      </button>
+    </footer>
+  </div>
+</div>
+
+<script>
+  type SurpriseKind = 'dato_curioso' | 'rarito' | 'comunidad_activa_hoy';
+
+  interface ShowDetail {
+    kind: SurpriseKind;
+    title: string;
+    body: string;
+  }
+
+  const root = document.getElementById('rastrum-surprise-overlay');
+  if (root) {
+    const titleEl = root.querySelector<HTMLElement>('[data-rs-title]');
+    const bodyEl  = root.querySelector<HTMLElement>('[data-rs-body]');
+    const iconEl  = root.querySelector<HTMLElement>('[data-rs-icon]');
+    const closeBtn = root.querySelector<HTMLButtonElement>('[data-rs-close]');
+    const docEl   = root.querySelector<HTMLAnchorElement>('[data-rs-doc]');
+
+    let lastFocused: HTMLElement | null = null;
+    const FOCUSABLE_SEL = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+    function focusableEls(): HTMLElement[] {
+      return Array.from(root!.querySelectorAll<HTMLElement>(FOCUSABLE_SEL))
+        .filter((el) => el.offsetParent !== null);
+    }
+
+    function close() {
+      root!.classList.add('hidden');
+      lastFocused?.focus();
+      lastFocused = null;
+    }
+
+    function open(detail: ShowDetail) {
+      lastFocused = (document.activeElement as HTMLElement | null) ?? null;
+      if (titleEl) titleEl.textContent = detail.title;
+      if (bodyEl)  bodyEl.textContent  = detail.body;
+      if (iconEl) {
+        iconEl.textContent =
+          detail.kind === 'rarito' ? '✦' :
+          detail.kind === 'comunidad_activa_hoy' ? '◎' : '✦';
+      }
+      root!.classList.remove('hidden');
+      // Focus the close button so Esc/Enter both work without a re-tab.
+      closeBtn?.focus();
+    }
+
+    closeBtn?.addEventListener('click', close);
+    root.addEventListener('click', (e) => {
+      if (e.target === root) close();
+    });
+    document.addEventListener('keydown', (e) => {
+      const ev = e as KeyboardEvent;
+      if (root.classList.contains('hidden')) return;
+      if (ev.key === 'Escape') {
+        close();
+        return;
+      }
+      if (ev.key === 'Tab') {
+        const els = focusableEls();
+        if (els.length === 0) return;
+        const first = els[0];
+        const last = els[els.length - 1];
+        const active = document.activeElement as HTMLElement | null;
+        if (ev.shiftKey && active === first) {
+          ev.preventDefault();
+          last.focus();
+        } else if (!ev.shiftKey && active === last) {
+          ev.preventDefault();
+          first.focus();
+        }
+      }
+    });
+
+    // Make sure the doc link reflects the current locale even after
+    // hydration (the SSR href is correct; this is just defensive).
+    const fallbackDoc = root.dataset.docHref;
+    if (docEl && fallbackDoc) docEl.href = fallbackDoc;
+
+    window.addEventListener('rastrum:surprise-show', (e) => {
+      const ev = e as CustomEvent<ShowDetail>;
+      if (!ev.detail) return;
+      open(ev.detail);
+    });
+  }
+</script>

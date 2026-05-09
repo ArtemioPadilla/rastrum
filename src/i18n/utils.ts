@@ -127,7 +127,7 @@ export const docPages = [
   'architecture', 'indigenous', 'funding', 'contribute',
   'faq', 'privacy', 'terms', 'console', 'sponsorships', 'mcp',
   'changelog', 'community', 'camera-stations', 'sponsor-pools',
-  'obs-detail', 'status', 'algorithms',
+  'obs-detail', 'status', 'algorithms', 'surprises',
 ] as const;
 
 export type DocPage = (typeof docPages)[number];
@@ -355,6 +355,10 @@ export const docPageMeta = {
   algorithms: {
     en: "Every ranked surface in Rastrum, with the inputs it uses, the time window, and the settings that change its behavior.",
     es: "Cada superficie ordenada en Rastrum, con las entradas que usa, la ventana de tiempo y los ajustes que cambian su comportamiento.",
+  },
+  surprises: {
+    en: "Field surprises: a transparent, opt-in catalog of variable rewards. 3 fixed kinds, 1-per-day cap, full disclosure of how each fires.",
+    es: "Sorpresas de campo: catálogo transparente y opt-in de recompensas variables. 3 tipos fijos, 1 por día como máximo, reglas públicas.",
   },
 } as const satisfies Record<DocPage, { en: string; es: string }>;
 
