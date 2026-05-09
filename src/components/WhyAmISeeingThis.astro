@@ -1,0 +1,66 @@
+---
+/**
+ * WhyAmISeeingThis — small "i" link rendered next to a ranked surface
+ * that opens the global `WhyAmISeeingThisDialog`. The dialog is
+ * mounted once in BaseLayout; this component just sets the algoId
+ * on it and unhides it.
+ *
+ * Pass an `algorithm` id from `src/lib/algorithms.ts`. EN+ES strings
+ * are derived from `lang`.
+ */
+import type { AlgorithmId } from '../lib/algorithms';
+
+interface Props {
+  /** Catalog id from `src/lib/algorithms.ts`. */
+  algorithm: AlgorithmId;
+  /** Locale for the trigger label. */
+  lang: 'en' | 'es';
+  /** Optional Tailwind classes to merge into the button. */
+  className?: string;
+}
+
+const { algorithm, lang, className } = Astro.props;
+const label = lang === 'es' ? '¿Por qué veo esto?' : 'Why am I seeing this?';
+const ariaLabel = lang === 'es'
+  ? 'Por qué veo este orden — abrir explicación'
+  : 'Why I am seeing this order — open explanation';
+---
+
+<button
+  type="button"
+  data-why-trigger
+  data-algorithm={algorithm}
+  aria-label={ariaLabel}
+  class:list={[
+    'inline-flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400 hover:text-emerald-700 dark:hover:text-emerald-400 underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-emerald-500 rounded-sm',
+    className,
+  ]}
+>
+  <span
+    aria-hidden="true"
+    class="inline-flex h-4 w-4 items-center justify-center rounded-full ring-1 ring-zinc-300 dark:ring-zinc-700 text-[10px] font-semibold leading-none"
+  >i</span>
+  <span>{label}</span>
+</button>
+
+<script>
+  function bindWhyTriggers() {
+    const dialog = document.getElementById('rastrum-why-dialog');
+    if (!dialog) return;
+    document.querySelectorAll<HTMLButtonElement>('[data-why-trigger]:not([data-why-bound])').forEach((btn) => {
+      btn.dataset.whyBound = '1';
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const algoId = btn.dataset.algorithm ?? '';
+        if (!algoId) return;
+        dialog.dataset.algoId = algoId;
+        dialog.classList.remove('hidden');
+      });
+    });
+  }
+
+  bindWhyTriggers();
+  // Also rebind whenever the DOM is mutated (CSR surfaces like /community).
+  const mo = new MutationObserver(() => bindWhyTriggers());
+  mo.observe(document.body, { childList: true, subtree: true });
+</script>

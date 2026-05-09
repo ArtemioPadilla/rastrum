@@ -1,0 +1,211 @@
+---
+/**
+ * WhyAmISeeingThisDialog — global, single-instance algorithmic-disclosure
+ * modal. Mirrors the ReportDialog pattern: mounted once in BaseLayout,
+ * opened by other surfaces by populating dataset.algoId on
+ * `#rastrum-why-dialog` and removing the `hidden` class.
+ *
+ * The body is template-driven from `src/lib/algorithms.ts` so adding a
+ * new ranking is one entry, never a new modal.
+ */
+import { ALGORITHMS, type AlgorithmId } from '../lib/algorithms';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+
+const { lang } = Astro.props;
+const isEs = lang === 'es';
+
+const titleSeeingThis = isEs ? '¿Por qué veo esto?' : 'Why am I seeing this?';
+const inputsHeading = isEs ? 'Entradas usadas' : 'Inputs used';
+const windowHeading = isEs ? 'Ventana de tiempo' : 'Time window';
+const howChangeHeading = isEs ? '¿Cómo cambio esto?' : 'How do I change this?';
+const moreHref = isEs ? '/es/docs/algorithms/' : '/en/docs/algorithms/';
+const moreLabel = isEs ? 'Sobre los algoritmos de Rastrum' : 'About Rastrum algorithms';
+const closeLabel = isEs ? 'Cerrar' : 'Close';
+
+// Pre-render the per-algorithm content blocks. The client script reads
+// `data-algo` to switch which block is visible.
+const ids = Object.keys(ALGORITHMS) as AlgorithmId[];
+---
+
+<div
+  id="rastrum-why-dialog"
+  class="hidden fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 backdrop-blur-sm px-4"
+  data-lang={lang}
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="rastrum-why-title"
+>
+  <div class="w-full max-w-md rounded-2xl bg-white dark:bg-zinc-900 ring-1 ring-zinc-200 dark:ring-zinc-800 shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200">
+    <header class="px-5 py-4 border-b border-zinc-100 dark:border-zinc-800">
+      <h2 id="rastrum-why-title" class="text-base font-semibold text-zinc-900 dark:text-zinc-100">
+        <span data-why-headline>{titleSeeingThis}</span>
+      </h2>
+      <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400" data-why-summary></p>
+    </header>
+
+    <div class="px-5 py-4 space-y-4 max-h-[60vh] overflow-y-auto">
+      {ids.map((id) => {
+        const entry = ALGORITHMS[id];
+        return (
+          <section
+            data-why-block={id}
+            class="hidden space-y-4"
+            data-headline-en={entry.headline.en}
+            data-headline-es={entry.headline.es}
+            data-summary-en={entry.summary.en}
+            data-summary-es={entry.summary.es}
+            data-window-en={entry.copy.en.window}
+            data-window-es={entry.copy.es.window}
+            data-settings-label-en={entry.copy.en.settings_label}
+            data-settings-label-es={entry.copy.es.settings_label}
+            data-settings-path={lang === 'es' ? entry.settings_path.es : entry.settings_path.en}
+          >
+            <div>
+              <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5">
+                {inputsHeading}
+              </h3>
+              <ul class="list-disc pl-5 space-y-1 text-sm text-zinc-800 dark:text-zinc-200">
+                {(lang === 'es' ? entry.copy.es.inputs : entry.copy.en.inputs).map((input) => (
+                  <li>{input}</li>
+                ))}
+              </ul>
+            </div>
+
+            <div>
+              <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5">
+                {windowHeading}
+              </h3>
+              <p class="text-sm text-zinc-800 dark:text-zinc-200">
+                {lang === 'es' ? entry.copy.es.window : entry.copy.en.window}
+              </p>
+            </div>
+          </section>
+        );
+      })}
+    </div>
+
+    <footer class="px-5 py-4 border-t border-zinc-100 dark:border-zinc-800 space-y-3">
+      <div>
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5">
+          {howChangeHeading}
+        </h3>
+        <a
+          data-why-settings-link
+          href="#"
+          class="inline-flex items-center text-sm font-medium text-emerald-700 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-300 underline"
+        >
+          <span data-why-settings-label></span>
+          <span aria-hidden="true" class="ml-1">→</span>
+        </a>
+      </div>
+      <div class="flex items-center justify-between gap-2">
+        <a
+          href={moreHref}
+          class="text-xs text-zinc-500 dark:text-zinc-400 hover:text-emerald-700 dark:hover:text-emerald-400 underline"
+        >
+          {moreLabel}
+        </a>
+        <button
+          type="button"
+          data-why-close
+          class="px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+        >
+          {closeLabel}
+        </button>
+      </div>
+    </footer>
+  </div>
+</div>
+
+<script>
+  const dialog = document.getElementById('rastrum-why-dialog');
+  if (dialog) {
+    const closeBtn = dialog.querySelector<HTMLButtonElement>('[data-why-close]');
+    const headlineEl = dialog.querySelector<HTMLElement>('[data-why-headline]');
+    const summaryEl = dialog.querySelector<HTMLElement>('[data-why-summary]');
+    const settingsLink = dialog.querySelector<HTMLAnchorElement>('[data-why-settings-link]');
+    const settingsLabel = dialog.querySelector<HTMLElement>('[data-why-settings-label]');
+    const lang = (dialog.dataset.lang === 'es' ? 'es' : 'en') as 'en' | 'es';
+
+    let lastFocused: HTMLElement | null = null;
+
+    const FOCUSABLE_SEL =
+      'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+    function focusableEls(): HTMLElement[] {
+      return Array.from(dialog!.querySelectorAll<HTMLElement>(FOCUSABLE_SEL))
+        .filter((el) => el.offsetParent !== null);
+    }
+
+    function close() {
+      dialog?.classList.add('hidden');
+      lastFocused?.focus();
+      lastFocused = null;
+    }
+
+    function applyAlgo(algoId: string) {
+      const blocks = dialog!.querySelectorAll<HTMLElement>('[data-why-block]');
+      let active: HTMLElement | null = null;
+      blocks.forEach((b) => {
+        if (b.dataset.whyBlock === algoId) {
+          b.classList.remove('hidden');
+          active = b;
+        } else {
+          b.classList.add('hidden');
+        }
+      });
+      if (!active) return;
+      const headline = active.dataset[`headline${lang === 'es' ? 'Es' : 'En'}`] ?? '';
+      const summary = active.dataset[`summary${lang === 'es' ? 'Es' : 'En'}`] ?? '';
+      const settingsPath = active.dataset.settingsPath ?? '#';
+      const settingsLabelText = active.dataset[`settingsLabel${lang === 'es' ? 'Es' : 'En'}`] ?? '';
+      if (headlineEl) headlineEl.textContent = headline;
+      if (summaryEl) summaryEl.textContent = summary;
+      if (settingsLink) settingsLink.setAttribute('href', settingsPath);
+      if (settingsLabel) settingsLabel.textContent = settingsLabelText;
+    }
+
+    function open() {
+      lastFocused = (document.activeElement as HTMLElement | null) ?? null;
+      const algoId = dialog!.dataset.algoId ?? '';
+      if (algoId) applyAlgo(algoId);
+      const first = closeBtn ?? focusableEls()[0];
+      first?.focus();
+    }
+
+    closeBtn?.addEventListener('click', close);
+    dialog.addEventListener('click', (e) => {
+      if (e.target === dialog) close();
+    });
+    document.addEventListener('keydown', (e) => {
+      const ev = e as KeyboardEvent;
+      if (dialog.classList.contains('hidden')) return;
+      if (ev.key === 'Escape') {
+        close();
+        return;
+      }
+      if (ev.key === 'Tab') {
+        const els = focusableEls();
+        if (els.length === 0) return;
+        const first = els[0];
+        const last = els[els.length - 1];
+        const active = document.activeElement as HTMLElement | null;
+        if (ev.shiftKey && active === first) {
+          ev.preventDefault();
+          last.focus();
+        } else if (!ev.shiftKey && active === last) {
+          ev.preventDefault();
+          first.focus();
+        }
+      }
+    });
+
+    const observer = new MutationObserver(() => {
+      if (!dialog.classList.contains('hidden')) open();
+    });
+    observer.observe(dialog, { attributes: true, attributeFilter: ['class', 'data-algo-id'] });
+  }
+</script>
