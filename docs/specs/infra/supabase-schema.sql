@@ -9120,3 +9120,42 @@ $$;
 
 REVOKE ALL ON FUNCTION public.recompute_user_stats() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.recompute_user_stats() TO service_role;
+-- ─────────────────────────────────────────────────────────────────────
+-- Kairos contextual prompts (#724)
+-- One row per (user, kind). v1 ships only `golden_hour`. The
+-- `kairos-fire` Edge Function reads opted-in subscribers every 15 min
+-- and sends a payload-less Web Push when sunset is 15-30 min away.
+-- `last_sent_at` enforces the "max one push/user/day" hard cap.
+-- ─────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.kairos_subscriptions (
+  user_id      uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  kind         text NOT NULL CHECK (kind IN ('golden_hour')),
+  opt_in       boolean NOT NULL DEFAULT false,
+  last_sent_at timestamptz,
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  updated_at   timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, kind)
+);
+
+CREATE INDEX IF NOT EXISTS idx_kairos_subs_kind_optin
+  ON public.kairos_subscriptions(kind, opt_in) WHERE opt_in = true;
+
+ALTER TABLE public.kairos_subscriptions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "kairos_subs_select_own" ON public.kairos_subscriptions;
+CREATE POLICY "kairos_subs_select_own" ON public.kairos_subscriptions
+  FOR SELECT TO authenticated USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "kairos_subs_insert_own" ON public.kairos_subscriptions;
+CREATE POLICY "kairos_subs_insert_own" ON public.kairos_subscriptions
+  FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "kairos_subs_update_own" ON public.kairos_subscriptions;
+CREATE POLICY "kairos_subs_update_own" ON public.kairos_subscriptions
+  FOR UPDATE TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "kairos_subs_delete_own" ON public.kairos_subscriptions;
+CREATE POLICY "kairos_subs_delete_own" ON public.kairos_subscriptions
+  FOR DELETE TO authenticated USING (auth.uid() = user_id);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.kairos_subscriptions TO authenticated;

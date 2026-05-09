@@ -62,6 +62,12 @@ high-level system view.
 |---|---|
 | [`social-features.md`](social-features.md) | Inbox polling, reactions self-hydration, ReportDialog, FollowButton states. |
 
+## Notifications (Modules ux-streak-push + 34)
+
+| Runbook | Covers |
+|---|---|
+| [`kairos-prompts.md`](kairos-prompts.md) | M34 — golden-hour push, `kairos-fire` 15-min cron, hard 1-per-day cap, manual fire instructions. |
+
 ## Operator hygiene + ops
 
 | Runbook | Covers |

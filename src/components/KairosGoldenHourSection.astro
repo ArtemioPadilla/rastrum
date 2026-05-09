@@ -1,0 +1,120 @@
+---
+import { t } from '../i18n/utils';
+
+interface Props { lang: 'en' | 'es'; }
+const { lang } = Astro.props;
+const tr = t(lang);
+const k = (tr as unknown as {
+  notifications: {
+    kairos: {
+      section_title: string;
+      section_hint: string;
+      enable: string;
+      enabling: string;
+      enabled: string;
+      disable: string;
+      disabling: string;
+      permission_blocked: string;
+      unsupported: string;
+      vapid_missing: string;
+    };
+  };
+}).notifications.kairos;
+---
+
+<section class="rounded-lg border border-amber-200 dark:border-amber-900/40 bg-amber-50/40 dark:bg-amber-950/20 p-4">
+  <h3 class="text-sm font-semibold text-amber-900 dark:text-amber-200 mb-1">
+    {k.section_title}
+  </h3>
+  <p class="text-xs text-amber-800/80 dark:text-amber-200/70 mb-3">{k.section_hint}</p>
+
+  <div class="flex items-start gap-3 flex-wrap">
+    <button
+      id="kairos-gh-toggle"
+      type="button"
+      class="rounded-lg border border-amber-600/60 bg-amber-100 dark:bg-amber-900/30 px-3 py-1.5 text-sm font-medium text-amber-800 dark:text-amber-200 hover:bg-amber-200 dark:hover:bg-amber-900/50 disabled:opacity-50"
+    >
+      <span data-kairos-label>{k.enable}</span>
+    </button>
+    <p id="kairos-gh-status" class="text-xs text-zinc-500"></p>
+  </div>
+  <p id="kairos-gh-warning" class="hidden mt-2 text-xs text-amber-700 dark:text-amber-400"></p>
+</section>
+
+<script define:vars={{ isEsLang: lang === 'es' }}>
+  (async function () {
+    const btn = /** @type {HTMLButtonElement | null} */ (document.getElementById('kairos-gh-toggle'));
+    if (!btn) return;
+    const labelEl = /** @type {HTMLElement | null} */ (btn.querySelector('[data-kairos-label]'));
+    const status = document.getElementById('kairos-gh-status');
+    const warn = document.getElementById('kairos-gh-warning');
+
+    const TXT = isEsLang
+      ? {
+          enable: 'Activar prompt de hora dorada',
+          enabling: 'Suscribiendo…',
+          enabled: 'Prompts de hora dorada activados.',
+          disable: 'Desactivar',
+          disabling: 'Desactivando…',
+          permission_blocked: 'Las notificaciones del navegador están bloqueadas. Actívalas en la configuración del sitio y vuelve a intentar.',
+          unsupported: 'Este navegador no soporta web push (prueba Chrome en Android o Safari 16.4+ en iOS).',
+          vapid_missing: 'El push aún no está configurado — el operador debe publicar primero una llave VAPID.',
+        }
+      : {
+          enable: 'Enable golden-hour prompt',
+          enabling: 'Subscribing…',
+          enabled: 'Golden-hour prompts enabled.',
+          disable: 'Disable',
+          disabling: 'Disabling…',
+          permission_blocked: 'Browser notifications are blocked. Enable them in your browser site settings, then try again.',
+          unsupported: "This browser doesn't support web push (try Chrome on Android or Safari 16.4+ on iOS).",
+          vapid_missing: "Push isn't configured yet — the operator must publish a VAPID key first.",
+        };
+
+    function setLabel(t) { if (labelEl) labelEl.textContent = t; }
+    function setStatus(t) { if (status) status.textContent = t; }
+    function setWarn(t) {
+      if (!warn) return;
+      if (!t) { warn.classList.add('hidden'); warn.textContent = ''; return; }
+      warn.textContent = t;
+      warn.classList.remove('hidden');
+    }
+
+    const kairosLib = await import('../lib/kairos');
+
+    async function refresh() {
+      const on = await kairosLib.isKairosOptIn('golden_hour');
+      if (on) {
+        setLabel(TXT.disable);
+        setStatus('✓ ' + TXT.enabled);
+        btn.dataset.state = 'on';
+      } else {
+        setLabel(TXT.enable);
+        setStatus('');
+        btn.dataset.state = 'off';
+      }
+      setWarn(null);
+    }
+
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      const turningOn = btn.dataset.state !== 'on';
+      setLabel(turningOn ? TXT.enabling : TXT.disabling);
+      const r = turningOn
+        ? await kairosLib.enableKairos('golden_hour')
+        : await kairosLib.disableKairos('golden_hour');
+      btn.disabled = false;
+      if (!r.ok) {
+        const map = {
+          unsupported: TXT.unsupported,
+          permission_blocked: TXT.permission_blocked,
+          vapid_missing: TXT.vapid_missing,
+        };
+        setWarn(map[r.reason] ?? r.message ?? '');
+      }
+      await refresh();
+    });
+
+    refresh().catch(() => {});
+  })();
+</script>

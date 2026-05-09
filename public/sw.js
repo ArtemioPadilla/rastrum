@@ -54,12 +54,18 @@ self.addEventListener('message', (event) => {
   if (event.data === 'SKIP_WAITING') self.skipWaiting();
 });
 
-// ── Web Push ── (ux-streak-push)
+// ── Web Push ── (ux-streak-push + #724 kairos)
 //
-// The streak-push EF sends payload-less notifications (just VAPID auth +
-// TTL). We render a fixed bilingual reminder body — picking ES vs EN by
-// the language of the most recently focused/visible client, falling back
-// to the document `lang`. Tapping the notification opens /profile/.
+// Both the `streak-push` and `kairos-fire` EFs send payload-less
+// notifications (VAPID auth + TTL only). We can't know which fired
+// from the push event itself, so we infer the topic from the device's
+// local time of day:
+//   • 16:00 - 21:00 local → golden-hour kairos (sunset window)
+//   • everything else     → streak reminder (8 PM cron is the legacy default)
+//
+// Both copies are bilingual; we pick ES vs EN by the language of the
+// most recently focused/visible client, falling back to ES.
+// Tapping the notification opens /profile/notifications/.
 self.addEventListener('push', (event) => {
   event.waitUntil((async () => {
     let lang = 'es';
@@ -72,19 +78,31 @@ self.addEventListener('push', (event) => {
       }
     } catch { /* fall through to default */ }
 
-    const title = lang === 'en' ? 'Your streak is 1 day from breaking' : 'Tu racha está a 1 día de romperse';
-    const body = lang === 'en'
-      ? 'Log one observation today (with confidence ≥ 40%) to keep it alive.'
-      : 'Registra una observación hoy (con confianza ≥ 40 %) para mantenerla viva.';
-    const tag = 'rastrum-streak-reminder';
+    const localHour = new Date().getHours();
+    const isKairosWindow = localHour >= 16 && localHour < 21;
 
-    await self.registration.showNotification(title, {
-      body,
+    const COPY = isKairosWindow
+      ? {
+          en: { title: 'Sunset in ~30 min', body: 'Good time for birds and pollinators. 20-min walk?' },
+          es: { title: 'Atardecer en ~30 min', body: 'Buena hora para aves y polinizadores. ¿20 min de caminata?' },
+        }
+      : {
+          en: { title: 'Your streak is 1 day from breaking', body: 'Log one observation today (with confidence ≥ 40%) to keep it alive.' },
+          es: { title: 'Tu racha está a 1 día de romperse',  body: 'Registra una observación hoy (con confianza ≥ 40 %) para mantenerla viva.' },
+        };
+
+    const tag = isKairosWindow ? 'rastrum-kairos-golden-hour' : 'rastrum-streak-reminder';
+    const target = isKairosWindow
+      ? (lang === 'en' ? '/en/observe/' : '/es/observar/')
+      : (lang === 'en' ? '/en/profile/notifications/' : '/es/perfil/notificaciones/');
+
+    await self.registration.showNotification(COPY[lang].title, {
+      body: COPY[lang].body,
       tag,
       icon: '/rastrum-logo.svg',
       badge: '/favicon.svg',
       renotify: false,
-      data: { lang, target: lang === 'en' ? '/en/profile/' : '/es/perfil/' },
+      data: { lang, target },
     });
   })());
 });
