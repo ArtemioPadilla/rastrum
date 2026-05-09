@@ -25,9 +25,14 @@ const sizeClass =
   : size === 'lg' ? 'w-24 h-24 md:w-28 md:h-28'
   : 'w-16 h-16 md:w-20 md:h-20';
 
+// For compact list contexts (size='sm') use the static variant (no animation).
+const activeRingClass = size === 'sm'
+  ? (tier.staticRingClass ?? tier.ringClass)
+  : tier.ringClass;
+
 const wrapperClass = [
   'inline-block rounded-full ring-offset-2 ring-offset-white dark:ring-offset-zinc-900',
-  tier.ringClass,
+  activeRingClass,
   extraClass,
 ].filter(Boolean).join(' ');
 ---
