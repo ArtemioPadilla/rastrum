@@ -67,6 +67,7 @@ jobs:
           PUBLIC_MEGADETECTOR_ENDPOINT: ${{ secrets.PUBLIC_MEGADETECTOR_ENDPOINT }}
           PUBLIC_POSTHOG_PROJECT_TOKEN: ${{ secrets.PUBLIC_POSTHOG_PROJECT_TOKEN }}
           PUBLIC_POSTHOG_HOST:        ${{ secrets.PUBLIC_POSTHOG_HOST }}
+          PUBLIC_VAPID_PUBLIC_KEY:    ${{ secrets.VAPID_PUBLIC_KEY }}
           PUBLIC_BUILD_SHA:           ${{ github.sha }}
           PUBLIC_VERSION:             ${{ steps.pkg.outputs.version }}
 
