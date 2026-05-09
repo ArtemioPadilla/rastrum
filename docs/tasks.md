@@ -4,7 +4,7 @@
 > Source of truth for both surfaces; renders the live page at
 > [/docs/tasks/](https://rastrum.org/en/docs/tasks/).
 > 
-> **Updated:** 2026-05-09 (v1.1.5 Persuasive Tech Audit — Tier S + Tier A + Ola 2b Fogg principles shipped; only PR #771 peer norms remaining in CI. v1.2 research workflow — M28 community discovery, M29 projects, M30 CLI batch import, M31 camera stations, M32 multi-provider vision, obs-detail redesign, admin console PR16 entity browsers; subtask granularity deepened for 53 roadmap items per #180).
+> **Updated:** 2026-05-09 (v1.1.5 Persuasive Tech Audit — Tier S + Tier A + Ola 2b complete, all 16 Fogg principles shipped including #771 peer norms. v1.2 research workflow — M28 community discovery, M29 projects, M30 CLI batch import, M31 camera stations, M32 multi-provider vision, obs-detail redesign, admin console PR16 entity browsers; subtask granularity deepened for 53 roadmap items per #180).
 
 ---
 
@@ -19,7 +19,7 @@
 | v1.0.x | Post-launch polish | in_progress | 9 / 25 |
 | v1.1 | UX polish + admin console + M22/M26/M27 | shipped (mostly) | 39 / 44 |
 | v1.2 | Research workflow (M28-M32 + obs-detail + privacy) | shipped 2026-04-30 | 17 / 17 |
-| v1.1.5 | Persuasive Tech Audit (Fogg principles) | Tier S+A+Ola 2b shipped; #771 peer norms in CI | 15 / 16 |
+| v1.1.5 | Persuasive Tech Audit (Fogg principles) | complete — Tier S+A+Ola 2b all merged | 16 / 16 |
 | **v0.1 → v1.0** | **Public launch** | **shipped 2026-04-26** | **54 / 59** |
 
 Phases v1.5, v2.0, v2.5 are tracked in [`progress.json`](progress.json) but have no shipped code yet — they are planned scope only.
@@ -230,7 +230,7 @@ A second wave landed the same day, focused on the CONANP-Oaxaca / DRFSIPS / PROR
 
 ## v1.1.5 — Persuasive Tech Audit (Fogg principles) — Tier S+A+Ola 2b shipped; #771 peer norms final
 
-**15 of 16 items done.** A principles-driven UX audit applying B.J. Fogg's
+**16 of 16 items done.** A principles-driven UX audit applying B.J. Fogg's
 *Persuasive Technology* (Stanford CS) chapter-by-chapter to Rastrum's
 existing surfaces. Tier S (foundation), Tier A (transparency + real-world
 feel), and Ola 2b (conditioning + suggestion + kairos + cause-and-effect +
@@ -264,9 +264,9 @@ variable rewards) all merged 2026-05-08 / 2026-05-09. Only PR #771
 - `fogg-kairos-prompts` — Kairos. Opt-in golden-hour Web Push that fires 15–30 min before local sunset, capped at 1/user/day. `kairos_subscriptions` table + `kairos-fire` Edge Function (`--no-verify-jwt` + `X-Cron-Secret`) scheduled every 15 min via pg_cron; sunset/sunrise via Meeus / SunCalc-derived helper at `src/lib/sun.ts` + `supabase/functions/_shared/sun.ts` (15-test parity vs NOAA). After-rain / migration-window / lunar-event triggers tracked separately for v1.1. PR #777 (closes #724). _(✓ done — module spec [`docs/specs/modules/34-kairos-prompts.md`](specs/modules/34-kairos-prompts.md), runbook [`docs/runbooks/kairos-prompts.md`](runbooks/kairos-prompts.md))_
 - `fogg-variable-rewards` — Variable Rewards. Transparent, opt-in `SurpriseOverlay` modal with FIXED catalog of 3 kinds (no runtime extension): `dato_curioso` (10% random per synced obs, requires curated species fact for locale), `rarito` (deterministic — fires when primary taxon's `taxon_rarity.bucket = 'rare'`), `comunidad_activa_hoy` (deterministic — fires when ≥ 2 active observers in user's country today). Hard cap of 1 surprise/day total enforced both client-side (localStorage) and server-side (`record_surprise_event` SECURITY DEFINER). Default-OFF opt-in toggle in Settings → Preferences. Rules disclosed at `/docs/surprises` — Fogg ch. 9 ethics, never slot-machine darkness. PR #779 (closes #727). _(✓ done)_
 
-### Ola 2b — in flight 2026-05-09
+### Ola 2b — final item shipped 2026-05-09
 
-- `fogg-peer-norms` — Normative Influence. Show peer norms when configuring license / privacy ("82% of MX observers choose this"); `license_norm` + `privacy_norm` materialised views, `peer_norm_pct(scope, country, key)` SECURITY INVOKER lookup, weekly refresh cron. Defaults are unchanged; copy is informational only. PR #771 (CI in flight, closes #745). _(· in flight)_
+- `fogg-peer-norms` — Normative Influence. Show peer norms when configuring license / privacy ("82% of MX observers choose this"); `license_norm` + `privacy_norm` materialised views, `peer_norm_pct(scope, country, key)` SECURITY INVOKER lookup, weekly refresh cron. Defaults are unchanged; copy is informational only. PR #771 (closes #745). _(✓ done)_
 
 ---
 
