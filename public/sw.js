@@ -8,8 +8,11 @@
 //     the filename): cache-first (these are immutable per their URL).
 //   - Manifest, favicon, sw.js itself: network-first so updates land fast.
 //
-// Bump VERSION to invalidate every cached entry on the next visit.
-const VERSION = 'rastrum-shell-2026.5.2';
+// VERSION is generated at deploy time by scripts/inject-version.js from the
+// PUBLIC_VERSION env var (CalVer). The placeholder below is substituted in
+// place during `npm run build`; the source must NOT be edited to bump the
+// cache. See docs/runbooks/sw-cache.md for how to force a flush.
+const VERSION = '__BUILD_VERSION__';
 
 // Page-managed cache (written by src/lib/offline-map.ts) holding the
 // full pmtiles archive as a single 200 Response. The fetch handler
