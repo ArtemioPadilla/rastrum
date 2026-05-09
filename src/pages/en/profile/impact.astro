@@ -1,0 +1,13 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import ImpactView from '../../../components/ImpactView.astro';
+import { t } from '../../../i18n/utils';
+
+const lang = 'en';
+const tr = t(lang);
+const impact = (tr as unknown as { my_impact: { page_title: string; page_subtitle: string } }).my_impact;
+---
+
+<BaseLayout title={`${impact.page_title} — Rastrum`} description={impact.page_subtitle} lang={lang}>
+  <ImpactView lang={lang} />
+</BaseLayout>

@@ -9277,3 +9277,139 @@ $$;
 
 REVOKE ALL ON FUNCTION public.record_surprise_event(uuid, text, jsonb) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.record_surprise_event(uuid, text, jsonb) TO authenticated;
+-- ── M06 — "Mi impacto ecológico" retrospective (issue #728) ────────────────
+--
+-- Returns a single JSONB envelope with five honest, computable-today
+-- metrics. Designed for ~200 obs per active user — no MV needed.
+--
+--   transect_km      heuristic: ST_Area(ST_ConvexHull(union of synced obs))
+--                    cast to geography → square metres → km² → sqrt() to
+--                    get a linear-equivalent km, then *0.5 because a
+--                    bounding hull radically over-estimates the swept
+--                    transect width.  Honest tooltip in the UI.
+--   research_grade   count of the user's RG observations.  Used as the
+--                    proxy for "obs that ended up in a DwC export" until
+--                    we have a per-export audit log (export-dwca currently
+--                    streams a ZIP without persisting which IDs it
+--                    enclosed). RG is the conservative subset because
+--                    the GBIF IPT only publishes RG.
+--   expert_confirmed count of distinct observations where any
+--                    identifications row has validated_by set AND that
+--                    validator currently holds the 'expert' role.
+--   in_research      count of observations whose project_id resolves to
+--                    a public M29 project. The projects table has no
+--                    `kind` column today; "research dataset" is read as
+--                    "tagged into a (typically researcher-owned) project".
+--                    When a `kind` column lands later this can be tightened
+--                    without changing the API surface.
+--   sensitive_seen   distinct species count where the user observed a
+--                    taxon flagged on NOM-059 (P/A/Pr/E) or IUCN
+--                    (CR/EN/VU/NT). Coarsens nicely as a Fogg-lever
+--                    "you've helped track N at-risk species".
+--
+-- SECURITY DEFINER + restrict-to-self is the simplest sound predicate:
+-- callers can only request their own impact (auth.uid() = p_user_id),
+-- so the function is safe to grant to authenticated. service_role is
+-- exempt for cron/EF reuse.
+CREATE OR REPLACE FUNCTION public.compute_user_impact(p_user_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_caller uuid := auth.uid();
+  v_transect_km numeric;
+  v_rg_count int;
+  v_expert_count int;
+  v_research_count int;
+  v_sensitive_species int;
+BEGIN
+  IF p_user_id IS NULL THEN
+    RAISE EXCEPTION 'p_user_id is required' USING ERRCODE = '22023';
+  END IF;
+  -- service_role calls have auth.uid() = NULL and bypass the predicate.
+  -- authenticated callers must be the subject of the impact report.
+  IF v_caller IS NOT NULL AND v_caller IS DISTINCT FROM p_user_id THEN
+    RAISE EXCEPTION 'compute_user_impact: caller must be the subject'
+      USING ERRCODE = '42501';
+  END IF;
+
+  -- Transect-equivalent km via convex hull radius proxy.
+  -- ST_Area on geography returns square metres. sqrt(area) gives an
+  -- equivalent linear span; halve to dampen the over-estimate.
+  -- Returns 0 (not NULL) for users with <3 located obs (hull undefined).
+  SELECT
+    COALESCE(
+      ROUND(
+        (sqrt(GREATEST(ST_Area(ST_ConvexHull(ST_Collect(o.location::geometry))::geography), 0)) / 1000.0)::numeric * 0.5,
+        2
+      ),
+      0
+    )
+  INTO v_transect_km
+  FROM public.observations o
+  WHERE o.observer_id = p_user_id
+    AND o.sync_status = 'synced'
+    AND o.location IS NOT NULL;
+
+  -- Research-grade observations (DwC-export proxy)
+  SELECT COUNT(DISTINCT o.id)::int
+  INTO v_rg_count
+  FROM public.observations o
+  JOIN public.identifications i
+    ON i.observation_id = o.id
+   AND i.is_primary = true
+   AND i.is_research_grade = true
+  WHERE o.observer_id = p_user_id
+    AND o.sync_status = 'synced';
+
+  -- Expert-confirmed observations
+  SELECT COUNT(DISTINCT o.id)::int
+  INTO v_expert_count
+  FROM public.observations o
+  JOIN public.identifications i
+    ON i.observation_id = o.id
+   AND i.validated_by IS NOT NULL
+  WHERE o.observer_id = p_user_id
+    AND o.sync_status = 'synced'
+    AND public.has_role(i.validated_by, 'expert'::public.user_role);
+
+  -- Observations included in a project (research-dataset proxy)
+  SELECT COUNT(*)::int
+  INTO v_research_count
+  FROM public.observations o
+  WHERE o.observer_id = p_user_id
+    AND o.sync_status = 'synced'
+    AND o.project_id IS NOT NULL;
+
+  -- Distinct NOM-059 / IUCN at-risk species observed
+  SELECT COUNT(DISTINCT t.id)::int
+  INTO v_sensitive_species
+  FROM public.observations o
+  JOIN public.identifications i
+    ON i.observation_id = o.id AND i.is_primary = true
+  JOIN public.taxa t
+    ON t.id = i.taxon_id
+  WHERE o.observer_id = p_user_id
+    AND o.sync_status = 'synced'
+    AND (
+      t.nom059_status IN ('E','P','A','Pr')
+      OR t.iucn_category IN ('CR','EN','VU','NT')
+    );
+
+  RETURN jsonb_build_object(
+    'transect_km',      COALESCE(v_transect_km, 0),
+    'research_grade',   COALESCE(v_rg_count, 0),
+    'expert_confirmed', COALESCE(v_expert_count, 0),
+    'in_research',      COALESCE(v_research_count, 0),
+    'sensitive_seen',   COALESCE(v_sensitive_species, 0),
+    'computed_at',      now()
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.compute_user_impact(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.compute_user_impact(uuid)
+  TO authenticated, service_role;

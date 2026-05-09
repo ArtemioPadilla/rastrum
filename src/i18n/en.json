@@ -3506,5 +3506,38 @@
     "from_ai_link": "Sponsorships",
     "from_sponsor_label": "Just want to use your own key for personal identifications?",
     "from_sponsor_link": "Configure it in AI Settings (simpler)"
+  },
+  "my_impact": {
+    "page_title": "My ecological impact",
+    "page_subtitle": "What your observations have made possible — open data, expert validation, conservation visibility.",
+    "sign_in_required": "Sign in to see your impact.",
+    "loading": "Computing your impact…",
+    "load_error": "We could not compute your impact right now. Try again in a moment.",
+    "view_link": "view",
+    "tooltip_label": "How is this computed?",
+    "no_data": "—",
+    "no_data_note": "Not yet computable.",
+    "footer_note": "These numbers are recomputed every time you load the page. Honest by design — no caches, no inflated counts.",
+    "transect_km": {
+      "label": "Transect-equivalent km",
+      "tooltip": "Heuristic: the convex hull of your synced observations is converted to an area, and we take the square root × 0.5 as a rough linear-equivalent km. This is intentionally conservative — it favours wide, well-spread sampling and shrinks toward zero when you observe in a single spot."
+    },
+    "research_grade": {
+      "label": "Observations in open-data exports",
+      "tooltip": "Count of your research-grade observations. Until per-export audit logs ship, this is a conservative proxy: only research-grade observations are pushed to GBIF / DwC archives.",
+      "no_log_note": "Audit log not yet available — proxied via research-grade count."
+    },
+    "expert_confirmed": {
+      "label": "Expert-confirmed observations",
+      "tooltip": "Count of your observations confirmed by a community member who currently holds the expert role."
+    },
+    "in_research": {
+      "label": "Observations in research projects",
+      "tooltip": "Count of your observations tagged into a Rastrum project (typically an ANP polygon or a researcher-defined sampling grid)."
+    },
+    "sensitive_seen": {
+      "label": "At-risk species you have helped track",
+      "tooltip": "Distinct species you have observed that are listed under NOM-059 (P/A/Pr/E) or IUCN (CR/EN/VU/NT). Coordinates of these observations are coarsened in public views by the obscure_level mechanism."
+    }
   }
 }
