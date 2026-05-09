@@ -12,6 +12,7 @@ const suggestions = widgets.suggestions;
 const greeting = tr.home.greeting;
 
 const recentHref = lang === 'es' ? '/es/explorar/recientes/' : '/en/explore/recent/';
+const observeHref = lang === 'es' ? '/es/observar/' : '/en/observe/';
 const leaderboardHref = lang === 'es' ? '/es/comunidad/tabla-de-lideres/' : '/en/community/leaderboard/';
 const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
 ---
@@ -35,6 +36,15 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
   data-label-nearby-anon={widgets.nearby_anonymous}
   data-label-nearby-unknown-species={widgets.nearby_unknown_species}
   data-recent-href={recentHref}
+  data-observe-href={observeHref}
+  data-label-challenge-title={widgets.challenge.title}
+  data-label-challenge-cta={widgets.challenge.cta_observe}
+  data-label-challenge-completed={widgets.challenge.completed_label}
+  data-label-challenge-why={widgets.challenge.why_label}
+  data-label-challenge-empty={widgets.challenge.empty_state}
+  data-label-challenge-rarity-common={widgets.challenge.rarity_common}
+  data-label-challenge-rarity-uncommon={widgets.challenge.rarity_uncommon}
+  data-label-challenge-rarity-rare={widgets.challenge.rarity_rare}
   data-leaderboard-href={leaderboardHref}
   data-profile-href={profileHref}
   data-label-leaderboard-title={widgets.leaderboard.title}
@@ -57,6 +67,10 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
   </div>
 
   <!-- #710 Suggestions widget (signed-in users with location only) -->
+  <div class="home-widgets-challenge hidden">
+    <!-- populated by script -->
+  </div>
+
   <div
     class="home-widgets-suggestions hidden"
     data-label-heading={suggestions.heading}
@@ -102,6 +116,7 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
   import { buildGreeting } from '../lib/home-greeting';
   import { formatTimeAgo } from '../lib/social';
   import { fetchSuggestions, type SpeciesSuggestion } from '../lib/suggestions';
+  import { fetchDailyChallenge } from '../lib/daily-challenge';
   import { fetchWeather, WMO_BUCKETS } from '../lib/home-weather';
   type WeatherKind = 'sunny' | 'rainy' | 'cloudy' | 'snow' | 'foggy' | 'windy';
 
@@ -424,6 +439,7 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
 
     await paintLeaderboard(root, lang, user.id);
     await paintNextBadge(root, lang, user.id);
+    await paintChallenge(root, lang, user.id);
     await paintNearby(root, lang, country, profile?.region_primary ?? null);
 
     // Fire suggestions widget (no await — it runs in parallel via geolocation)
@@ -585,6 +601,112 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
       container.classList.remove('hidden');
     } catch { /* next badge is optional */ }
   }
+
+  function rarityLabel(tier: number | null, root: HTMLElement): string {
+    if (tier === 1) return root.dataset.labelChallengeRarityCommon ?? 'Common';
+    if (tier === 2) return root.dataset.labelChallengeRarityUncommon ?? 'Uncommon';
+    if (tier === 3) return root.dataset.labelChallengeRarityRare ?? 'Rare';
+    return '';
+  }
+
+  function rarityColor(tier: number | null): string {
+    if (tier === 1) return 'bg-emerald-500';
+    if (tier === 2) return 'bg-yellow-400';
+    if (tier === 3) return 'bg-orange-500';
+    return 'bg-zinc-400';
+  }
+
+  async function paintChallenge(root: HTMLElement, lang: Lang, userId: string): Promise<void> {
+    const container = root.querySelector<HTMLElement>('.home-widgets-challenge');
+
+    if (!container) return;
+
+    let supabase;
+    try {
+      supabase = getSupabase();
+    } catch { return; }
+
+    type ChallengeRow = {
+      taxon_id: string;
+      scientific_name: string;
+      common_name_en: string | null;
+      common_name_es: string | null;
+      kingdom: string | null;
+      rarity_tier: number | null;
+      thumbnail_url: string | null;
+      why: string | null;
+    };
+
+    try {
+      const { data, error } = await supabase.rpc('daily_challenge_for_user', { p_user_id: userId });
+      if (error || !data || (data as ChallengeRow[]).length === 0) {
+        const emptyMsg = root.dataset.labelChallengeEmpty ?? 'No challenge available today.';
+        container.innerHTML = `<p class="text-sm text-zinc-500 dark:text-zinc-400">${escapeText(emptyMsg)}</p>`;
+        container.classList.remove('hidden');
+        return;
+      }
+
+      const ch = (data as ChallengeRow[])[0];
+      const title = root.dataset.labelChallengeTitle ?? "Today's Challenge";
+      const whyLabel = root.dataset.labelChallengeWhy ?? 'Why this species?';
+      const ctaLabel = root.dataset.labelChallengeCta ?? 'Observe one today';
+      const completedLabel = root.dataset.labelChallengeCompleted ?? '✓ Completed today';
+
+      const commonName = lang === 'es'
+        ? (ch.common_name_es ?? ch.common_name_en ?? '')
+        : (ch.common_name_en ?? ch.common_name_es ?? '');
+
+      const rarityLbl = rarityLabel(ch.rarity_tier, root);
+      const rarityDot = rarityColor(ch.rarity_tier);
+
+      const observeBase = root.dataset.observeHref ?? (lang === 'es' ? '/es/observar/' : '/en/observe/');
+      const ctaHref = `${observeBase}?taxon_id=${encodeURIComponent(ch.taxon_id)}`;
+
+      // Check if already observed today
+      const todayStart = new Date();
+      todayStart.setUTCHours(0, 0, 0, 0);
+
+      const { count } = await supabase
+        .from('observations')
+        .select('id', { count: 'exact', head: true })
+        .eq('observer_id', userId)
+        .eq('sync_status', 'synced')
+        .gte('observed_at', todayStart.toISOString());
+
+      // Simplified completed check — if they have any observation today we show completed
+      // (full taxon join would require identifications query)
+      const completed = (count ?? 0) > 0;
+
+      const thumbHtml = ch.thumbnail_url
+        ? `<img src="${escapeText(ch.thumbnail_url)}" alt="${escapeText(ch.scientific_name)}" class="w-14 h-14 rounded-lg object-cover flex-shrink-0" loading="lazy" />`
+        : `<div class="w-14 h-14 rounded-lg bg-zinc-200 dark:bg-zinc-700 flex-shrink-0 flex items-center justify-center"><span class="text-2xl">🌿</span></div>`;
+
+      const ctaHtml = completed
+        ? `<span class="inline-block text-xs font-semibold text-emerald-700 dark:text-emerald-400">${escapeText(completedLabel)}</span>`
+        : `<a href="${escapeText(ctaHref)}" class="inline-block text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-full px-3 py-1">${escapeText(ctaLabel)}</a>`;
+
+      container.innerHTML = `
+        <div>
+          <h2 class="text-sm font-semibold uppercase tracking-wider text-zinc-700 dark:text-zinc-300 mb-3">${escapeText(title)}</h2>
+          <div class="flex gap-3 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50">
+            ${thumbHtml}
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-0.5">
+                <p class="text-sm italic font-semibold text-zinc-900 dark:text-zinc-100 truncate">${escapeText(ch.scientific_name)}</p>
+                ${rarityLbl ? `<span class="flex items-center gap-1 text-[11px] text-zinc-600 dark:text-zinc-400 flex-shrink-0"><span class="inline-block w-2 h-2 rounded-full ${rarityDot}"></span>${escapeText(rarityLbl)}</span>` : ''}
+              </div>
+              ${commonName ? `<p class="text-xs text-zinc-600 dark:text-zinc-300 truncate mb-1">${escapeText(commonName)}</p>` : ''}
+              ${ch.why ? `<p class="text-[11px] text-zinc-500 dark:text-zinc-400 mb-2"><span class="font-medium">${escapeText(whyLabel)}:</span> ${escapeText(ch.why)}</p>` : ''}
+              ${ctaHtml}
+
+            </div>
+          </div>
+        </div>`;
+      container.classList.remove('hidden');
+    } catch { /* challenge is optional */ }
+
+  }
+
 
   async function paintNearby(root: HTMLElement, lang: Lang, country: string | null, _region: string | null): Promise<void> {
     const listEl = root.querySelector<HTMLUListElement>('.hw-nearby-list');

@@ -10743,3 +10743,74 @@ VALUES
    NULL)
 ON CONFLICT DO NOTHING;
 -- =======================================
+
+-- ====================================================================
+-- #852 — daily_challenge_for_user RPC
+-- Returns ONE taxon per UTC day per user: region-filtered, rarity<=3,
+-- deterministic via md5 seeding so device-refreshes get same result.
+-- ====================================================================
+CREATE OR REPLACE FUNCTION public.daily_challenge_for_user(p_user_id uuid)
+RETURNS TABLE (
+  taxon_id        uuid,
+  scientific_name text,
+  common_name_en  text,
+  common_name_es  text,
+  kingdom         text,
+  rarity_tier     int,
+  thumbnail_url   text,
+  why             text
+)
+LANGUAGE plpgsql STABLE
+SECURITY DEFINER
+SET search_path = public, extensions, pg_temp
+AS $$
+DECLARE
+  v_country_code text;
+  v_doy          int := EXTRACT(DOY FROM CURRENT_DATE)::int;
+BEGIN
+  SELECT country_code INTO v_country_code
+  FROM public.users WHERE id = p_user_id;
+
+  RETURN QUERY
+  SELECT
+    t.id,
+    t.scientific_name,
+    t.common_name_en,
+    t.common_name_es,
+    t.kingdom,
+    t.rarity_tier,
+    (SELECT mf.url FROM public.media_files mf
+       JOIN public.observations mo ON mo.id = mf.observation_id
+       JOIN public.identifications mi ON mi.observation_id = mo.id AND mi.taxon_id = t.id AND mi.is_primary
+       WHERE mf.is_primary AND mo.sync_status = 'synced'
+       LIMIT 1) AS thumbnail_url,
+    CASE t.kingdom
+      WHEN 'Animalia' THEN COALESCE(t.common_name_es, t.scientific_name) || ' — animal de la región'
+      WHEN 'Plantae'  THEN COALESCE(t.common_name_es, t.scientific_name) || ' — planta local'
+      ELSE COALESCE(t.common_name_es, t.scientific_name) || ' — especie regional'
+    END AS why
+  FROM public.taxa t
+  WHERE t.rarity_tier IS NOT NULL
+    AND t.rarity_tier <= 3
+    AND (
+      v_country_code IS NULL
+      OR EXISTS (
+        SELECT 1 FROM public.observations o
+        JOIN public.identifications i ON i.observation_id = o.id AND i.taxon_id = t.id AND i.is_primary
+        WHERE o.sync_status = 'synced'
+          AND (o.country_code = v_country_code OR o.country_code IS NULL)
+      )
+    )
+    AND t.id NOT IN (
+      SELECT DISTINCT i2.taxon_id
+      FROM public.observations o2
+      JOIN public.identifications i2 ON i2.observation_id = o2.id AND i2.is_primary
+      WHERE o2.observer_id = p_user_id AND i2.taxon_id IS NOT NULL
+    )
+  ORDER BY md5(p_user_id::text || v_doy::text || t.id::text)
+  LIMIT 1;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.daily_challenge_for_user(uuid) FROM PUBLIC;
+GRANT  EXECUTE ON FUNCTION public.daily_challenge_for_user(uuid) TO authenticated;
