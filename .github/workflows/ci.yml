@@ -47,12 +47,25 @@ jobs:
           fi
 
       - name: Build (static site)
+        # PostHog secrets (PUBLIC_POSTHOG_*) are deliberately NOT passed here —
+        # CI builds shouldn't fire capture events into prod analytics. Only
+        # deploy.yml gets them. See docs/runbooks/posthog.md.
         run: npm run build
         env:
           PUBLIC_SUPABASE_URL:       ${{ secrets.PUBLIC_SUPABASE_URL }}
           PUBLIC_SUPABASE_ANON_KEY:  ${{ secrets.PUBLIC_SUPABASE_ANON_KEY }}
           PUBLIC_R2_MEDIA_URL:       ${{ secrets.PUBLIC_R2_MEDIA_URL }}
           PUBLIC_R2_TILES_URL:       ${{ secrets.PUBLIC_R2_TILES_URL }}
+
+      - name: Verify search-index up to date
+        # public/search-index.{en,es}.json is regenerated on every build; if a
+        # PR edits the i18n routes/docs without rebuilding + committing, prod
+        # ⌘K search would silently miss new entries. Fail loudly here.
+        run: |
+          if ! git diff --exit-code public/search-index.en.json public/search-index.es.json; then
+            echo "::error::public/search-index.{en,es}.json drift detected. Run 'npm run build' locally and commit the regenerated files."
+            exit 1
+          fi
 
       - name: Report bundle size
         run: |
