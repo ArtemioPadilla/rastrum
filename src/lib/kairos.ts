@@ -16,7 +16,7 @@
 import { getSupabase } from './supabase';
 import { enableStreakPush, disableStreakPush, type PushSetupResult } from './push';
 
-export type KairosKind = 'golden_hour';
+export type KairosKind = 'golden_hour' | 'lunar_event';
 
 export async function isKairosOptIn(kind: KairosKind): Promise<boolean> {
   const supabase = getSupabase();

@@ -10098,3 +10098,13 @@ EXCEPTION WHEN insufficient_privilege THEN
   RAISE NOTICE 'apply role cannot CREATE POLICY on spatial_ref_sys; advisor entry will persist.';
 END
 $$;
+
+-- ─────────────────────────────────────────────────────────────────────
+-- #800 — lunar_event kairos trigger
+-- Extends kairos_subscriptions.kind CHECK to include 'lunar_event'.
+-- ─────────────────────────────────────────────────────────────────────
+ALTER TABLE public.kairos_subscriptions
+  DROP CONSTRAINT IF EXISTS kairos_subscriptions_kind_check;
+ALTER TABLE public.kairos_subscriptions
+  ADD CONSTRAINT kairos_subscriptions_kind_check
+  CHECK (kind IN ('golden_hour', 'after_rain', 'migration_window', 'lunar_event'));
