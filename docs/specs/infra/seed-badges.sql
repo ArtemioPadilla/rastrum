@@ -97,7 +97,21 @@ INSERT INTO public.badges (key, name_es, name_en, description_es, description_en
 ('first_nest',   'Primer nido',        'First nest',      'Tu primera observación de nido','Your first nest observation',
   'discovery','bronze', '{"type":"evidence_first","evidence":"nest"}'),
 ('first_camera_trap','Primera cámara trampa','First camera trap','Tu primera observación de cámara trampa','Your first camera-trap observation',
-  'discovery','bronze', '{"type":"evidence_first","evidence":"camera_trap"}')
+  'discovery','bronze', '{"type":"evidence_first","evidence":"camera_trap"}'),
+
+-- ─────────── STREAKS (#701) ───────────
+('streak_7',  'Racha de 7 días',  'Seven-day streak',  'Mantuviste una racha activa de 7 días','You kept a 7-day active streak',
+  'mastery','bronze', '{"type":"streak","min_days":7}'),
+('streak_30', 'Racha de 30 días', 'Thirty-day streak', 'Mantuviste una racha activa de 30 días','You kept a 30-day active streak',
+  'mastery','silver', '{"type":"streak","min_days":30}'),
+
+-- ─────────── GEOGRAPHIC DIVERSITY (#701) ───────────
+('state_explorer_3', 'Explorador de estados', 'State explorer', 'Observaste en 3 estados o provincias distintos','Observed in 3 distinct states or provinces',
+  'discovery','silver', '{"type":"state_diversity","min_states":3}'),
+
+-- ─────────── EASTER EGGS (hidden, #701) ───────────
+('midnight_owl', '🌙 Búho nocturno', '🌙 Midnight owl', 'Una observación entre las 00:00 y las 04:59 UTC','An observation between 00:00 and 04:59 UTC',
+  'discovery','bronze', '{"type":"midnight_observation"}')
 
 ON CONFLICT (key) DO UPDATE
 SET name_es = EXCLUDED.name_es,
