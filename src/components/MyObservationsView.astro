@@ -28,6 +28,14 @@ const profilePath = getLocalizedPath(lang, routes.profile[lang] + '/');
 const shareObsBase = `/share/obs/`;
 
 const profileStrings = tr.profile as unknown as Record<string, string>;
+const impactPillPrefix  = profileStrings.my_observations_impact_pill_prefix  ?? (lang === 'es' ? 'Filtrado por:' : 'Filtered by:');
+const impactPillClear   = profileStrings.my_observations_impact_pill_clear   ?? (lang === 'es' ? '× Quitar filtro' : '× Clear filter');
+const impactPillUnknown = profileStrings.my_observations_impact_pill_unknown ?? (lang === 'es' ? 'Filtro no reconocido — mostrando todas las observaciones.' : 'Unrecognized filter — showing all observations.');
+const impactLabelMapped           = profileStrings.my_observations_impact_label_mapped           ?? (lang === 'es' ? 'Observaciones mapeadas' : 'Mapped observations');
+const impactLabelResearchGrade    = profileStrings.my_observations_impact_label_research_grade   ?? (lang === 'es' ? 'Grado investigación' : 'Research-grade');
+const impactLabelExpertConfirmed  = profileStrings.my_observations_impact_label_expert_confirmed ?? (lang === 'es' ? 'Confirmadas por expertos' : 'Expert-confirmed');
+const impactLabelInProject        = profileStrings.my_observations_impact_label_in_project       ?? (lang === 'es' ? 'En un proyecto de investigación' : 'In a research project');
+const impactLabelSensitive        = profileStrings.my_observations_impact_label_sensitive        ?? (lang === 'es' ? 'Especies en riesgo' : 'At-risk species');
 const sgReactions = (tr as unknown as { socialgraph: { reactions: Record<string, string> } }).socialgraph.reactions;
 const faveAriaOne = sgReactions.fave_count_aria_one ?? '{{count}} person favorited this';
 const faveAriaOther = sgReactions.fave_count_aria_other ?? '{{count}} people favorited this';
@@ -93,6 +101,14 @@ const tabs = [
   data-label-hidden-no-reason={profileStrings.obs_hidden_by_mod_no_reason ?? (lang === 'es' ? 'Sin razón especificada.' : 'No reason provided.')}
   data-label-hidden-appeal-link={profileStrings.obs_hidden_by_mod_appeal_link ?? (lang === 'es' ? 'Ver razón / Apelar' : 'View reason / Appeal')}
   data-appeal-path={lang === 'es' ? '/es/perfil/apelar/' : '/en/profile/appeal/'}
+  data-label-impact-pill-prefix={impactPillPrefix}
+  data-label-impact-pill-clear={impactPillClear}
+  data-label-impact-pill-unknown={impactPillUnknown}
+  data-label-impact-mapped={impactLabelMapped}
+  data-label-impact-research-grade={impactLabelResearchGrade}
+  data-label-impact-expert-confirmed={impactLabelExpertConfirmed}
+  data-label-impact-in-project={impactLabelInProject}
+  data-label-impact-sensitive={impactLabelSensitive}
 >
   <header class="flex items-start justify-between gap-3 mb-6 flex-wrap">
     <div>
@@ -138,6 +154,27 @@ const tabs = [
   </div>
 
   <div id="mo-content" class="hidden">
+    <div
+      id="mo-impact-pill"
+      class="hidden mb-4 inline-flex items-center gap-2 rounded-full border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1 text-xs text-emerald-900 dark:text-emerald-200"
+      role="status"
+    >
+      <span class="font-medium" id="mo-impact-pill-prefix">{impactPillPrefix}</span>
+      <span id="mo-impact-pill-label" class="font-semibold"></span>
+      <button
+        type="button"
+        id="mo-impact-pill-clear"
+        class="ml-1 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium underline hover:no-underline"
+        aria-label={impactPillClear}
+      >{impactPillClear}</button>
+    </div>
+    <div
+      id="mo-impact-pill-unknown"
+      class="hidden mb-4 inline-flex items-center gap-2 rounded-full border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-1 text-xs text-amber-900 dark:text-amber-200"
+      role="status"
+    >
+      <span>{impactPillUnknown}</span>
+    </div>
     <nav class="flex gap-1 mb-5 overflow-x-auto" role="tablist" aria-label={tr.profile.my_observations_title}>
       {tabs.map(tab => (
         <button
@@ -186,6 +223,7 @@ const tabs = [
   import { getSupabase } from '../lib/supabase';
   import { isSyncFilter, type SyncFilter } from '../lib/social';
   import { buildBugReportUrl } from '../lib/bug-report';
+  import { parseImpactFilter, type ImpactFilter } from '../lib/impact-filter';
 
   type Lang = 'en' | 'es';
 
@@ -214,6 +252,7 @@ const tabs = [
   let exhausted = false;
   let busy = false;
   let userId: string | null = null;
+  let impactFilter: ImpactFilter | null = null;
 
   function statusBadge(status: Row['sync_status'], syncError?: string | null, obsId?: string, obsName?: string): string {
     if (!root) return '';
@@ -422,6 +461,28 @@ const tabs = [
     }
 
     const supabase = getSupabase();
+
+    // Impact-deep-link path: resolve the filter to an id list via the
+    // SECURITY DEFINER RPC, then fetch the row shape the list expects.
+    // The RPC mirrors compute_user_impact's predicates one-for-one and
+    // is scoped to sync_status='synced'.
+    if (impactFilter) {
+      const { data: idRows } = await supabase.rpc('list_user_impact_obs', {
+        p_user_id: userId,
+        p_filter:  impactFilter,
+        p_limit:   PAGE_SIZE,
+        p_offset:  offset,
+      });
+      const ids = ((idRows ?? []) as { id: string }[]).map(r => r.id);
+      if (ids.length === 0) return [];
+      const { data } = await supabase
+        .from('observations')
+        .select('id, observed_at, sync_status, state_province, hidden, hidden_reason, identifications(scientific_name, is_primary, is_research_grade), media_files(url, is_primary, media_type)')
+        .in('id', ids)
+        .order('observed_at', { ascending: false });
+      return ((data ?? []) as unknown) as Row[];
+    }
+
     let q = supabase
       .from('observations')
       .select('id, observed_at, sync_status, state_province, hidden, hidden_reason, identifications(scientific_name, is_primary, is_research_grade), media_files(url, is_primary, media_type)')
@@ -681,6 +742,61 @@ const tabs = [
     return loadMore();
   }
 
+  function impactLabelFor(filter: ImpactFilter): string {
+    switch (filter) {
+      case 'mapped':           return root?.dataset.labelImpactMapped           ?? 'Mapped observations';
+      case 'research_grade':   return root?.dataset.labelImpactResearchGrade    ?? 'Research-grade';
+      case 'expert_confirmed': return root?.dataset.labelImpactExpertConfirmed  ?? 'Expert-confirmed';
+      case 'in_project':       return root?.dataset.labelImpactInProject        ?? 'In a research project';
+      case 'sensitive':        return root?.dataset.labelImpactSensitive        ?? 'At-risk species';
+    }
+  }
+
+  function applyImpactFilterFromUrl() {
+    const parsed = parseImpactFilter(window.location.search);
+    const recognizedPill = document.getElementById('mo-impact-pill');
+    const labelEl        = document.getElementById('mo-impact-pill-label');
+    const unknownPill    = document.getElementById('mo-impact-pill-unknown');
+    const tabsNav        = document.querySelector<HTMLElement>('nav[role="tablist"]');
+    if (parsed.kind === 'recognized') {
+      impactFilter = parsed.value;
+      if (labelEl) labelEl.textContent = impactLabelFor(parsed.value);
+      recognizedPill?.classList.remove('hidden');
+      unknownPill?.classList.add('hidden');
+      // Tabs are sync-status oriented; they're ignored while an impact
+      // filter is active (the RPC scopes to sync_status='synced').
+      // Hide them to avoid implying they compose.
+      tabsNav?.classList.add('hidden');
+    } else if (parsed.kind === 'unknown') {
+      impactFilter = null;
+      recognizedPill?.classList.add('hidden');
+      unknownPill?.classList.remove('hidden');
+      tabsNav?.classList.remove('hidden');
+    } else {
+      impactFilter = null;
+      recognizedPill?.classList.add('hidden');
+      unknownPill?.classList.add('hidden');
+      tabsNav?.classList.remove('hidden');
+    }
+  }
+
+  function wireImpactClear() {
+    const btn = document.getElementById('mo-impact-pill-clear') as HTMLButtonElement | null;
+    if (!btn || btn.dataset.bound) return;
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      // Drop ?filter=… without a navigation so list state is preserved.
+      const url = new URL(window.location.href);
+      url.searchParams.delete('filter');
+      const qs = url.searchParams.toString();
+      const next = url.pathname + (qs ? '?' + qs : '') + url.hash;
+      window.history.replaceState(null, '', next);
+      applyImpactFilterFromUrl();
+      resetAndLoad().catch(() => { /* no-op */ });
+    });
+  }
+
   function wireTabs() {
     const tabs = document.querySelectorAll<HTMLButtonElement>('.mo-tab');
     const setActive = (id: string) => {
@@ -754,6 +870,8 @@ const tabs = [
     userId = user.id;
     document.getElementById('mo-content')?.classList.remove('hidden');
     wireTabs();
+    applyImpactFilterFromUrl();
+    wireImpactClear();
     document.getElementById('mo-load-more')?.addEventListener('click', () => {
       loadMore().catch(() => { /* no-op */ });
     });

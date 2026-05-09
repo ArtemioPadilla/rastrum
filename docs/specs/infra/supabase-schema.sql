@@ -9413,6 +9413,102 @@ $$;
 REVOKE ALL ON FUNCTION public.compute_user_impact(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.compute_user_impact(uuid)
   TO authenticated, service_role;
+
+-- list_user_impact_obs(user_id, filter, limit, offset)
+-- =====================================================================
+-- Returns observation IDs that match each impact-card filter, mirroring
+-- the predicates inside compute_user_impact() one-for-one. Used by the
+-- /profile/observations?filter=<key> deep-link from the impact page so
+-- the cards land on the rows their metric was computed from.
+--
+-- We only return ids (not full rows) because the client already has a
+-- detailed SELECT-with-joins for the list; a follow-up
+-- `.in('id', returned_ids)` keeps shape parity with the regular path.
+--
+-- Filters:
+--   mapped            location IS NOT NULL
+--   research_grade    primary identifications.is_research_grade = true
+--   expert_confirmed  any identification.validated_by has 'expert' role
+--   in_project        project_id IS NOT NULL
+--   sensitive         taxon nom059_status IN ('E','P','A','Pr')
+--                     OR    iucn_category IN ('CR','EN','VU','NT')
+--
+-- Self-only: authenticated callers must be the subject. service_role
+-- (auth.uid() = NULL) bypasses for cron/admin reuse.
+CREATE OR REPLACE FUNCTION public.list_user_impact_obs(
+  p_user_id uuid,
+  p_filter  text,
+  p_limit   int DEFAULT 20,
+  p_offset  int DEFAULT 0
+)
+RETURNS TABLE (id uuid)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_caller uuid := auth.uid();
+  v_limit  int  := LEAST(GREATEST(COALESCE(p_limit, 20), 1), 200);
+  v_offset int  := GREATEST(COALESCE(p_offset, 0), 0);
+BEGIN
+  IF p_user_id IS NULL THEN
+    RAISE EXCEPTION 'p_user_id is required' USING ERRCODE = '22023';
+  END IF;
+  IF v_caller IS NOT NULL AND v_caller IS DISTINCT FROM p_user_id THEN
+    RAISE EXCEPTION 'list_user_impact_obs: caller must be the subject'
+      USING ERRCODE = '42501';
+  END IF;
+  IF p_filter NOT IN ('mapped','research_grade','expert_confirmed','in_project','sensitive') THEN
+    RAISE EXCEPTION 'list_user_impact_obs: unknown filter %', p_filter
+      USING ERRCODE = '22023';
+  END IF;
+
+  RETURN QUERY
+  SELECT o.id
+  FROM public.observations o
+  WHERE o.observer_id = p_user_id
+    AND o.sync_status = 'synced'
+    AND CASE p_filter
+      WHEN 'mapped' THEN
+        o.location IS NOT NULL
+      WHEN 'research_grade' THEN
+        EXISTS (
+          SELECT 1 FROM public.identifications i
+          WHERE i.observation_id = o.id
+            AND i.is_primary = true
+            AND i.is_research_grade = true
+        )
+      WHEN 'expert_confirmed' THEN
+        EXISTS (
+          SELECT 1 FROM public.identifications i
+          WHERE i.observation_id = o.id
+            AND i.validated_by IS NOT NULL
+            AND public.has_role(i.validated_by, 'expert'::public.user_role)
+        )
+      WHEN 'in_project' THEN
+        o.project_id IS NOT NULL
+      WHEN 'sensitive' THEN
+        EXISTS (
+          SELECT 1 FROM public.identifications i
+          JOIN public.taxa t ON t.id = i.taxon_id
+          WHERE i.observation_id = o.id
+            AND i.is_primary = true
+            AND (
+              t.nom059_status IN ('E','P','A','Pr')
+              OR t.iucn_category IN ('CR','EN','VU','NT')
+            )
+        )
+    END
+  ORDER BY o.observed_at DESC
+  LIMIT v_limit OFFSET v_offset;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.list_user_impact_obs(uuid, text, int, int) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.list_user_impact_obs(uuid, text, int, int)
+  TO authenticated, service_role;
+
 -- M07 / #745 — Peer norms for license + privacy choice
 -- =====================================================================
 -- Two materialised views aggregate community-wide choices:
