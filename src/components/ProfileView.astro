@@ -378,9 +378,9 @@ const ep = (tr as unknown as { profile: { expert_prompt: Record<string, string> 
     if (statObs)   statObs.textContent   = String(stats?.total_observations ?? profile.observation_count ?? 0);
     if (statStreak) statStreak.textContent = String(stats?.current_streak ?? 0);
 
-    // Watchlist count
+    // Watchlist count — table is 'watchlists' (not 'watchlist_entries', fixes #698)
     const { count: watchlistCount } = await supabase
-      .from('watchlist_entries')
+      .from('watchlists')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id);
     if (statWatchlist) statWatchlist.textContent = String(watchlistCount ?? 0);
@@ -392,11 +392,12 @@ const ep = (tr as unknown as { profile: { expert_prompt: Record<string, string> 
         const DISMISS_KEY = 'rastrum.profile.expertPromptDismissed';
         const dismissed = sessionStorage.getItem(DISMISS_KEY) === '1';
 
-        const { data: expertiseRow } = await supabase
+        // Count distinct taxa rows for this user — user_expertise has no taxon_count
+        // column; the count of rows IS the taxon diversity metric (fixes #699)
+        const { count: userTaxonCount } = await supabase
           .from('user_expertise')
-          .select('taxon_count')
-          .eq('user_id', user.id)
-          .maybeSingle<{ taxon_count: number }>();
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id);
 
         const eligibility = evaluateExpertEligibility(
           {
@@ -404,7 +405,7 @@ const ep = (tr as unknown as { profile: { expert_prompt: Record<string, string> 
             is_expert: profile.is_expert ?? false,
             expert_application_status: (profile as unknown as { expert_application_status?: string | null }).expert_application_status as 'pending' | 'approved' | 'rejected' | null,
           },
-          { taxon_count: expertiseRow?.taxon_count ?? 0 },
+          { taxon_count: userTaxonCount ?? 0 },
         );
 
         const promptEl  = document.getElementById('expert-prompt');
