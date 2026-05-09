@@ -1,6 +1,7 @@
 ---
 import type { Locale } from '../i18n/utils';
 import { t } from '../i18n/utils';
+import WhyAmISeeingThis from './WhyAmISeeingThis.astro';
 
 interface Props {
   lang: Locale;
@@ -111,6 +112,11 @@ const exploreHref       = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'exp
   <div id="pokedex-hero" class="hidden"></div>
   <div id="pokedex-pills" class="hidden"></div>
   <div id="pokedex-missing-toolbar" class="hidden mt-4 flex flex-wrap items-center gap-3 text-xs"></div>
+  {!visitor && (
+    <div id="pokedex-why-falta" class="hidden mt-2">
+      <WhyAmISeeingThis algorithm="falta_dex_missing" lang={lang} />
+    </div>
+  )}
   <div id="pokedex-grid" class="hidden mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3"></div>
   <p id="pokedex-missing-disclaimer" class="hidden mt-3 text-[11px] text-zinc-500 dark:text-zinc-500"></p>
 </section>
@@ -543,6 +549,8 @@ const exploreHref       = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'exp
         ${escAttr(toggleLabel)}
       </button>`;
     missingToolbarEl.classList.remove('hidden');
+    // Reveal the falta-dex disclosure pill once the toolbar is rendered.
+    document.getElementById('pokedex-why-falta')?.classList.remove('hidden');
 
     const btn = missingToolbarEl.querySelector<HTMLButtonElement>('[data-pokedex-toggle-missing]');
     btn?.addEventListener('click', onToggleMissing);
