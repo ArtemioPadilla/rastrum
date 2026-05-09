@@ -1,11 +1,11 @@
 export type LeaderboardPeriod = '30d' | 'all';
 export type LeaderboardView = LeaderboardPeriod | 'experts';
 export type LeaderboardWindow = 'today' | 'week' | 'month' | 'all';
-export type LeaderboardScope = 'global' | 'friends';
+export type LeaderboardScope = 'global' | 'friends' | 'region';
 
 const VALID_VIEWS: readonly LeaderboardView[] = ['30d', 'all', 'experts'] as const;
 const VALID_WINDOWS: readonly LeaderboardWindow[] = ['today', 'week', 'month', 'all'] as const;
-const VALID_SCOPES: readonly LeaderboardScope[] = ['global', 'friends'] as const;
+const VALID_SCOPES: readonly LeaderboardScope[] = ['global', 'friends', 'region'] as const;
 
 export const DEFAULT_WINDOW: LeaderboardWindow = 'month';
 export const DEFAULT_SCOPE: LeaderboardScope = 'global';
@@ -80,6 +80,24 @@ export function parseLeaderboardScope(input: string | null | undefined): Leaderb
   return (VALID_SCOPES as readonly string[]).includes(input)
     ? (input as LeaderboardScope)
     : DEFAULT_SCOPE;
+}
+
+/** Read `?country=XX` — returns empty string if missing/malformed. */
+export function countryFromSearch(search: string): string {
+  const v = (new URLSearchParams(search).get('country') ?? '').toUpperCase();
+  return /^[A-Z]{2}$/.test(v) ? v : '';
+}
+
+/** Write `?country=XX` into the search string; removes param when country is empty. */
+export function searchForCountry(currentSearch: string, country: string): string {
+  const params = new URLSearchParams(currentSearch);
+  const trimmed = country.trim().toUpperCase();
+  if (trimmed && /^[A-Z]{2}$/.test(trimmed)) {
+    params.set('country', trimmed);
+  } else {
+    params.delete('country');
+  }
+  return serialize(params);
 }
 
 export function windowFromSearch(search: string): LeaderboardWindow {

@@ -10614,3 +10614,171 @@ EXCEPTION WHEN insufficient_privilege THEN
   RAISE NOTICE 'apply role cannot CREATE POLICY on spatial_ref_sys; advisor entry will persist.';
 END
 $$;
+
+-- ─────────────────────────────────────────────────────────────────────
+-- #812 — count_distinct_observed_species() RPC
+-- Returns distinct primary_taxon_id count from public observations.
+-- STABLE (no side effects), SECURITY INVOKER, LANGUAGE sql.
+-- GRANT to anon and authenticated.
+-- ─────────────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.count_distinct_observed_species()
+  RETURNS integer
+  LANGUAGE sql
+  STABLE
+  SECURITY INVOKER
+AS $$
+  SELECT COUNT(DISTINCT primary_taxon_id)::integer
+  FROM public.observations
+  WHERE primary_taxon_id IS NOT NULL
+    AND sync_status = 'synced'
+    AND obscure_level <> 'private';
+$$;
+
+GRANT EXECUTE ON FUNCTION public.count_distinct_observed_species() TO anon, authenticated;
+
+HEAD
+-- #798 — after_rain kairos trigger
+-- Extends kairos_subscriptions.kind CHECK to include 'after_rain'.
+-- Adds weather_snapshots table (geohash5 grid, populated by
+-- enrich-environment) and recent_rainfall_12h view.
+-- ─────────────────────────────────────────────────────────────────────
+
+-- Extend the kind CHECK constraint (drop + recreate idempotently).
+ALTER TABLE public.kairos_subscriptions
+  DROP CONSTRAINT IF EXISTS kairos_subscriptions_kind_check;
+ALTER TABLE public.kairos_subscriptions
+  ADD CONSTRAINT kairos_subscriptions_kind_check
+  CHECK (kind IN ('golden_hour', 'after_rain', 'migration_window', 'lunar_event'));
+
+-- weather_snapshots: one row per (geohash5, hour-bucket).
+-- Populated by enrich-environment; consumed by kairos-fire (after_rain).
+CREATE TABLE IF NOT EXISTS public.weather_snapshots (
+  id               bigserial PRIMARY KEY,
+  geohash5         text        NOT NULL,
+  precipitation_mm numeric     NOT NULL DEFAULT 0,
+  recorded_at      timestamptz NOT NULL DEFAULT now(),
+  created_at       timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_weather_snapshots_geohash5_recorded_at
+  ON public.weather_snapshots(geohash5, recorded_at DESC);
+
+ALTER TABLE public.weather_snapshots ENABLE ROW LEVEL SECURITY;
+
+-- Only service_role can write snapshots; no direct user access.
+GRANT SELECT ON public.weather_snapshots TO service_role;
+GRANT INSERT ON public.weather_snapshots TO service_role;
+
+-- recent_rainfall_12h: total precipitation in the last 12 h per geohash5.
+-- SECURITY INVOKER so RLS on weather_snapshots applies to the caller.
+DROP VIEW IF EXISTS public.recent_rainfall_12h;
+CREATE VIEW public.recent_rainfall_12h
+  WITH (security_invoker = true) AS
+SELECT
+  geohash5,
+  SUM(precipitation_mm) AS total_mm,
+  MAX(recorded_at)      AS latest_at
+FROM public.weather_snapshots
+WHERE recorded_at >= (now() - INTERVAL '12 hours')
+GROUP BY geohash5;
+
+GRANT SELECT ON public.recent_rainfall_12h TO service_role;
+
+
+-- migration_windows: catalog of seasonal windows when notable taxa migrate.
+CREATE TABLE IF NOT EXISTS public.migration_windows (
+  id           bigserial   PRIMARY KEY,
+  taxon_group  text        NOT NULL,
+  start_doy    integer     NOT NULL CHECK (start_doy BETWEEN 1 AND 366),
+  end_doy      integer     NOT NULL CHECK (end_doy BETWEEN 1 AND 366),
+  region_code  text        NOT NULL,
+  body_en      text        NOT NULL,
+  body_es      text        NOT NULL,
+  source_url   text,
+  enabled      boolean     NOT NULL DEFAULT true,
+  created_at   timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_migration_windows_region_enabled
+  ON public.migration_windows(region_code) WHERE enabled = true;
+
+ALTER TABLE public.migration_windows ENABLE ROW LEVEL SECURITY;
+
+-- Public read for enabled rows (anon/authenticated); writes via service_role only.
+DROP POLICY IF EXISTS "migration_windows_public_read" ON public.migration_windows;
+CREATE POLICY "migration_windows_public_read" ON public.migration_windows
+  FOR SELECT USING (enabled = true);
+
+GRANT SELECT ON public.migration_windows TO anon, authenticated, service_role;
+
+-- Seed 4–8 MX migration windows.
+INSERT INTO public.migration_windows
+  (taxon_group, start_doy, end_doy, region_code, body_en, body_es, source_url)
+VALUES
+  -- Monarch butterfly southbound through Michoacán (Sep–Nov: DOY 244–319)
+  ('Lepidoptera', 244, 319, 'MX-MIC',
+   'Monarch migration underway in Michoacán — watch for mass roosts.',
+   'Migración de monarca en Michoacán — busca dormideros masivos.',
+   'https://www.learner.org/series/journey-north/monarch-butterfly/'),
+  -- Monarch overwintering peak in Oaxaca valleys (Oct–Jan: DOY 274–31)
+  ('Lepidoptera', 274, 31, 'MX-OAX',
+   'Monarchs overwintering in Oaxaca highland forests.',
+   'Monarcas invernando en bosques serranos de Oaxaca.',
+   NULL),
+  -- Swainson''s Hawk southbound through Veracruz (Sep–Nov: DOY 244–319)
+  ('Aves', 244, 319, 'MX-VER',
+   'Swainson''s Hawk migration through Veracruz — count raptors from Chichicaxtle ridge.',
+   'Migración de gavilán de Swainson por Veracruz — conteo desde Chichicaxtle.',
+   'https://hawkcount.org/'),
+  -- Olive Ridley sea turtle nesting on Oaxaca coast (Jun–Dec: DOY 152–335)
+  ('Reptilia', 152, 335, 'MX-OAX',
+   'Olive Ridley nesting season on Oaxaca beaches — low-light observation only.',
+   'Temporada de anidación de golfina en playas de Oaxaca — observación con luz tenue.',
+   NULL)
+ON CONFLICT DO NOTHING;
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- Issue #870 — Granular notification preferences
+-- ═══════════════════════════════════════════════════════════════════════════
+-- Adds users.notification_prefs (jsonb) and a helper function so Edge
+-- Functions can check per-channel/trigger opt-in state without bespoke
+-- logic in every function.
+
+-- 1) New column on users (idempotent).
+ALTER TABLE public.users
+  ADD COLUMN IF NOT EXISTS notification_prefs jsonb NOT NULL DEFAULT '{}';
+
+-- 2) Helper: returns true when a user has opted in to a given channel+trigger.
+--    Defaults to TRUE (opt-out model) when the key is absent — new triggers
+--    are on by default until the user explicitly turns them off.
+CREATE OR REPLACE FUNCTION public.notification_prefs_get(
+  p_uid     uuid,
+  p_channel text,
+  p_trigger text
+) RETURNS boolean
+LANGUAGE sql STABLE
+SECURITY DEFINER SET search_path = public, extensions, pg_temp
+AS $$
+  SELECT COALESCE(
+    (SELECT (notification_prefs->p_channel->>p_trigger)::boolean
+     FROM public.users WHERE id = p_uid),
+    true
+  );
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.notification_prefs_get(uuid, text, text) FROM PUBLIC;
+GRANT  EXECUTE ON FUNCTION public.notification_prefs_get(uuid, text, text) TO authenticated, service_role;
+
+-- RLS: notification_prefs is part of the users table row; existing policies
+-- already enforce self-only write (users_self_write). No new policy needed —
+-- the column grant model controls column-level write access.
+-- Explicitly grant column-level UPDATE so the supabase-js client (authenticated)
+-- can write notification_prefs via UPDATE on users WHERE id = auth.uid().
+DO $$
+BEGIN
+  GRANT UPDATE (notification_prefs) ON public.users TO authenticated;
+EXCEPTION WHEN insufficient_privilege THEN
+  RAISE NOTICE 'Could not GRANT UPDATE (notification_prefs) — may require superuser. Grant manually if needed.';
+END
+$$;
+

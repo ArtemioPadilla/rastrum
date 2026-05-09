@@ -1,0 +1,121 @@
+---
+import { t } from '../i18n/utils';
+
+interface Props { lang: 'en' | 'es'; }
+const { lang } = Astro.props;
+const tr = t(lang);
+const k = (tr as unknown as {
+  notifications: {
+    migration_window: {
+      title: string;
+      opt_in_label: string;
+      opt_in_hint: string;
+      enabling: string;
+      enabled: string;
+      disable: string;
+      disabling: string;
+      permission_blocked: string;
+      unsupported: string;
+      vapid_missing: string;
+    };
+  };
+}).notifications.migration_window;
+---
+
+<section class="rounded-lg border border-teal-200 dark:border-teal-900/40 bg-teal-50/40 dark:bg-teal-950/20 p-4">
+  <h3 class="text-sm font-semibold text-teal-900 dark:text-teal-200 mb-1">
+    {k.title}
+  </h3>
+  <p class="text-xs text-teal-800/80 dark:text-teal-200/70 mb-3">{k.opt_in_hint}</p>
+
+  <div class="flex items-start gap-3 flex-wrap">
+    <button
+      id="kairos-mig-toggle"
+      type="button"
+      class="rounded-lg border border-teal-600/60 bg-teal-100 dark:bg-teal-900/30 px-3 py-1.5 text-sm font-medium text-teal-800 dark:text-teal-200 hover:bg-teal-200 dark:hover:bg-teal-900/50 disabled:opacity-50"
+    >
+      <span data-kairos-label>{k.opt_in_label}</span>
+    </button>
+    <p id="kairos-mig-status" class="text-xs text-zinc-500"></p>
+  </div>
+  <p id="kairos-mig-warning" class="hidden mt-2 text-xs text-teal-700 dark:text-teal-400"></p>
+</section>
+
+<script>
+  (async function () {
+    const isEsLang = document.documentElement.lang === 'es';
+    const btn = /** @type {HTMLButtonElement | null} */ (document.getElementById('kairos-mig-toggle'));
+    if (!btn) return;
+    const labelEl = /** @type {HTMLElement | null} */ (btn.querySelector('[data-kairos-label]'));
+    const status = document.getElementById('kairos-mig-status');
+    const warn = document.getElementById('kairos-mig-warning');
+
+    const TXT = isEsLang
+      ? {
+          enable: 'Activar prompt de ventana migratoria',
+          enabling: 'Suscribiendo…',
+          enabled: 'Prompts de ventana migratoria activados.',
+          disable: 'Desactivar',
+          disabling: 'Desactivando…',
+          permission_blocked: 'Las notificaciones del navegador están bloqueadas. Actívalas en la configuración del sitio y vuelve a intentar.',
+          unsupported: 'Este navegador no soporta web push (prueba Chrome en Android o Safari 16.4+ en iOS).',
+          vapid_missing: 'El push aún no está configurado — el operador debe publicar primero una llave VAPID.',
+        }
+      : {
+          enable: 'Enable migration window prompt',
+          enabling: 'Subscribing…',
+          enabled: 'Migration window prompts enabled.',
+          disable: 'Disable',
+          disabling: 'Disabling…',
+          permission_blocked: 'Browser notifications are blocked. Enable them in your browser site settings, then try again.',
+          unsupported: "This browser doesn't support web push (try Chrome on Android or Safari 16.4+ on iOS).",
+          vapid_missing: "Push isn't configured yet — the operator must publish a VAPID key first.",
+        };
+
+    function setLabel(t) { if (labelEl) labelEl.textContent = t; }
+    function setStatus(t) { if (status) status.textContent = t; }
+    function setWarn(t) {
+      if (!warn) return;
+      if (!t) { warn.classList.add('hidden'); warn.textContent = ''; return; }
+      warn.textContent = t;
+      warn.classList.remove('hidden');
+    }
+
+    const kairosLib = await import('../lib/kairos');
+
+    async function refresh() {
+      const on = await kairosLib.isKairosOptIn('migration_window');
+      if (on) {
+        setLabel(TXT.disable);
+        setStatus('✓ ' + TXT.enabled);
+        btn.dataset.state = 'on';
+      } else {
+        setLabel(TXT.enable);
+        setStatus('');
+        btn.dataset.state = 'off';
+      }
+      setWarn(null);
+    }
+
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      const turningOn = btn.dataset.state !== 'on';
+      setLabel(turningOn ? TXT.enabling : TXT.disabling);
+      const r = turningOn
+        ? await kairosLib.enableKairos('migration_window')
+        : await kairosLib.disableKairos('migration_window');
+      btn.disabled = false;
+      if (!r.ok) {
+        const map = {
+          unsupported: TXT.unsupported,
+          permission_blocked: TXT.permission_blocked,
+          vapid_missing: TXT.vapid_missing,
+        };
+        setWarn(map[r.reason] ?? r.message ?? '');
+      }
+      await refresh();
+    });
+
+    refresh().catch(() => {});
+  })();
+</script>

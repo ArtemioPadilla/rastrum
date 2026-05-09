@@ -176,6 +176,17 @@ describe('runParallelIdentify with taxonHint', () => {
     expect(out.kind).toBe('winner');
     if (out.kind === 'winner') expect(out.result.source).toBe('claude_haiku');
   });
+
+  it('returns all_failed with empty errors when hint filters all runners', async () => {
+    // Only PlantNet configured, hint = Animalia.Insecta (non-plant) → PlantNet filtered → no runners
+    const plantnet = vi.fn().mockResolvedValue({ source: 'plantnet', scientific_name: 'Cactus sp.', common_name: null, confidence: 0.8, alternates: [] });
+    const out = await runParallelIdentify(fakeFile, {
+      runners: { plantnet },
+      taxonHint: 'Animalia.Insecta',
+    });
+    expect(out.kind).toBe('all_failed');
+    expect((out as { kind: 'all_failed'; errors: Record<string, string> }).errors._).toBe('no runners');
+  });
 });
 
 describe('extractJsonObject', () => {

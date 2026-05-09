@@ -220,6 +220,7 @@ const stringsJson = JSON.stringify({
   import { parseFilters, serializeFilters, loadGps, saveGps, clearGps, type CommunityFilters, type CommunityGps } from '../lib/community-url';
   import { loadCommunity, loadCommunityNearbyAt, viewerHasCentroid, loadViewerCommunityMeta, loadIsoCountries, COMMUNITY_PAGE_SIZE, type CommunityObserver } from '../lib/community';
   import { getSupabase } from '../lib/supabase';
+  import { tierForKarma } from '../lib/karma-frame';
 
   interface Strings {
     lang: 'en' | 'es';
@@ -360,12 +361,14 @@ const stringsJson = JSON.stringify({
     const speciesLabel = STRINGS.speciesTpl.replace('{n}', String(row.species_count));
     const lastSeen = STRINGS.lastSeenTpl.replace('{when}', relativeTime(row.last_observation_at));
 
+    const karmaRingTier = tierForKarma(row.karma_total ?? 0);
+    const karmaRingClass = karmaRingTier.staticRingClass ?? karmaRingTier.ringClass;
     const el = document.createElement('article');
     el.className = 'rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 flex items-start gap-3';
     el.innerHTML = `
       <a href="${profileHref}" class="flex-none">
         ${row.avatar_url
-          ? `<img src="${escapeHtml(row.avatar_url)}" alt="" loading="lazy" class="w-12 h-12 rounded-full bg-zinc-200 dark:bg-zinc-800 object-cover">`
+          ? `<span class="inline-block rounded-full ring-offset-1 ring-offset-white dark:ring-offset-zinc-900 ${escapeHtml(karmaRingClass)}"><img src="${escapeHtml(row.avatar_url)}" alt="" loading="lazy" class="w-12 h-12 rounded-full bg-zinc-200 dark:bg-zinc-800 object-cover block"></span>`
           : `<div class="w-12 h-12 rounded-full bg-emerald-700 text-white flex items-center justify-center font-semibold">${escapeHtml(displayName.slice(0, 1).toUpperCase())}</div>`}
       </a>
       <div class="flex-1 min-w-0">

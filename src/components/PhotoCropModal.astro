@@ -87,6 +87,15 @@ const obs = (tr as unknown as { observe: Record<string, string> }).observe;
       </div>
 
       <div class="space-y-2 pt-1">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-medium text-zinc-500 dark:text-zinc-400">Adjustments</span>
+          <button
+            type="button"
+            id="rastrum-crop-auto-enhance"
+            class="inline-flex items-center rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-1 text-xs font-medium text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 data-[active=true]:border-emerald-500 data-[active=true]:bg-emerald-50 data-[active=true]:text-emerald-700 dark:data-[active=true]:bg-emerald-950 dark:data-[active=true]:text-emerald-300 min-h-[32px]"
+            aria-label={obs.auto_enhance_aria}
+          >{obs.auto_enhance}</button>
+        </div>
         <div>
           <div class="flex items-center justify-between mb-1">
             <label for="rastrum-crop-brightness" class="text-xs font-medium text-zinc-700 dark:text-zinc-300">
@@ -164,6 +173,7 @@ const obs = (tr as unknown as { observe: Record<string, string> }).observe;
     const brightVal   = document.getElementById('rastrum-crop-brightness-val') as HTMLElement | null;
     const contrInput  = document.getElementById('rastrum-crop-contrast')       as HTMLInputElement | null;
     const contrVal    = document.getElementById('rastrum-crop-contrast-val')   as HTMLElement | null;
+    const autoBtn     = document.getElementById('rastrum-crop-auto-enhance')   as HTMLButtonElement | null;
 
     type State = {
       file: File;
@@ -178,8 +188,14 @@ const obs = (tr as unknown as { observe: Record<string, string> }).observe;
     };
     let state: State | null = null;
     let prevFocus: Element | null = null;
+    let autoActive = false;
 
     const HANDLE_RADIUS = 14;
+
+    function setAutoActive(active: boolean) {
+      autoActive = active;
+      if (autoBtn) autoBtn.dataset.active = String(active);
+    }
 
     function openModal(file: File) {
       prevFocus = document.activeElement;
@@ -211,6 +227,7 @@ const obs = (tr as unknown as { observe: Record<string, string> }).observe;
       if (brightVal) brightVal.textContent = '0';
       if (contrInput) contrInput.value = '0';
       if (contrVal) contrVal.textContent = '0';
+      setAutoActive(false);
       root?.classList.remove('hidden');
       requestAnimationFrame(() => {
         useBtn?.focus();
@@ -313,6 +330,7 @@ const obs = (tr as unknown as { observe: Record<string, string> }).observe;
       if (brightVal) brightVal.textContent = '0';
       if (contrInput) contrInput.value = '0';
       if (contrVal) contrVal.textContent = '0';
+      setAutoActive(false);
       redraw();
     }
 
@@ -418,6 +436,17 @@ const obs = (tr as unknown as { observe: Record<string, string> }).observe;
     rotLBtn?.addEventListener('click', () => rotate('left'));
     rotRBtn?.addEventListener('click', () => rotate('right'));
     resetBtn?.addEventListener('click', reset);
+    autoBtn?.addEventListener('click', () => {
+      if (!state) return;
+      state.brightness = 20;
+      state.contrast = 15;
+      if (brightInput) brightInput.value = '20';
+      if (brightVal) brightVal.textContent = '20';
+      if (contrInput) contrInput.value = '15';
+      if (contrVal) contrVal.textContent = '15';
+      setAutoActive(true);
+      redraw();
+    });
 
     cancelBtn?.addEventListener('click', () => {
       emit('cancel');
@@ -460,6 +489,7 @@ const obs = (tr as unknown as { observe: Record<string, string> }).observe;
       const v = Number(brightInput.value);
       state.brightness = Number.isFinite(v) ? v : 0;
       if (brightVal) brightVal.textContent = String(state.brightness);
+      setAutoActive(false);
       redraw();
     });
     contrInput?.addEventListener('input', () => {
@@ -467,6 +497,7 @@ const obs = (tr as unknown as { observe: Record<string, string> }).observe;
       const v = Number(contrInput.value);
       state.contrast = Number.isFinite(v) ? v : 0;
       if (contrVal) contrVal.textContent = String(state.contrast);
+      setAutoActive(false);
       redraw();
     });
 

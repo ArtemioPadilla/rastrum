@@ -1,6 +1,8 @@
 ---
 import StreakRemindersSection from './StreakRemindersSection.astro';
 import KairosGoldenHourSection from './KairosGoldenHourSection.astro';
+import KairosAfterRainSection from './KairosAfterRainSection.astro';
+import KairosLunarEventSection from './KairosLunarEventSection.astro';
 import { t, getLocalizedPath, routes } from '../i18n/utils';
 
 interface Props { lang: 'en' | 'es'; }
@@ -29,7 +31,11 @@ const settingsPath = getLocalizedPath(lang, routes.profileSettingsPreferences[la
     <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-3">
       {ns.kairos_group_title}
     </h2>
-    <KairosGoldenHourSection lang={lang} />
+    <div class="space-y-4">
+      <KairosGoldenHourSection lang={lang} />
+      <KairosAfterRainSection lang={lang} />
+      <KairosLunarEventSection lang={lang} />
+    </div>
   </section>
 
   <section>

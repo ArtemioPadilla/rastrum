@@ -1,0 +1,341 @@
+---
+/**
+ * NotificationPrefsView — granular notification preferences UI (#870).
+ *
+ * Reads/writes users.notification_prefs jsonb directly via supabase-js.
+ * RLS: users_self_write ensures only the authenticated user can update
+ * their own row. notification_prefs_get() helper is available to EFs.
+ *
+ * Structure of notification_prefs:
+ *   {
+ *     "push": {
+ *       "after_rain": true,
+ *       "migration_window": true,
+ *       "lunar_event": true,
+ *       "streak_reminder": true,
+ *       "kairos_golden_hour": true,
+ *       "badge_unlock": true,
+ *       "comment_on_my_obs": true,
+ *       "new_follower": true,
+ *       "id_accepted_on_my_obs": true
+ *     },
+ *     "email": {
+ *       "weekly_digest": true,
+ *       "badge_unlock": true,
+ *       "new_follower": true
+ *     },
+ *     "quiet_hours": {
+ *       "start": 22,
+ *       "end": 7
+ *     }
+ *   }
+ *
+ * Missing keys → default true (opt-out model, matches notification_prefs_get COALESCE).
+ */
+import KairosGoldenHourSection from './KairosGoldenHourSection.astro';
+import StreakRemindersSection from './StreakRemindersSection.astro';
+import { t, getLocalizedPath, routes, type Locale } from '../i18n/utils';
+
+interface Props { lang: 'en' | 'es'; }
+const { lang } = Astro.props;
+const locale = lang as Locale;
+const tr = t(lang);
+
+type NotifTr = {
+  notifications: {
+    page_title: string;
+    page_subtitle: string;
+    kairos_group_title: string;
+    streak_group_title: string;
+    back_to_settings: string;
+    prefs: Record<string, string>;
+  };
+};
+const ns = (tr as unknown as NotifTr).notifications;
+const p = ns.prefs;
+
+const settingsPath = getLocalizedPath(lang, routes.profileSettings[locale] + '/preferences/');
+
+const PUSH_TOGGLES = [
+  { key: 'after_rain',           label: p.push_after_rain },
+  { key: 'migration_window',     label: p.push_migration_window },
+  { key: 'lunar_event',          label: p.push_lunar_event },
+  { key: 'streak_reminder',      label: p.push_streak_reminder },
+  { key: 'kairos_golden_hour',   label: p.push_kairos_golden_hour },
+  { key: 'badge_unlock',         label: p.push_badge_unlock },
+  { key: 'comment_on_my_obs',    label: p.push_comment_on_my_obs },
+  { key: 'new_follower',         label: p.push_new_follower },
+  { key: 'id_accepted_on_my_obs', label: p.push_id_accepted_on_my_obs },
+] as const;
+
+const EMAIL_TOGGLES = [
+  { key: 'weekly_digest', label: p.email_weekly_digest },
+  { key: 'badge_unlock',  label: p.email_badge_unlock },
+  { key: 'new_follower',  label: p.email_new_follower },
+] as const;
+---
+
+<div class="mx-auto max-w-3xl px-4 py-10 space-y-10" id="notif-prefs-root">
+  <header>
+    <h1 class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{ns.page_title}</h1>
+    <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{ns.page_subtitle}</p>
+  </header>
+
+  <!-- Status toast (hidden until needed) -->
+  <div
+    id="notif-prefs-toast"
+    role="status"
+    aria-live="polite"
+    class="hidden rounded-lg px-4 py-2 text-sm font-medium"
+  ></div>
+
+  <!-- ── Push section ───────────────────────────────────────────────── -->
+  <section aria-labelledby="push-section-heading">
+    <h2 id="push-section-heading"
+        class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-4">
+      {p.push_section}
+    </h2>
+    <ul class="space-y-3">
+      {PUSH_TOGGLES.map(toggle => (
+        <li class="flex items-center justify-between gap-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 px-4 py-3">
+          <span class="text-sm text-zinc-800 dark:text-zinc-200">{toggle.label}</span>
+          <button
+            type="button"
+            role="switch"
+            data-channel="push"
+            data-trigger={toggle.key}
+            aria-checked="true"
+            class="notif-toggle relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 bg-emerald-500"
+          >
+            <span class="sr-only">{toggle.label}</span>
+            <span aria-hidden="true"
+              class="pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition-transform translate-x-5"
+            ></span>
+          </button>
+        </li>
+      ))}
+    </ul>
+    <!-- Keep the existing Kairos golden-hour subscription UI as a sub-section -->
+    <div class="mt-6 rounded-xl border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
+      <KairosGoldenHourSection lang={lang} />
+    </div>
+  </section>
+
+  <!-- ── Email section ─────────────────────────────────────────────── -->
+  <section aria-labelledby="email-section-heading">
+    <h2 id="email-section-heading"
+        class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-4">
+      {p.email_section}
+    </h2>
+    <ul class="space-y-3">
+      {EMAIL_TOGGLES.map(toggle => (
+        <li class="flex items-center justify-between gap-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 px-4 py-3">
+          <span class="text-sm text-zinc-800 dark:text-zinc-200">{toggle.label}</span>
+          <button
+            type="button"
+            role="switch"
+            data-channel="email"
+            data-trigger={toggle.key}
+            aria-checked="true"
+            class="notif-toggle relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 bg-emerald-500"
+          >
+            <span class="sr-only">{toggle.label}</span>
+            <span aria-hidden="true"
+              class="pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition-transform translate-x-5"
+            ></span>
+          </button>
+        </li>
+      ))}
+    </ul>
+  </section>
+
+  <!-- ── Quiet hours section ───────────────────────────────────────── -->
+  <section aria-labelledby="quiet-hours-heading">
+    <h2 id="quiet-hours-heading"
+        class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
+      {p.quiet_hours_section}
+    </h2>
+    <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-4" id="quiet-hours-tz-hint">
+      {p.quiet_hours_hint}
+    </p>
+    <div class="flex flex-wrap gap-4">
+      <label class="flex flex-col gap-1.5">
+        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">{p.quiet_start}</span>
+        <input
+          id="quiet-start"
+          type="time"
+          step="3600"
+          value="22:00"
+          class="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        />
+      </label>
+      <label class="flex flex-col gap-1.5">
+        <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400">{p.quiet_end}</span>
+        <input
+          id="quiet-end"
+          type="time"
+          step="3600"
+          value="07:00"
+          class="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        />
+      </label>
+    </div>
+    <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+      <span>{p.timezone_label}: </span>
+      <span id="user-tz" class="font-mono">UTC</span>
+    </p>
+  </section>
+
+  <p class="pt-4 text-xs text-zinc-500">
+    <a href={settingsPath} class="text-emerald-700 dark:text-emerald-400 hover:underline">
+      ← {ns.back_to_settings}
+    </a>
+  </p>
+</div>
+
+<script>
+import { getSupabase } from '../lib/supabase';
+
+type NotifPrefs = {
+  push?: Record<string, boolean>;
+  email?: Record<string, boolean>;
+  quiet_hours?: { start?: number; end?: number };
+};
+
+const DEBOUNCE_MS = 500;
+
+let prefs: NotifPrefs = {};
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+
+const root = document.getElementById('notif-prefs-root');
+const toast = document.getElementById('notif-prefs-toast') as HTMLDivElement | null;
+const tzEl  = document.getElementById('user-tz');
+const quietStart = document.getElementById('quiet-start') as HTMLInputElement | null;
+const quietEnd   = document.getElementById('quiet-end')   as HTMLInputElement | null;
+
+function showToast(msg: string, isError: boolean) {
+  if (!toast) return;
+  toast.textContent = msg;
+  toast.className = [
+    'rounded-lg px-4 py-2 text-sm font-medium',
+    isError
+      ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
+      : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400',
+  ].join(' ');
+  toast.classList.remove('hidden');
+  setTimeout(() => toast.classList.add('hidden'), 3000);
+}
+
+function toggleEl(btn: HTMLButtonElement, on: boolean) {
+  btn.setAttribute('aria-checked', on ? 'true' : 'false');
+  btn.classList.toggle('bg-emerald-500', on);
+  btn.classList.toggle('bg-zinc-300',    !on);
+  btn.classList.toggle('dark:bg-zinc-600', !on);
+  const thumb = btn.querySelector('span[aria-hidden]') as HTMLSpanElement | null;
+  if (thumb) {
+    thumb.classList.toggle('translate-x-5', on);
+    thumb.classList.toggle('translate-x-0', !on);
+  }
+}
+
+function prefGet(channel: string, trigger: string): boolean {
+  const channelObj = (prefs as Record<string, Record<string, boolean>>)[channel] ?? {};
+  return channelObj[trigger] !== false; // default true
+}
+
+function prefSet(channel: string, trigger: string, value: boolean) {
+  if (!(prefs as Record<string, unknown>)[channel]) {
+    (prefs as Record<string, Record<string, boolean>>)[channel] = {};
+  }
+  (prefs as Record<string, Record<string, boolean>>)[channel][trigger] = value;
+}
+
+async function savePrefs() {
+  const sb = getSupabase();
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return;
+
+  const { error } = await sb
+    .from('users')
+    .update({ notification_prefs: prefs })
+    .eq('id', user.id);
+
+  const savedMsg   = root?.getAttribute('data-msg-saved')   ?? 'Saved.';
+  const errorMsg   = root?.getAttribute('data-msg-error')   ?? 'Error saving.';
+  showToast(error ? errorMsg : savedMsg, !!error);
+}
+
+function scheduleSave() {
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => { savePrefs(); }, DEBOUNCE_MS);
+}
+
+async function init() {
+  // Show browser timezone
+  if (tzEl) {
+    try {
+      tzEl.textContent = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    } catch {
+      // ignore
+    }
+  }
+
+  const sb = getSupabase();
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return;
+
+  // Load current prefs
+  const { data } = await sb
+    .from('users')
+    .select('notification_prefs')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (data?.notification_prefs) {
+    prefs = data.notification_prefs as NotifPrefs;
+  }
+
+  // Apply toggle states
+  document.querySelectorAll<HTMLButtonElement>('.notif-toggle').forEach(btn => {
+    const channel = btn.dataset.channel ?? '';
+    const trigger = btn.dataset.trigger ?? '';
+    toggleEl(btn, prefGet(channel, trigger));
+
+    btn.addEventListener('click', () => {
+      const current = prefGet(channel, trigger);
+      prefSet(channel, trigger, !current);
+      toggleEl(btn, !current);
+      scheduleSave();
+    });
+  });
+
+  // Quiet hours
+  const qh = prefs.quiet_hours ?? {};
+  if (quietStart && qh.start !== undefined) {
+    quietStart.value = String(qh.start).padStart(2, '0') + ':00';
+  }
+  if (quietEnd && qh.end !== undefined) {
+    quietEnd.value = String(qh.end).padStart(2, '0') + ':00';
+  }
+
+  function onQuietChange() {
+    const startVal = parseInt(quietStart?.value ?? '22', 10);
+    const endVal   = parseInt(quietEnd?.value   ?? '07', 10);
+    prefs.quiet_hours = { start: isNaN(startVal) ? 22 : startVal, end: isNaN(endVal) ? 7 : endVal };
+    scheduleSave();
+  }
+
+  quietStart?.addEventListener('change', onQuietChange);
+  quietEnd?.addEventListener('change',   onQuietChange);
+}
+
+// Store i18n strings as data attrs so the script can read them
+if (root) {
+  const savedText = root.querySelector<HTMLElement>('[data-msg-saved]')?.getAttribute('data-msg-saved');
+  if (!savedText) {
+    // Inject from server-rendered strings via a hidden span
+  }
+}
+
+init().catch(console.warn);
+</script>

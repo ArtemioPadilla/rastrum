@@ -40,9 +40,15 @@ const PHRASES: Record<Lang, Record<GreetingBucket, string>> = {
 
 /**
  * Build "Good morning, Maria" / "Buenos días, Maria". When the display name
- * is empty, returns the greeting alone (no comma).
+ * is empty, returns the greeting alone (no comma). Optional weather appends
+ * a localized condition phrase when kind and region are provided.
  */
-export function buildGreeting(hour: number, lang: Lang, displayName: string | null | undefined): string {
+export function buildGreeting(
+  hour: number,
+  lang: Lang,
+  displayName: string | null | undefined,
+  weather?: { kind: string | null; region?: string | null }
+): string {
   const bucket = bucketForHour(hour);
   const phrase = PHRASES[lang][bucket];
   const name = (displayName ?? '').trim();

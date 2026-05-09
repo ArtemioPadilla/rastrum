@@ -148,6 +148,16 @@
       "nearby_loading": "Loading recent observations…",
       "nearby_anonymous": "Anonymous",
       "nearby_unknown_species": "Unknown species"
+    },
+    "greeting": {
+      "weather": {
+        "sunny": "It's sunny in {region}",
+        "rainy": "It's raining in {region}",
+        "cloudy": "It's cloudy in {region}",
+        "snow": "It's snowing in {region}",
+        "foggy": "It's foggy in {region}",
+        "windy": "It's windy in {region}"
+      }
     }
   },
   "identify": {
@@ -539,7 +549,10 @@
     "leaderboard_experts_score": "Score",
     "leaderboard_experts_taxon_loading": "Loading taxa…",
     "leaderboard_experts_taxon_none": "No experts yet — add identifications to be the first",
-    "leaderboard_experts_no_data": "No one has earned expertise yet. Be the first by adding identifications."
+    "leaderboard_experts_no_data": "No one has earned expertise yet. Be the first by adding identifications.",
+    "leaderboard_scope_region": "Region",
+    "leaderboard_country_picker_label": "Select country",
+    "leaderboard_country_picker_aria": "Filter leaderboard by country"
   },
   "profile": {
     "title": "Profile",
@@ -878,7 +891,9 @@
     "obs_hidden_by_mod_badge": "Hidden by moderation",
     "obs_hidden_by_mod_reason_label": "Reason:",
     "obs_hidden_by_mod_no_reason": "No reason provided.",
-    "obs_hidden_by_mod_appeal_link": "View reason / Appeal"
+    "obs_hidden_by_mod_appeal_link": "View reason / Appeal",
+    "auto_enhance": "✨ Auto",
+    "auto_enhance_aria": "Apply auto enhance"
   },
   "obs_detail": {
     "tabs": {
@@ -1440,7 +1455,9 @@
       "fave_count_aria_one": "{{count}} person favorited this",
       "fave_count_aria_other": "{{count}} people favorited this",
       "live_added": "Favorited",
-      "live_removed": "Removed favorite"
+      "live_removed": "Removed favorite",
+      "fave_add_aria": "Add to favorites",
+      "fave_remove_aria": "Remove from favorites"
     },
     "inbox": {
       "title": "Inbox",
@@ -1488,7 +1505,9 @@
       "report_comment_aria": "Report this comment",
       "block_observer_aria": "Block this observer",
       "block_commenter_aria": "Block this commenter"
-    }
+    },
+    "recents_follow_aria": "Follow {{handle}}",
+    "recents_unfollow_aria": "Unfollow {{handle}}"
   },
   "sponsoring": {
     "page_title": "AI Sponsoring",
@@ -1723,6 +1742,57 @@
       "permission_blocked": "Browser notifications are blocked. Enable them in your browser site settings, then try again.",
       "unsupported": "This browser doesn't support web push (try Chrome on Android or Safari 16.4+ on iOS).",
       "vapid_missing": "Push isn't configured yet — the operator must publish a VAPID key first."
+    },
+    "after_rain": {
+      "title": "After-rain prompt",
+      "body": "Rain brings out amphibians, mushrooms, and insects — get outside!",
+      "opt_in_label": "Enable after-rain prompt",
+      "opt_in_hint": "One notification per day, within 12 h of ≥ 5 mm of rainfall at your last observation location.",
+      "enabling": "Subscribing…",
+      "enabled": "After-rain prompts enabled.",
+      "disable": "Disable",
+      "disabling": "Disabling…",
+      "permission_blocked": "Browser notifications are blocked. Enable them in your browser site settings, then try again.",
+      "unsupported": "This browser doesn't support web push (try Chrome on Android or Safari 16.4+ on iOS).",
+      "vapid_missing": "Push isn't configured yet — the operator must publish a VAPID key first."
+    },
+    "lunar_event": {
+      "title": "Lunar event prompt",
+      "body_full": "Full moon tonight — peak amphibian chorus.",
+      "body_new": "New moon tonight — good for light-trap insects.",
+      "body_eclipse": "Lunar eclipse visible tonight.",
+      "opt_in_label": "Enable lunar event prompt",
+      "opt_in_hint": "One notification per day on full moons, new moons, and total lunar eclipses.",
+      "enabling": "Subscribing…",
+      "enabled": "Lunar event prompts enabled.",
+      "disable": "Disable",
+      "disabling": "Disabling…",
+      "permission_blocked": "Browser notifications are blocked. Enable them in your browser site settings, then try again.",
+      "unsupported": "This browser doesn't support web push (try Chrome on Android or Safari 16.4+ on iOS).",
+      "vapid_missing": "Push isn't configured yet — the operator must publish a VAPID key first."
+    },
+    "prefs": {
+      "push_section": "Push notifications",
+      "email_section": "Email notifications",
+      "quiet_hours_section": "Quiet hours",
+      "quiet_hours_hint": "No push notifications will be delivered during these hours",
+      "quiet_start": "Start",
+      "quiet_end": "End",
+      "timezone_label": "Your timezone",
+      "save_error": "Could not save your preferences. Please try again.",
+      "saved": "Preferences saved.",
+      "push_after_rain": "After-rain alert",
+      "push_migration_window": "Migration window alert",
+      "push_lunar_event": "Lunar event alert",
+      "push_streak_reminder": "Streak reminder",
+      "push_kairos_golden_hour": "Golden-hour prompt (kairos)",
+      "push_badge_unlock": "Badge unlocked",
+      "push_comment_on_my_obs": "Comment on my observation",
+      "push_new_follower": "New follower",
+      "push_id_accepted_on_my_obs": "ID accepted on my observation",
+      "email_weekly_digest": "Weekly digest",
+      "email_badge_unlock": "Badge unlocked",
+      "email_new_follower": "New follower"
     }
   },
   "surprises": {
@@ -3650,5 +3720,47 @@
     "report_hint": "Re-runs the cascade with a different identifier.",
     "source_link": "View source",
     "collapse": "Close"
+  },
+  "photo_praise": {
+    "good_light": {
+      "bird": "Good light for feather detail.",
+      "mammal": "Good light for fur texture.",
+      "reptile": "Good light for scale detail.",
+      "amphibian": "Good low-ISO light — ideal for amphibian skin.",
+      "plant": "Good light for leaf color.",
+      "fungus": "Good light for cap detail."
+    },
+    "portrait_aperture": {
+      "bird": "Shallow depth isolates the subject.",
+      "mammal": "Wide aperture — smooth background blur.",
+      "reptile": "Wide aperture — sharp eye, soft background.",
+      "amphibian": "Portrait aperture — eye in sharp focus.",
+      "plant": "Wide aperture — background separation.",
+      "fungus": "Wide aperture — cap stands out."
+    },
+    "sharp_action": {
+      "bird": "Fast shutter — wing motion frozen.",
+      "mammal": "Fast shutter — motion sharp.",
+      "reptile": "Fast shutter — sharp strike moment.",
+      "amphibian": "Fast shutter — leap captured.",
+      "plant": "Fast shutter — breeze stopped.",
+      "fungus": "Fast shutter — nothing moves anyway! 🍄"
+    },
+    "balanced_exposure": {
+      "bird": "Balanced exposure for bird plumage.",
+      "mammal": "Moderate ISO — good for active mammals.",
+      "reptile": "Balanced exposure — thermal colors rendered.",
+      "amphibian": "Balanced exposure — skin sheen retained.",
+      "plant": "Balanced exposure — foliage detail preserved.",
+      "fungus": "Balanced exposure for cap texture."
+    },
+    "long_lens": {
+      "bird": "Telephoto — bird observed undisturbed.",
+      "mammal": "Long lens — safe distance from subject.",
+      "reptile": "Telephoto — undisturbed behavior.",
+      "amphibian": "Long lens — no habitat disturbance.",
+      "plant": "Telephoto compression — floral portrait.",
+      "fungus": "Long lens — good macro working distance."
+    }
   }
 }

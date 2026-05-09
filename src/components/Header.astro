@@ -227,7 +227,15 @@ const docColumns = [
       <BellIcon lang={locale} />
       <div id="avatar-wrap" class="hidden relative shrink-0">
         <button id="avatar-btn" aria-label="Account menu" class="block rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500">
-          <img id="header-avatar" src="" alt="" class="w-8 h-8 rounded-full bg-emerald-600 object-cover" />
+          <span
+            id="header-avatar-frame"
+            class="inline-block rounded-full ring-offset-2 ring-offset-white dark:ring-offset-zinc-900"
+            data-karma-frame
+            data-karma-tier="seedling"
+            data-karma-glow="0"
+          >
+            <img id="header-avatar" src="" alt="" class="w-8 h-8 rounded-full bg-emerald-600 object-cover" />
+          </span>
         </button>
         <div id="avatar-menu" class="hidden absolute right-0 top-full mt-2 w-52 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-lg py-1 z-50">
           <a id="menu-profile" href={getLocalizedPath(lang, routes.profile[locale] + '/')} class="block px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800">{tr.profile.view_profile}</a>
@@ -315,6 +323,7 @@ const docColumns = [
   import { signOut, SUPABASE_AUTH_STORAGE_KEY, HEADER_AVATAR_CACHE_KEY, HEADER_AVATAR_NAME_KEY } from '../lib/auth';
   import { getUserRoles } from '../lib/user-roles';
   import type { UserProfile } from '../lib/types';
+  import { tierForKarma } from '../lib/karma-frame';
 
   const signInLink = document.getElementById('sign-in-link');
   const avatarWrap = document.getElementById('avatar-wrap');
@@ -372,13 +381,24 @@ const docColumns = [
       if (!userId) return;
       const { data: profile } = await supabase
         .from('users')
-        .select('username,display_name,avatar_url')
+        .select('username,display_name,avatar_url,karma_total')
         .eq('id', userId)
-        .maybeSingle<Pick<UserProfile,'username'|'display_name'|'avatar_url'>>();
+        .maybeSingle<Pick<UserProfile,'username'|'display_name'|'avatar_url'> & { karma_total?: number | null }>();
       const name = profile?.display_name || profile?.username || sessionUser?.email?.split('@')[0] || '?';
       const finalSrc = profile?.avatar_url || avatarImg.src || initialsAvatar(name);
       avatarImg.src = finalSrc;
       avatarImg.alt = name;
+      // Apply KarmaFrame ring to the header avatar wrapper (size='sm' → static, no animation)
+      const avatarFrame = document.getElementById('header-avatar-frame');
+      if (avatarFrame) {
+        const tier = tierForKarma(profile?.karma_total ?? 0);
+        avatarFrame.className = [
+          'inline-block rounded-full ring-offset-2 ring-offset-white dark:ring-offset-zinc-900',
+          tier.staticRingClass ?? tier.ringClass,
+        ].join(' ');
+        avatarFrame.dataset.karmaTier = tier.id;
+        avatarFrame.dataset.karmaGlow = tier.glow ? '1' : '0';
+      }
       try { localStorage.setItem(AVATAR_CACHE_KEY, finalSrc); localStorage.setItem(AVATAR_NAME_KEY, name); } catch { /* ignore */ }
     } catch { /* env not set */ }
   }

@@ -82,23 +82,24 @@ async function exactCount(
 
 async function distinctSpeciesCount(url: string, key: string): Promise<number | null> {
   try {
+    // Use the count_distinct_observed_species() RPC for a server-side
+    // DISTINCT count (avoids fetching up to 10 000 rows client-side).
     const res = await fetch(
-      `${url.replace(/\/$/, '')}/rest/v1/observations?select=primary_taxon_id&primary_taxon_id=not.is.null&limit=10000`,
+      `${url.replace(/\/$/, '')}/rest/v1/rpc/count_distinct_observed_species`,
       {
+        method: 'POST',
         headers: {
           apikey: key,
           Authorization: `Bearer ${key}`,
-          Accept: 'application/json',
+          'Content-Type': 'application/json',
         },
+        body: '{}',
       },
     );
     if (!res.ok) return null;
-    const rows = (await res.json()) as Array<{ primary_taxon_id: string | null }>;
-    const set = new Set<string>();
-    for (const row of rows) {
-      if (row.primary_taxon_id) set.add(row.primary_taxon_id);
-    }
-    return set.size;
+    const value = await res.json() as number | null;
+    if (typeof value === 'number') return value;
+    return null;
   } catch {
     return null;
   }
@@ -123,18 +124,23 @@ async function main() {
     distinctSpeciesCount(url, key),
   ]);
 
+  // Fallback for species: if RPC fails, keep the previous JSON value so the
+  // About page doesn't show a blank species counter on transient RPC errors.
+  const prev = speciesCount === null ? previousOrPlaceholder() : null;
+  const resolvedSpeciesCount = speciesCount ?? prev?.total_species ?? null;
+
   const stats: AboutStats = {
     total_observations: obsCount,
     total_observers: observerCount,
-    total_species: speciesCount,
+    total_species: resolvedSpeciesCount,
     generated_at: new Date().toISOString(),
     available:
-      obsCount !== null || observerCount !== null || speciesCount !== null,
+      obsCount !== null || observerCount !== null || resolvedSpeciesCount !== null,
   };
 
   writeFileSync(OUT_FILE, JSON.stringify(stats, null, 2));
   console.log(
-    `[about-stats] obs=${obsCount} observers=${observerCount} species=${speciesCount}`,
+    `[about-stats] obs=${obsCount} observers=${observerCount} species=${resolvedSpeciesCount}${speciesCount === null ? ' (rpc-fallback)' : ''}`,
   );
 }
 

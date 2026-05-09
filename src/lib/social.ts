@@ -271,10 +271,39 @@ export function isSyncFilter(value: string | null | undefined): value is SyncFil
 }
 
 export async function followUser(targetUserId: string, tier: FollowTier = 'follower') {
-  const { data, error } = await getSupabase().functions.invoke('follow', {
+  const supabase = getSupabase();
+  const { data, error } = await supabase.functions.invoke('follow', {
     body: { action: 'follow', target_user_id: targetUserId, tier },
   });
   if (error) throw error;
+
+  // Onboarding: fire first_follow if this is the user's first follow.
+  void (async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      // All follows (including pending) are counted here: the funnel measures
+      // engagement (follow was attempted), not whether the connection was accepted.
+      const { count } = await supabase
+        .from('follows')
+        .select('*', { count: 'exact', head: true })
+        .eq('follower_id', user.id);
+      if (count === 1) {
+        const { data: userRow } = await supabase
+          .from('users')
+          .select('created_at')
+          .eq('id', user.id)
+          .maybeSingle();
+        const { cohortWeek, daysSince } = await import('./posthog-events');
+        (window as unknown as { posthog?: { capture: (e: string, p?: Record<string, unknown>) => void } })
+          .posthog?.capture('onboarding:first_follow', {
+            days_since_signup: userRow?.created_at ? daysSince(userRow.created_at as string) : 0,
+            cohort_week: cohortWeek(),
+          });
+      }
+    } catch { /* non-fatal */ }
+  })();
+
   return data as { ok: boolean; status: 'pending' | 'accepted' };
 }
 

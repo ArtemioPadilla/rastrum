@@ -8,6 +8,7 @@ interface Props {
 const { lang } = Astro.props;
 const tr = t(lang);
 const widgets = tr.home.widgets;
+const greeting = tr.home.greeting;
 const recentHref = lang === 'es' ? '/es/explorar/recientes/' : '/en/explore/recent/';
 ---
 
@@ -30,10 +31,16 @@ const recentHref = lang === 'es' ? '/es/explorar/recientes/' : '/en/explore/rece
   data-label-nearby-anon={widgets.nearby_anonymous}
   data-label-nearby-unknown-species={widgets.nearby_unknown_species}
   data-recent-href={recentHref}
+  data-label-weather-sunny={greeting.weather.sunny}
+  data-label-weather-rainy={greeting.weather.rainy}
+  data-label-weather-cloudy={greeting.weather.cloudy}
+  data-label-weather-snow={greeting.weather.snow}
+  data-label-weather-foggy={greeting.weather.foggy}
+  data-label-weather-windy={greeting.weather.windy}
   aria-live="polite"
 >
   <div class="home-widgets-greeting flex items-center justify-between flex-wrap gap-3">
-    <p class="hw-greeting-text text-3xl sm:text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100" role="status" aria-live="polite"></p>
+    <p class="hw-greeting-text text-3xl sm:text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100" role="status" aria-live="polite" data-testid="home-greeting"></p>
     <span
       class="hw-streak hidden inline-flex items-center gap-1.5 rounded-full border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-950/40 px-3 py-1.5 text-sm font-semibold text-amber-900 dark:text-amber-200"
       role="status"
@@ -61,6 +68,8 @@ const recentHref = lang === 'es' ? '/es/explorar/recientes/' : '/en/explore/rece
   import { getSupabase } from '../lib/supabase';
   import { buildGreeting } from '../lib/home-greeting';
   import { formatTimeAgo } from '../lib/social';
+  import { fetchWeather, WMO_BUCKETS } from '../lib/home-weather';
+  type WeatherKind = 'sunny' | 'rainy' | 'cloudy' | 'snow' | 'foggy' | 'windy';
 
   type Lang = 'en' | 'es';
 
@@ -200,6 +209,9 @@ const recentHref = lang === 'es' ? '/es/explorar/recientes/' : '/en/explore/rece
       greetingEl.textContent = pickGreeting(new Date().getHours(), lang, displayName, root);
     }
 
+    // Weather phrase — fetch async and append to greeting
+    appendWeatherGreeting(root, lang, profile?.region_primary ?? profile?.country_code ?? null).catch(() => { /* optional */ });
+
     // Streak badge — read user_streaks (RLS allows self-read regardless of opt-in).
     try {
       const { data: streak } = await supabase
@@ -227,6 +239,74 @@ const recentHref = lang === 'es' ? '/es/explorar/recientes/' : '/en/explore/rece
     }
 
     await paintNearby(root, lang, country, profile?.region_primary ?? null);
+  }
+
+  // Country code → approximate center coordinates for weather lookup
+  const COUNTRY_COORDS: Record<string, [number, number]> = {
+    MX: [23.6, -102.5], CO: [4.6, -74.1], AR: [-34.6, -58.4],
+    CL: [-33.5, -70.6], PE: [-12.0, -77.0], VE: [10.5, -66.9],
+    EC: [-0.2, -78.5], BO: [-16.5, -68.1], PY: [-25.3, -57.6],
+    UY: [-34.9, -56.2], BR: [-15.8, -47.9], GT: [14.6, -90.5],
+    HN: [14.1, -87.2], SV: [13.7, -89.2], NI: [12.1, -86.3],
+    CR: [9.9, -84.1], PA: [9.0, -79.5], CU: [23.1, -82.4],
+    US: [38.9, -77.0], CA: [45.4, -75.7], ES: [40.4, -3.7],
+  };
+
+  function weatherLabel(kind: WeatherKind, region: string | null, root: HTMLElement, lang: Lang): string {
+    const keyMap: Record<WeatherKind, string> = {
+      sunny: 'labelWeatherSunny',
+      rainy: 'labelWeatherRainy',
+      cloudy: 'labelWeatherCloudy',
+      snow: 'labelWeatherSnow',
+      foggy: 'labelWeatherFoggy',
+      windy: 'labelWeatherWindy',
+    };
+    const tpl = root.dataset[keyMap[kind]] ?? '';
+    if (!tpl) return '';
+    const regionName = region ?? (lang === 'es' ? 'tu zona' : 'your area');
+    return tpl.replace('{region}', regionName);
+  }
+
+  async function appendWeatherGreeting(root: HTMLElement, lang: Lang, region: string | null): Promise<void> {
+    // Try browser geolocation first, fall back to country coords
+    let lat: number | null = null;
+    let lng: number | null = null;
+
+    try {
+      const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 3000 });
+      });
+      lat = pos.coords.latitude;
+      lng = pos.coords.longitude;
+    } catch { /* geolocation denied or unavailable */ }
+
+    if (lat === null || lng === null) {
+      // Fall back to country code center
+      const cc = (region ?? '').toUpperCase();
+      const coords = COUNTRY_COORDS[cc];
+      if (!coords) return; // no coords available
+      [lat, lng] = coords;
+    }
+
+    const snap = await fetchWeather(lat, lng);
+    if (!snap.kind) return;
+
+    const phrase = weatherLabel(snap.kind as WeatherKind, region, root, lang);
+    if (!phrase) return;
+
+    const greetingEl = root.querySelector<HTMLElement>('.hw-greeting-text');
+    if (!greetingEl) return;
+
+    // Append weather pill after greeting text
+    const weatherEl = root.querySelector<HTMLElement>('.hw-weather-pill');
+    if (weatherEl) {
+      weatherEl.textContent = phrase;
+    } else {
+      const pill = document.createElement('span');
+      pill.className = 'hw-weather-pill block text-base font-normal text-zinc-500 dark:text-zinc-400 mt-1';
+      pill.textContent = phrase;
+      greetingEl.parentElement?.insertBefore(pill, greetingEl.nextSibling);
+    }
   }
 
   async function paintNearby(root: HTMLElement, lang: Lang, country: string | null, _region: string | null): Promise<void> {
