@@ -144,8 +144,11 @@ will reject the next call).
 
 ### VAPID keys (`VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `PUBLIC_VAPID_PUBLIC_KEY`)
 
-Used by the `streak-push` Edge Function to send Web Push notifications
-(see `ux-streak-push` in the v1.1 backlog). Three env vars work together:
+Used by the `streak-push` and `kairos-fire` Edge Functions to send Web
+Push notifications. The kairos prod-deploy checklist (the minimum
+operator path to make M34 actually fire pushes) lives in
+[`kairos-prompts.md`](kairos-prompts.md#production-deploy-checklist-operator-action-required);
+the rotation flow below applies to both. Three env vars work together:
 
 - **`VAPID_PUBLIC_KEY`** (Supabase secret) — uncompressed P-256 public key,
   base64url-encoded (65 bytes raw, starts with `0x04`).

@@ -66,7 +66,7 @@ high-level system view.
 
 | Runbook | Covers |
 |---|---|
-| [`kairos-prompts.md`](kairos-prompts.md) | M34 — golden-hour push, `kairos-fire` 15-min cron, hard 1-per-day cap, manual fire instructions. |
+| [`kairos-prompts.md`](kairos-prompts.md) | M34 — golden-hour push, `kairos-fire` 15-min cron, hard 1-per-day cap, manual fire instructions, VAPID prod-deploy checklist. |
 
 ## Operator hygiene + ops
 
