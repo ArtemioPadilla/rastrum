@@ -544,7 +544,18 @@ document.addEventListener('rastrum:files-dropped', async (e: Event) => {
   startGPS();
 
   // Run pipeline
-  await runPipeline(pipelineState);
+  // #783: wrap in try/catch so that an unexpected error (e.g. the
+  // gotrue auth-lock timeout that fires mid-pipeline on Android Chrome)
+  // doesn't leave postForm permanently hidden — we always show it so
+  // the user can still manually enter species and save.
+  try {
+    await runPipeline(pipelineState);
+  } catch (err) {
+    console.error('[rastrum] pipeline error — showing post-form as fallback', err);
+    pipelineState.status = 'failed';
+    await savePipelineState(pipelineState).catch(() => {});
+    showPostForm();
+  }
 });
 
 // ── Registry-based plugin gate ─────────────────────────────────────────────
@@ -1045,7 +1056,16 @@ async function resumePipeline(state: PipelineState) {
   startGPS();
 
   if (state.status !== 'done') {
-    await runPipeline(state);
+    // #783: same try/catch as files-dropped handler — always show post-form
+    // on pipeline error so the user can still save manually.
+    try {
+      await runPipeline(state);
+    } catch (err) {
+      console.error('[rastrum] resume pipeline error — showing post-form as fallback', err);
+      state.status = 'failed';
+      await savePipelineState(state).catch(() => {});
+      showPostForm();
+    }
   } else {
     showPostForm();
   }

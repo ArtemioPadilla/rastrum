@@ -93,6 +93,14 @@ const pillAria     = profile.sync_pill_aria ?? 'Sync pending observations';
     window.addEventListener(SYNC_EVENTS.start, () => {
       busy = true;
       paintSyncing();
+      // #783: safety timeout — if sync never fires 'done' within 15s
+      // (e.g. auth lock stall on Android Chrome), reset the pill so the
+      // user isn't stuck looking at an infinite spinner.
+      setTimeout(() => {
+        if (!busy) return;
+        busy = false;
+        void refresh();
+      }, 15_000);
     });
     window.addEventListener(SYNC_EVENTS.done, async () => {
       busy = false;
