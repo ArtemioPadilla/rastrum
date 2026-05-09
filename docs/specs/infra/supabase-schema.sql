@@ -10267,6 +10267,155 @@ GRANT EXECUTE ON FUNCTION public.chat_observer_card(uuid)        TO authenticate
 GRANT EXECUTE ON FUNCTION public.chat_self_profile_card(uuid)    TO authenticated;
 GRANT EXECUTE ON FUNCTION public.chat_entity_card(text, text)    TO authenticated;
 
+-- ── Chat tools — read-only search/list functions (M01 chat improvements) ──
+-- Each function wraps one filtered query against existing tables/views.
+-- SECURITY INVOKER + RLS enforces visibility; no row exposure beyond what
+-- the caller already had via direct SELECT.
+
+DROP FUNCTION IF EXISTS public.chat_find_observations(jsonb, int);
+CREATE FUNCTION public.chat_find_observations(p_filters jsonb, p_limit int DEFAULT 10)
+RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY INVOKER
+SET search_path = public, extensions, pg_temp
+AS $$
+DECLARE
+  v_owner_self    boolean := coalesce((p_filters ->> 'owner') = 'me', false);
+  v_taxon_id      uuid    := nullif(p_filters ->> 'primary_taxon_id', '')::uuid;
+  v_project_id    uuid    := nullif(p_filters ->> 'project_id', '')::uuid;
+  v_near_obs      uuid    := nullif(p_filters ->> 'near_observation_id', '')::uuid;
+  v_radius_km     numeric := coalesce((p_filters ->> 'radius_km')::numeric, 50);
+  v_research_only boolean := coalesce((p_filters ->> 'research_grade')::boolean, false);
+BEGIN
+  RETURN coalesce((
+    SELECT jsonb_agg(row_card)
+    FROM (
+      SELECT jsonb_build_object(
+        'id',                o.id::text,
+        'scientific_name',   t.scientific_name,
+        'common_name_en',    t.common_name_en,
+        'observed_at',       o.observed_at,
+        'region_primary',    o.region_primary,
+        'is_research_grade', o.is_research_grade
+      ) AS row_card
+      FROM public.observations o
+      LEFT JOIN public.taxa t ON t.id = o.primary_taxon_id
+      LEFT JOIN public.observations near ON near.id = v_near_obs
+      WHERE (NOT v_owner_self    OR o.observer_id = auth.uid())
+        AND (v_taxon_id    IS NULL OR o.primary_taxon_id = v_taxon_id)
+        AND (v_project_id  IS NULL OR o.project_id      = v_project_id)
+        AND (v_near_obs    IS NULL OR ST_DWithin(o.location, near.location, v_radius_km * 1000))
+        AND (NOT v_research_only OR o.is_research_grade = true)
+      ORDER BY o.observed_at DESC
+      LIMIT greatest(1, least(p_limit, 50))
+    ) sub
+  ), '[]'::jsonb);
+END;
+$$;
+
+DROP FUNCTION IF EXISTS public.chat_find_species(text, int);
+CREATE FUNCTION public.chat_find_species(p_query text, p_limit int DEFAULT 10)
+RETURNS jsonb
+LANGUAGE sql STABLE SECURITY INVOKER
+SET search_path = public, extensions, pg_temp
+AS $$
+  SELECT coalesce(jsonb_agg(row_card), '[]'::jsonb)
+  FROM (
+    SELECT jsonb_build_object(
+      'id',                t.id::text,
+      'scientific_name',   t.scientific_name,
+      'common_name_en',    t.common_name_en,
+      'common_name_es',    t.common_name_es,
+      'kingdom',           t.kingdom,
+      'family',            t.family
+    ) AS row_card
+    FROM public.taxa t
+    WHERE t.canonical_name    ILIKE ('%' || p_query || '%')
+       OR t.scientific_name   ILIKE ('%' || p_query || '%')
+       OR t.common_name_en    ILIKE ('%' || p_query || '%')
+       OR t.common_name_es    ILIKE ('%' || p_query || '%')
+    ORDER BY (t.scientific_name = p_query) DESC, t.canonical_name
+    LIMIT greatest(1, least(p_limit, 50))
+  ) sub;
+$$;
+
+DROP FUNCTION IF EXISTS public.chat_find_projects(text, int);
+CREATE FUNCTION public.chat_find_projects(p_query text, p_limit int DEFAULT 10)
+RETURNS jsonb
+LANGUAGE sql STABLE SECURITY INVOKER
+SET search_path = public, extensions, pg_temp
+AS $$
+  SELECT coalesce(jsonb_agg(row_card), '[]'::jsonb)
+  FROM (
+    SELECT jsonb_build_object(
+      'id',     p.id::text,
+      'slug',   p.slug,
+      'name',   p.name,
+      'name_es', p.name_es
+    ) AS row_card
+    FROM public.projects_with_geojson p
+    WHERE p.name    ILIKE ('%' || p_query || '%')
+       OR p.name_es ILIKE ('%' || p_query || '%')
+       OR p.slug    ILIKE ('%' || p_query || '%')
+    ORDER BY p.name
+    LIMIT greatest(1, least(p_limit, 50))
+  ) sub;
+$$;
+
+DROP FUNCTION IF EXISTS public.chat_find_camera_stations(uuid, int);
+CREATE FUNCTION public.chat_find_camera_stations(p_project_id uuid, p_limit int DEFAULT 20)
+RETURNS jsonb
+LANGUAGE sql STABLE SECURITY INVOKER
+SET search_path = public, extensions, pg_temp
+AS $$
+  SELECT coalesce(jsonb_agg(row_card), '[]'::jsonb)
+  FROM (
+    SELECT jsonb_build_object(
+      'id',          cs.id::text,
+      'station_key', cs.station_key,
+      'name',        cs.name,
+      'habitat',     cs.habitat
+    ) AS row_card
+    FROM public.camera_stations cs
+    WHERE cs.project_id = p_project_id
+    ORDER BY cs.station_key
+    LIMIT greatest(1, least(p_limit, 50))
+  ) sub;
+$$;
+
+DROP FUNCTION IF EXISTS public.chat_find_observers(text, int);
+CREATE FUNCTION public.chat_find_observers(p_query text, p_limit int DEFAULT 10)
+RETURNS jsonb
+LANGUAGE sql STABLE SECURITY INVOKER
+SET search_path = public, extensions, pg_temp
+AS $$
+  SELECT coalesce(jsonb_agg(row_card), '[]'::jsonb)
+  FROM (
+    SELECT jsonb_build_object(
+      'id',           u.id::text,
+      'username',     u.username,
+      'display_name', u.display_name,
+      'is_expert',    u.is_expert
+    ) AS row_card
+    FROM public.community_observers u
+    WHERE u.username     ILIKE ('%' || p_query || '%')
+       OR u.display_name ILIKE ('%' || p_query || '%')
+    ORDER BY u.observation_count DESC
+    LIMIT greatest(1, least(p_limit, 50))
+  ) sub;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.chat_find_observations(jsonb, int)        FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.chat_find_species(text, int)              FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.chat_find_projects(text, int)             FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.chat_find_camera_stations(uuid, int)      FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.chat_find_observers(text, int)            FROM PUBLIC;
+
+GRANT EXECUTE ON FUNCTION public.chat_find_observations(jsonb, int)         TO authenticated;
+GRANT EXECUTE ON FUNCTION public.chat_find_species(text, int)               TO authenticated;
+GRANT EXECUTE ON FUNCTION public.chat_find_projects(text, int)              TO authenticated;
+GRANT EXECUTE ON FUNCTION public.chat_find_camera_stations(uuid, int)       TO authenticated;
+GRANT EXECUTE ON FUNCTION public.chat_find_observers(text, int)             TO authenticated;
+
 -- ═══════════════════════════════════════════════════════════════════════════
 -- Security Advisor remediation — 2026-05-08
 -- ═══════════════════════════════════════════════════════════════════════════
