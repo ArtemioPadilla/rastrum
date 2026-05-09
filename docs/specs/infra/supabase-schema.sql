@@ -9915,7 +9915,9 @@ AS $$
       o.id, o.observer_id, o.observed_at,
       o.primary_taxon_id, o.obscure_level,
       o.location, o.location_obscured,
-      o.region_primary, o.is_research_grade, o.notes,
+      coalesce(o.locality, o.municipality, o.state_province) AS region_label,
+      o.locality, o.municipality, o.state_province,
+      o.is_research_grade, o.notes,
       t.scientific_name, t.common_name_es, t.common_name_en,
       t.kingdom, t.family
     FROM public.observations o
@@ -9927,12 +9929,12 @@ AS $$
     'id',            o.id::text,
     'label',         coalesce(o.scientific_name, '—')
                      || ' · ' || to_char(o.observed_at, 'Mon DD')
-                     || coalesce(' · ' || o.region_primary, ''),
+                     || coalesce(' · ' || o.region_label, ''),
     'summary_text',
       'Observation of ' || coalesce(o.scientific_name, 'unknown taxon')
       || coalesce(' (' || o.common_name_en || ')', '')
       || ' on ' || to_char(o.observed_at, 'YYYY-MM-DD')
-      || coalesce(' in ' || o.region_primary, '')
+      || coalesce(' in ' || o.region_label, '')
       || CASE WHEN o.is_research_grade THEN '. Research grade.' ELSE '. Needs review.' END
       || coalesce(' Observer notes: ' || left(o.notes, 240), ''),
     'fields',        jsonb_build_object(
@@ -9942,7 +9944,9 @@ AS $$
       'kingdom',         o.kingdom,
       'family',          o.family,
       'observed_at',     o.observed_at,
-      'region_primary',  o.region_primary,
+      'locality',        o.locality,
+      'municipality',    o.municipality,
+      'state_province',  o.state_province,
       'is_research_grade', o.is_research_grade,
       'obscure_level',   o.obscure_level,
       'lat', CASE WHEN auth.uid() = o.observer_id
@@ -10294,7 +10298,7 @@ BEGIN
         'scientific_name',   t.scientific_name,
         'common_name_en',    t.common_name_en,
         'observed_at',       o.observed_at,
-        'region_primary',    o.region_primary,
+        'region_label',      coalesce(o.locality, o.municipality, o.state_province),
         'is_research_grade', o.is_research_grade
       ) AS row_card
       FROM public.observations o

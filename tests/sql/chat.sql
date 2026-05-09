@@ -44,7 +44,7 @@ BEGIN
   INSERT INTO public.observations (
     id, observer_id, primary_taxon_id, observed_at,
     location, location_obscured, obscure_level,
-    region_primary, is_research_grade
+    state_province, is_research_grade
   )
   VALUES (
     obs_id, uid_owner, taxon_id, '2026-05-01T12:00:00Z',
