@@ -616,27 +616,19 @@ const view = page.view;
           const targetId = btn.dataset.followTarget ?? '';
           if (!targetId) return;
           const curState = btn.dataset.followState ?? 'none';
-          // Optimistic update — revert on error (mirrors fave button pattern).
-          const prevState = curState;
-          if (curState === 'none') {
-            setFollowBtnState(btn, 'pending');
-          } else {
-            setFollowBtnState(btn, 'none');
-          }
           btn.disabled = true;
           try {
             const { followUser, unfollowUser } = await import('../lib/social');
-            if (prevState === 'none') {
+            if (curState === 'none') {
               const result = await followUser(targetId);
-              // Server may promote straight to 'accepted' (open follows).
               setFollowBtnState(btn, result.status === 'accepted' ? 'accepted' : 'pending');
             } else {
+              // Following or requested -> unfollow
               await unfollowUser(targetId);
               setFollowBtnState(btn, 'none');
             }
           } catch {
-            // Revert to previous state on network/server error.
-            setFollowBtnState(btn, prevState);
+            // silent — state stays as-is
           } finally {
             btn.disabled = false;
           }
