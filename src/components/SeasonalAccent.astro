@@ -1,0 +1,24 @@
+---
+/**
+ * Seasonal accent illustration — issue #731.
+ *
+ * Renders a small decorative emoji whose glyph is driven by the
+ * `--rastrum-season-emoji` CSS variable set by BaseLayout's inline
+ * boot script. Pure presentation — `aria-hidden` so it doesn't bleed
+ * into screen-reader output.
+ *
+ * The class is safelisted in `tailwind.config.mjs`.
+ */
+
+interface Props {
+  /** Optional extra Tailwind classes (e.g. spacing). */
+  class?: string;
+}
+
+const { class: extraClass = '' } = Astro.props;
+---
+
+<div
+  aria-hidden="true"
+  class:list={['rastrum-season-illustration select-none leading-none', extraClass]}
+></div>

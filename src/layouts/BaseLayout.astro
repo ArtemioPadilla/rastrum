@@ -155,8 +155,50 @@ const resolvedOgImage = ogImage ?? `${SITE_URL}/og/${ogLang}/${ogSlugForPath(cur
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={resolvedOgImage} />
     <PostHog />
+    <style is:global>
+      /* Seasonal theme tokens — issue #731.
+         data-season is set by the inline boot script below before paint to
+         avoid flicker. CSS variables here cascade into chrome accents +
+         the homepage hero illustration. The Tailwind brand colour
+         (`emerald`) is unchanged; only the *seasonal accent* swaps. */
+      :root,
+      :root[data-season='default'] {
+        --rastrum-season-accent: #10b981;        /* emerald-500 */
+        --rastrum-season-accent-soft: #d1fae5;   /* emerald-100 */
+        --rastrum-season-tint: rgba(16, 185, 129, 0.08);
+        --rastrum-season-emoji: '\1F33F';        /* leaf */
+      }
+      :root[data-season='monarca'] {
+        --rastrum-season-accent: #ea580c;        /* orange-600 */
+        --rastrum-season-accent-soft: #ffedd5;   /* orange-100 */
+        --rastrum-season-tint: rgba(234, 88, 12, 0.10);
+        --rastrum-season-emoji: '\1F98B';        /* butterfly */
+      }
+      :root[data-season='lluvias'] {
+        --rastrum-season-accent: #047857;        /* emerald-700 */
+        --rastrum-season-accent-soft: #a7f3d0;   /* emerald-200 */
+        --rastrum-season-tint: rgba(4, 120, 87, 0.10);
+        --rastrum-season-emoji: '\1F327\FE0F';   /* rain cloud */
+      }
+      :root[data-season='secas'] {
+        --rastrum-season-accent: #b45309;        /* amber-700 */
+        --rastrum-season-accent-soft: #fef3c7;   /* amber-100 */
+        --rastrum-season-tint: rgba(180, 83, 9, 0.10);
+        --rastrum-season-emoji: '\1F33E';        /* sheaf */
+      }
+      .rastrum-season-accent { color: var(--rastrum-season-accent); }
+      .rastrum-season-accent-bg { background-color: var(--rastrum-season-tint); }
+      .rastrum-season-accent-border { border-color: var(--rastrum-season-accent); }
+      .rastrum-season-illustration::before {
+        content: var(--rastrum-season-emoji);
+        font-size: 2.25rem;
+        line-height: 1;
+        display: inline-block;
+      }
+    </style>
     <script is:inline>
       (function() {
+        // Theme state (light / dark / field / auto) — from #737
         var stored = localStorage.getItem('theme');
         var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
         var eff;
@@ -168,6 +210,27 @@ const resolvedOgImage = ogImage ?? `${SITE_URL}/og/${ogLang}/${ogSlugForPath(cur
         if (eff === 'field')      { el.add('dark'); el.add('field'); }
         else if (eff === 'dark')  { el.add('dark'); el.remove('field'); }
         else                      { el.remove('dark'); el.remove('field'); }
+        // Seasonal accent (monarca / lluvias / secas / default) — orthogonal to
+        // the theme state above. Issue #731. Inline mirror of seasonal-theme.ts
+        // to avoid flicker; keep in sync.
+        try {
+          var STORE = 'rastrum.theme.seasonal';
+          var raw;
+          try { raw = localStorage.getItem(STORE); } catch (_) { raw = null; }
+          var override = (raw === 'monarca' || raw === 'lluvias' || raw === 'secas' || raw === 'default') ? raw : null;
+          var picked;
+          if (override) {
+            picked = override;
+          } else {
+            var m = (new Date()).getMonth() + 1;
+            if (m >= 6 && m <= 9) picked = 'lluvias';
+            else if (m === 4 || m === 5) picked = 'secas';
+            else picked = 'monarca'; // Oct–Mar
+          }
+          document.documentElement.setAttribute('data-season', picked);
+        } catch (_) {
+          document.documentElement.setAttribute('data-season', 'default');
+        }
       })();
     </script>
     <style is:global>
