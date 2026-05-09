@@ -251,7 +251,6 @@ serve(async (req) => {
     if (!shouldFire || !firedKind) continue;
     candidates++;
 
-HEAD
     let anySuccess = false;
 
     // Check granular notification preference (#870).

@@ -908,7 +908,6 @@ END $$;
 RESET ROLE;
 
 -- ────────────────────────────────────────────────────────────────────────────
-HEAD
 -- follows RLS (issue #858 — friends-scope leaderboard)
 --
 -- Active policy: follows_read (Module 26)
@@ -954,7 +953,6 @@ SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000003';
 
 DO $$
 DECLARE
-HEAD
   cnt int;
 BEGIN
   SELECT count(*)::int INTO cnt
@@ -1060,7 +1058,6 @@ RESET ROLE;
 
 DO $$
 BEGIN
-HEAD
   RAISE NOTICE 'RLS suite: 38 of 38 assertions passed';
 
   RAISE NOTICE 'RLS suite: 37 of 37 assertions passed';
