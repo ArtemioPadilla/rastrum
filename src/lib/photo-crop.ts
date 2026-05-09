@@ -62,6 +62,8 @@ export interface CropAndRotateOptions {
   brightness?: number;
   /** Contrast adjustment, -100..+100. Default 0 (no change). */
   contrast?: number;
+  /** Exposure adjustment, -100..+100. Default 0 (no change). Maps to a second brightness() multiplier: -100→0.5x, 0→1.0x, +100→1.5x. */
+  exposure?: number;
 }
 
 /**
@@ -70,13 +72,17 @@ export interface CropAndRotateOptions {
  * change in the corresponding CSS filter, which mirrors how the live
  * preview slider behaves and keeps the export visually identical.
  */
-export function buildFilterString(brightness: number, contrast: number): string {
+export function buildFilterString(brightness: number, contrast: number, exposure?: number): string {
   const b = Number.isFinite(brightness) ? brightness : 0;
   const c = Number.isFinite(contrast) ? contrast : 0;
-  if (b === 0 && c === 0) return 'none';
+  const e = Number.isFinite(exposure) ? (exposure as number) : 0;
+  if (b === 0 && c === 0 && e === 0) return 'none';
   const bf = (1 + b / 100).toFixed(3);
   const cf = (1 + c / 100).toFixed(3);
-  return `brightness(${bf}) contrast(${cf})`;
+  const base = `brightness(${bf}) contrast(${cf})`;
+  if (e === 0) return base;
+  const em = (1 + (e / 100) * 0.5).toFixed(3);
+  return `${base} brightness(${em})`;
 }
 
 /**
@@ -105,6 +111,7 @@ export async function cropAndRotate(file: File, options: CropAndRotateOptions): 
   const quality = options.quality ?? 0.92;
   const brightness = options.brightness ?? 0;
   const contrast = options.contrast ?? 0;
+  const exposure = options.exposure ?? 0;
   const rotated = rotatedDims(bitmap.width, bitmap.height, rotation);
   const rect = normalizeCropRect(options.rect, rotated.w, rotated.h);
   if (rect.width === 0 || rect.height === 0) {
@@ -112,7 +119,7 @@ export async function cropAndRotate(file: File, options: CropAndRotateOptions): 
     return file;
   }
 
-  const blob = await drawAndEncode(bitmap, rect, rotation, quality, brightness, contrast);
+  const blob = await drawAndEncode(bitmap, rect, rotation, quality, brightness, contrast, exposure);
   bitmap.close?.();
   if (!blob) return file;
 
@@ -129,6 +136,7 @@ async function drawAndEncode(
   quality: number,
   brightness: number,
   contrast: number,
+  exposure: number,
 ): Promise<Blob | null> {
   const w = rect.width;
   const h = rect.height;
@@ -138,7 +146,7 @@ async function drawAndEncode(
       const c = new OffscreenCanvas(w, h);
       const ctx = c.getContext('2d');
       if (!ctx) return null;
-      drawRotatedCrop(ctx, bitmap, rect, rotation, brightness, contrast);
+      drawRotatedCrop(ctx, bitmap, rect, rotation, brightness, contrast, exposure);
       return await c.convertToBlob({ type: 'image/jpeg', quality });
     } catch {
       /* fall through */
@@ -150,7 +158,7 @@ async function drawAndEncode(
   c.height = h;
   const ctx = c.getContext('2d');
   if (!ctx) return null;
-  drawRotatedCrop(ctx, bitmap, rect, rotation, brightness, contrast);
+  drawRotatedCrop(ctx, bitmap, rect, rotation, brightness, contrast, exposure);
   return new Promise<Blob | null>((resolve) =>
     c.toBlob((b) => resolve(b), 'image/jpeg', quality),
   );
@@ -163,11 +171,12 @@ function drawRotatedCrop(
   rotation: Rotation,
   brightness: number,
   contrast: number,
+  exposure: number,
 ): void {
   const sw = bitmap.width;
   const sh = bitmap.height;
   ctx.save();
-  const filter = buildFilterString(brightness, contrast);
+  const filter = buildFilterString(brightness, contrast, exposure);
   if (filter !== 'none') {
     (ctx as CanvasRenderingContext2D).filter = filter;
   }
