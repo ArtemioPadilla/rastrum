@@ -36,6 +36,16 @@ interface LeaderboardCopy {
   leaderboard_period_all: string;
   leaderboard_period_experts: string;
   leaderboard_period_aria: string;
+  leaderboard_window_aria: string;
+  leaderboard_window_today: string;
+  leaderboard_window_week: string;
+  leaderboard_window_month: string;
+  leaderboard_window_all: string;
+  leaderboard_scope_aria: string;
+  leaderboard_scope_global: string;
+  leaderboard_scope_friends: string;
+  leaderboard_scope_friends_signin: string;
+  leaderboard_scope_friends_empty: string;
   leaderboard_region_label: string;
   leaderboard_region_all: string;
   leaderboard_region_empty: string;
@@ -65,6 +75,8 @@ const stringsJson = JSON.stringify({
   taxaLoading: cm.leaderboard_experts_taxon_loading,
   taxonNoneOption: cm.leaderboard_experts_taxon_none,
   expertsNoData: cm.leaderboard_experts_no_data,
+  scopeFriendsSignin: cm.leaderboard_scope_friends_signin,
+  scopeFriendsEmpty: cm.leaderboard_scope_friends_empty,
   profileBase,
 });
 ---
@@ -81,6 +93,76 @@ const stringsJson = JSON.stringify({
 
   <div class="mb-4 flex flex-wrap items-center gap-3">
     <div
+      data-window-wrap
+      class="inline-flex rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-0.5 text-xs"
+      role="tablist"
+      aria-label={cm.leaderboard_window_aria}
+    >
+      <button
+        type="button"
+        role="tab"
+        data-window-tab="today"
+        aria-pressed="false"
+        class="px-3 py-1.5 rounded-md font-medium transition"
+      >
+        {cm.leaderboard_window_today}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        data-window-tab="week"
+        aria-pressed="false"
+        class="px-3 py-1.5 rounded-md font-medium transition"
+      >
+        {cm.leaderboard_window_week}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        data-window-tab="month"
+        aria-pressed="true"
+        class="px-3 py-1.5 rounded-md font-medium transition"
+      >
+        {cm.leaderboard_window_month}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        data-window-tab="all"
+        aria-pressed="false"
+        class="px-3 py-1.5 rounded-md font-medium transition"
+      >
+        {cm.leaderboard_window_all}
+      </button>
+    </div>
+
+    <div
+      data-scope-wrap
+      class="inline-flex rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-0.5 text-xs"
+      role="tablist"
+      aria-label={cm.leaderboard_scope_aria}
+    >
+      <button
+        type="button"
+        role="tab"
+        data-scope-tab="global"
+        aria-pressed="true"
+        class="px-3 py-1.5 rounded-md font-medium transition"
+      >
+        {cm.leaderboard_scope_global}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        data-scope-tab="friends"
+        aria-pressed="false"
+        class="px-3 py-1.5 rounded-md font-medium transition"
+      >
+        {cm.leaderboard_scope_friends}
+      </button>
+    </div>
+
+    <div
       class="inline-flex rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-0.5 text-xs"
       role="tablist"
       aria-label={cm.leaderboard_period_aria}
@@ -88,20 +170,11 @@ const stringsJson = JSON.stringify({
       <button
         type="button"
         role="tab"
-        data-view-tab="30d"
+        data-view-tab="window"
         aria-pressed="true"
         class="px-3 py-1.5 rounded-md font-medium transition"
       >
-        {cm.leaderboard_period_30d}
-      </button>
-      <button
-        type="button"
-        role="tab"
-        data-view-tab="all"
-        aria-pressed="false"
-        class="px-3 py-1.5 rounded-md font-medium transition"
-      >
-        {cm.leaderboard_period_all}
+        {cm.leaderboard_karma}
       </button>
       <button
         type="button"
@@ -172,7 +245,14 @@ const stringsJson = JSON.stringify({
     searchForRegion,
     taxonFromSearch,
     searchForTaxon,
-    type LeaderboardView,
+    windowFromSearch,
+    searchForWindow,
+    scopeFromSearch,
+    searchForScope,
+    DEFAULT_WINDOW,
+    DEFAULT_SCOPE,
+    type LeaderboardWindow,
+    type LeaderboardScope,
   } from '../lib/leaderboard-url';
 
   interface LeaderboardStrings {
@@ -186,6 +266,36 @@ const stringsJson = JSON.stringify({
     taxaLoading: string;
     taxonNoneOption: string;
     expertsNoData: string;
+    scopeFriendsSignin: string;
+    scopeFriendsEmpty: string;
+  }
+
+  const PREFS_KEY = 'rastrum.leaderboard.prefs';
+
+  function readPrefs(): { window?: LeaderboardWindow; scope?: LeaderboardScope } {
+    try {
+      const raw = localStorage.getItem(PREFS_KEY);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw) as { window?: unknown; scope?: unknown };
+      return {
+        window: typeof parsed.window === 'string'
+          ? (['today', 'week', 'month', 'all'].includes(parsed.window) ? parsed.window as LeaderboardWindow : undefined)
+          : undefined,
+        scope: typeof parsed.scope === 'string'
+          ? (['global', 'friends'].includes(parsed.scope) ? parsed.scope as LeaderboardScope : undefined)
+          : undefined,
+      };
+    } catch {
+      return {};
+    }
+  }
+
+  function writePrefs(window: LeaderboardWindow, scope: LeaderboardScope) {
+    try {
+      localStorage.setItem(PREFS_KEY, JSON.stringify({ window, scope }));
+    } catch {
+      // ignore quota / disabled storage
+    }
   }
 
   const root = document.getElementById('leaderboard-root');
@@ -198,6 +308,10 @@ const stringsJson = JSON.stringify({
   const tableWrap = document.getElementById('leaderboard-table-wrap');
   const tbody = document.getElementById('leaderboard-body');
   const tabs = root.querySelectorAll<HTMLButtonElement>('[data-view-tab]');
+  const windowTabs = root.querySelectorAll<HTMLButtonElement>('[data-window-tab]');
+  const scopeTabs = root.querySelectorAll<HTMLButtonElement>('[data-scope-tab]');
+  const windowWrap = root.querySelector<HTMLElement>('[data-window-wrap]');
+  const scopeWrap = root.querySelector<HTMLElement>('[data-scope-wrap]');
   const regionWrap = root.querySelector<HTMLElement>('[data-region-wrap]');
   const regionSel = document.getElementById('leaderboard-region') as HTMLSelectElement | null;
   const taxonWrap = root.querySelector<HTMLElement>('[data-taxon-wrap]');
@@ -256,7 +370,7 @@ const stringsJson = JSON.stringify({
   let taxaEmpty = false;
   let lastTaxon = '';
 
-  function renderRow(row: LeaderboardRow, rank: number, view: LeaderboardView): HTMLTableRowElement {
+  function renderRow(row: LeaderboardRow, rank: number, mode: 'window' | 'experts'): HTMLTableRowElement {
     const handle = row.username ?? row.id.slice(0, 8);
     const displayName = row.display_name ?? handle;
     const profileHref = `${STRINGS.profileBase}/?username=${encodeURIComponent(handle)}`;
@@ -272,13 +386,13 @@ const stringsJson = JSON.stringify({
       ? `<img src="${escapeHtml(row.avatar_url)}" alt="" loading="lazy" class="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 object-cover flex-none">`
       : `<div class="w-8 h-8 rounded-full bg-emerald-700 text-white flex items-center justify-center font-semibold text-xs flex-none">${escapeHtml(displayName.slice(0, 1).toUpperCase())}</div>`;
 
-    const scoreCell = view === 'experts'
+    const scoreCell = mode === 'experts'
       ? `<td class="py-3 px-2 text-right font-semibold text-emerald-700 dark:text-emerald-400">${(Number(row.score ?? 0)).toFixed(1)}</td>`
       : '';
-    const karmaCell = view !== 'experts'
+    const karmaCell = mode !== 'experts'
       ? `<td class="py-3 px-2 text-right font-semibold text-emerald-700 dark:text-emerald-400">${Math.round(row.karma)}</td>`
       : '';
-    const speciesCell = view !== 'experts'
+    const speciesCell = mode !== 'experts'
       ? `<td class="py-3 pl-2 text-right text-zinc-600 dark:text-zinc-300">${row.species_count ?? 0}</td>`
       : '';
 
@@ -300,28 +414,54 @@ const stringsJson = JSON.stringify({
     return tr;
   }
 
-  function paintTabs(view: LeaderboardView) {
+  function paintTabs(mode: 'window' | 'experts') {
     tabs.forEach((tab) => {
-      const own = tab.dataset.viewTab as LeaderboardView;
-      const active = own === view;
+      const own = tab.dataset.viewTab;
+      const active = own === mode;
       tab.setAttribute('aria-pressed', active ? 'true' : 'false');
       tab.className = `px-3 py-1.5 rounded-md font-medium transition ${active ? ACTIVE_TAB : INACTIVE_TAB}`;
     });
   }
 
-  function paintFilters(view: LeaderboardView) {
-    if (view === 'experts') {
+  function paintWindowTabs(win: LeaderboardWindow) {
+    windowTabs.forEach((tab) => {
+      const own = tab.dataset.windowTab as LeaderboardWindow;
+      const active = own === win;
+      tab.setAttribute('aria-pressed', active ? 'true' : 'false');
+      tab.className = `px-3 py-1.5 rounded-md font-medium transition ${active ? ACTIVE_TAB : INACTIVE_TAB}`;
+    });
+  }
+
+  function paintScopeTabs(scope: LeaderboardScope) {
+    scopeTabs.forEach((tab) => {
+      const own = tab.dataset.scopeTab as LeaderboardScope;
+      const active = own === scope;
+      tab.setAttribute('aria-pressed', active ? 'true' : 'false');
+      tab.className = `px-3 py-1.5 rounded-md font-medium transition ${active ? ACTIVE_TAB : INACTIVE_TAB}`;
+    });
+  }
+
+  function paintFilters(mode: 'window' | 'experts', scope: LeaderboardScope) {
+    if (mode === 'experts') {
+      windowWrap?.classList.add('hidden');
+      scopeWrap?.classList.add('hidden');
       regionWrap?.classList.add('hidden');
       taxonWrap?.classList.remove('hidden');
       colKarmaEl?.classList.add('hidden');
       colSpeciesEl?.classList.add('hidden');
       colScoreEl?.classList.remove('hidden');
     } else {
-      regionWrap?.classList.remove('hidden');
+      windowWrap?.classList.remove('hidden');
+      scopeWrap?.classList.remove('hidden');
       taxonWrap?.classList.add('hidden');
       colKarmaEl?.classList.remove('hidden');
       colSpeciesEl?.classList.remove('hidden');
       colScoreEl?.classList.add('hidden');
+      if (scope === 'friends') {
+        regionWrap?.classList.add('hidden');
+      } else {
+        regionWrap?.classList.remove('hidden');
+      }
     }
   }
 
@@ -468,16 +608,91 @@ const stringsJson = JSON.stringify({
     }
   }
 
-  async function loadKarma(view: 'all' | '30d', region: string): Promise<void> {
-    showLoading();
+  function windowToIntervalMs(win: LeaderboardWindow): number {
+    switch (win) {
+      case 'today': return 24 * 60 * 60 * 1000;
+      case 'week':  return 7 * 24 * 60 * 60 * 1000;
+      case 'month': return 30 * 24 * 60 * 60 * 1000;
+      case 'all':   return 0;
+    }
+  }
+
+  async function getCurrentUserId(): Promise<string | null> {
     try {
       const supabase = getSupabase();
+      const { data } = await supabase.auth.getSession();
+      return data.session?.user?.id ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function loadFollowedIds(myId: string): Promise<string[]> {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('follows')
+      .select('followee_id')
+      .eq('follower_id', myId)
+      .eq('status', 'accepted');
+    if (error) throw new Error(error.message);
+    const ids = ((data ?? []) as Array<{ followee_id: string | null }>)
+      .map((r) => r.followee_id)
+      .filter((v): v is string => typeof v === 'string' && v.length > 0);
+    return ids;
+  }
+
+  async function loadKarma(win: LeaderboardWindow, region: string, scope: LeaderboardScope): Promise<void> {
+    showLoading();
+    try {
+      let restrictIds: string[] | null = null;
+      if (scope === 'friends') {
+        const myId = await getCurrentUserId();
+        if (!myId) {
+          showEmpty(STRINGS.scopeFriendsSignin);
+          return;
+        }
+        const ids = await loadFollowedIds(myId);
+        if (ids.length === 0) {
+          showEmpty(STRINGS.scopeFriendsEmpty);
+          return;
+        }
+        restrictIds = ids;
+      }
+
+      const supabase = getSupabase();
       let rows: LeaderboardRow[] = [];
-      if (view === '30d') {
+
+      if (win === 'all') {
+        let q = supabase
+          .from('community_observers')
+          .select('id, username, display_name, avatar_url, country_code, karma_total, species_count');
+        if (restrictIds) q = q.in('id', restrictIds);
+        else if (region) q = q.eq('country_code', region);
+        const { data, error } = await q
+          .order('karma_total', { ascending: false, nullsFirst: false })
+          .limit(20);
+        if (error) throw new Error(error.message);
+        rows = (data ?? []).map((r: {
+          id: string;
+          username: string | null;
+          display_name: string | null;
+          avatar_url: string | null;
+          karma_total: number | null;
+          species_count: number | null;
+        }) => ({
+          id: r.id,
+          username: r.username,
+          display_name: r.display_name,
+          avatar_url: r.avatar_url,
+          karma: Number(r.karma_total ?? 0),
+          species_count: r.species_count,
+        }));
+      } else if (win === 'month') {
         let q = supabase
           .from('karma_leaderboard_30d')
           .select('user_id, username, display_name, avatar_url, country_code, karma_30d, species_count');
-        if (region) q = q.eq('country_code', region);
+        if (restrictIds) q = q.in('user_id', restrictIds);
+        else if (region) q = q.eq('country_code', region);
         const { data, error } = await q
           .order('karma_30d', { ascending: false, nullsFirst: false })
           .limit(20);
@@ -498,34 +713,77 @@ const stringsJson = JSON.stringify({
           species_count: r.species_count,
         }));
       } else {
-        let q = supabase
+        const sinceIso = new Date(Date.now() - windowToIntervalMs(win)).toISOString();
+        let eq = supabase
+          .from('karma_events')
+          .select('user_id, delta')
+          .gt('delta', 0)
+          .gte('created_at', sinceIso)
+          .limit(5000);
+        if (restrictIds) eq = eq.in('user_id', restrictIds);
+        const { data: eventsData, error: eventsErr } = await eq;
+        if (eventsErr) throw new Error(eventsErr.message);
+
+        const totals = new Map<string, number>();
+        for (const r of (eventsData ?? []) as Array<{ user_id: string; delta: number | null }>) {
+          totals.set(r.user_id, (totals.get(r.user_id) ?? 0) + Number(r.delta ?? 0));
+        }
+        const topPairs = [...totals.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 20);
+        const topIds = topPairs.map(([id]) => id);
+
+        if (topIds.length === 0) {
+          loadingEl!.classList.add('hidden');
+          showEmpty(restrictIds ? STRINGS.scopeFriendsEmpty
+            : (region ? STRINGS.regionEmpty.replace('{region}', regionLabel(region)) : undefined));
+          return;
+        }
+
+        let userQ = supabase
           .from('community_observers')
-          .select('id, username, display_name, avatar_url, country_code, karma_total, species_count');
-        if (region) q = q.eq('country_code', region);
-        const { data, error } = await q
-          .order('karma_total', { ascending: false, nullsFirst: false })
-          .limit(20);
-        if (error) throw new Error(error.message);
-        rows = (data ?? []).map((r: {
+          .select('id, username, display_name, avatar_url, country_code, species_count')
+          .in('id', topIds);
+        if (!restrictIds && region) userQ = userQ.eq('country_code', region);
+        const { data: usersData, error: usersErr } = await userQ;
+        if (usersErr) throw new Error(usersErr.message);
+
+        const userMap = new Map<string, {
           id: string;
           username: string | null;
           display_name: string | null;
           avatar_url: string | null;
-          karma_total: number | null;
           species_count: number | null;
-        }) => ({
-          id: r.id,
-          username: r.username,
-          display_name: r.display_name,
-          avatar_url: r.avatar_url,
-          karma: Number(r.karma_total ?? 0),
-          species_count: r.species_count,
-        }));
+        }>();
+        for (const u of (usersData ?? []) as Array<{
+          id: string;
+          username: string | null;
+          display_name: string | null;
+          avatar_url: string | null;
+          species_count: number | null;
+        }>) {
+          userMap.set(u.id, u);
+        }
+
+        for (const [id, total] of topPairs) {
+          const u = userMap.get(id);
+          if (!u) continue;
+          rows.push({
+            id: u.id,
+            username: u.username,
+            display_name: u.display_name,
+            avatar_url: u.avatar_url,
+            karma: total,
+            species_count: u.species_count,
+          });
+        }
       }
 
       loadingEl!.classList.add('hidden');
       if (rows.length === 0) {
-        if (region) {
+        if (restrictIds) {
+          showEmpty(STRINGS.scopeFriendsEmpty);
+        } else if (region) {
           showEmpty(STRINGS.regionEmpty.replace('{region}', regionLabel(region)));
         } else {
           showEmpty();
@@ -533,7 +791,7 @@ const stringsJson = JSON.stringify({
         return;
       }
       for (let i = 0; i < rows.length; i++) {
-        tbody!.appendChild(renderRow(rows[i], i + 1, view));
+        tbody!.appendChild(renderRow(rows[i], i + 1, 'window'));
       }
       tableWrap!.classList.remove('hidden');
     } catch (err) {
@@ -620,70 +878,147 @@ const stringsJson = JSON.stringify({
     }
   }
 
-  async function applyState(view: LeaderboardView, push: boolean) {
-    paintTabs(view);
-    paintFilters(view);
+  function currentMode(): 'window' | 'experts' {
+    return viewFromSearch(window.location.search) === 'experts' ? 'experts' : 'window';
+  }
 
-    if (view === 'experts') {
+  function buildSearch(opts: {
+    mode: 'window' | 'experts';
+    win?: LeaderboardWindow;
+    scope?: LeaderboardScope;
+    region?: string;
+    taxon?: string;
+  }): string {
+    let s = window.location.search;
+    if (opts.mode === 'experts') {
+      s = searchForView(s, 'experts');
+      s = searchForTaxon(s, opts.taxon ?? '');
+    } else {
+      s = searchForView(s, '30d');
+      s = searchForWindow(s, opts.win ?? DEFAULT_WINDOW);
+      s = searchForScope(s, opts.scope ?? DEFAULT_SCOPE);
+      s = searchForRegion(s, opts.region ?? '');
+    }
+    return s;
+  }
+
+  async function applyState(mode: 'window' | 'experts', push: boolean) {
+    if (mode === 'experts') {
+      paintTabs('experts');
+      paintFilters('experts', DEFAULT_SCOPE);
       await loadTaxa();
       const taxonId = taxonSel!.value;
       lastTaxon = taxonId;
       if (push) {
-        const next = applyAll(window.location.search, view, '', taxonId);
+        const next = buildSearch({ mode: 'experts', taxon: taxonId });
         const url = `${window.location.pathname}${next}${window.location.hash}`;
-        window.history.pushState({ view, taxon: taxonId }, '', url);
+        window.history.pushState({ mode, taxon: taxonId }, '', url);
       }
       void loadExperts(taxonId);
-    } else {
-      void loadRegions();
-      const region = regionFromSearch(window.location.search);
-      regionSel!.value = region;
-      if (push) {
-        const next = applyAll(window.location.search, view, region, '');
-        const url = `${window.location.pathname}${next}${window.location.hash}`;
-        window.history.pushState({ view, region }, '', url);
-      }
-      void loadKarma(view, region);
+      return;
     }
-  }
 
-  function applyAll(currentSearch: string, view: LeaderboardView, region: string, taxon: string): string {
-    let s = searchForView(currentSearch, view);
-    s = searchForRegion(s, region);
-    s = searchForTaxon(s, taxon);
-    return s;
+    const win = windowFromSearch(window.location.search);
+    const scope = scopeFromSearch(window.location.search);
+    paintTabs('window');
+    paintWindowTabs(win);
+    paintScopeTabs(scope);
+    paintFilters('window', scope);
+    writePrefs(win, scope);
+
+    if (scope === 'global') void loadRegions();
+    const region = scope === 'global' ? regionFromSearch(window.location.search) : '';
+    regionSel!.value = region;
+
+    if (push) {
+      const next = buildSearch({ mode: 'window', win, scope, region });
+      const url = `${window.location.pathname}${next}${window.location.hash}`;
+      window.history.pushState({ mode, win, scope, region }, '', url);
+    }
+    void loadKarma(win, region, scope);
   }
 
   tabs.forEach((tab) => {
     tab.addEventListener('click', () => {
-      const view = tab.dataset.viewTab as LeaderboardView;
-      void applyState(view, true);
+      const raw = tab.dataset.viewTab;
+      const next: 'window' | 'experts' = raw === 'experts' ? 'experts' : 'window';
+      void applyState(next, true);
+    });
+  });
+
+  windowTabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      const win = tab.dataset.windowTab as LeaderboardWindow | undefined;
+      if (!win) return;
+      const search = buildSearch({
+        mode: 'window',
+        win,
+        scope: scopeFromSearch(window.location.search),
+        region: regionFromSearch(window.location.search),
+      });
+      const url = `${window.location.pathname}${search}${window.location.hash}`;
+      window.history.pushState({ mode: 'window', win }, '', url);
+      void applyState('window', false);
+    });
+  });
+
+  scopeTabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      const scope = tab.dataset.scopeTab as LeaderboardScope | undefined;
+      if (!scope) return;
+      const region = scope === 'global' ? regionFromSearch(window.location.search) : '';
+      const search = buildSearch({
+        mode: 'window',
+        win: windowFromSearch(window.location.search),
+        scope,
+        region,
+      });
+      const url = `${window.location.pathname}${search}${window.location.hash}`;
+      window.history.pushState({ mode: 'window', scope }, '', url);
+      void applyState('window', false);
     });
   });
 
   regionSel.addEventListener('change', () => {
     const region = regionSel.value;
-    const view = viewFromSearch(window.location.search);
-    if (view === 'experts') return;
-    const next = applyAll(window.location.search, view, region, '');
-    const url = `${window.location.pathname}${next}${window.location.hash}`;
-    window.history.pushState({ view, region }, '', url);
-    void loadKarma(view, region);
+    if (currentMode() === 'experts') return;
+    const win = windowFromSearch(window.location.search);
+    const scope = scopeFromSearch(window.location.search);
+    if (scope === 'friends') return;
+    const search = buildSearch({ mode: 'window', win, scope, region });
+    const url = `${window.location.pathname}${search}${window.location.hash}`;
+    window.history.pushState({ mode: 'window', region }, '', url);
+    void loadKarma(win, region, scope);
   });
 
   taxonSel.addEventListener('change', () => {
     const taxon = taxonSel.value;
     if (taxon === lastTaxon) return;
     lastTaxon = taxon;
-    const next = applyAll(window.location.search, 'experts', '', taxon);
-    const url = `${window.location.pathname}${next}${window.location.hash}`;
-    window.history.pushState({ view: 'experts', taxon }, '', url);
+    const search = buildSearch({ mode: 'experts', taxon });
+    const url = `${window.location.pathname}${search}${window.location.hash}`;
+    window.history.pushState({ mode: 'experts', taxon }, '', url);
     void loadExperts(taxon);
   });
 
   window.addEventListener('popstate', () => {
-    void applyState(viewFromSearch(window.location.search), false);
+    void applyState(currentMode(), false);
   });
 
-  void applyState(viewFromSearch(window.location.search), false);
+  (function bootstrap() {
+    const search = window.location.search;
+    const params = new URLSearchParams(search);
+    const hasUrlPrefs = params.has('window') || params.has('scope') || params.has('view');
+    if (!hasUrlPrefs) {
+      const stored = readPrefs();
+      if (stored.window || stored.scope) {
+        let s = search;
+        if (stored.window) s = searchForWindow(s, stored.window);
+        if (stored.scope) s = searchForScope(s, stored.scope);
+        const url = `${window.location.pathname}${s}${window.location.hash}`;
+        window.history.replaceState(window.history.state, '', url);
+      }
+    }
+    void applyState(currentMode(), false);
+  })();
 </script>
