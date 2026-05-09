@@ -6,6 +6,28 @@ Versions use CalVer `YYYY.M.N`.
 
 ---
 
+## [2026.5.3] — 2026-05-09
+
+### Added
+
+- **Personalized home widgets (#704)** — `/{en,es}/` home page now renders three signed-in widgets above the existing hero: a time-of-day greeting (`madrugada` / morning / afternoon / evening, EN+ES), a streak pill (hidden when 0), and a 3-up "Recent in your area" rail that falls back to a global feed when the user's country has no recent observations. New `src/lib/home-greeting.ts` is a pure helper covered by 12 unit tests on hour-bucket boundaries.
+- **Karma-tier avatar frames (#702)** — `KarmaFrame.astro` wraps an avatar with one of six tiers — Seedling (0–99) / Observer (100–499) / Naturalist (500–999) / Expert (1000–4999) / Master (5000–9999) / Legend (10000+). Tier ring colour, glow, and animation are derived from `users.karma_total` via `tierForKarma()` (12 unit tests). Wired on `ProfileView`; PublicProfile / header / leaderboard rows are v1.1 follow-ups. All animations use `motion-safe:` to respect `prefers-reduced-motion`.
+- **Photo editing in ObserveView2 (#787)** — the existing `PhotoCropModal` is now wired into the new Drop & Discover form via a per-thumbnail edit (✏️) button; on save the edited file replaces the pipeline file and re-triggers identification. Added brightness + contrast sliders (−100..+100, default 0, 44px touch target) applied via Canvas `filter` so the JPEG export matches the live preview. EN+ES i18n parity.
+- **Recents view-mode switcher (#705)** — `/explore/recent` and `/explora/recientes` get a top-right toggle between **cards** (existing) and **grid** (2-col mobile / 3-col `md+`). Choice persists in `localStorage["rastrum.recents.viewMode"]`. Shared `ViewMode` type + helpers in `src/lib/recents-view-mode.ts` so future modes (list, map, timeline — v1.1) extend cleanly.
+- **Karma leaderboard windows + scopes (#703)** — `/community/leaderboard` gains a window selector (Today / This week / This month / All time) and a scope selector (Global / Friends, the latter filtered by accepted edges in `follows`). URL-synced (`?window=…&scope=…`) plus `localStorage["rastrum.leaderboard.prefs"]`. Today/week ranking is now exact regardless of event volume — backed by a new `karma_leaderboard_window(p_since, p_limit, p_restrict_ids, p_country_code)` SECURITY DEFINER SQL function that does `GROUP BY user_id` + `ORDER BY SUM(delta) DESC` + `LIMIT` server-side, replacing the previous client-side aggregation over a 5000-row cap. Region scope is a v1.1 follow-up.
+- **Badge catalogue extended (#701)** — four new badges via existing `award-badges` nightly cron: `streak_7`, `streak_30` (read `users.streak_current`), `state_explorer_3` (observations across ≥3 distinct `observations.state_province` values), and the hidden `midnight_owl` easter egg. Three new SECURITY DEFINER predicates (`badge_eligible_streak`, `badge_eligible_state_diversity`, `badge_eligible_midnight_observation`) follow the schema-security invariants: pinned `search_path`, `REVOKE EXECUTE … FROM PUBLIC`, `GRANT EXECUTE … TO service_role`. `midnight_owl` evaluates the hour in the observer's timezone (`COALESCE(users.timezone, 'UTC')`) so users in CDMX who observe at 1am local correctly qualify regardless of UTC offset.
+- **Tauri v2 Android scaffold (#762)** — `src-tauri/` config, Cargo + Rust stubs, capabilities, and npm scripts (`tauri:dev`, `tauri:android:init|dev|build`) for packaging the static Astro PWA as a native Android app. Includes `.github/workflows/tauri-android.yml` (`workflow_dispatch`-only) for CI builds with documented NDK pin, plus `docs/runbooks/tauri-android.md` covering prereqs, signing, and Play Console upload. Detects the Tauri WebView at runtime via `window.__TAURI_INTERNALS__` so the PWA install banner doesn't render inside the wrapper. AAB builds require Rust + Android SDK locally — see runbook.
+
+### Changed
+
+- **Mobile bottom nav reordered (#706)** — new layout for signed-in users: `Home | Recents | [+ FAB] | Discover | Profile`. Recents is now the most thumb-accessible action; Discover replaces Explore in the rightmost slot, aliased provisionally to `/community/observers` (a dedicated personalized Discover feed is a v1.1 follow-up). FAB-shift behavior on `/observe` (→ `/identify` with "Quick ID" badge) is preserved.
+
+### Fixed
+
+- **`resumePipeline` no longer retries failed pipeline on reload (#786)** — `ObserveView2.resumePipeline` now treats `state.status='failed'` the same as `'done'` (shows the post-form directly, no retry). Prevents a reload loop when an underlying error like the Android Chrome gotrue auth lock persists across reloads.
+
+---
+
 ## [2026.5.2] — 2026-05-07
 
 ### Added
