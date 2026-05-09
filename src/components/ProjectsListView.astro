@@ -50,7 +50,7 @@ const projectsBase = routes.projects[lang];
 
 <script>
   import { listProjects } from '../lib/projects';
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedUser, getSupabase } from '../lib/supabase';
   import { escapeHtml } from '../lib/escape';
 
   const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
@@ -65,8 +65,8 @@ const projectsBase = routes.projects[lang];
 
     async function load() {
       const sb = getSupabase();
-      const { data: { session } } = await sb.auth.getSession();
-      if (session?.user) {
+      const user = await getCachedUser();
+      if (user) {
         cta?.classList.remove('hidden');
       }
       let rows;
@@ -76,20 +76,20 @@ const projectsBase = routes.projects[lang];
         console.warn('[rastrum] projects list failed', err);
         rows = [];
       }
-      const mineRows = session?.user
-        ? rows.filter((r) => r.owner_user_id === session.user.id)
+      const mineRows = user
+        ? rows.filter((r) => r.owner_user_id === user.id)
         : [];
-      const otherRows = session?.user
-        ? rows.filter((r) => r.owner_user_id !== session.user.id && r.visibility === 'public')
+      const otherRows = user
+        ? rows.filter((r) => r.owner_user_id !== user.id && r.visibility === 'public')
         : rows.filter((r) => r.visibility === 'public');
 
-      if (mineRows.length === 0 && session?.user) {
+      if (mineRows.length === 0 && user) {
         mineEmpty?.classList.remove('hidden');
       }
       if (otherRows.length === 0) {
         pubEmpty?.classList.remove('hidden');
       }
-      if (!session?.user) {
+      if (!user) {
         // Hide the "my projects" section entirely when not signed in.
         document.querySelector('[data-section="my"]')?.classList.add('hidden');
       }

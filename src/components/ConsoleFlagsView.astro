@@ -57,7 +57,7 @@ const isEs = lang === 'es';
 </section>
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedUser, getSupabase } from '../lib/supabase';
   import { getUserRoles } from '../lib/user-roles';
   import { escapeHtml } from '../lib/escape';
 
@@ -182,9 +182,9 @@ const isEs = lang === 'es';
 
   (async () => {
     const supabase = getSupabase();
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) { show('flags-not-auth'); return; }
-    const myRoles = await getUserRoles(session.user.id);
+    const user = await getCachedUser();
+    if (!user) { show('flags-not-auth'); return; }
+    const myRoles = await getUserRoles(user.id);
     if (!myRoles.has('admin')) { show('flags-not-auth'); return; }
     shell?.classList.remove('hidden');
     const params = new URLSearchParams(window.location.search);

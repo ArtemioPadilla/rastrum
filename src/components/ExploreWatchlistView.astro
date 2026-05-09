@@ -45,7 +45,7 @@ const signInPath = getLocalizedPath(lang, routes.signIn[lang] + '/');
 </section>
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedUser, getSupabase } from '../lib/supabase';
 
   const anonCta = document.getElementById('ew-anon-cta');
   const signedInBlock = document.getElementById('ew-signed-in');
@@ -58,7 +58,7 @@ const signInPath = getLocalizedPath(lang, routes.signIn[lang] + '/');
       anonCta?.classList.remove('hidden');
       return;
     }
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCachedUser();
     if (user) {
       signedInBlock?.classList.remove('hidden');
     } else {

@@ -98,7 +98,7 @@ const profilePath = getLocalizedPath(lang, routes.profile[lang] + '/');
 </div>
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedUser, getSupabase } from '../lib/supabase';
 
   type AppRow = {
     id: string;
@@ -185,7 +185,7 @@ const profilePath = getLocalizedPath(lang, routes.profile[lang] + '/');
       return;
     }
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCachedUser();
     if (!user) {
       hide('admin-loading');
       show('admin-not-auth');

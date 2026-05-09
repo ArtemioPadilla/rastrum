@@ -113,7 +113,7 @@ const psp = (tr as unknown as { profile_streak_push: { section_title: string; se
         setSppWarn(reasonMap[r.reason ?? 'unknown'] ?? r.message ?? '');
       } else {
         const supabase = supabaseLib.getSupabase();
-        const { data: { user } } = await supabase.auth.getUser();
+        const user = await supabaseLib.getCachedUser();
         if (user) {
           await supabase.from('users').update({ streak_digest_opt_in: turningOn }).eq('id', user.id);
         }

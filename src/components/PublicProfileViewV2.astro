@@ -235,7 +235,7 @@ const sponsoringI18n = {
 <script type="application/json" id="public-profile-i18n" set:html={JSON.stringify(sponsoringI18n)}></script>
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedUser, getSupabase } from '../lib/supabase';
   import { wireOverflowMenu } from '../lib/overflow-menu';
   import { openConfirmDialog } from '../lib/confirm-dialog';
   import { tierForKarma } from '../lib/karma-frame';
@@ -302,7 +302,7 @@ const sponsoringI18n = {
       return;
     }
 
-    const { data: { user: viewer } } = await supabase.auth.getUser();
+    const viewer = await getCachedUser();
 
     const { data: profile } = await supabase
       .from('users')

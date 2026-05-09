@@ -1165,8 +1165,9 @@ const langJson = JSON.stringify(lang);
     try { bens = await listSponsorships('sponsor'); } catch { /* silent */ }
     tbody.innerHTML = '';
 
-    const supabase = (await import('../lib/supabase')).getSupabase();
-    const { data: { user } } = await supabase.auth.getUser();
+    const { getSupabase, getCachedUser } = await import('../lib/supabase');
+    const supabase = getSupabase();
+    const user = await getCachedUser();
     const myId = user?.id;
 
     const ids = Array.from(new Set(bens.map(b => b.beneficiary_id)));
@@ -1263,8 +1264,9 @@ const langJson = JSON.stringify(lang);
   });
 
   async function refreshAnalytics(days = 30) {
-    const supabase = (await import('../lib/supabase')).getSupabase();
-    const { data: { user } } = await supabase.auth.getUser();
+    const { getSupabase, getCachedUser } = await import('../lib/supabase');
+    const supabase = getSupabase();
+    const user = await getCachedUser();
     if (!user) return;
 
     const sinceIso   = new Date(Date.now() - days * 24 * 60 * 60_000).toISOString();

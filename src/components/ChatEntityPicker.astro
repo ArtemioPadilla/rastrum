@@ -55,7 +55,7 @@ const labels = {
 </style>
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedUser, getSupabase } from '../lib/supabase';
   import { bootstrapChatEntities, registry } from '../lib/chat-entities';
   import type { EntityKind } from '../lib/chat-entities/types';
   import { escapeHtml } from '../lib/chat-bubble-html';
@@ -104,8 +104,8 @@ const labels = {
         const { data } = await sb.rpc('chat_find_observers', { p_query: q || ' ', p_limit: 20 });
         rows = (data ?? []).map((r: { id: string; display_name?: string; username?: string }) => ({ id: r.id, label: r.display_name ?? r.username ?? r.id }));
       } else if (activeTab === 'self_profile') {
-        const me = await sb.auth.getUser();
-        if (me.data?.user) rows = [{ id: me.data.user.id, label: isEs ? 'Yo' : 'Me' }];
+        const me = await getCachedUser();
+        if (me) rows = [{ id: me.id, label: isEs ? 'Yo' : 'Me' }];
       } else if (activeTab === 'camera_station') {
         list.innerHTML = `<li class="text-xs text-zinc-500 italic">${STATION}</li>`;
         return;

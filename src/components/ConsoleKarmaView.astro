@@ -67,7 +67,7 @@ const tr = t(lang);
 </section>
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedUser, getSupabase } from '../lib/supabase';
   import { getUserRoles } from '../lib/user-roles';
 
   type KarmaConfigRow = {
@@ -107,9 +107,9 @@ const tr = t(lang);
   const supabase = getSupabase();
 
   async function init() {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) { show('karma-not-auth'); return; }
-    const myRoles = await getUserRoles(session.user.id);
+    const user = await getCachedUser();
+    if (!user) { show('karma-not-auth'); return; }
+    const myRoles = await getUserRoles(user.id);
     if (!myRoles.has('admin')) { show('karma-not-auth'); return; }
     show('karma-shell');
     await Promise.all([loadKarmaConfig(), loadRarityMultipliers(), loadRecentEvents()]);

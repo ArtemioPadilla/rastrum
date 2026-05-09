@@ -226,7 +226,7 @@ const tabs = [
 <FirstObservationCelebration lang={lang} />
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedUser, getSupabase } from '../lib/supabase';
   import { isSyncFilter, type SyncFilter } from '../lib/social';
   import { buildBugReportUrl } from '../lib/bug-report';
   import { parseImpactFilter, type ImpactFilter } from '../lib/impact-filter';
@@ -850,8 +850,8 @@ const tabs = [
     // Guard: check session first. getSession() reads from localStorage and
     // is synchronous-ish — it won't hang on a stale token the way getUser()
     // can when the refresh token is invalid and GoTrue retries internally.
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    const _session_user = await getCachedUser();
+    if (!_session_user) {
       showExpiredSessionUI();
       return;
     }

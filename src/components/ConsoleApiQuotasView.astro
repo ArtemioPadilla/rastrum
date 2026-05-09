@@ -43,7 +43,7 @@ const tr = t(lang);
 </section>
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedUser, getSupabase } from '../lib/supabase';
   import { getUserRoles } from '../lib/user-roles';
 
   type ApiUsageRow = {
@@ -100,9 +100,9 @@ const tr = t(lang);
   let allRows: ApiUsageRow[] = [];
 
   async function init() {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) { show('api-not-auth'); return; }
-    const myRoles = await getUserRoles(session.user.id);
+    const user = await getCachedUser();
+    if (!user) { show('api-not-auth'); return; }
+    const myRoles = await getUserRoles(user.id);
     if (!myRoles.has('admin')) { show('api-not-auth'); return; }
     show('api-shell');
     await loadRows();

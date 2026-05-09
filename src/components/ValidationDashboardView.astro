@@ -57,13 +57,13 @@ const queuePath = getLocalizedPath(lang, routes.exploreValidate[lang] + '/');
 </div>
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedUser, getSupabase } from '../lib/supabase';
 
   const root = document.querySelector<HTMLElement>('.rastrum-validation-dashboard');
   if (root) {
     (async () => {
       const supabase = getSupabase();
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getCachedUser();
       if (!user) {
         document.getElementById('vd-signin')?.classList.remove('hidden');
         return;

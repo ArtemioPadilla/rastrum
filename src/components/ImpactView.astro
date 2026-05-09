@@ -169,7 +169,7 @@ const cards = [
 </section>
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedUser, getSupabase } from '../lib/supabase';
   import { formatTransectKm, formatCount, isUserImpact } from '../lib/impact';
 
   const root = document.querySelector<HTMLElement>('.rastrum-impact');
@@ -265,7 +265,7 @@ const cards = [
       return;
     }
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCachedUser();
     if (!user) {
       hide(loading);
       show(anonCta);

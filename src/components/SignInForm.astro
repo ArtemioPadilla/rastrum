@@ -97,13 +97,13 @@ const tr = t(lang);
     verifyPasskey,
     passkeySupported,
   } from '../lib/auth';
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedUser, getSupabase } from '../lib/supabase';
 
   // If the user already has a valid session, skip the form entirely.
   (async () => {
     try {
-      const { data: { session } } = await getSupabase().auth.getSession();
-      if (session?.user) {
+      const user = await getCachedUser();
+      if (user) {
         const isEsPath = window.location.pathname.startsWith('/es/');
         window.location.replace(isEsPath ? '/es/' : '/en/');
       }

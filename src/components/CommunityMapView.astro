@@ -127,7 +127,7 @@ const stringsJson = JSON.stringify({
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.0/dist/maplibre-gl.css" />
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedUser, getSupabase } from '../lib/supabase';
   import { loadIsoCountries } from '../lib/community';
 
   interface Strings {
@@ -221,7 +221,7 @@ const stringsJson = JSON.stringify({
 
     // Check auth status
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getCachedUser();
       isAuthenticated = !!user;
     } catch {
       isAuthenticated = false;

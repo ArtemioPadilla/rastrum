@@ -36,7 +36,7 @@ const emptyMsg = lang === 'es'
 
 <script>
   import { getExpertiseCoverage, legendTitle, tierColors } from '../lib/expertise-legends';
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedUser, getSupabase } from '../lib/supabase';
 
   async function init() {
     const grid = document.getElementById('expertise-coverage-grid');
@@ -47,8 +47,8 @@ const emptyMsg = lang === 'es'
     const emptyMsg = grid.dataset.empty ?? '';
 
     if (!userId) {
-      const { data } = await getSupabase().auth.getUser();
-      userId = data.user?.id ?? '';
+      const _authUser = await getCachedUser();
+      userId = _authUser?.id ?? '';
     }
     if (!userId) { grid.innerHTML = `<p class="col-span-full text-xs text-zinc-400">${emptyMsg}</p>`; return; }
 

@@ -36,7 +36,7 @@ const settingsHref = lang === 'es' ? '/es/perfil/ajustes/privacy/' : '/en/profil
 </aside>
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedUser, getSupabase } from '../lib/supabase';
   import { PRIVACY_PRESETS } from '../lib/profile-widgets';
 
   async function init() {
@@ -44,7 +44,7 @@ const settingsHref = lang === 'es' ? '/es/perfil/ajustes/privacy/' : '/en/profil
     if (!banner) return;
     let supabase;
     try { supabase = getSupabase(); } catch { return; }
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCachedUser();
     if (!user) return;
     const { data } = await supabase
       .from('users')

@@ -70,7 +70,7 @@ const labels = {
 <div id="fol-config" class="hidden" data-lang={lang} data-drill-follower={labels.drillProfileFollower} data-drill-followee={labels.drillProfileFollowee}></div>
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedUser, getSupabase } from '../lib/supabase';
   import { getUserRoles } from '../lib/user-roles';
   import {
     EntityBrowser,
@@ -197,13 +197,13 @@ const labels = {
 
   async function init(): Promise<void> {
     const supabase = getSupabase();
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    const user = await getCachedUser();
+    if (!user) {
       document.getElementById('fol-skeleton')?.classList.add('hidden');
       document.getElementById('fol-not-auth')?.classList.remove('hidden');
       return;
     }
-    const myRoles = await getUserRoles(session.user.id);
+    const myRoles = await getUserRoles(user.id);
     if (!myRoles.has('admin')) {
       document.getElementById('fol-skeleton')?.classList.add('hidden');
       document.getElementById('fol-not-auth')?.classList.remove('hidden');

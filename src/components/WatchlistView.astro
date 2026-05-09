@@ -48,7 +48,7 @@ const tr = t(lang);
 </section>
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedUser, getSupabase } from '../lib/supabase';
   import { formatTimeAgo } from '../lib/social';
 
   type ActivityRow = {
@@ -112,7 +112,7 @@ const tr = t(lang);
     let supabase;
     try { supabase = getSupabase(); } catch { hideSkeleton(); return; }
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCachedUser();
     if (!user) { hideSkeleton(); return; }
 
     const since = new Date();

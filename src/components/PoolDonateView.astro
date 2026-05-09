@@ -131,10 +131,10 @@ const cancelLabel = lang === 'es' ? 'Cancelar' : 'Cancel';
     const noCredsMsg   = root.dataset.noCredsMsg ?? '';
 
     // Dynamic imports to keep the page lightweight for anonymous visitors
-    const { getSupabase } = await import('../lib/supabase');
-    const { data: { session } } = await getSupabase().auth.getSession();
+    const { getSupabase, getCachedUser } = await import('../lib/supabase');
+    const user = await getCachedUser();
 
-    if (!session) {
+    if (!user) {
       signInEl?.classList.remove('hidden');
       return;
     }

@@ -9,7 +9,7 @@ const tr = t(lang);
 
 <script>
   import { listSponsorships, getUsage } from '../lib/sponsorships';
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedUser, getSupabase } from '../lib/supabase';
 
   interface CachedUsage { pctUsed: number; cap: number; usedThisMonth: number; sponsorshipId: string; }
   const CACHE_KEY = 'rastrum.sponsorshipBanner';
@@ -19,10 +19,8 @@ const tr = t(lang);
     const banner = document.getElementById('sponsorship-banner') as HTMLElement | null;
     if (!banner) return;
 
-    let supabaseSession;
-    try { supabaseSession = (await getSupabase().auth.getSession()).data.session; }
-    catch { return; }
-    if (!supabaseSession) return;
+    const supabaseUser = await getCachedUser().catch(() => null);
+    if (!supabaseUser) return;
 
     let usage: CachedUsage | null = null;
     const cached = sessionStorage.getItem(CACHE_KEY);

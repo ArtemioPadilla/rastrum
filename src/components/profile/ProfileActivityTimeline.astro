@@ -50,7 +50,7 @@ const ownerPill = (tr as unknown as { privacy?: { owner_only_badge?: string } })
 </section>
 
 <script>
-  import { getSupabase } from '../../lib/supabase';
+  import { getCachedUser, getSupabase } from '../../lib/supabase';
   import { groupActivityByWeek, type ActivityRow } from '../../lib/profile-widgets';
   import { escAttr } from '../../lib/karma';
 
@@ -78,7 +78,7 @@ const ownerPill = (tr as unknown as { privacy?: { owner_only_badge?: string } })
     try { supabase = getSupabase(); } catch { return; }
     let userId = el.dataset.targetUserId ?? null;
     if (!userId) {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getCachedUser();
       if (!user) return;
       userId = user.id;
     }

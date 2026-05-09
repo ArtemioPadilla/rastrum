@@ -79,7 +79,7 @@ const tr = t(lang);
 </section>
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedUser, getSupabase } from '../lib/supabase';
   import { summarizeStreak, formatStreakDays, type StreakRow, type StreakState } from '../lib/social';
   import { normalizeMatrix } from '../lib/privacy-presets';
 
@@ -145,7 +145,7 @@ const tr = t(lang);
       return;
     }
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCachedUser();
     if (!user) {
       // Not signed in — ProfileView handles signed-out state; hide the card.
       root.classList.add('hidden');
