@@ -178,7 +178,8 @@ function showPreviews(files: File[]) {
       // #787: edit/crop button overlay
       const editBtn = document.createElement('button');
       editBtn.type = 'button';
-      editBtn.className = 'absolute bottom-0 right-0 w-6 h-6 bg-black/60 hover:bg-emerald-600 flex items-center justify-center rounded-tl-md transition-colors';
+      // w-11 h-11 = 44px touch target (WCAG 2.5.5 — Nyx review #789)
+      editBtn.className = 'absolute bottom-0 right-0 w-11 h-11 bg-black/60 hover:bg-emerald-600 flex items-center justify-center rounded-tl-md transition-colors';
       editBtn.setAttribute('aria-label', 'Edit photo');
       editBtn.innerHTML = '<svg class="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536M9 11l6-6 3 3-6 6H9v-3z"/></svg>';
       editBtn.addEventListener('click', async (ev) => {
@@ -187,8 +188,11 @@ function showPreviews(files: File[]) {
           const { openCropModal } = await import('../lib/photo-crop-controller');
           const result = await openCropModal(file);
           if (result.kind === 'use') {
-            // Replace preview image
+            // Revoke old preview URL before replacing to avoid memory leak
+            // on repeated edits (Nyx review #789)
+            const oldSrc = img.src;
             img.src = URL.createObjectURL(result.file);
+            URL.revokeObjectURL(oldSrc);
             // Notify ObserveView2 to replace the file in pipelineFiles
             document.dispatchEvent(new CustomEvent('rastrum:photo-edited', {
               detail: { original: file, edited: result.file },
