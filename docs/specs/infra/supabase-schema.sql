@@ -17,6 +17,15 @@ CREATE EXTENSION IF NOT EXISTS "postgis";
 -- Deferred: pg_partman (v0.8+, when observations table crosses ~1M rows)
 -- Deferred: pgvector (v0.5+, when Scout AI RAG lands)
 
+-- The `extensions` schema holds relocated extensions (pg_trgm — see the
+-- "Security Advisor remediation" block at the end of this file). We create
+-- it here, and pre-add it to the session search_path, so that any DDL
+-- referencing pg_trgm operators / opclasses resolves whether or not the
+-- extension has already been moved on this database. Idempotent.
+CREATE SCHEMA IF NOT EXISTS extensions;
+GRANT USAGE ON SCHEMA extensions TO anon, authenticated, service_role;
+SET search_path TO public, extensions, pg_temp;
+
 -- ============================================================
 -- USERS
 -- ============================================================
