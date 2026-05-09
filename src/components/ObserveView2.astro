@@ -472,13 +472,13 @@ let hintTimer: ReturnType<typeof setTimeout> | null = null;
 
 document.addEventListener('rastrum:files-dropped', (e: Event) => {
   const ev = e as CustomEvent<{ files: File[] }>;
-  const files = ev.detail.files;
+  const files = (ev.detail.files ?? []).filter(Boolean);
   if (!files.length || !fileHint) return;
 
   // Determine dominant file type
-  const hasAudio  = files.some(f => f.type.startsWith('audio/'));
-  const hasVideo  = files.some(f => f.type.startsWith('video/'));
-  const hasPhoto  = files.some(f => f.type.startsWith('image/'));
+  const hasAudio  = files.some(f => f?.type?.startsWith('audio/'));
+  const hasVideo  = files.some(f => f?.type?.startsWith('video/'));
+  const hasPhoto  = files.some(f => f?.type?.startsWith('image/'));
 
   let hint = '';
   if (hasAudio && hasPhoto) {
