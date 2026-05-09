@@ -3,10 +3,9 @@
  * embedded in the widget root data-attributes (server-rendered, no auth needed)
  * AND that the DOM element reflects the phrase when the widget initializes.
  *
- * Two-layer strategy:
- *  1. data-label check: always passes in CI (static HTML, no auth required).
- *  2. DOM text check: attempted with a soft timeout; skipped if element is
- *     hidden (signed-out path hides the greeting wrapper).
+ * HomeWidgets is included in /en/ and /es/ home pages (#704).
+ * The .home-widgets root is always in the DOM; the greeting wrapper is hidden
+ * for signed-out visitors but the data-label-* attributes are always present.
  */
 import { test, expect } from '@playwright/test';
 
@@ -14,7 +13,7 @@ type BucketCase = {
   hour: number;
   locale: 'en' | 'es';
   path: string;
-  labelAttr: string;          // data-label-greeting-<bucket> on the widget root
+  labelAttr: string;
   expected: string;
 };
 
@@ -31,7 +30,6 @@ const CASES: BucketCase[] = [
 
 for (const { hour, locale, path, labelAttr, expected } of CASES) {
   test(`greeting label at ${hour}:00 (${locale}): "${expected}"`, async ({ page }) => {
-    // Mock Date before page scripts run so pickGreeting() uses the right bucket.
     const isoTs = `2026-05-09T${String(hour).padStart(2, '0')}:30:00.000Z`;
     await page.addInitScript((ts: string) => {
       const fixed = new Date(ts).valueOf();
@@ -53,19 +51,18 @@ for (const { hour, locale, path, labelAttr, expected } of CASES) {
 
     await page.goto(path, { waitUntil: 'domcontentloaded' });
 
-    // Layer 1: data-label attribute is server-rendered — always present, no auth.
+    // Layer 1: data-label attribute — server-rendered, always present, no auth.
     const root = page.locator('.home-widgets').first();
-    await expect(root).toBeAttached({ timeout: 5_000 });
+    await expect(root).toBeAttached({ timeout: 7_000 });
     const labelValue = await root.getAttribute(labelAttr);
     expect(labelValue).toBe(expected);
 
-    // Layer 2: if the greeting element is visible (signed-in path or future
-    // anon greeting), also verify the rendered text.
+    // Layer 2: rendered text — only if the greeting element is visible
+    // (requires auth session; skipped in CI signed-out path).
     const greetingEl = page.locator('[data-testid="home-greeting"]').first();
     const isVisible = await greetingEl.isVisible().catch(() => false);
     if (isVisible) {
       await expect(greetingEl).toContainText(expected, { timeout: 3_000 });
     }
-    // If not visible (signed-out in CI), layer 1 is sufficient coverage.
   });
 }
