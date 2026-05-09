@@ -1306,7 +1306,8 @@ const praiseLongLens         = praiseStrings.long_lens         ?? (isEs ? 'Detal
     const hintFilteredOutAll =
       Object.keys(hintFilteredRunners).length === 0 && Object.keys(runners).length > 0;
 
-    const out = await runParallelIdentify(file, { runners, taxonHint: activeTaxonHint }, activeAbort.signal);
+    // Pass pre-filtered runners + null hint so runParallelIdentify doesn't re-filter.
+    const out = await runParallelIdentify(file, { runners: hintFilteredRunners, taxonHint: null }, activeAbort.signal);
     activeAbort = null;
     idSpinner?.classList.add('hidden');
 
