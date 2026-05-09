@@ -80,6 +80,12 @@ async function eligibleUserIds(db: SupabaseClient, badge: Badge): Promise<string
       const { data } = await db.rpc('badge_eligible_midnight_observation', { p_user_id: null }) as { data: string[] | null };
       return data ?? [];
     }
+    case 'country_diversity': {
+      // Issue #867: Globetrotter badge — users who observed in >= threshold countries.
+      const t = r.threshold as number;
+      const { data } = await db.rpc('badge_eligible_country_diversity', { p_min: t }) as { data: string[] | null };
+      return data ?? [];
+    }
     // The remaining predicate types are stubbed — they'll come online with the
     // matching feature (GBIF publish, BioBlitz scoring, comments helpful flag,
     // governance courses). Returning empty is correct: nobody is eligible yet.
