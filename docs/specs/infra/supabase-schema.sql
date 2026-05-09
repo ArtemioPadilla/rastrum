@@ -9900,6 +9900,372 @@ $$;
 REVOKE ALL ON FUNCTION public.refresh_taxon_ranges() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.refresh_taxon_ranges() TO service_role;
 
+-- ── Chat entity cards (M01 chat improvements, 2026-05-09) ──
+-- Read-only functions returning EntityCard-shaped JSONB. Every function
+-- is SECURITY INVOKER; the existing RLS policies enforce visibility.
+
+DROP FUNCTION IF EXISTS public.chat_obs_card(uuid);
+CREATE FUNCTION public.chat_obs_card(p_id uuid)
+RETURNS jsonb
+LANGUAGE sql STABLE SECURITY INVOKER
+SET search_path = public, extensions, pg_temp
+AS $$
+  WITH o AS (
+    SELECT
+      o.id, o.observer_id, o.observed_at,
+      o.primary_taxon_id, o.obscure_level,
+      o.location, o.location_obscured,
+      o.region_primary, o.is_research_grade, o.notes,
+      t.scientific_name, t.common_name_es, t.common_name_en,
+      t.kingdom, t.family
+    FROM public.observations o
+    LEFT JOIN public.taxa t ON t.id = o.primary_taxon_id
+    WHERE o.id = p_id
+  )
+  SELECT CASE WHEN o.id IS NULL THEN NULL ELSE jsonb_build_object(
+    'kind',          'observation',
+    'id',            o.id::text,
+    'label',         coalesce(o.scientific_name, '—')
+                     || ' · ' || to_char(o.observed_at, 'Mon DD')
+                     || coalesce(' · ' || o.region_primary, ''),
+    'summary_text',
+      'Observation of ' || coalesce(o.scientific_name, 'unknown taxon')
+      || coalesce(' (' || o.common_name_en || ')', '')
+      || ' on ' || to_char(o.observed_at, 'YYYY-MM-DD')
+      || coalesce(' in ' || o.region_primary, '')
+      || CASE WHEN o.is_research_grade THEN '. Research grade.' ELSE '. Needs review.' END
+      || coalesce(' Observer notes: ' || left(o.notes, 240), ''),
+    'fields',        jsonb_build_object(
+      'scientific_name', o.scientific_name,
+      'common_name_en',  o.common_name_en,
+      'common_name_es',  o.common_name_es,
+      'kingdom',         o.kingdom,
+      'family',          o.family,
+      'observed_at',     o.observed_at,
+      'region_primary',  o.region_primary,
+      'is_research_grade', o.is_research_grade,
+      'obscure_level',   o.obscure_level,
+      'lat', CASE WHEN auth.uid() = o.observer_id
+                  THEN ST_Y(o.location::geometry)
+                  ELSE ST_Y(coalesce(o.location_obscured, o.location)::geometry) END,
+      'lng', CASE WHEN auth.uid() = o.observer_id
+                  THEN ST_X(o.location::geometry)
+                  ELSE ST_X(coalesce(o.location_obscured, o.location)::geometry) END,
+      'coords_obscured', (auth.uid() <> o.observer_id AND o.location_obscured IS NOT NULL)
+    ),
+    'suggested_questions', jsonb_build_array(
+      'Why is this ' || CASE WHEN o.is_research_grade THEN 'research grade' ELSE 'needs review' END || '?',
+      'What other observations of this species are nearby?',
+      'Tell me about ' || coalesce(o.scientific_name, 'this species') || '.'
+    ),
+    'related',       jsonb_build_object(
+      'primary_taxon_id', o.primary_taxon_id::text,
+      'observer_id',      o.observer_id::text
+    )
+  ) END
+  FROM o;
+$$;
+
+DROP FUNCTION IF EXISTS public.chat_species_card(text);
+CREATE FUNCTION public.chat_species_card(p_query text)
+RETURNS jsonb
+LANGUAGE sql STABLE SECURITY INVOKER
+SET search_path = public, extensions, pg_temp
+AS $$
+  WITH t AS (
+    SELECT id, scientific_name, canonical_name, common_name_es, common_name_en,
+           kingdom, family, nom059_status, cites_appendix, iucn_category, is_endemic_mexico,
+           description_es, description_en, obscure_level
+    FROM public.taxa
+    WHERE id::text = p_query
+       OR canonical_name ILIKE p_query
+       OR scientific_name ILIKE p_query
+    ORDER BY canonical_name
+    LIMIT 1
+  )
+  SELECT CASE WHEN t.id IS NULL THEN NULL ELSE jsonb_build_object(
+    'kind',          'species',
+    'id',            t.id::text,
+    'label',         t.scientific_name,
+    'summary_text',
+      coalesce(t.scientific_name, '')
+      || coalesce(' (' || t.common_name_en || ')', '')
+      || ' — ' || coalesce(t.kingdom, '?') || ' / ' || coalesce(t.family, '?')
+      || coalesce('. NOM-059: ' || t.nom059_status, '')
+      || coalesce('. CITES: ' || t.cites_appendix, '')
+      || coalesce('. IUCN: ' || t.iucn_category, '')
+      || coalesce('. ' || left(t.description_en, 240), ''),
+    'fields',        jsonb_build_object(
+      'scientific_name',     t.scientific_name,
+      'common_name_en',      t.common_name_en,
+      'common_name_es',      t.common_name_es,
+      'kingdom',             t.kingdom,
+      'family',              t.family,
+      'nom059_status',       t.nom059_status,
+      'cites_appendix',      t.cites_appendix,
+      'iucn_category',       t.iucn_category,
+      'is_endemic_mexico',   t.is_endemic_mexico,
+      'obscure_level',       t.obscure_level
+    ),
+    'suggested_questions', jsonb_build_array(
+      'Where in Mexico is ' || t.scientific_name || ' typically observed?',
+      'What does NOM-059 ' || coalesce(t.nom059_status, 'status') || ' mean?',
+      'Show me recent observations of this species.'
+    ),
+    'related',       jsonb_build_object(
+      'primary_taxon_id', t.id::text
+    )
+  ) END
+  FROM t;
+$$;
+
+DROP FUNCTION IF EXISTS public.chat_project_card(text);
+CREATE FUNCTION public.chat_project_card(p_query text)
+RETURNS jsonb
+LANGUAGE sql STABLE SECURITY INVOKER
+SET search_path = public, extensions, pg_temp
+AS $$
+  WITH p AS (
+    SELECT id, slug, name, name_es, description, description_es,
+           visibility, owner_user_id, area_km2
+    FROM public.projects_with_geojson
+    WHERE id::text = p_query OR slug = p_query
+    LIMIT 1
+  ),
+  c AS (
+    SELECT count(*)::int AS obs_count
+    FROM public.observations o, p
+    WHERE o.project_id = p.id
+  )
+  SELECT CASE WHEN p.id IS NULL THEN NULL ELSE jsonb_build_object(
+    'kind',          'project',
+    'id',            p.id::text,
+    'label',         coalesce(p.name, p.slug),
+    'summary_text',
+      'Project "' || coalesce(p.name, p.slug) || '"'
+      || coalesce(' — ' || left(p.description, 240), '')
+      || '. Visibility: ' || p.visibility
+      || coalesce('. Approx ' || round(p.area_km2)::text || ' km².', '')
+      || ' ' || c.obs_count || ' observations.',
+    'fields',        jsonb_build_object(
+      'slug',         p.slug,
+      'name',         p.name,
+      'name_es',      p.name_es,
+      'visibility',   p.visibility,
+      'area_km2',     p.area_km2,
+      'obs_count',    c.obs_count
+    ),
+    'suggested_questions', jsonb_build_array(
+      'Which species are most common in this project?',
+      'How many observations were added in the last 30 days?',
+      'List the camera stations in this project.'
+    ),
+    'related',       jsonb_build_object(
+      'project_id', p.id::text
+    )
+  ) END
+  FROM p, c;
+$$;
+
+DROP FUNCTION IF EXISTS public.chat_camera_station_card(uuid);
+CREATE FUNCTION public.chat_camera_station_card(p_id uuid)
+RETURNS jsonb
+LANGUAGE sql STABLE SECURITY INVOKER
+SET search_path = public, extensions, pg_temp
+AS $$
+  WITH s AS (
+    SELECT cs.id, cs.project_id, cs.station_key, cs.name, cs.habitat,
+           cs.camera_model, cs.notes, cs.coords,
+           p.name AS project_name, p.slug AS project_slug
+    FROM public.camera_stations cs
+    LEFT JOIN public.projects p ON p.id = cs.project_id
+    WHERE cs.id = p_id
+  ),
+  pn AS (
+    SELECT coalesce(sum(extract(day from coalesce(end_date::timestamp, now()) - start_date::timestamp))::int, 0) AS trap_nights
+    FROM public.camera_station_periods, s
+    WHERE camera_station_periods.station_id = s.id
+  )
+  SELECT CASE WHEN s.id IS NULL THEN NULL ELSE jsonb_build_object(
+    'kind',          'camera_station',
+    'id',            s.id::text,
+    'label',         coalesce(s.name, s.station_key),
+    'summary_text',
+      'Camera station ' || s.station_key
+      || coalesce(' (' || s.name || ')', '')
+      || coalesce(' in project "' || s.project_name || '"', '')
+      || coalesce(', habitat: ' || s.habitat, '')
+      || coalesce(', camera: ' || s.camera_model, '')
+      || '. Trap-nights to date: ' || pn.trap_nights || '.',
+    'fields',        jsonb_build_object(
+      'station_key',  s.station_key,
+      'name',         s.name,
+      'habitat',      s.habitat,
+      'camera_model', s.camera_model,
+      'project_slug', s.project_slug,
+      'trap_nights',  pn.trap_nights,
+      'lat',          ST_Y(s.coords::geometry),
+      'lng',          ST_X(s.coords::geometry)
+    ),
+    'suggested_questions', jsonb_build_array(
+      'Which species have been detected at this station?',
+      'What is the detection rate per 100 trap-nights?',
+      'How long has this station been deployed?'
+    ),
+    'related',       jsonb_build_object(
+      'project_id', s.project_id::text
+    )
+  ) END
+  FROM s, pn;
+$$;
+
+DROP FUNCTION IF EXISTS public.chat_observer_card(uuid);
+CREATE FUNCTION public.chat_observer_card(p_id uuid)
+RETURNS jsonb
+LANGUAGE sql STABLE SECURITY INVOKER
+SET search_path = public, extensions, pg_temp
+AS $$
+  WITH u AS (
+    SELECT id, username, display_name, avatar_url, country_code,
+           is_expert, expert_taxa,
+           observation_count, species_count, obs_count_30d,
+           last_observation_at, joined_at, karma_total
+    FROM public.community_observers
+    WHERE id = p_id
+  )
+  SELECT CASE WHEN u.id IS NULL THEN NULL ELSE jsonb_build_object(
+    'kind',          'observer',
+    'id',            u.id::text,
+    'label',         coalesce(u.display_name, u.username),
+    'thumbnail',     u.avatar_url,
+    'summary_text',
+      coalesce(u.display_name, u.username)
+      || coalesce(' (@' || u.username || ')', '')
+      || coalesce(' from ' || u.country_code, '')
+      || '. ' || u.observation_count || ' observations, '
+      || u.species_count || ' species, '
+      || u.karma_total || ' karma.'
+      || CASE WHEN u.is_expert THEN ' Expert.' ELSE '' END,
+    'fields',        jsonb_build_object(
+      'username',          u.username,
+      'display_name',      u.display_name,
+      'country_code',      u.country_code,
+      'is_expert',         u.is_expert,
+      'observation_count', u.observation_count,
+      'species_count',     u.species_count,
+      'obs_count_30d',     u.obs_count_30d,
+      'karma_total',       u.karma_total
+    ),
+    'suggested_questions', jsonb_build_array(
+      'What species does ' || coalesce(u.display_name, u.username) || ' observe most?',
+      'When were they most active?',
+      'What region do they observe in?'
+    ),
+    'related',       jsonb_build_object(
+      'observer_id', u.id::text
+    )
+  ) END
+  FROM u;
+$$;
+
+DROP FUNCTION IF EXISTS public.chat_self_profile_card(uuid);
+CREATE FUNCTION public.chat_self_profile_card(p_id uuid)
+RETURNS jsonb
+LANGUAGE sql STABLE SECURITY INVOKER
+SET search_path = public, extensions, pg_temp
+AS $$
+  WITH u AS (
+    SELECT id, username, display_name, bio, avatar_url, preferred_lang,
+           is_expert, expert_taxa, observer_license,
+           observation_count, country_code, region_primary,
+           karma_total, joined_at, last_observation_at
+    FROM public.users
+    WHERE id = p_id
+      AND id = auth.uid()
+  )
+  SELECT CASE WHEN u.id IS NULL THEN NULL ELSE jsonb_build_object(
+    'kind',          'self_profile',
+    'id',            u.id::text,
+    'label',         coalesce(u.display_name, u.username, 'You'),
+    'thumbnail',     u.avatar_url,
+    'summary_text',
+      'Your profile: ' || coalesce(u.display_name, u.username)
+      || coalesce(', based in ' || u.country_code, '')
+      || '. ' || u.observation_count || ' observations, '
+      || u.karma_total || ' karma.'
+      || coalesce(' Bio: ' || left(u.bio, 200), '')
+      || ' Preferred language: ' || coalesce(u.preferred_lang, 'en') || '.',
+    'fields',        jsonb_build_object(
+      'username',           u.username,
+      'display_name',       u.display_name,
+      'preferred_lang',     u.preferred_lang,
+      'country_code',       u.country_code,
+      'region_primary',     u.region_primary,
+      'is_expert',          u.is_expert,
+      'expert_taxa',        u.expert_taxa,
+      'observer_license',   u.observer_license,
+      'observation_count',  u.observation_count,
+      'karma_total',        u.karma_total
+    ),
+    'suggested_questions', jsonb_build_array(
+      'How is my karma calculated?',
+      'What badges am I close to earning?',
+      'Show my last 10 observations.'
+    ),
+    'related',       jsonb_build_object(
+      'observer_id', u.id::text
+    )
+  ) END
+  FROM u;
+$$;
+
+-- Dispatcher: routes by kind. Returns NULL for unknown kinds so callers
+-- can treat that as 'entity not found'.
+DROP FUNCTION IF EXISTS public.chat_entity_card(text, text);
+CREATE FUNCTION public.chat_entity_card(p_kind text, p_id text)
+RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY INVOKER
+SET search_path = public, extensions, pg_temp
+AS $$
+DECLARE
+  v_uuid uuid;
+BEGIN
+  IF p_kind IN ('observation','camera_station','observer','self_profile') THEN
+    BEGIN
+      v_uuid := p_id::uuid;
+    EXCEPTION WHEN invalid_text_representation THEN
+      RETURN NULL;
+    END;
+  END IF;
+
+  RETURN CASE p_kind
+    WHEN 'observation'    THEN public.chat_obs_card(v_uuid)
+    WHEN 'species'        THEN public.chat_species_card(p_id)
+    WHEN 'project'        THEN public.chat_project_card(p_id)
+    WHEN 'camera_station' THEN public.chat_camera_station_card(v_uuid)
+    WHEN 'observer'       THEN public.chat_observer_card(v_uuid)
+    WHEN 'self_profile'   THEN public.chat_self_profile_card(v_uuid)
+    ELSE NULL
+  END;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.chat_obs_card(uuid)            FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.chat_species_card(text)        FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.chat_project_card(text)        FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.chat_camera_station_card(uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.chat_observer_card(uuid)       FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.chat_self_profile_card(uuid)   FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.chat_entity_card(text, text)   FROM PUBLIC;
+
+GRANT EXECUTE ON FUNCTION public.chat_obs_card(uuid)             TO authenticated;
+GRANT EXECUTE ON FUNCTION public.chat_species_card(text)         TO authenticated;
+GRANT EXECUTE ON FUNCTION public.chat_project_card(text)         TO authenticated;
+GRANT EXECUTE ON FUNCTION public.chat_camera_station_card(uuid)  TO authenticated;
+GRANT EXECUTE ON FUNCTION public.chat_observer_card(uuid)        TO authenticated;
+GRANT EXECUTE ON FUNCTION public.chat_self_profile_card(uuid)    TO authenticated;
+GRANT EXECUTE ON FUNCTION public.chat_entity_card(text, text)    TO authenticated;
+
 -- ═══════════════════════════════════════════════════════════════════════════
 -- Security Advisor remediation — 2026-05-08
 -- ═══════════════════════════════════════════════════════════════════════════
