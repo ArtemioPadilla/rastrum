@@ -1,7 +1,14 @@
 export type LeaderboardPeriod = '30d' | 'all';
 export type LeaderboardView = LeaderboardPeriod | 'experts';
+export type LeaderboardWindow = 'today' | 'week' | 'month' | 'all';
+export type LeaderboardScope = 'global' | 'friends';
 
 const VALID_VIEWS: readonly LeaderboardView[] = ['30d', 'all', 'experts'] as const;
+const VALID_WINDOWS: readonly LeaderboardWindow[] = ['today', 'week', 'month', 'all'] as const;
+const VALID_SCOPES: readonly LeaderboardScope[] = ['global', 'friends'] as const;
+
+export const DEFAULT_WINDOW: LeaderboardWindow = 'month';
+export const DEFAULT_SCOPE: LeaderboardScope = 'global';
 
 export function parseLeaderboardPeriod(input: string | null | undefined): LeaderboardPeriod {
   if (input === 'all') return 'all';
@@ -47,6 +54,8 @@ export function searchForView(currentSearch: string, view: LeaderboardView): str
   if (view === 'experts') {
     params.set('view', 'experts');
     params.delete('period');
+    params.delete('window');
+    params.delete('scope');
   } else {
     params.delete('view');
     params.delete('taxon');
@@ -55,6 +64,48 @@ export function searchForView(currentSearch: string, view: LeaderboardView): str
     } else {
       params.set('period', view);
     }
+  }
+  return serialize(params);
+}
+
+export function parseLeaderboardWindow(input: string | null | undefined): LeaderboardWindow {
+  if (!input) return DEFAULT_WINDOW;
+  return (VALID_WINDOWS as readonly string[]).includes(input)
+    ? (input as LeaderboardWindow)
+    : DEFAULT_WINDOW;
+}
+
+export function parseLeaderboardScope(input: string | null | undefined): LeaderboardScope {
+  if (!input) return DEFAULT_SCOPE;
+  return (VALID_SCOPES as readonly string[]).includes(input)
+    ? (input as LeaderboardScope)
+    : DEFAULT_SCOPE;
+}
+
+export function windowFromSearch(search: string): LeaderboardWindow {
+  return parseLeaderboardWindow(new URLSearchParams(search).get('window'));
+}
+
+export function scopeFromSearch(search: string): LeaderboardScope {
+  return parseLeaderboardScope(new URLSearchParams(search).get('scope'));
+}
+
+export function searchForWindow(currentSearch: string, window: LeaderboardWindow): string {
+  const params = new URLSearchParams(currentSearch);
+  if (window === DEFAULT_WINDOW) {
+    params.delete('window');
+  } else {
+    params.set('window', window);
+  }
+  return serialize(params);
+}
+
+export function searchForScope(currentSearch: string, scope: LeaderboardScope): string {
+  const params = new URLSearchParams(currentSearch);
+  if (scope === DEFAULT_SCOPE) {
+    params.delete('scope');
+  } else {
+    params.set('scope', scope);
   }
   return serialize(params);
 }
