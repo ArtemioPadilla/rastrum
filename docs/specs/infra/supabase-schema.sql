@@ -10098,3 +10098,75 @@ EXCEPTION WHEN insufficient_privilege THEN
   RAISE NOTICE 'apply role cannot CREATE POLICY on spatial_ref_sys; advisor entry will persist.';
 END
 $$;
+
+-- ============================================================
+-- #710 — observation suggestions (location + season + not-yet-observed)
+-- Returns up to 10 species the viewer could find nearby that they
+-- haven't observed yet, ranked by nearby platform activity.
+-- ============================================================
+CREATE OR REPLACE FUNCTION public.suggest_nearby_species(
+  p_user_id   uuid,
+  p_lat       double precision,
+  p_lng       double precision,
+  p_month     integer,          -- 1–12 (current month, caller-supplied)
+  p_radius_km integer DEFAULT 50,
+  p_limit     integer DEFAULT 10
+)
+RETURNS TABLE (
+  taxon_id        uuid,
+  scientific_name text,
+  common_name_es  text,
+  common_name_en  text,
+  kingdom         text,
+  class           text,
+  nearby_count    bigint,
+  photo_url       text
+) LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  WITH user_observed AS (
+    SELECT DISTINCT i.taxon_id
+    FROM observations o
+    JOIN identifications i ON i.observation_id = o.id AND i.is_primary
+    WHERE o.observer_id = p_user_id
+      AND i.taxon_id IS NOT NULL
+  ),
+  nearby AS (
+    SELECT
+      i.taxon_id,
+      count(*) AS nearby_count
+    FROM observations o
+    JOIN identifications i ON i.observation_id = o.id AND i.is_primary
+    WHERE o.sync_status = 'synced'
+      AND o.location IS NOT NULL
+      AND ST_DWithin(
+            o.location::geography,
+            ST_SetSRID(ST_MakePoint(p_lng, p_lat), 4326)::geography,
+            p_radius_km * 1000
+          )
+      AND EXTRACT(MONTH FROM o.observed_at) BETWEEN p_month - 1 AND p_month + 1
+      AND i.taxon_id IS NOT NULL
+      AND i.taxon_id NOT IN (SELECT taxon_id FROM user_observed)
+    GROUP BY i.taxon_id
+    ORDER BY nearby_count DESC
+    LIMIT p_limit * 3   -- oversample before joining taxa
+  )
+  SELECT
+    t.id          AS taxon_id,
+    t.scientific_name,
+    t.common_name_es,
+    t.common_name_en,
+    t.kingdom,
+    t.class,
+    n.nearby_count,
+    (SELECT mf.url FROM media_files mf
+       JOIN observations mo ON mo.id = mf.observation_id
+       JOIN identifications mi ON mi.observation_id = mo.id AND mi.taxon_id = t.id AND mi.is_primary
+       WHERE mf.is_primary AND mo.sync_status = 'synced'
+       LIMIT 1) AS photo_url
+  FROM nearby n
+  JOIN taxa t ON t.id = n.taxon_id
+  ORDER BY n.nearby_count DESC
+  LIMIT p_limit;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.suggest_nearby_species FROM PUBLIC;
+GRANT  EXECUTE ON FUNCTION public.suggest_nearby_species TO authenticated;
