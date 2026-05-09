@@ -13,8 +13,14 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
 <!-- The chat lays out as full-height with a fixed input bar on small screens.
      `pb-44` reserves room above the sticky composer + the iOS home indicator. -->
 <div class="max-w-3xl mx-auto -mt-2 sm:mt-0">
-  <div class="mb-4 flex items-baseline justify-between gap-3 flex-wrap">
-    <h1 class="text-2xl font-bold tracking-tight">{tr.chat.title}</h1>
+  <div class="mb-2 flex items-baseline justify-between gap-3 flex-wrap">
+    <div class="flex items-center gap-2 flex-wrap">
+      <h1 class="text-2xl font-bold tracking-tight">{tr.chat.title}</h1>
+      <span id="chat-model-badge" class="inline-flex items-center gap-1 rounded-full border border-emerald-300 dark:border-emerald-700/40 bg-emerald-50 dark:bg-emerald-900/10 px-2 py-0.5 text-[10px] font-medium text-emerald-800 dark:text-emerald-300">
+        <span aria-hidden="true">✨</span>
+        <span id="chat-model-badge-text">{lang === 'es' ? 'En el dispositivo' : 'On-device'}</span>
+      </span>
+    </div>
     <button
       id="chat-clear-btn"
       type="button"
@@ -27,19 +33,57 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
 
   <!-- Consent / setup gate -->
   <div id="chat-consent" class="hidden rounded-xl border border-amber-300 dark:border-amber-700/40 bg-amber-50 dark:bg-amber-900/10 p-4 mb-4">
-    <p class="text-sm text-amber-900 dark:text-amber-100">{tr.chat.consent_required}</p>
+    <p class="text-sm text-amber-900 dark:text-amber-100">
+      {lang === 'es'
+        ? 'El chat se ejecuta totalmente en tu navegador. Elige un modelo:'
+        : 'Chat runs entirely in your browser. Pick a model to download once:'}
+    </p>
     <p id="chat-unsup" class="hidden mt-2 text-xs text-amber-900 dark:text-amber-200">{tr.chat.consent_unsupported}</p>
-    <div class="mt-3 flex flex-wrap gap-2">
+    <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+      <button
+        id="chat-gemma-download-btn"
+        type="button"
+        class="group inline-flex flex-col items-start min-h-11 rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2.5 text-white disabled:opacity-50"
+      >
+        <span class="flex items-center gap-2">
+          <span aria-hidden="true">✨</span>
+          <span class="text-sm font-semibold">Gemma 4 E2B</span>
+          <span class="rounded-full bg-emerald-900/40 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider">
+            {lang === 'es' ? 'Recomendado' : 'Recommended'}
+          </span>
+        </span>
+        <span class="text-[11px] font-normal text-emerald-100/80 mt-0.5">
+          {lang === 'es'
+            ? '~500 MB · razona mejor · también para fotos'
+            : '~500 MB · stronger reasoning · works for photos too'}
+        </span>
+      </button>
       <button
         id="chat-download-btn"
         type="button"
-        class="inline-flex items-center min-h-11 rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+        class="group inline-flex flex-col items-start min-h-11 rounded-lg border border-amber-400/60 dark:border-amber-700/60 bg-white dark:bg-zinc-900 px-4 py-2.5 text-zinc-800 dark:text-zinc-200 hover:bg-amber-100/50 dark:hover:bg-zinc-800 disabled:opacity-50"
       >
-        <span data-cdl>{tr.chat.consent_download}</span>
+        <span class="flex items-center gap-2">
+          <span aria-hidden="true">🦙</span>
+          <span class="text-sm font-semibold">Llama 3.2 1B</span>
+          <span class="rounded-full bg-zinc-200 dark:bg-zinc-700 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+            {lang === 'es' ? 'Más ligero' : 'Lighter'}
+          </span>
+        </span>
+        <span class="text-[11px] font-normal text-zinc-500 mt-0.5">
+          <span data-cdl>{lang === 'es' ? '~880 MB · más pequeño · solo texto' : '~880 MB · smaller · text only'}</span>
+        </span>
       </button>
+    </div>
+    <p class="mt-2 text-[11px] text-amber-800 dark:text-amber-300/80">
+      {lang === 'es'
+        ? 'Ambos corren totalmente en tu dispositivo — tus mensajes nunca salen del navegador.'
+        : 'Both run fully on-device — your messages never leave the browser.'}
+    </p>
+    <div class="mt-2 flex flex-wrap gap-2 items-center text-xs">
       <a
         href={`/${lang}/${lang === 'es' ? 'perfil/editar' : 'profile/edit'}/`}
-        class="inline-flex items-center min-h-11 rounded-lg border border-zinc-300 dark:border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
+        class="text-emerald-700 dark:text-emerald-400 hover:underline"
       >
         {tr.chat.consent_open_settings}
       </a>
@@ -54,8 +98,26 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
     role="log"
     aria-live="polite"
   >
-    <div id="chat-empty" class="text-sm text-zinc-500 italic px-1 py-12 text-center">
-      {tr.chat.empty_state}
+    <div id="chat-empty" class="px-1 py-12 text-center space-y-4">
+      <p class="text-sm text-zinc-500 italic">{tr.chat.empty_state}</p>
+      <div class="flex flex-wrap justify-center gap-2 max-w-xl mx-auto">
+        <button type="button" data-empty-prompt={lang === 'es' ? '¿Qué especies puedo encontrar cerca de mí?' : 'What species can I find near me?'} class="empty-suggestion">
+          <span aria-hidden="true">📍</span>
+          <span>{lang === 'es' ? 'Cerca de mí' : 'Near me'}</span>
+        </button>
+        <button type="button" data-empty-prompt={lang === 'es' ? 'Adjunta una observación reciente para revisarla.' : 'Attach a recent observation to review it.'} class="empty-suggestion">
+          <span aria-hidden="true">🔍</span>
+          <span>{lang === 'es' ? 'Revisar observación' : 'Review observation'}</span>
+        </button>
+        <button type="button" data-empty-prompt={lang === 'es' ? '¿Qué significa "necesita revisión"?' : 'What does "needs review" mean?'} class="empty-suggestion">
+          <span aria-hidden="true">❓</span>
+          <span>{lang === 'es' ? 'Cómo funciona' : 'How it works'}</span>
+        </button>
+        <button type="button" data-empty-prompt={lang === 'es' ? 'Cuéntame sobre NOM-059.' : 'Tell me about NOM-059.'} class="empty-suggestion">
+          <span aria-hidden="true">🦋</span>
+          <span>{lang === 'es' ? 'NOM-059' : 'NOM-059'}</span>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -155,10 +217,11 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
             type="button"
             aria-label={lang === 'es' ? 'Adjuntar contexto' : 'Attach context'}
             title={lang === 'es' ? 'Adjuntar contexto' : 'Attach context'}
-            class="min-h-11 min-w-11 sm:min-w-0 rounded-lg border border-zinc-300 dark:border-zinc-700 px-2 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 flex items-center justify-center gap-1"
+            class="min-h-11 sm:min-w-0 rounded-lg border border-emerald-600/50 bg-emerald-50/60 dark:bg-emerald-900/10 px-3 py-2 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/20 flex items-center justify-center gap-1.5"
           >
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2"/></svg>
-            <span class="sr-only">{lang === 'es' ? 'Adjuntar contexto' : 'Attach context'}</span>
+            <span class="hidden sm:inline">{lang === 'es' ? 'Contexto' : 'Context'}</span>
+            <span class="sr-only sm:hidden">{lang === 'es' ? 'Adjuntar contexto' : 'Attach context'}</span>
           </button>
         </div>
 
@@ -766,8 +829,18 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
         if (downloadBtn) downloadBtn.disabled = true;
         return;
       }
-      const status = await lib.getModelCacheStatus(lib.TEXT_MODEL_ID);
-      if (status.cached) {
+      const llamaStatus = await lib.getModelCacheStatus(lib.TEXT_MODEL_ID);
+      // Also probe Gemma cache — if the user already downloaded it from
+      // Profile → AI settings (or the consent gate), the chat is ready.
+      let gemmaCached = false;
+      try {
+        const ov = await import('../lib/onnx-vision');
+        const g = await ov.getGemmaCacheStatus();
+        gemmaCached = g.cached;
+      } catch {
+        // transformers.js not yet loaded — that's fine.
+      }
+      if (llamaStatus.cached || gemmaCached) {
         modelReady = true;
         consentBox?.classList.add('hidden');
         historyEl?.classList.remove('hidden');
@@ -886,6 +959,29 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
     } finally {
       downloadBtn.disabled = false;
       downloadLabel.textContent = DL_DEFAULT;
+    }
+  });
+
+  // Gemma 4 download — same model the vision identifier uses.
+  const gemmaDownloadBtn = document.getElementById('chat-gemma-download-btn') as HTMLButtonElement | null;
+  gemmaDownloadBtn?.addEventListener('click', async () => {
+    if (!gemmaDownloadBtn) return;
+    gemmaDownloadBtn.disabled = true;
+    if (dlProgress) dlProgress.classList.remove('hidden');
+    try {
+      const lib = await import('../lib/local-ai');
+      await lib.loadGemmaTextEngine((p) => {
+        if (dlProgress) dlProgress.textContent = `${Math.round((p.progress ?? 0) * 100)}%  ${p.text ?? ''}`;
+      });
+      modelReady = true;
+      consentBox?.classList.add('hidden');
+      historyEl?.classList.remove('hidden');
+      formEl?.classList.remove('hidden');
+      paintConversation();
+    } catch (err) {
+      if (dlProgress) dlProgress.textContent = err instanceof Error ? err.message : String(err);
+    } finally {
+      gemmaDownloadBtn.disabled = false;
     }
   });
 
@@ -1607,6 +1703,44 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
 
     // Expose for the form-submit hook below.
     (window as Window & { __chatGetAttachedEntity?: () => EntityCardLite | null }).__chatGetAttachedEntity = () => attachedEntity;
+
+    // Empty-state suggestion chips: seed the textarea and submit.
+    document.querySelectorAll('[data-empty-prompt]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const prompt = (btn as HTMLButtonElement).dataset.emptyPrompt ?? '';
+        const ta = document.getElementById('chat-input') as HTMLTextAreaElement | null;
+        if (!ta) return;
+        ta.value = prompt;
+        ta.focus();
+        const form = document.getElementById('chat-form') as HTMLFormElement | null;
+        form?.requestSubmit();
+      });
+    });
+
+    // Model badge: reflect Gemma vs Llama state when consent is granted.
+    const badgeText = document.getElementById('chat-model-badge-text');
+    function paintModelBadge(): void {
+      if (!badgeText) return;
+      const isReady = !document.getElementById('chat-consent')?.classList.contains('hidden') ? false : true;
+      if (!isReady) {
+        badgeText.textContent = isEs ? 'En el dispositivo' : 'On-device';
+        return;
+      }
+      // Probe which engine got loaded by checking the cache status.
+      void import('../lib/onnx-vision').then(async (lib) => {
+        try {
+          const status = await lib.getGemmaCacheStatus();
+          badgeText.textContent = status.cached
+            ? (isEs ? 'Gemma 4 · en el dispositivo' : 'Gemma 4 · on-device')
+            : (isEs ? 'Llama 1B · en el dispositivo' : 'Llama 1B · on-device');
+        } catch {
+          badgeText.textContent = isEs ? 'En el dispositivo' : 'On-device';
+        }
+      });
+    }
+    paintModelBadge();
+    // Re-paint after a small delay (the consent gate may flip after model load).
+    setTimeout(paintModelBadge, 1500);
   })().catch((e) => {
     console.warn('[chat] entity wiring init failed', e);
   });
@@ -1615,5 +1749,8 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
 <style>
   .chat-chip {
     @apply min-h-11 inline-flex items-center justify-center rounded-full border px-2.5 py-1 leading-none;
+  }
+  .empty-suggestion {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:border-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors;
   }
 </style>
