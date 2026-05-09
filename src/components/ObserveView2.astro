@@ -1114,9 +1114,11 @@ async function resumePipeline(state: PipelineState) {
   updatePipelineUI();
   startGPS();
 
-  if (state.status !== 'done') {
+  if (state.status !== 'done' && state.status !== 'failed') {
     // #783: same try/catch as files-dropped handler — always show post-form
     // on pipeline error so the user can still save manually.
+    // #786: don't retry when prior status is 'failed' — a persistent
+    // underlying error (e.g. auth lock) would loop on every reload.
     try {
       await runPipeline(state);
     } catch (err) {
