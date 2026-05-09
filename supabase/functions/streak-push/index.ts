@@ -215,6 +215,14 @@ serve(async () => {
     if (streak.last !== tzYesterday(sub.tz)) continue;
     candidates++;
 
+    // Check granular notification preference (#870).
+    const { data: prefAllowed } = await db.rpc('notification_prefs_get', {
+      p_uid: sub.user_id,
+      p_channel: 'push',
+      p_trigger: 'streak_reminder',
+    });
+    if (prefAllowed === false) continue;
+
     try {
       const r = await sendPushNoPayload(sub.endpoint, privateKey, vapidPub, vapidSubject);
       if (r.ok) sent++;

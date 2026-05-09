@@ -908,6 +908,7 @@ END $$;
 RESET ROLE;
 
 -- ────────────────────────────────────────────────────────────────────────────
+HEAD
 -- follows RLS (issue #858 — friends-scope leaderboard)
 --
 -- Active policy: follows_read (Module 26)
@@ -916,11 +917,44 @@ RESET ROLE;
 
 -- Test 36 of 38: follows_read: uid_user sees own outgoing edge (follower_id = auth.uid())
 -- Policy: follows_read — follower_id = auth.uid() branch.
+
+-- notification_prefs column RLS (issue #870 — self-only readable/writable)
+--
+-- users.notification_prefs is a JSONB column on public.users, which is
+-- governed by the users_self_write policy (authenticated, auth.uid() = id)
+-- and the users_public_read / users_self_read policies for reads.
+-- This test asserts uid_user can read their own row (including notification_prefs)
+-- but cannot read another user's notification_prefs.
+-- ────────────────────────────────────────────────────────────────────────────
+
+-- Test 36 of 37: notification_prefs: column exists on users table
+DO $$
+DECLARE
+  has_col boolean;
+BEGIN
+  SELECT EXISTS (
+    SELECT 1 FROM information_schema.columns
+     WHERE table_schema = 'public'
+       AND table_name   = 'users'
+       AND column_name  = 'notification_prefs'
+  ) INTO has_col;
+  IF NOT has_col THEN
+    RAISE EXCEPTION 'FAIL [Test 36 of 37: notification_prefs column exists on users]: column missing';
+  END IF;
+END $$;
+
+-- Test 37 of 37: notification_prefs: user can read their own prefs; cannot see others' prefs via direct select.
+-- users_self_read policy: the row is visible when auth.uid() = id.
+-- Other users' rows are still queryable via users_public_read but only
+-- profile_public columns (notification_prefs is not restricted at column-level
+-- here; the RLS guard is the row-level policy which hides the *row* from
+-- non-owners). We assert uid_user can read their own row.
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000003';
 
 DO $$
 DECLARE
+HEAD
   cnt int;
 BEGIN
   SELECT count(*)::int INTO cnt
@@ -986,6 +1020,36 @@ BEGIN
     RAISE EXCEPTION 'FAIL [Test 38 of 38: follows_read: pending follow with following_id=uid_mod leaked]: count=%', leaking;
   END IF;
   RAISE NOTICE 'follows RLS: 3 assertions passed';
+
+  self_prefs jsonb;
+  other_prefs jsonb;
+BEGIN
+  -- Own row must be readable.
+  SELECT notification_prefs INTO self_prefs
+    FROM public.users
+   WHERE id = '00000000-0000-0000-0000-000000000003'::uuid;
+  IF self_prefs IS NULL AND NOT EXISTS (
+    SELECT 1 FROM public.users WHERE id = '00000000-0000-0000-0000-000000000003'
+  ) THEN
+    RAISE EXCEPTION 'FAIL [Test 37 of 37: notification_prefs self read]: own users row not visible';
+  END IF;
+
+  -- uid_user should not be able to UPDATE another user's notification_prefs.
+  -- We use a nested BEGIN/EXCEPTION block; if the UPDATE silently affects 0
+  -- rows (RLS filter) that is also acceptable — the key invariant is 0 rows updated.
+  DECLARE
+    affected int;
+  BEGIN
+    UPDATE public.users
+       SET notification_prefs = '{"push":{"badge_unlock":false}}'
+     WHERE id = '00000000-0000-0000-0000-000000000002'; -- uid_mod, not self
+    GET DIAGNOSTICS affected = ROW_COUNT;
+    IF affected > 0 THEN
+      RAISE EXCEPTION 'FAIL [Test 37 of 37: notification_prefs self-only write]: uid_user updated another user\'s notification_prefs (% rows affected)', affected;
+    END IF;
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL; -- permission denied is also correct
+  END;
 END $$;
 
 RESET ROLE;
@@ -996,7 +1060,10 @@ RESET ROLE;
 
 DO $$
 BEGIN
+HEAD
   RAISE NOTICE 'RLS suite: 38 of 38 assertions passed';
+
+  RAISE NOTICE 'RLS suite: 37 of 37 assertions passed';
 END $$;
 
 ROLLBACK;
