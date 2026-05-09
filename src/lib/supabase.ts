@@ -26,6 +26,40 @@ if (!url || !anonKey) {
 let client: SupabaseClient | null = null;
 
 /**
+ * In-memory session cache to reduce concurrent navigator.locks contention.
+ * Multiple components mounting simultaneously each call auth.getUser() which
+ * competes for the gotrue navigator.lock — on Android Chrome with 15+ components
+ * this causes "Lock not released within 5000ms" warnings and AbortErrors.
+ *
+ * This cache holds the last resolved user for the duration of the page load.
+ * It is intentionally short-lived (cleared on visibility change) so stale
+ * sign-out state never persists across tab switches.
+ */
+let _userCache: { user: import('@supabase/supabase-js').User | null; resolvedAt: number } | null = null;
+const USER_CACHE_TTL_MS = 30_000; // 30s — enough to cover a full page hydration burst
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') _userCache = null;
+  });
+}
+
+/**
+ * Returns the current user with a short-lived in-memory cache.
+ * Use this instead of `getSupabase().auth.getUser()` in components that
+ * mount concurrently to avoid navigator.lock contention in gotrue.
+ */
+export async function getCachedUser() {
+  const now = Date.now();
+  if (_userCache && (now - _userCache.resolvedAt) < USER_CACHE_TTL_MS) {
+    return _userCache.user;
+  }
+  const { data: { user } } = await getSupabase().auth.getUser();
+  _userCache = { user, resolvedAt: now };
+  return user;
+}
+
+/**
  * Returns the singleton Supabase client. Only call from client-side code
  * (hydrated islands or <script> blocks) — Astro SSG pages themselves never
  * need this at build time.

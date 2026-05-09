@@ -10820,3 +10820,96 @@ $$;
 
 REVOKE EXECUTE ON FUNCTION public.daily_challenge_for_user(uuid) FROM PUBLIC;
 GRANT  EXECUTE ON FUNCTION public.daily_challenge_for_user(uuid) TO authenticated;
+
+-- ============================================================
+-- #710 — suggest_nearby_species RPC
+-- Returns up to 10 species the viewer could find nearby that
+-- they haven't observed yet, ranked by nearby platform activity.
+--
+-- Month wrapping fix (#881): uses = ANY(ARRAY[prev,cur,next]) with
+-- modular arithmetic instead of BETWEEN p_month±1 which broke at
+-- January (BETWEEN 0 AND 2) and December (BETWEEN 11 AND 13).
+--
+-- Supporting index for the correlated photo_url subquery:
+-- ============================================================
+CREATE INDEX IF NOT EXISTS idx_media_files_obs_primary
+  ON public.media_files(observation_id, is_primary)
+  WHERE is_primary = true;
+
+CREATE OR REPLACE FUNCTION public.suggest_nearby_species(
+  p_user_id   uuid,
+  p_lat       double precision,
+  p_lng       double precision,
+  p_month     integer,
+  p_radius_km integer DEFAULT 50,
+  p_limit     integer DEFAULT 10
+)
+RETURNS TABLE (
+  taxon_id        uuid,
+  scientific_name text,
+  common_name_es  text,
+  common_name_en  text,
+  kingdom         text,
+  class           text,
+  nearby_count    bigint,
+  photo_url       text
+)
+LANGUAGE sql STABLE
+SECURITY DEFINER
+SET search_path = public, extensions, pg_temp
+AS $$
+  WITH user_observed AS (
+    SELECT DISTINCT i.taxon_id
+    FROM public.observations o
+    JOIN public.identifications i ON i.observation_id = o.id AND i.is_primary
+    WHERE o.observer_id = p_user_id
+      AND i.taxon_id IS NOT NULL
+  ),
+  nearby AS (
+    SELECT
+      i.taxon_id,
+      count(*) AS nearby_count
+    FROM public.observations o
+    JOIN public.identifications i ON i.observation_id = o.id AND i.is_primary
+    WHERE o.sync_status = 'synced'
+      AND o.location IS NOT NULL
+      AND ST_DWithin(
+            o.location::geography,
+            ST_SetSRID(ST_MakePoint(p_lng, p_lat), 4326)::geography,
+            p_radius_km * 1000
+          )
+      AND EXTRACT(MONTH FROM o.observed_at) = ANY(
+            ARRAY[
+              ((p_month - 2 + 12) % 12) + 1,
+              p_month,
+              (p_month % 12) + 1
+            ]
+          )
+      AND i.taxon_id IS NOT NULL
+      AND i.taxon_id NOT IN (SELECT taxon_id FROM user_observed)
+    GROUP BY i.taxon_id
+    ORDER BY nearby_count DESC
+    LIMIT p_limit * 3
+  )
+  SELECT
+    t.id          AS taxon_id,
+    t.scientific_name,
+    t.common_name_es,
+    t.common_name_en,
+    t.kingdom,
+    t.class,
+    n.nearby_count,
+    (SELECT mf.url FROM public.media_files mf
+       JOIN public.observations mo ON mo.id = mf.observation_id
+       JOIN public.identifications mi ON mi.observation_id = mo.id
+         AND mi.taxon_id = t.id AND mi.is_primary
+       WHERE mf.is_primary AND mo.sync_status = 'synced'
+       LIMIT 1) AS photo_url
+  FROM nearby n
+  JOIN public.taxa t ON t.id = n.taxon_id
+  ORDER BY n.nearby_count DESC
+  LIMIT p_limit;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.suggest_nearby_species(uuid, double precision, double precision, integer, integer, integer) FROM PUBLIC;
+GRANT  EXECUTE ON FUNCTION public.suggest_nearby_species(uuid, double precision, double precision, integer, integer, integer) TO authenticated;
