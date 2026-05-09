@@ -1,0 +1,44 @@
+name: Rust lint (clippy + fmt)
+
+# Path-filtered: only runs when src-tauri/ changes, so most PRs don't pay the cost.
+on:
+  pull_request:
+    paths:
+      - 'src-tauri/**'
+  push:
+    branches:
+      - main
+    paths:
+      - 'src-tauri/**'
+
+permissions:
+  contents: read
+
+jobs:
+  rust-lint:
+    name: cargo fmt --check + cargo clippy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache Cargo registry + build artefacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          # Warm-cache runtime target: < 60 s for this minimal crate.
+
+      - name: cargo fmt --check
+        working-directory: src-tauri
+        run: cargo fmt --check
+
+      - name: cargo clippy — deny warnings
+        working-directory: src-tauri
+        run: cargo clippy --all-targets --all-features -- -D warnings
