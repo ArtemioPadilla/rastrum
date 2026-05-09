@@ -25,7 +25,17 @@ const sp = (tr as unknown as { sponsoring: SponsoringStrings }).sponsoring;
 const cancelLabel = lang === 'es' ? 'Cancelar' : 'Cancel';
 ---
 
-<section class="max-w-4xl mx-auto p-6 space-y-8">
+<section
+  class="max-w-4xl mx-auto p-6 space-y-8"
+  data-pool-donate
+  data-pool-label={sp.donate_pool_label}
+  data-model-label={sp.donate_model}
+  data-capacity-label={sp.donate_capacity}
+  data-confirm-label={sp.donate_confirm}
+  data-success-msg={sp.donate_success}
+  data-error-msg={sp.donate_error}
+  data-no-creds-msg={sp.donate_no_credentials}
+>
   <header>
     <h1 class="text-2xl md:text-3xl font-bold text-zinc-900 dark:text-zinc-100">{sp.donate_title}</h1>
     <p class="mt-2 text-zinc-600 dark:text-zinc-400">{sp.donate_subtitle}</p>
@@ -90,29 +100,35 @@ const cancelLabel = lang === 'es' ? 'Cancelar' : 'Cancel';
   </dialog>
 </section>
 
-<script define:vars={{
-  poolLabel: sp.donate_pool_label,
-  modelLabel: sp.donate_model,
-  capacityLabel: sp.donate_capacity,
-  confirmLabel: sp.donate_confirm,
-  successMsg: sp.donate_success,
-  errorMsg: sp.donate_error,
-  noCredsMsg: sp.donate_no_credentials,
-}}>
+<script>
+  // NOTE: do NOT use define:vars — it implicitly sets is:inline=true, which
+  // disables Astro bundling. The dynamic `await import('../lib/supabase')`
+  // and `await import('../lib/sponsorships')` below would then 404 at
+  // runtime. Read i18n strings from data-* attributes instead. See
+  // CLAUDE.md "Astro define:vars + dynamic-import pitfall".
   (async function initDonate() {
-    const signInEl   = document.getElementById('donate-sign-in');
-    const loadingEl  = document.getElementById('donate-loading');
-    const emptyEl    = document.getElementById('donate-empty');
-    const poolsEl    = document.getElementById('donate-pools');
-    const dialog     = document.getElementById('donate-dialog');
-    const form       = document.getElementById('donate-form');
-    const poolIdIn   = document.getElementById('donate-pool-id');
-    const credSelect = document.getElementById('donate-credential');
-    const callsIn    = document.getElementById('donate-calls');
-    const feedback   = document.getElementById('donate-feedback');
-    const submitBtn  = document.getElementById('donate-submit-btn');
-    const cancelBtn  = document.getElementById('donate-cancel-btn');
-    const noCredsEl  = document.getElementById('donate-no-creds-hint');
+    const root        = /** @type {HTMLElement | null} */ (document.querySelector('[data-pool-donate]'));
+    const signInEl    = document.getElementById('donate-sign-in');
+    const loadingEl   = document.getElementById('donate-loading');
+    const emptyEl     = document.getElementById('donate-empty');
+    const poolsEl     = document.getElementById('donate-pools');
+    const dialog      = document.getElementById('donate-dialog');
+    const form        = document.getElementById('donate-form');
+    const poolIdIn    = document.getElementById('donate-pool-id');
+    const credSelect  = document.getElementById('donate-credential');
+    const callsIn     = document.getElementById('donate-calls');
+    const feedback    = document.getElementById('donate-feedback');
+    const submitBtn   = document.getElementById('donate-submit-btn');
+    const cancelBtn   = document.getElementById('donate-cancel-btn');
+    const noCredsEl   = document.getElementById('donate-no-creds-hint');
+    if (!root) return;
+    const poolLabel    = root.dataset.poolLabel ?? '';
+    const modelLabel   = root.dataset.modelLabel ?? '';
+    const capacityLabel = root.dataset.capacityLabel ?? '';
+    const confirmLabel = root.dataset.confirmLabel ?? '';
+    const successMsg   = root.dataset.successMsg ?? '';
+    const errorMsg     = root.dataset.errorMsg ?? '';
+    const noCredsMsg   = root.dataset.noCredsMsg ?? '';
 
     // Dynamic imports to keep the page lightweight for anonymous visitors
     const { getSupabase } = await import('../lib/supabase');

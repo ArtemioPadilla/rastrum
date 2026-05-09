@@ -21,7 +21,13 @@ const docHref = lang === 'es' ? getDocPath('es', 'surprises') : getDocPath('en',
   </h2>
   <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">{sup.section_hint}</p>
 
-  <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3 flex flex-col gap-2">
+  <div
+    class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3 flex flex-col gap-2"
+    data-surprises-strings
+    data-status-on={sup.toggle_on_status}
+    data-status-off={sup.toggle_off_status}
+    data-error-msg={sup.toggle_save_failed}
+  >
     <label class="flex items-start gap-3 cursor-pointer">
       <input
         id="surprises-opt-in"
@@ -41,12 +47,20 @@ const docHref = lang === 'es' ? getDocPath('es', 'surprises') : getDocPath('en',
   </p>
 </section>
 
-<script define:vars={{ statusOn: sup.toggle_on_status, statusOff: sup.toggle_off_status, errorMsg: sup.toggle_save_failed }}>
+<script>
+  // NOTE: do NOT use define:vars — it implicitly sets is:inline=true, which
+  // disables Astro bundling. The dynamic `await import('../lib/supabase')`
+  // below would then 404 at runtime. Read i18n strings from data-* on the
+  // wrapper instead. See CLAUDE.md "Astro define:vars + dynamic-import pitfall".
   (async function () {
     const cb = /** @type {HTMLInputElement | null} */ (document.getElementById('surprises-opt-in'));
     const statusEl = document.getElementById('surprises-opt-in-status');
     const errorEl = document.getElementById('surprises-opt-in-error');
-    if (!cb || !statusEl) return;
+    const strings = /** @type {HTMLElement | null} */ (document.querySelector('[data-surprises-strings]'));
+    if (!cb || !statusEl || !strings) return;
+    const statusOn = strings.dataset.statusOn ?? '';
+    const statusOff = strings.dataset.statusOff ?? '';
+    const errorMsg = strings.dataset.errorMsg ?? '';
 
     function setStatus(checked) {
       statusEl.textContent = checked ? statusOn : statusOff;
