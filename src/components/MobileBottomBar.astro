@@ -13,28 +13,27 @@ const locale = lang as Locale;
 const fab = getFabTarget(currentPath, lang);
 
 // Build href helpers — these read from `routes` so they stay symmetric across locales.
-const explorePath = getLocalizedPath(lang, routes.explore[locale] + '/');
 const exploreRecentPath = getLocalizedPath(lang, routes.exploreRecent[locale] + '/');
-const chatPath    = getLocalizedPath(lang, routes.chat[locale] + '/');
 const profilePath = getLocalizedPath(lang, routes.profile[locale] + '/');
 const homePath    = getLocalizedPath(lang, '/');
 const observePath = getLocalizedPath(lang, routes.observe[locale] + '/');
 const exploreMapPath = getLocalizedPath(lang, routes.exploreMap[locale] + '/');
+const discoverPath = getLocalizedPath(lang, routes.communityObservers[locale] + '/');
 const signInPath  = getLocalizedPath(lang, routes.signIn[locale] + '/');
 
 // Active-state precomputes (so the markup stays tidy)
-const obsActive    = isActiveSection(currentPath, 'observe',       lang);
-const expActive    = isActiveSection(currentPath, 'explore',       lang);
-const chatActive   = isActiveSection(currentPath, 'chat',          lang);
-const profActive   = isActiveSection(currentPath, 'profile',       lang);
-const homeActive   = isActiveSection(currentPath, 'home',          lang);
-const recentActive = isActiveSection(currentPath, 'exploreRecent', lang);
+const obsActive       = isActiveSection(currentPath, 'observe',       lang);
+const expActive       = isActiveSection(currentPath, 'explore',       lang);
+const profActive      = isActiveSection(currentPath, 'profile',       lang);
+const homeActive      = isActiveSection(currentPath, 'home',          lang);
+const recentActive    = isActiveSection(currentPath, 'exploreRecent', lang);
+const discoverActive  = isActiveSection(currentPath, 'community',     lang);
 ---
 
 <!--
   Mobile bottom bar. Two layouts driven by auth state, swapped by the
-  inline script below: the signed-in 5-slot version (Explore · Chat ·
-  [FAB] · Recent · Profile) and the signed-out 4-slot version (Home ·
+  inline script below: the signed-in 5-slot version (Home · Recents ·
+  [FAB] · Discover · Profile) and the signed-out 4-slot version (Home ·
   Observe · Map · Sign in). The center FAB always means "observe";
   when already on /observe it triggers the camera input directly.
 -->
@@ -44,21 +43,21 @@ const recentActive = isActiveSection(currentPath, 'exploreRecent', lang);
   style="padding-bottom: max(env(safe-area-inset-bottom), 0px);"
   aria-label={tr.nav.bottom.observe}
 >
-  <!-- Signed-in: 5 slots, center FAB -->
+  <!-- Signed-in: 5 slots, center FAB — Home | Recents | [FAB] | Discover | Profile -->
   <div id="mbb-authed" class="hidden grid grid-cols-5 items-end h-16 relative">
-    <a href={explorePath} class:list={[
+    <a href={homePath} class:list={[
       'flex flex-col items-center justify-center gap-0.5 py-1 text-[10px]',
-      expActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-500 dark:text-zinc-400'
-    ]} data-tour="explore-tab">
-      <svg aria-hidden="true" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l5.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-1.447-.894L15 9m0 8V9"/></svg>
-      <span>{tr.nav.bottom.explore}</span>
-    </a>
-    <a href={chatPath} class:list={[
-      'flex flex-col items-center justify-center gap-0.5 py-1 text-[10px]',
-      chatActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-500 dark:text-zinc-400'
+      homeActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-500 dark:text-zinc-400'
     ]}>
-      <svg aria-hidden="true" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4-.83L3 20l1.41-3.18A8 8 0 0121 12z"/></svg>
-      <span>{tr.nav.bottom.chat}</span>
+      <svg aria-hidden="true" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h3v-7h6v7h3a1 1 0 001-1V10"/></svg>
+      <span>{tr.nav.bottom.home}</span>
+    </a>
+    <a href={exploreRecentPath} class:list={[
+      'flex flex-col items-center justify-center gap-0.5 py-1 text-[10px]',
+      recentActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-500 dark:text-zinc-400'
+    ]}>
+      <svg aria-hidden="true" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      <span>{tr.nav.bottom.recents}</span>
     </a>
 
     <!-- FAB slot — h-full so absolute children measure from the bar's top edge (not from items-end's collapsed bottom strip) -->
@@ -80,12 +79,12 @@ const recentActive = isActiveSection(currentPath, 'exploreRecent', lang);
       </span>
     </div>
 
-    <a href={exploreRecentPath} class:list={[
+    <a href={discoverPath} class:list={[
       'flex flex-col items-center justify-center gap-0.5 py-1 text-[10px]',
-      recentActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-500 dark:text-zinc-400'
-    ]}>
-      <svg aria-hidden="true" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-      <span>{tr.nav.bottom.recent}</span>
+      discoverActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-500 dark:text-zinc-400'
+    ]} data-tour="discover-tab">
+      <svg aria-hidden="true" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+      <span>{tr.nav.bottom.discover}</span>
     </a>
     <a href={profilePath} class:list={[
       'flex flex-col items-center justify-center gap-0.5 py-1 text-[10px]',
