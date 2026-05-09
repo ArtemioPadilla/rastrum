@@ -60,14 +60,22 @@ const ep = (tr as unknown as { profile: { expert_prompt: Record<string, string> 
     <!-- Identity strip -->
     <header class="mb-8">
       <div class="flex items-start gap-4">
-        <!-- Avatar (large) -->
+        <!-- Avatar (large) — karma-tier ring is applied at hydrate time (#702) -->
         <div class="shrink-0">
-          <img
-            id="avatar-img"
-            src=""
-            alt=""
-            class="w-20 h-20 md:w-24 md:h-24 rounded-full bg-zinc-200 dark:bg-zinc-800 object-cover"
-          />
+          <span
+            id="avatar-frame"
+            data-karma-frame
+            data-karma-tier=""
+            class="inline-block rounded-full ring-offset-2 ring-offset-white dark:ring-offset-zinc-900"
+          >
+            <img
+              id="avatar-img"
+              src=""
+              alt=""
+              class="w-20 h-20 md:w-24 md:h-24 rounded-full bg-zinc-200 dark:bg-zinc-800 object-cover"
+            />
+            <span id="avatar-tier-label" class="sr-only"></span>
+          </span>
         </div>
 
         <!-- Name + handle + meta -->
@@ -257,11 +265,14 @@ const ep = (tr as unknown as { profile: { expert_prompt: Record<string, string> 
 <script>
   import { getSupabase } from '../lib/supabase';
   import { escAttr } from '../lib/karma';
+  import { tierForKarma } from '../lib/karma-frame';
   import type { UserProfile } from '../lib/types';
   import { listCredentials } from '../lib/sponsorships';
 
   const signedOut    = document.getElementById('signed-out') as HTMLDivElement | null;
   const signedIn     = document.getElementById('signed-in') as HTMLDivElement | null;
+  const avatarFrame  = document.getElementById('avatar-frame') as HTMLSpanElement | null;
+  const avatarTierLabel = document.getElementById('avatar-tier-label');
   const avatarImg    = document.getElementById('avatar-img') as HTMLImageElement | null;
   const displayName  = document.getElementById('display-name');
   const usernameAt   = document.getElementById('username-at');
@@ -312,6 +323,28 @@ const ep = (tr as unknown as { profile: { expert_prompt: Record<string, string> 
     if (avatarImg) {
       avatarImg.src = profile.avatar_url || initialsAvatar(name);
       avatarImg.alt = name;
+    }
+
+    if (avatarFrame) {
+      const karmaTotal = Number((profile as { karma_total?: number | null }).karma_total ?? 0);
+      const tier = tierForKarma(karmaTotal);
+      avatarFrame.dataset.karmaTier = tier.id;
+      for (const cls of tier.ringClass.split(/\s+/)) {
+        if (cls) avatarFrame.classList.add(cls);
+      }
+      if (avatarTierLabel) {
+        const langCode = document.documentElement.lang === 'es' ? 'es' : 'en';
+        const tierNames: Record<string, { en: string; es: string }> = {
+          seedling:   { en: 'Seedling',   es: 'Plántula' },
+          observer:   { en: 'Observer',   es: 'Observador' },
+          naturalist: { en: 'Naturalist', es: 'Naturalista' },
+          expert:     { en: 'Expert',     es: 'Experto' },
+          master:     { en: 'Master',     es: 'Maestro' },
+          legend:     { en: 'Legend',     es: 'Leyenda' },
+        };
+        const label = tierNames[tier.id]?.[langCode] ?? tier.id;
+        avatarTierLabel.textContent = langCode === 'es' ? `Nivel: ${label}` : `Tier: ${label}`;
+      }
     }
 
     if (profile.username && viewPublicLink) {
