@@ -139,6 +139,12 @@ const view = page.view;
   import { getSupabase } from '../lib/supabase';
   import { formatTimeAgo } from '../lib/social';
   import { wireOverflowMenu } from '../lib/overflow-menu';
+  import {
+    RECENTS_VIEW_MODE_KEY,
+    DEFAULT_VIEW_MODE,
+    isViewMode,
+    type ViewMode,
+  } from '../lib/recents-view-mode';
 
   type Lang = 'en' | 'es';
 
@@ -324,16 +330,14 @@ const view = page.view;
       faveAriaOther: root.dataset.labelFaveAriaOther ?? '{{count}} people favorited this',
     };
 
-    const VIEW_MODE_KEY = 'rastrum.recents.viewMode';
-    type ViewMode = 'cards' | 'grid';
     function readViewMode(): ViewMode {
       try {
-        const v = localStorage.getItem(VIEW_MODE_KEY);
-        return v === 'grid' ? 'grid' : 'cards';
-      } catch { return 'cards'; }
+        const v = localStorage.getItem(RECENTS_VIEW_MODE_KEY);
+        return isViewMode(v) ? v : DEFAULT_VIEW_MODE;
+      } catch { return DEFAULT_VIEW_MODE; }
     }
     function writeViewMode(mode: ViewMode) {
-      try { localStorage.setItem(VIEW_MODE_KEY, mode); } catch { /* ignore */ }
+      try { localStorage.setItem(RECENTS_VIEW_MODE_KEY, mode); } catch { /* ignore */ }
     }
     function applyViewMode(mode: ViewMode) {
       const list = root.querySelector<HTMLUListElement>('.er-list');
