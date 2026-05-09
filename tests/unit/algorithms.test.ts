@@ -8,6 +8,10 @@ describe('algorithms catalog', () => {
     expect(ids).toContain('community_observers');
     expect(ids).toContain('explore_recent');
     expect(ids).toContain('explore_species_recent');
+    expect(ids).toContain('falta_dex_missing');
+    expect(ids).toContain('contextual_species_chips');
+    expect(ids).toContain('profile_percentile_cards');
+    expect(ids).toContain('active_observers_today');
   });
 
   it.each(ids)('"%s" has parity EN/ES copy with the required shape', (id) => {

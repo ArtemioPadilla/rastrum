@@ -29,6 +29,14 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
 
+      - name: Check Astro define:vars + dynamic imports
+        # Fails when a <script define:vars …> block contains a dynamic
+        # `import(` call. define:vars implicitly enables is:inline, which
+        # disables bundling — the import 404s at runtime against the
+        # page URL. See CLAUDE.md "Astro define:vars + dynamic-import
+        # pitfall" and PR #825.
+        run: npm run check:define-vars
+
       - name: Unit tests (Vitest)
         run: npm test
 

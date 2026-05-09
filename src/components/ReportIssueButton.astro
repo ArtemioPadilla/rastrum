@@ -271,15 +271,21 @@ const repoSlug = 'ArtemioPadilla/rastrum';
           }
           return res;
         }, function (err) {
-          diag.network.push({
-            ts: new Date().toISOString(),
-            method: method.toUpperCase(),
-            url: urlStr.slice(0, 200),
-            status: 0,
-            statusText: err && err.message ? err.message.slice(0, 100) : 'Network error'
-          });
-          if (diag.network.length > MAX) diag.network.shift();
-          W.__rastrum_updateFabBadge && W.__rastrum_updateFabBadge();
+          // Aborts aren't failures — PostHog SDK supersedes its own /flags/
+          // requests, and PWA navigation cancels in-flight fetches. Both
+          // surface as AbortError; logging them pollutes bug reports.
+          var isAbort = err && (err.name === 'AbortError' || (typeof DOMException !== 'undefined' && err instanceof DOMException && err.name === 'AbortError'));
+          if (!isAbort) {
+            diag.network.push({
+              ts: new Date().toISOString(),
+              method: method.toUpperCase(),
+              url: urlStr.slice(0, 200),
+              status: 0,
+              statusText: err && err.message ? err.message.slice(0, 100) : 'Network error'
+            });
+            if (diag.network.length > MAX) diag.network.shift();
+            W.__rastrum_updateFabBadge && W.__rastrum_updateFabBadge();
+          }
           throw err;
         });
       };

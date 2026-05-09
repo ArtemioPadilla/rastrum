@@ -22,6 +22,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -45,6 +47,10 @@ jobs:
           VERSION="${YEAR}.${MONTH}.${PATCH}"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "[version] Generated: $VERSION"
+          if [ "$PATCH" -lt 1 ]; then
+            echo "::error::CalVer patch count is $PATCH — likely a shallow checkout regression. Ensure actions/checkout has fetch-depth: 0."
+            exit 1
+          fi
       - name: Typecheck
         run: npx tsc --noEmit
 
@@ -67,6 +73,7 @@ jobs:
           PUBLIC_MEGADETECTOR_ENDPOINT: ${{ secrets.PUBLIC_MEGADETECTOR_ENDPOINT }}
           PUBLIC_POSTHOG_PROJECT_TOKEN: ${{ secrets.PUBLIC_POSTHOG_PROJECT_TOKEN }}
           PUBLIC_POSTHOG_HOST:        ${{ secrets.PUBLIC_POSTHOG_HOST }}
+          PUBLIC_VAPID_PUBLIC_KEY:    ${{ secrets.VAPID_PUBLIC_KEY }}
           PUBLIC_BUILD_SHA:           ${{ github.sha }}
           PUBLIC_VERSION:             ${{ steps.pkg.outputs.version }}
 

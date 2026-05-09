@@ -111,6 +111,8 @@ async function syncOne(record: ObservationRecord): Promise<void> {
     license:         obs.license ?? null,
     content_sensitive: obs.contentSensitive ?? false,
     notes:           obs.notes,
+    // M22-range (#742): user-confirmed outlier alert.
+    is_range_extension: obs.isRangeExtension ?? false,
     sync_status:     'synced' as const,
     app_version:     obs.appVersion,
     device_os:       obs.deviceOs,

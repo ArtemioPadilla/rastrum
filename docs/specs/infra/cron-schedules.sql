@@ -33,6 +33,9 @@
 --                    consecutive_failures.
 --   v9 (2026-05-08): added 'kairos-fire-15min' (every 15 min) for #724 —
 --                    fires golden-hour contextual push prompts.
+--   v10 (2026-05-08): added 'refresh-taxon-ranges-weekly' (Sundays 04:00 UTC)
+--                     for #742 — rebuilds the per-taxon convex-hull range
+--                     index used by the submit-time outlier alert.
 -- ════════════════════════════════════════════════════════════════════════
 
 CREATE EXTENSION IF NOT EXISTS pg_cron;
@@ -177,6 +180,21 @@ BEGIN
     $$ SELECT public.reconcile_webhook_deliveries(); $$
   );
 
+  -- 13. refresh-taxon-ranges-weekly — Sundays 04:00 UTC (#742)
+  --     Rebuilds per-taxon convex-hull range polygons from research-grade
+  --     observations of the last 5 years. The submit-time outlier alert
+  --     compares each new obs against this index. v1 source =
+  --     `rastrum_proxy`; v1.1 will replace this with a curated GBIF ETL.
+  PERFORM cron.unschedule('refresh-taxon-ranges-weekly')
+    FROM cron.job WHERE jobname = 'refresh-taxon-ranges-weekly';
+  PERFORM cron.schedule('refresh-taxon-ranges-weekly', '0 4 * * 0', format($body$
+    SELECT net.http_post(
+      url     := %L,
+      headers := ('{"Content-Type":"application/json","X-Cron-Secret":"' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'cron_secret') || '"}')::jsonb,
+      body    := '{}'::jsonb
+    );
+  $body$, v_base || '/refresh-taxon-ranges'));
+
   -- 12. kairos-fire-15min — every 15 minutes (#724)
   --     Sends one Web Push to opted-in users when sunset is 15-30 min away
   --     at the centroid of their most recent observation. Hard cap of one
@@ -204,7 +222,8 @@ WHERE jobname IN ('streaks-nightly', 'badges-nightly', 'plantnet-quota-daily',
                   'admin-anomaly-detect-hourly', 'admin-health-digest-weekly',
                   'auto-revoke-expired-roles-daily', 'expire-stale-proposals-hourly',
                   'reconcile-webhook-deliveries',
-                  'kairos-fire-15min')
+                  'kairos-fire-15min',
+                  'refresh-taxon-ranges-weekly')
 ORDER BY jobname;
 
 -- m26: prune read notifications older than 90 days, daily at 04:30 UTC.

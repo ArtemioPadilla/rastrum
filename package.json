@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "astro dev",
-    "build": "node scripts/inject-version.js && npm run build:og && npm run build:about-stats && node scripts/build-search-index.js && astro build && node scripts/sitemap-hreflang.js",
+    "build": "node scripts/inject-version.js && npm run build:og && npm run build:about-stats && node scripts/build-search-index.js && astro build && node scripts/sitemap-hreflang.js && node scripts/restore-version-placeholder.js",
     "build:og": "npx --yes tsx scripts/generate-og.ts",
     "build:about-stats": "npx --yes tsx scripts/fetch-about-stats.ts",
     "preview": "astro preview",
@@ -22,7 +22,8 @@
     "test:e2e:all": "playwright test",
     "test:lhci": "lhci autorun",
     "test:audit": "npm run build && npm run test:e2e && npm run test:lhci",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check:define-vars": "bash scripts/check-define-vars-imports.sh"
   },
   "dependencies": {
     "@astrojs/sitemap": "^3.7.2",

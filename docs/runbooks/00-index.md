@@ -34,6 +34,7 @@ high-level system view.
 | [`multi-provider-vision.md`](multi-provider-vision.md) | M32 — six vision providers (Anthropic, Bedrock, OpenAI, Azure, Gemini, Vertex). |
 | [`sponsor-pools.md`](sponsor-pools.md) | M27/M32 — platform-wide call pool + `consume_pool_slot` RPC. |
 | [`taxa-enrichment.md`](taxa-enrichment.md) | `enrich-taxon` EF + GBIF lineage backfill (kingdom→genus). |
+| [`range-outlier-alert.md`](range-outlier-alert.md) | M35 — submit-time outlier alert, `taxon_range_index`, weekly `refresh-taxon-ranges` cron, modal copy. |
 
 ## Observation flow (Modules 02 / 03)
 
@@ -66,7 +67,7 @@ high-level system view.
 
 | Runbook | Covers |
 |---|---|
-| [`kairos-prompts.md`](kairos-prompts.md) | M34 — golden-hour push, `kairos-fire` 15-min cron, hard 1-per-day cap, manual fire instructions. |
+| [`kairos-prompts.md`](kairos-prompts.md) | M34 — golden-hour push, `kairos-fire` 15-min cron, hard 1-per-day cap, manual fire instructions, VAPID prod-deploy checklist. |
 
 ## Operator hygiene + ops
 

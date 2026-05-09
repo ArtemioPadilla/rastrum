@@ -665,6 +665,12 @@ runbooks (`docs/runbooks/falta-dex.md`, `docs/runbooks/contextual-suggestions.md
 | Map page hits network for pmtiles even after user clicked "Download offline map" | Cache API entry written by `src/lib/offline-map.ts` was orphaned — MapLibre's pmtiles protocol uses `fetch()` directly, never consults the Cache API; the SW didn't intercept after the `.app → .org` migration | SW now intercepts `media.rastrum.org/maps/*.pmtiles` and slices the cached 200 into 206 Partial Content. Algorithm pinned by `tests/unit/sw-pmtiles-range.test.ts`. Fixed in PR #636. |
 | Downloaded offline map (and in-flight share-target stash) silently wiped on every SW upgrade | `activate` handler deleted any cache whose name wasn't the current `VERSION`; `rastrum/pmtiles` and `rastrum-share-target-v1` are page-managed and got nuked too | `PERSISTENT_CACHES` allowlist in `public/sw.js` now skips those caches when pruning. Fixed in PR #636. |
 
+### Pitfalls discovered 2026-05-09
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Dynamic `await import('../lib/foo')` 404s as `/<page-path>/lib/foo` (not `/_astro/...`) | `<script define:vars={...}>` implicitly sets `is:inline=true` → no bundling, so the dynamic import ships as raw text and resolves against the page URL | Drop `define:vars`; read state from the DOM (`document.documentElement.lang`) or `data-*` attributes on a wrapper element. CI guard: `scripts/check-define-vars-imports.sh` (wired in `.github/workflows/ci.yml`). Pattern fixed in PRs #825 (kairos/streak-push) and the follow-up (surprises/pool-donate). |
+
 ---
 
 ## Things you should NOT do without asking

@@ -55,24 +55,24 @@ downloaded offline map intact.
 
 ## Bumping the cache after a problematic deploy
 
-```js
-// public/sw.js
-const VERSION = 'rastrum-shell-v3-2026-04-26';   // ← bump this
-```
+`VERSION` in `public/sw.js` is a placeholder — `__BUILD_VERSION__` —
+substituted at build time by `scripts/inject-version.js` from the
+`PUBLIC_VERSION` env var, which the deploy workflow computes via CalVer
+(`YYYY.M.<patch>`). **Do not edit the placeholder.** The placeholder is
+restored after `astro build` so the working tree stays clean; if you see
+`'rastrum-shell-…'` in source, it's a stale local checkout.
 
-The convention is `rastrum-shell-v<n>-YYYY-MM-DD`. Increment the `v<n>`
-when the cache structure (the SHELL array, the strategy, the
-intercept rules) changes. Update the date for any push that requires
-purging old cached entries.
+To force a cache flush, push any commit on `main` and let the deploy
+workflow's CalVer counter increment the patch — that produces a new
+`VERSION` string in the deployed `sw.js`, which triggers the install →
+activate → cache-prune protocol described below. There is no
+hand-edit step.
 
 ```bash
-# 1. Edit public/sw.js, bump VERSION.
-# 2. Commit + push:
-git add public/sw.js
-git commit -m "fix(sw): bump cache to v4 to flush stale shell entries"
+# Just push something — typo fix, doc tweak, anything.
+git commit --allow-empty -m "chore(sw): force cache flush"
 git push
-# 3. CI runs deploy.yml; the new sw.js lands on rastrum.org.
-gh run watch
+gh run watch   # deploy.yml bumps the patch, builds, ships sw.js
 ```
 
 What happens next on each user's device:
