@@ -84,13 +84,16 @@ const cameraStationHint        = observeStrings.camera_station_hint        ?? (i
 const cameraStationNone        = observeStrings.camera_station_none        ?? (isEs ? 'Ninguna' : 'None');
 const cameraStationLoading     = observeStrings.camera_station_loading     ?? (isEs ? 'Cargando estaciones…' : 'Loading stations…');
 
-const uploadTree = (tr as unknown as { upload?: { praise?: Record<string, string> } }).upload;
+const uploadTree = (tr as unknown as { upload?: { praise?: Record<string, string> }; photo_praise?: Record<string, Record<string, string>> }).upload;
 const praiseStrings: Record<string, string> = uploadTree?.praise ?? {};
+const photoPraiseTree = (tr as unknown as { photo_praise?: Record<string, Record<string, string>> }).photo_praise ?? {};
 const praiseGoodLight        = praiseStrings.good_light        ?? (isEs ? 'Buena luz' : 'Good light');
 const praisePortraitAperture = praiseStrings.portrait_aperture ?? (isEs ? 'Profundidad de retrato' : 'Portrait depth');
 const praiseSharpAction      = praiseStrings.sharp_action      ?? (isEs ? 'Captura nítida' : 'Sharp action');
 const praiseBalancedExposure = praiseStrings.balanced_exposure ?? (isEs ? 'Exposición equilibrada' : 'Balanced exposure');
 const praiseLongLens         = praiseStrings.long_lens         ?? (isEs ? 'Detalle con teleobjetivo' : 'Long-lens detail');
+// Taxon-aware praise lookup table serialized as data-* attribute.
+const photoPraiseJson = JSON.stringify(photoPraiseTree);
 ---
 
 <div class="max-w-xl mx-auto">
@@ -145,6 +148,7 @@ const praiseLongLens         = praiseStrings.long_lens         ?? (isEs ? 'Detal
         data-praise-sharp-action={praiseSharpAction}
         data-praise-balanced-exposure={praiseBalancedExposure}
         data-praise-long-lens={praiseLongLens}
+        data-photo-praise={photoPraiseJson}
       ></div>
 
       <!-- Primary camera row -->
@@ -737,7 +741,7 @@ const praiseLongLens         = praiseStrings.long_lens         ?? (isEs ? 'Detal
     capturedFrom: 'gps' | 'exif' | 'manual';
   } | null;
 
-  type PhotoEntry = { file: File; blobId: string; praiseKey: PraiseKey | null };
+  type PhotoEntry = { file: File; blobId: string; praiseKey: PraiseKey | null; taxonGroup: string | null };
   type AudioEntry = { blob: Blob; blobId: string; mimeType: string; durationSec: number };
   type VideoEntry = {
     blob: Blob;
@@ -774,16 +778,44 @@ const praiseLongLens         = praiseStrings.long_lens         ?? (isEs ? 'Detal
     long_lens: 'praiseLongLens',
   };
 
-  function praiseLabel(key: PraiseKey): string {
+  function praiseLabel(key: PraiseKey, taxonGroup?: string | null): string {
     const grid = photoGrid as HTMLElement | null;
-    return grid?.dataset[PRAISE_DATA_KEY[key]] ?? '';
+    if (!grid) return '';
+    // Prefer taxon-aware string when available.
+    if (taxonGroup) {
+      try {
+        const photoPraise = JSON.parse(grid.dataset.photoPraise ?? '{}') as Record<string, Record<string, string>>;
+        const taxonStr = photoPraise[key]?.[taxonGroup];
+        if (taxonStr) return taxonStr;
+      } catch { /* ignore */ }
+    }
+    return grid.dataset[PRAISE_DATA_KEY[key]] ?? '';
+  }
+
+  function refreshPraiseBadge(photoIndex: number): void {
+    if (!photoGrid) return;
+    const entry = photos[photoIndex];
+    if (!entry) return;
+    const cells = photoGrid.querySelectorAll<HTMLElement>('.relative.aspect-square');
+    const cell = cells[photoIndex];
+    if (!cell) return;
+    const existing = cell.querySelector('[data-praise]');
+    if (existing) existing.remove();
+    const praiseText = entry.praiseKey ? praiseLabel(entry.praiseKey, entry.taxonGroup) : '';
+    if (praiseText) {
+      const span = document.createElement('span');
+      span.dataset.praise = '';
+      span.className = 'absolute bottom-1 left-1 right-1 text-[10px] px-1.5 py-0.5 rounded bg-black/60 text-white truncate text-center';
+      span.textContent = praiseText;
+      cell.appendChild(span);
+    }
   }
 
   function repaintGrid() {
     if (!photoGrid) return;
     photoGrid.classList.toggle('hidden', photos.length === 0);
     photoGrid.innerHTML = photos.map((p, i) => {
-      const praiseText = p.praiseKey ? praiseLabel(p.praiseKey) : '';
+      const praiseText = p.praiseKey ? praiseLabel(p.praiseKey, p.taxonGroup) : '';
       const praise = praiseText
         ? `<span data-praise class="absolute bottom-1 left-1 right-1 text-[10px] px-1.5 py-0.5 rounded bg-black/60 text-white truncate text-center">${escapeHtml(praiseText)}</span>`
         : '';
@@ -804,6 +836,19 @@ const praiseLongLens         = praiseStrings.long_lens         ?? (isEs ? 'Detal
       });
     });
   }
+
+  // Listen for photo-praise-refresh dispatched by sync.ts after cascade persists
+  // primary_taxon_id. Refreshes only the badge for photos where praiseKey is set.
+  window.addEventListener('rastrum:photo-praise-refresh', (ev: Event) => {
+    const detail = (ev as CustomEvent<{ observationId?: string; taxonGroup?: string | null }>).detail;
+    const newTaxonGroup = detail?.taxonGroup ?? null;
+    // Update taxonGroup for all photos in this form and refresh their badges.
+    photos.forEach((entry, idx) => {
+      if (!entry.praiseKey) return;
+      if (newTaxonGroup !== null) entry.taxonGroup = newTaxonGroup;
+      refreshPraiseBadge(idx);
+    });
+  });
 
   // ── Identification block (parallel cascade + progressive disclosure) ──
   const idSpinner       = document.getElementById('id-spinner');
@@ -1578,7 +1623,7 @@ const praiseLongLens         = praiseStrings.long_lens         ?? (isEs ? 'Detal
     }
 
     for (const file of compressed) {
-      photos.push({ file, blobId: crypto.randomUUID(), praiseKey: null });
+      photos.push({ file, blobId: crypto.randomUUID(), praiseKey: null, taxonGroup: null });
       if (photos.length === 1) triggerClientIdentify(file);
     }
     repaintGrid();
@@ -1777,7 +1822,7 @@ const praiseLongLens         = praiseStrings.long_lens         ?? (isEs ? 'Detal
 
       if (pending.kind === 'photo') {
         const file = new File([blob], filename, { type: pending.mime_type });
-        photos.push({ file, blobId: crypto.randomUUID(), praiseKey: null });
+        photos.push({ file, blobId: crypto.randomUUID(), praiseKey: null, taxonGroup: null });
         repaintGrid();
         void resolvePraiseForRecentlyAdded(1);
         await fillFromExif(file).catch(() => {});

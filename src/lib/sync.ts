@@ -267,6 +267,12 @@ async function syncOne(record: ObservationRecord): Promise<void> {
       // Fall through to server cascade as a backstop.
     } else {
       // Identification persisted; skip the server cascade for this observation.
+      // Emit photo-praise-refresh only for accepted IDs (not needs_review).
+      if (typeof window !== 'undefined' && clientId.status === 'accepted') {
+        window.dispatchEvent(new CustomEvent('rastrum:photo-praise-refresh', {
+          detail: { observationId: record.id, taxonGroup: null },
+        }));
+      }
       triggerEnvEnrichment(record.id).catch(err => console.warn('[rastrum] enrich failed', err));
       return;
     }
@@ -440,6 +446,22 @@ async function triggerIdentify(observationId: string): Promise<void> {
       last_error: 'identification insert failed: ' + msg,
     });
     return;
+  }
+
+  // Emit rastrum:photo-praise-refresh after primary_taxon_id is materialised
+  // by sync_primary_id_trigger. Keyed by observationId so ObservationForm can
+  // refresh the badge for only the photos belonging to this observation.
+  // Only fires for cascade winners (server-side accepted). Safe to no-op if
+  // the user has already navigated away.
+  if (typeof window !== 'undefined') {
+    const kingdom = (r as { kingdom?: string }).kingdom ?? null;
+    const taxonGroup = kingdom === 'Plantae' ? 'plant'
+      : kingdom === 'Fungi' ? 'fungus'
+      : r.source === 'birdnet_lite' ? 'bird'
+      : null;
+    window.dispatchEvent(new CustomEvent('rastrum:photo-praise-refresh', {
+      detail: { observationId, taxonGroup },
+    }));
   }
 
   // #334: Persist secondary species detections from BirdNET's sliding-window
