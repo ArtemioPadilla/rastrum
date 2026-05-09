@@ -60,6 +60,10 @@ jobs:
       - name: Build
         run: npm run build
         env:
+          # Lets `npm run build:triage-stats` fetch fresh issue counts at
+          # build time. Read-only — `permissions: contents: read` at the
+          # top of this workflow keeps the token's scope minimal.
+          GITHUB_TOKEN:               ${{ github.token }}
           PUBLIC_SUPABASE_URL:        ${{ secrets.PUBLIC_SUPABASE_URL }}
           PUBLIC_SUPABASE_ANON_KEY:   ${{ secrets.PUBLIC_SUPABASE_ANON_KEY }}
           PUBLIC_R2_MEDIA_URL:        ${{ secrets.PUBLIC_R2_MEDIA_URL }}
