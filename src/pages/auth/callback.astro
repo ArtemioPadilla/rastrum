@@ -125,7 +125,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
         if (user) {
           const { data: profile } = await supabase
             .from('users')
-            .select('preferred_lang')
+            .select('preferred_lang, created_at')
             .eq('id', user.id)
             .maybeSingle();
           const pl = profile?.preferred_lang;
@@ -133,6 +133,19 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
             lang = pl;
           } else if (navigator.language?.toLowerCase().startsWith('es')) {
             lang = 'es';
+          }
+          // Onboarding: fire signed_up for new accounts (created within last 5 min).
+          if (profile?.created_at) {
+            const ageMs = Date.now() - new Date(profile.created_at as string).getTime();
+            if (ageMs < 5 * 60 * 1000) {
+              const { cohortWeek } = await import('../../lib/posthog-events');
+              (window as unknown as { posthog?: { capture: (e: string, p?: Record<string, unknown>) => void } })
+                .posthog?.capture('onboarding:signed_up', {
+                  days_since_signup: 0,
+                  cohort_week: cohortWeek(),
+                  $set: { onboarded_at: new Date().toISOString() },
+                });
+            }
           }
         }
       } catch {
