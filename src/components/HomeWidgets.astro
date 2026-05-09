@@ -1,0 +1,300 @@
+---
+import { t } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+
+const { lang } = Astro.props;
+const tr = t(lang);
+const widgets = tr.home.widgets;
+const recentHref = lang === 'es' ? '/es/explorar/recientes/' : '/en/explore/recent/';
+---
+
+<section
+  class="home-widgets hidden mb-8 space-y-6"
+  data-lang={lang}
+  data-label-greeting-madrugada={widgets.greeting_madrugada}
+  data-label-greeting-morning={widgets.greeting_morning}
+  data-label-greeting-afternoon={widgets.greeting_afternoon}
+  data-label-greeting-evening={widgets.greeting_evening}
+  data-label-streak={widgets.streak_label}
+  data-label-streak-one={widgets.streak_label_one}
+  data-label-streak-aria={widgets.streak_aria}
+  data-label-streak-aria-one={widgets.streak_aria_one}
+  data-label-nearby-title-global={widgets.nearby_title_global}
+  data-label-nearby-title-local={widgets.nearby_title_local}
+  data-label-nearby-empty={widgets.nearby_empty}
+  data-label-nearby-view-all={widgets.nearby_view_all}
+  data-label-nearby-loading={widgets.nearby_loading}
+  data-label-nearby-anon={widgets.nearby_anonymous}
+  data-label-nearby-unknown-species={widgets.nearby_unknown_species}
+  data-recent-href={recentHref}
+  aria-live="polite"
+>
+  <div class="home-widgets-greeting flex items-center justify-between flex-wrap gap-3">
+    <p class="hw-greeting-text text-3xl sm:text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100" role="status" aria-live="polite"></p>
+    <span
+      class="hw-streak hidden inline-flex items-center gap-1.5 rounded-full border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-950/40 px-3 py-1.5 text-sm font-semibold text-amber-900 dark:text-amber-200"
+      role="status"
+    >
+      <span aria-hidden="true">🔥</span>
+      <span class="hw-streak-text tabular-nums">0 days</span>
+    </span>
+  </div>
+
+  <div class="home-widgets-nearby">
+    <div class="flex items-baseline justify-between gap-3 mb-3">
+      <h2 class="hw-nearby-title text-sm font-semibold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">{widgets.nearby_title_local}</h2>
+      <a
+        href={recentHref}
+        class="text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:underline"
+      >{widgets.nearby_view_all}</a>
+    </div>
+    <p class="hw-nearby-loading text-sm text-zinc-500 dark:text-zinc-400">{widgets.nearby_loading}</p>
+    <p class="hw-nearby-empty hidden text-sm text-zinc-500 dark:text-zinc-400">{widgets.nearby_empty}</p>
+    <ul class="hw-nearby-list grid grid-cols-1 sm:grid-cols-3 gap-3"></ul>
+  </div>
+</section>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { buildGreeting } from '../lib/home-greeting';
+  import { formatTimeAgo } from '../lib/social';
+
+  type Lang = 'en' | 'es';
+
+  type Ident = {
+    scientific_name: string | null;
+    is_primary: boolean | null;
+    is_research_grade: boolean | null;
+    confidence: number | null;
+    taxa: { common_name_es: string | null; common_name_en: string | null } | null;
+  };
+
+  type Media = { url: string | null; is_primary: boolean | null; media_type: string | null };
+
+  type Row = {
+    id: string;
+    observed_at: string;
+    state_province: string | null;
+    country_code: string | null;
+    identifications: Ident[] | Ident | null;
+    media_files: Media[];
+  };
+
+  function escapeText(s: string): string {
+    return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as Record<string, string>)[c]);
+  }
+
+  function pickIdent(r: Row): Ident | null {
+    if (!r.identifications) return null;
+    if (Array.isArray(r.identifications)) {
+      if (r.identifications.length === 0) return null;
+      const primary = r.identifications.find(i => i?.is_primary);
+      if (primary) return primary;
+      return [...r.identifications].sort((a, b) => (b?.confidence ?? 0) - (a?.confidence ?? 0))[0] ?? null;
+    }
+    return r.identifications;
+  }
+
+  function rowMarkup(r: Row, lang: Lang, unknownLabel: string): string {
+    const ident = pickIdent(r);
+    const sci = ident?.scientific_name ?? unknownLabel;
+    const common = lang === 'es'
+      ? (ident?.taxa?.common_name_es ?? ident?.taxa?.common_name_en ?? '')
+      : (ident?.taxa?.common_name_en ?? ident?.taxa?.common_name_es ?? '');
+    const photoMedia = (r.media_files ?? []).filter(m => !m?.media_type || m.media_type === 'photo');
+    const photo = photoMedia.find(m => m?.is_primary)?.url ?? photoMedia.find(m => !!m?.url)?.url ?? '';
+    const ago = formatTimeAgo(r.observed_at, lang);
+    const commonHtml = common ? `<p class="text-xs text-zinc-600 dark:text-zinc-300 truncate">${escapeText(common)}</p>` : '';
+
+    return `<li>
+      <a
+        href="/share/obs/?id=${encodeURIComponent(r.id)}"
+        class="block overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 hover:border-emerald-400 dark:hover:border-emerald-700 transition-colors"
+      >
+        <div class="aspect-square w-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+          ${photo
+            ? `<img src="${escapeText(photo)}" alt="${escapeText(sci)}" loading="lazy" class="w-full h-full object-cover" />`
+            : ''}
+        </div>
+        <div class="p-2.5">
+          <p class="text-xs italic font-semibold text-zinc-900 dark:text-zinc-100 truncate">${escapeText(sci)}</p>
+          ${commonHtml}
+          <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">${escapeText(ago)}</p>
+        </div>
+      </a>
+    </li>`;
+  }
+
+  function streakLabel(n: number, root: HTMLElement): string {
+    const tpl = n === 1 ? (root.dataset.labelStreakOne ?? '') : (root.dataset.labelStreak ?? '');
+    return `${n} ${tpl}`;
+  }
+
+  function streakAriaLabel(n: number, root: HTMLElement): string {
+    const tpl = n === 1 ? (root.dataset.labelStreakAriaOne ?? '') : (root.dataset.labelStreakAria ?? '');
+    return tpl.replace('{count}', String(n));
+  }
+
+  function pickGreeting(hour: number, lang: Lang, displayName: string | null, root: HTMLElement): string {
+    const phrase = buildGreeting(hour, lang, displayName);
+    const bucket = (() => {
+      const h = ((Math.floor(hour) % 24) + 24) % 24;
+      if (h < 6) return 'madrugada';
+      if (h < 12) return 'morning';
+      if (h < 19) return 'afternoon';
+      return 'evening';
+    })();
+    const datasetKey = {
+      madrugada: 'labelGreetingMadrugada',
+      morning: 'labelGreetingMorning',
+      afternoon: 'labelGreetingAfternoon',
+      evening: 'labelGreetingEvening',
+    }[bucket];
+    const localized = root.dataset[datasetKey] ?? '';
+    if (!localized) return phrase;
+    const name = (displayName ?? '').trim();
+    return name ? `${localized}, ${name}` : localized;
+  }
+
+  async function init() {
+    const root = document.querySelector<HTMLElement>('.home-widgets');
+    if (!root) return;
+    const lang = (root.dataset.lang === 'es' ? 'es' : 'en') as Lang;
+
+    let supabase;
+    try {
+      supabase = getSupabase();
+    } catch {
+      return;
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      // Signed-out: render anonymous "Recent observations" only — but skip
+      // the personalized hero entirely. Hide the greeting wrapper and show
+      // the global feed.
+      root.classList.remove('hidden');
+      const greeting = root.querySelector<HTMLElement>('.home-widgets-greeting');
+      greeting?.classList.add('hidden');
+      const titleEl = root.querySelector<HTMLElement>('.hw-nearby-title');
+      if (titleEl) titleEl.textContent = root.dataset.labelNearbyTitleGlobal ?? titleEl.textContent;
+      await paintNearby(root, lang, null, null);
+      return;
+    }
+
+    const { data: profile } = await supabase
+      .from('users')
+      .select('display_name, username, country_code, region_primary')
+      .eq('id', user.id)
+      .maybeSingle<{ display_name: string | null; username: string | null; country_code: string | null; region_primary: string | null }>();
+
+    const displayName = profile?.display_name ?? profile?.username ?? null;
+    const country = profile?.country_code ?? null;
+
+    root.classList.remove('hidden');
+    const greetingEl = root.querySelector<HTMLElement>('.hw-greeting-text');
+    if (greetingEl) {
+      greetingEl.textContent = pickGreeting(new Date().getHours(), lang, displayName, root);
+    }
+
+    // Streak badge — read user_streaks (RLS allows self-read regardless of opt-in).
+    try {
+      const { data: streak } = await supabase
+        .from('user_streaks')
+        .select('current_days')
+        .eq('user_id', user.id)
+        .maybeSingle<{ current_days: number }>();
+      const n = streak?.current_days ?? 0;
+      if (n > 0) {
+        const pill = root.querySelector<HTMLElement>('.hw-streak');
+        const text = root.querySelector<HTMLElement>('.hw-streak-text');
+        if (pill && text) {
+          text.textContent = streakLabel(n, root);
+          pill.setAttribute('aria-label', streakAriaLabel(n, root));
+          pill.classList.remove('hidden');
+        }
+      }
+    } catch { /* streaks are optional; ignore */ }
+
+    const titleEl = root.querySelector<HTMLElement>('.hw-nearby-title');
+    if (titleEl) {
+      titleEl.textContent = country
+        ? (root.dataset.labelNearbyTitleLocal ?? titleEl.textContent)
+        : (root.dataset.labelNearbyTitleGlobal ?? titleEl.textContent);
+    }
+
+    await paintNearby(root, lang, country, profile?.region_primary ?? null);
+  }
+
+  async function paintNearby(root: HTMLElement, lang: Lang, country: string | null, _region: string | null): Promise<void> {
+    const listEl = root.querySelector<HTMLUListElement>('.hw-nearby-list');
+    const loadingEl = root.querySelector<HTMLElement>('.hw-nearby-loading');
+    const emptyEl = root.querySelector<HTMLElement>('.hw-nearby-empty');
+    const unknownLabel = root.dataset.labelNearbyUnknownSpecies ?? 'Unknown species';
+    if (!listEl) return;
+
+    let supabase;
+    try {
+      supabase = getSupabase();
+    } catch {
+      loadingEl?.classList.add('hidden');
+      return;
+    }
+
+    try {
+      let query = supabase
+        .from('observations')
+        .select(`
+          id, observed_at, state_province, country_code,
+          identifications(scientific_name, is_primary, is_research_grade, confidence, taxa(common_name_es, common_name_en)),
+          media_files(url, is_primary, media_type)
+        `)
+        .eq('sync_status', 'synced')
+        .order('observed_at', { ascending: false })
+        .limit(3);
+      if (country) query = query.eq('country_code', country);
+      const { data, error } = await query;
+      if (error) throw error;
+      const rows = ((data ?? []) as unknown) as Row[];
+
+      // Country-scoped fetch may yield zero rows in low-density regions —
+      // fall back to global so the widget never goes empty for signed-in
+      // users with a known country.
+      const finalRows = rows.length > 0 || !country
+        ? rows
+        : await (async () => {
+            const { data: g } = await supabase
+              .from('observations')
+              .select(`
+                id, observed_at, state_province, country_code,
+                identifications(scientific_name, is_primary, is_research_grade, confidence, taxa(common_name_es, common_name_en)),
+                media_files(url, is_primary, media_type)
+              `)
+              .eq('sync_status', 'synced')
+              .order('observed_at', { ascending: false })
+              .limit(3);
+            // Title flips back to global when we fell back.
+            const titleEl = root.querySelector<HTMLElement>('.hw-nearby-title');
+            if (titleEl) titleEl.textContent = root.dataset.labelNearbyTitleGlobal ?? titleEl.textContent;
+            return ((g ?? []) as unknown) as Row[];
+          })();
+
+      loadingEl?.classList.add('hidden');
+      if (finalRows.length === 0) {
+        emptyEl?.classList.remove('hidden');
+        return;
+      }
+      listEl.innerHTML = finalRows.map(r => rowMarkup(r, lang, unknownLabel)).join('');
+    } catch {
+      loadingEl?.classList.add('hidden');
+      emptyEl?.classList.remove('hidden');
+    }
+  }
+
+  init().catch(() => {
+    document.querySelector<HTMLElement>('.home-widgets .hw-nearby-loading')?.classList.add('hidden');
+  });
+</script>
