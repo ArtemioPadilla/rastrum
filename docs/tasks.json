@@ -4005,6 +4005,54 @@
         }
       ]
     },
+    "posthog-analytics": {
+      "phase": "v1.0.x",
+      "title_en": "PostHog analytics — reverse-proxy snippet + hardening",
+      "title_es": "Analítica con PostHog — snippet con reverse-proxy + endurecimiento",
+      "modules": [],
+      "subtasks": [
+        {
+          "label_en": "Snippet at src/components/posthog.astro mounted in BaseLayout <head> (is:inline + define:vars to inject env at build time)",
+          "label_es": "Snippet en src/components/posthog.astro montado en <head> de BaseLayout (is:inline + define:vars para inyectar env en build)",
+          "status": "done"
+        },
+        {
+          "label_en": "init options: api_host=usage.rastrum.org (managed reverse proxy), ui_host=us.posthog.com (deep-link rewrite), defaults='2026-01-30', person_profiles='identified_only', capture_exceptions=true (autocapture window.onerror + unhandledrejection) — see PR #764, runbook docs/runbooks/posthog.md",
+          "label_es": "Opciones de init: api_host=usage.rastrum.org (reverse proxy gestionado), ui_host=us.posthog.com (reescritura de deep-links), defaults='2026-01-30', person_profiles='identified_only', capture_exceptions=true (autocaptura de window.onerror + unhandledrejection) — ver PR #764, runbook docs/runbooks/posthog.md",
+          "status": "done"
+        },
+        {
+          "label_en": "Build-env wired: PUBLIC_POSTHOG_PROJECT_TOKEN + PUBLIC_POSTHOG_HOST in .github/workflows/deploy.yml. Deliberately NOT in ci.yml/e2e.yml/lhci.yml so test/audit runs don't pollute prod analytics. Was silent in prod from wizard-setup until #764 — secrets weren't passed at all",
+          "label_es": "Build-env cableado: PUBLIC_POSTHOG_PROJECT_TOKEN + PUBLIC_POSTHOG_HOST en .github/workflows/deploy.yml. Deliberadamente NO en ci.yml/e2e.yml/lhci.yml para que las corridas de test/audit no contaminen la analítica de prod. Estuvo silencioso en prod desde el setup del wizard hasta #764 — los secrets no se pasaban en absoluto",
+          "status": "done"
+        },
+        {
+          "label_en": "14 capture call-sites (window.posthog?.capture pattern with optional chaining): sign_in_initiated/completed/failed (SignInForm), observation_saved (ObservationForm), identification_suggested + identification_promoted_to_research_grade (SuggestIdModal), observation_reaction_toggled (ReactionStrip), user_followed/unfollowed (FollowButton), comment_posted (Comments), observations_exported (ExportView, csv + dwca), onboarding_completed/dismissed (OnboardingTour), profile_updated (ProfileEditForm), pwa_install_prompted/installed (InstallPwaButton), project_created (ProjectNewView), sponsorship_credential_added (SponsoringView), content_reported (ReportDialog)",
+          "label_es": "14 puntos de captura (patrón window.posthog?.capture con optional chaining): sign_in_initiated/completed/failed (SignInForm), observation_saved (ObservationForm), identification_suggested + identification_promoted_to_research_grade (SuggestIdModal), observation_reaction_toggled (ReactionStrip), user_followed/unfollowed (FollowButton), comment_posted (Comments), observations_exported (ExportView, csv + dwca), onboarding_completed/dismissed (OnboardingTour), profile_updated (ProfileEditForm), pwa_install_prompted/installed (InstallPwaButton), project_created (ProjectNewView), sponsorship_credential_added (SponsoringView), content_reported (ReportDialog)",
+          "status": "done"
+        },
+        {
+          "label_en": "posthog.identify(userId) on sign-in success, posthog.reset() on sign-out (Header + MobileDrawer) — prevents distinct_id leak across users on the same tab",
+          "label_es": "posthog.identify(userId) al completar sign-in, posthog.reset() al cerrar sesión (Header + MobileDrawer) — previene fuga de distinct_id entre usuarios en la misma pestaña",
+          "status": "done"
+        },
+        {
+          "label_en": "Window.posthog interface in src/env.d.ts (capture, captureException, identify, reset, __loaded) — catches typos at compile time vs lib.dom's any-typed index signature",
+          "label_es": "Interfaz Window.posthog en src/env.d.ts (capture, captureException, identify, reset, __loaded) — atrapa typos en compile time vs el index signature any-tipado de lib.dom",
+          "status": "done"
+        },
+        {
+          "label_en": "search-index drift CI guard: ci.yml asserts public/search-index.{en,es}.json matches npm run build output (PR-time enforcement); e2e.yml mirrors it (push-to-main canary, covers admin/force-push paths)",
+          "label_es": "Guard de drift del search-index en CI: ci.yml asegura que public/search-index.{en,es}.json coincida con la salida de npm run build (enforcement en PR-time); e2e.yml lo replica (canario en push-to-main, cubre rutas de admin/force-push)",
+          "status": "done"
+        },
+        {
+          "label_en": ".env.example documents both PostHog env vars; operator runbook at docs/runbooks/posthog.md covers verification curls + token rotation + future-scope cross-refs to #780 (server-side EF ingest) and #781 (DNT/consent banner)",
+          "label_es": ".env.example documenta ambas variables de entorno de PostHog; runbook operativo en docs/runbooks/posthog.md cubre curls de verificación + rotación de tokens + cross-refs de scope futuro a #780 (ingest server-side desde EFs) y #781 (banner DNT/consent)",
+          "status": "done"
+        }
+      ]
+    },
     "community-validation": {
       "phase": "v1.1",
       "title_en": "Community validation queue (Module 22)",

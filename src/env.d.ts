@@ -37,6 +37,7 @@ interface ImportMeta {
 interface PostHog {
   __loaded?: boolean;
   capture(event: string, properties?: Record<string, unknown>): void;
+  captureException(error: unknown, properties?: Record<string, unknown>): void;
   identify(distinctId: string, properties?: Record<string, unknown>): void;
   reset(): void;
 }

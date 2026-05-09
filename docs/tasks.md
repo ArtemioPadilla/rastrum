@@ -16,7 +16,7 @@
 | v0.3 | Offline intelligence + activity | done | 11 / 11 |
 | v0.5 | Beta | shipped (partial) | 11 / 13 |
 | v1.0 | Public Launch | shipped (partial) | 18 / 21 |
-| v1.0.x | Post-launch polish | in_progress | 8 / 24 |
+| v1.0.x | Post-launch polish | in_progress | 9 / 25 |
 | v1.1 | UX polish + admin console + M22/M26/M27 | shipped (mostly) | 39 / 44 |
 | v1.2 | Research workflow (M28-M32 + obs-detail + privacy) | shipped 2026-04-30 | 17 / 17 |
 | v1.1.5 | Persuasive Tech Audit (Fogg principles) | Tier S+A shipped; Ola 2b in flight | 9 / 16 |
@@ -61,7 +61,7 @@ Remaining:
 
 ## v1.0.x — Post-launch polish — in_progress
 
-**8 of 24 items done.**
+**9 of 25 items done.** (Latest done: `posthog-analytics` 2026-05-08 — reverse-proxy snippet + 14 capture sites + exception autocapture + identify/reset on auth + drift CI guards + runbook. See `docs/runbooks/posthog.md`.)
 
 Remaining:
 
