@@ -985,6 +985,7 @@ BEGIN
   IF leaking > 0 THEN
     RAISE EXCEPTION 'FAIL [Test 38 of 38: follows_read: pending follow with following_id=uid_mod leaked]: count=%', leaking;
   END IF;
+  RAISE NOTICE 'follows RLS: 3 assertions passed';
 END $$;
 
 RESET ROLE;
