@@ -10127,11 +10127,18 @@ GRANT EXECUTE ON FUNCTION public.count_distinct_observed_species() TO anon, auth
 -- ─────────────────────────────────────────────────────────────────────
 
 -- Extend the kind CHECK constraint (drop + recreate idempotently).
+
+-- #799 — migration_window kairos trigger
+-- Extends kairos_subscriptions.kind CHECK.
+-- Adds migration_windows catalog table with seed data for MX.
+-- ─────────────────────────────────────────────────────────────────────
+
+-- Extend kind CHECK (drop + recreate idempotently).
 ALTER TABLE public.kairos_subscriptions
   DROP CONSTRAINT IF EXISTS kairos_subscriptions_kind_check;
 ALTER TABLE public.kairos_subscriptions
   ADD CONSTRAINT kairos_subscriptions_kind_check
-  CHECK (kind IN ('golden_hour', 'after_rain'));
+  CHECK (kind IN ('golden_hour', 'after_rain', 'migration_window'));
 
 -- weather_snapshots: one row per (geohash5, hour-bucket).
 -- Populated by enrich-environment; consumed by kairos-fire (after_rain).
@@ -10166,3 +10173,56 @@ WHERE recorded_at >= (now() - INTERVAL '12 hours')
 GROUP BY geohash5;
 
 GRANT SELECT ON public.recent_rainfall_12h TO service_role;
+
+
+-- migration_windows: catalog of seasonal windows when notable taxa migrate.
+CREATE TABLE IF NOT EXISTS public.migration_windows (
+  id           bigserial   PRIMARY KEY,
+  taxon_group  text        NOT NULL,
+  start_doy    integer     NOT NULL CHECK (start_doy BETWEEN 1 AND 366),
+  end_doy      integer     NOT NULL CHECK (end_doy BETWEEN 1 AND 366),
+  region_code  text        NOT NULL,
+  body_en      text        NOT NULL,
+  body_es      text        NOT NULL,
+  source_url   text,
+  enabled      boolean     NOT NULL DEFAULT true,
+  created_at   timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_migration_windows_region_enabled
+  ON public.migration_windows(region_code) WHERE enabled = true;
+
+ALTER TABLE public.migration_windows ENABLE ROW LEVEL SECURITY;
+
+-- Public read for enabled rows (anon/authenticated); writes via service_role only.
+DROP POLICY IF EXISTS "migration_windows_public_read" ON public.migration_windows;
+CREATE POLICY "migration_windows_public_read" ON public.migration_windows
+  FOR SELECT USING (enabled = true);
+
+GRANT SELECT ON public.migration_windows TO anon, authenticated, service_role;
+
+-- Seed 4–8 MX migration windows.
+INSERT INTO public.migration_windows
+  (taxon_group, start_doy, end_doy, region_code, body_en, body_es, source_url)
+VALUES
+  -- Monarch butterfly southbound through Michoacán (Sep–Nov: DOY 244–319)
+  ('Lepidoptera', 244, 319, 'MX-MIC',
+   'Monarch migration underway in Michoacán — watch for mass roosts.',
+   'Migración de monarca en Michoacán — busca dormideros masivos.',
+   'https://www.learner.org/series/journey-north/monarch-butterfly/'),
+  -- Monarch overwintering peak in Oaxaca valleys (Oct–Jan: DOY 274–31)
+  ('Lepidoptera', 274, 31, 'MX-OAX',
+   'Monarchs overwintering in Oaxaca highland forests.',
+   'Monarcas invernando en bosques serranos de Oaxaca.',
+   NULL),
+  -- Swainson''s Hawk southbound through Veracruz (Sep–Nov: DOY 244–319)
+  ('Aves', 244, 319, 'MX-VER',
+   'Swainson''s Hawk migration through Veracruz — count raptors from Chichicaxtle ridge.',
+   'Migración de gavilán de Swainson por Veracruz — conteo desde Chichicaxtle.',
+   'https://hawkcount.org/'),
+  -- Olive Ridley sea turtle nesting on Oaxaca coast (Jun–Dec: DOY 152–335)
+  ('Reptilia', 152, 335, 'MX-OAX',
+   'Olive Ridley nesting season on Oaxaca beaches — low-light observation only.',
+   'Temporada de anidación de golfina en playas de Oaxaca — observación con luz tenue.',
+   NULL)
+ON CONFLICT DO NOTHING;

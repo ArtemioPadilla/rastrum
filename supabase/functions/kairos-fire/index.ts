@@ -7,8 +7,9 @@
  * kairos subscription, picks the best trigger and sends one Web Push.
  *
  * Triggers (in priority order for 1/day cap):
- *   after_rain   — ≥ 5 mm in last 12 h at user's last-obs geohash5
- *   golden_hour  — now() ∈ [sunset - 30 min, sunset - 15 min]
+ *   after_rain        — ≥ 5 mm in last 12 h at user's last-obs geohash5
+ *   golden_hour       — now() ∈ [sunset - 30 min, sunset - 15 min]
+ *   migration_window  — today is in a migration window for user's region
  *
  * Required env vars:
  *   SUPABASE_URL                  Supabase project URL
@@ -74,6 +75,28 @@ interface ObsRow {
 const FALLBACK_LAT = 19.4326;
 const FALLBACK_LNG = -99.1332;
 const FALLBACK_TZ  = 'America/Mexico_City';
+interface UserRow {
+  id: string;
+  region_primary: string | null;
+}
+
+interface MigrationWindow {
+  id: number;
+  taxon_group: string;
+  start_doy: number;
+  end_doy: number;
+  region_code: string;
+  body_en: string;
+  body_es: string;
+}
+
+function dayOfYear(date: Date): number {
+  const start = new Date(date.getFullYear(), 0, 0);
+  const diff = date.getTime() - start.getTime();
+  return Math.floor(diff / (1000 * 60 * 60 * 24));
+}
+
+
 const AFTER_RAIN_THRESHOLD_MM = 5;
 
 // ── Golden-hour pick ─────────────────────────────────────────────────
@@ -143,7 +166,7 @@ serve(async (req) => {
   const { data: subs, error: subsErr } = await db
     .from('kairos_subscriptions')
     .select('user_id, kind, last_sent_at')
-    .in('kind', ['golden_hour', 'after_rain'])
+    .in('kind', ['golden_hour', 'after_rain', 'migration_window'])
     .eq('opt_in', true)
     .returns<KairosRow[]>();
   if (subsErr) {
@@ -187,7 +210,25 @@ serve(async (req) => {
   const privateKey = await importVapidPrivateKey(vapidPriv, vapidPub);
   const now = new Date();
 
+  // Load user region_primary for migration_window matching.
+  const { data: users } = await db
+    .from('users')
+    .select('id, region_primary')
+    .in('id', userIds)
+    .returns<UserRow[]>();
+  const regionByUser = new Map<string, string | null>();
+  (users ?? []).forEach(u => regionByUser.set(u.id, u.region_primary));
+
+  // Load all enabled migration windows once.
+  const { data: migWindows } = await db
+    .from('migration_windows')
+    .select('id, taxon_group, start_doy, end_doy, region_code, body_en, body_es')
+    .eq('enabled', true)
+    .returns<MigrationWindow[]>();
+  const allWindows = migWindows ?? [];
+
   // Group by user_id: after_rain has priority over golden_hour in 1/day cap.
+
   const subsByUser = new Map<string, KairosRow[]>();
   for (const sub of subs) {
     const list = subsByUser.get(sub.user_id) ?? [];
@@ -215,7 +256,9 @@ serve(async (req) => {
     }, null);
 
     // After_rain takes priority over golden_hour.
+    const regionPrimary = regionByUser.get(userId) ?? null;
     const afterRainSub = userSubs.find(s => s.kind === 'after_rain');
+    const migWindowSub = userSubs.find(s => s.kind === 'migration_window');
     const goldenHourSub = userSubs.find(s => s.kind === 'golden_hour');
 
     let shouldFire = false;
@@ -224,6 +267,10 @@ serve(async (req) => {
     if (afterRainSub) {
       shouldFire = await pickAfterRain({ db, lat, lng, tz, lastSentAt, now });
       if (shouldFire) firedKind = 'after_rain';
+    }
+    if (!shouldFire && migWindowSub) {
+      const win = pickMigrationWindow({ windows: allWindows, regionPrimary, lastSentAt, tz, now });
+      if (win) { shouldFire = true; firedKind = 'migration_window'; }
     }
     if (!shouldFire && goldenHourSub) {
       shouldFire = pickGoldenHour({ lat, lng, tz, lastSentAt, now });
@@ -260,3 +307,45 @@ serve(async (req) => {
     headers: { 'content-type': 'application/json' },
   });
 });
+// ── Migration window pick ────────────────────────────────────────────
+function pickMigrationWindow(params: {
+  windows: MigrationWindow[];
+  regionPrimary: string | null;
+  lastSentAt: string | null;
+  tz: string;
+  now: Date;
+}): MigrationWindow | null {
+  const { windows, regionPrimary, lastSentAt, tz, now } = params;
+  if (!regionPrimary) return null;
+
+  // 1/day cap shared — if already sent today, skip.
+  if (lastSentAt) {
+    if (tzLocalDate(tz, new Date(lastSentAt)) === tzLocalDate(tz, now)) return null;
+  }
+
+  const doy = dayOfYear(now);
+
+  // Filter to windows matching user region: state > national.
+  const matching = windows.filter(w => {
+    const regionMatch = w.region_code === regionPrimary ||
+      w.region_code === regionPrimary.split('-')[0];
+    if (!regionMatch) return false;
+
+    // DOY range — handle year-crossing (start_doy > end_doy).
+    if (w.start_doy <= w.end_doy) {
+      return doy >= w.start_doy && doy <= w.end_doy;
+    } else {
+      return doy >= w.start_doy || doy <= w.end_doy;
+    }
+  });
+
+  if (!matching.length) return null;
+
+  // State-level windows take priority over national.
+  const stateWindows = matching.filter(w => w.region_code === regionPrimary);
+  const candidates = stateWindows.length > 0 ? stateWindows : matching;
+  candidates.sort((a, b) => a.id - b.id);
+  return candidates[0];
+}
+
+
