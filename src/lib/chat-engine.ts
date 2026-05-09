@@ -9,7 +9,9 @@
  * of accumulated output. Anything else is treated as prose.
  */
 import { runTool, toolDefinitions } from './chat-tools';
-import { loadGemmaTextEngine, loadTextEngine } from './local-ai';
+// NOTE: local-ai is dynamically imported below — a static import would
+// drag the ~5.8 MB WebLLM bundle into the initial load graph. The
+// static-import guard test enforces this.
 
 export type ChatMessage = { role: 'system' | 'user' | 'assistant' | 'tool'; content: string };
 
@@ -36,6 +38,7 @@ function withToolPrompt(messages: ChatMessage[]): ChatMessage[] {
 }
 
 async function* streamGemma(messages: ChatMessage[]): AsyncIterable<{ delta?: string }> {
+  const { loadGemmaTextEngine } = await import('./local-ai');
   const eng = await loadGemmaTextEngine(() => {});
   for await (const chunk of eng.generate(messages, { max_tokens: 512, stream: true })) {
     const c = chunk.choices?.[0];
@@ -45,6 +48,7 @@ async function* streamGemma(messages: ChatMessage[]): AsyncIterable<{ delta?: st
 }
 
 async function* streamLlama(messages: ChatMessage[]): AsyncIterable<{ delta?: string }> {
+  const { loadTextEngine } = await import('./local-ai');
   const eng = await loadTextEngine(() => {});
   // Llama doesn't recognise the 'tool' role natively; flatten tool messages
   // into user-prefixed text so the conversation still parses.
