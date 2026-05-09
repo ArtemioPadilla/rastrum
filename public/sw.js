@@ -137,7 +137,19 @@ function isHtmlNavigation(req, url) {
 // makes byte-range fetches, so we slice the cached body and return a
 // 206 Partial Content. On cache miss we fall through to network.
 //
+// MapLibre fires several byte-range fetches in parallel at first paint
+// (header + root directory + visible tiles). Reading the cached 50 MB
+// archive once per fetch via cached.arrayBuffer() multiplies disk I/O
+// and memory pressure by N, slowing the SW response enough that
+// MapLibre's tile-priority logic cancels the slower ones — surfacing
+// as "ERR signal is aborted without reason" in the network panel.
+// The module-level memo keeps a single decoded ArrayBuffer per archive
+// keyed by URL + ETag; the SW process being torn down (or a fresh
+// download bumping the ETag) flushes it.
+//
 // Spec: tests/unit/sw-pmtiles-range.test.ts pins the slicing algorithm.
+let pmtilesBufferMemo = null; // { key: string, buf: ArrayBuffer }
+
 async function servePmtilesRange(req, url) {
   try {
     const cache = await caches.open(PMTILES_CACHE_NAME);
@@ -152,7 +164,15 @@ async function servePmtilesRange(req, url) {
 
     const start = parseInt(m[1], 10);
     const end   = parseInt(m[2], 10);
-    const buf   = await cached.arrayBuffer();
+    const etag  = cached.headers.get('etag') || '';
+    const memoKey = `${url.href}|${etag}`;
+    let buf;
+    if (pmtilesBufferMemo && pmtilesBufferMemo.key === memoKey) {
+      buf = pmtilesBufferMemo.buf;
+    } else {
+      buf = await cached.arrayBuffer();
+      pmtilesBufferMemo = { key: memoKey, buf };
+    }
     const total = buf.byteLength;
     if (start >= total) {
       return new Response(null, {
@@ -167,7 +187,6 @@ async function servePmtilesRange(req, url) {
     const headers = new Headers();
     const contentType = cached.headers.get('content-type');
     if (contentType) headers.set('Content-Type', contentType);
-    const etag = cached.headers.get('etag');
     if (etag) headers.set('ETag', etag);
     headers.set('Content-Range', `bytes ${start}-${sliceEnd - 1}/${total}`);
     headers.set('Content-Length', String(slice.byteLength));

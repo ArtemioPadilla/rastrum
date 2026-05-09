@@ -40,6 +40,8 @@ const PMTILES_CACHE_NAME = 'rastrum/pmtiles';
 
 // Mirror of public/sw.js#servePmtilesRange. Keep in sync — divergence is
 // caught by e2e in production but should not happen in code review.
+let pmtilesBufferMemo: { key: string; buf: ArrayBuffer } | null = null;
+
 async function servePmtilesRange(req: Request, url: URL): Promise<Response> {
   try {
     const cache = await cachesShim.open(PMTILES_CACHE_NAME);
@@ -54,7 +56,15 @@ async function servePmtilesRange(req: Request, url: URL): Promise<Response> {
 
     const start = parseInt(m[1], 10);
     const end   = parseInt(m[2], 10);
-    const buf   = await cached.arrayBuffer();
+    const etag  = cached.headers.get('etag') || '';
+    const memoKey = `${url.href}|${etag}`;
+    let buf: ArrayBuffer;
+    if (pmtilesBufferMemo && pmtilesBufferMemo.key === memoKey) {
+      buf = pmtilesBufferMemo.buf;
+    } else {
+      buf = await cached.arrayBuffer();
+      pmtilesBufferMemo = { key: memoKey, buf };
+    }
     const total = buf.byteLength;
     if (start >= total) {
       return new Response(null, {
@@ -69,7 +79,6 @@ async function servePmtilesRange(req: Request, url: URL): Promise<Response> {
     const headers = new Headers();
     const contentType = cached.headers.get('content-type');
     if (contentType) headers.set('Content-Type', contentType);
-    const etag = cached.headers.get('etag');
     if (etag) headers.set('ETag', etag);
     headers.set('Content-Range', `bytes ${start}-${sliceEnd - 1}/${total}`);
     headers.set('Content-Length', String(slice.byteLength));
@@ -89,12 +98,12 @@ function fillBytes(n: number): Uint8Array {
   return a;
 }
 
-async function seed(body: Uint8Array): Promise<void> {
+async function seed(body: Uint8Array, etag = 'W/"test-etag"'): Promise<void> {
   const cache = await cachesShim.open(PMTILES_CACHE_NAME);
   const headers = new Headers({
     'Content-Type': 'application/octet-stream',
     'Content-Length': String(body.byteLength),
-    'ETag': 'W/"test-etag"',
+    'ETag': etag,
   });
   await cache.put(ARCHIVE_URL, new Response(body as BodyInit, { status: 200, headers }));
 }
@@ -102,6 +111,7 @@ async function seed(body: Uint8Array): Promise<void> {
 describe('servePmtilesRange', () => {
   beforeEach(() => {
     cacheBuckets.clear();
+    pmtilesBufferMemo = null;
   });
 
   it('returns the full body when no Range header is present', async () => {
@@ -188,5 +198,50 @@ describe('servePmtilesRange', () => {
     const res = await servePmtilesRange(req, new URL(ARCHIVE_URL));
     expect(res.status).toBe(599);
     await expect(res.text()).resolves.toBe('network-fallback');
+  });
+
+  // The buffer memo exists so MapLibre's parallel byte-range fetches at
+  // first paint don't each pay the cost of decoding the full ~50 MB
+  // archive. Without it, the redundant arrayBuffer() reads slow each
+  // SW response enough that MapLibre cancels the slowest tile fetches,
+  // surfacing as "ERR signal is aborted without reason".
+  it('reuses the decoded buffer across range fetches with matching ETag', async () => {
+    const body = fillBytes(2048);
+    await seed(body, 'W/"v1"');
+
+    const req1 = new Request(ARCHIVE_URL, { headers: { Range: 'bytes=0-15' } });
+    await servePmtilesRange(req1, new URL(ARCHIVE_URL));
+    const memoAfterFirst = pmtilesBufferMemo;
+    expect(memoAfterFirst).not.toBeNull();
+    expect(memoAfterFirst!.key).toBe(`${ARCHIVE_URL}|W/"v1"`);
+    expect(memoAfterFirst!.buf.byteLength).toBe(2048);
+
+    const req2 = new Request(ARCHIVE_URL, { headers: { Range: 'bytes=100-200' } });
+    const res2 = await servePmtilesRange(req2, new URL(ARCHIVE_URL));
+    expect(res2.status).toBe(206);
+    expect(pmtilesBufferMemo).toBe(memoAfterFirst); // same object identity → not reread
+  });
+
+  it('invalidates the memo when the cached archive ETag changes', async () => {
+    const body1 = fillBytes(512);
+    await seed(body1, 'W/"v1"');
+    await servePmtilesRange(
+      new Request(ARCHIVE_URL, { headers: { Range: 'bytes=0-31' } }),
+      new URL(ARCHIVE_URL),
+    );
+    expect(pmtilesBufferMemo!.key).toBe(`${ARCHIVE_URL}|W/"v1"`);
+
+    // Operator re-downloads the archive — different content, new ETag.
+    cacheBuckets.clear();
+    const body2 = fillBytes(1024);
+    await seed(body2, 'W/"v2"');
+    const res = await servePmtilesRange(
+      new Request(ARCHIVE_URL, { headers: { Range: 'bytes=0-31' } }),
+      new URL(ARCHIVE_URL),
+    );
+    expect(res.status).toBe(206);
+    expect(res.headers.get('Content-Range')).toBe('bytes 0-31/1024');
+    expect(pmtilesBufferMemo!.key).toBe(`${ARCHIVE_URL}|W/"v2"`);
+    expect(pmtilesBufferMemo!.buf.byteLength).toBe(1024);
   });
 });
