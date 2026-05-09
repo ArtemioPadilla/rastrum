@@ -40,6 +40,12 @@ const lang: 'en' | 'es' = 'en';
       const err = document.getElementById('err');
       if (err) { err.textContent = 'No observation id in URL.'; err.classList.remove('hidden'); }
     } else {
+      // Update Ask-Rastrum link to pre-attach this observation in chat.
+      const askLink = document.getElementById('ask-rastrum-link') as HTMLAnchorElement | null;
+      if (askLink) {
+        const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
+        askLink.href = `/${lang}/chat/?attach=observation:${encodeURIComponent(id)}`;
+      }
       load(id).catch(e => {
         document.getElementById('loading')?.classList.add('hidden');
         const err = document.getElementById('err');

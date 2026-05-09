@@ -131,6 +131,10 @@ const sponsoringI18n = {
       <div class="shrink-0 flex flex-col gap-2 items-end">
         <FollowButton lang={lang} />
         <ShareButton lang={lang} id="profile-share-btn" />
+        <a id="ask-rastrum-link-profile" href={`/${lang}/chat/`} class="inline-flex items-center gap-1 min-h-9 rounded-lg border border-emerald-600/60 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/10" aria-label={lang === 'es' ? 'Pregunta a Rastrum sobre este observador' : 'Ask Rastrum about this observer'}>
+          <span aria-hidden="true">💬</span>
+          <span>{lang === 'es' ? 'Pregunta a Rastrum' : 'Ask Rastrum'}</span>
+        </a>
         <div data-pp-overflow class="hidden relative">
           <button
             type="button"
@@ -304,6 +308,14 @@ const sponsoringI18n = {
     }
 
     const isOwner = viewer?.id === profile.id;
+
+    // Update Ask-Rastrum link to pre-attach this observer in chat.
+    const askLink = document.getElementById('ask-rastrum-link-profile') as HTMLAnchorElement | null;
+    if (askLink && profile.id) {
+      const langLocal = document.documentElement.lang === 'es' ? 'es' : 'en';
+      const kind = isOwner ? 'self_profile' : 'observer';
+      askLink.href = `/${langLocal}/chat/?attach=${kind}:${encodeURIComponent(profile.id)}`;
+    }
 
     const facetList = [
       'profile', 'real_name', 'bio', 'location',
