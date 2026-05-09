@@ -24,6 +24,7 @@ const inboxPath          = getLocalizedPath(lang, routes.inbox[locale] + '/');
 const profileExportPath  = getLocalizedPath(lang, routes.profileExport[locale] + '/');
 const profileDexPath     = getLocalizedPath(lang, routes.dex[locale] + '/');
 const profileImportPath  = getLocalizedPath(lang, routes.profileImport[locale] + '/');
+const chatPath           = getLocalizedPath(lang, routes.chat[locale] + '/');
 
 // Explore (Biodiversity + Community subheadings) — M28
 const exploreMapPath        = getLocalizedPath(lang, routes.exploreMap[locale] + '/');
@@ -104,6 +105,15 @@ const getDocLabel = (key: string) => (tr.docs.sections as Record<string, string>
       <a href={communityObserversCountryHref} class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{em.community_country}</a>
       <a href={communityMapHref}             class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{em.community_map}</a>
       <a href={communityLeaderboardHref}     class="block py-1.5 hover:text-emerald-600 dark:hover:text-emerald-400">{em.community_leaderboard ?? (lang === 'es' ? 'Tabla de líderes' : 'Leaderboard')}</a>
+    </section>
+
+    <!-- Chat -->
+    <section>
+      <p class="text-xs font-semibold text-sky-600 dark:text-sky-400 uppercase tracking-wider mb-2">{tr.nav.chat}</p>
+      <a href={chatPath} class="block py-1.5 hover:text-sky-600 dark:hover:text-sky-400 flex items-center gap-2">
+        <span aria-hidden="true">💬</span>
+        <span>{tr.nav.chat}</span>
+      </a>
     </section>
 
     <!-- Reference -->

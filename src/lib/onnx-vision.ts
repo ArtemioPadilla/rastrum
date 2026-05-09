@@ -243,6 +243,45 @@ export async function identifyImageWithGemma(
 }
 
 /**
+ * Text-only generation using the loaded Gemma 4 E2B model. Yields one chunk
+ * shaped like `{ choices: [{ delta: { content } }] }` so chat-engine can
+ * consume Gemma and Llama through the same async iterator. Streaming token
+ * deltas via transformers.js is a v1.1 polish; v1 emits one chunk per turn.
+ */
+export async function* generateGemmaText(
+  messages: Array<{ role: string; content: string }>,
+  opts: { max_tokens?: number; stream?: boolean },
+): AsyncIterable<{ choices: Array<{ delta?: { content?: string }; message?: { content: string } }> }> {
+  const { processor: proc, model: mdl } = await loadGemmaVisionEngine(() => {});
+
+  // Map our role/content shape to the Gemma chat template's content array.
+  const chatMsgs = messages.map(m => ({
+    role: m.role === 'tool' ? 'user' : m.role,
+    content: [{ type: 'text', text: m.role === 'tool' ? `[tool_result] ${m.content}` : m.content }],
+  }));
+
+  const promptText = proc.apply_chat_template(chatMsgs, {
+    enable_thinking: false,
+    add_generation_prompt: true,
+  });
+  const inputs = await proc(promptText, undefined, { add_special_tokens: false });
+
+  const max_new_tokens = Math.min(opts.max_tokens ?? 512, 1024);
+  const generated = await mdl.generate({
+    ...(inputs as Record<string, unknown>),
+    max_new_tokens,
+    do_sample: false,
+  });
+  const decoded = await decodeGeneration(proc, generated);
+
+  if (opts.stream) {
+    yield { choices: [{ delta: { content: decoded } }] };
+  } else {
+    yield { choices: [{ message: { content: decoded } }] };
+  }
+}
+
+/**
  * Decode the generation output. transformers.js returns a tensor or array
  * shaped { sequences: number[][] } that the tokenizer batch_decode call
  * resolves to text. We extract the assistant turn between the last
