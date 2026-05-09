@@ -280,7 +280,19 @@ serve(async (req) => {
     if (!shouldFire || !firedKind) continue;
     candidates++;
 
+HEAD
     let anySuccess = false;
+
+    // Check granular notification preference (#870).
+    // notification_prefs_get returns true by default (opt-out model),
+    // so this only skips when the user explicitly disabled it.
+    const { data: prefAllowed } = await db.rpc('notification_prefs_get', {
+      p_uid: sub.user_id,
+      p_channel: 'push',
+      p_trigger: 'kairos_golden_hour',
+    });
+    if (prefAllowed === false) continue;
+
     for (const p of userPushes) {
       try {
         const r = await sendPushNoPayload(p.endpoint, privateKey, vapidPub, vapidSubject);

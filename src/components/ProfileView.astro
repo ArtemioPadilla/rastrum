@@ -32,6 +32,7 @@ const cameraTrapPath     = getLocalizedPath(lang, routes.profileImportCameraTrap
 const exportPath         = getLocalizedPath(lang, routes.profileExport[locale] + '/');
 const tokensPath         = getLocalizedPath(lang, routes.profileTokens[locale] + '/');
 const impactPath         = getLocalizedPath(lang, routes.profileImpact[locale] + '/');
+const notificationsPath  = getLocalizedPath(lang, routes.profileNotifications[locale] + '/');
 const k = (tr as unknown as { karma: Record<string, string> }).karma;
 const expertApplyPath = getLocalizedPath(lang, lang === 'es' ? '/es/perfil/aplicar-experto/' : '/en/profile/expert-apply/');
 const ep = (tr as unknown as { profile: { expert_prompt: Record<string, string> } }).profile.expert_prompt;
@@ -214,6 +215,10 @@ const ep = (tr as unknown as { profile: { expert_prompt: Record<string, string> 
         <a href={tokensPath} class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 hover:border-emerald-400 dark:hover:border-emerald-700 transition-colors group">
           <p class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 group-hover:text-emerald-700 dark:group-hover:text-emerald-400">{lang === 'es' ? 'Tokens API' : 'API tokens'}</p>
           <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">{lang === 'es' ? 'Gestionar acceso' : 'Manage access'}</p>
+        </a>
+        <a href={notificationsPath} class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 hover:border-emerald-400 dark:hover:border-emerald-700 transition-colors group">
+          <p class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 group-hover:text-emerald-700 dark:group-hover:text-emerald-400">{lang === 'es' ? 'Notificaciones' : 'Notifications'}</p>
+          <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">{lang === 'es' ? 'Push, correo, horas de silencio' : 'Push, email, quiet hours'}</p>
         </a>
         <a href={impactPath} class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 hover:border-emerald-400 dark:hover:border-emerald-700 transition-colors group">
           <p class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 group-hover:text-emerald-700 dark:group-hover:text-emerald-400">{lang === 'es' ? 'Mi impacto' : 'My impact'}</p>

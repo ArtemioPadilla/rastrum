@@ -10247,6 +10247,7 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.count_distinct_observed_species() TO anon, authenticated;
 
+HEAD
 -- #798 — after_rain kairos trigger
 -- Extends kairos_subscriptions.kind CHECK to include 'after_rain'.
 -- Adds weather_snapshots table (geohash5 grid, populated by
@@ -10353,3 +10354,48 @@ VALUES
    'Temporada de anidación de golfina en playas de Oaxaca — observación con luz tenue.',
    NULL)
 ON CONFLICT DO NOTHING;
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- Issue #870 — Granular notification preferences
+-- ═══════════════════════════════════════════════════════════════════════════
+-- Adds users.notification_prefs (jsonb) and a helper function so Edge
+-- Functions can check per-channel/trigger opt-in state without bespoke
+-- logic in every function.
+
+-- 1) New column on users (idempotent).
+ALTER TABLE public.users
+  ADD COLUMN IF NOT EXISTS notification_prefs jsonb NOT NULL DEFAULT '{}';
+
+-- 2) Helper: returns true when a user has opted in to a given channel+trigger.
+--    Defaults to TRUE (opt-out model) when the key is absent — new triggers
+--    are on by default until the user explicitly turns them off.
+CREATE OR REPLACE FUNCTION public.notification_prefs_get(
+  p_uid     uuid,
+  p_channel text,
+  p_trigger text
+) RETURNS boolean
+LANGUAGE sql STABLE
+SECURITY DEFINER SET search_path = public, extensions, pg_temp
+AS $$
+  SELECT COALESCE(
+    (SELECT (notification_prefs->p_channel->>p_trigger)::boolean
+     FROM public.users WHERE id = p_uid),
+    true
+  );
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.notification_prefs_get(uuid, text, text) FROM PUBLIC;
+GRANT  EXECUTE ON FUNCTION public.notification_prefs_get(uuid, text, text) TO authenticated, service_role;
+
+-- RLS: notification_prefs is part of the users table row; existing policies
+-- already enforce self-only write (users_self_write). No new policy needed —
+-- the column grant model controls column-level write access.
+-- Explicitly grant column-level UPDATE so the supabase-js client (authenticated)
+-- can write notification_prefs via UPDATE on users WHERE id = auth.uid().
+DO $$
+BEGIN
+  GRANT UPDATE (notification_prefs) ON public.users TO authenticated;
+EXCEPTION WHEN insufficient_privilege THEN
+  RAISE NOTICE 'Could not GRANT UPDATE (notification_prefs) — may require superuser. Grant manually if needed.';
+END
+$$;
