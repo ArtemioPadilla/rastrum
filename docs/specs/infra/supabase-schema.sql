@@ -9868,7 +9868,12 @@ BEGIN
            pg_get_function_identity_arguments(p.oid) AS args
     FROM pg_proc p
     JOIN pg_namespace n ON n.oid = p.pronamespace
-    WHERE n.nspname = 'public' AND p.prosecdef = true
+    WHERE n.nspname = 'public'
+      AND p.prosecdef = true
+      AND NOT EXISTS (
+        SELECT 1 FROM pg_depend d
+        WHERE d.objid = p.oid AND d.deptype = 'e'
+      )
   LOOP
     EXECUTE format(
       'REVOKE EXECUTE ON FUNCTION public.%I(%s) FROM PUBLIC',
@@ -9910,6 +9915,11 @@ $$;
 -- gin_trgm_ops opclass keep resolving from inside function bodies after
 -- the schema move above. Idempotent — only ALTERs functions whose
 -- proconfig doesn't already include a search_path entry.
+-- Extension-owned functions (PostGIS, pg_trgm, etc.) are owned by the
+-- extension's role on hosted Supabase, NOT by the role running the apply.
+-- ALTER FUNCTION on a function you don't own raises "must be owner of
+-- function …" — exactly the failure that broke the post-merge db-apply
+-- run for PR #828. Skip them via pg_depend (deptype 'e' = extension).
 DO $$
 DECLARE
   r record;
@@ -9926,6 +9936,10 @@ BEGIN
         SELECT 1
         FROM unnest(COALESCE(p.proconfig, ARRAY[]::text[])) AS c
         WHERE c LIKE 'search_path=%'
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM pg_depend d
+        WHERE d.objid = p.oid AND d.deptype = 'e'
       )
   LOOP
     EXECUTE format(
