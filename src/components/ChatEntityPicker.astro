@@ -1,0 +1,157 @@
+---
+/**
+ * ChatEntityPicker — popover triggered by ChatComposer's "Attach context"
+ * button (event: rastrum:chat-open-entity-picker). Tabs across the 6
+ * EntityKinds. Each tab queries one chat_find_* RPC.
+ *
+ * Selecting a row dispatches `rastrum:chat-attach-entity` with
+ * { kind, id } — ChatView handles the fetchCard + chip render.
+ */
+interface Props { lang: 'en' | 'es' }
+const { lang } = Astro.props;
+
+const labels = {
+  title: lang === 'es' ? 'Adjuntar contexto' : 'Attach context',
+  search: lang === 'es' ? 'Buscar…' : 'Search…',
+  close: lang === 'es' ? 'Cerrar' : 'Close',
+  loading: lang === 'es' ? 'Cargando…' : 'Loading…',
+  empty: lang === 'es' ? 'Sin resultados.' : 'No matches.',
+  station_hint: lang === 'es' ? 'Abre primero una página de proyecto.' : 'Open a project page first.',
+  tabs: {
+    observation: lang === 'es' ? 'Observaciones' : 'Observations',
+    species: lang === 'es' ? 'Especies' : 'Species',
+    project: lang === 'es' ? 'Proyectos' : 'Projects',
+    camera_station: lang === 'es' ? 'Estaciones' : 'Stations',
+    observer: lang === 'es' ? 'Observadores' : 'Observers',
+    self_profile: lang === 'es' ? 'Yo' : 'Me',
+  },
+};
+---
+
+<div id="chat-entity-picker" class="hidden fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center" role="dialog" aria-modal="true" aria-label={labels.title}>
+  <div class="bg-white dark:bg-zinc-900 w-full sm:max-w-lg rounded-t-xl sm:rounded-xl shadow-2xl">
+    <header class="flex items-center justify-between p-3 border-b border-zinc-200 dark:border-zinc-800">
+      <h2 class="text-sm font-semibold">{labels.title}</h2>
+      <button id="chat-entity-picker-close" aria-label={labels.close} class="w-8 h-8 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800">×</button>
+    </header>
+    <div role="tablist" class="flex overflow-x-auto border-b border-zinc-200 dark:border-zinc-800 text-xs">
+      <button data-pkr-tab="observation"    role="tab" aria-selected="true"  class="chat-pkr-tab">{labels.tabs.observation}</button>
+      <button data-pkr-tab="species"        role="tab" aria-selected="false" class="chat-pkr-tab">{labels.tabs.species}</button>
+      <button data-pkr-tab="project"        role="tab" aria-selected="false" class="chat-pkr-tab">{labels.tabs.project}</button>
+      <button data-pkr-tab="camera_station" role="tab" aria-selected="false" class="chat-pkr-tab">{labels.tabs.camera_station}</button>
+      <button data-pkr-tab="observer"       role="tab" aria-selected="false" class="chat-pkr-tab">{labels.tabs.observer}</button>
+      <button data-pkr-tab="self_profile"   role="tab" aria-selected="false" class="chat-pkr-tab">{labels.tabs.self_profile}</button>
+    </div>
+    <div class="p-3">
+      <input id="chat-entity-picker-search" type="search" placeholder={labels.search} class="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm" />
+    </div>
+    <ul id="chat-entity-picker-list" class="max-h-[60vh] overflow-y-auto px-3 pb-3 space-y-2"></ul>
+  </div>
+</div>
+
+<style>
+  .chat-pkr-tab { @apply min-h-11 px-3 py-2 whitespace-nowrap border-b-2 border-transparent hover:bg-zinc-50 dark:hover:bg-zinc-800/40; }
+  .chat-pkr-tab[aria-selected="true"] { @apply border-emerald-600 text-emerald-700 dark:text-emerald-400; }
+</style>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import { bootstrapChatEntities, registry } from '../lib/chat-entities';
+  import type { EntityKind } from '../lib/chat-entities/types';
+  import { escapeHtml } from '../lib/chat-bubble-html';
+
+  bootstrapChatEntities();
+
+  const dialog = document.getElementById('chat-entity-picker');
+  const list   = document.getElementById('chat-entity-picker-list');
+  const search = document.getElementById('chat-entity-picker-search') as HTMLInputElement | null;
+  const isEs   = document.documentElement.lang === 'es';
+  const LOADING = isEs ? 'Cargando…' : 'Loading…';
+  const EMPTY   = isEs ? 'Sin resultados.' : 'No matches.';
+  const STATION = isEs ? 'Abre primero una página de proyecto.' : 'Open a project page first.';
+
+  let activeTab: EntityKind = 'observation';
+  let lastQuery = '';
+
+  function setActiveTab(kind: EntityKind) {
+    activeTab = kind;
+    document.querySelectorAll('.chat-pkr-tab').forEach(b => {
+      const sel = (b as HTMLButtonElement).dataset.pkrTab === kind;
+      (b as HTMLButtonElement).setAttribute('aria-selected', String(sel));
+    });
+    refresh().catch(() => {});
+  }
+
+  async function refresh() {
+    if (!list) return;
+    list.innerHTML = `<li class="text-xs text-zinc-500 italic">${LOADING}</li>`;
+    const sb = getSupabase();
+    const q = lastQuery.trim();
+    let rows: Array<{ id: string; label: string }> = [];
+    try {
+      if (activeTab === 'observation') {
+        const filters = q ? {} : { owner: 'me' };
+        const { data } = await sb.rpc('chat_find_observations', { p_filters: filters, p_limit: 20 });
+        rows = (data ?? []).map((r: { id: string; scientific_name?: string; observed_at?: string }) =>
+          ({ id: r.id, label: `${r.scientific_name ?? '—'} · ${r.observed_at ? new Date(r.observed_at).toLocaleDateString() : ''}` }));
+      } else if (activeTab === 'species') {
+        const { data } = await sb.rpc('chat_find_species', { p_query: q || ' ', p_limit: 20 });
+        rows = (data ?? []).map((r: { id: string; scientific_name: string }) => ({ id: r.id, label: r.scientific_name }));
+      } else if (activeTab === 'project') {
+        const { data } = await sb.rpc('chat_find_projects', { p_query: q || ' ', p_limit: 20 });
+        rows = (data ?? []).map((r: { id: string; slug: string; name?: string }) => ({ id: r.slug, label: r.name ?? r.slug }));
+      } else if (activeTab === 'observer') {
+        const { data } = await sb.rpc('chat_find_observers', { p_query: q || ' ', p_limit: 20 });
+        rows = (data ?? []).map((r: { id: string; display_name?: string; username?: string }) => ({ id: r.id, label: r.display_name ?? r.username ?? r.id }));
+      } else if (activeTab === 'self_profile') {
+        const me = await sb.auth.getUser();
+        if (me.data?.user) rows = [{ id: me.data.user.id, label: isEs ? 'Yo' : 'Me' }];
+      } else if (activeTab === 'camera_station') {
+        list.innerHTML = `<li class="text-xs text-zinc-500 italic">${STATION}</li>`;
+        return;
+      }
+    } catch (e) {
+      list.innerHTML = `<li class="text-xs text-red-600">${escapeHtml(e instanceof Error ? e.message : String(e))}</li>`;
+      return;
+    }
+
+    if (rows.length === 0) {
+      list.innerHTML = `<li class="text-xs text-zinc-500 italic">${EMPTY}</li>`;
+      return;
+    }
+    const spec = registry.get(activeTab);
+    list.innerHTML = rows.map(r => {
+      return `<li><button type="button" data-row-id="${escapeHtml(r.id)}" class="w-full text-left rounded-lg border border-zinc-200 dark:border-zinc-800 p-2 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 min-h-11">
+        <span class="mr-2">${escapeHtml(spec?.icon ?? '·')}</span>${escapeHtml(r.label)}
+      </button></li>`;
+    }).join('');
+  }
+
+  list?.addEventListener('click', (ev) => {
+    const btn = (ev.target as Element)?.closest('button[data-row-id]') as HTMLButtonElement | null;
+    if (!btn) return;
+    const id = btn.dataset.rowId!;
+    document.dispatchEvent(new CustomEvent('rastrum:chat-attach-entity', {
+      detail: { kind: activeTab, id, source: 'picker' },
+    }));
+    dialog?.classList.add('hidden');
+  });
+
+  document.addEventListener('rastrum:chat-open-entity-picker', () => {
+    dialog?.classList.remove('hidden');
+    setActiveTab('observation');
+  });
+  document.getElementById('chat-entity-picker-close')?.addEventListener('click', () => dialog?.classList.add('hidden'));
+  dialog?.addEventListener('click', (ev) => {
+    if (ev.target === dialog) dialog.classList.add('hidden');
+  });
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape' && dialog && !dialog.classList.contains('hidden')) {
+      dialog.classList.add('hidden');
+    }
+  });
+  document.querySelectorAll('.chat-pkr-tab').forEach(b => b.addEventListener('click', (e) => {
+    setActiveTab((e.currentTarget as HTMLButtonElement).dataset.pkrTab as EntityKind);
+  }));
+  search?.addEventListener('input', () => { lastQuery = search.value; refresh().catch(() => {}); });
+</script>
