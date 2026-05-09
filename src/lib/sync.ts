@@ -127,6 +127,8 @@ async function syncOne(record: ObservationRecord): Promise<void> {
   // the count query uses a HEAD request so it's cheap.
   void (async () => {
     try {
+      // Only count observations that have been fully synced to the server
+      // (sync_status='synced'). Drafts or locally-pending rows don't count.
       const { count } = await supabase
         .from('observations')
         .select('*', { count: 'exact', head: true })
