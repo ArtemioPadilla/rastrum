@@ -3504,6 +3504,89 @@
         }
       ]
     },
+    "chat-improvements-v1-1": {
+      "phase": "v1.1",
+      "title_en": "Chat v1.1: Gemma 4 text + entity context + 5 typed tools",
+      "title_es": "Chat v1.1: Gemma 4 texto + contexto por entidad + 5 herramientas tipadas",
+      "modules": ["20-chat"],
+      "subtasks": [
+        {
+          "label_en": "loadGemmaTextEngine: reuse Gemma 4 E2B vision weights via transformers.js for text-only generation (no second download)",
+          "label_es": "loadGemmaTextEngine: reusar pesos de Gemma 4 E2B vía transformers.js para generación de texto (sin descarga doble)",
+          "status": "done"
+        },
+        {
+          "label_en": "chat-engine: streaming + 1-round tool-call loop, Llama fallback on Gemma load failure",
+          "label_es": "chat-engine: streaming + bucle de herramienta de 1 ronda, fallback a Llama si falla Gemma",
+          "status": "done"
+        },
+        {
+          "label_en": "Generic EntitySpec registry mirroring src/lib/identifiers/ — 6 built-ins (observation/species/project/camera_station/observer/self_profile)",
+          "label_es": "Registro EntitySpec genérico tipo src/lib/identifiers/ — 6 built-ins (observación/especie/proyecto/estación/observador/perfil propio)",
+          "status": "done"
+        },
+        {
+          "label_en": "5 SECURITY INVOKER chat_find_* RPCs + chat_entity_card dispatcher + 6 per-kind card builders",
+          "label_es": "5 RPCs SECURITY INVOKER chat_find_* + dispatcher chat_entity_card + 6 builders por tipo",
+          "status": "done"
+        },
+        {
+          "label_en": "chat-tools.ts: typed JSON tool layer with hand-rolled validators (no Zod), {ok|unknown_tool|invalid_args|network|offline} discriminated union",
+          "label_es": "chat-tools.ts: capa tipada de herramientas JSON con validadores manuales (sin Zod), unión discriminada {ok|unknown_tool|invalid_args|network|offline}",
+          "status": "done"
+        },
+        {
+          "label_en": "Two-button consent gate: side-by-side Gemma 4 (recommended) vs Llama 3.2 1B (lighter); refreshState checks both caches",
+          "label_es": "Portal de consentimiento de dos botones: Gemma 4 (recomendado) vs Llama 3.2 1B (más ligero) lado a lado; refreshState verifica ambos cachés",
+          "status": "done"
+        },
+        {
+          "label_en": "AskRastrumButton + ?attach=kind:id deep-link parser; mounted on share-obs, public profile, project detail, species profile",
+          "label_es": "AskRastrumButton + parser de enlace directo ?attach=kind:id; montado en share-obs, perfil público, detalle de proyecto, perfil de especie",
+          "status": "done"
+        },
+        {
+          "label_en": "ChatEntityPicker popover with 6 tabs and search; opens from composer's Context button",
+          "label_es": "Popover ChatEntityPicker con 6 pestañas y búsqueda; se abre desde el botón Contexto del compositor",
+          "status": "done"
+        },
+        {
+          "label_en": "Empty-state suggestion chips (Near me, Review observation, How it works, NOM-059) seed input + auto-submit",
+          "label_es": "Chips de sugerencia en estado vacío (Cerca de mí, Revisar observación, Cómo funciona, NOM-059) llenan input + auto-envían",
+          "status": "done"
+        },
+        {
+          "label_en": "Header model badge resolved client-side from cache status (Gemma 4 / Llama 1B / On-device)",
+          "label_es": "Badge de modelo en el header resuelto del lado del cliente desde el estado del caché (Gemma 4 / Llama 1B / En el dispositivo)",
+          "status": "done"
+        },
+        {
+          "label_en": "Chat link added to MobileDrawer (was missing on <sm viewports)",
+          "label_es": "Link de Chat agregado al MobileDrawer (faltaba en viewports <sm)",
+          "status": "done"
+        },
+        {
+          "label_en": "tests/sql/chat.sql regression suite (10 assertions) + db-validate workflow wiring",
+          "label_es": "Suite de regresión tests/sql/chat.sql (10 aserciones) + cableado al workflow db-validate",
+          "status": "done"
+        },
+        {
+          "label_en": "Privacy invariants: obscure-coords on observation card, self-only on self_profile_card, no-centroid on observer_card",
+          "label_es": "Invariantes de privacidad: coords-obscure en card de observación, solo-self en self_profile_card, sin-centroide en observer_card",
+          "status": "done"
+        },
+        {
+          "label_en": "Telemetry events on rastrum:onboarding-event bus (chat.entity.attached, chat.tool.called, chat.tool.failed, chat.engine.fallback)",
+          "label_es": "Eventos de telemetría en bus rastrum:onboarding-event (chat.entity.attached, chat.tool.called, chat.tool.failed, chat.engine.fallback)",
+          "status": "done"
+        },
+        {
+          "label_en": "Runbook: docs/runbooks/chat-improvements.md + index link",
+          "label_es": "Runbook: docs/runbooks/chat-improvements.md + link en índice",
+          "status": "done"
+        }
+      ]
+    },
     "install-discoverability": {
       "phase": "v1.0.x",
       "title_en": "Earlier PWA install prompt + iOS Add-to-Home-Screen walkthrough",
