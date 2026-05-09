@@ -10170,3 +10170,4 @@ $$;
 
 REVOKE EXECUTE ON FUNCTION public.daily_challenge_for_user(uuid) FROM PUBLIC;
 GRANT  EXECUTE ON FUNCTION public.daily_challenge_for_user(uuid) TO authenticated;
+

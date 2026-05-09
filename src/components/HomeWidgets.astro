@@ -10,6 +10,7 @@ const tr = t(lang);
 const widgets = tr.home.widgets;
 const recentHref = lang === 'es' ? '/es/explorar/recientes/' : '/en/explore/recent/';
 const observeHref = lang === 'es' ? '/es/observar/' : '/en/observe/';
+
 ---
 
 <section
@@ -40,6 +41,7 @@ const observeHref = lang === 'es' ? '/es/observar/' : '/en/observe/';
   data-label-challenge-rarity-common={widgets.challenge.rarity_common}
   data-label-challenge-rarity-uncommon={widgets.challenge.rarity_uncommon}
   data-label-challenge-rarity-rare={widgets.challenge.rarity_rare}
+
   aria-live="polite"
 >
   <div class="home-widgets-greeting flex items-center justify-between flex-wrap gap-3">
@@ -55,6 +57,7 @@ const observeHref = lang === 'es' ? '/es/observar/' : '/en/observe/';
 
   <div class="home-widgets-challenge hidden">
     <!-- populated by script -->
+
   </div>
 
   <div class="home-widgets-nearby">
@@ -75,6 +78,8 @@ const observeHref = lang === 'es' ? '/es/observar/' : '/en/observe/';
   import { getSupabase } from '../lib/supabase';
   import { buildGreeting } from '../lib/home-greeting';
   import { formatTimeAgo } from '../lib/social';
+
+
 
   type Lang = 'en' | 'es';
 
@@ -173,6 +178,158 @@ const observeHref = lang === 'es' ? '/es/observar/' : '/en/observe/';
     return name ? `${localized}, ${name}` : localized;
   }
 
+  // ── Suggestions (issue #710) ─────────────────────────────────────────────
+
+  const DISMISSED_KEY = 'rastrum.suggestions.dismissed';
+
+  function getDismissed(): Set<string> {
+    try {
+      const raw = sessionStorage.getItem(DISMISSED_KEY);
+      return raw ? new Set<string>(JSON.parse(raw)) : new Set<string>();
+    } catch {
+      return new Set<string>();
+    }
+  }
+
+  function saveDismissed(set: Set<string>): void {
+    try {
+      sessionStorage.setItem(DISMISSED_KEY, JSON.stringify([...set]));
+    } catch { /* quota exceeded — ignore */ }
+  }
+
+  function suggestionCard(s: SpeciesSuggestion, lang: Lang, sugRoot: HTMLElement): string {
+    const dismissed = getDismissed();
+    if (dismissed.has(s.taxon_id)) return '';
+
+    const countTpl = s.nearby_count === 1
+      ? (sugRoot.dataset.labelNearbyCountOne ?? '{{count}} nearby observation')
+      : (sugRoot.dataset.labelNearbyCountOther ?? '{{count}} nearby observations');
+    const countLabel = countTpl.replace('{{count}}', String(s.nearby_count));
+
+    const dismissTpl = sugRoot.dataset.labelDismissAria ?? 'Not interested in {{name}}';
+    const dismissLabel = dismissTpl.replace('{{name}}', s.scientific_name);
+
+    const common = lang === 'es'
+      ? (s.common_name_es ?? s.common_name_en ?? '')
+      : (s.common_name_en ?? s.common_name_es ?? '');
+
+    const commonHtml = common
+      ? `<p class="text-xs text-zinc-600 dark:text-zinc-300 truncate">${escapeText(common)}</p>`
+      : '';
+
+    const imgHtml = s.photo_url
+      ? `<img src="${escapeText(s.photo_url)}" alt="${escapeText(s.scientific_name)}" loading="lazy" class="w-full h-full object-cover" />`
+      : '';
+
+    return `<li data-taxon-id="${escapeText(s.taxon_id)}">
+      <div class="relative overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 group">
+        <div class="aspect-square w-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+          ${imgHtml}
+        </div>
+        <div class="p-2.5">
+          <p class="text-xs italic font-semibold text-zinc-900 dark:text-zinc-100 truncate">${escapeText(s.scientific_name)}</p>
+          ${commonHtml}
+          <p class="text-[11px] text-emerald-700 dark:text-emerald-400 mt-1">${escapeText(countLabel)}</p>
+        </div>
+        <button
+          type="button"
+          data-dismiss="${escapeText(s.taxon_id)}"
+          aria-label="${escapeText(dismissLabel)}"
+          class="absolute top-1.5 right-1.5 rounded-full p-1 text-zinc-400 dark:text-zinc-500 bg-white/80 dark:bg-zinc-900/80 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity hover:text-zinc-700 dark:hover:text-zinc-200"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4" aria-hidden="true">
+            <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+          </svg>
+        </button>
+      </div>
+    </li>`;
+  }
+
+  function monthName(lang: Lang): string {
+    return new Date().toLocaleString(lang === 'es' ? 'es-MX' : 'en-US', { month: 'long' });
+  }
+
+  async function paintSuggestions(
+    root: HTMLElement,
+    lang: Lang,
+    userId: string,
+    seed: number
+  ): Promise<void> {
+    const sugRoot = root.querySelector<HTMLElement>('.home-widgets-suggestions');
+    if (!sugRoot) return;
+
+    const listEl = sugRoot.querySelector<HTMLUListElement>('.hw-suggestions-list');
+    const loadingEl = sugRoot.querySelector<HTMLElement>('.hw-suggestions-loading');
+    const emptyEl = sugRoot.querySelector<HTMLElement>('.hw-suggestions-empty');
+    const subtitleEl = sugRoot.querySelector<HTMLElement>('.hw-suggestions-subtitle');
+    if (!listEl) return;
+
+    // Update subtitle month name
+    if (subtitleEl) {
+      const tpl = sugRoot.dataset.labelSubtitle ?? '';
+      subtitleEl.textContent = tpl.replace('{{month}}', monthName(lang));
+    }
+
+    loadingEl?.classList.remove('hidden');
+    emptyEl?.classList.add('hidden');
+    listEl.innerHTML = '';
+
+    // Request geolocation
+    let lat: number, lng: number;
+    try {
+      const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          timeout: 8000,
+          maximumAge: 5 * 60 * 1000, // 5 min cache
+        });
+      });
+      lat = pos.coords.latitude;
+      lng = pos.coords.longitude;
+    } catch {
+      // Permission denied or unavailable — keep widget hidden
+      loadingEl?.classList.add('hidden');
+      return;
+    }
+
+    try {
+      // seed param forces a different result set on refresh (use limit oversample trick)
+      const limit = 10 + (seed % 5); // vary limit slightly to get different rows
+      const all = await fetchSuggestions(userId, lat, lng, { limit });
+      const dismissed = getDismissed();
+      const filtered = all.filter(s => !dismissed.has(s.taxon_id)).slice(0, 5);
+
+      loadingEl?.classList.add('hidden');
+
+      if (filtered.length === 0) {
+        emptyEl?.classList.remove('hidden');
+        return;
+      }
+
+      listEl.innerHTML = filtered.map(s => suggestionCard(s, lang, sugRoot)).join('');
+      sugRoot.classList.remove('hidden');
+
+      // Wire up dismiss buttons
+      listEl.querySelectorAll<HTMLButtonElement>('button[data-dismiss]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const taxonId = btn.dataset.dismiss ?? '';
+          const dismissed = getDismissed();
+          dismissed.add(taxonId);
+          saveDismissed(dismissed);
+          const li = btn.closest('li');
+          if (li) li.remove();
+          if (listEl.children.length === 0) {
+            emptyEl?.classList.remove('hidden');
+          }
+        });
+      });
+    } catch {
+      loadingEl?.classList.add('hidden');
+      emptyEl?.classList.remove('hidden');
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+
   async function init() {
     const root = document.querySelector<HTMLElement>('.home-widgets');
     if (!root) return;
@@ -243,7 +400,21 @@ const observeHref = lang === 'es' ? '/es/observar/' : '/en/observe/';
     // Challenge widget — signed-in only
     await paintChallenge(root, lang, user.id);
 
+
     await paintNearby(root, lang, country, profile?.region_primary ?? null);
+
+    // Fire suggestions widget (no await — it runs in parallel via geolocation)
+    let suggestionSeed = 0;
+    paintSuggestions(root, lang, user.id, suggestionSeed).catch(() => {/* optional widget */});
+
+    // Wire up the Refresh button
+    const sugRoot = root.querySelector<HTMLElement>('.home-widgets-suggestions');
+    sugRoot?.querySelector<HTMLButtonElement>('.hw-suggestions-refresh')?.addEventListener('click', () => {
+      suggestionSeed = (suggestionSeed + 1) % 100;
+      // Clear dismissed on refresh
+      try { sessionStorage.removeItem(DISMISSED_KEY); } catch { /* ignore */ }
+      paintSuggestions(root, lang, user.id, suggestionSeed).catch(() => {/* optional */});
+    });
   }
 
   function rarityLabel(tier: number | null, root: HTMLElement): string {
@@ -262,6 +433,7 @@ const observeHref = lang === 'es' ? '/es/observar/' : '/en/observe/';
 
   async function paintChallenge(root: HTMLElement, lang: Lang, userId: string): Promise<void> {
     const container = root.querySelector<HTMLElement>('.home-widgets-challenge');
+
     if (!container) return;
 
     let supabase;
@@ -341,11 +513,13 @@ const observeHref = lang === 'es' ? '/es/observar/' : '/en/observe/';
               ${commonName ? `<p class="text-xs text-zinc-600 dark:text-zinc-300 truncate mb-1">${escapeText(commonName)}</p>` : ''}
               ${ch.why ? `<p class="text-[11px] text-zinc-500 dark:text-zinc-400 mb-2"><span class="font-medium">${escapeText(whyLabel)}:</span> ${escapeText(ch.why)}</p>` : ''}
               ${ctaHtml}
+
             </div>
           </div>
         </div>`;
       container.classList.remove('hidden');
     } catch { /* challenge is optional */ }
+
   }
 
   async function paintNearby(root: HTMLElement, lang: Lang, country: string | null, _region: string | null): Promise<void> {
