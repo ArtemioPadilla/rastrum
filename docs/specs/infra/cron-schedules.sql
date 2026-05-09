@@ -31,6 +31,8 @@
 --                    PR14 — writes back async pg_net status_code into
 --                    admin_webhook_deliveries and recomputes
 --                    consecutive_failures.
+--   v9 (2026-05-08): added 'kairos-fire-15min' (every 15 min) for #724 —
+--                    fires golden-hour contextual push prompts.
 -- ════════════════════════════════════════════════════════════════════════
 
 CREATE EXTENSION IF NOT EXISTS pg_cron;
@@ -175,6 +177,21 @@ BEGIN
     $$ SELECT public.reconcile_webhook_deliveries(); $$
   );
 
+  -- 12. kairos-fire-15min — every 15 minutes (#724)
+  --     Sends one Web Push to opted-in users when sunset is 15-30 min away
+  --     at the centroid of their most recent observation. Hard cap of one
+  --     push/user/day enforced by `kairos_subscriptions.last_sent_at`.
+  --     The EF is gated by `X-Cron-Secret` and exits as a no-op when the
+  --     VAPID env vars are unset.
+  PERFORM cron.unschedule('kairos-fire-15min') FROM cron.job WHERE jobname = 'kairos-fire-15min';
+  PERFORM cron.schedule('kairos-fire-15min', '*/15 * * * *', format($body$
+    SELECT net.http_post(
+      url     := %L,
+      headers := ('{"Content-Type":"application/json","X-Cron-Secret":"' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'cron_secret') || '"}')::jsonb,
+      body    := '{}'::jsonb
+    );
+  $body$, v_base || '/kairos-fire'));
+
   RAISE NOTICE '✓ Cron schedules applied';
 END
 $migration$;
@@ -186,7 +203,8 @@ WHERE jobname IN ('streaks-nightly', 'badges-nightly', 'plantnet-quota-daily',
                   'recompute-user-stats-nightly',
                   'admin-anomaly-detect-hourly', 'admin-health-digest-weekly',
                   'auto-revoke-expired-roles-daily', 'expire-stale-proposals-hourly',
-                  'reconcile-webhook-deliveries')
+                  'reconcile-webhook-deliveries',
+                  'kairos-fire-15min')
 ORDER BY jobname;
 
 -- m26: prune read notifications older than 90 days, daily at 04:30 UTC.

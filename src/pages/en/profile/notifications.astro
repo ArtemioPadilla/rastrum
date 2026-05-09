@@ -1,0 +1,13 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import NotificationsView from '../../../components/NotificationsView.astro';
+import { t } from '../../../i18n/utils';
+
+const lang = 'en';
+const tr = t(lang);
+const ns = (tr as unknown as { notifications: { page_title: string; page_subtitle: string } }).notifications;
+---
+
+<BaseLayout title={`${ns.page_title} — Rastrum`} description={ns.page_subtitle} lang={lang}>
+  <NotificationsView lang={lang} />
+</BaseLayout>

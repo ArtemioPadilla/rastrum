@@ -1,0 +1,47 @@
+---
+import StreakRemindersSection from './StreakRemindersSection.astro';
+import KairosGoldenHourSection from './KairosGoldenHourSection.astro';
+import { t, getLocalizedPath, routes } from '../i18n/utils';
+
+interface Props { lang: 'en' | 'es'; }
+const { lang } = Astro.props;
+const tr = t(lang);
+const ns = (tr as unknown as {
+  notifications: {
+    page_title: string;
+    page_subtitle: string;
+    kairos_group_title: string;
+    streak_group_title: string;
+    back_to_settings: string;
+  };
+}).notifications;
+
+const settingsPath = getLocalizedPath(lang, routes.profileSettingsPreferences[lang] + '/');
+---
+
+<div class="mx-auto max-w-3xl px-4 py-10 space-y-8">
+  <header>
+    <h1 class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{ns.page_title}</h1>
+    <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{ns.page_subtitle}</p>
+  </header>
+
+  <section>
+    <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-3">
+      {ns.kairos_group_title}
+    </h2>
+    <KairosGoldenHourSection lang={lang} />
+  </section>
+
+  <section>
+    <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-3">
+      {ns.streak_group_title}
+    </h2>
+    <StreakRemindersSection lang={lang} />
+  </section>
+
+  <p class="pt-4 text-xs text-zinc-500">
+    <a href={settingsPath} class="text-emerald-700 dark:text-emerald-400 hover:underline">
+      ← {ns.back_to_settings}
+    </a>
+  </p>
+</div>

@@ -89,6 +89,7 @@ narrative source.
 | 30 | CLI batch import for camera-trap memory cards | v1.3 | shipped 2026-04-29 (PR #134 — `rastrum-import` Node CLI + `/api/upload-url` Edge Function endpoint + EXIF GPS/timestamp walker; depends on M29) | [`30-cli-batch-import.md`](30-cli-batch-import.md) |
 | 31 | Camera stations + sampling-effort tracking | v1.3 | shipped 2026-04-29 schema (PR #141) + 2026-04-30 v1.1 follow-ups (create-station UI #213, `/api/observe` + CLI `--station-key` #208). Period management + detection-rate dashboard tracked in #224. | [`31-camera-stations.md`](31-camera-stations.md) |
 | 32 | Multi-provider vision + per-sponsor model + platform pool | v1.3 | shipped 2026-04-29 backend (PR #143 closes #115/#116/#118) + 2026-04-30 v1.1 follow-ups (sponsor UI #215, Vertex auto-rotation #209, ops crons #207, smoke probe workflow #210). Pool dashboard with top-taxa + cost-per-100 picker + pool karma incentives tracked in #226/#227/#228. | [`32-multi-provider-vision.md`](32-multi-provider-vision.md) |
+| 34 | Kairos contextual prompts (golden-hour push, opt-in, 1/day cap) | v1.3 | shipped 2026-05-08 (closes #724); v1.1 follow-ups: after-rain, migration window, lunar event triggers (separate issues). | [`34-kairos-prompts.md`](34-kairos-prompts.md) |
 
 ## v1.5 — Territory layer — planned
 
