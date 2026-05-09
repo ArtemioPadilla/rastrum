@@ -103,6 +103,14 @@ export interface Observation {
   ndviValue: number | null;
   phenologicalSeason: string | null;
 
+  /**
+   * M22-range (#742): set when the user confirms a submit-time outlier
+   * alert ("yes, this is correct, ~XXX km from the known range"). The
+   * obs gets a "Posible extensión de rango" pill on the detail page and
+   * lands on the M22 community-validation queue with priority.
+   */
+  isRangeExtension?: boolean;
+
   syncStatus: SyncStatus;
   syncedAt: string | null;
   appVersion: string;

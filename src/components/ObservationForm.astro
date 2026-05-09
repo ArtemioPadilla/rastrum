@@ -645,6 +645,8 @@ const praiseLongLens         = praiseStrings.long_lens         ?? (isEs ? 'Detal
   import { parse as parseExif } from 'exifr';
   import { syncOutbox, registerSyncTriggers } from '../lib/sync';
   import { resolveObserverRef, saveObservationToOutbox } from '../lib/observe';
+  import { checkOutlier, formatDistanceKm } from '../lib/outlier-alert';
+  import { openConfirmDialog } from '../lib/confirm-dialog';
   import type { Observation } from '../lib/types';
   import {
     pickVideoMime,
@@ -2611,6 +2613,11 @@ const praiseLongLens         = praiseStrings.long_lens         ?? (isEs ? 'Detal
 
   let lastSavedObservationId: string | null = null;
 
+  // M22-range (#742): set true once the user confirms the outlier alert
+  // modal. Carried into the draft so sync can persist
+  // observations.is_range_extension. Reset on form reset.
+  let confirmedRangeExtension = false;
+
   async function buildSaveDraft(asDraft: boolean): Promise<Parameters<typeof saveObservationToOutbox>[0] | null> {
     if (!form) return null;
     const ref = await resolveObserverRef();
@@ -2656,6 +2663,7 @@ const praiseLongLens         = praiseStrings.long_lens         ?? (isEs ? 'Detal
       evidenceType: ((form.elements.namedItem('evidence_type') as HTMLSelectElement).value || 'direct_sighting') as Observation['evidenceType'],
       cameraStationId: (document.getElementById('camera-station-id') as HTMLInputElement | null)?.value || null,
       notes: ((form.elements.namedItem('notes') as HTMLTextAreaElement).value || null),
+      isRangeExtension: confirmedRangeExtension,
       asDraft,
     };
   }
@@ -2720,6 +2728,49 @@ const praiseLongLens         = praiseStrings.long_lens         ?? (isEs ? 'Detal
         errBox.classList.remove('hidden');
       }
       return;
+    }
+
+    // ── Outlier alert (#742, M22-range) ────────────────────────────────
+    // Politely warn when the obs is far outside the cascaded taxon's
+    // known range. NEVER blocks: if the user confirms, we flag the
+    // observation as a candidate range extension and continue. If the
+    // user clicks "Revisar", we abort the submit and let them edit. Any
+    // DB error degrades silently to "no alert".
+    const sciName = (idInput?.value.trim() || currentIdentification?.scientific_name || '');
+    if (sciName && location && Number.isFinite(location.lat) && Number.isFinite(location.lng)) {
+      try {
+        const verdict = await checkOutlier({
+          scientificName: sciName,
+          lat: location.lat,
+          lng: location.lng,
+        });
+        if (verdict.kind === 'outlier') {
+          const distLabel = formatDistanceKm(verdict.distanceKm);
+          const oaTitle = isEsSubmit
+            ? `~${distLabel} km del rango conocido`
+            : `~${distLabel} km from the known range`;
+          const oaMessage = isEsSubmit
+            ? `Este registro está a ~${distLabel} km del rango conocido en GBIF/Rastrum.\n\n¿Es correcto? Puede ser un descubrimiento (extensión de rango), un especímen escapado o cultivado, o una posible mis-identificación.`
+            : `This record is ~${distLabel} km from the known range in GBIF/Rastrum.\n\nIs this correct? It could be a discovery (range extension), an escaped or cultivated specimen, or a possible mis-identification.`;
+          const confirmed = await openConfirmDialog({
+            title: oaTitle,
+            message: oaMessage,
+            confirmLabel: isEsSubmit ? 'Es correcto, lo confirmo' : 'It’s correct, I confirm',
+            cancelLabel:  isEsSubmit ? 'Revisar'                  : 'Review',
+          });
+          if (!confirmed) {
+            // User chose to review — re-enable the form and abort submit.
+            return;
+          }
+          confirmedRangeExtension = true;
+          window.posthog?.capture('outlier_alert_confirmed', {
+            distance_km: verdict.distanceKm,
+            scientific_name: sciName,
+          });
+        }
+      } catch {
+        /* outlier check is best-effort; never block submission */
+      }
     }
 
     submitBtn.disabled = true;

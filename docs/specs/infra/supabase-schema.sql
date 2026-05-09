@@ -9664,3 +9664,118 @@ CREATE INDEX IF NOT EXISTS idx_taxon_traits_lang
 
 COMMENT ON TABLE public.taxon_traits IS
   'Curated field marks per taxon, surfaced in the "Why this species?" panel under AI cascade results (issue #736). One row per (taxon_id, lang). Read-public, expert-write only.';
+-- M22-range — taxon range index (issue #742)
+-- =====================================================================
+-- Polite "outlier alert" at submit time: when the user's location is far
+-- from the known range for the cascaded taxon, surface a soft modal
+-- (NEVER blocks submission). Three outcomes:
+--   • Real range extension → user confirms, obs.is_range_extension=true
+--     and the obs lands on the M22 community-validation queue with
+--     priority.
+--   • Mis-ID / escapee → user reconsiders before submit.
+--   • Reasonable distance (< threshold) → no modal at all.
+--
+-- v1 source = Rastrum's own research-grade observations (the same Option
+-- A choice as falta-dex). v1.1 will replace `source = 'rastrum_proxy'`
+-- rows with a curated GBIF ETL.
+CREATE TABLE IF NOT EXISTS public.taxon_range_index (
+  taxon_id     uuid PRIMARY KEY REFERENCES public.taxa(id) ON DELETE CASCADE,
+  geom         geography(MultiPolygon, 4326) NOT NULL,
+  source       text NOT NULL,            -- 'gbif' | 'rastrum_proxy' | 'curated'
+  built_at     timestamptz NOT NULL DEFAULT now(),
+  n_records    integer NOT NULL DEFAULT 0
+);
+ALTER TABLE public.taxon_range_index ENABLE ROW LEVEL SECURITY;
+
+CREATE INDEX IF NOT EXISTS idx_taxon_range_index_geom
+  ON public.taxon_range_index USING GIST (geom);
+
+DROP POLICY IF EXISTS taxon_range_read ON public.taxon_range_index;
+CREATE POLICY taxon_range_read ON public.taxon_range_index
+  FOR SELECT USING (true);
+
+GRANT SELECT ON public.taxon_range_index TO anon, authenticated;
+GRANT INSERT, UPDATE, DELETE ON public.taxon_range_index TO service_role;
+
+-- Buffered membership check used at submit time. Returns the distance
+-- (km) from the obs location to the nearest edge of the known range,
+-- or NULL if the taxon has no range data yet (caller must treat NULL
+-- as "no signal — don't show modal", not "in range").
+CREATE OR REPLACE FUNCTION public.taxon_range_distance_km(
+  p_taxon_id uuid,
+  p_lat numeric,
+  p_lng numeric
+) RETURNS numeric
+LANGUAGE sql STABLE PARALLEL SAFE AS $$
+  SELECT (ST_Distance(
+            geom,
+            ST_SetSRID(ST_MakePoint(p_lng, p_lat), 4326)::geography
+          ) / 1000)::numeric(10,2)
+    FROM public.taxon_range_index
+   WHERE taxon_id = p_taxon_id;
+$$;
+
+REVOKE ALL ON FUNCTION public.taxon_range_distance_km(uuid, numeric, numeric) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.taxon_range_distance_km(uuid, numeric, numeric)
+  TO anon, authenticated;
+
+-- Range-extension flag on observations. When true, the obs is treated
+-- as a candidate range extension by M22's validation queue and gets a
+-- "Posible extensión de rango" pill on the detail page.
+ALTER TABLE public.observations
+  ADD COLUMN IF NOT EXISTS is_range_extension boolean NOT NULL DEFAULT false;
+
+CREATE INDEX IF NOT EXISTS idx_observations_range_extension
+  ON public.observations(is_range_extension)
+  WHERE is_range_extension = true;
+
+-- ─────────────────────────────────────────────────────────────────────
+-- public.refresh_taxon_ranges() — SECURITY DEFINER cron-only worker
+-- Recomputes the per-taxon range index from Rastrum research-grade
+-- observations in the last 5 years. Threshold: ≥10 obs per taxon.
+-- Geometry: ST_ConvexHull over the union of locations, cast to
+-- MultiPolygon for typed-column compatibility (a single hull always
+-- becomes a 1-element multipolygon). Idempotent on (taxon_id).
+-- ─────────────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.refresh_taxon_ranges()
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_inserted integer := 0;
+BEGIN
+  WITH eligible AS (
+    SELECT
+      o.primary_taxon_id                                            AS taxon_id,
+      ST_Multi(ST_ConvexHull(ST_Collect(o.location::geometry)))::geography(MultiPolygon, 4326) AS geom,
+      COUNT(*)::int                                                 AS n_records
+      FROM public.observations o
+      JOIN public.identifications i
+        ON i.observation_id = o.id
+       AND i.is_primary
+       AND i.is_research_grade
+     WHERE o.primary_taxon_id IS NOT NULL
+       AND o.location IS NOT NULL
+       AND o.observed_at >= now() - interval '5 years'
+     GROUP BY o.primary_taxon_id
+    HAVING COUNT(*) >= 10
+  )
+  INSERT INTO public.taxon_range_index AS tri
+    (taxon_id, geom, source, built_at, n_records)
+  SELECT taxon_id, geom, 'rastrum_proxy', now(), n_records
+    FROM eligible
+       ON CONFLICT (taxon_id) DO UPDATE
+      SET geom      = EXCLUDED.geom,
+          source    = EXCLUDED.source,
+          built_at  = EXCLUDED.built_at,
+          n_records = EXCLUDED.n_records;
+
+  GET DIAGNOSTICS v_inserted = ROW_COUNT;
+  RETURN v_inserted;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.refresh_taxon_ranges() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.refresh_taxon_ranges() TO service_role;
