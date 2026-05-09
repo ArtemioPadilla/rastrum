@@ -975,7 +975,20 @@
   },
   "chat": {
     "title": "Chat",
-    "subtitle": "Asistente de biodiversidad en el dispositivo — funciona totalmente en tu navegador. También puedes adjuntar una foto o un audio.",
+    "subtitle": "Asistente de biodiversidad en el dispositivo — funciona totalmente en tu navegador. Adjunta una foto, audio o cualquier observación/especie/proyecto como contexto.",
+    "ask_rastrum": "Pregunta a Rastrum",
+    "attach_entity_label": "Adjuntar contexto",
+    "attach_entity_search": "Buscar…",
+    "entities": {
+      "observation": "Observaciones",
+      "species": "Especies",
+      "project": "Proyectos",
+      "camera_station": "Estaciones",
+      "observer": "Observadores",
+      "self_profile": "Yo"
+    },
+    "engine_fallback_banner": "Usando un modelo más ligero — Gemma no disponible.",
+    "context_load_error": "No se pudo cargar el contexto — inténtalo cuando estés en línea.",
     "placeholder": "Pregunta lo que quieras sobre especies, hábitats o tus observaciones…",
     "send": "Enviar",
     "sending": "Pensando…",
@@ -1438,7 +1451,9 @@
       "fave_count_aria_one": "{{count}} persona marcó esto como favorito",
       "fave_count_aria_other": "{{count}} personas marcaron esto como favorito",
       "live_added": "Añadido a favoritos",
-      "live_removed": "Quitado de favoritos"
+      "live_removed": "Quitado de favoritos",
+      "fave_add_aria": "Añadir a favoritos",
+      "fave_remove_aria": "Quitar de favoritos"
     },
     "inbox": {
       "title": "Bandeja",
@@ -1486,7 +1501,9 @@
       "report_comment_aria": "Reportar este comentario",
       "block_observer_aria": "Bloquear a este observador",
       "block_commenter_aria": "Bloquear a este comentarista"
-    }
+    },
+    "recents_follow_aria": "Seguir a {{handle}}",
+    "recents_unfollow_aria": "Dejar de seguir a {{handle}}"
   },
   "sponsoring": {
     "page_title": "Patrocinios IA",
@@ -1735,13 +1752,15 @@
       "unsupported": "Este navegador no soporta web push (prueba Chrome en Android o Safari 16.4+ en iOS).",
       "vapid_missing": "El push aún no está configurado — el operador debe publicar primero una llave VAPID."
     },
-    "migration_window": {
-      "title": "Prompt de ventana migratoria",
-      "body_fallback": "Hay una migración notable activa en tu región — este es el momento.",
-      "opt_in_label": "Activar prompt de ventana migratoria",
-      "opt_in_hint": "Una notificación al día durante ventanas migratorias activas en tu región.",
+    "lunar_event": {
+      "title": "Prompt de evento lunar",
+      "body_full": "Luna llena esta noche — coros de anfibios al máximo.",
+      "body_new": "Luna nueva — buena noche para insectos atraídos a luz.",
+      "body_eclipse": "Eclipse lunar visible esta noche.",
+      "opt_in_label": "Activar prompt de evento lunar",
+      "opt_in_hint": "Una notificación al día en lunas llenas, lunas nuevas y eclipses lunares totales.",
       "enabling": "Suscribiendo…",
-      "enabled": "Prompts de ventana migratoria activados.",
+      "enabled": "Prompts de evento lunar activados.",
       "disable": "Desactivar",
       "disabling": "Desactivando…",
       "permission_blocked": "Las notificaciones del navegador están bloqueadas. Actívalas en la configuración del sitio y vuelve a intentar.",
