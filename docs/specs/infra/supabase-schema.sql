@@ -7150,10 +7150,12 @@ ALTER TABLE public.taxa ADD COLUMN IF NOT EXISTS nom059_status text;
 -- hero_observation_id: the observation that provides the hero photo
 -- hero_updated_at: when the hero was last recomputed
 -- slug: URL-safe species identifier (lower, spaces→dashes)
+-- rarity_tier: 1=common, 2=uncommon, 3=rare, 4=very rare (used by daily challenge)
 ALTER TABLE public.taxa ADD COLUMN IF NOT EXISTS hero_media_id uuid REFERENCES public.media_files(id) ON DELETE SET NULL;
 ALTER TABLE public.taxa ADD COLUMN IF NOT EXISTS hero_observation_id uuid REFERENCES public.observations(id) ON DELETE SET NULL;
 ALTER TABLE public.taxa ADD COLUMN IF NOT EXISTS hero_updated_at timestamptz;
 ALTER TABLE public.taxa ADD COLUMN IF NOT EXISTS slug text;
+ALTER TABLE public.taxa ADD COLUMN IF NOT EXISTS rarity_tier int CHECK (rarity_tier BETWEEN 1 AND 4);
 
 -- Back-fill slugs for existing taxa (idempotent)
 UPDATE public.taxa
@@ -10795,8 +10797,7 @@ BEGIN
       ELSE COALESCE(t.common_name_es, t.scientific_name) || ' — especie regional'
     END AS why
   FROM public.taxa t
-  WHERE t.rarity_tier IS NOT NULL
-    AND t.rarity_tier <= 3
+  WHERE (t.rarity_tier IS NULL OR t.rarity_tier <= 3)  -- NULL = unclassified, treat as common
     AND (
       v_country_code IS NULL
       OR EXISTS (
