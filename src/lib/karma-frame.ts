@@ -10,6 +10,8 @@ export interface KarmaTier {
   id: KarmaTierId;
   min: number;
   ringClass: string;
+  /** Ring class without animation — used for `size='sm'` compact/list contexts. */
+  staticRingClass?: string;
   glow?: boolean;
 }
 
@@ -33,18 +35,21 @@ const TIERS: readonly KarmaTier[] = [
     id: 'expert',
     min: 1000,
     ringClass: 'ring-2 ring-sky-500 motion-safe:animate-pulse',
+    staticRingClass: 'ring-2 ring-sky-500',
     glow: true,
   },
   {
     id: 'master',
     min: 5000,
     ringClass: 'ring-4 ring-yellow-400 shadow-[0_0_12px_rgba(250,204,21,0.6)] motion-safe:animate-pulse',
+    staticRingClass: 'ring-4 ring-yellow-400 shadow-[0_0_12px_rgba(250,204,21,0.6)]',
     glow: true,
   },
   {
     id: 'legend',
     min: 10000,
     ringClass: 'ring-4 ring-fuchsia-500 shadow-[0_0_16px_rgba(217,70,239,0.7)] motion-safe:animate-rastrum-legend-spin',
+    staticRingClass: 'ring-4 ring-fuchsia-500 shadow-[0_0_16px_rgba(217,70,239,0.7)]',
     glow: true,
   },
 ];

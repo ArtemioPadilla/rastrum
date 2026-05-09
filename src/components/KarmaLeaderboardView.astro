@@ -238,6 +238,7 @@ const stringsJson = JSON.stringify({
 
 <script>
   import { getSupabase } from '../lib/supabase';
+  import { tierForKarma } from '../lib/karma-frame';
   import {
     viewFromSearch,
     searchForView,
@@ -382,8 +383,10 @@ const stringsJson = JSON.stringify({
       ? ['🥇', '🥈', '🥉'][rank - 1]
       : String(rank);
 
+    const avatarKarmaTier = tierForKarma(row.karma ?? 0);
+    const avatarRing = avatarKarmaTier.staticRingClass ?? avatarKarmaTier.ringClass;
     const avatarCell = row.avatar_url
-      ? `<img src="${escapeHtml(row.avatar_url)}" alt="" loading="lazy" class="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 object-cover flex-none">`
+      ? `<span class="inline-block rounded-full ring-offset-1 ring-offset-white dark:ring-offset-zinc-900 ${escapeHtml(avatarRing)}"><img src="${escapeHtml(row.avatar_url)}" alt="" loading="lazy" class="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 object-cover flex-none block"></span>`
       : `<div class="w-8 h-8 rounded-full bg-emerald-700 text-white flex items-center justify-center font-semibold text-xs flex-none">${escapeHtml(displayName.slice(0, 1).toUpperCase())}</div>`;
 
     const scoreCell = mode === 'experts'

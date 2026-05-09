@@ -96,7 +96,15 @@ const sponsoringI18n = {
 
   <article data-pp-profile class="hidden">
     <header class="flex items-start gap-4 md:gap-6 mb-6">
-      <img data-pp-avatar src="" alt="" class="w-20 h-20 md:w-24 md:h-24 rounded-full bg-zinc-200 dark:bg-zinc-800 object-cover shrink-0" />
+      <span
+        data-pp-avatar-frame
+        class="inline-block rounded-full ring-offset-2 ring-offset-white dark:ring-offset-zinc-900 shrink-0"
+        data-karma-frame
+        data-karma-tier="seedling"
+        data-karma-glow="0"
+      >
+        <img data-pp-avatar src="" alt="" class="w-20 h-20 md:w-24 md:h-24 rounded-full bg-zinc-200 dark:bg-zinc-800 object-cover" />
+      </span>
       <div class="min-w-0 flex-1">
         <h1 data-pp-name class="text-2xl md:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 truncate">—</h1>
         <p class="text-sm text-zinc-500 mt-0.5">
@@ -230,6 +238,7 @@ const sponsoringI18n = {
   import { getSupabase } from '../lib/supabase';
   import { wireOverflowMenu } from '../lib/overflow-menu';
   import { openConfirmDialog } from '../lib/confirm-dialog';
+  import { tierForKarma } from '../lib/karma-frame';
 
   type Lang = 'en' | 'es';
 
@@ -408,6 +417,17 @@ const sponsoringI18n = {
     if (avatarEl) {
       avatarEl.src = profile.avatar_url || initialsAvatar(name);
       avatarEl.alt = name;
+    }
+    // Apply KarmaFrame ring to the avatar wrapper (size='lg' → full animation)
+    const avatarFrame = root.querySelector<HTMLElement>('[data-pp-avatar-frame]');
+    if (avatarFrame) {
+      const tier = tierForKarma(profile.karma_total ?? 0);
+      avatarFrame.className = [
+        'inline-block rounded-full ring-offset-2 ring-offset-white dark:ring-offset-zinc-900 shrink-0',
+        tier.ringClass,
+      ].join(' ');
+      avatarFrame.dataset.karmaTier = tier.id;
+      avatarFrame.dataset.karmaGlow = tier.glow ? '1' : '0';
     }
 
     if (showLocation && profile.region_primary) {
