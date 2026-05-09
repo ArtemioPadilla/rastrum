@@ -263,6 +263,23 @@ jobs:
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/sql/rls.sql
 
+      - name: Schema security invariants
+        # Three load-bearing rules enforced post-apply:
+        #   1. Every public-schema view is security_invoker (no SECURITY
+        #      DEFINER views — they bypass RLS at the view-owner's perms).
+        #   2. No user-defined SECURITY DEFINER function in public is
+        #      executable by PUBLIC (the implicit role that includes anon).
+        #      Explicit anon/authenticated grants are fine.
+        #   3. Every plpgsql / plpgsql-equivalent function in public has
+        #      its search_path pinned (defends against malicious schemas
+        #      ahead of public in the resolution path).
+        # Any violation fails the PR. See docs/specs/infra/supabase-schema.sql
+        # "Security Advisor remediation" section + CLAUDE.md "Schema security
+        # invariants" subsection for the rationale.
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f infra/lint-schema-security.sql
+
       - name: Summary
         run: |
-          echo "::notice::db-validate passed — schema applies cleanly, is idempotent (2× apply pass), all sentinels exist, every public table has RLS enabled, and the RLS regression suite passed (35 assertions)."
+          echo "::notice::db-validate passed — schema applies cleanly, is idempotent (2× apply pass), all sentinels exist, every public table has RLS enabled, the RLS regression suite passed (35 assertions), and all security invariants hold."

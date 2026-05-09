@@ -207,6 +207,39 @@ const item = map[key];
   to coarsen public coordinates; precise coords only readable by the
   observer or a credentialed researcher.
 
+### Schema security invariants
+
+Three rules are enforced in `db-validate.yml` via
+[`infra/lint-schema-security.sql`](infra/lint-schema-security.sql) and will
+fail any PR that breaks them:
+
+1. **Every view in `public` is `security_invoker = true`.** Postgres 15+
+   defaults views to "definer" semantics, which bypass RLS at the view
+   owner's perms. The Supabase advisor flags any view without this option
+   as critical. Add `WITH (security_invoker = true)` at create time, or use
+   `ALTER VIEW … SET (security_invoker = true)` to flip an existing view.
+2. **No SECURITY DEFINER function in `public` is callable by `PUBLIC`.**
+   Postgres' default ACL grants EXECUTE on new functions to PUBLIC (the
+   implicit role that includes `anon`). Every definer function ships with
+   an explicit `REVOKE EXECUTE … FROM PUBLIC` followed by a grant to the
+   minimal role that needs it (typically `authenticated` or `service_role`).
+   Extension-provided functions are exempt (the linter skips them).
+3. **Every `pl*` function in `public` pins its `search_path`.** Defends
+   against an attacker who can create objects in another schema earlier
+   in the resolution path. Use
+   `SET search_path = public, extensions, pg_temp` in the function
+   declaration. The end-of-file remediation block in
+   `supabase-schema.sql` ALTERs any function whose `proconfig` is missing
+   this entry, so adding a new function without the clause will still
+   pass — but explicit is better than implicit. `LANGUAGE sql` functions
+   are exempt because they bind references at definition time.
+
+`pg_trgm` lives in the `extensions` schema (post-2026-05-08); `pg_net`
+keeps its self-managed `net` schema; `postgis` stays in `public` because
+moving it post-install requires rewriting every geometry/geography
+column reference. The advisor's "Extension in Public" warning for
+`postgis` is accepted with that rationale.
+
 ### Module spec convention
 - Implementation specs live at `docs/specs/modules/NN-*.md`, numbered
   sequentially. **The module spec wins** when it disagrees with

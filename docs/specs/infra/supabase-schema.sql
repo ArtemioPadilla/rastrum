@@ -9531,3 +9531,158 @@ SELECT cron.unschedule('refresh-norms-weekly')
 SELECT cron.schedule('refresh-norms-weekly', '0 6 * * 1',
   $$REFRESH MATERIALIZED VIEW public.license_norm;
     REFRESH MATERIALIZED VIEW public.privacy_norm;$$);
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- Security Advisor remediation — 2026-05-08
+-- ═══════════════════════════════════════════════════════════════════════════
+-- Closes the critical + warning findings from the Supabase Database Advisor:
+--
+--   1. SECURITY DEFINER views (17) — flipped to security_invoker so RLS on
+--      underlying tables is honoured at the caller's perspective. The views'
+--      existing privacy gates (`can_see_facet()`, `hide_from_leaderboards`)
+--      keep doing their job; flipping just adds RLS as a second line of
+--      defence and stops the underlying-table-bypass class.
+--   2. PUBLIC role EXECUTE on user-defined SECURITY DEFINER functions —
+--      revoked surgically (definer-only, not all functions, so PostGIS /
+--      pgcrypto / etc. stay PUBLIC-callable). The blanket grant to
+--      `authenticated` upstream stays untouched. Net effect: every
+--      definer function now requires an explicit role grant — anon can't
+--      escalate via the "PUBLIC default ACL" path.
+--   3. Function search_path — every public-schema function gets
+--      `search_path = public, extensions, pg_temp` so opclasses /
+--      operators from extensions resolve cleanly and a malicious schema
+--      ahead of public can't shadow built-ins.
+--   4. pg_trgm extension moved out of `public` into `extensions` schema.
+--      pg_net keeps its own `net` schema (extension home is cosmetic).
+--      PostGIS stays in public — moving post-install is high-risk for
+--      negligible payoff.
+--
+-- Storage `media` bucket listing restriction is deliberately deferred to a
+-- follow-up because R2 is the primary path; verifying Supabase Storage's
+-- public-read flow under tightened RLS warrants its own dedicated PR.
+-- Track at https://github.com/ArtemioPadilla/rastrum/issues (TBD).
+--
+-- Auth → Leaked Password Protection is a Dashboard toggle (no SQL).
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- 1. Flip 17 views to security_invoker = true
+-- ─────────────────────────────────────────────────────────────────────────
+-- ALTER VIEW … SET (security_invoker = true) is PG15+. Idempotent — replays
+-- of make db-apply are no-ops once the option is set.
+ALTER VIEW public.community_observers                SET (security_invoker = true);
+ALTER VIEW public.community_observers_with_centroid  SET (security_invoker = true);
+ALTER VIEW public.featured_species_current           SET (security_invoker = true);
+ALTER VIEW public.moderator_trust_scores             SET (security_invoker = true);
+ALTER VIEW public.profile_activity_feed              SET (security_invoker = true);
+ALTER VIEW public.profile_badges_visible             SET (security_invoker = true);
+ALTER VIEW public.profile_calendar_buckets           SET (security_invoker = true);
+ALTER VIEW public.profile_karma                      SET (security_invoker = true);
+ALTER VIEW public.profile_observation_pins           SET (security_invoker = true);
+ALTER VIEW public.profile_pokedex                    SET (security_invoker = true);
+ALTER VIEW public.profile_stats_counts               SET (security_invoker = true);
+ALTER VIEW public.profile_taxonomic_donut            SET (security_invoker = true);
+ALTER VIEW public.profile_top_species                SET (security_invoker = true);
+ALTER VIEW public.profile_validation_reputation      SET (security_invoker = true);
+ALTER VIEW public.taxa_thumbnails                    SET (security_invoker = true);
+ALTER VIEW public.user_expertise_regional            SET (security_invoker = true);
+ALTER VIEW public.validation_queue                   SET (security_invoker = true);
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- 2. Revoke EXECUTE from PUBLIC on user-defined SECURITY DEFINER functions
+-- ─────────────────────────────────────────────────────────────────────────
+-- Postgres' default ACL grants EXECUTE on new functions to PUBLIC, which is
+-- why ~50 trigger / internal helpers showed up as "Public Can Execute
+-- SECURITY DEFINER Function" in the advisor. The blanket grant to
+-- `authenticated` upstream (line ~563) is unaffected — `authenticated` is a
+-- distinct role from PUBLIC.
+--
+-- Surgical: we only revoke from SECURITY DEFINER functions, not all
+-- functions. PostGIS, pgcrypto, and other extension-provided functions
+-- live in `public` and are PUBLIC-callable by design — sweeping them up
+-- in a blanket REVOKE would break anon's ability to read views that call
+-- `ST_AsGeoJSON`, `gen_random_uuid`, etc. through PostgREST.
+DO $$
+DECLARE
+  r record;
+BEGIN
+  FOR r IN
+    SELECT p.proname,
+           pg_get_function_identity_arguments(p.oid) AS args
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public' AND p.prosecdef = true
+  LOOP
+    EXECUTE format(
+      'REVOKE EXECUTE ON FUNCTION public.%I(%s) FROM PUBLIC',
+      r.proname, r.args
+    );
+  END LOOP;
+END
+$$;
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- 3. Move pg_trgm to the extensions schema
+-- ─────────────────────────────────────────────────────────────────────────
+-- pg_net intentionally untouched: its functions live in a self-managed
+-- `net` schema regardless of where the extension is installed, so the
+-- advisor "Extension in Public" warning for pg_net is cosmetic and moving
+-- it adds no security value while risking noise in net._http_response
+-- joins. PostGIS likewise stays in public (post-install moves are
+-- industry-known anti-patterns; the geometry/geography column-type
+-- references would all need rewriting).
+CREATE SCHEMA IF NOT EXISTS extensions;
+GRANT USAGE ON SCHEMA extensions TO anon, authenticated, service_role;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM pg_extension e
+    JOIN pg_namespace n ON n.oid = e.extnamespace
+    WHERE e.extname = 'pg_trgm' AND n.nspname = 'public'
+  ) THEN
+    EXECUTE 'ALTER EXTENSION pg_trgm SET SCHEMA extensions';
+  END IF;
+END
+$$;
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- 4. Pin search_path on every public function that doesn't already have one
+-- ─────────────────────────────────────────────────────────────────────────
+-- Includes `extensions` so pg_trgm's `similarity()`, `%` operator, and the
+-- gin_trgm_ops opclass keep resolving from inside function bodies after
+-- the schema move above. Idempotent — only ALTERs functions whose
+-- proconfig doesn't already include a search_path entry.
+DO $$
+DECLARE
+  r record;
+BEGIN
+  FOR r IN
+    SELECT n.nspname,
+           p.proname,
+           pg_get_function_identity_arguments(p.oid) AS args
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+      AND p.prokind IN ('f', 'p')  -- regular functions + procedures (not aggregates)
+      AND NOT EXISTS (
+        SELECT 1
+        FROM unnest(COALESCE(p.proconfig, ARRAY[]::text[])) AS c
+        WHERE c LIKE 'search_path=%'
+      )
+  LOOP
+    EXECUTE format(
+      'ALTER FUNCTION public.%I(%s) SET search_path = public, extensions, pg_temp',
+      r.proname, r.args
+    );
+  END LOOP;
+END
+$$;
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- 5. Reassert the authenticated-role blanket grant
+-- ─────────────────────────────────────────────────────────────────────────
+-- The REVOKE FROM PUBLIC above doesn't touch `authenticated`'s grants,
+-- but reapplying the blanket grant here is defensive: any function added
+-- between the line ~563 grant and this remediation block (e.g., via a
+-- `CREATE OR REPLACE FUNCTION` declared above) gets re-granted explicitly.
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO authenticated;
