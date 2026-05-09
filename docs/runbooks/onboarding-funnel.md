@@ -42,8 +42,10 @@ and guide retention interventions. Implemented in #878.
 
 1. `onboarding:signed_up`
 2. `onboarding:first_observation`
+   > **Note:** only counts observations with `sync_status='synced'`. Local drafts that haven't been uploaded to the server are excluded.
 3. `onboarding:first_id_accepted`
 4. `onboarding:first_follow`
+   > **Note:** counts all follows regardless of `status` (pending or accepted). The funnel measures user engagement (follow was attempted), not whether the connection was accepted by the other user.
 5. `onboarding:7d_return`
 6. `onboarding:30d_return`
 

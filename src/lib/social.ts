@@ -282,6 +282,8 @@ export async function followUser(targetUserId: string, tier: FollowTier = 'follo
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+      // All follows (including pending) are counted here: the funnel measures
+      // engagement (follow was attempted), not whether the connection was accepted.
       const { count } = await supabase
         .from('follows')
         .select('*', { count: 'exact', head: true })
