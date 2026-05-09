@@ -45,7 +45,7 @@ test.describe('navigation', () => {
     const observeLink = page.locator('a[href="/en/observe/"]').first();
     await observeLink.click();
     await expect(page).toHaveURL(/\/en\/observe\/?$/);
-    await expect(page.locator('h1')).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: /log observation/i })).toBeVisible();
   });
 
   test('language switcher swaps locale', async ({ page }) => {
