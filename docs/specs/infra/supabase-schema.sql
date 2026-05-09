@@ -9915,11 +9915,13 @@ AS $$
       o.id, o.observer_id, o.observed_at,
       o.primary_taxon_id, o.obscure_level,
       o.location, o.location_obscured,
-      o.region_primary, o.is_research_grade, o.notes,
+      o.state_province, o.notes,
+      COALESCE(i.is_research_grade, false) AS is_research_grade,
       t.scientific_name, t.common_name_es, t.common_name_en,
       t.kingdom, t.family
     FROM public.observations o
     LEFT JOIN public.taxa t ON t.id = o.primary_taxon_id
+    LEFT JOIN public.identifications i ON i.observation_id = o.id AND i.is_primary = true
     WHERE o.id = p_id
   )
   SELECT CASE WHEN o.id IS NULL THEN NULL ELSE jsonb_build_object(
@@ -9927,12 +9929,12 @@ AS $$
     'id',            o.id::text,
     'label',         coalesce(o.scientific_name, '—')
                      || ' · ' || to_char(o.observed_at, 'Mon DD')
-                     || coalesce(' · ' || o.region_primary, ''),
+                     || coalesce(' · ' || o.state_province, ''),
     'summary_text',
       'Observation of ' || coalesce(o.scientific_name, 'unknown taxon')
       || coalesce(' (' || o.common_name_en || ')', '')
       || ' on ' || to_char(o.observed_at, 'YYYY-MM-DD')
-      || coalesce(' in ' || o.region_primary, '')
+      || coalesce(' in ' || o.state_province, '')
       || CASE WHEN o.is_research_grade THEN '. Research grade.' ELSE '. Needs review.' END
       || coalesce(' Observer notes: ' || left(o.notes, 240), ''),
     'fields',        jsonb_build_object(
@@ -9942,7 +9944,7 @@ AS $$
       'kingdom',         o.kingdom,
       'family',          o.family,
       'observed_at',     o.observed_at,
-      'region_primary',  o.region_primary,
+      'state_province',  o.state_province,
       'is_research_grade', o.is_research_grade,
       'obscure_level',   o.obscure_level,
       'lat', CASE WHEN auth.uid() = o.observer_id
@@ -10294,17 +10296,18 @@ BEGIN
         'scientific_name',   t.scientific_name,
         'common_name_en',    t.common_name_en,
         'observed_at',       o.observed_at,
-        'region_primary',    o.region_primary,
-        'is_research_grade', o.is_research_grade
+        'state_province',    o.state_province,
+        'is_research_grade', COALESCE(i.is_research_grade, false)
       ) AS row_card
       FROM public.observations o
       LEFT JOIN public.taxa t ON t.id = o.primary_taxon_id
+      LEFT JOIN public.identifications i ON i.observation_id = o.id AND i.is_primary = true
       LEFT JOIN public.observations near ON near.id = v_near_obs
       WHERE (NOT v_owner_self    OR o.observer_id = auth.uid())
         AND (v_taxon_id    IS NULL OR o.primary_taxon_id = v_taxon_id)
         AND (v_project_id  IS NULL OR o.project_id      = v_project_id)
         AND (v_near_obs    IS NULL OR ST_DWithin(o.location, near.location, v_radius_km * 1000))
-        AND (NOT v_research_only OR o.is_research_grade = true)
+        AND (NOT v_research_only OR COALESCE(i.is_research_grade, false) = true)
       ORDER BY o.observed_at DESC
       LIMIT greatest(1, least(p_limit, 50))
     ) sub
