@@ -3,8 +3,8 @@
 > Briefing for AI coding agents (Claude Code, Copilot, Cursor, Codex, …)
 > working in this repo. Read this before making changes.
 >
-> **Last full doc sync:** 2026-05-08 (v1.1.5 Persuasive Tech Audit — Tier S +
-> Tier A merged, Ola 2b in flight; see `docs/progress.json` v1.1.5 phase).
+> **Last full doc sync:** 2026-05-08 (v1.1.5 Persuasive Tech Audit + schema
+> security invariants — see "Schema security invariants" section below).
 > Prior sync: 2026-05-01 (v1.2 + 42 field-bug/admin/docs PRs).
 
 ---
