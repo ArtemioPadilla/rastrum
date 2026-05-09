@@ -1,6 +1,7 @@
 ---
 import { t } from '../i18n/utils';
 import MapPicker from './MapPicker.astro';
+import WhyThisSpecies from './WhyThisSpecies.astro';
 import {
   HABITATS,
   WEATHERS,
@@ -363,6 +364,9 @@ const praiseLongLens         = praiseStrings.long_lens         ?? (isEs ? 'Detal
             <ul id="id-alternates-list" class="space-y-1 text-sm"></ul>
           </div>
         </div>
+
+        <!-- "Why this species?" — issue #736 — curated field marks + reference photos -->
+        <WhyThisSpecies lang={lang} />
 
         <!-- Save-as-observation inline link (only meaningful in identify-only mode after success) -->
         <div id="id-save-inline" class="hidden mt-3 pt-3 border-t border-zinc-200 dark:border-zinc-800">
@@ -937,9 +941,19 @@ const praiseLongLens         = praiseStrings.long_lens         ?? (isEs ? 'Detal
     currentIdentification = null;
     if (idInput) idInput.value = '';
     hideAllIdStates();
+    const wts = document.getElementById('why-this-species');
+    wts?.classList.add('hidden');
     if (activeAbort) { activeAbort.abort(); activeAbort = null; }
   }
   idClear?.addEventListener('click', clearIdResult);
+
+  // Wire the "Report incorrect" button on the why-this-species panel
+  // to the existing re-run-cascade flow. Pre-save we have no
+  // identification id, so M22 wrong_id reports happen post-save via
+  // the standard ReportDialog on /share/obs/.
+  window.addEventListener('rastrum:why-this-species-report', () => {
+    document.getElementById('id-again-btn')?.click();
+  });
 
   // Toggle the source-info popover. Native popover API is preferred but
   // we render a region in-card on browsers without it for robustness.
@@ -1097,6 +1111,16 @@ const praiseLongLens         = praiseStrings.long_lens         ?? (isEs ? 'Detal
       idSaveInline?.classList.remove('hidden');
     } else {
       idSaveInline?.classList.add('hidden');
+    }
+
+    // "Why this species?" panel (issue #736). Reveal the toggle and feed
+    // it the cascade source + scientific name so it can resolve traits +
+    // reference photos when the user opens it.
+    const wts = document.getElementById('why-this-species');
+    if (wts) {
+      wts.dataset.source = r.source;
+      wts.dataset.scientificName = r.scientific_name;
+      wts.classList.remove('hidden');
     }
   }
 
