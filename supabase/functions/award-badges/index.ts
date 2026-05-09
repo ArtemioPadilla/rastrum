@@ -24,6 +24,9 @@
  *   - governance_completion     — stub: requires a "courses" table (later)
  *   - helpful_comments
  *   - follower_count
+ *   - streak                    — #701: user_streaks.current_days >= min_days
+ *   - state_diversity           — #701: distinct state_province count >= min_states
+ *   - midnight_observation      — #701: any obs between 00:00 and 04:59 UTC (easter egg)
  */
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
@@ -61,6 +64,20 @@ async function eligibleUserIds(db: SupabaseClient, badge: Badge): Promise<string
     case 'kingdom_diversity': {
       const m = r.min_per_kingdom as number;
       const { data } = await db.rpc('badge_eligible_kingdom_diversity', { p_min: m }) as { data: string[] | null };
+      return data ?? [];
+    }
+    case 'streak': {
+      const m = r.min_days as number;
+      const { data } = await db.rpc('badge_eligible_streak', { p_min: m }) as { data: string[] | null };
+      return data ?? [];
+    }
+    case 'state_diversity': {
+      const m = r.min_states as number;
+      const { data } = await db.rpc('badge_eligible_state_diversity', { p_min: m }) as { data: string[] | null };
+      return data ?? [];
+    }
+    case 'midnight_observation': {
+      const { data } = await db.rpc('badge_eligible_midnight_observation', { p_user_id: null }) as { data: string[] | null };
       return data ?? [];
     }
     // The remaining predicate types are stubbed — they'll come online with the

@@ -1079,6 +1079,70 @@ GRANT EXECUTE ON FUNCTION public.badge_eligible_species_count(integer)         T
 GRANT EXECUTE ON FUNCTION public.badge_eligible_kingdom_diversity(integer)     TO service_role;
 GRANT EXECUTE ON FUNCTION public.recompute_streak(uuid)                        TO service_role;
 
+-- ─────────────────────────────────────────────────────────────────────
+-- Streak / diversity / easter-egg predicates (#701)
+-- ─────────────────────────────────────────────────────────────────────
+-- All return SETOF uuid — list of users currently eligible. The award-badges
+-- Edge Function diffs against user_badges and inserts new rows.
+CREATE OR REPLACE FUNCTION public.badge_eligible_streak(p_min integer)
+RETURNS SETOF uuid
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public, extensions, pg_temp
+AS $$
+BEGIN
+  RETURN QUERY
+    SELECT s.user_id
+      FROM public.user_streaks s
+     WHERE s.current_days >= p_min;
+END
+$$;
+
+CREATE OR REPLACE FUNCTION public.badge_eligible_state_diversity(p_min integer)
+RETURNS SETOF uuid
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public, extensions, pg_temp
+AS $$
+BEGIN
+  RETURN QUERY
+    SELECT o.observer_id
+      FROM public.observations o
+     WHERE o.sync_status = 'synced'
+       AND o.state_province IS NOT NULL
+       AND length(btrim(o.state_province)) > 0
+     GROUP BY o.observer_id
+    HAVING count(DISTINCT btrim(o.state_province)) >= p_min;
+END
+$$;
+
+CREATE OR REPLACE FUNCTION public.badge_eligible_midnight_observation(p_user_id uuid DEFAULT NULL)
+RETURNS SETOF uuid
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public, extensions, pg_temp
+AS $$
+BEGIN
+  RETURN QUERY
+    SELECT DISTINCT o.observer_id
+      FROM public.observations o
+     WHERE o.sync_status = 'synced'
+       AND EXTRACT(HOUR FROM o.observed_at AT TIME ZONE 'UTC') BETWEEN 0 AND 4
+       AND (p_user_id IS NULL OR o.observer_id = p_user_id);
+END
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.badge_eligible_streak(integer)               FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.badge_eligible_state_diversity(integer)      FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.badge_eligible_midnight_observation(uuid)    FROM PUBLIC;
+
+GRANT EXECUTE ON FUNCTION public.badge_eligible_streak(integer)                TO service_role;
+GRANT EXECUTE ON FUNCTION public.badge_eligible_state_diversity(integer)       TO service_role;
+GRANT EXECUTE ON FUNCTION public.badge_eligible_midnight_observation(uuid)     TO service_role;
+
 -- ============================================================
 -- EXPERT-WEIGHTED CONSENSUS (v0.5/v1.0 — module 08)
 -- ============================================================
