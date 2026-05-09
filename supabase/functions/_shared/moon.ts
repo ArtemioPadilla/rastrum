@@ -82,7 +82,7 @@ export function isLunarEventToday(now: Date, tz: string): LunarEventKind {
   // Compute local midnight bounds for "today" in the user's timezone.
   const localDateStr = now.toLocaleDateString('en-CA', { timeZone: tz }); // YYYY-MM-DD
   const localMidnight = new Date(localDateStr + 'T00:00:00Z');
-  // Use a 12-h window centred on local noon as the "today" bracket.
+  // Use the window [medianoche local - 12h, medianoche local + 36h] as the "today" bracket.
   const from = new Date(localMidnight.getTime() - 12 * 3600_000);
   const to   = new Date(localMidnight.getTime() + 36 * 3600_000);
 
