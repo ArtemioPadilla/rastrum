@@ -120,7 +120,9 @@ const pwa = (tr as unknown as { pwa: Record<string, string> }).pwa;
   };
 
   const root = document.getElementById('install-discovery-hint') as HTMLElement | null;
-  if (root) {
+  const isTauri = typeof window !== 'undefined'
+    && (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ !== undefined;
+  if (root && !isTauri) {
     const VISIT_KEY = root.dataset.visitKey ?? 'rastrum.visitCount';
     const DISMISSED_KEY = root.dataset.dismissedKey ?? 'rastrum.installHintDismissed';
     const cta = document.getElementById('install-hint-cta') as HTMLButtonElement | null;

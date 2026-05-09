@@ -82,4 +82,5 @@ high-level system view.
 | [`rotate-secret.md`](rotate-secret.md) | Secret rotation playbook — Supabase, R2, sponsor pool credentials. |
 | [`post-launch-improvements.md`](post-launch-improvements.md) | Post-launch backlog of operational hardening items. |
 | [`stripe-pro-tier.md`](stripe-pro-tier.md) | (Future) Stripe pro tier — design notes, deferred to v2.0. |
+| [`tauri-android.md`](tauri-android.md) | Tauri v2 Android wrapper — local toolchain prereqs, dev/build workflow, signing keystore, Play Store internal-track upload. |
 | [`ux-backlog.md`](ux-backlog.md) | Per-item rationale for v1.1 UX polish items. |

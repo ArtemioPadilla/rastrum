@@ -28,3 +28,12 @@ infra/megadetector/.wrangler/
 infra/megadetector/*.pt
 infra/megadetector/*.onnx
 infra/megadetector/*.onnx.data
+
+# Tauri Android wrapper — Rust build artefacts + tauri-generated
+# per-platform source. Cargo.lock IS committed (binary crate
+# convention) so CI builds are deterministic; do not add it here.
+src-tauri/target/
+src-tauri/gen/
+src-tauri/icons/*.png
+src-tauri/icons/*.icns
+src-tauri/icons/*.ico

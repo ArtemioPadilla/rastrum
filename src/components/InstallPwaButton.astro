@@ -105,7 +105,10 @@ const tr = t(lang);
     return false;
   }
 
-  if (!isStandaloneDisplayMode()) {
+  const isTauri = typeof window !== 'undefined'
+    && (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ !== undefined;
+
+  if (!isTauri && !isStandaloneDisplayMode()) {
     if (isIOS()) {
       // Show the iOS Add-to-Home-Screen tooltip once per install (until dismissed).
       const dismissed = localStorage.getItem(IOS_HINT_DISMISSED_KEY) === 'true';
