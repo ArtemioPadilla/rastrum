@@ -17,7 +17,7 @@ Three gaps the user has surfaced:
 The brainstorm settled five upstream questions:
 
 - **Entry points** — both deep-link from entity surfaces AND in-chat picker.
-- **Entity scope** — observations, species, projects, camera stations, observers, locations, self-profile (one `EntitySpec` interface, six built-ins, generic registry).
+- **Entity scope** — observations, species, projects, camera stations, observers, self-profile (one `EntitySpec` interface, six built-ins, generic registry). `location` is deferred to v1.1 because the `public.locations` table from the 2026-05-03 locations-first-class spec is not yet implemented.
 - **Behaviors** — Q&A, cross-entity follow-ups, drafting, Rastrum-guru help. **Read-only.**
 - **Writes deferred** — guided actions ("apply this fix") become a separate v1.1 spec. Privileged writes need their own action contract, confirmation flow, RLS verification, and audit log.
 - **Architecture** — entity card on attach + typed JSON tool calls for follow-ups (not eager system-prompt stuffing, not local RAG).
@@ -94,7 +94,7 @@ Writes are explicitly out of scope. Multi-round tool calling is explicitly out o
 
 - **`src/lib/chat-entities/types.ts`** — `EntityKind`, `EntityCard`, `EntitySpec` interfaces.
 - **`src/lib/chat-entities/registry.ts`** — singleton registry with collision detection (mirrors `identifiers/registry.ts`).
-- **`src/lib/chat-entities/{observation,species,project,camera-station,observer,location,self-profile}.ts`** — one file per built-in. Each exports an `EntitySpec` that knows how to fetch its card and which tools are most useful for its kind.
+- **`src/lib/chat-entities/{observation,species,project,camera-station,observer,self-profile}.ts`** — one file per built-in. Each exports an `EntitySpec` that knows how to fetch its card and which tools are most useful for its kind.
 - **`src/lib/chat-entities/index.ts`** — `bootstrapChatEntities()` — single call from ChatView mount.
 - **`src/lib/chat-tools.ts`** — tool registry + dispatcher. `runTool({name, args})` returns `{ok, data} | {error}`. Each tool has a hand-rolled `validateArgs(args)` and a `run(args)`. Five tools at v1: `find_observations`, `find_species`, `find_projects`, `find_camera_stations`, `find_observers`. (Karma and self-profile data ride inside the `self_profile` entity card; no separate tool needed.)
 - **`src/lib/chat-engine.ts`** — model dispatch. `getActiveEngine(): 'gemma'|'llama'`, `streamChat(messages, tools)`. Wraps `loadGemmaTextEngine()` + `loadTextEngine()`. Owns the tool-call loop (parse JSON, dispatch tool, append result, re-prompt — 1 round cap).
@@ -185,7 +185,7 @@ Stable contract — every entity kind serializes to the same shape:
 ```ts
 interface EntityCard {
   kind: 'observation' | 'species' | 'project' | 'camera_station'
-       | 'observer' | 'location' | 'self_profile';
+       | 'observer' | 'self_profile';
   id: string;                  // uuid for db rows; slug for species/projects
   label: string;               // 1-line display ("Setophaga magnolia · May 8 · CDMX")
   thumbnail?: string;          // optional 64×64 R2 URL
@@ -225,7 +225,7 @@ interface EntityCard {
 
 ## Privacy invariants (load-bearing)
 
-1. **Observation cards respect `obscure_level`.** `chat_obs_card` reads from `obs_public_read` (which already enforces this), not raw `observations`. For sensitive species, precise coords are returned only when the requester is the observer; everyone else receives the obscured centroid. Implemented as `CASE WHEN auth.uid() = observer_user_id THEN <precise> ELSE <obscured> END` in the RPC.
+1. **Observation cards respect `obscure_level`.** `chat_obs_card` queries `public.observations` (the existing `obs_public_read` RLS policy already gates row-level visibility). The function returns `location` only when the requester is the observer; everyone else receives `location_obscured`. Implemented as `CASE WHEN auth.uid() = observer_user_id THEN location ELSE location_obscured END` in the RPC.
 2. **Observer cards are public-fields only.** `chat_observer_card` joins `community_observers` (the public view) — no email, no centroid, no private profile fields. Self-profile is a separate `kind = self_profile` that pulls private fields gated by `auth.uid() = id`.
 3. **Tool args are validated, not interpolated.** Chat tools never construct SQL — they pass typed args to RPCs. Prevents prompt-injection-as-SQL-injection from a hostile entity card.
 4. **Chat content stays on-device.** Already true. Adding entity attachments doesn't change that — the entity *card* travels through Supabase, but the conversation transcript still lives only in Dexie.
@@ -278,9 +278,9 @@ Piggybacks the existing onboarding-event bus pattern — no new analytics dep:
 - `tests/unit/chat-composer.test.ts` — chip render/remove; suggested-question seeding; "📋" button toggles picker; existing photo/audio paths still work.
 - `tests/unit/ask-rastrum-button.test.ts` — builds correct deep-link URL per locale + entity kind.
 
-### SQL pgTAP (`infra/sql-tests/chat.sql`)
+### SQL regression (`tests/sql/chat.sql`)
 
-Wired into the existing `db-validate.yml` Postgres-17 service container.
+Plain SQL `DO $$ … $$` assertion blocks (mirrors the existing `tests/sql/rls.sql` and `tests/sql/social-rls.sql`). Wired into `db-validate.yml`'s Postgres-17 service container.
 
 - `chat_entity_card('observation', X)` returns coarsened coords for non-owner of an obscured species.
 - `chat_entity_card('self_profile', uid)` rejects when `auth.uid() != uid`.
@@ -318,6 +318,7 @@ Tool-call flows are NOT in E2E — they need a deterministic model output and wo
 - **Guided actions / writes.** Chat surfacing "Apply this fix" buttons that perform privileged writes. Needs its own typed action contract, confirmation step, RLS verification, audit log, undo semantics.
 - **Multi-round tool calling.** Model emits tool call → result → *another* tool call in the same user turn. The 1-round cap is a deliberate v1 floor.
 - **Local RAG over Dexie.** Embedding model + vector index for fully-offline entity Q&A. YAGNI for v1; the on-device card already covers offline Q&A about the *attached* entity.
+- **`location` entity kind.** Deferred until the locations-first-class spec (`docs/superpowers/specs/2026-05-03-locations-first-class-design.md`) lands the `public.locations` table.
 - **Chat history sync.** Conversations remain device-local — no cross-device sync, no Supabase persistence.
 - **Voice output.** Speech recognition (input) is already wired; speech synthesis (output) is not in scope.
 
