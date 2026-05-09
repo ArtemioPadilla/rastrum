@@ -28,11 +28,17 @@ const psp = (tr as unknown as { profile_streak_push: { section_title: string; se
   <p id="streak-push-warning" class="hidden mt-2 text-xs text-amber-700 dark:text-amber-400"></p>
 </section>
 
-<script define:vars={{ isEsLang: lang === 'es' }}>
+<script>
   // Streak push reminder toggle (ux-streak-push). Strict opt-in; never
   // multiple notifications per day. Single 8 PM local-time reminder when
   // your streak is one day from breaking.
+  //
+  // NOTE: do NOT use define:vars — it implicitly sets is:inline=true, which
+  // disables Astro bundling. Dynamic imports like `await import('../lib/push')`
+  // would then ship as raw text and resolve relative to the page URL
+  // (`/profile/lib/push` 404). Read lang from the DOM instead.
   (async function () {
+    const isEsLang = document.documentElement.lang === 'es';
     const sppBtn = /** @type {HTMLButtonElement | null} */ (document.getElementById('streak-push-toggle'));
     if (!sppBtn) return;
     const sppLabel = /** @type {HTMLElement | null} */ (sppBtn.querySelector('[data-spp-label]'));

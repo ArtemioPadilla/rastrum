@@ -41,8 +41,13 @@ const k = (tr as unknown as {
   <p id="kairos-gh-warning" class="hidden mt-2 text-xs text-amber-700 dark:text-amber-400"></p>
 </section>
 
-<script define:vars={{ isEsLang: lang === 'es' }}>
+<script>
+  // NOTE: do NOT use define:vars — it implicitly sets is:inline=true, which
+  // disables Astro bundling. Dynamic imports like `await import('../lib/kairos')`
+  // would then ship as raw text and resolve relative to the page URL
+  // (`/profile/notifications/lib/kairos` 404). Read lang from the DOM instead.
   (async function () {
+    const isEsLang = document.documentElement.lang === 'es';
     const btn = /** @type {HTMLButtonElement | null} */ (document.getElementById('kairos-gh-toggle'));
     if (!btn) return;
     const labelEl = /** @type {HTMLElement | null} */ (btn.querySelector('[data-kairos-label]'));
