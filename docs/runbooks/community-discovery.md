@@ -28,6 +28,13 @@
   `SECURITY DEFINER` SQL wrapper `public.recompute_user_stats()` that runs the
   CTE+UPDATE aggregate. Wrapper is `REVOKE ALL FROM PUBLIC` + `GRANT EXECUTE TO
   service_role` so anon/authenticated can't invoke it directly.
+- The same `recompute_user_stats()` wrapper also refreshes the
+  `user_metrics_percentile` materialized view (issue #744 — M08
+  "tú vs. observador MX promedio" cards). The MV refresh is wrapped in
+  a savepoint-equivalent `BEGIN … EXCEPTION WHEN OTHERS THEN RAISE
+  WARNING` so a percentile-MV failure never aborts the user-stats update.
+  A separate `public.recompute_user_metrics_percentile()` is exposed for
+  ad-hoc refresh / debugging (also `service_role` only).
 
 ## Cron schedule
 

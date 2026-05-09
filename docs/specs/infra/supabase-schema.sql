@@ -8858,3 +8858,265 @@ $$;
 REVOKE ALL ON FUNCTION public.probable_taxa_at(numeric, numeric, int, int) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.probable_taxa_at(numeric, numeric, int, int)
   TO anon, authenticated;
+-- ============================================================
+-- M08 — "tú vs. observador MX promedio" percentile cards (#744)
+-- ============================================================
+-- Normative comparison (Fogg ch. 8) replacing toxic raw rank framing.
+-- Four diversity-rich metrics per user, percentile-only, computed against
+-- the cohort of users with >= 5 observations in the last 90 days.
+--
+-- Privacy / framing invariants:
+--  * NEVER raw rank — only PERCENT_RANK percentile.
+--  * No "people above you" copy — UI shows percentile bar + cohort N.
+--  * If cohort_n < 50, the UI surfaces "datos insuficientes" instead of
+--    a noisy norm. The MV still ships a row per user when computed so
+--    the client can read both fields atomically.
+--  * `cohort_country` is reserved for v1.1 sub-cohorts; v1 fixes it to
+--    'MX' to mirror the platform's primary country focus and keep the
+--    initial cohort tractable.
+--
+-- Metrics:
+--   1. diversity_pctl  — Shannon H' over a user's observed taxa (primary IDs)
+--   2. habitats_pctl   — DISTINCT count of observations.habitat
+--   3. validations_pctl — count of identifications.validated_by = user
+--   4. spread_pctl     — km^2 of ST_ConvexHull over user's observation points
+--
+-- The materialized view is refreshed nightly in the same RPC the
+-- `recompute-user-stats` cron already calls (recompute_user_stats wraps
+-- both the user-stats UPDATE and the MV REFRESH in one transactional
+-- shot — see further down).
+
+CREATE MATERIALIZED VIEW IF NOT EXISTS public.user_metrics_percentile AS
+WITH cohort AS (
+  SELECT u.id AS user_id, COALESCE(u.country_code, 'MX') AS cohort_country
+    FROM public.users u
+   WHERE EXISTS (
+     SELECT 1 FROM public.observations o
+      WHERE o.observer_id = u.id
+        AND o.sync_status = 'synced'
+        AND o.observed_at >= now() - interval '90 days'
+      GROUP BY o.observer_id
+      HAVING COUNT(*) >= 5
+   )
+),
+diversity AS (
+  SELECT c.user_id,
+         -- Shannon H' = -SUM(p_i * ln(p_i)) over taxa shares.
+         COALESCE(-SUM((cnt::numeric / total::numeric) * LN(cnt::numeric / total::numeric)), 0)::numeric AS h_prime
+    FROM cohort c
+    JOIN LATERAL (
+      SELECT i.taxon_id, COUNT(*)::numeric AS cnt,
+             SUM(COUNT(*)) OVER ()::numeric AS total
+        FROM public.observations o
+        JOIN public.identifications i
+          ON i.observation_id = o.id AND i.is_primary = true
+       WHERE o.observer_id  = c.user_id
+         AND o.sync_status  = 'synced'
+         AND i.taxon_id IS NOT NULL
+       GROUP BY i.taxon_id
+    ) tx ON true
+   GROUP BY c.user_id
+),
+habitats AS (
+  SELECT c.user_id,
+         COUNT(DISTINCT o.habitat)::int AS habitat_count
+    FROM cohort c
+    LEFT JOIN public.observations o
+      ON o.observer_id = c.user_id
+     AND o.sync_status = 'synced'
+     AND o.habitat IS NOT NULL
+     AND o.habitat <> ''
+   GROUP BY c.user_id
+),
+validations AS (
+  SELECT c.user_id,
+         COUNT(*)::int AS validation_count
+    FROM cohort c
+    LEFT JOIN public.identifications i
+      ON i.validated_by = c.user_id
+   GROUP BY c.user_id
+),
+spread AS (
+  SELECT c.user_id,
+         COALESCE(
+           ST_Area(
+             ST_ConvexHull(ST_Collect(o.location::geometry))::geography
+           ) / 1e6,
+           0
+         )::numeric AS spread_km2
+    FROM cohort c
+    LEFT JOIN public.observations o
+      ON o.observer_id = c.user_id
+     AND o.sync_status = 'synced'
+     AND o.location IS NOT NULL
+   GROUP BY c.user_id
+),
+joined AS (
+  SELECT c.user_id,
+         c.cohort_country,
+         COALESCE(d.h_prime, 0)         AS diversity_metric,
+         COALESCE(h.habitat_count, 0)   AS habitats_metric,
+         COALESCE(v.validation_count, 0) AS validations_metric,
+         COALESCE(s.spread_km2, 0)      AS spread_metric
+    FROM cohort c
+    LEFT JOIN diversity   d ON d.user_id = c.user_id
+    LEFT JOIN habitats    h ON h.user_id = c.user_id
+    LEFT JOIN validations v ON v.user_id = c.user_id
+    LEFT JOIN spread      s ON s.user_id = c.user_id
+),
+ranked AS (
+  SELECT j.user_id,
+         j.cohort_country,
+         j.diversity_metric,
+         j.habitats_metric,
+         j.validations_metric,
+         j.spread_metric,
+         (PERCENT_RANK() OVER (ORDER BY j.diversity_metric)   * 100)::numeric AS diversity_pctl,
+         (PERCENT_RANK() OVER (ORDER BY j.habitats_metric)    * 100)::numeric AS habitats_pctl,
+         (PERCENT_RANK() OVER (ORDER BY j.validations_metric) * 100)::numeric AS validations_pctl,
+         (PERCENT_RANK() OVER (ORDER BY j.spread_metric)      * 100)::numeric AS spread_pctl,
+         COUNT(*) OVER ()::int AS cohort_n
+    FROM joined j
+)
+SELECT user_id,
+       cohort_country,
+       diversity_metric,
+       habitats_metric,
+       validations_metric,
+       spread_metric,
+       diversity_pctl,
+       habitats_pctl,
+       validations_pctl,
+       spread_pctl,
+       cohort_n,
+       now()::timestamptz AS computed_at
+  FROM ranked;
+
+CREATE UNIQUE INDEX IF NOT EXISTS user_metrics_percentile_pkey
+  ON public.user_metrics_percentile (user_id);
+
+REVOKE ALL    ON public.user_metrics_percentile FROM PUBLIC;
+REVOKE ALL    ON public.user_metrics_percentile FROM anon;
+REVOKE ALL    ON public.user_metrics_percentile FROM authenticated;
+GRANT  SELECT ON public.user_metrics_percentile TO service_role;
+
+-- SECURITY INVOKER RPC — returns ONLY auth.uid()'s row, projected as
+-- jsonb. Each user reads their own percentiles + cohort_n; the raw
+-- per-user metric values are kept off the public surface to reduce
+-- triangulation risk. cohort_n < 50 → UI shows "datos insuficientes"
+-- (the threshold is enforced in the client, not the RPC, so the
+-- function stays a pure projection and is easy to inspect).
+CREATE OR REPLACE FUNCTION public.get_my_percentiles()
+RETURNS jsonb
+LANGUAGE sql
+STABLE
+SECURITY INVOKER
+PARALLEL SAFE
+SET search_path = public AS $$
+  SELECT CASE
+    WHEN auth.uid() IS NULL THEN NULL::jsonb
+    ELSE (
+      SELECT jsonb_build_object(
+        'user_id',           p.user_id,
+        'cohort_country',    p.cohort_country,
+        'cohort_n',          p.cohort_n,
+        'computed_at',       p.computed_at,
+        'diversity_pctl',    ROUND(p.diversity_pctl)::int,
+        'habitats_pctl',     ROUND(p.habitats_pctl)::int,
+        'validations_pctl',  ROUND(p.validations_pctl)::int,
+        'spread_pctl',       ROUND(p.spread_pctl)::int,
+        'diversity_value',   ROUND(p.diversity_metric::numeric,    2),
+        'habitats_value',    p.habitats_metric,
+        'validations_value', p.validations_metric,
+        'spread_value',      ROUND(p.spread_metric::numeric,        1)
+      )
+      FROM public.user_metrics_percentile p
+      WHERE p.user_id = auth.uid()
+    )
+  END;
+$$;
+
+REVOKE ALL    ON FUNCTION public.get_my_percentiles() FROM PUBLIC;
+GRANT  EXECUTE ON FUNCTION public.get_my_percentiles() TO authenticated;
+
+-- recompute_user_metrics_percentile() — the wrapper the nightly cron
+-- calls. SECURITY DEFINER + service_role-only matches recompute_user_stats.
+-- Kept separate so it can be invoked manually for testing without
+-- re-running the full user-stats UPDATE.
+CREATE OR REPLACE FUNCTION public.recompute_user_metrics_percentile()
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public AS $$
+DECLARE
+  v_count integer;
+BEGIN
+  REFRESH MATERIALIZED VIEW CONCURRENTLY public.user_metrics_percentile;
+  SELECT COUNT(*) INTO v_count FROM public.user_metrics_percentile;
+  RETURN v_count;
+EXCEPTION
+  WHEN OTHERS THEN
+    -- First-ever refresh can't be CONCURRENTLY (needs a populated MV);
+    -- fall back to a non-concurrent refresh and continue.
+    REFRESH MATERIALIZED VIEW public.user_metrics_percentile;
+    SELECT COUNT(*) INTO v_count FROM public.user_metrics_percentile;
+    RETURN v_count;
+END;
+$$;
+
+REVOKE ALL    ON FUNCTION public.recompute_user_metrics_percentile() FROM PUBLIC;
+GRANT  EXECUTE ON FUNCTION public.recompute_user_metrics_percentile() TO service_role;
+
+-- Wire the percentile MV refresh into the existing recompute_user_stats()
+-- cron entry-point. CREATE OR REPLACE preserves the function signature
+-- so the Edge Function does not need to change — the body now also
+-- refreshes the MV after the user-stats UPDATE has settled. Failures
+-- in the MV refresh do not abort the user-stats update (best-effort).
+CREATE OR REPLACE FUNCTION public.recompute_user_stats()
+RETURNS integer
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public AS $$
+DECLARE
+  v_count integer;
+BEGIN
+  WITH stats AS (
+    SELECT
+      o.observer_id AS uid,
+      COUNT(*)::int                                                            AS obs_total,
+      COUNT(DISTINCT i.taxon_id)::int                                          AS species_total,
+      COUNT(*) FILTER (WHERE o.observed_at >= now() - interval '7 days')::int  AS obs_7d,
+      COUNT(*) FILTER (WHERE o.observed_at >= now() - interval '30 days')::int AS obs_30d,
+      ST_Centroid(ST_Collect(o.location::geometry))::geography                 AS centroid
+    FROM public.observations o
+    LEFT JOIN public.identifications i
+      ON i.observation_id = o.id AND i.is_primary = true
+    WHERE o.sync_status = 'synced'
+      AND o.location IS NOT NULL
+    GROUP BY o.observer_id
+  )
+  UPDATE public.users u
+  SET
+    observation_count = COALESCE(s.obs_total, 0),
+    species_count     = COALESCE(s.species_total, 0),
+    obs_count_7d      = COALESCE(s.obs_7d, 0),
+    obs_count_30d     = COALESCE(s.obs_30d, 0),
+    centroid_geog     = s.centroid,
+    country_code      = COALESCE(u.country_code, public.normalize_country_code(u.region_primary))
+  FROM stats s
+  WHERE u.id = s.uid;
+
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+
+  -- Best-effort MV refresh; never fail the cron over it.
+  BEGIN
+    PERFORM public.recompute_user_metrics_percentile();
+  EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING 'recompute_user_metrics_percentile failed: %', SQLERRM;
+  END;
+
+  RETURN v_count;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.recompute_user_stats() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.recompute_user_stats() TO service_role;
