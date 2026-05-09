@@ -47,6 +47,11 @@ export interface ObservationDraft {
   license?: 'CC BY 4.0' | 'CC BY-NC 4.0' | 'CC0' | null;
   notes?: string | null;
   contentSensitive?: boolean;
+  /**
+   * M22-range (#742): set when the user confirms a submit-time outlier
+   * alert. Flips `observations.is_range_extension` on sync.
+   */
+  isRangeExtension?: boolean;
   appVersion?: string;
   deviceOs?: string | null;
   /**
@@ -92,6 +97,7 @@ export function buildObservation(draft: ObservationDraft): Observation {
     license:       draft.license       ?? null,
     contentSensitive: draft.contentSensitive ?? false,
     notes:         draft.notes         ?? null,
+    isRangeExtension: draft.isRangeExtension ?? false,
     moonPhase: null,
     moonIllumination: null,
     precipitation24hMm: null,

@@ -104,7 +104,7 @@ const lang: 'en' | 'es' = 'en';
         .from('observations')
         .select(`
           id, observed_at, obscure_level, state_province, habitat, weather, establishment_means, observer_id, notes,
-          last_material_edit_at, location, location_obscured, evidence_type,
+          last_material_edit_at, is_range_extension, location, location_obscured, evidence_type,
           places:place_id(id, slug, name, place_type),
           identifications(scientific_name, is_primary, is_research_grade),
           users:observer_id(display_name, username, profile_public)
@@ -519,6 +519,15 @@ const lang: 'en' | 'es' = 'en';
             }
           }
         }
+      }
+
+      // M22-range (#742): show the "Posible extensión de rango" pill
+      // when the user confirmed the submit-time outlier alert. Visible
+      // unconditionally — unlike the edited badge, it doesn't depend on
+      // the presence of community IDs.
+      const isRangeExt = (obs as { is_range_extension?: boolean }).is_range_extension === true;
+      if (isRangeExt) {
+        document.querySelector('[data-range-extension-pill]')?.classList.remove('hidden');
       }
 
       // Surface the "edited after IDs" badge (PR2 schema column).

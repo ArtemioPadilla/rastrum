@@ -97,6 +97,7 @@ narrative source.
 |---|---|---|---|---|
 | 24 | Diversity Indices & Spatial Analytics (Shannon, Simpson, Hill numbers, ANPs, municipios) | v1.5 | planned (spec v1.0) | [`24-diversity-indices.md`](24-diversity-indices.md) |
 | 33 | User Journeys: Comprehensive Testing, Guided Tours & Feedback Loop | v1.2 → v1.4 | partial (spec + Phase 1 E2E tests + Phase 2 guides + Phase 3 feedback) | [`33-user-journeys-testing.md`](33-user-journeys-testing.md) |
+| 35 | Submit-time outlier alert ("Possible range extension") | v1.5 | shipped 2026-05-08 (closes #742); v1.1 follow-up: GBIF ETL replaces `rastrum_proxy` source. | [`35-range-outlier-alert.md`](35-range-outlier-alert.md) |
 
 > **Numbering note.** Two specs share the `15-` prefix:
 > [`15-map-location-picker.md`](15-map-location-picker.md) was claimed first

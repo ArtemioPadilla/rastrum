@@ -26,6 +26,7 @@ type ObsDetailTree = {
   save_changes: string;
   saved: string;
   edited_badge: string;
+  range_extension_pill: string;
 };
 const tr = t(lang) as { obs_detail: ObsDetailTree };
 const v  = tr.obs_detail.view;
@@ -55,6 +56,7 @@ const labels = {
   ownerNote:         v.owner_note,
   editLocation:      tr.obs_detail.edit_location,
   editedBadge:       tr.obs_detail.edited_badge,
+  rangeExtensionPill: tr.obs_detail.range_extension_pill,
   placeChipLabel:    v.place_chip_label,
 };
 ---
@@ -143,6 +145,18 @@ const labels = {
           data-edited-badge
           class="hidden text-xs text-amber-700 dark:text-amber-400 border-l-4 border-amber-500 pl-3 py-1"
         >{labels.editedBadge}</p>
+
+        <p
+          id="range-extension-pill"
+          data-range-extension-pill
+          class="hidden inline-flex items-center gap-1.5 rounded-full bg-violet-100 dark:bg-violet-900/30 px-2.5 py-0.5 text-[11px] font-semibold text-violet-800 dark:text-violet-300"
+          title={labels.rangeExtensionPill}
+        >
+          <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 2l3 6 6 1-4.5 4.5L18 20l-6-3-6 3 1.5-6.5L3 9l6-1z"/>
+          </svg>
+          <span>{labels.rangeExtensionPill}</span>
+        </p>
 
         <dl class="grid grid-cols-2 gap-4 text-sm">
           <div>
