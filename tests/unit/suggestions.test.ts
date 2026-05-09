@@ -128,3 +128,50 @@ describe('fetchSuggestions', () => {
     expect(Number.isInteger(month)).toBe(true);
   });
 });
+
+// ── Month-boundary formula unit tests (#876 fix) ──────────────────────────
+// The SQL uses: ((p_month - 2 + 12) % 12) + 1, p_month, (p_month % 12) + 1
+// to compute prev/current/next month without BETWEEN (which broke at
+// Jan=1 → BETWEEN 0 AND 2, and Dec=12 → BETWEEN 11 AND 13).
+function monthWindow(m: number): [number, number, number] {
+  return [
+    ((m - 2 + 12) % 12) + 1,
+    m,
+    (m % 12) + 1,
+  ];
+}
+
+describe('monthWindow — boundary-safe month triplet', () => {
+  it('January wraps prev to December', () => {
+    expect(monthWindow(1)).toEqual([12, 1, 2]);
+  });
+
+  it('December wraps next to January', () => {
+    expect(monthWindow(12)).toEqual([11, 12, 1]);
+  });
+
+  it('mid-year produces consecutive months', () => {
+    expect(monthWindow(6)).toEqual([5, 6, 7]);
+    expect(monthWindow(7)).toEqual([6, 7, 8]);
+  });
+
+  it('all months produce values in [1..12]', () => {
+    for (let m = 1; m <= 12; m++) {
+      const [prev, cur, next] = monthWindow(m);
+      expect(prev).toBeGreaterThanOrEqual(1);
+      expect(prev).toBeLessThanOrEqual(12);
+      expect(cur).toBe(m);
+      expect(next).toBeGreaterThanOrEqual(1);
+      expect(next).toBeLessThanOrEqual(12);
+    }
+  });
+
+  it('never produces 0 or 13 (which BETWEEN p_month±1 would generate)', () => {
+    // This was the original bug: BETWEEN 0 AND 2 in January, BETWEEN 11 AND 13 in December.
+    for (let m = 1; m <= 12; m++) {
+      const window = monthWindow(m);
+      expect(window).not.toContain(0);
+      expect(window).not.toContain(13);
+    }
+  });
+});
