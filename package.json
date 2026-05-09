@@ -22,7 +22,8 @@
     "test:e2e:all": "playwright test",
     "test:lhci": "lhci autorun",
     "test:audit": "npm run build && npm run test:e2e && npm run test:lhci",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check:define-vars": "bash scripts/check-define-vars-imports.sh"
   },
   "dependencies": {
     "@astrojs/sitemap": "^3.7.2",
