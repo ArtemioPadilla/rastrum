@@ -68,6 +68,36 @@ Personal `rst_*` tokens authenticate two parallel surfaces:
 
 Both gate on the same scope strings (`observe`, `identify`, `export`).
 
+## Engagement & Habit-Building (v1.1.5 Persuasive Tech Audit)
+
+In May 2026 the v1.1.5 phase applied B.J. Fogg's *Persuasive Technology*
+chapter-by-chapter to existing surfaces. 15 features shipped across 5
+clusters, all with **honest-by-design** primitives — no hidden ranking,
+no manipulative variable rewards, no toxic leaderboards.
+
+### Reduction & flow (Tier S)
+- **Quick Observation** — `/observe?quick=1` opens the camera immediately, GPS + EXIF + outbox draft in 1 tap.
+- **Photo praise** — EXIF-driven micro-feedback ("good light", "sharp action") at upload, never aesthetic.
+- **Falta-dex** — taxonomic gaps panel, ordered by rarity bucket (Option A: Rastrum-own data as proxy).
+- **Active observers banner** — "Hoy 7 personas observan en Oaxaca" on `/observe`, M28 anon-safe view.
+- **Triage SLA dashboard** — `/docs/status` with median time-to-first-comment from gh API, refreshed nightly.
+
+### Credibility & honesty (Tier A)
+- **Field theme** — pure-black, high-contrast variant for direct-sunlight readability; `field` is a 4th theme state.
+- **Seasonal themes** — Monarca / Lluvias / Secas accents auto-resolve by month + region.
+- **Humanized About** — team, funding ledger, governance summary, live stats from Supabase build-time fetcher.
+- **`<WhyAmISeeingThis />`** — pill on every ranked surface; opens a global modal with inputs/window/settings copy. The 4 disclosure principles ship at `/docs/algorithms`.
+
+### Normative & motivational (Ola 2b)
+- **Peer norms in config** — "82% of MX observers choose CC-BY" bars on license + privacy selectors. Honest fallback when n < 50.
+- **Percentile cards** — `/profile/` shows you-vs-cohort percentiles for diversity / habitats / validations / spread. Never raw rank.
+- **Contextual species** — `probable_taxa_at(lat, lng, month)` chip strip on `/observe` + `/identify`. No GBIF ETL — own-data proxy.
+- **Mi impacto ecológico** — 5-card retrospective at `/profile/impacto` (transect-equivalent km, NOM-059 species, expert validations).
+- **Golden-hour kairos** — opt-in Web Push 30 min before sunset; max 1/day; cron `kairos-fire-15min`. Other triggers (after-rain, migration, lunar) are tracked v1.1 follow-ups.
+- **Field surprises** — opt-in catalog of 3 fixed kinds (`dato_curioso`, `rarito`, `comunidad_activa_hoy`); 1/day cap; rules disclosed at `/docs/surprises`.
+
+Roadmap details: [`docs/progress.json`](docs/progress.json) v1.1.5 phase. Conventions: [`CLAUDE.md`](CLAUDE.md) "Persuasive Tech (Fogg) — v1.1.5".
+
 ## Tech Stack
 
 | Component | Technology | Purpose |
