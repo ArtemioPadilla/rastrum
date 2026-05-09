@@ -20,6 +20,7 @@ posthog.init(apiKey, {
   ui_host: 'https://us.posthog.com',      // so deep-links resolve to PostHog cloud
   defaults: '2026-01-30',
   person_profiles: 'identified_only',     // no anonymous-user profiles by default
+  capture_exceptions: true,               // hooks window.onerror + unhandledrejection
 });
 ```
 
@@ -27,6 +28,12 @@ The snippet has a runtime `if (apiKey && apiHost)` guard, so missing env vars
 silently disable PostHog rather than 404 a static script. Capture call-sites
 all use optional chaining (`window.posthog?.capture(...)`), so they no-op when
 the SDK never loaded.
+
+**Exception autocapture** (`capture_exceptions: true`) hooks `window.onerror`,
+`unhandledrejection`, and `console.error` — uncaught browser errors land in
+PostHog → Errors automatically. For caught errors that you want logged anyway
+(e.g. a fetch that failed but the UI recovered), call
+`window.posthog?.captureException(err, { context: '…' })` manually.
 
 ## Captured events
 
@@ -100,3 +107,8 @@ never loaded. Capture call-sites no-op'd against `window.posthog ===
 undefined`. PR #764 added the build-env wiring, the secrets were set,
 and the snippet was upgraded to the reverse-proxy-ready format with
 `ui_host` + `person_profiles: 'identified_only'`.
+
+## Future scope
+
+- **Server-side ingest from Edge Functions** — see [#780](https://github.com/ArtemioPadilla/rastrum/issues/780).
+- **DNT-respect + consent banner (LFPDPPP / LGPD)** — see [#781](https://github.com/ArtemioPadilla/rastrum/issues/781).
