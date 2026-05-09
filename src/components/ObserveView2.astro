@@ -1,5 +1,6 @@
 ---
 import DropZone from "./DropZone.astro";
+import PhotoCropModal from "./PhotoCropModal.astro";
 import PipelineGraph from "./PipelineGraph.astro";
 import MapPicker from "./MapPicker.astro";
 import TaxonAutocomplete from "./TaxonAutocomplete.astro";
@@ -333,6 +334,9 @@ const weathers = WEATHERS;
   </div>
 </div>
 
+<!-- Photo crop/rotate modal (#787) — single global instance, triggered by DropZone edit buttons -->
+<PhotoCropModal lang={lang} />
+
 <script>
 import type { PipelineFile, PipelineNode, PipelineState } from '../lib/pipeline-engine';
 import {
@@ -508,6 +512,36 @@ const confEl          = document.getElementById('obs2-conf');
 })();
 
 // ── Files dropped ──────────────────────────────────────────────────────────
+
+// ── Photo edited (crop/rotate from DropZone) — #787 ──────────────────────
+document.addEventListener('rastrum:photo-edited', (e: Event) => {
+  const ev = e as CustomEvent<{ original: File; edited: File }>;
+  if (!pipelineState) return;
+  const idx = pipelineState.files.findIndex(f => f.file === ev.detail.original);
+  if (idx === -1) return;
+  // Replace the file and revoke the old blobUrl to free memory
+  const old = pipelineState.files[idx];
+  URL.revokeObjectURL(old.blobUrl);
+  pipelineState.files[idx] = {
+    ...old,
+    file: ev.detail.edited,
+    blobUrl: URL.createObjectURL(ev.detail.edited),
+  };
+  // If pipeline already ran, re-run with the edited photo
+  if (pipelineState.status === 'done' || pipelineState.status === 'failed') {
+    pipelineState.status = 'processing';
+    const node = pipelineState.nodes.find(n => n.kind === 'identify' && n.fileId === old.id);
+    if (node) { node.state = 'pending'; node.output = undefined; node.error = undefined; }
+    postForm?.classList.add('hidden');
+    pipelineSection?.classList.remove('hidden');
+    updatePipelineUI();
+    runPipeline(pipelineState).catch(err => {
+      console.error('[rastrum] re-run after edit failed', err);
+      showPostForm();
+    });
+  }
+});
+
 document.addEventListener('rastrum:files-dropped', async (e: Event) => {
   const ev = e as CustomEvent<{ files: File[] }>;
   const files: File[] = ev.detail.files;
