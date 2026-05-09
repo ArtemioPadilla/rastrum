@@ -12,8 +12,11 @@
 \set ON_ERROR_STOP on
 
 -- ─────────────────────────────────────────────────────────────────────────
--- Check 1: every view in public must have security_invoker = true
+-- Check 1: every user-defined view in public must have security_invoker = true
 -- ─────────────────────────────────────────────────────────────────────────
+-- Extension-owned views (e.g. PostGIS's geography_columns, geometry_columns,
+-- spatial_ref_sys) are exempt — their reloptions are the extension author's
+-- call, not ours.
 DO $check1$
 DECLARE
   offenders text;
@@ -28,6 +31,10 @@ BEGIN
        SELECT 1
          FROM unnest(COALESCE(c.reloptions, ARRAY[]::text[])) opt
         WHERE opt = 'security_invoker=true'
+     )
+     AND NOT EXISTS (
+       SELECT 1 FROM pg_depend d
+        WHERE d.objid = c.oid AND d.deptype = 'e'
      );
 
   IF offenders IS NOT NULL THEN
