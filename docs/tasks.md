@@ -4,7 +4,7 @@
 > Source of truth for both surfaces; renders the live page at
 > [/docs/tasks/](https://rastrum.org/en/docs/tasks/).
 > 
-> **Updated:** 2026-04-30 (v1.2 research workflow — M28 community discovery, M29 projects, M30 CLI batch import, M31 camera stations, M32 multi-provider vision, obs-detail redesign, admin console PR16 entity browsers; subtask granularity deepened for 53 roadmap items per #180).
+> **Updated:** 2026-05-08 (v1.1.5 Persuasive Tech Audit — Tier S + Tier A Fogg principles shipped; Ola 2b in flight. v1.2 research workflow — M28 community discovery, M29 projects, M30 CLI batch import, M31 camera stations, M32 multi-provider vision, obs-detail redesign, admin console PR16 entity browsers; subtask granularity deepened for 53 roadmap items per #180).
 
 ---
 
@@ -19,6 +19,7 @@
 | v1.0.x | Post-launch polish | in_progress | 8 / 24 |
 | v1.1 | UX polish + admin console + M22/M26/M27 | shipped (mostly) | 39 / 44 |
 | v1.2 | Research workflow (M28-M32 + obs-detail + privacy) | shipped 2026-04-30 | 17 / 17 |
+| v1.1.5 | Persuasive Tech Audit (Fogg principles) | Tier S+A shipped; Ola 2b in flight | 9 / 16 |
 | **v0.1 → v1.0** | **Public launch** | **shipped 2026-04-26** | **54 / 59** |
 
 Phases v1.5, v2.0, v2.5 are tracked in [`progress.json`](progress.json) but have no shipped code yet — they are planned scope only.
@@ -226,6 +227,45 @@ A second wave landed the same day, focused on the CONANP-Oaxaca / DRFSIPS / PROR
   expiry-monitor crons (PR #207), nightly per-provider smoke probe
   (PR #210). _(✓ shipped — pool dashboard with top-taxa, cost-per-100
   picker, pool karma incentives tracked as #226/#227/#228)_
+
+## v1.1.5 — Persuasive Tech Audit (Fogg principles) — Tier S+A shipped; Ola 2b in flight
+
+**9 of 16 items done.** A principles-driven UX audit applying B.J. Fogg's
+*Persuasive Technology* (Stanford CS) chapter-by-chapter to Rastrum's
+existing surfaces. Tier S (foundation) and Tier A (transparency +
+real-world feel) are merged; Ola 2b (conditioning + kairos + cause-and-effect)
+is partially in flight, partially still as open issues.
+
+### Tier S — shipped 2026-05-08 (Reduction + Praise + Self-monitoring + Social Facilitation + Responsiveness)
+
+- `fogg-quick-observation` — Reduction. One-tap Quick Observation flow (foto + GPS + async ID); long-press the centre FAB or `?quick=1` collapses the standard 5-tap form to a single action; no-GPS path saves as draft + `promoteDraftsWithGps` worker. PR #759 (closes #721). _(✓ done)_
+- `fogg-photo-praise` — Praise. EXIF-driven photo praise badge on upload (5 priority-ordered rules: sharp_action, portrait_aperture, long_lens, good_light, balanced_exposure); silent when EXIF missing or ISO ≥ 800 — never aesthetic, never dishonest. PR #757 (closes #733). _(✓ done)_
+- `fogg-triage-sla` — Responsiveness. Public roadmap-triage SLA dashboard at `/docs/status/`; nightly workflow computes open count + median first-comment hours + resolved-30d via `gh` CLI, fault-tolerant fallback preserves last good JSON. PR #761 (closes #740). _(✓ done)_
+- `fogg-active-observers-banner` — Social Facilitation. Active-observers micro-banner on `/observe` ("Hoy 7 personas observan en Oaxaca · únete"); `community_active_observers_today(p_country)` RPC mirrors the M28 anon-safe predicate (`hide_from_leaderboards = false`). PR #758 (closes #743). _(✓ done)_
+- `fogg-falta-dex` — Self-monitoring. "Show missing" toggle on the Pokédex appends silhouette cards for species the user hasn't observed but are present in their region; owner-only; Option A baseline (Rastrum's own data per country, no GBIF ETL). PR #760 (phase-1 of #726, supersedes #561). _(✓ done — runbook [`docs/runbooks/falta-dex.md`](runbooks/falta-dex.md))_
+
+### Tier A — shipped 2026-05-08 / 2026-05-09 (Real-World Feel + Reputed Credibility + Transparency)
+
+- `fogg-field-theme` — Real-World Feel. High-contrast Field theme (Campo) for direct sunlight; pure black bg / white text / no gradients; 1.25× hit-target sizing on mobile FAB + inputs; auto-engages at > 5 000 lux via `AmbientLightSensor` when stored preference is 'auto'. PR #768. _(✓ done)_
+- `fogg-about-humanized` — Reputed Credibility. Humanized About page replaces auto-generated copy with team / funding / governance / live-stats / press sections; build-time stats from Supabase REST + publishable anon key; explicit "currently unfunded" framing. PR #770 (closes #739). _(✓ done)_
+- `fogg-why-am-i-seeing-this` — Transparency. WhyAmISeeingThis algorithmic disclosure on every ranked surface; single source of truth in `src/lib/algorithms.ts`, global modal pattern (focus trap, Esc/backdrop close), wired today on `community_observers` + `explore_recent` + `explore_species_recent`; new `/docs/algorithms/` reference page enumerates the catalog + 4 principles. PR #772 (closes #738). _(✓ done)_
+
+### Cleanup — superseded features removed
+
+- `fogg-cleanup-superseded` — Net -2048 LOC across 18 files: dropped `DisambiguationBanner` (#684) + `NearbySimilarCard` (#679) + `places-url` (#678) whose user-facing intent is now better served by the Fogg replacements. Replacement intent: #736 "Why this species?" panel (Tier B), #774 contextual species (Tier A in flight), #760 falta-dex (shipped), and the M28 Nearby flow's existing `community_observers_nearby_at` RPC. PR #766. _(✓ done)_
+
+### Ola 2b — in flight 2026-05-08
+
+- `fogg-seasonal-themes` — Conditioning. Seasonal + regional theme variants reflecting MX's ecological calendar: monarca (Oct–Mar), lluvias (Jun–Sep), secas (Apr–May), default (brand emerald). MX-Norte / MX-Sur fall back to MX-Centro mapping for v1. PR #769 (closes #731). _(· in flight)_
+- `fogg-peer-norms` — Normative Influence. Show peer norms when configuring license / privacy ("82% of MX observers choose this"); `license_norm` + `privacy_norm` materialised views, `peer_norm_pct(scope, country, key)` SECURITY INVOKER lookup, weekly refresh cron. Defaults are unchanged; copy is informational only. PR #771 (closes #745). _(· in flight)_
+- `fogg-percentile-card` — Self-monitoring. Tú-vs-promedio MX comparison card on `/profile/` (4 metrics × percentile bar); cohort = users with ≥ 5 obs in 90 days. NEVER raw rank, NEVER "people above you" copy — Fogg-ethical normative comparison only. PR #773 (closes #744). _(· in flight)_
+- `fogg-contextual-suggestions` — Suggestion Technology. Chip strip on `/observe` surfaces 5–10 species likely at the user's location + month via `probable_taxa_at(p_lat, p_lng, p_month, p_limit)` RPC. Tap pre-fills the manual ID, never auto-submits. PR #774 (closes #723). _(· in flight)_
+
+### Ola 2b — planned (open issues, no PR yet)
+
+- `fogg-variable-rewards` — Variable Rewards. Transparent, opt-in "sorpresa de campo" badges on rare-but-honest milestones; rule always disclosed in tooltip. _(! planned — issue #727)_
+- `fogg-kairos-prompts` — Kairos. Opt-in Web Push at "golden hour" (sunset ± 30 min) and "after the rain" (rain stop + 2 h); single nightly cap per channel. _(! planned — issue #724)_
+- `fogg-ecological-impact-viz` — Cause-and-Effect. "Mi impacto ecológico" visualization links every claimed downstream effect to a verifiable trace; honest framing, no inflated metrics. _(! planned — issue #728)_
 
 ---
 
