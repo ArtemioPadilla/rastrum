@@ -148,6 +148,16 @@
       "nearby_loading": "Loading recent observations…",
       "nearby_anonymous": "Anonymous",
       "nearby_unknown_species": "Unknown species",
+      "leaderboard": {
+        "title": "This week’s top observers",
+        "view_all": "Full leaderboard",
+        "rank": "Rank {{rank}}"
+      },
+      "next_badge": {
+        "title": "Next badge",
+        "progress_label": "{{current}} / {{threshold}}",
+        "view_profile": "View profile"
+      },
       "suggestions": {
         "heading": "Go find these",
         "subtitle": "Species near you in {{month}} you haven't observed yet",
@@ -158,16 +168,6 @@
         "no_location": "Allow location access to see suggestions",
         "loading": "Finding species near you…",
         "empty": "No new suggestions nearby. Check back next month."
-      }
-    },
-    "greeting": {
-      "weather": {
-        "sunny": "It's sunny in {region}",
-        "rainy": "It's raining in {region}",
-        "cloudy": "It's cloudy in {region}",
-        "snow": "It's snowing in {region}",
-        "foggy": "It's foggy in {region}",
-        "windy": "It's windy in {region}"
       }
     }
   },
@@ -560,10 +560,7 @@
     "leaderboard_experts_score": "Score",
     "leaderboard_experts_taxon_loading": "Loading taxa…",
     "leaderboard_experts_taxon_none": "No experts yet — add identifications to be the first",
-    "leaderboard_experts_no_data": "No one has earned expertise yet. Be the first by adding identifications.",
-    "leaderboard_scope_region": "Region",
-    "leaderboard_country_picker_label": "Select country",
-    "leaderboard_country_picker_aria": "Filter leaderboard by country"
+    "leaderboard_experts_no_data": "No one has earned expertise yet. Be the first by adding identifications."
   },
   "profile": {
     "title": "Profile",
@@ -902,9 +899,7 @@
     "obs_hidden_by_mod_badge": "Hidden by moderation",
     "obs_hidden_by_mod_reason_label": "Reason:",
     "obs_hidden_by_mod_no_reason": "No reason provided.",
-    "obs_hidden_by_mod_appeal_link": "View reason / Appeal",
-    "auto_enhance": "✨ Auto",
-    "auto_enhance_aria": "Apply auto enhance"
+    "obs_hidden_by_mod_appeal_link": "View reason / Appeal"
   },
   "obs_detail": {
     "tabs": {
@@ -990,20 +985,7 @@
   },
   "chat": {
     "title": "Chat",
-    "subtitle": "On-device biodiversity assistant — runs fully in your browser. Attach a photo, audio, or any observation/species/project for context.",
-    "ask_rastrum": "Ask Rastrum",
-    "attach_entity_label": "Attach context",
-    "attach_entity_search": "Search…",
-    "entities": {
-      "observation": "Observations",
-      "species": "Species",
-      "project": "Projects",
-      "camera_station": "Stations",
-      "observer": "Observers",
-      "self_profile": "Me"
-    },
-    "engine_fallback_banner": "Using lighter model — Gemma unavailable.",
-    "context_load_error": "Couldn't load context — try when online.",
+    "subtitle": "On-device biodiversity assistant — runs fully in your browser. You can also attach a photo or audio.",
     "placeholder": "Ask anything about species, habitats, or your observations…",
     "send": "Send",
     "sending": "Thinking…",
@@ -1466,9 +1448,7 @@
       "fave_count_aria_one": "{{count}} person favorited this",
       "fave_count_aria_other": "{{count}} people favorited this",
       "live_added": "Favorited",
-      "live_removed": "Removed favorite",
-      "fave_add_aria": "Add to favorites",
-      "fave_remove_aria": "Remove from favorites"
+      "live_removed": "Removed favorite"
     },
     "inbox": {
       "title": "Inbox",
@@ -1516,9 +1496,7 @@
       "report_comment_aria": "Report this comment",
       "block_observer_aria": "Block this observer",
       "block_commenter_aria": "Block this commenter"
-    },
-    "recents_follow_aria": "Follow {{handle}}",
-    "recents_unfollow_aria": "Unfollow {{handle}}"
+    }
   },
   "sponsoring": {
     "page_title": "AI Sponsoring",
@@ -1767,43 +1745,18 @@
       "unsupported": "This browser doesn't support web push (try Chrome on Android or Safari 16.4+ on iOS).",
       "vapid_missing": "Push isn't configured yet — the operator must publish a VAPID key first."
     },
-    "lunar_event": {
-      "title": "Lunar event prompt",
-      "body_full": "Full moon tonight — peak amphibian chorus.",
-      "body_new": "New moon tonight — good for light-trap insects.",
-      "body_eclipse": "Lunar eclipse visible tonight.",
-      "opt_in_label": "Enable lunar event prompt",
-      "opt_in_hint": "One notification per day on full moons, new moons, and total lunar eclipses.",
+    "migration_window": {
+      "title": "Migration window prompt",
+      "body_fallback": "A notable species migration is active in your region — now is the time.",
+      "opt_in_label": "Enable migration window prompt",
+      "opt_in_hint": "One notification per day during active seasonal migration windows for your region.",
       "enabling": "Subscribing…",
-      "enabled": "Lunar event prompts enabled.",
+      "enabled": "Migration window prompts enabled.",
       "disable": "Disable",
       "disabling": "Disabling…",
       "permission_blocked": "Browser notifications are blocked. Enable them in your browser site settings, then try again.",
       "unsupported": "This browser doesn't support web push (try Chrome on Android or Safari 16.4+ on iOS).",
       "vapid_missing": "Push isn't configured yet — the operator must publish a VAPID key first."
-    },
-    "prefs": {
-      "push_section": "Push notifications",
-      "email_section": "Email notifications",
-      "quiet_hours_section": "Quiet hours",
-      "quiet_hours_hint": "No push notifications will be delivered during these hours",
-      "quiet_start": "Start",
-      "quiet_end": "End",
-      "timezone_label": "Your timezone",
-      "save_error": "Could not save your preferences. Please try again.",
-      "saved": "Preferences saved.",
-      "push_after_rain": "After-rain alert",
-      "push_migration_window": "Migration window alert",
-      "push_lunar_event": "Lunar event alert",
-      "push_streak_reminder": "Streak reminder",
-      "push_kairos_golden_hour": "Golden-hour prompt (kairos)",
-      "push_badge_unlock": "Badge unlocked",
-      "push_comment_on_my_obs": "Comment on my observation",
-      "push_new_follower": "New follower",
-      "push_id_accepted_on_my_obs": "ID accepted on my observation",
-      "email_weekly_digest": "Weekly digest",
-      "email_badge_unlock": "Badge unlocked",
-      "email_new_follower": "New follower"
     }
   },
   "surprises": {
@@ -2049,7 +2002,17 @@
       "view": {
         "switcher_label": "Change view",
         "cards": "Cards",
-        "grid": "Grid"
+        "grid": "Grid",
+        "list": "List",
+        "map": "Map",
+        "timeline": "Timeline",
+        "list_aria": "List view",
+        "map_aria": "Map view",
+        "timeline_aria": "Timeline view"
+      },
+      "timeline": {
+        "today": "Today",
+        "yesterday": "Yesterday"
       }
     },
     "watchlist": {

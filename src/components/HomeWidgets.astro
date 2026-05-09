@@ -10,7 +10,10 @@ const tr = t(lang);
 const widgets = tr.home.widgets;
 const suggestions = widgets.suggestions;
 const greeting = tr.home.greeting;
+
 const recentHref = lang === 'es' ? '/es/explorar/recientes/' : '/en/explore/recent/';
+const leaderboardHref = lang === 'es' ? '/es/comunidad/tabla-de-lideres/' : '/en/community/leaderboard/';
+const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
 ---
 
 <section
@@ -32,16 +35,18 @@ const recentHref = lang === 'es' ? '/es/explorar/recientes/' : '/en/explore/rece
   data-label-nearby-anon={widgets.nearby_anonymous}
   data-label-nearby-unknown-species={widgets.nearby_unknown_species}
   data-recent-href={recentHref}
-  data-label-weather-sunny={greeting.weather.sunny}
-  data-label-weather-rainy={greeting.weather.rainy}
-  data-label-weather-cloudy={greeting.weather.cloudy}
-  data-label-weather-snow={greeting.weather.snow}
-  data-label-weather-foggy={greeting.weather.foggy}
-  data-label-weather-windy={greeting.weather.windy}
+  data-leaderboard-href={leaderboardHref}
+  data-profile-href={profileHref}
+  data-label-leaderboard-title={widgets.leaderboard.title}
+  data-label-leaderboard-view-all={widgets.leaderboard.view_all}
+  data-label-leaderboard-rank={widgets.leaderboard.rank}
+  data-label-next-badge-title={widgets.next_badge.title}
+  data-label-next-badge-progress={widgets.next_badge.progress_label}
+  data-label-next-badge-view-profile={widgets.next_badge.view_profile}
   aria-live="polite"
 >
   <div class="home-widgets-greeting flex items-center justify-between flex-wrap gap-3">
-    <p class="hw-greeting-text text-3xl sm:text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100" role="status" aria-live="polite" data-testid="home-greeting"></p>
+    <p class="hw-greeting-text text-3xl sm:text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100" role="status" aria-live="polite"></p>
     <span
       class="hw-streak hidden inline-flex items-center gap-1.5 rounded-full border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-950/40 px-3 py-1.5 text-sm font-semibold text-amber-900 dark:text-amber-200"
       role="status"
@@ -75,6 +80,7 @@ const recentHref = lang === 'es' ? '/es/explorar/recientes/' : '/en/explore/rece
     <p class="hw-suggestions-loading text-sm text-zinc-500 dark:text-zinc-400">{suggestions.loading}</p>
     <p class="hw-suggestions-empty hidden text-sm text-zinc-500 dark:text-zinc-400">{suggestions.empty}</p>
     <ul class="hw-suggestions-list grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3"></ul>
+
   </div>
 
   <div class="home-widgets-nearby">
@@ -98,6 +104,7 @@ const recentHref = lang === 'es' ? '/es/explorar/recientes/' : '/en/explore/rece
   import { fetchSuggestions, type SpeciesSuggestion } from '../lib/suggestions';
   import { fetchWeather, WMO_BUCKETS } from '../lib/home-weather';
   type WeatherKind = 'sunny' | 'rainy' | 'cloudy' | 'snow' | 'foggy' | 'windy';
+
 
   type Lang = 'en' | 'es';
 
@@ -389,9 +396,6 @@ const recentHref = lang === 'es' ? '/es/explorar/recientes/' : '/en/explore/rece
       greetingEl.textContent = pickGreeting(new Date().getHours(), lang, displayName, root);
     }
 
-    // Weather phrase — fetch async and append to greeting
-    appendWeatherGreeting(root, lang, profile?.region_primary ?? profile?.country_code ?? null).catch(() => { /* optional */ });
-
     // Streak badge — read user_streaks (RLS allows self-read regardless of opt-in).
     try {
       const { data: streak } = await supabase
@@ -418,6 +422,8 @@ const recentHref = lang === 'es' ? '/es/explorar/recientes/' : '/en/explore/rece
         : (root.dataset.labelNearbyTitleGlobal ?? titleEl.textContent);
     }
 
+    await paintLeaderboard(root, lang, user.id);
+    await paintNextBadge(root, lang, user.id);
     await paintNearby(root, lang, country, profile?.region_primary ?? null);
 
     // Fire suggestions widget (no await — it runs in parallel via geolocation)
@@ -434,72 +440,150 @@ const recentHref = lang === 'es' ? '/es/explorar/recientes/' : '/en/explore/rece
     });
   }
 
-  // Country code → approximate center coordinates for weather lookup
-  const COUNTRY_COORDS: Record<string, [number, number]> = {
-    MX: [23.6, -102.5], CO: [4.6, -74.1], AR: [-34.6, -58.4],
-    CL: [-33.5, -70.6], PE: [-12.0, -77.0], VE: [10.5, -66.9],
-    EC: [-0.2, -78.5], BO: [-16.5, -68.1], PY: [-25.3, -57.6],
-    UY: [-34.9, -56.2], BR: [-15.8, -47.9], GT: [14.6, -90.5],
-    HN: [14.1, -87.2], SV: [13.7, -89.2], NI: [12.1, -86.3],
-    CR: [9.9, -84.1], PA: [9.0, -79.5], CU: [23.1, -82.4],
-    US: [38.9, -77.0], CA: [45.4, -75.7], ES: [40.4, -3.7],
-  };
+  async function paintLeaderboard(root: HTMLElement, lang: Lang, _userId: string): Promise<void> {
+    const container = root.querySelector<HTMLElement>('.home-widgets-leaderboard');
+    if (!container) return;
 
-  function weatherLabel(kind: WeatherKind, region: string | null, root: HTMLElement, lang: Lang): string {
-    const keyMap: Record<WeatherKind, string> = {
-      sunny: 'labelWeatherSunny',
-      rainy: 'labelWeatherRainy',
-      cloudy: 'labelWeatherCloudy',
-      snow: 'labelWeatherSnow',
-      foggy: 'labelWeatherFoggy',
-      windy: 'labelWeatherWindy',
+    let supabase;
+    try {
+      supabase = getSupabase();
+    } catch { return; }
+
+    type LeaderRow = {
+      user_id: string;
+      username: string | null;
+      display_name: string | null;
+      avatar_url: string | null;
+      karma_30d: number;
     };
-    const tpl = root.dataset[keyMap[kind]] ?? '';
-    if (!tpl) return '';
-    const regionName = region ?? (lang === 'es' ? 'tu zona' : 'your area');
-    return tpl.replace('{region}', regionName);
-  }
-
-  async function appendWeatherGreeting(root: HTMLElement, lang: Lang, region: string | null): Promise<void> {
-    // Try browser geolocation first, fall back to country coords
-    let lat: number | null = null;
-    let lng: number | null = null;
 
     try {
-      const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 3000 });
-      });
-      lat = pos.coords.latitude;
-      lng = pos.coords.longitude;
-    } catch { /* geolocation denied or unavailable */ }
+      // Query top 3 from 30d MV — sorted server-side
+      const { data, error } = await supabase
+        .from('karma_leaderboard_30d')
+        .select('user_id, username, display_name, avatar_url, karma_30d')
+        .order('karma_30d', { ascending: false })
+        .limit(3);
 
-    if (lat === null || lng === null) {
-      // Fall back to country code center
-      const cc = (region ?? '').toUpperCase();
-      const coords = COUNTRY_COORDS[cc];
-      if (!coords) return; // no coords available
-      [lat, lng] = coords;
-    }
+      if (error || !data || (data as LeaderRow[]).length === 0) return;
 
-    const snap = await fetchWeather(lat, lng);
-    if (!snap.kind) return;
+      const rows = data as LeaderRow[];
+      const title = root.dataset.labelLeaderboardTitle ?? 'Top observers';
+      const viewAll = root.dataset.labelLeaderboardViewAll ?? 'Full leaderboard';
+      const rankTpl = root.dataset.labelLeaderboardRank ?? 'Rank {{rank}}';
+      const leaderHref = root.dataset.leaderboardHref ?? '/community/leaderboard/';
 
-    const phrase = weatherLabel(snap.kind as WeatherKind, region, root, lang);
-    if (!phrase) return;
+      const rankMedals = ['🥇', '🥈', '🥉'];
+      const itemsHtml = rows.map((r, i) => {
+        const name = r.display_name ?? r.username ?? 'Observer';
+        const rankLabel = rankTpl.replace('{{rank}}', String(i + 1));
+        const medal = rankMedals[i] ?? String(i + 1);
+        const avatarHtml = r.avatar_url
+          ? `<img src="${escapeText(r.avatar_url)}" alt="${escapeText(name)}" class="w-8 h-8 rounded-full object-cover flex-shrink-0" loading="lazy" />`
+          : `<div class="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-700 flex-shrink-0 flex items-center justify-center text-sm">${medal}</div>`;
+        return `<li class="flex items-center gap-2">
+          ${avatarHtml}
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate">${escapeText(name)}</p>
+            <p class="text-[11px] text-zinc-500 dark:text-zinc-400">${escapeText(rankLabel)} · ${Math.round(r.karma_30d)} pts</p>
+          </div>
+          <span class="text-xl">${medal}</span>
+        </li>`;
+      }).join('');
 
-    const greetingEl = root.querySelector<HTMLElement>('.hw-greeting-text');
-    if (!greetingEl) return;
+      container.innerHTML = `
+        <div>
+          <div class="flex items-baseline justify-between gap-3 mb-3">
+            <h2 class="text-sm font-semibold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">${escapeText(title)}</h2>
+            <a href="${escapeText(leaderHref)}" class="text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:underline">${escapeText(viewAll)}</a>
+          </div>
+          <ul class="space-y-2 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50">
+            ${itemsHtml}
+          </ul>
+        </div>`;
+      container.classList.remove('hidden');
+    } catch { /* leaderboard is optional */ }
+  }
 
-    // Append weather pill after greeting text
-    const weatherEl = root.querySelector<HTMLElement>('.hw-weather-pill');
-    if (weatherEl) {
-      weatherEl.textContent = phrase;
-    } else {
-      const pill = document.createElement('span');
-      pill.className = 'hw-weather-pill block text-base font-normal text-zinc-500 dark:text-zinc-400 mt-1';
-      pill.textContent = phrase;
-      greetingEl.parentElement?.insertBefore(pill, greetingEl.nextSibling);
-    }
+  async function paintNextBadge(root: HTMLElement, lang: Lang, userId: string): Promise<void> {
+    const container = root.querySelector<HTMLElement>('.home-widgets-next-badge');
+    if (!container) return;
+
+    let supabase;
+    try {
+      supabase = getSupabase();
+    } catch { return; }
+
+    type BadgeRow = {
+      key: string;
+      name_en: string;
+      name_es: string;
+      description_en: string;
+      description_es: string;
+      tier: string;
+    };
+
+    type UserBadgeRow = { badge_key: string; awarded_at: string | null };
+
+    try {
+      // Get all badges and which ones the user has earned
+      const [{ data: allBadges }, { data: userBadges }] = await Promise.all([
+        supabase.from('badges').select('key, name_en, name_es, description_en, description_es, tier').limit(100),
+        supabase.from('user_badges').select('badge_key, awarded_at').eq('user_id', userId),
+      ]);
+
+      if (!allBadges) return;
+      const earnedKeys = new Set((userBadges ?? []).map((ub: UserBadgeRow) => ub.badge_key));
+
+      // Find first unearned badge (ordered by tier: bronze → silver → gold → platinum)
+      const tierOrder: Record<string, number> = { bronze: 0, silver: 1, gold: 2, platinum: 3 };
+      const unearned = (allBadges as BadgeRow[])
+        .filter(b => !earnedKeys.has(b.key))
+        .sort((a, b) => (tierOrder[a.tier] ?? 99) - (tierOrder[b.tier] ?? 99));
+
+      if (unearned.length === 0) return;
+
+      const next = unearned[0];
+      const earned = earnedKeys.size;
+      const total = allBadges.length;
+
+      const title = root.dataset.labelNextBadgeTitle ?? 'Next badge';
+      const progressTpl = root.dataset.labelNextBadgeProgress ?? '{{current}} / {{threshold}}';
+      const viewProfileLabel = root.dataset.labelNextBadgeViewProfile ?? 'View profile';
+      const profileHref = root.dataset.profileHref ?? '/profile/';
+
+      const name = lang === 'es' ? next.name_es : next.name_en;
+      const desc = lang === 'es' ? next.description_es : next.description_en;
+      const progressLabel = progressTpl.replace('{{current}}', String(earned)).replace('{{threshold}}', String(total));
+      const pct = total > 0 ? Math.round((earned / total) * 100) : 0;
+
+      const tierColors: Record<string, string> = {
+        bronze: 'bg-amber-600',
+        silver: 'bg-zinc-400',
+        gold: 'bg-yellow-400',
+        platinum: 'bg-sky-400',
+      };
+      const barColor = tierColors[next.tier] ?? 'bg-emerald-500';
+
+      container.innerHTML = `
+        <div>
+          <div class="flex items-baseline justify-between gap-3 mb-3">
+            <h2 class="text-sm font-semibold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">${escapeText(title)}</h2>
+            <a href="${escapeText(profileHref)}" class="text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:underline">${escapeText(viewProfileLabel)}</a>
+          </div>
+          <div class="p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50">
+            <p class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-0.5">${escapeText(name)}</p>
+            <p class="text-xs text-zinc-600 dark:text-zinc-300 mb-2">${escapeText(desc)}</p>
+            <div class="flex items-center gap-2">
+              <div class="flex-1 bg-zinc-200 dark:bg-zinc-700 rounded-full h-1.5 overflow-hidden">
+                <div class="${barColor} h-full rounded-full" style="width:${pct}%"></div>
+              </div>
+              <span class="text-[11px] text-zinc-500 dark:text-zinc-400 flex-shrink-0">${escapeText(progressLabel)}</span>
+            </div>
+          </div>
+        </div>`;
+      container.classList.remove('hidden');
+    } catch { /* next badge is optional */ }
   }
 
   async function paintNearby(root: HTMLElement, lang: Lang, country: string | null, _region: string | null): Promise<void> {

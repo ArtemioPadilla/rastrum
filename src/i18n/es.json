@@ -148,6 +148,16 @@
       "nearby_loading": "Cargando observaciones recientes…",
       "nearby_anonymous": "Anónimo",
       "nearby_unknown_species": "Especie desconocida",
+      "leaderboard": {
+        "title": "Top observadores esta semana",
+        "view_all": "Ver clasificación completa",
+        "rank": "Lugar {{rank}}"
+      },
+      "next_badge": {
+        "title": "Próxima insignia",
+        "progress_label": "{{current}} / {{threshold}}",
+        "view_profile": "Ver perfil"
+      },
       "suggestions": {
         "heading": "Ve a buscar estos",
         "subtitle": "Especies cerca de ti en {{month}} que aún no has observado",
@@ -158,16 +168,6 @@
         "no_location": "Permite el acceso a tu ubicación para ver sugerencias",
         "loading": "Buscando especies cerca de ti…",
         "empty": "Sin nuevas sugerencias cercanas. Vuelve el próximo mes."
-      }
-    },
-    "greeting": {
-      "weather": {
-        "sunny": "Está soleado en {region}",
-        "rainy": "Está lloviendo en {region}",
-        "cloudy": "Está nublado en {region}",
-        "snow": "Está nevando en {region}",
-        "foggy": "Hay niebla en {region}",
-        "windy": "Hay viento en {region}"
       }
     }
   },
@@ -560,10 +560,7 @@
     "leaderboard_experts_score": "Puntaje",
     "leaderboard_experts_taxon_loading": "Cargando taxones…",
     "leaderboard_experts_taxon_none": "Aún no hay expertos — añade identificaciones para ser el primero",
-    "leaderboard_experts_no_data": "Aún nadie ha ganado experiencia. Sé el primero añadiendo identificaciones.",
-    "leaderboard_scope_region": "Región",
-    "leaderboard_country_picker_label": "Seleccionar país",
-    "leaderboard_country_picker_aria": "Filtrar clasificación por país"
+    "leaderboard_experts_no_data": "Aún nadie ha ganado experiencia. Sé el primero añadiendo identificaciones."
   },
   "profile": {
     "title": "Perfil",
@@ -902,9 +899,7 @@
     "obs_hidden_by_mod_badge": "Oculto por moderación",
     "obs_hidden_by_mod_reason_label": "Razón:",
     "obs_hidden_by_mod_no_reason": "Sin razón especificada.",
-    "obs_hidden_by_mod_appeal_link": "Ver razón / Apelar",
-    "auto_enhance": "✨ Auto",
-    "auto_enhance_aria": "Aplicar mejora automática"
+    "obs_hidden_by_mod_appeal_link": "Ver razón / Apelar"
   },
   "obs_detail": {
     "tabs": {
@@ -990,20 +985,7 @@
   },
   "chat": {
     "title": "Chat",
-    "subtitle": "Asistente de biodiversidad en el dispositivo — funciona totalmente en tu navegador. Adjunta una foto, audio o cualquier observación/especie/proyecto como contexto.",
-    "ask_rastrum": "Pregunta a Rastrum",
-    "attach_entity_label": "Adjuntar contexto",
-    "attach_entity_search": "Buscar…",
-    "entities": {
-      "observation": "Observaciones",
-      "species": "Especies",
-      "project": "Proyectos",
-      "camera_station": "Estaciones",
-      "observer": "Observadores",
-      "self_profile": "Yo"
-    },
-    "engine_fallback_banner": "Usando un modelo más ligero — Gemma no disponible.",
-    "context_load_error": "No se pudo cargar el contexto — inténtalo cuando estés en línea.",
+    "subtitle": "Asistente de biodiversidad en el dispositivo — funciona totalmente en tu navegador. También puedes adjuntar una foto o un audio.",
     "placeholder": "Pregunta lo que quieras sobre especies, hábitats o tus observaciones…",
     "send": "Enviar",
     "sending": "Pensando…",
@@ -1466,9 +1448,7 @@
       "fave_count_aria_one": "{{count}} persona marcó esto como favorito",
       "fave_count_aria_other": "{{count}} personas marcaron esto como favorito",
       "live_added": "Añadido a favoritos",
-      "live_removed": "Quitado de favoritos",
-      "fave_add_aria": "Añadir a favoritos",
-      "fave_remove_aria": "Quitar de favoritos"
+      "live_removed": "Quitado de favoritos"
     },
     "inbox": {
       "title": "Bandeja",
@@ -1516,9 +1496,7 @@
       "report_comment_aria": "Reportar este comentario",
       "block_observer_aria": "Bloquear a este observador",
       "block_commenter_aria": "Bloquear a este comentarista"
-    },
-    "recents_follow_aria": "Seguir a {{handle}}",
-    "recents_unfollow_aria": "Dejar de seguir a {{handle}}"
+    }
   },
   "sponsoring": {
     "page_title": "Patrocinios IA",
@@ -1767,43 +1745,18 @@
       "unsupported": "Este navegador no soporta web push (prueba Chrome en Android o Safari 16.4+ en iOS).",
       "vapid_missing": "El push aún no está configurado — el operador debe publicar primero una llave VAPID."
     },
-    "lunar_event": {
-      "title": "Prompt de evento lunar",
-      "body_full": "Luna llena esta noche — coros de anfibios al máximo.",
-      "body_new": "Luna nueva — buena noche para insectos atraídos a luz.",
-      "body_eclipse": "Eclipse lunar visible esta noche.",
-      "opt_in_label": "Activar prompt de evento lunar",
-      "opt_in_hint": "Una notificación al día en lunas llenas, lunas nuevas y eclipses lunares totales.",
+    "migration_window": {
+      "title": "Prompt de ventana migratoria",
+      "body_fallback": "Hay una migración notable activa en tu región — este es el momento.",
+      "opt_in_label": "Activar prompt de ventana migratoria",
+      "opt_in_hint": "Una notificación al día durante ventanas migratorias activas en tu región.",
       "enabling": "Suscribiendo…",
-      "enabled": "Prompts de evento lunar activados.",
+      "enabled": "Prompts de ventana migratoria activados.",
       "disable": "Desactivar",
       "disabling": "Desactivando…",
       "permission_blocked": "Las notificaciones del navegador están bloqueadas. Actívalas en la configuración del sitio y vuelve a intentar.",
       "unsupported": "Este navegador no soporta web push (prueba Chrome en Android o Safari 16.4+ en iOS).",
       "vapid_missing": "El push aún no está configurado — el operador debe publicar primero una llave VAPID."
-    },
-    "prefs": {
-      "push_section": "Notificaciones push",
-      "email_section": "Notificaciones por correo",
-      "quiet_hours_section": "Horas de silencio",
-      "quiet_hours_hint": "No se enviarán push durante estas horas",
-      "quiet_start": "Inicio",
-      "quiet_end": "Fin",
-      "timezone_label": "Tu zona horaria",
-      "save_error": "No se pudo guardar. Intenta de nuevo.",
-      "saved": "Preferencias guardadas.",
-      "push_after_rain": "Alerta post-lluvia",
-      "push_migration_window": "Alerta de ventana de migración",
-      "push_lunar_event": "Alerta de evento lunar",
-      "push_streak_reminder": "Recordatorio de racha",
-      "push_kairos_golden_hour": "Prompt de hora dorada (kairos)",
-      "push_badge_unlock": "Insignia desbloqueada",
-      "push_comment_on_my_obs": "Comentario en mi observación",
-      "push_new_follower": "Nuevo seguidor",
-      "push_id_accepted_on_my_obs": "ID aceptado en mi observación",
-      "email_weekly_digest": "Resumen semanal",
-      "email_badge_unlock": "Insignia desbloqueada",
-      "email_new_follower": "Nuevo seguidor"
     }
   },
   "surprises": {
@@ -2049,7 +2002,17 @@
       "view": {
         "switcher_label": "Cambiar vista",
         "cards": "Tarjetas",
-        "grid": "Cuadrícula"
+        "grid": "Cuadrícula",
+        "list": "Lista",
+        "map": "Mapa",
+        "timeline": "Línea de tiempo",
+        "list_aria": "Vista de lista",
+        "map_aria": "Vista de mapa",
+        "timeline_aria": "Vista de línea de tiempo"
+      },
+      "timeline": {
+        "today": "Hoy",
+        "yesterday": "Ayer"
       }
     },
     "watchlist": {
