@@ -37,7 +37,7 @@ export function makeDropTarget(
     if (!list) return [];
     const files = Array.from(list);
     if (!accept?.length) return files;
-    return files.filter(f => accept.some(prefix => f.type.startsWith(prefix)));
+    return files.filter(f => f && accept.some(prefix => f.type?.startsWith(prefix)));
   }
 
   function showOverlay() {
