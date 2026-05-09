@@ -9531,3 +9531,40 @@ SELECT cron.unschedule('refresh-norms-weekly')
 SELECT cron.schedule('refresh-norms-weekly', '0 6 * * 1',
   $$REFRESH MATERIALIZED VIEW public.license_norm;
     REFRESH MATERIALIZED VIEW public.privacy_norm;$$);
+
+-- =====================================================================
+-- M01-traits — curated field marks per taxon (issue #736)
+--
+-- Powers the "¿Por qué?" panel under cascade results: 3-5 short, expert-
+-- curated marks that let an observer self-verify the AI ID against the
+-- photo. Per-language because Spanish + English readers see different
+-- mnemonic phrases (e.g. "orejas desnudas" vs "naked ears").
+--
+-- Read: public (anon + authenticated). It's a field-guide layer.
+-- Write: service_role only — privileged edits flow through M24 admin EF
+--        once the editor UI lands. v1 seeds via taxon-traits-seed.sql.
+-- =====================================================================
+CREATE TABLE IF NOT EXISTS public.taxon_traits (
+  taxon_id        uuid NOT NULL REFERENCES public.taxa(id) ON DELETE CASCADE,
+  lang            text NOT NULL CHECK (lang IN ('en', 'es')),
+  trait_marks     text[] NOT NULL,
+  source_url      text,
+  updated_by      uuid REFERENCES public.users(id) ON DELETE SET NULL,
+  updated_at      timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (taxon_id, lang)
+);
+
+ALTER TABLE public.taxon_traits ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS taxon_traits_read ON public.taxon_traits;
+CREATE POLICY taxon_traits_read ON public.taxon_traits
+  FOR SELECT USING (true);
+
+GRANT SELECT ON public.taxon_traits TO anon, authenticated;
+GRANT INSERT, UPDATE, DELETE ON public.taxon_traits TO service_role;
+
+CREATE INDEX IF NOT EXISTS idx_taxon_traits_lang
+  ON public.taxon_traits(lang, taxon_id);
+
+COMMENT ON TABLE public.taxon_traits IS
+  'Curated field marks per taxon, surfaced in the "Why this species?" panel under AI cascade results (issue #736). One row per (taxon_id, lang). Read-public, expert-write only.';

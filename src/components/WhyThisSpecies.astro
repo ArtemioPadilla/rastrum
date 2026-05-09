@@ -1,0 +1,339 @@
+---
+/**
+ * WhyThisSpecies — cascade-result self-verification panel (issue #736).
+ *
+ * Mounts inside the cascade result card. Collapsed by default — opens
+ * to show 3-5 curated field marks, up to 4 research-grade reference
+ * photos, a provider chip with an honest "what this model is good at"
+ * note, and a "Report incorrect" button that re-runs the cascade
+ * excluding the current source.
+ *
+ * Reads taxon traits + reference photos from Supabase on first
+ * expansion. The cascade returns scientific_name; we resolve taxon_id
+ * via `taxa.scientific_name`. Anon-readable — no auth required.
+ *
+ * Wiring contract for the host page (e.g. ObservationForm):
+ *   1. Mount this component anywhere inside the result card.
+ *   2. After the cascade resolves, call:
+ *        const root = document.getElementById('why-this-species');
+ *        root.dataset.scientificName = '...';
+ *        root.dataset.source = '...';            // plugin id
+ *        root.classList.remove('hidden');
+ *      The component re-renders the chip + clears any prior expansion
+ *      automatically via a MutationObserver on dataset attributes.
+ *   3. The "Report incorrect" button dispatches
+ *      `rastrum:why-this-species-report` on `window`. Catch it to wire
+ *      to your re-run cascade flow (or to ReportDialog post-save).
+ */
+import { t } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+
+const { lang } = Astro.props;
+const tr = t(lang);
+const isEs = lang === 'es';
+const wts = (tr as Record<string, unknown>).why_this_species as
+  | {
+      cta: string;
+      heading: string;
+      provider_label: string;
+      marks_loading: string;
+      marks_empty: string;
+      photos_heading: string;
+      photos_empty: string;
+      report: string;
+      report_hint: string;
+      source_link: string;
+      collapse: string;
+    }
+  | undefined;
+
+const labels = wts ?? {
+  cta: isEs ? '¿Por qué esta especie?' : 'Why this species?',
+  heading: isEs ? 'Cómo verificar' : 'How to verify',
+  provider_label: isEs ? 'Identificado por' : 'Identified by',
+  marks_loading: isEs ? 'Buscando rasgos…' : 'Looking up field marks…',
+  marks_empty: isEs
+    ? 'Aún no hay rasgos curados para esta especie.'
+    : 'No curated field marks for this species yet.',
+  photos_heading: isEs ? 'Compara con observaciones validadas' : 'Compare with validated observations',
+  photos_empty: isEs
+    ? 'Aún no hay fotos validadas para comparar.'
+    : 'No validated photos to compare yet.',
+  report: isEs ? 'Reportar como incorrecta' : 'Report as incorrect',
+  report_hint: isEs
+    ? 'Volveremos a correr la cascada con un identificador distinto.'
+    : 'Re-runs the cascade with a different identifier.',
+  source_link: isEs ? 'Ver fuente' : 'View source',
+  collapse: isEs ? 'Cerrar' : 'Close',
+};
+---
+
+<div
+  id="why-this-species"
+  class="hidden mt-3 pt-3 border-t border-zinc-200 dark:border-zinc-800"
+  data-lang={lang}
+  data-source=""
+  data-scientific-name=""
+>
+  <button
+    type="button"
+    data-wts-toggle
+    aria-expanded="false"
+    aria-controls="why-this-species-panel"
+    class="text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:underline inline-flex items-center gap-1"
+  >
+    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" />
+      <path stroke-linecap="round" d="M12 8v.01M11 12h1v4h1" />
+    </svg>
+    <span data-wts-cta>{labels.cta}</span>
+  </button>
+
+  <section
+    id="why-this-species-panel"
+    data-wts-panel
+    class="hidden mt-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/60 p-4 space-y-4"
+    role="region"
+    aria-label={labels.heading}
+  >
+    <!-- Field marks -->
+    <div data-wts-marks-wrap>
+      <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2">
+        {labels.heading}
+      </p>
+      <p data-wts-marks-status class="text-xs text-zinc-500 dark:text-zinc-400">
+        {labels.marks_loading}
+      </p>
+      <ul
+        data-wts-marks-list
+        class="hidden list-disc list-inside space-y-1 text-sm text-zinc-700 dark:text-zinc-300 marker:text-emerald-600"
+      ></ul>
+      <a
+        data-wts-marks-source
+        class="hidden mt-2 inline-block text-xs underline text-emerald-700 dark:text-emerald-400"
+        target="_blank"
+        rel="noopener noreferrer"
+      >{labels.source_link}</a>
+    </div>
+
+    <!-- Reference photos -->
+    <div data-wts-photos-wrap>
+      <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2">
+        {labels.photos_heading}
+      </p>
+      <p data-wts-photos-status class="hidden text-xs text-zinc-500 dark:text-zinc-400">
+        {labels.photos_empty}
+      </p>
+      <ul
+        data-wts-photos-list
+        class="hidden grid grid-cols-4 gap-2"
+      ></ul>
+    </div>
+
+    <!-- Provider chip + note -->
+    <div data-wts-provider-wrap class="rounded-md bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 p-3 text-xs space-y-1">
+      <p class="text-zinc-500 dark:text-zinc-400">
+        <span class="uppercase tracking-wider font-semibold">{labels.provider_label}</span>
+        <span data-wts-provider-name class="ml-1 font-semibold text-zinc-800 dark:text-zinc-200"></span>
+      </p>
+      <p data-wts-provider-note class="text-zinc-600 dark:text-zinc-300 italic"></p>
+    </div>
+
+    <!-- Report incorrect -->
+    <div class="flex items-center gap-3 flex-wrap">
+      <button
+        type="button"
+        data-wts-report
+        class="min-h-9 inline-flex items-center gap-1.5 rounded-lg border border-amber-400 dark:border-amber-700/70 bg-amber-50 dark:bg-amber-900/20 px-3 py-1.5 text-xs font-medium text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/40"
+      >
+        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3m0 4h.01M4.93 4.93l14.14 14.14M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <span>{labels.report}</span>
+      </button>
+      <span class="text-xs text-zinc-500 dark:text-zinc-400">{labels.report_hint}</span>
+    </div>
+  </section>
+</div>
+
+<style>
+  [data-wts-photos-list] li a {
+    display: block;
+    aspect-ratio: 1 / 1;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    background: rgb(228 228 231);
+  }
+  .dark [data-wts-photos-list] li a { background: rgb(63 63 70); }
+  [data-wts-photos-list] img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+</style>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+  import {
+    pickProviderNote,
+    resolveTaxonId,
+    fetchTaxonTraits,
+    fetchReferencePhotos,
+    type Lang,
+  } from '../lib/why-this-species';
+
+  const root = document.getElementById('why-this-species');
+  if (root) initWhyThisSpecies(root);
+
+  function initWhyThisSpecies(container: HTMLElement) {
+    const lang = (container.dataset.lang ?? 'en') as Lang;
+    const toggle = container.querySelector<HTMLButtonElement>('[data-wts-toggle]');
+    const panel = container.querySelector<HTMLElement>('[data-wts-panel]');
+    const marksStatus = container.querySelector<HTMLElement>('[data-wts-marks-status]');
+    const marksList = container.querySelector<HTMLUListElement>('[data-wts-marks-list]');
+    const marksSource = container.querySelector<HTMLAnchorElement>('[data-wts-marks-source]');
+    const photosStatus = container.querySelector<HTMLElement>('[data-wts-photos-status]');
+    const photosList = container.querySelector<HTMLUListElement>('[data-wts-photos-list]');
+    const providerName = container.querySelector<HTMLElement>('[data-wts-provider-name]');
+    const providerNote = container.querySelector<HTMLElement>('[data-wts-provider-note]');
+    const reportBtn = container.querySelector<HTMLButtonElement>('[data-wts-report]');
+    const cta = container.querySelector<HTMLElement>('[data-wts-cta]');
+    const collapseLabel = lang === 'es' ? 'Cerrar' : 'Close';
+    const expandLabel = cta?.textContent ?? (lang === 'es' ? '¿Por qué esta especie?' : 'Why this species?');
+
+    if (!toggle || !panel) return;
+
+    type FetchKey = string;
+    let lastFetchKey: FetchKey | null = null;
+
+    function paintProvider() {
+      const source = container.dataset.source ?? '';
+      const note = pickProviderNote(source, lang);
+      if (providerName) providerName.textContent = note.name;
+      if (providerNote) providerNote.textContent = note.note;
+    }
+
+    function resetState() {
+      lastFetchKey = null;
+      marksStatus?.classList.remove('hidden');
+      if (marksStatus) {
+        marksStatus.textContent = lang === 'es' ? 'Buscando rasgos…' : 'Looking up field marks…';
+      }
+      marksList?.classList.add('hidden');
+      if (marksList) marksList.innerHTML = '';
+      marksSource?.classList.add('hidden');
+      photosStatus?.classList.add('hidden');
+      photosList?.classList.add('hidden');
+      if (photosList) photosList.innerHTML = '';
+    }
+
+    async function loadIfNeeded() {
+      const sciName = container.dataset.scientificName ?? '';
+      if (!sciName) return;
+      const fetchKey = `${sciName}::${lang}`;
+      if (fetchKey === lastFetchKey) return;
+      lastFetchKey = fetchKey;
+
+      const sb = getSupabase();
+      const taxonId = await resolveTaxonId(sb, sciName);
+
+      // Marks
+      if (!taxonId) {
+        if (marksStatus) {
+          marksStatus.textContent = lang === 'es'
+            ? 'Aún no hay rasgos curados para esta especie.'
+            : 'No curated field marks for this species yet.';
+        }
+      } else {
+        const traits = await fetchTaxonTraits(sb, taxonId, lang);
+        if (!traits || traits.trait_marks.length === 0) {
+          if (marksStatus) {
+            marksStatus.textContent = lang === 'es'
+              ? 'Aún no hay rasgos curados para esta especie.'
+              : 'No curated field marks for this species yet.';
+          }
+        } else {
+          marksStatus?.classList.add('hidden');
+          if (marksList) {
+            marksList.innerHTML = traits.trait_marks
+              .map((m) => `<li>${escapeHtml(m)}</li>`)
+              .join('');
+            marksList.classList.remove('hidden');
+          }
+          if (traits.source_url && marksSource) {
+            marksSource.href = traits.source_url;
+            marksSource.classList.remove('hidden');
+          }
+        }
+      }
+
+      // Reference photos
+      if (taxonId) {
+        const photos = await fetchReferencePhotos(sb, taxonId, 4);
+        if (photos.length === 0) {
+          photosStatus?.classList.remove('hidden');
+        } else if (photosList) {
+          const altText = sciName;
+          photosList.innerHTML = photos
+            .map((p) => {
+              const href = `/share/obs/?id=${encodeURIComponent(p.observation_id)}`;
+              return `<li><a href="${href}" aria-label="${escapeHtml(altText)}"><img src="${escapeHtml(p.url)}" alt="${escapeHtml(altText)}" loading="lazy" /></a></li>`;
+            })
+            .join('');
+          photosList.classList.remove('hidden');
+        }
+      } else {
+        photosStatus?.classList.remove('hidden');
+      }
+    }
+
+    toggle.addEventListener('click', () => {
+      const open = !panel.classList.contains('hidden');
+      panel.classList.toggle('hidden', open);
+      toggle.setAttribute('aria-expanded', String(!open));
+      if (cta) cta.textContent = open ? expandLabel : collapseLabel;
+      if (!open) {
+        paintProvider();
+        void loadIfNeeded();
+      }
+    });
+
+    reportBtn?.addEventListener('click', () => {
+      window.dispatchEvent(
+        new CustomEvent('rastrum:why-this-species-report', {
+          detail: {
+            scientific_name: container.dataset.scientificName ?? '',
+            source: container.dataset.source ?? '',
+          },
+        }),
+      );
+    });
+
+    // Re-paint chip + reset cached fetch when host updates the dataset.
+    const observer = new MutationObserver(() => {
+      paintProvider();
+      // Collapse on result change so the user sees the fresh CTA, then
+      // re-fetch on next open.
+      panel.classList.add('hidden');
+      toggle.setAttribute('aria-expanded', 'false');
+      if (cta) cta.textContent = expandLabel;
+      resetState();
+    });
+    observer.observe(container, {
+      attributes: true,
+      attributeFilter: ['data-source', 'data-scientific-name'],
+    });
+
+    // Initial paint (in case dataset is already populated server-side).
+    paintProvider();
+  }
+
+  function escapeHtml(s: string): string {
+    return s.replace(/[&<>"']/g, (c) => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string
+    ));
+  }
+</script>

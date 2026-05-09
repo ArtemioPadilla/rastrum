@@ -6,6 +6,7 @@ import MapPicker from "./MapPicker.astro";
 import TaxonAutocomplete from "./TaxonAutocomplete.astro";
 import ActiveObserversBanner from "./ActiveObserversBanner.astro";
 import ContextualSpeciesChips from "./ContextualSpeciesChips.astro";
+import WhyThisSpecies from "./WhyThisSpecies.astro";
 import { t } from "../i18n/utils";
 import { HABITATS, WEATHERS } from "../lib/observation-enums";
 
@@ -150,6 +151,8 @@ const weathers = WEATHERS;
         <button type="button" id="obs2-id-edit" class="mt-2 text-xs text-zinc-400 underline">
           {isEs ? "Editar identificación" : "Edit identification"}
         </button>
+        <!-- "Why this species?" — issue #736 — curated marks + reference photos -->
+        <WhyThisSpecies lang={lang} />
       </div>
       <!-- Manual entry — always visible so user can enter species even when AI returns nothing -->
       <div id="obs2-id-manual" class="mt-2">
@@ -914,6 +917,15 @@ function showPostForm() {
     if (taxonInputEl && !taxonInputEl.value) taxonInputEl.value = bestResult.scientific_name;
     const labelEl = document.getElementById('obs2-taxon-label');
     if (labelEl) labelEl.textContent = isEs ? 'Editar identificación' : 'Edit identification';
+
+    // "Why this species?" panel (issue #736). Feed dataset so it can
+    // resolve traits + reference photos when the user opens it.
+    const wts = document.getElementById('why-this-species');
+    if (wts) {
+      wts.dataset.source = bestResult.source;
+      wts.dataset.scientificName = bestResult.scientific_name;
+      wts.classList.remove('hidden');
+    }
   }
 
   // Edit identification toggle — only wired when AI result is present
@@ -921,6 +933,19 @@ function showPostForm() {
     document.getElementById('obs2-id-manual')?.classList.toggle('hidden');
   });
 }
+
+// "Report incorrect" from the WhyThisSpecies panel (issue #736).
+// Pre-save we have no identification id, so M22's wrong_id flow isn't
+// live yet — the most useful action is to reveal the manual-entry
+// field so the observer can correct the taxon themselves and focus
+// the input. After save, the standard ReportDialog on /share/obs/
+// handles the M22 path with target='identification'.
+window.addEventListener('rastrum:why-this-species-report', () => {
+  document.getElementById('obs2-id-manual')?.classList.remove('hidden');
+  const taxonInputEl = document.getElementById('obs2-taxon-input') as HTMLInputElement | null;
+  taxonInputEl?.focus();
+  taxonInputEl?.select();
+});
 
 // ── Identify mode: skip save ──────────────────────────────────────────────
 skipSaveBtn?.addEventListener('click', () => {
