@@ -987,6 +987,12 @@ BEGIN
   END IF;
 END $$;
 
+DO $$
+BEGIN
+  RAISE NOTICE 'follows RLS: 3 assertions passed (Tests 36–38)';
+  RAISE NOTICE 'NOTE: status=accepted edges are intentionally public (open follow graph). Tests 37-38 verify only pending edges are hidden.';
+END $$;
+
 RESET ROLE;
 
 -- ────────────────────────────────────────────────────────────────────────────
