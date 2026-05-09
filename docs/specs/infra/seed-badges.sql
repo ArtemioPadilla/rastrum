@@ -109,6 +109,10 @@ INSERT INTO public.badges (key, name_es, name_en, description_es, description_en
 ('state_explorer_3', 'Explorador de estados', 'State explorer', 'Observaste en 3 estados o provincias distintos','Observed in 3 distinct states or provinces',
   'discovery','silver', '{"type":"state_diversity","min_states":3}'),
 
+-- ─────────── GLOBAL DIVERSITY (#867) ───────────
+('globetrotter', 'Trotamundos', 'Globetrotter', 'Observaste en al menos 2 países','Observed in at least 2 countries',
+  'discovery','silver', '{"type":"country_diversity","threshold":2}'),
+
 -- ─────────── EASTER EGGS (hidden, #701) ───────────
 ('midnight_owl', '🌙 Búho nocturno', '🌙 Midnight owl', 'Una observación entre las 00:00 y las 04:59 UTC','An observation between 00:00 and 04:59 UTC',
   'discovery','bronze', '{"type":"midnight_observation"}')

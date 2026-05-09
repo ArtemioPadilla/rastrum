@@ -9901,6 +9901,133 @@ REVOKE ALL ON FUNCTION public.refresh_taxon_ranges() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.refresh_taxon_ranges() TO service_role;
 
 -- ═══════════════════════════════════════════════════════════════════════════
+-- Issue #867 — Globetrotter badge + observations.country_code backfill
+-- ═══════════════════════════════════════════════════════════════════════════
+-- Adds country_code column to observations, a SECURITY DEFINER trigger to
+-- fill it from the places table on INSERT/UPDATE OF location, a one-time
+-- idempotent backfill, and the badge_eligible_country_diversity() function
+-- that the award-badges EF calls for the new 'country_diversity' predicate.
+
+-- 1) New column on observations (idempotent).
+ALTER TABLE public.observations
+  ADD COLUMN IF NOT EXISTS country_code text
+    CHECK (country_code ~ '^[A-Z]{2}$');
+
+CREATE INDEX IF NOT EXISTS idx_obs_country_code
+  ON public.observations (country_code)
+  WHERE country_code IS NOT NULL;
+
+-- 2) Trigger function: fills country_code from places on INSERT/UPDATE OF location.
+--    SECURITY DEFINER so the function can SELECT from places (bypasses invoker-level
+--    RLS; places_public_read already grants everyone SELECT, but explicit SDEF is
+--    safer for service-role-restricted flows).
+--    Silent on error: if places table doesn't exist or no polygon covers the point,
+--    NEW.country_code remains unchanged (NULL for new rows, existing value for updates).
+CREATE OR REPLACE FUNCTION public.fill_observation_country_code()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = public, extensions, pg_temp
+AS $$
+DECLARE
+  v_cc text;
+BEGIN
+  IF NEW.location IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  BEGIN
+    -- ST_Covers uses the existing GiST index idx_places_geometry (created in the
+    -- places table definition above). Backfill performance is bounded by that index.
+    SELECT p.country_code INTO v_cc
+      FROM public.places p
+     WHERE p.country_code IS NOT NULL
+       AND ST_Covers(p.geometry::geometry, NEW.location::geometry)
+     ORDER BY
+       -- prefer smaller / more precise areas (protected_area < h3_cell < custom < community)
+       CASE p.place_type
+         WHEN 'protected_area' THEN 1
+         WHEN 'h3_cell'        THEN 2
+         WHEN 'custom'         THEN 3
+         ELSE 4
+       END
+     LIMIT 1;
+  EXCEPTION WHEN OTHERS THEN
+    -- places table may not exist in the test DB; swallow silently.
+    v_cc := NULL;
+  END;
+
+  IF v_cc IS NOT NULL THEN
+    NEW.country_code := v_cc;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.fill_observation_country_code() FROM PUBLIC;
+GRANT  EXECUTE ON FUNCTION public.fill_observation_country_code() TO service_role;
+
+DROP TRIGGER IF EXISTS tg_fill_obs_country_code ON public.observations;
+CREATE TRIGGER tg_fill_obs_country_code
+  BEFORE INSERT OR UPDATE OF location ON public.observations
+  FOR EACH ROW EXECUTE FUNCTION public.fill_observation_country_code();
+
+-- 3) Idempotent backfill: populate country_code for existing observations that
+--    have a location but no country_code yet. Safe to replay (WHERE country_code IS NULL
+--    ensures already-filled rows are never touched).
+-- NOTE: This backfill runs in the schema apply transaction. On a large production DB
+-- with millions of observations, consider running outside a transaction via psql \i
+-- to avoid long lock holds on the observations table.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+     WHERE table_schema = 'public' AND table_name = 'places'
+  ) THEN
+    UPDATE public.observations o
+       SET country_code = (
+         SELECT p.country_code
+           FROM public.places p
+          WHERE p.country_code IS NOT NULL
+            AND ST_Covers(p.geometry::geometry, o.location::geometry)
+          ORDER BY
+            CASE p.place_type
+              WHEN 'protected_area' THEN 1
+              WHEN 'h3_cell'        THEN 2
+              WHEN 'custom'         THEN 3
+              ELSE 4
+            END
+          LIMIT 1
+       )
+     WHERE o.country_code IS NULL
+       AND o.location IS NOT NULL;
+  END IF;
+END;
+$$;
+
+-- 4) Badge eligibility function for 'country_diversity' predicate.
+--    Returns user_ids with COUNT(DISTINCT observations.country_code) >= p_min.
+--    Only considers synced, non-hidden observations.
+CREATE OR REPLACE FUNCTION public.badge_eligible_country_diversity(
+  p_min integer DEFAULT 2
+)
+RETURNS TABLE(user_id uuid)
+LANGUAGE sql STABLE
+SECURITY DEFINER SET search_path = public, extensions, pg_temp
+AS $$
+  SELECT o.observer_id AS user_id
+    FROM public.observations o
+   WHERE o.sync_status  = 'synced'
+     AND o.hidden       = false
+     AND o.country_code IS NOT NULL
+   GROUP BY o.observer_id
+  HAVING COUNT(DISTINCT o.country_code) >= p_min;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.badge_eligible_country_diversity(integer) FROM PUBLIC;
+GRANT  EXECUTE ON FUNCTION public.badge_eligible_country_diversity(integer) TO service_role;
+
+-- ═══════════════════════════════════════════════════════════════════════════
 -- Security Advisor remediation — 2026-05-08
 -- ═══════════════════════════════════════════════════════════════════════════
 -- Closes the critical + warning findings from the Supabase Database Advisor:
