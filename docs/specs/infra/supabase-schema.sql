@@ -9951,7 +9951,7 @@ AS $$
       'lng', CASE WHEN auth.uid() = o.observer_id
                   THEN ST_X(o.location::geometry)
                   ELSE ST_X(coalesce(o.location_obscured, o.location)::geometry) END,
-      'coords_obscured', (auth.uid() <> o.observer_id AND o.location_obscured IS NOT NULL)
+      'coords_obscured', (auth.uid() IS DISTINCT FROM o.observer_id AND o.location_obscured IS NOT NULL)
     ),
     'suggested_questions', jsonb_build_array(
       'Why is this ' || CASE WHEN o.is_research_grade THEN 'research grade' ELSE 'needs review' END || '?',
@@ -10051,6 +10051,8 @@ AS $$
       'slug',         p.slug,
       'name',         p.name,
       'name_es',      p.name_es,
+      'description',    p.description,
+      'description_es', p.description_es,
       'visibility',   p.visibility,
       'area_km2',     p.area_km2,
       'obs_count',    c.obs_count
@@ -10082,9 +10084,8 @@ AS $$
     WHERE cs.id = p_id
   ),
   pn AS (
-    SELECT coalesce(sum(extract(day from coalesce(end_date::timestamp, now()) - start_date::timestamp))::int, 0) AS trap_nights
-    FROM public.camera_station_periods, s
-    WHERE camera_station_periods.station_id = s.id
+    SELECT coalesce(public.station_trap_nights(s.id), 0) AS trap_nights
+    FROM s
   )
   SELECT CASE WHEN s.id IS NULL THEN NULL ELSE jsonb_build_object(
     'kind',          'camera_station',
