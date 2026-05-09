@@ -3,6 +3,7 @@ import BaseLayout from '../../../../layouts/BaseLayout.astro';
 import SettingsShell from '../../../../components/SettingsShell.astro';
 import ProfileEditForm from '../../../../components/ProfileEditForm.astro';
 import StreakRemindersSection from '../../../../components/StreakRemindersSection.astro';
+import SurprisesPrefsSection from '../../../../components/SurprisesPrefsSection.astro';
 import PrivacyMatrix from '../../../../components/PrivacyMatrix.astro';
 import BlockedUsersList from '../../../../components/BlockedUsersList.astro';
 import { t, getLocalizedPath, routes } from '../../../../i18n/utils';
@@ -144,6 +145,9 @@ const mcpUrl = 'https://reppvlqejgoqvitturxp.supabase.co/functions/v1/mcp';
             </a>
           </p>
         </section>
+
+        <!-- Field surprises (variable rewards, opt-in, capped at 1/day) -->
+        <SurprisesPrefsSection lang={lang} />
       </div>
     )}
 

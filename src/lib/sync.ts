@@ -295,6 +295,24 @@ async function triggerEnvEnrichment(observationId: string): Promise<void> {
   });
 }
 
+/**
+ * Fire-and-forget post-sync surprise check. Lazy-imported so the
+ * surprises bundle (~2 KB + the curated facts catalog) is only paid
+ * for when sync actually succeeds. Closes #727.
+ *
+ * Any failure is swallowed — a missing surprise is invisible by
+ * definition. Never blocks sync.
+ */
+function maybeFireSurprise(observationId: string): void {
+  // Don't await — explicitly fire-and-forget so the outbox loop keeps
+  // moving. The trigger module also has its own daily-cap and opt-in
+  // gates so a stale call (e.g. observation already had a surprise)
+  // is a no-op.
+  import('./surprise-trigger').then(({ maybeShowSurpriseAfterSync }) => {
+    maybeShowSurpriseAfterSync(observationId).catch(() => { /* swallow */ });
+  }).catch(() => { /* surprises module not bundled — fine */ });
+}
+
 // Local-AI prefs extracted to ./local-ai-prefs.ts (#583). Re-exported for
 // backwards compat with consumers (ObservationForm) importing from sync.ts.
 export {
@@ -547,6 +565,7 @@ async function syncOutboxInner(): Promise<SyncResult> {
               await syncOne(upgraded);
               synced++;
               emit<SyncRowDetail>(SYNC_EVENTS.rowDone, { observation_id: rec.id });
+              maybeFireSurprise(rec.id);
             } catch (err) {
               failed++;
               const msg = err instanceof Error ? err.message : String(err);
@@ -570,6 +589,7 @@ async function syncOutboxInner(): Promise<SyncResult> {
       await syncOne(rec);
       synced++;
       emit<SyncRowDetail>(SYNC_EVENTS.rowDone, { observation_id: rec.id });
+      maybeFireSurprise(rec.id);
     } catch (err) {
       failed++;
       const msg = err instanceof Error ? err.message : String(err);

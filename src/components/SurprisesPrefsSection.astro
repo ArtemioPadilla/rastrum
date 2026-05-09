@@ -1,0 +1,105 @@
+---
+/**
+ * SurprisesPrefsSection — toggle for `users.surprises_opt_in` plus a
+ * link to /docs/surprises. Default OFF (column default is `false`).
+ * Closes #727.
+ */
+import { t, getDocPath } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+const { lang } = Astro.props;
+const tr = t(lang);
+const sup = (tr as unknown as { surprises: { section_title: string; section_hint: string; toggle_label: string; toggle_off_status: string; toggle_on_status: string; toggle_save_failed: string; learn_more: string } }).surprises;
+const docHref = lang === 'es' ? getDocPath('es', 'surprises') : getDocPath('en', 'surprises');
+---
+
+<section class="mt-10 border-t border-zinc-200 dark:border-zinc-800 pt-8">
+  <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2">
+    {sup.section_title}
+  </h2>
+  <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">{sup.section_hint}</p>
+
+  <div class="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3 flex flex-col gap-2">
+    <label class="flex items-start gap-3 cursor-pointer">
+      <input
+        id="surprises-opt-in"
+        type="checkbox"
+        class="mt-0.5 h-4 w-4 rounded border-zinc-300 dark:border-zinc-600 text-emerald-600 focus:ring-emerald-500"
+      />
+      <span class="text-sm text-zinc-800 dark:text-zinc-200">{sup.toggle_label}</span>
+    </label>
+    <p id="surprises-opt-in-status" class="text-xs text-zinc-500 dark:text-zinc-400 ml-7"></p>
+    <p id="surprises-opt-in-error" class="hidden ml-7 text-xs text-rose-600 dark:text-rose-400"></p>
+  </div>
+
+  <p class="mt-2 text-xs">
+    <a href={docHref} class="text-emerald-700 dark:text-emerald-400 hover:underline">
+      {sup.learn_more}
+    </a>
+  </p>
+</section>
+
+<script define:vars={{ statusOn: sup.toggle_on_status, statusOff: sup.toggle_off_status, errorMsg: sup.toggle_save_failed }}>
+  (async function () {
+    const cb = /** @type {HTMLInputElement | null} */ (document.getElementById('surprises-opt-in'));
+    const statusEl = document.getElementById('surprises-opt-in-status');
+    const errorEl = document.getElementById('surprises-opt-in-error');
+    if (!cb || !statusEl) return;
+
+    function setStatus(checked) {
+      statusEl.textContent = checked ? statusOn : statusOff;
+    }
+
+    function setError(msg) {
+      if (!errorEl) return;
+      if (!msg) { errorEl.classList.add('hidden'); errorEl.textContent = ''; return; }
+      errorEl.textContent = msg;
+      errorEl.classList.remove('hidden');
+    }
+
+    const { getSupabase } = await import('../lib/supabase.ts');
+    const supabase = getSupabase();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user?.id) {
+      cb.disabled = true;
+      setStatus(false);
+      return;
+    }
+    const userId = session.user.id;
+
+    // Read current pref
+    try {
+      const { data } = await supabase
+        .from('users')
+        .select('surprises_opt_in')
+        .eq('id', userId)
+        .maybeSingle();
+      const current = data?.surprises_opt_in === true;
+      cb.checked = current;
+      setStatus(current);
+    } catch {
+      setStatus(false);
+    }
+
+    cb.addEventListener('change', async () => {
+      const desired = cb.checked;
+      cb.disabled = true;
+      setError('');
+      try {
+        const { error } = await supabase
+          .from('users')
+          .update({ surprises_opt_in: desired })
+          .eq('id', userId);
+        if (error) throw error;
+        setStatus(desired);
+      } catch {
+        cb.checked = !desired;
+        setError(errorMsg);
+      } finally {
+        cb.disabled = false;
+      }
+    });
+  })();
+</script>

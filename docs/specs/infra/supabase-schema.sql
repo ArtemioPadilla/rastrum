@@ -9159,3 +9159,121 @@ CREATE POLICY "kairos_subs_delete_own" ON public.kairos_subscriptions
   FOR DELETE TO authenticated USING (auth.uid() = user_id);
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.kairos_subscriptions TO authenticated;
+-- ---------------------------------------------------------------------------
+-- M-Surprises — Sorpresas de campo (transparent, opt-in variable rewards)
+-- Closes #727. Catalog is FIXED in the client (src/lib/surprises.ts):
+-- 'dato_curioso' (10 % random), 'rarito' (deterministic on rare bucket),
+-- 'comunidad_activa_hoy' (deterministic, max 1×/day). Defaults OFF.
+-- ---------------------------------------------------------------------------
+
+ALTER TABLE public.users
+  ADD COLUMN IF NOT EXISTS surprises_opt_in boolean NOT NULL DEFAULT false;
+
+GRANT UPDATE (surprises_opt_in) ON public.users TO authenticated;
+
+CREATE TABLE IF NOT EXISTS public.surprise_events (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id         uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  observation_id  uuid REFERENCES public.observations(id) ON DELETE SET NULL,
+  kind            text NOT NULL CHECK (kind IN ('dato_curioso','rarito','comunidad_activa_hoy')),
+  payload         jsonb NOT NULL DEFAULT '{}'::jsonb,
+  shown_at        timestamptz NOT NULL DEFAULT now(),
+  dismissed_at    timestamptz
+);
+
+CREATE INDEX IF NOT EXISTS surprise_events_user_day_idx
+  ON public.surprise_events (user_id, shown_at DESC);
+
+ALTER TABLE public.surprise_events ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS surprise_events_self_read ON public.surprise_events;
+CREATE POLICY surprise_events_self_read ON public.surprise_events
+  FOR SELECT USING (user_id = auth.uid());
+
+-- Authenticated users can insert their own rows; the daily cap is
+-- enforced by `record_surprise_event()` below (SECURITY DEFINER) so a
+-- racing tab can't beat it. The direct-insert policy is a safety net
+-- for tests + admin tooling — combined with the cap function nothing
+-- bypasses the rule.
+DROP POLICY IF EXISTS surprise_events_self_insert ON public.surprise_events;
+CREATE POLICY surprise_events_self_insert ON public.surprise_events
+  FOR INSERT WITH CHECK (user_id = auth.uid());
+
+GRANT SELECT, INSERT ON public.surprise_events TO authenticated;
+
+-- ---- Helpers --------------------------------------------------------------
+
+-- Today's count for the calling user. Used by the client to short-circuit
+-- the picker before it hits any other RPC. Cheap (covered by the index).
+CREATE OR REPLACE FUNCTION public.surprise_count_today()
+RETURNS integer
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT COUNT(*)::int
+    FROM public.surprise_events
+   WHERE user_id = auth.uid()
+     AND shown_at >= date_trunc('day', now() AT TIME ZONE 'UTC');
+$$;
+
+REVOKE ALL ON FUNCTION public.surprise_count_today() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.surprise_count_today() TO authenticated;
+
+-- Atomic record-with-cap-check. Returns the inserted row id when the
+-- user is under cap, or NULL when capped or opted-out. Inline-checking
+-- is the only way to avoid TOCTOU between two tabs racing the same
+-- observation.
+CREATE OR REPLACE FUNCTION public.record_surprise_event(
+  p_observation_id uuid,
+  p_kind           text,
+  p_payload        jsonb
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_uid          uuid := auth.uid();
+  v_count        int;
+  v_id           uuid;
+  v_opt_in       boolean;
+BEGIN
+  IF v_uid IS NULL THEN
+    RETURN NULL;
+  END IF;
+
+  -- Honour the per-user opt-in. Insert is silently skipped when off so
+  -- we never log a surprise the user wouldn't have seen.
+  SELECT surprises_opt_in INTO v_opt_in
+    FROM public.users
+   WHERE id = v_uid;
+  IF NOT COALESCE(v_opt_in, false) THEN
+    RETURN NULL;
+  END IF;
+
+  IF p_kind NOT IN ('dato_curioso','rarito','comunidad_activa_hoy') THEN
+    RAISE EXCEPTION 'Unknown surprise kind: %', p_kind;
+  END IF;
+
+  -- 1×/day cap
+  SELECT COUNT(*) INTO v_count
+    FROM public.surprise_events
+   WHERE user_id = v_uid
+     AND shown_at >= date_trunc('day', now() AT TIME ZONE 'UTC');
+  IF v_count >= 1 THEN
+    RETURN NULL;
+  END IF;
+
+  INSERT INTO public.surprise_events (user_id, observation_id, kind, payload)
+  VALUES (v_uid, p_observation_id, p_kind, COALESCE(p_payload, '{}'::jsonb))
+  RETURNING id INTO v_id;
+
+  RETURN v_id;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.record_surprise_event(uuid, text, jsonb) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.record_surprise_event(uuid, text, jsonb) TO authenticated;
