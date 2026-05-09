@@ -15,6 +15,7 @@ import { t } from '../i18n/utils';
 import Skeleton from './Skeleton.astro';
 import EspeciesHero from './species/EspeciesHero.astro';
 import FilterChips from './species/FilterChips.astro';
+import WhyAmISeeingThis from './WhyAmISeeingThis.astro';
 import { renderSpeciesCard, type CardLabels } from '../lib/species-card-html';
 import { parseChips, serializeChips, buildSpeciesUrl, type ChipsState } from '../lib/species-filters';
 
@@ -124,6 +125,10 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
           autocomplete="off"
         />
       </label>
+
+      <div class="mb-3">
+        <WhyAmISeeingThis algorithm="explore_species_recent" lang={lang} />
+      </div>
 
       <div class="es-skeleton">
         <Skeleton variant="card" count={6} ariaLabel={page.loading} />

@@ -6759,6 +6759,464 @@
           "status": "done"
         }
       ]
+    },
+    "fogg-quick-observation": {
+      "phase": "v1.1.5",
+      "title_en": "Reduction — one-tap Quick Observation",
+      "title_es": "Reducción — Observación rápida de un toque",
+      "modules": [],
+      "subtasks": [
+        {
+          "label_en": "src/lib/quick-observe.ts pure helpers (buildQuickObservationDraft, getQuickGps with 12s timeout, mediaKindFromMime, isNullIsland)",
+          "label_es": "Helpers puros src/lib/quick-observe.ts (buildQuickObservationDraft, getQuickGps con timeout 12s, mediaKindFromMime, isNullIsland)",
+          "status": "done"
+        },
+        {
+          "label_en": "QuickObserveCapture.astro full-screen capture surface, gates on ?quick=1 so the script is inert on default /observe",
+          "label_es": "QuickObserveCapture.astro superficie de captura pantalla completa, se activa con ?quick=1 para no correr en /observar por defecto",
+          "status": "done"
+        },
+        {
+          "label_en": "MobileBottomBar long-press detection (touch + mouse, ≥500 ms, vibration cue if available) → /observe?quick=1",
+          "label_es": "MobileBottomBar detección de long-press (touch + mouse, ≥500 ms, vibración si está disponible) → /observar?quick=1",
+          "status": "done"
+        },
+        {
+          "label_en": "No-GPS path saves with asDraft=true; promoteDraftsWithGps worker flips to pending once a fix arrives",
+          "label_es": "Ruta sin GPS guarda con asDraft=true; el worker promoteDraftsWithGps lo cambia a pending cuando llega el fix",
+          "status": "done"
+        },
+        {
+          "label_en": "posthog.capture('quick_observation_saved', { had_gps, media_kind }) telemetry on success",
+          "label_es": "Telemetría posthog.capture('quick_observation_saved', { had_gps, media_kind }) al éxito",
+          "status": "done"
+        }
+      ]
+    },
+    "fogg-photo-praise": {
+      "phase": "v1.1.5",
+      "title_en": "Praise — contextual photo praise on upload",
+      "title_es": "Elogio — elogio contextual al subir foto",
+      "modules": [],
+      "subtasks": [
+        {
+          "label_en": "src/lib/photo-praise.ts pickPraise(exif) pure lookup with 5 priority-ordered rules (sharp_action, portrait_aperture, long_lens, good_light, balanced_exposure)",
+          "label_es": "Lookup puro pickPraise(exif) en src/lib/photo-praise.ts con 5 reglas priorizadas (sharp_action, portrait_aperture, long_lens, good_light, balanced_exposure)",
+          "status": "done"
+        },
+        {
+          "label_en": "Returns null when EXIF missing, ISO ≥ 800, or no rule matches — silent rather than dishonest",
+          "label_es": "Devuelve null cuando falta EXIF, ISO ≥ 800, o ninguna regla coincide — silencioso en vez de deshonesto",
+          "status": "done"
+        },
+        {
+          "label_en": "Single small badge next to thumbnail in ObservationForm; EN+ES copy under photo_praise.* i18n keys",
+          "label_es": "Una sola insignia pequeña junto a la miniatura en ObservationForm; copy EN+ES bajo claves i18n photo_praise.*",
+          "status": "done"
+        },
+        {
+          "label_en": "Taxon-agnostic for v1 (cascade hasn't run at upload time); thresholds work for any subject",
+          "label_es": "Independiente de taxón en v1 (la cascade no ha corrido al subir); umbrales funcionan para cualquier sujeto",
+          "status": "done"
+        }
+      ]
+    },
+    "fogg-triage-sla": {
+      "phase": "v1.1.5",
+      "title_en": "Responsiveness — public roadmap-triage SLA dashboard",
+      "title_es": "Responsividad — tablero público de SLA de triage",
+      "modules": [],
+      "subtasks": [
+        {
+          "label_en": "TriageStatusView.astro reads public/data/triage-stats.json at build time and renders three stat tiles + 'who responds' / 'how to report' sections",
+          "label_es": "TriageStatusView.astro lee public/data/triage-stats.json en build-time y renderiza tres tiles de stats + secciones 'quién responde' / 'cómo reportar'",
+          "status": "done"
+        },
+        {
+          "label_en": ".github/workflows/triage-stats.yml nightly at 07:00 UTC; computes via gh CLI (default GITHUB_TOKEN); commits JSON back only when changed",
+          "label_es": ".github/workflows/triage-stats.yml nocturno a 07:00 UTC; computa vía gh CLI (GITHUB_TOKEN por defecto); hace commit del JSON solo cuando cambia",
+          "status": "done"
+        },
+        {
+          "label_en": "scripts/fetch-gh-issue-stats.ts fault-tolerant — preserves last good JSON on transient API failure so the build never breaks",
+          "label_es": "scripts/fetch-gh-issue-stats.ts tolerante a fallos — preserva el último JSON bueno ante fallo transitorio para nunca romper el build",
+          "status": "done"
+        },
+        {
+          "label_en": "src/lib/triage-stats.ts pure helpers (median, hoursBetween, round1) + 9 unit tests",
+          "label_es": "Helpers puros src/lib/triage-stats.ts (median, hoursBetween, round1) + 9 tests unitarios",
+          "status": "done"
+        }
+      ]
+    },
+    "fogg-active-observers-banner": {
+      "phase": "v1.1.5",
+      "title_en": "Social Facilitation — active-observers banner on /observe",
+      "title_es": "Facilitación social — banner de observadores activos en /observar",
+      "modules": ["28-community-discovery.md"],
+      "subtasks": [
+        {
+          "label_en": "community_active_observers_today(p_country) RPC — same eligibility predicate as community_observers (hide_from_leaderboards = false); never reads centroid view",
+          "label_es": "RPC community_active_observers_today(p_country) — mismo predicado de elegibilidad que community_observers (hide_from_leaderboards = false); nunca lee vista con centroide",
+          "status": "done"
+        },
+        {
+          "label_en": "ActiveObserversBanner.astro mounts at top of ObserveView2; starts display:none and reveals only after count + region resolve (no SSR flash)",
+          "label_es": "ActiveObserversBanner.astro monta en el top de ObserveView2; arranca display:none y se revela solo cuando se resuelven count + region (sin flash SSR)",
+          "status": "done"
+        },
+        {
+          "label_en": "src/lib/active-observers.ts pure formatter with 11 unit tests covering plural/singular EN+ES, empty, null-region, NULL leakage guard, negative count clamp",
+          "label_es": "Formatter puro src/lib/active-observers.ts con 11 tests unitarios cubriendo plural/singular EN+ES, vacío, null-region, guard contra fuga de NULL, clamp de count negativo",
+          "status": "done"
+        },
+        {
+          "label_en": "Click target uses the M28 serializeFilters() to land on /community/observers/?country=<ISO> — no new URL helpers",
+          "label_es": "Target de click usa serializeFilters() de M28 para aterrizar en /community/observers/?country=<ISO> — sin nuevos helpers de URL",
+          "status": "done"
+        }
+      ]
+    },
+    "fogg-falta-dex": {
+      "phase": "v1.1.5",
+      "title_en": "Self-monitoring — falta-dex 'Show missing' Pokédex toggle",
+      "title_es": "Auto-monitoreo — toggle 'Mostrar faltantes' en Pokédex",
+      "modules": ["08-profile.md", "23-karma-reputation.md"],
+      "subtasks": [
+        {
+          "label_en": "profile_pokedex_with_missing(p_user_id, p_region_country, p_missing_limit) SECURITY INVOKER RPC returning observed + silhouette rows in one call",
+          "label_es": "RPC SECURITY INVOKER profile_pokedex_with_missing(p_user_id, p_region_country, p_missing_limit) que devuelve filas observadas + silueta en una sola llamada",
+          "status": "done"
+        },
+        {
+          "label_en": "Owner-only — visitor /u/<handle>/dex never sees the missing surface (privacy: more invasive than what they have)",
+          "label_es": "Solo dueño — /u/<handle>/dex visitante nunca ve la superficie de faltantes (privacidad: más invasivo que lo que sí tiene)",
+          "status": "done"
+        },
+        {
+          "label_en": "Toggle persists in localStorage[rastrum.pokedex.showMissing], default off",
+          "label_es": "Toggle persiste en localStorage[rastrum.pokedex.showMissing], por defecto off",
+          "status": "done"
+        },
+        {
+          "label_en": "Option A baseline: country pool = taxa with research-grade public obs by users with matching country_code. Runbook documents v1.1 GBIF upgrade path",
+          "label_es": "Línea base Opción A: pool por país = taxa con obs research-grade públicas por usuarios con country_code coincidente. Runbook documenta ruta de upgrade a GBIF en v1.1",
+          "status": "done"
+        }
+      ]
+    },
+    "fogg-field-theme": {
+      "phase": "v1.1.5",
+      "title_en": "Real-World Feel — high-contrast Field theme",
+      "title_es": "Sensación de mundo real — tema Campo de alto contraste",
+      "modules": [],
+      "subtasks": [
+        {
+          "label_en": "src/lib/theme.ts pure resolver (parseStoredTheme, resolveEffective, applyEffective); Field layered on top of .dark so dark:* utilities stay readable",
+          "label_es": "Resolver puro src/lib/theme.ts (parseStoredTheme, resolveEffective, applyEffective); Campo se apila sobre .dark para que utilidades dark:* sigan legibles",
+          "status": "done"
+        },
+        {
+          "label_en": "First-paint inline script in BaseLayout + ConsoleLayout is now a 4-state machine (light / dark / auto / field)",
+          "label_es": "Script inline de primer pintado en BaseLayout + ConsoleLayout ahora es máquina de 4 estados (light / dark / auto / field)",
+          "status": "done"
+        },
+        {
+          "label_en": "AmbientLightSensor auto-detect at > 5 000 lux when stored preference is 'auto'; feature-detected, manual via Settings as cross-browser path",
+          "label_es": "AmbientLightSensor auto-detect a > 5 000 lux cuando la preferencia es 'auto'; feature-detected, ruta multi-browser manual vía Ajustes",
+          "status": "done"
+        },
+        {
+          "label_en": "1.25× hit-target sizing on mobile FAB and form inputs (48 → 60 px) for sweat/gloves",
+          "label_es": "Tamaño de hit-target 1.25× en FAB móvil e inputs (48 → 60 px) para sudor/guantes",
+          "status": "done"
+        },
+        {
+          "label_en": "9 unit tests in tests/unit/theme.test.ts pin the state machine + Field-on-top-of-dark layering",
+          "label_es": "9 tests unitarios en tests/unit/theme.test.ts fijan la máquina de estado + apilamiento Campo-sobre-dark",
+          "status": "done"
+        }
+      ]
+    },
+    "fogg-about-humanized": {
+      "phase": "v1.1.5",
+      "title_en": "Reputed Credibility — humanized About page",
+      "title_es": "Credibilidad reputada — página Acerca humanizada",
+      "modules": [],
+      "subtasks": [
+        {
+          "label_en": "AboutView.astro shared by /en/about + /es/acerca; pages slim to ~15-line wrappers",
+          "label_es": "AboutView.astro compartido por /en/about + /es/acerca; las páginas se reducen a wrappers de ~15 líneas",
+          "status": "done"
+        },
+        {
+          "label_en": "scripts/fetch-about-stats.ts queries Supabase REST + publishable anon key at build time; graceful placeholder when env missing or unreachable",
+          "label_es": "scripts/fetch-about-stats.ts consulta Supabase REST + anon key publicable en build-time; placeholder gracioso cuando falta env o es inalcanzable",
+          "status": "done"
+        },
+        {
+          "label_en": "Sections: team / funding / governance / live stats / press — each backed by i18n (about.people, about.funding, about.governance, about.stats, about.press)",
+          "label_es": "Secciones: equipo / financiación / gobernanza / stats en vivo / prensa — cada una respaldada por i18n (about.people, about.funding, about.governance, about.stats, about.press)",
+          "status": "done"
+        },
+        {
+          "label_en": "Funding: explicit 'currently unfunded' framing with cost line items; preserves the privacy promise via BYO API keys note",
+          "label_es": "Financiación: framing explícito 'sin financiación actual' con líneas de costo; preserva la promesa de privacidad via nota de BYO API keys",
+          "status": "done"
+        }
+      ]
+    },
+    "fogg-why-am-i-seeing-this": {
+      "phase": "v1.1.5",
+      "title_en": "Transparency — WhyAmISeeingThis algorithmic disclosure",
+      "title_es": "Transparencia — divulgación algorítmica WhyAmISeeingThis",
+      "modules": [],
+      "subtasks": [
+        {
+          "label_en": "src/lib/algorithms.ts catalog keyed by AlgorithmId; each entry holds headline, summary, EN+ES inputs/window/settings copy, and settings deep-link path",
+          "label_es": "Catálogo src/lib/algorithms.ts indexado por AlgorithmId; cada entrada tiene título, resumen, copy EN+ES de inputs/ventana/ajustes, y deep-link a ajustes",
+          "status": "done"
+        },
+        {
+          "label_en": "WhyAmISeeingThis inline 'i' pill + global WhyAmISeeingThisDialog (focus trap, Esc/backdrop close, focus restore) — single instance in BaseLayout",
+          "label_es": "Pill inline 'i' WhyAmISeeingThis + WhyAmISeeingThisDialog global (focus trap, cerrar con Esc/fondo, restauración de foco) — única instancia en BaseLayout",
+          "status": "done"
+        },
+        {
+          "label_en": "Wired today on community_observers, explore_recent, explore_species_recent; adding a new ranked surface = one catalog entry + one tag",
+          "label_es": "Hoy cableado en community_observers, explore_recent, explore_species_recent; agregar una superficie rankeada nueva = una entrada de catálogo + un tag",
+          "status": "done"
+        },
+        {
+          "label_en": "/{en,es}/docs/algorithms/ reference page enumerates the catalog + 4 principles ('no black box', 'no hidden profiling', 'a lever for every input', 'no engagement bait')",
+          "label_es": "Página de referencia /{en,es}/docs/algorithms/ enumera el catálogo + 4 principios ('sin caja negra', 'sin perfilado oculto', 'una palanca por entrada', 'sin cebos de engagement')",
+          "status": "done"
+        },
+        {
+          "label_en": "8 unit tests pin catalog shape + EN/ES parity",
+          "label_es": "8 tests unitarios fijan la forma del catálogo + paridad EN/ES",
+          "status": "done"
+        }
+      ]
+    },
+    "fogg-cleanup-superseded": {
+      "phase": "v1.1.5",
+      "title_en": "Cleanup — remove disambiguation + nearby-similar + places-url",
+      "title_es": "Limpieza — eliminar disambiguation + nearby-similar + places-url",
+      "modules": [],
+      "subtasks": [
+        {
+          "label_en": "Remove DisambiguationBanner.astro + NearbySimilarCard.astro components and their callsites in ObservationForm + ShareObsView + ExplorePlacesView",
+          "label_es": "Eliminar componentes DisambiguationBanner.astro + NearbySimilarCard.astro y sus callsites en ObservationForm + ShareObsView + ExplorePlacesView",
+          "status": "done"
+        },
+        {
+          "label_en": "Remove src/lib/{disambiguation,nearby-similar,places-url}.ts + their tests",
+          "label_es": "Eliminar src/lib/{disambiguation,nearby-similar,places-url}.ts + sus tests",
+          "status": "done"
+        },
+        {
+          "label_en": "Remove handleDisambiguate branch from supabase/functions/identify/index.ts; preserve the #693 fallback chain",
+          "label_es": "Eliminar rama handleDisambiguate de supabase/functions/identify/index.ts; preservar la cadena de fallback #693",
+          "status": "done"
+        },
+        {
+          "label_en": "Remove cascade_config + taxon_pair_disambiguations + nearby_similar_species SQL surface from supabase-schema.sql",
+          "label_es": "Eliminar superficie SQL cascade_config + taxon_pair_disambiguations + nearby_similar_species de supabase-schema.sql",
+          "status": "done"
+        },
+        {
+          "label_en": "Net -2048 LOC across 18 files; intent now served by #736 'Why this species?' panel + #774 contextual species + #760 falta-dex + M28 Nearby flow",
+          "label_es": "Net -2048 LOC en 18 archivos; intención ahora servida por panel #736 '¿Por qué esta especie?' + especies contextuales #774 + falta-dex #760 + flujo Nearby de M28",
+          "status": "done"
+        }
+      ]
+    },
+    "fogg-seasonal-themes": {
+      "phase": "v1.1.5",
+      "title_en": "Conditioning — seasonal + regional theme variants",
+      "title_es": "Condicionamiento — variantes estacionales y regionales de tema",
+      "modules": [],
+      "subtasks": [
+        {
+          "label_en": "src/lib/seasonal-theme.ts pure resolver (now, region) → 'monarca' | 'lluvias' | 'secas' | 'default'",
+          "label_es": "Resolver puro src/lib/seasonal-theme.ts (now, region) → 'monarca' | 'lluvias' | 'secas' | 'default'",
+          "status": "in_progress"
+        },
+        {
+          "label_en": "Inline boot script resolves before first paint; data-season='<theme>' on <html> avoids flicker",
+          "label_es": "Script inline antes del primer pintado; data-season='<tema>' en <html> evita parpadeo",
+          "status": "in_progress"
+        },
+        {
+          "label_en": "5-button picker in Profile → Apariencia (Auto + Default + Monarca + Lluvias + Secas) writes localStorage[rastrum.theme.seasonal]",
+          "label_es": "Selector de 5 botones en Perfil → Apariencia (Auto + Default + Monarca + Lluvias + Secas) escribe localStorage[rastrum.theme.seasonal]",
+          "status": "in_progress"
+        },
+        {
+          "label_en": "MX-Norte / MX-Sur fall back to MX-Centro mapping for v1; registry shape accepts new region keys for v1.1 differentiation",
+          "label_es": "MX-Norte / MX-Sur caen al mapeo MX-Centro en v1; la forma del registro acepta nuevas claves de región para diferenciación v1.1",
+          "status": "planned"
+        }
+      ]
+    },
+    "fogg-peer-norms": {
+      "phase": "v1.1.5",
+      "title_en": "Normative Influence — peer norms on license / privacy",
+      "title_es": "Influencia normativa — normas de pares en licencia / privacidad",
+      "modules": ["07-licensing.md", "25-profile-privacy.md"],
+      "subtasks": [
+        {
+          "label_en": "license_norm + privacy_norm materialised views; refresh-norms-weekly pg_cron (Mon 06:00 UTC)",
+          "label_es": "Vistas materializadas license_norm + privacy_norm; pg_cron refresh-norms-weekly (lunes 06:00 UTC)",
+          "status": "in_progress"
+        },
+        {
+          "label_en": "peer_norm_pct(scope, country, key) SECURITY INVOKER lookup; src/lib/peer-norms.ts wrapper with 9 unit tests + per-page cache",
+          "label_es": "Lookup SECURITY INVOKER peer_norm_pct(scope, country, key); wrapper src/lib/peer-norms.ts con 9 tests unitarios + caché por página",
+          "status": "in_progress"
+        },
+        {
+          "label_en": "License selector on /profile/edit + PrivacyMatrix render small bars; hide when n < 50 (MIN_N_THRESHOLD)",
+          "label_es": "Selector de licencia en /profile/edit + PrivacyMatrix renderizan barras pequeñas; ocultar cuando n < 50 (MIN_N_THRESHOLD)",
+          "status": "in_progress"
+        },
+        {
+          "label_en": "Defaults are unchanged; copy is informational only — no normative-default-flip",
+          "label_es": "Los defaults no cambian; copy es solo informativo — sin flip de default normativo",
+          "status": "in_progress"
+        }
+      ]
+    },
+    "fogg-percentile-card": {
+      "phase": "v1.1.5",
+      "title_en": "Self-monitoring — tú-vs-promedio MX percentile card",
+      "title_es": "Auto-monitoreo — tarjeta tú-vs-promedio MX",
+      "modules": [],
+      "subtasks": [
+        {
+          "label_en": "user_metrics_percentile materialised view computes PERCENT_RANK() over cohort (≥ 5 obs in 90 days, country = MX)",
+          "label_es": "Vista materializada user_metrics_percentile computa PERCENT_RANK() sobre cohorte (≥ 5 obs en 90 días, país = MX)",
+          "status": "in_progress"
+        },
+        {
+          "label_en": "recompute_user_stats() extended via CREATE OR REPLACE with guarded BEGIN/EXCEPTION block — best-effort, never aborts user-stats update",
+          "label_es": "recompute_user_stats() extendido vía CREATE OR REPLACE con bloque BEGIN/EXCEPTION protegido — best-effort, nunca aborta la actualización de user-stats",
+          "status": "in_progress"
+        },
+        {
+          "label_en": "4 cards (Diversity Shannon H', Habitats, Validations, Geographic km²) on /profile/; honest fallback when cohort_n < 50",
+          "label_es": "4 tarjetas (Diversidad Shannon H', Hábitats, Validaciones, Geográfico km²) en /perfil/; fallback honesto cuando cohort_n < 50",
+          "status": "in_progress"
+        },
+        {
+          "label_en": "NEVER raw rank, NEVER 'people above you' copy — Fogg-ethical normative comparison only",
+          "label_es": "NUNCA rank crudo, NUNCA copy 'gente sobre ti' — solo comparación normativa ética Fogg",
+          "status": "in_progress"
+        }
+      ]
+    },
+    "fogg-contextual-suggestions": {
+      "phase": "v1.1.5",
+      "title_en": "Suggestion Technology — contextual species chips on /observe",
+      "title_es": "Tecnología de sugerencia — chips de especies contextuales en /observar",
+      "modules": [],
+      "subtasks": [
+        {
+          "label_en": "probable_taxa_at(p_lat, p_lng, p_month, p_limit) SECURITY INVOKER RPC: ST_DWithin(50 km) + month ±1 + research-grade-or-confirmed; top-N by COUNT DESC, MIN(distance) ASC",
+          "label_es": "RPC SECURITY INVOKER probable_taxa_at(p_lat, p_lng, p_month, p_limit): ST_DWithin(50 km) + mes ±1 + research-grade-o-confirmada; top-N por COUNT DESC, MIN(distancia) ASC",
+          "status": "in_progress"
+        },
+        {
+          "label_en": "ContextualSpeciesChips.astro mounts above DropZone in ObserveView2; emits rastrum:observe-location-ready after first GPS fix",
+          "label_es": "ContextualSpeciesChips.astro monta arriba de DropZone en ObserveView2; emite rastrum:observe-location-ready tras el primer fix de GPS",
+          "status": "in_progress"
+        },
+        {
+          "label_en": "Chip-tap pre-fills the manual ID input (mirrors TaxonAutocomplete.select), never auto-submits",
+          "label_es": "Tocar un chip pre-llena el input de ID manual (refleja TaxonAutocomplete.select), nunca envía automáticamente",
+          "status": "in_progress"
+        },
+        {
+          "label_en": "Cache layer deferred — live RPC < 300 ms at current scale + sessionStorage browser cache; runbook documents migration path",
+          "label_es": "Capa de caché diferida — RPC en vivo < 300 ms a escala actual + caché del navegador en sessionStorage; runbook documenta la ruta de migración",
+          "status": "in_progress"
+        },
+        {
+          "label_en": "24 unit tests in tests/unit/contextual-suggest.test.ts (pickCommonName, formatDistancePill, suggestCacheKey)",
+          "label_es": "24 tests unitarios en tests/unit/contextual-suggest.test.ts (pickCommonName, formatDistancePill, suggestCacheKey)",
+          "status": "in_progress"
+        }
+      ]
+    },
+    "fogg-variable-rewards": {
+      "phase": "v1.1.5",
+      "title_en": "Variable Rewards — transparent 'sorpresa de campo' badges",
+      "title_es": "Recompensas variables — insignias 'sorpresa de campo' transparentes",
+      "modules": [],
+      "subtasks": [
+        {
+          "label_en": "Design rare-but-honest milestones (first species in new genus, first nocturnal observation, first ecoregion, etc.)",
+          "label_es": "Diseñar hitos raros pero honestos (primera especie en nuevo género, primera observación nocturna, primera ecorregión, etc.)",
+          "status": "planned"
+        },
+        {
+          "label_en": "Opt-in toggle in Profile → Preferences; default off (Fogg ch. 5: kairos must be welcomed)",
+          "label_es": "Toggle opt-in en Perfil → Preferencias; por defecto off (Fogg cap. 5: kairos debe ser bienvenido)",
+          "status": "planned"
+        },
+        {
+          "label_en": "Always disclose the underlying rule in the badge tooltip — no slot-machine darkness",
+          "label_es": "Siempre divulgar la regla subyacente en el tooltip de la insignia — sin oscuridad de tragamonedas",
+          "status": "planned"
+        }
+      ]
+    },
+    "fogg-kairos-prompts": {
+      "phase": "v1.1.5",
+      "title_en": "Kairos / Right-Time Prompts — golden hour + after the rain push",
+      "title_es": "Kairos / Avisos al momento justo — push de hora dorada + después de la lluvia",
+      "modules": [],
+      "subtasks": [
+        {
+          "label_en": "Web Push at sunset ± 30 min ('golden hour') and rain stop + 2 h ('after the rain'); geo-aware via region_primary",
+          "label_es": "Web Push en atardecer ± 30 min ('hora dorada') y cese de lluvia + 2 h ('después de la lluvia'); geo-consciente vía region_primary",
+          "status": "planned"
+        },
+        {
+          "label_en": "Single nightly cap per channel; explicitly opt-in (Fogg: kairos must be welcomed, not ambushed)",
+          "label_es": "Tope único nocturno por canal; opt-in explícito (Fogg: kairos debe ser bienvenido, no emboscar)",
+          "status": "planned"
+        },
+        {
+          "label_en": "Cron schedule + push-subscription table + service-worker push handler",
+          "label_es": "Schedule de cron + tabla de subscripciones de push + handler de push en service worker",
+          "status": "planned"
+        }
+      ]
+    },
+    "fogg-ecological-impact-viz": {
+      "phase": "v1.1.5",
+      "title_en": "Cause-and-Effect — 'mi impacto ecológico' visualization",
+      "title_es": "Causa-efecto — visualización 'mi impacto ecológico'",
+      "modules": [],
+      "subtasks": [
+        {
+          "label_en": "Surface research-grade contributions used in GBIF, validations that helped peers, sensitive-species records that helped CONANP staff",
+          "label_es": "Mostrar contribuciones research-grade usadas en GBIF, validaciones que ayudaron a pares, registros de especies sensibles que ayudaron a CONANP",
+          "status": "planned"
+        },
+        {
+          "label_en": "Honest framing — every claimed effect links to a verifiable trace; no inflated metrics",
+          "label_es": "Framing honesto — cada efecto reclamado enlaza a una traza verificable; sin métricas infladas",
+          "status": "planned"
+        },
+        {
+          "label_en": "Renders on /profile/ as a card; per-user data only (privacy: not exposed in /u/<handle>/ visitor view)",
+          "label_es": "Renderiza en /perfil/ como tarjeta; datos solo del usuario (privacidad: no expuesto en vista visitante /u/<handle>/)",
+          "status": "planned"
+        }
+      ]
     }
   }
 }

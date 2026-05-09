@@ -14,6 +14,7 @@ import OfflineBanner from '../components/OfflineBanner.astro';
 import ReportDialog from '../components/ReportDialog.astro';
 import ConfirmDialog from '../components/ConfirmDialog.astro';
 import PhotoCropModal from '../components/PhotoCropModal.astro';
+import WhyAmISeeingThisDialog from '../components/WhyAmISeeingThisDialog.astro';
 import BanBanner from '../components/BanBanner.astro';
 import { getAlternateUrl } from '../i18n/utils';
 import StructuredData from '../components/StructuredData.astro';
@@ -376,6 +377,7 @@ const resolvedOgImage = ogImage ?? `${SITE_URL}/og/${ogLang}/${ogSlugForPath(cur
     <ReportDialog lang={installLang} />
     <ConfirmDialog lang={installLang} />
     <PhotoCropModal lang={installLang} />
+    <WhyAmISeeingThisDialog lang={installLang} />
     <script>
       import { getSupabase } from '../lib/supabase';
       import { subscribeToKarmaEvents } from '../lib/karma-toast';

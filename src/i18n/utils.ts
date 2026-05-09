@@ -126,7 +126,7 @@ export const docPages = [
   'architecture', 'indigenous', 'funding', 'contribute',
   'faq', 'privacy', 'terms', 'console', 'sponsorships', 'mcp',
   'changelog', 'community', 'camera-stations', 'sponsor-pools',
-  'obs-detail', 'status',
+  'obs-detail', 'status', 'algorithms',
 ] as const;
 
 export type DocPage = (typeof docPages)[number];
@@ -349,6 +349,10 @@ export const docPageMeta = {
   status: {
     en: "Public triage SLA dashboard: open issues, median time-to-first-comment over the last 30 days, and recent resolution count.",
     es: "Tablero público de SLA de triage: issues abiertas, tiempo medio a primer comentario en los últimos 30 días y resoluciones recientes.",
+  },
+  algorithms: {
+    en: "Every ranked surface in Rastrum, with the inputs it uses, the time window, and the settings that change its behavior.",
+    es: "Cada superficie ordenada en Rastrum, con las entradas que usa, la ventana de tiempo y los ajustes que cambian su comportamiento.",
   },
 } as const satisfies Record<DocPage, { en: string; es: string }>;
 

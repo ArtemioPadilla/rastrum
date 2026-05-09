@@ -1,0 +1,12 @@
+---
+import DocLayout from '../../../layouts/DocLayout.astro';
+import AlgorithmsDocView from '../../../components/AlgorithmsDocView.astro';
+import { t } from '../../../i18n/utils';
+
+const lang = 'es';
+const tr = t(lang);
+---
+
+<DocLayout title={tr.docs.sections.algorithms} lang={lang} section="algorithms" editPath="src/pages/es/docs/algorithms.astro">
+  <AlgorithmsDocView lang={lang} />
+</DocLayout>

@@ -10,6 +10,7 @@
  */
 import { t } from '../i18n/utils';
 import Skeleton from './Skeleton.astro';
+import WhyAmISeeingThis from './WhyAmISeeingThis.astro';
 
 interface Props {
   lang: 'en' | 'es';
@@ -62,6 +63,7 @@ const sgReport = sgTree.socialgraph.report.button;
   <header class="space-y-3 py-6">
     <h1 class="text-3xl font-bold tracking-tight">{page.title}</h1>
     <p class="text-zinc-600 dark:text-zinc-400">{page.subtitle}</p>
+    <WhyAmISeeingThis algorithm="explore_recent" lang={lang} />
   </header>
 
   <div class="er-skeleton">
