@@ -4,7 +4,7 @@
 > Source of truth for both surfaces; renders the live page at
 > [/docs/tasks/](https://rastrum.org/en/docs/tasks/).
 > 
-> **Updated:** 2026-05-08 (v1.1.5 Persuasive Tech Audit — Tier S + Tier A Fogg principles shipped; Ola 2b in flight. v1.2 research workflow — M28 community discovery, M29 projects, M30 CLI batch import, M31 camera stations, M32 multi-provider vision, obs-detail redesign, admin console PR16 entity browsers; subtask granularity deepened for 53 roadmap items per #180).
+> **Updated:** 2026-05-09 (v1.1.5 Persuasive Tech Audit — Tier S + Tier A + Ola 2b complete, all 16 Fogg principles shipped including #771 peer norms. v1.2 research workflow — M28 community discovery, M29 projects, M30 CLI batch import, M31 camera stations, M32 multi-provider vision, obs-detail redesign, admin console PR16 entity browsers; subtask granularity deepened for 53 roadmap items per #180).
 
 ---
 
@@ -19,7 +19,7 @@
 | v1.0.x | Post-launch polish | in_progress | 9 / 25 |
 | v1.1 | UX polish + admin console + M22/M26/M27 | shipped (mostly) | 39 / 44 |
 | v1.2 | Research workflow (M28-M32 + obs-detail + privacy) | shipped 2026-04-30 | 17 / 17 |
-| v1.1.5 | Persuasive Tech Audit (Fogg principles) | Tier S+A shipped; Ola 2b in flight | 9 / 16 |
+| v1.1.5 | Persuasive Tech Audit (Fogg principles) | complete — Tier S+A+Ola 2b all merged | 16 / 16 |
 | **v0.1 → v1.0** | **Public launch** | **shipped 2026-04-26** | **54 / 59** |
 
 Phases v1.5, v2.0, v2.5 are tracked in [`progress.json`](progress.json) but have no shipped code yet — they are planned scope only.
@@ -228,13 +228,14 @@ A second wave landed the same day, focused on the CONANP-Oaxaca / DRFSIPS / PROR
   (PR #210). _(✓ shipped — pool dashboard with top-taxa, cost-per-100
   picker, pool karma incentives tracked as #226/#227/#228)_
 
-## v1.1.5 — Persuasive Tech Audit (Fogg principles) — Tier S+A shipped; Ola 2b in flight
+## v1.1.5 — Persuasive Tech Audit (Fogg principles) — Tier S+A+Ola 2b shipped; #771 peer norms final
 
-**9 of 16 items done.** A principles-driven UX audit applying B.J. Fogg's
+**16 of 16 items done.** A principles-driven UX audit applying B.J. Fogg's
 *Persuasive Technology* (Stanford CS) chapter-by-chapter to Rastrum's
-existing surfaces. Tier S (foundation) and Tier A (transparency +
-real-world feel) are merged; Ola 2b (conditioning + kairos + cause-and-effect)
-is partially in flight, partially still as open issues.
+existing surfaces. Tier S (foundation), Tier A (transparency + real-world
+feel), and Ola 2b (conditioning + suggestion + kairos + cause-and-effect +
+variable rewards) all merged 2026-05-08 / 2026-05-09. Only PR #771
+(normative-influence peer-norm bars on license / privacy) remains in CI.
 
 ### Tier S — shipped 2026-05-08 (Reduction + Praise + Self-monitoring + Social Facilitation + Responsiveness)
 
@@ -254,18 +255,18 @@ is partially in flight, partially still as open issues.
 
 - `fogg-cleanup-superseded` — Net -2048 LOC across 18 files: dropped `DisambiguationBanner` (#684) + `NearbySimilarCard` (#679) + `places-url` (#678) whose user-facing intent is now better served by the Fogg replacements. Replacement intent: #736 "Why this species?" panel (Tier B), #774 contextual species (Tier A in flight), #760 falta-dex (shipped), and the M28 Nearby flow's existing `community_observers_nearby_at` RPC. PR #766. _(✓ done)_
 
-### Ola 2b — in flight 2026-05-08
+### Ola 2b — shipped 2026-05-09
 
-- `fogg-seasonal-themes` — Conditioning. Seasonal + regional theme variants reflecting MX's ecological calendar: monarca (Oct–Mar), lluvias (Jun–Sep), secas (Apr–May), default (brand emerald). MX-Norte / MX-Sur fall back to MX-Centro mapping for v1. PR #769 (closes #731). _(· in flight)_
-- `fogg-peer-norms` — Normative Influence. Show peer norms when configuring license / privacy ("82% of MX observers choose this"); `license_norm` + `privacy_norm` materialised views, `peer_norm_pct(scope, country, key)` SECURITY INVOKER lookup, weekly refresh cron. Defaults are unchanged; copy is informational only. PR #771 (closes #745). _(· in flight)_
-- `fogg-percentile-card` — Self-monitoring. Tú-vs-promedio MX comparison card on `/profile/` (4 metrics × percentile bar); cohort = users with ≥ 5 obs in 90 days. NEVER raw rank, NEVER "people above you" copy — Fogg-ethical normative comparison only. PR #773 (closes #744). _(· in flight)_
-- `fogg-contextual-suggestions` — Suggestion Technology. Chip strip on `/observe` surfaces 5–10 species likely at the user's location + month via `probable_taxa_at(p_lat, p_lng, p_month, p_limit)` RPC. Tap pre-fills the manual ID, never auto-submits. PR #774 (closes #723). _(· in flight)_
+- `fogg-seasonal-themes` — Conditioning. Seasonal + regional theme variants reflecting MX's ecological calendar: monarca (Oct–Mar), lluvias (Jun–Sep), secas (Apr–May), default (brand emerald). Inline boot script resolves (now, region) before first paint to avoid flicker; 5-button picker in Profile → Apariencia. MX-Norte / MX-Sur fall back to MX-Centro mapping for v1. PR #769 (closes #731). _(✓ done)_
+- `fogg-percentile-card` — Self-monitoring. Tú-vs-promedio MX comparison card on `/profile/` (4 metrics × percentile bar); `user_metrics_percentile` MV with `PERCENT_RANK()` over cohort (≥ 5 obs in 90 days, country = MX); refresh wrapped in guarded BEGIN/EXCEPTION inside existing nightly `recompute_user_stats()` cron. Honest fallback when cohort_n < 50. NEVER raw rank, NEVER "people above you" copy — Fogg-ethical normative comparison only. PR #773 (closes #744). _(✓ done)_
+- `fogg-contextual-suggestions` — Suggestion Technology. Chip strip on `/observe` surfaces 5–10 species likely at the user's location + month via `probable_taxa_at(p_lat, p_lng, p_month, p_limit)` RPC (`ST_DWithin(50 km)` + month ±1 + research-grade-or-confirmed). Tap pre-fills the manual ID, never auto-submits. Cache layer deferred — live RPC < 300 ms at current scale. PR #774 (closes #723). _(✓ done — runbook [`docs/runbooks/contextual-suggestions.md`](runbooks/contextual-suggestions.md))_
+- `fogg-ecological-impact-viz` — Cause-and-Effect. `/profile/impact` (en) / `/perfil/impacto` (es) 5-metric retrospective: Transect-equivalent km, Observations in open-data exports, Expert-confirmed observations, Observations in research projects, At-risk species seen. `compute_user_impact(uuid) → jsonb` SECURITY DEFINER RPC; honest framing renders `—` with `no_data_note` when a metric can't be computed. PR #775 (closes #728). _(✓ done)_
+- `fogg-kairos-prompts` — Kairos. Opt-in golden-hour Web Push that fires 15–30 min before local sunset, capped at 1/user/day. `kairos_subscriptions` table + `kairos-fire` Edge Function (`--no-verify-jwt` + `X-Cron-Secret`) scheduled every 15 min via pg_cron; sunset/sunrise via Meeus / SunCalc-derived helper at `src/lib/sun.ts` + `supabase/functions/_shared/sun.ts` (15-test parity vs NOAA). After-rain / migration-window / lunar-event triggers tracked separately for v1.1. PR #777 (closes #724). _(✓ done — module spec [`docs/specs/modules/34-kairos-prompts.md`](specs/modules/34-kairos-prompts.md), runbook [`docs/runbooks/kairos-prompts.md`](runbooks/kairos-prompts.md))_
+- `fogg-variable-rewards` — Variable Rewards. Transparent, opt-in `SurpriseOverlay` modal with FIXED catalog of 3 kinds (no runtime extension): `dato_curioso` (10% random per synced obs, requires curated species fact for locale), `rarito` (deterministic — fires when primary taxon's `taxon_rarity.bucket = 'rare'`), `comunidad_activa_hoy` (deterministic — fires when ≥ 2 active observers in user's country today). Hard cap of 1 surprise/day total enforced both client-side (localStorage) and server-side (`record_surprise_event` SECURITY DEFINER). Default-OFF opt-in toggle in Settings → Preferences. Rules disclosed at `/docs/surprises` — Fogg ch. 9 ethics, never slot-machine darkness. PR #779 (closes #727). _(✓ done)_
 
-### Ola 2b — planned (open issues, no PR yet)
+### Ola 2b — final item shipped 2026-05-09
 
-- `fogg-variable-rewards` — Variable Rewards. Transparent, opt-in "sorpresa de campo" badges on rare-but-honest milestones; rule always disclosed in tooltip. _(! planned — issue #727)_
-- `fogg-kairos-prompts` — Kairos. Opt-in Web Push at "golden hour" (sunset ± 30 min) and "after the rain" (rain stop + 2 h); single nightly cap per channel. _(! planned — issue #724)_
-- `fogg-ecological-impact-viz` — Cause-and-Effect. "Mi impacto ecológico" visualization links every claimed downstream effect to a verifiable trace; honest framing, no inflated metrics. _(! planned — issue #728)_
+- `fogg-peer-norms` — Normative Influence. Show peer norms when configuring license / privacy ("82% of MX observers choose this"); `license_norm` + `privacy_norm` materialised views, `peer_norm_pct(scope, country, key)` SECURITY INVOKER lookup, weekly refresh cron. Defaults are unchanged; copy is informational only. PR #771 (closes #745). _(✓ done)_
 
 ---
 

@@ -7087,24 +7087,34 @@
       "modules": [],
       "subtasks": [
         {
-          "label_en": "src/lib/seasonal-theme.ts pure resolver (now, region) → 'monarca' | 'lluvias' | 'secas' | 'default'",
-          "label_es": "Resolver puro src/lib/seasonal-theme.ts (now, region) → 'monarca' | 'lluvias' | 'secas' | 'default'",
-          "status": "in_progress"
+          "label_en": "src/lib/seasonal-theme.ts pure resolver (now, region) → 'monarca' | 'lluvias' | 'secas' | 'default' (15 unit tests pin month mapping + resolution order)",
+          "label_es": "Resolver puro src/lib/seasonal-theme.ts (now, region) → 'monarca' | 'lluvias' | 'secas' | 'default' (15 tests pinean mapeo de mes + orden de resolución)",
+          "status": "done"
         },
         {
-          "label_en": "Inline boot script resolves before first paint; data-season='<theme>' on <html> avoids flicker",
-          "label_es": "Script inline antes del primer pintado; data-season='<tema>' en <html> evita parpadeo",
-          "status": "in_progress"
+          "label_en": "Inline <style is:global> with CSS variables per [data-season=…] in BaseLayout + boot script resolves before first paint to avoid flicker",
+          "label_es": "<style is:global> inline con variables CSS por [data-season=…] en BaseLayout + script de arranque resuelve antes del primer pintado para evitar parpadeo",
+          "status": "done"
         },
         {
-          "label_en": "5-button picker in Profile → Apariencia (Auto + Default + Monarca + Lluvias + Secas) writes localStorage[rastrum.theme.seasonal]",
-          "label_es": "Selector de 5 botones en Perfil → Apariencia (Auto + Default + Monarca + Lluvias + Secas) escribe localStorage[rastrum.theme.seasonal]",
-          "status": "in_progress"
+          "label_en": "SeasonalThemePicker.astro 5-button picker in Profile → Apariencia (Auto + Default + Monarca + Lluvias + Secas) writes localStorage[rastrum.theme.seasonal]; live 'currently applying' hint shows what Auto resolves to",
+          "label_es": "Selector de 5 botones SeasonalThemePicker.astro en Perfil → Apariencia (Auto + Default + Monarca + Lluvias + Secas) escribe localStorage[rastrum.theme.seasonal]; pista en vivo de 'aplicando ahora' muestra a qué resuelve Auto",
+          "status": "done"
         },
         {
-          "label_en": "MX-Norte / MX-Sur fall back to MX-Centro mapping for v1; registry shape accepts new region keys for v1.1 differentiation",
-          "label_es": "MX-Norte / MX-Sur caen al mapeo MX-Centro en v1; la forma del registro acepta nuevas claves de región para diferenciación v1.1",
-          "status": "planned"
+          "label_en": "SeasonalAccent.astro decorative emoji glyph driven by --rastrum-season-emoji; Tailwind safelist for rastrum-season-* classes (illustration / accent / accent-bg / accent-border)",
+          "label_es": "SeasonalAccent.astro glifo decorativo de emoji manejado por --rastrum-season-emoji; safelist Tailwind para clases rastrum-season-* (illustration / accent / accent-bg / accent-border)",
+          "status": "done"
+        },
+        {
+          "label_en": "MX-Norte / MX-Sur fall back to MX-Centro mapping for v1; registry shape accepts new region keys for v1.1 differentiation; non-MX regions resolve to default",
+          "label_es": "MX-Norte / MX-Sur caen al mapeo MX-Centro en v1; la forma del registro acepta nuevas claves de región para diferenciación v1.1; regiones fuera de MX resuelven a default",
+          "status": "done"
+        },
+        {
+          "label_en": "docs/runbooks/themes.md auditable seasonality logic; settings.preferences.appearance_* + season_* i18n keys EN+ES",
+          "label_es": "docs/runbooks/themes.md lógica de estacionalidad auditable; claves i18n settings.preferences.appearance_* + season_* EN+ES",
+          "status": "done"
         }
       ]
     },
@@ -7117,22 +7127,22 @@
         {
           "label_en": "license_norm + privacy_norm materialised views; refresh-norms-weekly pg_cron (Mon 06:00 UTC)",
           "label_es": "Vistas materializadas license_norm + privacy_norm; pg_cron refresh-norms-weekly (lunes 06:00 UTC)",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "label_en": "peer_norm_pct(scope, country, key) SECURITY INVOKER lookup; src/lib/peer-norms.ts wrapper with 9 unit tests + per-page cache",
           "label_es": "Lookup SECURITY INVOKER peer_norm_pct(scope, country, key); wrapper src/lib/peer-norms.ts con 9 tests unitarios + caché por página",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "label_en": "License selector on /profile/edit + PrivacyMatrix render small bars; hide when n < 50 (MIN_N_THRESHOLD)",
           "label_es": "Selector de licencia en /profile/edit + PrivacyMatrix renderizan barras pequeñas; ocultar cuando n < 50 (MIN_N_THRESHOLD)",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "label_en": "Defaults are unchanged; copy is informational only — no normative-default-flip",
           "label_es": "Los defaults no cambian; copy es solo informativo — sin flip de default normativo",
-          "status": "in_progress"
+          "status": "done"
         }
       ]
     },
@@ -7143,24 +7153,34 @@
       "modules": [],
       "subtasks": [
         {
-          "label_en": "user_metrics_percentile materialised view computes PERCENT_RANK() over cohort (≥ 5 obs in 90 days, country = MX)",
-          "label_es": "Vista materializada user_metrics_percentile computa PERCENT_RANK() sobre cohorte (≥ 5 obs en 90 días, país = MX)",
-          "status": "in_progress"
+          "label_en": "user_metrics_percentile materialised view computes PERCENT_RANK() over cohort (≥ 5 obs in 90 days, country = MX); cohort_country column carries forward so v1.1 state-level sub-cohorts add without schema churn",
+          "label_es": "Vista materializada user_metrics_percentile computa PERCENT_RANK() sobre cohorte (≥ 5 obs en 90 días, país = MX); columna cohort_country deja sub-cohortes a nivel estado para v1.1 sin churn de schema",
+          "status": "done"
         },
         {
-          "label_en": "recompute_user_stats() extended via CREATE OR REPLACE with guarded BEGIN/EXCEPTION block — best-effort, never aborts user-stats update",
-          "label_es": "recompute_user_stats() extendido vía CREATE OR REPLACE con bloque BEGIN/EXCEPTION protegido — best-effort, nunca aborta la actualización de user-stats",
-          "status": "in_progress"
+          "label_en": "recompute_user_stats() extended via CREATE OR REPLACE with guarded BEGIN/EXCEPTION block — percentile-MV refresh failure never aborts user-stats update; nightly via existing 08:00 UTC cron, no new EF",
+          "label_es": "recompute_user_stats() extendido vía CREATE OR REPLACE con bloque BEGIN/EXCEPTION protegido — fallo de refresh de MV de percentil nunca aborta actualización de user-stats; nocturno vía cron existente 08:00 UTC, sin EF nueva",
+          "status": "done"
         },
         {
-          "label_en": "4 cards (Diversity Shannon H', Habitats, Validations, Geographic km²) on /profile/; honest fallback when cohort_n < 50",
-          "label_es": "4 tarjetas (Diversidad Shannon H', Hábitats, Validaciones, Geográfico km²) en /perfil/; fallback honesto cuando cohort_n < 50",
-          "status": "in_progress"
+          "label_en": "get_my_percentiles() SECURITY INVOKER RPC scoped to auth.uid(), authenticated-only; per-user metric values stay off public surfaces",
+          "label_es": "RPC get_my_percentiles() SECURITY INVOKER acotado a auth.uid(), solo autenticado; valores por-usuario quedan fuera de superficies públicas",
+          "status": "done"
         },
         {
-          "label_en": "NEVER raw rank, NEVER 'people above you' copy — Fogg-ethical normative comparison only",
-          "label_es": "NUNCA rank crudo, NUNCA copy 'gente sobre ti' — solo comparación normativa ética Fogg",
-          "status": "in_progress"
+          "label_en": "ProfilePercentileCards.astro 4 cards (Diversity Shannon H', Habitats, Validations, Geographic km²) on /profile/ with skeleton/insufficient/ready states + owner-only badge",
+          "label_es": "ProfilePercentileCards.astro 4 tarjetas (Diversidad Shannon H', Hábitats, Validaciones, Geográfico km²) en /perfil/ con estados skeleton/insuficiente/listo + insignia solo-dueño",
+          "status": "done"
+        },
+        {
+          "label_en": "Honest fallback when cohort_n < 50 — 'datos insuficientes' / 'Not enough data' copy via centralised hasSufficientCohort() in src/lib/percentile.ts; 17 unit tests pin bar math, cohort gate, value formatting",
+          "label_es": "Fallback honesto cuando cohort_n < 50 — copy 'datos insuficientes' / 'Not enough data' vía hasSufficientCohort() centralizado en src/lib/percentile.ts; 17 tests pinean math de barras, gate de cohorte, formato de valores",
+          "status": "done"
+        },
+        {
+          "label_en": "NEVER raw rank, NEVER 'people above you' copy — Fogg-ethical normative comparison (Persuasive Tech ch. 8) over leaderboard toxicity (ch. 9)",
+          "label_es": "NUNCA rank crudo, NUNCA copy 'gente sobre ti' — comparación normativa ética Fogg (Persuasive Tech cap. 8) sobre toxicidad de leaderboard (cap. 9)",
+          "status": "done"
         }
       ]
     },
@@ -7171,98 +7191,163 @@
       "modules": [],
       "subtasks": [
         {
-          "label_en": "probable_taxa_at(p_lat, p_lng, p_month, p_limit) SECURITY INVOKER RPC: ST_DWithin(50 km) + month ±1 + research-grade-or-confirmed; top-N by COUNT DESC, MIN(distance) ASC",
-          "label_es": "RPC SECURITY INVOKER probable_taxa_at(p_lat, p_lng, p_month, p_limit): ST_DWithin(50 km) + mes ±1 + research-grade-o-confirmada; top-N por COUNT DESC, MIN(distancia) ASC",
-          "status": "in_progress"
+          "label_en": "probable_taxa_at(p_lat, p_lng, p_month, p_limit) SECURITY INVOKER RPC: ST_DWithin(50 km) + month ±1 (year-wrapping) + research-grade-or-confirmed; top-N by COUNT DESC, MIN(distance) ASC; returns has_observed_by_viewer reading auth.uid()",
+          "label_es": "RPC SECURITY INVOKER probable_taxa_at(p_lat, p_lng, p_month, p_limit): ST_DWithin(50 km) + mes ±1 (con wrap de año) + research-grade-o-confirmada; top-N por COUNT DESC, MIN(distancia) ASC; devuelve has_observed_by_viewer leyendo auth.uid()",
+          "status": "done"
         },
         {
-          "label_en": "ContextualSpeciesChips.astro mounts above DropZone in ObserveView2; emits rastrum:observe-location-ready after first GPS fix",
-          "label_es": "ContextualSpeciesChips.astro monta arriba de DropZone en ObserveView2; emite rastrum:observe-location-ready tras el primer fix de GPS",
-          "status": "in_progress"
+          "label_en": "ContextualSpeciesChips.astro mounts above DropZone in ObserveView2; emits rastrum:observe-location-ready after first GPS fix so the strip can hydrate",
+          "label_es": "ContextualSpeciesChips.astro monta arriba de DropZone en ObserveView2; emite rastrum:observe-location-ready tras el primer fix de GPS para que el strip hidrate",
+          "status": "done"
         },
         {
-          "label_en": "Chip-tap pre-fills the manual ID input (mirrors TaxonAutocomplete.select), never auto-submits",
-          "label_es": "Tocar un chip pre-llena el input de ID manual (refleja TaxonAutocomplete.select), nunca envía automáticamente",
-          "status": "in_progress"
+          "label_en": "Chip-tap pre-fills the manual ID input (mirrors TaxonAutocomplete.select: input.value + dataset.idSource='manual' + dataset.taxonId); bubbling change event + rastrum:contextual-pick CustomEvent for analytics; never auto-submits",
+          "label_es": "Tocar un chip pre-llena el input de ID manual (refleja TaxonAutocomplete.select: input.value + dataset.idSource='manual' + dataset.taxonId); evento change burbujeante + CustomEvent rastrum:contextual-pick para analytics; nunca envía automáticamente",
+          "status": "done"
         },
         {
-          "label_en": "Cache layer deferred — live RPC < 300 ms at current scale + sessionStorage browser cache; runbook documents migration path",
-          "label_es": "Capa de caché diferida — RPC en vivo < 300 ms a escala actual + caché del navegador en sessionStorage; runbook documenta la ruta de migración",
-          "status": "in_progress"
+          "label_en": "'Aún no en tu dex' pill when has_observed_by_viewer=false; honest copy under heading: 'Estimación basada en observaciones de la comunidad. La precisión mejora con más datos.'",
+          "label_es": "Pill 'Aún no en tu dex' cuando has_observed_by_viewer=false; copy honesto bajo el encabezado: 'Estimación basada en observaciones de la comunidad. La precisión mejora con más datos.'",
+          "status": "done"
         },
         {
-          "label_en": "24 unit tests in tests/unit/contextual-suggest.test.ts (pickCommonName, formatDistancePill, suggestCacheKey)",
-          "label_es": "24 tests unitarios en tests/unit/contextual-suggest.test.ts (pickCommonName, formatDistancePill, suggestCacheKey)",
-          "status": "in_progress"
+          "label_en": "Cache layer deferred — live RPC < 300 ms on indexed idx_obs_location GIST + grouped FK at current scale; sessionStorage browser cache covers bounce-and-return; docs/runbooks/contextual-suggestions.md documents migration path",
+          "label_es": "Capa de caché diferida — RPC en vivo < 300 ms en idx_obs_location GIST indexado + FK agrupada a escala actual; caché del navegador en sessionStorage cubre rebote-y-regreso; docs/runbooks/contextual-suggestions.md documenta la ruta de migración",
+          "status": "done"
+        },
+        {
+          "label_en": "24 unit tests in tests/unit/contextual-suggest.test.ts (pickCommonName, formatDistancePill, suggestCacheKey); observe.contextual.* i18n keys EN+ES",
+          "label_es": "24 tests unitarios en tests/unit/contextual-suggest.test.ts (pickCommonName, formatDistancePill, suggestCacheKey); claves i18n observe.contextual.* EN+ES",
+          "status": "done"
         }
       ]
     },
     "fogg-variable-rewards": {
       "phase": "v1.1.5",
-      "title_en": "Variable Rewards — transparent 'sorpresa de campo' badges",
-      "title_es": "Recompensas variables — insignias 'sorpresa de campo' transparentes",
+      "title_en": "Variable Rewards — transparent 'sorpresa de campo' overlay",
+      "title_es": "Recompensas variables — overlay 'sorpresa de campo' transparente",
       "modules": [],
       "subtasks": [
         {
-          "label_en": "Design rare-but-honest milestones (first species in new genus, first nocturnal observation, first ecoregion, etc.)",
-          "label_es": "Diseñar hitos raros pero honestos (primera especie en nuevo género, primera observación nocturna, primera ecorregión, etc.)",
-          "status": "planned"
+          "label_en": "FIXED catalog of 3 kinds (no runtime extension): dato_curioso (10% random per synced obs, requires curated species fact for locale), rarito (deterministic — fires when primary taxon's taxon_rarity.bucket = 'rare'), comunidad_activa_hoy (deterministic — fires only when ≥ 2 active observers in user's country today)",
+          "label_es": "Catálogo FIJO de 3 tipos (sin extensión en runtime): dato_curioso (10% aleatorio por obs sincronizada, requiere dato curado por idioma), rarito (determinista — dispara cuando taxón primario tiene taxon_rarity.bucket = 'rare'), comunidad_activa_hoy (determinista — dispara solo cuando ≥ 2 observadores activos en el país del usuario hoy)",
+          "status": "done"
         },
         {
-          "label_en": "Opt-in toggle in Profile → Preferences; default off (Fogg ch. 5: kairos must be welcomed)",
-          "label_es": "Toggle opt-in en Perfil → Preferencias; por defecto off (Fogg cap. 5: kairos debe ser bienvenido)",
-          "status": "planned"
+          "label_en": "Hard cap of 1 surprise/day total enforced both client-side (localStorage, fast) and server-side (record_surprise_event SECURITY DEFINER, race-proof across tabs)",
+          "label_es": "Tope estricto de 1 sorpresa/día total aplicado tanto en cliente (localStorage, rápido) como en servidor (record_surprise_event SECURITY DEFINER, a prueba de race entre pestañas)",
+          "status": "done"
         },
         {
-          "label_en": "Always disclose the underlying rule in the badge tooltip — no slot-machine darkness",
-          "label_es": "Siempre divulgar la regla subyacente en el tooltip de la insignia — sin oscuridad de tragamonedas",
-          "status": "planned"
+          "label_en": "Schema: users.surprises_opt_in boolean default false + surprise_events table with RLS read-own + insert-own + surprise_count_today() / record_surprise_event() SECURITY DEFINER helpers",
+          "label_es": "Schema: users.surprises_opt_in boolean default false + tabla surprise_events con RLS leer-propio + insertar-propio + helpers SECURITY DEFINER surprise_count_today() / record_surprise_event()",
+          "status": "done"
+        },
+        {
+          "label_en": "Client-side post-sync trigger in syncOutboxInner() (sync.ts) lazy-imports src/lib/surprise-trigger.ts so the surprises bundle is only paid for after a successful sync",
+          "label_es": "Trigger en cliente post-sync en syncOutboxInner() (sync.ts) hace lazy-import de src/lib/surprise-trigger.ts para que el bundle de sorpresas solo se pague tras un sync exitoso",
+          "status": "done"
+        },
+        {
+          "label_en": "SurpriseOverlay.astro global modal mounted in BaseLayout (mirrors ReportDialog focus-trap pattern); SurprisesPrefsSection.astro opt-in toggle in Settings → Preferences (default off, Fogg ch. 9)",
+          "label_es": "Modal global SurpriseOverlay.astro montado en BaseLayout (refleja patrón focus-trap de ReportDialog); SurprisesPrefsSection.astro toggle opt-in en Ajustes → Preferencias (por defecto off, Fogg cap. 9)",
+          "status": "done"
+        },
+        {
+          "label_en": "/docs/surprises (EN+ES) operator-auditable doc explains all 3 kinds + 10% probability + the cap + the privacy model + the off-switch; 32 new unit tests pin picker order, RNG determinism, daily-cap state, facts resolution",
+          "label_es": "/docs/surprises (EN+ES) doc auditable explica los 3 tipos + probabilidad 10% + el tope + modelo de privacidad + el switch off; 32 tests unitarios nuevos pinean orden del picker, determinismo del RNG, estado del tope diario, resolución de facts",
+          "status": "done"
         }
       ]
     },
     "fogg-kairos-prompts": {
       "phase": "v1.1.5",
-      "title_en": "Kairos / Right-Time Prompts — golden hour + after the rain push",
-      "title_es": "Kairos / Avisos al momento justo — push de hora dorada + después de la lluvia",
-      "modules": [],
+      "title_en": "Kairos / Right-Time Prompts — golden-hour push (v1)",
+      "title_es": "Kairos / Avisos al momento justo — push de hora dorada (v1)",
+      "modules": ["34-kairos-prompts.md"],
       "subtasks": [
         {
-          "label_en": "Web Push at sunset ± 30 min ('golden hour') and rain stop + 2 h ('after the rain'); geo-aware via region_primary",
-          "label_es": "Web Push en atardecer ± 30 min ('hora dorada') y cese de lluvia + 2 h ('después de la lluvia'); geo-consciente vía region_primary",
-          "status": "planned"
+          "label_en": "Schema: kairos_subscriptions(user_id, kind PK) with RLS own-row read/insert/update/delete; idempotent CREATE TABLE IF NOT EXISTS",
+          "label_es": "Schema: kairos_subscriptions(user_id, kind PK) con RLS leer/insertar/actualizar/borrar propios; CREATE TABLE IF NOT EXISTS idempotente",
+          "status": "done"
         },
         {
-          "label_en": "Single nightly cap per channel; explicitly opt-in (Fogg: kairos must be welcomed, not ambushed)",
-          "label_es": "Tope único nocturno por canal; opt-in explícito (Fogg: kairos debe ser bienvenido, no emboscar)",
-          "status": "planned"
+          "label_en": "supabase/functions/kairos-fire/ Edge Function deployed --no-verify-jwt + gated by X-Cron-Secret; resolves user's most recent located observation centroid (fallback CDMX 19.4326,-99.1332), checks now ∈ [sunset-30min, sunset-15min], enforces 1-per-day cap via tz-local-date comparison",
+          "label_es": "Edge Function supabase/functions/kairos-fire/ desplegada --no-verify-jwt + protegida por X-Cron-Secret; resuelve el centroide de la última observación localizada del usuario (fallback CDMX 19.4326,-99.1332), valida now ∈ [atardecer-30min, atardecer-15min], aplica tope 1-por-día vía comparación de fecha local-tz",
+          "status": "done"
         },
         {
-          "label_en": "Cron schedule + push-subscription table + service-worker push handler",
-          "label_es": "Schedule de cron + tabla de subscripciones de push + handler de push en service worker",
+          "label_en": "kairos-fire-15min pg_cron schedule (every 15 min, idempotent); send payload-less Web Push to each push_subscriptions.endpoint, update last_sent_at = now() atomically on success",
+          "label_es": "Schedule pg_cron kairos-fire-15min (cada 15 min, idempotente); envía Web Push sin payload a cada push_subscriptions.endpoint, actualiza last_sent_at = now() atómicamente en éxito",
+          "status": "done"
+        },
+        {
+          "label_en": "Shared sunset/sunrise helper (Meeus / SunCalc-derived) at src/lib/sun.ts + supabase/functions/_shared/sun.ts; pinned by tests/unit/sun-sunset.test.ts (15 cases vs NOAA references for CDMX equinox + Tlacolula solstice + polar edge cases)",
+          "label_es": "Helper compartido de atardecer/amanecer (Meeus / derivado de SunCalc) en src/lib/sun.ts + supabase/functions/_shared/sun.ts; pineado por tests/unit/sun-sunset.test.ts (15 casos vs referencias NOAA para equinoccio CDMX + solsticio Tlacolula + casos polares)",
+          "status": "done"
+        },
+        {
+          "label_en": "Shared VAPID push helper extracted to supabase/functions/_shared/web-push.ts so kairos and streak-push share JWT signing logic",
+          "label_es": "Helper VAPID compartido extraído a supabase/functions/_shared/web-push.ts para que kairos y streak-push compartan la lógica de firma JWT",
+          "status": "done"
+        },
+        {
+          "label_en": "/profile/notifications (EN) + /perfil/notificaciones (ES) toggle pages; SW push handler infers topic from device local hour (16:00–21:00 → kairos copy, else streak copy) since cron paths send payload-less notifications; notifications.* i18n namespace EN+ES; runbook docs/runbooks/kairos-prompts.md + module spec docs/specs/modules/34-kairos-prompts.md",
+          "label_es": "Páginas toggle /profile/notifications (EN) + /perfil/notificaciones (ES); handler de push del SW infiere el tema desde la hora local del dispositivo (16:00–21:00 → copy kairos, si no copy streak) porque las rutas de cron mandan notificaciones sin payload; namespace i18n notifications.* EN+ES; runbook docs/runbooks/kairos-prompts.md + spec del módulo docs/specs/modules/34-kairos-prompts.md",
+          "status": "done"
+        },
+        {
+          "label_en": "After-rain, migration-window, and lunar-event triggers explicitly out of scope for v1; tracked as separate v1.1 issues",
+          "label_es": "Disparadores de después-de-lluvia, ventana-migratoria y eventos-lunares explícitamente fuera de alcance para v1; rastreados como issues separados de v1.1",
           "status": "planned"
         }
       ]
     },
     "fogg-ecological-impact-viz": {
       "phase": "v1.1.5",
-      "title_en": "Cause-and-Effect — 'mi impacto ecológico' visualization",
-      "title_es": "Causa-efecto — visualización 'mi impacto ecológico'",
+      "title_en": "Cause-and-Effect — 'mi impacto ecológico' 5-metric retrospective",
+      "title_es": "Causa-efecto — retrospectiva 'mi impacto ecológico' de 5 métricas",
       "modules": [],
       "subtasks": [
         {
-          "label_en": "Surface research-grade contributions used in GBIF, validations that helped peers, sensitive-species records that helped CONANP staff",
-          "label_es": "Mostrar contribuciones research-grade usadas en GBIF, validaciones que ayudaron a pares, registros de especies sensibles que ayudaron a CONANP",
-          "status": "planned"
+          "label_en": "compute_user_impact(uuid) → jsonb SECURITY DEFINER RPC, single round-trip, STABLE, granted to authenticated; self-only predicate (auth.uid() = p_user_id) with service_role bypass for cron reuse",
+          "label_es": "RPC compute_user_impact(uuid) → jsonb SECURITY DEFINER, single round-trip, STABLE, otorgado a authenticated; predicado solo-yo (auth.uid() = p_user_id) con bypass de service_role para reuso en cron",
+          "status": "done"
         },
         {
-          "label_en": "Honest framing — every claimed effect links to a verifiable trace; no inflated metrics",
-          "label_es": "Framing honesto — cada efecto reclamado enlaza a una traza verificable; sin métricas infladas",
-          "status": "planned"
+          "label_en": "Card 1 — Transect-equivalent km: sqrt(ST_Area(ST_ConvexHull(synced obs locations)::geography)) / 1000 * 0.5 (conservative linear-equivalent km from convex-hull area); tooltip explains the heuristic",
+          "label_es": "Tarjeta 1 — km equivalentes de transecto: sqrt(ST_Area(ST_ConvexHull(ubicaciones de obs sincronizadas)::geography)) / 1000 * 0.5 (km lineales conservadores desde área de convex hull); tooltip explica la heurística",
+          "status": "done"
         },
         {
-          "label_en": "Renders on /profile/ as a card; per-user data only (privacy: not exposed in /u/<handle>/ visitor view)",
-          "label_es": "Renderiza en /perfil/ como tarjeta; datos solo del usuario (privacidad: no expuesto en vista visitante /u/<handle>/)",
-          "status": "planned"
+          "label_en": "Card 2 — Observations in open-data exports: count of user's research-grade observations (proxy: per-export audit log not yet shipped, only RG goes to GBIF/DwC); tooltip documents proxy honestly",
+          "label_es": "Tarjeta 2 — Observaciones en exportaciones de datos abiertos: cuenta de observaciones research-grade del usuario (proxy: log de auditoría por-exportación aún no lanzado, solo RG va a GBIF/DwC); tooltip documenta el proxy honestamente",
+          "status": "done"
+        },
+        {
+          "label_en": "Card 3 — Expert-confirmed observations: count where identifications.validated_by currently holds expert role via has_role()",
+          "label_es": "Tarjeta 3 — Observaciones confirmadas por expertos: cuenta donde identifications.validated_by tiene actualmente el rol expert vía has_role()",
+          "status": "done"
+        },
+        {
+          "label_en": "Card 4 — Observations in research projects: count where observations.project_id IS NOT NULL (M29 polygon tagging)",
+          "label_es": "Tarjeta 4 — Observaciones en proyectos de investigación: cuenta donde observations.project_id IS NOT NULL (etiquetado por polígono M29)",
+          "status": "done"
+        },
+        {
+          "label_en": "Card 5 — At-risk species seen: distinct species with taxa.nom059_status IN ('E','P','A','Pr') OR taxa.iucn_category IN ('CR','EN','VU','NT')",
+          "label_es": "Tarjeta 5 — Especies en riesgo vistas: especies distintas con taxa.nom059_status IN ('E','P','A','Pr') O taxa.iucn_category IN ('CR','EN','VU','NT')",
+          "status": "done"
+        },
+        {
+          "label_en": "ImpactView.astro skeleton → grid render; click-to-show tooltips with focus management; 'ver' deep-links to /profile/observations?filter=…; honest fallback renders '—' with no_data_note when a metric can't be computed",
+          "label_es": "ImpactView.astro skeleton → render de grid; tooltips click-para-ver con manejo de foco; 'ver' enlaza a /profile/observations?filter=…; fallback honesto renderiza '—' con no_data_note cuando una métrica no se puede computar",
+          "status": "done"
+        },
+        {
+          "label_en": "Pure formatting helpers in src/lib/impact.ts (formatTransectKm, formatCount, isUserImpact); 13 unit tests pin rounding rules; new ProfileView card surfaces /profile/impact discoverability",
+          "label_es": "Helpers puros de formato en src/lib/impact.ts (formatTransectKm, formatCount, isUserImpact); 13 tests unitarios pinean reglas de redondeo; nueva tarjeta en ProfileView superficia descubribilidad de /profile/impact",
+          "status": "done"
         }
       ]
     }
