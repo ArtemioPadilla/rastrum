@@ -38,6 +38,9 @@ jobs:
           (sudo apt-get update -qq && npx playwright install --with-deps chromium)
 
       - name: Build (static site)
+        # PostHog secrets (PUBLIC_POSTHOG_*) are deliberately NOT passed here —
+        # E2E runs shouldn't fire capture events into prod analytics. Only
+        # deploy.yml gets them. See docs/runbooks/posthog.md.
         run: npm run build
         env:
           PUBLIC_SUPABASE_URL:       ${{ secrets.PUBLIC_SUPABASE_URL }}

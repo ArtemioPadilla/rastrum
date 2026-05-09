@@ -244,6 +244,7 @@ const getDocLabel = (key: string) => (tr.docs.sections as Record<string, string>
   signOutBtn?.addEventListener('click', async () => {
     try { await signOut(); } catch { /* dead refresh token — fall through to local cleanup */ }
     try {
+      window.posthog?.reset();
       localStorage.removeItem(HEADER_AVATAR_CACHE_KEY);
       localStorage.removeItem(HEADER_AVATAR_NAME_KEY);
       localStorage.removeItem(SUPABASE_AUTH_STORAGE_KEY);
