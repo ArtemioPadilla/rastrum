@@ -238,3 +238,7 @@ DELETE FROM public.push_subscriptions;
 - Migration window trigger.
 - Lunar event trigger.
 - Encrypted payloads (RFC 8291) so the SW can render per-place copy.
+
+## After-rain trigger — operator notes
+
+> **RLS caveat:** La vista `recent_rainfall_12h` solo es accesible por `service_role`. Si se hace query directamente como `authenticated` devolverá 0 filas silenciosamente por RLS en `weather_snapshots`.
