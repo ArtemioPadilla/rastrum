@@ -122,6 +122,34 @@ async function syncOne(record: ObservationRecord): Promise<void> {
     .upsert(serverRow, { onConflict: 'id' });
   if (upsertErr) throw upsertErr;
 
+  // Onboarding instrumentation: fire first_observation on the user's very first
+  // successful sync. We check observation count BEFORE this upsert completed —
+  // the count query uses a HEAD request so it's cheap.
+  void (async () => {
+    try {
+      const { count } = await supabase
+        .from('observations')
+        .select('*', { count: 'exact', head: true })
+        .eq('observer_id', observerRef.id)
+        .eq('sync_status', 'synced');
+      if (count === 1) {
+        // This was the first synced observation.
+        const { data: userRow } = await supabase
+          .from('users')
+          .select('created_at')
+          .eq('id', observerRef.id)
+          .maybeSingle();
+        const { cohortWeek, daysSince } = await import('./posthog-events');
+        (window as unknown as { posthog?: { capture: (e: string, p?: Record<string, unknown>) => void } })
+          .posthog?.capture('onboarding:first_observation', {
+            days_since_signup: userRow?.created_at ? daysSince(userRow.created_at as string) : 0,
+            cohort_week: cohortWeek(),
+            observation_id: obs.id,
+          });
+      }
+    } catch { /* non-fatal */ }
+  })();
+
   // 3. Insert media_files rows for every uploaded blob
   const uploaded = await db.mediaBlobs.where('observation_id').equals(record.id).toArray();
   if (uploaded.length) {
