@@ -8,9 +8,13 @@ interface Props {
 const { lang } = Astro.props;
 const tr = t(lang);
 const widgets = tr.home.widgets;
+const suggestions = widgets.suggestions;
+const greeting = tr.home.greeting;
+
 const recentHref = lang === 'es' ? '/es/explorar/recientes/' : '/en/explore/recent/';
 const observeHref = lang === 'es' ? '/es/observar/' : '/en/observe/';
-
+const leaderboardHref = lang === 'es' ? '/es/comunidad/tabla-de-lideres/' : '/en/community/leaderboard/';
+const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
 ---
 
 <section
@@ -41,7 +45,14 @@ const observeHref = lang === 'es' ? '/es/observar/' : '/en/observe/';
   data-label-challenge-rarity-common={widgets.challenge.rarity_common}
   data-label-challenge-rarity-uncommon={widgets.challenge.rarity_uncommon}
   data-label-challenge-rarity-rare={widgets.challenge.rarity_rare}
-
+  data-leaderboard-href={leaderboardHref}
+  data-profile-href={profileHref}
+  data-label-leaderboard-title={widgets.leaderboard.title}
+  data-label-leaderboard-view-all={widgets.leaderboard.view_all}
+  data-label-leaderboard-rank={widgets.leaderboard.rank}
+  data-label-next-badge-title={widgets.next_badge.title}
+  data-label-next-badge-progress={widgets.next_badge.progress_label}
+  data-label-next-badge-view-profile={widgets.next_badge.view_profile}
   aria-live="polite"
 >
   <div class="home-widgets-greeting flex items-center justify-between flex-wrap gap-3">
@@ -55,8 +66,34 @@ const observeHref = lang === 'es' ? '/es/observar/' : '/en/observe/';
     </span>
   </div>
 
+  <!-- #710 Suggestions widget (signed-in users with location only) -->
   <div class="home-widgets-challenge hidden">
     <!-- populated by script -->
+  </div>
+
+  <div
+    class="home-widgets-suggestions hidden"
+    data-label-heading={suggestions.heading}
+    data-label-subtitle={suggestions.subtitle}
+    data-label-nearby-count-one={suggestions.nearby_count_one}
+    data-label-nearby-count-other={suggestions.nearby_count_other}
+    data-label-refresh={suggestions.refresh}
+    data-label-dismiss-aria={suggestions.dismiss_aria}
+    data-label-no-location={suggestions.no_location}
+    data-label-loading={suggestions.loading}
+    data-label-empty={suggestions.empty}
+  >
+    <div class="flex items-baseline justify-between gap-3 mb-3">
+      <h2 class="text-sm font-semibold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">{suggestions.heading}</h2>
+      <button
+        type="button"
+        class="hw-suggestions-refresh text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:underline"
+      >{suggestions.refresh}</button>
+    </div>
+    <p class="hw-suggestions-subtitle text-xs text-zinc-500 dark:text-zinc-400 mb-3"></p>
+    <p class="hw-suggestions-loading text-sm text-zinc-500 dark:text-zinc-400">{suggestions.loading}</p>
+    <p class="hw-suggestions-empty hidden text-sm text-zinc-500 dark:text-zinc-400">{suggestions.empty}</p>
+    <ul class="hw-suggestions-list grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3"></ul>
 
   </div>
 
@@ -78,7 +115,10 @@ const observeHref = lang === 'es' ? '/es/observar/' : '/en/observe/';
   import { getSupabase } from '../lib/supabase';
   import { buildGreeting } from '../lib/home-greeting';
   import { formatTimeAgo } from '../lib/social';
-
+  import { fetchSuggestions, type SpeciesSuggestion } from '../lib/suggestions';
+  import { fetchDailyChallenge } from '../lib/daily-challenge';
+  import { fetchWeather, WMO_BUCKETS } from '../lib/home-weather';
+  type WeatherKind = 'sunny' | 'rainy' | 'cloudy' | 'snow' | 'foggy' | 'windy';
 
 
   type Lang = 'en' | 'es';
@@ -397,10 +437,9 @@ const observeHref = lang === 'es' ? '/es/observar/' : '/en/observe/';
         : (root.dataset.labelNearbyTitleGlobal ?? titleEl.textContent);
     }
 
-    // Challenge widget — signed-in only
+    await paintLeaderboard(root, lang, user.id);
+    await paintNextBadge(root, lang, user.id);
     await paintChallenge(root, lang, user.id);
-
-
     await paintNearby(root, lang, country, profile?.region_primary ?? null);
 
     // Fire suggestions widget (no await — it runs in parallel via geolocation)
@@ -415,6 +454,152 @@ const observeHref = lang === 'es' ? '/es/observar/' : '/en/observe/';
       try { sessionStorage.removeItem(DISMISSED_KEY); } catch { /* ignore */ }
       paintSuggestions(root, lang, user.id, suggestionSeed).catch(() => {/* optional */});
     });
+  }
+
+  async function paintLeaderboard(root: HTMLElement, lang: Lang, _userId: string): Promise<void> {
+    const container = root.querySelector<HTMLElement>('.home-widgets-leaderboard');
+    if (!container) return;
+
+    let supabase;
+    try {
+      supabase = getSupabase();
+    } catch { return; }
+
+    type LeaderRow = {
+      user_id: string;
+      username: string | null;
+      display_name: string | null;
+      avatar_url: string | null;
+      karma_30d: number;
+    };
+
+    try {
+      // Query top 3 from 30d MV — sorted server-side
+      const { data, error } = await supabase
+        .from('karma_leaderboard_30d')
+        .select('user_id, username, display_name, avatar_url, karma_30d')
+        .order('karma_30d', { ascending: false })
+        .limit(3);
+
+      if (error || !data || (data as LeaderRow[]).length === 0) return;
+
+      const rows = data as LeaderRow[];
+      const title = root.dataset.labelLeaderboardTitle ?? 'Top observers';
+      const viewAll = root.dataset.labelLeaderboardViewAll ?? 'Full leaderboard';
+      const rankTpl = root.dataset.labelLeaderboardRank ?? 'Rank {{rank}}';
+      const leaderHref = root.dataset.leaderboardHref ?? '/community/leaderboard/';
+
+      const rankMedals = ['🥇', '🥈', '🥉'];
+      const itemsHtml = rows.map((r, i) => {
+        const name = r.display_name ?? r.username ?? 'Observer';
+        const rankLabel = rankTpl.replace('{{rank}}', String(i + 1));
+        const medal = rankMedals[i] ?? String(i + 1);
+        const avatarHtml = r.avatar_url
+          ? `<img src="${escapeText(r.avatar_url)}" alt="${escapeText(name)}" class="w-8 h-8 rounded-full object-cover flex-shrink-0" loading="lazy" />`
+          : `<div class="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-700 flex-shrink-0 flex items-center justify-center text-sm">${medal}</div>`;
+        return `<li class="flex items-center gap-2">
+          ${avatarHtml}
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate">${escapeText(name)}</p>
+            <p class="text-[11px] text-zinc-500 dark:text-zinc-400">${escapeText(rankLabel)} · ${Math.round(r.karma_30d)} pts</p>
+          </div>
+          <span class="text-xl">${medal}</span>
+        </li>`;
+      }).join('');
+
+      container.innerHTML = `
+        <div>
+          <div class="flex items-baseline justify-between gap-3 mb-3">
+            <h2 class="text-sm font-semibold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">${escapeText(title)}</h2>
+            <a href="${escapeText(leaderHref)}" class="text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:underline">${escapeText(viewAll)}</a>
+          </div>
+          <ul class="space-y-2 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50">
+            ${itemsHtml}
+          </ul>
+        </div>`;
+      container.classList.remove('hidden');
+    } catch { /* leaderboard is optional */ }
+  }
+
+  async function paintNextBadge(root: HTMLElement, lang: Lang, userId: string): Promise<void> {
+    const container = root.querySelector<HTMLElement>('.home-widgets-next-badge');
+    if (!container) return;
+
+    let supabase;
+    try {
+      supabase = getSupabase();
+    } catch { return; }
+
+    type BadgeRow = {
+      key: string;
+      name_en: string;
+      name_es: string;
+      description_en: string;
+      description_es: string;
+      tier: string;
+    };
+
+    type UserBadgeRow = { badge_key: string; awarded_at: string | null };
+
+    try {
+      // Get all badges and which ones the user has earned
+      const [{ data: allBadges }, { data: userBadges }] = await Promise.all([
+        supabase.from('badges').select('key, name_en, name_es, description_en, description_es, tier').limit(100),
+        supabase.from('user_badges').select('badge_key, awarded_at').eq('user_id', userId),
+      ]);
+
+      if (!allBadges) return;
+      const earnedKeys = new Set((userBadges ?? []).map((ub: UserBadgeRow) => ub.badge_key));
+
+      // Find first unearned badge (ordered by tier: bronze → silver → gold → platinum)
+      const tierOrder: Record<string, number> = { bronze: 0, silver: 1, gold: 2, platinum: 3 };
+      const unearned = (allBadges as BadgeRow[])
+        .filter(b => !earnedKeys.has(b.key))
+        .sort((a, b) => (tierOrder[a.tier] ?? 99) - (tierOrder[b.tier] ?? 99));
+
+      if (unearned.length === 0) return;
+
+      const next = unearned[0];
+      const earned = earnedKeys.size;
+      const total = allBadges.length;
+
+      const title = root.dataset.labelNextBadgeTitle ?? 'Next badge';
+      const progressTpl = root.dataset.labelNextBadgeProgress ?? '{{current}} / {{threshold}}';
+      const viewProfileLabel = root.dataset.labelNextBadgeViewProfile ?? 'View profile';
+      const profileHref = root.dataset.profileHref ?? '/profile/';
+
+      const name = lang === 'es' ? next.name_es : next.name_en;
+      const desc = lang === 'es' ? next.description_es : next.description_en;
+      const progressLabel = progressTpl.replace('{{current}}', String(earned)).replace('{{threshold}}', String(total));
+      const pct = total > 0 ? Math.round((earned / total) * 100) : 0;
+
+      const tierColors: Record<string, string> = {
+        bronze: 'bg-amber-600',
+        silver: 'bg-zinc-400',
+        gold: 'bg-yellow-400',
+        platinum: 'bg-sky-400',
+      };
+      const barColor = tierColors[next.tier] ?? 'bg-emerald-500';
+
+      container.innerHTML = `
+        <div>
+          <div class="flex items-baseline justify-between gap-3 mb-3">
+            <h2 class="text-sm font-semibold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">${escapeText(title)}</h2>
+            <a href="${escapeText(profileHref)}" class="text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:underline">${escapeText(viewProfileLabel)}</a>
+          </div>
+          <div class="p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50">
+            <p class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-0.5">${escapeText(name)}</p>
+            <p class="text-xs text-zinc-600 dark:text-zinc-300 mb-2">${escapeText(desc)}</p>
+            <div class="flex items-center gap-2">
+              <div class="flex-1 bg-zinc-200 dark:bg-zinc-700 rounded-full h-1.5 overflow-hidden">
+                <div class="${barColor} h-full rounded-full" style="width:${pct}%"></div>
+              </div>
+              <span class="text-[11px] text-zinc-500 dark:text-zinc-400 flex-shrink-0">${escapeText(progressLabel)}</span>
+            </div>
+          </div>
+        </div>`;
+      container.classList.remove('hidden');
+    } catch { /* next badge is optional */ }
   }
 
   function rarityLabel(tier: number | null, root: HTMLElement): string {
@@ -521,6 +706,7 @@ const observeHref = lang === 'es' ? '/es/observar/' : '/en/observe/';
     } catch { /* challenge is optional */ }
 
   }
+
 
   async function paintNearby(root: HTMLElement, lang: Lang, country: string | null, _region: string | null): Promise<void> {
     const listEl = root.querySelector<HTMLUListElement>('.hw-nearby-list');
