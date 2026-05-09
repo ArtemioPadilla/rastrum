@@ -17,9 +17,31 @@ export default {
     'rastrum-season-accent',
     'rastrum-season-accent-bg',
     'rastrum-season-accent-border',
+    'ring-2', 'ring-4',
+    'ring-emerald-500', 'ring-teal-500', 'ring-amber-500',
+    'ring-sky-500', 'ring-yellow-400', 'ring-fuchsia-500',
+    'ring-offset-2', 'ring-offset-white', 'dark:ring-offset-zinc-900',
+    'shadow-[0_0_12px_rgba(250,204,21,0.6)]',
+    'shadow-[0_0_16px_rgba(217,70,239,0.7)]',
+    'motion-safe:animate-pulse',
+    'motion-safe:animate-rastrum-legend-spin',
   ],
   theme: {
-    extend: {},
+    extend: {
+      keyframes: {
+        'rastrum-legend-spin': {
+          '0%, 100%': {
+            'box-shadow': '0 0 12px rgba(217, 70, 239, 0.55), 0 0 22px rgba(168, 85, 247, 0.35)',
+          },
+          '50%': {
+            'box-shadow': '0 0 18px rgba(217, 70, 239, 0.85), 0 0 28px rgba(168, 85, 247, 0.55)',
+          },
+        },
+      },
+      animation: {
+        'rastrum-legend-spin': 'rastrum-legend-spin 3.4s ease-in-out infinite',
+      },
+    },
   },
   plugins: [],
 };

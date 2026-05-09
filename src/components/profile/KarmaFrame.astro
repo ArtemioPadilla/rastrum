@@ -1,0 +1,46 @@
+---
+import { tierForKarma } from '../../lib/karma-frame';
+
+interface Props {
+  karmaTotal: number;
+  src: string;
+  alt: string;
+  size?: 'sm' | 'md' | 'lg';
+  class?: string;
+}
+
+const {
+  karmaTotal,
+  src,
+  alt,
+  size = 'md',
+  class: extraClass = '',
+} = Astro.props;
+
+const tier = tierForKarma(karmaTotal ?? 0);
+
+const sizeClass =
+  size === 'sm' ? 'w-10 h-10'
+  : size === 'lg' ? 'w-24 h-24 md:w-28 md:h-28'
+  : 'w-16 h-16 md:w-20 md:h-20';
+
+const wrapperClass = [
+  'inline-block rounded-full ring-offset-2 ring-offset-white dark:ring-offset-zinc-900',
+  tier.ringClass,
+  extraClass,
+].filter(Boolean).join(' ');
+---
+
+<span
+  class={wrapperClass}
+  data-karma-frame
+  data-karma-tier={tier.id}
+  data-karma-glow={tier.glow ? '1' : '0'}
+>
+  <img
+    src={src}
+    alt={alt}
+    loading="lazy"
+    class={`rounded-full bg-zinc-200 dark:bg-zinc-800 object-cover ${sizeClass}`}
+  />
+</span>
