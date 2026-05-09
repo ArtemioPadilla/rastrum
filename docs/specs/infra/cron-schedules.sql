@@ -435,3 +435,10 @@ BEGIN
     $body$DELETE FROM public.anon_rate_limit WHERE ts < now() - interval '2 hours'$body$
   );
 END $$;
+
+-- Recompute taxa rarity tiers (runs after recompute_user_stats)
+SELECT cron.schedule(
+  'recompute-taxa-rarity',
+  '45 3 * * *',  -- 3:45 AM UTC daily, after recompute_user_stats (3:30 AM)
+  $$SELECT public.recompute_taxa_rarity()$$
+);

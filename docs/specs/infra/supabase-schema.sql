@@ -9240,6 +9240,9 @@ BEGIN
     RAISE WARNING 'recompute_user_metrics_percentile failed: %', SQLERRM;
   END;
 
+  -- Recompute taxa rarity tiers (uses observation counts already refreshed above)
+  PERFORM public.recompute_taxa_rarity();
+
   RETURN v_count;
 END;
 $$;
@@ -10913,3 +10916,76 @@ $$;
 
 REVOKE EXECUTE ON FUNCTION public.suggest_nearby_species(uuid, double precision, double precision, integer, integer, integer) FROM PUBLIC;
 GRANT  EXECUTE ON FUNCTION public.suggest_nearby_species(uuid, double precision, double precision, integer, integer, integer) TO authenticated;
+
+-- ============================================================
+-- #934 — taxa.rarity_tier backfill + nightly recompute
+-- Tier 1 = common    (≥50 synced observations on platform)
+-- Tier 2 = uncommon  (10–49 observations)
+-- Tier 3 = rare      (1–9 observations)
+-- Tier 4 = very rare (0 platform observations — known taxon, never recorded here)
+-- ============================================================
+
+-- One-time idempotent backfill (safe to re-run — only touches NULL rows).
+DO $$
+BEGIN
+  UPDATE public.taxa t
+  SET rarity_tier = sub.tier
+  FROM (
+    SELECT
+      i.taxon_id,
+      CASE
+        WHEN COUNT(*) >= 50 THEN 1
+        WHEN COUNT(*) >= 10 THEN 2
+        WHEN COUNT(*) >= 1  THEN 3
+        ELSE 4
+      END AS tier
+    FROM public.identifications i
+    JOIN public.observations o ON o.id = i.observation_id
+    WHERE i.is_primary AND o.sync_status = 'synced'
+    GROUP BY i.taxon_id
+  ) sub
+  WHERE t.id = sub.taxon_id
+    AND t.rarity_tier IS NULL;
+
+  -- Taxa in the taxa table but with zero platform observations get tier 4.
+  UPDATE public.taxa
+  SET rarity_tier = 4
+  WHERE rarity_tier IS NULL;
+END $$;
+
+-- Nightly recompute function — called by the scheduler after recompute_user_stats().
+CREATE OR REPLACE FUNCTION public.recompute_taxa_rarity()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions, pg_temp
+AS $$
+BEGIN
+  UPDATE public.taxa t
+  SET rarity_tier = sub.tier
+  FROM (
+    SELECT
+      i.taxon_id,
+      CASE
+        WHEN COUNT(*) >= 50 THEN 1
+        WHEN COUNT(*) >= 10 THEN 2
+        WHEN COUNT(*) >= 1  THEN 3
+        ELSE 4
+      END AS tier
+    FROM public.identifications i
+    JOIN public.observations o ON o.id = i.observation_id
+    WHERE i.is_primary AND o.sync_status = 'synced'
+    GROUP BY i.taxon_id
+  ) sub
+  WHERE t.id = sub.taxon_id
+    AND (t.rarity_tier IS NULL OR t.rarity_tier <> sub.tier);
+
+  -- Newly added taxa with no observations yet
+  UPDATE public.taxa
+  SET rarity_tier = 4
+  WHERE rarity_tier IS NULL;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.recompute_taxa_rarity() FROM PUBLIC;
+GRANT  EXECUTE ON FUNCTION public.recompute_taxa_rarity() TO service_role;
