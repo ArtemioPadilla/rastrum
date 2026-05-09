@@ -102,6 +102,17 @@ const weathers = WEATHERS;
       <span id="obs2-pipeline-status" class="text-xs text-zinc-500 dark:text-zinc-400"></span>
     </div>
     <PipelineGraph lang={lang} />
+    <!-- Escape hatch: shown after 15s if pipeline is still running (#pipeline-stuck) -->
+    <div id="obs2-pipeline-escape" class="hidden mt-3 flex items-center gap-3">
+      <button
+        type="button"
+        id="obs2-pipeline-skip-btn"
+        class="text-xs text-zinc-500 dark:text-zinc-400 underline underline-offset-2 hover:text-zinc-700 dark:hover:text-zinc-200"
+      >
+        {isEs ? 'Saltar identificación y continuar →' : 'Skip identification and continue →'}
+      </button>
+      <span class="text-[10px] text-zinc-400">{isEs ? '(puedes editar el nombre después)' : '(you can edit the name later)'}</span>
+    </div>
   </div>
 
   <!-- Audio-skipped warning (#278) — shown when audio node skipped due to BirdNET not downloaded -->
@@ -357,8 +368,10 @@ let location: { lat: number; lng: number; accuracyM: number; altitudeM: number |
 let bestResult: { scientific_name: string; common_name_en: string | null; confidence: number; source: string } | null = null;
 
 // DOM refs
-const pipelineSection = document.getElementById('obs2-pipeline-section');
-const pipelineStatus  = document.getElementById('obs2-pipeline-status');
+const pipelineSection  = document.getElementById('obs2-pipeline-section');
+const pipelineStatus   = document.getElementById('obs2-pipeline-status');
+const pipelineEscape   = document.getElementById('obs2-pipeline-escape');
+const pipelineSkipBtn  = document.getElementById('obs2-pipeline-skip-btn') as HTMLButtonElement | null;
 const postForm        = document.getElementById('obs2-post-form') as HTMLFormElement | null;
 const successEl       = document.getElementById('obs2-success');
 const errorEl         = document.getElementById('obs2-error');
@@ -580,6 +593,15 @@ document.addEventListener('rastrum:files-dropped', async (e: Event) => {
   // Start GPS in parallel
   startGPS();
 
+  // Escape hatch: show "Skip and continue" after 15s if still processing.
+  // Covers the Android Chrome auth-lock timeout and slow network cases.
+  const escapeTimer = setTimeout(() => {
+    if (pipelineState.status === 'processing') {
+      pipelineEscape?.classList.remove('hidden');
+      pipelineEscape?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, 15_000);
+
   // Run pipeline
   // #783: wrap in try/catch so that an unexpected error (e.g. the
   // gotrue auth-lock timeout that fires mid-pipeline on Android Chrome)
@@ -592,6 +614,9 @@ document.addEventListener('rastrum:files-dropped', async (e: Event) => {
     pipelineState.status = 'failed';
     await savePipelineState(pipelineState).catch(() => {});
     showPostForm();
+  } finally {
+    clearTimeout(escapeTimer);
+    pipelineEscape?.classList.add('hidden');
   }
 });
 
@@ -905,6 +930,8 @@ function startGPS() {
 
 // ── Show post form ─────────────────────────────────────────────────────────
 function showPostForm() {
+  // Hide the escape hatch once we get to the post-form.
+  pipelineEscape?.classList.add('hidden');
   postForm?.classList.remove('hidden');
   // id card is always shown so user can always enter/edit species
   if (bestResult) {
@@ -948,6 +975,16 @@ window.addEventListener('rastrum:why-this-species-report', () => {
 });
 
 // ── Identify mode: skip save ──────────────────────────────────────────────
+// Pipeline escape hatch: "Skip identification and continue"
+pipelineSkipBtn?.addEventListener('click', () => {
+  if (pipelineState.status === 'processing') {
+    pipelineState.status = 'failed';
+    void savePipelineState(pipelineState).catch(() => {});
+  }
+  pipelineEscape?.classList.add('hidden');
+  showPostForm();
+});
+
 skipSaveBtn?.addEventListener('click', () => {
   postForm?.classList.add('hidden');
   identifyResult?.classList.remove('hidden');
