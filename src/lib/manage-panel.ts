@@ -506,6 +506,58 @@ export async function wireManagePanelPhotos(obsId: string): Promise<void> {
   }
 
   addBtn.addEventListener('click', () => fileIn.click());
+
+  // ── Drag & drop on photos grid area (#790) ────────────────────────────
+  const dropArea    = document.getElementById('m-photos-drop-area');
+  const dropOverlay = document.getElementById('m-photos-drop-overlay');
+  if (dropArea) {
+    import('./make-drop-target').then(({ makeDropTarget }) => {
+      makeDropTarget(
+        dropArea,
+        async (files) => {
+          if (files.length === 0) return;
+          setError(null);
+          setBusy(copy.uploading);
+          addBtn.disabled = true;
+          try {
+            const maxSort = allPhotos.reduce((acc, p) => {
+              const so = p.sort_order ?? 0;
+              return so > acc ? so : acc;
+            }, 0);
+            let nextSort = maxSort + 1;
+            for (const file of files) {
+              const blob  = await resizeImage(file);
+              const newId = (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
+                ? crypto.randomUUID()
+                : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+              const key  = `observations/${obsId}/${newId}.jpg`;
+              const url  = await uploadMedia(blob, key, 'image/jpeg');
+              const { error: insertErr } = await supabase.from('media_files').insert({
+                id:              newId,
+                observation_id:  obsId,
+                media_type:      'photo',
+                url,
+                mime_type:       'image/jpeg',
+                file_size_bytes: blob.size,
+                sort_order:      nextSort,
+                is_primary:      false,
+              });
+              if (insertErr) throw insertErr;
+              nextSort += 1;
+            }
+            await refresh();
+          } catch (err) {
+            setError(err instanceof Error ? err.message : copy.upload_failed);
+          } finally {
+            addBtn.disabled = false;
+            setBusy(null);
+          }
+        },
+        { accept: ['image/'], overlayEl: dropOverlay ?? undefined },
+      );
+    }).catch(() => { /* drag & drop unavailable, file picker still works */ });
+  }
+
   fileIn.addEventListener('change', async () => {
     const files = Array.from(fileIn.files ?? []);
     if (files.length === 0) return;
