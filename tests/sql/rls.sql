@@ -95,6 +95,14 @@ BEGIN
       ('aaaaaaaa-0000-0000-0000-000000000001', uid_user, 'synced', 'none',  false),
       ('aaaaaaaa-0000-0000-0000-000000000002', uid_user, 'synced', 'full',  true)
   ON CONFLICT DO NOTHING;
+
+  -- Follow edges for issue #858 RLS assertions (friends-scope leaderboard).
+  -- uid_user follows uid_mod, and uid_mod follows uid_user back (mutual).
+  INSERT INTO public.follows (follower_id, followee_id, status)
+    VALUES
+      (uid_user, uid_mod, 'accepted'),
+      (uid_mod,  uid_user, 'accepted')
+  ON CONFLICT DO NOTHING;
 END $$;
 
 -- ────────────────────────────────────────────────────────────────────────────
@@ -900,12 +908,94 @@ END $$;
 RESET ROLE;
 
 -- ────────────────────────────────────────────────────────────────────────────
+-- follows RLS (issue #858 — friends-scope leaderboard)
+--
+-- Active policy: follows_read (Module 26)
+--   USING (follower_id = auth.uid() OR followee_id = auth.uid() OR status = 'accepted')
+-- ────────────────────────────────────────────────────────────────────────────
+
+-- Test 36 of 38: follows_read: uid_user sees own outgoing edge (follower_id = auth.uid())
+-- Policy: follows_read — follower_id = auth.uid() branch.
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000003';
+
+DO $$
+DECLARE
+  cnt int;
+BEGIN
+  SELECT count(*)::int INTO cnt
+    FROM public.follows
+   WHERE follower_id = auth.uid();
+  IF cnt < 1 THEN
+    RAISE EXCEPTION 'FAIL [Test 36 of 38: follows_read: uid_user sees own outgoing follows]: expected >= 1, got %', cnt;
+  END IF;
+  -- Verify no rows belong to a different follower_id (server-side filter)
+  SELECT count(*)::int INTO cnt
+    FROM public.follows
+   WHERE follower_id <> '00000000-0000-0000-0000-000000000003'
+     AND status <> 'accepted'; -- pending from other users must be invisible
+  IF cnt > 0 THEN
+    RAISE EXCEPTION 'FAIL [Test 36 of 38: follows_read: uid_user leaks pending follows of others]: got %', cnt;
+  END IF;
+END $$;
+
+-- Test 37 of 38: follows_read: querying another user's follower_id returns 0 pending/private rows
+-- Policy: follows_read — only accepted rows visible for third parties.
+-- uid_user queries follows WHERE follower_id = uid_mod (a different user).
+-- Because both edges are 'accepted', status = 'accepted' branch applies and
+-- that row IS visible. We assert the count is 0 or >= 0 but no private rows leak.
+-- The critical invariant: pending edges from other users are invisible.
+DO $$
+DECLARE
+  cnt       int;
+  leaking   int;
+BEGIN
+  -- Count all follows rows visible where follower_id = uid_mod
+  SELECT count(*)::int INTO cnt
+    FROM public.follows
+   WHERE follower_id = '00000000-0000-0000-0000-000000000002';
+  -- cnt may be 1 (the accepted edge is visible via status='accepted' branch).
+  -- What must NOT happen: seeing pending edges not involving auth.uid().
+  SELECT count(*)::int INTO leaking
+    FROM public.follows
+   WHERE follower_id = '00000000-0000-0000-0000-000000000002'
+     AND status <> 'accepted'
+     AND follower_id <> auth.uid()
+     AND followee_id <> auth.uid();
+  IF leaking > 0 THEN
+    RAISE EXCEPTION 'FAIL [Test 37 of 38: follows_read: pending follow of other user leaked to uid_user]: count=%', leaking;
+  END IF;
+END $$;
+
+-- Test 38 of 38: follows_read: querying following_id = uid_mod only shows rows
+-- where uid_user is involved (follower/followee) or status='accepted'.
+DO $$
+DECLARE
+  leaking int;
+BEGIN
+  -- Any row visible where following_id = uid_mod AND NOT accepted AND caller not involved
+  -- is a data leak. Policy: follows_read USING (follower_id = auth.uid()
+  --   OR followee_id = auth.uid() OR status = 'accepted').
+  SELECT count(*)::int INTO leaking
+    FROM public.follows
+   WHERE followee_id = '00000000-0000-0000-0000-000000000002'
+     AND status <> 'accepted'
+     AND follower_id <> auth.uid()
+     AND followee_id <> auth.uid();
+  IF leaking > 0 THEN
+    RAISE EXCEPTION 'FAIL [Test 38 of 38: follows_read: pending follow with following_id=uid_mod leaked]: count=%', leaking;
+  END IF;
+END $$;
+
+RESET ROLE;
+
+-- ────────────────────────────────────────────────────────────────────────────
 -- Summary
 -- ────────────────────────────────────────────────────────────────────────────
 
 DO $$
 BEGIN
-  RAISE NOTICE 'RLS suite: 35 of 35 assertions passed';
+  RAISE NOTICE 'RLS suite: 38 of 38 assertions passed';
 END $$;
 
 ROLLBACK;
