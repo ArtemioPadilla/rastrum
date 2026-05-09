@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeCropRect, rotatedDims, renameToJpeg, cropAndRotate } from './photo-crop';
+import { normalizeCropRect, rotatedDims, renameToJpeg, cropAndRotate, buildFilterString } from './photo-crop';
 
 describe('normalizeCropRect', () => {
   it('returns the rect untouched when valid', () => {
@@ -59,6 +59,22 @@ describe('renameToJpeg', () => {
 
   it('falls back to a default name on empty input', () => {
     expect(renameToJpeg('')).toBe('photo.jpg');
+  });
+});
+
+describe('buildFilterString', () => {
+  it('returns "none" when both deltas are 0', () => {
+    expect(buildFilterString(0, 0)).toBe('none');
+  });
+
+  it('builds a brightness/contrast filter string from deltas', () => {
+    expect(buildFilterString(50, 0)).toBe('brightness(1.500) contrast(1.000)');
+    expect(buildFilterString(-50, 25)).toBe('brightness(0.500) contrast(1.250)');
+  });
+
+  it('coerces non-finite inputs to 0', () => {
+    expect(buildFilterString(NaN, NaN)).toBe('none');
+    expect(buildFilterString(Infinity, -Infinity)).toBe('none');
   });
 });
 

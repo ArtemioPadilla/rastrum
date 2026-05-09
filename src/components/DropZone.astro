@@ -28,12 +28,20 @@ const galleryLabel   = isEs ? 'Galería' : 'Gallery';
 const audioLabel     = isEs ? 'Grabar audio' : 'Record audio';
 const dragOverLabel  = isEs ? 'Suelta los archivos' : 'Drop files here';
 const pasteHint      = isEs ? 'También puedes pegar (Ctrl+V)' : 'You can also paste (Ctrl+V)';
+const editPhotoLabel = isEs ? 'Editar foto' : 'Edit photo';
 ---
 
+{/*
+  data-edit-photo-label: localized aria-label for the per-thumbnail edit button.
+  Read by ObserveView2's photo-grid hydrator (and any future consumer that
+  wires PhotoCropModal). Kept on the wrapper — not the buttons — so a single
+  attribute serves all thumbnails regardless of count.
+*/}
 <div
   id="drop-zone-root"
   class={`relative rounded-2xl border-2 border-dashed border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/40 transition-all ${extraClass}`}
   aria-label={dropLabel}
+  data-edit-photo-label={editPhotoLabel}
   role="region"
 >
   <!-- Hidden file inputs -->
@@ -180,7 +188,9 @@ function showPreviews(files: File[]) {
       editBtn.type = 'button';
       // w-11 h-11 = 44px touch target (WCAG 2.5.5 — Nyx review #789)
       editBtn.className = 'absolute bottom-0 right-0 w-11 h-11 bg-black/60 hover:bg-emerald-600 flex items-center justify-center rounded-tl-md transition-colors';
-      editBtn.setAttribute('aria-label', 'Edit photo');
+      const editLabel = root?.getAttribute('data-edit-photo-label')
+        ?? (document.documentElement.lang === 'es' ? 'Editar foto' : 'Edit photo');
+      editBtn.setAttribute('aria-label', editLabel);
       editBtn.innerHTML = '<svg class="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536M9 11l6-6 3 3-6 6H9v-3z"/></svg>';
       editBtn.addEventListener('click', async (ev) => {
         ev.stopPropagation();
