@@ -48,6 +48,17 @@ jobs:
           PUBLIC_R2_MEDIA_URL:       ${{ secrets.PUBLIC_R2_MEDIA_URL }}
           PUBLIC_R2_TILES_URL:       ${{ secrets.PUBLIC_R2_TILES_URL }}
 
+      - name: Verify search-index up to date
+        # Post-merge canary: this workflow also runs on push to main, so it
+        # catches search-index drift that bypassed PR review (admin commit,
+        # branch-protection bypass, force-push). Mirrors ci.yml's PR-time
+        # guard. See docs/runbooks/posthog.md.
+        run: |
+          if ! git diff --exit-code public/search-index.en.json public/search-index.es.json; then
+            echo "::error::public/search-index.{en,es}.json drift detected. Run 'npm run build' locally and commit the regenerated files."
+            exit 1
+          fi
+
       - name: Run Playwright tests
         run: npm run test:e2e
 
