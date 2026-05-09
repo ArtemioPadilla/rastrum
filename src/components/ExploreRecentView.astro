@@ -31,11 +31,19 @@ const sgTree = tr as unknown as {
     cards: Record<string, string>;
     block: { button: string };
     report: { button: string };
+    reactions: Record<string, string>;
+    follow: Record<string, string>;
+    recents_follow_aria: string;
+    recents_unfollow_aria: string;
   };
 };
 const sgCards  = sgTree.socialgraph.cards;
 const sgBlock  = sgTree.socialgraph.block.button;
 const sgReport = sgTree.socialgraph.report.button;
+const sgReactions = sgTree.socialgraph.reactions;
+const sgFollow = sgTree.socialgraph.follow;
+const sgRecentsFollowAria = sgTree.socialgraph.recents_follow_aria;
+const sgRecentsUnfollowAria = sgTree.socialgraph.recents_unfollow_aria;
 const view = page.view;
 ---
 
@@ -60,6 +68,13 @@ const view = page.view;
   data-label-block-observer-aria={sgCards.block_observer_aria}
   data-label-fave-aria-one={(tr as unknown as { socialgraph: { reactions: Record<string, string> } }).socialgraph.reactions.fave_count_aria_one}
   data-label-fave-aria-other={(tr as unknown as { socialgraph: { reactions: Record<string, string> } }).socialgraph.reactions.fave_count_aria_other}
+  data-label-fave-add-aria={sgReactions.fave_add_aria}
+  data-label-fave-remove-aria={sgReactions.fave_remove_aria}
+  data-label-recents-follow-aria={sgRecentsFollowAria}
+  data-label-recents-unfollow-aria={sgRecentsUnfollowAria}
+  data-label-follow-btn={sgFollow.button}
+  data-label-following-btn={sgFollow.following}
+  data-label-requested-btn={sgFollow.requested}
 >
   <header class="space-y-3 py-6">
     <div class="flex items-start justify-between gap-3">
@@ -276,11 +291,44 @@ const view = page.view;
         </div>`
       : '';
 
-    // Reaction count chip placeholder — populated after batched fetch.
-    const faveChipHtml = `<span class="er-fave-chip hidden inline-flex items-center gap-1 rounded-full bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 px-2 py-0.5 text-[11px] font-semibold text-rose-700 dark:text-rose-300" data-fave-target="${escapeText(r.id)}"><svg class="w-3 h-3" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21s-7-4.5-9.5-9A5.5 5.5 0 0 1 12 6a5.5 5.5 0 0 1 9.5 6c-2.5 4.5-9.5 9-9.5 9Z"/></svg><span class="er-fave-count tabular-nums">0</span></span>`;
+    // Reaction count chip / interactive like button.
+    // For signed-in users: interactive heart button (replaces passive chip).
+    // For signed-out users: passive chip (read-only, only shown if count > 0).
+    const faveChipHtml = viewerAuthed
+      ? `<button
+          type="button"
+          class="er-fave-btn inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold border transition-colors
+            er-fave-off:bg-zinc-100 er-fave-off:dark:bg-zinc-800/50 er-fave-off:border-zinc-300 er-fave-off:dark:border-zinc-700 er-fave-off:text-zinc-500 er-fave-off:dark:text-zinc-400
+            er-fave-on:bg-rose-50 er-fave-on:dark:bg-rose-950/40 er-fave-on:border-rose-200 er-fave-on:dark:border-rose-900/60 er-fave-on:text-rose-700 er-fave-on:dark:text-rose-300
+            bg-zinc-100 dark:bg-zinc-800/50 border-zinc-300 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400"
+          data-fave-target="${escapeText(r.id)}"
+          data-fave-active="false"
+          aria-label="${escapeText(labels.faveAddAria)}"
+          aria-pressed="false"
+          data-stop
+        ><svg class="w-3 h-3" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21s-7-4.5-9.5-9A5.5 5.5 0 0 1 12 6a5.5 5.5 0 0 1 9.5 6c-2.5 4.5-9.5 9-9.5 9Z"/></svg><span class="er-fave-count tabular-nums">0</span></button>`
+      : `<span class="er-fave-chip hidden inline-flex items-center gap-1 rounded-full bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 px-2 py-0.5 text-[11px] font-semibold text-rose-700 dark:text-rose-300" data-fave-target="${escapeText(r.id)}"><svg class="w-3 h-3" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21s-7-4.5-9.5-9A5.5 5.5 0 0 1 12 6a5.5 5.5 0 0 1 9.5 6c-2.5 4.5-9.5 9-9.5 9Z"/></svg><span class="er-fave-count tabular-nums">0</span></span>`;
+
+    // Follow button — shown for signed-in viewers looking at someone else's card.
+    // Initial follow state is populated after batched query; default is 'none'.
+    const showFollowBtn = viewerAuthed && !isOwn && isPublic && !!observer?.id;
+    const followBtnHtml = showFollowBtn
+      ? `<button
+          type="button"
+          class="er-follow-btn inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold border transition-colors
+            bg-zinc-100 dark:bg-zinc-800/50 border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400
+            hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:border-emerald-300 dark:hover:border-emerald-800 hover:text-emerald-700 dark:hover:text-emerald-300"
+          data-follow-target="${escapeText(observer?.id ?? '')}"
+          data-follow-handle="${escapeText(observer?.username ?? '')}"
+          data-follow-state="none"
+          aria-label="${escapeText(labels.recentsFollowAria.replace('{{handle}}', observer?.username ?? ''))}"
+          data-stop
+        >${escapeText(labels.followBtn)}</button>`
+      : '';
+
+    const observerRowHtml = `<p class="text-xs text-zinc-500 dark:text-zinc-400 truncate flex items-center gap-1.5">${observerHtml}${followBtnHtml}</p>`;
 
     return `<li class="relative">
-      ${overflowHtml}
       <a
         href="${shareBase}?id=${encodeURIComponent(r.id)}"
         class="er-card block overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 hover:border-emerald-400 dark:hover:border-emerald-700 transition-colors"
@@ -303,7 +351,7 @@ const view = page.view;
             ${faveChipHtml}
             <span>${escapeText(ago)}</span>
           </div>
-          <p class="text-xs text-zinc-500 dark:text-zinc-400 truncate">${observerHtml}</p>
+          ${observerRowHtml}
         </div>
       </a>
     </li>`;
@@ -328,6 +376,13 @@ const view = page.view;
       blockObserverAria: root.dataset.labelBlockObserverAria ?? 'Block this observer',
       faveAriaOne: root.dataset.labelFaveAriaOne ?? '{{count}} person favorited this',
       faveAriaOther: root.dataset.labelFaveAriaOther ?? '{{count}} people favorited this',
+      faveAddAria: root.dataset.labelFaveAddAria ?? 'Add to favorites',
+      faveRemoveAria: root.dataset.labelFaveRemoveAria ?? 'Remove from favorites',
+      recentsFollowAria: root.dataset.labelRecentsFollowAria ?? 'Follow {{handle}}',
+      recentsUnfollowAria: root.dataset.labelRecentsUnfollowAria ?? 'Unfollow {{handle}}',
+      followBtn: root.dataset.labelFollowBtn ?? 'Follow',
+      followingBtn: root.dataset.labelFollowingBtn ?? 'Following ✓',
+      requestedBtn: root.dataset.labelRequestedBtn ?? 'Requested',
     };
 
     function readViewMode(): ViewMode {
@@ -424,16 +479,161 @@ const view = page.view;
         }
         for (const id of ids) {
           const n = byId.get(id) ?? 0;
-          if (n <= 0) continue;
-          const chip = root.querySelector<HTMLElement>(`.er-fave-chip[data-fave-target="${CSS.escape(id)}"]`);
-          if (!chip) continue;
-          const countEl = chip.querySelector<HTMLElement>('.er-fave-count');
+          // Interactive button (authed) or passive chip (anon) — same selector.
+          const el = root.querySelector<HTMLElement>(`[data-fave-target="${CSS.escape(id)}"]`);
+          if (!el) continue;
+          const countEl = el.querySelector<HTMLElement>('.er-fave-count');
           if (countEl) countEl.textContent = String(n);
-          const tpl = n === 1 ? labels.faveAriaOne : labels.faveAriaOther;
-          chip.setAttribute('aria-label', tpl.replace('{{count}}', String(n)));
-          chip.classList.remove('hidden');
+          if (el.tagName === 'BUTTON') {
+            // Interactive button — always visible for authed users.
+            const tpl = el.dataset.faveActive === 'true' ? labels.faveRemoveAria : labels.faveAddAria;
+            el.setAttribute('aria-label', tpl);
+          } else {
+            // Passive chip — only show if count > 0.
+            if (n <= 0) continue;
+            const tpl = n === 1 ? labels.faveAriaOne : labels.faveAriaOther;
+            el.setAttribute('aria-label', tpl.replace('{{count}}', String(n)));
+            el.classList.remove('hidden');
+          }
         }
       } catch { /* aggregate fetch failures shouldn't break the feed */ }
+    }
+
+    // Batch-fetch the viewer's own fave reactions for a set of obs ids.
+    // Marks the interactive heart buttons as active/inactive.
+    async function paintViewerFaves(ids: string[]) {
+      if (!viewerAuthed || !viewerId || ids.length === 0) return;
+      try {
+        const { data } = await supabase
+          .from('reactions')
+          .select('target_id')
+          .eq('user_id', viewerId)
+          .eq('target', 'observation')
+          .eq('kind', 'fave')
+          .in('target_id', ids);
+        const faved = new Set((data ?? []).map((r: { target_id: string }) => r.target_id));
+        for (const id of ids) {
+          const btn = root.querySelector<HTMLButtonElement>(`button[data-fave-target="${CSS.escape(id)}"]`);
+          if (!btn) continue;
+          const active = faved.has(id);
+          setFaveBtnState(btn, active);
+        }
+      } catch { /* silent */ }
+    }
+
+    function setFaveBtnState(btn: HTMLButtonElement, active: boolean) {
+      btn.dataset.faveActive = active ? 'true' : 'false';
+      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+      btn.setAttribute('aria-label', active ? labels.faveRemoveAria : labels.faveAddAria);
+      if (active) {
+        btn.classList.remove('bg-zinc-100', 'dark:bg-zinc-800/50', 'border-zinc-300', 'dark:border-zinc-700', 'text-zinc-500', 'dark:text-zinc-400');
+        btn.classList.add('bg-rose-50', 'dark:bg-rose-950/40', 'border-rose-200', 'dark:border-rose-900/60', 'text-rose-700', 'dark:text-rose-300');
+      } else {
+        btn.classList.add('bg-zinc-100', 'dark:bg-zinc-800/50', 'border-zinc-300', 'dark:border-zinc-700', 'text-zinc-500', 'dark:text-zinc-400');
+        btn.classList.remove('bg-rose-50', 'dark:bg-rose-950/40', 'border-rose-200', 'dark:border-rose-900/60', 'text-rose-700', 'dark:text-rose-300');
+      }
+    }
+
+    // Batch-fetch the viewer's follow status for a set of observer ids.
+    async function paintViewerFollows(observerIds: string[]) {
+      if (!viewerAuthed || !viewerId || observerIds.length === 0) return;
+      try {
+        const { data } = await supabase
+          .from('follows')
+          .select('followee_id, status')
+          .eq('follower_id', viewerId)
+          .in('followee_id', observerIds);
+        const byId = new Map<string, string>();
+        for (const row of (data ?? []) as { followee_id: string; status: string }[]) {
+          byId.set(row.followee_id, row.status);
+        }
+        root.querySelectorAll<HTMLButtonElement>('.er-follow-btn:not([data-follow-bound])').forEach((btn) => {
+          const targetId = btn.dataset.followTarget ?? '';
+          if (!targetId || !observerIds.includes(targetId)) return;
+          const status = byId.get(targetId) ?? 'none';
+          setFollowBtnState(btn, status);
+        });
+      } catch { /* silent */ }
+    }
+
+    function setFollowBtnState(btn: HTMLButtonElement, status: string) {
+      btn.dataset.followState = status;
+      const handle = btn.dataset.followHandle ?? '';
+      if (status === 'accepted') {
+        btn.textContent = labels.followingBtn;
+        btn.setAttribute('aria-label', labels.recentsUnfollowAria.replace('{{handle}}', handle));
+        btn.classList.remove('bg-zinc-100', 'dark:bg-zinc-800/50', 'border-zinc-300', 'dark:border-zinc-700', 'text-zinc-600', 'dark:text-zinc-400');
+        btn.classList.add('bg-emerald-50', 'dark:bg-emerald-950/40', 'border-emerald-300', 'dark:border-emerald-800', 'text-emerald-700', 'dark:text-emerald-300');
+      } else if (status === 'pending') {
+        btn.textContent = labels.requestedBtn;
+        btn.setAttribute('aria-label', labels.recentsUnfollowAria.replace('{{handle}}', handle));
+        btn.classList.remove('bg-zinc-100', 'dark:bg-zinc-800/50', 'border-zinc-300', 'dark:border-zinc-700', 'text-zinc-600', 'dark:text-zinc-400');
+        btn.classList.add('bg-amber-50', 'dark:bg-amber-950/40', 'border-amber-300', 'dark:border-amber-800', 'text-amber-700', 'dark:text-amber-300');
+      } else {
+        btn.textContent = labels.followBtn;
+        btn.setAttribute('aria-label', labels.recentsFollowAria.replace('{{handle}}', handle));
+        btn.classList.remove('bg-emerald-50', 'dark:bg-emerald-950/40', 'border-emerald-300', 'dark:border-emerald-800', 'text-emerald-700', 'dark:text-emerald-300',
+          'bg-amber-50', 'dark:bg-amber-950/40', 'border-amber-300', 'dark:border-amber-800', 'text-amber-700', 'dark:text-amber-300');
+        btn.classList.add('bg-zinc-100', 'dark:bg-zinc-800/50', 'border-zinc-300', 'dark:border-zinc-700', 'text-zinc-600', 'dark:text-zinc-400');
+      }
+    }
+
+    function wireLikeAndFollowButtons(scope: ParentNode) {
+      // Wire like (fave) buttons.
+      scope.querySelectorAll<HTMLButtonElement>('.er-fave-btn:not([data-bound])').forEach((btn) => {
+        btn.dataset.bound = '1';
+        btn.addEventListener('click', async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const obsId = btn.dataset.faveTarget ?? '';
+          if (!obsId) return;
+          const wasActive = btn.dataset.faveActive === 'true';
+          // Optimistic update.
+          const countEl = btn.querySelector<HTMLElement>('.er-fave-count');
+          const prevCount = parseInt(countEl?.textContent ?? '0', 10);
+          setFaveBtnState(btn, !wasActive);
+          if (countEl) countEl.textContent = String(wasActive ? Math.max(0, prevCount - 1) : prevCount + 1);
+          btn.disabled = true;
+          try {
+            const { react } = await import('../lib/social');
+            await react({ target: 'observation', target_id: obsId, kind: 'fave' });
+          } catch {
+            // Revert on error.
+            setFaveBtnState(btn, wasActive);
+            if (countEl) countEl.textContent = String(prevCount);
+          } finally {
+            btn.disabled = false;
+          }
+        });
+      });
+
+      // Wire follow buttons.
+      scope.querySelectorAll<HTMLButtonElement>('.er-follow-btn:not([data-follow-bound])').forEach((btn) => {
+        btn.dataset.followBound = '1';
+        btn.addEventListener('click', async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const targetId = btn.dataset.followTarget ?? '';
+          if (!targetId) return;
+          const curState = btn.dataset.followState ?? 'none';
+          btn.disabled = true;
+          try {
+            const { followUser, unfollowUser } = await import('../lib/social');
+            if (curState === 'none') {
+              const result = await followUser(targetId);
+              setFollowBtnState(btn, result.status === 'accepted' ? 'accepted' : 'pending');
+            } else {
+              // Following or requested -> unfollow
+              await unfollowUser(targetId);
+              setFollowBtnState(btn, 'none');
+            }
+          } catch {
+            // silent — state stays as-is
+          } finally {
+            btn.disabled = false;
+          }
+        });
+      });
     }
 
     function wireOverflowMenus(scope: ParentNode) {
@@ -515,6 +715,7 @@ const view = page.view;
             }).join(''),
           );
           wireOverflowMenus(listEl);
+          wireLikeAndFollowButtons(listEl);
           // Hydrate media thumbnails (audio + video)
           listEl.querySelectorAll<HTMLElement>('.media-player-mount:not([data-mounted])').forEach((el) => {
             el.dataset.mounted = '1';
@@ -541,7 +742,15 @@ const view = page.view;
           loadMoreWrap?.classList.remove('hidden');
         }
         // Fire-and-forget reaction-count fetch for the rows just rendered.
-        paintReactionCounts(renderedIds).catch(() => { /* silent */ });
+        const renderedObserverIds = page
+          .filter(r => r.observer_id && r.observer_id !== viewerId)
+          .map(r => r.observer_id)
+          .filter((v, i, a) => a.indexOf(v) === i);
+        Promise.all([
+          paintReactionCounts(renderedIds),
+          paintViewerFaves(renderedIds),
+          paintViewerFollows(renderedObserverIds),
+        ]).catch(() => { /* silent */ });
       } catch (e) {
         hideSkeleton();
         if (errEl) {
