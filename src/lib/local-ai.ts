@@ -151,6 +151,41 @@ export async function loadVisionEngine(onProgress: (p: LoadProgress) => void): P
   return visionEngine;
 }
 
+export const GEMMA_TEXT_MODEL_ID = 'onnx_gemma4_text';
+
+/**
+ * Load Gemma 4 E2B for text-only chat. Reuses the transformers.js + ONNX
+ * runtime path from onnx-vision.ts (same model weights). Cached after first
+ * load like the WebLLM models. Returns a thin engine handle whose `generate`
+ * method yields OpenAI-style chunks so chat-engine can consume Gemma and
+ * Llama through the same iterator interface.
+ */
+export async function loadGemmaTextEngine(
+  onProgress: (p: LoadProgress) => void,
+): Promise<{
+  generate: (
+    messages: Array<{ role: string; content: string }>,
+    opts?: { max_tokens?: number; stream?: boolean },
+  ) => AsyncIterable<{ choices: Array<{ delta?: { content?: string }; message?: { content: string } }> }>;
+}> {
+  if (!localAISupported()) throw new Error('WebGPU not available — Gemma 4 unavailable on this browser.');
+  cancelledFlags.delete(GEMMA_TEXT_MODEL_ID);
+  await requestPersistentStorage().catch(() => {});
+
+  const { loadGemmaVisionEngine, generateGemmaText } = await import('./onnx-vision');
+  // Trigger weight load with cancellation-aware progress bridge.
+  await loadGemmaVisionEngine((p) => {
+    if (cancelledFlags.has(GEMMA_TEXT_MODEL_ID)) {
+      throw new Error('Download cancelled');
+    }
+    onProgress(p);
+  });
+
+  return {
+    generate: (messages, opts) => generateGemmaText(messages, opts ?? {}),
+  };
+}
+
 /** Load the Llama-3.2-1B text model. ~880 MB; cached after first load. */
 export async function loadTextEngine(onProgress: (p: LoadProgress) => void): Promise<MLCEngineInterface> {
   if (textEngine) return textEngine;
