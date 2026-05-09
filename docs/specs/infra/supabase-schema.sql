@@ -10098,3 +10098,24 @@ EXCEPTION WHEN insufficient_privilege THEN
   RAISE NOTICE 'apply role cannot CREATE POLICY on spatial_ref_sys; advisor entry will persist.';
 END
 $$;
+
+-- ─────────────────────────────────────────────────────────────────────
+-- #812 — count_distinct_observed_species() RPC
+-- Returns distinct primary_taxon_id count from public observations.
+-- STABLE (no side effects), SECURITY INVOKER, LANGUAGE sql.
+-- GRANT to anon and authenticated.
+-- ─────────────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.count_distinct_observed_species()
+  RETURNS integer
+  LANGUAGE sql
+  STABLE
+  SECURITY INVOKER
+AS $$
+  SELECT COUNT(DISTINCT primary_taxon_id)::integer
+  FROM public.observations
+  WHERE primary_taxon_id IS NOT NULL
+    AND sync_status = 'synced'
+    AND obscure_level <> 'private';
+$$;
+
+GRANT EXECUTE ON FUNCTION public.count_distinct_observed_species() TO anon, authenticated;
