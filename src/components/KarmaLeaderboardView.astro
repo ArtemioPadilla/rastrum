@@ -714,23 +714,17 @@ const stringsJson = JSON.stringify({
         }));
       } else {
         const sinceIso = new Date(Date.now() - windowToIntervalMs(win)).toISOString();
-        let eq = supabase
-          .from('karma_events')
-          .select('user_id, delta')
-          .gt('delta', 0)
-          .gte('created_at', sinceIso)
-          .limit(5000);
-        if (restrictIds) eq = eq.in('user_id', restrictIds);
-        const { data: eventsData, error: eventsErr } = await eq;
-        if (eventsErr) throw new Error(eventsErr.message);
+        const { data: pairs, error: pairsErr } = await supabase.rpc('karma_leaderboard_window', {
+          p_since: sinceIso,
+          p_limit: 20,
+          p_restrict_ids: restrictIds ?? null,
+          p_country_code: (!restrictIds && region) ? region : null,
+        });
+        if (pairsErr) throw new Error(pairsErr.message);
 
-        const totals = new Map<string, number>();
-        for (const r of (eventsData ?? []) as Array<{ user_id: string; delta: number | null }>) {
-          totals.set(r.user_id, (totals.get(r.user_id) ?? 0) + Number(r.delta ?? 0));
-        }
-        const topPairs = [...totals.entries()]
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 20);
+        const topPairs = ((pairs ?? []) as Array<{ user_id: string; total: number | string | null }>).map(
+          (r) => [r.user_id, Number(r.total ?? 0)] as [string, number],
+        );
         const topIds = topPairs.map(([id]) => id);
 
         if (topIds.length === 0) {

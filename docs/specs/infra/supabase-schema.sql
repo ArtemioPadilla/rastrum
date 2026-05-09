@@ -7833,6 +7833,48 @@ EXCEPTION WHEN OTHERS THEN
 END $$;
 
 -- ─────────────────────────────────────────────────────────────────────────────
+-- #703 — karma_leaderboard_window: server-side aggregation for today/week.
+--
+-- The 30-day leaderboard uses the materialized view above; shorter windows
+-- (today / week) need an exact, on-demand aggregation. Doing the GROUP BY
+-- client-side after pulling raw karma_events rows breaks correctness once
+-- a power user accrues more rows than the LIMIT cap (the prior 5000-row
+-- pull aggregated client-side could mis-rank the top 20). This RPC pushes
+-- the aggregation, ORDER BY, and LIMIT down to Postgres.
+--
+-- SECURITY DEFINER is required so the function bypasses karma_events_self_read
+-- RLS for the aggregation. The privacy gate is the JOIN against
+-- community_observers, which already enforces hide_from_leaderboards = false.
+-- LANGUAGE sql binds search_path at definition time, so no SET search_path
+-- is needed (per CLAUDE.md schema invariant 3).
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.karma_leaderboard_window(
+  p_since        timestamptz,
+  p_limit        integer    DEFAULT 20,
+  p_restrict_ids uuid[]     DEFAULT NULL,
+  p_country_code text       DEFAULT NULL
+)
+RETURNS TABLE (user_id uuid, total numeric)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+AS $$
+  SELECT ke.user_id, SUM(ke.delta)::numeric AS total
+    FROM public.karma_events ke
+    JOIN public.community_observers co ON co.id = ke.user_id
+   WHERE ke.delta > 0
+     AND ke.created_at >= p_since
+     AND (p_restrict_ids IS NULL OR ke.user_id = ANY(p_restrict_ids))
+     AND (p_country_code IS NULL OR co.country_code = p_country_code)
+   GROUP BY ke.user_id
+   ORDER BY total DESC
+   LIMIT GREATEST(p_limit, 1);
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.karma_leaderboard_window(timestamptz, integer, uuid[], text) FROM PUBLIC;
+GRANT  EXECUTE ON FUNCTION public.karma_leaderboard_window(timestamptz, integer, uuid[], text) TO anon, authenticated;
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- #589 — UNIQUE primary identification per observation + upsert RPC.
 --
 -- Multiple code paths (sync.ts step 4.5, triggerIdentify, identify EF,
