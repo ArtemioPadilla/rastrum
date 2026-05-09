@@ -268,12 +268,22 @@ const observe = tr.observe;
     data-tab="photos"
     class="hidden space-y-3"
   >
-    <div
-      id="m-photos-grid"
-      data-photos-grid
-      class="grid grid-cols-3 sm:grid-cols-4 gap-2"
-    >
-      <!-- Hydrated by wireManagePanelPhotos at runtime. -->
+    <!-- Drag & drop target wrapper (#790) -->
+    <div id="m-photos-drop-area" class="relative rounded-xl transition-colors">
+      <!-- Drag-active overlay -->
+      <div id="m-photos-drop-overlay"
+        class="hidden absolute inset-0 z-10 rounded-xl border-2 border-dashed border-emerald-500 bg-emerald-500/5 items-center justify-center pointer-events-none">
+        <span class="text-sm font-medium text-emerald-700 dark:text-emerald-300">
+          {od.drop_to_add ?? (lang === 'es' ? 'Suelta para agregar fotos' : 'Drop to add photos')}
+        </span>
+      </div>
+      <div
+        id="m-photos-grid"
+        data-photos-grid
+        class="grid grid-cols-3 sm:grid-cols-4 gap-2"
+      >
+        <!-- Hydrated by wireManagePanelPhotos at runtime. -->
+      </div>
     </div>
     <p
       id="m-photos-empty"
