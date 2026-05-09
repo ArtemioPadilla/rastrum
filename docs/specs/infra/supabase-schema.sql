@@ -9936,8 +9936,6 @@ BEGIN
   END IF;
 
   BEGIN
-    -- ST_Covers uses the existing GiST index idx_places_geometry (created in the
-    -- places table definition above). Backfill performance is bounded by that index.
     SELECT p.country_code INTO v_cc
       FROM public.places p
      WHERE p.country_code IS NOT NULL
@@ -9975,9 +9973,6 @@ CREATE TRIGGER tg_fill_obs_country_code
 -- 3) Idempotent backfill: populate country_code for existing observations that
 --    have a location but no country_code yet. Safe to replay (WHERE country_code IS NULL
 --    ensures already-filled rows are never touched).
--- NOTE: This backfill runs in the schema apply transaction. On a large production DB
--- with millions of observations, consider running outside a transaction via psql \i
--- to avoid long lock holds on the observations table.
 DO $$
 BEGIN
   IF EXISTS (
