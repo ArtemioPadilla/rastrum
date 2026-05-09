@@ -44,8 +44,11 @@ interface LeaderboardCopy {
   leaderboard_scope_aria: string;
   leaderboard_scope_global: string;
   leaderboard_scope_friends: string;
+  leaderboard_scope_region: string;
   leaderboard_scope_friends_signin: string;
   leaderboard_scope_friends_empty: string;
+  leaderboard_country_picker_label: string;
+  leaderboard_country_picker_aria: string;
   leaderboard_region_label: string;
   leaderboard_region_all: string;
   leaderboard_region_empty: string;
@@ -77,6 +80,9 @@ const stringsJson = JSON.stringify({
   expertsNoData: cm.leaderboard_experts_no_data,
   scopeFriendsSignin: cm.leaderboard_scope_friends_signin,
   scopeFriendsEmpty: cm.leaderboard_scope_friends_empty,
+  scopeRegion: cm.leaderboard_scope_region,
+  countryPickerLabel: cm.leaderboard_country_picker_label,
+  countryPickerAria: cm.leaderboard_country_picker_aria,
   profileBase,
 });
 ---
@@ -160,6 +166,15 @@ const stringsJson = JSON.stringify({
       >
         {cm.leaderboard_scope_friends}
       </button>
+      <button
+        type="button"
+        role="tab"
+        data-scope-tab="region"
+        aria-pressed="false"
+        class="px-3 py-1.5 rounded-md font-medium transition"
+      >
+        {cm.leaderboard_scope_region}
+      </button>
     </div>
 
     <div
@@ -196,6 +211,18 @@ const stringsJson = JSON.stringify({
         class="rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-2 py-1.5 text-xs"
       >
         <option value="">{cm.leaderboard_region_all}</option>
+      </select>
+    </div>
+
+    <div data-country-wrap class="hidden inline-flex items-center gap-2 text-xs">
+      <label for="leaderboard-country" class="text-zinc-600 dark:text-zinc-400 font-medium">
+        {cm.leaderboard_country_picker_label}
+      </label>
+      <select
+        id="leaderboard-country"
+        aria-label={cm.leaderboard_country_picker_aria}
+        class="rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-2 py-1.5 text-xs"
+      >
       </select>
     </div>
 
@@ -244,6 +271,8 @@ const stringsJson = JSON.stringify({
     searchForView,
     regionFromSearch,
     searchForRegion,
+    countryFromSearch,
+    searchForCountry,
     taxonFromSearch,
     searchForTaxon,
     windowFromSearch,
@@ -269,7 +298,26 @@ const stringsJson = JSON.stringify({
     expertsNoData: string;
     scopeFriendsSignin: string;
     scopeFriendsEmpty: string;
+    scopeRegion: string;
+    countryPickerLabel: string;
+    countryPickerAria: string;
   }
+
+  const COUNTRY_NAMES: Record<string, { en: string; es: string }> = {
+    MX: { en: 'Mexico', es: 'México' },
+    CO: { en: 'Colombia', es: 'Colombia' },
+    AR: { en: 'Argentina', es: 'Argentina' },
+    BR: { en: 'Brazil', es: 'Brasil' },
+    CL: { en: 'Chile', es: 'Chile' },
+    PE: { en: 'Peru', es: 'Perú' },
+    EC: { en: 'Ecuador', es: 'Ecuador' },
+    VE: { en: 'Venezuela', es: 'Venezuela' },
+    GT: { en: 'Guatemala', es: 'Guatemala' },
+    US: { en: 'United States', es: 'Estados Unidos' },
+    ES: { en: 'Spain', es: 'España' },
+  };
+
+  const COUNTRY_LS_KEY = 'rastrum.karmaLeaderboard.country';
 
   const PREFS_KEY = 'rastrum.leaderboard.prefs';
 
@@ -283,7 +331,7 @@ const stringsJson = JSON.stringify({
           ? (['today', 'week', 'month', 'all'].includes(parsed.window) ? parsed.window as LeaderboardWindow : undefined)
           : undefined,
         scope: typeof parsed.scope === 'string'
-          ? (['global', 'friends'].includes(parsed.scope) ? parsed.scope as LeaderboardScope : undefined)
+          ? (['global', 'friends', 'region'].includes(parsed.scope) ? parsed.scope as LeaderboardScope : undefined)
           : undefined,
       };
     } catch {
@@ -314,6 +362,8 @@ const stringsJson = JSON.stringify({
   const windowWrap = root.querySelector<HTMLElement>('[data-window-wrap]');
   const scopeWrap = root.querySelector<HTMLElement>('[data-scope-wrap]');
   const regionWrap = root.querySelector<HTMLElement>('[data-region-wrap]');
+  const countryWrap = root.querySelector<HTMLElement>('[data-country-wrap]');
+  const countrySel = document.getElementById('leaderboard-country') as HTMLSelectElement | null;
   const regionSel = document.getElementById('leaderboard-region') as HTMLSelectElement | null;
   const taxonWrap = root.querySelector<HTMLElement>('[data-taxon-wrap]');
   const taxonSel = document.getElementById('leaderboard-taxon') as HTMLSelectElement | null;
@@ -321,7 +371,7 @@ const stringsJson = JSON.stringify({
   const colSpeciesEl = root.querySelector<HTMLElement>('[data-col-species]');
   const colScoreEl = root.querySelector<HTMLElement>('[data-col-score]');
 
-  if (!loadingEl || !emptyEl || !tableWrap || !tbody || !regionSel || !taxonSel) {
+  if (!loadingEl || !emptyEl || !tableWrap || !tbody || !regionSel || !taxonSel || !countrySel) {
     throw new Error('KarmaLeaderboardView: missing required DOM nodes');
   }
 
@@ -364,6 +414,124 @@ const stringsJson = JSON.stringify({
     karma: number;
     species_count: number | null;
     score?: number | null;
+  }
+
+  function countryLabel(code: string): string {
+    if (!code) return code;
+    const entry = COUNTRY_NAMES[code.toUpperCase()];
+    if (entry) return STRINGS.lang === 'es' ? entry.es : entry.en;
+    // Fallback: Intl.DisplayNames if available
+    if (REGION_NAMES) {
+      try {
+        const v = REGION_NAMES.of(code);
+        if (v) return v;
+      } catch { /* ignore */ }
+    }
+    return code;
+  }
+
+  let countriesLoaded = false;
+
+  async function loadCountries(preselectCountry: string): Promise<void> {
+    if (countriesLoaded) {
+      // Already populated; just update selection.
+      if (preselectCountry && [...countrySel!.options].some((o) => o.value === preselectCountry)) {
+        countrySel!.value = preselectCountry;
+      } else if (!preselectCountry && countrySel!.options.length > 0) {
+        // keep current
+      }
+      return;
+    }
+    countriesLoaded = true;
+    try {
+      const supabase = getSupabase();
+      // Get user's own country first for pre-selection
+      let userCountry = '';
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData?.session?.user?.id;
+      if (userId) {
+        const { data: userData } = await supabase
+          .from('community_observers')
+          .select('country_code')
+          .eq('id', userId)
+          .single();
+        userCountry = ((userData as { country_code: string | null } | null)?.country_code ?? '').toUpperCase();
+        if (!/^[A-Z]{2}$/.test(userCountry)) userCountry = '';
+      }
+
+      const { data } = await supabase
+        .from('community_observers')
+        .select('country_code')
+        .not('country_code', 'is', null)
+        .limit(2000);
+
+      const counts = new Map<string, number>();
+      for (const row of (data ?? []) as Array<{ country_code: string | null }>) {
+        const cc = (row.country_code ?? '').toUpperCase();
+        if (!/^[A-Z]{2}$/.test(cc)) continue;
+        counts.set(cc, (counts.get(cc) ?? 0) + 1);
+      }
+
+      // Keep countries with ≥3 observers, sorted by count desc
+      const qualified = [...counts.entries()]
+        .filter(([, n]) => n >= 3)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 50);
+
+      while (countrySel!.options.length > 0) countrySel!.remove(0);
+
+      for (const [code] of qualified) {
+        const opt = document.createElement('option');
+        opt.value = code;
+        opt.textContent = `${countryLabel(code)} (${code})`;
+        countrySel!.appendChild(opt);
+      }
+
+      // Determine which country to pre-select:
+      // 1. Explicit preselectCountry (from URL/localStorage)
+      // 2. User's own country
+      // 3. First in list
+      const target = preselectCountry || userCountry;
+      if (target && [...countrySel!.options].some((o) => o.value === target)) {
+        countrySel!.value = target;
+      } else if (target && qualified.length > 0) {
+        // Not in qualified list — append it
+        const opt = document.createElement('option');
+        opt.value = target;
+        opt.textContent = `${countryLabel(target)} (${target})`;
+        countrySel!.appendChild(opt);
+        countrySel!.value = target;
+      } else if (countrySel!.options.length > 0) {
+        countrySel!.value = countrySel!.options[0].value;
+      }
+    } catch {
+      countriesLoaded = false;
+    }
+  }
+
+  function readCountryFromStorage(): string {
+    try {
+      const v = (localStorage.getItem(COUNTRY_LS_KEY) ?? '').toUpperCase();
+      return /^[A-Z]{2}$/.test(v) ? v : '';
+    } catch {
+      return '';
+    }
+  }
+
+  function writeCountryToStorage(code: string) {
+    try {
+      if (code && /^[A-Z]{2}$/.test(code)) {
+        localStorage.setItem(COUNTRY_LS_KEY, code);
+      } else {
+        localStorage.removeItem(COUNTRY_LS_KEY);
+      }
+    } catch { /* ignore */ }
+  }
+
+  function clearCountryFromStorage() {
+    try {
+      localStorage.removeItem(COUNTRY_LS_KEY);
+    } catch { /* ignore */ }
   }
 
   let regionsLoaded = false;
@@ -449,6 +617,7 @@ const stringsJson = JSON.stringify({
       windowWrap?.classList.add('hidden');
       scopeWrap?.classList.add('hidden');
       regionWrap?.classList.add('hidden');
+      countryWrap?.classList.add('hidden');
       taxonWrap?.classList.remove('hidden');
       colKarmaEl?.classList.add('hidden');
       colSpeciesEl?.classList.add('hidden');
@@ -462,8 +631,14 @@ const stringsJson = JSON.stringify({
       colScoreEl?.classList.add('hidden');
       if (scope === 'friends') {
         regionWrap?.classList.add('hidden');
+        countryWrap?.classList.add('hidden');
+      } else if (scope === 'region') {
+        regionWrap?.classList.add('hidden');
+        countryWrap?.classList.remove('hidden');
       } else {
+        // global
         regionWrap?.classList.remove('hidden');
+        countryWrap?.classList.add('hidden');
       }
     }
   }
@@ -644,10 +819,12 @@ const stringsJson = JSON.stringify({
     return ids;
   }
 
-  async function loadKarma(win: LeaderboardWindow, region: string, scope: LeaderboardScope): Promise<void> {
+  async function loadKarma(win: LeaderboardWindow, region: string, scope: LeaderboardScope, country: string): Promise<void> {
     showLoading();
     try {
       let restrictIds: string[] | null = null;
+      let countryFilter = '';
+
       if (scope === 'friends') {
         const myId = await getCurrentUserId();
         if (!myId) {
@@ -660,6 +837,11 @@ const stringsJson = JSON.stringify({
           return;
         }
         restrictIds = ids;
+      } else if (scope === 'region') {
+        countryFilter = country;
+      } else {
+        // global — use existing region filter
+        countryFilter = region;
       }
 
       const supabase = getSupabase();
@@ -670,7 +852,7 @@ const stringsJson = JSON.stringify({
           .from('community_observers')
           .select('id, username, display_name, avatar_url, country_code, karma_total, species_count');
         if (restrictIds) q = q.in('id', restrictIds);
-        else if (region) q = q.eq('country_code', region);
+        else if (countryFilter) q = q.eq('country_code', countryFilter);
         const { data, error } = await q
           .order('karma_total', { ascending: false, nullsFirst: false })
           .limit(20);
@@ -695,7 +877,7 @@ const stringsJson = JSON.stringify({
           .from('karma_leaderboard_30d')
           .select('user_id, username, display_name, avatar_url, country_code, karma_30d, species_count');
         if (restrictIds) q = q.in('user_id', restrictIds);
-        else if (region) q = q.eq('country_code', region);
+        else if (countryFilter) q = q.eq('country_code', countryFilter);
         const { data, error } = await q
           .order('karma_30d', { ascending: false, nullsFirst: false })
           .limit(20);
@@ -721,7 +903,7 @@ const stringsJson = JSON.stringify({
           p_since: sinceIso,
           p_limit: 20,
           p_restrict_ids: restrictIds ?? null,
-          p_country_code: (!restrictIds && region) ? region : null,
+          p_country_code: (!restrictIds && countryFilter) ? countryFilter : null,
         });
         if (pairsErr) throw new Error(pairsErr.message);
 
@@ -733,7 +915,7 @@ const stringsJson = JSON.stringify({
         if (topIds.length === 0) {
           loadingEl!.classList.add('hidden');
           showEmpty(restrictIds ? STRINGS.scopeFriendsEmpty
-            : (region ? STRINGS.regionEmpty.replace('{region}', regionLabel(region)) : undefined));
+            : (countryFilter ? STRINGS.regionEmpty.replace('{region}', regionLabel(countryFilter)) : undefined));
           return;
         }
 
@@ -741,7 +923,7 @@ const stringsJson = JSON.stringify({
           .from('community_observers')
           .select('id, username, display_name, avatar_url, country_code, species_count')
           .in('id', topIds);
-        if (!restrictIds && region) userQ = userQ.eq('country_code', region);
+        if (!restrictIds && countryFilter) userQ = userQ.eq('country_code', countryFilter);
         const { data: usersData, error: usersErr } = await userQ;
         if (usersErr) throw new Error(usersErr.message);
 
@@ -780,8 +962,8 @@ const stringsJson = JSON.stringify({
       if (rows.length === 0) {
         if (restrictIds) {
           showEmpty(STRINGS.scopeFriendsEmpty);
-        } else if (region) {
-          showEmpty(STRINGS.regionEmpty.replace('{region}', regionLabel(region)));
+        } else if (countryFilter) {
+          showEmpty(STRINGS.regionEmpty.replace('{region}', regionLabel(countryFilter)));
         } else {
           showEmpty();
         }
@@ -884,6 +1066,7 @@ const stringsJson = JSON.stringify({
     win?: LeaderboardWindow;
     scope?: LeaderboardScope;
     region?: string;
+    country?: string;
     taxon?: string;
   }): string {
     let s = window.location.search;
@@ -894,7 +1077,8 @@ const stringsJson = JSON.stringify({
       s = searchForView(s, '30d');
       s = searchForWindow(s, opts.win ?? DEFAULT_WINDOW);
       s = searchForScope(s, opts.scope ?? DEFAULT_SCOPE);
-      s = searchForRegion(s, opts.region ?? '');
+      s = searchForRegion(s, opts.scope === 'region' ? '' : (opts.region ?? ''));
+      s = searchForCountry(s, opts.scope === 'region' ? (opts.country ?? '') : '');
     }
     return s;
   }
@@ -923,16 +1107,41 @@ const stringsJson = JSON.stringify({
     paintFilters('window', scope);
     writePrefs(win, scope);
 
-    if (scope === 'global') void loadRegions();
-    const region = scope === 'global' ? regionFromSearch(window.location.search) : '';
-    regionSel!.value = region;
-
-    if (push) {
-      const next = buildSearch({ mode: 'window', win, scope, region });
-      const url = `${window.location.pathname}${next}${window.location.hash}`;
-      window.history.pushState({ mode, win, scope, region }, '', url);
+    if (scope === 'global') {
+      void loadRegions();
+      const region = regionFromSearch(window.location.search);
+      regionSel!.value = region;
+      if (push) {
+        const next = buildSearch({ mode: 'window', win, scope, region });
+        const url = `${window.location.pathname}${next}${window.location.hash}`;
+        window.history.pushState({ mode, win, scope, region }, '', url);
+      }
+      void loadKarma(win, region, scope, '');
+    } else if (scope === 'region') {
+      // Determine country: URL > localStorage > will be resolved by loadCountries
+      const urlCountry = countryFromSearch(window.location.search);
+      const storedCountry = readCountryFromStorage();
+      const preselectCountry = urlCountry || storedCountry;
+      await loadCountries(preselectCountry);
+      const country = countrySel!.value;
+      // Save to localStorage
+      if (country) writeCountryToStorage(country);
+      if (push) {
+        const next = buildSearch({ mode: 'window', win, scope, country });
+        const url = `${window.location.pathname}${next}${window.location.hash}`;
+        window.history.pushState({ mode, win, scope, country }, '', url);
+      }
+      void loadKarma(win, '', scope, country);
+    } else {
+      // friends
+      regionSel!.value = '';
+      if (push) {
+        const next = buildSearch({ mode: 'window', win, scope });
+        const url = `${window.location.pathname}${next}${window.location.hash}`;
+        window.history.pushState({ mode, win, scope }, '', url);
+      }
+      void loadKarma(win, '', scope, '');
     }
-    void loadKarma(win, region, scope);
   }
 
   tabs.forEach((tab) => {
@@ -947,11 +1156,15 @@ const stringsJson = JSON.stringify({
     tab.addEventListener('click', () => {
       const win = tab.dataset.windowTab as LeaderboardWindow | undefined;
       if (!win) return;
+      const scope = scopeFromSearch(window.location.search);
+      const region = scope === 'global' ? regionFromSearch(window.location.search) : '';
+      const country = scope === 'region' ? countryFromSearch(window.location.search) : '';
       const search = buildSearch({
         mode: 'window',
         win,
-        scope: scopeFromSearch(window.location.search),
-        region: regionFromSearch(window.location.search),
+        scope,
+        region,
+        country,
       });
       const url = `${window.location.pathname}${search}${window.location.hash}`;
       window.history.pushState({ mode: 'window', win }, '', url);
@@ -961,17 +1174,29 @@ const stringsJson = JSON.stringify({
 
   scopeTabs.forEach((tab) => {
     tab.addEventListener('click', () => {
-      const scope = tab.dataset.scopeTab as LeaderboardScope | undefined;
-      if (!scope) return;
-      const region = scope === 'global' ? regionFromSearch(window.location.search) : '';
-      const search = buildSearch({
-        mode: 'window',
-        win: windowFromSearch(window.location.search),
-        scope,
-        region,
-      });
+      const newScope = tab.dataset.scopeTab as LeaderboardScope | undefined;
+      if (!newScope) return;
+
+      const win = windowFromSearch(window.location.search);
+      let search: string;
+
+      if (newScope === 'friends') {
+        // #862: Hide region picker, remove ?country from URL, clear localStorage country
+        clearCountryFromStorage();
+        search = buildSearch({ mode: 'window', win, scope: newScope });
+        // searchForCountry is handled by buildSearch (scope !== 'region' → country='')
+      } else if (newScope === 'global') {
+        // #862: Hide region picker (country wrap), preserve localStorage country, remove ?country
+        const region = regionFromSearch(window.location.search);
+        search = buildSearch({ mode: 'window', win, scope: newScope, region });
+      } else {
+        // region — restore from localStorage if present
+        const storedCountry = readCountryFromStorage();
+        search = buildSearch({ mode: 'window', win, scope: newScope, country: storedCountry });
+      }
+
       const url = `${window.location.pathname}${search}${window.location.hash}`;
-      window.history.pushState({ mode: 'window', scope }, '', url);
+      window.history.pushState({ mode: 'window', scope: newScope }, '', url);
       void applyState('window', false);
     });
   });
@@ -981,11 +1206,25 @@ const stringsJson = JSON.stringify({
     if (currentMode() === 'experts') return;
     const win = windowFromSearch(window.location.search);
     const scope = scopeFromSearch(window.location.search);
-    if (scope === 'friends') return;
+    if (scope === 'friends' || scope === 'region') return;
     const search = buildSearch({ mode: 'window', win, scope, region });
     const url = `${window.location.pathname}${search}${window.location.hash}`;
     window.history.pushState({ mode: 'window', region }, '', url);
-    void loadKarma(win, region, scope);
+    void loadKarma(win, region, scope, '');
+  });
+
+  countrySel.addEventListener('change', () => {
+    const country = countrySel.value;
+    if (currentMode() === 'experts') return;
+    const win = windowFromSearch(window.location.search);
+    const scope = scopeFromSearch(window.location.search);
+    if (scope !== 'region') return;
+    // Persist to localStorage
+    writeCountryToStorage(country);
+    const search = buildSearch({ mode: 'window', win, scope, country });
+    const url = `${window.location.pathname}${search}${window.location.hash}`;
+    window.history.pushState({ mode: 'window', country }, '', url);
+    void loadKarma(win, '', scope, country);
   });
 
   taxonSel.addEventListener('change', () => {
