@@ -19,6 +19,7 @@
  * form.
  */
 import { t } from '../i18n/utils';
+import WhyAmISeeingThis from './WhyAmISeeingThis.astro';
 
 interface Props { lang: 'en' | 'es'; }
 const { lang } = Astro.props;
@@ -33,18 +34,21 @@ const banner = (tr.observe as Record<string, unknown>).active_banner as {
 const observersHref = isEs ? '/es/comunidad/observadores' : '/en/community/observers';
 ---
 
-<a
-  id="active-observers-banner"
-  href={observersHref}
-  aria-label={banner.aria_label}
-  class="hidden rounded-full border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 px-3 py-1.5 text-xs text-emerald-800 dark:text-emerald-200 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors w-fit"
-  data-lang={lang}
-  data-copy-today-n={banner.today_n}
-  data-copy-today-one={banner.today_one}
-  data-copy-empty={banner.empty}
->
-  <span id="active-observers-banner-text">{banner.empty.replace('{region}', '')}</span>
-</a>
+<div id="active-observers-banner-wrap" class="hidden flex flex-wrap items-center gap-2">
+  <a
+    id="active-observers-banner"
+    href={observersHref}
+    aria-label={banner.aria_label}
+    class="rounded-full border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 px-3 py-1.5 text-xs text-emerald-800 dark:text-emerald-200 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors w-fit"
+    data-lang={lang}
+    data-copy-today-n={banner.today_n}
+    data-copy-today-one={banner.today_one}
+    data-copy-empty={banner.empty}
+  >
+    <span id="active-observers-banner-text">{banner.empty.replace('{region}', '')}</span>
+  </a>
+  <WhyAmISeeingThis algorithm="active_observers_today" lang={lang} />
+</div>
 
 <script>
   import { loadViewerRegion, loadActiveObserversToday } from '../lib/community';
@@ -85,7 +89,8 @@ const observersHref = isEs ? '/es/comunidad/observadores' : '/en/community/obser
 
     const qs = serializeFilters({ ...DEFAULT_FILTERS, country: region.countryCode });
     el.href = `${el.pathname}${qs}`;
-    el.classList.remove('hidden');
+    const wrap = document.getElementById('active-observers-banner-wrap');
+    wrap?.classList.remove('hidden');
   }
 
   hydrate();

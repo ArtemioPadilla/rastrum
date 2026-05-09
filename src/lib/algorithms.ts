@@ -13,7 +13,11 @@ import { routes } from '../i18n/utils';
 export type AlgorithmId =
   | 'community_observers'
   | 'explore_recent'
-  | 'explore_species_recent';
+  | 'explore_species_recent'
+  | 'falta_dex_missing'
+  | 'contextual_species_chips'
+  | 'profile_percentile_cards'
+  | 'active_observers_today';
 
 export interface AlgorithmCopy {
   /** Inputs the ranker consumes — one bullet per input. */
@@ -138,6 +142,154 @@ export const ALGORITHMS: Record<AlgorithmId, AlgorithmEntry> = {
     settings_path: {
       en: routes.profileSettingsPrivacy.en,
       es: routes.profileSettingsPrivacy.es,
+    },
+  },
+  falta_dex_missing: {
+    headline: {
+      en: 'Why am I seeing these missing species?',
+      es: '¿Por qué veo estas especies faltantes?',
+    },
+    summary: {
+      en: 'Species you have not yet logged, sorted by rarity bucket so the rarest gaps surface first.',
+      es: 'Especies que aún no registras, ordenadas por bucket de rareza para que las más raras aparezcan primero.',
+    },
+    copy: {
+      en: {
+        inputs: [
+          'Rarity bucket of each missing species (rare → common)',
+          'Region pool for your country (your profile country, set in Edit profile)',
+          'Your existing pokédex (only species you have NOT yet observed are included)',
+          'No personalisation beyond country — same pool regardless of who is signed in',
+        ],
+        window: 'Snapshot of the current region pool — refreshed when the page loads',
+        settings_label: 'Edit profile (change country)',
+      },
+      es: {
+        inputs: [
+          'Bucket de rareza de cada especie faltante (raro → común)',
+          'Pool regional de tu país (tu país de perfil, configurable en Editar perfil)',
+          'Tu pokédex actual (solo se incluyen especies que aún NO has observado)',
+          'Sin personalización más allá del país — el mismo pool para cualquiera que inicie sesión',
+        ],
+        window: 'Instantánea del pool regional actual — refresca al cargar la página',
+        settings_label: 'Editar perfil (cambiar país)',
+      },
+    },
+    settings_path: {
+      en: routes.profileEdit.en,
+      es: routes.profileEdit.es,
+    },
+  },
+  contextual_species_chips: {
+    headline: {
+      en: 'Why am I seeing these probable species?',
+      es: '¿Por qué veo estas especies probables?',
+    },
+    summary: {
+      en: 'A density estimate from public observations near the location and month of the photo you are about to log.',
+      es: 'Una estimación de densidad a partir de observaciones públicas cercanas a la ubicación y al mes de la foto que vas a registrar.',
+    },
+    copy: {
+      en: {
+        inputs: [
+          'Approximate location (geohash-5 cell, ≈ ±2.4 km) of the photo or your device',
+          'Current calendar month (seasonality)',
+          'Count of public community observations matching that cell + month, descending',
+          'Distance to the closest matching observation (tiebreaker)',
+          'No model, no curated baseline — these are real community sightings only',
+        ],
+        window: 'Public observations within the same geohash-5 cell, in the current month, all years',
+        settings_label: 'Edit profile (location & defaults)',
+      },
+      es: {
+        inputs: [
+          'Ubicación aproximada (celda geohash-5, ≈ ±2.4 km) de la foto o tu dispositivo',
+          'Mes calendario actual (estacionalidad)',
+          'Conteo de observaciones públicas de la comunidad en esa celda + mes, descendente',
+          'Distancia a la observación coincidente más cercana (desempate)',
+          'Sin modelo, sin baseline curado — solo son observaciones reales de la comunidad',
+        ],
+        window: 'Observaciones públicas dentro de la misma celda geohash-5, en el mes actual, todos los años',
+        settings_label: 'Editar perfil (ubicación y predeterminados)',
+      },
+    },
+    settings_path: {
+      en: routes.profileEdit.en,
+      es: routes.profileEdit.es,
+    },
+  },
+  profile_percentile_cards: {
+    headline: {
+      en: 'Why am I seeing these percentiles?',
+      es: '¿Por qué veo estos percentiles?',
+    },
+    summary: {
+      en: 'A private comparison against an anonymous cohort of active MX observers — only you see this card.',
+      es: 'Una comparación privada contra una cohorte anónima de observadores activos en MX — solo tú la ves.',
+    },
+    copy: {
+      en: {
+        inputs: [
+          'Cohort definition: users with ≥ 5 observations in the last 90 days, country MX',
+          'Your four metrics: Shannon diversity, distinct habitats, validations cast, geographic spread (km²)',
+          'Each percentile is your rank within the cohort for that one metric',
+          'Hidden when the cohort is too small (n < 50) — no rank shown until the comparison is meaningful',
+          'No public leaderboard — these numbers never leave your screen',
+        ],
+        window: 'Last 90 days for the cohort; metrics are recomputed on each page visit',
+        settings_label: 'Privacy & leaderboards settings',
+      },
+      es: {
+        inputs: [
+          'Definición de cohorte: usuarios con ≥ 5 observaciones en los últimos 90 días, país MX',
+          'Tus cuatro métricas: diversidad de Shannon, hábitats distintos, validaciones, alcance geográfico (km²)',
+          'Cada percentil es tu rango dentro de la cohorte para esa única métrica',
+          'Se oculta si la cohorte es muy pequeña (n < 50) — no se muestra rango hasta que la comparación sea significativa',
+          'Sin tabla pública — estos números no salen de tu pantalla',
+        ],
+        window: 'Últimos 90 días para la cohorte; las métricas se recalculan en cada visita a la página',
+        settings_label: 'Privacidad y leaderboards',
+      },
+    },
+    settings_path: {
+      en: routes.profileSettingsPrivacy.en,
+      es: routes.profileSettingsPrivacy.es,
+    },
+  },
+  active_observers_today: {
+    headline: {
+      en: 'Why am I seeing this banner?',
+      es: '¿Por qué veo este banner?',
+    },
+    summary: {
+      en: 'A non-personal count of distinct observers in your country who have synced at least one observation today.',
+      es: 'Un conteo no personalizado de observadores distintos en tu país que han sincronizado al menos una observación hoy.',
+    },
+    copy: {
+      en: {
+        inputs: [
+          'Country code from your profile (or inferred from your most-used region)',
+          'Distinct count of observers who synced ≥ 1 public observation since 00:00 UTC today',
+          'Aggregate only — no observer IDs, names, or locations are surfaced',
+          'Banner is hidden entirely when no profile country is set (never shows "in NULL")',
+        ],
+        window: 'Today (UTC) — resets at 00:00 UTC each day',
+        settings_label: 'Edit profile (country)',
+      },
+      es: {
+        inputs: [
+          'Código de país de tu perfil (o inferido de tu región más usada)',
+          'Conteo distinto de observadores que sincronizaron ≥ 1 observación pública desde las 00:00 UTC de hoy',
+          'Solo agregado — no se exponen IDs, nombres ni ubicaciones de observadores',
+          'El banner se oculta cuando no hay país en el perfil (nunca muestra "en NULL")',
+        ],
+        window: 'Hoy (UTC) — reinicia a las 00:00 UTC cada día',
+        settings_label: 'Editar perfil (país)',
+      },
+    },
+    settings_path: {
+      en: routes.profileEdit.en,
+      es: routes.profileEdit.es,
     },
   },
 };
