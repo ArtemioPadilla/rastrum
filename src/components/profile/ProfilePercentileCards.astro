@@ -1,0 +1,155 @@
+---
+import type { Locale } from '../../i18n/utils';
+import { t } from '../../i18n/utils';
+
+interface Props {
+  lang: Locale;
+}
+
+const { lang } = Astro.props;
+const tr = t(lang);
+const tp = (tr as unknown as {
+  profile: { percentiles?: Record<string, string> };
+}).profile.percentiles ?? {};
+
+const heading             = tp.heading             ?? (lang === 'es' ? 'Tú vs. observador MX promedio' : 'You vs. average MX observer');
+const subheading          = tp.subheading          ?? (lang === 'es'
+  ? 'Comparación normativa anónima — privada, solo tú la ves.'
+  : 'Anonymous normative comparison — private, only you see this.');
+const insufficient        = tp.insufficient        ?? (lang === 'es'
+  ? 'Datos insuficientes — el grupo de comparación es muy pequeño todavía. Vuelve cuando haya más observadores activos.'
+  : 'Not enough data yet — the comparison cohort is too small. Check back as more observers become active.');
+const loading             = tp.loading             ?? (lang === 'es' ? 'Cargando…' : 'Loading…');
+const labelDiversity      = tp.label_diversity     ?? (lang === 'es' ? 'Diversidad'         : 'Diversity');
+const labelHabitats       = tp.label_habitats      ?? (lang === 'es' ? 'Hábitats cubiertos' : 'Habitats covered');
+const labelValidations    = tp.label_validations   ?? (lang === 'es' ? 'Validaciones'       : 'Validations');
+const labelSpread         = tp.label_spread        ?? (lang === 'es' ? 'Alcance geográfico' : 'Geographic spread');
+const hintDiversity       = tp.hint_diversity      ?? (lang === 'es' ? "Índice de Shannon H' sobre tus taxones" : "Shannon H' index over your taxa");
+const hintHabitats        = tp.hint_habitats       ?? (lang === 'es' ? 'Hábitats distintos en tus observaciones' : 'Distinct habitats in your observations');
+const hintValidations     = tp.hint_validations    ?? (lang === 'es' ? 'IDs comunitarias que has validado'       : 'Community IDs you have validated');
+const hintSpread          = tp.hint_spread         ?? (lang === 'es' ? 'km² del polígono que cubren tus puntos'  : 'km² of the polygon your points cover');
+const unitDiversity       = tp.unit_diversity      ?? "H'";
+const unitHabitats        = tp.unit_habitats       ?? (lang === 'es' ? 'tipos' : 'types');
+const unitValidations     = tp.unit_validations    ?? (lang === 'es' ? 'IDs'   : 'IDs');
+const unitSpread          = tp.unit_spread         ?? 'km²';
+const ownerOnly           = tp.owner_only          ?? (lang === 'es' ? '🔒 Solo tú lo ves' : '🔒 Only you see this');
+const aria                = tp.aria_bar            ?? (lang === 'es' ? 'Barra de percentil' : 'Percentile bar');
+---
+
+<section
+  data-widget="percentile-cards"
+  data-lang={lang}
+  class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 mb-6"
+>
+  <header class="flex items-baseline justify-between mb-1">
+    <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">{heading}</h2>
+    <span class="text-[10px] font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded">
+      {ownerOnly}
+    </span>
+  </header>
+  <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-4">{subheading}</p>
+
+  <p data-state="loading" class="text-xs text-zinc-500 italic py-4">{loading}</p>
+
+  <p data-state="insufficient" class="hidden text-xs text-zinc-500 italic py-4">{insufficient}</p>
+
+  <div data-state="ready" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-3">
+    {[
+      { metric: 'diversity',   label: labelDiversity,   hint: hintDiversity,   unit: unitDiversity },
+      { metric: 'habitats',    label: labelHabitats,    hint: hintHabitats,    unit: unitHabitats },
+      { metric: 'validations', label: labelValidations, hint: hintValidations, unit: unitValidations },
+      { metric: 'spread',      label: labelSpread,      hint: hintSpread,      unit: unitSpread },
+    ].map((card) => (
+      <div data-card={card.metric} class="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30 p-3">
+        <div class="flex items-baseline justify-between mb-1">
+          <p class="text-xs font-semibold text-zinc-800 dark:text-zinc-100">{card.label}</p>
+          <p class="text-xs font-mono text-zinc-700 dark:text-zinc-300">
+            <span data-value>—</span>
+            <span class="ml-0.5 text-zinc-500">{card.unit}</span>
+          </p>
+        </div>
+        <div
+          class="relative h-2 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden"
+          role="img"
+          aria-label={aria}
+        >
+          <div
+            data-bar
+            class="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-700 dark:from-emerald-600 dark:to-emerald-400 transition-[width] duration-500"
+            style="width:0%"
+          ></div>
+        </div>
+        <p class="mt-1.5 text-[11px] text-zinc-600 dark:text-zinc-400" data-caption></p>
+        <p class="text-[10px] text-zinc-500 dark:text-zinc-500">{card.hint}</p>
+      </div>
+    ))}
+  </div>
+</section>
+
+<script>
+  import { getSupabase } from '../../lib/supabase';
+  import {
+    buildCards,
+    hasSufficientCohort,
+    type PercentileMetric,
+    type PercentilePayload,
+  } from '../../lib/percentile';
+
+  function setVisible(root: HTMLElement, state: 'loading' | 'insufficient' | 'ready') {
+    for (const s of ['loading', 'insufficient', 'ready'] as const) {
+      const el = root.querySelector<HTMLElement>(`[data-state="${s}"]`);
+      if (!el) continue;
+      el.classList.toggle('hidden', s !== state);
+    }
+  }
+
+  function buildCaption(
+    lang: string,
+    pctlLabel: string,
+    cohortCountry: string | null,
+    cohortN: number,
+  ): string {
+    const country = (cohortCountry ?? 'MX').toUpperCase();
+    if (lang === 'es') {
+      return `Estás en el percentil ${pctlLabel} de los observadores activos en ${country} (n = ${cohortN}).`;
+    }
+    return `You are in the ${pctlLabel}th percentile of active observers in ${country} (n = ${cohortN}).`;
+  }
+
+  async function hydrate(root: HTMLElement) {
+    const lang = root.dataset.lang ?? 'en';
+    let supabase;
+    try { supabase = getSupabase(); } catch { setVisible(root, 'insufficient'); return; }
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      root.classList.add('hidden');
+      return;
+    }
+    const { data, error } = await supabase.rpc('get_my_percentiles');
+    if (error || !data) {
+      setVisible(root, 'insufficient');
+      return;
+    }
+    const payload = data as PercentilePayload | null;
+    if (!payload || !hasSufficientCohort(payload.cohort_n)) {
+      setVisible(root, 'insufficient');
+      return;
+    }
+    const cards = buildCards(payload);
+    for (const card of cards) {
+      const cardEl = root.querySelector<HTMLElement>(`[data-card="${card.metric}"]`);
+      if (!cardEl) continue;
+      const valueEl = cardEl.querySelector<HTMLElement>('[data-value]');
+      const barEl   = cardEl.querySelector<HTMLElement>('[data-bar]');
+      const capEl   = cardEl.querySelector<HTMLElement>('[data-caption]');
+      if (valueEl) valueEl.textContent = card.valueLabel;
+      if (barEl)   barEl.style.width   = `${card.barWidthPct}%`;
+      if (capEl)   capEl.textContent   = buildCaption(lang, card.pctlLabel, payload.cohort_country, payload.cohort_n);
+      const _metric: PercentileMetric = card.metric;
+      void _metric;
+    }
+    setVisible(root, 'ready');
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-widget="percentile-cards"]').forEach(hydrate);
+</script>

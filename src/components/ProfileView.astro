@@ -11,6 +11,7 @@ import ProfileTaxonomicDonut from './profile/ProfileTaxonomicDonut.astro';
 import ProfileTopSpeciesGrid from './profile/ProfileTopSpeciesGrid.astro';
 import ProfileStreakRing from './profile/ProfileStreakRing.astro';
 import ProfileKarmaSection from './profile/ProfileKarmaSection.astro';
+import ProfilePercentileCards from './profile/ProfilePercentileCards.astro';
 import ProfilePokedexLink from './profile/ProfilePokedexLink.astro';
 import ProfileBadgesGrid from './profile/ProfileBadgesGrid.astro';
 import ProfileActivityTimeline from './profile/ProfileActivityTimeline.astro';
@@ -154,6 +155,7 @@ const ep = (tr as unknown as { profile: { expert_prompt: Record<string, string> 
     <ProfileTopSpeciesGrid lang={lang} viewer="self" />
     <ProfileStreakRing lang={lang} viewer="self" />
     <ProfileKarmaSection lang={lang} viewer="self" />
+    <ProfilePercentileCards lang={lang} />
     <ExpertiseLegendBadge lang={lang} class="mb-2" />
     <ExpertiseCoverageGrid lang={lang} />
     <ProfilePokedexLink lang={lang} viewer="self" />
