@@ -937,6 +937,10 @@ const praiseLongLens         = praiseStrings.long_lens         ?? (isEs ? 'Detal
     idAllFailed?.classList.add('hidden');
     phiOffer?.classList.add('hidden');
     phiProgress?.classList.add('hidden');
+    // Also reset Gemma offer — omitted previously so the banner persisted
+    // across re-triggers caused by taxon-hint chip changes (#784).
+    gemmaOffer?.classList.add('hidden');
+    gemmaProgress?.classList.add('hidden');
   }
 
   function clearIdResult() {
@@ -1240,7 +1244,7 @@ const praiseLongLens         = praiseStrings.long_lens         ?? (isEs ? 'Detal
     idSpinner?.classList.remove('hidden');
 
     // Build the runner set based on what's actually available.
-    const { runParallelIdentify } = await import('../lib/identify-cascade-client');
+    const { runParallelIdentify, filterRunnersByHint } = await import('../lib/identify-cascade-client');
     const { makePlantNetRunner, makeClaudeRunner, makePhiRunner, makeGemmaRunner, resolvePlantNetKey } = await import('../lib/identify-runners');
     const { claudeAvailable } = await import('../lib/claude-availability');
 
@@ -1294,6 +1298,14 @@ const praiseLongLens         = praiseStrings.long_lens         ?? (isEs ? 'Detal
 
     if (activeAbort) activeAbort.abort();
     activeAbort = new AbortController();
+
+    // Pre-apply the taxon hint filter here (mirrors what runParallelIdentify
+    // does internally) so we can detect the "hint filtered all runners" case
+    // and surface a specific actionable message to the user (#784).
+    const hintFilteredRunners = filterRunnersByHint(runners, activeTaxonHint ?? null);
+    const hintFilteredOutAll =
+      Object.keys(hintFilteredRunners).length === 0 && Object.keys(runners).length > 0;
+
     const out = await runParallelIdentify(file, { runners, taxonHint: activeTaxonHint }, activeAbort.signal);
     activeAbort = null;
     idSpinner?.classList.add('hidden');
@@ -1319,10 +1331,14 @@ const praiseLongLens         = praiseStrings.long_lens         ?? (isEs ? 'Detal
       if (idAllFailed) {
         idAllFailed.textContent = describeAllFailed({
           hint: activeTaxonHint,
-          hadPlantNet: !!runners.plantnet,
-          hadClaude: !!runners.claude_haiku,
-          hadPhi: !!runners.webllm_phi35_vision,
-          hadGemma: !!runners.onnx_gemma4_vision,
+          // Pass effective availability (after hint filter) so the message
+          // is accurate: if PlantNet was filtered out by the hint, the user
+          // should not be told "PlantNet ran but failed" (#784).
+          hadPlantNet: !!hintFilteredRunners.plantnet,
+          hadClaude: !!hintFilteredRunners.claude_haiku,
+          hadPhi: !!hintFilteredRunners.webllm_phi35_vision,
+          hadGemma: !!hintFilteredRunners.onnx_gemma4_vision,
+          hintFilteredOutAll,
         });
         idAllFailed.classList.remove('hidden');
       }
@@ -1341,14 +1357,24 @@ const praiseLongLens         = praiseStrings.long_lens         ?? (isEs ? 'Detal
     hadClaude: boolean;
     hadPhi: boolean;
     hadGemma: boolean;
+    /** True when the taxon-hint chip filtered out the only available runner (#784). */
+    hintFilteredOutAll?: boolean;
   }): string {
     const hadOnDeviceVLM = ctx.hadPhi || ctx.hadGemma;
     const isAnimal = ctx.hint && ctx.hint !== 'Plantae' && ctx.hint !== 'Fungi';
     const onlyPlantNet = ctx.hadPlantNet && !ctx.hadClaude && !hadOnDeviceVLM;
+
+    // When the taxon chip filtered PlantNet (the only available runner),
+    // give a clear explanation instead of a generic failure (#784).
+    if (ctx.hintFilteredOutAll && isAnimal) {
+      return isEs
+        ? 'El filtro de taxón evitó que PlantNet identifique animales (es un modelo de plantas). Agrega tu llave de Claude Haiku (Perfil → Editar) o activa un modelo en el dispositivo (Gemma ~500 MB) para poder identificar animales.'
+        : 'The taxon filter skipped PlantNet — it only handles plants. Add your Claude Haiku key (Profile → Edit) or enable an on-device model (Gemma ~500 MB) to identify animals.';
+    }
     if (isAnimal && onlyPlantNet) {
       return isEs
         ? 'Para identificar animales necesitamos un modelo más allá de PlantNet. Configura tu llave de Claude Haiku (Perfil → Editar) o activa un modelo en el dispositivo (Phi ~4 GB o Gemma ~500 MB) para que funcione sin conexión.'
-        : "We need a non-plant identifier for animals. Add your Claude Haiku key (Profile → Edit) or enable an on-device model (Phi ~4 GB or Gemma ~500 MB) for offline use.";
+        : "We need a non-plant identifier for animals. Add your Claude Haiku key (Profile \u2192 Edit) or enable an on-device model (Phi ~4 GB or Gemma ~500 MB) for offline use.";
     }
     if (!ctx.hadClaude && !hadOnDeviceVLM && !ctx.hadPlantNet) {
       return isEs
