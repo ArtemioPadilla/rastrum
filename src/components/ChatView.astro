@@ -1,5 +1,6 @@
 ---
 import { t, getLocalizedPath, routes } from '../i18n/utils';
+import ChatEntityPicker from './ChatEntityPicker.astro';
 
 interface Props {
   lang: 'en' | 'es';
@@ -148,7 +149,21 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path stroke-linecap="round" stroke-linejoin="round" d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
             <span data-voice-label class="sr-only">{tr.chat.voice_input_label}</span>
           </button>
+
+          <button
+            id="chat-attach-entity-btn"
+            type="button"
+            aria-label={lang === 'es' ? 'Adjuntar contexto' : 'Attach context'}
+            title={lang === 'es' ? 'Adjuntar contexto' : 'Attach context'}
+            class="min-h-11 min-w-11 sm:min-w-0 rounded-lg border border-zinc-300 dark:border-zinc-700 px-2 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 flex items-center justify-center gap-1"
+          >
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2"/></svg>
+            <span class="sr-only">{lang === 'es' ? 'Adjuntar contexto' : 'Attach context'}</span>
+          </button>
         </div>
+
+        <!-- Entity context chip slot (rendered by chat-bubble-html.entityChipHtml when attached) -->
+        <div id="chat-entity-chip-slot"></div>
 
         <textarea
           id="chat-input"
@@ -167,6 +182,9 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
       <p id="chat-attach-error" class="hidden text-xs text-red-600 dark:text-red-400"></p>
     </div>
   </form>
+
+  <!-- Entity picker dialog (M01 chat improvements) -->
+  <ChatEntityPicker lang={lang} />
 
   <!-- Vision-download consent dialog -->
   <dialog id="chat-vision-dialog" class="rounded-xl p-0 m-auto bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 shadow-2xl border border-zinc-200 dark:border-zinc-800 max-w-md w-[92vw] backdrop:bg-black/50">
@@ -1264,10 +1282,67 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
         persistAssistantTurn(conversation[placeholderIdx]);
       }
     } else {
-      // Text-only flow (original behaviour).
+      // Text-only flow. When an entity is attached, route through chat-engine
+      // (Gemma 4 default + 1-round tool-call loop + Llama fallback). Without
+      // an entity, keep the lighter Llama-only path that already works.
       conversation.push({ role: 'assistant', content: '' });
       paintConversation();
       const assistantIdx = conversation.length - 1;
+      const attached = (window as Window & { __chatGetAttachedEntity?: () => unknown }).__chatGetAttachedEntity?.() as
+        | { kind: string; summary_text: string; label: string; suggested_questions?: string[] }
+        | null
+        | undefined;
+
+      if (attached) {
+        try {
+          const { streamChat } = await import('../lib/chat-engine');
+          type ChatMsg = { role: 'system' | 'user' | 'assistant' | 'tool'; content: string };
+          const messages: ChatMsg[] = [
+            { role: 'system', content: CHAT_SYSTEM_PROMPT },
+            { role: 'system', content: `[Context — attached ${attached.kind}]\n${attached.summary_text}` },
+            ...conversation
+              .slice(0, -1)
+              .filter(t => !t.attachment)
+              .slice(-6)
+              .map(t => ({ role: t.role as ChatMsg['role'], content: t.content.slice(0, 600) })),
+          ];
+
+          let assembled = '';
+          for await (const event of streamChat({ messages })) {
+            if (event.type === 'text') {
+              assembled += event.delta;
+              conversation[assistantIdx].content = assembled;
+              setBubbleStreaming(assistantIdx, assembled);
+            } else if (event.type === 'tool_call') {
+              window.dispatchEvent(new CustomEvent('rastrum:onboarding-event', {
+                detail: { type: 'chat.tool.called', tool_name: event.tool, ok: true },
+              }));
+            } else if (event.type === 'tool_result') {
+              const r = event.result as { error?: string };
+              if (r.error) {
+                window.dispatchEvent(new CustomEvent('rastrum:onboarding-event', {
+                  detail: { type: 'chat.tool.failed', tool_name: event.tool, reason: r.error },
+                }));
+              }
+            } else if (event.type === 'engine_fallback') {
+              window.dispatchEvent(new CustomEvent('rastrum:onboarding-event', {
+                detail: { type: 'chat.engine.fallback', from: 'gemma', to: event.engine },
+              }));
+            }
+          }
+          paintConversation();
+          persistAssistantTurn(conversation[assistantIdx]);
+        } catch (err) {
+          conversation[assistantIdx].content = (isEs ? 'Error: ' : 'Error: ') + (err instanceof Error ? err.message : String(err));
+          paintConversation();
+          persistAssistantTurn(conversation[assistantIdx]);
+        }
+        busy = false;
+        sendBtn.disabled = false;
+        sendLabel.textContent = SEND_DEFAULT;
+        return;
+      }
+
       try {
         const lib = await import('../lib/local-ai');
         if (dlProgress) dlProgress.classList.remove('hidden');
@@ -1432,6 +1507,109 @@ const observePath = getLocalizedPath(lang, routes.observe[lang] + '/');
     voiceBtn.setAttribute('title', label);
     if (voiceBtnLabel) voiceBtnLabel.textContent = label;
   }
+
+  // ──────────────────────────────────────────────────────────────────────
+  // Entity context (M01 chat improvements, 2026-05-09)
+  //
+  // Three concerns wired here:
+  //   1. Deep-link: ?attach=kind:id on page load → fetch + render chip
+  //   2. Picker: composer button dispatches rastrum:chat-open-entity-picker;
+  //      the ChatEntityPicker dialog handles the rest, then dispatches
+  //      rastrum:chat-attach-entity which we listen for below.
+  //   3. Plain-text turns with attached context → chat-engine.streamChat
+  //      (Gemma 4 default, Llama fallback). Photo/audio cascade paths
+  //      stay unchanged.
+  // ──────────────────────────────────────────────────────────────────────
+  (async () => {
+    const { bootstrapChatEntities, registry } = await import('../lib/chat-entities');
+    bootstrapChatEntities();
+
+    type EntityCardLite = import('../lib/chat-entities/types').EntityCard;
+    type EntityKindLite = import('../lib/chat-entities/types').EntityKind;
+    let attachedEntity: EntityCardLite | null = null;
+
+    function renderEntityChipFor(card: EntityCardLite): void {
+      const slot = document.getElementById('chat-entity-chip-slot');
+      if (!slot) return;
+      import('../lib/chat-bubble-html').then(({ entityChipHtml }) => {
+        slot.innerHTML = entityChipHtml({
+          kind: card.kind,
+          id: card.id,
+          label: card.label,
+          icon: registry.get(card.kind)?.icon ?? '·',
+          lang: isEs ? 'es' : 'en',
+        });
+        slot.querySelector('[data-chip-detach]')?.addEventListener('click', (ev) => {
+          ev.preventDefault();
+          document.dispatchEvent(new CustomEvent('rastrum:chat-detach-entity'));
+        });
+      });
+    }
+
+    function seedSuggestion(card: EntityCardLite): void {
+      const ta = document.getElementById('chat-input') as HTMLTextAreaElement | null;
+      if (!ta || ta.value || !card.suggested_questions?.[0]) return;
+      ta.placeholder = card.suggested_questions[0];
+    }
+
+    function showAttachError(msg: string): void {
+      const errEl = document.getElementById('chat-attach-error');
+      if (!errEl) return;
+      errEl.textContent = msg;
+      errEl.classList.remove('hidden');
+      setTimeout(() => errEl.classList.add('hidden'), 4000);
+    }
+
+    document.addEventListener('rastrum:chat-attach-entity', async (ev) => {
+      const detail = (ev as CustomEvent<{ kind: EntityKindLite; id: string; source?: string }>).detail;
+      const spec = registry.get(detail.kind);
+      if (!spec) return;
+      try {
+        const card = await spec.fetchCard(detail.id);
+        if (!card) {
+          showAttachError(isEs ? 'No se encontró ese contexto.' : `Couldn't find that ${detail.kind}.`);
+          return;
+        }
+        attachedEntity = card;
+        renderEntityChipFor(card);
+        seedSuggestion(card);
+        window.dispatchEvent(new CustomEvent('rastrum:onboarding-event', {
+          detail: { type: 'chat.entity.attached', kind: card.kind, source: detail.source ?? 'deep-link' },
+        }));
+      } catch (e) {
+        showAttachError(e instanceof Error ? e.message : (isEs ? 'Error al cargar contexto.' : 'Failed to load context.'));
+      }
+    });
+
+    document.addEventListener('rastrum:chat-detach-entity', () => {
+      attachedEntity = null;
+      const slot = document.getElementById('chat-entity-chip-slot');
+      if (slot) slot.innerHTML = '';
+    });
+
+    // Open picker on composer button click.
+    document.getElementById('chat-attach-entity-btn')?.addEventListener('click', () => {
+      document.dispatchEvent(new CustomEvent('rastrum:chat-open-entity-picker'));
+    });
+
+    // Handle ?attach= deep-link on page load.
+    const { parseAttachQuerystring } = await import('../lib/parse-attach-querystring');
+    const params = new URLSearchParams(location.search);
+    const parsed = parseAttachQuerystring(params.get('attach'));
+    if (parsed) {
+      document.dispatchEvent(new CustomEvent('rastrum:chat-attach-entity', {
+        detail: { ...parsed, source: 'deep-link' },
+      }));
+      params.delete('attach');
+      const qs = params.toString();
+      history.replaceState(null, '', `${location.pathname}${qs ? '?' + qs : ''}`);
+    }
+
+    // Expose for the form-submit hook below.
+    (window as Window & { __chatGetAttachedEntity?: () => EntityCardLite | null }).__chatGetAttachedEntity = () => attachedEntity;
+  })().catch((e) => {
+    console.warn('[chat] entity wiring init failed', e);
+  });
 </script>
 
 <style>

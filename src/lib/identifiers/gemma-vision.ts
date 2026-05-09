@@ -19,7 +19,7 @@ export const gemmaVisionIdentifier: Identifier = {
   id: GEMMA_PLUGIN_ID,
   name: 'Gemma 4 E2B (on-device)',
   brand: '✨',
-  description: 'Google Gemma 4 E2B vision-language model running entirely in your browser via transformers.js + ONNX Runtime Web. ~500 MB one-time download. Apache 2.0 licensed. Generalist — confidence is hard-capped because it has no taxonomic training.',
+  description: 'Google Gemma 4 E2B running entirely in your browser via transformers.js + ONNX Runtime Web. ~500 MB one-time download. Apache 2.0 licensed. Powers both photo identification (here) and text chat (Chat tab) from the same cached weights. Generalist — confidence is hard-capped because it has no taxonomic training.',
   setupSteps: [
     { text: 'Profile → Edit → AI settings → "Gemma 4 (experimental)" → "Download model".' },
     { text: 'You only download once. The model stays cached for next time.', details: 'Requires WebGPU and a device with more than 4 GB RAM. ~500 MB download + ~1.3 GB VRAM at inference.' },

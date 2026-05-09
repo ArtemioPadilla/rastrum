@@ -263,6 +263,10 @@ jobs:
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/sql/rls.sql
 
+      - name: Run chat-function regression suite
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/sql/chat.sql
+
       - name: Schema security invariants
         # Three load-bearing rules enforced post-apply:
         #   1. Every public-schema view is security_invoker (no SECURITY

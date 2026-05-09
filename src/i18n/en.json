@@ -964,7 +964,20 @@
   },
   "chat": {
     "title": "Chat",
-    "subtitle": "On-device biodiversity assistant — runs fully in your browser. You can also attach a photo or audio.",
+    "subtitle": "On-device biodiversity assistant — runs fully in your browser. Attach a photo, audio, or any observation/species/project for context.",
+    "ask_rastrum": "Ask Rastrum",
+    "attach_entity_label": "Attach context",
+    "attach_entity_search": "Search…",
+    "entities": {
+      "observation": "Observations",
+      "species": "Species",
+      "project": "Projects",
+      "camera_station": "Stations",
+      "observer": "Observers",
+      "self_profile": "Me"
+    },
+    "engine_fallback_banner": "Using lighter model — Gemma unavailable.",
+    "context_load_error": "Couldn't load context — try when online.",
     "placeholder": "Ask anything about species, habitats, or your observations…",
     "send": "Send",
     "sending": "Thinking…",
@@ -1427,7 +1440,9 @@
       "fave_count_aria_one": "{{count}} person favorited this",
       "fave_count_aria_other": "{{count}} people favorited this",
       "live_added": "Favorited",
-      "live_removed": "Removed favorite"
+      "live_removed": "Removed favorite",
+      "fave_add_aria": "Add to favorites",
+      "fave_remove_aria": "Remove from favorites"
     },
     "inbox": {
       "title": "Inbox",
@@ -1475,7 +1490,9 @@
       "report_comment_aria": "Report this comment",
       "block_observer_aria": "Block this observer",
       "block_commenter_aria": "Block this commenter"
-    }
+    },
+    "recents_follow_aria": "Follow {{handle}}",
+    "recents_unfollow_aria": "Unfollow {{handle}}"
   },
   "sponsoring": {
     "page_title": "AI Sponsoring",
@@ -1724,13 +1741,15 @@
       "unsupported": "This browser doesn't support web push (try Chrome on Android or Safari 16.4+ on iOS).",
       "vapid_missing": "Push isn't configured yet — the operator must publish a VAPID key first."
     },
-    "migration_window": {
-      "title": "Migration window prompt",
-      "body_fallback": "A notable species migration is active in your region — now is the time.",
-      "opt_in_label": "Enable migration window prompt",
-      "opt_in_hint": "One notification per day during active seasonal migration windows for your region.",
+    "lunar_event": {
+      "title": "Lunar event prompt",
+      "body_full": "Full moon tonight — peak amphibian chorus.",
+      "body_new": "New moon tonight — good for light-trap insects.",
+      "body_eclipse": "Lunar eclipse visible tonight.",
+      "opt_in_label": "Enable lunar event prompt",
+      "opt_in_hint": "One notification per day on full moons, new moons, and total lunar eclipses.",
       "enabling": "Subscribing…",
-      "enabled": "Migration window prompts enabled.",
+      "enabled": "Lunar event prompts enabled.",
       "disable": "Disable",
       "disabling": "Disabling…",
       "permission_blocked": "Browser notifications are blocked. Enable them in your browser site settings, then try again.",

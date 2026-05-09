@@ -49,6 +49,7 @@ high-level system view.
 | [`add-identifier.md`](add-identifier.md) | Three-step recipe to add a new model / service to the cascade. |
 | [`on-device-vision-fallback.md`](on-device-vision-fallback.md) | Phi (MLC) + Gemma (transformers.js) dual-runtime resilience story; opt-in flags; what to do when one crashes. |
 | [`contextual-suggestions.md`](contextual-suggestions.md) | Issue #723 — `probable_taxa_at()` RPC + chip strip on `/observe`. |
+| [`chat-improvements.md`](chat-improvements.md) | M01 chat redesign — Gemma 4 text backbone + entity-context (observation/species/project/camera_station/observer/self_profile) + 5 read-only tools + 1-round tool-call loop. |
 
 ## Karma + reputation (Module 23)
 
