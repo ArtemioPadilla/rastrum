@@ -13,6 +13,7 @@
  * observers" static surface).
  */
 import { t, getLocalizedPath, routes } from '../i18n/utils';
+import WhyAmISeeingThis from './WhyAmISeeingThis.astro';
 
 interface Props {
   lang: 'en' | 'es';
@@ -101,6 +102,9 @@ const stringsJson = JSON.stringify({
     <div class="min-w-0">
       <h1 class="text-2xl font-bold tracking-tight">{cm.page_title}</h1>
       <p class="text-sm text-zinc-600 dark:text-zinc-400 mt-1">{cm.page_subtitle}</p>
+      <div class="mt-1.5">
+        <WhyAmISeeingThis algorithm="community_observers" lang={lang} />
+      </div>
     </div>
     <a
       href={editProfileHref}

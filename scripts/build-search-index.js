@@ -81,6 +81,7 @@ const docPages = [
   { key: 'privacy',       en: 'Privacy',       es: 'Privacidad',          group: 'Community' },
   { key: 'terms',         en: 'Terms',         es: 'Términos',            group: 'Community' },
   { key: 'status',        en: 'Triage status', es: 'Estado de triage',    group: 'Community' },
+  { key: 'algorithms',    en: 'Algorithms',    es: 'Algoritmos',          group: 'Product' },
 ];
 
 // ---------------------------------------------------------------------------
