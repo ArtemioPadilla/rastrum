@@ -6,6 +6,50 @@ Versions use CalVer `YYYY.M.N`.
 
 ---
 
+## [2026.5.4] — 2026-05-09
+
+### Added
+
+- **Daily challenge widget (#852)** — new home tile picks one taxon per UTC day per user: region-filtered, rarity≤3, deterministic via md5 seed so the same challenge shows across devices. Progress dot fills when a matching observation is synced today. New `daily_challenge_for_user(uuid)` SECURITY DEFINER RPC. EN/ES i18n.
+- **Observation suggestions on home (#710)** — "Go find these" widget shows up to 5 species near the user's location that they haven't observed yet, ranked by nearby platform activity. Uses `suggest_nearby_species()` RPC with PostGIS `ST_DWithin`, season filter (month ± 1 with wraparound), and per-card dismiss via sessionStorage. 6 unit tests.
+- **Leaderboard top-3 + badge-progress widgets (#853)** — two new home tiles: top-3 observers this week (from `karma_leaderboard_30d` MV) and closest-unearned badge with progress bar. Signed-in only.
+- **Weather condition in greeting (#854)** — greeting widget now appends a live weather phrase ("Está lloviendo en Oaxaca") from Open-Meteo, cached 30 min in localStorage. Falls back gracefully when coords unavailable. 17 unit tests covering WMO bucket mapping and cache TTL.
+- **Kairos push triggers (#798 #799 #800)** — three new contextual notification types: **after_rain** (≥5 mm rainfall in last 12h at user's last-obs geohash5, from `weather_snapshots`), **migration_window** (today's DOY is within a seasonal migration window for user's region, seeded with 4 MX windows), **lunar_event** (full moon / new moon / total lunar eclipse today in user's timezone, using Jean Meeus ch.49 algorithm ±2h accuracy). All share the 1/day cap with golden_hour. Kairos now has 4 active triggers.
+- **Granular notification preferences (#870)** — per-trigger opt-in page at `/profile/notifications` lets users enable/disable each kairos trigger individually. Toggle state persisted in `kairos_subscriptions` table.
+- **KarmaFrame on 5 avatar surfaces (#859)** — tier ring now visible on public profile hero (animated), header dropdown, leaderboard rows, community observer cards, and comment author avatars. `size='sm'` uses static ring (no animation) for dense list contexts — Option C from #861 architecture decision.
+- **Like + follow inline from recents (#709)** — ❤️ fave button and Follow/Following/Requested toggle directly on observation cards in ExploreRecentView. Optimistic updates with error revert on both actions. Batch-prefetch of viewer's fave/follow state on load.
+- **Recents list / map / timeline modes (#863)** — three new view modes alongside the existing cards/grid: compact **list** rows, **map** (lazy MapLibre with cluster pins), and **timeline** (grouped by UTC day with sticky headers). All persist via localStorage + URL `?view=`.
+- **Region scope on leaderboard (#860 #862)** — "Region" third scope option with country picker (countries with ≥3 observers). URL sync (`?scope=region&country=MX`). Switching to Friends clears the country selection; switching back restores it.
+- **Exposure slider in PhotoCropModal (#857)** — third slider (−100..+100) maps to a second `brightness()` CSS filter multiplier (0.5×–1.5×), rescuing underexposed shots. `buildFilterString()` extended; 4 new unit tests.
+- **Auto-enhance preset (#856)** — "✨ Auto" button applies brightness=+20, contrast=+15 in one tap; deactivates when user manually adjusts either slider.
+- **Globetrotter badge (#867)** — new `silver` badge for observing in ≥2 countries. `observations.country_code` column added with BEFORE INSERT/UPDATE trigger `fill_observation_country_code()` from `places` geometry, idempotent backfill, and `badge_eligible_country_diversity()` predicate.
+- **Onboarding funnel + PostHog instrumentation (#878)** — `docs/runbooks/onboarding-funnel.md` documents 7 milestones. Client-side events: `onboarding:signed_up` (auth callback, first-time), `onboarding:first_observation` (sync.ts), `onboarding:first_follow` (social.ts). `cohortWeek()` + `daysSince()` helpers with 11 unit tests.
+- **Taxon-conditional photo praise (#810)** — post-cascade praise messages are now scoped to the identified taxon's kingdom/class (bird → "Sharp focus on plumage", insect → "Macro detail captured", etc.) instead of generic text.
+- **Distinct-species live stats RPC (#812)** — `count_distinct_species_synced()` SECURITY DEFINER function powers the `/about` live stats counter.
+
+### Changed
+
+- **Chat improvements (#908)** — Gemma 4 text model wired, entity context cards for observations/taxa/projects/users, mobile drawer fix. Fixed `observations.region_primary` column reference (doesn't exist — use `state_province`) and `is_research_grade` join via identifications.
+- **KarmaFrame `size='sm'` contract (#861)** — architectural decision: KarmaFrame is now the canonical avatar component everywhere; `size='sm'` renders static ring (no motion animations) for performance on dense lists.
+
+### Fixed
+
+- **Profile: watchlist 404 + user_expertise 400 on Android Chrome (#698 #699)** — `.from('watchlist_entries')` → `.from('watchlists')`; `.select('taxon_count')` (non-existent column) → `count: exact` on `user_expertise` rows.
+- **Taxon filter chips had no visible effect (#784)** — `hideAllIdStates()` now resets `gemmaOffer`; `filterRunnersByHint` pre-applied before `runParallelIdentify` so `describeAllFailed` receives accurate `hadPlantNet` flag and shows targeted "taxon filter skipped PlantNet" message.
+- **HomeWidgets production 400 (#906)** — hotfix stripping problematic widget causing server error.
+- **Stray `HEAD` markers in schema/rls.sql/kairos-fire (#911)** — bad conflict resolution artifacts removed.
+
+### Security
+
+- **RLS test for `follows` table (#858)** — 3 assertions covering viewer-only pending edges, accepted-edge visibility (by design public), and symmetric followee path.
+- **Cargo clippy + fmt in Tauri CI (#872)** — new `rust-lint.yml` workflow, path-filtered to `src-tauri/**`, zero-warnings policy.
+
+### Tests
+
+- **E2E: greeting time-bucket (#864)** — 8 Playwright tests (4 buckets × 2 locales) with `addInitScript` Date mock; `data-testid="home-greeting"` anchor added.
+
+---
+
 ## [2026.5.3] — 2026-05-09
 
 ### Added
