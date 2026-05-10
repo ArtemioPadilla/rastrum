@@ -49,10 +49,10 @@ const weathers = WEATHERS;
   <DropZone lang={lang} />
 
   <!-- 4. AI capability caption — 1 line, positive framing, appears AFTER dropzone (#942) -->
-  <!-- Hidden by default; JS replaces with concise status after capability check -->
+  <!-- opacity-0 by default; JS sets content then fades in to avoid empty-flash (ArtemIO review) -->
   <p
     id="obs2-capability-caption"
-    class="hidden text-xs text-zinc-400 dark:text-zinc-500 text-center px-2"
+    class="opacity-0 transition-opacity duration-300 text-xs text-zinc-400 dark:text-zinc-500 text-center px-2"
     aria-live="polite"
   ></p>
 
@@ -434,7 +434,12 @@ const fileHint      = document.getElementById('obs2-file-hint');
     } else {
       capCaptionEl.innerHTML = `${readyProviders.join(' + ')} ${isEs ? 'listos' : 'ready'} · <a href="${configureHref}" class="underline hover:no-underline">${configureMore}</a>`;
     }
-    capCaptionEl.classList.remove('hidden');
+    // Reveal after content is set — avoids empty-flash (opacity-0 → opacity-100)
+    // rAF ensures the DOM paint with content happens before the transition starts.
+    requestAnimationFrame(() => {
+      capCaptionEl.classList.remove('opacity-0');
+      capCaptionEl.classList.add('opacity-100');
+    });
   } catch { /* silent */ }
 })();
 
