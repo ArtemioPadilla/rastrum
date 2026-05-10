@@ -2,7 +2,7 @@
 import DropZone from "./DropZone.astro";
 import PhotoCropModal from "./PhotoCropModal.astro";
 import PipelineGraph from "./PipelineGraph.astro";
-import ObservationSuccess from "./ObservationSuccess.astro";
+import PipelineStepper from "./PipelineStepper.astro";
 import MapPicker from "./MapPicker.astro";
 import TaxonAutocomplete from "./TaxonAutocomplete.astro";
 import ActiveObserversBanner from "./ActiveObserversBanner.astro";
@@ -15,6 +15,9 @@ interface Props { lang: "en" | "es"; }
 const { lang } = Astro.props;
 const isEs = lang === "es";
 const tr = t(lang);
+// Feature flag: set PUBLIC_OBSERVE_PIPELINE_GRAPH=1 to keep the legacy SVG DAG.
+// Remove after 30 days without incident reports (#942).
+const useLegacyGraph = import.meta.env.PUBLIC_OBSERVE_PIPELINE_GRAPH === '1';
 
 const observeStr = tr.observe as Record<string, string>;
 const habitats = HABITATS;
@@ -102,7 +105,7 @@ const weathers = WEATHERS;
       </h2>
       <span id="obs2-pipeline-status" class="text-xs text-zinc-500 dark:text-zinc-400"></span>
     </div>
-    <PipelineGraph lang={lang} />
+    {useLegacyGraph ? <PipelineGraph lang={lang} /> : <PipelineStepper lang={lang} />}
     <!-- Escape hatch: shown after 15s if pipeline is still running (#pipeline-stuck) -->
     <div id="obs2-pipeline-escape" class="hidden mt-3 flex items-center gap-3">
       <button
@@ -282,10 +285,8 @@ const weathers = WEATHERS;
       {isEs ? "Guardar observación" : "Save observation"}
     </button>
 
-    <!-- Identify-only skip (secondary action) -->
-    <button type="button" id="obs2-skip-save-btn" class="hidden w-full text-center text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 py-1 underline">
-      {isEs ? "Solo identificar, no guardar" : "Just identify, don't save"}
-    </button>
+    <!-- Identify-only skip (obs2-skip-save-btn) removed (#942 PR7).
+         The identify-only mode is accessible via /observe?mode=identify. -->
   </form>
 
   <!-- Identify-only result (shown when ?mode=identify, pipeline done, user skips save) -->
@@ -336,8 +337,17 @@ const weathers = WEATHERS;
     </div>
   </div>
 
-  <!-- Success state — ObservationSuccess.astro (Tiny Habits celebration, #942 PR6) -->
-  <ObservationSuccess lang={lang} />
+  <!-- Success state -->
+  <div id="obs2-success" class="hidden rounded-xl border border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 p-6 text-center space-y-3">
+    <div class="text-4xl">✅</div>
+    <p class="font-semibold text-emerald-800 dark:text-emerald-300">
+      {isEs ? "¡Observación guardada!" : "Observation saved!"}
+    </p>
+    <div id="obs2-success-link"></div>
+    <button type="button" id="obs2-new-btn" class="text-sm text-emerald-700 dark:text-emerald-400 underline">
+      {isEs ? "Registrar otra" : "Log another"}
+    </button>
+  </div>
 </div>
 
 <!-- Photo crop/rotate modal (#787) — single global instance, triggered by DropZone edit buttons -->
@@ -350,6 +360,7 @@ import {
 } from '../lib/pipeline-engine';
 import { saveObservationToOutbox, resolveObserverRef } from '../lib/observe';
 import { syncOutbox } from '../lib/sync';
+import { getObservationDefaults, setObservationDefaults } from '../lib/observation-defaults';
 
 // ── State ──────────────────────────────────────────────────────────────────
 const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
@@ -371,7 +382,7 @@ const saveBtn         = document.getElementById('obs2-save-btn') as HTMLButtonEl
 const resumeBanner    = document.getElementById('obs2-resume-banner');
 const gpsStatus       = document.getElementById('obs2-gps-status');
 const contributeNudge = document.getElementById('obs2-contribute-nudge');
-const skipSaveBtn     = document.getElementById('obs2-skip-save-btn') as HTMLButtonElement | null;
+// skipSaveBtn removed (#942 PR7) — identify-only mode via /observe?mode=identify
 const identifyResult  = document.getElementById('obs2-identify-result');
 const identifySpeciesCard = document.getElementById('obs2-identify-species-card');
 const contributeBtn   = document.getElementById('obs2-contribute-btn');
@@ -430,7 +441,25 @@ const capBanner   = document.getElementById('obs2-capability-banner');
 const capList     = document.getElementById('obs2-capability-list');
 const fileHint    = document.getElementById('obs2-file-hint');
 
-// Banner is always visible — no hide/collapse logic.
+// ── Observation defaults memory (#942) ────────────────────────────────────
+// Pre-fill advanced fields (habitat/weather/license) from last saved values.
+(async () => {
+  try {
+    const defaults = await getObservationDefaults();
+    if (defaults.habitat) {
+      const el = document.getElementById('obs2-habitat') as HTMLSelectElement | null;
+      if (el) el.value = defaults.habitat;
+    }
+    if (defaults.weather) {
+      const el = document.getElementById('obs2-weather') as HTMLSelectElement | null;
+      if (el) el.value = defaults.weather;
+    }
+    if (defaults.licenseCode) {
+      const el = document.getElementById('obs2-license') as HTMLSelectElement | null;
+      if (el) el.value = defaults.licenseCode;
+    }
+  } catch { /* non-fatal — defaults are a convenience */ }
+})();
 
 // Render capability status
 (async () => {
@@ -495,7 +524,24 @@ document.addEventListener('rastrum:files-dropped', (e: Event) => {
 const identifyMode = new URLSearchParams(window.location.search).get('mode') === 'identify';
 if (identifyMode) {
   contributeNudge?.classList.remove('hidden');
-  skipSaveBtn?.classList.remove('hidden');
+  // skipSaveBtn removed (#942 PR7)
+}
+
+// ── One-shot migration notice for users who used "Just identify, don't save" (#942 PR7) ──
+// Shows once per device after the skip-save button was removed. Directs them to ?mode=identify.
+const SKIP_SAVE_MIGRATION_KEY = 'rastrum_identify_mode_notice_v1';
+if (!localStorage.getItem(SKIP_SAVE_MIGRATION_KEY) && !identifyMode) {
+  localStorage.setItem(SKIP_SAVE_MIGRATION_KEY, '1');
+  const identifyUrl = window.location.pathname + '?mode=identify';
+  const notice = document.createElement('div');
+  notice.setAttribute('role', 'status');
+  notice.setAttribute('aria-live', 'polite');
+  notice.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-lg px-5 py-3 text-sm max-w-[340px] text-center space-y-2';
+  notice.innerHTML = isEs
+    ? `<p class="text-zinc-700 dark:text-zinc-300">El botón <em>"Solo identificar"</em> se movió.</p><a href="${identifyUrl}" class="text-emerald-600 dark:text-emerald-400 underline text-xs">Identificar sin guardar →</a>`
+    : `<p class="text-zinc-700 dark:text-zinc-300"><em>"Just identify"</em> moved to a dedicated URL.</p><a href="${identifyUrl}" class="text-emerald-600 dark:text-emerald-400 underline text-xs">Identify without saving →</a>`;
+  document.body.appendChild(notice);
+  setTimeout(() => { notice.style.opacity = '0'; notice.style.transition = 'opacity 0.3s'; setTimeout(() => notice.remove(), 350); }, 6000);
 }
 const idCard          = document.getElementById('obs2-id-card');
 const speciesEl       = document.getElementById('obs2-species');
@@ -977,17 +1023,7 @@ pipelineSkipBtn?.addEventListener('click', () => {
   showPostForm();
 });
 
-skipSaveBtn?.addEventListener('click', () => {
-  postForm?.classList.add('hidden');
-  identifyResult?.classList.remove('hidden');
-  if (bestResult && identifySpeciesCard) {
-    identifySpeciesCard.innerHTML = `
-      <p class="font-semibold italic text-zinc-900 dark:text-zinc-100 text-lg">${bestResult.scientific_name}</p>
-      ${bestResult.common_name_en ? `<p class="text-sm text-zinc-500 dark:text-zinc-400">${bestResult.common_name_en}</p>` : ''}
-      <p class="text-sm font-mono text-emerald-600 dark:text-emerald-400">${Math.round(bestResult.confidence * 100)}% confidence · ${bestResult.source}</p>
-    `;
-  }
-});
+// skipSaveBtn listener removed (#942 PR7) — button no longer in template
 
 contributeBtn?.addEventListener('click', () => {
   identifyResult?.classList.add('hidden');
@@ -1094,28 +1130,29 @@ postForm?.addEventListener('submit', async (e) => {
     pipelineState.status = 'done';
     await savePipelineState(pipelineState).catch(() => {});
 
-    // Show success — dispatch event for ObservationSuccess.astro (#942 PR6)
+    // Persist observation defaults for next form open (#942)
+    void setObservationDefaults({
+      habitat: habitatVal ?? undefined,
+      weather: weatherVal ?? undefined,
+      licenseCode: licenseTyped ?? undefined,
+    });
+
+    // Show success — hide form, reveal card, toast
     postForm?.classList.add('hidden');
-    const shareUrl = obs.id ? `/share/obs/?id=${obs.id}` : undefined;
-    // Get first photo URL for the hero (create object URL from pipeline file)
-    const firstPhoto = pipelineState.files.find(f => f.kind === 'photo');
-    const photoUrl = firstPhoto ? URL.createObjectURL(firstPhoto.file) : undefined;
-    document.dispatchEvent(new CustomEvent('rastrum:observation-saved', {
-      detail: {
-        obsId: obs.id,
-        scientificName: bestResult?.scientific_name ?? (taxonInput || undefined),
-        photoUrl,
-        shareUrl,
-      },
-    }));
-    // Brief toast for screen readers
+    successEl?.classList.remove('hidden');
+    const linkEl = document.getElementById('obs2-success-link');
+    if (linkEl && obs.id) {
+      const href = `/share/obs/?id=${obs.id}`;
+      linkEl.innerHTML = `<a href="${href}" class="text-emerald-700 dark:text-emerald-400 underline text-sm">${isEs ? 'Ver observaci\u00f3n' : 'View observation'}</a>`;
+    }
+    // Toast confirmation
     const toastEl = document.createElement('div');
     toastEl.setAttribute('role', 'status');
     toastEl.setAttribute('aria-live', 'polite');
-    toastEl.className = 'sr-only';
+    toastEl.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-xl bg-emerald-700 text-white px-5 py-3 text-sm shadow-lg max-w-[340px] text-center pointer-events-none transition-opacity duration-300';
     toastEl.textContent = isEs ? '¡Observación guardada!' : 'Observation saved!';
     document.body.appendChild(toastEl);
-    setTimeout(() => toastEl.remove(), 3000);
+    setTimeout(() => { toastEl.style.opacity = '0'; setTimeout(() => toastEl.remove(), 300); }, 3000);
   } catch (err) {
     if (errorEl) {
       errorEl.textContent = (err as Error).message ?? (isEs ? 'Error al guardar' : 'Error saving');
@@ -1125,13 +1162,14 @@ postForm?.addEventListener('submit', async (e) => {
   }
 });
 
-// ── New observation (triggered by ObservationSuccess "Registrar otra" via rastrum:observe-reset) ──
-function resetObserveForm(): void {
+// ── New observation ────────────────────────────────────────────────────────
+document.getElementById('obs2-new-btn')?.addEventListener('click', () => {
   location = null;
   bestResult = null;
   pipelineState = null;
   pipelineSection?.classList.add('hidden');
   postForm?.classList.add('hidden');
+  successEl?.classList.add('hidden');
   // Reset id card: hide the AI result section, clear taxon input, restore label
   document.getElementById('obs2-id-result')?.classList.add('hidden');
   const taxonReset = document.getElementById('obs2-taxon-input') as HTMLInputElement | null;
@@ -1139,10 +1177,7 @@ function resetObserveForm(): void {
   const labelReset = document.getElementById('obs2-taxon-label');
   if (labelReset) labelReset.textContent = isEs ? 'Nombre científico (opcional)' : 'Scientific name (optional)';
   window.scrollTo(0, 0);
-}
-// Legacy obs2-new-btn (identify-done path) + new event from ObservationSuccess
-document.getElementById('obs2-new-btn')?.addEventListener('click', resetObserveForm);
-document.addEventListener('rastrum:observe-reset', resetObserveForm);
+});
 
 // ── Resume pipeline ────────────────────────────────────────────────────────
 async function resumePipeline(state: PipelineState) {

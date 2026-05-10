@@ -187,30 +187,32 @@ export const ALGORITHMS: Record<AlgorithmId, AlgorithmEntry> = {
       es: '¿Por qué veo estas especies probables?',
     },
     summary: {
-      en: 'A density estimate from public observations near the location and month of the photo you are about to log.',
-      es: 'Una estimación de densidad a partir de observaciones públicas cercanas a la ubicación y al mes de la foto que vas a registrar.',
+      en: 'A density estimate from wild public observations near the location and month of the photo you are about to log. Filters to wild-only (excludes cultivated plants and captive/domestic animals).',
+      es: 'Una estimación de densidad a partir de observaciones públicas silvestres cercanas a la ubicación y al mes de la foto que vas a registrar. Filtra a observaciones silvestres únicamente (excluye plantas cultivadas y animales domésticos/cautivos).',
     },
     copy: {
       en: {
         inputs: [
           'Approximate location (geohash-5 cell, ≈ ±2.4 km) of the photo or your device',
           'Current calendar month (seasonality)',
-          'Count of public community observations matching that cell + month, descending',
+          'Count of wild public community observations matching that cell + month, descending',
           'Distance to the closest matching observation (tiebreaker)',
           'No model, no curated baseline — these are real community sightings only',
+          'Filtered to establishment_means = wild — excludes cultivated plants and captive/domestic animals',
         ],
-        window: 'Public observations within the same geohash-5 cell, in the current month, all years',
+        window: 'Wild public observations within the same geohash-5 cell, in the current month, all years',
         settings_label: 'Edit profile (location & defaults)',
       },
       es: {
         inputs: [
           'Ubicación aproximada (celda geohash-5, ≈ ±2.4 km) de la foto o tu dispositivo',
           'Mes calendario actual (estacionalidad)',
-          'Conteo de observaciones públicas de la comunidad en esa celda + mes, descendente',
+          'Conteo de observaciones públicas silvestres de la comunidad en esa celda + mes, descendente',
           'Distancia a la observación coincidente más cercana (desempate)',
           'Sin modelo, sin baseline curado — solo son observaciones reales de la comunidad',
+          'Filtrado a establishment_means = wild — excluye plantas cultivadas y animales domésticos/cautivos',
         ],
-        window: 'Observaciones públicas dentro de la misma celda geohash-5, en el mes actual, todos los años',
+        window: 'Observaciones públicas silvestres dentro de la misma celda geohash-5, en el mes actual, todos los años',
         settings_label: 'Editar perfil (ubicación y predeterminados)',
       },
     },
