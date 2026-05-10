@@ -58,6 +58,15 @@ export async function getObservationDefaults(): Promise<ObservationDefaults> {
 export async function setObservationDefaults(
   partial: Partial<ObservationDefaults>,
 ): Promise<void> {
+  // Early exit: if the caller passes all-undefined fields there is nothing to do.
+  // This avoids a getCachedUser() round-trip on every save where advanced fields
+  // were left blank. (ArtemIO review suggestion, #942 PR3)
+  if (
+    partial.habitat === undefined &&
+    partial.weather === undefined &&
+    partial.licenseCode === undefined
+  ) return;
+
   try {
     const user = await getCachedUser();
     if (!user) return;
@@ -68,7 +77,7 @@ export async function setObservationDefaults(
     if (partial.weather !== undefined) patch['weather'] = partial.weather || null;
     if (partial.licenseCode !== undefined) patch['licenseCode'] = partial.licenseCode || null;
 
-    // Nothing to write.
+    // Nothing to write (all fields were empty strings → all null → patch is empty).
     if (Object.keys(patch).length === 0) return;
 
     const supabase = getSupabase();
