@@ -11179,3 +11179,56 @@ COMMENT ON COLUMN public.observations.vital_status IS
   'Vital status of the observed individual. Optional. Darwin Core: occurrenceStatus extension.';
 
 
+
+-- ====================================================
+-- #873 — notify observation owner + parent comment author on new comment
+-- ====================================================
+
+CREATE OR REPLACE FUNCTION public.notify_on_comment()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions, pg_temp
+AS $$
+DECLARE
+  v_obs_owner uuid;
+  v_parent_author uuid;
+BEGIN
+  -- Get observation owner
+  SELECT observer_id INTO v_obs_owner FROM public.observations WHERE id = NEW.observation_id;
+
+  -- Notify obs owner (unless they are the commenter)
+  IF v_obs_owner IS NOT NULL AND v_obs_owner != NEW.author_id THEN
+    INSERT INTO public.notifications (user_id, kind, payload)
+    VALUES (v_obs_owner, 'comment', jsonb_build_object(
+      'comment_id', NEW.id,
+      'observation_id', NEW.observation_id,
+      'commenter_id', NEW.author_id
+    ));
+  END IF;
+
+  -- Notify parent comment author on reply
+  IF NEW.parent_id IS NOT NULL THEN
+    SELECT author_id INTO v_parent_author FROM public.observation_comments WHERE id = NEW.parent_id;
+    IF v_parent_author IS NOT NULL AND v_parent_author != NEW.author_id AND v_parent_author != v_obs_owner THEN
+      INSERT INTO public.notifications (user_id, kind, payload)
+      VALUES (v_parent_author, 'comment', jsonb_build_object(
+        'comment_id', NEW.id,
+        'observation_id', NEW.observation_id,
+        'commenter_id', NEW.author_id,
+        'is_reply', true
+      ));
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS tg_notify_on_comment ON public.observation_comments;
+CREATE TRIGGER tg_notify_on_comment
+  AFTER INSERT ON public.observation_comments
+  FOR EACH ROW EXECUTE FUNCTION public.notify_on_comment();
+
+REVOKE EXECUTE ON FUNCTION public.notify_on_comment() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.notify_on_comment() TO authenticated;
