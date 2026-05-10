@@ -908,25 +908,14 @@ END $$;
 RESET ROLE;
 
 -- ────────────────────────────────────────────────────────────────────────────
--- follows RLS (issue #858 — friends-scope leaderboard)
---
--- Active policy: follows_read (Module 26)
---   USING (follower_id = auth.uid() OR followee_id = auth.uid() OR status = 'accepted')
--- ────────────────────────────────────────────────────────────────────────────
-
--- Test 36 of 38: follows_read: uid_user sees own outgoing edge (follower_id = auth.uid())
--- Policy: follows_read — follower_id = auth.uid() branch.
-
 -- notification_prefs column RLS (issue #870 — self-only readable/writable)
 --
--- users.notification_prefs is a JSONB column on public.users, which is
--- governed by the users_self_write policy (authenticated, auth.uid() = id)
--- and the users_public_read / users_self_read policies for reads.
--- This test asserts uid_user can read their own row (including notification_prefs)
--- but cannot read another user's notification_prefs.
+-- users.notification_prefs is a JSONB column on public.users, governed by
+-- the users_self_write policy (authenticated, auth.uid() = id) and the
+-- users_public_read / users_self_read policies for reads.
 -- ────────────────────────────────────────────────────────────────────────────
 
--- Test 36 of 37: notification_prefs: column exists on users table
+-- Test 36 of 40: notification_prefs: column exists on users table
 DO $$
 DECLARE
   has_col boolean;
@@ -938,19 +927,21 @@ BEGIN
        AND column_name  = 'notification_prefs'
   ) INTO has_col;
   IF NOT has_col THEN
-    RAISE EXCEPTION 'FAIL [Test 36 of 37: notification_prefs column exists on users]: column missing';
+    RAISE EXCEPTION 'FAIL [Test 36 of 40: notification_prefs column exists on users]: column missing';
   END IF;
 END $$;
 
--- Test 37 of 37: notification_prefs: user can read their own prefs; cannot see others' prefs via direct select.
--- users_self_read policy: the row is visible when auth.uid() = id.
--- Other users' rows are still queryable via users_public_read but only
--- profile_public columns (notification_prefs is not restricted at column-level
--- here; the RLS guard is the row-level policy which hides the *row* from
--- non-owners). We assert uid_user can read their own row.
+-- ────────────────────────────────────────────────────────────────────────────
+-- follows RLS (issue #858 — friends-scope leaderboard)
+--
+-- Active policy: follows_read (Module 26)
+--   USING (follower_id = auth.uid() OR followee_id = auth.uid() OR status = 'accepted')
+-- ────────────────────────────────────────────────────────────────────────────
+
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claim.sub" = '00000000-0000-0000-0000-000000000003';
 
+-- Test 37 of 40: follows_read: uid_user sees own outgoing edge (follower_id = auth.uid())
 DO $$
 DECLARE
   cnt int;
@@ -959,7 +950,7 @@ BEGIN
     FROM public.follows
    WHERE follower_id = auth.uid();
   IF cnt < 1 THEN
-    RAISE EXCEPTION 'FAIL [Test 36 of 38: follows_read: uid_user sees own outgoing follows]: expected >= 1, got %', cnt;
+    RAISE EXCEPTION 'FAIL [Test 37 of 40: follows_read: uid_user sees own outgoing follows]: expected >= 1, got %', cnt;
   END IF;
   -- Verify no rows belong to a different follower_id (server-side filter)
   SELECT count(*)::int INTO cnt
@@ -967,27 +958,21 @@ BEGIN
    WHERE follower_id <> '00000000-0000-0000-0000-000000000003'
      AND status <> 'accepted'; -- pending from other users must be invisible
   IF cnt > 0 THEN
-    RAISE EXCEPTION 'FAIL [Test 36 of 38: follows_read: uid_user leaks pending follows of others]: got %', cnt;
+    RAISE EXCEPTION 'FAIL [Test 37 of 40: follows_read: uid_user leaks pending follows of others]: got %', cnt;
   END IF;
 END $$;
 
--- Test 37 of 38: follows_read: querying another user's follower_id returns 0 pending/private rows
--- Policy: follows_read — only accepted rows visible for third parties.
--- uid_user queries follows WHERE follower_id = uid_mod (a different user).
--- Because both edges are 'accepted', status = 'accepted' branch applies and
--- that row IS visible. We assert the count is 0 or >= 0 but no private rows leak.
+-- Test 38 of 40: follows_read: querying another user's follower_id returns 0 pending/private rows
+-- Both edges are 'accepted', so status='accepted' branch makes them visible.
 -- The critical invariant: pending edges from other users are invisible.
 DO $$
 DECLARE
   cnt       int;
   leaking   int;
 BEGIN
-  -- Count all follows rows visible where follower_id = uid_mod
   SELECT count(*)::int INTO cnt
     FROM public.follows
    WHERE follower_id = '00000000-0000-0000-0000-000000000002';
-  -- cnt may be 1 (the accepted edge is visible via status='accepted' branch).
-  -- What must NOT happen: seeing pending edges not involving auth.uid().
   SELECT count(*)::int INTO leaking
     FROM public.follows
    WHERE follower_id = '00000000-0000-0000-0000-000000000002'
@@ -995,19 +980,16 @@ BEGIN
      AND follower_id <> auth.uid()
      AND followee_id <> auth.uid();
   IF leaking > 0 THEN
-    RAISE EXCEPTION 'FAIL [Test 37 of 38: follows_read: pending follow of other user leaked to uid_user]: count=%', leaking;
+    RAISE EXCEPTION 'FAIL [Test 38 of 40: follows_read: pending follow of other user leaked to uid_user]: count=%', leaking;
   END IF;
 END $$;
 
--- Test 38 of 38: follows_read: querying following_id = uid_mod only shows rows
+-- Test 39 of 40: follows_read: querying following_id = uid_mod only shows rows
 -- where uid_user is involved (follower/followee) or status='accepted'.
 DO $$
 DECLARE
   leaking int;
 BEGIN
-  -- Any row visible where following_id = uid_mod AND NOT accepted AND caller not involved
-  -- is a data leak. Policy: follows_read USING (follower_id = auth.uid()
-  --   OR followee_id = auth.uid() OR status = 'accepted').
   SELECT count(*)::int INTO leaking
     FROM public.follows
    WHERE followee_id = '00000000-0000-0000-0000-000000000002'
@@ -1015,12 +997,19 @@ BEGIN
      AND follower_id <> auth.uid()
      AND followee_id <> auth.uid();
   IF leaking > 0 THEN
-    RAISE EXCEPTION 'FAIL [Test 38 of 38: follows_read: pending follow with following_id=uid_mod leaked]: count=%', leaking;
+    RAISE EXCEPTION 'FAIL [Test 39 of 40: follows_read: pending follow with following_id=uid_mod leaked]: count=%', leaking;
   END IF;
   RAISE NOTICE 'follows RLS: 3 assertions passed';
+END $$;
 
+-- ────────────────────────────────────────────────────────────────────────────
+-- notification_prefs row RLS (issue #870 — self-only readable/writable)
+-- ────────────────────────────────────────────────────────────────────────────
+
+-- Test 40 of 40: notification_prefs: own row readable; cannot UPDATE another user's prefs.
+DO $$
+DECLARE
   self_prefs jsonb;
-  other_prefs jsonb;
 BEGIN
   -- Own row must be readable.
   SELECT notification_prefs INTO self_prefs
@@ -1029,12 +1018,12 @@ BEGIN
   IF self_prefs IS NULL AND NOT EXISTS (
     SELECT 1 FROM public.users WHERE id = '00000000-0000-0000-0000-000000000003'
   ) THEN
-    RAISE EXCEPTION 'FAIL [Test 37 of 37: notification_prefs self read]: own users row not visible';
+    RAISE EXCEPTION 'FAIL [Test 40 of 40: notification_prefs self read]: own users row not visible';
   END IF;
 
-  -- uid_user should not be able to UPDATE another user's notification_prefs.
-  -- We use a nested BEGIN/EXCEPTION block; if the UPDATE silently affects 0
-  -- rows (RLS filter) that is also acceptable — the key invariant is 0 rows updated.
+  -- uid_user must not be able to UPDATE another user's notification_prefs.
+  -- A silent 0-row UPDATE (RLS filter) and an insufficient_privilege throw are
+  -- both acceptable — the invariant is 0 rows affected.
   DECLARE
     affected int;
   BEGIN
@@ -1043,7 +1032,7 @@ BEGIN
      WHERE id = '00000000-0000-0000-0000-000000000002'; -- uid_mod, not self
     GET DIAGNOSTICS affected = ROW_COUNT;
     IF affected > 0 THEN
-      RAISE EXCEPTION 'FAIL [Test 37 of 37: notification_prefs self-only write]: uid_user updated another user\'s notification_prefs (% rows affected)', affected;
+      RAISE EXCEPTION 'FAIL [Test 40 of 40: notification_prefs self-only write]: uid_user updated another user''s notification_prefs (% rows affected)', affected;
     END IF;
   EXCEPTION WHEN insufficient_privilege THEN
     NULL; -- permission denied is also correct
@@ -1058,9 +1047,7 @@ RESET ROLE;
 
 DO $$
 BEGIN
-  RAISE NOTICE 'RLS suite: 38 of 38 assertions passed';
-
-  RAISE NOTICE 'RLS suite: 37 of 37 assertions passed';
+  RAISE NOTICE 'RLS suite: 40 of 40 assertions passed';
 END $$;
 
 ROLLBACK;
