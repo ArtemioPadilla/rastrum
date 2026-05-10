@@ -1,12 +1,18 @@
 ---
 import BaseLayout from '../../../layouts/BaseLayout.astro';
-import ExploreMap from '../../../components/ExploreMap.astro';
+import ExploreMapView from '../../../components/ExploreMapView.astro';
 import { t } from '../../../i18n/utils';
 
 const lang = 'es';
 const tr = t(lang);
+
+const url = Astro.url;
+const taxon    = url.searchParams.get('taxon')    ?? '';
+const dateFrom = url.searchParams.get('dateFrom') ?? '';
+const dateTo   = url.searchParams.get('dateTo')   ?? '';
+const observer = url.searchParams.get('observer') ?? '';
 ---
 
-<BaseLayout title={`${tr.map.title} — Rastrum`} description="Mapa interactivo de observaciones de biodiversidad de la comunidad Rastrum. Filtra por mes, especie y tipo de observación en América Latina." lang={lang}>
-  <ExploreMap lang={lang} />
+<BaseLayout title={`${tr.map.title} — Rastrum`} description="Mapa interactivo de observaciones de biodiversidad de la comunidad Rastrum. Filtra por taxón, rango de fechas y observador en América Latina." lang={lang}>
+  <ExploreMapView lang={lang} taxon={taxon} dateFrom={dateFrom} dateTo={dateTo} observer={observer} />
 </BaseLayout>

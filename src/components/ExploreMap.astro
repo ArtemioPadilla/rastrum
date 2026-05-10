@@ -317,14 +317,50 @@ const observersMapHref = getLocalizedPath(lang, routes.communityMap[locale] + '/
 
     const allFeatures = features;
     let activeMonth: number | null = null;
+    let activeFilters: { taxon: string; dateFrom: string; dateTo: string; observer: string } = {
+      taxon: '', dateFrom: '', dateTo: '', observer: '',
+    };
 
-    function applyMonthFilter(): void {
-      const filtered = activeMonth === null
-        ? allFeatures
-        : allFeatures.filter((f) => {
-            const m = (f.properties as { observed_month?: number | null } | null)?.observed_month;
-            return typeof m === 'number' && m === activeMonth;
-          });
+    function applyAllFilters(): void {
+      const { taxon, dateFrom, dateTo, observer } = activeFilters;
+      const taxonLc   = taxon.toLowerCase();
+      const fromMs    = dateFrom ? Date.parse(dateFrom) : null;
+      const toMs      = dateTo   ? Date.parse(dateTo)   : null;
+      const observerLc = observer.startsWith('@') ? observer.slice(1).toLowerCase() : observer.toLowerCase();
+
+      const filtered = allFeatures.filter((f) => {
+        const props = f.properties as Record<string, unknown>;
+
+        // Month filter (from TimeSlider)
+        if (activeMonth !== null) {
+          const m = props.observed_month;
+          if (typeof m !== 'number' || m !== activeMonth) return false;
+        }
+
+        // Taxon filter
+        if (taxonLc) {
+          const species = (props.species as string ?? '').toLowerCase();
+          if (!species.includes(taxonLc)) return false;
+        }
+
+        // Date range filter
+        if (fromMs !== null || toMs !== null) {
+          const date = props.date as string | undefined;
+          const ms = date ? Date.parse(date) : null;
+          if (ms === null) return false;
+          if (fromMs !== null && ms < fromMs) return false;
+          if (toMs   !== null && ms > toMs  ) return false;
+        }
+
+        // Observer filter (matches handle stored in properties.observer_handle if present)
+        if (observerLc) {
+          const handle = (props.observer_handle as string ?? '').toLowerCase();
+          if (!handle.includes(observerLc)) return false;
+        }
+
+        return true;
+      });
+
       const src = map.getSource('observations') as maplibregl.GeoJSONSource | undefined;
       src?.setData({ type: 'FeatureCollection', features: filtered });
       document.dispatchEvent(
@@ -334,10 +370,21 @@ const observersMapHref = getLocalizedPath(lang, routes.communityMap[locale] + '/
       );
     }
 
+    function applyMonthFilter(): void {
+      applyAllFilters();
+    }
+
     document.addEventListener('rastrum:time-slider-change', (ev) => {
       const detail = (ev as CustomEvent<{ month: number | null }>).detail || { month: null };
       activeMonth = typeof detail.month === 'number' ? detail.month : null;
-      applyMonthFilter();
+      applyAllFilters();
+    });
+
+    // ── Explore filter bar (issue #670) ────────────────────────────────────
+    document.addEventListener('rastrum:explore-filter-changed', (ev) => {
+      const detail = (ev as CustomEvent<{ taxon: string; dateFrom: string; dateTo: string; observer: string }>).detail;
+      if (detail) activeFilters = { ...detail };
+      applyAllFilters();
     });
 
     map.addSource('observations', {

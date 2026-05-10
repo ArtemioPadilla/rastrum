@@ -1,0 +1,256 @@
+---
+/**
+ * ExploreMapView.astro — Unified explore map with filter sidebar (issue #670).
+ *
+ * Wraps the existing ExploreMap component and adds a filter bar for:
+ *   - Taxon (scientific or common name free-text search)
+ *   - Date range (from / to)
+ *   - Observer (handle)
+ *
+ * Filter state is reflected in / read from URL search params so views are
+ * shareable.  The component dispatches a `rastrum:explore-filter-changed`
+ * CustomEvent whenever filters change; ExploreMap's script listens to it
+ * and re-queries accordingly.
+ *
+ * Privacy: filter UI is purely client-side.  The underlying map query in
+ * ExploreMap still runs through Supabase RLS, so observer-precision
+ * invariants are preserved regardless of what filters are set.
+ */
+import ExploreMap from './ExploreMap.astro';
+import { t } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+  /** Pre-selected taxon filter (from URL param or parent page). */
+  taxon?: string;
+  /** Pre-selected date-from filter (ISO date string YYYY-MM-DD). */
+  dateFrom?: string;
+  /** Pre-selected date-to filter (ISO date string YYYY-MM-DD). */
+  dateTo?: string;
+  /** Pre-selected observer handle filter. */
+  observer?: string;
+}
+
+const { lang, taxon = '', dateFrom = '', dateTo = '', observer = '' } = Astro.props;
+const isEs = lang === 'es';
+
+// i18n strings (inline fallback — avoids brittle key paths for a new UI)
+const copy = {
+  filtersLabel:    isEs ? 'Filtros'                 : 'Filters',
+  taxonLabel:      isEs ? 'Taxón'                   : 'Taxon',
+  taxonPlaceholder:isEs ? 'p. ej. Quercus, jaguar'  : 'e.g. Quercus, jaguar',
+  dateFromLabel:   isEs ? 'Desde'                   : 'From',
+  dateToLabel:     isEs ? 'Hasta'                   : 'To',
+  observerLabel:   isEs ? 'Observador'              : 'Observer',
+  observerPlaceholder: isEs ? '@usuario'            : '@handle',
+  applyLabel:      isEs ? 'Aplicar'                 : 'Apply',
+  clearLabel:      isEs ? 'Limpiar'                 : 'Clear',
+  activeFilters:   isEs ? 'filtros activos'         : 'active filters',
+};
+---
+
+<div id="explore-map-view-root" class="space-y-4">
+  <!-- Filter bar -->
+  <details
+    id="explore-filter-details"
+    class="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-sm"
+    open
+  >
+    <summary
+      class="flex items-center justify-between gap-3 px-4 py-3 cursor-pointer select-none list-none"
+      aria-label={copy.filtersLabel}
+    >
+      <div class="flex items-center gap-2">
+        <svg class="w-4 h-4 text-zinc-500 dark:text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 4h18M7 8h10M10 12h4"/>
+        </svg>
+        <span class="text-sm font-medium text-zinc-700 dark:text-zinc-200">{copy.filtersLabel}</span>
+        <span
+          id="explore-filter-badge"
+          class="hidden rounded-full bg-emerald-600 text-white text-[10px] font-bold px-1.5 py-0.5"
+          aria-live="polite"
+        ></span>
+      </div>
+      <!-- Chevron -->
+      <svg class="explore-filter-chevron w-4 h-4 text-zinc-400 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+      </svg>
+    </summary>
+
+    <form
+      id="explore-filter-form"
+      class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 px-4 pb-4"
+      novalidate
+    >
+      <!-- Taxon -->
+      <div class="flex flex-col gap-1">
+        <label for="ef-taxon" class="text-xs font-medium text-zinc-600 dark:text-zinc-400">{copy.taxonLabel}</label>
+        <input
+          id="ef-taxon"
+          name="taxon"
+          type="search"
+          value={taxon}
+          placeholder={copy.taxonPlaceholder}
+          autocomplete="off"
+          class="rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        />
+      </div>
+
+      <!-- Date from -->
+      <div class="flex flex-col gap-1">
+        <label for="ef-date-from" class="text-xs font-medium text-zinc-600 dark:text-zinc-400">{copy.dateFromLabel}</label>
+        <input
+          id="ef-date-from"
+          name="dateFrom"
+          type="date"
+          value={dateFrom}
+          class="rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        />
+      </div>
+
+      <!-- Date to -->
+      <div class="flex flex-col gap-1">
+        <label for="ef-date-to" class="text-xs font-medium text-zinc-600 dark:text-zinc-400">{copy.dateToLabel}</label>
+        <input
+          id="ef-date-to"
+          name="dateTo"
+          type="date"
+          value={dateTo}
+          class="rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        />
+      </div>
+
+      <!-- Observer -->
+      <div class="flex flex-col gap-1">
+        <label for="ef-observer" class="text-xs font-medium text-zinc-600 dark:text-zinc-400">{copy.observerLabel}</label>
+        <input
+          id="ef-observer"
+          name="observer"
+          type="search"
+          value={observer}
+          placeholder={copy.observerPlaceholder}
+          autocomplete="off"
+          class="rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        />
+      </div>
+
+      <!-- Actions row (full-width on small, right-aligned on large) -->
+      <div class="sm:col-span-2 lg:col-span-4 flex items-center gap-2 justify-end">
+        <button
+          id="explore-filter-clear"
+          type="button"
+          class="rounded-lg border border-zinc-300 dark:border-zinc-600 px-3 py-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+        >{copy.clearLabel}</button>
+        <button
+          id="explore-filter-apply"
+          type="submit"
+          class="rounded-lg bg-emerald-600 hover:bg-emerald-700 px-4 py-1.5 text-xs font-semibold text-white transition-colors"
+        >{copy.applyLabel}</button>
+      </div>
+    </form>
+  </details>
+
+  <!-- Map (unchanged ExploreMap component) -->
+  <ExploreMap lang={lang} />
+</div>
+
+<script>
+  // ── Filter wiring ────────────────────────────────────────────────────────
+  // Reads form values → updates URL params → dispatches event for ExploreMap.
+
+  export interface ExploreFilters {
+    taxon:    string;
+    dateFrom: string;
+    dateTo:   string;
+    observer: string;
+  }
+
+  const form     = document.getElementById('explore-filter-form')    as HTMLFormElement | null;
+  const clearBtn = document.getElementById('explore-filter-clear')   as HTMLButtonElement | null;
+  const badge    = document.getElementById('explore-filter-badge');
+  const details  = document.getElementById('explore-filter-details') as HTMLDetailsElement | null;
+  const chevron  = document.querySelector('.explore-filter-chevron') as SVGElement | null;
+
+  // Sync chevron rotation with open/closed state
+  details?.addEventListener('toggle', () => {
+    chevron?.style.setProperty('transform', details.open ? 'rotate(180deg)' : '');
+  });
+
+  function getFiltersFromUrl(): ExploreFilters {
+    const p = new URLSearchParams(window.location.search);
+    return {
+      taxon:    p.get('taxon')    ?? '',
+      dateFrom: p.get('dateFrom') ?? '',
+      dateTo:   p.get('dateTo')   ?? '',
+      observer: p.get('observer') ?? '',
+    };
+  }
+
+  function countActive(f: ExploreFilters): number {
+    return [f.taxon, f.dateFrom, f.dateTo, f.observer].filter(Boolean).length;
+  }
+
+  function updateBadge(f: ExploreFilters): void {
+    if (!badge) return;
+    const n = countActive(f);
+    if (n === 0) {
+      badge.classList.add('hidden');
+    } else {
+      badge.classList.remove('hidden');
+      badge.textContent = String(n);
+    }
+  }
+
+  function applyFilters(f: ExploreFilters): void {
+    // Update URL without full page reload
+    const url = new URL(window.location.href);
+    if (f.taxon)    url.searchParams.set('taxon',    f.taxon);    else url.searchParams.delete('taxon');
+    if (f.dateFrom) url.searchParams.set('dateFrom', f.dateFrom); else url.searchParams.delete('dateFrom');
+    if (f.dateTo)   url.searchParams.set('dateTo',   f.dateTo);   else url.searchParams.delete('dateTo');
+    if (f.observer) url.searchParams.set('observer', f.observer); else url.searchParams.delete('observer');
+    window.history.replaceState({}, '', url.toString());
+
+    updateBadge(f);
+
+    // Notify ExploreMap (or any listener) of the new filter set.
+    document.dispatchEvent(new CustomEvent('rastrum:explore-filter-changed', { detail: f }));
+  }
+
+  // Hydrate form from URL params on load
+  (function hydrate() {
+    const f = getFiltersFromUrl();
+    const taxonEl    = document.getElementById('ef-taxon')    as HTMLInputElement | null;
+    const dateFromEl = document.getElementById('ef-date-from') as HTMLInputElement | null;
+    const dateToEl   = document.getElementById('ef-date-to')  as HTMLInputElement | null;
+    const observerEl = document.getElementById('ef-observer') as HTMLInputElement | null;
+    if (taxonEl)    taxonEl.value    = f.taxon;
+    if (dateFromEl) dateFromEl.value = f.dateFrom;
+    if (dateToEl)   dateToEl.value   = f.dateTo;
+    if (observerEl) observerEl.value = f.observer;
+    updateBadge(f);
+    // Fire initial filter event so ExploreMap can apply any URL-encoded filters
+    // on first paint (e.g. from a shared link).
+    if (countActive(f) > 0) {
+      document.dispatchEvent(new CustomEvent('rastrum:explore-filter-changed', { detail: f }));
+    }
+  })();
+
+  // Submit
+  form?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const data = new FormData(form);
+    applyFilters({
+      taxon:    (data.get('taxon')    as string ?? '').trim(),
+      dateFrom: (data.get('dateFrom') as string ?? '').trim(),
+      dateTo:   (data.get('dateTo')   as string ?? '').trim(),
+      observer: (data.get('observer') as string ?? '').trim(),
+    });
+  });
+
+  // Clear
+  clearBtn?.addEventListener('click', () => {
+    const empty: ExploreFilters = { taxon: '', dateFrom: '', dateTo: '', observer: '' };
+    (form?.reset?.());
+    applyFilters(empty);
+  });
+</script>
