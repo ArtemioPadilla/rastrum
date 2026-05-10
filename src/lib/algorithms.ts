@@ -335,6 +335,11 @@ export const ALGORITHMS: Record<AlgorithmId, AlgorithmEntry> = {
   },
 };
 
+// ── Deferred entries (wire when parent feature ships) ──────────────────────
+// buddy_suggestions: #732 — wire when buddy observation suggestions land
+// mini_bioblitz_ranking: #747 — wire when mini-bioblitz duels land
+// ──────────────────────────────────────────────────────────────────────────
+
 export function getAlgorithm(id: AlgorithmId): AlgorithmEntry {
   return ALGORITHMS[id];
 }
