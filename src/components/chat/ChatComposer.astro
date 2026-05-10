@@ -1,0 +1,206 @@
+---
+/**
+ * ChatComposer.astro — sticky chat input bar, extracted from ChatView.astro (#913)
+ *
+ * Contains:
+ *   - Attachment chip (staged photo/audio preview + remove button)
+ *   - Model picker row (shown when attachment staged)
+ *   - Attachment buttons: camera, gallery, audio recorder, voice input, entity context
+ *   - Entity context chip slot
+ *   - Textarea + send button
+ *   - Attach error line
+ *   - ChatEntityPicker dialog
+ *   - Vision-download consent dialog
+ *   - Hidden i18n bag (`#chat-i18n`)
+ *
+ * All behaviour wired in ChatView.astro's <script> via stable element IDs.
+ * CustomEvents used by this component:
+ *   - rastrum:chat-open-entity-picker  (dispatched by #chat-attach-entity-btn)
+ *   - rastrum:chat-attach-entity       (consumed by ChatView entity bootstrap)
+ *   - rastrum:chat-detach-entity       (dispatched by chip remove btn)
+ */
+
+interface Props {
+  lang: 'en' | 'es';
+  observePath: string;
+}
+
+import { t, getLocalizedPath, routes } from '../../i18n/utils';
+import ChatEntityPicker from '../ChatEntityPicker.astro';
+
+const { lang, observePath } = Astro.props;
+const tr = t(lang);
+---
+
+<!-- Composer (sticky on mobile, inline on desktop) -->
+<form
+  id="chat-form"
+  class="hidden fixed bottom-0 left-0 right-0 sm:static border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 sm:border-0 sm:bg-transparent z-30"
+  style="padding-bottom: env(safe-area-inset-bottom);"
+>
+  <div class="max-w-3xl mx-auto px-4 sm:px-0 py-3 sm:py-0 space-y-2">
+    <!-- Attachment chip (shown when an attachment is staged) -->
+    <div id="chat-attachment-chip" class="hidden flex items-center gap-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 p-2">
+      <div id="chat-attachment-thumb" class="w-12 h-12 rounded-md overflow-hidden bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 text-xs flex-shrink-0"></div>
+      <div class="flex-1 min-w-0">
+        <p id="chat-attachment-label" class="text-xs font-medium text-zinc-700 dark:text-zinc-300 truncate"></p>
+        <p id="chat-attachment-meta" class="text-[10px] text-zinc-500 truncate"></p>
+      </div>
+      <button
+        id="chat-attachment-remove"
+        type="button"
+        aria-label={tr.chat.attach_remove}
+        class="w-7 h-7 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-sm flex items-center justify-center hover:bg-zinc-300 dark:hover:bg-zinc-700 flex-shrink-0"
+      >×</button>
+    </div>
+
+    <!-- Model picker — shown only when a photo attachment is staged. -->
+    <div
+      id="chat-model-picker"
+      class="hidden flex flex-wrap gap-1.5 items-center text-[11px]"
+      role="radiogroup"
+      aria-label={tr.chat.model_picker_label}
+    >
+      <span class="text-zinc-500 dark:text-zinc-400 mr-1">{tr.chat.model_picker_label}:</span>
+      <button type="button" data-model="auto" class="chat-chip">{tr.chat.model_auto}</button>
+      <button type="button" data-model="plantnet" class="chat-chip">PlantNet</button>
+      <button type="button" data-model="claude_haiku" class="chat-chip">Claude</button>
+      <button type="button" data-model="webllm_phi35_vision" class="chat-chip">Phi</button>
+      <button type="button" data-model="onnx_gemma4_vision" class="chat-chip">Gemma</button>
+      <button type="button" data-model="onnx_efficientnet_lite0" class="chat-chip">EfficientNet</button>
+      <button type="button" data-model="compare" class="chat-chip">{tr.chat.model_compare}</button>
+    </div>
+
+    <!-- Buttons + textarea row -->
+    <div class="flex flex-col sm:flex-row sm:items-end gap-2">
+      <!-- Attachment buttons: above on mobile, inline on sm+ -->
+      <div class="flex gap-2 sm:gap-1">
+        <button
+          id="chat-photo-btn"
+          type="button"
+          aria-label={tr.chat.attach_photo}
+          title={tr.chat.attach_photo}
+          class="min-h-11 min-w-11 sm:min-w-0 rounded-lg border border-zinc-300 dark:border-zinc-700 px-2 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 flex items-center justify-center gap-1"
+        >
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 0 1 2-2h2l1.5-2h7L17 7h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+          <span class="sr-only">{tr.chat.attach_photo}</span>
+        </button>
+        <input id="chat-photo-input" type="file" accept="image/*" capture="environment" class="sr-only" />
+
+        <button
+          id="chat-gallery-btn"
+          type="button"
+          aria-label={tr.chat.attach_gallery}
+          title={tr.chat.attach_gallery}
+          class="min-h-11 min-w-11 sm:min-w-0 rounded-lg border border-zinc-300 dark:border-zinc-700 px-2 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 flex items-center justify-center gap-1"
+        >
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 5h16v14H4z"/><path stroke-linecap="round" stroke-linejoin="round" d="m4 16 4-4 4 4 3-3 5 5"/><circle cx="9" cy="9" r="1.5" fill="currentColor"/></svg>
+          <span class="sr-only">{tr.chat.attach_gallery}</span>
+        </button>
+        <input id="chat-gallery-input" type="file" accept="image/*" class="sr-only" />
+
+        <button
+          id="chat-audio-btn"
+          type="button"
+          aria-label={tr.chat.attach_audio}
+          title={tr.chat.attach_audio}
+          class="min-h-11 min-w-11 sm:min-w-0 rounded-lg border border-zinc-300 dark:border-zinc-700 px-2 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 flex items-center justify-center gap-1"
+        >
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path stroke-linecap="round" stroke-linejoin="round" d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+          <span data-audio-label class="sr-only">{tr.chat.attach_audio}</span>
+          <span id="chat-audio-elapsed" class="hidden text-[10px] font-mono text-red-600 dark:text-red-400"></span>
+        </button>
+
+        <button
+          id="chat-voice-btn"
+          type="button"
+          hidden
+          aria-label={tr.chat.voice_input_label}
+          title={tr.chat.voice_input_label}
+          class="min-h-11 min-w-11 sm:min-w-0 rounded-lg border border-zinc-300 dark:border-zinc-700 px-2 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 flex items-center justify-center gap-1"
+        >
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path stroke-linecap="round" stroke-linejoin="round" d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+          <span data-voice-label class="sr-only">{tr.chat.voice_input_label}</span>
+        </button>
+
+        <button
+          id="chat-attach-entity-btn"
+          type="button"
+          aria-label={lang === 'es' ? 'Adjuntar contexto' : 'Attach context'}
+          title={lang === 'es' ? 'Adjuntar contexto' : 'Attach context'}
+          class="min-h-11 sm:min-w-0 rounded-lg border border-emerald-600/50 bg-emerald-50/60 dark:bg-emerald-900/10 px-3 py-2 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/20 flex items-center justify-center gap-1.5"
+        >
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2"/></svg>
+          <span class="hidden sm:inline">{lang === 'es' ? 'Contexto' : 'Context'}</span>
+          <span class="sr-only sm:hidden">{lang === 'es' ? 'Adjuntar contexto' : 'Attach context'}</span>
+        </button>
+      </div>
+
+      <!-- Entity context chip slot (rendered by chat-bubble-html.entityChipHtml when attached) -->
+      <div id="chat-entity-chip-slot"></div>
+
+      <textarea
+        id="chat-input"
+        rows="1"
+        placeholder={tr.chat.placeholder}
+        class="flex-1 resize-none rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-base min-h-11 max-h-40"
+      ></textarea>
+      <button
+        id="chat-send-btn"
+        type="submit"
+        class="rounded-lg bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 px-4 py-2 text-sm font-semibold text-white min-h-11 whitespace-nowrap"
+      >
+        <span data-csl>{tr.chat.send}</span>
+      </button>
+    </div>
+    <p id="chat-attach-error" class="hidden text-xs text-red-600 dark:text-red-400"></p>
+  </div>
+</form>
+
+<!-- Entity picker dialog (M01 chat improvements) -->
+<ChatEntityPicker lang={lang} />
+
+<!-- Vision-download consent dialog -->
+<dialog id="chat-vision-dialog" class="rounded-xl p-0 m-auto bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 shadow-2xl border border-zinc-200 dark:border-zinc-800 max-w-md w-[92vw] backdrop:bg-black/50">
+  <form method="dialog" class="p-6">
+    <h2 class="text-lg font-bold mb-3">{tr.chat.vision_consent_title}</h2>
+    <p class="text-sm text-zinc-700 dark:text-zinc-300">{tr.chat.vision_consent_body}</p>
+    <div class="mt-6 flex justify-end gap-2">
+      <button value="cancel" class="rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
+        {tr.chat.vision_consent_cancel}
+      </button>
+      <button value="ok" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 text-sm font-semibold text-white">
+        {tr.chat.vision_consent_ok}
+      </button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Hidden i18n bag: route + label strings read by ChatView's script at runtime -->
+<div
+  id="chat-i18n"
+  class="hidden"
+  data-observe-path={observePath}
+  data-attach-photo={tr.chat.attach_photo}
+  data-attach-gallery={tr.chat.attach_gallery}
+  data-attach-audio={tr.chat.attach_audio}
+  data-attach-audio-stop={tr.chat.attach_audio_stop}
+  data-attach-audio-unsupported={tr.chat.attach_audio_unsupported}
+  data-attach-audio-permission={tr.chat.attach_audio_permission}
+  data-identifying={tr.chat.identifying}
+  data-identifying-audio={tr.chat.identifying_audio}
+  data-looking-more-carefully={tr.chat.looking_more_carefully}
+  data-cascade-no-match={tr.chat.cascade_no_match}
+  data-vision-unavailable-hint={tr.chat.vision_unavailable_hint}
+  data-save-as-observation={tr.chat.save_as_observation}
+  data-vision-download-progress={tr.chat.vision_download_progress}
+  data-attach-photo-label={lang === 'es' ? 'Foto' : 'Photo'}
+  data-attach-audio-label={lang === 'es' ? 'Audio' : 'Audio'}
+  data-suggestions-label={tr.chat.suggestions.label}
+  data-voice-input-label={tr.chat.voice_input_label}
+  data-voice-input-stop-label={tr.chat.voice_input_stop_label}
+  data-compare-running={tr.chat.compare_running}
+  data-compare-heading={tr.chat.compare_heading}
+  data-compare-unavailable={tr.chat.compare_unavailable}
+  data-compare-no-id={tr.chat.compare_no_id}
+></div>
