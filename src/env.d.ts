@@ -33,6 +33,16 @@ interface ImportMetaEnv {
    * new linear PipelineStepper (PR4 of #942). Remove after 30 days without
    * incident reports.
    */
+  /**
+   * Set to '1' to use the legacy SVG DAG pipeline graph instead of the
+   * new linear PipelineStepper (PR4 of #942). Remove after 30 days without
+   * incident reports.
+   *
+   * ⚠️  This is a BUILD-TIME flag (Astro reads it at SSG/SSR build, not runtime).
+   * Changing it requires a full redeploy — a hot env-var update is not enough.
+   * To rollback without a code change, set the flag in your deployment env
+   * (Cloudflare Pages / Firebase Hosting env vars) and trigger a redeploy.
+   */
   readonly PUBLIC_OBSERVE_PIPELINE_GRAPH?: string;
 }
 

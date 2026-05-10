@@ -284,6 +284,8 @@ const labels = {
   function renderConnector(idx: number, done: boolean): void {
     const connector = stepper.querySelector<HTMLElement>(`[data-connector="${idx}"]`);
     if (!connector) return;
+    // Connector line turns emerald when the step to its left is done.
+    // Confirmed behaviour (ArtemIO review #942 PR4): ps-done class is toggled here.
     connector.classList.toggle('ps-done', done);
   }
 
