@@ -1,0 +1,94 @@
+name: db-advisor-smoke
+
+# Weekly smoke: fetch Supabase Database Advisor findings and fail on ERROR-level
+# findings; emit a warning annotation for WARN-level findings.
+#
+# Why weekly?
+#   The advisor findings (index efficiency, RLS gaps, function security, etc.)
+#   change slowly. A weekly run catches regressions before they become incidents
+#   without burning API quota on every push.
+#
+# Secrets required (already present in other workflows):
+#   SUPABASE_ACCESS_TOKEN  — personal access token with project read scope
+#   SUPABASE_PROJECT_REF   — project ref slug (e.g. "abcxyz")
+#
+# API reference:
+#   GET https://api.supabase.com/v1/projects/{ref}/advisors/lint
+
+on:
+  schedule:
+    # Every Monday at 08:00 UTC
+    - cron: '0 8 * * 1'
+  workflow_dispatch: {}
+
+concurrency:
+  group: db-advisor-smoke
+  cancel-in-progress: true
+
+jobs:
+  advisor-smoke:
+    name: Database Advisor lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Fetch advisor findings
+        id: fetch
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          set -euo pipefail
+
+          RESPONSE=$(curl --silent --fail-with-body \
+            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
+            -H "Accept: application/json" \
+            "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_REF}/advisors/lint")
+
+          echo "raw_response<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$RESPONSE" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+          # Write to a temp file for the analysis step
+          echo "$RESPONSE" > /tmp/advisor-findings.json
+
+      - name: Analyse findings
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PYEOF'
+          import json, sys, os
+
+          with open('/tmp/advisor-findings.json') as f:
+              data = json.load(f)
+
+          # The API returns either a list directly or an object with a "data" key.
+          findings = data if isinstance(data, list) else data.get('data', [])
+
+          errors = [f for f in findings if (f.get('level') or f.get('severity') or '').upper() in ('ERROR', 'CRITICAL')]
+          warns  = [f for f in findings if (f.get('level') or f.get('severity') or '').upper() in ('WARN', 'WARNING')]
+
+          def fmt(f):
+              name  = f.get('name') or f.get('title') or f.get('type') or 'unknown'
+              desc  = f.get('description') or f.get('message') or ''
+              table = f.get('metadata', {}).get('table', '') or f.get('table', '')
+              loc   = f' [table: {table}]' if table else ''
+              return f'{name}{loc}: {desc}'
+
+          for w in warns:
+              print(f'::warning::{fmt(w)}')
+
+          if errors:
+              for e in errors:
+                  print(f'::error::{fmt(e)}')
+              print()
+              print(f'Database Advisor returned {len(errors)} ERROR-level finding(s).')
+              print('Resolve them in docs/specs/infra/supabase-schema.sql and re-run.')
+              sys.exit(1)
+
+          total = len(findings)
+          print(f'::notice::Database Advisor: {total} total finding(s), {len(warns)} warn(s), 0 errors. ✓')
+          PYEOF
