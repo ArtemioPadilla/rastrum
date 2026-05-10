@@ -11100,3 +11100,5 @@ BEGIN
 END;
 $$;
 GRANT EXECUTE ON FUNCTION public.falta_dex_summary() TO authenticated;
+
+-- ci: trigger db-validate for fix/944-gemma4-system-prompt-v2 (no schema changes in this PR)
