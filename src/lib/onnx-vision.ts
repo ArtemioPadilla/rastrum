@@ -303,16 +303,44 @@ export async function* generateGemmaText(
   const inputs = await proc(promptText, undefined, { add_special_tokens: false });
 
   const max_new_tokens = Math.min(opts.max_tokens ?? 512, 1024);
-  const generated = await mdl.generate({
-    ...(inputs as Record<string, unknown>),
-    max_new_tokens,
-    do_sample: false,
-  });
-  const decoded = await decodeGeneration(proc, generated);
 
   if (opts.stream) {
-    yield { choices: [{ delta: { content: decoded } }] };
+    const { TextStreamer } = await import('@huggingface/transformers') as unknown as {
+      TextStreamer: new (
+        tokenizer: unknown,
+        opts: {
+          skip_prompt: boolean;
+          skip_special_tokens: boolean;
+          callback_function: (token: string) => void;
+        },
+      ) => unknown;
+    };
+    const tokens: string[] = [];
+    const streamer = new TextStreamer(proc.tokenizer, {
+      skip_prompt: true,
+      skip_special_tokens: true,
+      callback_function: (token: string) => {
+        tokens.push(token);
+      },
+    });
+    await mdl.generate({
+      ...(inputs as Record<string, unknown>),
+      max_new_tokens,
+      do_sample: false,
+      streamer,
+    } as Record<string, unknown>);
+    // Yield all collected tokens as a single delta chunk.
+    // Token-level streaming requires the caller to hold an async queue;
+    // emitting one buffered chunk here matches the v1.1 contract while
+    // still exercising the TextStreamer code path (warmup for true streaming).
+    yield { choices: [{ delta: { content: tokens.join('') } }] };
   } else {
+    const generated = await mdl.generate({
+      ...(inputs as Record<string, unknown>),
+      max_new_tokens,
+      do_sample: false,
+    });
+    const decoded = await decodeGeneration(proc, generated);
     yield { choices: [{ message: { content: decoded } }] };
   }
 }

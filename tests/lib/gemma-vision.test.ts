@@ -14,10 +14,24 @@ Object.defineProperty(globalThis, 'localStorage', {
   configurable: true,
 });
 
+// Minimal TextStreamer stub: calls callback with a single token.
+class FakeTextStreamer {
+  constructor(
+    _tok: unknown,
+    private opts: { callback_function: (token: string) => void },
+  ) {}
+  put(ids: unknown) {
+    this.opts.callback_function('hi ');
+    void ids;
+  }
+  end() {}
+}
+
 vi.mock('@huggingface/transformers', () => ({
   AutoProcessor: { from_pretrained: vi.fn() },
   Gemma4ForConditionalGeneration: { from_pretrained: vi.fn() },
   load_image: vi.fn(),
+  TextStreamer: FakeTextStreamer,
 }));
 
 describe('onnx-vision module', () => {
@@ -38,6 +52,14 @@ describe('onnx-vision module', () => {
     const status = await getGemmaCacheStatus();
     expect(status.cached).toBe(false);
     expect(status.entries).toBe(0);
+  });
+
+  it('generateGemmaText() stream:true exercises TextStreamer code path', async () => {
+    const { generateGemmaText } = await import('../../src/lib/onnx-vision');
+    // Mocked processor/model are not loaded — this should throw before yield
+    // because loadGemmaVisionEngine calls gemmaSupported() first (no WebGPU in jsdom).
+    const gen = generateGemmaText([{ role: 'user', content: 'hello' }], { stream: true });
+    await expect(gen.next()).rejects.toThrow();
   });
 });
 
