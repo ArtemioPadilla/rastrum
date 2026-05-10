@@ -11100,3 +11100,5 @@ BEGIN
 END;
 $$;
 GRANT EXECUTE ON FUNCTION public.falta_dex_summary() TO authenticated;
+
+-- ci: trigger db-validate for feat/942-pr5-observe-reorder (no schema changes in this PR)
