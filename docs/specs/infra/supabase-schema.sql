@@ -11100,3 +11100,5 @@ BEGIN
 END;
 $$;
 GRANT EXECUTE ON FUNCTION public.falta_dex_summary() TO authenticated;
+
+-- ci: trigger db-validate for feat/942-pr3-observation-defaults (no schema changes in this PR)
