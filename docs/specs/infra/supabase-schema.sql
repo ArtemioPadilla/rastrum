@@ -11319,3 +11319,31 @@ CREATE TRIGGER tg_generate_list_slug BEFORE INSERT ON public.species_lists
 
 REVOKE EXECUTE ON FUNCTION public.generate_list_slug() FROM PUBLIC;
 
+-- #868 — Weekly email digest for inactive users
+-- Adds email_notifications_enabled + last_digest_sent_at
+-- and a pg_cron schedule that fires hourly.
+-- ====================================================
+ALTER TABLE public.users
+  ADD COLUMN IF NOT EXISTS email_notifications_enabled boolean NOT NULL DEFAULT true;
+COMMENT ON COLUMN public.users.email_notifications_enabled IS
+  'When true, the user receives the weekly digest email. Toggled via
+   /email-unsubscribe or the profile notifications settings page.';
+ALTER TABLE public.users
+  ADD COLUMN IF NOT EXISTS last_digest_sent_at timestamptz;
+
+COMMENT ON COLUMN public.users.last_digest_sent_at IS
+  'Timestamp of the most recent weekly digest email sent to this user.';
+
+-- pg_cron: fire every hour; the Edge Function computes the per-timezone
+-- recipient set so each user receives the email at ~14:00 local time.
+SELECT cron.schedule(
+  'weekly-digest',
+  '0 * * * *',
+  $$SELECT net.http_post(
+    url     := current_setting('app.supabase_url') || '/functions/v1/weekly-digest',
+    headers := jsonb_build_object(
+      'Authorization', 'Bearer ' || current_setting('app.cron_secret')
+    ),
+    body    := '{}'::jsonb
+  )$$
+);
