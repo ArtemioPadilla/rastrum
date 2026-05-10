@@ -281,10 +281,8 @@ const weathers = WEATHERS;
       {isEs ? "Guardar observación" : "Save observation"}
     </button>
 
-    <!-- Identify-only skip (secondary action) -->
-    <button type="button" id="obs2-skip-save-btn" class="hidden w-full text-center text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 py-1 underline">
-      {isEs ? "Solo identificar, no guardar" : "Just identify, don't save"}
-    </button>
+    <!-- Identify-only skip (obs2-skip-save-btn) removed (#942 PR7).
+         The identify-only mode is accessible via /observe?mode=identify. -->
   </form>
 
   <!-- Identify-only result (shown when ?mode=identify, pipeline done, user skips save) -->
@@ -379,7 +377,7 @@ const saveBtn         = document.getElementById('obs2-save-btn') as HTMLButtonEl
 const resumeBanner    = document.getElementById('obs2-resume-banner');
 const gpsStatus       = document.getElementById('obs2-gps-status');
 const contributeNudge = document.getElementById('obs2-contribute-nudge');
-const skipSaveBtn     = document.getElementById('obs2-skip-save-btn') as HTMLButtonElement | null;
+// skipSaveBtn removed (#942 PR7) — identify-only mode via /observe?mode=identify
 const identifyResult  = document.getElementById('obs2-identify-result');
 const identifySpeciesCard = document.getElementById('obs2-identify-species-card');
 const contributeBtn   = document.getElementById('obs2-contribute-btn');
@@ -503,7 +501,7 @@ document.addEventListener('rastrum:files-dropped', (e: Event) => {
 const identifyMode = new URLSearchParams(window.location.search).get('mode') === 'identify';
 if (identifyMode) {
   contributeNudge?.classList.remove('hidden');
-  skipSaveBtn?.classList.remove('hidden');
+  // skipSaveBtn removed (#942 PR7)
 }
 const idCard          = document.getElementById('obs2-id-card');
 const speciesEl       = document.getElementById('obs2-species');
@@ -985,17 +983,7 @@ pipelineSkipBtn?.addEventListener('click', () => {
   showPostForm();
 });
 
-skipSaveBtn?.addEventListener('click', () => {
-  postForm?.classList.add('hidden');
-  identifyResult?.classList.remove('hidden');
-  if (bestResult && identifySpeciesCard) {
-    identifySpeciesCard.innerHTML = `
-      <p class="font-semibold italic text-zinc-900 dark:text-zinc-100 text-lg">${bestResult.scientific_name}</p>
-      ${bestResult.common_name_en ? `<p class="text-sm text-zinc-500 dark:text-zinc-400">${bestResult.common_name_en}</p>` : ''}
-      <p class="text-sm font-mono text-emerald-600 dark:text-emerald-400">${Math.round(bestResult.confidence * 100)}% confidence · ${bestResult.source}</p>
-    `;
-  }
-});
+// skipSaveBtn listener removed (#942 PR7) — button no longer in template
 
 contributeBtn?.addEventListener('click', () => {
   identifyResult?.classList.add('hidden');
