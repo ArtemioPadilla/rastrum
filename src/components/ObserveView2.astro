@@ -285,10 +285,8 @@ const weathers = WEATHERS;
       {isEs ? "Guardar observación" : "Save observation"}
     </button>
 
-    <!-- Identify-only skip (secondary action) -->
-    <button type="button" id="obs2-skip-save-btn" class="hidden w-full text-center text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 py-1 underline">
-      {isEs ? "Solo identificar, no guardar" : "Just identify, don't save"}
-    </button>
+    <!-- Identify-only skip (obs2-skip-save-btn) removed (#942 PR7).
+         The identify-only mode is accessible via /observe?mode=identify. -->
   </form>
 
   <!-- Identify-only result (shown when ?mode=identify, pipeline done, user skips save) -->
@@ -384,7 +382,7 @@ const saveBtn         = document.getElementById('obs2-save-btn') as HTMLButtonEl
 const resumeBanner    = document.getElementById('obs2-resume-banner');
 const gpsStatus       = document.getElementById('obs2-gps-status');
 const contributeNudge = document.getElementById('obs2-contribute-nudge');
-const skipSaveBtn     = document.getElementById('obs2-skip-save-btn') as HTMLButtonElement | null;
+// skipSaveBtn removed (#942 PR7) — identify-only mode via /observe?mode=identify
 const identifyResult  = document.getElementById('obs2-identify-result');
 const identifySpeciesCard = document.getElementById('obs2-identify-species-card');
 const contributeBtn   = document.getElementById('obs2-contribute-btn');
@@ -526,7 +524,24 @@ document.addEventListener('rastrum:files-dropped', (e: Event) => {
 const identifyMode = new URLSearchParams(window.location.search).get('mode') === 'identify';
 if (identifyMode) {
   contributeNudge?.classList.remove('hidden');
-  skipSaveBtn?.classList.remove('hidden');
+  // skipSaveBtn removed (#942 PR7)
+}
+
+// ── One-shot migration notice for users who used "Just identify, don't save" (#942 PR7) ──
+// Shows once per device after the skip-save button was removed. Directs them to ?mode=identify.
+const SKIP_SAVE_MIGRATION_KEY = 'rastrum_identify_mode_notice_v1';
+if (!localStorage.getItem(SKIP_SAVE_MIGRATION_KEY) && !identifyMode) {
+  localStorage.setItem(SKIP_SAVE_MIGRATION_KEY, '1');
+  const identifyUrl = window.location.pathname + '?mode=identify';
+  const notice = document.createElement('div');
+  notice.setAttribute('role', 'status');
+  notice.setAttribute('aria-live', 'polite');
+  notice.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-lg px-5 py-3 text-sm max-w-[340px] text-center space-y-2';
+  notice.innerHTML = isEs
+    ? `<p class="text-zinc-700 dark:text-zinc-300">El botón <em>"Solo identificar"</em> se movió.</p><a href="${identifyUrl}" class="text-emerald-600 dark:text-emerald-400 underline text-xs">Identificar sin guardar →</a>`
+    : `<p class="text-zinc-700 dark:text-zinc-300"><em>"Just identify"</em> moved to a dedicated URL.</p><a href="${identifyUrl}" class="text-emerald-600 dark:text-emerald-400 underline text-xs">Identify without saving →</a>`;
+  document.body.appendChild(notice);
+  setTimeout(() => { notice.style.opacity = '0'; notice.style.transition = 'opacity 0.3s'; setTimeout(() => notice.remove(), 350); }, 6000);
 }
 const idCard          = document.getElementById('obs2-id-card');
 const speciesEl       = document.getElementById('obs2-species');
@@ -1008,17 +1023,7 @@ pipelineSkipBtn?.addEventListener('click', () => {
   showPostForm();
 });
 
-skipSaveBtn?.addEventListener('click', () => {
-  postForm?.classList.add('hidden');
-  identifyResult?.classList.remove('hidden');
-  if (bestResult && identifySpeciesCard) {
-    identifySpeciesCard.innerHTML = `
-      <p class="font-semibold italic text-zinc-900 dark:text-zinc-100 text-lg">${bestResult.scientific_name}</p>
-      ${bestResult.common_name_en ? `<p class="text-sm text-zinc-500 dark:text-zinc-400">${bestResult.common_name_en}</p>` : ''}
-      <p class="text-sm font-mono text-emerald-600 dark:text-emerald-400">${Math.round(bestResult.confidence * 100)}% confidence · ${bestResult.source}</p>
-    `;
-  }
-});
+// skipSaveBtn listener removed (#942 PR7) — button no longer in template
 
 contributeBtn?.addEventListener('click', () => {
   identifyResult?.classList.add('hidden');
