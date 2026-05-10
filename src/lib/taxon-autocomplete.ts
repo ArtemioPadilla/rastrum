@@ -201,7 +201,7 @@ async function fetchFromRastrum(query: string): Promise<TaxonSuggestion[]> {
     scientificName: r.scientific_name,
     commonNameEs: r.common_name_es ?? null,
     commonNameEn: r.common_name_en ?? null,
-    observationCount: r.rarity_tier ?? null,
+    observationCount: null, // rarity_tier is not a count — hide from count display
     inUserHistory: userTaxonIds.has(r.id),
     source: 'rastrum' as const,
   }));

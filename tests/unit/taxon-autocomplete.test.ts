@@ -22,6 +22,7 @@ function makeQueryStub(resolveWith: any) {
     ilike:  () => stub,
     order:  () => stub,
     eq:     () => stub,
+    not:    () => stub,
     limit:  () => Promise.resolve(resolveWith),
   };
   return stub;
@@ -37,10 +38,11 @@ vi.mock('../../src/lib/supabase', () => ({
         return makeQueryStub({
           data: [
             {
+              id: 'taxon-uuid-1',
               scientific_name: 'Alamania punicea',
               common_name_es: 'Orquídea de agave',
               common_name_en: null,
-              observation_count: 12,
+              rarity_tier: 1,
             },
           ],
           error: null,
@@ -48,7 +50,7 @@ vi.mock('../../src/lib/supabase', () => ({
       }
       if (table === 'observations') {
         return makeQueryStub({
-          data: [{ primary_scientific_name: 'Alamania punicea' }],
+          data: [{ primary_taxon_id: 'taxon-uuid-1' }],
           error: null,
         });
       }
@@ -106,7 +108,7 @@ describe('suggestTaxa', () => {
     );
     expect(rastrumHit).toBeDefined();
     expect(rastrumHit.commonNameEs).toBe('Orquídea de agave');
-    expect(rastrumHit.observationCount).toBe(12);
+    expect(rastrumHit.observationCount).toBeNull(); // rarity_tier not exposed as count
   });
 
   it('merges GBIF results without duplicating Rastrum hits', async () => {
