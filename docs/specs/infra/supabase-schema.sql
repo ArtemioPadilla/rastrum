@@ -11100,3 +11100,5 @@ BEGIN
 END;
 $$;
 GRANT EXECUTE ON FUNCTION public.falta_dex_summary() TO authenticated;
+
+-- ci: trigger db-validate for fix/952-auth-lock-and-943-explore-rich (no schema changes in this PR)
