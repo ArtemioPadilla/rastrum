@@ -52,8 +52,9 @@ const observersHref = isEs ? '/es/comunidad/observadores' : '/en/community/obser
 
 <script>
   import { loadViewerRegion, loadActiveObserversToday } from '../lib/community';
-  import { formatActiveObserversBanner } from '../lib/active-observers';
+  import { formatActiveObserversBanner, subscribeToActiveObservers } from '../lib/active-observers';
   import { serializeFilters, DEFAULT_FILTERS } from '../lib/community-url';
+  import { getSupabase } from '../lib/supabase';
 
   async function hydrate(): Promise<void> {
     const el = document.getElementById('active-observers-banner') as HTMLAnchorElement | null;
@@ -91,6 +92,27 @@ const observersHref = isEs ? '/es/comunidad/observadores' : '/en/community/obser
     el.href = `${el.pathname}${qs}`;
     const wrap = document.getElementById('active-observers-banner-wrap');
     wrap?.classList.remove('hidden');
+
+    // Subscribe to realtime count updates
+    const supabase = getSupabase();
+    const country = region.countryCode;
+    const regionLabel = region.regionPrimary;
+
+    const unsubscribe = subscribeToActiveObservers(supabase, country, (newCount) => {
+      const output = formatActiveObserversBanner(
+        { count: newCount, region: regionLabel },
+        { today_n: copyTodayN, today_one: copyTodayOne, empty: copyEmpty },
+      );
+      if (output.text && textEl) {
+        textEl.textContent = output.text;
+        wrap?.classList.remove('hidden');
+      }
+    });
+
+    // Clean up on page navigation (Astro view transitions)
+    document.addEventListener('astro:before-swap', () => {
+      unsubscribe();
+    }, { once: true });
   }
 
   hydrate();
