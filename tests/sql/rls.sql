@@ -1064,9 +1064,9 @@ DO $$
 DECLARE
   v_uid uuid := '88880000-0000-0000-0000-000000000001';
 BEGIN
-  -- Seed a user row.
-  INSERT INTO public.users (id, email, gamification_opt_in)
-  VALUES (v_uid, 'freeze-test@example.com', true)
+  -- Seed a user row (public.users has no email column — that lives in auth.users).
+  INSERT INTO public.users (id, username, display_name)
+  VALUES (v_uid, 'freeze_test_user', 'Freeze Test')
   ON CONFLICT (id) DO NOTHING;
 
   -- Seed user_streaks with 1 freeze available, streak=7, last obs 2 days ago.
