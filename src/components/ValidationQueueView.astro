@@ -73,6 +73,7 @@ const sharePathBase = '/share/obs/';
 
 <script>
   import { getSupabase } from '../lib/supabase';
+  import { getCachedUser } from '../lib/supabase';
   import type { ValidationQueueRow } from '../lib/types';
 
   const root = document.querySelector<HTMLElement>('.rastrum-validation-queue');
@@ -177,7 +178,7 @@ const sharePathBase = '/share/obs/';
       try {
         const supabase = getSupabase();
         // Auth state (decides whether to show signin prompt + Sugerir CTAs).
-        const { data: { user } } = await supabase.auth.getUser();
+        const user = await getCachedUser();
         userId = user?.id ?? null;
         if (!userId) document.getElementById('vq-signin')?.classList.remove('hidden');
 

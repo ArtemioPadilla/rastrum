@@ -53,6 +53,7 @@ const signInPath = getLocalizedPath(lang, routes.signIn[lang] + '/');
 
 <script>
   import { getSupabase } from '../lib/supabase';
+  import { getCachedUser } from '../lib/supabase';
   import { followUser, unfollowUser } from '../lib/social';
 
   type FollowEl = HTMLElement & { __wired?: boolean };
@@ -114,7 +115,7 @@ const signInPath = getLocalizedPath(lang, routes.signIn[lang] + '/');
     let supabase;
     try { supabase = getSupabase(); } catch { return; }
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCachedUser();
 
     if (!user) {
       paint(btn, 'signin', root);

@@ -320,6 +320,7 @@ const docColumns = [
 <!-- Auth status: keeps the existing avatar-swap behavior -->
 <script>
   import { getSupabase } from '../lib/supabase';
+  import { getCachedUser } from '../lib/supabase';
   import { signOut, SUPABASE_AUTH_STORAGE_KEY, HEADER_AVATAR_CACHE_KEY, HEADER_AVATAR_NAME_KEY } from '../lib/auth';
   import { getUserRoles } from '../lib/user-roles';
   import type { UserProfile } from '../lib/types';
@@ -414,7 +415,7 @@ const docColumns = [
 
   (async () => {
     try {
-      const { data: { session } } = await getSupabase().auth.getSession();
+      const session = { user: await getCachedUser() };
       await paint(!!session, session?.user as Parameters<typeof paint>[1]);
       if (session?.user) await maybeShowConsolePill(session.user.id);
       getSupabase().auth.onAuthStateChange(async (_evt, s) => {

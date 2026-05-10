@@ -220,6 +220,7 @@ const stringsJson = JSON.stringify({
   import { parseFilters, serializeFilters, loadGps, saveGps, clearGps, type CommunityFilters, type CommunityGps } from '../lib/community-url';
   import { loadCommunity, loadCommunityNearbyAt, viewerHasCentroid, loadViewerCommunityMeta, loadIsoCountries, COMMUNITY_PAGE_SIZE, type CommunityObserver } from '../lib/community';
   import { getSupabase } from '../lib/supabase';
+  import { getCachedUser } from '../lib/supabase';
   import { tierForKarma } from '../lib/karma-frame';
 
   interface Strings {
@@ -503,7 +504,7 @@ const stringsJson = JSON.stringify({
       // enforced server-side via the centroid view's grant; this UI
       // layer is purely UX.
       try {
-        const { data: { user } } = await getSupabase().auth.getUser();
+        const user = await getCachedUser();
         if (!user) { showEmpty(STRINGS.emptyNearbyAnon); return; }
         // Only require centroid when no GPS overlay is set.
         if (!gpsCoords) {

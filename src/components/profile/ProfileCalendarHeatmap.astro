@@ -51,6 +51,7 @@ const ownerPill = (tr as unknown as { privacy?: { owner_only_badge?: string } })
 
 <script>
   import { getSupabase } from '../../lib/supabase';
+  import { getCachedUser } from '../../lib/supabase';
   import { buildCalendarGrid, type CalendarBucket } from '../../lib/profile-widgets';
 
   const widgets = document.querySelectorAll<HTMLElement>('[data-widget="calendar-heatmap"]');
@@ -78,7 +79,7 @@ const ownerPill = (tr as unknown as { privacy?: { owner_only_badge?: string } })
     try { supabase = getSupabase(); } catch { return; }
     let userId = el.dataset.targetUserId ?? null;
     if (!userId) {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getCachedUser();
       if (!user) return;
       userId = user.id;
     }

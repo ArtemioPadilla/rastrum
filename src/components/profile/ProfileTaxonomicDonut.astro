@@ -41,6 +41,7 @@ const ownerPill = (tr as unknown as { privacy?: { owner_only_badge?: string } })
 
 <script>
   import { getSupabase } from '../../lib/supabase';
+  import { getCachedUser } from '../../lib/supabase';
   import { arcPath, donutFromCounts } from '../../lib/profile-widgets';
 
   const PALETTE: Record<string, string> = {
@@ -64,7 +65,7 @@ const ownerPill = (tr as unknown as { privacy?: { owner_only_badge?: string } })
     try { supabase = getSupabase(); } catch { return; }
     let userId = el.dataset.targetUserId ?? null;
     if (!userId) {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getCachedUser();
       if (!user) return;
       userId = user.id;
     }

@@ -120,6 +120,7 @@ const sgReportLabel = sgTree.socialgraph.report.button;
 
 <script>
   import { getSupabase } from '../lib/supabase';
+  import { getCachedUser } from '../lib/supabase';
   import { buildCommentTree, formatTimeAgo, sanitizeCommentBody, type CommentRow, type CommentNode } from '../lib/social';
   import { wireOverflowMenu } from '../lib/overflow-menu';
   import { tierForKarma } from '../lib/karma-frame';
@@ -257,7 +258,7 @@ const sgReportLabel = sgTree.socialgraph.report.button;
       return;
     }
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCachedUser();
     const currentUserId: string | null = user?.id ?? null;
 
     if (currentUserId) composer?.classList.remove('hidden');

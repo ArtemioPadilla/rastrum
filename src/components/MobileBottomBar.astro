@@ -206,6 +206,7 @@ const discoverActive  = isActiveSection(currentPath, 'community',     lang);
 -->
 <script>
   import { getSupabase } from '../lib/supabase';
+  import { getCachedUser } from '../lib/supabase';
 
   const authed = document.getElementById('mbb-authed');
   const anon   = document.getElementById('mbb-anon');
@@ -218,7 +219,7 @@ const discoverActive  = isActiveSection(currentPath, 'community',     lang);
 
   (async () => {
     try {
-      const { data: { session } } = await getSupabase().auth.getSession();
+      const session = { user: await getCachedUser() };
       paint(!!session);
       getSupabase().auth.onAuthStateChange((_e, s) => paint(!!s));
     } catch { /* env not set; leave anon visible */ }

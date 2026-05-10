@@ -227,6 +227,7 @@ const tabs = [
 
 <script>
   import { getSupabase } from '../lib/supabase';
+  import { getCachedUser } from '../lib/supabase';
   import { isSyncFilter, type SyncFilter } from '../lib/social';
   import { buildBugReportUrl } from '../lib/bug-report';
   import { parseImpactFilter, type ImpactFilter } from '../lib/impact-filter';
@@ -850,7 +851,7 @@ const tabs = [
     // Guard: check session first. getSession() reads from localStorage and
     // is synchronous-ish — it won't hang on a stale token the way getUser()
     // can when the refresh token is invalid and GoTrue retries internally.
-    const { data: { session } } = await supabase.auth.getSession();
+    const _sess = { user: await getCachedUser() }; const session = _sess;
     if (!session) {
       showExpiredSessionUI();
       return;
@@ -860,7 +861,7 @@ const tabs = [
     // stalled token-refresh doesn't leave the page spinning forever.
     let user: import('@supabase/supabase-js').User | null = null;
     try {
-      const userPromise = supabase.auth.getUser();
+      const userPromise = getCachedUser().then(u => ({ data: { user: u } }));
       const timeout = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('auth_timeout')), 8_000),
       );

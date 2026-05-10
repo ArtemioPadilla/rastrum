@@ -39,6 +39,7 @@ const ariaLabel = lang === 'es' ? 'Bandeja' : 'Inbox';
 
 <script>
   import { getSupabase } from '../lib/supabase';
+  import { getCachedUser } from '../lib/supabase';
 
   const POLL_MS = 60_000;
 
@@ -56,7 +57,7 @@ const ariaLabel = lang === 'es' ? 'Bandeja' : 'Inbox';
       // round-trip) — we only need to know "is there a logged-in user"
       // for showing the bell. JWT validation happens on the actual
       // notification-count query against RLS.
-      const { data: { session } } = await supabase.auth.getSession();
+      const session = { user: await getCachedUser() };
       const user = session?.user ?? null;
       if (!user) {
         if (wrapper) wrapper.classList.add('hidden');
