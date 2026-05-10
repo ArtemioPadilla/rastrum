@@ -11160,5 +11160,3 @@ $$;
 
 REVOKE EXECUTE ON FUNCTION public.is_first_in_sector(uuid) FROM PUBLIC;
 GRANT  EXECUTE ON FUNCTION public.is_first_in_sector(uuid) TO authenticated;
-
--- ci: trigger db-validate (no schema changes in this branch)
