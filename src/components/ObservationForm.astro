@@ -521,6 +521,38 @@ const photoPraiseJson = JSON.stringify(photoPraiseTree);
       </div>
     </div>
 
+    <!-- Life stage (#941) -->
+    <div data-identify-hide class="space-y-1">
+      <label for="obs-life-stage" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+        {isEs ? 'Etapa de vida' : 'Life stage'} <span class="text-zinc-400 text-xs">{isEs ? '(opcional)' : '(optional)'}</span>
+      </label>
+      <select id="obs-life-stage" name="life_stage"
+        class="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+        <option value="">{isEs ? 'Desconocida' : 'Unknown'}</option>
+        <option value="adult">{isEs ? 'Adulto' : 'Adult'}</option>
+        <option value="juvenile">{isEs ? 'Juvenil' : 'Juvenile'}</option>
+        <option value="subadult">{isEs ? 'Subadulto' : 'Subadult'}</option>
+        <option value="nestling">{isEs ? 'Polluelo / Cría' : 'Nestling / Chick'}</option>
+        <option value="egg">{isEs ? 'Huevo' : 'Egg'}</option>
+        <option value="larva">{isEs ? 'Larva' : 'Larva'}</option>
+        <option value="pupa">{isEs ? 'Pupa' : 'Pupa'}</option>
+      </select>
+    </div>
+
+    <!-- Vital status (#941) -->
+    <div data-identify-hide class="space-y-1">
+      <label for="obs-vital-status" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+        {isEs ? 'Estado vital' : 'Vital status'} <span class="text-zinc-400 text-xs">{isEs ? '(opcional)' : '(optional)'}</span>
+      </label>
+      <select id="obs-vital-status" name="vital_status"
+        class="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+        <option value="">{isEs ? 'Desconocido' : 'Unknown'}</option>
+        <option value="alive">{isEs ? 'Vivo' : 'Alive'}</option>
+        <option value="dead">{isEs ? 'Muerto' : 'Dead'}</option>
+        <option value="injured">{isEs ? 'Herido' : 'Injured'}</option>
+      </select>
+    </div>
+
     <!-- Notes -->
     <div data-identify-hide>
       <div class="flex items-end justify-between gap-2 flex-wrap mb-1">
@@ -2736,6 +2768,8 @@ const photoPraiseJson = JSON.stringify(photoPraiseTree);
       cameraStationId: (document.getElementById('camera-station-id') as HTMLInputElement | null)?.value || null,
       notes: ((form.elements.namedItem('notes') as HTMLTextAreaElement).value || null),
       isRangeExtension: confirmedRangeExtension,
+      lifeStage: ((document.getElementById('obs-life-stage') as HTMLSelectElement)?.value || null) as Observation['lifeStage'],
+      vitalStatus: ((document.getElementById('obs-vital-status') as HTMLSelectElement)?.value || null) as Observation['vitalStatus'],
       asDraft,
     };
   }
@@ -2975,7 +3009,7 @@ const photoPraiseJson = JSON.stringify(photoPraiseTree);
   (function wireFormAutoSave() {
     if (!form || form.dataset.mode === 'identify-only') return;
     const KEY = 'rastrum.formAutoSave.v1';
-    const fields = ['notes', 'habitat', 'weather', 'evidence_type'];
+    const fields = ['notes', 'habitat', 'weather', 'evidence_type', 'life_stage', 'vital_status'];
 
     type Saved = { ts: number; values: Record<string, string> };
 

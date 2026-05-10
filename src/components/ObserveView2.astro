@@ -246,6 +246,36 @@ const weathers = WEATHERS;
           </select>
           <p class="mt-1 text-xs text-zinc-400">{isEs ? "Anula tu licencia por defecto solo para esta observación" : "Overrides your default license for this observation only"}</p>
         </div>
+        <!-- Life stage (#941) -->
+        <div class="space-y-1">
+          <label for="obs2-life-stage" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            {isEs ? 'Etapa de vida' : 'Life stage'} <span class="text-zinc-400 text-xs">{isEs ? '(opcional)' : '(optional)'}</span>
+          </label>
+          <select id="obs2-life-stage"
+            class="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            <option value="">{isEs ? 'Desconocida' : 'Unknown'}</option>
+            <option value="adult">{isEs ? 'Adulto' : 'Adult'}</option>
+            <option value="juvenile">{isEs ? 'Juvenil' : 'Juvenile'}</option>
+            <option value="subadult">{isEs ? 'Subadulto' : 'Subadult'}</option>
+            <option value="nestling">{isEs ? 'Polluelo / Cría' : 'Nestling / Chick'}</option>
+            <option value="egg">{isEs ? 'Huevo' : 'Egg'}</option>
+            <option value="larva">{isEs ? 'Larva' : 'Larva'}</option>
+            <option value="pupa">{isEs ? 'Pupa' : 'Pupa'}</option>
+          </select>
+        </div>
+        <!-- Vital status (#941) -->
+        <div class="space-y-1">
+          <label for="obs2-vital-status" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            {isEs ? 'Estado vital' : 'Vital status'} <span class="text-zinc-400 text-xs">{isEs ? '(opcional)' : '(optional)'}</span>
+          </label>
+          <select id="obs2-vital-status"
+            class="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            <option value="">{isEs ? 'Desconocido' : 'Unknown'}</option>
+            <option value="alive">{isEs ? 'Vivo' : 'Alive'}</option>
+            <option value="dead">{isEs ? 'Muerto' : 'Dead'}</option>
+            <option value="injured">{isEs ? 'Herido' : 'Injured'}</option>
+          </select>
+        </div>
         <!-- Content sensitivity -->
         <div class="flex items-start gap-3">
           <input id="obs2-sensitive" type="checkbox" class="mt-1 rounded border-zinc-300 dark:border-zinc-700 text-emerald-600 focus:ring-emerald-500" />
@@ -1064,6 +1094,8 @@ postForm?.addEventListener('submit', async (e) => {
     const sensitiveVal = (document.getElementById('obs2-sensitive') as HTMLInputElement | null)?.checked ?? false;
     const licenseVal = (document.getElementById('obs2-license') as HTMLSelectElement | null)?.value || null;
     const licenseTyped = licenseVal as 'CC BY 4.0' | 'CC BY-NC 4.0' | 'CC0' | null;
+    const lifeStageVal = (document.getElementById('obs2-life-stage') as HTMLSelectElement | null)?.value || null;
+    const vitalStatusVal = (document.getElementById('obs2-vital-status') as HTMLSelectElement | null)?.value || null;
     const taxonInput = (document.getElementById('obs2-taxon-input') as HTMLInputElement | null)?.value.trim();
 
     // MediaRecorder-produced Blobs sometimes have an empty `type` (notably
@@ -1102,6 +1134,8 @@ postForm?.addEventListener('submit', async (e) => {
       notes,
       contentSensitive: sensitiveVal,
       license: licenseTyped,
+      lifeStage: (lifeStageVal || null) as import('../lib/observe').ObservationDraft['lifeStage'],
+      vitalStatus: (vitalStatusVal || null) as import('../lib/observe').ObservationDraft['vitalStatus'],
     });
 
     // Fire sync without blocking success UX. Use ifAvailable so we don't

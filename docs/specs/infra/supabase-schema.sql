@@ -11160,3 +11160,20 @@ $$;
 
 REVOKE EXECUTE ON FUNCTION public.is_first_in_sector(uuid) FROM PUBLIC;
 GRANT  EXECUTE ON FUNCTION public.is_first_in_sector(uuid) TO authenticated;
+
+-- ====================================================
+-- #941 — life_stage + vital_status fields on observations
+-- ====================================================
+
+ALTER TABLE public.observations
+  ADD COLUMN IF NOT EXISTS life_stage text
+    CHECK (life_stage IN ('adult','juvenile','subadult','nestling','egg','larva','pupa','unknown'));
+
+ALTER TABLE public.observations
+  ADD COLUMN IF NOT EXISTS vital_status text
+    CHECK (vital_status IN ('alive','dead','injured','unknown'));
+
+COMMENT ON COLUMN public.observations.life_stage IS
+  'Life stage of the observed individual. Optional. Darwin Core: lifeStage.';
+COMMENT ON COLUMN public.observations.vital_status IS
+  'Vital status of the observed individual. Optional. Darwin Core: occurrenceStatus extension.';
