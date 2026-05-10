@@ -65,7 +65,7 @@ jobs:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       PROJECT_REF: reppvlqejgoqvitturxp
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           # Need at least 2 commits so we can diff against the parent on push.
           fetch-depth: 2

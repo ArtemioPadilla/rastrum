@@ -65,7 +65,7 @@ jobs:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/rastrum_test
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Stub Supabase auth schema and helpers
         # The schema references auth.uid() and auth.users (Supabase managed).
