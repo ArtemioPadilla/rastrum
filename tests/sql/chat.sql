@@ -38,7 +38,7 @@ BEGIN
   ON CONFLICT (id) DO UPDATE SET username = EXCLUDED.username;
 
   INSERT INTO public.taxa (id, scientific_name, canonical_name, kingdom, family, obscure_level)
-  VALUES (taxon_id, 'Test sensitivus', 'Test sensitivus', 'Animalia', 'Testidae', 'obscured')
+  VALUES (taxon_id, 'Test sensitivus', 'Test sensitivus', 'Animalia', 'Testidae', '5km')
   ON CONFLICT (id) DO UPDATE SET obscure_level = EXCLUDED.obscure_level;
 
   INSERT INTO public.observations (
@@ -50,7 +50,7 @@ BEGIN
     obs_id, uid_owner, taxon_id, '2026-05-01T12:00:00Z',
     ST_SetSRID(ST_MakePoint(-99.13, 19.43), 4326),
     ST_SetSRID(ST_MakePoint(-99.10, 19.40), 4326),
-    'obscured', 'CDMX'
+    '5km', 'CDMX'
   )
   ON CONFLICT (id) DO NOTHING;
 END $$;
