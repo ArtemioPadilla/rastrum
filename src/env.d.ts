@@ -28,6 +28,12 @@ interface ImportMetaEnv {
    * unset (good enough for local dev).
    */
   readonly PUBLIC_BUILD_VERSION?: string;
+  /**
+   * Set to '1' to use the legacy SVG DAG pipeline graph instead of the
+   * new linear PipelineStepper (PR4 of #942). Remove after 30 days without
+   * incident reports.
+   */
+  readonly PUBLIC_OBSERVE_PIPELINE_GRAPH?: string;
 }
 
 interface ImportMeta {
