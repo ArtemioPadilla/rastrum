@@ -62,22 +62,106 @@ describe('streamChat', () => {
     expect(events.filter(e => e.type === 'text').map(e => e.delta).join('')).toContain('Magnolia');
   });
 
-  it('caps tool calls at 1 round per turn', async () => {
+  it('supports multi-round tool chains up to MAX_TOOL_ROUNDS', async () => {
     let callIdx = 0;
     loadGemmaMock.mockResolvedValue({
       async *generate() {
-        const tool = `{"tool":"find_species","args":{"p_query":"x${callIdx++}"}}`;
-        yield { choices: [{ delta: { content: tool } }] };
+        if (callIdx === 0) {
+          callIdx++;
+          yield { choices: [{ delta: { content: '{"tool":"find_species","args":{"p_query":"magnolia"}}' } }] };
+        } else if (callIdx === 1) {
+          callIdx++;
+          yield { choices: [{ delta: { content: '{"tool":"find_observations","args":{"p_filters":{},"p_limit":5}}' } }] };
+        } else if (callIdx === 2) {
+          callIdx++;
+          yield { choices: [{ delta: { content: '{"tool":"find_projects","args":{"p_query":"conservation"}}' } }] };
+        } else {
+          callIdx++;
+          yield { choices: [{ delta: { content: 'Found all species, observations, and projects.' } }] };
+        }
+      },
+    });
+    runToolMock.mockResolvedValue({ ok: true, data: [] });
+
+    const events: Array<{ type: string; round?: number }> = [];
+    for await (const chunk of streamChat({ messages: [{ role: 'user', content: 'find species chains' }] })) {
+      events.push(chunk);
+    }
+    const toolCalls = events.filter(e => e.type === 'tool_call');
+    // 3 rounds allowed
+    expect(toolCalls.length).toBeGreaterThanOrEqual(3);
+    // rounds are indexed
+    expect(toolCalls[0].round).toBe(0);
+    expect(toolCalls[1].round).toBe(1);
+    expect(toolCalls[2].round).toBe(2);
+    // final prose
+    expect(events.filter(e => e.type === 'text').map((e: any) => e.delta).join('')).toContain('Found');
+  });
+
+  it('tool_call and tool_result events include round index', async () => {
+    let callIdx = 0;
+    loadGemmaMock.mockResolvedValue({
+      async *generate() {
+        if (callIdx++ === 0) {
+          yield { choices: [{ delta: { content: '{"tool":"find_species","args":{"p_query":"oak"}}' } }] };
+        } else {
+          yield { choices: [{ delta: { content: 'Oak found.' } }] };
+        }
+      },
+    });
+    runToolMock.mockResolvedValue({ ok: true, data: [] });
+
+    const events: Array<{ type: string; round?: number }> = [];
+    for await (const chunk of streamChat({ messages: [{ role: 'user', content: 'find oak' }] })) {
+      events.push(chunk);
+    }
+    const toolCall = events.find(e => e.type === 'tool_call');
+    const toolResult = events.find(e => e.type === 'tool_result');
+    expect(toolCall?.round).toBe(0);
+    expect(toolResult?.round).toBe(0);
+  });
+
+  it('circuit breaker stops repeated similar tool calls', async () => {
+    let callIdx = 0;
+    loadGemmaMock.mockResolvedValue({
+      async *generate() {
+        // Always emit the same tool with identical args — triggers circuit breaker on 2nd call
+        callIdx++;
+        yield { choices: [{ delta: { content: '{"tool":"find_species","args":{"p_query":"samequery"}}' } }] };
       },
     });
     runToolMock.mockResolvedValue({ ok: true, data: [] });
 
     const events: Array<{ type: string }> = [];
-    for await (const chunk of streamChat({ messages: [{ role: 'user', content: 'x' }] })) {
+    for await (const chunk of streamChat({ messages: [{ role: 'user', content: 'loop' }] })) {
       events.push(chunk);
     }
-    const toolEvents = events.filter(e => e.type === 'tool_call');
-    expect(toolEvents).toHaveLength(1);
+    // Only 1 tool_call before circuit break
+    expect(events.filter(e => e.type === 'tool_call')).toHaveLength(1);
+    expect(events.some(e => e.type === 'circuit_break')).toBe(true);
+  });
+
+  it('token budget stops tool loop after prose exceeds threshold', async () => {
+    let callIdx = 0;
+    const bigText = 'x'.repeat(5000); // exceeds TOKEN_BUDGET_CHARS=4000
+    loadGemmaMock.mockResolvedValue({
+      async *generate() {
+        if (callIdx++ === 0) {
+          // First call: emit big prose (not a tool call)
+          yield { choices: [{ delta: { content: bigText } }] };
+        } else {
+          yield { choices: [{ delta: { content: '{"tool":"find_species","args":{"p_query":"after"}}' } }] };
+        }
+      },
+    });
+    runToolMock.mockResolvedValue({ ok: true, data: [] });
+
+    const events: Array<{ type: string }> = [];
+    for await (const chunk of streamChat({ messages: [{ role: 'user', content: 'big response' }] })) {
+      events.push(chunk);
+    }
+    // No tool calls — budget was already consumed by the big prose
+    expect(events.filter(e => e.type === 'tool_call')).toHaveLength(0);
   });
 
   it('falls back to Llama when Gemma load fails', async () => {

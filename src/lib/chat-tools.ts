@@ -24,6 +24,8 @@ export interface ToolDef {
   description: string;
   /** JSON schema-ish description for the system prompt. */
   args_schema: Record<string, string>;
+  /** Whether this tool performs write operations. Defaults to 'read'. */
+  scope?: 'read' | 'write';
   validateArgs(args: unknown): { ok: true; value: Record<string, unknown> } | { ok: false; reason: string };
   run(args: Record<string, unknown>): Promise<unknown>;
 }
@@ -144,6 +146,59 @@ export async function runTool(call: { name: string; args: unknown }): Promise<To
   if (!v.ok) return { error: 'invalid_args', detail: v.reason };
   try {
     const data = await def.run(v.value);
+    return { ok: true, data };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.startsWith('NETWORK:')) return { error: 'network', detail: msg.slice(8) };
+    return { error: 'offline', detail: msg };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Typed action contract (v1.2 — write operations with confirmation + undo)
+// ---------------------------------------------------------------------------
+
+export interface ChatAction {
+  id: string;
+  label: { en: string; es: string };
+  tool: string;
+  args: Record<string, unknown>;
+  requiresConfirmation: boolean;
+  undoable: boolean;
+}
+
+/**
+ * Build a ChatAction suggestion for updating an observation's notes.
+ * Only implemented write tool for v1.2 — scoped to low-risk text edits.
+ */
+export function buildUpdateNotesAction(observationId: string, newNotes: string): ChatAction {
+  return {
+    id: `update-notes-${observationId}`,
+    label: {
+      en: 'Apply — update notes',
+      es: 'Aplicar — actualizar notas',
+    },
+    tool: 'chat_update_observation_notes',
+    args: { observation_id: observationId, notes: newNotes },
+    requiresConfirmation: true,
+    undoable: true,
+  };
+}
+
+/**
+ * Execute a confirmed ChatAction. Only 'chat_update_observation_notes' is
+ * supported in v1.2; all others return an error.
+ */
+export async function executeAction(action: ChatAction): Promise<ToolResult> {
+  if (action.tool !== 'chat_update_observation_notes') {
+    return { error: 'unknown_tool' };
+  }
+  const { observation_id, notes } = action.args;
+  if (typeof observation_id !== 'string' || typeof notes !== 'string') {
+    return { error: 'invalid_args', detail: 'observation_id and notes must be strings' };
+  }
+  try {
+    const data = await rpcCall('chat_update_observation_notes', { p_observation_id: observation_id, p_notes: notes });
     return { ok: true, data };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
