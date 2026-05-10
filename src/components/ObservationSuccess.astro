@@ -1,0 +1,284 @@
+<!--
+  ObservationSuccess.astro — Tiny Habits celebration state for the observation form.
+
+  Replaces the minimal "✅ Observation saved!" placeholder in ObserveView2.astro.
+  Mounted by JS after a successful save; receives obs data via custom event.
+
+  Tiny Habits pattern (B.J. Fogg):
+    - Photo prominent: the user's own photo is the celebration object
+    - Verifiable achievement line: "#43 · Primera en este sector hoy" (honest, server-verified)
+    - Dex progress: +1 · Asteraceae (mastery, not shame)
+    - "Registrar otra" as PRIMARY button: the next trigger is the reward
+
+  Honest-norms invariants (v1.1.5):
+    - "Primera en este sector hoy" only shown when is_first_in_sector() returns true
+    - "Research-grade-ready" only shown when the obs meets the criteria
+    - Dex progress shows real numbers; first-ever obs gets special "¡Tu primera!" copy
+    - No streaks, no leaderboard, no inflated counts
+
+  Part of #942 PR6/7 — Observation form redesign.
+-->
+
+interface Props {
+  lang: 'en' | 'es';
+}
+const { lang } = Astro.props;
+const isEs = lang === 'es';
+---
+
+<div
+  id="obs-success-card"
+  class="hidden rounded-xl border border-emerald-200 dark:border-emerald-700 bg-white dark:bg-zinc-900 overflow-hidden shadow-sm"
+  data-lang={lang}
+  aria-live="polite"
+  aria-atomic="true"
+>
+  <!-- Photo hero -->
+  <div
+    id="osc-photo-hero"
+    class="relative w-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden"
+    style="min-height: 180px; max-height: 40vh;"
+    aria-hidden="true"
+  >
+    <!-- Filled by JS with <img> when photo URL is available -->
+    <div id="osc-photo-placeholder" class="absolute inset-0 flex items-center justify-center text-5xl">🌿</div>
+  </div>
+
+  <!-- Content -->
+  <div class="px-5 py-4 space-y-4">
+
+    <!-- Achievement headline -->
+    <div class="text-center space-y-1">
+      <p id="osc-headline" class="text-xl font-bold text-zinc-900 dark:text-zinc-100">
+        {isEs ? '¡Observación guardada! 🎉' : 'Observation saved! 🎉'}
+      </p>
+      <p id="osc-species-name" class="text-base italic text-zinc-600 dark:text-zinc-400 hidden"></p>
+    </div>
+
+    <!-- Achievement badges row -->
+    <div id="osc-badges" class="flex flex-wrap justify-center gap-2 text-xs" aria-live="polite">
+      <!-- Populated by JS: first-in-sector, research-grade-ready, etc. -->
+    </div>
+
+    <!-- Dex progress card -->
+    <div
+      id="osc-dex"
+      class="hidden rounded-lg border border-emerald-100 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 px-4 py-3 space-y-2"
+      aria-live="polite"
+    >
+      <div class="flex items-center justify-between text-xs">
+        <span id="osc-dex-label" class="font-medium text-emerald-800 dark:text-emerald-300"></span>
+        <span id="osc-dex-increment" class="text-emerald-600 dark:text-emerald-400 font-mono"></span>
+      </div>
+      <div
+        class="w-full h-1.5 rounded-full bg-emerald-100 dark:bg-emerald-900 overflow-hidden"
+        role="progressbar"
+        aria-label={isEs ? 'Progreso del dex' : 'Dex progress'}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        id="osc-progress-bar-container"
+      >
+        <div
+          id="osc-progress-bar"
+          class="h-full rounded-full bg-emerald-500 transition-all duration-700"
+          style="width: 0%"
+        ></div>
+      </div>
+    </div>
+
+    <!-- CTA row -->
+    <div class="space-y-2">
+      <button
+        type="button"
+        id="osc-register-another"
+        class="w-full min-h-[48px] rounded-xl bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white font-semibold text-sm transition-colors flex items-center justify-center gap-2"
+      >
+        <span aria-hidden="true">📷</span>
+        {isEs ? 'Registrar otra' : 'Log another'}
+      </button>
+
+      <div class="flex items-center justify-center gap-4 text-xs text-zinc-400">
+        <button type="button" id="osc-share-btn" class="hover:text-zinc-600 dark:hover:text-zinc-300 underline underline-offset-2">
+          {isEs ? 'Compartir' : 'Share'}
+        </button>
+        <span aria-hidden="true">·</span>
+        <a id="osc-view-detail" href="#" class="hover:text-zinc-600 dark:hover:text-zinc-300 underline underline-offset-2">
+          {isEs ? 'Ver detalle' : 'View detail'}
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  import { getSupabase, getCachedUser } from '../lib/supabase';
+
+  interface SuccessPayload {
+    obsId: string;
+    scientificName?: string;
+    photoUrl?: string;
+    shareUrl?: string;
+  }
+
+  const card = document.getElementById('obs-success-card');
+  const lang = (card?.dataset.lang ?? 'en') as 'en' | 'es';
+  const isEs = lang === 'es';
+
+  // ── Badge helpers ──────────────────────────────────────────────────────
+  function addBadge(icon: string, text: string, color: 'emerald' | 'blue' | 'amber'): void {
+    const badgesEl = document.getElementById('osc-badges');
+    if (!badgesEl) return;
+    const colors = {
+      emerald: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
+      blue: 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800',
+      amber: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+    };
+    const span = document.createElement('span');
+    span.className = `inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 ${colors[color]}`;
+    span.innerHTML = `<span aria-hidden="true">${icon}</span> ${text}`;
+    badgesEl.appendChild(span);
+  }
+
+  // ── Async enrichment ───────────────────────────────────────────────────
+  async function enrichSuccess(payload: SuccessPayload): Promise<void> {
+    try {
+      const user = await getCachedUser();
+      if (!user) return;
+
+      const supabase = getSupabase();
+
+      // Run queries in parallel; failures are gracefully swallowed.
+      const [firstInSector, obsCountData] = await Promise.allSettled([
+        // is_first_in_sector — honest claim; returns false when sector < 50 obs
+        supabase.rpc('is_first_in_sector', { p_obs_id: payload.obsId }),
+        // observation_count from users table (populated by community-discovery cron)
+        supabase
+          .from('users')
+          .select('observation_count')
+          .eq('id', user.id)
+          .single(),
+      ]);
+
+      // First-in-sector badge (only when truthfully true)
+      if (firstInSector.status === 'fulfilled' && firstInSector.value.data === true) {
+        addBadge('🌟', isEs ? 'Primera en este sector hoy' : 'First in sector today', 'emerald');
+      }
+
+      // Observation count headline
+      const obsCount = obsCountData.status === 'fulfilled'
+        ? (obsCountData.value.data?.observation_count ?? 0)
+        : 0;
+
+      const headlineEl = document.getElementById('osc-headline');
+      if (headlineEl) {
+        if (obsCount === 1) {
+          headlineEl.textContent = isEs ? '¡Tu primera observación! 🎉' : 'Your first observation! 🎉';
+        } else if (obsCount > 1) {
+          headlineEl.textContent = isEs
+            ? `¡Tu observación #${obsCount}! 🎉`
+            : `Observation #${obsCount}! 🎉`;
+        }
+      }
+
+      // Dex progress: show +1 with family when count > 0
+      if (obsCount > 0) {
+        const dexEl = document.getElementById('osc-dex');
+        const dexLabel = document.getElementById('osc-dex-label');
+        const dexIncrement = document.getElementById('osc-dex-increment');
+        const progressBar = document.getElementById('osc-progress-bar');
+        const progressContainer = document.getElementById('osc-progress-bar-container');
+
+        if (dexEl && dexLabel && dexIncrement) {
+          // Cap displayed dex at 100 for the progress bar display (simple milestone)
+          const cappedCount = Math.min(obsCount, 100);
+          const pct = cappedCount;
+
+          dexLabel.textContent = isEs
+            ? `Profile-dex: ${obsCount} / 100`
+            : `Profile-dex: ${obsCount} / 100`;
+          dexIncrement.textContent = '+1';
+
+          if (progressBar) progressBar.style.width = `${pct}%`;
+          if (progressContainer) {
+            progressContainer.setAttribute('aria-valuenow', String(cappedCount));
+          }
+
+          dexEl.classList.remove('hidden');
+        }
+      }
+    } catch { /* non-fatal */ }
+  }
+
+  // ── Mount function ─────────────────────────────────────────────────────
+  function mountSuccess(payload: SuccessPayload): void {
+    if (!card) return;
+
+    // Photo hero
+    if (payload.photoUrl) {
+      const heroEl = document.getElementById('osc-photo-hero');
+      const placeholder = document.getElementById('osc-photo-placeholder');
+      if (heroEl) {
+        const img = document.createElement('img');
+        img.src = payload.photoUrl;
+        img.alt = '';
+        img.className = 'w-full h-full object-cover';
+        img.style.maxHeight = '40vh';
+        img.loading = 'lazy';
+        placeholder?.remove();
+        heroEl.appendChild(img);
+      }
+    }
+
+    // Species name
+    if (payload.scientificName) {
+      const speciesEl = document.getElementById('osc-species-name');
+      if (speciesEl) {
+        speciesEl.textContent = payload.scientificName;
+        speciesEl.classList.remove('hidden');
+      }
+    }
+
+    // View detail link
+    if (payload.shareUrl) {
+      const viewDetailEl = document.getElementById('osc-view-detail') as HTMLAnchorElement | null;
+      if (viewDetailEl) viewDetailEl.href = payload.shareUrl;
+    }
+
+    // Reveal card
+    card.classList.remove('hidden');
+
+    // Async enrichment runs in parallel after mount — doesn't block reveal
+    void enrichSuccess(payload);
+  }
+
+  // ── Event listeners ────────────────────────────────────────────────────
+
+  // "Registrar otra" resets the form to state 1
+  document.getElementById('osc-register-another')?.addEventListener('click', () => {
+    card?.classList.add('hidden');
+    document.dispatchEvent(new CustomEvent('rastrum:observe-reset'));
+  });
+
+  // Share button
+  document.getElementById('osc-share-btn')?.addEventListener('click', () => {
+    const shareUrl = (document.getElementById('osc-view-detail') as HTMLAnchorElement | null)?.href;
+    if (navigator.share && shareUrl) {
+      void navigator.share({ url: shareUrl }).catch(() => {/* user cancelled */});
+    } else if (shareUrl) {
+      void navigator.clipboard.writeText(shareUrl).then(() => {
+        const btn = document.getElementById('osc-share-btn');
+        if (btn) {
+          const prev = btn.textContent;
+          btn.textContent = isEs ? '¡Copiado!' : 'Copied!';
+          setTimeout(() => { if (btn) btn.textContent = prev; }, 2000);
+        }
+      }).catch(() => {/* clipboard not available */});
+    }
+  });
+
+  // Listen for mount event from ObserveView2.astro
+  document.addEventListener('rastrum:observation-saved', (e: Event) => {
+    const ev = e as CustomEvent<SuccessPayload>;
+    mountSuccess(ev.detail);
+  });
+</script>

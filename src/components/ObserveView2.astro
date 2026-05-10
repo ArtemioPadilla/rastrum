@@ -2,6 +2,7 @@
 import DropZone from "./DropZone.astro";
 import PhotoCropModal from "./PhotoCropModal.astro";
 import PipelineGraph from "./PipelineGraph.astro";
+import ObservationSuccess from "./ObservationSuccess.astro";
 import MapPicker from "./MapPicker.astro";
 import TaxonAutocomplete from "./TaxonAutocomplete.astro";
 import ActiveObserversBanner from "./ActiveObserversBanner.astro";
@@ -335,17 +336,8 @@ const weathers = WEATHERS;
     </div>
   </div>
 
-  <!-- Success state -->
-  <div id="obs2-success" class="hidden rounded-xl border border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 p-6 text-center space-y-3">
-    <div class="text-4xl">✅</div>
-    <p class="font-semibold text-emerald-800 dark:text-emerald-300">
-      {isEs ? "¡Observación guardada!" : "Observation saved!"}
-    </p>
-    <div id="obs2-success-link"></div>
-    <button type="button" id="obs2-new-btn" class="text-sm text-emerald-700 dark:text-emerald-400 underline">
-      {isEs ? "Registrar otra" : "Log another"}
-    </button>
-  </div>
+  <!-- Success state — ObservationSuccess.astro (Tiny Habits celebration, #942 PR6) -->
+  <ObservationSuccess lang={lang} />
 </div>
 
 <!-- Photo crop/rotate modal (#787) — single global instance, triggered by DropZone edit buttons -->
@@ -1102,22 +1094,28 @@ postForm?.addEventListener('submit', async (e) => {
     pipelineState.status = 'done';
     await savePipelineState(pipelineState).catch(() => {});
 
-    // Show success — hide form, reveal card, toast
+    // Show success — dispatch event for ObservationSuccess.astro (#942 PR6)
     postForm?.classList.add('hidden');
-    successEl?.classList.remove('hidden');
-    const linkEl = document.getElementById('obs2-success-link');
-    if (linkEl && obs.id) {
-      const href = `/share/obs/?id=${obs.id}`;
-      linkEl.innerHTML = `<a href="${href}" class="text-emerald-700 dark:text-emerald-400 underline text-sm">${isEs ? 'Ver observaci\u00f3n' : 'View observation'}</a>`;
-    }
-    // Toast confirmation
+    const shareUrl = obs.id ? `/share/obs/?id=${obs.id}` : undefined;
+    // Get first photo URL for the hero (create object URL from pipeline file)
+    const firstPhoto = pipelineState.files.find(f => f.kind === 'photo');
+    const photoUrl = firstPhoto ? URL.createObjectURL(firstPhoto.file) : undefined;
+    document.dispatchEvent(new CustomEvent('rastrum:observation-saved', {
+      detail: {
+        obsId: obs.id,
+        scientificName: bestResult?.scientific_name ?? (taxonInput || undefined),
+        photoUrl,
+        shareUrl,
+      },
+    }));
+    // Brief toast for screen readers
     const toastEl = document.createElement('div');
     toastEl.setAttribute('role', 'status');
     toastEl.setAttribute('aria-live', 'polite');
-    toastEl.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-xl bg-emerald-700 text-white px-5 py-3 text-sm shadow-lg max-w-[340px] text-center pointer-events-none transition-opacity duration-300';
+    toastEl.className = 'sr-only';
     toastEl.textContent = isEs ? '¡Observación guardada!' : 'Observation saved!';
     document.body.appendChild(toastEl);
-    setTimeout(() => { toastEl.style.opacity = '0'; setTimeout(() => toastEl.remove(), 300); }, 3000);
+    setTimeout(() => toastEl.remove(), 3000);
   } catch (err) {
     if (errorEl) {
       errorEl.textContent = (err as Error).message ?? (isEs ? 'Error al guardar' : 'Error saving');
@@ -1127,14 +1125,13 @@ postForm?.addEventListener('submit', async (e) => {
   }
 });
 
-// ── New observation ────────────────────────────────────────────────────────
-document.getElementById('obs2-new-btn')?.addEventListener('click', () => {
+// ── New observation (triggered by ObservationSuccess "Registrar otra" via rastrum:observe-reset) ──
+function resetObserveForm(): void {
   location = null;
   bestResult = null;
   pipelineState = null;
   pipelineSection?.classList.add('hidden');
   postForm?.classList.add('hidden');
-  successEl?.classList.add('hidden');
   // Reset id card: hide the AI result section, clear taxon input, restore label
   document.getElementById('obs2-id-result')?.classList.add('hidden');
   const taxonReset = document.getElementById('obs2-taxon-input') as HTMLInputElement | null;
@@ -1142,7 +1139,10 @@ document.getElementById('obs2-new-btn')?.addEventListener('click', () => {
   const labelReset = document.getElementById('obs2-taxon-label');
   if (labelReset) labelReset.textContent = isEs ? 'Nombre científico (opcional)' : 'Scientific name (optional)';
   window.scrollTo(0, 0);
-});
+}
+// Legacy obs2-new-btn (identify-done path) + new event from ObservationSuccess
+document.getElementById('obs2-new-btn')?.addEventListener('click', resetObserveForm);
+document.addEventListener('rastrum:observe-reset', resetObserveForm);
 
 // ── Resume pipeline ────────────────────────────────────────────────────────
 async function resumePipeline(state: PipelineState) {
