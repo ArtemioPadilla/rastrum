@@ -62,10 +62,17 @@ export function formatActiveObserversBanner(
 }
 
 /**
- * Subscribe to realtime active-observers count for a country.
+ * Subscribe to realtime active-observers count updates for a country.
  *
- * Privacy: the broadcast payload contains only `{ count: number }` —
- * no user IDs or PII ever transit this channel.
+ * Uses Supabase Realtime postgres_changes on `observations` INSERT/UPDATE
+ * to detect new synced observations. On each change, re-fetches the
+ * aggregate count via `community_active_observers_today(p_country)` RPC.
+ *
+ * Privacy: no observer IDs or row data leave the server. The only data
+ * the client receives is the integer count from the RPC.
+ *
+ * Note: pg_notify is Postgres LISTEN/NOTIFY — not Supabase Realtime Broadcast.
+ * This implementation uses postgres_changes, the correct Realtime protocol.
  *
  * @returns unsubscribe function — call on component unmount
  */
@@ -76,10 +83,18 @@ export function subscribeToActiveObservers(
 ): () => void {
   const channel = supabase
     .channel(`active-observers:${country}`)
-    .on('broadcast', { event: 'count' }, (payload: { payload?: { count?: number } }) => {
-      const count = payload?.payload?.count;
-      if (typeof count === 'number') onCount(count);
-    })
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'observations', filter: 'sync_status=eq.synced' },
+      async () => {
+        // Re-fetch aggregate — never expose row data to client
+        try {
+          const { data } = await supabase
+            .rpc('community_active_observers_today', { p_country: country });
+          if (typeof data === 'number') onCount(data);
+        } catch { /* silent — banner keeps last known count */ }
+      },
+    )
     .subscribe();
 
   return () => { channel.unsubscribe(); };

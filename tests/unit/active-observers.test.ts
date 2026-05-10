@@ -98,22 +98,27 @@ describe('subscribeToActiveObservers', () => {
     expect(mockSupabase.channel).toHaveBeenCalledWith('active-observers:MX');
   });
 
-  it('calls onCount callback when broadcast received', () => {
-    const captured: { handler: ((payload: any) => void) | null } = { handler: null };
+  it('calls onCount callback when postgres_changes fires and RPC returns count', async () => {
+    let changeHandler: (() => Promise<void>) | null = null;
     const mockChannel = {
       on: vi.fn().mockImplementation((_type: any, _opts: any, handler: any) => {
-        captured.handler = handler;
+        changeHandler = handler;
         return mockChannel;
       }),
       subscribe: vi.fn().mockReturnThis(),
       unsubscribe: vi.fn(),
     };
-    const mockSupabase = { channel: vi.fn().mockReturnValue(mockChannel) };
+    const mockRpc = vi.fn().mockResolvedValue({ data: 7 });
+    const mockSupabase = {
+      channel: vi.fn().mockReturnValue(mockChannel),
+      rpc: mockRpc,
+    };
     const onCount = vi.fn();
 
     subscribeToActiveObservers(mockSupabase as any, 'MX', onCount);
-    captured.handler?.({ payload: { count: 7 } });
+    if (changeHandler) await (changeHandler as () => Promise<void>)();
 
+    expect(mockRpc).toHaveBeenCalledWith('community_active_observers_today', { p_country: 'MX' });
     expect(onCount).toHaveBeenCalledWith(7);
   });
 
