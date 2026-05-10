@@ -60,6 +60,12 @@ interface KairosRow {
   last_sent_at: string | null;
 }
 
+interface Day3NudgeUser {
+  id: string;
+  created_at: string;
+  observation_count: number;
+}
+
 interface PushSub {
   id: string;
   user_id: string;
@@ -77,6 +83,20 @@ const FALLBACK_LAT = 19.4326;
 const FALLBACK_LNG = -99.1332;
 const FALLBACK_TZ  = 'America/Mexico_City';
 const AFTER_RAIN_THRESHOLD_MM = 5;
+
+// ── Day-3 nudge push payloads ────────────────────────────────────────
+function buildDay3Nudge(lang: 'en' | 'es', weatherContext?: string | null): { title: string; body: string } {
+  const weatherLine = weatherContext ? `\n${weatherContext}` : '';
+  return lang === 'es'
+    ? {
+        title: '¡Sal a explorar! 🌿',
+        body: `Ya llevas 3 días en Rastrum y aún no has registrado tu primera observación.${weatherLine} ¿Qué hay afuera hoy?`,
+      }
+    : {
+        title: 'Go explore! 🌿',
+        body: `You've been on Rastrum for 3 days but haven't logged your first observation yet.${weatherLine} What's out there today?`,
+      };
+}
 
 // ── Golden-hour pick ─────────────────────────────────────────────────
 
@@ -152,6 +172,100 @@ serve(async (req) => {
   }
 
   const db = createClient(url, role);
+  const now = new Date();
+
+  // ── Day-3 nudge: fire for users who signed up 3 days ago with 0 observations ──
+  let day3Sent = 0;
+  let day3Candidates = 0;
+  {
+    const since4d = new Date(now.getTime() - 4 * 24 * 60 * 60 * 1_000).toISOString();
+    const since3d = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1_000).toISOString();
+
+    const { data: day3Users } = await db
+      .from('users')
+      .select('id, created_at, observation_count')
+      .gte('created_at', since4d)
+      .lte('created_at', since3d)
+      .eq('observation_count', 0)
+      .returns<Day3NudgeUser[]>();
+
+    if (day3Users?.length) {
+      const day3UserIds = day3Users.map(u => u.id);
+
+      // Ensure we haven't already sent a day3_nudge today (dedupe via kairos_subscriptions).
+      const { data: alreadySent } = await db
+        .from('kairos_subscriptions')
+        .select('user_id, last_sent_at')
+        .eq('kind', 'day3_nudge')
+        .in('user_id', day3UserIds)
+        .returns<{ user_id: string; last_sent_at: string | null }[]>();
+
+      const sentToday = new Set<string>();
+      const todayDateStr = now.toLocaleDateString('en-CA', { timeZone: 'UTC' });
+      for (const row of alreadySent ?? []) {
+        if (!row.last_sent_at) continue;
+        const sentDate = new Date(row.last_sent_at).toLocaleDateString('en-CA', { timeZone: 'UTC' });
+        if (sentDate === todayDateStr) sentToday.add(row.user_id);
+      }
+
+      const { data: day3Pushes } = await db
+        .from('push_subscriptions')
+        .select('id, user_id, endpoint, tz')
+        .in('user_id', day3UserIds)
+        .returns<PushSub[]>();
+
+      const day3PushesByUser = new Map<string, PushSub[]>();
+      for (const p of day3Pushes ?? []) {
+        const list = day3PushesByUser.get(p.user_id) ?? [];
+        list.push(p);
+        day3PushesByUser.set(p.user_id, list);
+      }
+
+      const privateKey = await importVapidPrivateKey(vapidPriv, vapidPub);
+
+      for (const user of day3Users) {
+        if (sentToday.has(user.id)) continue;
+        const pushes = day3PushesByUser.get(user.id);
+        if (!pushes?.length) continue;
+
+        day3Candidates++;
+
+        // Enrich with golden-hour / weather context if available.
+        const tz = pushes[0].tz || FALLBACK_TZ;
+        let weatherContext: string | null = null;
+        try {
+          const sunset = computeSunset(FALLBACK_LAT, FALLBACK_LNG, now);
+          if (sunset && inGoldenHourPromptWindow(sunset, now)) {
+            weatherContext = tz.startsWith('America') ? 'La luz dorada está perfecta ahora. ☀️' : 'The golden hour light is perfect right now. ☀️';
+          }
+        } catch { /* weather enrichment is best-effort */ }
+
+        const lang = tz.startsWith('America') ? 'es' : 'en';
+        const payload = buildDay3Nudge(lang, weatherContext);
+
+        let anyOk = false;
+        for (const p of pushes) {
+          try {
+            const r = await sendPushNoPayload(p.endpoint, privateKey, vapidPub, vapidSubject);
+            if (r.ok) { day3Sent++; anyOk = true; }
+            else if (r.status === 404 || r.status === 410) {
+              await db.from('push_subscriptions').delete().eq('id', p.id);
+            }
+          } catch { /* best effort */ }
+        }
+        void payload; // payload fields available for future rich-push implementation
+
+        if (anyOk) {
+          const iso = now.toISOString();
+          // Upsert a day3_nudge subscription record so we track last_sent_at.
+          await db.from('kairos_subscriptions').upsert(
+            { user_id: user.id, kind: 'day3_nudge', opt_in: true, last_sent_at: iso, updated_at: iso },
+            { onConflict: 'user_id,kind' },
+          );
+        }
+      }
+    }
+  }
 
   const { data: subs, error: subsErr } = await db
     .from('kairos_subscriptions')
@@ -198,7 +312,6 @@ serve(async (req) => {
   });
 
   const privateKey = await importVapidPrivateKey(vapidPriv, vapidPub);
-  const now = new Date();
 
   // Group by user_id: after_rain has priority over golden_hour in 1/day cap.
   const subsByUser = new Map<string, KairosRow[]>();
@@ -285,7 +398,7 @@ serve(async (req) => {
     }
   }
 
-  return new Response(JSON.stringify({ sent, candidates, errored, total: subs.length }), {
+  return new Response(JSON.stringify({ sent, candidates, errored, total: subs.length, day3_sent: day3Sent, day3_candidates: day3Candidates }), {
     headers: { 'content-type': 'application/json' },
   });
 });
