@@ -60,7 +60,7 @@ const isEs = lang === 'es';
 </section>
 
 <script>
-  import { getSupabase } from '../../lib/supabase';
+  import { getCachedSession, getSupabase } from '../../lib/supabase';
   import { escapeHtml } from '../../lib/escape';
   const isEs = document.documentElement.lang === 'es';
   const shell = document.getElementById('ea-shell');
@@ -132,7 +132,7 @@ const isEs = lang === 'es';
 
   async function callAdmin(action: string, payload: Record<string, unknown>): Promise<void> {
     const sb = getSupabase();
-    const { data: { session } } = await sb.auth.getSession();
+    const session = await getCachedSession();
     if (!session) throw new Error('Not authenticated');
     const url = import.meta.env.PUBLIC_SUPABASE_URL || (sb as unknown as { supabaseUrl: string }).supabaseUrl;
     const res = await fetch(`${url}/functions/v1/admin`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` }, body: JSON.stringify({ action, payload, reason: 'Console action' }) });

@@ -135,10 +135,8 @@ const v = (tr as unknown as { validation: Record<string, string> }).validation;
       }
       try {
         const supabase = getSupabase();
-        const [{ data: rarity }, { data: { user } }] = await Promise.all([
-          supabase.from('taxon_rarity').select('bucket, multiplier').eq('taxon_id', taxonId).maybeSingle(),
-          supabase.auth.getUser(),
-        ]);
+        const user = await getCachedUser();
+        const { data: rarity } = await supabase.from('taxon_rarity').select('bucket, multiplier').eq('taxon_id', taxonId).maybeSingle();
         let inGrace = false;
         let graceDaysLeft: number | undefined;
         let expertiseLevel: string | null = null;

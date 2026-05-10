@@ -99,7 +99,7 @@ const loadingText = (tr.console as unknown as Record<string, string>).loading
 </section>
 
 <script>
-  import { getSupabase } from '../../lib/supabase';
+  import { getCachedSession, getSupabase } from '../../lib/supabase';
   import { getUserRoles } from '../../lib/user-roles';
 
   type UsageRow = {
@@ -214,7 +214,7 @@ const loadingText = (tr.console as unknown as Record<string, string>).loading
         return;
       }
 
-      const { data: { session } } = await supabase.auth.getSession();
+      const session = await getCachedSession();
       if (!session?.user) { hide('pnq-loading'); show('pnq-not-auth'); return; }
 
       const myRoles = await getUserRoles(session.user.id);

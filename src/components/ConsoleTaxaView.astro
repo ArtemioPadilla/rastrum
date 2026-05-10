@@ -129,7 +129,7 @@ const tr = t(lang);
 </section>
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedSession, getSupabase } from '../lib/supabase';
   import { getUserRoles } from '../lib/user-roles';
   import { adminClient } from '../lib/admin-client';
 
@@ -171,7 +171,7 @@ const tr = t(lang);
   const supabase = getSupabase();
 
   async function init() {
-    const { data: { session } } = await supabase.auth.getSession();
+    const session = await getCachedSession();
     if (!session?.user) { show('taxa-not-auth'); return; }
     const myRoles = await getUserRoles(session.user.id);
     if (!myRoles.has('admin')) { show('taxa-not-auth'); return; }

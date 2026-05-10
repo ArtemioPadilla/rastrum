@@ -129,7 +129,7 @@ const tr = t(lang);
 </ConsoleSlideOver>
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedSession, getSupabase } from '../lib/supabase';
   import { getUserRoles } from '../lib/user-roles';
   import { adminClient, AdminClientError } from '../lib/admin-client';
   import { readFilterState, writeFilterState } from '../lib/console-filter-state';
@@ -162,7 +162,7 @@ const tr = t(lang);
   const supabase = getSupabase();
 
   async function init() {
-    const { data: { session } } = await supabase.auth.getSession();
+    const session = await getCachedSession();
     if (!session?.user) { show('bans-not-auth'); return; }
     const myRoles = await getUserRoles(session.user.id);
     if (!myRoles.has('moderator') && !myRoles.has('admin')) { show('bans-not-auth'); return; }
@@ -330,7 +330,7 @@ const tr = t(lang);
 
       const durationHours = durationStr ? parseInt(durationStr, 10) : null;
 
-      const { data: { session } } = await supabase.auth.getSession();
+      const session = await getCachedSession();
       if (!session?.access_token) {
         document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id, ok: false, error: 'Session expired.' } }));
         return;
@@ -349,7 +349,7 @@ const tr = t(lang);
 
     if (id !== 'console-slideover-bans') return;
 
-    const { data: { session } } = await supabase.auth.getSession();
+    const session = await getCachedSession();
     if (!session?.access_token) {
       document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id, ok: false, error: 'Session expired.' } }));
       return;

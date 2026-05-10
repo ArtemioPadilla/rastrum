@@ -100,7 +100,7 @@ const fCols = (forensicsNs?.columns as Record<string, string>) ?? {};
 </section>
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedSession, getSupabase } from '../lib/supabase';
   import { getUserRoles } from '../lib/user-roles';
   import { adminClient, AdminClientError, type AdminAuditRow, type AuditExportResult } from '../lib/admin-client';
   import { readFilterState, writeFilterState } from '../lib/console-filter-state';
@@ -280,7 +280,7 @@ const fCols = (forensicsNs?.columns as Record<string, string>) ?? {};
       show('forensics-not-auth');
       return;
     }
-    const { data: { session } } = await supabase.auth.getSession();
+    const session = await getCachedSession();
     if (!session) { show('forensics-not-auth'); return; }
     const myRoles = await getUserRoles(session.user.id);
     if (!myRoles.has('admin')) { show('forensics-not-auth'); return; }

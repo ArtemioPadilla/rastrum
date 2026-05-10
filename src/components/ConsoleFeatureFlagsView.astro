@@ -23,7 +23,7 @@ const tr = t(lang);
 </section>
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedSession, getSupabase } from '../lib/supabase';
   import { getUserRoles } from '../lib/user-roles';
   import { adminClient } from '../lib/admin-client';
 
@@ -49,7 +49,7 @@ const tr = t(lang);
   const supabase = getSupabase();
 
   async function init() {
-    const { data: { session: s } } = await supabase.auth.getSession();
+    const session = await getCachedSession();
     if (!s?.user) { show('features-not-auth'); return; }
     session = s;
     const myRoles = await getUserRoles(s.user.id);

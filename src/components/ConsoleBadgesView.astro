@@ -153,7 +153,7 @@ const tr = t(lang);
 </ConsoleSlideOver>
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedSession, getSupabase } from '../lib/supabase';
   import { getUserRoles } from '../lib/user-roles';
   import { adminClient } from '../lib/admin-client';
 
@@ -200,7 +200,7 @@ const tr = t(lang);
   const supabase = getSupabase();
 
   async function init() {
-    const { data: { session } } = await supabase.auth.getSession();
+    const session = await getCachedSession();
     if (!session?.user) { show('badges-not-auth'); return; }
     const myRoles = await getUserRoles(session.user.id);
     if (!myRoles.has('admin')) { show('badges-not-auth'); return; }

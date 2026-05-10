@@ -119,7 +119,7 @@ const c = tr.console as unknown as Record<string, string>;
 />
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedSession, getSupabase } from '../lib/supabase';
   import { adminClient, AdminClientError } from '../lib/admin-client';
 
   type AppealRow = {
@@ -248,7 +248,7 @@ const c = tr.console as unknown as Record<string, string>;
       document.getElementById('appeals-not-auth')?.classList.remove('hidden');
       return;
     }
-    const { data: { session } } = await supabase.auth.getSession();
+    const session = await getCachedSession();
     if (!session) {
       document.getElementById('appeals-not-auth')?.classList.remove('hidden');
       return;

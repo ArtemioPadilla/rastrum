@@ -144,7 +144,7 @@ for (const k of METRIC_KEYS) metricLabelMap[k] = metricLabels[k] ?? k;
 </section>
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedSession, getSupabase } from '../lib/supabase';
   import { getUserRoles } from '../lib/user-roles';
   import { adminClient, AdminClientError } from '../lib/admin-client';
   import {
@@ -314,7 +314,7 @@ for (const k of METRIC_KEYS) metricLabelMap[k] = metricLabels[k] ?? k;
       show('health-not-auth');
       return;
     }
-    const { data: { session } } = await supabase.auth.getSession();
+    const session = await getCachedSession();
     if (!session) { hide('health-skeleton'); show('health-not-auth'); return; }
     const myRoles = await getUserRoles(session.user.id);
     if (!myRoles.has('admin')) { hide('health-skeleton'); show('health-not-auth'); return; }
