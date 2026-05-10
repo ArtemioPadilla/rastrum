@@ -8,7 +8,8 @@
  * prose. We detect (b) by looking for a `{"tool":` substring at the start
  * of accumulated output. Anything else is treated as prose.
  */
-import { runTool, toolDefinitions } from './chat-tools';
+import { runTool, toolDefinitions, buildUpdateNotesAction } from './chat-tools';
+import type { ChatAction } from './chat-tools';
 // NOTE: local-ai is dynamically imported below — a static import would
 // drag the ~5.8 MB WebLLM bundle into the initial load graph. The
 // static-import guard test enforces this.
@@ -17,9 +18,11 @@ export type ChatMessage = { role: 'system' | 'user' | 'assistant' | 'tool'; cont
 
 export type StreamEvent =
   | { type: 'text'; delta: string }
-  | { type: 'tool_call'; tool: string; args: unknown }
-  | { type: 'tool_result'; tool: string; result: unknown }
+  | { type: 'tool_call'; tool: string; args: unknown; round: number }
+  | { type: 'tool_result'; tool: string; result: unknown; round: number }
   | { type: 'engine_fallback'; engine: 'llama'; reason: string }
+  | { type: 'circuit_break'; reason: string }
+  | { type: 'action_suggestion'; action: ChatAction }
   | { type: 'error'; message: string };
 
 export interface StreamChatInput {
@@ -29,7 +32,9 @@ export interface StreamChatInput {
 }
 
 const TOOL_RE = /^\s*\{\s*"tool"\s*:/;
-const MAX_TOOL_ROUNDS = 1;
+const ACTION_SUGGEST_RE = /^\s*\{\s*"suggest_action"\s*:/;
+const MAX_TOOL_ROUNDS = 3;
+const TOKEN_BUDGET_CHARS = 4000;
 const SYSTEM_TOOLS_PROMPT = `You may emit a JSON tool call to look up data. Tools available:\n%TOOLS%\nWhen calling a tool, respond with ONLY a JSON object: {"tool": "<name>", "args": { ... }}. Otherwise reply in prose. Use tools sparingly.`;
 
 function withToolPrompt(messages: ChatMessage[]): ChatMessage[] {
@@ -89,8 +94,26 @@ async function* runOnce(
   }
 }
 
+/** Levenshtein distance between two strings (capped at maxDist for speed). */
+function levenshtein(a: string, b: string, maxDist = 100): number {
+  if (a === b) return 0;
+  if (a.length === 0) return Math.min(b.length, maxDist);
+  if (b.length === 0) return Math.min(a.length, maxDist);
+  const row = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = i;
+    for (let j = 1; j <= b.length; j++) {
+      const val = a[i - 1] === b[j - 1] ? row[j - 1] : Math.min(row[j - 1], row[j], prev) + 1;
+      row[j - 1] = prev;
+      prev = val;
+    }
+    row[b.length] = prev;
+  }
+  return row[b.length];
+}
+
 /**
- * Streaming chat with a 1-round tool-call loop. Yields:
+ * Streaming chat with a multi-round tool-call loop. Yields:
  *   { type: 'text', delta }            — model text deltas
  *   { type: 'tool_call', tool, args }  — when the model emitted a tool
  *   { type: 'tool_result', tool, … }   — after tool dispatch
@@ -100,6 +123,9 @@ async function* runOnce(
 export async function* streamChat(input: StreamChatInput): AsyncIterable<StreamEvent> {
   const messages = withToolPrompt(input.messages);
   let toolRounds = 0;
+  let accumulatedTextChars = 0;
+  // Circuit breaker: track (toolName, stringifiedArgs) pairs called this turn.
+  const calledTools: Array<{ tool: string; argsStr: string }> = [];
 
   while (true) {
     let accumulated = '';
@@ -109,16 +135,18 @@ export async function* streamChat(input: StreamChatInput): AsyncIterable<StreamE
     for await (const ev of runOnce(messages, input.prefer)) {
       if (ev.type === 'text') {
         accumulated += ev.delta;
-        if (toolCallText === null && accumulated.length >= 16 && !TOOL_RE.test(accumulated)) {
+        if (toolCallText === null && accumulated.length >= 16 && !TOOL_RE.test(accumulated) && !ACTION_SUGGEST_RE.test(accumulated)) {
           // Definitely prose — flush buffered + this delta.
           for (const b of buffered) yield b;
           buffered.length = 0;
           yield ev;
+          accumulatedTextChars += ev.delta.length;
         } else if (toolCallText === null) {
           // Still ambiguous — buffer.
           buffered.push(ev);
         }
         if (TOOL_RE.test(accumulated)) toolCallText = accumulated;
+        if (ACTION_SUGGEST_RE.test(accumulated)) toolCallText = accumulated;
       } else {
         for (const b of buffered) yield b;
         buffered.length = 0;
@@ -126,16 +154,54 @@ export async function* streamChat(input: StreamChatInput): AsyncIterable<StreamE
       }
     }
 
+    // Per-turn token budget check.
+    if (accumulatedTextChars >= TOKEN_BUDGET_CHARS) {
+      for (const b of buffered) yield b;
+      return;
+    }
+
     if (toolCallText && toolRounds < MAX_TOOL_ROUNDS) {
-      let parsed: { tool?: string; args?: unknown } | null = null;
+      let parsed: { tool?: string; args?: unknown; suggest_action?: string; observation_id?: string; notes?: string } | null = null;
       try { parsed = JSON.parse(toolCallText.trim()); } catch { /* fallthrough */ }
-      if (!parsed?.tool) {
+      if (!parsed) {
         for (const b of buffered) yield b;
         return;
       }
-      yield { type: 'tool_call', tool: parsed.tool, args: parsed.args ?? {} };
+
+      // Handle action suggestion (write op requiring confirmation)
+      if (parsed.suggest_action === 'update_notes' && parsed.observation_id && parsed.notes) {
+        const action = buildUpdateNotesAction(parsed.observation_id, parsed.notes);
+        yield { type: 'action_suggestion', action };
+        for (const b of buffered) yield b;
+        return;
+      }
+
+      if (!parsed.tool) {
+        for (const b of buffered) yield b;
+        return;
+      }
+
+      // Circuit breaker: check if this tool+args combo is suspiciously similar
+      // to a previous call in this turn.
+      const argsStr = JSON.stringify(parsed.args ?? {});
+      const isDuplicate = calledTools.some(prev => {
+        if (prev.tool !== parsed!.tool) return false;
+        const maxLen = Math.max(prev.argsStr.length, argsStr.length);
+        if (maxLen === 0) return true;
+        const dist = levenshtein(prev.argsStr, argsStr, Math.ceil(maxLen * 0.1) + 1);
+        return dist < maxLen * 0.1;
+      });
+
+      if (isDuplicate) {
+        yield { type: 'circuit_break', reason: `Tool '${parsed.tool}' called with similar args in same turn` };
+        for (const b of buffered) yield b;
+        return;
+      }
+
+      calledTools.push({ tool: parsed.tool, argsStr });
+      yield { type: 'tool_call', tool: parsed.tool, args: parsed.args ?? {}, round: toolRounds };
       const result = await runTool({ name: parsed.tool, args: parsed.args ?? {} });
-      yield { type: 'tool_result', tool: parsed.tool, result };
+      yield { type: 'tool_result', tool: parsed.tool, result, round: toolRounds };
       toolRounds++;
       messages.push({ role: 'assistant', content: toolCallText });
       messages.push({ role: 'tool', content: JSON.stringify(result) });
