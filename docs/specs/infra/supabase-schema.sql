@@ -11100,3 +11100,61 @@ BEGIN
 END;
 $$;
 GRANT EXECUTE ON FUNCTION public.falta_dex_summary() TO authenticated;
+
+-- ====================================================
+-- #942 PR1 — Observation form redesign: schema deltas
+-- Observation defaults memory + honest first-in-sector claim
+-- ====================================================
+
+-- Defaults memory: persists last habitat/weather/license per user (jsonb)
+ALTER TABLE public.users
+  ADD COLUMN IF NOT EXISTS last_observation_defaults jsonb NOT NULL DEFAULT '{}'::jsonb;
+
+COMMENT ON COLUMN public.users.last_observation_defaults IS
+  'Remembers last-used observation defaults (habitat, weather, license) per user.
+   Pre-filled on next form open. Privacy: read only by the owning user (RLS).';
+
+-- is_first_in_sector — honest claim helper for the success state celebration
+-- Returns true only when:
+--   1. The sector (1 km radius) has >= 50 historical observations (honest-norms n>=50 invariant, v1.1.5)
+--   2. The supplied observation is the first one in that sector on its own calendar day
+-- Returns false in all other cases (including sectors with < 50 historical obs).
+CREATE OR REPLACE FUNCTION public.is_first_in_sector(p_obs_id uuid)
+RETURNS boolean
+LANGUAGE sql STABLE
+SECURITY DEFINER
+SET search_path = public, extensions, pg_temp
+AS $$
+  WITH this_obs AS (
+    SELECT location, observed_at
+    FROM public.observations
+    WHERE id = p_obs_id
+      AND location IS NOT NULL
+  )
+  SELECT
+    CASE
+      -- Honest-norms invariant v1.1.5: only claim "first" when the sector
+      -- has enough historical data (n>=50). Below that threshold we simply
+      -- return false — we cannot make a meaningful claim.
+      WHEN (
+        SELECT count(*)
+        FROM public.observations o, this_obs t
+        WHERE o.location IS NOT NULL
+          AND ST_DWithin(o.location::geography, t.location::geography, 1000)
+          AND o.id != p_obs_id
+      ) < 50 THEN false
+      -- Sector has enough history: check if this obs is truly the first today.
+      ELSE NOT EXISTS (
+        SELECT 1
+        FROM public.observations o, this_obs t
+        WHERE o.location IS NOT NULL
+          AND ST_DWithin(o.location::geography, t.location::geography, 1000)
+          AND date_trunc('day', o.observed_at AT TIME ZONE 'UTC')
+            = date_trunc('day', t.observed_at AT TIME ZONE 'UTC')
+          AND o.id != p_obs_id
+      )
+    END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.is_first_in_sector(uuid) FROM PUBLIC;
+GRANT  EXECUTE ON FUNCTION public.is_first_in_sector(uuid) TO authenticated;
