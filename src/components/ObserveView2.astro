@@ -2,6 +2,7 @@
 import DropZone from "./DropZone.astro";
 import PhotoCropModal from "./PhotoCropModal.astro";
 import PipelineGraph from "./PipelineGraph.astro";
+import PipelineStepper from "./PipelineStepper.astro";
 import MapPicker from "./MapPicker.astro";
 import TaxonAutocomplete from "./TaxonAutocomplete.astro";
 import ActiveObserversBanner from "./ActiveObserversBanner.astro";
@@ -14,6 +15,9 @@ interface Props { lang: "en" | "es"; }
 const { lang } = Astro.props;
 const isEs = lang === "es";
 const tr = t(lang);
+// Feature flag: set PUBLIC_OBSERVE_PIPELINE_GRAPH=1 to keep the legacy SVG DAG.
+// Remove after 30 days without incident reports (#942).
+const useLegacyGraph = import.meta.env.PUBLIC_OBSERVE_PIPELINE_GRAPH === '1';
 
 const observeStr = tr.observe as Record<string, string>;
 const habitats = HABITATS;
@@ -101,7 +105,7 @@ const weathers = WEATHERS;
       </h2>
       <span id="obs2-pipeline-status" class="text-xs text-zinc-500 dark:text-zinc-400"></span>
     </div>
-    <PipelineGraph lang={lang} />
+    {useLegacyGraph ? <PipelineGraph lang={lang} /> : <PipelineStepper lang={lang} />}
     <!-- Escape hatch: shown after 15s if pipeline is still running (#pipeline-stuck) -->
     <div id="obs2-pipeline-escape" class="hidden mt-3 flex items-center gap-3">
       <button
