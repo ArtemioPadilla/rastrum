@@ -10876,6 +10876,9 @@ AS $$
     JOIN public.identifications i ON i.observation_id = o.id AND i.is_primary
     WHERE o.sync_status = 'synced'
       AND o.location IS NOT NULL
+      AND o.establishment_means = 'wild'  -- #942: exclude cultivated/captive/domestic species
+      -- Valid values (CHECK constraint): 'wild'|'cultivated'|'captive'|'uncertain'
+      -- Darwin Core establishmentMeans. All pre-2026 rows backfilled to 'wild' (schema:3078).
       AND ST_DWithin(
             o.location::geography,
             ST_SetSRID(ST_MakePoint(p_lng, p_lat), 4326)::geography,
@@ -10902,12 +10905,7 @@ AS $$
     t.kingdom,
     t.class,
     n.nearby_count,
-    (SELECT mf.url FROM public.media_files mf
-       JOIN public.observations mo ON mo.id = mf.observation_id
-       JOIN public.identifications mi ON mi.observation_id = mo.id
-         AND mi.taxon_id = t.id AND mi.is_primary
-       WHERE mf.is_primary AND mo.sync_status = 'synced'
-       LIMIT 1) AS photo_url
+    NULL::text AS photo_url  -- #942: no stranger thumbnails (privacy + framing)
   FROM nearby n
   JOIN public.taxa t ON t.id = n.taxon_id
   ORDER BY n.nearby_count DESC
