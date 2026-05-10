@@ -10989,7 +10989,6 @@ $$;
 
 REVOKE EXECUTE ON FUNCTION public.recompute_taxa_rarity() FROM PUBLIC;
 GRANT  EXECUTE ON FUNCTION public.recompute_taxa_rarity() TO service_role;
-=======
 -- =====================================================================
 -- M33: home page redesign — pulse + counts + falta-dex summary
 -- See docs/superpowers/specs/2026-05-09-home-page-redesign-design.md.
