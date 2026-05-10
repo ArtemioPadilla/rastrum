@@ -17,7 +17,8 @@ export type AlgorithmId =
   | 'falta_dex_missing'
   | 'contextual_species_chips'
   | 'profile_percentile_cards'
-  | 'active_observers_today';
+  | 'active_observers_today'
+  | 'home_recent_nearby';
 
 export interface AlgorithmCopy {
   /** Inputs the ranker consumes — one bullet per input. */
@@ -285,6 +286,42 @@ export const ALGORITHMS: Record<AlgorithmId, AlgorithmEntry> = {
         ],
         window: 'Hoy (UTC) — reinicia a las 00:00 UTC cada día',
         settings_label: 'Editar perfil (país)',
+      },
+    },
+    settings_path: {
+      en: routes.profileEdit.en,
+      es: routes.profileEdit.es,
+    },
+  },
+  home_recent_nearby: {
+    headline: {
+      en: 'Why am I seeing these observations?',
+      es: '¿Por qué veo estas observaciones?',
+    },
+    summary: {
+      en: 'Most recent observations from observers in your country, with a global fallback if there are fewer than 3.',
+      es: 'Observaciones más recientes de personas en tu país, con respaldo global si hay menos de 3.',
+    },
+    copy: {
+      en: {
+        inputs: [
+          'Sync timestamp (most recent first)',
+          'Country code from your profile (used to scope to nearby observers)',
+          'Public visibility (private observations are excluded)',
+          'No engagement signals — order does not depend on likes, IDs, or follows',
+        ],
+        window: 'Top 3 most recent synced public observations',
+        settings_label: 'Profile country & privacy settings',
+      },
+      es: {
+        inputs: [
+          'Marca de tiempo de sincronización (más recientes primero)',
+          'Código de país de tu perfil (se usa para limitar a personas cercanas)',
+          'Visibilidad pública (las observaciones privadas se excluyen)',
+          'Sin señales de engagement — el orden no depende de likes, IDs ni seguidores',
+        ],
+        window: 'Las 3 observaciones públicas sincronizadas más recientes',
+        settings_label: 'País del perfil y privacidad',
       },
     },
     settings_path: {
