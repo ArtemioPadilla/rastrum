@@ -358,6 +358,7 @@ import {
 } from '../lib/pipeline-engine';
 import { saveObservationToOutbox, resolveObserverRef } from '../lib/observe';
 import { syncOutbox } from '../lib/sync';
+import { getObservationDefaults, setObservationDefaults } from '../lib/observation-defaults';
 
 // ── State ──────────────────────────────────────────────────────────────────
 const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
@@ -438,7 +439,25 @@ const capBanner   = document.getElementById('obs2-capability-banner');
 const capList     = document.getElementById('obs2-capability-list');
 const fileHint    = document.getElementById('obs2-file-hint');
 
-// Banner is always visible — no hide/collapse logic.
+// ── Observation defaults memory (#942) ────────────────────────────────────
+// Pre-fill advanced fields (habitat/weather/license) from last saved values.
+(async () => {
+  try {
+    const defaults = await getObservationDefaults();
+    if (defaults.habitat) {
+      const el = document.getElementById('obs2-habitat') as HTMLSelectElement | null;
+      if (el) el.value = defaults.habitat;
+    }
+    if (defaults.weather) {
+      const el = document.getElementById('obs2-weather') as HTMLSelectElement | null;
+      if (el) el.value = defaults.weather;
+    }
+    if (defaults.licenseCode) {
+      const el = document.getElementById('obs2-license') as HTMLSelectElement | null;
+      if (el) el.value = defaults.licenseCode;
+    }
+  } catch { /* non-fatal — defaults are a convenience */ }
+})();
 
 // Render capability status
 (async () => {
@@ -1101,6 +1120,13 @@ postForm?.addEventListener('submit', async (e) => {
     if (saveNode) setNodeState(pipelineState, saveNode.id, 'done');
     pipelineState.status = 'done';
     await savePipelineState(pipelineState).catch(() => {});
+
+    // Persist observation defaults for next form open (#942)
+    void setObservationDefaults({
+      habitat: habitatVal ?? undefined,
+      weather: weatherVal ?? undefined,
+      licenseCode: licenseTyped ?? undefined,
+    });
 
     // Show success — hide form, reveal card, toast
     postForm?.classList.add('hidden');
