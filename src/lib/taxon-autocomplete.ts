@@ -22,7 +22,7 @@ export interface TaxonSuggestion {
   commonNameEs: string | null;
   /** English common name (best effort) */
   commonNameEn: string | null;
-  /** Number of observations in Rastrum DB (null = GBIF-only hit) */
+  /** Rarity tier from Rastrum DB (1=common … 4=very rare, null = GBIF-only or unclassified) */
   observationCount: number | null;
   /** Whether the user has observed this taxon before */
   inUserHistory: boolean;
@@ -149,28 +149,28 @@ async function fetchFromRastrum(query: string): Promise<TaxonSuggestion[]> {
 
   const prefixQuery = supabase
     .from('taxa')
-    .select('scientific_name, common_name_es, common_name_en, observation_count')
+    .select('id, scientific_name, common_name_es, common_name_en, rarity_tier')
     .ilike('scientific_name', `${q}%`)
-    .order('observation_count', { ascending: false })
+    .order('rarity_tier', { ascending: true, nullsFirst: false })
     .limit(MAX_RESULTS);
 
   const genusQuery = isGenusOnly
     ? supabase
         .from('taxa')
-        .select('scientific_name, common_name_es, common_name_en, observation_count')
+        .select('id, scientific_name, common_name_es, common_name_en, rarity_tier')
         .ilike('scientific_name', `${q} %`)
-        .order('observation_count', { ascending: false })
+        .order('rarity_tier', { ascending: true, nullsFirst: false })
         .limit(MAX_RESULTS)
     : null;
 
-  // User history query — fetch distinct scientific names the user has observed
+  // User history query — fetch distinct primary_taxon_id values the user has observed
   const historyQuery = user
     ? supabase
         .from('observations')
-        .select('primary_scientific_name')
+        .select('primary_taxon_id')
         .eq('observer_id', user.id)
-        .ilike('primary_scientific_name', `${q}%`)
-        .limit(MAX_RESULTS)
+        .not('primary_taxon_id', 'is', null)
+        .limit(50)
     : null;
 
   const [prefixRes, genusRes, historyRes] = await Promise.all([
@@ -179,8 +179,8 @@ async function fetchFromRastrum(query: string): Promise<TaxonSuggestion[]> {
     historyQuery ?? Promise.resolve({ data: [] as any[], error: null }),
   ]);
 
-  const userSpecies = new Set<string>(
-    (historyRes.data ?? []).map((r: any) => (r.primary_scientific_name ?? '').toLowerCase())
+  const userTaxonIds = new Set<string>(
+    (historyRes.data ?? []).map((r: any) => r.primary_taxon_id).filter(Boolean)
   );
 
   const rows: any[] = [
@@ -201,8 +201,8 @@ async function fetchFromRastrum(query: string): Promise<TaxonSuggestion[]> {
     scientificName: r.scientific_name,
     commonNameEs: r.common_name_es ?? null,
     commonNameEn: r.common_name_en ?? null,
-    observationCount: r.observation_count ?? null,
-    inUserHistory: userSpecies.has(r.scientific_name?.toLowerCase() ?? ''),
+    observationCount: null, // rarity_tier is not a count — hide from count display
+    inUserHistory: userTaxonIds.has(r.id),
     source: 'rastrum' as const,
   }));
 }
