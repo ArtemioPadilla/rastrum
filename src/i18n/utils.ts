@@ -70,6 +70,8 @@ export const routes: Record<string, Record<Locale, string>> = {
   communityMap:        { en: '/community/map',        es: '/comunidad/mapa' },
   leaderboard:         { en: '/community/leaderboard', es: '/comunidad/tabla-de-lideres' },
   communityDonate:     { en: '/community/donate',      es: '/comunidad/donar' },
+  // Personalized discover feed (#865)
+  discover:            { en: '/discover',               es: '/descubrir' },
   privacy: { en: '/privacy', es: '/privacidad' },
   terms: { en: '/terms', es: '/terminos' },
   faq: { en: '/faq', es: '/preguntas-frecuentes' },
