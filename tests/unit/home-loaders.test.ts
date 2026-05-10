@@ -78,11 +78,39 @@ describe('home-loaders', () => {
     const c = makeClient({
       'from:user_streaks': () => ({
         select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({
-          data: { current_days: 5, last_qualifying_day: '2026-05-08' }, error: null,
+          data: {
+            current_days: 5, last_qualifying_day: '2026-05-08',
+            streak_freezes_available: 1, streak_freezes_used: 3,
+            streak_freeze_last_used_at: '2026-04-10T08:00:00Z',
+          }, error: null,
         }) }) }),
       }),
     });
-    expect(await loadStreak(c as never, 'u1')).toEqual({ currentDays: 5, lastObsLocalDay: '2026-05-08' });
+    expect(await loadStreak(c as never, 'u1')).toEqual({
+      currentDays: 5,
+      lastObsLocalDay: '2026-05-08',
+      freezesAvailable: 1,
+      freezesUsed: 3,
+      freezeLastUsedAt: '2026-04-10T08:00:00Z',
+    });
+  });
+
+  it('loadStreak returns freezesAvailable=0 when column is null (pre-migration rows)', async () => {
+    const c = makeClient({
+      'from:user_streaks': () => ({
+        select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({
+          data: {
+            current_days: 7, last_qualifying_day: '2026-05-08',
+            streak_freezes_available: null, streak_freezes_used: null,
+            streak_freeze_last_used_at: null,
+          }, error: null,
+        }) }) }),
+      }),
+    });
+    const snap = await loadStreak(c as never, 'u1');
+    expect(snap?.freezesAvailable).toBe(0);
+    expect(snap?.freezesUsed).toBe(0);
+    expect(snap?.freezeLastUsedAt).toBeNull();
   });
 
   it('loadWatchlistHit returns null in v1 (deferred)', async () => {
@@ -94,7 +122,11 @@ describe('home-loaders', () => {
     const c = makeClient({
       'from:user_streaks': () => ({
         select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({
-          data: { current_days: 5, last_qualifying_day: '2026-05-08' }, error: null,
+          data: {
+            current_days: 5, last_qualifying_day: '2026-05-08',
+            streak_freezes_available: 0, streak_freezes_used: 0,
+            streak_freeze_last_used_at: null,
+          }, error: null,
         }) }) }),
       }),
       'rpc:pending_validation_count': () => Promise.resolve({ data: 0, error: null }),
@@ -105,7 +137,7 @@ describe('home-loaders', () => {
       }),
     });
     const inputs = await loadHeroInputs(c as never, 'u1', new Date('2026-05-09T20:00:00Z'));
-    expect(inputs.streak).toEqual({ currentDays: 5, lastObsLocalDay: '2026-05-08' });
+    expect(inputs.streak).toMatchObject({ currentDays: 5, lastObsLocalDay: '2026-05-08' });
     expect(inputs.pendingIdsCount).toBe(0);
     expect(inputs.userTimezone).toBe('America/Mexico_City');
     expect(inputs.expertTaxonGroup).toBe('Aves');

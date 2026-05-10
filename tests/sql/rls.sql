@@ -1051,3 +1051,80 @@ BEGIN
 END $$;
 
 ROLLBACK;
+
+-- ────────────────────────────────────────────────────────────────────────────
+-- #866 Streak freeze assertions (plain SQL DO-blocks, not pgtap)
+-- ────────────────────────────────────────────────────────────────────────────
+-- These blocks run as service_role (unrestricted) to validate freeze logic.
+-- They use a temporary user row — no real data is touched.
+
+RESET ROLE; -- ensure service_role for freeze tests below
+
+DO $$
+DECLARE
+  v_uid uuid := '88880000-0000-0000-0000-000000000001';
+BEGIN
+  -- Seed a user row.
+  INSERT INTO public.users (id, email, gamification_opt_in)
+  VALUES (v_uid, 'freeze-test@example.com', true)
+  ON CONFLICT (id) DO NOTHING;
+
+  -- Seed user_streaks with 1 freeze available, streak=7, last obs 2 days ago.
+  INSERT INTO public.user_streaks (
+    user_id, current_days, longest_days, last_qualifying_day,
+    streak_freezes_available, streak_freezes_used, updated_at
+  ) VALUES (
+    v_uid, 7, 7, CURRENT_DATE - 2,
+    1, 0, now()
+  ) ON CONFLICT (user_id) DO UPDATE
+    SET current_days = 7,
+        last_qualifying_day = CURRENT_DATE - 2,
+        streak_freezes_available = 1,
+        streak_freezes_used = 0,
+        updated_at = now();
+
+  -- Simulate recompute_streak: missed day with 1 freeze available.
+  PERFORM public.recompute_streak(v_uid);
+
+  DECLARE
+    v_cur   integer;
+    v_avail smallint;
+    v_used  integer;
+  BEGIN
+    SELECT current_days, streak_freezes_available, streak_freezes_used
+      INTO v_cur, v_avail, v_used
+      FROM public.user_streaks WHERE user_id = v_uid;
+
+    IF v_cur = 0 THEN
+      RAISE EXCEPTION '#866 FAIL [freeze day 1]: streak reset to 0 but 1 freeze was available';
+    END IF;
+    IF v_avail <> 0 THEN
+      RAISE EXCEPTION '#866 FAIL [freeze day 1]: freeze not consumed (available=%, expected 0)', v_avail;
+    END IF;
+    IF v_used <> 1 THEN
+      RAISE EXCEPTION '#866 FAIL [freeze day 1]: lifetime used counter wrong (used=%, expected 1)', v_used;
+    END IF;
+  END;
+
+  -- Second miss: freezes_available=0 → streak MUST reset.
+  UPDATE public.user_streaks
+     SET last_qualifying_day = CURRENT_DATE - 3,
+         streak_freezes_available = 0
+   WHERE user_id = v_uid;
+
+  PERFORM public.recompute_streak(v_uid);
+
+  DECLARE
+    v_cur2 integer;
+  BEGIN
+    SELECT current_days INTO v_cur2 FROM public.user_streaks WHERE user_id = v_uid;
+    IF v_cur2 <> 0 THEN
+      RAISE EXCEPTION '#866 FAIL [freeze day 2]: streak not reset when no freezes (current=%, expected 0)', v_cur2;
+    END IF;
+  END;
+
+  -- Cleanup
+  DELETE FROM public.users WHERE id = v_uid;
+
+  RAISE NOTICE '#866 streak-freeze assertions passed (day1 preserved, day2 reset)';
+END $$;

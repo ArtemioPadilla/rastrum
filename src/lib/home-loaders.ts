@@ -45,17 +45,29 @@ export async function loadWatchlistHit(_c: Client, _userId: string): Promise<Wat
   return null;
 }
 
-export interface StreakSnap { currentDays: number; lastObsLocalDay: string | null; }
+export interface StreakSnap { currentDays: number; lastObsLocalDay: string | null; freezesAvailable: number; freezesUsed: number; freezeLastUsedAt: string | null; }
 
 export async function loadStreak(c: Client, userId: string): Promise<StreakSnap | null> {
   try {
     const { data, error } = await c.from('user_streaks')
-      .select('current_days, last_qualifying_day')
+      .select('current_days, last_qualifying_day, streak_freezes_available, streak_freezes_used, streak_freeze_last_used_at')
       .eq('user_id', userId)
       .maybeSingle();
     if (error || !data) return null;
-    const row = data as { current_days: number; last_qualifying_day: string | null };
-    return { currentDays: row.current_days, lastObsLocalDay: row.last_qualifying_day };
+    const row = data as {
+      current_days: number;
+      last_qualifying_day: string | null;
+      streak_freezes_available: number | null;
+      streak_freezes_used: number | null;
+      streak_freeze_last_used_at: string | null;
+    };
+    return {
+      currentDays: row.current_days,
+      lastObsLocalDay: row.last_qualifying_day,
+      freezesAvailable: row.streak_freezes_available ?? 0,
+      freezesUsed: row.streak_freezes_used ?? 0,
+      freezeLastUsedAt: row.streak_freeze_last_used_at ?? null,
+    };
   } catch { return null; }
 }
 

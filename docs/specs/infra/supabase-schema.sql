@@ -11347,3 +11347,147 @@ SELECT cron.schedule(
     body    := '{}'::jsonb
   )$$
 );
+
+-- ============================================================
+-- #866 — Streak freeze / skip-day mechanic
+-- ============================================================
+
+-- 1. New columns on user_streaks: available freezes (hard cap 2) + lifetime used count.
+ALTER TABLE public.user_streaks
+  ADD COLUMN IF NOT EXISTS streak_freezes_available smallint NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS streak_freezes_used      integer  NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS streak_freeze_last_used_at timestamptz;
+
+COMMENT ON COLUMN public.user_streaks.streak_freezes_available IS
+  'Freeze credits available to auto-consume on a missed day. Hard cap: 2.';
+COMMENT ON COLUMN public.user_streaks.streak_freezes_used IS
+  'Lifetime count of auto-consumed freezes (transparency / Fogg honesty).';
+COMMENT ON COLUMN public.user_streaks.streak_freeze_last_used_at IS
+  'Timestamp of the most recent freeze consumption — used for the freeze ledger in ProfileView.';
+
+-- 2. Extend karma_events.reason CHECK to include streak_freeze_consumed.
+ALTER TABLE public.karma_events DROP CONSTRAINT IF EXISTS karma_events_reason_check;
+ALTER TABLE public.karma_events ADD CONSTRAINT karma_events_reason_check
+  CHECK (reason IN (
+    'consensus_win','consensus_loss','first_in_rastrum',
+    'observation_synced','comment_reaction','manual_adjust',
+    'ai_sponsorship_active','ai_sponsorship_revoked','ai_sponsor_call',
+    'pool_donation','pool_call_sponsor_drip',
+    'streak_freeze_consumed'
+  ));
+
+-- 3. Updated recompute_streak: freeze grant on 7-day multiples + freeze consumption on miss.
+CREATE OR REPLACE FUNCTION public.recompute_streak(p_user_id uuid)
+RETURNS void AS $$
+DECLARE
+  qualifying_days date[];
+  cur         integer := 0;
+  longest     integer := 0;
+  prev        date;
+  d           date;
+  last_q      date;
+  uses_grace  boolean := false;
+  -- freeze fields
+  v_freezes_available smallint;
+  v_freezes_used      integer;
+  v_prev_current      integer;
+  v_freeze_consumed   boolean := false;
+BEGIN
+  SELECT array_agg(DISTINCT (observed_at AT TIME ZONE 'UTC')::date ORDER BY (observed_at AT TIME ZONE 'UTC')::date DESC)
+  INTO qualifying_days
+  FROM public.observations o
+  JOIN public.identifications i ON i.observation_id = o.id AND i.is_primary
+  WHERE o.observer_id = p_user_id
+    AND o.sync_status = 'synced'
+    AND COALESCE(i.confidence, 0) >= 0.4;
+
+  IF qualifying_days IS NULL THEN
+    INSERT INTO public.user_streaks (user_id, current_days, longest_days, updated_at)
+    VALUES (p_user_id, 0, 0, now())
+    ON CONFLICT (user_id) DO UPDATE SET current_days = 0, updated_at = now();
+    RETURN;
+  END IF;
+
+  last_q := qualifying_days[1];
+  prev := last_q;
+  cur := 1;
+  longest := 1;
+  -- iterate desc-sorted days, allowing one grace miss in any 30-day window
+  FOR i IN 2..array_length(qualifying_days, 1) LOOP
+    d := qualifying_days[i];
+    IF prev - d = 1 THEN
+      cur := cur + 1;
+    ELSIF prev - d = 2 AND NOT uses_grace AND (CURRENT_DATE - prev) <= 30 THEN
+      cur := cur + 1;
+      uses_grace := true;
+    ELSE
+      EXIT;
+    END IF;
+    IF cur > longest THEN longest := cur; END IF;
+    prev := d;
+  END LOOP;
+
+  -- Read current streak row for freeze logic
+  SELECT
+    COALESCE(s.current_days, 0),
+    COALESCE(s.streak_freezes_available, 0),
+    COALESCE(s.streak_freezes_used, 0)
+  INTO v_prev_current, v_freezes_available, v_freezes_used
+  FROM public.user_streaks s
+  WHERE s.user_id = p_user_id;
+
+  -- If today's not in the list and yesterday was the most recent, streak is at risk.
+  IF (CURRENT_DATE - last_q) > 1 THEN
+    -- Missed day detected: try to consume a freeze before resetting.
+    IF v_freezes_available > 0 AND v_prev_current > 0 THEN
+      -- Consume one freeze: preserve cur from what we computed above (streak alive).
+      -- cur is already 0 from the above traversal exit, but if the miss is TODAY
+      -- we want to keep the previous streak alive; override cur with v_prev_current.
+      cur := v_prev_current;
+      v_freeze_consumed := true;
+      -- Write audit row to karma_events (delta = 0, no karma change).
+      INSERT INTO public.karma_events (user_id, delta, reason)
+      VALUES (p_user_id, 0, 'streak_freeze_consumed');
+    ELSE
+      cur := 0;
+    END IF;
+  END IF;
+
+  -- Freeze grant: if cur just crossed a 7-day boundary (cur % 7 == 0, cur > 0),
+  -- award +1 freeze clamped at 2.
+  IF cur > 0 AND cur % 7 = 0 THEN
+    v_freezes_available := LEAST(
+      (CASE WHEN v_freeze_consumed THEN v_freezes_available - 1 ELSE v_freezes_available END) + 1,
+      2
+    );
+  ELSIF v_freeze_consumed THEN
+    v_freezes_available := v_freezes_available - 1;
+  END IF;
+
+  INSERT INTO public.user_streaks (
+    user_id, current_days, longest_days, last_qualifying_day,
+    grace_used_at, streak_freezes_available, streak_freezes_used,
+    streak_freeze_last_used_at, updated_at
+  )
+  VALUES (
+    p_user_id, cur, GREATEST(longest, cur), last_q,
+    CASE WHEN uses_grace THEN now() END,
+    v_freezes_available,
+    v_freezes_used + (CASE WHEN v_freeze_consumed THEN 1 ELSE 0 END),
+    CASE WHEN v_freeze_consumed THEN now() END,
+    now()
+  )
+  ON CONFLICT (user_id) DO UPDATE
+    SET current_days               = EXCLUDED.current_days,
+        longest_days               = GREATEST(public.user_streaks.longest_days, EXCLUDED.current_days, EXCLUDED.longest_days),
+        last_qualifying_day        = EXCLUDED.last_qualifying_day,
+        grace_used_at              = EXCLUDED.grace_used_at,
+        streak_freezes_available   = EXCLUDED.streak_freezes_available,
+        streak_freezes_used        = public.user_streaks.streak_freezes_used + (CASE WHEN v_freeze_consumed THEN 1 ELSE 0 END),
+        streak_freeze_last_used_at = CASE WHEN v_freeze_consumed THEN now() ELSE public.user_streaks.streak_freeze_last_used_at END,
+        updated_at                 = now();
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp;
+
+REVOKE EXECUTE ON FUNCTION public.recompute_streak(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.recompute_streak(uuid) TO service_role;
