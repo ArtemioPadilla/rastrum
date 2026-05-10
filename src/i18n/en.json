@@ -256,7 +256,9 @@
     "source_meta_plantnet": "PlantNet — free regional plant identification by INRIA",
     "source_meta_claude_haiku": "Claude Haiku 4.5 — Anthropic vision LLM, generalist",
     "source_meta_webllm_phi35_vision": "Phi-3.5-vision — Microsoft on-device general VLM (low confidence by design)",
-    "license_label": "License"
+    "license_label": "License",
+    "provisional_pill": "Provisional",
+    "provisional_awaiting": "Waiting for community confirmation"
   },
   "explore": {
     "title": "Explore Observations",
@@ -1196,6 +1198,10 @@
       "privacy": {
         "title": "Pick your privacy preset",
         "body": "Choose how visible your observations are to other naturalists. You can change this anytime."
+      },
+      "first_observation_demo": {
+        "title": "See how identification works",
+        "body": "Here's what happens when you take your first photo — we run it through specialized models in parallel and show you the most confident match."
       }
     },
     "step_privacy_title": "Pick your privacy preset",
@@ -1203,7 +1209,13 @@
     "preset_open_scientist": "Open scientist",
     "preset_researcher": "Researcher",
     "preset_researcher_recommended": "Researcher (recommended)",
-    "preset_private_observer": "Private observer"
+    "preset_private_observer": "Private observer",
+    "first_obs_demo_cascade_label": "Identification cascade",
+    "first_obs_demo_step_plantnet": "PlantNet",
+    "first_obs_demo_step_claude": "Claude Haiku",
+    "first_obs_demo_step_result": "Quercus robur — Oak",
+    "first_obs_demo_confidence": "87% confidence",
+    "first_obs_demo_try_cta": "Try it yourself →"
   },
   "pipeline": {
     "section_title": "Identification pipeline",
@@ -3816,5 +3828,21 @@
       "plant": "Telephoto compression — floral portrait.",
       "fungus": "Long lens — good macro working distance."
     }
+  },
+  "discover": {
+    "title": "Discover",
+    "subtitle": "What's interesting to you right now",
+    "section_followed": "From people you follow",
+    "section_nearby": "Nearby species you haven't found yet",
+    "section_trending": "Trending in your region this week",
+    "no_follows_hint": "Follow some observers to see their recent activity here.",
+    "no_nearby_hint": "Enable location to see species near you.",
+    "no_trending_hint": "No trending species yet in your region.",
+    "obs_count": "{n} observations",
+    "species_count": "{n} species",
+    "view_all": "View all",
+    "explore_community": "Explore community",
+    "loading": "Loading feed…",
+    "sign_in_hint": "Sign in to get a personalized feed."
   }
 }

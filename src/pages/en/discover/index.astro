@@ -1,0 +1,27 @@
+---
+/**
+ * /en/discover/ — Personalized Discover feed page (#865).
+ *
+ * Renders the DiscoverFeedView component. Data is loaded client-side
+ * via Supabase (auth-gated, personalized per user).
+ */
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import DiscoverFeedView from '../../../components/DiscoverFeedView.astro';
+import { t } from '../../../i18n/utils';
+
+export function getStaticPaths() { return [{}]; }
+
+const lang = 'en';
+const tr = t(lang);
+const dc = (tr as unknown as { discover: Record<string, string> }).discover ?? {};
+const title = dc.title ?? 'Discover';
+const subtitle = dc.subtitle ?? "What's interesting to you right now";
+---
+
+<BaseLayout
+  title={`${title} — Rastrum`}
+  description={subtitle}
+  lang={lang}
+>
+  <DiscoverFeedView lang={lang} />
+</BaseLayout>

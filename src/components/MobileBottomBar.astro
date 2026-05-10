@@ -18,7 +18,7 @@ const profilePath = getLocalizedPath(lang, routes.profile[locale] + '/');
 const homePath    = getLocalizedPath(lang, '/');
 const observePath = getLocalizedPath(lang, routes.observe[locale] + '/');
 const exploreMapPath = getLocalizedPath(lang, routes.exploreMap[locale] + '/');
-const discoverPath = getLocalizedPath(lang, routes.communityObservers[locale] + '/');
+const discoverPath = getLocalizedPath(lang, routes.discover[locale] + '/');
 const signInPath  = getLocalizedPath(lang, routes.signIn[locale] + '/');
 
 // Active-state precomputes (so the markup stays tidy)
@@ -27,7 +27,7 @@ const expActive       = isActiveSection(currentPath, 'explore',       lang);
 const profActive      = isActiveSection(currentPath, 'profile',       lang);
 const homeActive      = isActiveSection(currentPath, 'home',          lang);
 const recentActive    = isActiveSection(currentPath, 'exploreRecent', lang);
-const discoverActive  = isActiveSection(currentPath, 'community',     lang);
+const discoverActive  = isActiveSection(currentPath, 'discover',     lang);
 ---
 
 <!--

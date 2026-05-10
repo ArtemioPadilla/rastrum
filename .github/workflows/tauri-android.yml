@@ -1,13 +1,15 @@
 name: Build Tauri Android AAB
 
-# Manual-dispatch only. Rust + Android SDK + NDK are heavy; we don't
-# want this on every PR. Kick it off from the Actions tab when you
-# need an AAB to upload to Play Console.
+# Triggers:
+#   - Manual dispatch (workflow_dispatch) for on-demand builds.
+#   - Push of a `v*` tag (e.g. v1.0.0) for automated Play Store internal-track releases.
+#
+# See: docs/runbooks/play-store-release.md for one-time setup and rollback instructions.
 on:
   workflow_dispatch:
     inputs:
       release_track:
-        description: 'Play Store track (informational only — actual upload is manual)'
+        description: 'Play Store track (informational only — upload always goes to internal)'
         required: false
         default: 'internal'
         type: choice
@@ -16,6 +18,9 @@ on:
           - alpha
           - beta
           - production
+  push:
+    tags:
+      - 'v*'
 
 permissions:
   contents: read
@@ -99,36 +104,76 @@ jobs:
           NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/26.1.10909125
         run: npx tauri android build --aab
 
-      - name: Decode keystore (optional signing)
-        id: keystore
-        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      - name: Validate required signing secrets
+        # Fail loudly if signing secrets are not set — avoids uploading an
+        # unsigned build and confusing Play Console upload failures.
         run: |
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > /tmp/release.jks
-          echo "keystore_path=/tmp/release.jks" >> "$GITHUB_OUTPUT"
-
-      - name: Sign AAB (optional)
-        if: ${{ steps.keystore.outputs.keystore_path != '' }}
+          missing=""
+          [ -z "$RASTRUM_ANDROID_KEYSTORE_BASE64" ] && missing="$missing RASTRUM_ANDROID_KEYSTORE_BASE64"
+          [ -z "$RASTRUM_ANDROID_KEY_ALIAS"       ] && missing="$missing RASTRUM_ANDROID_KEY_ALIAS"
+          [ -z "$RASTRUM_ANDROID_KEY_PASSWORD"    ] && missing="$missing RASTRUM_ANDROID_KEY_PASSWORD"
+          [ -z "$RASTRUM_ANDROID_KEYSTORE_PASSWORD" ] && missing="$missing RASTRUM_ANDROID_KEYSTORE_PASSWORD"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing required signing secrets:$missing"
+            echo "::error::See docs/runbooks/play-store-release.md for setup instructions."
+            exit 1
+          fi
         env:
-          KEYSTORE_PATH:        ${{ steps.keystore.outputs.keystore_path }}
-          ANDROID_KEY_ALIAS:    ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          RASTRUM_ANDROID_KEYSTORE_BASE64:  ${{ secrets.RASTRUM_ANDROID_KEYSTORE_BASE64 }}
+          RASTRUM_ANDROID_KEY_ALIAS:        ${{ secrets.RASTRUM_ANDROID_KEY_ALIAS }}
+          RASTRUM_ANDROID_KEY_PASSWORD:     ${{ secrets.RASTRUM_ANDROID_KEY_PASSWORD }}
+          RASTRUM_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.RASTRUM_ANDROID_KEYSTORE_PASSWORD }}
+
+      - name: Decode signing keystore
+        id: keystore
+        run: |
+          echo "$RASTRUM_ANDROID_KEYSTORE_BASE64" | base64 -d > /tmp/rastrum-release.jks
+          echo "keystore_path=/tmp/rastrum-release.jks" >> "$GITHUB_OUTPUT"
+        env:
+          RASTRUM_ANDROID_KEYSTORE_BASE64: ${{ secrets.RASTRUM_ANDROID_KEYSTORE_BASE64 }}
+
+      - name: Sign AAB
+        id: sign
+        env:
+          KEYSTORE_PATH:                    ${{ steps.keystore.outputs.keystore_path }}
+          RASTRUM_ANDROID_KEY_ALIAS:        ${{ secrets.RASTRUM_ANDROID_KEY_ALIAS }}
+          RASTRUM_ANDROID_KEY_PASSWORD:     ${{ secrets.RASTRUM_ANDROID_KEY_PASSWORD }}
+          RASTRUM_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.RASTRUM_ANDROID_KEYSTORE_PASSWORD }}
         run: |
           AAB=$(find src-tauri/gen/android/app/build/outputs/bundle -name '*-release.aab' | head -n 1)
           if [ -z "$AAB" ]; then
-            echo "::error::No AAB produced under src-tauri/gen/android/app/build/outputs/bundle"
+            echo "::error::No release AAB found under src-tauri/gen/android/app/build/outputs/bundle"
             exit 1
           fi
+          echo "Found AAB: $AAB"
           jarsigner -verbose \
             -sigalg SHA256withRSA -digestalg SHA-256 \
             -keystore "$KEYSTORE_PATH" \
-            -storepass "$ANDROID_KEYSTORE_PASSWORD" \
-            -keypass   "$ANDROID_KEY_PASSWORD" \
-            "$AAB" "$ANDROID_KEY_ALIAS"
+            -storepass "$RASTRUM_ANDROID_KEYSTORE_PASSWORD" \
+            -keypass   "$RASTRUM_ANDROID_KEY_PASSWORD" \
+            "$AAB" "$RASTRUM_ANDROID_KEY_ALIAS"
+          echo "aab_path=$AAB" >> "$GITHUB_OUTPUT"
 
-      - name: Upload AAB artifact
+      - name: Validate Play Store secret
+        run: |
+          if [ -z "$RASTRUM_PLAY_SERVICE_ACCOUNT_JSON" ]; then
+            echo "::error::RASTRUM_PLAY_SERVICE_ACCOUNT_JSON is not set."
+            echo "::error::See docs/runbooks/play-store-release.md → 'Service account setup'."
+            exit 1
+          fi
+        env:
+          RASTRUM_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.RASTRUM_PLAY_SERVICE_ACCOUNT_JSON }}
+
+      - name: Upload to Play Store internal track
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.RASTRUM_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: org.rastrum.app
+          releaseFiles: ${{ steps.sign.outputs.aab_path }}
+          track: internal
+          status: completed
+
+      - name: Upload AAB artifact (CI archive)
         uses: actions/upload-artifact@v4
         with:
           name: rastrum-android-aab

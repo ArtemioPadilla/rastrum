@@ -1,0 +1,27 @@
+---
+/**
+ * /es/descubrir/ — Feed personalizado de Descubrir (#865).
+ *
+ * Renderiza el componente DiscoverFeedView. Los datos se cargan en el cliente
+ * vía Supabase (requiere autenticación, personalizado por usuario).
+ */
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import DiscoverFeedView from '../../../components/DiscoverFeedView.astro';
+import { t } from '../../../i18n/utils';
+
+export function getStaticPaths() { return [{}]; }
+
+const lang = 'es';
+const tr = t(lang);
+const dc = (tr as unknown as { discover: Record<string, string> }).discover ?? {};
+const title = dc.title ?? 'Descubrir';
+const subtitle = dc.subtitle ?? 'Lo que es interesante para ti ahora mismo';
+---
+
+<BaseLayout
+  title={`${title} — Rastrum`}
+  description={subtitle}
+  lang={lang}
+>
+  <DiscoverFeedView lang={lang} />
+</BaseLayout>
