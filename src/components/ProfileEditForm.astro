@@ -1479,6 +1479,14 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
    * (license-cost ascending, confidence_ceiling tiebreaker), not registration
    * order. Two flows shown — one for photo, one for audio — since the sort
    * differs per media type.
+   *
+   * #718: The chip strip order INTENTIONALLY differs from the section-grouped
+   * card list above. Sections group by semantic role (specialist / generalist /
+   * experimental), which helps users understand what each plugin does.
+   * The chip strip shows the actual runtime cascade execution order (free
+   * models first, then paid), which helps users understand when each plugin
+   * fires. Merging the two orderings would either hide the cascade semantics
+   * from the chip strip or force an unnatural section grouping in the card list.
    */
   async function updatePipelineFlow(plugins: Array<{ id: string; name: string; brand?: string; capabilities: { media: string[]; license: string; confidence_ceiling?: number } }>) {
     const flowItems = document.getElementById('pipeline-flow-items');
