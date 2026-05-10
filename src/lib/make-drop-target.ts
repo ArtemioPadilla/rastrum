@@ -1,80 +1,95 @@
 /**
- * makeDropTarget — attach drag & drop file handling to any element.
+ * make-drop-target.ts — Shared drag & drop utility (issue #790).
  *
- * Extracted from DropZone.astro so all multimedia upload surfaces can
- * share the same UX without duplicating event-handler boilerplate.
+ * Extracts the drag-and-drop wiring logic from DropZone.astro into a
+ * reusable function so ObsManagePanel, QuickObserveSheet, and BatchImporter
+ * can all get the same UX without duplicating event-listener boilerplate.
  *
  * Usage:
- *   const cleanup = makeDropTarget(el, (files) => handleFiles(files), {
- *     accept: ['image/'],          // MIME prefix filter (optional)
- *     overlayEl: myOverlayDiv,     // shown on dragenter, hidden on drop/leave
- *     label: 'Drop to add photos', // accessible aria-label on overlay (optional)
- *   });
- *   // later: cleanup() to remove all listeners
+ *   import { makeDropTarget } from '../lib/make-drop-target';
+ *   makeDropTarget(myElement, (files) => handleFiles(files));
  *
- * Refs #790
+ * The element receives:
+ *   - dragenter / dragleave: adds/removes a CSS class for visual feedback
+ *   - drop: calls onFiles with the dropped File array
+ *
+ * The optional `overlayEl` or `overlaySelector` points to a child element
+ * that is shown/hidden during drag-over (mirrors DropZone's #dz-dragover).
  */
 
 export interface DropTargetOptions {
-  /** MIME type prefixes to accept. E.g. ['image/', 'audio/']. Undefined = accept all. */
+  /** CSS class applied to `element` during drag-over. Default: 'drag-over' */
+  activeClass?: string;
+  /**
+   * A child overlay element to show/hide during drag-over.
+   * Pass either a reference or a CSS selector relative to `element`.
+   */
+  overlayEl?: HTMLElement;
+  /** Selector for a child overlay element to show/hide. Optional. */
+  overlaySelector?: string;
+  /** Accept only these MIME type prefixes. Empty = accept all. */
   accept?: string[];
-  /** Optional overlay element to show while a drag is active. */
-  overlayEl?: HTMLElement | null;
-  /** If true, prevent the drop zone from activating when the drag originates
-   *  from inside the same element (e.g. reordering thumbnails). Default false. */
-  rejectInternal?: boolean;
 }
 
+/**
+ * Wire drag-and-drop behaviour onto `element`.
+ *
+ * @param element  The DOM element to use as a drop target.
+ * @param onFiles  Called with the array of dropped (and optionally filtered) files.
+ * @param options  Optional configuration.
+ * @returns        A cleanup function that removes all added listeners.
+ */
 export function makeDropTarget(
   element: HTMLElement,
   onFiles: (files: File[]) => void,
   options: DropTargetOptions = {},
 ): () => void {
-  const { accept, overlayEl, rejectInternal = false } = options;
-  let dragDepth = 0; // track nested dragenter/dragleave pairs
+  const { activeClass = 'drag-over', accept = [] } = options;
 
-  function filterFiles(list: FileList | null): File[] {
-    if (!list) return [];
-    const files = Array.from(list);
-    if (!accept?.length) return files;
-    return files.filter(f => f && accept.some(prefix => f.type?.startsWith(prefix)));
+  // Resolve overlay element: direct reference takes priority over selector.
+  const overlay: HTMLElement | null =
+    options.overlayEl ??
+    (options.overlaySelector
+      ? (element.querySelector(options.overlaySelector) as HTMLElement | null)
+      : null);
+
+  function showOverlay(): void {
+    overlay?.classList.remove('hidden');
+    element.classList.add(activeClass);
   }
 
-  function showOverlay() {
-    if (!overlayEl) return;
-    overlayEl.classList.remove('hidden');
-    overlayEl.classList.add('flex');
+  function hideOverlay(): void {
+    overlay?.classList.add('hidden');
+    element.classList.remove(activeClass);
   }
 
-  function hideOverlay() {
-    if (!overlayEl) return;
-    overlayEl.classList.add('hidden');
-    overlayEl.classList.remove('flex');
+  function filterFiles(files: File[]): File[] {
+    if (!accept.length) return files;
+    return files.filter((f) =>
+      accept.some((mime) => f.type.startsWith(mime)),
+    );
   }
 
-  function onDragEnter(e: DragEvent) {
+  function onDragEnter(e: DragEvent): void {
     e.preventDefault();
-    if (rejectInternal && element.contains(e.relatedTarget as Node)) return;
-    dragDepth++;
-    if (dragDepth === 1) showOverlay();
+    showOverlay();
   }
 
-  function onDragLeave(e: DragEvent) {
-    if (rejectInternal && element.contains(e.relatedTarget as Node)) return;
-    dragDepth--;
-    if (dragDepth <= 0) { dragDepth = 0; hideOverlay(); }
+  function onDragLeave(e: DragEvent): void {
+    // Only hide if leaving the element itself, not a child.
+    if (!element.contains(e.relatedTarget as Node | null)) {
+      hideOverlay();
+    }
   }
 
-  function onDragOver(e: DragEvent) {
+  function onDragOver(e: DragEvent): void {
     e.preventDefault();
-    if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
   }
 
-  function onDrop(e: DragEvent) {
+  function onDrop(e: DragEvent): void {
     e.preventDefault();
-    dragDepth = 0;
     hideOverlay();
-    const files = filterFiles(e.dataTransfer?.files ?? null);
+    const files = filterFiles(Array.from(e.dataTransfer?.files ?? []));
     if (files.length) onFiles(files);
   }
 
