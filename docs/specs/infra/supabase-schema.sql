@@ -10621,6 +10621,21 @@ $$;
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO authenticated;
 
 -- ─────────────────────────────────────────────────────────────────────────
+-- Phase 2 (#834): restrict cron-only SECURITY DEFINER functions
+-- ─────────────────────────────────────────────────────────────────────────
+-- prune_old_notifications is a cron-only entry point (see cron-schedules.sql
+-- 'prune_old_notifications' job). It is never called via supabase.rpc() from
+-- the front-end. Restrict to service_role; revoke the blanket authenticated
+-- grant that was reasserted two lines above.
+--
+-- Trigger functions (RETURNS trigger) are intentionally excluded: Postgres
+-- prevents direct rpc() calls to trigger-returning functions regardless of
+-- ACLs, so their blanket-only state is cosmetically imperfect but safe.
+-- Per-function grants on them would be defensive noise.
+REVOKE EXECUTE ON FUNCTION public.prune_old_notifications() FROM authenticated;
+GRANT  EXECUTE ON FUNCTION public.prune_old_notifications() TO service_role;
+
+-- ─────────────────────────────────────────────────────────────────────────
 -- 6. PostGIS spatial_ref_sys — enable RLS with a permissive read policy
 -- ─────────────────────────────────────────────────────────────────────────
 -- Advisor flags `public.spatial_ref_sys` as a public-exposed table without

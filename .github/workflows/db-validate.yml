@@ -284,6 +284,17 @@ jobs:
           set -euo pipefail
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f infra/lint-schema-security.sql
 
+      - name: Lint-schema-security regression suite
+        # Verifies that infra/lint-schema-security.sql itself is correct:
+        #   - check1 detects a view missing security_invoker
+        #   - check2 detects a PUBLIC-callable SECURITY DEFINER function
+        #   - check3 detects a plpgsql function without search_path
+        #   - positive case: current schema passes all three checks
+        # Uses savepoints so injected test objects are rolled back cleanly
+        # before the next test case.
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/sql/lint-schema-security.test.sql
+
       - name: Summary
         run: |
-          echo "::notice::db-validate passed — schema applies cleanly, is idempotent (2× apply pass), all sentinels exist, every public table has RLS enabled, the RLS regression suite passed (35 assertions), and all security invariants hold."
+          echo "::notice::db-validate passed — schema applies cleanly, is idempotent (2× apply pass), all sentinels exist, every public table has RLS enabled, the RLS regression suite passed (35 assertions), security invariants hold, and lint-schema-security regression suite passed (4 test cases)."
