@@ -25,6 +25,8 @@ export interface DwCInput {
   habitat: string | null;
   observer_display_name: string | null;
   observer_license: string;
+  life_stage?: string | null;
+  vital_status?: string | null;
 }
 
 export interface DwCRecord {
@@ -40,7 +42,8 @@ export interface DwCRecord {
   kingdom: string;
   identificationQualifier: string;
   identifiedBy: string;
-  occurrenceStatus: 'present';
+  occurrenceStatus: string;
+  lifeStage: string;
   license: string;
   rightsHolder: string;
   stateProvince: string;
@@ -55,6 +58,7 @@ export const DWC_COLUMNS: (keyof DwCRecord)[] = [
   'decimalLatitude','decimalLongitude','geodeticDatum','coordinateUncertaintyInMeters',
   'scientificName','taxonRank','kingdom',
   'identificationQualifier','identifiedBy','occurrenceStatus',
+  'lifeStage',
   'license','rightsHolder','stateProvince','habitat',
   'informationWithheld','dataGeneralizations',
 ];
@@ -67,6 +71,19 @@ function formatIdentifiedBy(source: string | null): string {
     case 'onnx_offline': return 'Rastrum AI (on-device)';
     case 'human':        return 'Observer';
     default:             return 'Unknown';
+  }
+}
+
+/**
+ * Map vital_status to DwC occurrenceStatus.
+ * alive → present, dead → dead, injured → injured, null/unknown → unknown
+ */
+function mapVitalStatus(status: string | null | undefined): string {
+  switch (status) {
+    case 'alive':   return 'present';
+    case 'dead':    return 'dead';
+    case 'injured': return 'injured';
+    default:        return 'unknown';
   }
 }
 
@@ -95,7 +112,8 @@ export function toDwCRecord(input: DwCInput): DwCRecord {
     kingdom: input.kingdom ?? '',
     identificationQualifier: qualifier,
     identifiedBy: formatIdentifiedBy(input.id_source),
-    occurrenceStatus: 'present',
+    occurrenceStatus: mapVitalStatus(input.vital_status),
+    lifeStage: input.life_stage ?? '',
     license: input.observer_license,
     rightsHolder: input.observer_display_name ?? '',
     stateProvince: input.state_province ?? '',
@@ -129,6 +147,7 @@ export const SNIB_COLUMNS: (keyof DwCRecord)[] = [
   'occurrenceID','eventDate','decimalLatitude','decimalLongitude',
   'coordinateUncertaintyInMeters','scientificName','kingdom',
   'identificationQualifier','identifiedBy','occurrenceStatus',
+  'lifeStage',
   'license','rightsHolder','stateProvince','habitat',
 ];
 

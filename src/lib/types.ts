@@ -111,6 +111,18 @@ export interface Observation {
    */
   isRangeExtension?: boolean;
 
+  /**
+   * #941 — Life stage of the observed individual. Optional.
+   * Darwin Core: lifeStage.
+   */
+  lifeStage?: 'adult' | 'juvenile' | 'subadult' | 'nestling' | 'egg' | 'larva' | 'pupa' | 'unknown' | null;
+
+  /**
+   * #941 — Vital status of the observed individual. Optional.
+   * Darwin Core: occurrenceStatus extension.
+   */
+  vitalStatus?: 'alive' | 'dead' | 'injured' | 'unknown' | null;
+
   syncStatus: SyncStatus;
   syncedAt: string | null;
   appVersion: string;

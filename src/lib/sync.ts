@@ -113,6 +113,9 @@ async function syncOne(record: ObservationRecord): Promise<void> {
     notes:           obs.notes,
     // M22-range (#742): user-confirmed outlier alert.
     is_range_extension: obs.isRangeExtension ?? false,
+    // #941: life stage + vital status
+    life_stage:  obs.lifeStage  ?? null,
+    vital_status: obs.vitalStatus ?? null,
     sync_status:     'synced' as const,
     app_version:     obs.appVersion,
     device_os:       obs.deviceOs,

@@ -52,6 +52,16 @@ export interface ObservationDraft {
    * alert. Flips `observations.is_range_extension` on sync.
    */
   isRangeExtension?: boolean;
+
+  /**
+   * #941 — Life stage of the observed individual. Optional.
+   */
+  lifeStage?: 'adult' | 'juvenile' | 'subadult' | 'nestling' | 'egg' | 'larva' | 'pupa' | 'unknown' | null;
+
+  /**
+   * #941 — Vital status of the observed individual. Optional.
+   */
+  vitalStatus?: 'alive' | 'dead' | 'injured' | 'unknown' | null;
   appVersion?: string;
   deviceOs?: string | null;
   /**
@@ -98,6 +108,8 @@ export function buildObservation(draft: ObservationDraft): Observation {
     contentSensitive: draft.contentSensitive ?? false,
     notes:         draft.notes         ?? null,
     isRangeExtension: draft.isRangeExtension ?? false,
+    lifeStage: draft.lifeStage ?? null,
+    vitalStatus: draft.vitalStatus ?? null,
     moonPhase: null,
     moonIllumination: null,
     precipitation24hMm: null,
