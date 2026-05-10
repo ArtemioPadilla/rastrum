@@ -1134,8 +1134,8 @@ postForm?.addEventListener('submit', async (e) => {
       notes,
       contentSensitive: sensitiveVal,
       license: licenseTyped,
-      lifeStage: lifeStageVal as never,
-      vitalStatus: vitalStatusVal as never,
+      lifeStage: (lifeStageVal || null) as import('../lib/observe').ObservationDraft['lifeStage'],
+      vitalStatus: (vitalStatusVal || null) as import('../lib/observe').ObservationDraft['vitalStatus'],
     });
 
     // Fire sync without blocking success UX. Use ifAvailable so we don't

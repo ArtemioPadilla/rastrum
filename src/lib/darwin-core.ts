@@ -42,8 +42,8 @@ export interface DwCRecord {
   kingdom: string;
   identificationQualifier: string;
   identifiedBy: string;
-  occurrenceStatus: string;
-  lifeStage: string;
+  occurrenceStatus: 'present' | 'dead' | 'injured' | 'unknown';
+  lifeStage?: string;
   license: string;
   rightsHolder: string;
   stateProvince: string;
@@ -78,7 +78,7 @@ function formatIdentifiedBy(source: string | null): string {
  * Map vital_status to DwC occurrenceStatus.
  * alive → present, dead → dead, injured → injured, null/unknown → unknown
  */
-function mapVitalStatus(status: string | null | undefined): string {
+function mapVitalStatus(status: string | null | undefined): 'present' | 'dead' | 'injured' | 'unknown' {
   switch (status) {
     case 'alive':   return 'present';
     case 'dead':    return 'dead';
@@ -113,7 +113,7 @@ export function toDwCRecord(input: DwCInput): DwCRecord {
     identificationQualifier: qualifier,
     identifiedBy: formatIdentifiedBy(input.id_source),
     occurrenceStatus: mapVitalStatus(input.vital_status),
-    lifeStage: input.life_stage ?? '',
+    lifeStage: input.life_stage ?? undefined,
     license: input.observer_license,
     rightsHolder: input.observer_display_name ?? '',
     stateProvince: input.state_province ?? '',
