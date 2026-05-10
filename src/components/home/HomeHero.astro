@@ -1,0 +1,117 @@
+---
+import { t } from '../../i18n/utils';
+interface Props { lang: 'en' | 'es'; }
+const { lang } = Astro.props;
+const tr = t(lang);
+const h = tr.home.widgets.hero;
+---
+
+<section
+  class="hh-root rounded-2xl border-2 p-5 sm:p-6 mb-4 hidden"
+  data-lang={lang}
+  data-streak-eyebrow={h.streak_at_risk.eyebrow}
+  data-streak-title={h.streak_at_risk.title}
+  data-streak-subtitle={h.streak_at_risk.subtitle}
+  data-streak-cta={h.streak_at_risk.cta}
+  data-watch-eyebrow={h.watchlist_hit.eyebrow}
+  data-watch-title={h.watchlist_hit.title}
+  data-watch-subtitle={h.watchlist_hit.subtitle}
+  data-watch-cta={h.watchlist_hit.cta}
+  data-pending-eyebrow={h.pending_ids.eyebrow}
+  data-pending-title={h.pending_ids.title}
+  data-pending-subtitle={h.pending_ids.subtitle}
+  data-pending-cta={h.pending_ids.cta}
+  data-default-eyebrow={h.observe_default.eyebrow}
+  data-default-title={h.observe_default.title}
+  data-default-title-morning={h.observe_default.title_morning}
+  data-default-subtitle={h.observe_default.subtitle}
+  data-default-subtitle-morning={h.observe_default.subtitle_morning}
+  data-default-cta={h.observe_default.cta}
+>
+  <div class="hh-eyebrow text-xs uppercase tracking-wider font-bold mb-1.5"></div>
+  <div class="hh-title text-xl sm:text-2xl font-bold leading-tight"></div>
+  <div class="hh-subtitle text-sm mt-1.5 opacity-90"></div>
+  <a class="hh-cta inline-block mt-4 px-5 py-2.5 rounded-lg font-semibold transition-colors" href="#"></a>
+</section>
+
+<script>
+  import { getSupabase, getCachedUser } from '../../lib/supabase';
+  import { loadHeroInputs } from '../../lib/home-loaders';
+  import { resolveHeroState } from '../../lib/home-hero';
+
+  type Lang = 'en' | 'es';
+
+  const KIND_CLASSES: Record<string, string[]> = {
+    streak_at_risk: ['border-red-400', 'bg-red-50/60', 'text-red-700', 'dark:border-red-700/60', 'dark:bg-red-950/40', 'dark:text-red-300'],
+    watchlist_hit: ['border-blue-400', 'bg-blue-50/60', 'text-blue-700', 'dark:border-blue-700/60', 'dark:bg-blue-950/40', 'dark:text-blue-300'],
+    pending_ids: ['border-purple-400', 'bg-purple-50/60', 'text-purple-700', 'dark:border-purple-700/60', 'dark:bg-purple-950/40', 'dark:text-purple-300'],
+    observe_default: ['border-emerald-400', 'bg-emerald-50/60', 'text-emerald-700', 'dark:border-emerald-700/60', 'dark:bg-emerald-950/40', 'dark:text-emerald-300'],
+  };
+  const CTA_BG: Record<string, string> = {
+    streak_at_risk: 'bg-red-600 hover:bg-red-700 text-white',
+    watchlist_hit: 'bg-blue-600 hover:bg-blue-700 text-white',
+    pending_ids: 'bg-purple-600 hover:bg-purple-700 text-white',
+    observe_default: 'bg-emerald-700 hover:bg-emerald-800 text-white',
+  };
+
+  function fill(s: string, vars: Record<string, string | number>): string {
+    return s.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ''));
+  }
+
+  async function init() {
+    const root = document.querySelector<HTMLElement>('.hh-root');
+    if (!root) return;
+    const lang = (root.dataset.lang as Lang) ?? 'en';
+    const user = await getCachedUser();
+    if (!user) return;
+    let c; try { c = getSupabase(); } catch { return; }
+
+    const inputs = await loadHeroInputs(c as never, user.id, new Date());
+    const state = resolveHeroState(inputs);
+
+    const cls = KIND_CLASSES[state.kind] ?? [];
+    cls.forEach(k => root.classList.add(k));
+
+    const eyebrow = root.querySelector<HTMLElement>('.hh-eyebrow')!;
+    const title = root.querySelector<HTMLElement>('.hh-title')!;
+    const subtitle = root.querySelector<HTMLElement>('.hh-subtitle')!;
+    const cta = root.querySelector<HTMLAnchorElement>('.hh-cta')!;
+    cta.className = `hh-cta inline-block mt-4 px-5 py-2.5 rounded-lg font-semibold transition-colors ${CTA_BG[state.kind]}`;
+
+    const observeUrl = lang === 'es' ? '/es/observar/' : '/en/observe/';
+    const validateUrl = lang === 'es' ? '/es/consola/validacion/' : '/en/console/validation/';
+
+    if (state.kind === 'streak_at_risk') {
+      eyebrow.textContent = root.dataset.streakEyebrow ?? '';
+      title.textContent = fill(root.dataset.streakTitle ?? '', { streakDays: state.currentDays });
+      subtitle.textContent = root.dataset.streakSubtitle ?? '';
+      cta.textContent = root.dataset.streakCta ?? '';
+      cta.href = observeUrl;
+    } else if (state.kind === 'watchlist_hit') {
+      eyebrow.textContent = root.dataset.watchEyebrow ?? '';
+      title.textContent = fill(root.dataset.watchTitle ?? '', { taxonName: state.taxonName, km: Math.round(state.distanceKm) });
+      subtitle.textContent = root.dataset.watchSubtitle ?? '';
+      cta.textContent = root.dataset.watchCta ?? '';
+      cta.href = `/share/obs/?id=${encodeURIComponent(state.obsId)}`;
+    } else if (state.kind === 'pending_ids') {
+      eyebrow.textContent = root.dataset.pendingEyebrow ?? '';
+      title.textContent = fill(root.dataset.pendingTitle ?? '', { count: state.count });
+      subtitle.textContent = fill(root.dataset.pendingSubtitle ?? '', { taxonGroup: state.taxonGroup });
+      cta.textContent = root.dataset.pendingCta ?? '';
+      cta.href = validateUrl;
+    } else {
+      eyebrow.textContent = root.dataset.defaultEyebrow ?? '';
+      title.textContent = state.morningPeak ? (root.dataset.defaultTitleMorning ?? '') : (root.dataset.defaultTitle ?? '');
+      subtitle.textContent = state.morningPeak ? (root.dataset.defaultSubtitleMorning ?? '') : (root.dataset.defaultSubtitle ?? '');
+      cta.textContent = root.dataset.defaultCta ?? '';
+      cta.href = observeUrl;
+    }
+
+    root.classList.remove('hidden');
+    window.dispatchEvent(new CustomEvent('rastrum:home-hero-resolved', {
+      detail: { kind: state.kind },
+    }));
+  }
+
+  init().catch(() => {});
+</script>
