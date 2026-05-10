@@ -848,36 +848,37 @@ const tabs = [
       return;
     }
 
-    // Guard: check session first. getSession() reads from localStorage and
-    // is synchronous-ish — it won't hang on a stale token the way getUser()
-    // can when the refresh token is invalid and GoTrue retries internally.
-    const _sess = { user: await getCachedUser() }; const session = _sess;
-    if (!session) {
+    // Guard: check if there's an authenticated user. getCachedUser() shares
+    // a single getUser() call (30s TTL) across all concurrent components —
+    // avoids navigator.locks contention while still validating against the
+    // server on cache miss.
+    const user = await getCachedUser();
+    if (!user) {
       showExpiredSessionUI();
       return;
     }
 
-    // getUser() validates the JWT server-side. Wrap in a timeout so a
-    // stalled token-refresh doesn't leave the page spinning forever.
-    let user: import('@supabase/supabase-js').User | null = null;
+    // Double-check with a timeout so a stalled token-refresh doesn't leave
+    // the page spinning forever.
+    let verifiedUser: import('@supabase/supabase-js').User | null = null;
     try {
       const userPromise = getCachedUser().then(u => ({ data: { user: u } }));
       const timeout = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('auth_timeout')), 8_000),
       );
       const { data } = await Promise.race([userPromise, timeout]);
-      user = data.user;
+      verifiedUser = data.user;
     } catch {
       // Network error or timeout — session exists in localStorage but
       // can't be verified. Show expired-session UI.
       showExpiredSessionUI();
       return;
     }
-    if (!user) {
+    if (!verifiedUser) {
       showExpiredSessionUI();
       return;
     }
-    userId = user.id;
+    userId = verifiedUser.id;
     document.getElementById('mo-content')?.classList.remove('hidden');
     wireTabs();
     applyImpactFilterFromUrl();

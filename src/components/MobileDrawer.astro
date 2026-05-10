@@ -242,9 +242,9 @@ const getDocLabel = (key: string) => (tr.docs.sections as Record<string, string>
   }
   (async () => {
     try {
-      const session = { user: await getCachedUser() };
-      paintAuth(!!session);
-      if (session?.user) await maybeShowConsoleLink(session.user.id);
+      const user = await getCachedUser();
+      paintAuth(!!user);
+      if (user) await maybeShowConsoleLink(user.id);
       getSupabase().auth.onAuthStateChange(async (_e, s) => {
         paintAuth(!!s);
         if (s?.user) await maybeShowConsoleLink(s.user.id);

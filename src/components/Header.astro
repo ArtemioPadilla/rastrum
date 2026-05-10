@@ -415,9 +415,9 @@ const docColumns = [
 
   (async () => {
     try {
-      const session = { user: await getCachedUser() };
-      await paint(!!session, session?.user as Parameters<typeof paint>[1]);
-      if (session?.user) await maybeShowConsolePill(session.user.id);
+      const user = await getCachedUser();
+      await paint(!!user, user as Parameters<typeof paint>[1]);
+      if (user) await maybeShowConsolePill(user.id);
       getSupabase().auth.onAuthStateChange(async (_evt, s) => {
         paint(!!s, s?.user as Parameters<typeof paint>[1]);
         if (s?.user) await maybeShowConsolePill(s.user.id);

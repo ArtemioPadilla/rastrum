@@ -219,8 +219,8 @@ const discoverActive  = isActiveSection(currentPath, 'community',     lang);
 
   (async () => {
     try {
-      const session = { user: await getCachedUser() };
-      paint(!!session);
+      const user = await getCachedUser();
+      paint(!!user);
       getSupabase().auth.onAuthStateChange((_e, s) => paint(!!s));
     } catch { /* env not set; leave anon visible */ }
   })();
