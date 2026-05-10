@@ -57,11 +57,17 @@ A TypeScript template function `renderPluginCard(props): string` lives in `src/l
 export interface PluginCardProps {
   lang: 'en' | 'es';
   plugin: Identifier;                    // from src/lib/identifiers/types.ts
-  availability: AvailabilityResult;      // pre-resolved by paintRegistry
-  isDisabled: boolean;                   // from rastrum.disabledPlugins
-  cacheStatus?: ModelCacheStatus | null; // for on-device plugins
+  // NOTE (#719): the implementation uses `state: CardState` (pre-derived via
+  // deriveCardState()) instead of raw `availability: AvailabilityResult`.
+  // This was refined during implementation — state derivation was extracted
+  // into identifier-state.ts so the same logic is shared between the UI and
+  // cascade gates. The spec below reflects the actual implementation.
+  state: CardState;                      // pre-derived by paintRegistry via deriveCardState()
+  isDisabled: boolean;                   // from rastrum.pipeline.disabled
+  cacheStatus: ModelCacheStatus | null;  // for on-device plugins
   byoKeysSet: Record<string, boolean>;   // per-key-name presence map
-  sponsorship?: ActiveSponsorship | null;// only meaningful for plugin.id === 'claude_haiku'
+  sponsorship: ActiveSponsorship | null; // only meaningful for plugin.id === 'claude_haiku'
+  plantnetQuota?: PlantNetQuota | null;  // only meaningful for plugin.id === 'plantnet'
 }
 
 export function renderPluginCard(props: PluginCardProps): string;

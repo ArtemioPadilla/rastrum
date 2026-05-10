@@ -32,6 +32,17 @@ export interface PlantNetQuota {
   reset_at?: string;
 }
 
+/**
+ * Props for a unified plugin card on the AI settings tab.
+ *
+ * @see docs/superpowers/specs/2026-05-07-ai-tab-redesign-design.md
+ *
+ * NOTE (#719): The spec originally listed `availability: AvailabilityResult`
+ * here. During implementation this was refined to `state: CardState` (pre-
+ * derived via `deriveCardState()` in identifier-state.ts) so the same logic
+ * is shared between the card renderer and the cascade gates. The spec has
+ * been updated to match.
+ */
 export interface PluginCardProps {
   lang: 'en' | 'es';
   plugin: Identifier;

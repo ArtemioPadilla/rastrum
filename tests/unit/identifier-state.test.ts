@@ -72,6 +72,24 @@ describe('deriveCardState', () => {
   it('disabled state takes precedence over availability', () => {
     expect(deriveCardState(input({ isDisabled: true }))).toEqual({ kind: 'disabled' });
   });
+
+  // #717 — explicit coverage for disabled-precedence edge cases
+  it('disabled=true + availability.ready=true → returns disabled', () => {
+    // The most common path: user toggled off a plugin that is fully ready.
+    const s = deriveCardState(input({ isDisabled: true, availability: { ready: true } }));
+    expect(s).toEqual({ kind: 'disabled' });
+  });
+
+  it('disabled=true + availability.ready=false (unsupported) → unsupported wins over disabled', () => {
+    // Per spec: "User-flipped Disable wins over everything EXCEPT actual unsupportedness."
+    // A device that lacks WebGPU cannot run the model regardless of the toggle state.
+    const s = deriveCardState(input({
+      isDisabled: true,
+      availability: { ready: false, reason: 'unsupported', message: 'No WebGPU' },
+    }));
+    // Unsupported takes precedence — disabled toggle is irrelevant when the hw is missing.
+    expect(s).toEqual({ kind: 'unsupported', reason: 'webgpu', message: 'No WebGPU' });
+  });
 });
 
 describe('runStorageMigration', () => {
