@@ -25,6 +25,20 @@ export default {
     'shadow-[0_0_16px_rgba(217,70,239,0.7)]',
     'motion-safe:animate-pulse',
     'motion-safe:animate-rastrum-legend-spin',
+    // Home hero — kind-driven rail/bg/text classes resolved at runtime.
+    'border-red-400', 'bg-red-50/60', 'text-red-700',
+    'border-blue-400', 'bg-blue-50/60', 'text-blue-700',
+    'border-purple-400', 'bg-purple-50/60', 'text-purple-700',
+    'border-emerald-400', 'bg-emerald-50/60', 'text-emerald-700',
+    'dark:border-red-700/60', 'dark:bg-red-950/40', 'dark:text-red-300',
+    'dark:border-blue-700/60', 'dark:bg-blue-950/40', 'dark:text-blue-300',
+    'dark:border-purple-700/60', 'dark:bg-purple-950/40', 'dark:text-purple-300',
+    'dark:border-emerald-700/60', 'dark:bg-emerald-950/40', 'dark:text-emerald-300',
+    'bg-red-600', 'hover:bg-red-700',
+    'bg-blue-600', 'hover:bg-blue-700',
+    'bg-purple-600', 'hover:bg-purple-700',
+    'bg-emerald-700', 'hover:bg-emerald-800',
+    'text-white',
   ],
   theme: {
     extend: {

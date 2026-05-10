@@ -1,5 +1,8 @@
 ---
 import { t } from '../i18n/utils';
+import HomeHero from './home/HomeHero.astro';
+import HomeChips from './home/HomeChips.astro';
+import HomeRecent from './home/HomeRecent.astro';
 
 interface Props {
   lang: 'en' | 'es';
@@ -9,9 +12,7 @@ const { lang } = Astro.props;
 const tr = t(lang);
 const widgets = tr.home.widgets;
 const suggestions = widgets.suggestions;
-const greeting = tr.home.greeting;
 
-const recentHref = lang === 'es' ? '/es/explorar/recientes/' : '/en/explore/recent/';
 const observeHref = lang === 'es' ? '/es/observar/' : '/en/observe/';
 const leaderboardHref = lang === 'es' ? '/es/comunidad/tabla-de-lideres/' : '/en/community/leaderboard/';
 const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
@@ -28,14 +29,6 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
   data-label-streak-one={widgets.streak_label_one}
   data-label-streak-aria={widgets.streak_aria}
   data-label-streak-aria-one={widgets.streak_aria_one}
-  data-label-nearby-title-global={widgets.nearby_title_global}
-  data-label-nearby-title-local={widgets.nearby_title_local}
-  data-label-nearby-empty={widgets.nearby_empty}
-  data-label-nearby-view-all={widgets.nearby_view_all}
-  data-label-nearby-loading={widgets.nearby_loading}
-  data-label-nearby-anon={widgets.nearby_anonymous}
-  data-label-nearby-unknown-species={widgets.nearby_unknown_species}
-  data-recent-href={recentHref}
   data-observe-href={observeHref}
   data-label-challenge-title={widgets.challenge.title}
   data-label-challenge-cta={widgets.challenge.cta_observe}
@@ -66,7 +59,10 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
     </span>
   </div>
 
-  <!-- #710 Suggestions widget (signed-in users with location only) -->
+  <HomeHero lang={lang} />
+  <HomeChips lang={lang} />
+
+  <!-- #710 Daily Challenge -->
   <div class="home-widgets-challenge hidden">
     <!-- populated by script -->
   </div>
@@ -94,97 +90,21 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
     <p class="hw-suggestions-loading text-sm text-zinc-500 dark:text-zinc-400">{suggestions.loading}</p>
     <p class="hw-suggestions-empty hidden text-sm text-zinc-500 dark:text-zinc-400">{suggestions.empty}</p>
     <ul class="hw-suggestions-list grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3"></ul>
-
   </div>
 
-  <div class="home-widgets-nearby">
-    <div class="flex items-baseline justify-between gap-3 mb-3">
-      <h2 class="hw-nearby-title text-sm font-semibold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">{widgets.nearby_title_local}</h2>
-      <a
-        href={recentHref}
-        class="text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:underline"
-      >{widgets.nearby_view_all}</a>
-    </div>
-    <p class="hw-nearby-loading text-sm text-zinc-500 dark:text-zinc-400">{widgets.nearby_loading}</p>
-    <p class="hw-nearby-empty hidden text-sm text-zinc-500 dark:text-zinc-400">{widgets.nearby_empty}</p>
-    <ul class="hw-nearby-list grid grid-cols-1 sm:grid-cols-3 gap-3"></ul>
-  </div>
+  <HomeRecent lang={lang} />
 </section>
 
 <script>
   import { getSupabase, getCachedUser } from '../lib/supabase';
   import { buildGreeting } from '../lib/home-greeting';
-  import { formatTimeAgo } from '../lib/social';
+  import { loadStreak } from '../lib/home-loaders';
   import { fetchSuggestions, type SpeciesSuggestion } from '../lib/suggestions';
-  import { fetchDailyChallenge } from '../lib/daily-challenge';
-  import { fetchWeather, WMO_BUCKETS } from '../lib/home-weather';
-  type WeatherKind = 'sunny' | 'rainy' | 'cloudy' | 'snow' | 'foggy' | 'windy';
-
 
   type Lang = 'en' | 'es';
 
-  type Ident = {
-    scientific_name: string | null;
-    is_primary: boolean | null;
-    is_research_grade: boolean | null;
-    confidence: number | null;
-    taxa: { common_name_es: string | null; common_name_en: string | null } | null;
-  };
-
-  type Media = { url: string | null; is_primary: boolean | null; media_type: string | null };
-
-  type Row = {
-    id: string;
-    observed_at: string;
-    state_province: string | null;
-    country_code: string | null;
-    identifications: Ident[] | Ident | null;
-    media_files: Media[];
-  };
-
   function escapeText(s: string): string {
     return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as Record<string, string>)[c]);
-  }
-
-  function pickIdent(r: Row): Ident | null {
-    if (!r.identifications) return null;
-    if (Array.isArray(r.identifications)) {
-      if (r.identifications.length === 0) return null;
-      const primary = r.identifications.find(i => i?.is_primary);
-      if (primary) return primary;
-      return [...r.identifications].sort((a, b) => (b?.confidence ?? 0) - (a?.confidence ?? 0))[0] ?? null;
-    }
-    return r.identifications;
-  }
-
-  function rowMarkup(r: Row, lang: Lang, unknownLabel: string): string {
-    const ident = pickIdent(r);
-    const sci = ident?.scientific_name ?? unknownLabel;
-    const common = lang === 'es'
-      ? (ident?.taxa?.common_name_es ?? ident?.taxa?.common_name_en ?? '')
-      : (ident?.taxa?.common_name_en ?? ident?.taxa?.common_name_es ?? '');
-    const photoMedia = (r.media_files ?? []).filter(m => !m?.media_type || m.media_type === 'photo');
-    const photo = photoMedia.find(m => m?.is_primary)?.url ?? photoMedia.find(m => !!m?.url)?.url ?? '';
-    const ago = formatTimeAgo(r.observed_at, lang);
-    const commonHtml = common ? `<p class="text-xs text-zinc-600 dark:text-zinc-300 truncate">${escapeText(common)}</p>` : '';
-
-    return `<li>
-      <a
-        href="/share/obs/?id=${encodeURIComponent(r.id)}"
-        class="block overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 hover:border-emerald-400 dark:hover:border-emerald-700 transition-colors"
-      >
-        <div class="aspect-square w-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
-          ${photo
-            ? `<img src="${escapeText(photo)}" alt="${escapeText(sci)}" loading="lazy" class="w-full h-full object-cover" />`
-            : ''}
-        </div>
-        <div class="p-2.5">
-          <p class="text-xs italic font-semibold text-zinc-900 dark:text-zinc-100 truncate">${escapeText(sci)}</p>
-          ${commonHtml}
-          <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">${escapeText(ago)}</p>
-        </div>
-      </a>
-    </li>`;
   }
 
   function streakLabel(n: number, root: HTMLElement): string {
@@ -304,7 +224,6 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
     const subtitleEl = sugRoot.querySelector<HTMLElement>('.hw-suggestions-subtitle');
     if (!listEl) return;
 
-    // Update subtitle month name
     if (subtitleEl) {
       const tpl = sugRoot.dataset.labelSubtitle ?? '';
       subtitleEl.textContent = tpl.replace('{{month}}', monthName(lang));
@@ -314,26 +233,23 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
     emptyEl?.classList.add('hidden');
     listEl.innerHTML = '';
 
-    // Request geolocation
     let lat: number, lng: number;
     try {
       const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
           timeout: 8000,
-          maximumAge: 5 * 60 * 1000, // 5 min cache
+          maximumAge: 5 * 60 * 1000,
         });
       });
       lat = pos.coords.latitude;
       lng = pos.coords.longitude;
     } catch {
-      // Permission denied or unavailable — keep widget hidden
       loadingEl?.classList.add('hidden');
       return;
     }
 
     try {
-      // seed param forces a different result set on refresh (use limit oversample trick)
-      const limit = 10 + (seed % 5); // vary limit slightly to get different rows
+      const limit = 10 + (seed % 5);
       const all = await fetchSuggestions(userId, lat, lng, { limit });
       const dismissed = getDismissed();
       const filtered = all.filter(s => !dismissed.has(s.taxon_id)).slice(0, 5);
@@ -348,7 +264,6 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
       listEl.innerHTML = filtered.map(s => suggestionCard(s, lang, sugRoot)).join('');
       sugRoot.classList.remove('hidden');
 
-      // Wire up dismiss buttons
       listEl.querySelectorAll<HTMLButtonElement>('button[data-dismiss]').forEach(btn => {
         btn.addEventListener('click', () => {
           const taxonId = btn.dataset.dismiss ?? '';
@@ -368,102 +283,14 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // ── Leaderboard / Next badge / Daily challenge ───────────────────────────
 
-  async function init() {
-    const root = document.querySelector<HTMLElement>('.home-widgets');
-    if (!root) return;
-    const lang = (root.dataset.lang === 'es' ? 'es' : 'en') as Lang;
-
-    let supabase;
-    try {
-      supabase = getSupabase();
-    } catch {
-      return;
-    }
-
-    const user = await getCachedUser();
-    if (!user) {
-      // Signed-out: render anonymous "Recent observations" only — but skip
-      // the personalized hero entirely. Hide the greeting wrapper and show
-      // the global feed.
-      root.classList.remove('hidden');
-      const greeting = root.querySelector<HTMLElement>('.home-widgets-greeting');
-      greeting?.classList.add('hidden');
-      const titleEl = root.querySelector<HTMLElement>('.hw-nearby-title');
-      if (titleEl) titleEl.textContent = root.dataset.labelNearbyTitleGlobal ?? titleEl.textContent;
-      await paintNearby(root, lang, null, null);
-      return;
-    }
-
-    const { data: profile } = await supabase
-      .from('users')
-      .select('display_name, username, country_code, region_primary')
-      .eq('id', user.id)
-      .maybeSingle<{ display_name: string | null; username: string | null; country_code: string | null; region_primary: string | null }>();
-
-    const displayName = profile?.display_name ?? profile?.username ?? null;
-    const country = profile?.country_code ?? null;
-
-    root.classList.remove('hidden');
-    const greetingEl = root.querySelector<HTMLElement>('.hw-greeting-text');
-    if (greetingEl) {
-      greetingEl.textContent = pickGreeting(new Date().getHours(), lang, displayName, root);
-    }
-
-    // Streak badge — read user_streaks (RLS allows self-read regardless of opt-in).
-    try {
-      const { data: streak } = await supabase
-        .from('user_streaks')
-        .select('current_days')
-        .eq('user_id', user.id)
-        .maybeSingle<{ current_days: number }>();
-      const n = streak?.current_days ?? 0;
-      if (n > 0) {
-        const pill = root.querySelector<HTMLElement>('.hw-streak');
-        const text = root.querySelector<HTMLElement>('.hw-streak-text');
-        if (pill && text) {
-          text.textContent = streakLabel(n, root);
-          pill.setAttribute('aria-label', streakAriaLabel(n, root));
-          pill.classList.remove('hidden');
-        }
-      }
-    } catch { /* streaks are optional; ignore */ }
-
-    const titleEl = root.querySelector<HTMLElement>('.hw-nearby-title');
-    if (titleEl) {
-      titleEl.textContent = country
-        ? (root.dataset.labelNearbyTitleLocal ?? titleEl.textContent)
-        : (root.dataset.labelNearbyTitleGlobal ?? titleEl.textContent);
-    }
-
-    await paintLeaderboard(root, lang, user.id);
-    await paintNextBadge(root, lang, user.id);
-    await paintChallenge(root, lang, user.id);
-    await paintNearby(root, lang, country, profile?.region_primary ?? null);
-
-    // Fire suggestions widget (no await — it runs in parallel via geolocation)
-    let suggestionSeed = 0;
-    paintSuggestions(root, lang, user.id, suggestionSeed).catch(() => {/* optional widget */});
-
-    // Wire up the Refresh button
-    const sugRoot = root.querySelector<HTMLElement>('.home-widgets-suggestions');
-    sugRoot?.querySelector<HTMLButtonElement>('.hw-suggestions-refresh')?.addEventListener('click', () => {
-      suggestionSeed = (suggestionSeed + 1) % 100;
-      // Clear dismissed on refresh
-      try { sessionStorage.removeItem(DISMISSED_KEY); } catch { /* ignore */ }
-      paintSuggestions(root, lang, user.id, suggestionSeed).catch(() => {/* optional */});
-    });
-  }
-
-  async function paintLeaderboard(root: HTMLElement, lang: Lang, _userId: string): Promise<void> {
+  async function paintLeaderboard(root: HTMLElement, _lang: Lang, _userId: string): Promise<void> {
     const container = root.querySelector<HTMLElement>('.home-widgets-leaderboard');
     if (!container) return;
 
     let supabase;
-    try {
-      supabase = getSupabase();
-    } catch { return; }
+    try { supabase = getSupabase(); } catch { return; }
 
     type LeaderRow = {
       user_id: string;
@@ -474,7 +301,6 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
     };
 
     try {
-      // Query top 3 from 30d MV — sorted server-side
       const { data, error } = await supabase
         .from('karma_leaderboard_30d')
         .select('user_id, username, display_name, avatar_url, karma_30d')
@@ -526,9 +352,7 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
     if (!container) return;
 
     let supabase;
-    try {
-      supabase = getSupabase();
-    } catch { return; }
+    try { supabase = getSupabase(); } catch { return; }
 
     type BadgeRow = {
       key: string;
@@ -542,7 +366,6 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
     type UserBadgeRow = { badge_key: string; awarded_at: string | null };
 
     try {
-      // Get all badges and which ones the user has earned
       const [{ data: allBadges }, { data: userBadges }] = await Promise.all([
         supabase.from('badges').select('key, name_en, name_es, description_en, description_es, tier').limit(100),
         supabase.from('user_badges').select('badge_key, awarded_at').eq('user_id', userId),
@@ -551,7 +374,6 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
       if (!allBadges) return;
       const earnedKeys = new Set((userBadges ?? []).map((ub: UserBadgeRow) => ub.badge_key));
 
-      // Find first unearned badge (ordered by tier: bronze → silver → gold → platinum)
       const tierOrder: Record<string, number> = { bronze: 0, silver: 1, gold: 2, platinum: 3 };
       const unearned = (allBadges as BadgeRow[])
         .filter(b => !earnedKeys.has(b.key))
@@ -618,13 +440,10 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
 
   async function paintChallenge(root: HTMLElement, lang: Lang, userId: string): Promise<void> {
     const container = root.querySelector<HTMLElement>('.home-widgets-challenge');
-
     if (!container) return;
 
     let supabase;
-    try {
-      supabase = getSupabase();
-    } catch { return; }
+    try { supabase = getSupabase(); } catch { return; }
 
     type ChallengeRow = {
       taxon_id: string;
@@ -662,7 +481,6 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
       const observeBase = root.dataset.observeHref ?? (lang === 'es' ? '/es/observar/' : '/en/observe/');
       const ctaHref = `${observeBase}?taxon_id=${encodeURIComponent(ch.taxon_id)}`;
 
-      // Check if already observed today
       const todayStart = new Date();
       todayStart.setUTCHours(0, 0, 0, 0);
 
@@ -673,8 +491,6 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
         .eq('sync_status', 'synced')
         .gte('observed_at', todayStart.toISOString());
 
-      // Simplified completed check — if they have any observation today we show completed
-      // (full taxon join would require identifications query)
       const completed = (count ?? 0) > 0;
 
       const thumbHtml = ch.thumbnail_url
@@ -698,82 +514,72 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
               ${commonName ? `<p class="text-xs text-zinc-600 dark:text-zinc-300 truncate mb-1">${escapeText(commonName)}</p>` : ''}
               ${ch.why ? `<p class="text-[11px] text-zinc-500 dark:text-zinc-400 mb-2"><span class="font-medium">${escapeText(whyLabel)}:</span> ${escapeText(ch.why)}</p>` : ''}
               ${ctaHtml}
-
             </div>
           </div>
         </div>`;
       container.classList.remove('hidden');
     } catch { /* challenge is optional */ }
-
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
 
-  async function paintNearby(root: HTMLElement, lang: Lang, country: string | null, _region: string | null): Promise<void> {
-    const listEl = root.querySelector<HTMLUListElement>('.hw-nearby-list');
-    const loadingEl = root.querySelector<HTMLElement>('.hw-nearby-loading');
-    const emptyEl = root.querySelector<HTMLElement>('.hw-nearby-empty');
-    const unknownLabel = root.dataset.labelNearbyUnknownSpecies ?? 'Unknown species';
-    if (!listEl) return;
+  async function init() {
+    const root = document.querySelector<HTMLElement>('.home-widgets');
+    if (!root) return;
+    const lang = (root.dataset.lang === 'es' ? 'es' : 'en') as Lang;
 
     let supabase;
-    try {
-      supabase = getSupabase();
-    } catch {
-      loadingEl?.classList.add('hidden');
+    try { supabase = getSupabase(); } catch { return; }
+
+    const user = await getCachedUser();
+    if (!user) {
+      // Signed-out: keep the widget hidden. The marketing hero / how / why
+      // sections handle the anon experience. HomeRecent will silently no-op
+      // its own auth check — no dangling spinners.
       return;
     }
 
-    try {
-      let query = supabase
-        .from('observations')
-        .select(`
-          id, observed_at, state_province, country_code,
-          identifications(scientific_name, is_primary, is_research_grade, confidence, taxa(common_name_es, common_name_en)),
-          media_files(url, is_primary, media_type)
-        `)
-        .eq('sync_status', 'synced')
-        .order('observed_at', { ascending: false })
-        .limit(3);
-      if (country) query = query.eq('country_code', country);
-      const { data, error } = await query;
-      if (error) throw error;
-      const rows = ((data ?? []) as unknown) as Row[];
+    const { data: profile } = await supabase
+      .from('users')
+      .select('display_name, username')
+      .eq('id', user.id)
+      .maybeSingle<{ display_name: string | null; username: string | null }>();
 
-      // Country-scoped fetch may yield zero rows in low-density regions —
-      // fall back to global so the widget never goes empty for signed-in
-      // users with a known country.
-      const finalRows = rows.length > 0 || !country
-        ? rows
-        : await (async () => {
-            const { data: g } = await supabase
-              .from('observations')
-              .select(`
-                id, observed_at, state_province, country_code,
-                identifications(scientific_name, is_primary, is_research_grade, confidence, taxa(common_name_es, common_name_en)),
-                media_files(url, is_primary, media_type)
-              `)
-              .eq('sync_status', 'synced')
-              .order('observed_at', { ascending: false })
-              .limit(3);
-            // Title flips back to global when we fell back.
-            const titleEl = root.querySelector<HTMLElement>('.hw-nearby-title');
-            if (titleEl) titleEl.textContent = root.dataset.labelNearbyTitleGlobal ?? titleEl.textContent;
-            return ((g ?? []) as unknown) as Row[];
-          })();
+    const displayName = profile?.display_name ?? profile?.username ?? null;
 
-      loadingEl?.classList.add('hidden');
-      if (finalRows.length === 0) {
-        emptyEl?.classList.remove('hidden');
-        return;
-      }
-      listEl.innerHTML = finalRows.map(r => rowMarkup(r, lang, unknownLabel)).join('');
-    } catch {
-      loadingEl?.classList.add('hidden');
-      emptyEl?.classList.remove('hidden');
+    root.classList.remove('hidden');
+    const greetingEl = root.querySelector<HTMLElement>('.hw-greeting-text');
+    if (greetingEl) {
+      greetingEl.textContent = pickGreeting(new Date().getHours(), lang, displayName, root);
     }
+
+    const streak = await loadStreak(supabase, user.id);
+    const n = streak?.currentDays ?? 0;
+    if (n > 0) {
+      const pill = root.querySelector<HTMLElement>('.hw-streak');
+      const text = root.querySelector<HTMLElement>('.hw-streak-text');
+      if (pill && text) {
+        text.textContent = streakLabel(n, root);
+        pill.setAttribute('aria-label', streakAriaLabel(n, root));
+        pill.classList.remove('hidden');
+      }
+    }
+
+    await paintLeaderboard(root, lang, user.id);
+    await paintNextBadge(root, lang, user.id);
+    await paintChallenge(root, lang, user.id);
+
+    // Suggestions runs in parallel via geolocation; doesn't block.
+    let suggestionSeed = 0;
+    paintSuggestions(root, lang, user.id, suggestionSeed).catch(() => {/* optional */});
+
+    const sugRoot = root.querySelector<HTMLElement>('.home-widgets-suggestions');
+    sugRoot?.querySelector<HTMLButtonElement>('.hw-suggestions-refresh')?.addEventListener('click', () => {
+      suggestionSeed = (suggestionSeed + 1) % 100;
+      try { sessionStorage.removeItem(DISMISSED_KEY); } catch { /* ignore */ }
+      paintSuggestions(root, lang, user.id, suggestionSeed).catch(() => {/* optional */});
+    });
   }
 
-  init().catch(() => {
-    document.querySelector<HTMLElement>('.home-widgets .hw-nearby-loading')?.classList.add('hidden');
-  });
+  init().catch(() => {});
 </script>

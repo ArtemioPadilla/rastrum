@@ -1,0 +1,82 @@
+---
+import { t } from '../../i18n/utils';
+import WhyAmISeeingThis from '../WhyAmISeeingThis.astro';
+interface Props { lang: 'en' | 'es'; }
+const { lang } = Astro.props;
+const tr = t(lang);
+const w = tr.home.widgets;
+const viewAllHref = lang === 'es' ? '/es/explorar/recientes/' : '/en/explore/recent/';
+---
+
+<section class="hr-root mb-8" data-lang={lang}
+  data-title-local={w.nearby_title_local} data-title-global={w.nearby_title_global}
+  data-loading={w.nearby_loading} data-empty={w.nearby_empty} data-unknown-species={w.nearby_unknown_species}>
+  <div class="flex items-baseline justify-between gap-3 mb-2">
+    <h2 class="hr-title text-sm font-semibold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">{w.nearby_title_global}</h2>
+    <a href={viewAllHref} class="text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:underline">{w.nearby_view_all}</a>
+  </div>
+  <div class="mb-3"><WhyAmISeeingThis algorithm="home_recent_nearby" lang={lang} /></div>
+  <p class="hr-loading text-sm text-zinc-500 dark:text-zinc-400">{w.nearby_loading}</p>
+  <p class="hr-empty hidden text-sm text-zinc-500 dark:text-zinc-400">{w.nearby_empty}</p>
+  <ul class="hr-list grid grid-cols-1 sm:grid-cols-3 gap-3"></ul>
+</section>
+
+<script>
+  import { getSupabase, getCachedUser } from '../../lib/supabase';
+  import { loadRecent } from '../../lib/home-loaders';
+  import { formatTimeAgo } from '../../lib/social';
+
+  type Lang = 'en' | 'es';
+
+  function escape(s: string): string {
+    const map: Record<string, string> = { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' };
+    return s.replace(/[&<>"']/g, ch => map[ch]);
+  }
+
+  async function init() {
+    const root = document.querySelector<HTMLElement>('.hr-root');
+    if (!root) return;
+    const lang = (root.dataset.lang as Lang) ?? 'en';
+    const list = root.querySelector<HTMLUListElement>('.hr-list');
+    const loading = root.querySelector<HTMLElement>('.hr-loading');
+    const empty = root.querySelector<HTMLElement>('.hr-empty');
+    if (!list) return;
+
+    let c; try { c = getSupabase(); } catch { loading?.classList.add('hidden'); return; }
+    const user = await getCachedUser();
+    let country: string | null = null;
+    if (user) {
+      const { data } = await c.from('users').select('country_code').eq('id', user.id).maybeSingle();
+      country = (data as { country_code: string | null } | null)?.country_code ?? null;
+    }
+
+    const { rows, usedLocalScope } = await loadRecent(c as never, lang, country);
+    loading?.classList.add('hidden');
+    if (rows.length === 0) { empty?.classList.remove('hidden'); return; }
+
+    if (usedLocalScope && country) {
+      const titleEl = root.querySelector<HTMLElement>('.hr-title');
+      if (titleEl) titleEl.textContent = (root.dataset.titleLocal ?? '').replace('{country}', country);
+    }
+
+    const unknown = root.dataset.unknownSpecies ?? 'Unknown species';
+    list.innerHTML = rows.map(r => {
+      const sci = r.scientificName ?? unknown;
+      const common = r.commonName ?? '';
+      const ago = formatTimeAgo(r.observedAt, lang);
+      const photo = r.photoUrl
+        ? `<img src="${escape(r.photoUrl)}" alt="${escape(sci)}" loading="lazy" class="w-full h-full object-cover" />`
+        : '';
+      return `<li><a href="/share/obs/?id=${encodeURIComponent(r.id)}" class="block overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 hover:border-emerald-400 dark:hover:border-emerald-700 transition-colors">
+        <div class="aspect-square w-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">${photo}</div>
+        <div class="p-2.5">
+          <p class="text-xs italic font-semibold text-zinc-900 dark:text-zinc-100 truncate">${escape(sci)}</p>
+          ${common ? `<p class="text-xs text-zinc-600 dark:text-zinc-300 truncate">${escape(common)}</p>` : ''}
+          <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">${escape(ago)}</p>
+        </div>
+      </a></li>`;
+    }).join('');
+  }
+
+  init().catch(() => {});
+</script>

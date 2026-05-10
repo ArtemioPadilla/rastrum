@@ -1,0 +1,59 @@
+---
+import { t } from '../../i18n/utils';
+interface Props { lang: 'en' | 'es'; }
+const { lang } = Astro.props;
+const tr = t(lang);
+const c = tr.home.widgets.chips;
+const inboxHref = lang === 'es' ? '/es/bandeja/' : '/en/inbox/';
+const validateHref = lang === 'es' ? '/es/consola/validacion/' : '/en/console/validation/';
+const faltaDexHref = lang === 'es' ? '/es/perfil/dex/' : '/en/profile/dex/';
+const watchlistHref = lang === 'es' ? '/es/explorar/seguimiento/' : '/en/explore/watchlist/';
+---
+
+<nav class="hc-root grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6" data-lang={lang} aria-label="Home actions">
+  <a class="hc-tile" href={inboxHref} data-key="inbox"><span class="hc-icon" aria-hidden="true">📬</span><span class="hc-label">{c.inbox}</span><span class="hc-count tabular-nums" aria-hidden="true"></span></a>
+  <a class="hc-tile" href={validateHref} data-key="validate"><span class="hc-icon" aria-hidden="true">🔍</span><span class="hc-label">{c.validate}</span><span class="hc-count tabular-nums" aria-hidden="true"></span></a>
+  <a class="hc-tile" href={faltaDexHref} data-key="falta_dex"><span class="hc-icon" aria-hidden="true">📊</span><span class="hc-label">{c.falta_dex}</span><span class="hc-count tabular-nums" aria-hidden="true"></span></a>
+  <a class="hc-tile" href={watchlistHref} data-key="watchlist"><span class="hc-icon" aria-hidden="true">👀</span><span class="hc-label">{c.watchlist}</span><span class="hc-count tabular-nums" aria-hidden="true"></span></a>
+</nav>
+
+<style>
+  .hc-tile { display:flex; align-items:center; gap:.5rem; padding:.6rem .75rem; border:1px solid rgb(228 228 231); border-radius:.75rem; font-size:.875rem; transition:border-color .15s; }
+  .hc-tile:hover { border-color:rgb(110 231 183); }
+  :global(.dark) .hc-tile { border-color:rgb(63 63 70); }
+  .hc-count { margin-left:auto; min-width:1.5em; text-align:right; font-weight:600; opacity:.8; }
+</style>
+
+<script>
+  import { getSupabase, getCachedUser } from '../../lib/supabase';
+  import { loadInboxCount, loadValidateCount, loadFaltaDexCount } from '../../lib/home-loaders';
+
+  async function init() {
+    const root = document.querySelector<HTMLElement>('.hc-root');
+    if (!root) return;
+    const user = await getCachedUser();
+    if (!user) return;
+    let c; try { c = getSupabase(); } catch { return; }
+
+    const [inbox, validate, falta] = await Promise.all([
+      loadInboxCount(c, user.id),
+      loadValidateCount(c),
+      loadFaltaDexCount(c),
+    ]);
+
+    const setCount = (key: string, n: number) => {
+      const el = root.querySelector<HTMLElement>(`[data-key="${key}"] .hc-count`);
+      if (!el) return;
+      if (n <= 0) { el.textContent = ''; return; }
+      el.textContent = n >= 99 ? '99+' : String(n);
+    };
+    setCount('inbox', inbox);
+    setCount('validate', validate);
+    setCount('falta_dex', falta.count);
+    // watchlist count omitted in v1 — promotion of watchlist hits happens
+    // through the hero (when the loader is wired up in v1.1). The chip
+    // remains as a navigation affordance.
+  }
+
+  init().catch(() => {});
+</script>

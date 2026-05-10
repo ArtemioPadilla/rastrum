@@ -10917,7 +10917,7 @@ $$;
 REVOKE EXECUTE ON FUNCTION public.suggest_nearby_species(uuid, double precision, double precision, integer, integer, integer) FROM PUBLIC;
 GRANT  EXECUTE ON FUNCTION public.suggest_nearby_species(uuid, double precision, double precision, integer, integer, integer) TO authenticated;
 
--- ============================================================
+-- ====================================================
 -- #934 — taxa.rarity_tier backfill + nightly recompute
 -- Tier 1 = common    (≥50 synced observations on platform)
 -- Tier 2 = uncommon  (10–49 observations)
@@ -10989,3 +10989,114 @@ $$;
 
 REVOKE EXECUTE ON FUNCTION public.recompute_taxa_rarity() FROM PUBLIC;
 GRANT  EXECUTE ON FUNCTION public.recompute_taxa_rarity() TO service_role;
+-- =====================================================================
+-- M33: home page redesign — pulse + counts + falta-dex summary
+-- See docs/superpowers/specs/2026-05-09-home-page-redesign-design.md.
+-- =====================================================================
+
+-- Marketing live-pulse counts (last 30 days). Cached at the EF layer.
+CREATE OR REPLACE FUNCTION public.home_pulse_stats()
+RETURNS TABLE(obs_30d int, species_30d int, active_observers_30d int)
+LANGUAGE sql STABLE SECURITY INVOKER
+SET search_path = public, extensions, pg_temp
+AS $$
+  SELECT
+    (SELECT count(*)::int FROM observations
+       WHERE sync_status='synced' AND observed_at >= now() - interval '30 days'),
+    (SELECT count(DISTINCT primary_taxon_id)::int FROM observations
+       WHERE sync_status='synced' AND observed_at >= now() - interval '30 days'
+         AND primary_taxon_id IS NOT NULL),
+    (SELECT count(DISTINCT observer_id)::int FROM observations
+       WHERE sync_status='synced' AND observed_at >= now() - interval '30 days');
+$$;
+GRANT EXECUTE ON FUNCTION public.home_pulse_stats() TO anon, authenticated;
+
+-- Partial index — accelerates pending_validation_count's WHERE clause.
+CREATE INDEX IF NOT EXISTS idx_id_pending
+  ON public.identifications (observation_id)
+  WHERE is_research_grade = false AND validated_by IS NULL;
+
+-- Returns the number of pending community IDs scoped to the caller's
+-- expert kingdoms (users.expert_taxa). Capped at 99 (UI shows "99+").
+-- Returns 0 for non-experts. Falls back to all taxa when expert_taxa is
+-- NULL or empty so newly-onboarded experts still see the queue.
+CREATE OR REPLACE FUNCTION public.pending_validation_count()
+RETURNS int
+LANGUAGE plpgsql STABLE SECURITY INVOKER
+SET search_path = public, extensions, pg_temp
+AS $$
+DECLARE
+  uid uuid := auth.uid();
+  n   int;
+BEGIN
+  IF uid IS NULL THEN RETURN 0; END IF;
+  IF NOT has_role(uid, 'expert') THEN RETURN 0; END IF;
+
+  SELECT LEAST(count(*), 99)::int INTO n
+  FROM identifications i
+  JOIN observations    o ON o.id = i.observation_id
+  JOIN taxa            t ON t.id = i.taxon_id
+  JOIN users           u ON u.id = uid
+  WHERE i.is_research_grade = false
+    AND i.validated_by IS NULL
+    AND o.observer_id <> uid
+    AND (u.expert_taxa IS NULL
+         OR cardinality(u.expert_taxa) = 0
+         OR t.kingdom = ANY(u.expert_taxa));
+
+  RETURN COALESCE(n, 0);
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.pending_validation_count() TO authenticated;
+
+-- Composite indexes — accelerate falta_dex_summary's two regional/owner
+-- subqueries. Idempotent.
+CREATE INDEX IF NOT EXISTS idx_obs_state_taxon
+  ON public.observations (state_province, primary_taxon_id)
+  WHERE primary_taxon_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_obs_observer_taxon
+  ON public.observations (observer_id, primary_taxon_id)
+  WHERE primary_taxon_id IS NOT NULL;
+
+-- Returns a summary of falta-dex gaps for the caller — count of taxa
+-- observed in user's region_primary but NOT yet observed by the caller,
+-- capped at 999. Returns (0, NULL) for users without region_primary set.
+-- Both subqueries btrim(state_province) to match the leaderboard
+-- convention; the user's-own subquery filters sync_status='synced' so
+-- pending drafts don't silently exclude taxa from the gap count.
+CREATE OR REPLACE FUNCTION public.falta_dex_summary()
+RETURNS TABLE(gap_count int, region text)
+LANGUAGE plpgsql STABLE SECURITY INVOKER
+SET search_path = public, extensions, pg_temp
+AS $$
+DECLARE
+  uid uuid := auth.uid();
+  user_region text;
+BEGIN
+  IF uid IS NULL THEN
+    RETURN QUERY SELECT 0::int, NULL::text; RETURN;
+  END IF;
+
+  SELECT btrim(region_primary) INTO user_region FROM users WHERE id = uid;
+  IF user_region IS NULL OR length(user_region) = 0 THEN
+    RETURN QUERY SELECT 0::int, NULL::text; RETURN;
+  END IF;
+
+  RETURN QUERY
+  SELECT
+    LEAST(count(DISTINCT t.id), 999)::int AS gap_count,
+    user_region                          AS region
+  FROM taxa t
+  WHERE t.id IN (
+    SELECT DISTINCT primary_taxon_id FROM observations
+    WHERE btrim(state_province) = user_region AND primary_taxon_id IS NOT NULL
+  )
+  AND t.id NOT IN (
+    SELECT DISTINCT primary_taxon_id FROM observations
+    WHERE observer_id = uid
+      AND primary_taxon_id IS NOT NULL
+      AND sync_status = 'synced'
+  );
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.falta_dex_summary() TO authenticated;
