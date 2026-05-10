@@ -204,7 +204,8 @@ const filterAllLabel = (ctx as any).filter_all ?? (isEs ? 'Ver todas' : 'Show al
 <script>
   import { fetchProbableTaxa, pickCommonName, formatDistancePill, suggestCacheKey } from '../lib/contextual-suggest';
   import type { ProbableTaxon } from '../lib/contextual-suggest';
-  import { filterChipsByDex, type ChipRow } from '../lib/contextual-chips-filter';
+  import { filterChipsByDex } from '../lib/contextual-chips-filter';
+  import type { ProbableTaxon } from '../lib/contextual-suggest';
   import { getCachedUser } from '../lib/supabase';
 
   const root = document.getElementById('obs2-contextual-chips');
@@ -219,7 +220,7 @@ const filterAllLabel = (ctx as any).filter_all ?? (isEs ? 'Ver todas' : 'Show al
     if (!statusEl || !listEl || !emptyEl) return;
 
     let loaded = false;
-    let allChipRows: ChipRow[] = [];
+    let allChipRows: ProbableTaxon[] = [];
     let newOnlyActive = false;
 
     // Wire filter toggle
@@ -306,7 +307,7 @@ const filterAllLabel = (ctx as any).filter_all ?? (isEs ? 'Ver todas' : 'Show al
         return;
       }
 
-      allChipRows = rows as ChipRow[];
+      allChipRows = rows; // ProbableTaxon has has_observed_by_viewer
       renderChips(filterChipsByDex(allChipRows, newOnlyActive));
     }
 
