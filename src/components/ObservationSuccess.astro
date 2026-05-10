@@ -198,12 +198,19 @@ const isEs = lang === 'es';
             : `Profile-dex: ${obsCount} / 100`;
           dexIncrement.textContent = '+1';
 
-          if (progressBar) progressBar.style.width = `${pct}%`;
-          if (progressContainer) {
-            progressContainer.setAttribute('aria-valuenow', String(cappedCount));
-          }
-
+          // Double rAF: first frame reveals the dex card at width 0%,
+          // second frame triggers the CSS transition to the target width.
+          // Without this, the browser collapses initial+final into one paint
+          // and the transition never fires. (ArtemIO review suggestion, #942 PR6)
           dexEl.classList.remove('hidden');
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              if (progressBar) progressBar.style.width = `${pct}%`;
+              if (progressContainer) {
+                progressContainer.setAttribute('aria-valuenow', String(cappedCount));
+              }
+            });
+          });
         }
       }
     } catch { /* non-fatal */ }
