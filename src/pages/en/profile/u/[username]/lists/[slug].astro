@@ -4,7 +4,7 @@
  * Route: /en/profile/u/[username]/lists/[slug]/
  * Issue #875.
  */
-import BaseLayout from '../../../../../layouts/BaseLayout.astro';
+import BaseLayout from '../../../../../../layouts/BaseLayout.astro';
 
 const lang = 'en' as const;
 const { username, slug } = Astro.params as { username: string; slug: string };
@@ -72,7 +72,7 @@ const { username, slug } = Astro.params as { username: string; slug: string };
 </BaseLayout>
 
 <script>
-  import { getCachedUser, getSupabase } from '../../../../../lib/supabase';
+  import { getCachedUser, getSupabase } from '../../../../../../lib/supabase';
 
   const root = document.getElementById('list-detail-root') as HTMLDivElement;
   const lang = root.dataset.lang as 'en' | 'es';
