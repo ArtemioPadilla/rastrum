@@ -168,7 +168,7 @@ async function fetchFromRastrum(query: string): Promise<TaxonSuggestion[]> {
     ? supabase
         .from('observations')
         .select('primary_scientific_name')
-        .eq('user_id', user.id)
+        .eq('observer_id', user.id)
         .ilike('primary_scientific_name', `${q}%`)
         .limit(MAX_RESULTS)
     : null;

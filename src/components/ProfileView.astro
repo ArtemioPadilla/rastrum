@@ -474,7 +474,7 @@ const ep = (tr as unknown as { profile: { expert_prompt: Record<string, string> 
     const { data: obsRows } = await supabase
       .from('observations')
       .select('id, sync_status, obscure_level, observed_at')
-      .eq('user_id', user.id)
+      .eq('observer_id', user.id)
       .eq('sync_status', 'synced')
       .order('observed_at', { ascending: false })
       .limit(4);
