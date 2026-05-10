@@ -10876,6 +10876,9 @@ AS $$
     JOIN public.identifications i ON i.observation_id = o.id AND i.is_primary
     WHERE o.sync_status = 'synced'
       AND o.location IS NOT NULL
+      AND o.establishment_means = 'wild'  -- #942: exclude cultivated/captive/domestic species
+      -- Valid values (CHECK constraint): 'wild'|'cultivated'|'captive'|'uncertain'
+      -- Darwin Core establishmentMeans. All pre-2026 rows backfilled to 'wild' (schema:3078).
       AND ST_DWithin(
             o.location::geography,
             ST_SetSRID(ST_MakePoint(p_lng, p_lat), 4326)::geography,
@@ -10902,12 +10905,7 @@ AS $$
     t.kingdom,
     t.class,
     n.nearby_count,
-    (SELECT mf.url FROM public.media_files mf
-       JOIN public.observations mo ON mo.id = mf.observation_id
-       JOIN public.identifications mi ON mi.observation_id = mo.id
-         AND mi.taxon_id = t.id AND mi.is_primary
-       WHERE mf.is_primary AND mo.sync_status = 'synced'
-       LIMIT 1) AS photo_url
+    NULL::text AS photo_url  -- #942: no stranger thumbnails (privacy + framing)
   FROM nearby n
   JOIN public.taxa t ON t.id = n.taxon_id
   ORDER BY n.nearby_count DESC
@@ -11101,4 +11099,66 @@ END;
 $$;
 GRANT EXECUTE ON FUNCTION public.falta_dex_summary() TO authenticated;
 
--- ci: trigger db-validate for fix/944-gemma4-system-prompt-v2 (no schema changes in this PR)
+-- ====================================================
+-- #942 PR1 — Observation form redesign: schema deltas
+-- Observation defaults memory + honest first-in-sector claim
+-- ====================================================
+
+-- Defaults memory: persists last habitat/weather/license per user (jsonb)
+ALTER TABLE public.users
+  ADD COLUMN IF NOT EXISTS last_observation_defaults jsonb NOT NULL DEFAULT '{}'::jsonb;
+
+COMMENT ON COLUMN public.users.last_observation_defaults IS
+  'Remembers last-used observation defaults (habitat, weather, license) per user.
+   Pre-filled on next form open. Privacy: read only by the owning user (RLS).';
+
+-- is_first_in_sector — honest claim helper for the success state celebration
+-- Returns true only when:
+--   1. The sector (1 km radius) has >= 50 historical observations (honest-norms n>=50 invariant, v1.1.5)
+--   2. The supplied observation is the first one in that sector on its own calendar day
+-- Returns false in all other cases (including sectors with < 50 historical obs).
+CREATE OR REPLACE FUNCTION public.is_first_in_sector(p_obs_id uuid)
+RETURNS boolean
+LANGUAGE sql STABLE
+SECURITY DEFINER
+SET search_path = public, extensions, pg_temp
+AS $$
+  -- Single-scan optimisation (ArtemIO review #942 PR1):
+  -- One CTE scans the sector once and computes both:
+  --   (a) the total neighbour count  → n>=50 honest-norms check
+  --   (b) whether any neighbour shares the same calendar day
+  -- The original implementation ran two separate ST_DWithin scans.
+  WITH this_obs AS (
+    SELECT location, observed_at
+    FROM public.observations
+    WHERE id = p_obs_id
+      AND location IS NOT NULL
+  ),
+  sector_stats AS (
+    SELECT
+      count(*)                                                         AS total_neighbours,
+      count(*) FILTER (
+        WHERE date_trunc('day', o.observed_at AT TIME ZONE 'UTC')
+            = date_trunc('day', t.observed_at AT TIME ZONE 'UTC')
+      )                                                                AS same_day_neighbours
+    FROM public.observations o, this_obs t
+    WHERE o.location IS NOT NULL
+      AND ST_DWithin(o.location::geography, t.location::geography, 1000)
+      AND o.id != p_obs_id
+  )
+  SELECT
+    CASE
+      -- Honest-norms invariant v1.1.5: only claim "first" when the sector
+      -- has enough historical data (n>=50). Below that threshold we simply
+      -- return false — we cannot make a meaningful claim.
+      WHEN total_neighbours < 50 THEN false
+      -- Sector has enough history: first today iff no same-day neighbours.
+      ELSE same_day_neighbours = 0
+    END
+  FROM sector_stats;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.is_first_in_sector(uuid) FROM PUBLIC;
+GRANT  EXECUTE ON FUNCTION public.is_first_in_sector(uuid) TO authenticated;
+
+-- ci: trigger db-validate (no schema changes in this branch)
