@@ -1,0 +1,400 @@
+---
+/**
+ * SpeciesListsView — "My Lists" tab on the profile page.
+ * Shows the signed-in user's species lists with create/edit/delete.
+ * Issue #875.
+ */
+interface Props {
+  lang: 'en' | 'es';
+}
+const { lang } = Astro.props;
+const isEs = lang === 'es';
+
+const labels = {
+  heading:        isEs ? 'Mis listas' : 'My lists',
+  create:         isEs ? 'Nueva lista' : 'New list',
+  empty:          isEs ? 'No has creado ninguna lista todavía.' : 'You haven\'t created any lists yet.',
+  name_en:        isEs ? 'Nombre (inglés)' : 'Name (English)',
+  name_es:        isEs ? 'Nombre (español)' : 'Name (Spanish)',
+  description_en: isEs ? 'Descripción (inglés)' : 'Description (English)',
+  description_es: isEs ? 'Descripción (español)' : 'Description (Spanish)',
+  visibility:     isEs ? 'Visibilidad' : 'Visibility',
+  public:         isEs ? 'Pública' : 'Public',
+  private:        isEs ? 'Privada' : 'Private',
+  save:           isEs ? 'Guardar' : 'Save',
+  cancel:         isEs ? 'Cancelar' : 'Cancel',
+  delete:         isEs ? 'Eliminar' : 'Delete',
+  edit:           isEs ? 'Editar' : 'Edit',
+  items:          isEs ? 'especies' : 'species',
+  confirm_delete: isEs ? '¿Eliminar esta lista?' : 'Delete this list?',
+  loading:        isEs ? 'Cargando…' : 'Loading…',
+  sign_in:        isEs ? 'Inicia sesión para ver tus listas.' : 'Sign in to see your lists.',
+  private_badge:  isEs ? 'Privada' : 'Private',
+  view:           isEs ? 'Ver' : 'View',
+  saving:         isEs ? 'Guardando…' : 'Saving…',
+  error_save:     isEs ? 'Error al guardar.' : 'Failed to save.',
+  error_delete:   isEs ? 'Error al eliminar.' : 'Failed to delete.',
+  name_required:  isEs ? 'El nombre es requerido.' : 'Name is required.',
+};
+---
+
+<div
+  id="species-lists-view"
+  class="max-w-3xl mx-auto"
+  data-lang={lang}
+  data-labels={JSON.stringify(labels)}
+>
+  <!-- Signed-out -->
+  <div id="sl-signed-out" class="hidden py-16 text-center">
+    <p class="text-zinc-500 dark:text-zinc-400">{labels.sign_in}</p>
+  </div>
+
+  <!-- Loading skeleton -->
+  <div id="sl-loading" class="py-10 text-center text-sm text-zinc-500 dark:text-zinc-400">
+    {labels.loading}
+  </div>
+
+  <!-- Main content -->
+  <div id="sl-content" class="hidden">
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="text-xl font-bold text-zinc-900 dark:text-zinc-100">{labels.heading}</h2>
+      <button
+        id="sl-create-btn"
+        type="button"
+        class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 text-sm font-semibold text-white transition-colors"
+      >
+        <svg aria-hidden="true" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+        </svg>
+        {labels.create}
+      </button>
+    </div>
+
+    <!-- Create / Edit form (hidden by default) -->
+    <div id="sl-form-wrap" class="hidden mb-6 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4">
+      <form id="sl-form" class="space-y-3" novalidate>
+        <input type="hidden" id="sl-form-id" value="" />
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label for="sl-name-es" class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{labels.name_es}</label>
+            <input
+              id="sl-name-es"
+              type="text"
+              maxlength="120"
+              class="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+          <div>
+            <label for="sl-name-en" class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{labels.name_en}</label>
+            <input
+              id="sl-name-en"
+              type="text"
+              maxlength="120"
+              class="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+          <div>
+            <label for="sl-desc-es" class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{labels.description_es}</label>
+            <textarea
+              id="sl-desc-es"
+              rows="2"
+              maxlength="500"
+              class="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
+            ></textarea>
+          </div>
+          <div>
+            <label for="sl-desc-en" class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">{labels.description_en}</label>
+            <textarea
+              id="sl-desc-en"
+              rows="2"
+              maxlength="500"
+              class="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
+            ></textarea>
+          </div>
+        </div>
+        <div class="flex items-center gap-4">
+          <label class="text-xs font-medium text-zinc-700 dark:text-zinc-300">{labels.visibility}</label>
+          <label class="flex items-center gap-1.5 cursor-pointer text-sm">
+            <input type="radio" name="sl-visibility" value="public" checked class="accent-emerald-600" />
+            {labels.public}
+          </label>
+          <label class="flex items-center gap-1.5 cursor-pointer text-sm">
+            <input type="radio" name="sl-visibility" value="private" class="accent-emerald-600" />
+            {labels.private}
+          </label>
+        </div>
+        <p id="sl-form-error" class="hidden text-xs text-red-600 dark:text-red-400"></p>
+        <div class="flex gap-2 justify-end">
+          <button type="button" id="sl-cancel-btn" class="rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors">
+            {labels.cancel}
+          </button>
+          <button type="submit" id="sl-save-btn" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 text-sm font-semibold text-white transition-colors">
+            {labels.save}
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Empty state -->
+    <div id="sl-empty" class="hidden rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-8 text-center">
+      <p class="text-sm text-zinc-500 dark:text-zinc-400">{labels.empty}</p>
+    </div>
+
+    <!-- Lists grid -->
+    <div id="sl-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div>
+  </div>
+</div>
+
+<script>
+  import { getCachedUser, getSupabase } from '../lib/supabase';
+
+  const root = document.getElementById('species-lists-view') as HTMLDivElement | null;
+  if (!root) throw new Error('species-lists-view root not found');
+
+  const lang = root.dataset.lang as 'en' | 'es';
+  const labels = JSON.parse(root.dataset.labels ?? '{}') as Record<string, string>;
+
+  const signedOut  = document.getElementById('sl-signed-out') as HTMLElement;
+  const loading    = document.getElementById('sl-loading') as HTMLElement;
+  const content    = document.getElementById('sl-content') as HTMLElement;
+  const formWrap   = document.getElementById('sl-form-wrap') as HTMLElement;
+  const form       = document.getElementById('sl-form') as HTMLFormElement;
+  const formId     = document.getElementById('sl-form-id') as HTMLInputElement;
+  const nameEs     = document.getElementById('sl-name-es') as HTMLInputElement;
+  const nameEn     = document.getElementById('sl-name-en') as HTMLInputElement;
+  const descEs     = document.getElementById('sl-desc-es') as HTMLTextAreaElement;
+  const descEn     = document.getElementById('sl-desc-en') as HTMLTextAreaElement;
+  const formError  = document.getElementById('sl-form-error') as HTMLElement;
+  const saveBtn    = document.getElementById('sl-save-btn') as HTMLButtonElement;
+  const createBtn  = document.getElementById('sl-create-btn') as HTMLButtonElement;
+  const cancelBtn  = document.getElementById('sl-cancel-btn') as HTMLButtonElement;
+  const emptyEl    = document.getElementById('sl-empty') as HTMLElement;
+  const grid       = document.getElementById('sl-grid') as HTMLElement;
+
+  type SpeciesList = {
+    id: string;
+    name_en: string | null;
+    name_es: string | null;
+    description_en: string | null;
+    description_es: string | null;
+    visibility: 'public' | 'private';
+    slug: string;
+    created_at: string;
+    item_count?: number;
+  };
+
+  let lists: SpeciesList[] = [];
+  let userId = '';
+
+  function listName(l: SpeciesList): string {
+    return (lang === 'es' ? l.name_es : l.name_en) || l.name_en || l.name_es || l.slug;
+  }
+
+  function listDesc(l: SpeciesList): string {
+    return (lang === 'es' ? l.description_es : l.description_en) || '';
+  }
+
+  function buildListDetailPath(username: string, slug: string): string {
+    const base = lang === 'es' ? '/es/perfil/u' : '/en/profile/u';
+    return `${base}/${encodeURIComponent(username)}/lists/${encodeURIComponent(slug)}/`;
+  }
+
+  function escAttr(s: string): string {
+    return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function renderGrid(username: string) {
+    if (!lists.length) {
+      emptyEl.classList.remove('hidden');
+      grid.innerHTML = '';
+      return;
+    }
+    emptyEl.classList.add('hidden');
+    grid.innerHTML = lists.map(l => {
+      const name = escAttr(listName(l));
+      const desc = escAttr(listDesc(l));
+      const href = escAttr(buildListDetailPath(username, l.slug));
+      const count = l.item_count ?? 0;
+      const isPrivate = l.visibility === 'private';
+      return `
+        <div class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 flex flex-col gap-2">
+          <div class="flex items-start justify-between gap-2">
+            <a href="${href}" class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 hover:text-emerald-700 dark:hover:text-emerald-400 leading-snug">${name}</a>
+            ${isPrivate ? `<span class="shrink-0 rounded-full bg-zinc-200 dark:bg-zinc-700 px-2 py-0.5 text-xs text-zinc-600 dark:text-zinc-300">${escAttr(labels.private_badge)}</span>` : ''}
+          </div>
+          ${desc ? `<p class="text-xs text-zinc-500 dark:text-zinc-400 line-clamp-2">${desc}</p>` : ''}
+          <p class="text-xs text-zinc-400 dark:text-zinc-500">${count} ${escAttr(labels.items)}</p>
+          <div class="flex gap-2 mt-auto pt-1">
+            <a href="${href}" class="text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:underline">${escAttr(labels.view)} →</a>
+            <button type="button" class="sl-edit-btn text-xs font-medium text-zinc-500 dark:text-zinc-400 hover:underline" data-id="${escAttr(l.id)}">${escAttr(labels.edit)}</button>
+            <button type="button" class="sl-delete-btn text-xs font-medium text-red-500 hover:underline ml-auto" data-id="${escAttr(l.id)}">${escAttr(labels.delete)}</button>
+          </div>
+        </div>`;
+    }).join('');
+
+    // Wire edit/delete buttons
+    grid.querySelectorAll<HTMLButtonElement>('.sl-edit-btn').forEach(btn => {
+      btn.addEventListener('click', () => openEdit(btn.dataset.id ?? ''));
+    });
+    grid.querySelectorAll<HTMLButtonElement>('.sl-delete-btn').forEach(btn => {
+      btn.addEventListener('click', () => deleteList(btn.dataset.id ?? ''));
+    });
+  }
+
+  function openCreate() {
+    formId.value = '';
+    nameEs.value = '';
+    nameEn.value = '';
+    descEs.value = '';
+    descEn.value = '';
+    (form.querySelector('input[name="sl-visibility"][value="public"]') as HTMLInputElement).checked = true;
+    formError.classList.add('hidden');
+    formWrap.classList.remove('hidden');
+    nameEs.focus();
+  }
+
+  function openEdit(id: string) {
+    const l = lists.find(x => x.id === id);
+    if (!l) return;
+    formId.value = l.id;
+    nameEs.value = l.name_es ?? '';
+    nameEn.value = l.name_en ?? '';
+    descEs.value = l.description_es ?? '';
+    descEn.value = l.description_en ?? '';
+    (form.querySelector(`input[name="sl-visibility"][value="${l.visibility}"]`) as HTMLInputElement).checked = true;
+    formError.classList.add('hidden');
+    formWrap.classList.remove('hidden');
+    nameEs.focus();
+  }
+
+  function closeForm() {
+    formWrap.classList.add('hidden');
+  }
+
+  async function deleteList(id: string) {
+    if (!confirm(labels.confirm_delete)) return;
+    const supabase = getSupabase();
+    const { error } = await supabase.from('species_lists').delete().eq('id', id).eq('user_id', userId);
+    if (error) { alert(labels.error_delete); return; }
+    lists = lists.filter(l => l.id !== id);
+    const username = await fetchUsername();
+    renderGrid(username);
+  }
+
+  async function fetchUsername(): Promise<string> {
+    const supabase = getSupabase();
+    const { data } = await supabase.from('users').select('username').eq('id', userId).maybeSingle();
+    return (data as { username?: string | null } | null)?.username ?? '';
+  }
+
+  async function fetchItemCounts(ids: string[]): Promise<Map<string, number>> {
+    if (!ids.length) return new Map();
+    const supabase = getSupabase();
+    // Count items per list via individual queries (RLS-safe approach)
+    const counts = new Map<string, number>();
+    await Promise.all(ids.map(async (id) => {
+      const { count } = await supabase
+        .from('species_list_items')
+        .select('*', { count: 'exact', head: true })
+        .eq('list_id', id);
+      counts.set(id, count ?? 0);
+    }));
+    return counts;
+  }
+
+  createBtn.addEventListener('click', openCreate);
+  cancelBtn.addEventListener('click', closeForm);
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const nameEsVal = nameEs.value.trim();
+    const nameEnVal = nameEn.value.trim();
+    if (!nameEsVal && !nameEnVal) {
+      formError.textContent = labels.name_required;
+      formError.classList.remove('hidden');
+      return;
+    }
+    formError.classList.add('hidden');
+    saveBtn.textContent = labels.saving;
+    saveBtn.disabled = true;
+
+    const supabase = getSupabase();
+    const visibility = (form.querySelector('input[name="sl-visibility"]:checked') as HTMLInputElement)?.value ?? 'public';
+    const editId = formId.value;
+
+    const payload = {
+      name_en: nameEnVal || null,
+      name_es: nameEsVal || null,
+      description_en: descEn.value.trim() || null,
+      description_es: descEs.value.trim() || null,
+      visibility,
+    };
+
+    try {
+      if (editId) {
+        const { error } = await supabase
+          .from('species_lists')
+          .update({ ...payload, updated_at: new Date().toISOString() })
+          .eq('id', editId)
+          .eq('user_id', userId);
+        if (error) throw error;
+        const idx = lists.findIndex(l => l.id === editId);
+        if (idx >= 0) lists[idx] = { ...lists[idx], ...payload };
+      } else {
+        const { data, error } = await supabase
+          .from('species_lists')
+          .insert({ ...payload, user_id: userId, slug: '' })
+          .select('*')
+          .single();
+        if (error) throw error;
+        lists.unshift(data as SpeciesList);
+      }
+      closeForm();
+      const username = await fetchUsername();
+      renderGrid(username);
+    } catch {
+      formError.textContent = labels.error_save;
+      formError.classList.remove('hidden');
+    } finally {
+      saveBtn.textContent = labels.save;
+      saveBtn.disabled = false;
+    }
+  });
+
+  async function run() {
+    const user = await getCachedUser();
+    if (!user) {
+      loading.classList.add('hidden');
+      signedOut.classList.remove('hidden');
+      return;
+    }
+    userId = user.id;
+
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('species_lists')
+      .select('id, name_en, name_es, description_en, description_es, visibility, slug, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    loading.classList.add('hidden');
+
+    if (error) {
+      content.classList.remove('hidden');
+      emptyEl.classList.remove('hidden');
+      return;
+    }
+
+    lists = (data ?? []) as SpeciesList[];
+
+    // Fetch item counts
+    const countMap = await fetchItemCounts(lists.map(l => l.id));
+    lists = lists.map(l => ({ ...l, item_count: countMap.get(l.id) ?? 0 }));
+
+    const username = await fetchUsername();
+    content.classList.remove('hidden');
+    renderGrid(username);
+  }
+
+  run().catch(console.error);
+</script>

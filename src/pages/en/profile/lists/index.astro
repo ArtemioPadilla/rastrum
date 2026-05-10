@@ -1,0 +1,25 @@
+---
+/**
+ * My Lists page — EN variant.
+ * Route: /en/profile/lists/
+ * Issue #875.
+ */
+import BaseLayout from '../../../../layouts/BaseLayout.astro';
+import SpeciesListsView from '../../../../components/SpeciesListsView.astro';
+import { t } from '../../../../i18n/utils';
+
+const lang = 'en' as const;
+const tr = t(lang);
+---
+
+<BaseLayout
+  title={`My lists — Rastrum`}
+  description="Your curated species lists on Rastrum."
+  lang={lang}
+  robots="noindex,nofollow"
+>
+  <div class="max-w-3xl mx-auto px-4 py-6">
+    <a href="/en/profile/" class="text-xs text-zinc-500 hover:underline">← Profile</a>
+    <SpeciesListsView lang={lang} />
+  </div>
+</BaseLayout>

@@ -11232,3 +11232,90 @@ CREATE TRIGGER tg_notify_on_comment
 
 REVOKE EXECUTE ON FUNCTION public.notify_on_comment() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.notify_on_comment() TO authenticated;
+-- #875 — User-curated species lists
+-- ====================================================
+
+CREATE TABLE IF NOT EXISTS public.species_lists (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  name_en text,
+  name_es text,
+  slug text NOT NULL,
+  description_en text,
+  description_es text,
+  visibility text NOT NULL DEFAULT 'public' CHECK (visibility IN ('public','private')),
+  cover_taxon_id uuid REFERENCES public.taxa(id),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (user_id, slug)
+);
+
+CREATE TABLE IF NOT EXISTS public.species_list_items (
+  list_id uuid NOT NULL REFERENCES public.species_lists(id) ON DELETE CASCADE,
+  taxon_id uuid NOT NULL REFERENCES public.taxa(id),
+  added_at timestamptz NOT NULL DEFAULT now(),
+  note text CHECK (length(note) <= 500),
+  observation_id uuid REFERENCES public.observations(id) ON DELETE SET NULL,
+  PRIMARY KEY (list_id, taxon_id)
+);
+
+CREATE INDEX IF NOT EXISTS species_lists_user_idx ON public.species_lists(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS species_lists_public_idx ON public.species_lists(visibility, created_at DESC) WHERE visibility = 'public';
+
+ALTER TABLE public.species_lists ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.species_list_items ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS species_lists_public_read ON public.species_lists;
+CREATE POLICY species_lists_public_read ON public.species_lists FOR SELECT
+  USING (visibility = 'public' OR (SELECT auth.uid()) = user_id);
+
+DROP POLICY IF EXISTS species_lists_owner_write ON public.species_lists;
+CREATE POLICY species_lists_owner_write ON public.species_lists FOR ALL
+  TO authenticated USING ((SELECT auth.uid()) = user_id) WITH CHECK ((SELECT auth.uid()) = user_id);
+
+DROP POLICY IF EXISTS species_list_items_read ON public.species_list_items;
+CREATE POLICY species_list_items_read ON public.species_list_items FOR SELECT
+  USING (EXISTS (
+    SELECT 1 FROM public.species_lists sl
+    WHERE sl.id = list_id
+      AND (sl.visibility = 'public' OR (SELECT auth.uid()) = sl.user_id)
+  ));
+
+DROP POLICY IF EXISTS species_list_items_owner_write ON public.species_list_items;
+CREATE POLICY species_list_items_owner_write ON public.species_list_items FOR ALL
+  TO authenticated
+  USING (EXISTS (SELECT 1 FROM public.species_lists sl WHERE sl.id = list_id AND (SELECT auth.uid()) = sl.user_id))
+  WITH CHECK (EXISTS (SELECT 1 FROM public.species_lists sl WHERE sl.id = list_id AND (SELECT auth.uid()) = sl.user_id));
+
+-- Slug auto-generation trigger
+CREATE OR REPLACE FUNCTION public.generate_list_slug()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions, pg_temp
+AS $$
+DECLARE
+  v_base text;
+  v_slug text;
+  v_count int := 0;
+BEGIN
+  IF NEW.slug IS NOT NULL AND NEW.slug != '' THEN RETURN NEW; END IF;
+  v_base := lower(regexp_replace(coalesce(NEW.name_es, NEW.name_en, 'list'), '[^a-z0-9]+', '-', 'g'));
+  v_base := trim(both '-' from v_base);
+  v_slug := v_base;
+  LOOP
+    EXIT WHEN NOT EXISTS (SELECT 1 FROM public.species_lists WHERE user_id = NEW.user_id AND slug = v_slug);
+    v_count := v_count + 1;
+    v_slug := v_base || '-' || v_count;
+  END LOOP;
+  NEW.slug := v_slug;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS tg_generate_list_slug ON public.species_lists;
+CREATE TRIGGER tg_generate_list_slug BEFORE INSERT ON public.species_lists
+  FOR EACH ROW EXECUTE FUNCTION public.generate_list_slug();
+
+REVOKE EXECUTE ON FUNCTION public.generate_list_slug() FROM PUBLIC;
+
