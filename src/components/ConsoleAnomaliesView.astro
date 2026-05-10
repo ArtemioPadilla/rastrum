@@ -94,7 +94,7 @@ const labelAcknowledged = aActions.acknowledged ?? 'acknowledged';
 </ConsoleSlideOver>
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedSession, getSupabase } from '../lib/supabase';
   import { getUserRoles } from '../lib/user-roles';
   import { adminClient, AdminClientError } from '../lib/admin-client';
 
@@ -218,7 +218,7 @@ const labelAcknowledged = aActions.acknowledged ?? 'acknowledged';
       show('anomalies-not-auth');
       return;
     }
-    const { data: { session } } = await supabase.auth.getSession();
+    const session = await getCachedSession();
     if (!session) { show('anomalies-not-auth'); return; }
     const myRoles = await getUserRoles(session.user.id);
     if (!myRoles.has('admin')) { show('anomalies-not-auth'); return; }

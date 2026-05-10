@@ -191,7 +191,7 @@ const eventKeys: Array<keyof typeof wEvents> = [
 />
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedSession, getSupabase } from '../lib/supabase';
   import { getUserRoles } from '../lib/user-roles';
   import { adminClient, AdminClientError } from '../lib/admin-client';
 
@@ -481,7 +481,7 @@ const eventKeys: Array<keyof typeof wEvents> = [
   async function init() {
     let supabase;
     try { supabase = getSupabase(); } catch { show('webhooks-not-auth'); return; }
-    const { data: { session } } = await supabase.auth.getSession();
+    const session = await getCachedSession();
     if (!session) { show('webhooks-not-auth'); return; }
     const myRoles = await getUserRoles(session.user.id);
     if (!myRoles.has('admin')) { show('webhooks-not-auth'); return; }

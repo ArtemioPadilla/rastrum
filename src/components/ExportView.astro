@@ -82,7 +82,7 @@ const tr = t(lang);
 </div>
 
 <script>
-  import { getCachedUser, getSupabase } from '../lib/supabase';
+  import { getCachedSession, getCachedUser, getSupabase } from '../lib/supabase';
   import { toDwCRecord, toCSV, toCsvSnib, toCsvConanp, downloadCSV, type DwCInput } from '../lib/darwin-core';
   import type { UserProfile } from '../lib/types';
 
@@ -203,7 +203,7 @@ const tr = t(lang);
     gbifBtnLabel.textContent = GBIF_GENERATING;
     try {
       const supabase = getSupabase();
-      const { data: { session } } = await supabase.auth.getSession();
+      const session = await getCachedSession();
       if (!session) throw new Error('Not signed in');
 
       const since = (document.getElementById('gbif-since') as HTMLInputElement | null)?.value;

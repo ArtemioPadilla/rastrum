@@ -23,7 +23,7 @@ const tr = t(lang);
 </section>
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedSession, getSupabase } from '../lib/supabase';
   import { getUserRoles } from '../lib/user-roles';
   import { adminClient } from '../lib/admin-client';
 
@@ -43,16 +43,14 @@ const tr = t(lang);
     return s.replace(/[<>&'"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&#39;','"':'&quot;'}[c]!));
   }
 
-  let session: { access_token: string } | null = null;
   let allFlags: FlagRow[] = [];
 
   const supabase = getSupabase();
 
   async function init() {
-    const { data: { session: s } } = await supabase.auth.getSession();
-    if (!s?.user) { show('features-not-auth'); return; }
-    session = s;
-    const myRoles = await getUserRoles(s.user.id);
+    const session = await getCachedSession();
+    if (!session?.user) { show('features-not-auth'); return; }
+    const myRoles = await getUserRoles(session.user.id);
     if (!myRoles.has('admin')) { show('features-not-auth'); return; }
     show('features-shell');
     await loadFlags();
@@ -132,7 +130,9 @@ const tr = t(lang);
 
   document.addEventListener('click', async (ev) => {
     const btn = (ev.target as HTMLElement).closest<HTMLElement>('button[data-flag-key]');
-    if (!btn || !session) return;
+    if (!btn) return;
+    const session = await getCachedSession();
+    if (!session?.access_token) return;
 
     const key = btn.dataset.flagKey!;
     const currentValue = btn.dataset.flagValue === 'true';

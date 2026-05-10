@@ -37,10 +37,15 @@ let client: SupabaseClient | null = null;
  */
 let _userCache: { user: import('@supabase/supabase-js').User | null; resolvedAt: number } | null = null;
 const USER_CACHE_TTL_MS = 30_000; // 30s — enough to cover a full page hydration burst
+let _sessionCache: { session: import('@supabase/supabase-js').Session | null; resolvedAt: number } | null = null;
+const SESSION_CACHE_TTL_MS = 30_000;
 
 if (typeof document !== 'undefined') {
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') _userCache = null;
+    if (document.visibilityState === 'hidden') {
+      _userCache = null;
+      _sessionCache = null;
+    }
   });
 }
 
@@ -51,8 +56,30 @@ function ensureAuthListener() {
   if (_authListenerAttached) return;
   _authListenerAttached = true;
   getSupabase().auth.onAuthStateChange((event) => {
-    if (event === 'SIGNED_OUT') _userCache = null;
+    if (event === 'SIGNED_OUT') {
+      _userCache = null;
+      _sessionCache = null;
+    }
   });
+}
+
+/**
+ * Returns the current session (including access_token) with a short-lived
+ * in-memory cache. Use this instead of `getSupabase().auth.getSession()` in
+ * Console components that need access_token for Edge Function calls.
+ *
+ * Safe for concurrent callers — only one getSession() request fires per
+ * 30-second window, preventing navigator.lock contention.
+ */
+export async function getCachedSession() {
+  ensureAuthListener();
+  const now = Date.now();
+  if (_sessionCache && (now - _sessionCache.resolvedAt) < SESSION_CACHE_TTL_MS) {
+    return _sessionCache.session;
+  }
+  const { data: { session } } = await getSupabase().auth.getSession();
+  _sessionCache = { session, resolvedAt: now };
+  return session;
 }
 
 /**

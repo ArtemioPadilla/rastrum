@@ -185,7 +185,7 @@ const eFilterByCode = (errorsNs?.filterByCode as string) ?? 'Filter by code';
 </ConsoleSlideOver>
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedSession, getSupabase } from '../lib/supabase';
   import { getUserRoles } from '../lib/user-roles';
   import { adminClient, AdminClientError, type ErrorAcknowledgeBulkFilters } from '../lib/admin-client';
   import { errorSeverity, severityColorClass } from '../lib/error-severity';
@@ -540,7 +540,7 @@ const eFilterByCode = (errorsNs?.filterByCode as string) ?? 'Filter by code';
   async function init() {
     let supabase;
     try { supabase = getSupabase(); } catch { hide('errors-skeleton'); show('errors-not-auth'); return; }
-    const { data: { session } } = await supabase.auth.getSession();
+    const session = await getCachedSession();
     if (!session) { hide('errors-skeleton'); show('errors-not-auth'); return; }
     const myRoles = await getUserRoles(session.user.id);
     if (!myRoles.has('admin')) { hide('errors-skeleton'); show('errors-not-auth'); return; }

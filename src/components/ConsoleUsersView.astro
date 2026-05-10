@@ -99,7 +99,7 @@ const tr = t(lang);
 </ConsoleSlideOver>
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedSession, getSupabase } from '../lib/supabase';
   import { getUserRoles } from '../lib/user-roles';
   import { adminClient, AdminClientError } from '../lib/admin-client';
   import { readFilterState, writeFilterState } from '../lib/console-filter-state';
@@ -141,7 +141,7 @@ const tr = t(lang);
   const supabase = getSupabase();
 
   async function init() {
-    const { data: { session } } = await supabase.auth.getSession();
+    const session = await getCachedSession();
     if (!session?.user) { show('users-not-auth'); return; }
     currentJwt = session.access_token;
     const myRoles = await getUserRoles(session.user.id);
@@ -286,7 +286,7 @@ const tr = t(lang);
     section.classList.add('hidden');
     dl.innerHTML = '<dt class="text-zinc-500 col-span-2 text-xs italic">Loading…</dt>';
 
-    const { data: { session } } = await supabase.auth.getSession();
+    const session = await getCachedSession();
     if (!session?.access_token) return;
 
     try {
@@ -341,7 +341,7 @@ const tr = t(lang);
     const { id, action, payload, reason } = (ev as CustomEvent<{ id: string; action: string; payload: Record<string, string>; reason: string }>).detail;
     if (id !== 'console-slideover-users') return;
 
-    const { data: { session } } = await supabase.auth.getSession();
+    const session = await getCachedSession();
     if (!session?.access_token) {
       document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id, ok: false, error: 'Session expired.' } }));
       return;
@@ -394,7 +394,7 @@ const tr = t(lang);
     emailSearchTimer = setTimeout(async () => {
       const raw = (ev.target as HTMLInputElement).value.trim();
       if (!raw) return;
-      const { data: { session } } = await supabase.auth.getSession();
+      const session = await getCachedSession();
       if (!session?.access_token) return;
       const payload = raw.includes('@') ? { email: raw } : { user_id: raw };
       try {

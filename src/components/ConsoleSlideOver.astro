@@ -225,10 +225,10 @@ const customLabel = tr.console.quick_reason_custom;
   ) {
     const errorEl = root.querySelector<HTMLElement>('[data-slideover-error]');
     try {
-      const { getSupabase } = await import('../lib/supabase');
+      const { getCachedSession, getSupabase } = await import('../lib/supabase');
       const { adminClient, AdminClientError } = await import('../lib/admin-client');
       const supabase = getSupabase();
-      const { data: { session } } = await supabase.auth.getSession();
+      const session = await getCachedSession();
       if (!session?.access_token) {
         document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id: root.id, ok: false, error: 'Session expired.' } }));
         return;

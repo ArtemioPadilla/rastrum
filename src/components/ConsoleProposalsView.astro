@@ -103,7 +103,7 @@ const pSelfApproval = (pNs?.selfApprovalForbidden as string) ?? 'You cannot appr
 />
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedSession, getSupabase } from '../lib/supabase';
   import { getUserRoles } from '../lib/user-roles';
   import { adminClient, AdminClientError } from '../lib/admin-client';
 
@@ -243,7 +243,7 @@ const pSelfApproval = (pNs?.selfApprovalForbidden as string) ?? 'You cannot appr
       show('proposals-not-auth');
       return;
     }
-    const { data: { session } } = await supabase.auth.getSession();
+    const session = await getCachedSession();
     if (!session) { show('proposals-not-auth'); return; }
     viewerId = session.user.id;
     const myRoles = await getUserRoles(session.user.id);

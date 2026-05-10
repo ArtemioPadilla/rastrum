@@ -162,7 +162,7 @@ const tr = t(lang);
 </ConsoleSlideOver>
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedSession, getSupabase } from '../lib/supabase';
   import { getUserRoles } from '../lib/user-roles';
   import { adminClient, AdminClientError } from '../lib/admin-client';
   import { readFilterState, writeFilterState, applyFilterStateToForm } from '../lib/console-filter-state';
@@ -209,7 +209,7 @@ const tr = t(lang);
   };
 
   async function init() {
-    const { data: { session } } = await supabase.auth.getSession();
+    const session = await getCachedSession();
     if (!session?.user) { show('obs-not-auth'); return; }
     currentJwt = session.access_token;
     const myRoles = await getUserRoles(session.user.id);
@@ -430,7 +430,7 @@ const tr = t(lang);
     const { id, action, payload, reason } = (ev as CustomEvent<{ id: string; action: string; payload: Record<string, string>; reason: string }>).detail;
     if (id !== 'console-slideover-obs') return;
 
-    const { data: { session } } = await supabase.auth.getSession();
+    const session = await getCachedSession();
     if (!session?.access_token) {
       document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id, ok: false, error: 'Session expired.' } }));
       return;
