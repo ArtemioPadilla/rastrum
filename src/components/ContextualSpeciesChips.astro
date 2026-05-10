@@ -48,6 +48,8 @@ const emptyText = ctx.empty ?? (isEs
   : 'Not enough data nearby yet to suggest species.');
 const notInDexText = ctx.not_in_dex ?? (isEs ? 'aún no en tu dex' : 'not in your dex yet');
 const useLabel = ctx.use_label ?? (isEs ? 'Usar como identificación' : 'Use as identification');
+const filterNewLabel = (ctx as any).filter_new_only ?? (isEs ? 'Solo nuevas para mí' : 'New to me only');
+const filterAllLabel = (ctx as any).filter_all ?? (isEs ? 'Ver todas' : 'Show all');
 ---
 
 <section
@@ -67,6 +69,24 @@ const useLabel = ctx.use_label ?? (isEs ? 'Usar como identificación' : 'Use as 
       </p>
     </div>
     <WhyAmISeeingThis algorithm="contextual_species_chips" lang={lang} className="shrink-0" />
+  </div>
+
+  <!-- New-to-me filter toggle — only shown for signed-in users (JS reveals it) -->
+  <div id="obs2-chips-filter-wrap" class="hidden flex items-center gap-2">
+    <button
+      type="button"
+      id="obs2-chips-filter-btn"
+      class="inline-flex items-center gap-1.5 rounded-full border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-1 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:border-emerald-400 dark:hover:border-emerald-600 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors"
+      data-active="false"
+      data-label-new={filterNewLabel}
+      data-label-all={filterAllLabel}
+      aria-pressed="false"
+    >
+      <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/>
+      </svg>
+      <span id="obs2-chips-filter-label">{filterNewLabel}</span>
+    </button>
   </div>
 
   <div id="obs2-contextual-status" class="text-xs text-zinc-400 dark:text-zinc-500">
@@ -184,6 +204,8 @@ const useLabel = ctx.use_label ?? (isEs ? 'Usar como identificación' : 'Use as 
 <script>
   import { fetchProbableTaxa, pickCommonName, formatDistancePill, suggestCacheKey } from '../lib/contextual-suggest';
   import type { ProbableTaxon } from '../lib/contextual-suggest';
+  import { filterChipsByDex, type ChipRow } from '../lib/contextual-chips-filter';
+  import { getCachedUser } from '../lib/supabase';
 
   const root = document.getElementById('obs2-contextual-chips');
   if (root) initChips(root);
@@ -197,6 +219,33 @@ const useLabel = ctx.use_label ?? (isEs ? 'Usar como identificación' : 'Use as 
     if (!statusEl || !listEl || !emptyEl) return;
 
     let loaded = false;
+    let allChipRows: ChipRow[] = [];
+    let newOnlyActive = false;
+
+    // Wire filter toggle
+    const filterBtn = document.getElementById('obs2-chips-filter-btn') as HTMLButtonElement | null;
+    const filterWrap = document.getElementById('obs2-chips-filter-wrap');
+    const filterLabel = document.getElementById('obs2-chips-filter-label');
+
+    filterBtn?.addEventListener('click', () => {
+      newOnlyActive = !newOnlyActive;
+      filterBtn.setAttribute('aria-pressed', newOnlyActive ? 'true' : 'false');
+      filterBtn.dataset.active = newOnlyActive ? 'true' : 'false';
+      filterBtn.classList.toggle('border-emerald-500', newOnlyActive);
+      filterBtn.classList.toggle('text-emerald-700', newOnlyActive);
+      filterBtn.classList.toggle('dark:text-emerald-400', newOnlyActive);
+      if (filterLabel) {
+        filterLabel.textContent = newOnlyActive
+          ? (filterBtn.dataset.labelAll ?? 'Show all')
+          : (filterBtn.dataset.labelNew ?? 'New to me only');
+      }
+      renderChips(filterChipsByDex(allChipRows, newOnlyActive));
+    });
+
+    // Show filter wrap only for authenticated users
+    getCachedUser().then(user => {
+      if (user && filterWrap) filterWrap.classList.remove('hidden');
+    }).catch(() => {});
 
     // Wait for an explicit GPS event from the form, OR fall back to
     // navigator.geolocation if no event arrives within a short window
@@ -257,7 +306,8 @@ const useLabel = ctx.use_label ?? (isEs ? 'Usar como identificación' : 'Use as 
         return;
       }
 
-      renderChips(rows);
+      allChipRows = rows as ChipRow[];
+      renderChips(filterChipsByDex(allChipRows, newOnlyActive));
     }
 
     function renderChips(rows: ProbableTaxon[]) {
