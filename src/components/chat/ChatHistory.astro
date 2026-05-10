@@ -1,0 +1,49 @@
+---
+/**
+ * ChatHistory.astro — scrollable chat message list, extracted from ChatView.astro (#913)
+ *
+ * Owns the #chat-history log region and the empty-state display with suggestion
+ * quick-prompt chips. ChatView's paintConversation() script populates this
+ * container with bubbleHtml() calls at runtime.
+ *
+ * CustomEvents dispatched by chips → consumed by ChatView's entity bootstrap:
+ *   - <button data-empty-prompt="…"> clicks are wired by ChatView's entity IIFE
+ */
+
+interface Props {
+  lang: 'en' | 'es';
+}
+
+import { t } from '../../i18n/utils';
+const { lang } = Astro.props;
+const tr = t(lang);
+---
+<!-- Conversation log — populated by ChatView's paintConversation() at runtime -->
+<div
+  id="chat-history"
+  class="hidden space-y-3 mb-4 pb-56 sm:pb-4"
+  role="log"
+  aria-live="polite"
+>
+  <div id="chat-empty" class="px-1 py-12 text-center space-y-4">
+    <p class="text-sm text-zinc-500 italic">{tr.chat.empty_state}</p>
+    <div class="flex flex-wrap justify-center gap-2 max-w-xl mx-auto">
+      <button type="button" data-empty-prompt={lang === 'es' ? '¿Qué especies puedo encontrar cerca de mí?' : 'What species can I find near me?'} class="empty-suggestion">
+        <span aria-hidden="true">📍</span>
+        <span>{lang === 'es' ? 'Cerca de mí' : 'Near me'}</span>
+      </button>
+      <button type="button" data-empty-prompt={lang === 'es' ? 'Adjunta una observación reciente para revisarla.' : 'Attach a recent observation to review it.'} class="empty-suggestion">
+        <span aria-hidden="true">🔍</span>
+        <span>{lang === 'es' ? 'Revisar observación' : 'Review observation'}</span>
+      </button>
+      <button type="button" data-empty-prompt={lang === 'es' ? '¿Qué significa "necesita revisión"?' : 'What does "needs review" mean?'} class="empty-suggestion">
+        <span aria-hidden="true">❓</span>
+        <span>{lang === 'es' ? 'Cómo funciona' : 'How it works'}</span>
+      </button>
+      <button type="button" data-empty-prompt={lang === 'es' ? 'Cuéntame sobre NOM-059.' : 'Tell me about NOM-059.'} class="empty-suggestion">
+        <span aria-hidden="true">🦋</span>
+        <span>{lang === 'es' ? 'NOM-059' : 'NOM-059'}</span>
+      </button>
+    </div>
+  </div>
+</div>

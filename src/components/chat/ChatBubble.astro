@@ -1,0 +1,47 @@
+---
+/**
+ * ChatBubble.astro — extracted from ChatView.astro (#913)
+ *
+ * HTML shell for a single chat message bubble. Actual content is injected
+ * at runtime by ChatView's bubbleHtml() function via innerHTML on the parent
+ * `#chat-history` container. This component defines the data-* attribute
+ * contract and the bubble skeleton that the script populates.
+ *
+ * The cascade footer and compare footer HTML templates live in
+ * src/lib/chat-bubble-html.ts — referenced by ChatView's script.
+ *
+ * Communication: ChatView listens for bubble-level CustomEvents that use the
+ * `rastrum:chat-*` prefix (save-obs, suggestion-click, etc.).
+ */
+
+/**
+ * Props: no static props needed — the parent ChatView injects all bubble
+ * content dynamically at runtime. This shell is here to document the
+ * contract and allow future static-SSR optimisation.
+ */
+---
+<!--
+  Chat bubble container — populated by ChatView's paintConversation() script.
+  Each turn is rendered into #chat-history via bubbleHtml(turn, idx).
+
+  Bubble structure (set at runtime):
+    <div class="ml-auto|mr-auto max-w-[85%] sm:max-w-[75%]" data-bubble="{idx}">
+      <p class="text-[10px] …">role label</p>
+      <div data-bubble-body class="…bg…">
+        <img|<audio …/>  ← attachment preview (photo/audio)
+        <span data-bubble-text>…content…</span>
+      </div>
+      <!-- cascade footer: scientific name + confidence + "Save as observation" CTA -->
+      <!-- compare footer: side-by-side model comparison cards -->
+      <!-- suggestion chips: follow-up question chips on last assistant turn -->
+    </div>
+
+  Data attributes read by ChatView script:
+    - data-bubble="{number}"        turn index
+    - data-save-obs="{number}"      save-observation button
+    - data-suggestion="{number}"    suggestion chip (turn index)
+    - data-suggestion-idx="{number}" suggestion chip (option index)
+    - data-compare="{number}"       compare result container
+    - data-bubble-body              bubble body wrapper
+    - data-bubble-text              text span (used by streaming update)
+-->

@@ -12,6 +12,7 @@ const { lang } = Astro.props;
 const tr = t(lang);
 const widgets = tr.home.widgets;
 const suggestions = widgets.suggestions;
+const sf = tr.karma.streak_freeze;
 
 const observeHref = lang === 'es' ? '/es/observar/' : '/en/observe/';
 const leaderboardHref = lang === 'es' ? '/es/comunidad/tabla-de-lideres/' : '/en/community/leaderboard/';
@@ -29,6 +30,9 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
   data-label-streak-one={widgets.streak_label_one}
   data-label-streak-aria={widgets.streak_aria}
   data-label-streak-aria-one={widgets.streak_aria_one}
+  data-label-freeze-tooltip={sf.tooltip_explanation}
+  data-label-freeze-one={sf.available_one}
+  data-label-freeze-other={sf.available_other}
   data-observe-href={observeHref}
   data-label-challenge-title={widgets.challenge.title}
   data-label-challenge-cta={widgets.challenge.cta_observe}
@@ -56,6 +60,14 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
     >
       <span aria-hidden="true">🔥</span>
       <span class="hw-streak-text tabular-nums">0 days</span>
+      <!-- Snowflake freeze indicator: hidden until freezes > 0 (#866) -->
+      <span
+        class="hw-streak-freeze hidden items-center gap-0.5 text-[11px] font-normal text-blue-500 dark:text-blue-400 border-l border-amber-300 dark:border-amber-700/60 pl-1.5 ml-0.5"
+        aria-label=""
+        title=""
+      >
+        <span aria-hidden="true">❄️</span><span class="hw-streak-freeze-count"></span>
+      </span>
     </span>
   </div>
 
@@ -562,6 +574,24 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
         text.textContent = streakLabel(n, root);
         pill.setAttribute('aria-label', streakAriaLabel(n, root));
         pill.classList.remove('hidden');
+      }
+      // Paint freeze indicator (#866): show snowflake when freezes > 0.
+      const freezes = streak?.freezesAvailable ?? 0;
+      if (freezes > 0 && pill) {
+        const freezeEl = pill.querySelector<HTMLElement>('.hw-streak-freeze');
+        const freezeCount = pill.querySelector<HTMLElement>('.hw-streak-freeze-count');
+        if (freezeEl && freezeCount) {
+          const tooltip = root.getAttribute('data-label-freeze-tooltip') ?? '';
+          const labelTpl = freezes === 1
+            ? root.getAttribute('data-label-freeze-one') ?? '{n} freeze'
+            : root.getAttribute('data-label-freeze-other') ?? '{n} freezes';
+          const label = labelTpl.replace('{n}', String(freezes));
+          freezeCount.textContent = String(freezes);
+          freezeEl.setAttribute('aria-label', label);
+          freezeEl.setAttribute('title', tooltip);
+          freezeEl.classList.remove('hidden');
+          freezeEl.classList.add('inline-flex');
+        }
       }
     }
 
