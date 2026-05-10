@@ -28,6 +28,12 @@ type OnbTree = {
   preset_open_scientist?: string;
   preset_researcher_recommended?: string;
   preset_private_observer?: string;
+  first_obs_demo_cascade_label?: string;
+  first_obs_demo_step_plantnet?: string;
+  first_obs_demo_step_claude?: string;
+  first_obs_demo_step_result?: string;
+  first_obs_demo_confidence?: string;
+  first_obs_demo_try_cta?: string;
   steps: {
     welcome: { title: string; body: string };
     fab: { title: string; body: string };
@@ -35,6 +41,7 @@ type OnbTree = {
     explore: { title: string; body: string };
     privacy?: { title: string; body: string };
     settings: { title: string; body: string };
+    first_observation_demo?: { title: string; body: string };
   };
 };
 const onb = (tr as unknown as { onboarding: OnbTree }).onboarding;
@@ -43,6 +50,16 @@ const privacyStep = stepsData.privacy ?? {
   title: 'Pick your privacy preset',
   body: 'Choose how visible your observations are to other naturalists. You can change this anytime.',
 };
+const firstObsDemoStep = stepsData.first_observation_demo ?? {
+  title: 'See how identification works',
+  body: 'Here\'s what happens when you take your first photo \u2014 we run models in parallel and show the most confident match.',
+};
+const firstObsDemoCascadeLabel = onb.first_obs_demo_cascade_label ?? 'Identification cascade';
+const firstObsDemoPlantnet = onb.first_obs_demo_step_plantnet ?? 'PlantNet';
+const firstObsDemoClaude = onb.first_obs_demo_step_claude ?? 'Claude Haiku';
+const firstObsDemoResult = onb.first_obs_demo_step_result ?? 'Quercus robur \u2014 Oak';
+const firstObsDemoConfidence = onb.first_obs_demo_confidence ?? '87% confidence';
+const firstObsDemoTryCta = onb.first_obs_demo_try_cta ?? 'Try it yourself \u2192';
 const presetOpen = onb.preset_open_scientist ?? 'Open scientist';
 const presetResearcher = onb.preset_researcher_recommended ?? 'Researcher (recommended)';
 const presetPrivate = onb.preset_private_observer ?? 'Private observer';
@@ -69,7 +86,13 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
   data-label-preset-open={presetOpen}
   data-label-preset-researcher={presetResearcher}
   data-label-preset-private={presetPrivate}
-  data-step-count="6"
+  data-step-count="7"
+  data-label-first-obs-demo-cascade={firstObsDemoCascadeLabel}
+  data-label-first-obs-demo-plantnet={firstObsDemoPlantnet}
+  data-label-first-obs-demo-claude={firstObsDemoClaude}
+  data-label-first-obs-demo-result={firstObsDemoResult}
+  data-label-first-obs-demo-confidence={firstObsDemoConfidence}
+  data-label-first-obs-demo-try={firstObsDemoTryCta}
 >
   <!-- Backdrop with spotlight hole punched via clip-path -->
   <div
@@ -123,6 +146,7 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
         <span class="onb-dot w-2 h-2 rounded-full" data-i="3"></span>
         <span class="onb-dot w-2 h-2 rounded-full" data-i="4"></span>
         <span class="onb-dot w-2 h-2 rounded-full" data-i="5"></span>
+        <span class="onb-dot w-2 h-2 rounded-full" data-i="6"></span>
       </div>
 
       <div class="flex items-center gap-2">
@@ -162,6 +186,12 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
       target: '[data-tour="fab"]',
     },
     {
+      title: firstObsDemoStep.title,
+      body: firstObsDemoStep.body,
+      target: null,
+      kind: 'first_observation_demo',
+    },
+    {
       title: stepsData.explore.title,
       body: stepsData.explore.body,
       target: '[data-tour="explore-tab"],[data-tour="explore-nav"]',
@@ -183,7 +213,7 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
 <script>
   import { getCachedUser, getSupabase } from '../lib/supabase';
 
-  type StepDef = { title: string; body: string; target: string | null; kind?: 'privacy_preset' };
+  type StepDef = { title: string; body: string; target: string | null; kind?: 'privacy_preset' | 'first_observation_demo' };
 
   const root = document.getElementById('onboarding-tour') as HTMLDivElement | null;
   if (!root) throw new Error('OnboardingTour: root element missing');
@@ -209,6 +239,13 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
   const labelStart = dialog.dataset.labelStart ?? 'Start';
   const stepTpl    = dialog.dataset.stepLabel  ?? 'Step {current} of {total}';
   const dotAriaTpl = dialog.dataset.dotAria    ?? 'Step {n}';
+
+  const labelFirstObsDemoCascade   = dialog.dataset.labelFirstObsDemoCascade   ?? 'Identification cascade';
+  const labelFirstObsDemoPlantnet  = dialog.dataset.labelFirstObsDemoPlantnet  ?? 'PlantNet';
+  const labelFirstObsDemoClaude    = dialog.dataset.labelFirstObsDemoClaude    ?? 'Claude Haiku';
+  const labelFirstObsDemoResult    = dialog.dataset.labelFirstObsDemoResult    ?? 'Quercus robur \u2014 Oak';
+  const labelFirstObsDemoConfidence = dialog.dataset.labelFirstObsDemoConfidence ?? '87% confidence';
+  const labelFirstObsDemoTry       = dialog.dataset.labelFirstObsDemoTry       ?? 'Try it yourself \u2192';
 
   const rawSteps = document.getElementById('onb-step-data');
   let STEPS: StepDef[] = [];
@@ -409,6 +446,55 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
     container.innerHTML = '';
   }
 
+  // ── First-observation demo renderer ──────────────────────────────────
+  function renderFirstObsDemo(container: HTMLElement): void {
+    container.innerHTML = '';
+    const wrap = document.createElement('div');
+    wrap.className = 'mt-4 rounded-xl border border-zinc-200 dark:border-zinc-700 overflow-hidden text-xs';
+
+    // Header
+    const header = document.createElement('div');
+    header.className = 'bg-zinc-100 dark:bg-zinc-800 px-3 py-2 font-semibold text-zinc-700 dark:text-zinc-300 flex items-center gap-2';
+    header.innerHTML = `<span class="text-emerald-600">⚡</span> ${labelFirstObsDemoCascade}`;
+    wrap.appendChild(header);
+
+    // Cascade rows
+    const rows: Array<{ label: string; icon: string; state: 'running' | 'done' | 'secondary' }> = [
+      { label: labelFirstObsDemoPlantnet, icon: '🌱', state: 'done' },
+      { label: labelFirstObsDemoClaude,   icon: '🧠', state: 'secondary' },
+    ];
+    for (const row of rows) {
+      const r = document.createElement('div');
+      r.className = 'flex items-center gap-2 px-3 py-2 border-t border-zinc-100 dark:border-zinc-700';
+      const stateClass = row.state === 'done'
+        ? 'text-emerald-600 font-semibold'
+        : 'text-zinc-400 dark:text-zinc-500';
+      r.innerHTML = `<span>${row.icon}</span><span class="${stateClass}">${row.label}</span>`;
+      if (row.state === 'done') {
+        r.innerHTML += '<span class="ml-auto text-emerald-600">✓</span>';
+      } else {
+        r.innerHTML += '<span class="ml-auto opacity-50">—</span>';
+      }
+      wrap.appendChild(r);
+    }
+
+    // Result row
+    const result = document.createElement('div');
+    result.className = 'bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2 border-t border-emerald-100 dark:border-emerald-800 flex items-center justify-between gap-2';
+    result.innerHTML = [
+      `<span class="font-semibold text-emerald-800 dark:text-emerald-200 italic">${labelFirstObsDemoResult}</span>`,
+      `<span class="text-emerald-700 dark:text-emerald-300">${labelFirstObsDemoConfidence}</span>`,
+    ].join('');
+    wrap.appendChild(result);
+
+    // CTA note
+    const cta = document.createElement('p');
+    cta.className = 'mt-2 text-xs text-zinc-500 dark:text-zinc-400 italic';
+    cta.textContent = labelFirstObsDemoTry;
+    container.appendChild(wrap);
+    container.appendChild(cta);
+  }
+
   function render(): void {
     const step = STEPS[current];
     if (!step) return;
@@ -423,6 +509,7 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
       bodyEl.parentElement?.insertBefore(presetWrap, bodyEl.nextSibling);
     }
     if (step.kind === 'privacy_preset') renderPresetButtons(presetWrap);
+    else if (step.kind === 'first_observation_demo') renderFirstObsDemo(presetWrap);
     else clearPresetButtons(presetWrap);
 
     stepLabelEl.textContent = stepTpl
