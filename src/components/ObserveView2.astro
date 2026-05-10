@@ -503,6 +503,23 @@ if (identifyMode) {
   contributeNudge?.classList.remove('hidden');
   // skipSaveBtn removed (#942 PR7)
 }
+
+// ── One-shot migration notice for users who used "Just identify, don't save" (#942 PR7) ──
+// Shows once per device after the skip-save button was removed. Directs them to ?mode=identify.
+const SKIP_SAVE_MIGRATION_KEY = 'rastrum_identify_mode_notice_v1';
+if (!localStorage.getItem(SKIP_SAVE_MIGRATION_KEY) && !identifyMode) {
+  localStorage.setItem(SKIP_SAVE_MIGRATION_KEY, '1');
+  const identifyUrl = window.location.pathname + '?mode=identify';
+  const notice = document.createElement('div');
+  notice.setAttribute('role', 'status');
+  notice.setAttribute('aria-live', 'polite');
+  notice.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-lg px-5 py-3 text-sm max-w-[340px] text-center space-y-2';
+  notice.innerHTML = isEs
+    ? `<p class="text-zinc-700 dark:text-zinc-300">El botón <em>"Solo identificar"</em> se movió.</p><a href="${identifyUrl}" class="text-emerald-600 dark:text-emerald-400 underline text-xs">Identificar sin guardar →</a>`
+    : `<p class="text-zinc-700 dark:text-zinc-300"><em>"Just identify"</em> moved to a dedicated URL.</p><a href="${identifyUrl}" class="text-emerald-600 dark:text-emerald-400 underline text-xs">Identify without saving →</a>`;
+  document.body.appendChild(notice);
+  setTimeout(() => { notice.style.opacity = '0'; notice.style.transition = 'opacity 0.3s'; setTimeout(() => notice.remove(), 350); }, 6000);
+}
 const idCard          = document.getElementById('obs2-id-card');
 const speciesEl       = document.getElementById('obs2-species');
 const commonEl        = document.getElementById('obs2-common');
