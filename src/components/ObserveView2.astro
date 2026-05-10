@@ -2,6 +2,7 @@
 import DropZone from "./DropZone.astro";
 import PhotoCropModal from "./PhotoCropModal.astro";
 import PipelineGraph from "./PipelineGraph.astro";
+import PipelineStepper from "./PipelineStepper.astro";
 import MapPicker from "./MapPicker.astro";
 import TaxonAutocomplete from "./TaxonAutocomplete.astro";
 import ActiveObserversBanner from "./ActiveObserversBanner.astro";
@@ -14,6 +15,9 @@ interface Props { lang: "en" | "es"; }
 const { lang } = Astro.props;
 const isEs = lang === "es";
 const tr = t(lang);
+// Feature flag: set PUBLIC_OBSERVE_PIPELINE_GRAPH=1 to keep the legacy SVG DAG.
+// Remove after 30 days without incident reports (#942).
+const useLegacyGraph = import.meta.env.PUBLIC_OBSERVE_PIPELINE_GRAPH === '1';
 
 const observeStr = tr.observe as Record<string, string>;
 const habitats = HABITATS;
@@ -21,24 +25,7 @@ const weathers = WEATHERS;
 ---
 
 <div class="max-w-2xl mx-auto space-y-6">
-  <!-- Active observers micro-banner (issue #743) — at the top so the
-       social-presence cue lands before the form. -->
-  <ActiveObserversBanner lang={lang} />
-
-  <!-- Header -->
-  <div class="flex items-start justify-between gap-4">
-    <h1 class="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
-      {isEs ? "Registrar observación" : "Log observation"}
-    </h1>
-    <a
-      href={isEs ? "/es/observar/clasico" : "/en/observe/classic"}
-      class="text-xs text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300 underline underline-offset-2 shrink-0 mt-1"
-    >
-      {isEs ? "Formulario clásico" : "Classic form"}
-    </a>
-  </div>
-
-  <!-- Resume in-progress banner -->
+  <!-- 1. Resume in-progress banner -->
   <div id="obs2-resume-banner" class="hidden rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 p-4 flex items-center gap-3">
     <span class="text-amber-700 dark:text-amber-300 text-sm flex-1">
       {isEs ? "Tienes una observación en progreso." : "You have an observation in progress."}
@@ -51,30 +38,25 @@ const weathers = WEATHERS;
     </button>
   </div>
 
-  <!-- AI Capability Status Banner (#274) -->
-  <!-- Banner starts hidden to prevent SSR flash; JS reveals it after checking localStorage/sessionStorage -->
-  <div id="obs2-capability-banner" class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/60 px-4 py-3 text-xs space-y-1">
-    <div class="flex items-center justify-between">
-      <span class="font-medium text-zinc-700 dark:text-zinc-300">
-        {isEs ? "🤖 Modelos disponibles:" : "🤖 Available AI:"}
-      </span>
-      <div class="flex items-center gap-2">
-        <a id="obs2-setup-link" href={isEs ? "/es/perfil/editar#on-device-ai-section" : "/en/profile/edit#on-device-ai-section"}
-          class="text-emerald-600 dark:text-emerald-400 underline hover:no-underline">
-          {isEs ? "Configurar →" : "Set up →"}
-        </a>
-      </div>
-    </div>
-    <div id="obs2-capability-list" class="flex flex-wrap gap-x-4 gap-y-1 text-zinc-500 dark:text-zinc-400">
-      <!-- Populated by JS -->
-      <span class="animate-pulse">{isEs ? "Verificando modelos..." : "Checking models..."}</span>
-    </div>
+  <!-- 2. Header — "Classic form" link removed (#942: moved to /profile/edit advanced prefs) -->
+  <div class="flex items-start gap-4">
+    <h1 class="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+      {isEs ? "Registrar observación" : "Log observation"}
+    </h1>
   </div>
 
-  <!-- Contextual hint (shown briefly after file drop) -->
-  <div id="obs2-file-hint" class="hidden rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 px-3 py-2 text-xs text-blue-800 dark:text-blue-300 transition-all"></div>
+  <!-- 3. Drop Zone — HERO POSITION: primary action wins the first fold (#942) -->
+  <DropZone lang={lang} />
 
-  <!-- AI mode selector (#296) -->
+  <!-- 4. AI capability caption — 1 line, positive framing, appears AFTER dropzone (#942) -->
+  <!-- Hidden by default; JS replaces with concise status after capability check -->
+  <p
+    id="obs2-capability-caption"
+    class="hidden text-xs text-zinc-400 dark:text-zinc-500 text-center px-2"
+    aria-live="polite"
+  ></p>
+
+  <!-- AI mode selector (#296) — shown only when ≥2 usable modes exist -->
   <div id="obs2-ai-mode-selector" class="hidden">
     <div class="flex items-center gap-2 flex-wrap">
       <span class="text-xs font-medium text-zinc-500 dark:text-zinc-400 shrink-0">{isEs ? "Fuente de IA:" : "AI source:"}</span>
@@ -86,14 +68,10 @@ const weathers = WEATHERS;
     </div>
   </div>
 
-  <!-- Contextual species suggestions (issue #723) — appears above the upload
-       once a location is known. Chip taps pre-fill the manual ID input. -->
-  <ContextualSpeciesChips lang={lang} targetInputId="obs2-taxon-input" />
+  <!-- Contextual hint (shown briefly after file drop) -->
+  <div id="obs2-file-hint" class="hidden rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 px-3 py-2 text-xs text-blue-800 dark:text-blue-300 transition-all"></div>
 
-  <!-- Drop Zone -->
-  <DropZone lang={lang} />
-
-  <!-- Pipeline section (hidden until files added) -->
+  <!-- 5. Pipeline section (hidden until files added) -->
   <div id="obs2-pipeline-section" class="hidden space-y-3">
     <div class="flex items-center justify-between">
       <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
@@ -101,7 +79,7 @@ const weathers = WEATHERS;
       </h2>
       <span id="obs2-pipeline-status" class="text-xs text-zinc-500 dark:text-zinc-400"></span>
     </div>
-    <PipelineGraph lang={lang} />
+    {useLegacyGraph ? <PipelineGraph lang={lang} /> : <PipelineStepper lang={lang} />}
     <!-- Escape hatch: shown after 15s if pipeline is still running (#pipeline-stuck) -->
     <div id="obs2-pipeline-escape" class="hidden mt-3 flex items-center gap-3">
       <button
@@ -115,7 +93,7 @@ const weathers = WEATHERS;
     </div>
   </div>
 
-  <!-- Audio-skipped warning (#278) — shown when audio node skipped due to BirdNET not downloaded -->
+  <!-- 6. Audio-skipped warning (#278) — shown when audio node skipped due to BirdNET not downloaded -->
   <div id="obs2-audio-skip-warn" class="hidden rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 p-4 space-y-3">
     <div class="flex items-start gap-3">
       <span class="text-2xl shrink-0">🎵</span>
@@ -142,7 +120,7 @@ const weathers = WEATHERS;
     </div>
   </div>
 
-  <!-- Post-process form (hidden until pipeline done) -->
+  <!-- 7. Post-process form (hidden until pipeline done) -->
   <form id="obs2-post-form" class="hidden space-y-5" novalidate>
     <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
       {isEs ? "Últimos detalles" : "Almost done"}
@@ -159,9 +137,7 @@ const weathers = WEATHERS;
           </div>
           <span id="obs2-conf" class="text-xs font-mono text-emerald-600 dark:text-emerald-400 shrink-0"></span>
         </div>
-        <button type="button" id="obs2-id-edit" class="mt-2 text-xs text-zinc-400 underline">
-          {isEs ? "Editar identificación" : "Edit identification"}
-        </button>
+        <!-- "Edit identification" link removed: manual input below is always visible (#942) -->
         <!-- "Why this species?" — issue #736 — curated marks + reference photos -->
         <WhyThisSpecies lang={lang} />
       </div>
@@ -173,6 +149,10 @@ const weathers = WEATHERS;
         <TaxonAutocomplete inputId="obs2-taxon-input" lang={lang} />
       </div>
     </div>
+
+    <!-- Contextual species chips — moved post-GPS (#942): shown only once location resolves.
+         Render triggered by JS when gpsResolved=true and bestResult.confidence < 0.95. -->
+    <ContextualSpeciesChips lang={lang} targetInputId="obs2-taxon-input" />
 
     <!-- Location -->
     <div>
@@ -272,7 +252,7 @@ const weathers = WEATHERS;
       </p>
     </div>
 
-    <!-- Save button -->
+    <!-- Save button — primary action -->
     <button
       type="submit"
       id="obs2-save-btn"
@@ -287,7 +267,7 @@ const weathers = WEATHERS;
     </button>
   </form>
 
-  <!-- Identify-only result (shown when ?mode=identify, pipeline done, user skips save) -->
+  <!-- 8. Identify-only result (shown when ?mode=identify, pipeline done, user skips save) -->
   <div id="obs2-identify-result" class="hidden rounded-xl border border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 p-5 space-y-3">
     <p class="font-semibold text-emerald-800 dark:text-emerald-300 text-center">
       {isEs ? "Identificación completa" : "Identification complete"}
@@ -310,7 +290,7 @@ const weathers = WEATHERS;
     </div>
   </div>
 
-  <!-- No-runners empty state (#274) -->
+  <!-- 9. No-runners empty state (#274) -->
   <div id="obs2-no-runners" class="hidden rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-5 space-y-3">
     <p class="font-semibold text-amber-800 dark:text-amber-300">
       {isEs ? "🔧 Sin modelos de IA configurados" : "🔧 No AI models configured"}
@@ -335,7 +315,12 @@ const weathers = WEATHERS;
     </div>
   </div>
 
-  <!-- Success state -->
+  <!-- 10. Active observers — footer position (#942: moved from top; hidden when {region} unresolved) -->
+  <div id="obs2-active-observers-footer" class="hidden">
+    <ActiveObserversBanner lang={lang} />
+  </div>
+
+  <!-- Success state (minimal placeholder; replaced by ObservationSuccess in PR6) -->
   <div id="obs2-success" class="hidden rounded-xl border border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 p-6 text-center space-y-3">
     <div class="text-4xl">✅</div>
     <p class="font-semibold text-emerald-800 dark:text-emerald-300">
@@ -404,21 +389,7 @@ function showModeToast(msg: string): void {
   el.className = 'fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 px-5 py-3 text-sm shadow-lg max-w-[340px] text-center pointer-events-none';
   el.textContent = msg; document.body.appendChild(el); setTimeout(() => el.remove(), 4000);
 }
-(async () => {
-  try {
-    const { hasKeysForPlugin } = await import('../lib/byo-keys');
-    const { getBirdNETCacheStatus, getBirdNETWeightsBaseUrl } = await import('../lib/identifiers/birdnet-cache');
-    const hasByo = hasKeysForPlugin('claude_haiku') || hasKeysForPlugin('plantnet');
-    const hasBirdnet = getBirdNETWeightsBaseUrl() ? await getBirdNETCacheStatus().then(s => s.modelCached && s.labelsCached).catch(() => false) : false;
-    const ownBtn = document.getElementById('obs2-mode-own-key') as HTMLButtonElement | null;
-    const locBtn = document.getElementById('obs2-mode-local') as HTMLButtonElement | null;
-    if (ownBtn && !hasByo) ownBtn.disabled = true;
-    if (locBtn && !hasBirdnet) locBtn.disabled = true;
-    applyModeStyles(readAiMode());
-    document.getElementById('obs2-ai-mode-selector')?.classList.remove('hidden');
-    modeButtons.forEach(btn => btn.addEventListener('click', () => { if (btn.disabled) return; writeAiMode(btn.dataset.mode as AiMode); applyModeStyles(btn.dataset.mode as AiMode); }));
-  } catch { /* selector stays hidden */ }
-})();
+// NOTE: AI mode selector setup merged into capability caption block below (#942)
 
 // ── First-time onboarding toast (#274) ────────────────────────────────────
 const ONBOARDING_KEY = 'rastrum.obs2.onboarding_shown';
@@ -433,38 +404,62 @@ if (!localStorage.getItem(ONBOARDING_KEY)) {
   setTimeout(() => toast.remove(), 5000);
 }
 
-// ── Capability banner (#274) ───────────────────────────────────────────────
-const capBanner   = document.getElementById('obs2-capability-banner');
-const capList     = document.getElementById('obs2-capability-list');
-const fileHint    = document.getElementById('obs2-file-hint');
+// ── Capability caption (#942: replaces old multi-line banner) ────────────────────────────
+// Shows a single-line positive status below the dropzone. Old obs2-capability-banner
+// div no longer exists; we use obs2-capability-caption instead.
+const capCaptionEl = document.getElementById('obs2-capability-caption');
+const fileHint      = document.getElementById('obs2-file-hint');
 
-// Banner is always visible — no hide/collapse logic.
-
-// Render capability status
+// Render 1-line capability caption
 (async () => {
   try {
     const runners = await detectRunners();
-    if (!capList) return;
-    const items = [
-      { label: 'PlantNet (plants)', labelEs: 'PlantNet (plantas)', ok: runners.plantnet },
-      { label: 'BirdNET (birds)', labelEs: 'BirdNET (aves)', ok: runners.birdnet },
-      // Multi-provider since M32: the EF resolves Anthropic / OpenAI / Bedrock / Azure /
-      // Gemini / Vertex via the BYO → sponsor → pool chain, so labelling this row "Claude"
-      // misrepresented what's actually available. The user-visible label is now provider-agnostic.
-      { label: 'Cloud AI Vision', labelEs: 'IA en la nube', ok: runners.claude },
-      { label: 'Phi Vision (local)', labelEs: 'Phi Vision (local)', ok: runners.phi },
-      { label: 'Gemma 4 (local)', labelEs: 'Gemma 4 (local)', ok: runners.gemma },
-      { label: 'EfficientNet (local)', labelEs: 'EfficientNet (local)', ok: runners.efficientNet },
-    ];
-    const allOk = items.every(i => i.ok);
-    // Hide setup link if all configured
-    if (allOk) document.getElementById('obs2-setup-link')?.classList.add('hidden');
-    capList.innerHTML = items.map(item => `
-      <span class="${item.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-400 dark:text-zinc-500'}">
-        ${item.ok ? '✅' : '❌'} ${isEs ? item.labelEs : item.label}
-      </span>
-    `).join('');
+    if (!capCaptionEl) return;
+
+    const readyProviders: string[] = [];
+    if (runners.plantnet) readyProviders.push('PlantNet');
+    if (runners.birdnet)  readyProviders.push('BirdNET');
+    if (runners.claude)   readyProviders.push(isEs ? 'IA en la nube' : 'Cloud AI');
+    if (runners.phi)      readyProviders.push('Phi');
+    if (runners.gemma)    readyProviders.push('Gemma');
+    if (runners.efficientNet) readyProviders.push('EfficientNet');
+
+    const configureMore = isEs ? 'configurar más' : 'configure more';
+    const configureHref = isEs ? '/es/perfil/editar#on-device-ai-section' : '/en/profile/edit#on-device-ai-section';
+
+    if (readyProviders.length === 0) {
+      capCaptionEl.innerHTML = isEs
+        ? `Configura un identificador para reconocer especies automáticamente · <a href="${configureHref}" class="underline hover:no-underline">Configurar →</a>`
+        : `Set up an identifier to recognise species automatically · <a href="${configureHref}" class="underline hover:no-underline">Set up →</a>`;
+    } else {
+      capCaptionEl.innerHTML = `${readyProviders.join(' + ')} ${isEs ? 'listos' : 'ready'} · <a href="${configureHref}" class="underline hover:no-underline">${configureMore}</a>`;
+    }
+    capCaptionEl.classList.remove('hidden');
   } catch { /* silent */ }
+})();
+
+// AI mode selector: hide when only 1 usable mode exists (#942 spec)
+(async () => {
+  try {
+    const { hasKeysForPlugin } = await import('../lib/byo-keys');
+    const { getBirdNETCacheStatus, getBirdNETWeightsBaseUrl } = await import('../lib/identifiers/birdnet-cache');
+    const hasByo = hasKeysForPlugin('claude_haiku') || hasKeysForPlugin('plantnet');
+    const hasBirdnet = getBirdNETWeightsBaseUrl() ? await getBirdNETCacheStatus().then(s => s.modelCached && s.labelsCached).catch(() => false) : false;
+    const ownBtn = document.getElementById('obs2-mode-own-key') as HTMLButtonElement | null;
+    const locBtn = document.getElementById('obs2-mode-local') as HTMLButtonElement | null;
+    if (ownBtn && !hasByo) ownBtn.disabled = true;
+    if (locBtn && !hasBirdnet) locBtn.disabled = true;
+    applyModeStyles(readAiMode());
+    // Only show mode selector when >=2 usable (non-disabled) modes exist
+    const modeSelector = document.getElementById('obs2-ai-mode-selector');
+    if (modeSelector) {
+      const usableCount = [true, hasByo, hasBirdnet].filter(Boolean).length;
+      if (usableCount >= 2) {
+        modeSelector.classList.remove('hidden');
+      }
+    }
+    modeButtons.forEach(btn => btn.addEventListener('click', () => { if (btn.disabled) return; writeAiMode(btn.dataset.mode as AiMode); applyModeStyles(btn.dataset.mode as AiMode); }));
+  } catch { /* selector stays hidden */ }
 })();
 
 // ── Contextual hint after file drop (#274) ─────────────────────────────────
@@ -912,6 +907,8 @@ function startGPS() {
       window.dispatchEvent(new CustomEvent('rastrum:observe-location-ready', {
         detail: { lat: location.lat, lng: location.lng },
       }));
+      // Show active observers footer now that region is resolved (#942)
+      document.getElementById('obs2-active-observers-footer')?.classList.remove('hidden');
       // Update location node
       if (pipelineState) {
         const locNode = pipelineState.nodes.find(n => n.kind === 'location');
@@ -955,11 +952,7 @@ function showPostForm() {
     }
   }
 
-  // Edit identification toggle — only wired when AI result is present
-  document.getElementById('obs2-id-edit')?.addEventListener('click', () => {
-    document.getElementById('obs2-id-manual')?.classList.toggle('hidden');
-  });
-}
+  // Manual ID field is always visible now — no edit toggle needed (#942: removed "Edit identification" link)
 
 // "Report incorrect" from the WhyThisSpecies panel (issue #736).
 // Pre-save we have no identification id, so M22's wrong_id flow isn't
