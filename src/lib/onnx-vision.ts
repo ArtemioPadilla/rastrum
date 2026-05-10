@@ -254,10 +254,46 @@ export async function* generateGemmaText(
 ): AsyncIterable<{ choices: Array<{ delta?: { content?: string }; message?: { content: string } }> }> {
   const { processor: proc, model: mdl } = await loadGemmaVisionEngine(() => {});
 
+  // --- Gemma 4 strict message normalization ---
+  // Gemma's chat template requires:
+  //   1. messages[0].role === 'system' (exactly one, exactly first)
+  //   2. No consecutive same-role turns (alternating user/assistant)
+  //   3. 'tool' role not supported — flatten to user
+
+  // 1. Collect all system messages and merge them into one
+  const systemParts = messages
+    .filter(m => m.role === 'system')
+    .map(m => m.content)
+    .join('\n\n');
+  const nonSystemMsgs = messages.filter(m => m.role !== 'system');
+
+  // 2. Flatten 'tool' role → user with [tool_result] prefix
+  const flatMsgs = nonSystemMsgs.map(m =>
+    m.role === 'tool'
+      ? { role: 'user', content: `[tool_result] ${m.content}` }
+      : { role: m.role, content: m.content }
+  );
+
+  // 3. Merge consecutive same-role turns (Gemma requires strict alternation)
+  const merged: Array<{ role: string; content: string }> = [];
+  for (const msg of flatMsgs) {
+    if (merged.length > 0 && merged[merged.length - 1].role === msg.role) {
+      merged[merged.length - 1].content += '\n\n' + msg.content;
+    } else {
+      merged.push({ ...msg });
+    }
+  }
+
+  // 4. Build final array: single system first, then alternating turns
+  const normalized = [
+    ...(systemParts ? [{ role: 'system', content: systemParts }] : []),
+    ...merged,
+  ];
+
   // Map our role/content shape to the Gemma chat template's content array.
-  const chatMsgs = messages.map(m => ({
-    role: m.role === 'tool' ? 'user' : m.role,
-    content: [{ type: 'text', text: m.role === 'tool' ? `[tool_result] ${m.content}` : m.content }],
+  const chatMsgs = normalized.map(m => ({
+    role: m.role,
+    content: [{ type: 'text', text: m.content }],
   }));
 
   const promptText = proc.apply_chat_template(chatMsgs, {
