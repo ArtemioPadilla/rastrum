@@ -11125,35 +11125,39 @@ LANGUAGE sql STABLE
 SECURITY DEFINER
 SET search_path = public, extensions, pg_temp
 AS $$
+  -- Single-scan optimisation (ArtemIO review #942 PR1):
+  -- One CTE scans the sector once and computes both:
+  --   (a) the total neighbour count  → n>=50 honest-norms check
+  --   (b) whether any neighbour shares the same calendar day
+  -- The original implementation ran two separate ST_DWithin scans.
   WITH this_obs AS (
     SELECT location, observed_at
     FROM public.observations
     WHERE id = p_obs_id
       AND location IS NOT NULL
+  ),
+  sector_stats AS (
+    SELECT
+      count(*)                                                         AS total_neighbours,
+      count(*) FILTER (
+        WHERE date_trunc('day', o.observed_at AT TIME ZONE 'UTC')
+            = date_trunc('day', t.observed_at AT TIME ZONE 'UTC')
+      )                                                                AS same_day_neighbours
+    FROM public.observations o, this_obs t
+    WHERE o.location IS NOT NULL
+      AND ST_DWithin(o.location::geography, t.location::geography, 1000)
+      AND o.id != p_obs_id
   )
   SELECT
     CASE
       -- Honest-norms invariant v1.1.5: only claim "first" when the sector
       -- has enough historical data (n>=50). Below that threshold we simply
       -- return false — we cannot make a meaningful claim.
-      WHEN (
-        SELECT count(*)
-        FROM public.observations o, this_obs t
-        WHERE o.location IS NOT NULL
-          AND ST_DWithin(o.location::geography, t.location::geography, 1000)
-          AND o.id != p_obs_id
-      ) < 50 THEN false
-      -- Sector has enough history: check if this obs is truly the first today.
-      ELSE NOT EXISTS (
-        SELECT 1
-        FROM public.observations o, this_obs t
-        WHERE o.location IS NOT NULL
-          AND ST_DWithin(o.location::geography, t.location::geography, 1000)
-          AND date_trunc('day', o.observed_at AT TIME ZONE 'UTC')
-            = date_trunc('day', t.observed_at AT TIME ZONE 'UTC')
-          AND o.id != p_obs_id
-      )
-    END;
+      WHEN total_neighbours < 50 THEN false
+      -- Sector has enough history: first today iff no same-day neighbours.
+      ELSE same_day_neighbours = 0
+    END
+  FROM sector_stats;
 $$;
 
 REVOKE EXECUTE ON FUNCTION public.is_first_in_sector(uuid) FROM PUBLIC;
