@@ -44,13 +44,13 @@ BEGIN
   INSERT INTO public.observations (
     id, observer_id, primary_taxon_id, observed_at,
     location, location_obscured, obscure_level,
-    state_province
+    state_province, sync_status
   )
   VALUES (
     obs_id, uid_owner, taxon_id, '2026-05-01T12:00:00Z',
     ST_SetSRID(ST_MakePoint(-99.13, 19.43), 4326),
     ST_SetSRID(ST_MakePoint(-99.10, 19.40), 4326),
-    '5km', 'CDMX'
+    '5km', 'CDMX', 'synced'
   )
   ON CONFLICT (id) DO NOTHING;
 END $$;
