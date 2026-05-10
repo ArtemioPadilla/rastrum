@@ -56,6 +56,12 @@ export interface RunParallelIdentifyOptions {
   timeoutMs?: number;
   /** When set, runners are filtered/ordered by `filterRunnersByHint`. */
   taxonHint?: TaxonHint | null;
+  /**
+   * When true (new user with 0 accepted IDs), lower the confidence threshold
+   * to 0.3 and mark results as provisional instead of uncertain (#898).
+   * Shows a 'waiting for community confirmation' label to reduce first-obs anxiety.
+   */
+  isNewUser?: boolean;
 }
 
 /**
@@ -89,6 +95,7 @@ export function filterRunnersByHint(
 export type ParallelIdentifyOutcome =
   | { kind: 'winner'; result: UnifiedIdResult; uncertain: false }
   | { kind: 'uncertain'; result: UnifiedIdResult; uncertain: true }
+  | { kind: 'provisional'; result: UnifiedIdResult; uncertain: false; awaitingConfirmation: true }
   | { kind: 'all_failed'; errors: Record<string, string> };
 
 /**
@@ -105,12 +112,18 @@ export type ParallelIdentifyOutcome =
  * (the function creates a child controller internally for the cancel
  * race; passing `external: AbortSignal` aborts the whole batch).
  */
+/** Confidence floor used for new users to show a provisional ID. */
+export const NEW_USER_PROVISIONAL_THRESHOLD = 0.3;
+
 export async function runParallelIdentify(
   file: File,
   opts: RunParallelIdentifyOptions,
   external?: AbortSignal,
 ): Promise<ParallelIdentifyOutcome> {
-  const threshold = opts.threshold ?? 0.5;
+  const isNewUser = opts.isNewUser ?? false;
+  // New users get a lower confidence threshold so they see something
+  // meaningful instead of 'uncertain' on their very first identification.
+  const threshold = opts.threshold ?? (isNewUser ? NEW_USER_PROVISIONAL_THRESHOLD : 0.5);
   const timeoutMs = opts.timeoutMs ?? 30_000;
   const filteredRunners = filterRunnersByHint(opts.runners, opts.taxonHint ?? null);
   const entries = Object.entries(filteredRunners);
@@ -151,7 +164,13 @@ export async function runParallelIdentify(
   }
 
   if (winner) {
-    return { kind: 'winner', result: (winner as { id: string; result: UnifiedIdResult }).result, uncertain: false };
+    const winResult = (winner as { id: string; result: UnifiedIdResult }).result;
+    // If this win is only because the new-user lower threshold was applied
+    // AND confidence is below the standard threshold, mark it as provisional.
+    if (isNewUser && winResult.confidence < 0.5) {
+      return { kind: 'provisional', result: winResult, uncertain: false, awaitingConfirmation: true };
+    }
+    return { kind: 'winner', result: winResult, uncertain: false };
   }
 
   if (results.length > 0) {

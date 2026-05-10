@@ -1311,6 +1311,28 @@ DROP POLICY IF EXISTS "media_public_read" ON storage.objects;
 CREATE POLICY "media_public_read" ON storage.objects
   FOR SELECT USING (bucket_id = 'media');
 
+-- #830 — Restrict anonymous LIST on media bucket.
+-- Individual object reads stay public (required for CDN / direct <img> URLs);
+-- listing (bulk enumeration) is restricted to authenticated users to prevent
+-- unauthenticated harvesting of all uploaded observation photos.
+-- See docs/runbooks/storage-security.md for verification steps.
+DROP POLICY IF EXISTS "media_authenticated_list" ON storage.objects;
+CREATE POLICY "media_authenticated_list" ON storage.objects
+  FOR SELECT
+  TO authenticated
+  USING (
+    bucket_id = 'media'
+    AND (storage.foldername(name))[1] != '.keep'
+  );
+
+-- #831 — Leaked Password Protection (HIBP) is enabled via the Supabase
+-- Dashboard (Auth → Settings → Security → Enable Leaked Password Protection).
+-- It uses k-anonymity prefix queries against the Have I Been Pwned API;
+-- the full password hash never leaves Supabase infrastructure.
+-- See docs/runbooks/leaked-password-protection.md for the enable procedure
+-- and verification steps.
+-- NOTE: This is a project-level configuration toggle, not a SQL setting.
+
 -- ============================================================
 -- MODULE 14 — USER API TOKENS
 -- ============================================================

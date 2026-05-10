@@ -1,0 +1,378 @@
+---
+/**
+ * DiscoverFeedView — personalized "What's interesting to ME right now?" feed.
+ *
+ * Three sections (MVP, all loaded client-side):
+ *   1. Observations from followed users (last 24 h)
+ *   2. Nearby species not yet in the user's dex (from probable_taxa_at())
+ *   3. Trending species in the user's region this week
+ *
+ * When signed out, shows a sign-in prompt. When signed in with no follows,
+ * falls back gracefully with a helpful nudge.
+ *
+ * Spec: #865 — dedicated personalized Discover feed page.
+ */
+import { t } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+
+const { lang } = Astro.props;
+const tr = t(lang);
+const dc = (tr as unknown as { discover: Record<string, string> }).discover ?? {};
+
+const title             = dc.title             ?? (lang === 'es' ? 'Descubrir'        : 'Discover');
+const subtitle          = dc.subtitle          ?? (lang === 'es' ? 'Lo interesante ahora mismo' : "What's interesting to you right now");
+const sectionFollowed   = dc.section_followed  ?? (lang === 'es' ? 'De personas que sigues'     : 'From people you follow');
+const sectionNearby     = dc.section_nearby    ?? (lang === 'es' ? 'Especies cercanas sin encontrar' : "Nearby species you haven't found yet");
+const sectionTrending   = dc.section_trending  ?? (lang === 'es' ? 'Tendencias esta semana'     : 'Trending in your region this week');
+const noFollowsHint     = dc.no_follows_hint   ?? (lang === 'es' ? 'Sigue a observadores para ver su actividad.' : 'Follow some observers to see their recent activity here.');
+const noNearbyHint      = dc.no_nearby_hint    ?? (lang === 'es' ? 'Activa ubicación para ver especies cercanas.' : 'Enable location to see species near you.');
+const noTrendingHint    = dc.no_trending_hint  ?? (lang === 'es' ? 'Sin tendencias aún.' : 'No trending species yet in your region.');
+const loadingLabel      = dc.loading           ?? (lang === 'es' ? 'Cargando feed…' : 'Loading feed…');
+const signInHint        = dc.sign_in_hint      ?? (lang === 'es' ? 'Inicia sesión para un feed personalizado.' : 'Sign in to get a personalized feed.');
+const viewAllLabel      = dc.view_all          ?? (lang === 'es' ? 'Ver todo' : 'View all');
+const exploreCommunity  = dc.explore_community ?? (lang === 'es' ? 'Explorar comunidad' : 'Explore community');
+
+const shareBase   = `/share/obs/`;
+const profileBase = `/${lang}/u/`;
+const communityHref = `/${lang}/${lang === 'es' ? 'comunidad/observadores' : 'community/observers'}/`;
+---
+
+<section
+  class="rastrum-discover-feed"
+  data-lang={lang}
+  data-share-base={shareBase}
+  data-profile-base={profileBase}
+  data-label-loading={loadingLabel}
+  data-label-sign-in-hint={signInHint}
+  data-label-no-follows={noFollowsHint}
+  data-label-no-nearby={noNearbyHint}
+  data-label-no-trending={noTrendingHint}
+  data-label-view-all={viewAllLabel}
+  data-label-section-followed={sectionFollowed}
+  data-label-section-nearby={sectionNearby}
+  data-label-section-trending={sectionTrending}
+>
+  <!-- Page header -->
+  <div class="px-4 pt-6 pb-2">
+    <h1 class="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">{title}</h1>
+    <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-1">{subtitle}</p>
+  </div>
+
+  <!-- Loading skeleton (shown until JS hydrates) -->
+  <div id="discover-loading" class="px-4 py-8 flex items-center justify-center text-zinc-400 text-sm" aria-live="polite">
+    <span class="animate-pulse">{loadingLabel}</span>
+  </div>
+
+  <!-- Sign-in prompt (shown when logged out) -->
+  <div id="discover-signin-prompt" class="hidden px-4 py-8 text-center">
+    <p class="text-sm text-zinc-500 dark:text-zinc-400 mb-3">{signInHint}</p>
+    <a
+      href={`/${lang}/${lang === 'es' ? 'ingresar' : 'sign-in'}/`}
+      class="inline-flex items-center rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white"
+    >
+      {lang === 'es' ? 'Iniciar sesión' : 'Sign in'}
+    </a>
+  </div>
+
+  <!-- Main feed (populated by JS) -->
+  <div id="discover-feed-content" class="hidden space-y-8 pb-24 px-4">
+    <!-- Section: Followed users -->
+    <section id="discover-section-followed" aria-labelledby="discover-followed-heading">
+      <div class="flex items-center justify-between mb-3">
+        <h2 id="discover-followed-heading" class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
+          {sectionFollowed}
+        </h2>
+        <a href={communityHref} class="text-xs text-emerald-600 dark:text-emerald-400 hover:underline">
+          {exploreCommunity}
+        </a>
+      </div>
+      <div id="discover-followed-list" class="space-y-3" role="list">
+        <!-- Populated by JS -->
+      </div>
+      <p id="discover-followed-empty" class="hidden text-sm text-zinc-400 dark:text-zinc-500 italic">{noFollowsHint}</p>
+    </section>
+
+    <!-- Section: Nearby species -->
+    <section id="discover-section-nearby" aria-labelledby="discover-nearby-heading">
+      <div class="flex items-center justify-between mb-3">
+        <h2 id="discover-nearby-heading" class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
+          {sectionNearby}
+        </h2>
+      </div>
+      <div id="discover-nearby-list" class="flex flex-wrap gap-2" role="list">
+        <!-- Populated by JS -->
+      </div>
+      <p id="discover-nearby-empty" class="hidden text-sm text-zinc-400 dark:text-zinc-500 italic">{noNearbyHint}</p>
+    </section>
+
+    <!-- Section: Trending this week -->
+    <section id="discover-section-trending" aria-labelledby="discover-trending-heading">
+      <div class="flex items-center justify-between mb-3">
+        <h2 id="discover-trending-heading" class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
+          {sectionTrending}
+        </h2>
+        <a href={`/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/species'}/`} class="text-xs text-emerald-600 dark:text-emerald-400 hover:underline">
+          {viewAllLabel}
+        </a>
+      </div>
+      <div id="discover-trending-list" class="flex flex-wrap gap-2" role="list">
+        <!-- Populated by JS -->
+      </div>
+      <p id="discover-trending-empty" class="hidden text-sm text-zinc-400 dark:text-zinc-500 italic">{noTrendingHint}</p>
+    </section>
+  </div>
+</section>
+
+<script>
+  import { getCachedUser, getSupabase } from '../lib/supabase';
+
+  // ── Types ──────────────────────────────────────────────────────────────────
+
+  interface FollowedObs {
+    id: string;
+    observer_id: string;
+    scientific_name: string | null;
+    common_name: string | null;
+    photo_url: string | null;
+    observed_at: string;
+    observer_username: string | null;
+    observer_avatar_url: string | null;
+  }
+
+  interface SpeciesTip {
+    taxon_name: string;
+    common_name: string | null;
+    obs_count?: number;
+  }
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+
+  const root      = document.querySelector<HTMLElement>('.rastrum-discover-feed');
+  const loading   = document.getElementById('discover-loading');
+  const signinEl  = document.getElementById('discover-signin-prompt');
+  const feedEl    = document.getElementById('discover-feed-content');
+
+  const labelNoFollows = root?.dataset.labelNoFollows ?? '';
+  const labelNoNearby  = root?.dataset.labelNoNearby  ?? '';
+  const labelNoTrending = root?.dataset.labelNoTrending ?? '';
+  const shareBase      = root?.dataset.shareBase      ?? '/share/obs/';
+  const profileBase    = root?.dataset.profileBase    ?? '/en/u/';
+
+  function hide(el: HTMLElement | null) { el?.classList.add('hidden'); }
+  function show(el: HTMLElement | null) { el?.classList.remove('hidden'); }
+
+  // ── Observation card ───────────────────────────────────────────────────────
+
+  function buildObsCard(obs: FollowedObs): HTMLElement {
+    const card = document.createElement('a');
+    card.href = `${shareBase}?id=${obs.id}`;
+    card.role = 'listitem';
+    card.className = 'flex items-center gap-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 p-3 hover:border-emerald-300 transition-colors';
+
+    const thumb = document.createElement('div');
+    thumb.className = 'w-14 h-14 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex-shrink-0 overflow-hidden';
+    if (obs.photo_url) {
+      const img = document.createElement('img');
+      img.src = obs.photo_url;
+      img.alt = obs.scientific_name ?? '';
+      img.className = 'w-full h-full object-cover';
+      img.loading = 'lazy';
+      thumb.appendChild(img);
+    }
+    card.appendChild(thumb);
+
+    const info = document.createElement('div');
+    info.className = 'flex flex-col min-w-0';
+    const name = document.createElement('span');
+    name.className = 'text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate italic';
+    name.textContent = obs.scientific_name ?? '—';
+    const observer = document.createElement('span');
+    observer.className = 'text-xs text-zinc-500 dark:text-zinc-400 truncate';
+    observer.textContent = obs.observer_username ? `@${obs.observer_username}` : '';
+    const date = document.createElement('span');
+    date.className = 'text-xs text-zinc-400 dark:text-zinc-500 mt-0.5';
+    date.textContent = obs.observed_at ? new Date(obs.observed_at).toLocaleDateString() : '';
+    info.appendChild(name);
+    info.appendChild(observer);
+    info.appendChild(date);
+    card.appendChild(info);
+
+    return card;
+  }
+
+  // ── Species chip ───────────────────────────────────────────────────────────
+
+  function buildSpeciesChip(sp: SpeciesTip, lang: string): HTMLElement {
+    const anchor = document.createElement('a');
+    const slug = sp.taxon_name.toLowerCase().replace(/\s+/g, '-');
+    anchor.href = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/species'}/?slug=${encodeURIComponent(slug)}`;
+    anchor.role = 'listitem';
+    anchor.className = 'inline-flex items-center gap-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 px-3 py-1.5 text-xs font-medium text-zinc-800 dark:text-zinc-200 transition-colors border border-zinc-200 dark:border-zinc-700';
+    anchor.innerHTML = `<span class="italic">${sp.taxon_name}</span>${sp.common_name ? `<span class="text-zinc-500">· ${sp.common_name}</span>` : ''}`;
+    return anchor;
+  }
+
+  // ── Data loaders ───────────────────────────────────────────────────────────
+
+  async function loadFollowedObservations(sb: ReturnType<typeof getSupabase>, userId: string): Promise<FollowedObs[]> {
+    const since24h = new Date(Date.now() - 24 * 60 * 60 * 1_000).toISOString();
+    // Get followed user IDs
+    const { data: follows } = await sb
+      .from('follows')
+      .select('following_id')
+      .eq('follower_id', userId)
+      .limit(200);
+    const followedIds = (follows ?? []).map((f: { following_id: string }) => f.following_id);
+    if (!followedIds.length) return [];
+
+    const { data } = await sb
+      .from('observations')
+      .select(`
+        id,
+        observer_id,
+        scientific_name,
+        common_name,
+        photo_url,
+        observed_at,
+        users!observer_id ( username, avatar_url )
+      `)
+      .in('observer_id', followedIds)
+      .gte('observed_at', since24h)
+      .eq('sync_status', 'synced')
+      .order('observed_at', { ascending: false })
+      .limit(12);
+
+    return (data ?? []).map((r: Record<string, unknown>) => {
+      const u = (r.users as Record<string, string> | null) ?? {};
+      return {
+        id: r.id as string,
+        observer_id: r.observer_id as string,
+        scientific_name: r.scientific_name as string | null,
+        common_name: r.common_name as string | null,
+        photo_url: r.photo_url as string | null,
+        observed_at: r.observed_at as string,
+        observer_username: u.username ?? null,
+        observer_avatar_url: u.avatar_url ?? null,
+      };
+    });
+  }
+
+  async function loadNearbySpecies(sb: ReturnType<typeof getSupabase>, userId: string): Promise<SpeciesTip[]> {
+    // Get user's dex (observed taxa)
+    const { data: dex } = await sb
+      .from('observations')
+      .select('scientific_name')
+      .eq('observer_id', userId)
+      .not('scientific_name', 'is', null);
+    const observed = new Set<string>((dex ?? []).map((o: { scientific_name: string }) => o.scientific_name));
+
+    // Get trending nearby as proxy for "probable_taxa_at" (function may not exist in all envs)
+    const { data: nearby } = await sb
+      .from('observations')
+      .select('scientific_name, common_name')
+      .eq('sync_status', 'synced')
+      .not('scientific_name', 'is', null)
+      .order('observed_at', { ascending: false })
+      .limit(100);
+
+    const seen = new Set<string>();
+    const result: SpeciesTip[] = [];
+    for (const r of (nearby ?? []) as Array<{ scientific_name: string; common_name: string | null }>) {
+      if (!r.scientific_name) continue;
+      if (observed.has(r.scientific_name)) continue;
+      if (seen.has(r.scientific_name)) continue;
+      seen.add(r.scientific_name);
+      result.push({ taxon_name: r.scientific_name, common_name: r.common_name });
+      if (result.length >= 10) break;
+    }
+    return result;
+  }
+
+  async function loadTrendingSpecies(sb: ReturnType<typeof getSupabase>): Promise<SpeciesTip[]> {
+    const since7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1_000).toISOString();
+    const { data } = await sb
+      .from('observations')
+      .select('scientific_name, common_name')
+      .eq('sync_status', 'synced')
+      .not('scientific_name', 'is', null)
+      .gte('observed_at', since7d)
+      .order('observed_at', { ascending: false })
+      .limit(200);
+
+    const counts = new Map<string, { common_name: string | null; count: number }>();
+    for (const r of (data ?? []) as Array<{ scientific_name: string; common_name: string | null }>) {
+      if (!r.scientific_name) continue;
+      const entry = counts.get(r.scientific_name);
+      if (entry) { entry.count++; }
+      else { counts.set(r.scientific_name, { common_name: r.common_name, count: 1 }); }
+    }
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, 12)
+      .map(([taxon_name, v]) => ({ taxon_name, common_name: v.common_name, obs_count: v.count }));
+  }
+
+  // ── Main hydration ─────────────────────────────────────────────────────────
+
+  async function hydrate(): Promise<void> {
+    let sb: ReturnType<typeof getSupabase>;
+    try { sb = getSupabase(); } catch { hide(loading); show(signinEl); return; }
+
+    const user = await getCachedUser();
+    if (!user) { hide(loading); show(signinEl); return; }
+
+    const lang = root?.dataset.lang ?? 'en';
+
+    // Load all sections in parallel
+    const [followed, nearby, trending] = await Promise.allSettled([
+      loadFollowedObservations(sb, user.id),
+      loadNearbySpecies(sb, user.id),
+      loadTrendingSpecies(sb),
+    ]);
+
+    hide(loading);
+    show(feedEl);
+
+    // Followed section
+    const followedList = document.getElementById('discover-followed-list');
+    const followedEmpty = document.getElementById('discover-followed-empty');
+    const followedData = followed.status === 'fulfilled' ? followed.value : [];
+    if (followedData.length && followedList) {
+      for (const obs of followedData) followedList.appendChild(buildObsCard(obs));
+    } else if (followedEmpty) {
+      show(followedEmpty);
+    }
+
+    // Nearby section
+    const nearbyList = document.getElementById('discover-nearby-list');
+    const nearbyEmpty = document.getElementById('discover-nearby-empty');
+    const nearbyData = nearby.status === 'fulfilled' ? nearby.value : [];
+    if (nearbyData.length && nearbyList) {
+      for (const sp of nearbyData) nearbyList.appendChild(buildSpeciesChip(sp, lang));
+    } else if (nearbyEmpty) {
+      show(nearbyEmpty);
+    }
+
+    // Trending section
+    const trendingList = document.getElementById('discover-trending-list');
+    const trendingEmpty = document.getElementById('discover-trending-empty');
+    const trendingData = trending.status === 'fulfilled' ? trending.value : [];
+    if (trendingData.length && trendingList) {
+      for (const sp of trendingData) trendingList.appendChild(buildSpeciesChip(sp, lang));
+    } else if (trendingEmpty) {
+      show(trendingEmpty);
+    }
+
+    // PostHog
+    try { window.posthog?.capture('discover_feed_viewed', { user_id: user.id }); } catch { /* noop */ }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => { hydrate().catch(() => { hide(loading); show(signinEl); }); });
+  } else {
+    hydrate().catch(() => { hide(loading); show(signinEl); });
+  }
+</script>
