@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { formatActiveObserversBanner } from '../../src/lib/active-observers';
+import { describe, it, expect, vi } from 'vitest';
+import { formatActiveObserversBanner, subscribeToActiveObservers } from '../../src/lib/active-observers';
 
 const COPY_EN = {
   today_n: 'Today {count} people are observing in {region} · join in',
@@ -81,5 +81,52 @@ describe('formatActiveObserversBanner', () => {
   it('truncates fractional counts to int', () => {
     const out = formatActiveObserversBanner({ count: 7.9, region: 'Oaxaca' }, COPY_EN);
     expect(out.text).toBe('Today 7 people are observing in Oaxaca · join in');
+  });
+});
+
+describe('subscribeToActiveObservers', () => {
+  it('returns an unsubscribe function', () => {
+    const mockChannel = {
+      on: vi.fn().mockReturnThis(),
+      subscribe: vi.fn().mockReturnThis(),
+      unsubscribe: vi.fn(),
+    };
+    const mockSupabase = { channel: vi.fn().mockReturnValue(mockChannel) };
+
+    const unsub = subscribeToActiveObservers(mockSupabase as any, 'MX', vi.fn());
+    expect(typeof unsub).toBe('function');
+    expect(mockSupabase.channel).toHaveBeenCalledWith('active-observers:MX');
+  });
+
+  it('calls onCount callback when broadcast received', () => {
+    const captured: { handler: ((payload: any) => void) | null } = { handler: null };
+    const mockChannel = {
+      on: vi.fn().mockImplementation((_type: any, _opts: any, handler: any) => {
+        captured.handler = handler;
+        return mockChannel;
+      }),
+      subscribe: vi.fn().mockReturnThis(),
+      unsubscribe: vi.fn(),
+    };
+    const mockSupabase = { channel: vi.fn().mockReturnValue(mockChannel) };
+    const onCount = vi.fn();
+
+    subscribeToActiveObservers(mockSupabase as any, 'MX', onCount);
+    captured.handler?.({ payload: { count: 7 } });
+
+    expect(onCount).toHaveBeenCalledWith(7);
+  });
+
+  it('unsubscribes channel on returned function call', () => {
+    const mockChannel = {
+      on: vi.fn().mockReturnThis(),
+      subscribe: vi.fn().mockReturnThis(),
+      unsubscribe: vi.fn(),
+    };
+    const mockSupabase = { channel: vi.fn().mockReturnValue(mockChannel) };
+
+    const unsub = subscribeToActiveObservers(mockSupabase as any, 'MX', vi.fn());
+    unsub();
+    expect(mockChannel.unsubscribe).toHaveBeenCalledTimes(1);
   });
 });

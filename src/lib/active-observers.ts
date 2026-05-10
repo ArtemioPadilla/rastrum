@@ -1,3 +1,5 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
+
 /**
  * Pure formatter for the active-observers micro-banner (issue #743).
  *
@@ -57,4 +59,28 @@ export function formatActiveObserversBanner(
     .replace('{count}', String(count))
     .replace('{region}', region);
   return { text, isEmpty: false };
+}
+
+/**
+ * Subscribe to realtime active-observers count for a country.
+ *
+ * Privacy: the broadcast payload contains only `{ count: number }` —
+ * no user IDs or PII ever transit this channel.
+ *
+ * @returns unsubscribe function — call on component unmount
+ */
+export function subscribeToActiveObservers(
+  supabase: SupabaseClient,
+  country: string,
+  onCount: (count: number) => void,
+): () => void {
+  const channel = supabase
+    .channel(`active-observers:${country}`)
+    .on('broadcast', { event: 'count' }, (payload: { payload?: { count?: number } }) => {
+      const count = payload?.payload?.count;
+      if (typeof count === 'number') onCount(count);
+    })
+    .subscribe();
+
+  return () => { channel.unsubscribe(); };
 }
