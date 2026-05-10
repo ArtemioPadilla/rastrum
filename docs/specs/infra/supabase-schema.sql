@@ -11513,3 +11513,292 @@ $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_te
 
 REVOKE EXECUTE ON FUNCTION public.recompute_streak(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.recompute_streak(uuid) TO service_role;
+
+-- ============================================================
+-- M03-ext — probable_taxa_cache layer (issue #803)
+-- ============================================================
+-- Pre-computed geohash5 × month suggestion cache.
+-- Populated nightly by recompute-taxa-cache EF (03:00 UTC).
+-- probable_taxa_at() checks cache first; falls through to live
+-- query on cache miss (new cells, just-deployed).
+-- ============================================================
+
+-- geohash5 precision ≈ 4.9 km × 4.9 km cell — coarse enough to
+-- aggregate many observations per cell, fine enough to reflect
+-- local species composition.  A user's ±50 km search radius spans
+-- ~100 geohash5 cells, so LIMIT 10 from the cache is fast.
+
+CREATE TABLE IF NOT EXISTS public.probable_taxa_cache (
+  geohash5    text        NOT NULL,
+  month       int         NOT NULL CHECK (month BETWEEN 1 AND 12),
+  taxon_id    uuid        NOT NULL REFERENCES public.taxa(id) ON DELETE CASCADE,
+  score       numeric     NOT NULL DEFAULT 0,   -- n_obs used for ordering
+  updated_at  timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (geohash5, month, taxon_id)
+);
+
+CREATE INDEX IF NOT EXISTS probable_taxa_cache_geohash5_month_score_idx
+  ON public.probable_taxa_cache (geohash5, month, score DESC);
+
+-- RLS: public read (anon may read suggestions), no direct write from clients.
+ALTER TABLE public.probable_taxa_cache ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "probable_taxa_cache: anon can read"
+  ON public.probable_taxa_cache FOR SELECT
+  USING (true);
+
+-- Revoke direct writes from unprivileged roles.
+REVOKE INSERT, UPDATE, DELETE ON public.probable_taxa_cache FROM anon, authenticated;
+GRANT  SELECT                  ON public.probable_taxa_cache TO anon, authenticated;
+GRANT  ALL                     ON public.probable_taxa_cache TO service_role;
+
+-- ── recompute_probable_taxa_cache() ──────────────────────────────────────
+-- Called by the nightly EF.  For every (geohash5, month) cell that has
+-- qualifying observations, upserts the top-50 taxa by observation count.
+-- Returns the total number of rows upserted.
+
+CREATE OR REPLACE FUNCTION public.recompute_probable_taxa_cache()
+RETURNS int
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions, pg_temp
+AS $$
+DECLARE
+  v_rows int := 0;
+BEGIN
+  -- Delete stale entries older than 48 h so cells with zero recent obs
+  -- are pruned over time.
+  DELETE FROM public.probable_taxa_cache
+  WHERE updated_at < now() - interval '48 hours';
+
+  -- Recompute: for each (geohash5, month) with qualifying observations,
+  -- take the top-50 taxa by count and upsert.
+  WITH cells AS (
+    SELECT
+      ST_GeoHash(o.location::geometry, 5)            AS geohash5,
+      EXTRACT(MONTH FROM o.observed_at AT TIME ZONE 'UTC')::int AS month,
+      i.taxon_id,
+      COUNT(*)::numeric                              AS score
+    FROM public.observations o
+    JOIN public.identifications i
+      ON i.observation_id = o.id AND i.is_primary = true
+    WHERE o.location   IS NOT NULL
+      AND i.taxon_id   IS NOT NULL
+      AND (i.is_research_grade = true OR o.primary_taxon_id IS NOT NULL)
+    GROUP BY 1, 2, 3
+  ),
+  ranked AS (
+    SELECT
+      geohash5,
+      month,
+      taxon_id,
+      score,
+      ROW_NUMBER() OVER (PARTITION BY geohash5, month ORDER BY score DESC) AS rn
+    FROM cells
+  ),
+  top50 AS (
+    SELECT geohash5, month, taxon_id, score
+    FROM ranked
+    WHERE rn <= 50
+  )
+  INSERT INTO public.probable_taxa_cache (geohash5, month, taxon_id, score, updated_at)
+  SELECT geohash5, month, taxon_id, score, now()
+  FROM   top50
+  ON CONFLICT (geohash5, month, taxon_id) DO UPDATE
+    SET score      = EXCLUDED.score,
+        updated_at = EXCLUDED.updated_at;
+
+  GET DIAGNOSTICS v_rows = ROW_COUNT;
+  RETURN v_rows;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.recompute_probable_taxa_cache() FROM PUBLIC;
+GRANT  EXECUTE ON FUNCTION public.recompute_probable_taxa_cache() TO service_role;
+
+-- ── Update probable_taxa_at() to check cache first ───────────────────────
+-- Cache path: look up the caller's geohash5 + ±1 month window in
+-- probable_taxa_cache.  On cache miss (empty result set) fall through to
+-- the original live ST_DWithin query so new regions always work.
+
+CREATE OR REPLACE FUNCTION public.probable_taxa_at(
+  p_lat   numeric,
+  p_lng   numeric,
+  p_month int,
+  p_limit int DEFAULT 10
+)
+RETURNS TABLE (
+  taxon_id               uuid,
+  scientific_name        text,
+  common_name_es         text,
+  common_name_en         text,
+  slug                   text,
+  thumbnail_url          text,
+  n_obs                  int,
+  last_seen_distance_km  numeric,
+  has_observed_by_viewer boolean
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY INVOKER
+SET search_path = public
+AS $$
+DECLARE
+  v_point    geography;
+  v_viewer   uuid;
+  v_months   int[];
+  v_geohash5 text;
+  v_cached   int := 0;
+BEGIN
+  -- Input validation (unchanged from original)
+  IF p_lat IS NULL OR p_lng IS NULL OR p_month IS NULL THEN RETURN; END IF;
+  IF p_lat < -90 OR p_lat > 90 OR p_lng < -180 OR p_lng > 180 THEN RETURN; END IF;
+  IF p_month < 1 OR p_month > 12 THEN RETURN; END IF;
+
+  IF p_limit IS NULL OR p_limit <= 0 THEN
+    p_limit := 10;
+  ELSIF p_limit > 50 THEN
+    p_limit := 50;
+  END IF;
+
+  v_point    := ST_SetSRID(ST_MakePoint(p_lng, p_lat), 4326)::geography;
+  v_viewer   := auth.uid();
+  v_geohash5 := ST_GeoHash(ST_SetSRID(ST_MakePoint(p_lng, p_lat), 4326), 5);
+
+  -- Month window ±1 (wrap at year boundaries)
+  v_months := ARRAY[
+    ((p_month - 2 + 12) % 12) + 1,
+    p_month,
+    (p_month % 12) + 1
+  ]::int[];
+
+  -- ── Cache path ────────────────────────────────────────────────────────
+  -- Check how many cached rows exist for this cell + month window.
+  -- Neighbouring geohash5 cells are not queried here — the cache covers
+  -- a ~5 km cell which is a good proxy for "what's near me" at the
+  -- suggestion level.  Precise distance is not needed for chips.
+  SELECT COUNT(*) INTO v_cached
+  FROM public.probable_taxa_cache c
+  WHERE c.geohash5 = v_geohash5
+    AND c.month = ANY(v_months);
+
+  IF v_cached > 0 THEN
+    -- Cache hit: return from cache, join taxa + thumbnails for display fields.
+    RETURN QUERY
+    WITH agg AS (
+      SELECT
+        c.taxon_id,
+        SUM(c.score)::int         AS n_obs,
+        -- Distance from geohash cell centre to query point
+        ROUND(
+          (ST_Distance(
+            ST_SetSRID(ST_PointFromGeoHash(v_geohash5), 4326)::geography,
+            v_point
+          ) / 1000.0)::numeric, 1
+        )                         AS last_seen_distance_km
+      FROM public.probable_taxa_cache c
+      WHERE c.geohash5 = v_geohash5
+        AND c.month = ANY(v_months)
+      GROUP BY c.taxon_id
+      ORDER BY n_obs DESC
+      LIMIT p_limit
+    )
+    SELECT
+      t.id                         AS taxon_id,
+      t.scientific_name,
+      t.common_name_es,
+      t.common_name_en,
+      t.slug,
+      th.thumbnail_url,
+      a.n_obs,
+      a.last_seen_distance_km,
+      CASE WHEN v_viewer IS NULL THEN NULL
+           ELSE EXISTS (
+             SELECT 1
+             FROM public.observations obs2
+             JOIN public.identifications i2
+               ON i2.observation_id = obs2.id AND i2.is_primary = true
+             WHERE obs2.observer_id = v_viewer
+               AND i2.taxon_id = t.id
+           )
+      END                          AS has_observed_by_viewer
+    FROM agg a
+    JOIN public.taxa t   ON t.id = a.taxon_id
+    LEFT JOIN public.taxa_thumbnails th ON th.taxon_id = t.id
+    WHERE t.taxon_rank = 'species'
+    ORDER BY a.n_obs DESC, a.last_seen_distance_km ASC;
+
+    RETURN;
+  END IF;
+
+  -- ── Live fallback (cache miss) ────────────────────────────────────────
+  -- Identical to the original query; runs when cache is empty for this cell.
+  RETURN QUERY
+  WITH nearby AS (
+    SELECT
+      i.taxon_id,
+      ST_Distance(o.location, v_point) AS distance_m,
+      o.observer_id
+    FROM public.observations o
+    JOIN public.identifications i
+      ON i.observation_id = o.id AND i.is_primary = true
+    WHERE o.location IS NOT NULL
+      AND i.taxon_id IS NOT NULL
+      AND ST_DWithin(o.location, v_point, 50000)
+      AND EXTRACT(MONTH FROM o.observed_at AT TIME ZONE 'UTC')::int = ANY(v_months)
+      AND (i.is_research_grade = true OR o.primary_taxon_id IS NOT NULL)
+  ),
+  ranked AS (
+    SELECT
+      n.taxon_id,
+      COUNT(*)::int                  AS n_obs,
+      MIN(n.distance_m) / 1000.0     AS last_seen_distance_km,
+      bool_or(n.observer_id = v_viewer) AS observed_by_viewer
+    FROM nearby n
+    GROUP BY n.taxon_id
+    ORDER BY COUNT(*) DESC, MIN(n.distance_m) ASC
+    LIMIT p_limit
+  )
+  SELECT
+    t.id                        AS taxon_id,
+    t.scientific_name,
+    t.common_name_es,
+    t.common_name_en,
+    t.slug,
+    th.thumbnail_url,
+    r.n_obs,
+    ROUND(r.last_seen_distance_km::numeric, 1) AS last_seen_distance_km,
+    CASE WHEN v_viewer IS NULL THEN NULL ELSE COALESCE(r.observed_by_viewer, false) END
+                                AS has_observed_by_viewer
+  FROM ranked r
+  JOIN public.taxa t   ON t.id = r.taxon_id
+  LEFT JOIN public.taxa_thumbnails th ON th.taxon_id = t.id
+  WHERE t.taxon_rank = 'species'
+  ORDER BY r.n_obs DESC, r.last_seen_distance_km ASC;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.probable_taxa_at(numeric, numeric, int, int) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.probable_taxa_at(numeric, numeric, int, int)
+  TO anon, authenticated;
+
+-- ============================================================
+-- Performance indexes (issue #713)
+-- ============================================================
+-- Composite covering index for probable_taxa_at() hot path.
+-- The function joins identifications filtered by is_primary=true
+-- and taxon_id IS NOT NULL; a partial composite speeds both the
+-- live query and the nightly cache-recompute.
+CREATE INDEX IF NOT EXISTS idx_id_primary_taxon
+  ON public.identifications (observation_id, taxon_id)
+  WHERE is_primary = true AND taxon_id IS NOT NULL;
+
+-- observations.observed_at DESC partial for synced rows — used by
+-- feed queries, profile tabs, and the recompute-user-stats CTE.
+CREATE INDEX IF NOT EXISTS idx_obs_synced_at
+  ON public.observations (observer_id, observed_at DESC)
+  WHERE sync_status = 'synced';
+
+-- activity_events: unread notifications per target user (bell badge).
+CREATE INDEX IF NOT EXISTS idx_activity_target_unread
+  ON public.activity_events (target_user_id, created_at DESC)
+  WHERE read_at IS NULL;
