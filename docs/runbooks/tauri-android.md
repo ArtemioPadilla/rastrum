@@ -7,10 +7,7 @@ existing Astro PWA — `dist/` is loaded by the system WebView (Android
 adds: AAB packaging, deep-link handling, native push notifications
 (future), and the Play Console deploy lane.
 
-> Status: **scaffold landed in #762.** The config files, GH Actions
-> workflow, and this runbook ship in-tree. Producing an actual AAB
-> requires the Rust + Android SDK + NDK toolchain on the operator's
-> machine (or running the CI workflow with the right secrets).
+> Status: **CI signing + Play Store upload automated in #871.** The CI workflow now signs the AAB and uploads it to the internal track automatically on every `v*` tag push or manual dispatch.
 
 ---
 
@@ -146,34 +143,72 @@ Set the following Actions secrets in
 
 | Secret | Value |
 |---|---|
-| `ANDROID_KEYSTORE_BASE64` | output of `base64 < release.jks` |
-| `ANDROID_KEY_ALIAS` | `rastrum-upload` (matches `-alias` above) |
-| `ANDROID_KEY_PASSWORD` | the key password |
-| `ANDROID_KEYSTORE_PASSWORD` | the store password |
+| `RASTRUM_ANDROID_KEYSTORE_BASE64` | output of `base64 < release.jks` |
+| `RASTRUM_ANDROID_KEY_ALIAS` | `rastrum-upload` (matches `-alias` above) |
+| `RASTRUM_ANDROID_KEY_PASSWORD` | the key password |
+| `RASTRUM_ANDROID_KEYSTORE_PASSWORD` | the store password |
 
-The `tauri-android.yml` workflow conditionally signs the AAB only
-when `ANDROID_KEYSTORE_BASE64` is present, so the workflow still
-produces an unsigned AAB for testing while signing is being set up.
+The `tauri-android.yml` workflow **requires all four secrets** — it fails loudly if any are missing so you never accidentally upload an unsigned build.
 
 ---
 
-## Play Store internal-track upload
+## Play Store service account (one-time)
 
-For v1 the upload is **manual**:
+1. Open https://play.google.com/console → Setup → API access.
+2. Link to a Google Cloud project (or create one) and click **Create new service account**.
+3. Grant it the **Release manager** role (or the finer-grained "Release to internal track" permission).
+4. Download the JSON key file.
+5. Add it as GitHub Actions secret `RASTRUM_PLAY_SERVICE_ACCOUNT_JSON` (the full JSON contents, not base64).
 
-1. Sign in to https://play.google.com/console.
-2. Pick the Rastrum app (or create it the first time — set the
-   package name to `org.rastrum.app`, matching `tauri.conf.json
-   identifier`).
-3. Release → Testing → Internal testing → Create new release.
-4. Upload the signed AAB.
-5. Bump the version code (Tauri sets it from
-   `tauri.conf.json -> version` — increment before each release).
-6. Submit for review.
+The workflow uses `r0adkll/upload-google-play@v1` which reads this secret directly.
 
-A future PR can wire `r0adto/upload-google-play` or `fastlane supply`
-into the Actions workflow once the Play Console service-account JSON
-is set up.
+---
+
+## Cutting a release
+
+### Tag-based (recommended for releases)
+
+```bash
+# Bump version in tauri.conf.json (and also versionCode in build.gradle if pinned):
+# Edit `version` field in src-tauri/tauri.conf.json.
+git add src-tauri/tauri.conf.json
+git commit -m "chore: bump version to 1.x.y"
+git tag v1.x.y
+git push origin v1.x.y
+```
+
+Pushing the `v*` tag triggers `.github/workflows/tauri-android.yml` automatically:
+build → sign → upload to Play internal track.
+
+### Manual dispatch
+
+```bash
+gh workflow run tauri-android.yml --ref main
+gh run watch
+```
+
+This always uploads to the **internal** track regardless of the workflow_dispatch input.
+
+---
+
+## Rollback / halt
+
+### Pause an internal-track release
+
+1. Play Console → Testing → Internal testing → Find the release.
+2. Click the three-dot menu → **Halt release**.
+3. The build stays on the server but stops rolling out to internal testers.
+
+### Re-upload after halt
+
+The same AAB cannot be re-uploaded with the same `versionCode`. Increment the version, rebuild, and re-upload.
+
+### Emergency key rotation
+
+If the upload key is compromised:
+1. Generate a new keystore (same `keytool` command).
+2. Contact Google Play support — Play Console does not self-serve key rotation; you need to submit a key upgrade request via the Play Developer API or support ticket.
+3. Update all four `RASTRUM_ANDROID_KEYSTORE_*` secrets immediately.
 
 ---
 
