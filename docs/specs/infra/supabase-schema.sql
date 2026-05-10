@@ -10877,6 +10877,8 @@ AS $$
     WHERE o.sync_status = 'synced'
       AND o.location IS NOT NULL
       AND o.establishment_means = 'wild'  -- #942: exclude cultivated/captive/domestic species
+      -- Valid values (CHECK constraint): 'wild'|'cultivated'|'captive'|'uncertain'
+      -- Darwin Core establishmentMeans. All pre-2026 rows backfilled to 'wild' (schema:3078).
       AND ST_DWithin(
             o.location::geography,
             ST_SetSRID(ST_MakePoint(p_lng, p_lat), 4326)::geography,
