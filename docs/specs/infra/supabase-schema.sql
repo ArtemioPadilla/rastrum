@@ -11177,3 +11177,5 @@ COMMENT ON COLUMN public.observations.life_stage IS
   'Life stage of the observed individual. Optional. Darwin Core: lifeStage.';
 COMMENT ON COLUMN public.observations.vital_status IS
   'Vital status of the observed individual. Optional. Darwin Core: occurrenceStatus extension.';
+
+
