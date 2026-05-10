@@ -44,12 +44,24 @@ if (typeof document !== 'undefined') {
   });
 }
 
+// Invalidate cache on sign-out so components reflect signed-out state immediately.
+// We attach this lazily (first getCachedUser() call) to avoid circular initialization.
+let _authListenerAttached = false;
+function ensureAuthListener() {
+  if (_authListenerAttached) return;
+  _authListenerAttached = true;
+  getSupabase().auth.onAuthStateChange((event) => {
+    if (event === 'SIGNED_OUT') _userCache = null;
+  });
+}
+
 /**
  * Returns the current user with a short-lived in-memory cache.
  * Use this instead of `getSupabase().auth.getUser()` in components that
  * mount concurrently to avoid navigator.lock contention in gotrue.
  */
 export async function getCachedUser() {
+  ensureAuthListener();
   const now = Date.now();
   if (_userCache && (now - _userCache.resolvedAt) < USER_CACHE_TTL_MS) {
     return _userCache.user;

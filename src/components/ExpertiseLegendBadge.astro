@@ -33,7 +33,7 @@ const { lang, userId = '', class: extraClass = '' } = Astro.props;
 
 <script>
   import { getTopLegend, legendTitle, tierColors, tierLabel } from '../lib/expertise-legends';
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedUser, getSupabase } from '../lib/supabase';
 
   async function init() {
     const el = document.getElementById('expertise-legend-badge');
@@ -44,8 +44,8 @@ const { lang, userId = '', class: extraClass = '' } = Astro.props;
 
     // If no userId provided, use current auth user
     if (!userId) {
-      const { data } = await getSupabase().auth.getUser();
-      userId = data.user?.id ?? '';
+      const _authUser = await getCachedUser();
+      userId = _authUser?.id ?? '';
     }
     if (!userId) return;
 

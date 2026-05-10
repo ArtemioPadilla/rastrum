@@ -183,7 +183,7 @@ const timeline = (page as unknown as { timeline: Record<string, string> }).timel
 </section>
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedUser, getSupabase } from '../lib/supabase';
   import { formatTimeAgo } from '../lib/social';
   import { wireOverflowMenu } from '../lib/overflow-menu';
   import {
@@ -581,9 +581,9 @@ const timeline = (page as unknown as { timeline: Record<string, string> }).timel
     let viewerAuthed = false;
     let viewerId: string | null = null;
     try {
-      const { data } = await supabase.auth.getUser();
-      viewerAuthed = !!data.user;
-      viewerId = data.user?.id ?? null;
+      const _viewer = await getCachedUser();
+      viewerAuthed = !!_viewer;
+      viewerId = _viewer?.id ?? null;
     } catch { viewerAuthed = false; viewerId = null; }
 
     async function fetchPage(): Promise<Row[]> {

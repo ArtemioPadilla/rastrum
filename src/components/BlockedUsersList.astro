@@ -38,7 +38,7 @@ const block = (tr as unknown as {
 </section>
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedUser, getSupabase } from '../lib/supabase';
   import { unblockUser } from '../lib/social';
 
   type Row = {
@@ -63,7 +63,7 @@ const block = (tr as unknown as {
       return;
     }
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCachedUser();
     if (!user) {
       loading.classList.add('hidden');
       empty.classList.remove('hidden');

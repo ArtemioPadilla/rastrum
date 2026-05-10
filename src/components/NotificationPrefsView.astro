@@ -194,7 +194,7 @@ const EMAIL_TOGGLES = [
 </div>
 
 <script>
-import { getSupabase } from '../lib/supabase';
+import { getCachedUser, getSupabase } from '../lib/supabase';
 
 type NotifPrefs = {
   push?: Record<string, boolean>;
@@ -252,7 +252,7 @@ function prefSet(channel: string, trigger: string, value: boolean) {
 
 async function savePrefs() {
   const sb = getSupabase();
-  const { data: { user } } = await sb.auth.getUser();
+  const user = await getCachedUser();
   if (!user) return;
 
   const { error } = await sb
@@ -281,7 +281,7 @@ async function init() {
   }
 
   const sb = getSupabase();
-  const { data: { user } } = await sb.auth.getUser();
+  const user = await getCachedUser();
   if (!user) return;
 
   // Load current prefs

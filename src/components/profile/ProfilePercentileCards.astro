@@ -91,7 +91,7 @@ const aria                = tp.aria_bar            ?? (lang === 'es' ? 'Barra de
 </section>
 
 <script>
-  import { getSupabase } from '../../lib/supabase';
+  import { getCachedUser, getSupabase } from '../../lib/supabase';
   import {
     buildCards,
     hasSufficientCohort,
@@ -124,7 +124,7 @@ const aria                = tp.aria_bar            ?? (lang === 'es' ? 'Barra de
     const lang = root.dataset.lang ?? 'en';
     let supabase;
     try { supabase = getSupabase(); } catch { setVisible(root, 'insufficient'); return; }
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCachedUser();
     if (!user) {
       root.classList.add('hidden');
       return;

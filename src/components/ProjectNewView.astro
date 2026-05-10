@@ -104,7 +104,7 @@ const projectsBase = routes.projects[lang];
 <script>
   import { upsertProject, validatePolygonGeoJSON, isValidSlug } from '../lib/projects';
   import { validateKMLOrKMZ } from '../lib/kml-parser';
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedUser, getSupabase } from '../lib/supabase';
 
   const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
   const root = document.querySelector('[data-projects-base]') as HTMLElement | null;
@@ -122,8 +122,8 @@ const projectsBase = routes.projects[lang];
 
     (async () => {
       const sb = getSupabase();
-      const { data: { session } } = await sb.auth.getSession();
-      if (!session?.user) {
+      const user = await getCachedUser();
+      if (!user) {
         signInWarn?.classList.remove('hidden');
         return;
       }

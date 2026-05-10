@@ -200,7 +200,7 @@ const levels: Array<{ key: 'public' | 'signed_in' | 'private'; label: string }> 
 />
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedUser, getSupabase } from '../lib/supabase';
   import { SUPABASE_AUTH_STORAGE_KEY } from '../lib/auth';
   import {
     applyPreset,
@@ -222,7 +222,7 @@ const levels: Array<{ key: 'public' | 'signed_in' | 'private'; label: string }> 
 
   async function init(rootEl: HTMLElement) {
     const supabase = getSupabase();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCachedUser();
     if (!user) {
       window.location.replace(rootEl.dataset.lang === 'es' ? '/es/ingresar/' : '/en/sign-in/');
       return;

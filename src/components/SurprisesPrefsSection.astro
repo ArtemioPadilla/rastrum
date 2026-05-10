@@ -73,15 +73,15 @@ const docHref = lang === 'es' ? getDocPath('es', 'surprises') : getDocPath('en',
       errorEl.classList.remove('hidden');
     }
 
-    const { getSupabase } = await import('../lib/supabase.ts');
+    const { getSupabase, getCachedUser } = await import('../lib/supabase.ts');
     const supabase = getSupabase();
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user?.id) {
+    const user = await getCachedUser();
+    if (!user?.id) {
       cb.disabled = true;
       setStatus(false);
       return;
     }
-    const userId = session.user.id;
+    const userId = user.id;
 
     // Read current pref
     try {

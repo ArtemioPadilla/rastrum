@@ -268,7 +268,7 @@ const ep = (tr as unknown as { profile: { expert_prompt: Record<string, string> 
 </div>
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedUser, getSupabase } from '../lib/supabase';
   import { escAttr } from '../lib/karma';
   import { tierForKarma } from '../lib/karma-frame';
   import type { UserProfile } from '../lib/types';
@@ -301,7 +301,7 @@ const ep = (tr as unknown as { profile: { expert_prompt: Record<string, string> 
 
   async function run() {
     const supabase = getSupabase();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCachedUser();
 
     if (!user) {
       signedOut?.classList.remove('hidden');
@@ -541,7 +541,7 @@ const ep = (tr as unknown as { profile: { expert_prompt: Record<string, string> 
 </script>
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getSupabase, getCachedUser } from '../lib/supabase';
   import { formatDelta, escAttr } from '../lib/karma';
 
   (async function hydrateKarma() {
@@ -551,7 +551,7 @@ const ep = (tr as unknown as { profile: { expert_prompt: Record<string, string> 
     if (!totalEl || !listEl) return;
 
     const supabase = getSupabase();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCachedUser();
     if (!user) return;
 
     const [{ data: u }, { data: events }, { data: expertise }] = await Promise.all([

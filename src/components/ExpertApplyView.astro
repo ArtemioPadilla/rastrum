@@ -167,7 +167,7 @@ const roadmapPath = getLocalizedPath(lang, '/docs/roadmap/');
 </div>
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedUser, getSupabase } from '../lib/supabase';
 
   type ProfileRow = { is_expert: boolean | null };
 
@@ -186,7 +186,7 @@ const roadmapPath = getLocalizedPath(lang, '/docs/roadmap/');
       return;
     }
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCachedUser();
     if (!user) {
       show('expert-signin');
       return;

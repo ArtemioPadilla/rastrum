@@ -93,7 +93,7 @@ const tr = t(lang);
 </section>
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedUser, getSupabase } from '../lib/supabase';
   import { readFilterState, writeFilterState } from '../lib/console-filter-state';
 
   type Row = {
@@ -125,7 +125,7 @@ const tr = t(lang);
 
   async function load() {
     const supabase = getSupabase();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCachedUser();
     if (!user) { hide('audit-loading'); show('audit-not-auth'); return; }
 
     show('audit-filters');

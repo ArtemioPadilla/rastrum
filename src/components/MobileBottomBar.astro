@@ -181,9 +181,9 @@ const discoverActive  = isActiveSection(currentPath, 'community',     lang);
 
 <!--
   First-paint cache. Header.astro writes `rastrum.headerAvatar` to localStorage
-  every time it resolves a session; we read it synchronously here so the
+  every time it resolves a user; we read it synchronously here so the
   authed variant (with FAB) shows on first paint instead of flashing the
-  4-tab anon layout while Supabase resolves the session asynchronously.
+  4-tab anon layout while Supabase resolves the user asynchronously.
 -->
 <script is:inline>
   (function () {
@@ -205,7 +205,7 @@ const discoverActive  = isActiveSection(currentPath, 'community',     lang);
   another tab, etc.) so the bar stays in sync.
 -->
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedUser, getSupabase } from '../lib/supabase';
 
   const authed = document.getElementById('mbb-authed');
   const anon   = document.getElementById('mbb-anon');
@@ -218,8 +218,8 @@ const discoverActive  = isActiveSection(currentPath, 'community',     lang);
 
   (async () => {
     try {
-      const { data: { session } } = await getSupabase().auth.getSession();
-      paint(!!session);
+      const user = await getCachedUser();
+      paint(!!user);
       getSupabase().auth.onAuthStateChange((_e, s) => paint(!!s));
     } catch { /* env not set; leave anon visible */ }
   })();

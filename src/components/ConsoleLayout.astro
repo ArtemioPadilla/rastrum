@@ -327,7 +327,7 @@ const knownPills: Set<UserRole> | null = allRoles ?? null;
 
     <script>
       import { installConsoleKeybindings } from '../lib/console-keybindings';
-      import { getSupabase } from '../lib/supabase';
+      import { getCachedUser, getSupabase } from '../lib/supabase';
       import { getUserRoles } from '../lib/user-roles';
       import { rolePillsFor } from '../lib/console-tabs';
       import type { UserRole } from '../lib/types';
@@ -364,7 +364,7 @@ const knownPills: Set<UserRole> | null = allRoles ?? null;
         if (!shell) return;
 
         const supabase = getSupabase();
-        const { data: { user } } = await supabase.auth.getUser();
+        const user = await getCachedUser();
         if (!user) return;
 
         const usernameEl = shell.querySelector('[data-console-username]') as HTMLElement | null;

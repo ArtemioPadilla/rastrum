@@ -181,10 +181,10 @@ const proj = (tr as unknown as { projects: Record<string, string> }).projects;
   // ── M31: camera stations ─────────────────────────────────────────
   async function initStations(projectId: string, ownerUserId: string) {
     const { listProjectStations, createStation, trapNights, isValidStationKey, listStationPeriods, createPeriod, closePeriod } = await import('../lib/camera-stations');
-    const { getSupabase } = await import('../lib/supabase');
+    const { getSupabase, getCachedUser } = await import('../lib/supabase');
     const sb = getSupabase();
-    const { data: { session } } = await sb.auth.getSession();
-    const isOwner = session?.user?.id === ownerUserId;
+    const user = await getCachedUser();
+    const isOwner = user?.id === ownerUserId;
 
     const addBtn   = document.getElementById('stations-add-btn');
     const ownerWarn = document.getElementById('stations-owner-only');
@@ -195,7 +195,7 @@ const proj = (tr as unknown as { projects: Record<string, string> }).projects;
     const errBox   = document.getElementById('stations-form-error');
 
     if (isOwner) addBtn?.classList.remove('hidden');
-    else if (session?.user) ownerWarn?.classList.remove('hidden');
+    else if (user) ownerWarn?.classList.remove('hidden');
 
     addBtn?.addEventListener('click', () => form?.classList.remove('hidden'));
     cancelBtn?.addEventListener('click', () => {

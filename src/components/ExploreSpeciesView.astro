@@ -194,7 +194,7 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
 
 <script>
   import maplibregl from 'maplibre-gl';
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedUser, getSupabase } from '../lib/supabase';
   import { renderSpeciesCard, type CardLabels } from '../lib/species-card-html';
   import { parseChips, parseSort, buildSpeciesUrl, type ChipsState, type SortMode } from '../lib/species-filters';
   import { deriveGenus, colorForName, buildTaxonomicTree, taxonomicDepth, type TaxonNode } from '../lib/species-display';
@@ -414,7 +414,7 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
     let inDexSet = new Set<string>();
     {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const user = await getCachedUser();
         if (user) {
           const { data: dex } = await supabase
             .from('profile_pokedex')

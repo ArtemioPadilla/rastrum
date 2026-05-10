@@ -61,7 +61,7 @@ const labels = {
 <div id="ntf-config" class="hidden" data-lang={lang}></div>
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedUser, getSupabase } from '../lib/supabase';
   import { getUserRoles } from '../lib/user-roles';
   import {
     EntityBrowser,
@@ -190,13 +190,13 @@ const labels = {
 
   async function init(): Promise<void> {
     const supabase = getSupabase();
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    const user = await getCachedUser();
+    if (!user) {
       document.getElementById('ntf-skeleton')?.classList.add('hidden');
       document.getElementById('ntf-not-auth')?.classList.remove('hidden');
       return;
     }
-    const myRoles = await getUserRoles(session.user.id);
+    const myRoles = await getUserRoles(user.id);
     if (!myRoles.has('admin')) {
       document.getElementById('ntf-skeleton')?.classList.add('hidden');
       document.getElementById('ntf-not-auth')?.classList.remove('hidden');

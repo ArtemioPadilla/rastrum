@@ -67,7 +67,7 @@ const tr = t(lang);
 </section>
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedUser, getSupabase } from '../lib/supabase';
   import { getUserRoles } from '../lib/user-roles';
   import { readFilterState, writeFilterState, applyFilterStateToForm } from '../lib/console-filter-state';
 
@@ -160,9 +160,9 @@ const tr = t(lang);
   }
 
   async function init() {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) { show('exp-skill-not-auth'); return; }
-    const myRoles = await getUserRoles(session.user.id);
+    const user = await getCachedUser();
+    if (!user) { show('exp-skill-not-auth'); return; }
+    const myRoles = await getUserRoles(user.id);
     if (!myRoles.has('expert') && !myRoles.has('admin')) {
       show('exp-skill-not-auth');
       return;
@@ -172,7 +172,7 @@ const tr = t(lang);
     const { data, error } = await supabase
       .from('user_expertise')
       .select('taxon_id, score, verified_at, updated_at, taxa(scientific_name, kingdom)')
-      .eq('user_id', session.user.id)
+      .eq('user_id', user.id)
       .order('score', { ascending: false });
 
     hide('exp-skill-loading');

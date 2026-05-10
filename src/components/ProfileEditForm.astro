@@ -338,7 +338,7 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
 />
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedUser, getSupabase } from '../lib/supabase';
   import { shouldShowInferredCountryBadge, buildCommunityDiscoveryPayload } from '../lib/profile-edit';
   import type { UserProfile } from '../lib/types';
 
@@ -402,7 +402,7 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
   async function load() {
     if (!form) return;
     const supabase = getSupabase();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCachedUser();
     if (!user) {
       window.location.replace(`${window.location.pathname.startsWith('/es/') ? '/es/ingresar/' : '/en/sign-in/'}`);
       return;
@@ -484,7 +484,7 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
     };
 
     const supabase = getSupabase();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCachedUser();
     if (!user) return;
 
     const { error } = await supabase.from('users').update(payload).eq('id', user.id);

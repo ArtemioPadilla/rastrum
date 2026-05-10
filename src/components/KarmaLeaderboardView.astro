@@ -264,7 +264,7 @@ const stringsJson = JSON.stringify({
 </section>
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedUser, getSupabase } from '../lib/supabase';
   import { tierForKarma } from '../lib/karma-frame';
   import {
     viewFromSearch,
@@ -447,8 +447,8 @@ const stringsJson = JSON.stringify({
       const supabase = getSupabase();
       // Get user's own country first for pre-selection
       let userCountry = '';
-      const { data: sessionData } = await supabase.auth.getSession();
-      const userId = sessionData?.session?.user?.id;
+      const _karmaUser = await getCachedUser();
+      const userId = _karmaUser?.id;
       if (userId) {
         const { data: userData } = await supabase
           .from('community_observers')
@@ -798,8 +798,8 @@ const stringsJson = JSON.stringify({
   async function getCurrentUserId(): Promise<string | null> {
     try {
       const supabase = getSupabase();
-      const { data } = await supabase.auth.getSession();
-      return data.session?.user?.id ?? null;
+      const _user = await getCachedUser();
+      return _user?.id ?? null;
     } catch {
       return null;
     }

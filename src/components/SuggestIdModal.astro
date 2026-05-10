@@ -104,7 +104,7 @@ const v = (tr as unknown as { validation: Record<string, string> }).validation;
 </div>
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getCachedUser, getSupabase } from '../lib/supabase';
   import { microcopyForVote, type Bucket } from '../lib/karma';
 
   const modal = document.getElementById('suggest-id-modal') as HTMLElement | null;
@@ -288,7 +288,7 @@ const v = (tr as unknown as { validation: Record<string, string> }).validation;
 
       try {
         const supabase = getSupabase();
-        const { data: { user } } = await supabase.auth.getUser();
+        const user = await getCachedUser();
         if (!user) throw new Error('not_signed_in');
 
         // Resolve taxon_id by name (required — see spec; the consensus
