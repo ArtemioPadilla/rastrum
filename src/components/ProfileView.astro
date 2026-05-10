@@ -541,7 +541,7 @@ const ep = (tr as unknown as { profile: { expert_prompt: Record<string, string> 
 </script>
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import { getSupabase, getCachedUser } from '../lib/supabase';
   import { formatDelta, escAttr } from '../lib/karma';
 
   (async function hydrateKarma() {
