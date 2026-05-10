@@ -13,6 +13,7 @@ import ProfileStreakRing from './profile/ProfileStreakRing.astro';
 import ProfileKarmaSection from './profile/ProfileKarmaSection.astro';
 import ProfilePercentileCards from './profile/ProfilePercentileCards.astro';
 import ProfilePokedexLink from './profile/ProfilePokedexLink.astro';
+import ProfileSpeciesListsLink from './profile/ProfileSpeciesListsLink.astro';
 import ProfileBadgesGrid from './profile/ProfileBadgesGrid.astro';
 import ProfileActivityTimeline from './profile/ProfileActivityTimeline.astro';
 
@@ -169,6 +170,7 @@ const ep = (tr as unknown as { profile: { expert_prompt: Record<string, string> 
     <ExpertiseLegendBadge lang={lang} class="mb-2" />
     <ExpertiseCoverageGrid lang={lang} />
     <ProfilePokedexLink lang={lang} viewer="self" />
+    <ProfileSpeciesListsLink lang={lang} />
     <ProfileBadgesGrid lang={lang} viewer="self" />
     <ProfileActivityTimeline lang={lang} viewer="self" />
 

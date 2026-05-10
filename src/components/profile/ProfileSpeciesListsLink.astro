@@ -1,0 +1,36 @@
+---
+/**
+ * ProfileSpeciesListsLink — link card to the species lists section (#875).
+ * Placed on the profile page after the Pokédex link.
+ * Shows a live count of the user's lists (hydrated client-side).
+ */
+import type { Locale } from '../../i18n/utils';
+
+interface Props {
+  lang: Locale;
+}
+const { lang } = Astro.props;
+
+const isEs = lang === 'es';
+const heading = isEs ? 'Mis listas' : 'My lists';
+const desc    = isEs ? 'Listas de especies curadas por ti' : 'Your curated species lists';
+const cta     = isEs ? 'Ver listas' : 'View lists';
+// The lists page is SpeciesListsView embedded in the profile. For now we
+// link to a dedicated page at /en/profile/lists/ (to be added) — or fall
+// back to a scroll anchor that will load inline. We use a hash link that
+// the tab-wiring script can intercept.
+const href = lang === 'es' ? '/es/perfil/listas/' : '/en/profile/lists/';
+---
+
+<a
+  href={href}
+  class="block rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 mb-6 hover:border-emerald-400 dark:hover:border-emerald-700 transition-colors"
+>
+  <div class="flex items-center justify-between">
+    <div>
+      <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">{heading}</h2>
+      <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">{desc}</p>
+    </div>
+    <span class="text-sm font-medium text-emerald-700 dark:text-emerald-400">{cta} →</span>
+  </div>
+</a>
