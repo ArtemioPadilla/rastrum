@@ -393,6 +393,19 @@ const v = (tr as unknown as { validation: Record<string, string> }).validation;
           promoted = !!(primary as { is_research_grade?: boolean } | null)?.is_research_grade;
         } catch { /* leave promoted=false */ }
 
+        // #735: look up institutional affiliation for the validator
+        let validatorInstitution: string | null = null;
+        try {
+          const { data: affil } = await supabase
+            .from('user_active_affiliations')
+            .select('institution_short, is_verified')
+            .eq('user_id', user.id)
+            .eq('is_verified', true)
+            .limit(1)
+            .maybeSingle() as { data: { institution_short: string; is_verified: boolean } | null };
+          validatorInstitution = affil?.institution_short ?? null;
+        } catch { /* optional — non-critical */ }
+
         // Parent decides which toast to show. Pass the actual outcome
         // so the queue view doesn't lie about promotion.
         window.posthog?.capture('identification_suggested', {
@@ -400,6 +413,7 @@ const v = (tr as unknown as { validation: Record<string, string> }).validation;
           scientific_name: sci,
           confidence,
           promoted_to_research_grade: promoted,
+          validator_institution: validatorInstitution,
         });
         if (promoted) {
           window.posthog?.capture('identification_promoted_to_research_grade', {
@@ -408,7 +422,7 @@ const v = (tr as unknown as { validation: Record<string, string> }).validation;
           });
         }
         window.dispatchEvent(new CustomEvent('rastrum:suggestion-submitted', {
-          detail: { observation_id: observationId, promoted },
+          detail: { observation_id: observationId, promoted, validator_institution: validatorInstitution },
         }));
         close();
       } catch (err) {

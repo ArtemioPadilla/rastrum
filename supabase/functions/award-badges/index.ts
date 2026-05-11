@@ -80,6 +80,11 @@ async function eligibleUserIds(db: SupabaseClient, badge: Badge): Promise<string
       const { data } = await db.rpc('badge_eligible_midnight_observation', { p_user_id: null }) as { data: string[] | null };
       return data ?? [];
     }
+    case 'birthday_observation': {
+      // #869: fires on user's birthday if they logged ≥1 obs today (in their tz)
+      const { data } = await db.rpc('badge_eligible_birthday_observation', { p_user_id: null }) as { data: string[] | null };
+      return data ?? [];
+    }
     case 'country_diversity': {
       // Issue #867: Globetrotter badge — users who observed in >= threshold countries.
       const t = r.threshold as number;

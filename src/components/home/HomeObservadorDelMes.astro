@@ -1,0 +1,189 @@
+---
+/**
+ * HomeObservadorDelMes — "Observador del mes" featured-user spotlight.
+ *
+ * Principle of Recognition (Fogg ch. 8, p. 207): Public recognition increases
+ * the likelihood of a behavior being adopted by others.
+ *
+ * Issue #748.
+ */
+import type { Locale } from '../../i18n/utils';
+
+interface Props {
+  lang: Locale;
+}
+const { lang } = Astro.props;
+const isEs = lang === 'es';
+---
+
+<section
+  id="observador-del-mes"
+  class="hidden rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/50 dark:bg-emerald-950/20 p-4"
+  aria-label={isEs ? 'Observador del mes' : 'Observer of the month'}
+  data-lang={lang}
+>
+  <!-- Header -->
+  <div class="flex items-center justify-between gap-2 mb-3">
+    <h2 class="text-sm font-semibold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider">
+      🏅 {isEs ? 'Observador del mes' : 'Observer of the month'}
+    </h2>
+    <a
+      id="odm-view-all"
+      href={isEs ? '/es/destacados/' : '/en/featured/'}
+      class="text-xs text-emerald-700 dark:text-emerald-400 hover:underline"
+    >
+      {isEs ? 'Ver todos →' : 'See all →'}
+    </a>
+  </div>
+
+  <!-- Loading skeleton -->
+  <div id="odm-skeleton" class="flex items-center gap-3 animate-pulse">
+    <div class="w-12 h-12 rounded-full bg-zinc-200 dark:bg-zinc-700 flex-shrink-0"></div>
+    <div class="flex-1 space-y-2">
+      <div class="h-3 bg-zinc-200 dark:bg-zinc-700 rounded w-2/3"></div>
+      <div class="h-2 bg-zinc-200 dark:bg-zinc-700 rounded w-1/2"></div>
+    </div>
+  </div>
+
+  <!-- Content (populated by client script) -->
+  <div id="odm-content" class="hidden">
+    <div class="flex items-start gap-3">
+      <a id="odm-profile-link" href="#" class="flex-shrink-0">
+        <img
+          id="odm-avatar"
+          src=""
+          alt=""
+          width="48"
+          height="48"
+          class="w-12 h-12 rounded-full object-cover border-2 border-emerald-300 dark:border-emerald-700"
+        />
+      </a>
+      <div class="min-w-0">
+        <a id="odm-username-link" href="#" class="font-semibold text-zinc-900 dark:text-zinc-100 hover:underline text-sm truncate block"></a>
+        <p id="odm-blurb" class="text-xs text-zinc-600 dark:text-zinc-400 mt-0.5 line-clamp-2"></p>
+        <!-- Top 3 species of the month -->
+        <div id="odm-species" class="flex flex-wrap gap-1 mt-2"></div>
+        <!-- Observation count -->
+        <p id="odm-obs-count" class="text-xs text-emerald-700 dark:text-emerald-400 mt-1 font-medium"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Empty state (no featured user this month) -->
+  <p id="odm-empty" class="hidden text-xs text-zinc-500 dark:text-zinc-400">
+    {isEs ? 'Próximamente…' : 'Coming soon…'}
+  </p>
+</section>
+
+<script>
+  import { getSupabase } from '../../lib/supabase';
+
+  interface FeaturedObserver {
+    month_date: string;
+    user_id: string;
+    headline_es: string | null;
+    headline_en: string | null;
+    users: {
+      username: string | null;
+      display_name: string | null;
+      avatar_url: string | null;
+    };
+  }
+
+  const section  = document.getElementById('observador-del-mes');
+  const skeleton = document.getElementById('odm-skeleton');
+  const content  = document.getElementById('odm-content');
+  const empty    = document.getElementById('odm-empty');
+  const lang     = section?.dataset.lang ?? 'es';
+
+  async function load() {
+    if (!section) return;
+    const supabase = getSupabase();
+
+    // Fetch the current month's featured observer
+    const today = new Date();
+    const monthDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
+
+    const { data } = await supabase
+      .from('featured_observers')
+      .select(`
+        month_date, user_id, headline_es, headline_en,
+        users ( username, display_name, avatar_url )
+      `)
+      .eq('month_date', monthDate)
+      .maybeSingle<FeaturedObserver>();
+
+    skeleton?.classList.add('hidden');
+
+    if (!data) {
+      empty?.classList.remove('hidden');
+      section.classList.remove('hidden');
+      return;
+    }
+
+    // Populate fields
+    const profileBase = lang === 'es' ? '/es/perfil/' : '/en/profile/';
+    const profileUrl  = `${profileBase}${data.users.username}/`;
+    const avatar      = data.users.avatar_url ?? '/img/default-avatar.svg';
+    const name        = data.users.display_name ?? data.users.username ?? '?';
+    const blurb       = lang === 'es' ? data.headline_es : data.headline_en;
+
+    const avatarEl = document.getElementById('odm-avatar') as HTMLImageElement | null;
+    const profileLink = document.getElementById('odm-profile-link') as HTMLAnchorElement | null;
+    const usernameLink = document.getElementById('odm-username-link') as HTMLAnchorElement | null;
+    const blurbEl  = document.getElementById('odm-blurb');
+    const obsCountEl = document.getElementById('odm-obs-count');
+    const speciesEl = document.getElementById('odm-species');
+
+    if (avatarEl)    { avatarEl.src = avatar; avatarEl.alt = name; }
+    if (profileLink) profileLink.href = profileUrl;
+    if (usernameLink) { usernameLink.href = profileUrl; usernameLink.textContent = name; }
+    if (blurbEl)     blurbEl.textContent = blurb ?? '';
+
+    // Fetch obs count + top 3 species this month
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString();
+    const monthEnd   = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59).toISOString();
+
+    const { data: obsRows } = await supabase
+      .from('observations')
+      .select('identifications(taxa(common_name_es, common_name_en, scientific_name))')
+      .eq('observer_id', data.user_id)
+      .eq('sync_status', 'synced')
+      .gte('observed_at', monthStart)
+      .lte('observed_at', monthEnd);
+
+    if (obsCountEl) {
+      const count = obsRows?.length ?? 0;
+      obsCountEl.textContent = lang === 'es'
+        ? `${count} observación${count !== 1 ? 'es' : ''} este mes`
+        : `${count} observation${count !== 1 ? 's' : ''} this month`;
+    }
+
+    // Build top-3 species chips
+    if (speciesEl && obsRows) {
+      const speciesSeen = new Map<string, number>();
+      for (const obs of obsRows) {
+        const idents = (obs as unknown as { identifications: Array<{ taxa: { scientific_name: string; common_name_es: string | null; common_name_en: string | null } | null }> }).identifications ?? [];
+        const primary = idents[0]?.taxa;
+        if (!primary) continue;
+        const key = primary.scientific_name;
+        speciesSeen.set(key, (speciesSeen.get(key) ?? 0) + 1);
+      }
+      const top3 = [...speciesSeen.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3);
+
+      for (const [sci] of top3) {
+        const chip = document.createElement('span');
+        chip.className = 'inline-block text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 font-medium italic';
+        chip.textContent = sci;
+        speciesEl.appendChild(chip);
+      }
+    }
+
+    content?.classList.remove('hidden');
+    section.classList.remove('hidden');
+  }
+
+  void load().catch(console.error);
+</script>

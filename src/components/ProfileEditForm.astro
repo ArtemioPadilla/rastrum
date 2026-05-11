@@ -166,6 +166,23 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
       </label>
     </fieldset>
 
+    <!-- #869: Birthday Naturalist badge — optional, private, year is stripped -->
+    <div>
+      <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+        🎂 {isEs ? 'Cumpleaños (opcional, privado)' : 'Birthday (optional, private)'}
+      </label>
+      <input
+        name="birthday"
+        type="date"
+        class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm"
+      />
+      <p class="mt-1 text-xs text-zinc-500">
+        {isEs
+          ? 'Sólo el mes y día se usan. Registra una observación en tu cumpleaños para obtener la medalla 🎉'
+          : 'Only month and day are used. Log an observation on your birthday to earn the badge 🎉'}
+      </p>
+    </div>
+
     <div class="flex items-center gap-3 pt-2">
       <button type="submit" id="save-btn" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
         <span data-label>{tr.profile.save}</span>
@@ -381,7 +398,7 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
   type EditableKey =
     | 'username' | 'display_name' | 'bio' | 'region_primary' | 'avatar_url'
     | 'preferred_lang' | 'observer_license' | 'country_code' | 'timezone'
-    | 'gamification_opt_in' | 'streak_digest_opt_in';
+    | 'gamification_opt_in' | 'streak_digest_opt_in' | 'birthday';
 
   type IsoCountry = { code: string; name_en: string; name_es: string };
 
@@ -454,6 +471,9 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
     (form.elements.namedItem('gamification_opt_in') as HTMLInputElement).checked = profile.gamification_opt_in;
     (form.elements.namedItem('streak_digest_opt_in') as HTMLInputElement).checked = profile.streak_digest_opt_in;
     (form.elements.namedItem('community_visible') as HTMLInputElement).checked = !profile.hide_from_leaderboards;
+    // #869: birthday (optional) — show only YYYY-MM-DD from the stored date
+    const bdayInput = form.elements.namedItem('birthday') as HTMLInputElement | null;
+    if (bdayInput) bdayInput.value = (profile as unknown as Record<string,string>).birthday ?? '';
 
     await populateCountryOptions(supabase, profile.country_code ?? null);
 
@@ -500,6 +520,8 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
       timezone:             nullableText('timezone'),
       gamification_opt_in:  data.get('gamification_opt_in') === 'on',
       streak_digest_opt_in: data.get('streak_digest_opt_in') === 'on',
+      // #869: birthday — stored as a date string (YYYY-MM-DD) or null
+      birthday:             nullableText('birthday'),
       ...buildCommunityDiscoveryPayload({
         country_code:       ((data.get('country_code') as string) ?? '').trim(),
         // UI-true ("Show me…") inverts to DB-false (hide_from_leaderboards).
