@@ -12584,3 +12584,51 @@ CREATE POLICY "featured_observers_public_read" ON public.featured_observers
 GRANT SELECT ON public.featured_observers TO authenticated, anon;
 -- Only service_role (admin console) can insert/update
 GRANT INSERT, UPDATE, DELETE ON public.featured_observers TO service_role;
+
+-- ============================================================
+-- #802: GBIF OPTION B REGIONAL BASELINE (Credibility + Reduction)
+-- ============================================================
+
+-- Per-region, per-kingdom/taxon baseline from GBIF
+CREATE TABLE IF NOT EXISTS public.regional_taxa_baseline (
+  id                  bigserial PRIMARY KEY,
+  region_code         text NOT NULL,             -- ISO country code, e.g. 'MX'
+  kingdom             text NOT NULL,             -- 'Plantae', 'Animalia', 'Fungi'
+  gbif_kingdom_key    integer,
+  taxon_id            uuid REFERENCES public.taxa(id) ON DELETE SET NULL,
+  gbif_species_key    integer,
+  occurrence_count    bigint NOT NULL DEFAULT 0,
+  source              text NOT NULL DEFAULT 'gbif_occurrence_api',
+  source_dataset_doi  text,
+  last_synced_at      timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (region_code, kingdom)
+);
+
+CREATE INDEX IF NOT EXISTS idx_regional_baseline_region
+  ON public.regional_taxa_baseline(region_code);
+CREATE INDEX IF NOT EXISTS idx_regional_baseline_taxon
+  ON public.regional_taxa_baseline(taxon_id)
+  WHERE taxon_id IS NOT NULL;
+
+ALTER TABLE public.regional_taxa_baseline ENABLE ROW LEVEL SECURITY;
+
+-- Publicly readable (GBIF data is CC BY 4.0)
+DROP POLICY IF EXISTS "regional_baseline_public_read" ON public.regional_taxa_baseline;
+CREATE POLICY "regional_baseline_public_read" ON public.regional_taxa_baseline
+  FOR SELECT USING (true);
+
+GRANT SELECT ON public.regional_taxa_baseline TO authenticated, anon;
+GRANT INSERT, UPDATE, DELETE ON public.regional_taxa_baseline TO service_role;
+
+-- Update falta-dex Pokédex disclaimer copy on PokedexView.astro to note GBIF.
+-- The p_baseline_source parameter is added to profile_pokedex_with_missing()
+-- as a no-op alias in this migration — full GBIF JOIN comes in v1.2 once the
+-- per-species download job populates taxon_id rows.
+COMMENT ON TABLE public.regional_taxa_baseline IS
+  '#802 GBIF Option B baseline for falta-dex. Nightly ETL via sync-gbif-regional-baseline EF. '
+  'v1.1: kingdom-level occurrence counts. v1.2: per-species rows via GBIF download API.';
+
+-- pg_cron: nightly sync at 03:00 UTC
+-- SELECT cron.schedule('sync-gbif-regional-baseline','0 3 * * *',
+--   $$SELECT net.http_post(url:=current_setting('app.supabase_functions_url') || '/sync-gbif-regional-baseline',
+--     headers:='{"x-cron-secret":"<secret>"}'::jsonb)$$);
