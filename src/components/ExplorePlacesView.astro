@@ -209,12 +209,26 @@ const placesIndexBase = `/${lang}/${lang === 'es' ? 'explorar/lugares' : 'explor
     place_type: string;
     obs_count: number;
     species_count: number;
+    observer_count?: number;
+    last_obs_at?: string | null;
   }): string {
     const typeName   = labels.types[place.place_type] ?? place.place_type;
     const badgeClass = typeBadgeClass(place.place_type);
     const obsLabel   = formatLabel(labels.obsCount, { count: (place.obs_count ?? 0).toLocaleString() });
     const sppLabel   = formatLabel(labels.speciesCount, { count: (place.species_count ?? 0).toLocaleString() });
     const href       = `${placesBase}?slug=${encodeURIComponent(place.slug)}`;
+
+    // Social layer: observer count + last activity (#711)
+    const obsCountVal = place.observer_count ?? 0;
+    const observersStr = obsCountVal > 0
+      ? `👥 ${obsCountVal.toLocaleString()}`
+      : '';
+    const lastActivityStr = place.last_obs_at
+      ? `🕒 ${new Date(place.last_obs_at).toLocaleDateString(
+          lang === 'es' ? 'es-MX' : 'en-US',
+          { year: 'numeric', month: 'short' }
+        )}`
+      : '';
 
     return `<a
       href="${href}"
@@ -226,9 +240,11 @@ const placesIndexBase = `/${lang}/${lang === 'es' ? 'explorar/lugares' : 'explor
         </h2>
         <span class="shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${badgeClass}">${escHtml(typeName)}</span>
       </div>
-      <div class="flex items-center gap-3 text-xs text-zinc-500 dark:text-zinc-400">
+      <div class="flex flex-wrap items-center gap-3 text-xs text-zinc-500 dark:text-zinc-400">
         <span>🔭 ${escHtml(obsLabel)}</span>
         <span>🌿 ${escHtml(sppLabel)}</span>
+        ${observersStr ? `<span>${escHtml(observersStr)}</span>` : ''}
+        ${lastActivityStr ? `<span class="text-zinc-400 dark:text-zinc-500">${escHtml(lastActivityStr)}</span>` : ''}
       </div>
     </a>`;
   }

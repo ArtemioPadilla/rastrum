@@ -9187,7 +9187,188 @@ $$;
 REVOKE ALL    ON FUNCTION public.get_my_percentiles() FROM PUBLIC;
 GRANT  EXECUTE ON FUNCTION public.get_my_percentiles() TO authenticated;
 
--- recompute_user_metrics_percentile() — the wrapper the nightly cron
+-- ─────────────────────────────────────────────────────────────────────────────
+-- #805 — State-level sub-cohorts for percentile cards
+-- Adds a state-scoped MV (user_metrics_percentile_state) that partitions by
+-- region_primary, and a scoped get_my_percentiles(p_scope) RPC override.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+CREATE MATERIALIZED VIEW IF NOT EXISTS public.user_metrics_percentile_state AS
+WITH cohort AS (
+  SELECT u.id AS user_id,
+         COALESCE(u.country_code, 'MX') AS cohort_country,
+         u.region_primary                AS cohort_state
+    FROM public.users u
+   WHERE u.region_primary IS NOT NULL
+     AND EXISTS (
+       SELECT 1 FROM public.observations o
+        WHERE o.observer_id = u.id
+          AND o.sync_status = 'synced'
+          AND o.observed_at >= now() - interval '90 days'
+        GROUP BY o.observer_id
+       HAVING COUNT(*) >= 5
+     )
+),
+diversity AS (
+  SELECT c.user_id,
+         COALESCE(-SUM((cnt::numeric / total::numeric) * LN(cnt::numeric / total::numeric)), 0)::numeric AS h_prime
+    FROM cohort c
+    JOIN LATERAL (
+      SELECT i.taxon_id, COUNT(*)::numeric AS cnt,
+             SUM(COUNT(*)) OVER ()::numeric AS total
+        FROM public.observations o
+        JOIN public.identifications i
+          ON i.observation_id = o.id AND i.is_primary = true
+       WHERE o.observer_id  = c.user_id
+         AND o.sync_status  = 'synced'
+         AND i.taxon_id IS NOT NULL
+       GROUP BY i.taxon_id
+    ) tx ON true
+   GROUP BY c.user_id
+),
+habitats AS (
+  SELECT c.user_id,
+         COUNT(DISTINCT o.habitat)::int AS habitat_count
+    FROM cohort c
+    LEFT JOIN public.observations o
+      ON o.observer_id = c.user_id
+     AND o.sync_status = 'synced'
+     AND o.habitat IS NOT NULL
+     AND o.habitat <> ''
+   GROUP BY c.user_id
+),
+validations AS (
+  SELECT c.user_id,
+         COUNT(*)::int AS validation_count
+    FROM cohort c
+    LEFT JOIN public.identifications i
+      ON i.validated_by = c.user_id
+   GROUP BY c.user_id
+),
+spread AS (
+  SELECT c.user_id,
+         COALESCE(
+           ST_Area(
+             ST_ConvexHull(ST_Collect(o.location::geometry))::geography
+           ) / 1e6,
+           0
+         )::numeric AS spread_km2
+    FROM cohort c
+    LEFT JOIN public.observations o
+      ON o.observer_id = c.user_id
+     AND o.sync_status = 'synced'
+     AND o.location IS NOT NULL
+   GROUP BY c.user_id
+),
+joined AS (
+  SELECT c.user_id,
+         c.cohort_country,
+         c.cohort_state,
+         COALESCE(d.h_prime, 0)          AS diversity_metric,
+         COALESCE(h.habitat_count, 0)    AS habitats_metric,
+         COALESCE(v.validation_count, 0)  AS validations_metric,
+         COALESCE(s.spread_km2, 0)        AS spread_metric
+    FROM cohort c
+    LEFT JOIN diversity   d ON d.user_id = c.user_id
+    LEFT JOIN habitats    h ON h.user_id = c.user_id
+    LEFT JOIN validations v ON v.user_id = c.user_id
+    LEFT JOIN spread      s ON s.user_id = c.user_id
+),
+ranked AS (
+  SELECT j.user_id,
+         j.cohort_country,
+         j.cohort_state,
+         j.diversity_metric,
+         j.habitats_metric,
+         j.validations_metric,
+         j.spread_metric,
+         (PERCENT_RANK() OVER (PARTITION BY j.cohort_country, j.cohort_state ORDER BY j.diversity_metric)   * 100)::numeric AS diversity_pctl,
+         (PERCENT_RANK() OVER (PARTITION BY j.cohort_country, j.cohort_state ORDER BY j.habitats_metric)    * 100)::numeric AS habitats_pctl,
+         (PERCENT_RANK() OVER (PARTITION BY j.cohort_country, j.cohort_state ORDER BY j.validations_metric) * 100)::numeric AS validations_pctl,
+         (PERCENT_RANK() OVER (PARTITION BY j.cohort_country, j.cohort_state ORDER BY j.spread_metric)      * 100)::numeric AS spread_pctl,
+         COUNT(*) OVER (PARTITION BY j.cohort_country, j.cohort_state)::int AS cohort_n
+    FROM joined j
+)
+SELECT user_id,
+       cohort_country,
+       cohort_state,
+       diversity_metric,
+       habitats_metric,
+       validations_metric,
+       spread_metric,
+       diversity_pctl,
+       habitats_pctl,
+       validations_pctl,
+       spread_pctl,
+       cohort_n,
+       now()::timestamptz AS computed_at
+  FROM ranked;
+
+CREATE UNIQUE INDEX IF NOT EXISTS user_metrics_percentile_state_pkey
+  ON public.user_metrics_percentile_state (user_id);
+
+REVOKE ALL    ON public.user_metrics_percentile_state FROM PUBLIC;
+REVOKE ALL    ON public.user_metrics_percentile_state FROM anon;
+REVOKE ALL    ON public.user_metrics_percentile_state FROM authenticated;
+GRANT  SELECT ON public.user_metrics_percentile_state TO service_role;
+
+-- Scoped RPC: get_my_percentiles(p_scope) — overloaded variant that accepts
+-- 'country' (default — reads the existing MV) or 'state' (reads the new
+-- state MV). The original zero-arg form is preserved for backwards compat.
+CREATE OR REPLACE FUNCTION public.get_my_percentiles(p_scope text DEFAULT 'country')
+RETURNS jsonb
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+PARALLEL SAFE
+SET search_path = public AS $$
+  SELECT CASE
+    WHEN auth.uid() IS NULL THEN NULL::jsonb
+    WHEN p_scope = 'state' THEN (
+      SELECT jsonb_build_object(
+        'user_id',           s.user_id,
+        'scope',             'state',
+        'cohort_country',    s.cohort_country,
+        'cohort_state',      s.cohort_state,
+        'cohort_n',          s.cohort_n,
+        'computed_at',       s.computed_at,
+        'diversity_pctl',    ROUND(s.diversity_pctl)::int,
+        'habitats_pctl',     ROUND(s.habitats_pctl)::int,
+        'validations_pctl',  ROUND(s.validations_pctl)::int,
+        'spread_pctl',       ROUND(s.spread_pctl)::int,
+        'diversity_value',   ROUND(s.diversity_metric::numeric,    2),
+        'habitats_value',    s.habitats_metric,
+        'validations_value', s.validations_metric,
+        'spread_value',      ROUND(s.spread_metric::numeric,        1)
+      )
+      FROM public.user_metrics_percentile_state s
+      WHERE s.user_id = auth.uid()
+    )
+    ELSE (
+      SELECT jsonb_build_object(
+        'user_id',           p.user_id,
+        'scope',             'country',
+        'cohort_country',    p.cohort_country,
+        'cohort_state',      null,
+        'cohort_n',          p.cohort_n,
+        'computed_at',       p.computed_at,
+        'diversity_pctl',    ROUND(p.diversity_pctl)::int,
+        'habitats_pctl',     ROUND(p.habitats_pctl)::int,
+        'validations_pctl',  ROUND(p.validations_pctl)::int,
+        'spread_pctl',       ROUND(p.spread_pctl)::int,
+        'diversity_value',   ROUND(p.diversity_metric::numeric,    2),
+        'habitats_value',    p.habitats_metric,
+        'validations_value', p.validations_metric,
+        'spread_value',      ROUND(p.spread_metric::numeric,        1)
+      )
+      FROM public.user_metrics_percentile p
+      WHERE p.user_id = auth.uid()
+    )
+  END;
+$$;
+
+REVOKE ALL    ON FUNCTION public.get_my_percentiles(text) FROM PUBLIC;
+GRANT  EXECUTE ON FUNCTION public.get_my_percentiles(text) TO authenticated;
 -- calls. SECURITY DEFINER + service_role-only matches recompute_user_stats.
 -- Kept separate so it can be invoked manually for testing without
 -- re-running the full user-stats UPDATE.
@@ -9200,6 +9381,12 @@ DECLARE
   v_count integer;
 BEGIN
   REFRESH MATERIALIZED VIEW CONCURRENTLY public.user_metrics_percentile;
+  -- Also refresh the state-level sub-cohort MV (#805).
+  BEGIN
+    REFRESH MATERIALIZED VIEW CONCURRENTLY public.user_metrics_percentile_state;
+  EXCEPTION WHEN OTHERS THEN
+    REFRESH MATERIALIZED VIEW public.user_metrics_percentile_state;
+  END;
   SELECT COUNT(*) INTO v_count FROM public.user_metrics_percentile;
   RETURN v_count;
 EXCEPTION
@@ -9207,6 +9394,11 @@ EXCEPTION
     -- First-ever refresh can't be CONCURRENTLY (needs a populated MV);
     -- fall back to a non-concurrent refresh and continue.
     REFRESH MATERIALIZED VIEW public.user_metrics_percentile;
+    BEGIN
+      REFRESH MATERIALIZED VIEW CONCURRENTLY public.user_metrics_percentile_state;
+    EXCEPTION WHEN OTHERS THEN
+      REFRESH MATERIALIZED VIEW public.user_metrics_percentile_state;
+    END;
     SELECT COUNT(*) INTO v_count FROM public.user_metrics_percentile;
     RETURN v_count;
 END;

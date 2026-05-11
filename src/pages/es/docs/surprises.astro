@@ -1,13 +1,27 @@
 ---
-import DocLayout from '../../../layouts/DocLayout.astro';
-import SurprisesDocView from '../../../components/SurprisesDocView.astro';
-import { t } from '../../../i18n/utils';
-
-const lang = 'es';
-const tr = t(lang);
-const sections = (tr.docs.sections as Record<string, string>);
+/**
+ * /es/docs/surprises/ — legacy URL, preserved for link-rot prevention.
+ * Canonical ES URL: /es/docs/sorpresas/
+ *
+ * Closes #813: adds the Spanish-language slug while keeping the English
+ * slug alive for external links. This page is marked noindex so search
+ * engines consolidate ranking signal on the new canonical URL.
+ */
 ---
 
-<DocLayout title={sections.surprises} lang={lang} section="surprises" editPath="src/pages/es/docs/surprises.astro">
-  <SurprisesDocView lang={lang} />
-</DocLayout>
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>Sorpresas de campo — Rastrum</title>
+    <meta name="robots" content="noindex" />
+    <link rel="canonical" href="/es/docs/sorpresas/" />
+    <meta http-equiv="refresh" content="0; url=/es/docs/sorpresas/" />
+  </head>
+  <body>
+    <p>
+      Esta página ha sido movida.
+      <a href="/es/docs/sorpresas/">Ir a /es/docs/sorpresas/</a>
+    </p>
+  </body>
+</html>

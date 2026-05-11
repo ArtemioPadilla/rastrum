@@ -69,6 +69,7 @@ high-level system view.
 | Runbook | Covers |
 |---|---|
 | [`kairos-prompts.md`](kairos-prompts.md) | M34 — golden-hour push, `kairos-fire` 15-min cron, hard 1-per-day cap, manual fire instructions, VAPID prod-deploy checklist. |
+| [`vapid-keys-deploy.md`](vapid-keys-deploy.md) | VAPID keys standalone runbook — what they are, one-time setup (4 steps), key rotation, SW registration, failure modes, secrets inventory. Closes #815. |
 
 ## Operator hygiene + ops
 

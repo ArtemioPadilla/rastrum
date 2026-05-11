@@ -28,7 +28,11 @@ export type PercentileMetric =
 
 export interface PercentilePayload {
   user_id: string;
+  /** 'country' (default) or 'state' — scope of the cohort used for this row. */
+  scope?: 'country' | 'state';
   cohort_country: string | null;
+  /** Set when scope='state'; the region_primary value for the cohort. */
+  cohort_state?: string | null;
   cohort_n: number;
   computed_at: string;
   diversity_pctl: number;
@@ -135,4 +139,38 @@ export function buildCards(p: PercentilePayload): PercentileCard[] {
       valueLabel: formatMetricValue('spread', p.spread_value),
     },
   ];
+}
+
+// ---------------------------------------------------------------------------
+// Scope helpers (#805 — state-level sub-cohorts)
+// ---------------------------------------------------------------------------
+
+export type PercentileScope = 'country' | 'state';
+
+/**
+ * Load percentiles for a given scope from Supabase.
+ * Returns null if the user has no row for this scope (e.g. no region_primary
+ * set → state scope will be empty; UI shows "select your state in profile").
+ */
+export async function loadPercentilesForScope(
+  supabase: ReturnType<typeof import('./supabase').getSupabase>,
+  scope: PercentileScope,
+): Promise<PercentilePayload | null> {
+  const { data, error } = await (supabase as unknown as {
+    rpc(fn: string, args: Record<string, unknown>): Promise<{ data: unknown; error: unknown }>;
+  }).rpc('get_my_percentiles', { p_scope: scope });
+  if (error || !data) return null;
+  return data as PercentilePayload;
+}
+
+/**
+ * Build the human-readable cohort label for the scope toggle caption.
+ * e.g. "MX" or "Oaxaca"
+ */
+export function getCohortLabel(payload: PercentilePayload, lang: string): string {
+  if (payload.scope === 'state' && payload.cohort_state) {
+    return payload.cohort_state;
+  }
+  const country = (payload.cohort_country ?? 'MX').toUpperCase();
+  return country === 'MX' ? (lang === 'es' ? 'México' : 'Mexico') : country;
 }

@@ -1,0 +1,19 @@
+---
+import DocLayout from '../../../layouts/DocLayout.astro';
+import SurprisesDocView from '../../../components/SurprisesDocView.astro';
+import { t } from '../../../i18n/utils';
+
+/**
+ * Canonical Spanish URL: /es/docs/sorpresas/
+ * The old /es/docs/surprises/ URL redirects here (301-style meta refresh).
+ *
+ * Closes #813 — ES URL slug /docs/sorpresas/ for SEO cultural fit.
+ */
+const lang = 'es';
+const tr = t(lang);
+const sections = (tr.docs.sections as Record<string, string>);
+---
+
+<DocLayout title={sections.surprises} lang={lang} section="surprises" editPath="src/pages/es/docs/sorpresas.astro">
+  <SurprisesDocView lang={lang} />
+</DocLayout>
