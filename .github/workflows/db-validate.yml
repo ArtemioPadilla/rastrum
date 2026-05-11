@@ -20,12 +20,14 @@ name: db-validate
 #     future PR; we only check the ENABLE flag here, not policy logic)
 
 on:
+  # No `paths:` filter — validate runs on every PR so the required status
+  # check is always present. A path-filtered required check creates a
+  # deadlock (the rule expects the check, but the workflow never fires on
+  # PRs that don't touch schema). Validate is fast (~1.5 min, parallel
+  # with other CI), and idempotent schema apply is a useful smoke test
+  # even on PRs that don't change SQL — catches any drift between the
+  # checked-in schema and what Postgres actually accepts.
   pull_request:
-    paths:
-      - 'docs/specs/infra/supabase-schema.sql'
-      - 'docs/specs/infra/cron-schedules.sql'
-      - 'tests/sql/**'
-      - '.github/workflows/db-validate.yml'
 
 concurrency:
   group: db-validate-${{ github.ref }}
