@@ -12085,21 +12085,21 @@ ALTER TABLE public.taxa
 -- Monthly cron: triggers the refresh-conservation-status Edge Function.
 -- Runs on the 1st of each month at 03:00 UTC.
 -- Requires pg_cron + pg_net extensions (already enabled in Rastrum).
-DO $$
+DO $do$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
     PERFORM cron.unschedule('refresh-conservation-status');
     PERFORM cron.schedule(
       'refresh-conservation-status',
       '0 3 1 * *',
-      $$SELECT net.http_post(
+      $cron$SELECT net.http_post(
           url    := current_setting('app.supabase_url') || '/functions/v1/refresh-conservation-status',
           headers := json_build_object('x-cron-secret', current_setting('app.cron_secret'))::jsonb,
           body   := '{}'::jsonb
-      )$$
+      )$cron$
     );
   END IF;
-END $$;
+END $do$;
 
 -- ============================================================
 -- #551: Wire conservation multipliers into award_karma()
