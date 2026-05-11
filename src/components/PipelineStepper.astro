@@ -150,9 +150,7 @@ const labels = {
 
 <script>
   import type { PipelineNode, PipelineState } from '../lib/pipeline-engine';
-
-  type StepId = 'photo' | 'identify' | 'save';
-  type StepState = 'pending' | 'running' | 'done' | 'failed' | 'skipped';
+  import { deriveSteps, type StepId, type StepState } from './PipelineStepper.helpers';
 
   const ESTIMATE_MS: Record<string, number> = {
     plantnet: 4000,
@@ -190,35 +188,6 @@ const labels = {
     failed:  '✕',
     skipped: '–',
   };
-
-  // ── State derivation ────────────────────────────────────────────────────
-  function deriveSteps(nodes: PipelineNode[]): Record<StepId, { state: StepState; nodes: PipelineNode[] }> {
-    const byKind = (kinds: PipelineNode['kind'][]) => nodes.filter(n => kinds.includes(n.kind));
-
-    const inputNodes    = byKind(['input']);
-    const identNodes    = byKind(['identify', 'merge']);
-    const locationNodes = byKind(['location']);
-    const saveNodes     = byKind(['save']);
-
-    function collapse(ns: PipelineNode[]): StepState {
-      if (!ns.length) return 'pending';
-      if (ns.some(n => n.state === 'running'))  return 'running';
-      if (ns.some(n => n.state === 'failed'))   return 'failed';
-      if (ns.every(n => n.state === 'done'))    return 'done';
-      if (ns.every(n => n.state === 'skipped')) return 'skipped';
-      if (ns.some(n => n.state === 'done'))     return 'running'; // partial done = still going
-      return 'pending';
-    }
-
-    // Save step includes location node state in its detail popover
-    const saveNodesToShow = [...saveNodes, ...locationNodes];
-
-    return {
-      photo:    { state: collapse(inputNodes),  nodes: inputNodes },
-      identify: { state: collapse(identNodes),  nodes: identNodes },
-      save:     { state: collapse(saveNodesToShow), nodes: saveNodesToShow },
-    };
-  }
 
   // ── Render ──────────────────────────────────────────────────────────────
   let stepNumbers: Record<StepId, number> = { photo: 1, identify: 2, save: 3 };
