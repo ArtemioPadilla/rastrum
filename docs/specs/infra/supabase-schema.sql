@@ -11701,6 +11701,30 @@ BEGIN
     AND COALESCE(i.confidence, 0) >= 0.4;
 
   IF qualifying_days IS NULL THEN
+    -- Edge case: no qualifying observations right now (never logged, all
+    -- deleted, or this is the first call after a freeze window). Before
+    -- resetting, try to consume a freeze — mirrors the "missed day" branch
+    -- below so the freeze feature works regardless of whether qualifying_days
+    -- is empty or stale. Without this, recompute_streak silently resets
+    -- streaks for users who legitimately hold a freeze. Caught by the #866
+    -- regression test in tests/sql/rls.sql:1063 (freeze day 1).
+    SELECT COALESCE(s.streak_freezes_available, 0), COALESCE(s.current_days, 0)
+      INTO v_freezes_available, v_prev_current
+      FROM public.user_streaks s
+      WHERE s.user_id = p_user_id;
+
+    IF v_freezes_available > 0 AND v_prev_current > 0 THEN
+      UPDATE public.user_streaks
+         SET streak_freezes_available   = v_freezes_available - 1,
+             streak_freezes_used        = streak_freezes_used + 1,
+             streak_freeze_last_used_at = now(),
+             updated_at                 = now()
+       WHERE user_id = p_user_id;
+      INSERT INTO public.karma_events (user_id, delta, reason)
+      VALUES (p_user_id, 0, 'streak_freeze_consumed');
+      RETURN;
+    END IF;
+
     INSERT INTO public.user_streaks (user_id, current_days, longest_days, updated_at)
     VALUES (p_user_id, 0, 0, now())
     ON CONFLICT (user_id) DO UPDATE SET current_days = 0, updated_at = now();
