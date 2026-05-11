@@ -12558,3 +12558,29 @@ ALTER TABLE public.karma_events
 -- SELECT cron.schedule('weekly-expert-lottery','0 18 * * 0',
 --   $$SELECT net.http_post(url:=current_setting('app.supabase_functions_url') || '/weekly-expert-lottery',
 --     headers:='{"x-cron-secret":"<secret>"}'::jsonb)$$);
+
+-- ============================================================
+-- #748: OBSERVADOR DEL MES (Principle of Recognition)
+-- ============================================================
+
+-- Featured observer per calendar month (admin-selectable or auto-picked)
+CREATE TABLE IF NOT EXISTS public.featured_observers (
+  month_date     date NOT NULL PRIMARY KEY,   -- first day of month, e.g. 2026-05-01
+  user_id        uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  headline_es    text,                         -- blurb in Spanish
+  headline_en    text,                         -- blurb in English
+  custom_photo_url text,                       -- override avatar for the feature
+  picked_by_admin uuid REFERENCES public.users(id),
+  created_at     timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.featured_observers ENABLE ROW LEVEL SECURITY;
+
+-- Publicly readable
+DROP POLICY IF EXISTS "featured_observers_public_read" ON public.featured_observers;
+CREATE POLICY "featured_observers_public_read" ON public.featured_observers
+  FOR SELECT USING (true);
+
+GRANT SELECT ON public.featured_observers TO authenticated, anon;
+-- Only service_role (admin console) can insert/update
+GRANT INSERT, UPDATE, DELETE ON public.featured_observers TO service_role;
