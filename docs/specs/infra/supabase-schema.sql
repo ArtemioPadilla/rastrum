@@ -2163,7 +2163,8 @@ BEGIN
 
   RETURN v_delta;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+   SET search_path = public, extensions, pg_temp;
 
 GRANT EXECUTE ON FUNCTION public.award_karma(uuid, uuid, uuid, text, numeric) TO service_role;
 
@@ -12327,7 +12328,8 @@ BEGIN
 
   RETURN v_delta;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+   SET search_path = public, extensions, pg_temp;
 
 GRANT EXECUTE ON FUNCTION public.award_karma(uuid, uuid, uuid, text, numeric) TO service_role;
 
