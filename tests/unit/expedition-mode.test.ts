@@ -7,6 +7,21 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
+// Node 22's experimental localStorage shadows happy-dom/jsdom and is
+// missing most of the Storage API (no `.clear()`). Install our own
+// Map-backed shim before any code under test touches it. Same pattern as
+// src/lib/byo-keys.test.ts; documented in CLAUDE.md → known pitfalls.
+const _store = new Map<string, string>();
+const _shim: Storage = {
+  get length() { return _store.size; },
+  clear() { _store.clear(); },
+  getItem(k) { return _store.get(k) ?? null; },
+  key(i) { return Array.from(_store.keys())[i] ?? null; },
+  removeItem(k) { _store.delete(k); },
+  setItem(k, v) { _store.set(k, String(v)); },
+};
+Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: _shim });
+
 // ---------------------------------------------------------------------------
 // Constants (mirrors ExpeditionMode.astro)
 // ---------------------------------------------------------------------------
