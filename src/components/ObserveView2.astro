@@ -29,18 +29,12 @@ const weathers = WEATHERS;
        social-presence cue lands before the form. -->
   <ActiveObserversBanner lang={lang} />
 
-  <!-- Header -->
-  <div class="flex items-start justify-between gap-4">
-    <h1 class="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
-      {isEs ? "Registrar observación" : "Log observation"}
-    </h1>
-    <a
-      href={isEs ? "/es/observar/clasico" : "/en/observe/classic"}
-      class="text-xs text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300 underline underline-offset-2 shrink-0 mt-1"
-    >
-      {isEs ? "Formulario clásico" : "Classic form"}
-    </a>
-  </div>
+  <!-- Header — Classic form link migrated to /profile/edit#advanced-prefs-section
+       (#942 PR7 ProfileEditForm advanced section). Inline link removed: it
+       signalled the new form was provisional and added pre-action chrome. -->
+  <h1 class="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+    {isEs ? "Registrar observación" : "Log observation"}
+  </h1>
 
   <!-- Resume in-progress banner -->
   <div id="obs2-resume-banner" class="hidden rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 p-4 flex items-center gap-3">
@@ -55,30 +49,28 @@ const weathers = WEATHERS;
     </button>
   </div>
 
-  <!-- AI Capability Status Banner (#274) -->
-  <!-- Banner starts hidden to prevent SSR flash; JS reveals it after checking localStorage/sessionStorage -->
-  <div id="obs2-capability-banner" class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/60 px-4 py-3 text-xs space-y-1">
-    <div class="flex items-center justify-between">
-      <span class="font-medium text-zinc-700 dark:text-zinc-300">
-        {isEs ? "🤖 Modelos disponibles:" : "🤖 Available AI:"}
-      </span>
-      <div class="flex items-center gap-2">
-        <a id="obs2-setup-link" href={isEs ? "/es/perfil/editar#on-device-ai-section" : "/en/profile/edit#on-device-ai-section"}
-          class="text-emerald-600 dark:text-emerald-400 underline hover:no-underline">
-          {isEs ? "Configurar →" : "Set up →"}
-        </a>
-      </div>
-    </div>
-    <div id="obs2-capability-list" class="flex flex-wrap gap-x-4 gap-y-1 text-zinc-500 dark:text-zinc-400">
-      <!-- Populated by JS -->
-      <span class="animate-pulse">{isEs ? "Verificando modelos..." : "Checking models..."}</span>
-    </div>
-  </div>
+  <!-- Drop Zone — promoted above capability/AI selector/chips so the primary
+       action wins the first fold (#942 PR5 redo, Fogg ability lever). -->
+  <DropZone lang={lang} />
+
+  <!-- AI capability caption — single positive line, replaces the prior
+       multi-line banner with 4❌ (#942 PR5 redo). JS rewrites the inner
+       text once detectRunners() resolves. Hidden until then to avoid
+       layout shift. -->
+  <p id="obs2-capability-caption" class="hidden text-xs text-zinc-500 dark:text-zinc-400 text-center">
+    <span id="obs2-capability-text">{isEs ? "Verificando modelos…" : "Checking models…"}</span>
+    <a id="obs2-setup-link" href={isEs ? "/es/perfil/editar#on-device-ai-section" : "/en/profile/edit#on-device-ai-section"}
+      class="hidden ml-1 text-emerald-600 dark:text-emerald-400 underline hover:no-underline">
+      {isEs ? "configurar →" : "set up →"}
+    </a>
+  </p>
 
   <!-- Contextual hint (shown briefly after file drop) -->
   <div id="obs2-file-hint" class="hidden rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 px-3 py-2 text-xs text-blue-800 dark:text-blue-300 transition-all"></div>
 
-  <!-- AI mode selector (#296) -->
+  <!-- AI mode selector (#296) — hidden by default; revealed only when
+       ≥2 modes are usable (#942 PR5 redo). A selector with one usable
+       option + disabled siblings reads as broken UI. -->
   <div id="obs2-ai-mode-selector" class="hidden">
     <div class="flex items-center gap-2 flex-wrap">
       <span class="text-xs font-medium text-zinc-500 dark:text-zinc-400 shrink-0">{isEs ? "Fuente de IA:" : "AI source:"}</span>
@@ -89,13 +81,6 @@ const weathers = WEATHERS;
       </div>
     </div>
   </div>
-
-  <!-- Contextual species suggestions (issue #723) — appears above the upload
-       once a location is known. Chip taps pre-fill the manual ID input. -->
-  <ContextualSpeciesChips lang={lang} targetInputId="obs2-taxon-input" />
-
-  <!-- Drop Zone -->
-  <DropZone lang={lang} />
 
   <!-- Pipeline section (hidden until files added) -->
   <div id="obs2-pipeline-section" class="hidden space-y-3">
@@ -163,9 +148,8 @@ const weathers = WEATHERS;
           </div>
           <span id="obs2-conf" class="text-xs font-mono text-emerald-600 dark:text-emerald-400 shrink-0"></span>
         </div>
-        <button type="button" id="obs2-id-edit" class="mt-2 text-xs text-zinc-400 underline">
-          {isEs ? "Editar identificación" : "Edit identification"}
-        </button>
+        <!-- obs2-id-edit removed (#942 PR7 redo): manual input is always
+             visible directly below; toggle was redundant. -->
         <!-- "Why this species?" — issue #736 — curated marks + reference photos -->
         <WhyThisSpecies lang={lang} />
       </div>
@@ -178,16 +162,21 @@ const weathers = WEATHERS;
       </div>
     </div>
 
-    <!-- Location -->
+    <!-- Contextual species suggestions (issue #723) — moved here from
+         pre-action (#942 PR5 redo). The chips component self-gates on the
+         rastrum:observe-location-ready event, so they only render after
+         GPS resolves. Mounting them inside the post-form keeps them out
+         of the pre-action chrome stack and means they anchor an existing
+         AI result rather than seeding the user's expectation. -->
+    <ContextualSpeciesChips lang={lang} targetInputId="obs2-taxon-input" />
+
+    <!-- Location — Skip button removed (#942 PR7 redo). Users without GPS
+         can still pick a location via the map; the bull-island sentinel
+         (0,0) shortcut was a 5th exit creating choice paralysis. -->
     <div>
-      <div class="flex items-center justify-between mb-2">
-        <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-          {isEs ? "Ubicación" : "Location"}
-        </label>
-        <button type="button" id="obs2-skip-location" class="text-xs text-zinc-400 underline">
-          {isEs ? "Omitir ubicación" : "Skip location"}
-        </button>
-      </div>
+      <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+        {isEs ? "Ubicación" : "Location"}
+      </label>
       <div id="obs2-gps-status" class="mb-2 text-xs text-zinc-500 dark:text-zinc-400">
         {isEs ? "Obteniendo GPS..." : "Acquiring GPS..."}
       </div>
@@ -448,7 +437,14 @@ function showModeToast(msg: string): void {
     if (ownBtn && !hasByo) ownBtn.disabled = true;
     if (locBtn && !hasBirdnet) locBtn.disabled = true;
     applyModeStyles(readAiMode());
-    document.getElementById('obs2-ai-mode-selector')?.classList.remove('hidden');
+    // Only reveal the selector when ≥2 modes are usable (#942 PR5 redo).
+    // Sponsored is always available; count it plus any of own-key/local
+    // that are not disabled. With ≤1 usable mode the selector reads as
+    // broken UI ("disabled buttons next to one live button").
+    const usableModes = 1 /* sponsored */ + (hasByo ? 1 : 0) + (hasBirdnet ? 1 : 0);
+    if (usableModes >= 2) {
+      document.getElementById('obs2-ai-mode-selector')?.classList.remove('hidden');
+    }
     modeButtons.forEach(btn => btn.addEventListener('click', () => { if (btn.disabled) return; writeAiMode(btn.dataset.mode as AiMode); applyModeStyles(btn.dataset.mode as AiMode); }));
   } catch { /* selector stays hidden */ }
 })();
@@ -466,9 +462,14 @@ if (!localStorage.getItem(ONBOARDING_KEY)) {
   setTimeout(() => toast.remove(), 5000);
 }
 
-// ── Capability banner (#274) ───────────────────────────────────────────────
-const capBanner   = document.getElementById('obs2-capability-banner');
-const capList     = document.getElementById('obs2-capability-list');
+// ── Capability caption (#274 → #942 PR5 redo) ─────────────────────────────
+// Single positive line: lists only providers that ARE ready, plus a
+// "configure more" link when the user is still missing some. The prior
+// banner with 4❌ vs 2✅ read as "your app is broken" and added pre-roll
+// chrome that competed with the dropzone.
+const capCaption  = document.getElementById('obs2-capability-caption');
+const capText     = document.getElementById('obs2-capability-text');
+const setupLink   = document.getElementById('obs2-setup-link');
 const fileHint    = document.getElementById('obs2-file-hint');
 
 // ── Observation defaults memory (#942) ────────────────────────────────────
@@ -491,31 +492,42 @@ const fileHint    = document.getElementById('obs2-file-hint');
   } catch { /* non-fatal — defaults are a convenience */ }
 })();
 
-// Render capability status
+// Render capability caption — positive framing only (#942 PR5 redo)
 (async () => {
   try {
     const runners = await detectRunners();
-    if (!capList) return;
-    const items = [
-      { label: 'PlantNet (plants)', labelEs: 'PlantNet (plantas)', ok: runners.plantnet },
-      { label: 'BirdNET (birds)', labelEs: 'BirdNET (aves)', ok: runners.birdnet },
-      // Multi-provider since M32: the EF resolves Anthropic / OpenAI / Bedrock / Azure /
-      // Gemini / Vertex via the BYO → sponsor → pool chain, so labelling this row "Claude"
-      // misrepresented what's actually available. The user-visible label is now provider-agnostic.
-      { label: 'Cloud AI Vision', labelEs: 'IA en la nube', ok: runners.claude },
-      { label: 'Phi Vision (local)', labelEs: 'Phi Vision (local)', ok: runners.phi },
-      { label: 'Gemma 4 (local)', labelEs: 'Gemma 4 (local)', ok: runners.gemma },
-      { label: 'EfficientNet (local)', labelEs: 'EfficientNet (local)', ok: runners.efficientNet },
-    ];
-    const allOk = items.every(i => i.ok);
-    // Hide setup link if all configured
-    if (allOk) document.getElementById('obs2-setup-link')?.classList.add('hidden');
-    capList.innerHTML = items.map(item => `
-      <span class="${item.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-400 dark:text-zinc-500'}">
-        ${item.ok ? '✅' : '❌'} ${isEs ? item.labelEs : item.label}
-      </span>
-    `).join('');
-  } catch { /* silent */ }
+    if (!capCaption || !capText) return;
+
+    // Provider-agnostic "Cloud AI" label — the EF resolves Anthropic /
+    // OpenAI / Bedrock / Azure / Gemini / Vertex via BYO → sponsor → pool.
+    const ready: string[] = [];
+    if (runners.plantnet)     ready.push('PlantNet');
+    if (runners.birdnet)      ready.push('BirdNET');
+    if (runners.claude)       ready.push(isEs ? 'IA en la nube' : 'Cloud AI');
+    if (runners.phi)          ready.push('Phi Vision');
+    if (runners.gemma)        ready.push('Gemma 4');
+    if (runners.efficientNet) ready.push('EfficientNet');
+
+    if (ready.length === 0) {
+      capText.textContent = isEs
+        ? 'Configura un identificador para reconocer especies automáticamente'
+        : 'Configure an identifier to recognize species automatically';
+      // Keep setup link visible — only path forward.
+      setupLink?.classList.remove('hidden');
+    } else {
+      const list = ready.join(' + ');
+      const verb = isEs ? (ready.length === 1 ? 'listo' : 'listos') : 'ready';
+      capText.textContent = `${list} · ${verb}`;
+      // Hide setup link only when ALL six providers are ready.
+      const allReady = ready.length === 6;
+      if (allReady) {
+        setupLink?.classList.add('hidden');
+      } else {
+        setupLink?.classList.remove('hidden');
+      }
+    }
+    capCaption.classList.remove('hidden');
+  } catch { /* silent — caption stays hidden, no harm */ }
 })();
 
 // ── Contextual hint after file drop (#274) ─────────────────────────────────
@@ -1023,10 +1035,8 @@ function showPostForm() {
     }
   }
 
-  // Edit identification toggle — only wired when AI result is present
-  document.getElementById('obs2-id-edit')?.addEventListener('click', () => {
-    document.getElementById('obs2-id-manual')?.classList.toggle('hidden');
-  });
+  // obs2-id-edit handler removed (#942 PR7 redo) — manual input is always
+  // visible directly below the AI result; toggle was redundant.
 }
 
 // "Report incorrect" from the WhyThisSpecies panel (issue #736).
@@ -1073,11 +1083,9 @@ identifyDoneBtn?.addEventListener('click', () => {
   if (newBtn) newBtn.textContent = isEs ? 'Identificar otra' : 'Identify another';
 });
 
-// ── Skip location ──────────────────────────────────────────────────────────
-document.getElementById('obs2-skip-location')?.addEventListener('click', () => {
-  location = { lat: 0, lng: 0, accuracyM: 0, altitudeM: null };
-  if (gpsStatus) gpsStatus.textContent = isEs ? 'Ubicación omitida' : 'Location skipped';
-});
+// obs2-skip-location handler removed (#942 PR7 redo) — bull-island
+// sentinel (0,0) shortcut was a 5th exit creating choice paralysis.
+// Users without GPS pick a location via the map.
 
 // ── Save ───────────────────────────────────────────────────────────────────
 postForm?.addEventListener('submit', async (e) => {

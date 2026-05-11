@@ -73,9 +73,8 @@ const isEs = lang === 'es';
       <div
         class="w-full h-1.5 rounded-full bg-emerald-100 dark:bg-emerald-900 overflow-hidden"
         role="progressbar"
-        aria-label={isEs ? 'Progreso del dex' : 'Dex progress'}
+        aria-label={isEs ? 'Progreso al siguiente hito' : 'Progress to next milestone'}
         aria-valuemin={0}
-        aria-valuemax={100}
         id="osc-progress-bar-container"
       >
         <div
@@ -112,6 +111,7 @@ const isEs = lang === 'es';
 
 <script>
   import { getSupabase, getCachedUser } from '../lib/supabase';
+  import { nextMilestone } from '../lib/milestones';
 
   interface SuccessPayload {
     obsId: string;
@@ -180,7 +180,10 @@ const isEs = lang === 'es';
         }
       }
 
-      // Dex progress: show +1 with family when count > 0
+      // Dex progress: show count vs next explicit milestone (honest-norms
+      // invariant from v1.1.5). The previous "/100" denominator was
+      // fabricated — there is no platform goal of 100 observations. Real
+      // milestones are explicit and motivating without lying.
       if (obsCount > 0) {
         const dexEl = document.getElementById('osc-dex');
         const dexLabel = document.getElementById('osc-dex-label');
@@ -189,13 +192,12 @@ const isEs = lang === 'es';
         const progressContainer = document.getElementById('osc-progress-bar-container');
 
         if (dexEl && dexLabel && dexIncrement) {
-          // Cap displayed dex at 100 for the progress bar display (simple milestone)
-          const cappedCount = Math.min(obsCount, 100);
-          const pct = cappedCount;
+          const next = nextMilestone(obsCount);
+          const pct = Math.min(100, Math.round((obsCount / next) * 100));
 
           dexLabel.textContent = isEs
-            ? `Profile-dex: ${obsCount} / 100`
-            : `Profile-dex: ${obsCount} / 100`;
+            ? `Observaciones: ${obsCount} / ${next}`
+            : `Observations: ${obsCount} / ${next}`;
           dexIncrement.textContent = '+1';
 
           // Double rAF: first frame reveals the dex card at width 0%,
@@ -207,7 +209,8 @@ const isEs = lang === 'es';
             requestAnimationFrame(() => {
               if (progressBar) progressBar.style.width = `${pct}%`;
               if (progressContainer) {
-                progressContainer.setAttribute('aria-valuenow', String(cappedCount));
+                progressContainer.setAttribute('aria-valuenow', String(obsCount));
+                progressContainer.setAttribute('aria-valuemax', String(next));
               }
             });
           });
