@@ -139,3 +139,114 @@ export function applySeasonalTheme(
 ): void {
   doc.documentElement.setAttribute('data-season', theme);
 }
+
+// ---------------------------------------------------------------------------
+// #811 — Community themes
+// ---------------------------------------------------------------------------
+
+import type { SupabaseClient } from '@supabase/supabase-js';
+
+/** A row from the `community_themes` table (approved only for public reads). */
+export interface CommunityTheme {
+  id: string;
+  creator_id: string | null;
+  name_es: string;
+  name_en: string;
+  slug: string;
+  accent_color: string;
+  bg_gradient_from: string;
+  bg_gradient_to: string;
+  region: string | null;
+  active_months: number[] | null;
+  status: 'pending' | 'approved' | 'rejected';
+  votes: number;
+  created_at: string;
+}
+
+/** Validates a hex colour string — guards against CSS injection. */
+export function isValidHexColor(value: string): boolean {
+  return /^#[0-9a-fA-F]{6}$/.test(value);
+}
+
+/**
+ * Sanitise a community theme submission before INSERT.
+ * Throws if any required colour field is not a valid 6-digit hex string.
+ * Returns a cleaned-up object safe to pass to Supabase.
+ */
+export function sanitiseCommunityThemeInput(input: {
+  name_es: string;
+  name_en: string;
+  slug: string;
+  accent_color: string;
+  bg_gradient_from: string;
+  bg_gradient_to: string;
+  region?: string | null;
+  active_months?: number[] | null;
+}): typeof input {
+  const colorFields = ['accent_color', 'bg_gradient_from', 'bg_gradient_to'] as const;
+  for (const field of colorFields) {
+    if (!isValidHexColor(input[field])) {
+      throw new Error(
+        `Invalid color value for "${field}": must be a 6-digit hex string (e.g. #ff6b00).`,
+      );
+    }
+  }
+  // Slug: allow only lowercase alphanumeric + hyphen
+  if (!/^[a-z0-9-]+$/.test(input.slug)) {
+    throw new Error(`Invalid slug "${input.slug}": only lowercase letters, digits, and hyphens allowed.`);
+  }
+  return input;
+}
+
+/**
+ * Fetch approved community themes from Supabase.
+ * Results are cached in sessionStorage for 24 h to reduce API calls.
+ *
+ * Falls back to an empty array on any error so the UI degrades gracefully.
+ */
+const CT_CACHE_KEY = 'rastrum.community_themes.cache';
+const CT_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+export async function loadCommunityThemes(
+  supabase: SupabaseClient,
+  { bypassCache = false } = {},
+): Promise<CommunityTheme[]> {
+  // Try cache first (browser only)
+  if (!bypassCache && typeof sessionStorage !== 'undefined') {
+    try {
+      const raw = sessionStorage.getItem(CT_CACHE_KEY);
+      if (raw) {
+        const cached: { ts: number; themes: CommunityTheme[] } = JSON.parse(raw);
+        if (Date.now() - cached.ts < CT_CACHE_TTL_MS) {
+          return cached.themes;
+        }
+      }
+    } catch {
+      // Ignore parse errors
+    }
+  }
+
+  const { data, error } = await supabase
+    .from('community_themes')
+    .select('id, creator_id, name_es, name_en, slug, accent_color, bg_gradient_from, bg_gradient_to, region, active_months, status, votes, created_at')
+    .eq('status', 'approved')
+    .order('votes', { ascending: false });
+
+  if (error) {
+    console.error('[seasonal-theme] loadCommunityThemes error:', error.message);
+    return [];
+  }
+
+  const themes = (data ?? []) as CommunityTheme[];
+
+  // Store in sessionStorage
+  if (typeof sessionStorage !== 'undefined') {
+    try {
+      sessionStorage.setItem(CT_CACHE_KEY, JSON.stringify({ ts: Date.now(), themes }));
+    } catch {
+      // Ignore quota errors
+    }
+  }
+
+  return themes;
+}
