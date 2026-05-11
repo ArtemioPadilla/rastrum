@@ -10636,14 +10636,12 @@ REVOKE EXECUTE ON FUNCTION public.chat_find_species(text, int)              FROM
 REVOKE EXECUTE ON FUNCTION public.chat_find_projects(text, int)             FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.chat_find_camera_stations(uuid, int)      FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.chat_find_observers(text, int)            FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.chat_find_location(text, int)             FROM PUBLIC;
 
 GRANT EXECUTE ON FUNCTION public.chat_find_observations(jsonb, int)         TO authenticated;
 GRANT EXECUTE ON FUNCTION public.chat_find_species(text, int)               TO authenticated;
 GRANT EXECUTE ON FUNCTION public.chat_find_projects(text, int)              TO authenticated;
 GRANT EXECUTE ON FUNCTION public.chat_find_camera_stations(uuid, int)       TO authenticated;
 GRANT EXECUTE ON FUNCTION public.chat_find_observers(text, int)             TO authenticated;
-GRANT EXECUTE ON FUNCTION public.chat_find_location(text, int)              TO authenticated, anon;
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- Locations first-class (#914) — places table + chat_find_location RPC
@@ -10684,6 +10682,8 @@ SET search_path = public, pg_temp AS $$
   ORDER BY observation_count DESC
   LIMIT p_limit;
 $$;
+REVOKE EXECUTE ON FUNCTION public.chat_find_location(text, int) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.chat_find_location(text, int) TO authenticated, anon;
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- Security Advisor remediation — 2026-05-08
