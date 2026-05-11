@@ -10,10 +10,11 @@ beforeEach(() => {
 });
 
 describe('chat-tools', () => {
-  it('exposes 5 tools', () => {
+  it('exposes 6 tools', () => {
     const names = listTools().map(t => t.name).sort();
     expect(names).toEqual([
       'find_camera_stations',
+      'find_location',
       'find_observations',
       'find_observers',
       'find_projects',
