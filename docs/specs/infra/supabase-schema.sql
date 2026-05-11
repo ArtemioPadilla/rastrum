@@ -2537,6 +2537,9 @@ ALTER TABLE public.users
   }'::jsonb,
   ADD COLUMN IF NOT EXISTS dismissed_privacy_intro_at timestamptz;
 
+ALTER TABLE public.users
+  ADD COLUMN IF NOT EXISTS onboarding_completed_at timestamptz;
+
 CREATE INDEX IF NOT EXISTS idx_users_profile_privacy
   ON public.users USING gin (profile_privacy jsonb_path_ops);
 
