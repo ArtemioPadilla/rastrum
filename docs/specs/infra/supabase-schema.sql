@@ -10678,11 +10678,16 @@ CREATE OR REPLACE FUNCTION public.chat_find_location(p_query text, p_limit int D
 RETURNS TABLE (id uuid, slug text, name text, place_type text, observation_count int)
 LANGUAGE sql STABLE SECURITY DEFINER
 SET search_path = public, pg_temp AS $$
-  SELECT id, slug, name, place_type, observation_count
+  -- #914's CREATE TABLE places (line ~10650) is a no-op because
+  -- IF NOT EXISTS yields to the earlier WDPA places table (line ~7285),
+  -- which spells the column obs_count, not observation_count. Alias here
+  -- preserves the function's RETURNS TABLE contract (clients still see
+  -- observation_count) until the two places designs are reconciled.
+  SELECT id, slug, name, place_type, obs_count AS observation_count
   FROM public.places
   WHERE name ILIKE '%' || p_query || '%'
      OR slug ILIKE '%' || p_query || '%'
-  ORDER BY observation_count DESC
+  ORDER BY obs_count DESC
   LIMIT p_limit;
 $$;
 REVOKE EXECUTE ON FUNCTION public.chat_find_location(text, int) FROM PUBLIC;
