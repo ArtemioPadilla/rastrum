@@ -11819,6 +11819,7 @@ CREATE INDEX IF NOT EXISTS probable_taxa_cache_geohash5_month_score_idx
 
 -- RLS: public read (anon may read suggestions), no direct write from clients.
 ALTER TABLE public.probable_taxa_cache ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "probable_taxa_cache: anon can read" ON public.probable_taxa_cache;
 CREATE POLICY "probable_taxa_cache: anon can read"
   ON public.probable_taxa_cache FOR SELECT
   USING (true);
