@@ -111,6 +111,24 @@ const exploreHref       = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'exp
 
   <div id="pokedex-hero" class="hidden"></div>
   <div id="pokedex-pills" class="hidden"></div>
+
+  <!-- #707: View toggle (Grid / Tree) -->
+  <div id="pokedex-view-tabs" class="hidden flex gap-1 mt-4 mb-2" role="tablist">
+    <button id="pokedex-tab-grid" data-pdx-view="grid" role="tab" aria-selected="true"
+      class="px-3 py-1.5 text-xs font-medium rounded-full border border-emerald-700 bg-emerald-700 text-white">
+      {lang === 'es' ? 'Cuadrícula' : 'Grid'}
+    </button>
+    <button id="pokedex-tab-tree" data-pdx-view="tree" role="tab" aria-selected="false"
+      class="px-3 py-1.5 text-xs font-medium rounded-full border border-zinc-300 dark:border-zinc-600 text-zinc-600 dark:text-zinc-300">
+      {lang === 'es' ? 'Árbol' : 'Tree'}
+    </button>
+  </div>
+
+  <!-- #707: Taxonomic tree panel -->
+  <div id="pokedex-tree" class="hidden mt-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 overflow-hidden"
+    aria-label={lang === 'es' ? 'Árbol taxonómico' : 'Taxonomic tree'}>
+    <!-- Populated by script -->
+  </div>
   <div id="pokedex-missing-toolbar" class="hidden mt-4 flex flex-wrap items-center gap-3 text-xs"></div>
   {!visitor && (
     <div id="pokedex-why-falta" class="hidden mt-2">
@@ -142,6 +160,9 @@ const exploreHref       = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'exp
   const heroEl    = document.getElementById('pokedex-hero');
   const pillsEl   = document.getElementById('pokedex-pills');
   const gridEl    = document.getElementById('pokedex-grid');
+  // #707: tree elements
+  const treeEl       = document.getElementById('pokedex-tree');
+  const viewTabsEl   = document.getElementById('pokedex-view-tabs');
   const loading   = document.getElementById('pokedex-loading');
   const emptyEl   = document.getElementById('pokedex-empty');
   const notFound  = document.getElementById('pokedex-not-found');
@@ -668,6 +689,128 @@ const exploreHref       = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'exp
     wireKingdomPills();
     if (!isVisitor) renderMissingToolbar();
     loading?.classList.add('hidden');
+
+    // #707: Show view-tabs and build tree data once rows are loaded.
+    if (rows.length > 0) {
+      viewTabsEl?.classList.remove('hidden');
+      buildPokedexTree(rows);
+      wirePokedexViewTabs();
+    }
+  }
+
+  // ── #707: Pokédex taxonomic tree ────────────────────────────────────────
+  // Build an expandable Kingdom→…→Species tree from the user's observed rows.
+  // Each node shows: name, observed count, completion percentage.
+  // Observed nodes are coloured; unobserved (grey) are NOT shown here since
+  // the tree only shows observed taxa (the full catalogue tree is out of scope
+  // for this view — that lives in the explore species page).
+
+  type TreeNodeState = { name: string; rank: string; observed: number; total: number; children: TreeNodeState[] };
+
+  function buildObservedTree(rows: DexRow[]): TreeNodeState {
+    const RANKS: Array<keyof DexRow> = ['kingdom', 'scientific_name'];
+    // Build nested map: kingdom → { family: {genus: [species]} }
+    type NodeMap = Map<string, { observed: number; children: NodeMap; rank: string }>;
+    const root: NodeMap = new Map();
+
+    for (const r of rows) {
+      const path: Array<{ rank: string; name: string }> = [];
+      if (r.kingdom) path.push({ rank: 'Kingdom', name: r.kingdom });
+      // We don't have phylum/class/order/family in DexRow from PokedexView,
+      // so we fall back to a 2-level tree: Kingdom → Species.
+      path.push({ rank: 'Species', name: r.scientific_name });
+
+      let cur = root;
+      for (const step of path) {
+        if (!cur.has(step.name)) {
+          cur.set(step.name, { observed: 0, children: new Map(), rank: step.rank });
+        }
+        const node = cur.get(step.name)!;
+        node.observed += r.obs_count ?? 1;
+        cur = node.children;
+      }
+    }
+
+    function toNode(name: string, data: { observed: number; children: NodeMap; rank: string }): TreeNodeState {
+      const children = Array.from(data.children.entries()).map(([n, d]) => toNode(n, d));
+      return { name, rank: data.rank, observed: data.observed, total: children.length || 1, children };
+    }
+
+    const children = Array.from(root.entries()).map(([n, d]) => toNode(n, d));
+    const totalObs = children.reduce((s, c) => s + c.observed, 0);
+    return { name: 'root', rank: 'root', observed: totalObs, total: children.length, children };
+  }
+
+  function renderTreeHtml(node: TreeNodeState, depth: number, isLastChild: boolean): string {
+    const isLeaf = node.children.length === 0 || node.rank === 'Species';
+    const indent = depth * 16;
+    const labelColor = node.rank === 'Kingdom'
+      ? 'text-emerald-700 dark:text-emerald-400 font-semibold'
+      : node.rank === 'Species'
+        ? 'italic text-zinc-800 dark:text-zinc-200'
+        : 'text-zinc-700 dark:text-zinc-300 font-medium';
+    const dot = node.rank === 'Kingdom'
+      ? '<span class="w-2.5 h-2.5 rounded-full bg-emerald-600 inline-block mr-1.5 shrink-0"></span>'
+      : node.rank === 'Species'
+        ? '<span class="w-1.5 h-1.5 rounded-full bg-blue-500 dark:bg-blue-400 inline-block mr-1.5 shrink-0"></span>'
+        : '<span class="w-2 h-2 rounded-full bg-zinc-400 inline-block mr-1.5 shrink-0"></span>';
+    const obsLabel = `<span class="ml-auto text-[11px] text-zinc-500 dark:text-zinc-400 shrink-0">${node.observed} obs</span>`;
+
+    if (isLeaf || node.rank === 'Species') {
+      return `<div class="flex items-center py-1 px-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 text-sm" style="padding-left:${8 + indent}px">
+        ${dot}<span class="${labelColor} truncate">${node.name}</span>${obsLabel}
+      </div>`;
+    }
+
+    const id = `pdx-tree-${node.name.replace(/\s/g, '-')}-${depth}`;
+    const childrenHtml = node.children
+      .sort((a, b) => b.observed - a.observed)
+      .map((c, i) => renderTreeHtml(c, depth + 1, i === node.children.length - 1))
+      .join('');
+
+    return `<details class="group" open=${depth < 1 ? 'true' : 'false'}>
+      <summary class="flex items-center py-1.5 px-3 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/40 list-none text-sm select-none" style="padding-left:${8 + indent}px">
+        <span class="mr-1 text-zinc-400 group-open:rotate-90 transition-transform duration-150" aria-hidden="true">▶</span>
+        ${dot}<span class="${labelColor} truncate">${node.name}</span>
+        <span class="ml-1.5 text-[11px] rounded-full bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 text-zinc-500 dark:text-zinc-400 shrink-0">${node.children.length}</span>
+        ${obsLabel}
+      </summary>
+      <div>${childrenHtml}</div>
+    </details>`;
+  }
+
+  let treeBuilt = false;
+  function buildPokedexTree(rows: DexRow[]) {
+    if (treeBuilt || !treeEl) return;
+    treeBuilt = true;
+    const tree = buildObservedTree(rows);
+    const childrenSorted = [...tree.children].sort((a, b) => b.observed - a.observed);
+    const html = childrenSorted.map((c, i) => renderTreeHtml(c, 0, i === childrenSorted.length - 1)).join('');
+    treeEl.innerHTML = `<div class="py-2">${html || '<p class="text-sm text-zinc-400 text-center py-8">—</p>'}</div>`;
+  }
+
+  const activePdxTab   = ['px-3','py-1.5','text-xs','font-medium','rounded-full','border','border-emerald-700','bg-emerald-700','text-white'];
+  const inactivePdxTab = ['px-3','py-1.5','text-xs','font-medium','rounded-full','border','border-zinc-300','dark:border-zinc-600','text-zinc-600','dark:text-zinc-300'];
+
+  function switchPokedexView(view: string) {
+    viewTabsEl?.querySelectorAll<HTMLButtonElement>('[data-pdx-view]').forEach(btn => {
+      const active = btn.dataset.pdxView === view;
+      btn.setAttribute('aria-selected', String(active));
+      btn.className = (active ? activePdxTab : inactivePdxTab).join(' ');
+    });
+    gridEl?.classList.toggle('hidden', view !== 'grid');
+    treeEl?.classList.toggle('hidden', view !== 'tree');
+    // Also hide/show the missing toolbar and pills only in grid mode.
+    const missingTb = document.getElementById('pokedex-missing-toolbar');
+    missingTb?.classList.toggle('hidden', view !== 'grid');
+    const missingDisc = document.getElementById('pokedex-missing-disclaimer');
+    missingDisc?.classList.toggle('hidden', view !== 'grid');
+  }
+
+  function wirePokedexViewTabs() {
+    viewTabsEl?.querySelectorAll<HTMLButtonElement>('[data-pdx-view]').forEach(btn => {
+      btn.addEventListener('click', () => switchPokedexView(btn.dataset.pdxView ?? 'grid'));
+    });
   }
 
   async function runOwner() {
