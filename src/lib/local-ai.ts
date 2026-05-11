@@ -16,11 +16,23 @@
  *     `needs_review` and never lets it count toward research-grade
  *     (the quality gate in supabase-schema.sql enforces that bound too).
  *
+ *     ⚠️ EVALUATE FOR REPLACEMENT — see docs/runbooks/phi-gemma3-evaluation.md
+ *     Phi-3.5-vision crashes on Apple Silicon with WebGPU "Binding size 1
+ *     isn't a multiple of 4" errors (Chromium 147+, Metal backend). It is
+ *     currently behind a strict opt-in gate (PR #637). Issue #638 tracks the
+ *     evaluation of Gemma 3/4 as a more stable replacement.
+ *
  *   - **Llama-3.2-1B-Instruct** (q4f16_1, ~880 MB VRAM, low-resource)
  *     Used for text-only helpers: ES↔EN translation of observation notes,
  *     local search over the user's own observation history, and field-note
  *     narrative generation from structured observation data. NOT used for
  *     identification.
+ *
+ *     ℹ️ Issue #716: Llama text tasks now route through the transformers.js/ONNX
+ *     path (generateLlamaText in onnx-vision.ts) by default. The WebLLM path
+ *     (loadTextEngine / textEngine) is kept as a feature-flag fallback activated
+ *     by setting USE_WEBLLM=1 (env) or window.__USE_WEBLLM=true (runtime). This
+ *     allows A/B testing and safe rollback without a code change.
  *
  * Models are loaded lazily on first use. WebLLM caches in OPFS, so the
  * second load is instant. We never auto-download — every model fetch is
@@ -497,49 +509,103 @@ export async function identifyImageLocal(
 // ───────────────────── Text helpers ─────────────────────
 
 /**
+ * Returns true when the USE_WEBLLM feature flag is active.
+ * Set `USE_WEBLLM=1` in the environment (SSR) or `window.__USE_WEBLLM = true`
+ * in the browser to force the WebLLM/MLC path for Llama text tasks.
+ * Default (flag absent / false): use the transformers.js/ONNX path (#716).
+ */
+function useWebLLMFlag(): boolean {
+  // Browser runtime: check window flag.
+  if (typeof window !== 'undefined') {
+    return !!(window as Window & { __USE_WEBLLM?: boolean }).__USE_WEBLLM;
+  }
+  // SSR / Node: check env.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (typeof process !== 'undefined' && (process as any).env?.USE_WEBLLM === '1');
+}
+
+/**
  * Translate a short observation note between Spanish and English locally.
  * Useful for community contributors writing in one language but submitting
  * to a Darwin Core export that prefers the other.
+ *
+ * Routes through the transformers.js/ONNX Llama path by default (#716).
+ * Set USE_WEBLLM=1 / window.__USE_WEBLLM=true to fall back to WebLLM/MLC.
  */
 export async function translateNote(
   text: string,
   to: 'es' | 'en',
   onProgress: (p: LoadProgress) => void,
 ): Promise<string> {
-  const engine = await loadTextEngine(onProgress);
   const target = to === 'es' ? 'Spanish' : 'English';
-  const reply = await engine.chat.completions.create({
-    messages: [
-      { role: 'system', content: `You are a translator. Translate the user's biodiversity observation note into ${target}. Output the translation only, no preamble.` },
-      { role: 'user', content: text },
-    ],
-    max_tokens: 200,
-  });
-  const raw = reply.choices?.[0]?.message?.content ?? '';
-  return typeof raw === 'string' ? raw.trim() : '';
+  const messages: ChatTurn[] = [
+    { role: 'system', content: `You are a translator. Translate the user's biodiversity observation note into ${target}. Output the translation only, no preamble.` },
+    { role: 'user', content: text },
+  ];
+
+  if (useWebLLMFlag()) {
+    // Legacy WebLLM/MLC path — USE_WEBLLM=1 fallback.
+    const engine = await loadTextEngine(onProgress);
+    const reply = await engine.chat.completions.create({
+      messages,
+      max_tokens: 200,
+    });
+    const raw = reply.choices?.[0]?.message?.content ?? '';
+    return typeof raw === 'string' ? raw.trim() : '';
+  }
+
+  // Default: transformers.js / ONNX Llama (#716)
+  const { generateLlamaText } = await import('./onnx-vision');
+  let result = '';
+  for await (const chunk of generateLlamaText(messages, { max_tokens: 200 })) {
+    const delta = chunk.choices?.[0]?.delta?.content
+      ?? chunk.choices?.[0]?.message?.content
+      ?? '';
+    result += delta;
+  }
+  return result.trim();
 }
 
 /**
  * Generate a short field-note narrative from structured observation data.
  * Helps users with limited writing time turn coordinates + species into a
  * paragraph suitable for Darwin Core export.
+ *
+ * Routes through the transformers.js/ONNX Llama path by default (#716).
+ * Set USE_WEBLLM=1 / window.__USE_WEBLLM=true to fall back to WebLLM/MLC.
  */
 export async function generateFieldNote(
   data: { species: string; date: string; location: string; habitat?: string; weather?: string; notes?: string },
   lang: 'es' | 'en',
   onProgress: (p: LoadProgress) => void,
 ): Promise<string> {
-  const engine = await loadTextEngine(onProgress);
   const targetLang = lang === 'es' ? 'Spanish' : 'English';
-  const reply = await engine.chat.completions.create({
-    messages: [
-      { role: 'system', content: `You are a naturalist's writing assistant. Turn structured observation data into a short, professional field note in ${targetLang}, 2-3 sentences. Output the narrative only.` },
-      { role: 'user', content: JSON.stringify(data) },
-    ],
-    max_tokens: 200,
-  });
-  const raw = reply.choices?.[0]?.message?.content ?? '';
-  return typeof raw === 'string' ? raw.trim() : '';
+  const messages: ChatTurn[] = [
+    { role: 'system', content: `You are a naturalist's writing assistant. Turn structured observation data into a short, professional field note in ${targetLang}, 2-3 sentences. Output the narrative only.` },
+    { role: 'user', content: JSON.stringify(data) },
+  ];
+
+  if (useWebLLMFlag()) {
+    // Legacy WebLLM/MLC path — USE_WEBLLM=1 fallback.
+    const engine = await loadTextEngine(onProgress);
+    const reply = await engine.chat.completions.create({
+      messages,
+      max_tokens: 200,
+    });
+    const raw = reply.choices?.[0]?.message?.content ?? '';
+    return typeof raw === 'string' ? raw.trim() : '';
+  }
+
+  // Default: transformers.js / ONNX Llama (#716)
+  const { generateLlamaText } = await import('./onnx-vision');
+  let result = '';
+  for await (const chunk of generateLlamaText(messages, { max_tokens: 200 })) {
+    const delta = chunk.choices?.[0]?.delta?.content
+      ?? chunk.choices?.[0]?.message?.content
+      ?? '';
+    result += delta;
+  }
+  return result.trim();
 }
 
 // ───────────────────── Generic chat (text-engine, streaming) ─────────────────────

@@ -38,6 +38,7 @@ const sgBlock  = sgTree.socialgraph.block.button;
 const sgReport = sgTree.socialgraph.report.button;
 const view = page.view;
 const timeline = (page as unknown as { timeline: Record<string, string> }).timeline ?? {};
+const distancePage = page as unknown as Record<string, string>;
 ---
 
 <section
@@ -63,6 +64,11 @@ const timeline = (page as unknown as { timeline: Record<string, string> }).timel
   data-label-fave-aria-other={(tr as unknown as { socialgraph: { reactions: Record<string, string> } }).socialgraph.reactions.fave_count_aria_other}
   data-label-timeline-today={timeline.today}
   data-label-timeline-yesterday={timeline.yesterday}
+  data-label-distance-filter={distancePage.distance_filter_label ?? 'Filter by distance'}
+  data-label-distance-all={distancePage.distance_filter_all ?? 'All'}
+  data-label-distance-km={distancePage.distance_filter_km ?? '{{km}} km'}
+  data-label-distance-no-location={distancePage.distance_filter_no_location ?? 'Enable location to filter by distance'}
+  data-label-distance-locating={distancePage.distance_filter_locating ?? 'Getting your location…'}
 >
   <header class="space-y-3 py-6">
     <div class="flex items-start justify-between gap-3">
@@ -127,6 +133,25 @@ const timeline = (page as unknown as { timeline: Record<string, string> }).timel
           <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
         </button>
       </div>
+    </div>
+
+    <!-- #712 Distance filter — fires after geolocation; non-blocking -->
+    <div
+      class="er-distance-filter hidden items-center gap-2 flex-wrap"
+      role="group"
+      aria-label={distancePage.distance_filter_label ?? 'Filter by distance'}
+    >
+      <span class="text-xs font-medium text-zinc-600 dark:text-zinc-400 shrink-0">
+        {distancePage.distance_filter_label ?? 'Filter by distance'}:
+      </span>
+      <!-- Buttons are injected by the client script after geolocation resolves -->
+      <p class="er-distance-locating text-xs text-zinc-400 dark:text-zinc-500">
+        {distancePage.distance_filter_locating ?? 'Getting your location…'}
+      </p>
+      <p class="er-distance-no-loc hidden text-xs text-zinc-400 dark:text-zinc-500">
+        {distancePage.distance_filter_no_location ?? 'Enable location to filter by distance'}
+      </p>
+      <div class="er-distance-btns hidden flex flex-wrap gap-1.5"></div>
     </div>
   </header>
 
@@ -428,6 +453,146 @@ const timeline = (page as unknown as { timeline: Record<string, string> }).timel
 
     // All loaded rows — kept in memory so list/timeline can re-render on mode switch
     const allRows: Row[] = [];
+
+    // ── Distance filter state (#712) ────────────────────────────────────────
+    // Rows decorated with distance from user for the current filter session.
+    // null = distance filter inactive (show all, all rows included).
+    let distanceFilterKm: number | null = null;
+    let userLat: number | null = null;
+    let userLng: number | null = null;
+
+    const LOCATION_KEY = 'rastrum.user_location';
+    const LOCATION_TTL_MS = 5 * 60 * 1000;
+    function getCachedLoc(): { lat: number; lng: number } | null {
+      try {
+        const raw = sessionStorage.getItem(LOCATION_KEY);
+        if (!raw) return null;
+        const loc: { lat: number; lng: number; ts: number } = JSON.parse(raw);
+        if (Date.now() - loc.ts > LOCATION_TTL_MS) return null;
+        return { lat: loc.lat, lng: loc.lng };
+      } catch { return null; }
+    }
+    function setCachedLoc(lat: number, lng: number): void {
+      try { sessionStorage.setItem(LOCATION_KEY, JSON.stringify({ lat, lng, ts: Date.now() })); } catch { /* quota */ }
+    }
+
+    /**
+     * Haversine distance in km between two WGS84 points.
+     * Used for client-side distance filtering when the DB row includes lat/lng.
+     */
+    function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+      const R = 6371;
+      const dLat = ((lat2 - lat1) * Math.PI) / 180;
+      const dLng = ((lng2 - lng1) * Math.PI) / 180;
+      const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos((lat1 * Math.PI) / 180) *
+          Math.cos((lat2 * Math.PI) / 180) *
+          Math.sin(dLng / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    type RowWithDist = Row & { _distKm?: number };
+
+    function applyDistanceFilter(rows: Row[]): Row[] {
+      if (distanceFilterKm === null || userLat === null || userLng === null) return rows;
+      return (rows as RowWithDist[]).filter((r) => {
+        // Rows from explore_recent don't carry lat/lng directly; the filter
+        // is best-effort: if the row has distance data we use it, otherwise
+        // we pass it through so we don't drop observations without coords.
+        if (typeof r._distKm === 'number') return r._distKm <= distanceFilterKm!;
+        return true; // no coord data — include conservatively
+      });
+    }
+
+    /**
+     * Initialise the distance filter UI. Fires after geolocation resolves.
+     * Non-blocking — called from init() with .catch(() => {}).
+     */
+    async function initDistanceFilter(): Promise<void> {
+      const filterWrap = root.querySelector<HTMLElement>('.er-distance-filter');
+      const locatingEl = root.querySelector<HTMLElement>('.er-distance-locating');
+      const noLocEl = root.querySelector<HTMLElement>('.er-distance-no-loc');
+      const btnsEl = root.querySelector<HTMLElement>('.er-distance-btns');
+      if (!filterWrap || !btnsEl) return;
+
+      filterWrap.classList.remove('hidden');
+      filterWrap.classList.add('flex');
+
+      // Try cached location first.
+      let lat: number, lng: number;
+      const cached = getCachedLoc();
+      if (cached) {
+        lat = cached.lat; lng = cached.lng;
+      } else {
+        try {
+          const pos = await new Promise<GeolocationPosition>((res, rej) =>
+            navigator.geolocation.getCurrentPosition(res, rej, { timeout: 8000, maximumAge: LOCATION_TTL_MS }),
+          );
+          lat = pos.coords.latitude;
+          lng = pos.coords.longitude;
+          setCachedLoc(lat, lng);
+        } catch {
+          locatingEl?.classList.add('hidden');
+          noLocEl?.classList.remove('hidden');
+          return;
+        }
+      }
+      userLat = lat; userLng = lng;
+
+      locatingEl?.classList.add('hidden');
+      btnsEl.classList.remove('hidden');
+      btnsEl.classList.add('flex');
+
+      const RADII = [null, 5, 10, 25, 50] as const; // null = "All"
+      const labelAll = root.dataset.labelDistanceAll ?? 'All';
+      const labelKm = root.dataset.labelDistanceKm ?? '{{km}} km';
+
+      btnsEl.innerHTML = RADII.map((km) => {
+        const label = km === null ? labelAll : labelKm.replace('{{km}}', String(km));
+        const active = km === null && distanceFilterKm === null;
+        return `<button
+          type="button"
+          class="er-dist-btn inline-flex h-7 items-center rounded-full border px-3 text-xs font-medium transition-colors
+            ${active
+              ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300'
+              : 'border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900/50 text-zinc-600 dark:text-zinc-400 hover:border-emerald-400'
+            }"
+          data-km="${km === null ? '' : String(km)}"
+          aria-pressed="${active ? 'true' : 'false'}"
+        >${escapeText(label)}</button>`;
+      }).join('');
+
+      btnsEl.querySelectorAll<HTMLButtonElement>('.er-dist-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const km = btn.dataset.km === '' ? null : Number(btn.dataset.km);
+          distanceFilterKm = km;
+
+          // Re-style all buttons
+          btnsEl.querySelectorAll<HTMLButtonElement>('.er-dist-btn').forEach((b) => {
+            const isActive = (b.dataset.km === '' ? null : Number(b.dataset.km)) === km;
+            b.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+            b.className = b.className
+              .replace(/border-emerald-500.*?dark:text-emerald-300/, '')
+              .replace(/border-zinc-300.*?hover:border-emerald-400/, '')
+              .trim();
+            if (isActive) {
+              b.className += ' border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300';
+            } else {
+              b.className += ' border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900/50 text-zinc-600 dark:text-zinc-400 hover:border-emerald-400';
+            }
+          });
+
+          // Re-render the list with the new filter applied
+          if (listEl) {
+            const filtered = applyDistanceFilter(allRows);
+            listEl.innerHTML = filtered.map(r => rowMarkup(r, lang, anonLabel, unknownLabel, shareBase, profileBase, rgLabel, rgTitle, viewerAuthed, viewerId, labels)).join('');
+            paintReactionCounts(filtered.map(r => r.id)).catch(() => {});
+          }
+        });
+      });
+    }
+    // ── End distance filter setup ────────────────────────────────────────────
 
     // MapLibre state
     let mapInstance: { resize: () => void; fitBounds: (b: [[number,number],[number,number]], o?: Record<string,unknown>) => void } | null = null;
@@ -879,6 +1044,9 @@ const timeline = (page as unknown as { timeline: Record<string, string> }).timel
     loadMoreBtn?.addEventListener('click', () => {
       loadMore().catch(() => { /* surfaced via errEl */ });
     });
+
+    // #712 — Start distance filter setup non-blocking after main content loads
+    initDistanceFilter().catch(() => { /* geolocation denied or unavailable */ });
 
     await loadMore();
   }

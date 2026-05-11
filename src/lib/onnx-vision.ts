@@ -1,19 +1,25 @@
 /**
- * On-device vision via transformers.js + ONNX (Gemma 4 E2B).
+ * On-device vision/text via transformers.js + ONNX.
  *
- * Parallel runtime to `local-ai.ts` (which uses MLC/WebLLM for Phi-3.5-vision).
- * Both ride the same opt-in pattern in Profile → Edit and surface as
- * separate registered identifiers — when one crashes on a given hardware
- * combo, the other can still work because they take completely different
- * WebGPU code paths (MLC's TVM-compiled kernels vs. transformers.js's ORT
- * kernels). The intent is resilience, not replacement.
+ * Models managed here:
+ *   - **Gemma 4 E2B** (vision + text) — `onnx-community/gemma-4-E2B-it-ONNX`
+ *     ~500 MB on disk (q4f16), ~1.3–1.5 GB VRAM. Apache 2.0 license.
+ *   - **Llama 3.2 1B** (text only) — `onnx-community/Llama-3.2-1B-Instruct`
+ *     ~880 MB on disk, ~600 MB VRAM. Meta Llama 3 Community License.
+ *     Added by issue #716: re-platforms Llama from WebLLM/MLC to
+ *     transformers.js, consolidating on a single ONNX runtime.
  *
- * License note: Gemma 4 ships under Apache 2.0 (no field-of-use
- * restrictions), which is more permissive than Phi-3.5's MIT for some
- * downstream redistribution scenarios.
- *
- * Model: ~500 MB on disk (q4f16), ~1.3–1.5 GB VRAM at inference.
+ * Parallel runtime to `local-ai.ts` (which uses MLC/WebLLM for Phi-3.5-vision
+ * and, by default, now delegates Llama text here). Both runtimes take
+ * completely different WebGPU code paths so a crash on one doesn't affect
+ * the other — resilience, not replacement.
  */
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Feature flag: set USE_WEBLLM=1 (env or window.__USE_WEBLLM) to keep using the
+// WebLLM/MLC path for Llama instead of this ONNX path. Intended for A/B testing
+// and rollback. Checked at runtime in local-ai.ts (translateNote, generateFieldNote).
+// ──────────────────────────────────────────────────────────────────────────────
 
 export const GEMMA_VISION_MODEL_ID = 'onnx-community/gemma-4-E2B-it-ONNX';
 
@@ -367,4 +373,171 @@ async function decodeGeneration(
   const lastMarker = full.lastIndexOf('model\n');
   const tail = lastMarker >= 0 ? full.slice(lastMarker + 'model\n'.length) : full;
   return tail.trim();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Llama 3.2 1B — transformers.js / ONNX (issue #716)
+//
+// Replaces the WebLLM/MLC path for Llama text tasks (translation, field notes,
+// offline chat). Shares the transformers-cache bucket with Gemma.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const LLAMA_ONNX_MODEL_ID = 'onnx-community/Llama-3.2-1B-Instruct';
+
+interface TokenizerLike {
+  apply_chat_template: (
+    messages: Array<{ role: string; content: string }>,
+    opts: Record<string, unknown>,
+  ) => Promise<unknown>;
+  decode: (ids: unknown, opts?: Record<string, unknown>) => string;
+  batch_decode?: (ids: unknown, opts?: Record<string, unknown>) => string[];
+  [key: string]: unknown;
+}
+
+interface TextModelLike {
+  generate: (args: Record<string, unknown>) => Promise<unknown>;
+  dispose?: () => Promise<void>;
+}
+
+let llamaTokenizer: TokenizerLike | null = null;
+let llamaModel: TextModelLike | null = null;
+
+/**
+ * Load Llama 3.2 1B via transformers.js/ONNX. ~880 MB; cached after first
+ * load in the shared `transformers-cache` bucket. Progress fires during the
+ * initial download.
+ */
+export async function loadLlamaOnnxEngine(
+  onProgress: (p: LoadProgress) => void,
+): Promise<{ tokenizer: TokenizerLike; model: TextModelLike }> {
+  if (llamaTokenizer && llamaModel) return { tokenizer: llamaTokenizer, model: llamaModel };
+  await requestPersistentStorage().catch(() => {});
+
+  const start = performance.now();
+  const tx = await import('@huggingface/transformers');
+  const { AutoTokenizer, AutoModelForCausalLM } = tx as unknown as {
+    AutoTokenizer: { from_pretrained: (id: string, opts?: Record<string, unknown>) => Promise<TokenizerLike> };
+    AutoModelForCausalLM: { from_pretrained: (id: string, opts?: Record<string, unknown>) => Promise<TextModelLike> };
+  };
+
+  const progressBridge = (p: { status?: string; progress?: number; file?: string }) => {
+    const ratio = typeof p.progress === 'number'
+      ? (p.progress > 1 ? p.progress / 100 : p.progress)
+      : 0;
+    onProgress({
+      progress: Math.max(0, Math.min(1, ratio)),
+      text: p.file ? `${p.status ?? 'loading'} ${p.file}` : (p.status ?? 'loading'),
+      timeElapsedMs: performance.now() - start,
+    });
+  };
+
+  llamaTokenizer = await AutoTokenizer.from_pretrained(LLAMA_ONNX_MODEL_ID, {
+    progress_callback: progressBridge,
+  });
+  llamaModel = await AutoModelForCausalLM.from_pretrained(LLAMA_ONNX_MODEL_ID, {
+    dtype: 'q4',
+    device: 'wasm',           // CPU/WASM — Llama 1B is light enough; avoids
+                               // spinning up a second WebGPU context alongside Gemma.
+    progress_callback: progressBridge,
+  });
+  return { tokenizer: llamaTokenizer, model: llamaModel };
+}
+
+export async function unloadLlama(): Promise<void> {
+  if (llamaModel?.dispose) {
+    try { await llamaModel.dispose(); } catch { /* ignore */ }
+  }
+  llamaTokenizer = null;
+  llamaModel = null;
+}
+
+export async function clearLlamaCache(): Promise<{ deleted: number }> {
+  await unloadLlama();
+  if (typeof caches === 'undefined') return { deleted: 0 };
+  const c = await caches.open(TRANSFORMERS_CACHE_NAME).catch(() => null);
+  if (!c) return { deleted: 0 };
+  const keys = await c.keys();
+  let deleted = 0;
+  for (const req of keys) {
+    if (req.url.includes(LLAMA_ONNX_MODEL_ID)) {
+      const ok = await c.delete(req);
+      if (ok) deleted++;
+    }
+  }
+  return { deleted };
+}
+
+/**
+ * Generate text using Llama 3.2 1B (ONNX/WASM). Yields OpenAI-shaped chunks
+ * so callers (translateNote, generateFieldNote, ChatView) stay runtime-agnostic.
+ *
+ * Streaming in transformers.js requires a TextStreamer callback; v1 emits one
+ * chunk after generation completes. True token-by-token streaming is a follow-up.
+ */
+export async function* generateLlamaText(
+  messages: Array<{ role: string; content: string }>,
+  opts: { max_tokens?: number } = {},
+): AsyncIterable<{ choices: Array<{ delta?: { content?: string }; message?: { content: string } }> }> {
+  const { tokenizer: tok, model: mdl } = await loadLlamaOnnxEngine(() => {});
+
+  // Apply the Llama-3 chat template.
+  const inputIds = await tok.apply_chat_template(messages, {
+    tokenize: true,
+    add_generation_prompt: true,
+    return_tensors: 'pt',
+  });
+
+  const max_new_tokens = Math.min(opts.max_tokens ?? 512, 1024);
+
+  const { TextStreamer } = await import('@huggingface/transformers') as unknown as {
+    TextStreamer: new (
+      tokenizer: unknown,
+      opts: {
+        skip_prompt: boolean;
+        skip_special_tokens: boolean;
+        callback_function: (token: string) => void;
+      },
+    ) => unknown;
+  };
+
+  const tokens: string[] = [];
+  const streamer = new TextStreamer(tok, {
+    skip_prompt: true,
+    skip_special_tokens: true,
+    callback_function: (token: string) => { tokens.push(token); },
+  });
+
+  await mdl.generate({
+    input_ids: inputIds,
+    max_new_tokens,
+    do_sample: false,
+    streamer,
+  } as Record<string, unknown>);
+
+  yield { choices: [{ delta: { content: tokens.join('') } }] };
+}
+
+/**
+ * Check whether the Llama ONNX cache has weights downloaded.
+ */
+export async function getLlamaOnnxCacheStatus(): Promise<ModelCacheStatus> {
+  if (typeof caches === 'undefined') {
+    return { modelId: LLAMA_ONNX_MODEL_ID, cached: false, approxBytes: 0, entries: 0 };
+  }
+  const c = await caches.open(TRANSFORMERS_CACHE_NAME).catch(() => null);
+  if (!c) return { modelId: LLAMA_ONNX_MODEL_ID, cached: false, approxBytes: 0, entries: 0 };
+  const keys = await c.keys();
+  let entries = 0;
+  let approxBytes = 0;
+  for (const req of keys) {
+    if (req.url.includes(LLAMA_ONNX_MODEL_ID)) {
+      entries++;
+      try {
+        const res = await c.match(req);
+        const len = res?.headers.get('content-length');
+        if (len) approxBytes += parseInt(len, 10);
+      } catch { /* ignore */ }
+    }
+  }
+  return { modelId: LLAMA_ONNX_MODEL_ID, cached: entries > 0, approxBytes, entries };
 }

@@ -3,6 +3,7 @@ import { t } from '../i18n/utils';
 import HomeHero from './home/HomeHero.astro';
 import HomeChips from './home/HomeChips.astro';
 import HomeRecent from './home/HomeRecent.astro';
+import HomeNearby from './home/HomeNearby.astro';
 
 interface Props {
   lang: 'en' | 'es';
@@ -105,6 +106,9 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
   </div>
 
   <HomeRecent lang={lang} />
+
+  <!-- #712 Near you right now — fires after geolocation resolves; non-blocking -->
+  <HomeNearby lang={lang} radiusKm={10} limit={6} />
 </section>
 
 <script>
