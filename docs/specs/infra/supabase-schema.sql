@@ -12706,3 +12706,128 @@ CREATE POLICY "wrapped_cache_self_read" ON public.wrapped_cache
 GRANT SELECT ON public.wrapped_cache TO authenticated;
 -- generate-wrapped EF uses service_role to upsert
 GRANT INSERT, UPDATE, DELETE ON public.wrapped_cache TO service_role;
+
+-- ============================================================
+-- #806: DWC_EXPORT_LOG (Per-export audit log for DwC archives)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.dwc_export_log (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  exported_at timestamptz NOT NULL DEFAULT now(),
+  observation_count int NOT NULL DEFAULT 0,
+  file_size_bytes bigint,
+  format text NOT NULL DEFAULT 'dwca' CHECK (format IN ('dwca','csv','json')),
+  triggered_by text NOT NULL DEFAULT 'user' CHECK (triggered_by IN ('user','api','gbif_sync','cron'))
+);
+
+CREATE INDEX IF NOT EXISTS dwc_export_log_user_idx ON public.dwc_export_log(user_id, exported_at DESC);
+
+ALTER TABLE public.dwc_export_log ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS dwc_export_log_owner_read ON public.dwc_export_log;
+CREATE POLICY dwc_export_log_owner_read ON public.dwc_export_log FOR SELECT
+  USING ((SELECT auth.uid()) = user_id);
+
+DROP POLICY IF EXISTS dwc_export_log_service_insert ON public.dwc_export_log;
+CREATE POLICY dwc_export_log_service_insert ON public.dwc_export_log FOR INSERT
+  TO authenticated WITH CHECK ((SELECT auth.uid()) = user_id);
+
+GRANT SELECT, INSERT ON public.dwc_export_log TO authenticated;
+GRANT INSERT, UPDATE, SELECT ON public.dwc_export_log TO service_role;
+
+COMMENT ON TABLE public.dwc_export_log IS
+  '#806 Per-export audit log for DwC archives. Each row represents one export job. '
+  'user_id is the observer whose records were included. For full-corpus exports '
+  '(service_role), one row is inserted per unique observer_id in the archive.';
+
+-- ============================================================
+-- #811: COMMUNITY_THEMES (Community-submitted seasonal themes)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.community_themes (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  creator_id uuid REFERENCES public.users(id) ON DELETE SET NULL,
+  name_es text NOT NULL,
+  name_en text NOT NULL,
+  slug text UNIQUE NOT NULL,
+  accent_color text NOT NULL CHECK (accent_color ~ '^#[0-9a-fA-F]{6}$'),
+  bg_gradient_from text NOT NULL CHECK (bg_gradient_from ~ '^#[0-9a-fA-F]{6}$'),
+  bg_gradient_to text NOT NULL CHECK (bg_gradient_to ~ '^#[0-9a-fA-F]{6}$'),
+  region text,
+  active_months int[] CHECK (array_length(active_months,1) BETWEEN 1 AND 12),
+  status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
+  votes int NOT NULL DEFAULT 0,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS community_themes_status_idx ON public.community_themes(status);
+CREATE INDEX IF NOT EXISTS community_themes_creator_idx ON public.community_themes(creator_id);
+
+ALTER TABLE public.community_themes ENABLE ROW LEVEL SECURITY;
+
+-- Public read: approved themes only
+DROP POLICY IF EXISTS community_themes_public_read ON public.community_themes;
+CREATE POLICY community_themes_public_read ON public.community_themes FOR SELECT USING (status = 'approved');
+
+-- Author can read their own (any status)
+DROP POLICY IF EXISTS community_themes_self_read ON public.community_themes;
+CREATE POLICY community_themes_self_read ON public.community_themes FOR SELECT
+  USING ((SELECT auth.uid()) = creator_id);
+
+-- Authenticated users can submit (INSERT) their own themes
+DROP POLICY IF EXISTS community_themes_owner_write ON public.community_themes;
+CREATE POLICY community_themes_owner_write ON public.community_themes FOR INSERT TO authenticated
+  WITH CHECK ((SELECT auth.uid()) = creator_id);
+
+GRANT SELECT ON public.community_themes TO anon;
+GRANT SELECT, INSERT ON public.community_themes TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.community_themes TO service_role;
+
+COMMENT ON TABLE public.community_themes IS
+  '#811 Community-submitted seasonal themes. status=approved themes surface '
+  'in SeasonalThemePicker. Moderation via admin console.';
+
+-- ============================================================
+-- #713: PERFORMANCE — Materialized Views
+-- ============================================================
+
+-- Pre-computed per-user observation aggregates.
+-- Avoids expensive live COUNT(*) / COUNT(DISTINCT taxon_id) on profile pages.
+CREATE MATERIALIZED VIEW IF NOT EXISTS public.mv_user_observation_counts AS
+  SELECT
+    observer_id,
+    COUNT(*) AS total,
+    COUNT(DISTINCT taxon_id) AS species_count,
+    MAX(observed_at) AS last_observed_at
+  FROM public.observations
+  WHERE sync_status = 'synced'
+  GROUP BY observer_id;
+
+CREATE UNIQUE INDEX IF NOT EXISTS mv_user_obs_counts_idx
+  ON public.mv_user_observation_counts(observer_id);
+
+-- Pre-computed recent-species activity (last 30 days).
+-- Avoids a full-table scan on the explore / trending-species page.
+CREATE MATERIALIZED VIEW IF NOT EXISTS public.mv_recent_species AS
+  SELECT
+    taxon_id,
+    COUNT(*) AS recent_count,
+    MAX(observed_at) AS last_seen
+  FROM public.observations
+  WHERE sync_status = 'synced'
+    AND observed_at > now() - interval '30 days'
+  GROUP BY taxon_id
+  ORDER BY recent_count DESC;
+
+CREATE UNIQUE INDEX IF NOT EXISTS mv_recent_species_idx
+  ON public.mv_recent_species(taxon_id);
+
+-- Access grants (read-only for all authenticated + anon users)
+GRANT SELECT ON public.mv_user_observation_counts TO authenticated, anon;
+GRANT SELECT ON public.mv_recent_species TO authenticated, anon;
+
+COMMENT ON MATERIALIZED VIEW public.mv_user_observation_counts IS
+  '#713 Perf: refreshed by recompute-user-stats EF. Replaces live COUNT() on profile pages.';
+COMMENT ON MATERIALIZED VIEW public.mv_recent_species IS
+  '#713 Perf: refreshed by recompute-user-stats EF. Drives trending species on explore page.';

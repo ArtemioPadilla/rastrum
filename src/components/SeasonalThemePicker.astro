@@ -1,14 +1,18 @@
 ---
 /**
- * Seasonal theme picker — issue #731.
+ * Seasonal theme picker — issues #731, #811.
  *
  * Renders a 5-button row (Auto + Default + Monarca + Lluvias + Secas) that
  * writes to `localStorage[rastrum.theme.seasonal]` and applies the change
  * via `applySeasonalTheme()` for flicker-free swap. Used in
  * Profile → Apariencia (Preferences tab).
+ *
+ * #811: Also renders approved community themes below the official section
+ * and a "Submit theme" button that opens CommunityThemeSubmitModal.
  */
 
 import { t } from '../i18n/utils';
+import CommunityThemeSubmitModal from './CommunityThemeSubmitModal.astro';
 
 interface Props {
   lang: 'en' | 'es';
@@ -27,6 +31,12 @@ const opts: Array<{ id: 'auto' | 'default' | 'monarca' | 'lluvias' | 'secas'; la
   { id: 'lluvias',  labelKey: 'season_lluvias' },
   { id: 'secas',    labelKey: 'season_secas' },
 ];
+
+const communityLabel = lang === 'es' ? 'Comunidad' : 'Community';
+const submitLabel = lang === 'es' ? 'Enviar tema' : 'Submit theme';
+const communityEmptyLabel = lang === 'es'
+  ? 'Aún no hay temas de comunidad aprobados.'
+  : 'No approved community themes yet.';
 ---
 
 <section>
@@ -36,6 +46,8 @@ const opts: Array<{ id: 'auto' | 'default' | 'monarca' | 'lluvias' | 'secas'; la
   <p class="text-sm text-zinc-500 dark:text-zinc-400 mb-3">
     {settings.preferences.appearance_subtitle}
   </p>
+
+  <!-- Official themes -->
   <div class="flex flex-wrap gap-2" role="radiogroup" aria-label={settings.preferences.appearance_title}>
     {opts.map(o => (
       <button
@@ -54,7 +66,34 @@ const opts: Array<{ id: 'auto' | 'default' | 'monarca' | 'lluvias' | 'secas'; la
     class="mt-3 text-xs text-zinc-500 dark:text-zinc-400"
     aria-live="polite"
   ></p>
+
+  <!-- Community themes section -->
+  <div class="mt-5">
+    <div class="flex items-center justify-between mb-2">
+      <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300">{communityLabel}</h3>
+      <button
+        type="button"
+        id="open-community-theme-modal"
+        class="text-xs px-3 py-1.5 rounded-lg border border-emerald-500 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
+      >
+        {submitLabel}
+      </button>
+    </div>
+    <div
+      id="community-themes-list"
+      class="flex flex-wrap gap-2"
+      role="radiogroup"
+      aria-label={communityLabel}
+    >
+      <!-- Populated by client-side script after fetching from Supabase -->
+      <p id="community-themes-empty" class="text-xs text-zinc-400 dark:text-zinc-500 italic">
+        {communityEmptyLabel}
+      </p>
+    </div>
+  </div>
 </section>
+
+<CommunityThemeSubmitModal lang={lang} />
 
 <script>
   import {
@@ -63,8 +102,13 @@ const opts: Array<{ id: 'auto' | 'default' | 'monarca' | 'lluvias' | 'secas'; la
     pickSeasonalTheme,
     readStoredChoice,
     resolveSeasonalTheme,
+    loadCommunityThemes,
     type SeasonalThemeChoice,
+    type CommunityTheme,
   } from '../lib/seasonal-theme';
+  import { getSupabase } from '../lib/supabase';
+
+  // ── Official theme picker ───────────────────────────────────────────────
 
   const buttons = Array.from(
     document.querySelectorAll<HTMLButtonElement>('[data-season-choice]'),
@@ -90,6 +134,10 @@ const opts: Array<{ id: 'auto' | 'default' | 'monarca' | 'lluvias' | 'secas'; la
       const isActive = (btn.dataset.seasonChoice as SeasonalThemeChoice) === choice;
       btn.setAttribute('aria-checked', isActive ? 'true' : 'false');
     }
+    // Deselect any active community theme button
+    for (const btn of communityButtons) {
+      btn.setAttribute('aria-checked', 'false');
+    }
     if (effectiveLabel) effectiveLabel.textContent = effectiveText(choice);
     const applied = resolveSeasonalTheme({ choice });
     applySeasonalTheme(applied);
@@ -104,4 +152,74 @@ const opts: Array<{ id: 'auto' | 'default' | 'monarca' | 'lluvias' | 'secas'; la
       paint(choice);
     });
   }
+
+  // ── Community themes ────────────────────────────────────────────────────
+
+  const communityList = document.getElementById('community-themes-list');
+  const communityEmpty = document.getElementById('community-themes-empty');
+  let communityButtons: HTMLButtonElement[] = [];
+
+  function applyCommunityTheme(theme: CommunityTheme) {
+    // Write the slug as the stored choice (prefixed) so it survives reload
+    const key = `community:${theme.slug}`;
+    try { localStorage.setItem(STORAGE_KEY, key); } catch { /* ignore */ }
+
+    // Paint official buttons as unchecked
+    for (const btn of buttons) btn.setAttribute('aria-checked', 'false');
+    for (const btn of communityButtons) {
+      btn.setAttribute('aria-checked', btn.dataset.communitySlug === theme.slug ? 'true' : 'false');
+    }
+
+    // Apply CSS variables directly on <html>
+    const html = document.documentElement;
+    html.setAttribute('data-season', `community-${theme.slug}`);
+    html.style.setProperty('--rastrum-season-accent', theme.accent_color);
+    html.style.setProperty('--rastrum-season-bg-from', theme.bg_gradient_from);
+    html.style.setProperty('--rastrum-season-bg-to', theme.bg_gradient_to);
+  }
+
+  async function renderCommunityThemes() {
+    const supabase = getSupabase();
+    const themes = await loadCommunityThemes(supabase);
+    if (!communityList) return;
+
+    if (themes.length === 0) {
+      // Empty state already rendered server-side
+      return;
+    }
+
+    // Hide the empty placeholder
+    if (communityEmpty) communityEmpty.remove();
+
+    for (const theme of themes) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.role = 'radio';
+      btn.setAttribute('aria-checked', 'false');
+      btn.dataset.communitySlug = theme.slug;
+      btn.title = theme.region ? `${theme.name_en} (${theme.region})` : theme.name_en;
+      btn.style.borderColor = theme.accent_color;
+      btn.className =
+        'px-4 py-2 rounded-lg border text-zinc-700 dark:text-zinc-300 text-sm font-medium ' +
+        'hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors ' +
+        'aria-checked:bg-zinc-100 dark:aria-checked:bg-zinc-800';
+
+      const lang = document.documentElement.getAttribute('lang') || 'en';
+      btn.textContent = lang === 'es' ? theme.name_es : theme.name_en;
+
+      btn.addEventListener('click', () => applyCommunityTheme(theme));
+      communityList.appendChild(btn);
+    }
+
+    communityButtons = Array.from(
+      communityList.querySelectorAll<HTMLButtonElement>('[data-community-slug]'),
+    );
+  }
+
+  renderCommunityThemes().catch(console.error);
+
+  // ── Open modal ──────────────────────────────────────────────────────────
+  document.getElementById('open-community-theme-modal')?.addEventListener('click', () => {
+    (window as unknown as Record<string, unknown>).openCommunityThemeModal?.();
+  });
 </script>

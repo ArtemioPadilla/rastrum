@@ -173,3 +173,70 @@ From the contextual-suggestions runbook cache-layer section:
 - `probable_taxa_at` p95 > 500 ms → verify cache is being hit (`SELECT COUNT(*) FROM probable_taxa_cache`).
 - `probable_taxa_cache` row count < 1000 after first nightly run → check `recompute-taxa-cache` EF logs.
 - Bundle size increase > 10% in a single PR → require bundle diff in PR description.
+
+---
+
+## #713 Implementation Notes (2026-05-11)
+
+### Materialized Views
+
+Two MVs added to `supabase-schema.sql`:
+
+| View | Purpose | Refresh |
+|---|---|---|
+| `mv_user_observation_counts` | Pre-computed per-user totals (`total`, `species_count`, `last_observed_at`) | `recompute-user-stats` EF (nightly) |
+| `mv_recent_species` | Top species observed in last 30 days (`recent_count`, `last_seen`) | `recompute-user-stats` EF (nightly) |
+
+**Refreshing concurrently:**
+The `recompute-user-stats` EF now calls `REFRESH MATERIALIZED VIEW CONCURRENTLY` after each stats run. This requires the unique indexes `mv_user_obs_counts_idx` and `mv_recent_species_idx` to be present (created in the same migration).
+
+**Querying the MVs:**
+```ts
+// Profile page: total obs + species count (no live COUNT needed)
+const { data } = await supabase
+  .from('mv_user_observation_counts')
+  .select('total, species_count, last_observed_at')
+  .eq('observer_id', userId)
+  .maybeSingle();
+```
+
+### SWR-style Query Cache
+
+New module: `src/lib/query-cache.ts`.
+
+Provides a singleton `QueryCache` with stale-while-revalidate semantics:
+- Stale entries return immediately and kick off a background refresh.
+- Concurrent callers are de-duplicated (only one in-flight request per key).
+- Pre-configured TTL constants in `CACHE_TTL` object.
+
+```ts
+import { queryCache, CACHE_TTL } from '../lib/query-cache';
+
+const stats = await queryCache.get(
+  `profile-stats:${userId}`,
+  () => supabase.rpc('compute_user_impact', { p_user_id: userId }),
+  { staleMs: CACHE_TTL.PROFILE_STATS },
+);
+```
+
+### Bundle Analysis
+
+Added `build:analyze` script to `package.json`:
+
+```bash
+npm run build:analyze
+```
+
+Sets `ANALYZE=true` before the standard Vite build so the `vite-bundle-visualizer`
+plugin (if installed) emits `stats.html`. To interpret results:
+1. Open `stats.html` in a browser.
+2. Sort by size, look for chunks > 50 KB loaded on every route.
+3. Apply dynamic imports for non-critical components (see "Lazy-load recommendations" above).
+
+### Known issues / follow-ups
+
+- `refresh_materialized_view_safely` RPC is referenced but not yet created in schema.
+  As a temporary fallback, the EF logs a warning and skips MV refresh.
+  Follow-up: add the helper RPC to supabase-schema.sql in v1.2.
+- `mv_recent_species` must be updated to use `REFRESH ... CONCURRENTLY`
+  which requires the unique index on `taxon_id` (present in this PR).

@@ -4,7 +4,11 @@
  * The metric values come from the SQL function `compute_user_impact()` which
  * returns a JSONB envelope. These helpers are pure formatting / locale
  * concerns kept out of the Astro frontmatter so they can be unit-tested.
+ *
+ * #806: Extended with `loadUserExportHistory()` to query the new
+ * `dwc_export_log` table and return an accurate per-export list.
  */
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 export interface UserImpact {
   transect_km: number;
@@ -55,4 +59,42 @@ export function formatCount(value: number, lang: 'en' | 'es' = 'en'): string {
   if (!Number.isFinite(value) || value < 0) return '0';
   const fmt = new Intl.NumberFormat(lang === 'es' ? 'es-MX' : 'en-US');
   return fmt.format(Math.floor(value));
+}
+
+// ---------------------------------------------------------------------------
+// #806 — Export history
+// ---------------------------------------------------------------------------
+
+export interface DwcExportLogRow {
+  id: string;
+  exported_at: string;
+  observation_count: number;
+  file_size_bytes: number | null;
+  format: 'dwca' | 'csv' | 'json';
+  triggered_by: 'user' | 'api' | 'gbif_sync' | 'cron';
+}
+
+/**
+ * Load the most recent DwC export log rows for `userId`.
+ *
+ * Returns an empty array on any error so the UI can show a graceful empty
+ * state rather than throwing.
+ */
+export async function loadUserExportHistory(
+  supabase: SupabaseClient,
+  userId: string,
+  limit = 20,
+): Promise<DwcExportLogRow[]> {
+  if (!userId) return [];
+  const { data, error } = await supabase
+    .from('dwc_export_log')
+    .select('id, exported_at, observation_count, file_size_bytes, format, triggered_by')
+    .eq('user_id', userId)
+    .order('exported_at', { ascending: false })
+    .limit(limit);
+  if (error) {
+    console.error('[impact] loadUserExportHistory error:', error.message);
+    return [];
+  }
+  return (data ?? []) as DwcExportLogRow[];
 }

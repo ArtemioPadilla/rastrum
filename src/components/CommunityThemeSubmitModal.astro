@@ -1,0 +1,200 @@
+---
+/**
+ * CommunityThemeSubmitModal.astro — #811
+ *
+ * Modal form for submitting a new community seasonal theme.
+ * Opened by SeasonalThemePicker's "Submit theme" button.
+ * Submits to `community_themes` with status='pending'.
+ *
+ * Color values are restricted to `<input type="color">` (hex only) to
+ * prevent CSS injection via freeform text input.
+ */
+
+interface Props {
+  lang: 'en' | 'es';
+}
+
+const { lang } = Astro.props;
+const t = {
+  en: {
+    title: 'Submit a community theme',
+    name_en: 'Theme name (English)',
+    name_es: 'Theme name (Spanish)',
+    slug: 'Slug (lowercase, no spaces)',
+    accent_color: 'Accent color',
+    bg_from: 'Background gradient from',
+    bg_to: 'Background gradient to',
+    region: 'Region (optional, e.g. MX-OAX)',
+    active_months: 'Active months (comma-separated 1–12)',
+    submit: 'Submit for review',
+    cancel: 'Cancel',
+    success: 'Theme submitted! It will appear after admin review.',
+    error: 'Submission failed. Please try again.',
+    license_note: 'By submitting, you agree to license this theme under CC BY 4.0.',
+  },
+  es: {
+    title: 'Enviar tema de comunidad',
+    name_en: 'Nombre del tema (inglés)',
+    name_es: 'Nombre del tema (español)',
+    slug: 'Slug (minúsculas, sin espacios)',
+    accent_color: 'Color de acento',
+    bg_from: 'Gradiente de fondo (inicio)',
+    bg_to: 'Gradiente de fondo (fin)',
+    region: 'Región (opcional, ej. MX-OAX)',
+    active_months: 'Meses activos (separados por coma, 1–12)',
+    submit: 'Enviar para revisión',
+    cancel: 'Cancelar',
+    success: '¡Tema enviado! Aparecerá tras revisión del administrador.',
+    error: 'Error al enviar. Intenta de nuevo.',
+    license_note: 'Al enviar, aceptas licenciar este tema bajo CC BY 4.0.',
+  },
+}[lang];
+---
+
+<dialog
+  id="community-theme-modal"
+  class="fixed inset-0 z-50 w-full max-w-md mx-auto mt-16 rounded-2xl bg-white dark:bg-zinc-900 shadow-2xl p-6 open:flex flex-col gap-4"
+  aria-labelledby="ct-modal-title"
+>
+  <h2 id="ct-modal-title" class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">{t.title}</h2>
+
+  <form id="ct-submit-form" class="flex flex-col gap-3">
+    <label class="flex flex-col gap-1 text-sm text-zinc-700 dark:text-zinc-300">
+      {t.name_en}
+      <input type="text" name="name_en" required maxlength="60"
+        class="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+    </label>
+
+    <label class="flex flex-col gap-1 text-sm text-zinc-700 dark:text-zinc-300">
+      {t.name_es}
+      <input type="text" name="name_es" required maxlength="60"
+        class="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+    </label>
+
+    <label class="flex flex-col gap-1 text-sm text-zinc-700 dark:text-zinc-300">
+      {t.slug}
+      <input type="text" name="slug" required maxlength="40" pattern="[a-z0-9\-]+"
+        class="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+    </label>
+
+    <div class="grid grid-cols-3 gap-3">
+      <label class="flex flex-col gap-1 text-xs text-zinc-700 dark:text-zinc-300">
+        {t.accent_color}
+        <input type="color" name="accent_color" value="#10b981" required class="h-10 w-full rounded cursor-pointer" />
+      </label>
+      <label class="flex flex-col gap-1 text-xs text-zinc-700 dark:text-zinc-300">
+        {t.bg_from}
+        <input type="color" name="bg_gradient_from" value="#064e3b" required class="h-10 w-full rounded cursor-pointer" />
+      </label>
+      <label class="flex flex-col gap-1 text-xs text-zinc-700 dark:text-zinc-300">
+        {t.bg_to}
+        <input type="color" name="bg_gradient_to" value="#065f46" required class="h-10 w-full rounded cursor-pointer" />
+      </label>
+    </div>
+
+    <label class="flex flex-col gap-1 text-sm text-zinc-700 dark:text-zinc-300">
+      {t.region}
+      <input type="text" name="region" maxlength="20" placeholder="MX-OAX"
+        class="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+    </label>
+
+    <label class="flex flex-col gap-1 text-sm text-zinc-700 dark:text-zinc-300">
+      {t.active_months}
+      <input type="text" name="active_months" placeholder="10,11,12,1,2,3" maxlength="30"
+        class="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+    </label>
+
+    <p class="text-xs text-zinc-400 dark:text-zinc-500">{t.license_note}</p>
+
+    <div id="ct-status" class="text-sm hidden"></div>
+
+    <div class="flex gap-3 justify-end pt-2">
+      <button type="button" id="ct-cancel-btn"
+        class="px-4 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+        {t.cancel}
+      </button>
+      <button type="submit"
+        class="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 transition-colors disabled:opacity-50">
+        {t.submit}
+      </button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+  import { getSupabase, getCachedUser } from '../lib/supabase';
+  import { sanitiseCommunityThemeInput } from '../lib/seasonal-theme';
+
+  const modal = document.getElementById('community-theme-modal') as HTMLDialogElement | null;
+  const form = document.getElementById('ct-submit-form') as HTMLFormElement | null;
+  const cancelBtn = document.getElementById('ct-cancel-btn');
+  const statusEl = document.getElementById('ct-status');
+
+  cancelBtn?.addEventListener('click', () => modal?.close());
+  modal?.addEventListener('click', (e) => { if (e.target === modal) modal.close(); });
+
+  // Exposed globally so SeasonalThemePicker can open the modal
+  (window as unknown as Record<string, unknown>).openCommunityThemeModal = () => modal?.showModal();
+
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!form) return;
+
+    const data = new FormData(form);
+    const rawMonths = (data.get('active_months') as string | null)?.trim();
+    const activeMonths = rawMonths
+      ? rawMonths.split(',').map(s => parseInt(s.trim(), 10)).filter(n => n >= 1 && n <= 12)
+      : null;
+
+    let input: Parameters<typeof sanitiseCommunityThemeInput>[0];
+    try {
+      input = sanitiseCommunityThemeInput({
+        name_en: (data.get('name_en') as string).trim(),
+        name_es: (data.get('name_es') as string).trim(),
+        slug: (data.get('slug') as string).trim(),
+        accent_color: data.get('accent_color') as string,
+        bg_gradient_from: data.get('bg_gradient_from') as string,
+        bg_gradient_to: data.get('bg_gradient_to') as string,
+        region: (data.get('region') as string | null)?.trim() || null,
+        active_months: activeMonths,
+      });
+    } catch (err) {
+      if (statusEl) {
+        statusEl.textContent = (err as Error).message;
+        statusEl.className = 'text-sm text-red-600 dark:text-red-400';
+        statusEl.classList.remove('hidden');
+      }
+      return;
+    }
+
+    const user = await getCachedUser();
+    if (!user) {
+      if (statusEl) {
+        statusEl.textContent = 'You must be signed in to submit a theme.';
+        statusEl.className = 'text-sm text-red-600 dark:text-red-400';
+        statusEl.classList.remove('hidden');
+      }
+      return;
+    }
+
+    const supabase = getSupabase();
+    const { error } = await supabase.from('community_themes').insert({
+      ...input,
+      creator_id: user.id,
+      status: 'pending',
+    });
+
+    if (statusEl) {
+      statusEl.classList.remove('hidden');
+      if (error) {
+        statusEl.textContent = 'Submission failed. Please try again.';
+        statusEl.className = 'text-sm text-red-600 dark:text-red-400';
+      } else {
+        statusEl.textContent = 'Theme submitted! It will appear after admin review.';
+        statusEl.className = 'text-sm text-emerald-600 dark:text-emerald-400';
+        form.reset();
+        setTimeout(() => modal?.close(), 2000);
+      }
+    }
+  });
+</script>

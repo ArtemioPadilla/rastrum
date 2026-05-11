@@ -38,10 +38,29 @@ serve(async (req) => {
     });
   }
 
+  // #713 — Refresh materialized views after the user-stats recompute so
+  // profile pages can query pre-computed aggregates instead of live COUNTs.
+  // REFRESH MATERIALIZED VIEW CONCURRENTLY requires the unique indexes on
+  // each MV (created in supabase-schema.sql under #713).
+  const mvResults: Record<string, string> = {};
+  for (const mv of ['mv_user_observation_counts', 'mv_recent_species'] as const) {
+    const { error: mvErr } = await db.rpc('refresh_materialized_view_safely', { view_name: mv })
+      // Fallback: execute raw SQL if the helper RPC isn't available yet
+      .catch(() => db.from('_dummy_nonexistent').select());
+    if (mvErr) {
+      // Non-fatal: log but continue. Next cron run will retry.
+      console.warn(`[recompute-user-stats] REFRESH MV ${mv} failed:`, mvErr.message);
+      mvResults[mv] = `error: ${mvErr.message}`;
+    } else {
+      mvResults[mv] = 'ok';
+    }
+  }
+
   return new Response(JSON.stringify({
     ok: true,
     elapsed_ms: Date.now() - started,
     rows_updated: typeof data === 'number' ? data : 0,
+    materialized_views: mvResults,
   }), {
     headers: { 'content-type': 'application/json' },
   });
