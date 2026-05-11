@@ -1,9 +1,11 @@
 /**
- * Conservation status multipliers — lookup table only.
- * Not currently consumed by the karma path: award_karma() in SQL does
- * not read iucn/nom-059 status, so microcopyForVote() doesn't either
- * (avoids predicting a bonus the SQL won't deliver). Phase 3 will wire
- * these multipliers into the SQL function.
+ * Conservation status multipliers — consumed by award_karma() (SQL) and
+ * microcopyForVote() (TypeScript) since #551.
+ *
+ * award_karma() reads taxa.iucn_category + taxa.nom059_status and applies
+ * the higher multiplier to the win delta. microcopyForVote() calls
+ * conservationBonusText() to show the same suffix so the predicted delta
+ * matches what the SQL function actually delivers.
  */
 
 export type IUCNCategory = 'LC' | 'NT' | 'VU' | 'EN' | 'CR' | 'EW' | 'EX' | 'DD' | 'NE';

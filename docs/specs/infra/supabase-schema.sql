@@ -11817,3 +11817,314 @@ CREATE INDEX IF NOT EXISTS idx_obs_synced_at
 CREATE INDEX IF NOT EXISTS idx_activity_target_unread
   ON public.activity_events (target_user_id, created_at DESC)
   WHERE read_at IS NULL;
+
+-- ============================================================
+-- #550: Conservation status ETL — conservation_synced_at column
+-- ============================================================
+-- Add tracking column so the monthly delta job skips recently-synced rows.
+ALTER TABLE public.taxa
+  ADD COLUMN IF NOT EXISTS conservation_synced_at timestamptz;
+
+-- Monthly cron: triggers the refresh-conservation-status Edge Function.
+-- Runs on the 1st of each month at 03:00 UTC.
+-- Requires pg_cron + pg_net extensions (already enabled in Rastrum).
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
+    PERFORM cron.unschedule('refresh-conservation-status');
+    PERFORM cron.schedule(
+      'refresh-conservation-status',
+      '0 3 1 * *',
+      $$SELECT net.http_post(
+          url    := current_setting('app.supabase_url') || '/functions/v1/refresh-conservation-status',
+          headers := json_build_object('x-cron-secret', current_setting('app.cron_secret'))::jsonb,
+          body   := '{}'::jsonb
+      )$$
+    );
+  END IF;
+END $$;
+
+-- ============================================================
+-- #551: Wire conservation multipliers into award_karma()
+-- ============================================================
+-- Extends karma_events with a conservation_source column so the admin
+-- Karma view can surface which classification drove the bonus.
+ALTER TABLE public.karma_events
+  ADD COLUMN IF NOT EXISTS conservation_source text;
+
+-- Extend reason CHECK to include conservation_win (for future targeted queries).
+ALTER TABLE public.karma_events DROP CONSTRAINT IF EXISTS karma_events_reason_check;
+ALTER TABLE public.karma_events ADD CONSTRAINT karma_events_reason_check
+  CHECK (reason IN (
+    'consensus_win','consensus_loss','first_in_rastrum',
+    'observation_synced','comment_reaction','manual_adjust',
+    'ai_sponsorship_active','ai_sponsorship_revoked','ai_sponsor_call',
+    'pool_donation','pool_call_sponsor_drip',
+    'streak_freeze_consumed'
+  ));
+
+-- Replace award_karma() with conservation-multiplier-aware version.
+CREATE OR REPLACE FUNCTION public.award_karma(
+  p_user_id        uuid,
+  p_observation_id uuid,
+  p_taxon_id       uuid,
+  p_outcome        text,
+  p_confidence     numeric DEFAULT 0.7
+)
+RETURNS numeric AS $$
+DECLARE
+  v_rarity              public.taxon_rarity;
+  v_obs_path            uuid[];
+  v_matched_taxon       uuid;
+  v_matched_rank        integer;
+  v_streak_mult         numeric := 1.0;
+  v_expertise_mult      numeric := 1.0;
+  v_conf_factor         numeric;
+  v_grace               boolean;
+  v_user                public.users;
+  v_delta               numeric;
+  v_penalty_rarity      numeric;
+  v_conservation_mult   numeric := 1.0;
+  v_conservation_source text    := null;
+  v_iucn                text;
+  v_nom059              text;
+BEGIN
+  -- Confidence → factor.
+  v_conf_factor := CASE
+    WHEN p_confidence >= 0.85 THEN 1.0
+    WHEN p_confidence >= 0.65 THEN 0.7
+    ELSE                            0.4
+  END;
+
+  -- Rarity. Falls back to 1.0× if not yet materialized.
+  SELECT * INTO v_rarity FROM public.taxon_rarity WHERE taxon_id = p_taxon_id;
+  IF NOT FOUND THEN
+    v_rarity.multiplier := 1.0;
+    v_rarity.bucket     := 1;
+  END IF;
+
+  -- Observation taxon's lineage = self || ancestors.
+  SELECT array_prepend(t.id, t.ancestor_path)
+    INTO v_obs_path
+    FROM public.taxa t
+   WHERE t.id = p_taxon_id;
+
+  -- User's most-specific expertise that is in the observation lineage.
+  SELECT ue.taxon_id, array_position(v_obs_path, ue.taxon_id)
+    INTO v_matched_taxon, v_matched_rank
+    FROM public.user_expertise ue
+   WHERE ue.user_id = p_user_id
+     AND ue.taxon_id = ANY(v_obs_path)
+   ORDER BY array_position(v_obs_path, ue.taxon_id) ASC
+   LIMIT 1;
+
+  -- Verified expert in the matched ancestor → multiplier bump.
+  IF v_matched_taxon IS NOT NULL THEN
+    SELECT 1.5
+      INTO v_expertise_mult
+      FROM public.user_expertise
+     WHERE user_id = p_user_id
+       AND taxon_id = v_matched_taxon
+       AND verified_at IS NOT NULL;
+    IF v_expertise_mult IS NULL THEN v_expertise_mult := 1.0; END IF;
+  END IF;
+
+  -- Streak multiplier (reads existing user_streaks).
+  SELECT CASE
+           WHEN current_streak >= 30 THEN 1.5
+           WHEN current_streak >=  7 THEN 1.2
+           ELSE                            1.0
+         END
+    INTO v_streak_mult
+    FROM public.user_streaks
+   WHERE user_id = p_user_id;
+  IF v_streak_mult IS NULL THEN v_streak_mult := 1.0; END IF;
+
+  -- Grace check.
+  SELECT * INTO v_user FROM public.users WHERE id = p_user_id;
+  v_grace := (v_user.grace_until IS NOT NULL
+              AND v_user.grace_until > now()
+              AND COALESCE(v_user.vote_count, 0) < 20);
+
+  -- Conservation multiplier (#551): higher of IUCN vs NOM-059 wins.
+  SELECT iucn_category, nom059_status
+    INTO v_iucn, v_nom059
+    FROM public.taxa
+   WHERE id = p_taxon_id;
+
+  DECLARE
+    v_iucn_mult  numeric := 1.0;
+    v_nom_mult   numeric := 1.0;
+  BEGIN
+    v_iucn_mult := CASE v_iucn
+      WHEN 'EW' THEN 5.0
+      WHEN 'CR' THEN 3.0
+      WHEN 'EN' THEN 2.0
+      WHEN 'VU' THEN 1.5
+      WHEN 'NT' THEN 1.2
+      WHEN 'DD' THEN 1.5
+      ELSE 1.0
+    END;
+    v_nom_mult := CASE v_nom059
+      WHEN 'E'  THEN 4.0
+      WHEN 'P'  THEN 2.5
+      WHEN 'A'  THEN 1.8
+      WHEN 'Pr' THEN 1.3
+      ELSE 1.0
+    END;
+    IF v_nom_mult > v_iucn_mult THEN
+      v_conservation_mult   := v_nom_mult;
+      v_conservation_source := 'NOM-059 ' || v_nom059;
+    ELSIF v_iucn_mult > 1.0 THEN
+      v_conservation_mult   := v_iucn_mult;
+      v_conservation_source := 'IUCN ' || v_iucn;
+    END IF;
+  END;
+
+  -- Delta computation.
+  IF p_outcome = 'win' THEN
+    v_delta := round(
+      5 * v_rarity.multiplier * v_streak_mult * v_expertise_mult
+        * v_conf_factor * v_conservation_mult
+    );
+  ELSIF p_outcome = 'loss' THEN
+    IF v_grace THEN
+      v_delta := 0;
+    ELSE
+      -- Conservation multiplier does NOT apply to loss penalty (design choice:
+      -- penalising wrong IDs for rare species harder would disincentivise voting
+      -- on them — noted in PR description per #551 acceptance criteria).
+      v_penalty_rarity := LEAST(v_rarity.multiplier, 2.0);
+      v_delta := round(-2 * v_penalty_rarity * v_conf_factor);
+    END IF;
+  ELSE
+    RAISE EXCEPTION 'award_karma: invalid p_outcome %', p_outcome;
+  END IF;
+
+  -- Insert ledger row.
+  INSERT INTO public.karma_events
+    (user_id, observation_id, taxon_id, delta, reason,
+     rarity_bucket, expertise_rank, conservation_source)
+  VALUES
+    (p_user_id, p_observation_id, p_taxon_id, v_delta,
+     CASE WHEN p_outcome = 'win' THEN 'consensus_win' ELSE 'consensus_loss' END,
+     v_rarity.bucket, v_matched_rank, v_conservation_source);
+
+  -- Update user totals + vote counter.
+  UPDATE public.users
+     SET karma_total      = karma_total + v_delta,
+         karma_updated_at = now(),
+         vote_count       = COALESCE(vote_count, 0) + 1
+   WHERE id = p_user_id;
+
+  -- Wins also accrue per-taxon expertise on the matched ancestor (or
+  -- on the kingdom of the observation if no expertise existed yet).
+  IF p_outcome = 'win' AND v_delta > 0 THEN
+    IF v_matched_taxon IS NOT NULL THEN
+      UPDATE public.user_expertise
+         SET score = score + v_delta,
+             updated_at = now()
+       WHERE user_id = p_user_id AND taxon_id = v_matched_taxon;
+    ELSE
+      INSERT INTO public.user_expertise (user_id, taxon_id, score)
+      SELECT p_user_id,
+             COALESCE(v_obs_path[array_length(v_obs_path, 1)], p_taxon_id),
+             v_delta
+      ON CONFLICT (user_id, taxon_id) DO UPDATE
+         SET score = public.user_expertise.score + EXCLUDED.score,
+             updated_at = now();
+    END IF;
+  END IF;
+
+  RETURN v_delta;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION public.award_karma(uuid, uuid, uuid, text, numeric) TO service_role;
+
+-- ============================================================
+-- #558: Karma-threshold privilege gates
+-- ============================================================
+
+-- karma_thresholds table: tunable gate values without a deploy.
+CREATE TABLE IF NOT EXISTS public.karma_thresholds (
+  privilege       text    PRIMARY KEY,
+  min_karma       numeric NOT NULL CHECK (min_karma >= 0),
+  description_en  text    NOT NULL DEFAULT '',
+  description_es  text    NOT NULL DEFAULT ''
+);
+
+ALTER TABLE public.karma_thresholds ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS karma_thresholds_public_read ON public.karma_thresholds;
+CREATE POLICY karma_thresholds_public_read ON public.karma_thresholds
+  FOR SELECT USING (true);
+
+GRANT SELECT ON public.karma_thresholds TO anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.karma_thresholds TO service_role;
+
+-- Seed default thresholds (#558 acceptance criteria values).
+INSERT INTO public.karma_thresholds (privilege, min_karma, description_en, description_es)
+VALUES
+  ('validation_suggest', 100,  'Suggest species IDs on others'' observations',
+                                'Sugerir identificaciones de especie en observaciones ajenas'),
+  ('observation_flag',   500,  'Flag observations for moderation',
+                                'Reportar observaciones para moderación'),
+  ('expert_application', 1000, 'Apply for expert status in a taxon group',
+                                'Solicitar estatus de experto en un grupo taxonómico')
+ON CONFLICT (privilege) DO NOTHING;
+
+-- Helper function: check if a user has a privilege by karma.
+CREATE OR REPLACE FUNCTION public.has_karma_privilege(
+  p_uid       uuid,
+  p_privilege text
+)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public, pg_temp AS $$
+  SELECT COALESCE((
+    SELECT u.karma_total >= kt.min_karma
+      FROM public.users u
+      JOIN public.karma_thresholds kt ON kt.privilege = p_privilege
+     WHERE u.id = p_uid
+  ), false);
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.has_karma_privilege(uuid, text) FROM PUBLIC;
+GRANT  EXECUTE ON FUNCTION public.has_karma_privilege(uuid, text) TO authenticated;
+
+-- RLS: gate validation_suggest on identifications INSERT (#558).
+-- Replaces id_validator_insert with a karma-aware version.
+DROP POLICY IF EXISTS "id_validator_insert" ON public.identifications;
+CREATE POLICY "id_validator_insert" ON public.identifications
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    (SELECT auth.uid()) = validated_by
+    AND validated_by IS NOT NULL
+    AND is_primary = false
+    AND public.has_karma_privilege(auth.uid(), 'validation_suggest')
+    AND EXISTS (
+      SELECT 1 FROM public.observations o
+      WHERE o.id = observation_id
+        AND o.observer_id <> validated_by
+        AND o.sync_status = 'synced'
+        AND o.obscure_level IN ('none','0.1deg','0.2deg','5km')
+    )
+  );
+
+-- RLS: gate observation_flag on reports INSERT (#558).
+DROP POLICY IF EXISTS reports_owner_write ON public.reports;
+CREATE POLICY reports_owner_write ON public.reports FOR INSERT
+  WITH CHECK (
+    reporter_id = auth.uid()
+    AND public.has_karma_privilege(auth.uid(), 'observation_flag')
+  );
+
+-- RLS: gate expert_application on expert_applications INSERT (#558).
+DROP POLICY IF EXISTS "expert_apps_insert_own" ON public.expert_applications;
+CREATE POLICY "expert_apps_insert_own" ON public.expert_applications
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    user_id = auth.uid()
+    AND public.has_karma_privilege(auth.uid(), 'expert_application')
+  );
+
