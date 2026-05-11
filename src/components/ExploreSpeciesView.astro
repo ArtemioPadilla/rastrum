@@ -92,17 +92,47 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
 
     <!-- M34: Radial/sunburst panel (hidden by default) -->
     <div id="es-panel-radial" class="hidden">
-      <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
-        {lang === 'es' ? 'Toca un segmento para explorar. Doble toque en especie para ver su perfil.' : 'Tap a segment to explore. Double-tap a species to view its profile.'}
-      </p>
-      <div id="es-sunburst-container" class="relative w-full max-w-md mx-auto" style="aspect-ratio: 1;">
-        <svg id="es-sunburst" width="100%" height="100%" viewBox="-1 -1 2 2" style="display:block;"></svg>
-        <div id="es-sunburst-center" class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-          <p id="es-sunburst-name" class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 text-center px-8"></p>
-          <p id="es-sunburst-count" class="text-xs text-zinc-500 dark:text-zinc-400"></p>
+      <!-- #681: Sub-toggle — Sunburst vs Radial Dendrogram -->
+      <div class="flex gap-1 mb-3" role="group" aria-label={lang === 'es' ? 'Tipo de vista radial' : 'Radial view type'}>
+        <button id="es-radial-sub-sunburst" data-radial-sub="sunburst"
+          class="px-2.5 py-1 text-xs font-medium rounded-full border border-emerald-700 bg-emerald-700 text-white"
+          aria-pressed="true">
+          {lang === 'es' ? 'Anillos' : 'Sunburst'}
+        </button>
+        <button id="es-radial-sub-dendro" data-radial-sub="dendro"
+          class="px-2.5 py-1 text-xs font-medium rounded-full border border-zinc-300 dark:border-zinc-600 text-zinc-600 dark:text-zinc-300"
+          aria-pressed="false">
+          {lang === 'es' ? 'Dendrograma' : 'Dendrogram'}
+        </button>
+      </div>
+
+      <!-- Sunburst sub-panel -->
+      <div id="es-radial-sub-panel-sunburst">
+        <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
+          {lang === 'es' ? 'Toca un segmento para explorar. Doble toque en especie para ver su perfil.' : 'Tap a segment to explore. Double-tap a species to view its profile.'}
+        </p>
+        <div id="es-sunburst-container" class="relative w-full max-w-md mx-auto" style="aspect-ratio: 1;">
+          <svg id="es-sunburst" width="100%" height="100%" viewBox="-1 -1 2 2" style="display:block;"></svg>
+          <div id="es-sunburst-center" class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+            <p id="es-sunburst-name" class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 text-center px-8"></p>
+            <p id="es-sunburst-count" class="text-xs text-zinc-500 dark:text-zinc-400"></p>
+          </div>
+        </div>
+        <nav id="es-sunburst-breadcrumb" class="mt-2 text-xs text-zinc-500 dark:text-zinc-400 flex flex-wrap gap-1"></nav>
+      </div>
+
+      <!-- #681: Radial Dendrogram sub-panel -->
+      <div id="es-radial-sub-panel-dendro" class="hidden">
+        <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
+          {lang === 'es'
+            ? 'Reino en el centro, especies en la periferia. Toca una especie para ver su perfil.'
+            : 'Kingdom at center, species at periphery. Tap a species to view its profile.'}
+        </p>
+        <div class="overflow-auto rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50" style="max-height: 70vh;">
+          <svg id="es-radial-dendro" style="display:block; width:100%;" role="img"
+            aria-label={lang === 'es' ? 'Dendrograma radial taxonómico' : 'Taxonomic radial dendrogram'}></svg>
         </div>
       </div>
-      <nav id="es-sunburst-breadcrumb" class="mt-2 text-xs text-zinc-500 dark:text-zinc-400 flex flex-wrap gap-1"></nav>
     </div>
 
     <!-- M34: Dendrogram tree panel (hidden by default) -->
@@ -116,6 +146,15 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
     </div>
 
     <div id="es-panel-grid">
+      <!-- #463: Clade filter notice (shown when sunburst filtered the grid) -->
+      <div id="es-clade-filter-banner" class="hidden mb-3 flex items-center gap-2 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2 text-sm">
+        <span id="es-clade-filter-label" class="text-emerald-800 dark:text-emerald-300 flex-1"></span>
+        <button id="es-clade-filter-clear" type="button"
+          class="text-xs text-emerald-700 dark:text-emerald-400 font-semibold hover:underline">
+          {lang === 'es' ? 'Ver todos' : 'Clear filter'}
+        </button>
+      </div>
+
       <label class="block mb-4">
         <span class="sr-only">{page.search_placeholder}</span>
         <input
@@ -257,6 +296,12 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
   };
   let allTaxa: TaxaEnriched[] = [];
   let _indexBase = '';
+  // #463: Sunburst-to-grid clade filter state.
+  // When the user clicks an intermediate sunburst segment, we collect the
+  // taxon IDs of all species within that clade and filter the grid to show
+  // only those cards. Cleared when the user clicks the sunburst root or
+  // switches away from the radial tab.
+  let sunburstCladeIds: Set<string> | null = null;
 
   function showDetail(idOrSlug: string) {
     // The detail pane (renderDetail below) queries `taxa` by
@@ -574,7 +619,30 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
 
       if (view === 'radial') initSunburst();
       if (view === 'tree') initDendrogram();
+      // #463: Clear sunburst clade filter when leaving grid view or re-entering
+      // the radial tab (user is exploring again, so any previous filter is stale).
+      if (view !== 'grid') sunburstCladeIds = null;
     }
+
+    // #681: Radial sub-toggle (Sunburst ↔ Dendrogram)
+    const radialSubBtns = root?.querySelectorAll<HTMLButtonElement>('[data-radial-sub]');
+    const radialSubPanelSunburst = document.getElementById('es-radial-sub-panel-sunburst');
+    const radialSubPanelDendro   = document.getElementById('es-radial-sub-panel-dendro');
+    const activeSub = ['px-2.5','py-1','text-xs','font-medium','rounded-full','border','border-emerald-700','bg-emerald-700','text-white'];
+    const inactiveSub = ['px-2.5','py-1','text-xs','font-medium','rounded-full','border','border-zinc-300','dark:border-zinc-600','text-zinc-600','dark:text-zinc-300'];
+    function switchRadialSub(sub: string) {
+      radialSubBtns?.forEach(btn => {
+        const active = btn.dataset.radialSub === sub;
+        btn.setAttribute('aria-pressed', String(active));
+        btn.className = (active ? activeSub : inactiveSub).join(' ');
+      });
+      radialSubPanelSunburst?.classList.toggle('hidden', sub !== 'sunburst');
+      radialSubPanelDendro?.classList.toggle('hidden', sub !== 'dendro');
+      if (sub === 'dendro') initRadialDendrogram();
+    }
+    radialSubBtns?.forEach(btn => {
+      btn.addEventListener('click', () => switchRadialSub(btn.dataset.radialSub ?? 'sunburst'));
+    });
 
     esTabs?.forEach(btn => {
       btn.addEventListener('click', () => switchEsView(btn.dataset.view ?? 'grid'));
@@ -651,6 +719,11 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
         }
         const q = (searchEl?.value ?? '').trim().toLowerCase();
         if (q && !search.includes(q)) visible = false;
+        // #463: sunburst clade filter
+        if (sunburstCladeIds !== null) {
+          const taxonId = card.getAttribute('data-taxon-id') ?? '';
+          if (!sunburstCladeIds.has(taxonId)) visible = false;
+        }
         li.style.display = visible ? '' : 'none';
         if (visible) visibleCount++;
       });
@@ -660,7 +733,27 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
         emptyEl?.classList.add('hidden');
       }
       paintChipPressedState();
+      // #463: Update the clade filter banner.
+      const cladeBanner = document.getElementById('es-clade-filter-banner');
+      const cladeLabel  = document.getElementById('es-clade-filter-label');
+      if (cladeBanner && cladeLabel) {
+        if (sunburstCladeIds !== null) {
+          cladeLabel.textContent = isEs
+            ? `Filtrando ${sunburstCladeIds.size} especies del clado seleccionado`
+            : `Showing ${sunburstCladeIds.size} species from selected clade`;
+          cladeBanner.classList.remove('hidden');
+        } else {
+          cladeBanner.classList.add('hidden');
+        }
+      }
     }
+
+    // Wire the clade-filter clear button.
+    const cladeFilterClearBtn = document.getElementById('es-clade-filter-clear');
+    cladeFilterClearBtn?.addEventListener('click', () => {
+      sunburstCladeIds = null;
+      applyAllFilters();
+    });
 
     function paintChipPressedState() {
       const chips = document.querySelectorAll<HTMLButtonElement>('[data-filter-chips] [data-chip]');
@@ -727,6 +820,17 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
     };
 
     // ── M34: Sunburst ──────────────────────────────────────────
+    // #463: Collect all leaf taxon IDs under a TaxonNode (for clade filtering).
+    function collectCladeTaxonIds(node: TaxonNode): Set<string> {
+      const ids = new Set<string>();
+      function walk(n: TaxonNode) {
+        if (n.taxonId) ids.add(n.taxonId);
+        n.children.forEach(walk);
+      }
+      walk(node);
+      return ids;
+    }
+
     let sunburstInitialized = false;
     function initSunburst() {
       if (sunburstInitialized || allTaxa.length === 0) return;
@@ -777,15 +881,63 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
       // left half so they're never upside-down. Skip when the segment's arc
       // is too narrow for any meaningful label.
       const TEXT_FONT          = 0.045;
-      const TEXT_GLYPH_W       = 0.6;   // approx. char width as fraction of font-size
-      const TEXT_RADIAL_FRAC   = 0.85;  // chars must fit in this fraction of the ring
+      // #680 — proper text measurement instead of a fixed glyph-width constant.
+      // Strategy: try OffscreenCanvas measureText first (accurate, no layout cost);
+      // fall back to a per-character-class width table when OffscreenCanvas is
+      // unavailable (SSR, old browsers). The table is calibrated for system-ui at
+      // the font-size we render (TEXT_FONT SVG user units).
+      //
+      // Character classes (as fraction of em):
+      //   wide  (W M w m)   ≈ 0.78
+      //   mid   (A-Z excl.)  ≈ 0.68
+      //   narrow (i l r t f j . , : ;) ≈ 0.40
+      //   space              ≈ 0.28
+      //   default            ≈ 0.62
+      const _WIDE   = new Set([..."WMwm"]);
+      const _NARROW = new Set([..."ilrtfj.,:; "]);
+      function _charW(c: string): number {
+        if (_WIDE.has(c))   return 0.78;
+        if (_NARROW.has(c)) return c === ' ' ? 0.28 : 0.40;
+        if (c >= 'A' && c <= 'Z') return 0.68;
+        return 0.62;
+      }
+      // Returns estimated text width in SVG user units for a string rendered at TEXT_FONT em.
+      let _offCtx: OffscreenCanvasRenderingContext2D | null = null;
+      function measureLabelWidth(s: string, leafParam: boolean): number {
+        if (_offCtx === null) {
+          try {
+            const oc = new OffscreenCanvas(0, 0);
+            _offCtx = oc.getContext('2d') as OffscreenCanvasRenderingContext2D;
+          } catch { _offCtx = undefined as unknown as null; } // mark unavailable
+        }
+        if (_offCtx) {
+          // Font string matches the SVG text attributes below (italic 600 …px system-ui).
+          // pxPerVbu: arbitrary px→vbu scale; what matters is the ratio.
+          const PX = 100; // 100px gives enough precision for subpixel measurements
+          _offCtx.font = `${leafParam ? 'italic ' : ''}600 ${PX}px system-ui`;
+          return (_offCtx.measureText(s).width / PX) * TEXT_FONT;
+        }
+        // Fallback: sum per-character estimates
+        let w = 0;
+        for (const c of s) w += _charW(c) * TEXT_FONT;
+        return w;
+      }
+      const TEXT_RADIAL_FRAC   = 0.85;  // label must fit in this fraction of the ring
       const TEXT_MIN_SWEEP_RAD = 0.18;  // ~10° — below this, label is illegible
-
       function addSegmentLabel(name: string, isLeaf: boolean, midAngle: number, sweep: number, r0: number, r1: number) {
         if (sweep < TEXT_MIN_SWEEP_RAD) return;
         const ringW = r1 - r0;
-        const maxChars = Math.max(3, Math.floor((ringW * TEXT_RADIAL_FRAC) / (TEXT_GLYPH_W * TEXT_FONT)));
-        const label = name.length > maxChars ? name.slice(0, maxChars - 1) + '…' : name;
+        const budget = ringW * TEXT_RADIAL_FRAC;
+        // Binary-search the truncation point using proper measurement.
+        let label = name;
+        if (measureLabelWidth(name, isLeaf) > budget) {
+          let lo = 1, hi = name.length - 1;
+          while (lo < hi) {
+            const mid = (lo + hi + 1) >> 1;
+            if (measureLabelWidth(name.slice(0, mid) + '…', isLeaf) <= budget) lo = mid; else hi = mid - 1;
+          }
+          label = lo >= 1 ? name.slice(0, lo) + '…' : '…';
+        }
 
         const r = (r0 + r1) / 2;
         const midAngleDeg = midAngle * 180 / Math.PI;
@@ -837,14 +989,21 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
           path.setAttribute('stroke', '#fff');
           path.setAttribute('stroke-width', '0.005');
           // Only leaf nodes (species) navigate to the detail page.
-          // Intermediate nodes (kingdom → genus) update the center label only
-          // so the user can explore the hierarchy without accidental navigation.
+          // Intermediate nodes (kingdom → genus) update the center label AND
+          // #463: filter the grid panel to show species in that clade.
           const isLeaf = child.children.length === 0;
           path.style.cursor = 'pointer';
           path.addEventListener('click', () => {
             if (nameEl) nameEl.textContent = child.name;
             if (countEl) countEl.textContent = `${child.count} obs`;
-            if (isLeaf && child.taxonId) showDetail(child.taxonId);
+            if (isLeaf && child.taxonId) {
+              showDetail(child.taxonId);
+            } else {
+              // #463: filter the grid by clade, then switch to grid view.
+              sunburstCladeIds = collectCladeTaxonIds(child);
+              switchEsView('grid');
+              applyAllFilters();
+            }
           });
           // Hover updates the centre label without committing — desktop only;
           // mobile gets the same content via tap (the click handler above).
@@ -871,6 +1030,169 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
 
       if (nameEl) nameEl.textContent = isEs ? 'Todas las especies' : 'All species';
       if (countEl) countEl.textContent = `${allTaxa.length} ${isEs ? 'especies' : 'species'}`;
+    }
+
+    // ── #681: Radial Dendrogram ─────────────────────────────────────────────
+    // Radial tree layout: kingdom at centre, species at periphery.
+    // Angle of each leaf = (leafIndex / totalLeaves) * 2π
+    // Radius of each node = (depth / maxDepth) * outerRadius
+    // Curved Bezier links from parent to child with parent centre as control point.
+    let radialDendroInitialized = false;
+    function initRadialDendrogram() {
+      if (radialDendroInitialized || allTaxa.length === 0) return;
+      radialDendroInitialized = true;
+      const svgEl = document.getElementById('es-radial-dendro') as SVGSVGElement | null;
+      if (!svgEl) return;
+
+      const tree = buildTaxonomicTree(allTaxa);
+      const maxDepth = Math.max(1, taxonomicDepth(tree));
+
+      // Collect and number leaves for angle assignment.
+      type RadialNode = TaxonNode & { _angle: number; _depth: number };
+      const leaves: RadialNode[] = [];
+      function collectLeaves(n: TaxonNode) {
+        if (!n.children.length) leaves.push(n as RadialNode);
+        else n.children.forEach(collectLeaves);
+      }
+      collectLeaves(tree);
+      const TOTAL = Math.max(1, leaves.length);
+
+      // Assign angles to leaves and propagate to parents.
+      // Parent angle = average of first and last child angle.
+      leaves.forEach((leaf, i) => { leaf._angle = (i / TOTAL) * 2 * Math.PI; });
+      function assignAngles(n: TaxonNode, depth: number): number {
+        const rn = n as RadialNode;
+        rn._depth = depth;
+        if (!n.children.length) return rn._angle;
+        const childAngles = n.children.map(c => assignAngles(c, depth + 1));
+        rn._angle = (childAngles[0] + childAngles[childAngles.length - 1]) / 2;
+        return rn._angle;
+      }
+      assignAngles(tree, 0);
+
+      // Layout constants (SVG user units; viewBox is square).
+      const SIZE = 600;      // viewBox width & height
+      const CX   = SIZE / 2; // centre x
+      const CY   = SIZE / 2; // centre y
+      const R_MIN = 40;      // inner-most ring radius (root stays at center dot)
+      const R_MAX = SIZE / 2 - 60; // outer radius for species leaves
+      // Map depth 0..maxDepth → R_MIN..R_MAX
+      function depthR(d: number): number {
+        return d === 0 ? 0 : R_MIN + ((d - 1) / (maxDepth - 1 || 1)) * (R_MAX - R_MIN);
+      }
+      function toXY(angle: number, r: number): [number, number] {
+        return [CX + r * Math.cos(angle - Math.PI / 2), CY + r * Math.sin(angle - Math.PI / 2)];
+      }
+
+      svgEl.setAttribute('viewBox', `0 0 ${SIZE} ${SIZE}`);
+      svgEl.setAttribute('height', String(SIZE));
+      svgEl.setAttribute('width', String(SIZE));
+      svgEl.innerHTML = '';
+      const NS = 'http://www.w3.org/2000/svg';
+
+      // Group layers so links are drawn under nodes.
+      const gLinks = document.createElementNS(NS, 'g');
+      const gNodes = document.createElementNS(NS, 'g');
+      svgEl.appendChild(gLinks);
+      svgEl.appendChild(gNodes);
+
+      // Curved links: cubic Bezier from parent to child.
+      // Control points interpolate between parent and child radii at their
+      // respective angles — produces smooth curved branches.
+      function drawLinks(n: TaxonNode) {
+        const rn = n as RadialNode;
+        const pr  = depthR(rn._depth);
+        const [px, py] = toXY(rn._angle, pr);
+        n.children.forEach(c => {
+          const rc  = n as RadialNode;
+          const cr  = depthR((c as RadialNode)._depth);
+          const [cx2, cy2] = toXY((c as RadialNode)._angle, cr);
+          // Control points: parent at child angle, then child at parent angle
+          const [cp1x, cp1y] = toXY((c as RadialNode)._angle, pr);
+          const [cp2x, cp2y] = toXY(rn._angle, cr);
+          const path = document.createElementNS(NS, 'path');
+          path.setAttribute('d', `M${px},${py} C${cp1x},${cp1y} ${cp2x},${cp2y} ${cx2},${cy2}`);
+          path.setAttribute('stroke', KINGDOM_COLORS[(c as RadialNode).kingdom ?? ''] ?? '#71717a');
+          path.setAttribute('stroke-opacity', '0.35');
+          path.setAttribute('stroke-width', '1.5');
+          path.setAttribute('fill', 'none');
+          gLinks.appendChild(path);
+          drawLinks(c);
+        });
+      }
+      drawLinks(tree);
+
+      // Nodes: circle + label.
+      function drawNodes(n: TaxonNode, isRoot: boolean) {
+        const rn   = n as RadialNode;
+        const isLeafNode = n.children.length === 0;
+        const r    = depthR(rn._depth);
+        const [nx, ny] = toXY(rn._angle, r);
+        const kColor = KINGDOM_COLORS[rn.kingdom ?? ''] ?? colorForName(n.name);
+
+        // Node dot
+        const circle = document.createElementNS(NS, 'circle');
+        circle.setAttribute('cx', String(nx));
+        circle.setAttribute('cy', String(ny));
+        circle.setAttribute('r',  isLeafNode ? '4' : isRoot ? '6' : '3');
+        circle.setAttribute('fill', isRoot ? '#71717a' : kColor);
+        if (isLeafNode && n.taxonId) {
+          circle.style.cursor = 'pointer';
+          circle.setAttribute('role', 'button');
+          circle.setAttribute('aria-label', `${n.name}, ${n.count} obs`);
+          circle.addEventListener('click', () => showDetail(n.taxonId!));
+        }
+        gNodes.appendChild(circle);
+
+        // Label for leaf nodes — rotated tangentially, flipped if on the left half.
+        if (isLeafNode && !isRoot) {
+          const angleDeg  = (rn._angle * 180 / Math.PI);
+          const norm      = ((angleDeg % 360) + 360) % 360;
+          const flip      = norm > 90 && norm < 270;
+          const LBL_OFFSET = 8;
+          const text = document.createElementNS(NS, 'text');
+          const [lx, ly] = toXY(rn._angle, r + LBL_OFFSET);
+          text.setAttribute('x', String(lx));
+          text.setAttribute('y', String(ly));
+          text.setAttribute('font-size', '9');
+          text.setAttribute('font-style', 'italic');
+          text.setAttribute('fill', 'currentColor');
+          text.setAttribute('text-anchor', flip ? 'end' : 'start');
+          text.setAttribute('dominant-baseline', 'middle');
+          text.setAttribute('transform', `rotate(${flip ? angleDeg + 90 : angleDeg - 90},${lx},${ly})`);
+          // Observation count badge (colored dot)
+          const maxObs = Math.max(...leaves.map(l => l.count));
+          const intensity = maxObs > 0 ? Math.min(1, n.count / maxObs) : 0;
+          const opacity   = 0.3 + 0.7 * intensity;
+          text.setAttribute('fill-opacity', String(opacity));
+          text.style.pointerEvents = 'none';
+          text.style.userSelect = 'none';
+          text.textContent = n.name.length > 22 ? n.name.slice(0, 21) + '…' : n.name;
+          if (n.taxonId) {
+            text.style.cursor = 'pointer';
+            text.addEventListener('click', () => showDetail(n.taxonId!));
+          }
+          gNodes.appendChild(text);
+        } else if (!isRoot) {
+          // Internal node: small label near dot
+          const text = document.createElementNS(NS, 'text');
+          text.setAttribute('x', String(nx));
+          text.setAttribute('y', String(ny - 6));
+          text.setAttribute('font-size', '9');
+          text.setAttribute('fill', 'currentColor');
+          text.setAttribute('fill-opacity', '0.6');
+          text.setAttribute('text-anchor', 'middle');
+          text.setAttribute('dominant-baseline', 'auto');
+          text.style.pointerEvents = 'none';
+          text.textContent = n.name.length > 14 ? n.name.slice(0, 13) + '…' : n.name;
+          gNodes.appendChild(text);
+        }
+
+        n.children.forEach(c => drawNodes(c, false));
+      }
+      drawNodes(tree, true);
+
+      svgEl.style.color = 'inherit';
     }
 
     // ── M34: Dendrogram (horizontal tree) ──────────────────────
