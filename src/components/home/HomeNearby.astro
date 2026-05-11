@@ -1,0 +1,289 @@
+---
+/**
+ * HomeNearby.astro — "Near you right now" section for the home page.
+ *
+ * Issue #712: Deeper location integration.
+ *
+ * Fires after `navigator.geolocation` resolves (non-blocking — home
+ * page loads fully without it). Queries `observations` within the
+ * configured radius (default 10 km) via Supabase PostGIS RPC
+ * `nearby_observations(lat, lng, radius_km, limit)`.
+ *
+ * Location coordinates are stored in `sessionStorage` (key:
+ * `rastrum.user_location`) and refreshed every 5 minutes so subsequent
+ * navigation within the session is fast.
+ *
+ * Species chips use location context (already implemented — see
+ * HomeChips.astro + `src/lib/suggestions.ts`). This component adds the
+ * companion "Near you right now" feed.
+ */
+import { t } from '../../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+  /** Default search radius in km. Can be overridden by parent. */
+  radiusKm?: number;
+  /** Max cards to show. */
+  limit?: number;
+}
+
+const { lang, radiusKm = 10, limit = 6 } = Astro.props;
+const tr = t(lang);
+const w = tr.home.widgets as Record<string, string>;
+const mapHref = lang === 'es' ? '/es/explorar/mapa/' : '/en/explore/map/';
+const shareBase = '/share/obs/';
+---
+
+<section
+  class="hn-root hidden"
+  data-lang={lang}
+  data-radius={radiusKm}
+  data-limit={limit}
+  data-share-base={shareBase}
+  data-map-href={mapHref}
+  data-label-title={w.near_you_title ?? 'Near you right now'}
+  data-label-subtitle={w.near_you_subtitle ?? 'Observations within {{radius}} km'}
+  data-label-loading={w.near_you_loading ?? 'Finding nearby observations…'}
+  data-label-empty={w.near_you_empty ?? 'No observations found within {{radius}} km.'}
+  data-label-no-location={w.near_you_no_location ?? 'Enable location to see nearby observations.'}
+  data-label-km-away={w.near_you_km_away ?? '{{dist}} km away'}
+  data-label-view-all={w.near_you_view_all ?? 'View on map'}
+  aria-live="polite"
+>
+  <div class="flex items-baseline justify-between gap-3 mb-3">
+    <h2 class="text-sm font-semibold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+      {w.near_you_title ?? 'Near you right now'}
+    </h2>
+    <a
+      class="hn-map-link hidden text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:underline"
+      href={mapHref}
+    >
+      {w.near_you_view_all ?? 'View on map'}
+    </a>
+  </div>
+  <p class="hn-subtitle mb-3 text-xs text-zinc-500 dark:text-zinc-400"></p>
+  <p class="hn-loading text-sm text-zinc-500 dark:text-zinc-400">
+    {w.near_you_loading ?? 'Finding nearby observations…'}
+  </p>
+  <p class="hn-empty hidden text-sm text-zinc-500 dark:text-zinc-400"></p>
+  <p class="hn-no-location hidden text-sm text-zinc-500 dark:text-zinc-400">
+    {w.near_you_no_location ?? 'Enable location to see nearby observations.'}
+  </p>
+  <ul class="hn-list grid grid-cols-2 sm:grid-cols-3 gap-3"></ul>
+</section>
+
+<script>
+  import { getSupabase } from '../../lib/supabase';
+
+  type Lang = 'en' | 'es';
+
+  const LOCATION_KEY = 'rastrum.user_location';
+  const LOCATION_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+  interface CachedLocation {
+    lat: number;
+    lng: number;
+    ts: number;
+  }
+
+  interface NearbyRow {
+    id: string;
+    scientific_name: string | null;
+    common_name_en: string | null;
+    common_name_es: string | null;
+    photo_url: string | null;
+    observed_at: string;
+    distance_m: number;
+  }
+
+  function escape(s: string): string {
+    const m: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+    return s.replace(/[&<>"']/g, c => m[c]);
+  }
+
+  function getCachedLocation(): CachedLocation | null {
+    try {
+      const raw = sessionStorage.getItem(LOCATION_KEY);
+      if (!raw) return null;
+      const loc: CachedLocation = JSON.parse(raw);
+      if (Date.now() - loc.ts > LOCATION_TTL_MS) return null;
+      return loc;
+    } catch {
+      return null;
+    }
+  }
+
+  function setCachedLocation(lat: number, lng: number): void {
+    try {
+      sessionStorage.setItem(LOCATION_KEY, JSON.stringify({ lat, lng, ts: Date.now() }));
+    } catch { /* quota exceeded — ignore */ }
+  }
+
+  async function getLocation(): Promise<{ lat: number; lng: number }> {
+    const cached = getCachedLocation();
+    if (cached) return cached;
+    const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        timeout: 8000,
+        maximumAge: LOCATION_TTL_MS,
+      });
+    });
+    const { latitude: lat, longitude: lng } = pos.coords;
+    setCachedLocation(lat, lng);
+    return { lat, lng };
+  }
+
+  /**
+   * Haversine distance in km between two WGS84 coordinates.
+   * Used as a client-side fallback when the DB does not return distance_m.
+   */
+  function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+    const R = 6371;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLng = ((lng2 - lng1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  function renderCard(
+    row: NearbyRow,
+    lang: Lang,
+    shareBase: string,
+    labelKmAway: string,
+  ): string {
+    const displayName =
+      (lang === 'es'
+        ? row.common_name_es ?? row.common_name_en
+        : row.common_name_en ?? row.common_name_es) ?? row.scientific_name ?? '';
+    const distKm = row.distance_m > 0 ? (row.distance_m / 1000).toFixed(1) : null;
+    const distLabel = distKm
+      ? labelKmAway.replace('{{dist}}', distKm)
+      : '';
+    const imgHtml = row.photo_url
+      ? `<img src="${escape(row.photo_url)}" alt="${escape(displayName)}" loading="lazy" class="w-full h-full object-cover" />`
+      : '';
+    const href = `${shareBase}?id=${escape(row.id)}`;
+    return `<li>
+      <a href="${href}" class="block overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 hover:border-emerald-400 dark:hover:border-emerald-600 transition-colors">
+        <div class="aspect-square w-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+          ${imgHtml}
+        </div>
+        <div class="p-2">
+          <p class="text-xs italic font-semibold text-zinc-900 dark:text-zinc-100 truncate">${escape(displayName)}</p>
+          ${distLabel ? `<p class="text-[11px] text-emerald-700 dark:text-emerald-400 mt-0.5">${escape(distLabel)}</p>` : ''}
+        </div>
+      </a>
+    </li>`;
+  }
+
+  async function init() {
+    const root = document.querySelector<HTMLElement>('.hn-root');
+    if (!root) return;
+
+    const lang = (root.dataset.lang as Lang) ?? 'en';
+    const radiusKm = Number(root.dataset.radius ?? 10);
+    const lim = Number(root.dataset.limit ?? 6);
+    const shareBase = root.dataset.shareBase ?? '/share/obs/';
+    const mapHref = root.dataset.mapHref ?? '/en/explore/map/';
+
+    const loadingEl = root.querySelector<HTMLElement>('.hn-loading');
+    const emptyEl = root.querySelector<HTMLElement>('.hn-empty');
+    const noLocEl = root.querySelector<HTMLElement>('.hn-no-location');
+    const subtitleEl = root.querySelector<HTMLElement>('.hn-subtitle');
+    const listEl = root.querySelector<HTMLUListElement>('.hn-list');
+    const mapLink = root.querySelector<HTMLAnchorElement>('.hn-map-link');
+    if (!listEl) return;
+
+    // Update subtitle with radius
+    if (subtitleEl) {
+      const tpl = root.dataset.labelSubtitle ?? '';
+      subtitleEl.textContent = tpl.replace('{{radius}}', String(radiusKm));
+    }
+
+    // Show section skeleton while waiting for geolocation
+    root.classList.remove('hidden');
+
+    // Get location — non-blocking; if user denies we show the no-location message.
+    let lat: number, lng: number;
+    try {
+      ({ lat, lng } = await getLocation());
+    } catch {
+      loadingEl?.classList.add('hidden');
+      noLocEl?.classList.remove('hidden');
+      return;
+    }
+
+    // Update map link to include location context
+    if (mapLink) {
+      mapLink.href = `${mapHref}?lat=${lat}&lng=${lng}&radius=${radiusKm}`;
+      mapLink.classList.remove('hidden');
+    }
+
+    // Query nearby observations via Supabase PostGIS RPC.
+    let supabase;
+    try { supabase = getSupabase(); } catch {
+      loadingEl?.classList.add('hidden');
+      emptyEl?.classList.remove('hidden');
+      if (emptyEl) {
+        const tpl = root.dataset.labelEmpty ?? '';
+        emptyEl.textContent = tpl.replace('{{radius}}', String(radiusKm));
+      }
+      return;
+    }
+
+    type RawRow = {
+      id: string;
+      scientific_name: string | null;
+      common_name_en: string | null;
+      common_name_es: string | null;
+      photo_url: string | null;
+      observed_at: string;
+      lat: number | null;
+      lng: number | null;
+      distance_m?: number;
+    };
+
+    const { data, error } = await supabase.rpc('nearby_observations', {
+      p_lat: lat,
+      p_lng: lng,
+      p_radius_km: radiusKm,
+      p_limit: lim,
+    });
+
+    loadingEl?.classList.add('hidden');
+
+    if (error || !data || (data as RawRow[]).length === 0) {
+      emptyEl?.classList.remove('hidden');
+      if (emptyEl) {
+        const tpl = root.dataset.labelEmpty ?? '';
+        emptyEl.textContent = tpl.replace('{{radius}}', String(radiusKm));
+      }
+      return;
+    }
+
+    const labelKmAway = root.dataset.labelKmAway ?? '{{dist}} km away';
+    const rows = (data as RawRow[]).map((r): NearbyRow => ({
+      id: r.id,
+      scientific_name: r.scientific_name,
+      common_name_en: r.common_name_en,
+      common_name_es: r.common_name_es,
+      photo_url: r.photo_url,
+      observed_at: r.observed_at,
+      // Use PostGIS distance if available, otherwise compute client-side.
+      distance_m: r.distance_m
+        ?? (r.lat != null && r.lng != null
+          ? haversineKm(lat, lng, r.lat, r.lng) * 1000
+          : 0),
+    }));
+
+    listEl.innerHTML = rows
+      .map(r => renderCard(r, lang, shareBase, labelKmAway))
+      .join('');
+  }
+
+  init().catch(() => {});
+</script>
