@@ -12423,3 +12423,94 @@ CREATE POLICY "expert_apps_insert_own" ON public.expert_applications
 -- Run: node scripts/backfill-rarity-tier.mjs
 -- After backfill, nightly recompute via recompute-taxa-cache EF
 COMMENT ON COLUMN public.taxa.rarity_tier IS '1=common(101+obs), 2=uncommon(21-100), 3=rare(6-20), 4=very_rare(1-5), NULL=no_obs';
+
+-- ============================================================
+-- #735: INSTITUTIONAL ENDORSEMENT BADGES
+-- ============================================================
+
+-- Known institutions (seed data for the 20 most likely in Mexico)
+CREATE TABLE IF NOT EXISTS public.institutions (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  short_name  text NOT NULL UNIQUE,           -- 'CONANP', 'CONABIO', etc.
+  long_name   text NOT NULL,
+  logo_url    text,
+  country     text NOT NULL DEFAULT 'MX',
+  kind        text NOT NULL DEFAULT 'gov'
+                CHECK (kind IN ('gov','academic','ngo','research')),
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+
+-- Admin-verified institutional affiliations for experts
+CREATE TABLE IF NOT EXISTS public.institutional_affiliations (
+  id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id           uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  institution_id    uuid NOT NULL REFERENCES public.institutions(id) ON DELETE CASCADE,
+  role              text,                     -- 'Investigador', 'Técnico', etc.
+  valid_from        date,
+  valid_to          date,                     -- NULL means currently active
+  verified_by_admin uuid REFERENCES public.users(id),
+  created_at        timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (user_id, institution_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_inst_affiliations_user
+  ON public.institutional_affiliations(user_id);
+
+ALTER TABLE public.institutions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.institutional_affiliations ENABLE ROW LEVEL SECURITY;
+
+-- Institutions are publicly readable
+DROP POLICY IF EXISTS "institutions_public_read" ON public.institutions;
+CREATE POLICY "institutions_public_read" ON public.institutions
+  FOR SELECT USING (true);
+
+-- Affiliations readable by everyone (institutional credibility is public)
+DROP POLICY IF EXISTS "affiliations_public_read" ON public.institutional_affiliations;
+CREATE POLICY "affiliations_public_read" ON public.institutional_affiliations
+  FOR SELECT USING (true);
+
+GRANT SELECT ON public.institutions TO authenticated, anon;
+GRANT SELECT ON public.institutional_affiliations TO authenticated, anon;
+-- Only service_role can insert/update (admin-verified flow)
+GRANT INSERT, UPDATE, DELETE ON public.institutions TO service_role;
+GRANT INSERT, UPDATE, DELETE ON public.institutional_affiliations TO service_role;
+
+-- Seed: 20 most common Mexican institutions in biodiversity research
+INSERT INTO public.institutions (short_name, long_name, kind) VALUES
+  ('CONANP',  'Comisión Nacional de Áreas Naturales Protegidas',  'gov'),
+  ('CONABIO', 'Comisión Nacional para el Conocimiento y Uso de la Biodiversidad', 'gov'),
+  ('UNAM',    'Universidad Nacional Autónoma de México',          'academic'),
+  ('INECOL',  'Instituto de Ecología, A.C.',                      'research'),
+  ('INE',     'Instituto Nacional de Ecología',                   'gov'),
+  ('IPN',     'Instituto Politécnico Nacional',                   'academic'),
+  ('IIB',     'Instituto de Investigaciones Biomédicas, UNAM',    'research'),
+  ('IBUNAM',  'Instituto de Biología, UNAM',                      'research'),
+  ('UAM',     'Universidad Autónoma Metropolitana',               'academic'),
+  ('ECOSUR',  'El Colegio de la Frontera Sur',                    'research'),
+  ('CICY',    'Centro de Investigación Científica de Yucatán',    'research'),
+  ('CIBNOR',  'Centro de Investigaciones Biológicas del Noroeste','research'),
+  ('ENCB-IPN','Escuela Nacional de Ciencias Biológicas, IPN',     'academic'),
+  ('WWF-MX',  'WWF México',                                       'ngo'),
+  ('PRONATURA','Pronatura México',                                 'ngo'),
+  ('GEMA',    'Grupo de Ecología y Conservación de Islas',        'ngo'),
+  ('CEDES',   'Centro Ecológico de Sonora',                       'gov'),
+  ('UAC',     'Universidad Autónoma de Campeche',                 'academic'),
+  ('UJAT',    'Universidad Juárez Autónoma de Tabasco',           'academic'),
+  ('UASLP',   'Universidad Autónoma de San Luis Potosí',          'academic')
+ON CONFLICT (short_name) DO NOTHING;
+
+-- Helper view: active affiliations with institution details for a user
+CREATE OR REPLACE VIEW public.user_active_affiliations AS
+  SELECT
+    ia.user_id,
+    i.short_name   AS institution_short,
+    i.long_name    AS institution_long,
+    i.logo_url,
+    i.kind,
+    ia.role,
+    ia.verified_by_admin IS NOT NULL AS is_verified
+  FROM public.institutional_affiliations ia
+  JOIN public.institutions i ON i.id = ia.institution_id
+  WHERE ia.valid_to IS NULL OR ia.valid_to > CURRENT_DATE;
+
+GRANT SELECT ON public.user_active_affiliations TO authenticated, anon;
