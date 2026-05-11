@@ -33,6 +33,7 @@ export function canonicalEntityUrl(kind: EntityKind, id: string, lang: 'en' | 'e
     case 'observer':       return `/${lang}/${lang === 'es' ? 'perfil' : 'profile'}/u/${encodeURIComponent(id)}/`;
     case 'self_profile':   return `/${lang}/${lang === 'es' ? 'perfil' : 'profile'}/`;
     case 'camera_station': return '#';
+    case 'location':       return `/${lang}/${lang === 'es' ? 'explorar' : 'explore'}/lugares/${encodeURIComponent(id)}/`;
     default:               return '#';
   }
 }

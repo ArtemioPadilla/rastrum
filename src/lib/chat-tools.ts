@@ -118,12 +118,26 @@ const findObservers: ToolDef = {
   run(args) { return rpcCall('chat_find_observers', args); },
 };
 
+const findLocation: ToolDef = {
+  name: 'find_location',
+  description: 'Search places/locations by name or slug. Returns places with observation counts and type.',
+  args_schema: { p_query: 'string', p_limit: 'number — 1..50, default 5' },
+  validateArgs(args) {
+    if (!isObject(args)) return { ok: false, reason: 'args must be an object' };
+    if (typeof args.p_query !== 'string' || !args.p_query.trim()) return { ok: false, reason: 'p_query must be a non-empty string' };
+    if (args.p_limit !== undefined && typeof args.p_limit !== 'number') return { ok: false, reason: 'p_limit must be a number' };
+    return { ok: true, value: { p_query: args.p_query, p_limit: (args.p_limit as number) ?? 5 } };
+  },
+  run(args) { return rpcCall('chat_find_location', args); },
+};
+
 const REGISTRY: Record<string, ToolDef> = {
   find_observations:    findObservations,
   find_species:         findSpecies,
   find_projects:        findProjects,
   find_camera_stations: findCameraStations,
   find_observers:       findObservers,
+  find_location:        findLocation,
 };
 
 export function listTools(): ToolDef[] {

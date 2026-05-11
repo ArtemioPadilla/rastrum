@@ -9,6 +9,7 @@ import { projectSpec } from './project';
 import { cameraStationSpec } from './camera-station';
 import { observerSpec } from './observer';
 import { selfProfileSpec } from './self-profile';
+import { locationSpec } from './location';
 
 export { registry } from './registry';
 export type { EntityCard, EntityKind, EntitySpec } from './types';
@@ -24,4 +25,5 @@ export function bootstrapChatEntities(): void {
   registry.register(cameraStationSpec);
   registry.register(observerSpec);
   registry.register(selfProfileSpec);
+  registry.register(locationSpec);
 }
