@@ -76,10 +76,15 @@ function notifySwPmtilesUpdated(url: string, controller: { postMessage: (...a: u
 
 describe('#817 — page notifies SW after cache.put', () => {
   const URL = 'https://media.rastrum.org/maps/mexico_z0_10.pmtiles';
-  let mockController: { postMessage: ReturnType<typeof vi.fn> };
+  // Mock the callable signature explicitly so the type matches the
+  // `controller: { postMessage: (...a: unknown[]) => void }` parameter
+  // of notifySwPmtilesUpdated. Without the explicit generic, `vi.fn()`
+  // returns `Mock<Procedure | Constructable>` which Vitest 4 no longer
+  // structurally satisfies plain function types.
+  let mockController: { postMessage: ReturnType<typeof vi.fn<(...a: unknown[]) => void>> };
 
   beforeEach(() => {
-    mockController = { postMessage: vi.fn() };
+    mockController = { postMessage: vi.fn<(...a: unknown[]) => void>() };
   });
 
   it('sends PMTILES_CACHE_UPDATED with correct url', () => {
