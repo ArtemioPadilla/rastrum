@@ -468,6 +468,43 @@ serve(async (req) => {
 
   const zipBytes = await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' });
 
+  // #806 — insert per-export audit log row(s).
+  // For user-JWT exports: one row for the authenticated user.
+  // For service-role exports: one row per unique observer in the archive.
+  try {
+    const fileSizeBytes = zipBytes.byteLength;
+    if (userId) {
+      // Single-user export
+      await db.from('dwc_export_log').insert({
+        user_id: userId,
+        observation_count: dwcRows.length,
+        file_size_bytes: fileSizeBytes,
+        format: 'dwca',
+        triggered_by: 'user',
+      });
+    } else if (isServiceRole && observations.length > 0) {
+      // Full-corpus export: collect unique observer_ids and insert one row each.
+      const observerSet = new Set<string>(observations.map(o => o.observer_id));
+      // Approximate per-observer count (total records / unique observers).
+      const avgCount = Math.ceil(dwcRows.length / observerSet.size);
+      const logRows = Array.from(observerSet).map(oid => ({
+        user_id: oid,
+        observation_count: avgCount,
+        file_size_bytes: fileSizeBytes,
+        format: 'dwca',
+        triggered_by: 'api',
+      }));
+      // Insert in batches to avoid hitting PostgREST body-size limits.
+      const BATCH = 100;
+      for (let i = 0; i < logRows.length; i += BATCH) {
+        await db.from('dwc_export_log').insert(logRows.slice(i, i + BATCH));
+      }
+    }
+  } catch (_logErr) {
+    // Logging failure must never abort the export response.
+    console.error('[export-dwca] dwc_export_log insert failed:', _logErr);
+  }
+
   return new Response(zipBytes, {
     headers: {
       ...corsHeaders,
