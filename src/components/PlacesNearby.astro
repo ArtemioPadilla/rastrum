@@ -1,0 +1,184 @@
+---
+/**
+ * PlacesNearby — shows 3-5 nearby/popular places on the home page or explore page.
+ * Closes #711 (places discovery — "Places near you" section).
+ *
+ * Discovery strategy (priority order):
+ *   1. If the browser provides geolocation, query places sorted by distance
+ *      from the user's current position (requires PostGIS `place_centroid_geog`).
+ *   2. Fall back to most-active places globally (sorted by obs_count desc).
+ *
+ * This component renders a skeleton on the server and hydrates client-side.
+ */
+import { t } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+  /** Max places to show. Default 5. */
+  limit?: number;
+}
+
+const { lang, limit = 5 } = Astro.props;
+const tr = t(lang);
+const isEs = lang === 'es';
+
+const placesBase = `/${lang}/${isEs ? 'explorar/lugares' : 'explore/places'}/`;
+
+const labels = {
+  heading:      isEs ? 'Lugares cerca de ti' : 'Places near you',
+  fallback:     isEs ? 'Lugares activos' : 'Active places',
+  obs:          isEs ? 'obs' : 'obs',
+  loading:      isEs ? 'Buscando lugares…' : 'Looking for places…',
+  empty:        isEs ? 'No se encontraron lugares cercanos.' : 'No nearby places found.',
+  seeAll:       isEs ? 'Ver todos los lugares' : 'See all places',
+  locDenied:    isEs ? 'Permiso de ubicación denegado' : 'Location permission denied',
+};
+---
+
+<section
+  data-widget="places-nearby"
+  data-lang={lang}
+  data-places-base={placesBase}
+  data-limit={limit}
+  data-label-heading={labels.heading}
+  data-label-fallback={labels.fallback}
+  data-label-obs={labels.obs}
+  data-label-empty={labels.empty}
+  data-label-see-all={labels.seeAll}
+  class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4 mb-4"
+>
+  <div class="flex items-center justify-between mb-3">
+    <h2 data-pn-heading class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
+      {labels.heading}
+    </h2>
+    <a
+      href={placesBase}
+      class="text-xs text-emerald-600 dark:text-emerald-400 hover:underline"
+    >{labels.seeAll}</a>
+  </div>
+
+  <!-- Loading skeleton -->
+  <div data-pn-state="loading" class="space-y-2">
+    {Array.from({ length: 3 }).map(() => (
+      <div class="h-12 rounded-lg bg-zinc-100 dark:bg-zinc-800 animate-pulse" />
+    ))}
+  </div>
+
+  <!-- Empty state -->
+  <p data-pn-state="empty" class="hidden text-xs text-zinc-400 py-4">{labels.empty}</p>
+
+  <!-- Place list (populated by script) -->
+  <ul data-pn-list class="hidden space-y-1.5"></ul>
+</section>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+
+  interface NearbyPlace {
+    id: string;
+    slug: string;
+    name: string;
+    place_type: string;
+    obs_count: number;
+    last_obs_at: string | null;
+    observer_count: number;
+  }
+
+  function setVisible(root: HTMLElement, state: 'loading' | 'empty' | 'list') {
+    root.querySelectorAll<HTMLElement>('[data-pn-state]').forEach(el => {
+      el.classList.toggle('hidden', el.dataset.pnState !== state);
+    });
+    const list = root.querySelector<HTMLElement>('[data-pn-list]');
+    if (list) list.classList.toggle('hidden', state !== 'list');
+  }
+
+  function renderPlace(place: NearbyPlace, base: string, obs: string, lang: string): string {
+    const href = `${base}?slug=${encodeURIComponent(place.slug)}`;
+    const lastDate = place.last_obs_at
+      ? new Date(place.last_obs_at).toLocaleDateString(
+          lang === 'es' ? 'es-MX' : 'en-US',
+          { month: 'short', year: 'numeric' }
+        )
+      : null;
+    return `<li>
+      <a href="${href}"
+        class="flex items-center justify-between gap-2 rounded-lg px-3 py-2
+               border border-transparent hover:border-emerald-400/50 hover:bg-emerald-50/40
+               dark:hover:bg-emerald-900/20 transition-colors group"
+      >
+        <span class="text-sm font-medium text-zinc-800 dark:text-zinc-200
+                     group-hover:text-emerald-700 dark:group-hover:text-emerald-400
+                     truncate max-w-[70%]">
+          📍 ${place.name}
+        </span>
+        <span class="flex items-center gap-2 text-xs text-zinc-400 dark:text-zinc-500 shrink-0">
+          ${lastDate ? `<span>${lastDate}</span>` : ''}
+          <span>${(place.obs_count ?? 0).toLocaleString()} ${obs}</span>
+        </span>
+      </a>
+    </li>`;
+  }
+
+  async function hydrate(root: HTMLElement) {
+    const lang      = root.dataset.lang ?? 'en';
+    const base      = root.dataset.placesBase ?? '';
+    const limit     = parseInt(root.dataset.limit ?? '5', 10);
+    const obsLabel  = root.dataset.labelObs ?? 'obs';
+    const headingEl = root.querySelector<HTMLElement>('[data-pn-heading]');
+    const listEl    = root.querySelector<HTMLElement>('[data-pn-list]');
+
+    let supabase;
+    try { supabase = getSupabase(); } catch { setVisible(root, 'empty'); return; }
+
+    // Try geolocation first
+    const tryGeolocation = (): Promise<{ lat: number; lng: number } | null> =>
+      new Promise(resolve => {
+        if (!navigator.geolocation) { resolve(null); return; }
+        navigator.geolocation.getCurrentPosition(
+          pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+          () => resolve(null),
+          { timeout: 4000, maximumAge: 300_000 },
+        );
+      });
+
+    const geo = await tryGeolocation();
+
+    let places: NearbyPlace[] | null = null;
+
+    if (geo) {
+      // Attempt distance-sorted query via rpc (if place_nearby RPC exists)
+      try {
+        const { data } = await supabase.rpc('places_near_point', {
+          p_lat: geo.lat, p_lng: geo.lng, p_limit: limit,
+        });
+        if (data && data.length > 0) places = data;
+      } catch { /* RPC may not exist yet; fall through to obs_count sort */ }
+    }
+
+    if (!places) {
+      // Fallback: most active places globally
+      const { data } = await supabase
+        .from('places')
+        .select('id,slug,name,place_type,obs_count,last_obs_at,observer_count')
+        .not('obs_count', 'eq', 0)
+        .order('obs_count', { ascending: false })
+        .limit(limit);
+      places = data as NearbyPlace[] | null;
+      if (headingEl) headingEl.textContent = root.dataset.labelFallback ?? (lang === 'es' ? 'Lugares activos' : 'Active places');
+    } else {
+      if (headingEl) headingEl.textContent = root.dataset.labelHeading ?? (lang === 'es' ? 'Lugares cerca de ti' : 'Places near you');
+    }
+
+    if (!places || places.length === 0) {
+      setVisible(root, 'empty');
+      return;
+    }
+
+    if (listEl) {
+      listEl.innerHTML = places.map(p => renderPlace(p, base, obsLabel, lang)).join('');
+    }
+    setVisible(root, 'list');
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-widget="places-nearby"]').forEach(hydrate);
+</script>
