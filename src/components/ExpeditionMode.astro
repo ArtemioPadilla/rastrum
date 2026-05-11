@@ -1,0 +1,477 @@
+---
+/**
+ * ExpeditionMode — guided field-walk wizard (Fogg Principle of Tunneling)
+ *
+ * 4 stages:
+ *   1. Setup  — offline map, GPS, battery check
+ *   2. Active — waypoint counter, quick-observe button, species chips
+ *   3. Pause  — rest prompt after 90 minutes
+ *   4. Summary — species count, distance, top photo, share card
+ *
+ * State persists in localStorage under `rastrum_expedition_*`.
+ * Triggered as a modal from observe page (ExpedititionMode.astro injected).
+ *
+ * Issue #722.
+ */
+import type { Locale } from '../i18n/utils';
+interface Props { lang: Locale }
+const { lang } = Astro.props;
+const isEs = lang === 'es';
+---
+
+<!-- Expedition Mode backdrop -->
+<div
+  id="expedition-mode-overlay"
+  class="hidden fixed inset-0 z-50 bg-black/80 flex items-end sm:items-center justify-center"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="expedition-title"
+  data-lang={lang}
+>
+  <!-- Sheet / Modal -->
+  <div class="w-full sm:max-w-lg bg-white dark:bg-zinc-900 rounded-t-2xl sm:rounded-2xl shadow-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden max-h-[90dvh] overflow-y-auto">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between p-4 border-b border-zinc-100 dark:border-zinc-800">
+      <h2 id="expedition-title" class="font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+        <span id="expedition-stage-icon">🗺️</span>
+        <span id="expedition-stage-title">{isEs ? 'Modo Expedición' : 'Expedition Mode'}</span>
+      </h2>
+      <button id="expedition-close" type="button" aria-label={isEs ? 'Cerrar' : 'Close'}
+        class="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 p-1">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Stage: Setup -->
+    <div id="expedition-stage-setup" class="p-4 space-y-4">
+      <p class="text-sm text-zinc-600 dark:text-zinc-400">
+        {isEs
+          ? 'Verifica que todo esté listo antes de salir al campo.'
+          : 'Make sure everything is ready before heading into the field.'}
+      </p>
+      <!-- Checklist -->
+      <ul id="expedition-checklist" class="space-y-3">
+        <li class="flex items-center gap-3">
+          <span id="check-gps" class="text-lg">⏳</span>
+          <span class="text-sm text-zinc-700 dark:text-zinc-300">
+            {isEs ? 'Señal GPS disponible' : 'GPS signal available'}
+          </span>
+        </li>
+        <li class="flex items-center gap-3">
+          <span id="check-offline" class="text-lg">⏳</span>
+          <span class="text-sm text-zinc-700 dark:text-zinc-300">
+            {isEs ? 'Mapa sin conexión listo' : 'Offline map cached'}
+          </span>
+        </li>
+        <li class="flex items-center gap-3">
+          <span id="check-battery" class="text-lg">⏳</span>
+          <span class="text-sm text-zinc-700 dark:text-zinc-300" id="battery-label">
+            {isEs ? 'Batería verificando…' : 'Battery checking…'}
+          </span>
+        </li>
+      </ul>
+      <!-- Area picker (optional) -->
+      <div>
+        <label class="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1 uppercase tracking-wider">
+          {isEs ? 'Nombre del recorrido (opcional)' : 'Route name (optional)'}
+        </label>
+        <input
+          id="expedition-name-input"
+          type="text"
+          maxlength="80"
+          placeholder={isEs ? 'Ej: Cerro del Águila' : 'e.g. Eagle Hill'}
+          class="block w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm"
+        />
+      </div>
+      <button
+        id="expedition-start-btn"
+        type="button"
+        class="w-full rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-40 transition"
+      >
+        🚀 {isEs ? 'Iniciar expedición' : 'Start expedition'}
+      </button>
+    </div>
+
+    <!-- Stage: Active -->
+    <div id="expedition-stage-active" class="hidden p-4 space-y-4">
+      <div class="flex items-center justify-between text-sm">
+        <span class="text-zinc-600 dark:text-zinc-400" id="expedition-timer">00:00</span>
+        <span class="font-semibold text-emerald-700 dark:text-emerald-400" id="expedition-waypoint-count">
+          {isEs ? '0 puntos' : '0 waypoints'}
+        </span>
+      </div>
+      <!-- Species so far -->
+      <div>
+        <p class="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2">
+          {isEs ? 'Especies observadas' : 'Species observed'}
+        </p>
+        <div id="expedition-species-chips" class="flex flex-wrap gap-1 min-h-[28px]">
+          <span class="text-xs text-zinc-400">{isEs ? '(ninguna aún)' : '(none yet)'}</span>
+        </div>
+      </div>
+      <button
+        id="expedition-observe-btn"
+        type="button"
+        class="w-full rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white"
+        onclick="window.location.href = (document.documentElement.lang === 'es' ? '/es/observar/' : '/en/observe/')"
+      >
+        📷 {isEs ? 'Registrar observación' : 'Log observation'}
+      </button>
+      <button
+        id="expedition-waypoint-btn"
+        type="button"
+        class="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+      >
+        📍 {isEs ? 'Marcar punto de ruta' : 'Mark waypoint'}
+      </button>
+      <button
+        id="expedition-finish-btn"
+        type="button"
+        class="w-full text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 py-1"
+      >
+        {isEs ? 'Terminar expedición →' : 'Finish expedition →'}
+      </button>
+    </div>
+
+    <!-- Stage: Pause (90-min nudge) -->
+    <div id="expedition-stage-pause" class="hidden p-4 space-y-4 text-center">
+      <div class="text-5xl">☕</div>
+      <h3 class="font-bold text-zinc-900 dark:text-zinc-100">
+        {isEs ? '¡Llevas 90 minutos!' : "You've been out for 90 minutes!"}
+      </h3>
+      <p class="text-sm text-zinc-600 dark:text-zinc-400">
+        {isEs
+          ? 'Buen momento para descansar, tomar agua y revisar tus observaciones.'
+          : 'A good moment to rest, hydrate, and review your observations.'}
+      </p>
+      <button
+        id="expedition-continue-btn"
+        type="button"
+        class="w-full rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white"
+      >
+        {isEs ? 'Continuar expedición' : 'Continue expedition'}
+      </button>
+      <button
+        id="expedition-pause-finish-btn"
+        type="button"
+        class="w-full text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 py-1"
+      >
+        {isEs ? 'Terminar aquí →' : 'Finish here →'}
+      </button>
+    </div>
+
+    <!-- Stage: Summary -->
+    <div id="expedition-stage-summary" class="hidden p-4 space-y-4">
+      <div class="text-center">
+        <div class="text-4xl mb-2">🎉</div>
+        <h3 class="font-bold text-zinc-900 dark:text-zinc-100 text-lg">
+          {isEs ? '¡Expedición completada!' : 'Expedition complete!'}
+        </h3>
+      </div>
+      <dl class="grid grid-cols-2 gap-3">
+        <div class="rounded-lg bg-zinc-50 dark:bg-zinc-800 p-3 text-center">
+          <dt class="text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1">
+            {isEs ? 'Especies' : 'Species'}
+          </dt>
+          <dd id="summary-species-count" class="text-2xl font-bold text-emerald-700 dark:text-emerald-400">0</dd>
+        </div>
+        <div class="rounded-lg bg-zinc-50 dark:bg-zinc-800 p-3 text-center">
+          <dt class="text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1">
+            {isEs ? 'Duración' : 'Duration'}
+          </dt>
+          <dd id="summary-duration" class="text-2xl font-bold text-emerald-700 dark:text-emerald-400">—</dd>
+        </div>
+        <div class="rounded-lg bg-zinc-50 dark:bg-zinc-800 p-3 text-center">
+          <dt class="text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1">
+            {isEs ? 'Puntos' : 'Waypoints'}
+          </dt>
+          <dd id="summary-waypoints" class="text-2xl font-bold text-emerald-700 dark:text-emerald-400">0</dd>
+        </div>
+        <div class="rounded-lg bg-zinc-50 dark:bg-zinc-800 p-3 text-center">
+          <dt class="text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1">
+            {isEs ? 'Fotos' : 'Photos'}
+          </dt>
+          <dd id="summary-photos" class="text-2xl font-bold text-emerald-700 dark:text-emerald-400">0</dd>
+        </div>
+      </dl>
+      <button
+        id="expedition-done-btn"
+        type="button"
+        class="w-full rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white"
+      >
+        {isEs ? '¡Listo!' : 'Done!'}
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- Trigger button (FAB) — wired by observe page or bottom bar -->
+<button
+  id="expedition-mode-fab"
+  type="button"
+  class="hidden fixed bottom-20 right-4 z-40 rounded-full bg-emerald-700 shadow-lg p-3.5 text-white hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+  aria-label={isEs ? 'Modo Expedición' : 'Expedition Mode'}
+  title={isEs ? 'Modo Expedición' : 'Expedition Mode'}
+>
+  🗺️
+</button>
+
+<script>
+  // -------------------------------------------------------------------------
+  // State keys
+  // -------------------------------------------------------------------------
+  const KEY_SESSION   = 'rastrum_expedition_session';
+  const KEY_STAGE     = 'rastrum_expedition_stage';
+  const KEY_NAME      = 'rastrum_expedition_name';
+  const KEY_STARTED   = 'rastrum_expedition_started_at';
+  const KEY_WAYPOINTS = 'rastrum_expedition_waypoints';
+  const KEY_SPECIES   = 'rastrum_expedition_species';
+
+  type Stage = 'setup' | 'active' | 'pause' | 'summary';
+
+  // -------------------------------------------------------------------------
+  // DOM refs
+  // -------------------------------------------------------------------------
+  const overlay   = document.getElementById('expedition-mode-overlay');
+  const fab       = document.getElementById('expedition-mode-fab');
+  const closeBtn  = document.getElementById('expedition-close');
+  const stageIcon  = document.getElementById('expedition-stage-icon');
+  const stageTitle = document.getElementById('expedition-stage-title');
+  const lang = overlay?.dataset.lang ?? 'es';
+  const isEs = lang === 'es';
+
+  const stageSetup   = document.getElementById('expedition-stage-setup');
+  const stageActive  = document.getElementById('expedition-stage-active');
+  const stagePause   = document.getElementById('expedition-stage-pause');
+  const stageSummary = document.getElementById('expedition-stage-summary');
+
+  let timerInterval: ReturnType<typeof setInterval> | null = null;
+  let pauseTimeout:  ReturnType<typeof setTimeout>  | null = null;
+
+  // -------------------------------------------------------------------------
+  // Stage management
+  // -------------------------------------------------------------------------
+  function showStage(stage: Stage) {
+    stageSetup  ?.classList.toggle('hidden', stage !== 'setup');
+    stageActive ?.classList.toggle('hidden', stage !== 'active');
+    stagePause  ?.classList.toggle('hidden', stage !== 'pause');
+    stageSummary?.classList.toggle('hidden', stage !== 'summary');
+    localStorage.setItem(KEY_STAGE, stage);
+
+    const icons: Record<Stage, string>  = { setup: '🗺️', active: '🧭', pause: '☕', summary: '🎉' };
+    const titles: Record<Stage, string> = {
+      setup:   isEs ? 'Modo Expedición' : 'Expedition Mode',
+      active:  isEs ? 'Expedición activa' : 'Active expedition',
+      pause:   isEs ? 'Descanso' : 'Break',
+      summary: isEs ? '¡Expedición completada!' : 'Expedition complete!',
+    };
+    if (stageIcon)  stageIcon.textContent  = icons[stage];
+    if (stageTitle) stageTitle.textContent = titles[stage];
+  }
+
+  function openModal() {
+    overlay?.classList.remove('hidden');
+    overlay?.classList.add('flex');
+    fab?.classList.add('hidden');
+
+    // Restore stage if an expedition is in progress
+    const savedStage = localStorage.getItem(KEY_STAGE) as Stage | null;
+    if (savedStage && savedStage !== 'summary') {
+      showStage(savedStage);
+      if (savedStage === 'active') startTimer();
+    } else {
+      showStage('setup');
+      runChecks();
+    }
+  }
+
+  function closeModal() {
+    overlay?.classList.add('hidden');
+    overlay?.classList.remove('flex');
+    fab?.classList.remove('hidden');
+  }
+
+  // -------------------------------------------------------------------------
+  // Pre-trip checks
+  // -------------------------------------------------------------------------
+  function runChecks() {
+    // GPS check
+    const gpsIcon = document.getElementById('check-gps');
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        () => { if (gpsIcon) gpsIcon.textContent = '✅'; },
+        () => { if (gpsIcon) gpsIcon.textContent = '⚠️'; },
+        { timeout: 5000 },
+      );
+    } else {
+      if (gpsIcon) gpsIcon.textContent = '❌';
+    }
+
+    // Offline map (SW cache) check
+    const offlineIcon = document.getElementById('check-offline');
+    if ('caches' in window) {
+      window.caches.has('rastrum-map-tiles-v1').then(has => {
+        if (offlineIcon) offlineIcon.textContent = has ? '✅' : '⚠️';
+      }).catch(() => {
+        if (offlineIcon) offlineIcon.textContent = '⚠️';
+      });
+    } else {
+      if (offlineIcon) offlineIcon.textContent = '⚠️';
+    }
+
+    // Battery check
+    const battIcon  = document.getElementById('check-battery');
+    const battLabel = document.getElementById('battery-label');
+    if ('getBattery' in navigator) {
+      (navigator as unknown as { getBattery: () => Promise<{ level: number; charging: boolean }> })
+        .getBattery()
+        .then(bat => {
+          const pct = Math.round(bat.level * 100);
+          if (battLabel) battLabel.textContent = `${pct}% ${bat.charging ? (isEs ? '(cargando)' : '(charging)') : ''}`;
+          if (battIcon) battIcon.textContent = pct >= 20 ? '✅' : '⚠️';
+        })
+        .catch(() => {
+          if (battIcon) battIcon.textContent = '⚠️';
+          if (battLabel) battLabel.textContent = isEs ? 'Batería (no disponible)' : 'Battery (unavailable)';
+        });
+    } else {
+      if (battIcon)  battIcon.textContent  = '⚠️';
+      if (battLabel) battLabel.textContent = isEs ? 'Batería (API no disponible)' : 'Battery (API unavailable)';
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Timer
+  // -------------------------------------------------------------------------
+  function startTimer() {
+    const startedAt = parseInt(localStorage.getItem(KEY_STARTED) ?? '0', 10);
+    if (!startedAt) return;
+
+    if (timerInterval) clearInterval(timerInterval);
+    timerInterval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+      const m = Math.floor(elapsed / 60);
+      const s = elapsed % 60;
+      const timerEl = document.getElementById('expedition-timer');
+      if (timerEl) timerEl.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+
+      // 90-min pause nudge
+      if (elapsed >= 90 * 60 && localStorage.getItem(KEY_STAGE) === 'active') {
+        clearInterval(timerInterval!);
+        showStage('pause');
+      }
+    }, 1000);
+  }
+
+  // -------------------------------------------------------------------------
+  // Waypoints
+  // -------------------------------------------------------------------------
+  function addWaypoint() {
+    const wp: number[] = JSON.parse(localStorage.getItem(KEY_WAYPOINTS) ?? '[]');
+    wp.push(Date.now());
+    localStorage.setItem(KEY_WAYPOINTS, JSON.stringify(wp));
+    const el = document.getElementById('expedition-waypoint-count');
+    if (el) el.textContent = `${wp.length} ${isEs ? (wp.length === 1 ? 'punto' : 'puntos') : (wp.length === 1 ? 'waypoint' : 'waypoints')}`;
+  }
+
+  // -------------------------------------------------------------------------
+  // Summary
+  // -------------------------------------------------------------------------
+  function showSummary() {
+    if (timerInterval) clearInterval(timerInterval);
+    if (pauseTimeout)  clearTimeout(pauseTimeout);
+
+    const startedAt = parseInt(localStorage.getItem(KEY_STARTED) ?? '0', 10);
+    const elapsed = startedAt ? Math.floor((Date.now() - startedAt) / 1000) : 0;
+    const wps: number[] = JSON.parse(localStorage.getItem(KEY_WAYPOINTS) ?? '[]');
+    const species: string[] = JSON.parse(localStorage.getItem(KEY_SPECIES) ?? '[]');
+
+    const m = Math.floor(elapsed / 60);
+    const s = elapsed % 60;
+    const durationStr = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+
+    const summSpecies   = document.getElementById('summary-species-count');
+    const summDuration  = document.getElementById('summary-duration');
+    const summWaypoints = document.getElementById('summary-waypoints');
+    if (summSpecies)   summSpecies.textContent   = String(new Set(species).size);
+    if (summDuration)  summDuration.textContent  = durationStr;
+    if (summWaypoints) summWaypoints.textContent = String(wps.length);
+
+    showStage('summary');
+    // Fire badge event for "first expedition completed"
+    window.dispatchEvent(new CustomEvent('rastrum:expedition-completed', {
+      detail: { species_count: new Set(species).size, waypoints: wps.length, duration_s: elapsed },
+    }));
+  }
+
+  function clearExpedition() {
+    [KEY_SESSION, KEY_STAGE, KEY_NAME, KEY_STARTED, KEY_WAYPOINTS, KEY_SPECIES].forEach(k =>
+      localStorage.removeItem(k),
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Wire events
+  // -------------------------------------------------------------------------
+  closeBtn?.addEventListener('click', closeModal);
+  overlay?.addEventListener('click', (e) => {
+    if (e.target === overlay) closeModal();
+  });
+  fab?.addEventListener('click', openModal);
+
+  // Also expose a global open function for embedding pages
+  (window as unknown as Record<string, unknown>).openExpeditionMode = openModal;
+
+  document.getElementById('expedition-start-btn')?.addEventListener('click', () => {
+    const name = (document.getElementById('expedition-name-input') as HTMLInputElement | null)?.value.trim();
+    const sessionId = crypto.randomUUID();
+    localStorage.setItem(KEY_SESSION, sessionId);
+    localStorage.setItem(KEY_NAME, name ?? '');
+    localStorage.setItem(KEY_STARTED, String(Date.now()));
+    localStorage.setItem(KEY_WAYPOINTS, '[]');
+    localStorage.setItem(KEY_SPECIES, '[]');
+    showStage('active');
+    startTimer();
+  });
+
+  document.getElementById('expedition-waypoint-btn')?.addEventListener('click', addWaypoint);
+  document.getElementById('expedition-finish-btn')?.addEventListener('click', showSummary);
+  document.getElementById('expedition-pause-finish-btn')?.addEventListener('click', showSummary);
+  document.getElementById('expedition-continue-btn')?.addEventListener('click', () => {
+    showStage('active');
+    startTimer();
+  });
+  document.getElementById('expedition-done-btn')?.addEventListener('click', () => {
+    clearExpedition();
+    closeModal();
+  });
+
+  // Listen for observations submitted during expedition and count species
+  window.addEventListener('rastrum:suggestion-submitted', (e) => {
+    const detail = (e as CustomEvent).detail;
+    if (detail?.scientific_name && localStorage.getItem(KEY_STAGE) === 'active') {
+      const species: string[] = JSON.parse(localStorage.getItem(KEY_SPECIES) ?? '[]');
+      species.push(detail.scientific_name);
+      localStorage.setItem(KEY_SPECIES, JSON.stringify(species));
+      // Update chip
+      const chips = document.getElementById('expedition-species-chips');
+      if (chips) {
+        chips.querySelector('span.text-zinc-400')?.remove();
+        const chip = document.createElement('span');
+        chip.className = 'text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 italic';
+        chip.textContent = detail.scientific_name;
+        chips.appendChild(chip);
+      }
+    }
+  });
+
+  // Show FAB on observe page
+  const isObservePage = window.location.pathname.includes('/observar/') || window.location.pathname.includes('/observe/');
+  if (isObservePage) {
+    fab?.classList.remove('hidden');
+  }
+</script>
