@@ -1064,6 +1064,10 @@ DO $$
 DECLARE
   v_uid uuid := '88880000-0000-0000-0000-000000000001';
 BEGIN
+  -- Seed auth.users first — public.users.id has a FK to auth.users(id).
+  INSERT INTO auth.users (id, email) VALUES (v_uid, 'freeze_test_user@example.test')
+  ON CONFLICT (id) DO NOTHING;
+
   -- Seed a user row (public.users has no email column — that lives in auth.users).
   INSERT INTO public.users (id, username, display_name)
   VALUES (v_uid, 'freeze_test_user', 'Freeze Test')
