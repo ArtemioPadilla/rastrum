@@ -56,7 +56,12 @@ export function makePlantNetRunner(locale: Locale): IdentifierRunner {
     //   404 → PlantNet's "not a plant" or unknown key — no winner from us
     //   429 → daily quota exhausted (shared key shipped 500/day; the operator
     //         hit the cap, but Claude / Phi can still answer)
-    if (res.status === 403 || res.status === 404 || res.status === 429) return null;
+    // Soft-fail codes: skip this runner, let others continue
+    // 400 → malformed image / unsupported format / no organ detected → not fatal
+    // 403 → key revoked or origin not allowed
+    // 404 → PlantNet's "not a plant" or unknown taxon
+    // 429 → daily quota exhausted
+    if (res.status === 400 || res.status === 403 || res.status === 404 || res.status === 429) return null;
     if (!res.ok) throw new Error(`PlantNet HTTP ${res.status}`);
     const data = await res.json() as { results?: PlantNetMatch[] };
     const results = data.results ?? [];
