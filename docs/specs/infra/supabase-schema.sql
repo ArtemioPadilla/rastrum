@@ -12421,11 +12421,13 @@ CREATE TABLE IF NOT EXISTS public.trails (
 ALTER TABLE public.trails ENABLE ROW LEVEL SECURITY;
 
 -- Public trails are readable by anyone; owner can always read their own
+DROP POLICY IF EXISTS trails_public_read ON public.trails;
 CREATE POLICY trails_public_read ON public.trails
   FOR SELECT
   USING (visibility = 'public' OR (SELECT auth.uid()) = creator_id);
 
 -- Owners can insert/update/delete their own trails
+DROP POLICY IF EXISTS trails_owner_write ON public.trails;
 CREATE POLICY trails_owner_write ON public.trails
   FOR ALL
   TO authenticated
@@ -12451,11 +12453,13 @@ CREATE TABLE IF NOT EXISTS public.pits (
 ALTER TABLE public.pits ENABLE ROW LEVEL SECURITY;
 
 -- PITs are publicly readable (they link to public QR codes)
+DROP POLICY IF EXISTS pits_public_read ON public.pits;
 CREATE POLICY pits_public_read ON public.pits
   FOR SELECT
   USING (true);
 
 -- Only authenticated users can create/manage PITs (future: karma gate)
+DROP POLICY IF EXISTS pits_authenticated_write ON public.pits;
 CREATE POLICY pits_authenticated_write ON public.pits
   FOR ALL
   TO authenticated
