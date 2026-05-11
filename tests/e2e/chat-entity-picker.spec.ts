@@ -3,8 +3,11 @@
  * type a query, pick a row, and verify the entity chip appears.
  *
  * Strategy: No real Supabase needed. We:
- *  1. Intercept `getSupabase().rpc` at the window level so picker queries
- *     return deterministic fixture data.
+ *  1. Intercept the Supabase REST RPC endpoint via Playwright's
+ *     `page.route()` so picker queries return deterministic fixture data.
+ *     The route matches any URL whose pathname includes `/rest/v1/rpc/chat_find_`,
+ *     which keeps it working regardless of whether the preview build has
+ *     `PUBLIC_SUPABASE_URL` set.
  *  2. Intercept `rastrum:chat-attach-entity` to render a predictable chip
  *     (same mock used in chat-deep-link.spec.ts).
  *  3. Dispatch `rastrum:chat-open-entity-picker` programmatically to open
@@ -17,45 +20,53 @@ import { test, expect } from './fixtures/auth';
 
 const CHAT_EN = '/en/chat/';
 
-/** Inject a Supabase RPC mock that returns one fixture species row. */
+/** Intercept the supabase REST RPC endpoint and return fixture rows. */
 async function mockSupabaseRpc(page: import('@playwright/test').Page) {
-  await page.addInitScript(() => {
-    const FIXTURE_SPECIES = [
-      { id: 'taxon-001', scientific_name: 'Quercus rugosa' },
-      { id: 'taxon-002', scientific_name: 'Tillandsia usneoides' },
-    ];
-
-    // Proxy the global supabase getter used by ChatEntityPicker.
-    // The picker calls `getSupabase().rpc(...)` which internally is imported.
-    // We install a mock on `window.__supabaseMock` and patch via addInitScript.
-    (window as unknown as { __supabaseMock: unknown }).__supabaseMock = {
-      rpc: (fn: string) => {
-        if (fn === 'chat_find_species') {
-          return Promise.resolve({ data: FIXTURE_SPECIES, error: null });
-        }
-        if (fn === 'chat_find_observations') {
-          return Promise.resolve({ data: [], error: null });
-        }
-        return Promise.resolve({ data: [], error: null });
-      },
-      auth: { getUser: () => Promise.resolve({ data: { user: { id: 'e2e-user' } }, error: null }) },
-    };
-
-    // Patch the module-level supabase client reference by overriding
-    // the global `getSupabase` function if it was already attached.
-    // If not yet attached, wait for it via a MutationObserver-free poll.
-    const maybeOverride = () => {
-      const w = window as unknown as Record<string, unknown>;
-      if (typeof w['__rastrum_supabase_override'] === 'function') {
-        (w['__rastrum_supabase_override'] as (v: unknown) => void)((window as unknown as { __supabaseMock: unknown }).__supabaseMock);
-        return true;
-      }
-      return false;
-    };
-    if (!maybeOverride()) {
-      const iv = setInterval(() => { if (maybeOverride()) clearInterval(iv); }, 50);
-      setTimeout(() => clearInterval(iv), 5000);
+  await page.route(/\/rest\/v1\/rpc\/chat_find_/, async (route) => {
+    const url = new URL(route.request().url());
+    const fn = url.pathname.split('/').pop();
+    if (fn === 'chat_find_species') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          { id: 'taxon-001', scientific_name: 'Quercus rugosa' },
+          { id: 'taxon-002', scientific_name: 'Tillandsia usneoides' },
+        ]),
+      });
     }
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: '[]',
+    });
+  });
+}
+
+/** ChatView.refreshState() keeps `#chat-form` (and the entity-picker
+ *  button inside it) hidden until the WebLLM model cache reports a
+ *  cached Llama or Gemma shard. In a fresh CI environment neither is
+ *  cached, so `#chat-attach-entity-btn` stays hidden and the spec
+ *  can't open the picker. Same fix as chat-deep-link.spec.ts (#1004):
+ *  wrap caches.open('webllm/model') so the first call seeds a fake
+ *  shard URL containing TEXT_MODEL_ID before returning. */
+async function mockChatModelCached(page: import('@playwright/test').Page) {
+  await page.addInitScript(() => {
+    if (typeof caches === 'undefined') return;
+    const FAKE_URL = 'https://e2e.fixture/Llama-3.2-1B-Instruct-q4f16_1-MLC/shard.bin';
+    const realOpen = caches.open.bind(caches);
+    (caches as unknown as { open: typeof caches.open }).open = async (name: string) => {
+      const c = await realOpen(name);
+      if (name === 'webllm/model') {
+        const existing = await c.match(FAKE_URL);
+        if (!existing) {
+          await c.put(FAKE_URL, new Response(new Uint8Array(0), {
+            headers: { 'content-length': '0' },
+          }));
+        }
+      }
+      return c;
+    };
   });
 }
 
@@ -73,6 +84,7 @@ async function mockEntityChipRenderer(page: import('@playwright/test').Page) {
 
 test.describe('chat entity picker — species flow', () => {
   test('open picker, switch to Species tab, pick row → chip appears', async ({ authedPage: page }) => {
+    await mockChatModelCached(page);
     await mockSupabaseRpc(page);
     await mockEntityChipRenderer(page);
 
@@ -119,6 +131,7 @@ test.describe('chat entity picker — species flow', () => {
   });
 
   test('entity chip contains correct id after picker selection', async ({ authedPage: page }) => {
+    await mockChatModelCached(page);
     await mockSupabaseRpc(page);
     await mockEntityChipRenderer(page);
 
