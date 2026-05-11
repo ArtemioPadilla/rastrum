@@ -1,0 +1,81 @@
+---
+/**
+ * ConsentBanner.astro — LFPDPPP / LGPD analytics consent gate (#781)
+ *
+ * Shown on first visit (no 'rastrum_analytics_consent' key in localStorage).
+ * Hidden when DNT is set (no analytics fire regardless of this banner).
+ * Stores 'rastrum_analytics_consent' = 'true' | 'false' in localStorage.
+ *
+ * After accepting, PostHog is initialised by dispatching a custom event
+ * ('rastrum:consent-updated') that posthog.astro listens for via
+ * ConsentBanner's inline script, so the page doesn't need a reload.
+ */
+import enStrings from '../i18n/en.json';
+import esStrings from '../i18n/es.json';
+
+interface Props {
+  lang?: 'en' | 'es';
+}
+
+const { lang = 'en' } = Astro.props;
+const tr = lang === 'es' ? esStrings.consent : enStrings.consent;
+---
+
+<!-- Consent banner: hidden by default; shown by JS when consent is unknown -->
+<div
+  id="rastrum-consent-banner"
+  role="dialog"
+  aria-live="polite"
+  aria-label={lang === 'es' ? 'Banner de consentimiento de analíticas' : 'Analytics consent banner'}
+  class="fixed bottom-0 left-0 right-0 z-[9000] hidden"
+>
+  <div class="mx-auto max-w-2xl mb-4 mx-4 sm:mx-auto px-5 py-4 rounded-xl shadow-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+    <p class="text-sm text-zinc-700 dark:text-zinc-300 flex-1">
+      {tr.banner_text}
+    </p>
+    <div class="flex gap-2 shrink-0">
+      <button
+        id="rastrum-consent-decline"
+        class="rounded-lg px-3 py-1.5 text-sm font-medium border border-zinc-300 dark:border-zinc-600 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+      >
+        {tr.decline}
+      </button>
+      <button
+        id="rastrum-consent-accept"
+        class="rounded-lg px-3 py-1.5 text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
+      >
+        {tr.accept}
+      </button>
+    </div>
+  </div>
+</div>
+
+<script is:inline>
+  (function () {
+    const CONSENT_KEY = 'rastrum_analytics_consent';
+    const banner = document.getElementById('rastrum-consent-banner');
+    if (!banner) return;
+
+    // Never show when DNT is active.
+    const dnt = navigator.doNotTrack === '1' || window.doNotTrack === '1';
+    if (dnt) return;
+
+    // Show only if no decision has been stored yet.
+    const stored = localStorage.getItem(CONSENT_KEY);
+    if (stored !== null) return;
+
+    banner.classList.remove('hidden');
+
+    function dismiss(accepted) {
+      localStorage.setItem(CONSENT_KEY, accepted ? 'true' : 'false');
+      banner.classList.add('hidden');
+      // Notify other scripts (e.g. a reload-free PostHog init could listen here).
+      window.dispatchEvent(new CustomEvent('rastrum:consent-updated', { detail: { accepted } }));
+    }
+
+    document.getElementById('rastrum-consent-accept')
+      ?.addEventListener('click', () => dismiss(true));
+    document.getElementById('rastrum-consent-decline')
+      ?.addEventListener('click', () => dismiss(false));
+  })();
+</script>

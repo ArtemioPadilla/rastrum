@@ -17,6 +17,7 @@ import PhotoCropModal from '../components/PhotoCropModal.astro';
 import WhyAmISeeingThisDialog from '../components/WhyAmISeeingThisDialog.astro';
 import SurpriseOverlay from '../components/SurpriseOverlay.astro';
 import BanBanner from '../components/BanBanner.astro';
+import ConsentBanner from '../components/ConsentBanner.astro';
 import { getAlternateUrl } from '../i18n/utils';
 import StructuredData from '../components/StructuredData.astro';
 import Breadcrumbs from '../components/Breadcrumbs.astro';
@@ -360,6 +361,7 @@ const resolvedOgImage = ogImage ?? `${SITE_URL}/og/${ogLang}/${ogSlugForPath(cur
   </head>
   <body class="min-h-screen bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 transition-colors pb-20 sm:pb-0">
     <BanBanner lang={installLang} />
+    <ConsentBanner lang={installLang} />
     <OfflineBanner lang={installLang} />
     <Header lang={lang} currentPath={currentPath} />
     <InstallDiscoveryHint lang={installLang} />
