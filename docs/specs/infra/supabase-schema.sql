@@ -2163,7 +2163,8 @@ BEGIN
 
   RETURN v_delta;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+   SET search_path = public, extensions, pg_temp;
 
 GRANT EXECUTE ON FUNCTION public.award_karma(uuid, uuid, uuid, text, numeric) TO service_role;
 
@@ -10678,11 +10679,16 @@ CREATE OR REPLACE FUNCTION public.chat_find_location(p_query text, p_limit int D
 RETURNS TABLE (id uuid, slug text, name text, place_type text, observation_count int)
 LANGUAGE sql STABLE SECURITY DEFINER
 SET search_path = public, pg_temp AS $$
-  SELECT id, slug, name, place_type, observation_count
+  -- #914's CREATE TABLE places (line ~10650) is a no-op because
+  -- IF NOT EXISTS yields to the earlier WDPA places table (line ~7285),
+  -- which spells the column obs_count, not observation_count. Alias here
+  -- preserves the function's RETURNS TABLE contract (clients still see
+  -- observation_count) until the two places designs are reconciled.
+  SELECT id, slug, name, place_type, obs_count AS observation_count
   FROM public.places
   WHERE name ILIKE '%' || p_query || '%'
      OR slug ILIKE '%' || p_query || '%'
-  ORDER BY observation_count DESC
+  ORDER BY obs_count DESC
   LIMIT p_limit;
 $$;
 REVOKE EXECUTE ON FUNCTION public.chat_find_location(text, int) FROM PUBLIC;
@@ -11696,6 +11702,30 @@ BEGIN
     AND COALESCE(i.confidence, 0) >= 0.4;
 
   IF qualifying_days IS NULL THEN
+    -- Edge case: no qualifying observations right now (never logged, all
+    -- deleted, or this is the first call after a freeze window). Before
+    -- resetting, try to consume a freeze — mirrors the "missed day" branch
+    -- below so the freeze feature works regardless of whether qualifying_days
+    -- is empty or stale. Without this, recompute_streak silently resets
+    -- streaks for users who legitimately hold a freeze. Caught by the #866
+    -- regression test in tests/sql/rls.sql:1063 (freeze day 1).
+    SELECT COALESCE(s.streak_freezes_available, 0), COALESCE(s.current_days, 0)
+      INTO v_freezes_available, v_prev_current
+      FROM public.user_streaks s
+      WHERE s.user_id = p_user_id;
+
+    IF v_freezes_available > 0 AND v_prev_current > 0 THEN
+      UPDATE public.user_streaks
+         SET streak_freezes_available   = v_freezes_available - 1,
+             streak_freezes_used        = streak_freezes_used + 1,
+             streak_freeze_last_used_at = now(),
+             updated_at                 = now()
+       WHERE user_id = p_user_id;
+      INSERT INTO public.karma_events (user_id, delta, reason)
+      VALUES (p_user_id, 0, 'streak_freeze_consumed');
+      RETURN;
+    END IF;
+
     INSERT INTO public.user_streaks (user_id, current_days, longest_days, updated_at)
     VALUES (p_user_id, 0, 0, now())
     ON CONFLICT (user_id) DO UPDATE SET current_days = 0, updated_at = now();
@@ -11814,6 +11844,7 @@ CREATE INDEX IF NOT EXISTS probable_taxa_cache_geohash5_month_score_idx
 
 -- RLS: public read (anon may read suggestions), no direct write from clients.
 ALTER TABLE public.probable_taxa_cache ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "probable_taxa_cache: anon can read" ON public.probable_taxa_cache;
 CREATE POLICY "probable_taxa_cache: anon can read"
   ON public.probable_taxa_cache FOR SELECT
   USING (true);
@@ -12070,10 +12101,12 @@ CREATE INDEX IF NOT EXISTS idx_obs_synced_at
   ON public.observations (observer_id, observed_at DESC)
   WHERE sync_status = 'synced';
 
--- activity_events: unread notifications per target user (bell badge).
-CREATE INDEX IF NOT EXISTS idx_activity_target_unread
-  ON public.activity_events (target_user_id, created_at DESC)
-  WHERE read_at IS NULL;
+-- (Removed: idx_activity_target_unread referenced a non-existent
+-- activity_events.target_user_id column — the column was planned but
+-- never added. db-apply has been silently failing on this line, and
+-- the bell-badge query is already covered by idx_activity_unread on
+-- actor_id. Re-add this index in the same PR that introduces the
+-- target_user_id column with a real consumer.)
 
 -- ============================================================
 -- #550: Conservation status ETL — conservation_synced_at column
@@ -12085,21 +12118,21 @@ ALTER TABLE public.taxa
 -- Monthly cron: triggers the refresh-conservation-status Edge Function.
 -- Runs on the 1st of each month at 03:00 UTC.
 -- Requires pg_cron + pg_net extensions (already enabled in Rastrum).
-DO $$
+DO $do$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
     PERFORM cron.unschedule('refresh-conservation-status');
     PERFORM cron.schedule(
       'refresh-conservation-status',
       '0 3 1 * *',
-      $$SELECT net.http_post(
+      $cron$SELECT net.http_post(
           url    := current_setting('app.supabase_url') || '/functions/v1/refresh-conservation-status',
           headers := json_build_object('x-cron-secret', current_setting('app.cron_secret'))::jsonb,
           body   := '{}'::jsonb
-      )$$
+      )$cron$
     );
   END IF;
-END $$;
+END $do$;
 
 -- ============================================================
 -- #551: Wire conservation multipliers into award_karma()
@@ -12295,7 +12328,8 @@ BEGIN
 
   RETURN v_delta;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+   SET search_path = public, extensions, pg_temp;
 
 GRANT EXECUTE ON FUNCTION public.award_karma(uuid, uuid, uuid, text, numeric) TO service_role;
 
@@ -12413,11 +12447,13 @@ CREATE TABLE IF NOT EXISTS public.trails (
 ALTER TABLE public.trails ENABLE ROW LEVEL SECURITY;
 
 -- Public trails are readable by anyone; owner can always read their own
+DROP POLICY IF EXISTS trails_public_read ON public.trails;
 CREATE POLICY trails_public_read ON public.trails
   FOR SELECT
   USING (visibility = 'public' OR (SELECT auth.uid()) = creator_id);
 
 -- Owners can insert/update/delete their own trails
+DROP POLICY IF EXISTS trails_owner_write ON public.trails;
 CREATE POLICY trails_owner_write ON public.trails
   FOR ALL
   TO authenticated
@@ -12443,11 +12479,13 @@ CREATE TABLE IF NOT EXISTS public.pits (
 ALTER TABLE public.pits ENABLE ROW LEVEL SECURITY;
 
 -- PITs are publicly readable (they link to public QR codes)
+DROP POLICY IF EXISTS pits_public_read ON public.pits;
 CREATE POLICY pits_public_read ON public.pits
   FOR SELECT
   USING (true);
 
 -- Only authenticated users can create/manage PITs (future: karma gate)
+DROP POLICY IF EXISTS pits_authenticated_write ON public.pits;
 CREATE POLICY pits_authenticated_write ON public.pits
   FOR ALL
   TO authenticated
@@ -12500,6 +12538,8 @@ CREATE TABLE IF NOT EXISTS public.institutions (
   kind        text NOT NULL DEFAULT 'gov'
                 CHECK (kind IN ('gov','academic','ngo','research')),
   created_at  timestamptz NOT NULL DEFAULT now()
+);
+
 -- Admin-verified institutional affiliations for experts
 CREATE TABLE IF NOT EXISTS public.institutional_affiliations (
   id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -12557,8 +12597,13 @@ INSERT INTO public.institutions (short_name, long_name, kind) VALUES
   ('UASLP',   'Universidad Autónoma de San Luis Potosí',          'academic')
 ON CONFLICT (short_name) DO NOTHING;
 
--- Helper view: active affiliations with institution details for a user
-CREATE OR REPLACE VIEW public.user_active_affiliations AS
+-- Helper view: active affiliations with institution details for a user.
+-- security_invoker=true so the view honors the calling user's RLS on
+-- the underlying tables instead of bypassing them with the view owner's
+-- perms (Postgres 15+ default). Required by the schema-security lint
+-- enforced in db-validate.yml (see CLAUDE.md "Schema security invariants").
+CREATE OR REPLACE VIEW public.user_active_affiliations
+  WITH (security_invoker = true) AS
   SELECT
     ia.user_id,
     i.short_name   AS institution_short,
@@ -12582,6 +12627,8 @@ CREATE TABLE IF NOT EXISTS public.weekly_validator_rewards (
   awarded_at    timestamptz NOT NULL DEFAULT now(),
   claimed_at    timestamptz,
   UNIQUE (week_iso, user_id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_weekly_validator_rewards_user
   ON public.weekly_validator_rewards(user_id, awarded_at DESC);
 ALTER TABLE public.weekly_validator_rewards ENABLE ROW LEVEL SECURITY;
@@ -12595,12 +12642,23 @@ GRANT SELECT ON public.weekly_validator_rewards TO authenticated;
 -- Extend karma_events.reason CHECK to include lottery win
 -- (applied via ALTER TABLE; the original CREATE TABLE definition can't be
 --  retroactively changed without a migration, so we add a constraint here)
+-- Extends the constraint redefined above (line ~12145) to include
+-- expert_id_lottery_win. PRESERVE every reason already accumulated by
+-- prior ALTERs — the previous version of this block dropped
+-- streak_freeze_consumed, pool_donation, ai_sponsorship_*, ai_sponsor_call,
+-- and pool_call_sponsor_drip on every db-apply, silently breaking those
+-- features whenever a real INSERT was attempted. (The broken validate
+-- gate masked this in CI; production INSERTs from those features have
+-- been failing on the CHECK constraint since #725/#734/#735 shipped.)
 ALTER TABLE public.karma_events
   DROP CONSTRAINT IF EXISTS karma_events_reason_check;
 ALTER TABLE public.karma_events
   ADD CONSTRAINT karma_events_reason_check CHECK (reason IN (
     'consensus_win','consensus_loss','first_in_rastrum',
     'observation_synced','comment_reaction','manual_adjust',
+    'ai_sponsorship_active','ai_sponsorship_revoked','ai_sponsor_call',
+    'pool_donation','pool_call_sponsor_drip',
+    'streak_freeze_consumed',
     'expert_id_lottery_win'
   ));
 
@@ -12793,12 +12851,12 @@ COMMENT ON TABLE public.community_themes IS
 -- ============================================================
 
 -- Pre-computed per-user observation aggregates.
--- Avoids expensive live COUNT(*) / COUNT(DISTINCT taxon_id) on profile pages.
+-- Avoids expensive live COUNT(*) / COUNT(DISTINCT primary_taxon_id) on profile pages.
 CREATE MATERIALIZED VIEW IF NOT EXISTS public.mv_user_observation_counts AS
   SELECT
     observer_id,
     COUNT(*) AS total,
-    COUNT(DISTINCT taxon_id) AS species_count,
+    COUNT(DISTINCT primary_taxon_id) AS species_count,
     MAX(observed_at) AS last_observed_at
   FROM public.observations
   WHERE sync_status = 'synced'
@@ -12811,13 +12869,14 @@ CREATE UNIQUE INDEX IF NOT EXISTS mv_user_obs_counts_idx
 -- Avoids a full-table scan on the explore / trending-species page.
 CREATE MATERIALIZED VIEW IF NOT EXISTS public.mv_recent_species AS
   SELECT
-    taxon_id,
+    primary_taxon_id AS taxon_id,
     COUNT(*) AS recent_count,
     MAX(observed_at) AS last_seen
   FROM public.observations
   WHERE sync_status = 'synced'
     AND observed_at > now() - interval '30 days'
-  GROUP BY taxon_id
+    AND primary_taxon_id IS NOT NULL
+  GROUP BY primary_taxon_id
   ORDER BY recent_count DESC;
 
 CREATE UNIQUE INDEX IF NOT EXISTS mv_recent_species_idx

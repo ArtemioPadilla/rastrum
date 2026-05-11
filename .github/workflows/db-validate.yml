@@ -20,12 +20,14 @@ name: db-validate
 #     future PR; we only check the ENABLE flag here, not policy logic)
 
 on:
+  # No `paths:` filter — validate runs on every PR so the required status
+  # check is always present. A path-filtered required check creates a
+  # deadlock (the rule expects the check, but the workflow never fires on
+  # PRs that don't touch schema). Validate is fast (~1.5 min, parallel
+  # with other CI), and idempotent schema apply is a useful smoke test
+  # even on PRs that don't change SQL — catches any drift between the
+  # checked-in schema and what Postgres actually accepts.
   pull_request:
-    paths:
-      - 'docs/specs/infra/supabase-schema.sql'
-      - 'docs/specs/infra/cron-schedules.sql'
-      - 'tests/sql/**'
-      - '.github/workflows/db-validate.yml'
 
 concurrency:
   group: db-validate-${{ github.ref }}
@@ -133,6 +135,15 @@ jobs:
           GRANT USAGE ON SCHEMA storage TO anon, authenticated, service_role;
           GRANT ALL ON storage.buckets, storage.objects TO authenticated, service_role;
           GRANT SELECT ON storage.buckets, storage.objects TO anon;
+
+          -- storage.foldername(text) — Supabase's real impl splits a path by '/' and
+          -- returns the array of folder segments minus the final filename. For the
+          -- validate context we just need a function that lets the policy compile
+          -- and evaluate correctly; the simplest equivalent splits on '/' and returns
+          -- all segments, which the only consuming policy ([1] != '.keep') reads
+          -- positionally from. See docs/specs/infra/supabase-schema.sql media_authenticated_list.
+          CREATE OR REPLACE FUNCTION storage.foldername(name text) RETURNS text[]
+          LANGUAGE sql IMMUTABLE AS $$ SELECT string_to_array($1, '/') $$;
 
           -- Cron stubs MUST be created before supabase-schema.sql is applied,
           -- because rastrum's schema now defines SQL functions whose body
