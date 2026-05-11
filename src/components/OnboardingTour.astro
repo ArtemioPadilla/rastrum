@@ -271,6 +271,22 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
     try { localStorage.setItem(SEEN_KEY, SEEN_VAL); } catch { /* noop */ }
   }
 
+  // Guards: persistPreset() calls persistOnboardingDone() when the user
+  // picks a preset (they may close the modal before reaching the last step).
+  // hide() ALSO calls it when the modal actually closes. Both paths are safe
+  // because the UPDATE is idempotent — writing now() twice is a no-op effect.
+  // The paths are NOT mutually exclusive: preset → continue → last step → hide()
+  // will fire persistOnboardingDone() twice. This is intentional and harmless.
+  async function persistOnboardingDone(): Promise<void> {
+    let sb;
+    try { sb = getSupabase(); } catch { return; }
+    try {
+      const user = await getCachedUser();
+      if (!user) return;
+      await sb.from('users').update({ onboarding_completed_at: new Date().toISOString() }).eq('id', user.id);
+    } catch { /* env not configured / column missing — fail closed */ }
+  }
+
   function resolveTarget(selector: string | null): Element | null {
     if (!selector) return null;
     const parts = selector.split(',').map(s => s.trim());
@@ -397,6 +413,7 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
       const user = await getCachedUser();
       if (!user) return;
       await sb.from('users').update({ profile_privacy: PRESET_DEFS[preset] }).eq('id', user.id);
+      persistOnboardingDone().catch(() => { /* env not configured */ });
     } catch { /* env not configured / column missing — fail closed */ }
   }
 
@@ -581,6 +598,7 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
     try { returnFocusEl?.focus(); } catch { /* noop */ }
     const outcomeType = current === TOTAL - 1 ? 'completed' : 'dismissed';
     try { window.dispatchEvent(new CustomEvent('rastrum:onboarding-event', { detail: { type: outcomeType, step: current } })); } catch { /* noop */ }
+    persistOnboardingDone().catch(() => { /* env not configured */ });
     if (outcomeType === 'completed') {
       window.posthog?.capture('onboarding_completed', { steps_total: TOTAL });
     } else {
@@ -676,17 +694,17 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
     try { sb = getSupabase(); } catch { return; }
     const user = await getCachedUser();
     if (!user) return;
-    // Cross-device dedupe: if this user already configured privacy on another
-    // browser/session, the server holds profile_privacy. Treat that as proof
-    // the tour ran before and skip — otherwise users hit the privacy step
-    // every time their localStorage is cleared (incognito, ITP, new device).
+    // Cross-device dedupe: if this user already resolved the tour on another
+    // browser/session, the server holds onboarding_completed_at. Treat that
+    // as proof the tour ran before and skip — otherwise users hit it every
+    // time their localStorage is cleared (incognito, ITP, new device).
     try {
       const { data: profile } = await sb
         .from('users')
-        .select('profile_privacy')
+        .select('onboarding_completed_at')
         .eq('id', user.id)
-        .maybeSingle<{ profile_privacy: Record<string, string> | null }>();
-      if (profile?.profile_privacy && Object.keys(profile.profile_privacy).length > 0) {
+        .maybeSingle<{ onboarding_completed_at: string | null }>();
+      if (profile?.onboarding_completed_at) {
         markSeen();
         return;
       }

@@ -69,13 +69,6 @@ ALTER TABLE public.users
   -- users_self_update policies, never exposed via users_public_read.
   ADD COLUMN IF NOT EXISTS notification_prefs    jsonb NOT NULL DEFAULT '{}'::jsonb;
 
--- #869: Birthday Naturalist badge — user-supplied birthday (month+day), private by default.
-ALTER TABLE public.users
-  ADD COLUMN IF NOT EXISTS birthday date NULL;
-
--- Allow self-write for birthday field.
-GRANT UPDATE (birthday) ON public.users TO authenticated;
-
 -- Auto-create user profile on sign-up. Pulls avatar + display name from
 -- the OAuth provider's metadata when present:
 --   Google → user_metadata.picture (preferred) or .avatar_url
@@ -1158,35 +1151,6 @@ REVOKE EXECUTE ON FUNCTION public.badge_eligible_midnight_observation(uuid)    F
 GRANT EXECUTE ON FUNCTION public.badge_eligible_streak(integer)                TO service_role;
 GRANT EXECUTE ON FUNCTION public.badge_eligible_state_diversity(integer)       TO service_role;
 GRANT EXECUTE ON FUNCTION public.badge_eligible_midnight_observation(uuid)     TO service_role;
-
--- #869: Birthday Naturalist — fires on the user's birthday when they have ≥1 obs today.
-CREATE OR REPLACE FUNCTION public.badge_eligible_birthday_observation(p_user_id uuid DEFAULT NULL)
-RETURNS SETOF uuid
-LANGUAGE plpgsql
-STABLE
-SECURITY DEFINER
-SET search_path = public, extensions, pg_temp
-AS $$
-BEGIN
-  RETURN QUERY
-    SELECT DISTINCT u.id
-      FROM public.users u
-     WHERE u.birthday IS NOT NULL
-       AND EXTRACT(MONTH FROM (now() AT TIME ZONE COALESCE(u.timezone, 'UTC'))::date) = EXTRACT(MONTH FROM u.birthday)
-       AND EXTRACT(DAY   FROM (now() AT TIME ZONE COALESCE(u.timezone, 'UTC'))::date) = EXTRACT(DAY   FROM u.birthday)
-       AND EXISTS (
-         SELECT 1 FROM public.observations o
-          WHERE o.observer_id = u.id
-            AND o.sync_status = 'synced'
-            AND (o.observed_at AT TIME ZONE COALESCE(u.timezone, 'UTC'))::date
-                = (now() AT TIME ZONE COALESCE(u.timezone, 'UTC'))::date
-       )
-       AND (p_user_id IS NULL OR u.id = p_user_id);
-END
-$$;
-
-REVOKE EXECUTE ON FUNCTION public.badge_eligible_birthday_observation(uuid) FROM PUBLIC;
-GRANT  EXECUTE ON FUNCTION public.badge_eligible_birthday_observation(uuid) TO service_role;
 
 -- ============================================================
 -- EXPERT-WEIGHTED CONSENSUS (v0.5/v1.0 — module 08)
@@ -2572,6 +2536,9 @@ ALTER TABLE public.users
     "pokedex":          "public"
   }'::jsonb,
   ADD COLUMN IF NOT EXISTS dismissed_privacy_intro_at timestamptz;
+
+ALTER TABLE public.users
+  ADD COLUMN IF NOT EXISTS onboarding_completed_at timestamptz;
 
 CREATE INDEX IF NOT EXISTS idx_users_profile_privacy
   ON public.users USING gin (profile_privacy jsonb_path_ops);
@@ -12425,234 +12392,64 @@ CREATE POLICY "expert_apps_insert_own" ON public.expert_applications
 COMMENT ON COLUMN public.taxa.rarity_tier IS '1=common(101+obs), 2=uncommon(21-100), 3=rare(6-20), 4=very_rare(1-5), NULL=no_obs';
 
 -- ============================================================
--- #735: INSTITUTIONAL ENDORSEMENT BADGES
+-- v1.5: Biodiversity Trails (#191)
 -- ============================================================
 
--- Known institutions (seed data for the 20 most likely in Mexico)
-CREATE TABLE IF NOT EXISTS public.institutions (
-  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  short_name  text NOT NULL UNIQUE,           -- 'CONANP', 'CONABIO', etc.
-  long_name   text NOT NULL,
-  logo_url    text,
-  country     text NOT NULL DEFAULT 'MX',
-  kind        text NOT NULL DEFAULT 'gov'
-                CHECK (kind IN ('gov','academic','ngo','research')),
-  created_at  timestamptz NOT NULL DEFAULT now()
+CREATE TABLE IF NOT EXISTS public.trails (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name text NOT NULL,
+  name_es text,
+  creator_id uuid REFERENCES public.users(id) ON DELETE SET NULL,
+  -- waypoints: [{lat, lng, name, obs_count}]
+  waypoints jsonb NOT NULL DEFAULT '[]',
+  total_species int NOT NULL DEFAULT 0,
+  total_observations int NOT NULL DEFAULT 0,
+  distance_km numeric,
+  visibility text NOT NULL DEFAULT 'public'
+    CHECK (visibility IN ('public', 'private')),
+  created_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Admin-verified institutional affiliations for experts
-CREATE TABLE IF NOT EXISTS public.institutional_affiliations (
-  id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id           uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-  institution_id    uuid NOT NULL REFERENCES public.institutions(id) ON DELETE CASCADE,
-  role              text,                     -- 'Investigador', 'Técnico', etc.
-  valid_from        date,
-  valid_to          date,                     -- NULL means currently active
-  verified_by_admin uuid REFERENCES public.users(id),
-  created_at        timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (user_id, institution_id)
+ALTER TABLE public.trails ENABLE ROW LEVEL SECURITY;
+
+-- Public trails are readable by anyone; owner can always read their own
+CREATE POLICY trails_public_read ON public.trails
+  FOR SELECT
+  USING (visibility = 'public' OR (SELECT auth.uid()) = creator_id);
+
+-- Owners can insert/update/delete their own trails
+CREATE POLICY trails_owner_write ON public.trails
+  FOR ALL
+  TO authenticated
+  USING ((SELECT auth.uid()) = creator_id)
+  WITH CHECK ((SELECT auth.uid()) = creator_id);
+
+-- ============================================================
+-- v1.5: PITs — Puntos de Información Territorial (#193)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.pits (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  slug text NOT NULL UNIQUE,
+  name text NOT NULL,
+  name_es text,
+  lat numeric NOT NULL,
+  lng numeric NOT NULL,
+  qr_payload text NOT NULL,
+  trail_id uuid REFERENCES public.trails(id) ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_inst_affiliations_user
-  ON public.institutional_affiliations(user_id);
+ALTER TABLE public.pits ENABLE ROW LEVEL SECURITY;
 
-ALTER TABLE public.institutions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.institutional_affiliations ENABLE ROW LEVEL SECURITY;
+-- PITs are publicly readable (they link to public QR codes)
+CREATE POLICY pits_public_read ON public.pits
+  FOR SELECT
+  USING (true);
 
--- Institutions are publicly readable
-DROP POLICY IF EXISTS "institutions_public_read" ON public.institutions;
-CREATE POLICY "institutions_public_read" ON public.institutions
-  FOR SELECT USING (true);
-
--- Affiliations readable by everyone (institutional credibility is public)
-DROP POLICY IF EXISTS "affiliations_public_read" ON public.institutional_affiliations;
-CREATE POLICY "affiliations_public_read" ON public.institutional_affiliations
-  FOR SELECT USING (true);
-
-GRANT SELECT ON public.institutions TO authenticated, anon;
-GRANT SELECT ON public.institutional_affiliations TO authenticated, anon;
--- Only service_role can insert/update (admin-verified flow)
-GRANT INSERT, UPDATE, DELETE ON public.institutions TO service_role;
-GRANT INSERT, UPDATE, DELETE ON public.institutional_affiliations TO service_role;
-
--- Seed: 20 most common Mexican institutions in biodiversity research
-INSERT INTO public.institutions (short_name, long_name, kind) VALUES
-  ('CONANP',  'Comisión Nacional de Áreas Naturales Protegidas',  'gov'),
-  ('CONABIO', 'Comisión Nacional para el Conocimiento y Uso de la Biodiversidad', 'gov'),
-  ('UNAM',    'Universidad Nacional Autónoma de México',          'academic'),
-  ('INECOL',  'Instituto de Ecología, A.C.',                      'research'),
-  ('INE',     'Instituto Nacional de Ecología',                   'gov'),
-  ('IPN',     'Instituto Politécnico Nacional',                   'academic'),
-  ('IIB',     'Instituto de Investigaciones Biomédicas, UNAM',    'research'),
-  ('IBUNAM',  'Instituto de Biología, UNAM',                      'research'),
-  ('UAM',     'Universidad Autónoma Metropolitana',               'academic'),
-  ('ECOSUR',  'El Colegio de la Frontera Sur',                    'research'),
-  ('CICY',    'Centro de Investigación Científica de Yucatán',    'research'),
-  ('CIBNOR',  'Centro de Investigaciones Biológicas del Noroeste','research'),
-  ('ENCB-IPN','Escuela Nacional de Ciencias Biológicas, IPN',     'academic'),
-  ('WWF-MX',  'WWF México',                                       'ngo'),
-  ('PRONATURA','Pronatura México',                                 'ngo'),
-  ('GEMA',    'Grupo de Ecología y Conservación de Islas',        'ngo'),
-  ('CEDES',   'Centro Ecológico de Sonora',                       'gov'),
-  ('UAC',     'Universidad Autónoma de Campeche',                 'academic'),
-  ('UJAT',    'Universidad Juárez Autónoma de Tabasco',           'academic'),
-  ('UASLP',   'Universidad Autónoma de San Luis Potosí',          'academic')
-ON CONFLICT (short_name) DO NOTHING;
-
--- Helper view: active affiliations with institution details for a user
-CREATE OR REPLACE VIEW public.user_active_affiliations AS
-  SELECT
-    ia.user_id,
-    i.short_name   AS institution_short,
-    i.long_name    AS institution_long,
-    i.logo_url,
-    i.kind,
-    ia.role,
-    ia.verified_by_admin IS NOT NULL AS is_verified
-  FROM public.institutional_affiliations ia
-  JOIN public.institutions i ON i.id = ia.institution_id
-  WHERE ia.valid_to IS NULL OR ia.valid_to > CURRENT_DATE;
-
-GRANT SELECT ON public.user_active_affiliations TO authenticated, anon;
-
--- ============================================================
--- #734: WEEKLY EXPERT-ID LOTTERY (Principle of Reciprocity)
--- ============================================================
-
--- Ledger of weekly lottery winners
-CREATE TABLE IF NOT EXISTS public.weekly_validator_rewards (
-  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  week_iso      text NOT NULL,                    -- e.g. '2026-W20'
-  user_id       uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-  observation_id uuid REFERENCES public.observations(id) ON DELETE SET NULL,
-  awarded_at    timestamptz NOT NULL DEFAULT now(),
-  claimed_at    timestamptz,
-  UNIQUE (week_iso, user_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_weekly_validator_rewards_user
-  ON public.weekly_validator_rewards(user_id, awarded_at DESC);
-
-ALTER TABLE public.weekly_validator_rewards ENABLE ROW LEVEL SECURITY;
-
--- Users can read their own rewards
-DROP POLICY IF EXISTS "validator_rewards_self_read" ON public.weekly_validator_rewards;
-CREATE POLICY "validator_rewards_self_read" ON public.weekly_validator_rewards
-  FOR SELECT TO authenticated USING (auth.uid() = user_id);
-
-GRANT SELECT ON public.weekly_validator_rewards TO authenticated;
-
--- Extend karma_events.reason CHECK to include lottery win
--- (applied via ALTER TABLE; the original CREATE TABLE definition can't be
---  retroactively changed without a migration, so we add a constraint here)
-ALTER TABLE public.karma_events
-  DROP CONSTRAINT IF EXISTS karma_events_reason_check;
-ALTER TABLE public.karma_events
-  ADD CONSTRAINT karma_events_reason_check CHECK (reason IN (
-    'consensus_win','consensus_loss','first_in_rastrum',
-    'observation_synced','comment_reaction','manual_adjust',
-    'expert_id_lottery_win'
-  ));
-
--- pg_cron: run weekly-expert-lottery every Sunday at 18:00 UTC
--- SELECT cron.schedule('weekly-expert-lottery','0 18 * * 0',
---   $$SELECT net.http_post(url:=current_setting('app.supabase_functions_url') || '/weekly-expert-lottery',
---     headers:='{"x-cron-secret":"<secret>"}'::jsonb)$$);
-
--- ============================================================
--- #748: OBSERVADOR DEL MES (Principle of Recognition)
--- ============================================================
-
--- Featured observer per calendar month (admin-selectable or auto-picked)
-CREATE TABLE IF NOT EXISTS public.featured_observers (
-  month_date     date NOT NULL PRIMARY KEY,   -- first day of month, e.g. 2026-05-01
-  user_id        uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-  headline_es    text,                         -- blurb in Spanish
-  headline_en    text,                         -- blurb in English
-  custom_photo_url text,                       -- override avatar for the feature
-  picked_by_admin uuid REFERENCES public.users(id),
-  created_at     timestamptz NOT NULL DEFAULT now()
-);
-
-ALTER TABLE public.featured_observers ENABLE ROW LEVEL SECURITY;
-
--- Publicly readable
-DROP POLICY IF EXISTS "featured_observers_public_read" ON public.featured_observers;
-CREATE POLICY "featured_observers_public_read" ON public.featured_observers
-  FOR SELECT USING (true);
-
-GRANT SELECT ON public.featured_observers TO authenticated, anon;
--- Only service_role (admin console) can insert/update
-GRANT INSERT, UPDATE, DELETE ON public.featured_observers TO service_role;
-
--- ============================================================
--- #802: GBIF OPTION B REGIONAL BASELINE (Credibility + Reduction)
--- ============================================================
-
--- Per-region, per-kingdom/taxon baseline from GBIF
-CREATE TABLE IF NOT EXISTS public.regional_taxa_baseline (
-  id                  bigserial PRIMARY KEY,
-  region_code         text NOT NULL,             -- ISO country code, e.g. 'MX'
-  kingdom             text NOT NULL,             -- 'Plantae', 'Animalia', 'Fungi'
-  gbif_kingdom_key    integer,
-  taxon_id            uuid REFERENCES public.taxa(id) ON DELETE SET NULL,
-  gbif_species_key    integer,
-  occurrence_count    bigint NOT NULL DEFAULT 0,
-  source              text NOT NULL DEFAULT 'gbif_occurrence_api',
-  source_dataset_doi  text,
-  last_synced_at      timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (region_code, kingdom)
-);
-
-CREATE INDEX IF NOT EXISTS idx_regional_baseline_region
-  ON public.regional_taxa_baseline(region_code);
-CREATE INDEX IF NOT EXISTS idx_regional_baseline_taxon
-  ON public.regional_taxa_baseline(taxon_id)
-  WHERE taxon_id IS NOT NULL;
-
-ALTER TABLE public.regional_taxa_baseline ENABLE ROW LEVEL SECURITY;
-
--- Publicly readable (GBIF data is CC BY 4.0)
-DROP POLICY IF EXISTS "regional_baseline_public_read" ON public.regional_taxa_baseline;
-CREATE POLICY "regional_baseline_public_read" ON public.regional_taxa_baseline
-  FOR SELECT USING (true);
-
-GRANT SELECT ON public.regional_taxa_baseline TO authenticated, anon;
-GRANT INSERT, UPDATE, DELETE ON public.regional_taxa_baseline TO service_role;
-
--- Update falta-dex Pokédex disclaimer copy on PokedexView.astro to note GBIF.
--- The p_baseline_source parameter is added to profile_pokedex_with_missing()
--- as a no-op alias in this migration — full GBIF JOIN comes in v1.2 once the
--- per-species download job populates taxon_id rows.
-COMMENT ON TABLE public.regional_taxa_baseline IS
-  '#802 GBIF Option B baseline for falta-dex. Nightly ETL via sync-gbif-regional-baseline EF. '
-  'v1.1: kingdom-level occurrence counts. v1.2: per-species rows via GBIF download API.';
-
--- pg_cron: nightly sync at 03:00 UTC
--- SELECT cron.schedule('sync-gbif-regional-baseline','0 3 * * *',
---   $$SELECT net.http_post(url:=current_setting('app.supabase_functions_url') || '/sync-gbif-regional-baseline',
---     headers:='{"x-cron-secret":"<secret>"}'::jsonb)$$);
-
--- ============================================================
--- #725: RASTRUM WRAPPED (Principle of Self-Monitoring)
--- ============================================================
-
--- Cache table for annual Wrapped stats
-CREATE TABLE IF NOT EXISTS public.wrapped_cache (
-  user_id      uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-  year         smallint NOT NULL CHECK (year BETWEEN 2020 AND 2099),
-  payload      jsonb NOT NULL,
-  generated_at timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (user_id, year)
-);
-
-ALTER TABLE public.wrapped_cache ENABLE ROW LEVEL SECURITY;
-
--- Users can read their own Wrapped
-DROP POLICY IF EXISTS "wrapped_cache_self_read" ON public.wrapped_cache;
-CREATE POLICY "wrapped_cache_self_read" ON public.wrapped_cache
-  FOR SELECT TO authenticated USING (auth.uid() = user_id);
-
-GRANT SELECT ON public.wrapped_cache TO authenticated;
--- generate-wrapped EF uses service_role to upsert
-GRANT INSERT, UPDATE, DELETE ON public.wrapped_cache TO service_role;
+-- Only authenticated users can create/manage PITs (future: karma gate)
+CREATE POLICY pits_authenticated_write ON public.pits
+  FOR ALL
+  TO authenticated
+  USING (true)
+  WITH CHECK (true);

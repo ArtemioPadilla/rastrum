@@ -1,0 +1,360 @@
+---
+/**
+ * SpatialLayersPanel.astro — Toggle panel for ANP/INEGI/INAH GeoJSON layers (issue #194).
+ *
+ * Renders a floating panel that controls three spatial overlay layer groups:
+ *   1. ANP (Áreas Naturales Protegidas) — Mexico protected areas
+ *   2. INEGI states/municipalities — administrative boundary layers
+ *   3. INAH heritage zones — cultural/archaeological heritage overlays
+ *
+ * Each layer has:
+ *   - Toggle checkbox to show/hide the layer
+ *   - Color swatch showing the layer's fill color
+ *   - Opacity slider (0–100%)
+ *
+ * When a layer is toggled or its opacity changes the component dispatches a
+ * `rastrum:layer-toggled` CustomEvent on `document` with the payload:
+ *   { layer: string, visible: boolean, opacity: number }
+ *
+ * The ExploreMap/ExploreMapView can listen to this event and apply the
+ * corresponding MapLibre layer visibility/opacity properties.
+ *
+ * No npm dependencies — uses the QR-server API and plain CSS/JS only.
+ */
+interface Props {
+  lang: 'en' | 'es';
+  /** Whether the panel starts open or collapsed. Default: false (collapsed). */
+  open?: boolean;
+}
+
+const { lang, open = false } = Astro.props;
+const isEs = lang === 'es';
+
+const copy = {
+  title:    isEs ? 'Capas espaciales'          : 'Spatial layers',
+  anpGroup: isEs ? 'ANP — Áreas Naturales Protegidas' : 'ANP — Protected Natural Areas',
+  inegiGroup: isEs ? 'INEGI — Estados y municipios' : 'INEGI — States & municipalities',
+  inahGroup: isEs ? 'INAH — Zonas de patrimonio'  : 'INAH — Heritage zones',
+  opacity:  isEs ? 'Opacidad'                  : 'Opacity',
+  collapse: isEs ? 'Colapsar capas'            : 'Collapse layers',
+  expand:   isEs ? 'Expandir capas'            : 'Expand layers',
+  states:   isEs ? 'Estados'                   : 'States',
+  municipalities: isEs ? 'Municipios'          : 'Municipalities',
+  inegiGrid: isEs ? 'Malla INEGI'              : 'INEGI grid',
+};
+
+// Layer definitions
+const layers = [
+  // ANP group
+  {
+    id: 'anp-federal',
+    group: 'anp',
+    label: isEs ? 'ANP Federales' : 'Federal ANPs',
+    color: '#16a34a',
+    defaultVisible: true,
+    defaultOpacity: 0.35,
+  },
+  {
+    id: 'anp-state',
+    group: 'anp',
+    label: isEs ? 'ANP Estatales' : 'State ANPs',
+    color: '#86efac',
+    defaultVisible: false,
+    defaultOpacity: 0.3,
+  },
+  // INEGI group
+  {
+    id: 'inegi-states',
+    group: 'inegi',
+    label: copy.states,
+    color: '#3b82f6',
+    defaultVisible: false,
+    defaultOpacity: 0.2,
+  },
+  {
+    id: 'inegi-municipalities',
+    group: 'inegi',
+    label: copy.municipalities,
+    color: '#93c5fd',
+    defaultVisible: false,
+    defaultOpacity: 0.15,
+  },
+  // INAH group
+  {
+    id: 'inah-heritage',
+    group: 'inah',
+    label: isEs ? 'Zonas arqueológicas' : 'Archaeological zones',
+    color: '#f59e0b',
+    defaultVisible: false,
+    defaultOpacity: 0.4,
+  },
+];
+---
+
+<div
+  id="spatial-layers-panel"
+  class="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden"
+  data-open={String(open)}
+>
+  <!-- Header / toggle -->
+  <button
+    id="spatial-layers-header"
+    class="w-full flex items-center justify-between gap-3 px-4 py-3 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
+    aria-expanded={String(open)}
+    aria-controls="spatial-layers-body"
+  >
+    <div class="flex items-center gap-2">
+      <svg class="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
+      </svg>
+      <span class="text-sm font-medium text-zinc-700 dark:text-zinc-200">{copy.title}</span>
+    </div>
+    <svg
+      id="spatial-layers-chevron"
+      class="w-4 h-4 text-zinc-400 transition-transform duration-200"
+      class:list={[open && 'rotate-180']}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      stroke-width="2"
+    >
+      <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+    </svg>
+  </button>
+
+  <!-- Body -->
+  <div
+    id="spatial-layers-body"
+    class="transition-all duration-200 overflow-hidden"
+    class:list={[!open && 'hidden']}
+  >
+    <div class="px-4 pb-4 space-y-4">
+
+      <!-- ANP Group -->
+      <div>
+        <p class="text-[11px] font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500 mb-2">
+          {copy.anpGroup}
+        </p>
+        <div class="space-y-2">
+          {layers.filter(l => l.group === 'anp').map(layer => (
+            <div class="flex items-center gap-3" data-layer-row={layer.id}>
+              <!-- Checkbox -->
+              <input
+                type="checkbox"
+                id={`layer-toggle-${layer.id}`}
+                data-layer-id={layer.id}
+                checked={layer.defaultVisible}
+                class="spatial-layer-toggle w-4 h-4 rounded accent-emerald-600 cursor-pointer flex-shrink-0"
+              />
+              <!-- Color swatch -->
+              <span
+                class="w-3 h-3 rounded-sm flex-shrink-0 border border-white/20"
+                style={`background-color: ${layer.color};`}
+                aria-hidden="true"
+              ></span>
+              <!-- Label -->
+              <label
+                for={`layer-toggle-${layer.id}`}
+                class="flex-1 text-xs text-zinc-700 dark:text-zinc-300 cursor-pointer"
+              >
+                {layer.label}
+              </label>
+              <!-- Opacity slider -->
+              <div class="flex items-center gap-1.5 flex-shrink-0">
+                <span class="text-[10px] text-zinc-400 w-6 text-right" id={`opacity-label-${layer.id}`}>
+                  {Math.round(layer.defaultOpacity * 100)}%
+                </span>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={Math.round(layer.defaultOpacity * 100)}
+                  data-layer-id={layer.id}
+                  class="spatial-layer-opacity w-20 h-1 cursor-pointer accent-emerald-600"
+                  aria-label={`${copy.opacity} ${layer.label}`}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <!-- Divider -->
+      <hr class="border-zinc-100 dark:border-zinc-800" />
+
+      <!-- INEGI Group -->
+      <div>
+        <p class="text-[11px] font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500 mb-2">
+          {copy.inegiGroup}
+        </p>
+        <div class="space-y-2">
+          {layers.filter(l => l.group === 'inegi').map(layer => (
+            <div class="flex items-center gap-3" data-layer-row={layer.id}>
+              <input
+                type="checkbox"
+                id={`layer-toggle-${layer.id}`}
+                data-layer-id={layer.id}
+                checked={layer.defaultVisible}
+                class="spatial-layer-toggle w-4 h-4 rounded accent-blue-500 cursor-pointer flex-shrink-0"
+              />
+              <span
+                class="w-3 h-3 rounded-sm flex-shrink-0 border border-white/20"
+                style={`background-color: ${layer.color};`}
+                aria-hidden="true"
+              ></span>
+              <label
+                for={`layer-toggle-${layer.id}`}
+                class="flex-1 text-xs text-zinc-700 dark:text-zinc-300 cursor-pointer"
+              >
+                {layer.label}
+              </label>
+              <div class="flex items-center gap-1.5 flex-shrink-0">
+                <span class="text-[10px] text-zinc-400 w-6 text-right" id={`opacity-label-${layer.id}`}>
+                  {Math.round(layer.defaultOpacity * 100)}%
+                </span>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={Math.round(layer.defaultOpacity * 100)}
+                  data-layer-id={layer.id}
+                  class="spatial-layer-opacity w-20 h-1 cursor-pointer accent-blue-500"
+                  aria-label={`${copy.opacity} ${layer.label}`}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <!-- Divider -->
+      <hr class="border-zinc-100 dark:border-zinc-800" />
+
+      <!-- INAH Group -->
+      <div>
+        <p class="text-[11px] font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500 mb-2">
+          {copy.inahGroup}
+        </p>
+        <div class="space-y-2">
+          {layers.filter(l => l.group === 'inah').map(layer => (
+            <div class="flex items-center gap-3" data-layer-row={layer.id}>
+              <input
+                type="checkbox"
+                id={`layer-toggle-${layer.id}`}
+                data-layer-id={layer.id}
+                checked={layer.defaultVisible}
+                class="spatial-layer-toggle w-4 h-4 rounded accent-amber-500 cursor-pointer flex-shrink-0"
+              />
+              <span
+                class="w-3 h-3 rounded-sm flex-shrink-0 border border-white/20"
+                style={`background-color: ${layer.color};`}
+                aria-hidden="true"
+              ></span>
+              <label
+                for={`layer-toggle-${layer.id}`}
+                class="flex-1 text-xs text-zinc-700 dark:text-zinc-300 cursor-pointer"
+              >
+                {layer.label}
+              </label>
+              <div class="flex items-center gap-1.5 flex-shrink-0">
+                <span class="text-[10px] text-zinc-400 w-6 text-right" id={`opacity-label-${layer.id}`}>
+                  {Math.round(layer.defaultOpacity * 100)}%
+                </span>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={Math.round(layer.defaultOpacity * 100)}
+                  data-layer-id={layer.id}
+                  class="spatial-layer-opacity w-20 h-1 cursor-pointer accent-amber-500"
+                  aria-label={`${copy.opacity} ${layer.label}`}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  /**
+   * SpatialLayersPanel client script.
+   *
+   * Wires up:
+   * 1. The collapse/expand toggle on the panel header.
+   * 2. Layer checkbox toggles → dispatch `rastrum:layer-toggled` event.
+   * 3. Opacity sliders → dispatch `rastrum:layer-toggled` event.
+   */
+
+  /** Payload type for the `rastrum:layer-toggled` CustomEvent. */
+  interface LayerToggledDetail {
+    layer: string;
+    visible: boolean;
+    opacity: number;
+  }
+
+  function dispatchLayerToggled(detail: LayerToggledDetail): void {
+    document.dispatchEvent(
+      new CustomEvent<LayerToggledDetail>('rastrum:layer-toggled', {
+        detail,
+        bubbles: true,
+      })
+    );
+  }
+
+  function getCurrentLayerState(layerId: string): { visible: boolean; opacity: number } {
+    const checkbox = document.getElementById(`layer-toggle-${layerId}`) as HTMLInputElement | null;
+    const slider = document.querySelector<HTMLInputElement>(
+      `.spatial-layer-opacity[data-layer-id="${layerId}"]`
+    );
+    return {
+      visible: checkbox?.checked ?? false,
+      opacity: slider ? parseInt(slider.value, 10) / 100 : 0.3,
+    };
+  }
+
+  // --- Panel collapse/expand ---
+  const header = document.getElementById('spatial-layers-header');
+  const body = document.getElementById('spatial-layers-body');
+  const chevron = document.getElementById('spatial-layers-chevron');
+
+  header?.addEventListener('click', () => {
+    const isOpen = body?.classList.contains('hidden') === false;
+    if (isOpen) {
+      body?.classList.add('hidden');
+      header.setAttribute('aria-expanded', 'false');
+      chevron?.classList.remove('rotate-180');
+    } else {
+      body?.classList.remove('hidden');
+      header.setAttribute('aria-expanded', 'true');
+      chevron?.classList.add('rotate-180');
+    }
+  });
+
+  // --- Layer toggle checkboxes ---
+  document.querySelectorAll<HTMLInputElement>('.spatial-layer-toggle').forEach((checkbox) => {
+    checkbox.addEventListener('change', () => {
+      const layerId = checkbox.dataset.layerId ?? '';
+      const { opacity } = getCurrentLayerState(layerId);
+      dispatchLayerToggled({ layer: layerId, visible: checkbox.checked, opacity });
+    });
+  });
+
+  // --- Opacity sliders ---
+  document.querySelectorAll<HTMLInputElement>('.spatial-layer-opacity').forEach((slider) => {
+    slider.addEventListener('input', () => {
+      const layerId = slider.dataset.layerId ?? '';
+      const opacityVal = parseInt(slider.value, 10) / 100;
+
+      // Update label
+      const label = document.getElementById(`opacity-label-${layerId}`);
+      if (label) label.textContent = `${slider.value}%`;
+
+      const { visible } = getCurrentLayerState(layerId);
+      dispatchLayerToggled({ layer: layerId, visible, opacity: opacityVal });
+    });
+  });
+</script>
