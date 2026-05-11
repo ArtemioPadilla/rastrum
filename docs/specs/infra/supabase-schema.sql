@@ -69,6 +69,13 @@ ALTER TABLE public.users
   -- users_self_update policies, never exposed via users_public_read.
   ADD COLUMN IF NOT EXISTS notification_prefs    jsonb NOT NULL DEFAULT '{}'::jsonb;
 
+-- #869: Birthday Naturalist badge — user-supplied birthday (month+day), private by default.
+ALTER TABLE public.users
+  ADD COLUMN IF NOT EXISTS birthday date NULL;
+
+-- Allow self-write for birthday field.
+GRANT UPDATE (birthday) ON public.users TO authenticated;
+
 -- Auto-create user profile on sign-up. Pulls avatar + display name from
 -- the OAuth provider's metadata when present:
 --   Google → user_metadata.picture (preferred) or .avatar_url
@@ -1151,6 +1158,35 @@ REVOKE EXECUTE ON FUNCTION public.badge_eligible_midnight_observation(uuid)    F
 GRANT EXECUTE ON FUNCTION public.badge_eligible_streak(integer)                TO service_role;
 GRANT EXECUTE ON FUNCTION public.badge_eligible_state_diversity(integer)       TO service_role;
 GRANT EXECUTE ON FUNCTION public.badge_eligible_midnight_observation(uuid)     TO service_role;
+
+-- #869: Birthday Naturalist — fires on the user's birthday when they have ≥1 obs today.
+CREATE OR REPLACE FUNCTION public.badge_eligible_birthday_observation(p_user_id uuid DEFAULT NULL)
+RETURNS SETOF uuid
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public, extensions, pg_temp
+AS $$
+BEGIN
+  RETURN QUERY
+    SELECT DISTINCT u.id
+      FROM public.users u
+     WHERE u.birthday IS NOT NULL
+       AND EXTRACT(MONTH FROM (now() AT TIME ZONE COALESCE(u.timezone, 'UTC'))::date) = EXTRACT(MONTH FROM u.birthday)
+       AND EXTRACT(DAY   FROM (now() AT TIME ZONE COALESCE(u.timezone, 'UTC'))::date) = EXTRACT(DAY   FROM u.birthday)
+       AND EXISTS (
+         SELECT 1 FROM public.observations o
+          WHERE o.observer_id = u.id
+            AND o.sync_status = 'synced'
+            AND (o.observed_at AT TIME ZONE COALESCE(u.timezone, 'UTC'))::date
+                = (now() AT TIME ZONE COALESCE(u.timezone, 'UTC'))::date
+       )
+       AND (p_user_id IS NULL OR u.id = p_user_id);
+END
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.badge_eligible_birthday_observation(uuid) FROM PUBLIC;
+GRANT  EXECUTE ON FUNCTION public.badge_eligible_birthday_observation(uuid) TO service_role;
 
 -- ============================================================
 -- EXPERT-WEIGHTED CONSENSUS (v0.5/v1.0 — module 08)
