@@ -12809,12 +12809,12 @@ COMMENT ON TABLE public.community_themes IS
 -- ============================================================
 
 -- Pre-computed per-user observation aggregates.
--- Avoids expensive live COUNT(*) / COUNT(DISTINCT taxon_id) on profile pages.
+-- Avoids expensive live COUNT(*) / COUNT(DISTINCT primary_taxon_id) on profile pages.
 CREATE MATERIALIZED VIEW IF NOT EXISTS public.mv_user_observation_counts AS
   SELECT
     observer_id,
     COUNT(*) AS total,
-    COUNT(DISTINCT taxon_id) AS species_count,
+    COUNT(DISTINCT primary_taxon_id) AS species_count,
     MAX(observed_at) AS last_observed_at
   FROM public.observations
   WHERE sync_status = 'synced'
