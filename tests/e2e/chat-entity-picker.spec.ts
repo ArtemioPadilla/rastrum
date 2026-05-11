@@ -43,6 +43,33 @@ async function mockSupabaseRpc(page: import('@playwright/test').Page) {
   });
 }
 
+/** ChatView.refreshState() keeps `#chat-form` (and the entity-picker
+ *  button inside it) hidden until the WebLLM model cache reports a
+ *  cached Llama or Gemma shard. In a fresh CI environment neither is
+ *  cached, so `#chat-attach-entity-btn` stays hidden and the spec
+ *  can't open the picker. Same fix as chat-deep-link.spec.ts (#1004):
+ *  wrap caches.open('webllm/model') so the first call seeds a fake
+ *  shard URL containing TEXT_MODEL_ID before returning. */
+async function mockChatModelCached(page: import('@playwright/test').Page) {
+  await page.addInitScript(() => {
+    if (typeof caches === 'undefined') return;
+    const FAKE_URL = 'https://e2e.fixture/Llama-3.2-1B-Instruct-q4f16_1-MLC/shard.bin';
+    const realOpen = caches.open.bind(caches);
+    (caches as unknown as { open: typeof caches.open }).open = async (name: string) => {
+      const c = await realOpen(name);
+      if (name === 'webllm/model') {
+        const existing = await c.match(FAKE_URL);
+        if (!existing) {
+          await c.put(FAKE_URL, new Response(new Uint8Array(0), {
+            headers: { 'content-length': '0' },
+          }));
+        }
+      }
+      return c;
+    };
+  });
+}
+
 /** Inject a chip renderer that intercepts the attach event. */
 async function mockEntityChipRenderer(page: import('@playwright/test').Page) {
   await page.addInitScript(() => {
@@ -57,6 +84,7 @@ async function mockEntityChipRenderer(page: import('@playwright/test').Page) {
 
 test.describe('chat entity picker — species flow', () => {
   test('open picker, switch to Species tab, pick row → chip appears', async ({ authedPage: page }) => {
+    await mockChatModelCached(page);
     await mockSupabaseRpc(page);
     await mockEntityChipRenderer(page);
 
@@ -103,6 +131,7 @@ test.describe('chat entity picker — species flow', () => {
   });
 
   test('entity chip contains correct id after picker selection', async ({ authedPage: page }) => {
+    await mockChatModelCached(page);
     await mockSupabaseRpc(page);
     await mockEntityChipRenderer(page);
 
