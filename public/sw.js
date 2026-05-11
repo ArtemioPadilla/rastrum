@@ -53,8 +53,15 @@ self.addEventListener('activate', (event) => {
 });
 
 // Allow the page to ping us if it ever wants to force-update.
+// Also handles PMTILES_CACHE_UPDATED: clears the buffer memo so the next
+// range request re-decodes the freshly-written archive (#817).
 self.addEventListener('message', (event) => {
   if (event.data === 'SKIP_WAITING') self.skipWaiting();
+  if (event.data?.type === 'PMTILES_CACHE_UPDATED') {
+    // Clear the whole memo — the archive may have new content even when the
+    // ETag is identical (same-ETag re-upload edge case described in #817).
+    pmtilesBufferMemo = null;
+  }
 });
 
 // ── Web Push ── (ux-streak-push + #724 kairos)
@@ -172,30 +179,41 @@ function isHtmlNavigation(req, url) {
 let pmtilesBufferMemo = null; // { key: string, buf: ArrayBuffer }
 
 async function servePmtilesRange(req, url) {
+  const _start = performance.now();
+  /** Broadcast latency to all active clients (#818). */
+  function _reportLatency(source) {
+    const latencyMs = Math.round(performance.now() - _start);
+    self.clients.matchAll().then(clients =>
+      clients.forEach(c => c.postMessage({ type: 'pmtiles_latency', latencyMs, source }))
+    );
+  }
   try {
     const cache = await caches.open(PMTILES_CACHE_NAME);
     const cached = await cache.match(url.href);
-    if (!cached) return fetch(req);
+    if (!cached) { _reportLatency('network-fallback'); return fetch(req); }
 
     const range = req.headers.get('range');
-    if (!range) return cached;
+    if (!range) { _reportLatency('cache-no-range'); return cached; }
 
     const m = /^bytes=(\d+)-(\d+)$/.exec(range);
-    if (!m) return cached;
+    if (!m) { _reportLatency('cache-bad-range'); return cached; }
 
     const start = parseInt(m[1], 10);
     const end   = parseInt(m[2], 10);
     const etag  = cached.headers.get('etag') || '';
     const memoKey = `${url.href}|${etag}`;
     let buf;
+    let memoHit = false;
     if (pmtilesBufferMemo && pmtilesBufferMemo.key === memoKey) {
       buf = pmtilesBufferMemo.buf;
+      memoHit = true;
     } else {
       buf = await cached.arrayBuffer();
       pmtilesBufferMemo = { key: memoKey, buf };
     }
     const total = buf.byteLength;
     if (start >= total) {
+      _reportLatency('cache-416');
       return new Response(null, {
         status: 416,
         statusText: 'Range Not Satisfiable',
@@ -213,12 +231,14 @@ async function servePmtilesRange(req, url) {
     headers.set('Content-Length', String(slice.byteLength));
     headers.set('Accept-Ranges', 'bytes');
 
+    _reportLatency(memoHit ? 'cache-memo' : 'cache-decode');
     return new Response(slice, {
       status: 206,
       statusText: 'Partial Content',
       headers,
     });
   } catch {
+    _reportLatency('error-fallback');
     return fetch(req);
   }
 }
