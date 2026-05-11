@@ -12070,10 +12070,12 @@ CREATE INDEX IF NOT EXISTS idx_obs_synced_at
   ON public.observations (observer_id, observed_at DESC)
   WHERE sync_status = 'synced';
 
--- activity_events: unread notifications per target user (bell badge).
-CREATE INDEX IF NOT EXISTS idx_activity_target_unread
-  ON public.activity_events (target_user_id, created_at DESC)
-  WHERE read_at IS NULL;
+-- (Removed: idx_activity_target_unread referenced a non-existent
+-- activity_events.target_user_id column — the column was planned but
+-- never added. db-apply has been silently failing on this line, and
+-- the bell-badge query is already covered by idx_activity_unread on
+-- actor_id. Re-add this index in the same PR that introduces the
+-- target_user_id column with a real consumer.)
 
 -- ============================================================
 -- #550: Conservation status ETL — conservation_synced_at column
