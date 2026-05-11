@@ -1,0 +1,413 @@
+---
+/**
+ * PITsView.astro — Puntos de Información Territorial browse UI (issue #193).
+ *
+ * A PIT is a named real-world location with a QR code that deep-links to Rastrum.
+ * This view lists existing PITs and allows creating new ones.
+ *
+ * QR codes are generated via https://api.qrserver.com (no npm dep).
+ * Schema: public.pits (see docs/specs/infra/supabase-schema.sql)
+ */
+interface Props {
+  lang: 'en' | 'es';
+}
+
+const { lang } = Astro.props;
+const isEs = lang === 'es';
+
+const copy = {
+  title:        isEs ? 'Puntos de Información Territorial' : 'Territorial Information Points',
+  subtitle:     isEs ? 'Lugares reales con códigos QR que enlazan a Rastrum.'
+                     : 'Real-world locations with QR codes that link to Rastrum.',
+  createBtn:    isEs ? 'Crear PIT'          : 'Create PIT',
+  emptyPits:    isEs ? 'No hay PITs todavía. ¡Crea el primero!'
+                     : 'No PITs yet. Create the first one!',
+  loading:      isEs ? 'Cargando PITs…'   : 'Loading PITs…',
+  name:         isEs ? 'Nombre'            : 'Name',
+  coordinates:  isEs ? 'Coordenadas'       : 'Coordinates',
+  qrCode:       isEs ? 'Código QR'         : 'QR Code',
+  trail:        isEs ? 'Sendero'           : 'Trail',
+  none:         isEs ? 'Ninguno'           : 'None',
+  scan:         isEs ? 'Escanear'          : 'Scan',
+  modalTitle:   isEs ? 'Nuevo PIT'         : 'New PIT',
+  modalNameLabel: isEs ? 'Nombre del PIT'  : 'PIT name',
+  modalNamePlaceholder: isEs ? 'Entrada bosque norte' : 'North Forest Entrance',
+  modalLatLabel: isEs ? 'Latitud'          : 'Latitude',
+  modalLngLabel: isEs ? 'Longitud'         : 'Longitude',
+  modalSlugLabel: isEs ? 'Slug (URL)'      : 'Slug (URL)',
+  modalSlugPlaceholder: isEs ? 'bosque-norte' : 'north-forest',
+  modalSaveBtn: isEs ? 'Guardar'           : 'Save',
+  modalCancelBtn: isEs ? 'Cancelar'        : 'Cancel',
+  signInRequired: isEs ? 'Inicia sesión para crear PITs.' : 'Sign in to create PITs.',
+  viewPit:      isEs ? 'Ver PIT'           : 'View PIT',
+  downloadQr:   isEs ? 'Descargar QR'     : 'Download QR',
+};
+---
+
+<div id="pits-view-root" data-lang={lang} class="space-y-6">
+
+  <!-- Header -->
+  <div class="flex items-start justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+        {copy.title}
+      </h1>
+      <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+        {copy.subtitle}
+      </p>
+    </div>
+    <button
+      id="create-pit-btn"
+      class="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition-colors shadow-sm flex-shrink-0"
+    >
+      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+      </svg>
+      {copy.createBtn}
+    </button>
+  </div>
+
+  <!-- PITs list -->
+  <div
+    id="pits-list"
+    class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+    role="list"
+    aria-label={copy.title}
+  >
+    <div id="pits-loading" class="col-span-full">
+      <p class="text-sm text-zinc-500">{copy.loading}</p>
+    </div>
+  </div>
+
+</div>
+
+<!-- Create PIT Modal -->
+<div
+  id="create-pit-modal"
+  class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="create-pit-modal-title"
+>
+  <div class="w-full max-w-md rounded-2xl bg-white dark:bg-zinc-900 shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+    <h3
+      id="create-pit-modal-title"
+      class="text-lg font-semibold text-zinc-900 dark:text-zinc-50"
+    >
+      {copy.modalTitle}
+    </h3>
+
+    <!-- Name -->
+    <div class="space-y-1">
+      <label for="pit-name-input" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+        {copy.modalNameLabel}
+      </label>
+      <input
+        id="pit-name-input"
+        type="text"
+        placeholder={copy.modalNamePlaceholder}
+        maxlength="120"
+        class="w-full rounded-lg border border-zinc-200 dark:border-zinc-700 bg-transparent px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition"
+      />
+    </div>
+
+    <!-- Slug -->
+    <div class="space-y-1">
+      <label for="pit-slug-input" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+        {copy.modalSlugLabel}
+      </label>
+      <input
+        id="pit-slug-input"
+        type="text"
+        placeholder={copy.modalSlugPlaceholder}
+        maxlength="80"
+        pattern="[a-z0-9\-]+"
+        class="w-full rounded-lg border border-zinc-200 dark:border-zinc-700 bg-transparent px-3 py-2 text-sm font-mono text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition"
+      />
+    </div>
+
+    <!-- Lat/Lng row -->
+    <div class="grid grid-cols-2 gap-3">
+      <div class="space-y-1">
+        <label for="pit-lat-input" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          {copy.modalLatLabel}
+        </label>
+        <input
+          id="pit-lat-input"
+          type="number"
+          step="0.000001"
+          min="-90"
+          max="90"
+          placeholder="19.432608"
+          class="w-full rounded-lg border border-zinc-200 dark:border-zinc-700 bg-transparent px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition"
+        />
+      </div>
+      <div class="space-y-1">
+        <label for="pit-lng-input" class="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          {copy.modalLngLabel}
+        </label>
+        <input
+          id="pit-lng-input"
+          type="number"
+          step="0.000001"
+          min="-180"
+          max="180"
+          placeholder="-99.133208"
+          class="w-full rounded-lg border border-zinc-200 dark:border-zinc-700 bg-transparent px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition"
+        />
+      </div>
+    </div>
+
+    <!-- Use my location button -->
+    <button
+      id="pit-use-location-btn"
+      type="button"
+      class="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400 hover:underline"
+    >
+      <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+        <circle cx="12" cy="9" r="2.5" fill="currentColor" stroke="none"/>
+      </svg>
+      {isEs ? 'Usar mi ubicación' : 'Use my location'}
+    </button>
+
+    <!-- Error -->
+    <p id="create-pit-error" class="hidden text-sm text-red-500"></p>
+
+    <div class="flex gap-3 pt-2">
+      <button
+        id="create-pit-cancel-btn"
+        class="flex-1 px-4 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+      >
+        {copy.modalCancelBtn}
+      </button>
+      <button
+        id="create-pit-save-btn"
+        class="flex-1 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition-colors"
+      >
+        {copy.modalSaveBtn}
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+
+  const root = document.getElementById('pits-view-root')!;
+  const lang = root.dataset.lang ?? 'en';
+  const isEs = lang === 'es';
+
+  const SITE_ORIGIN = window.location.origin;
+
+  /** Build QR code URL using qrserver.com (no npm dep). */
+  function qrUrl(data: string, size = 200): string {
+    return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(data)}`;
+  }
+
+  /** Build the deep-link URL for a PIT slug. */
+  function pitDeepLink(slug: string): string {
+    const pitBase = isEs ? `/${lang}/explorar/pits/` : `/${lang}/explore/pits/`;
+    return `${SITE_ORIGIN}${pitBase}${slug}`;
+  }
+
+  function escapeHtml(str: string): string {
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function makePitCard(pit: {
+    id: string;
+    slug: string;
+    name: string;
+    lat: number;
+    lng: number;
+    qr_payload: string;
+    trail_id?: string | null;
+  }): string {
+    const deepLink = pitDeepLink(pit.slug);
+    const qr = qrUrl(pit.qr_payload || deepLink, 120);
+    const pitBase = isEs ? `/${lang}/explorar/pits/` : `/${lang}/explore/pits/`;
+
+    return `
+      <article
+        class="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-4 space-y-3 hover:shadow-md transition-shadow flex gap-4"
+        role="listitem"
+        data-pit-id="${pit.id}"
+      >
+        <!-- QR thumbnail -->
+        <a href="${escapeHtml(qr)}" target="_blank" rel="noopener" title="${isEs ? 'Ver código QR completo' : 'View full QR code'}" class="flex-shrink-0">
+          <img
+            src="${escapeHtml(qr)}"
+            alt="QR ${escapeHtml(pit.name)}"
+            width="60"
+            height="60"
+            loading="lazy"
+            class="rounded border border-zinc-100 dark:border-zinc-700"
+          />
+        </a>
+
+        <!-- Info -->
+        <div class="flex-1 min-w-0 space-y-1">
+          <h3 class="font-semibold text-zinc-900 dark:text-zinc-50 truncate">${escapeHtml(pit.name)}</h3>
+          <p class="text-xs font-mono text-zinc-400">/${pit.slug}</p>
+          <p class="text-xs text-zinc-500">
+            📍 ${Number(pit.lat).toFixed(5)}, ${Number(pit.lng).toFixed(5)}
+          </p>
+          <a
+            href="${pitBase}${escapeHtml(pit.slug)}"
+            class="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:underline"
+          >
+            ${isEs ? 'Ver PIT' : 'View PIT'} →
+          </a>
+        </div>
+      </article>
+    `;
+  }
+
+  // ---- Load PITs ----
+  async function loadPits(): Promise<void> {
+    const pitsList = document.getElementById('pits-list')!;
+    try {
+      const sb = getSupabase();
+      const { data: pits } = await sb
+        .from('pits')
+        .select('id,slug,name,lat,lng,qr_payload,trail_id')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      document.getElementById('pits-loading')?.remove();
+
+      if (!pits || pits.length === 0) {
+        pitsList.innerHTML = `<p class="col-span-full text-sm text-zinc-500">${isEs ? 'No hay PITs todavía. ¡Crea el primero!' : 'No PITs yet. Create the first one!'}</p>`;
+      } else {
+        pitsList.innerHTML = pits.map(makePitCard).join('');
+      }
+    } catch (err) {
+      console.error('[PITsView] load error', err);
+      document.getElementById('pits-loading')?.remove();
+    }
+  }
+
+  // ---- Slug auto-generation ----
+  function slugify(str: string): string {
+    return str
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 80);
+  }
+
+  const nameInput = document.getElementById('pit-name-input') as HTMLInputElement;
+  const slugInput = document.getElementById('pit-slug-input') as HTMLInputElement;
+  let slugManuallyEdited = false;
+
+  nameInput.addEventListener('input', () => {
+    if (!slugManuallyEdited) {
+      slugInput.value = slugify(nameInput.value);
+    }
+  });
+
+  slugInput.addEventListener('input', () => {
+    slugManuallyEdited = slugInput.value.length > 0;
+  });
+
+  // ---- Use my location ----
+  document.getElementById('pit-use-location-btn')?.addEventListener('click', () => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition((pos) => {
+      (document.getElementById('pit-lat-input') as HTMLInputElement).value =
+        pos.coords.latitude.toFixed(6);
+      (document.getElementById('pit-lng-input') as HTMLInputElement).value =
+        pos.coords.longitude.toFixed(6);
+    });
+  });
+
+  // ---- Modal ----
+  const modal = document.getElementById('create-pit-modal')!;
+  const openBtn = document.getElementById('create-pit-btn')!;
+  const cancelBtn = document.getElementById('create-pit-cancel-btn')!;
+  const saveBtn = document.getElementById('create-pit-save-btn')!;
+  const latInput = document.getElementById('pit-lat-input') as HTMLInputElement;
+  const lngInput = document.getElementById('pit-lng-input') as HTMLInputElement;
+  const errorEl = document.getElementById('create-pit-error')!;
+
+  function openModal(): void {
+    modal.classList.remove('hidden');
+    nameInput.focus();
+  }
+
+  function closeModal(): void {
+    modal.classList.add('hidden');
+    nameInput.value = '';
+    slugInput.value = '';
+    latInput.value = '';
+    lngInput.value = '';
+    slugManuallyEdited = false;
+    errorEl.textContent = '';
+    errorEl.classList.add('hidden');
+  }
+
+  openBtn.addEventListener('click', openModal);
+  cancelBtn.addEventListener('click', closeModal);
+  modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModal();
+  });
+
+  saveBtn.addEventListener('click', async () => {
+    const name = nameInput.value.trim();
+    const slug = slugInput.value.trim();
+    const lat = parseFloat(latInput.value);
+    const lng = parseFloat(lngInput.value);
+
+    if (!name || !slug) {
+      errorEl.textContent = isEs ? 'Nombre y slug son obligatorios.' : 'Name and slug are required.';
+      errorEl.classList.remove('hidden');
+      return;
+    }
+
+    if (isNaN(lat) || isNaN(lng)) {
+      errorEl.textContent = isEs ? 'Coordenadas inválidas.' : 'Invalid coordinates.';
+      errorEl.classList.remove('hidden');
+      return;
+    }
+
+    saveBtn.disabled = true;
+    errorEl.classList.add('hidden');
+
+    try {
+      const sb = getSupabase();
+      const { data: { user } } = await sb.auth.getUser();
+      if (!user) {
+        errorEl.textContent = isEs ? 'Inicia sesión para crear PITs.' : 'Sign in to create PITs.';
+        errorEl.classList.remove('hidden');
+        return;
+      }
+
+      const deepLink = pitDeepLink(slug);
+
+      const { data, error } = await sb
+        .from('pits')
+        .insert({ name, slug, lat, lng, qr_payload: deepLink })
+        .select('slug')
+        .single();
+
+      if (error || !data) throw error ?? new Error('insert failed');
+
+      closeModal();
+      loadPits(); // refresh list
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      errorEl.textContent = msg.includes('duplicate') || msg.includes('unique')
+        ? (isEs ? 'Ese slug ya existe.' : 'That slug already exists.')
+        : (isEs ? 'Error al guardar el PIT.' : 'Failed to save PIT.');
+      errorEl.classList.remove('hidden');
+    } finally {
+      saveBtn.disabled = false;
+    }
+  });
+
+  loadPits();
+</script>
