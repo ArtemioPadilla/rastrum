@@ -6,6 +6,29 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Journey guides', () => {
+  // Two pre-conditions must hold for journey-guide click interactions to be
+  // testable on /en/observe:
+  //  1. Suppress the first-visit auto-guide so it doesn't race with the
+  //     manually-dispatched test guide and clobber its steps ~500ms later.
+  //  2. Dismiss the analytics consent banner — it sits at z-[9000] (above the
+  //     spotlight's z-[65]) and intercepts pointer events on #js-next when the
+  //     tooltip lands near the viewport bottom.
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      try {
+        localStorage.setItem('rastrum_analytics_consent', 'false');
+        for (const key of [
+          'rastrum.guide.observe',
+          'rastrum.guide.explore',
+          'rastrum.guide.validate',
+          'rastrum.guide.export',
+          'rastrum.guide.community',
+          'rastrum.guide.console',
+        ]) localStorage.setItem(key, 'done');
+      } catch { /* noop */ }
+    });
+  });
+
   test('journey spotlight is hidden by default', async ({ page }) => {
     await page.goto('/en/');
     const spotlight = page.locator('#journey-spotlight');
