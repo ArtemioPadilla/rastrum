@@ -3,8 +3,11 @@
  * type a query, pick a row, and verify the entity chip appears.
  *
  * Strategy: No real Supabase needed. We:
- *  1. Intercept `getSupabase().rpc` at the window level so picker queries
- *     return deterministic fixture data.
+ *  1. Intercept the Supabase REST RPC endpoint via Playwright's
+ *     `page.route()` so picker queries return deterministic fixture data.
+ *     The route matches any URL whose pathname includes `/rest/v1/rpc/chat_find_`,
+ *     which keeps it working regardless of whether the preview build has
+ *     `PUBLIC_SUPABASE_URL` set.
  *  2. Intercept `rastrum:chat-attach-entity` to render a predictable chip
  *     (same mock used in chat-deep-link.spec.ts).
  *  3. Dispatch `rastrum:chat-open-entity-picker` programmatically to open
@@ -17,45 +20,26 @@ import { test, expect } from './fixtures/auth';
 
 const CHAT_EN = '/en/chat/';
 
-/** Inject a Supabase RPC mock that returns one fixture species row. */
+/** Intercept the supabase REST RPC endpoint and return fixture rows. */
 async function mockSupabaseRpc(page: import('@playwright/test').Page) {
-  await page.addInitScript(() => {
-    const FIXTURE_SPECIES = [
-      { id: 'taxon-001', scientific_name: 'Quercus rugosa' },
-      { id: 'taxon-002', scientific_name: 'Tillandsia usneoides' },
-    ];
-
-    // Proxy the global supabase getter used by ChatEntityPicker.
-    // The picker calls `getSupabase().rpc(...)` which internally is imported.
-    // We install a mock on `window.__supabaseMock` and patch via addInitScript.
-    (window as unknown as { __supabaseMock: unknown }).__supabaseMock = {
-      rpc: (fn: string) => {
-        if (fn === 'chat_find_species') {
-          return Promise.resolve({ data: FIXTURE_SPECIES, error: null });
-        }
-        if (fn === 'chat_find_observations') {
-          return Promise.resolve({ data: [], error: null });
-        }
-        return Promise.resolve({ data: [], error: null });
-      },
-      auth: { getUser: () => Promise.resolve({ data: { user: { id: 'e2e-user' } }, error: null }) },
-    };
-
-    // Patch the module-level supabase client reference by overriding
-    // the global `getSupabase` function if it was already attached.
-    // If not yet attached, wait for it via a MutationObserver-free poll.
-    const maybeOverride = () => {
-      const w = window as unknown as Record<string, unknown>;
-      if (typeof w['__rastrum_supabase_override'] === 'function') {
-        (w['__rastrum_supabase_override'] as (v: unknown) => void)((window as unknown as { __supabaseMock: unknown }).__supabaseMock);
-        return true;
-      }
-      return false;
-    };
-    if (!maybeOverride()) {
-      const iv = setInterval(() => { if (maybeOverride()) clearInterval(iv); }, 50);
-      setTimeout(() => clearInterval(iv), 5000);
+  await page.route(/\/rest\/v1\/rpc\/chat_find_/, async (route) => {
+    const url = new URL(route.request().url());
+    const fn = url.pathname.split('/').pop();
+    if (fn === 'chat_find_species') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          { id: 'taxon-001', scientific_name: 'Quercus rugosa' },
+          { id: 'taxon-002', scientific_name: 'Tillandsia usneoides' },
+        ]),
+      });
     }
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: '[]',
+    });
   });
 }
 
