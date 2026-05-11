@@ -109,3 +109,10 @@ If the secret is suspected to be leaked:
 1. **Immediately** rotate (start at Step 1 above)
 2. Check Supabase EF logs for unusual POST patterns in the last 24h
 3. Check pg_cron run history for unexpected extra runs
+
+---
+
+## Cross-links
+
+- **VAPID keys** (parallel procedure for Web Push signing keys): [`vapid-keys-deploy.md`](vapid-keys-deploy.md)
+- Kairos pipeline that uses both secrets: [`kairos-prompts.md`](kairos-prompts.md)
