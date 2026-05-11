@@ -37,6 +37,7 @@ const routes = {
   profileImport:            { en: '/profile/import',             es: '/perfil/importar' },
   profileImportCameraTrap:  { en: '/profile/import/camera-trap', es: '/perfil/importar/camara-trampa' },
   chat:                     { en: '/chat',                       es: '/chat' },
+  discover:                 { en: '/discover',                   es: '/descubrir' },
   privacy:                  { en: '/privacy',                    es: '/privacidad' },
   terms:                    { en: '/terms',                      es: '/terminos' },
   faq:                      { en: '/faq',                        es: '/preguntas-frecuentes' },
@@ -62,6 +63,7 @@ const routeLabels = {
   profileImport:            { en: 'Import',             es: 'Importar' },
   profileImportCameraTrap:  { en: 'Camera trap',        es: 'Cámara trampa' },
   chat:                     { en: 'Chat',               es: 'Chat' },
+  discover:                 { en: 'Discover',           es: 'Descubrir' },
   privacy:                  { en: 'Privacy',            es: 'Privacidad' },
   terms:                    { en: 'Terms',              es: 'Términos' },
   faq:                      { en: 'FAQ',                es: 'Preguntas frecuentes' },
@@ -180,7 +182,7 @@ function buildIndex(lang) {
   const pageRouteKeys = [
     'home', 'identify', 'observe', 'explore', 'exploreMap',
     'exploreRecent', 'exploreWatchlist', 'exploreSpecies', 'exploreValidate',
-    'chat', 'about', 'docs', 'signIn', 'profile', 'profileEdit',
+    'chat', 'discover', 'about', 'docs', 'signIn', 'profile', 'profileEdit',
     'profileExport', 'profileObservations', 'profileImport',
     'profileImportCameraTrap', 'faq', 'privacy', 'terms',
   ];

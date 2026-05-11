@@ -59,7 +59,9 @@ describe('onnx-vision module', () => {
     // Mocked processor/model are not loaded — this should throw before yield
     // because loadGemmaVisionEngine calls gemmaSupported() first (no WebGPU in jsdom).
     const gen = generateGemmaText([{ role: 'user', content: 'hello' }], { stream: true });
-    await expect(gen.next()).rejects.toThrow();
+    // AsyncIterable — use async iterator protocol to call next()
+    const iter = (gen as AsyncGenerator)[Symbol.asyncIterator]();
+    await expect(iter.next()).rejects.toThrow();
   });
 });
 
