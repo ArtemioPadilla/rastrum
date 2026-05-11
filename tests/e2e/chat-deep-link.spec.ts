@@ -25,6 +25,26 @@ const DEEP_LINK_ES = `/es/chat/?attach=observation:${OBS_ID}`;
 async function mockEntityResolution(page: import('@playwright/test').Page) {
   await page.addInitScript(() => {
     // Intercept `rastrum:chat-attach-entity` and render a predictable chip.
+    // The chip slot lives inside #chat-form which ships with `hidden` until
+    // ChatView's model-cache probe resolves; in E2E without WebLLM that probe
+    // never completes and may re-hide the form repeatedly — so we keep the
+    // form forcibly visible via a MutationObserver on its class attribute.
+    const pinFormVisible = () => {
+      const form = document.getElementById('chat-form');
+      if (!form) return;
+      form.classList.remove('hidden');
+      const obs = new MutationObserver(() => {
+        if (form.classList.contains('hidden')) form.classList.remove('hidden');
+      });
+      obs.observe(form, { attributes: true, attributeFilter: ['class'] });
+    };
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', pinFormVisible);
+    } else {
+      pinFormVisible();
+    }
+    setTimeout(pinFormVisible, 500);
+
     document.addEventListener('rastrum:chat-attach-entity', (ev: Event) => {
       const detail = (ev as CustomEvent<{ kind: string; id: string }>).detail;
       const slot = document.getElementById('chat-entity-chip-slot');
