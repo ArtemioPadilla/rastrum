@@ -12591,6 +12591,8 @@ CREATE TABLE IF NOT EXISTS public.weekly_validator_rewards (
   awarded_at    timestamptz NOT NULL DEFAULT now(),
   claimed_at    timestamptz,
   UNIQUE (week_iso, user_id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_weekly_validator_rewards_user
   ON public.weekly_validator_rewards(user_id, awarded_at DESC);
 ALTER TABLE public.weekly_validator_rewards ENABLE ROW LEVEL SECURITY;
