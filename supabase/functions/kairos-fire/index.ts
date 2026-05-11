@@ -23,9 +23,10 @@ import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { requireCronSecret } from '../_shared/cron-auth.ts';
 import { computeSunset, inGoldenHourPromptWindow, tzLocalDate } from '../_shared/sun.ts';
-import { importVapidPrivateKey, sendPushNoPayload } from '../_shared/web-push.ts';
+import { importVapidPrivateKey, sendPushNoPayload, sendPushWithPayload } from '../_shared/web-push.ts';
 import { isLunarEventToday } from '../_shared/moon.ts';
 import { getRecentRainfallMm } from '../_shared/weather.ts';
+import { captureServerEvent } from '../_shared/analytics.ts';
 
 // Ngeohash-compatible 5-char encode (pure, no deps).
 function encodeGeohash5(lat: number, lng: number): string {
@@ -70,6 +71,8 @@ interface PushSub {
   id: string;
   user_id: string;
   endpoint: string;
+  p256dh: string;
+  auth: string;
   tz: string;
 }
 
@@ -163,6 +166,7 @@ serve(async (req) => {
   const vapidPub = Deno.env.get('VAPID_PUBLIC_KEY');
   const vapidPriv = Deno.env.get('VAPID_PRIVATE_KEY');
   const vapidSubject = Deno.env.get('VAPID_SUBJECT') ?? 'mailto:owner@rastrum.org';
+  const posthogKey = Deno.env.get('POSTHOG_PROJECT_KEY');
 
   if (!url || !role) return new Response('Function not configured', { status: 500 });
   if (!vapidPub || !vapidPriv) {
@@ -210,7 +214,7 @@ serve(async (req) => {
 
       const { data: day3Pushes } = await db
         .from('push_subscriptions')
-        .select('id, user_id, endpoint, tz')
+        .select('id, user_id, endpoint, p256dh, auth, tz')
         .in('user_id', day3UserIds)
         .returns<PushSub[]>();
 
@@ -246,16 +250,21 @@ serve(async (req) => {
         let anyOk = false;
         for (const p of pushes) {
           try {
-            const r = await sendPushNoPayload(p.endpoint, privateKey, vapidPub, vapidSubject);
+            const r = await sendPushWithPayload(
+              p.endpoint, privateKey, vapidPub, vapidSubject,
+              p.p256dh, p.auth, { title: payload.title, body: payload.body },
+            );
             if (r.ok) { day3Sent++; anyOk = true; }
             else if (r.status === 404 || r.status === 410) {
               await db.from('push_subscriptions').delete().eq('id', p.id);
             }
           } catch { /* best effort */ }
         }
-        void payload; // payload fields available for future rich-push implementation
-
-        if (anyOk) {
+if (anyOk) {
+          await captureServerEvent(posthogKey, user.id, 'push_sent', {
+            trigger: 'day3_nudge',
+            lang,
+          });
           const iso = now.toISOString();
           // Upsert a day3_nudge subscription record so we track last_sent_at.
           await db.from('kairos_subscriptions').upsert(
@@ -288,7 +297,7 @@ serve(async (req) => {
 
   const { data: pushes } = await db
     .from('push_subscriptions')
-    .select('id, user_id, endpoint, tz')
+    .select('id, user_id, endpoint, p256dh, auth, tz')
     .in('user_id', userIds)
     .returns<PushSub[]>();
   const pushesByUser = new Map<string, PushSub[]>();
@@ -376,9 +385,25 @@ serve(async (req) => {
     });
     if (prefAllowed === false) continue;
 
+    // Determine the push payload to send for this trigger.
+    const kairosPayload = firedKind === 'golden_hour'
+      ? (tz.startsWith('America')
+          ? { title: 'Atardecer en ~30 min', body: 'Buena hora para aves y polinizadores. ¿20 min de caminata?', url: '/es/observar/' }
+          : { title: 'Sunset in ~30 min', body: 'Good time for birds and pollinators. 20-min walk?', url: '/en/observe/' })
+      : firedKind === 'after_rain'
+      ? (tz.startsWith('America')
+          ? { title: 'Después de la lluvia 🌿', body: '¿Saliste a ver qué emergió?', url: '/es/observar/' }
+          : { title: 'After the rain 🌿', body: 'Time to see what emerged.', url: '/en/observe/' })
+      : (tz.startsWith('America')
+          ? { title: 'Evento lunar esta noche 🌕', body: '¿Qué está activo en la oscuridad?', url: '/es/observar/' }
+          : { title: 'Lunar event tonight 🌕', body: 'What's active in the dark?', url: '/en/observe/' });
+
     for (const p of userPushes) {
       try {
-        const r = await sendPushNoPayload(p.endpoint, privateKey, vapidPub, vapidSubject);
+        const r = await sendPushWithPayload(
+          p.endpoint, privateKey, vapidPub, vapidSubject,
+          p.p256dh, p.auth, kairosPayload,
+        );
         if (r.ok) { sent++; anySuccess = true; }
         else if (r.status === 404 || r.status === 410) {
           await db.from('push_subscriptions').delete().eq('id', p.id);
@@ -387,6 +412,10 @@ serve(async (req) => {
     }
 
     if (anySuccess) {
+      await captureServerEvent(posthogKey, userId, 'push_sent', {
+        trigger: firedKind,
+        tz,
+      });
       const iso = now.toISOString();
       // Update last_sent_at on all opted-in kinds for this user (shared cap).
       for (const s of userSubs) {
