@@ -10,7 +10,8 @@ export type EntityKind =
   | 'project'
   | 'camera_station'
   | 'observer'
-  | 'self_profile';
+  | 'self_profile'
+  | 'location';
 
 export interface EntityCard {
   kind: EntityKind;

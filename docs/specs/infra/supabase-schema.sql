@@ -10444,12 +10444,54 @@ REVOKE EXECUTE ON FUNCTION public.chat_find_species(text, int)              FROM
 REVOKE EXECUTE ON FUNCTION public.chat_find_projects(text, int)             FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.chat_find_camera_stations(uuid, int)      FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.chat_find_observers(text, int)            FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.chat_find_location(text, int)             FROM PUBLIC;
 
 GRANT EXECUTE ON FUNCTION public.chat_find_observations(jsonb, int)         TO authenticated;
 GRANT EXECUTE ON FUNCTION public.chat_find_species(text, int)               TO authenticated;
 GRANT EXECUTE ON FUNCTION public.chat_find_projects(text, int)              TO authenticated;
 GRANT EXECUTE ON FUNCTION public.chat_find_camera_stations(uuid, int)       TO authenticated;
 GRANT EXECUTE ON FUNCTION public.chat_find_observers(text, int)             TO authenticated;
+GRANT EXECUTE ON FUNCTION public.chat_find_location(text, int)              TO authenticated, anon;
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- Locations first-class (#914) — places table + chat_find_location RPC
+-- ═══════════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS public.places (
+  id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  slug            text UNIQUE NOT NULL,
+  name            text NOT NULL,
+  name_local      text,
+  place_type      text NOT NULL DEFAULT 'h3_cell'
+                  CHECK (place_type IN ('protected_area','h3_cell','custom','community')),
+  geometry        geography(Geometry,4326),
+  h3_cells        text[],
+  observation_count integer NOT NULL DEFAULT 0,
+  observer_count    integer NOT NULL DEFAULT 0,
+  top_taxa          jsonb,
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  updated_at      timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS places_slug_idx ON public.places(slug);
+CREATE INDEX IF NOT EXISTS places_geo_idx ON public.places USING GIST(geometry);
+
+ALTER TABLE public.places ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS places_public_read ON public.places;
+CREATE POLICY places_public_read ON public.places FOR SELECT USING (true);
+
+CREATE OR REPLACE FUNCTION public.chat_find_location(p_query text, p_limit int DEFAULT 5)
+RETURNS TABLE (id uuid, slug text, name text, place_type text, observation_count int)
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public, pg_temp AS $$
+  SELECT id, slug, name, place_type, observation_count
+  FROM public.places
+  WHERE name ILIKE '%' || p_query || '%'
+     OR slug ILIKE '%' || p_query || '%'
+  ORDER BY observation_count DESC
+  LIMIT p_limit;
+$$;
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- Security Advisor remediation — 2026-05-08
