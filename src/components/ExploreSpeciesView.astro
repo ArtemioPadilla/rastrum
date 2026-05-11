@@ -902,15 +902,16 @@ const indexBase = `/${lang}/${lang === 'es' ? 'explorar/especies' : 'explore/spe
         return 0.62;
       }
       // Returns estimated text width in SVG user units for a string rendered at TEXT_FONT em.
-      let _offCtx: OffscreenCanvasRenderingContext2D | null = null;
+      // null = not yet tried; false = unavailable; OffscreenCanvasRenderingContext2D = ready
+      let _offCtx: OffscreenCanvasRenderingContext2D | null | false = null;
       function measureLabelWidth(s: string, leafParam: boolean): number {
         if (_offCtx === null) {
           try {
             const oc = new OffscreenCanvas(0, 0);
             _offCtx = oc.getContext('2d') as OffscreenCanvasRenderingContext2D;
-          } catch { _offCtx = undefined as unknown as null; } // mark unavailable
+          } catch { _offCtx = false; } // mark permanently unavailable
         }
-        if (_offCtx) {
+        if (_offCtx !== null && _offCtx !== false) {
           // Font string matches the SVG text attributes below (italic 600 …px system-ui).
           // pxPerVbu: arbitrary px→vbu scale; what matters is the ratio.
           const PX = 100; // 100px gives enough precision for subpixel measurements

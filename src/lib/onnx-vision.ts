@@ -382,6 +382,9 @@ async function decodeGeneration(
 // offline chat). Shares the transformers-cache bucket with Gemma.
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Llama uses the same HuggingFace Hub endpoint as Gemma (from_pretrained with no
+// custom baseURL). Both download from https://huggingface.co/<model-id>/resolve/main/.
+// No separate ONNX_BASE_URL needed — transformers.js handles caching via Cache API.
 export const LLAMA_ONNX_MODEL_ID = 'onnx-community/Llama-3.2-1B-Instruct';
 
 interface TokenizerLike {
