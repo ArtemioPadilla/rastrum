@@ -12632,3 +12632,27 @@ COMMENT ON TABLE public.regional_taxa_baseline IS
 -- SELECT cron.schedule('sync-gbif-regional-baseline','0 3 * * *',
 --   $$SELECT net.http_post(url:=current_setting('app.supabase_functions_url') || '/sync-gbif-regional-baseline',
 --     headers:='{"x-cron-secret":"<secret>"}'::jsonb)$$);
+
+-- ============================================================
+-- #725: RASTRUM WRAPPED (Principle of Self-Monitoring)
+-- ============================================================
+
+-- Cache table for annual Wrapped stats
+CREATE TABLE IF NOT EXISTS public.wrapped_cache (
+  user_id      uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  year         smallint NOT NULL CHECK (year BETWEEN 2020 AND 2099),
+  payload      jsonb NOT NULL,
+  generated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, year)
+);
+
+ALTER TABLE public.wrapped_cache ENABLE ROW LEVEL SECURITY;
+
+-- Users can read their own Wrapped
+DROP POLICY IF EXISTS "wrapped_cache_self_read" ON public.wrapped_cache;
+CREATE POLICY "wrapped_cache_self_read" ON public.wrapped_cache
+  FOR SELECT TO authenticated USING (auth.uid() = user_id);
+
+GRANT SELECT ON public.wrapped_cache TO authenticated;
+-- generate-wrapped EF uses service_role to upsert
+GRANT INSERT, UPDATE, DELETE ON public.wrapped_cache TO service_role;

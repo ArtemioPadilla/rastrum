@@ -1,0 +1,222 @@
+---
+import BaseLayout from '../../../../layouts/BaseLayout.astro';
+
+const lang = 'es';
+const year = Astro.url.searchParams.get('year') ?? new Date().getFullYear().toString();
+---
+
+<BaseLayout
+  title={`Tu ${year} en Rastrum · Wrapped`}
+  description={`Revive tu año ${year} de biodiversidad — especies observadas, hábitats visitados y más.`}
+  lang={lang}
+>
+  <main class="min-h-screen bg-zinc-950 text-white" data-lang={lang} data-year={year} id="wrapped-root">
+    <!-- Cargando -->
+    <div id="wrapped-loading" class="flex flex-col items-center justify-center min-h-screen gap-4">
+      <div class="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+      <p class="text-zinc-400 text-sm">Cargando tu Wrapped de {year}…</p>
+    </div>
+
+    <!-- Tarjetas (scroll-snap) -->
+    <div id="wrapped-cards" class="hidden snap-y snap-mandatory overflow-y-scroll h-screen">
+
+      <!-- Tarjeta 1: Hero -->
+      <section class="snap-start flex flex-col items-center justify-center min-h-screen p-8 text-center bg-gradient-to-b from-emerald-950 to-zinc-950">
+        <p class="text-emerald-400 text-sm font-semibold uppercase tracking-widest mb-2">Rastrum Wrapped</p>
+        <h1 class="text-5xl font-extrabold mb-4">Tu {year}</h1>
+        <p class="text-zinc-400 mb-8">Un año de biodiversidad, en números.</p>
+        <div class="flex gap-8">
+          <div class="text-center">
+            <div id="w-total-obs" class="text-4xl font-bold text-emerald-400">—</div>
+            <div class="text-xs text-zinc-400 mt-1 uppercase tracking-wider">Observaciones</div>
+          </div>
+          <div class="text-center">
+            <div id="w-total-spp" class="text-4xl font-bold text-emerald-400">—</div>
+            <div class="text-xs text-zinc-400 mt-1 uppercase tracking-wider">Especies</div>
+          </div>
+        </div>
+        <button class="mt-8 text-xs text-zinc-500 animate-bounce">Desliza hacia abajo ↓</button>
+      </section>
+
+      <!-- Tarjeta 2: Top especies -->
+      <section class="snap-start flex flex-col justify-center min-h-screen p-8 bg-zinc-950">
+        <h2 class="text-2xl font-bold mb-6">🦋 Tus top especies</h2>
+        <ul id="w-top-species" class="space-y-3"></ul>
+      </section>
+
+      <!-- Tarjeta 3: Hábitats -->
+      <section class="snap-start flex flex-col justify-center min-h-screen p-8 bg-gradient-to-b from-zinc-950 to-emerald-950">
+        <h2 class="text-2xl font-bold mb-6">🌿 Hábitats explorados</h2>
+        <div id="w-habitats" class="space-y-2"></div>
+      </section>
+
+      <!-- Tarjeta 4: Racha -->
+      <section class="snap-start flex flex-col items-center justify-center min-h-screen p-8 text-center bg-zinc-950">
+        <h2 class="text-2xl font-bold mb-4">🔥 Tu récord de racha</h2>
+        <div id="w-streak" class="text-6xl font-extrabold text-amber-400 mb-2">—</div>
+        <p class="text-zinc-400 text-sm">días consecutivos</p>
+        <div class="mt-8 grid grid-cols-2 gap-4 text-sm text-zinc-400">
+          <div>Primera obs: <span id="w-first-obs" class="text-white">—</span></div>
+          <div>Última obs: <span id="w-last-obs" class="text-white">—</span></div>
+        </div>
+      </section>
+
+      <!-- Tarjeta 5: Top foto -->
+      <section class="snap-start flex flex-col items-center justify-center min-h-screen p-8 bg-zinc-950">
+        <h2 class="text-2xl font-bold mb-6">📷 Tu foto más querida</h2>
+        <div id="w-top-photo-container" class="w-full max-w-sm">
+          <p id="w-no-photo" class="text-zinc-500 text-sm">Sin datos de foto disponibles.</p>
+          <a id="w-top-photo-link" href="#" class="hidden block">
+            <img id="w-top-photo" src="" alt="Top foto" class="rounded-xl w-full object-cover max-h-64" />
+          </a>
+        </div>
+      </section>
+
+      <!-- Tarjeta 6: Impacto -->
+      <section class="snap-start flex flex-col justify-center min-h-screen p-8 bg-gradient-to-b from-zinc-950 to-emerald-950">
+        <h2 class="text-2xl font-bold mb-6">🌍 Tu impacto</h2>
+        <div class="space-y-4">
+          <div class="rounded-xl bg-white/5 p-4">
+            <div id="w-dwc-count" class="text-3xl font-bold text-emerald-400">—</div>
+            <div class="text-sm text-zinc-400 mt-1">Exportaciones DwC que incluyen tus datos</div>
+          </div>
+          <div class="rounded-xl bg-white/5 p-4">
+            <div id="w-threatened-count" class="text-3xl font-bold text-red-400">—</div>
+            <div class="text-sm text-zinc-400 mt-1">Especies NOM-059 documentadas</div>
+          </div>
+        </div>
+        <div class="mt-8">
+          <a
+            id="w-share-btn"
+            href="#"
+            class="block w-full text-center rounded-xl bg-emerald-600 hover:bg-emerald-700 px-4 py-3 font-semibold text-sm"
+          >
+            Compartir tu Wrapped →
+          </a>
+        </div>
+      </section>
+    </div>
+
+    <!-- Error -->
+    <div id="wrapped-error" class="hidden flex flex-col items-center justify-center min-h-screen gap-4 text-center p-8">
+      <div class="text-5xl">😔</div>
+      <h2 class="text-xl font-bold">No se pudo cargar tu Wrapped</h2>
+      <p class="text-zinc-400 text-sm">Asegúrate de estar autenticado y de tener observaciones en {year}.</p>
+      <a href="/es/perfil/" class="text-emerald-400 hover:underline text-sm">← Volver al perfil</a>
+    </div>
+  </main>
+</BaseLayout>
+
+<script>
+  import { getCachedUser, getSupabase } from '../../../../lib/supabase';
+
+  interface WrappedPayload {
+    year: number;
+    total_observations: number;
+    total_species: number;
+    top_species: Array<{ scientific_name: string; common_name_es: string | null; count: number; thumbnail_url: string | null }>;
+    habitats: Array<{ habitat: string; count: number }>;
+    longest_streak_days: number;
+    first_obs_date: string | null;
+    last_obs_date: string | null;
+    top_photo_url: string | null;
+    top_photo_obs_id: string | null;
+    dwc_export_count: number;
+    threatened_species_count: number;
+  }
+
+  const root = document.getElementById('wrapped-root');
+  const year = root?.dataset.year ?? new Date().getFullYear().toString();
+  const loadingEl = document.getElementById('wrapped-loading');
+  const cardsEl   = document.getElementById('wrapped-cards');
+  const errorEl   = document.getElementById('wrapped-error');
+
+  function show(el: HTMLElement | null) { el?.classList.remove('hidden'); }
+  function hide(el: HTMLElement | null) { el?.classList.add('hidden'); }
+  function setText(id: string, val: string) { const el = document.getElementById(id); if (el) el.textContent = val; }
+
+  async function load() {
+    const supabase = getSupabase();
+    const user = await getCachedUser();
+    if (!user) { hide(loadingEl); show(errorEl); return; }
+
+    try {
+      const fnUrl = `${(import.meta.env.PUBLIC_SUPABASE_URL as string)}/functions/v1/generate-wrapped?year=${year}&user_id=${user.id}`;
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      const res = await fetch(fnUrl, { headers: { Authorization: `Bearer ${token ?? ''}` } });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data: WrappedPayload = await res.json();
+      render(data);
+    } catch {
+      hide(loadingEl);
+      show(errorEl);
+    }
+  }
+
+  function render(d: WrappedPayload) {
+    setText('w-total-obs', d.total_observations.toLocaleString('es-MX'));
+    setText('w-total-spp', d.total_species.toLocaleString('es-MX'));
+
+    const ul = document.getElementById('w-top-species');
+    if (ul) {
+      ul.innerHTML = '';
+      for (const [i, sp] of (d.top_species ?? []).entries()) {
+        const li = document.createElement('li');
+        li.className = 'flex items-center gap-3';
+        li.innerHTML = `
+          <span class="text-2xl font-bold text-emerald-400/50">${i + 1}</span>
+          ${sp.thumbnail_url ? `<img src="${sp.thumbnail_url}" class="w-10 h-10 rounded-lg object-cover flex-shrink-0" alt="" />` : '<div class="w-10 h-10 rounded-lg bg-white/10 flex-shrink-0"></div>'}
+          <div>
+            <div class="font-semibold italic">${sp.scientific_name}</div>
+            ${sp.common_name_es ? `<div class="text-xs text-zinc-400">${sp.common_name_es}</div>` : ''}
+          </div>
+          <span class="ml-auto text-xs text-zinc-400">${sp.count}×</span>
+        `;
+        ul.appendChild(li);
+      }
+    }
+
+    const habitatsEl = document.getElementById('w-habitats');
+    if (habitatsEl) {
+      habitatsEl.innerHTML = '';
+      const maxCount = Math.max(...(d.habitats ?? []).map(h => h.count), 1);
+      for (const h of d.habitats ?? []) {
+        const pct = Math.round((h.count / maxCount) * 100);
+        const bar = document.createElement('div');
+        bar.innerHTML = `
+          <div class="flex justify-between text-sm mb-1">
+            <span class="capitalize">${h.habitat}</span>
+            <span class="text-zinc-400">${h.count}</span>
+          </div>
+          <div class="h-2 rounded-full bg-white/10">
+            <div class="h-2 rounded-full bg-emerald-500" style="width:${pct}%"></div>
+          </div>
+        `;
+        habitatsEl.appendChild(bar);
+      }
+    }
+
+    setText('w-streak', String(d.longest_streak_days));
+    setText('w-first-obs', d.first_obs_date ? new Date(d.first_obs_date).toLocaleDateString('es-MX') : '—');
+    setText('w-last-obs',  d.last_obs_date  ? new Date(d.last_obs_date).toLocaleDateString('es-MX')  : '—');
+
+    if (d.top_photo_url) {
+      const img  = document.getElementById('w-top-photo')  as HTMLImageElement  | null;
+      const link = document.getElementById('w-top-photo-link') as HTMLAnchorElement | null;
+      const noPhoto = document.getElementById('w-no-photo');
+      if (img) img.src = d.top_photo_url;
+      if (link) { link.href = `/es/observaciones/${d.top_photo_obs_id}/`; show(link); }
+      hide(noPhoto);
+    }
+
+    setText('w-dwc-count',       String(d.dwc_export_count));
+    setText('w-threatened-count', String(d.threatened_species_count));
+    const shareBtn = document.getElementById('w-share-btn') as HTMLAnchorElement | null;
+    if (shareBtn) shareBtn.href = `/es/perfil/wrapped/?year=${year}`;
+
+    hide(loadingEl);
+    show(cardsEl);
+  }
+
+  void load().catch(() => { hide(loadingEl); show(errorEl); });
+</script>
