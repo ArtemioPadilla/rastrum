@@ -34,8 +34,44 @@ async function mockEntityResolution(page: import('@playwright/test').Page) {
   });
 }
 
+/** ChatView.refreshState() keeps `<form id="chat-form">` hidden until either
+ *  Llama or Gemma weights show up in the Cache API. In a fresh CI environment
+ *  neither is cached, so the form stays hidden — and the chip slot inside it.
+ *
+ *  This helper monkey-patches `caches.open('webllm/model')` so the next call
+ *  pre-seeds a tiny fake entry whose URL contains TEXT_MODEL_ID
+ *  (Llama-3.2-1B-Instruct-q4f16_1-MLC). Chat's getModelCacheStatus() then
+ *  returns `cached: true`, refreshState() unhides the form, and the chip
+ *  rendered by mockEntityResolution is visible.
+ *
+ *  Wraps caches.open instead of pre-populating up-front so the seed is
+ *  guaranteed to land before the chat code awaits the cache lookup —
+ *  no race with the init script's async body.
+ *
+ *  Closes #1003 (e2e blocked by model-cache gate). */
+async function mockChatModelCached(page: import('@playwright/test').Page) {
+  await page.addInitScript(() => {
+    if (typeof caches === 'undefined') return;
+    const FAKE_URL = 'https://e2e.fixture/Llama-3.2-1B-Instruct-q4f16_1-MLC/shard.bin';
+    const realOpen = caches.open.bind(caches);
+    (caches as unknown as { open: typeof caches.open }).open = async (name: string) => {
+      const c = await realOpen(name);
+      if (name === 'webllm/model') {
+        const existing = await c.match(FAKE_URL);
+        if (!existing) {
+          await c.put(FAKE_URL, new Response(new Uint8Array(0), {
+            headers: { 'content-length': '0' },
+          }));
+        }
+      }
+      return c;
+    };
+  });
+}
+
 test.describe('chat deep-link (EN)', () => {
   test('entity chip renders after ?attach= navigation', async ({ authedPage: page }) => {
+    await mockChatModelCached(page);
     await mockEntityResolution(page);
     await page.goto(DEEP_LINK_EN);
 
@@ -47,6 +83,7 @@ test.describe('chat deep-link (EN)', () => {
   });
 
   test('?attach= query param is removed from URL after hydration', async ({ authedPage: page }) => {
+    await mockChatModelCached(page);
     await mockEntityResolution(page);
     await page.goto(DEEP_LINK_EN);
 
@@ -61,6 +98,7 @@ test.describe('chat deep-link (EN)', () => {
 
 test.describe('chat deep-link (ES)', () => {
   test('entity chip renders for ES locale deep-link', async ({ authedPage: page }) => {
+    await mockChatModelCached(page);
     await mockEntityResolution(page);
     await page.goto(DEEP_LINK_ES);
 
@@ -72,6 +110,7 @@ test.describe('chat deep-link (ES)', () => {
 
 test.describe('chat deep-link (mobile)', () => {
   test('entity chip renders on mobile viewport', async ({ authedPage: page }) => {
+    await mockChatModelCached(page);
     await mockEntityResolution(page);
     await page.goto(DEEP_LINK_EN);
 
