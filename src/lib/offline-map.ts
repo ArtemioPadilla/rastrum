@@ -134,6 +134,37 @@ export async function downloadPmtilesMx(
     headers,
   });
   await cache.put(url, stored);
+
+  // Notify the SW to flush its buffer memo for this URL (#817).
+  // The memo is keyed by URL+ETag; if the archive is re-uploaded with the
+  // same ETag the SW would otherwise serve the old ArrayBuffer indefinitely.
+  if (typeof navigator !== 'undefined' && navigator.serviceWorker?.controller) {
+    navigator.serviceWorker.controller.postMessage({ type: 'PMTILES_CACHE_UPDATED', url });
+  }
+}
+
+/**
+ * Listen for pmtiles_latency messages broadcast by the SW (#818).
+ * Logs to console.debug and optionally fires a PostHog event.
+ *
+ * Call once during app init (e.g. from the map component). Safe to call
+ * multiple times — returns a cleanup function.
+ */
+export function initPmtilesLatencyListener(
+  onEvent?: (latencyMs: number, source: string) => void,
+): () => void {
+  if (typeof navigator === 'undefined' || !navigator.serviceWorker) return () => {};
+
+  const handler = (event: MessageEvent) => {
+    const data = event.data;
+    if (!data || data.type !== 'pmtiles_latency') return;
+    const { latencyMs, source } = data as { latencyMs: number; source: string };
+    console.debug(`[rastrum] pmtiles SW latency: ${latencyMs}ms (${source})`);
+    onEvent?.(latencyMs, source);
+  };
+
+  navigator.serviceWorker.addEventListener('message', handler);
+  return () => navigator.serviceWorker.removeEventListener('message', handler);
 }
 
 /** Delete the cached pmtiles archive. Returns the number of entries removed. */

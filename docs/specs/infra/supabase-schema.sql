@@ -12148,3 +12148,8 @@ CREATE POLICY "expert_apps_insert_own" ON public.expert_applications
     AND public.has_karma_privilege(auth.uid(), 'expert_application')
   );
 
+
+-- #932: one-time backfill of rarity_tier from observation counts
+-- Run: node scripts/backfill-rarity-tier.mjs
+-- After backfill, nightly recompute via recompute-taxa-cache EF
+COMMENT ON COLUMN public.taxa.rarity_tier IS '1=common(101+obs), 2=uncommon(21-100), 3=rare(6-20), 4=very_rare(1-5), NULL=no_obs';
