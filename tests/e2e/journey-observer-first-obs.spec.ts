@@ -14,9 +14,9 @@ test.describe('J2: Observer first observation journey', () => {
     const dialog = page.locator('#onboarding-tour');
     await expect(dialog).toBeVisible();
 
-    // Walk through all 6 steps
-    for (let i = 0; i < 6; i++) {
-      await expect(page.locator('#onb-step-label')).toContainText(`${i + 1}`);
+    // Walk through all 7 steps
+    for (let i = 0; i < 7; i++) {
+      await expect(page.locator('#onb-step-label')).toContainText(`${i + 1} of 7`);
       await page.locator('#onb-next').click();
     }
     // Dialog should close after final step
