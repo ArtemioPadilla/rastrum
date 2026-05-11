@@ -118,6 +118,30 @@ const shareBase = '/share/obs/';
       <ul id="sp-states-list" class="space-y-1"></ul>
     </section>
 
+    <!-- #464: Phenology chart (monthly observation counts as SVG bar chart) -->
+    <section id="sp-phenology-section" class="hidden">
+      <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-3">
+        {lang === 'es' ? 'Actividad estacional' : 'Seasonal activity'}
+      </h2>
+      <div id="sp-phenology-chart" class="w-full overflow-x-auto"></div>
+    </section>
+
+    <!-- #464: ID leaderboard -->
+    <section id="sp-id-leaderboard-section" class="hidden">
+      <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-3">
+        {lang === 'es' ? 'Mejores identificadores' : 'Top identifiers'}
+      </h2>
+      <ol id="sp-id-leaderboard" class="space-y-2"></ol>
+    </section>
+
+    <!-- #464: Best-shot nomination (for logged-in users) -->
+    <section id="sp-best-shot-section" class="hidden">
+      <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-3">
+        {lang === 'es' ? 'Foto representativa' : 'Hero photo voting'}
+      </h2>
+      <p id="sp-best-shot-body" class="text-sm text-zinc-600 dark:text-zinc-400"></p>
+    </section>
+
   </div>
 </div>
 
@@ -568,6 +592,130 @@ const shareBase = '/share/obs/';
           </div>`;
         }).join('');
         seasonalSection.classList.remove('hidden');
+      }
+
+      // #464: Phenology chart — proper SVG bar chart replacing the CSS-only version.
+      const phenologySection = document.getElementById('sp-phenology-section');
+      const phenologyChart   = document.getElementById('sp-phenology-chart');
+      if (phenologySection && phenologyChart && months.some(m => m > 0)) {
+        const BAR_W  = 24;
+        const GAP    = 4;
+        const H      = 80;  // chart height
+        const PAD_L  = 4;
+        const PAD_T  = 8;
+        const PAD_B  = 20; // space for labels
+        const totalW = PAD_L + months.length * (BAR_W + GAP);
+        const svgH   = H + PAD_T + PAD_B;
+        const NS = 'http://www.w3.org/2000/svg';
+        const svgEl = document.createElementNS(NS, 'svg');
+        svgEl.setAttribute('viewBox', `0 0 ${totalW} ${svgH}`);
+        svgEl.setAttribute('width', String(totalW));
+        svgEl.setAttribute('height', String(svgH));
+        svgEl.style.display = 'block';
+        svgEl.setAttribute('role', 'img');
+        svgEl.setAttribute('aria-label',
+          lang === 'es' ? 'Actividad estacional por mes' : 'Monthly observation activity');
+        months.forEach((count, i) => {
+          const barH  = maxCount > 0 ? Math.max(2, Math.round((count / maxCount) * H)) : 2;
+          const x     = PAD_L + i * (BAR_W + GAP);
+          const y     = PAD_T + H - barH;
+          const intensity = maxCount > 0 ? 0.25 + 0.75 * (count / maxCount) : 0.15;
+          // Bar
+          const rect = document.createElementNS(NS, 'rect');
+          rect.setAttribute('x', String(x));
+          rect.setAttribute('y', String(y));
+          rect.setAttribute('width', String(BAR_W));
+          rect.setAttribute('height', String(barH));
+          rect.setAttribute('rx', '3');
+          rect.setAttribute('fill', `rgba(16,185,129,${intensity.toFixed(2)})`);
+          rect.setAttribute('aria-label', `${monthLabels[i]}: ${count} obs`);
+          // Tooltip title
+          const title = document.createElementNS(NS, 'title');
+          title.textContent = `${monthLabels[i]}: ${count} obs`;
+          rect.appendChild(title);
+          svgEl.appendChild(rect);
+          // Month label
+          const text = document.createElementNS(NS, 'text');
+          text.setAttribute('x', String(x + BAR_W / 2));
+          text.setAttribute('y', String(PAD_T + H + PAD_B - 6));
+          text.setAttribute('text-anchor', 'middle');
+          text.setAttribute('font-size', '9');
+          text.setAttribute('fill', 'currentColor');
+          text.setAttribute('fill-opacity', '0.6');
+          text.textContent = monthLabels[i];
+          svgEl.appendChild(text);
+          // Count label on bars with data
+          if (count > 0) {
+            const countText = document.createElementNS(NS, 'text');
+            countText.setAttribute('x', String(x + BAR_W / 2));
+            countText.setAttribute('y', String(y - 2));
+            countText.setAttribute('text-anchor', 'middle');
+            countText.setAttribute('font-size', '8');
+            countText.setAttribute('fill', 'currentColor');
+            countText.setAttribute('fill-opacity', '0.5');
+            countText.textContent = String(count);
+            svgEl.appendChild(countText);
+          }
+        });
+        phenologyChart.innerHTML = '';
+        phenologyChart.appendChild(svgEl);
+        phenologySection.classList.remove('hidden');
+      }
+
+      // #464: ID Leaderboard — top identifiers for this species.
+      const leaderboardSection = document.getElementById('sp-id-leaderboard-section');
+      const leaderboardEl      = document.getElementById('sp-id-leaderboard');
+      if (leaderboardSection && leaderboardEl && taxon) {
+        try {
+          const { data: idRows } = await supabase
+            .from('identifications')
+            .select('identifier_id, users!inner(id, username, avatar_url)')
+            .eq('scientific_name', taxon.scientific_name)
+            .eq('is_primary', true)
+            .limit(200);
+          if (idRows && idRows.length > 0) {
+            type IdRow = { identifier_id: string; users: { id: string; username: string | null; avatar_url: string | null } };
+            const rows = idRows as unknown as IdRow[];
+            const counts = new Map<string, { user: IdRow['users']; count: number }>();
+            for (const r of rows) {
+              const key = r.identifier_id;
+              const prev = counts.get(key);
+              if (prev) prev.count++;
+              else counts.set(key, { user: r.users, count: 1 });
+            }
+            const sorted = Array.from(counts.values()).sort((a, b) => b.count - a.count).slice(0, 5);
+            if (sorted.length > 0) {
+              leaderboardEl.innerHTML = sorted.map((entry, i) => {
+                const handle = entry.user.username ? `@${esc(entry.user.username)}` : esc(entry.user.id.slice(0, 8));
+                const profileHref = `/${lang}/u/?username=${encodeURIComponent(entry.user.username ?? '')}` ;
+                return `<li class="flex items-center gap-3 py-2 border-b border-zinc-100 dark:border-zinc-800 last:border-0">
+                  <span class="w-5 text-center text-xs font-bold text-zinc-400">${i + 1}</span>
+                  ${entry.user.avatar_url ? `<img src="${esc(entry.user.avatar_url)}" alt="${handle}" class="w-8 h-8 rounded-full object-cover">` : `<div class="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-700"></div>`}
+                  <a href="${esc(profileHref)}" class="text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:underline">${handle}</a>
+                  <span class="ml-auto text-xs text-zinc-500">${entry.count} ${lang === 'es' ? 'IDs' : 'IDs'}</span>
+                </li>`;
+              }).join('');
+              leaderboardSection.classList.remove('hidden');
+            }
+          }
+        } catch { /* non-fatal */ }
+      }
+
+      // #464: Best-shot nomination section — show for logged-in users.
+      const bestShotSection = document.getElementById('sp-best-shot-section');
+      const bestShotBody    = document.getElementById('sp-best-shot-body');
+      if (bestShotSection && bestShotBody && taxon) {
+        try {
+          const { getCachedUser } = await import('../lib/supabase');
+          const user = await getCachedUser();
+          if (user) {
+            const totalObs = obsRows.length;
+            bestShotBody.textContent = lang === 'es'
+              ? `Hay ${totalObs} observaciones de esta especie. Los usuarios registrados pueden nominar la mejor foto como representativa de la especie.`
+              : `There are ${totalObs} observations of this species. Logged-in users can nominate the best photo as the hero shot.`;
+            bestShotSection.classList.remove('hidden');
+          }
+        } catch { /* non-fatal */ }
       }
     }
   }
