@@ -271,6 +271,12 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
     try { localStorage.setItem(SEEN_KEY, SEEN_VAL); } catch { /* noop */ }
   }
 
+  // Guards: persistPreset() calls persistOnboardingDone() when the user
+  // picks a preset (they may close the modal before reaching the last step).
+  // hide() ALSO calls it when the modal actually closes. Both paths are safe
+  // because the UPDATE is idempotent — writing now() twice is a no-op effect.
+  // The paths are NOT mutually exclusive: preset → continue → last step → hide()
+  // will fire persistOnboardingDone() twice. This is intentional and harmless.
   async function persistOnboardingDone(): Promise<void> {
     let sb;
     try { sb = getSupabase(); } catch { return; }
