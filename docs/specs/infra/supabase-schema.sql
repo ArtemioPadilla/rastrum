@@ -12595,8 +12595,13 @@ INSERT INTO public.institutions (short_name, long_name, kind) VALUES
   ('UASLP',   'Universidad Autónoma de San Luis Potosí',          'academic')
 ON CONFLICT (short_name) DO NOTHING;
 
--- Helper view: active affiliations with institution details for a user
-CREATE OR REPLACE VIEW public.user_active_affiliations AS
+-- Helper view: active affiliations with institution details for a user.
+-- security_invoker=true so the view honors the calling user's RLS on
+-- the underlying tables instead of bypassing them with the view owner's
+-- perms (Postgres 15+ default). Required by the schema-security lint
+-- enforced in db-validate.yml (see CLAUDE.md "Schema security invariants").
+CREATE OR REPLACE VIEW public.user_active_affiliations
+  WITH (security_invoker = true) AS
   SELECT
     ia.user_id,
     i.short_name   AS institution_short,
