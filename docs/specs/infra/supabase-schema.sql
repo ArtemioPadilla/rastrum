@@ -12507,6 +12507,8 @@ CREATE TABLE IF NOT EXISTS public.institutions (
   kind        text NOT NULL DEFAULT 'gov'
                 CHECK (kind IN ('gov','academic','ngo','research')),
   created_at  timestamptz NOT NULL DEFAULT now()
+);
+
 -- Admin-verified institutional affiliations for experts
 CREATE TABLE IF NOT EXISTS public.institutional_affiliations (
   id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
