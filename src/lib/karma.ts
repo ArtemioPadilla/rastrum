@@ -1,3 +1,6 @@
+import { getConservationMultiplier, conservationBonusText } from './karma-conservation';
+import type { IUCNCategory, NOM059Category } from './karma-conservation';
+
 export type Bucket = 1 | 2 | 3 | 4 | 5;
 
 export interface RarityBucket {
@@ -42,12 +45,24 @@ export interface VoteMicrocopyInput {
   confidence: 0.5 | 0.7 | 0.9;
   inGrace: boolean;
   graceDaysLeft?: number;
+  /** IUCN Red List category — wired into award_karma() since #551. */
+  iucnCategory?: string | null;
+  /** NOM-059 category — wired into award_karma() since #551. */
+  nom059Category?: string | null;
 }
 
 export function microcopyForVote(i: VoteMicrocopyInput): string {
   const stars = rarityTier(i.bucket);
   const confFactor = i.confidence >= 0.85 ? 1.0 : i.confidence >= 0.65 ? 0.7 : 0.4;
-  const win = 5 * i.multiplier * i.streakMultiplier * confFactor;
+
+  // Conservation multiplier (wired into award_karma() since #551)
+  const cons = getConservationMultiplier(
+    (i.iucnCategory as IUCNCategory | null) ?? null,
+    (i.nom059Category as NOM059Category) ?? null,
+  );
+  const consMult = cons.multiplier;
+
+  const win = 5 * i.multiplier * i.streakMultiplier * confFactor * consMult;
   const lossRarity = Math.min(i.multiplier, 2.0);
   const loss = -2 * lossRarity * confFactor;
 
@@ -59,9 +74,11 @@ export function microcopyForVote(i: VoteMicrocopyInput): string {
   }
 
   const level = i.expertiseLevel ?? (i.lang === 'es' ? 'sin especialidad' : 'no expertise');
+  const bonusSuffix = conservationBonusText(consMult, cons.source, i.lang);
+  const bonus = bonusSuffix ? ` · ${bonusSuffix}` : '';
 
   if (i.lang === 'es') {
-    return `Rareza ${stars} — tu voto pesa ${i.expertiseWeight.toFixed(1)}× en ${level} · acertar: ${formatDelta(win)} / fallar: ${formatDelta(loss)}.`;
+    return `Rareza ${stars} — tu voto pesa ${i.expertiseWeight.toFixed(1)}× en ${level} · acertar: ${formatDelta(win)} / fallar: ${formatDelta(loss)}${bonus}.`;
   }
-  return `Rarity ${stars} — your vote weighs ${i.expertiseWeight.toFixed(1)}× in ${level} · win: ${formatDelta(win)} / lose: ${formatDelta(loss)}.`;
+  return `Rarity ${stars} — your vote weighs ${i.expertiseWeight.toFixed(1)}× in ${level} · win: ${formatDelta(win)} / lose: ${formatDelta(loss)}${bonus}.`;
 }

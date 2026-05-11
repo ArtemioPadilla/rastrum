@@ -27,7 +27,10 @@ const v = (tr as unknown as { validation: Record<string, string> }).validation;
   data-label-submitting={v.submitting}
   data-label-failed={v.submit_failed}
   data-label-no-taxon-match={v.no_taxon_match}
-  data-label-target-tpl={v.submit_target_tpl}
+  data-label-target-tpl={v.submit_target_pl}
+  data-label-karma-gate-validate={v.karma_gate_validate}
+  data-label-karma-gate-flag={v.karma_gate_flag}
+  data-label-karma-gate-expert={v.karma_gate_expert}
   class="hidden fixed inset-0 z-50 items-center justify-center bg-black/60 px-4"
 >
   <div class="w-full max-w-md rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 shadow-xl">
@@ -44,6 +47,8 @@ const v = (tr as unknown as { validation: Record<string, string> }).validation;
     <p id="suggest-id-microcopy" class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">
       {v.karma_microcopy_loading}
     </p>
+    <!-- Karma gate warning (#558): shown as soft warning when user is below threshold -->
+    <p id="suggest-id-karma-gate" class="hidden text-xs text-amber-600 dark:text-amber-400 mb-3" role="status"></p>
 
     <form id="suggest-id-form" class="space-y-3" novalidate>
       <div>
@@ -162,6 +167,20 @@ const v = (tr as unknown as { validation: Record<string, string> }).validation;
         const r = rarity as { bucket?: number; multiplier?: number } | null;
         const bucket = ((r?.bucket ?? 1) as Bucket);
         const multiplier = r?.multiplier ?? 1.0;
+
+        // Fetch conservation status for this taxon (#551)
+        let iucnCategory: string | null = null;
+        let nom059Category: string | null = null;
+        const { data: taxonRow } = await supabase
+          .from('taxa')
+          .select('iucn_category, nom059_status')
+          .eq('id', taxonId)
+          .maybeSingle();
+        if (taxonRow) {
+          iucnCategory  = (taxonRow as { iucn_category?: string | null }).iucn_category ?? null;
+          nom059Category = (taxonRow as { nom059_status?: string | null }).nom059_status ?? null;
+        }
+
         microcopyEl.textContent = microcopyForVote({
           lang: isEs ? 'es' : 'en',
           bucket,
@@ -172,6 +191,8 @@ const v = (tr as unknown as { validation: Record<string, string> }).validation;
           confidence,
           inGrace,
           graceDaysLeft,
+          iucnCategory,
+          nom059Category,
         });
       } catch {
         microcopyEl.textContent = isEs
@@ -184,6 +205,33 @@ const v = (tr as unknown as { validation: Record<string, string> }).validation;
     const failedTpl  = modal.dataset.labelFailed     ?? 'Could not submit: {error}';
     const noTaxonMatch = modal.dataset.labelNoTaxonMatch ?? 'No taxon match.';
     const targetTpl  = modal.dataset.labelTargetTpl  ?? 'Suggestion for {name}';
+    const karmaGateValidateMsg = modal.dataset.labelKarmaGateValidate ?? 'Reach {min_karma} karma to suggest IDs';
+    const karmaGateEl = document.getElementById('suggest-id-karma-gate') as HTMLElement | null;
+
+    /** Check karma gate and show soft warning (#558). Non-blocking for v1. */
+    async function checkKarmaGate(): Promise<void> {
+      if (!karmaGateEl) return;
+      try {
+        const supabase = getSupabase();
+        const user = await getCachedUser();
+        if (!user) return;
+        const { data: u } = await supabase
+          .from('users')
+          .select('karma_total')
+          .eq('id', user.id)
+          .maybeSingle();
+        const karma = (u as { karma_total?: number } | null)?.karma_total ?? 0;
+        const MIN_KARMA = 100; // mirrors karma_thresholds seed value
+        if (karma < MIN_KARMA) {
+          karmaGateEl.textContent = karmaGateValidateMsg.replace('{min_karma}', String(MIN_KARMA));
+          karmaGateEl.classList.remove('hidden');
+        } else {
+          karmaGateEl.classList.add('hidden');
+        }
+      } catch {
+        // Gate check failure is non-blocking: silently skip.
+      }
+    }
 
     function open(obsId: string, observer: string | null) {
       observationId = obsId;
@@ -195,9 +243,11 @@ const v = (tr as unknown as { validation: Record<string, string> }).validation;
       } else if (target) {
         target.textContent = '';
       }
+      karmaGateEl?.classList.add('hidden');
       errorEl?.classList.add('hidden');
       form!.reset();
       nameInput?.focus();
+      void checkKarmaGate();
     }
     function close() {
       modal!.classList.add('hidden');

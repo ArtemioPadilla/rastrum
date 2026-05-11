@@ -59,12 +59,11 @@ self.addEventListener('message', (event) => {
 
 // ── Web Push ── (ux-streak-push + #724 kairos)
 //
-// Both the `streak-push` and `kairos-fire` EFs send payload-less
-// notifications (VAPID auth + TTL only). We can't know which fired
-// from the push event itself, so we infer the topic from the device's
-// local time of day:
-//   • 16:00 - 21:00 local → golden-hour kairos (sunset window)
-//   • everything else     → streak reminder (8 PM cron is the legacy default)
+// kairos-fire now sends RFC 8291 encrypted payloads containing
+// { title, body, url } (#801). We try to parse event.data?.json() first.
+// When present, use those fields directly.
+// When absent (payload-less push from streak-push or older clients),
+// fall back to the time-of-day heuristic below.
 //
 // Both copies are bilingual; we pick ES vs EN by the language of the
 // most recently focused/visible client, falling back to ES.
@@ -81,6 +80,21 @@ self.addEventListener('push', (event) => {
       }
     } catch { /* fall through to default */ }
 
+    // Try to read encrypted payload from event (#801).
+    let payloadTitle = null;
+    let payloadBody = null;
+    let payloadUrl = null;
+    try {
+      if (event.data) {
+        const data = event.data.json();
+        if (data && data.title) {
+          payloadTitle = data.title;
+          payloadBody = data.body || '';
+          payloadUrl = data.url || null;
+        }
+      }
+    } catch { /* encrypted payload not available — use fallback */ }
+
     const localHour = new Date().getHours();
     const isKairosWindow = localHour >= 16 && localHour < 21;
 
@@ -95,12 +109,16 @@ self.addEventListener('push', (event) => {
         };
 
     const tag = isKairosWindow ? 'rastrum-kairos-golden-hour' : 'rastrum-streak-reminder';
-    const target = isKairosWindow
+    const fallbackTarget = isKairosWindow
       ? (lang === 'en' ? '/en/observe/' : '/es/observar/')
       : (lang === 'en' ? '/en/profile/notifications/' : '/es/perfil/notificaciones/');
+    const target = payloadUrl || fallbackTarget;
 
-    await self.registration.showNotification(COPY[lang].title, {
-      body: COPY[lang].body,
+    const title = payloadTitle || COPY[lang].title;
+    const body  = payloadBody  || COPY[lang].body;
+
+    await self.registration.showNotification(title, {
+      body,
       tag,
       icon: '/rastrum-logo.svg',
       badge: '/favicon.svg',

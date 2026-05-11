@@ -46,7 +46,7 @@ describe('microcopyForVote', () => {
     expect(txt).toContain('-4');
   });
 
-  it('does not include conservation bonus suffix (parity with award_karma SQL)', () => {
+  it('does not include conservation bonus suffix when no conservation status provided', () => {
     const txt = microcopyForVote({
       lang: 'en',
       bucket: 3,
@@ -56,6 +56,7 @@ describe('microcopyForVote', () => {
       streakMultiplier: 1.0,
       confidence: 0.9,
       inGrace: false,
+      // iucnCategory and nom059Category not provided → no bonus
     });
     expect(txt).not.toMatch(/conservation bonus/i);
     expect(txt).not.toMatch(/IUCN|NOM-059/);
@@ -94,5 +95,62 @@ describe('escAttr', () => {
   });
   it('escapes & first to avoid double-escaping', () => {
     expect(escAttr('A & B')).toBe('A &amp; B');
+  });
+});
+
+// ── #551: Conservation bonus in microcopy ────────────────────────────────────
+
+describe('microcopyForVote — conservation bonus (#551)', () => {
+  it('appends IUCN conservation bonus suffix for EN species', () => {
+    const txt = microcopyForVote({
+      lang: 'en',
+      bucket: 3,
+      multiplier: 2.5,
+      expertiseLevel: 'Aves',
+      expertiseWeight: 1.0,
+      streakMultiplier: 1.0,
+      confidence: 0.9,
+      inGrace: false,
+      iucnCategory: 'EN',
+      nom059Category: null,
+    });
+    expect(txt).toMatch(/conservation bonus/i);
+    expect(txt).toContain('IUCN EN');
+    // win = round(5 * 2.5 * 1.0 * 1.0 * 2.0) = +25
+    expect(txt).toContain('+25');
+  });
+
+  it('appends NOM-059 bonus suffix when NOM-059 wins over IUCN', () => {
+    const txt = microcopyForVote({
+      lang: 'es',
+      bucket: 2,
+      multiplier: 1.5,
+      expertiseLevel: 'Mammalia',
+      expertiseWeight: 1.0,
+      streakMultiplier: 1.0,
+      confidence: 0.9,
+      inGrace: false,
+      iucnCategory: 'LC',   // mult=1.0 — NOM-059 P (2.5) wins
+      nom059Category: 'P',
+    });
+    expect(txt).toMatch(/bono conservaci\u00f3n/i);
+    expect(txt).toContain('NOM-059 P');
+  });
+
+  it('does not append bonus suffix for LC species with no NOM-059 status', () => {
+    const txt = microcopyForVote({
+      lang: 'en',
+      bucket: 1,
+      multiplier: 1.0,
+      expertiseLevel: null,
+      expertiseWeight: 1.0,
+      streakMultiplier: 1.0,
+      confidence: 0.7,
+      inGrace: false,
+      iucnCategory: 'LC',
+      nom059Category: null,
+    });
+    expect(txt).not.toMatch(/conservation bonus/i);
+    expect(txt).not.toMatch(/IUCN|NOM-059/);
   });
 });
