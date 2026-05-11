@@ -12827,13 +12827,14 @@ CREATE UNIQUE INDEX IF NOT EXISTS mv_user_obs_counts_idx
 -- Avoids a full-table scan on the explore / trending-species page.
 CREATE MATERIALIZED VIEW IF NOT EXISTS public.mv_recent_species AS
   SELECT
-    taxon_id,
+    primary_taxon_id AS taxon_id,
     COUNT(*) AS recent_count,
     MAX(observed_at) AS last_seen
   FROM public.observations
   WHERE sync_status = 'synced'
     AND observed_at > now() - interval '30 days'
-  GROUP BY taxon_id
+    AND primary_taxon_id IS NOT NULL
+  GROUP BY primary_taxon_id
   ORDER BY recent_count DESC;
 
 CREATE UNIQUE INDEX IF NOT EXISTS mv_recent_species_idx
