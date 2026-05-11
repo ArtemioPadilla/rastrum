@@ -2,6 +2,12 @@
 --
 -- Regression suite for infra/lint-schema-security.sql.
 --
+-- ⚠️  MAINTENANCE NOTE: These tests duplicate the invariants from
+--    infra/lint-schema-security.sql. If you change the linter (add/remove
+--    a check, change error message text), update these tests too.
+--    The tests do NOT import or execute the linter file directly — they
+--    independently verify the same three invariants using SAVEPOINT injection.
+--
 -- Strategy: inject a known-bad schema object inside a SAVEPOINT, assert
 -- the linter fails (raises an exception), then ROLLBACK TO SAVEPOINT so
 -- the next test case starts from a clean state. A final positive case

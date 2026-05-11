@@ -34,6 +34,10 @@ export interface StreamChatInput {
 const TOOL_RE = /^\s*\{\s*"tool"\s*:/;
 const ACTION_SUGGEST_RE = /^\s*\{\s*"suggest_action"\s*:/;
 const MAX_TOOL_ROUNDS = 3;
+// TOKEN_BUDGET_CHARS is a per-user-turn global budget across all tool rounds.
+// If round 0 emits 4000 chars of prose, subsequent rounds cannot emit more.
+// This is intentionally conservative for v1 — prevents runaway multi-round verbosity.
+// Raise or make per-round if users report truncated responses in deep tool chains.
 const TOKEN_BUDGET_CHARS = 4000;
 const SYSTEM_TOOLS_PROMPT = `You may emit a JSON tool call to look up data. Tools available:\n%TOOLS%\nWhen calling a tool, respond with ONLY a JSON object: {"tool": "<name>", "args": { ... }}. Otherwise reply in prose. Use tools sparingly.`;
 
