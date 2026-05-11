@@ -20,6 +20,9 @@ const subheading          = tp.subheading          ?? (lang === 'es'
 const insufficient        = tp.insufficient        ?? (lang === 'es'
   ? 'Datos insuficientes — el grupo de comparación es muy pequeño todavía. Vuelve cuando haya más observadores activos.'
   : 'Not enough data yet — the comparison cohort is too small. Check back as more observers become active.');
+const insufficientState   = tp.insufficient_state  ?? (lang === 'es'
+  ? 'Datos insuficientes para tu estado. Selecciona tu estado en Editar perfil o vuelve cuando haya más observadores activos.'
+  : 'Not enough data for your state. Set your state in Edit profile, or check back as more observers become active.');
 const loading             = tp.loading             ?? (lang === 'es' ? 'Cargando…' : 'Loading…');
 const labelDiversity      = tp.label_diversity     ?? (lang === 'es' ? 'Diversidad'         : 'Diversity');
 const labelHabitats       = tp.label_habitats      ?? (lang === 'es' ? 'Hábitats cubiertos' : 'Habitats covered');
@@ -35,6 +38,8 @@ const unitValidations     = tp.unit_validations    ?? (lang === 'es' ? 'IDs'   :
 const unitSpread          = tp.unit_spread         ?? 'km²';
 const ownerOnly           = tp.owner_only          ?? (lang === 'es' ? '🔒 Solo tú lo ves' : '🔒 Only you see this');
 const aria                = tp.aria_bar            ?? (lang === 'es' ? 'Barra de percentil' : 'Percentile bar');
+const scopeCountryLabel   = tp.scope_country_label ?? (lang === 'es' ? 'MX' : 'MX');
+const scopeStateLabel     = tp.scope_state_label   ?? (lang === 'es' ? 'Estado' : 'State');
 ---
 
 <section
@@ -49,6 +54,24 @@ const aria                = tp.aria_bar            ?? (lang === 'es' ? 'Barra de
     </span>
   </header>
   <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-2">{subheading}</p>
+
+  <!-- Scope toggle: MX country vs state (#805) -->
+  <div class="flex items-center gap-1 mb-3" data-scope-toggle>
+    <button
+      data-scope="country"
+      class="scope-pill text-[11px] font-medium px-2 py-0.5 rounded-full border transition-colors
+             border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+      aria-pressed="true"
+    >{scopeCountryLabel}</button>
+    <button
+      data-scope="state"
+      class="scope-pill text-[11px] font-medium px-2 py-0.5 rounded-full border transition-colors
+             border-zinc-300 bg-transparent text-zinc-500 dark:border-zinc-600 dark:text-zinc-400
+             hover:border-emerald-400 hover:text-emerald-600"
+      aria-pressed="false"
+    >{scopeStateLabel}</button>
+  </div>
+
   <div class="mb-4">
     <WhyAmISeeingThis algorithm="profile_percentile_cards" lang={lang} />
   </div>
@@ -56,6 +79,7 @@ const aria                = tp.aria_bar            ?? (lang === 'es' ? 'Barra de
   <p data-state="loading" class="text-xs text-zinc-500 italic py-4">{loading}</p>
 
   <p data-state="insufficient" class="hidden text-xs text-zinc-500 italic py-4">{insufficient}</p>
+  <p data-state="insufficient-state" class="hidden text-xs text-zinc-500 italic py-4">{insufficientState}</p>
 
   <div data-state="ready" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-3">
     {[
@@ -95,12 +119,19 @@ const aria                = tp.aria_bar            ?? (lang === 'es' ? 'Barra de
   import {
     buildCards,
     hasSufficientCohort,
+    getCohortLabel,
     type PercentileMetric,
     type PercentilePayload,
+    type PercentileScope,
   } from '../../lib/percentile';
 
-  function setVisible(root: HTMLElement, state: 'loading' | 'insufficient' | 'ready') {
-    for (const s of ['loading', 'insufficient', 'ready'] as const) {
+  const SCOPE_STORAGE_KEY = 'rastrum.percentile.scope';
+
+  function setVisible(
+    root: HTMLElement,
+    state: 'loading' | 'insufficient' | 'insufficient-state' | 'ready'
+  ) {
+    for (const s of ['loading', 'insufficient', 'insufficient-state', 'ready'] as const) {
       const el = root.querySelector<HTMLElement>(`[data-state="${s}"]`);
       if (!el) continue;
       el.classList.toggle('hidden', s !== state);
@@ -110,33 +141,47 @@ const aria                = tp.aria_bar            ?? (lang === 'es' ? 'Barra de
   function buildCaption(
     lang: string,
     pctlLabel: string,
-    cohortCountry: string | null,
-    cohortN: number,
+    payload: PercentilePayload,
   ): string {
-    const country = (cohortCountry ?? 'MX').toUpperCase();
+    const label = getCohortLabel(payload, lang);
     if (lang === 'es') {
-      return `Estás en el percentil ${pctlLabel} de los observadores activos en ${country} (n = ${cohortN}).`;
+      return `Estás en el percentil ${pctlLabel} de los observadores activos en ${label} (n = ${payload.cohort_n}).`;
     }
-    return `You are in the ${pctlLabel}th percentile of active observers in ${country} (n = ${cohortN}).`;
+    return `You are in the ${pctlLabel}th percentile of active observers in ${label} (n = ${payload.cohort_n}).`;
   }
 
-  async function hydrate(root: HTMLElement) {
-    const lang = root.dataset.lang ?? 'en';
-    let supabase;
-    try { supabase = getSupabase(); } catch { setVisible(root, 'insufficient'); return; }
-    const user = await getCachedUser();
-    if (!user) {
-      root.classList.add('hidden');
-      return;
-    }
-    const { data, error } = await supabase.rpc('get_my_percentiles');
+  function applyScopeToggleStyle(root: HTMLElement, scope: PercentileScope) {
+    root.querySelectorAll<HTMLButtonElement>('.scope-pill').forEach(btn => {
+      const active = btn.dataset.scope === scope;
+      btn.setAttribute('aria-pressed', String(active));
+      btn.classList.toggle('border-emerald-500', active);
+      btn.classList.toggle('bg-emerald-50', active);
+      btn.classList.toggle('text-emerald-700', active);
+      btn.classList.toggle('dark:bg-emerald-900/30', active);
+      btn.classList.toggle('dark:text-emerald-300', active);
+      btn.classList.toggle('border-zinc-300', !active);
+      btn.classList.toggle('bg-transparent', !active);
+      btn.classList.toggle('text-zinc-500', !active);
+      btn.classList.toggle('dark:border-zinc-600', !active);
+      btn.classList.toggle('dark:text-zinc-400', !active);
+    });
+  }
+
+  async function loadScope(
+    root: HTMLElement,
+    lang: string,
+    supabase: ReturnType<typeof getSupabase>,
+    scope: PercentileScope,
+  ) {
+    setVisible(root, 'loading');
+    const { data, error } = await supabase.rpc('get_my_percentiles', { p_scope: scope });
     if (error || !data) {
-      setVisible(root, 'insufficient');
+      setVisible(root, scope === 'state' ? 'insufficient-state' : 'insufficient');
       return;
     }
     const payload = data as PercentilePayload | null;
     if (!payload || !hasSufficientCohort(payload.cohort_n)) {
-      setVisible(root, 'insufficient');
+      setVisible(root, scope === 'state' ? 'insufficient-state' : 'insufficient');
       return;
     }
     const cards = buildCards(payload);
@@ -148,11 +193,38 @@ const aria                = tp.aria_bar            ?? (lang === 'es' ? 'Barra de
       const capEl   = cardEl.querySelector<HTMLElement>('[data-caption]');
       if (valueEl) valueEl.textContent = card.valueLabel;
       if (barEl)   barEl.style.width   = `${card.barWidthPct}%`;
-      if (capEl)   capEl.textContent   = buildCaption(lang, card.pctlLabel, payload.cohort_country, payload.cohort_n);
+      if (capEl)   capEl.textContent   = buildCaption(lang, card.pctlLabel, payload);
       const _metric: PercentileMetric = card.metric;
       void _metric;
     }
     setVisible(root, 'ready');
+  }
+
+  async function hydrate(root: HTMLElement) {
+    const lang = root.dataset.lang ?? 'en';
+    let supabase;
+    try { supabase = getSupabase(); } catch { setVisible(root, 'insufficient'); return; }
+    const user = await getCachedUser();
+    if (!user) {
+      root.classList.add('hidden');
+      return;
+    }
+
+    // Restore persisted scope or default to 'country'
+    const savedScope = (localStorage.getItem(SCOPE_STORAGE_KEY) ?? 'country') as PercentileScope;
+    applyScopeToggleStyle(root, savedScope);
+    await loadScope(root, lang, supabase, savedScope);
+
+    // Wire scope toggle buttons
+    root.querySelectorAll<HTMLButtonElement>('.scope-pill').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const scope = btn.dataset.scope as PercentileScope;
+        if (!scope) return;
+        localStorage.setItem(SCOPE_STORAGE_KEY, scope);
+        applyScopeToggleStyle(root, scope);
+        await loadScope(root, lang, supabase, scope);
+      });
+    });
   }
 
   document.querySelectorAll<HTMLElement>('[data-widget="percentile-cards"]').forEach(hydrate);
