@@ -75,11 +75,12 @@ function notifySwPmtilesUpdated(url: string, controller: { postMessage: (...a: u
 }
 
 describe('#817 — page notifies SW after cache.put', () => {
+  type PostMessageFn = (...a: unknown[]) => void;
   const URL = 'https://media.rastrum.org/maps/mexico_z0_10.pmtiles';
-  let mockController: { postMessage: ReturnType<typeof vi.fn> };
+  let mockController: { postMessage: ReturnType<typeof vi.fn<PostMessageFn>> };
 
   beforeEach(() => {
-    mockController = { postMessage: vi.fn() };
+    mockController = { postMessage: vi.fn<PostMessageFn>() };
   });
 
   it('sends PMTILES_CACHE_UPDATED with correct url', () => {
