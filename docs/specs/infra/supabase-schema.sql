@@ -12635,12 +12635,23 @@ GRANT SELECT ON public.weekly_validator_rewards TO authenticated;
 -- Extend karma_events.reason CHECK to include lottery win
 -- (applied via ALTER TABLE; the original CREATE TABLE definition can't be
 --  retroactively changed without a migration, so we add a constraint here)
+-- Extends the constraint redefined above (line ~12145) to include
+-- expert_id_lottery_win. PRESERVE every reason already accumulated by
+-- prior ALTERs — the previous version of this block dropped
+-- streak_freeze_consumed, pool_donation, ai_sponsorship_*, ai_sponsor_call,
+-- and pool_call_sponsor_drip on every db-apply, silently breaking those
+-- features whenever a real INSERT was attempted. (The broken validate
+-- gate masked this in CI; production INSERTs from those features have
+-- been failing on the CHECK constraint since #725/#734/#735 shipped.)
 ALTER TABLE public.karma_events
   DROP CONSTRAINT IF EXISTS karma_events_reason_check;
 ALTER TABLE public.karma_events
   ADD CONSTRAINT karma_events_reason_check CHECK (reason IN (
     'consensus_win','consensus_loss','first_in_rastrum',
     'observation_synced','comment_reaction','manual_adjust',
+    'ai_sponsorship_active','ai_sponsorship_revoked','ai_sponsor_call',
+    'pool_donation','pool_call_sponsor_drip',
+    'streak_freeze_consumed',
     'expert_id_lottery_win'
   ));
 
