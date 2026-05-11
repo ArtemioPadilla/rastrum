@@ -102,15 +102,7 @@ async function mockEntityChipRenderer(page: import('@playwright/test').Page) {
   });
 }
 
-// TODO(#979 author): these two tests rely on a `window.__rastrum_supabase_override`
-// hook that was never wired in `src/lib/supabase.ts`. The picker calls
-// `chat_find_species` via supabase-js; in preview builds `PUBLIC_SUPABASE_URL`
-// is unset, so the RPC resolves with `data: null` and no rows render. Two
-// fixes are possible: (a) ship a test-only override hook in supabase.ts, or
-// (b) Playwright `page.route` interception keyed off the supabase URL. Both
-// are out of scope for the build-unblock PR — re-enable once #979 lands a
-// proper mock seam.
-test.describe.skip('chat entity picker — species flow', () => {
+test.describe('chat entity picker — species flow', () => {
   test('open picker, switch to Species tab, pick row → chip appears', async ({ authedPage: page }) => {
     await mockChatModelCached(page);
     await mockSupabaseRpc(page);
