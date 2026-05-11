@@ -34,6 +34,7 @@ const ROUTES = {
   '/observe':                '/observar',
   '/about':                  '/acerca',
   '/docs':                   '/docs',
+  '/docs/surprises':         '/docs/sorpresas',   // #813 — ES slug override
   '/sign-in':                '/ingresar',
   '/profile':                '/perfil',
   '/profile/edit':           '/perfil/editar',

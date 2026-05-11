@@ -135,9 +135,20 @@ export const docPages = [
 
 export type DocPage = (typeof docPages)[number];
 
+/**
+ * Per-locale slug overrides for doc pages where the ES URL slug differs
+ * from the EN slug. Add entries here when a non-English locale needs its
+ * own slug for SEO / cultural-fit reasons (#813).
+ */
+const docPageSlugOverrides: Partial<Record<string, Partial<Record<string, string>>>> = {
+  surprises: { es: 'sorpresas' },
+};
+
 export function getDocPath(lang: string, page?: string) {
   const base = import.meta.env.BASE_URL.replace(/\/$/, '');
-  return page ? `${base}/${lang}/docs/${page}/` : `${base}/${lang}/docs/`;
+  if (!page) return `${base}/${lang}/docs/`;
+  const slug = docPageSlugOverrides[page]?.[lang] ?? page;
+  return `${base}/${lang}/docs/${slug}/`;
 }
 
 export function getAlternateLocale(lang: string): Locale {
