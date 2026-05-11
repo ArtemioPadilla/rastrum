@@ -646,6 +646,8 @@ runbooks (`docs/runbooks/falta-dex.md`, `docs/runbooks/contextual-suggestions.md
 | 404 on `media.rastrum.app/...` after domain migration | Old hostname `media.rastrum.app` retired | **Resolved 2026-04-26:** use `https://media.rastrum.org/...`. Service worker pass-through list and env vars updated. |
 | Test file imports `phi-vision.ts` directly and panics in Node | WebLLM bundle pulls WebGPU APIs at import time | Mock at the module boundary in your test, not at the WebLLM SDK level (see `local-ai.test.ts`). |
 | `gh` CLI deploys still hit `rastrum.artemiop.com` in docs | Old canonical domain | **Resolved 2026-04-26:** all docs migrated to `rastrum.org`; the old domain redirects but new content goes to `rastrum.org`. |
+| `git add -A` in a worktree stages the `node_modules` symlink and breaks CI | In a worktree, `node_modules` is a symlink pointing to the main worktree's `node_modules`. `git add -A` picks it up as a new tracked entry. | Always stage specific files in worktrees: `git add <specific-files>` or `git add -p`. Never `git add -A` or `git add .` from the worktree root. |
+| `git stash pop` in one worktree pops a stash that belongs to another | Git stash is global across all worktrees sharing the same `.git` directory. A stash created in worktree A is visible (and poppable) from worktree B. | Use named stashes: `git stash push -m "worktree-name: description"`. Or avoid `git stash` in worktrees entirely — use a WIP commit instead. |
 
 ### Pitfalls discovered 2026-05-01
 
