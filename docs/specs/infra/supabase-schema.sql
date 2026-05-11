@@ -12390,3 +12390,66 @@ CREATE POLICY "expert_apps_insert_own" ON public.expert_applications
 -- Run: node scripts/backfill-rarity-tier.mjs
 -- After backfill, nightly recompute via recompute-taxa-cache EF
 COMMENT ON COLUMN public.taxa.rarity_tier IS '1=common(101+obs), 2=uncommon(21-100), 3=rare(6-20), 4=very_rare(1-5), NULL=no_obs';
+
+-- ============================================================
+-- v1.5: Biodiversity Trails (#191)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.trails (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name text NOT NULL,
+  name_es text,
+  creator_id uuid REFERENCES public.users(id) ON DELETE SET NULL,
+  -- waypoints: [{lat, lng, name, obs_count}]
+  waypoints jsonb NOT NULL DEFAULT '[]',
+  total_species int NOT NULL DEFAULT 0,
+  total_observations int NOT NULL DEFAULT 0,
+  distance_km numeric,
+  visibility text NOT NULL DEFAULT 'public'
+    CHECK (visibility IN ('public', 'private')),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.trails ENABLE ROW LEVEL SECURITY;
+
+-- Public trails are readable by anyone; owner can always read their own
+CREATE POLICY trails_public_read ON public.trails
+  FOR SELECT
+  USING (visibility = 'public' OR (SELECT auth.uid()) = creator_id);
+
+-- Owners can insert/update/delete their own trails
+CREATE POLICY trails_owner_write ON public.trails
+  FOR ALL
+  TO authenticated
+  USING ((SELECT auth.uid()) = creator_id)
+  WITH CHECK ((SELECT auth.uid()) = creator_id);
+
+-- ============================================================
+-- v1.5: PITs — Puntos de Información Territorial (#193)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.pits (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  slug text NOT NULL UNIQUE,
+  name text NOT NULL,
+  name_es text,
+  lat numeric NOT NULL,
+  lng numeric NOT NULL,
+  qr_payload text NOT NULL,
+  trail_id uuid REFERENCES public.trails(id) ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.pits ENABLE ROW LEVEL SECURITY;
+
+-- PITs are publicly readable (they link to public QR codes)
+CREATE POLICY pits_public_read ON public.pits
+  FOR SELECT
+  USING (true);
+
+-- Only authenticated users can create/manage PITs (future: karma gate)
+CREATE POLICY pits_authenticated_write ON public.pits
+  FOR ALL
+  TO authenticated
+  USING (true)
+  WITH CHECK (true);

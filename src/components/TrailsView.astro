@@ -1,0 +1,353 @@
+---
+/**
+ * TrailsView.astro — Biodiversity Trails browse + create UI (issue #191).
+ *
+ * Displays:
+ *   - List of the logged-in user's trails
+ *   - Public trails nearby (loaded client-side via Supabase)
+ *   - "Create Trail" button that opens a modal to name + start recording waypoints
+ *
+ * Each trail card shows: name, species count, observation count, distance, waypoint count.
+ *
+ * Data model: public.trails (see docs/specs/infra/supabase-schema.sql)
+ * Waypoints: [{lat, lng, name, obs_count}]
+ */
+interface Props {
+  lang: 'en' | 'es';
+}
+
+const { lang } = Astro.props;
+const isEs = lang === 'es';
+
+const copy = {
+  title:           isEs ? 'Senderos de Biodiversidad' : 'Biodiversity Trails',
+  subtitle:        isEs ? 'Crea y explora senderos con observaciones de campo.'
+                        : 'Create and explore trails with field observations.',
+  createBtn:       isEs ? 'Crear sendero'              : 'Create Trail',
+  myTrails:        isEs ? 'Mis senderos'               : 'My Trails',
+  nearbyTrails:    isEs ? 'Senderos cercanos'          : 'Nearby Trails',
+  emptyMy:         isEs ? 'Aún no tienes senderos. ¡Crea el primero!'
+                        : "You don't have any trails yet. Create your first!",
+  emptyNearby:     isEs ? 'No se encontraron senderos cercanos.'
+                        : 'No nearby trails found.',
+  species:         isEs ? 'especies'                   : 'species',
+  observations:    isEs ? 'observaciones'              : 'observations',
+  waypoints:       isEs ? 'waypoints'                  : 'waypoints',
+  km:              'km',
+  loading:         isEs ? 'Cargando senderos…'        : 'Loading trails…',
+  modalTitle:      isEs ? 'Nuevo sendero'              : 'New Trail',
+  modalNameLabel:  isEs ? 'Nombre del sendero'         : 'Trail name',
+  modalNamePlaceholder: isEs ? 'Bosque de Chapultepec'  : 'Forest Loop Trail',
+  modalStartBtn:   isEs ? 'Empezar grabación'          : 'Start recording',
+  modalCancelBtn:  isEs ? 'Cancelar'                   : 'Cancel',
+  viewTrail:       isEs ? 'Ver sendero'                : 'View trail',
+  signInRequired:  isEs ? 'Inicia sesión para crear senderos.'
+                        : 'Sign in to create trails.',
+};
+---
+
+<div id="trails-view-root" data-lang={lang} class="space-y-6">
+
+  <!-- Header -->
+  <div class="flex items-start justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+        {copy.title}
+      </h1>
+      <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+        {copy.subtitle}
+      </p>
+    </div>
+    <button
+      id="create-trail-btn"
+      class="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition-colors shadow-sm flex-shrink-0"
+    >
+      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+      </svg>
+      {copy.createBtn}
+    </button>
+  </div>
+
+  <!-- My Trails section -->
+  <section aria-labelledby="my-trails-heading">
+    <h2
+      id="my-trails-heading"
+      class="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-3"
+    >
+      {copy.myTrails}
+    </h2>
+    <div
+      id="my-trails-list"
+      class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+      role="list"
+      aria-label={copy.myTrails}
+    >
+      <!-- Skeleton / loading state -->
+      <div id="my-trails-loading" class="col-span-full">
+        <p class="text-sm text-zinc-500">{copy.loading}</p>
+      </div>
+      <!-- Content rendered by client script -->
+    </div>
+  </section>
+
+  <!-- Nearby Trails section -->
+  <section aria-labelledby="nearby-trails-heading">
+    <h2
+      id="nearby-trails-heading"
+      class="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-3"
+    >
+      {copy.nearbyTrails}
+    </h2>
+    <div
+      id="nearby-trails-list"
+      class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+      role="list"
+      aria-label={copy.nearbyTrails}
+    >
+      <div id="nearby-trails-loading" class="col-span-full">
+        <p class="text-sm text-zinc-500">{copy.loading}</p>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<!-- Create Trail Modal -->
+<div
+  id="create-trail-modal"
+  class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="create-trail-modal-title"
+>
+  <div class="w-full max-w-md rounded-2xl bg-white dark:bg-zinc-900 shadow-2xl p-6 space-y-4">
+    <h3
+      id="create-trail-modal-title"
+      class="text-lg font-semibold text-zinc-900 dark:text-zinc-50"
+    >
+      {copy.modalTitle}
+    </h3>
+
+    <div class="space-y-2">
+      <label
+        for="trail-name-input"
+        class="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+      >
+        {copy.modalNameLabel}
+      </label>
+      <input
+        id="trail-name-input"
+        type="text"
+        placeholder={copy.modalNamePlaceholder}
+        maxlength="120"
+        class="w-full rounded-lg border border-zinc-200 dark:border-zinc-700 bg-transparent px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition"
+      />
+    </div>
+
+    <!-- Error message -->
+    <p id="create-trail-error" class="hidden text-sm text-red-500"></p>
+
+    <div class="flex gap-3 pt-2">
+      <button
+        id="create-trail-cancel-btn"
+        class="flex-1 px-4 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+      >
+        {copy.modalCancelBtn}
+      </button>
+      <button
+        id="create-trail-start-btn"
+        class="flex-1 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition-colors"
+      >
+        {copy.modalStartBtn}
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+
+  const lang = document.getElementById('trails-view-root')?.dataset.lang ?? 'en';
+  const isEs = lang === 'es';
+
+  const tr = {
+    emptyMy:     isEs ? 'Aún no tienes senderos. ¡Crea el primero!' : "You don't have any trails yet. Create your first!",
+    emptyNearby: isEs ? 'No se encontraron senderos cercanos.'      : 'No nearby trails found.',
+    species:     isEs ? 'especies'     : 'species',
+    observations:isEs ? 'observaciones': 'observations',
+    waypoints:   isEs ? 'waypoints'    : 'waypoints',
+    km:          'km',
+    viewTrail:   isEs ? 'Ver sendero'  : 'View trail',
+    signInRequired: isEs ? 'Inicia sesión para crear senderos.' : 'Sign in to create trails.',
+    errorEmpty:  isEs ? 'El nombre no puede estar vacío.' : 'Name cannot be empty.',
+    errorSave:   isEs ? 'Error al crear el sendero.'      : 'Failed to create trail.',
+  };
+
+  // ---- Trail card HTML factory ----
+  function makeTrailCard(trail: {
+    id: string;
+    name: string;
+    total_species: number;
+    total_observations: number;
+    waypoints: { lat: number; lng: number; name?: string; obs_count?: number }[];
+    distance_km?: number | null;
+  }): string {
+    const trailBase = isEs ? `/${lang}/explorar/senderos/` : `/${lang}/explore/trails/`;
+    const waypointCount = Array.isArray(trail.waypoints) ? trail.waypoints.length : 0;
+    const distance = trail.distance_km != null
+      ? `<span class="flex items-center gap-1"><span>📏</span>${Number(trail.distance_km).toFixed(1)} ${tr.km}</span>`
+      : '';
+
+    return `
+      <article
+        class="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-4 space-y-3 hover:shadow-md transition-shadow"
+        role="listitem"
+        data-trail-id="${trail.id}"
+      >
+        <h3 class="font-semibold text-zinc-900 dark:text-zinc-50 line-clamp-2">${escapeHtml(trail.name)}</h3>
+        <div class="flex flex-wrap gap-3 text-xs text-zinc-500 dark:text-zinc-400">
+          <span class="flex items-center gap-1"><span>🌿</span>${trail.total_species} ${tr.species}</span>
+          <span class="flex items-center gap-1"><span>📍</span>${trail.total_observations} ${tr.observations}</span>
+          <span class="flex items-center gap-1"><span>🗺️</span>${waypointCount} ${tr.waypoints}</span>
+          ${distance}
+        </div>
+        <a
+          href="${trailBase}${trail.id}"
+          class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:underline"
+        >
+          ${tr.viewTrail} →
+        </a>
+      </article>
+    `;
+  }
+
+  function escapeHtml(str: string): string {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  // ---- Load trails ----
+  async function loadTrails(): Promise<void> {
+    const sb = getSupabase();
+
+    const myList = document.getElementById('my-trails-list')!;
+    const nearbyList = document.getElementById('nearby-trails-list')!;
+
+    try {
+      const { data: { user } } = await sb.auth.getUser();
+
+      // My trails
+      if (user) {
+        const { data: myTrails } = await sb
+          .from('trails')
+          .select('id,name,total_species,total_observations,waypoints,distance_km')
+          .eq('creator_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(20);
+
+        document.getElementById('my-trails-loading')?.remove();
+        if (!myTrails || myTrails.length === 0) {
+          myList.innerHTML = `<p class="col-span-full text-sm text-zinc-500">${tr.emptyMy}</p>`;
+        } else {
+          myList.innerHTML = myTrails.map(makeTrailCard).join('');
+        }
+      } else {
+        document.getElementById('my-trails-loading')?.remove();
+        myList.innerHTML = `<p class="col-span-full text-sm text-zinc-400">${tr.signInRequired}</p>`;
+      }
+
+      // Nearby trails (public, last 50)
+      const { data: nearbyTrails } = await sb
+        .from('trails')
+        .select('id,name,total_species,total_observations,waypoints,distance_km')
+        .eq('visibility', 'public')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      document.getElementById('nearby-trails-loading')?.remove();
+      if (!nearbyTrails || nearbyTrails.length === 0) {
+        nearbyList.innerHTML = `<p class="col-span-full text-sm text-zinc-500">${tr.emptyNearby}</p>`;
+      } else {
+        nearbyList.innerHTML = nearbyTrails.map(makeTrailCard).join('');
+      }
+    } catch (err) {
+      console.error('[TrailsView] load error', err);
+      document.getElementById('my-trails-loading')?.remove();
+      document.getElementById('nearby-trails-loading')?.remove();
+    }
+  }
+
+  // ---- Modal ----
+  const modal = document.getElementById('create-trail-modal')!;
+  const openBtn = document.getElementById('create-trail-btn')!;
+  const cancelBtn = document.getElementById('create-trail-cancel-btn')!;
+  const startBtn = document.getElementById('create-trail-start-btn')!;
+  const nameInput = document.getElementById('trail-name-input') as HTMLInputElement;
+  const errorEl = document.getElementById('create-trail-error')!;
+
+  function openModal(): void {
+    modal.classList.remove('hidden');
+    nameInput.focus();
+  }
+
+  function closeModal(): void {
+    modal.classList.add('hidden');
+    nameInput.value = '';
+    errorEl.textContent = '';
+    errorEl.classList.add('hidden');
+  }
+
+  openBtn.addEventListener('click', openModal);
+  cancelBtn.addEventListener('click', closeModal);
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) closeModal();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModal();
+  });
+
+  startBtn.addEventListener('click', async () => {
+    const name = nameInput.value.trim();
+    if (!name) {
+      errorEl.textContent = tr.errorEmpty;
+      errorEl.classList.remove('hidden');
+      return;
+    }
+
+    startBtn.disabled = true;
+    errorEl.classList.add('hidden');
+
+    try {
+      const sb = getSupabase();
+      const { data: { user } } = await sb.auth.getUser();
+      if (!user) {
+        errorEl.textContent = tr.signInRequired;
+        errorEl.classList.remove('hidden');
+        return;
+      }
+
+      const { data, error } = await sb
+        .from('trails')
+        .insert({ name, creator_id: user.id })
+        .select('id')
+        .single();
+
+      if (error || !data) throw error ?? new Error('insert failed');
+
+      closeModal();
+
+      // Navigate to the new trail page
+      const trailBase = isEs ? `/${lang}/explorar/senderos/` : `/${lang}/explore/trails/`;
+      window.location.href = `${trailBase}${data.id}`;
+    } catch (err) {
+      console.error('[TrailsView] create error', err);
+      errorEl.textContent = tr.errorSave;
+      errorEl.classList.remove('hidden');
+    } finally {
+      startBtn.disabled = false;
+    }
+  });
+
+  // Kick off data load
+  loadTrails();
+</script>
