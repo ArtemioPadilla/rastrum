@@ -1,0 +1,183 @@
+---
+/**
+ * Field guide page — /es/explorar/senderos/[slug]/guia-de-campo
+ *
+ * Print-ready field guide view for a biodiversity trail.
+ * Opens as a standalone page with print CSS pre-loaded.
+ * User prints (Ctrl/Cmd+P) → "Save as PDF" in browser.
+ *
+ * getStaticPaths returns [] (runtime routing).
+ */
+export function getStaticPaths() {
+  return [];
+}
+
+const { slug } = Astro.params as { slug: string };
+const lang = 'es';
+---
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Guía de campo — Rastrum</title>
+  <style>
+    /* ── Base ── */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Georgia', 'Times New Roman', serif;
+      font-size: 11pt;
+      line-height: 1.55;
+      color: #1a1a1a;
+      background: #fff;
+      padding: 2cm 2.5cm;
+      max-width: 21cm;
+      margin: 0 auto;
+    }
+    h1 { font-size: 22pt; margin-bottom: 4pt; }
+    h2 { font-size: 13pt; border-bottom: 1px solid #ccc; padding-bottom: 4pt; margin: 20pt 0 8pt; color: #1a3a1a; }
+    p  { margin-bottom: 6pt; }
+    .field-guide-header {
+      border: 2px solid #1a3a1a;
+      border-radius: 4px;
+      padding: 16pt 20pt;
+      margin-bottom: 20pt;
+    }
+    .field-guide-header .subtitle {
+      font-size: 9pt;
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 6pt;
+    }
+    .field-guide-header .meta { font-size: 9.5pt; color: #444; margin-top: 10pt; }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(100pt, 1fr));
+      gap: 8pt;
+      margin-bottom: 20pt;
+    }
+    .stat-box { border: 1px solid #ccc; border-radius: 4px; padding: 8pt; text-align: center; }
+    .stat-box .value { font-size: 18pt; font-weight: bold; color: #1a5c1a; }
+    .stat-box .label { font-size: 8.5pt; color: #666; text-transform: uppercase; letter-spacing: 0.04em; }
+    table { width: 100%; border-collapse: collapse; font-size: 9.5pt; }
+    th { background: #1a3a1a; color: #fff; padding: 5pt 7pt; text-align: left; font-size: 8.5pt; text-transform: uppercase; letter-spacing: 0.04em; }
+    td { padding: 5pt 7pt; border-bottom: 1px solid #e5e5e5; }
+    tr:nth-child(even) td { background: #f8f8f4; }
+    .mono { font-family: 'Courier New', monospace; font-size: 8.5pt; }
+    .notes-lines .line { border-bottom: 1px dotted #bbb; height: 20pt; }
+    .field-guide-footer { margin-top: 24pt; padding-top: 10pt; border-top: 1px solid #ccc; font-size: 8pt; color: #888; text-align: center; }
+    #loading { padding: 40pt; text-align: center; color: #888; font-style: italic; }
+
+    /* ── Print ── */
+    @media print {
+      body { padding: 1.5cm 2cm; }
+      .no-print { display: none !important; }
+      h2 { page-break-after: avoid; }
+      table { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="no-print" style="text-align:right; margin-bottom: 12pt;">
+    <button
+      onclick="window.print()"
+      style="padding: 6pt 14pt; background: #1a5c1a; color: #fff; border: none; border-radius: 4px; font-size: 10pt; cursor: pointer; margin-right: 8pt;"
+    >
+      🖨️ Imprimir / Guardar como PDF
+    </button>
+    <a
+      href={`/es/explorar/senderos/${slug}`}
+      style="font-size: 9.5pt; color: #1a5c1a; text-decoration: none;"
+    >
+      ← Volver al sendero
+    </a>
+  </div>
+
+  <div id="loading">Cargando guía de campo…</div>
+  <div id="field-guide-content" style="display:none;"></div>
+  <div id="field-guide-error" style="display:none; color: #c00;">Sendero no encontrado.</div>
+
+</body>
+<script>
+  const slug = window.location.pathname.split('/').filter(Boolean).slice(-2)[0] ?? '';
+
+  async function loadFieldGuide() {
+    if (!slug) { showError(); return; }
+    try {
+      // Import getSupabase lazily so we can use the existing Supabase client
+      const { getSupabase } = await import('/src/lib/supabase.ts');
+      const sb = getSupabase();
+      const { data: trail, error } = await sb
+        .from('trails')
+        .select('*')
+        .eq('id', slug)
+        .single();
+      if (error || !trail) { showError(); return; }
+      renderFieldGuide(trail);
+    } catch (err) {
+      console.error(err);
+      // Fallback: redirect to edge function
+      window.location.href = `/functions/v1/export-trail-pdf?trail_id=${encodeURIComponent(slug)}&lang=es`;
+    }
+  }
+
+  function escHtml(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function renderFieldGuide(trail) {
+    const waypoints = Array.isArray(trail.waypoints) ? trail.waypoints : [];
+    const date = new Date(trail.created_at).toLocaleDateString('es-MX', { year:'numeric', month:'long', day:'numeric' });
+    const displayName = trail.name_es ?? trail.name;
+    const waypointRows = waypoints.map((wp, i) => `
+      <tr>
+        <td>${i+1}</td>
+        <td>${escHtml(wp.name ?? 'WP '+(i+1))}</td>
+        <td class="mono">${Number(wp.lat).toFixed(5)}</td>
+        <td class="mono">${Number(wp.lng).toFixed(5)}</td>
+        <td>${wp.obs_count ?? 0}</td>
+      </tr>
+    `).join('');
+
+    document.getElementById('field-guide-content').innerHTML = `
+      <div class="field-guide-header">
+        <div class="subtitle">Rastrum · Guía de campo</div>
+        <h1>${escHtml(displayName)}</h1>
+        <div class="meta">Creado: ${date}${trail.distance_km != null ? ` · ${Number(trail.distance_km).toFixed(1)} km` : ''}</div>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-box"><div class="value">${trail.total_species}</div><div class="label">Especies</div></div>
+        <div class="stat-box"><div class="value">${trail.total_observations}</div><div class="label">Observaciones</div></div>
+        <div class="stat-box"><div class="value">${waypoints.length}</div><div class="label">Puntos</div></div>
+        ${trail.distance_km != null ? `<div class="stat-box"><div class="value">${Number(trail.distance_km).toFixed(1)}</div><div class="label">km</div></div>` : ''}
+      </div>
+      <h2>Puntos del sendero</h2>
+      ${waypoints.length > 0 ? `
+      <table>
+        <thead><tr><th>#</th><th>Nombre</th><th>Lat</th><th>Lng</th><th>Obs</th></tr></thead>
+        <tbody>${waypointRows}</tbody>
+      </table>` : '<p style="color:#888;font-style:italic;">No hay puntos registrados.</p>'}
+      <div class="notes-section" style="margin-top:24pt;">
+        <h2>Notas de campo</h2>
+        <div class="notes-lines">${Array(10).fill('<div class="line"></div>').join('')}</div>
+      </div>
+      <div class="field-guide-footer">
+        Rastrum · Guía de campo generada el ${new Date().toLocaleDateString('es-MX')} · rastrum.org
+      </div>
+    `;
+
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('field-guide-content').style.display = '';
+    document.title = `${displayName} — Guía de campo | Rastrum`;
+  }
+
+  function showError() {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('field-guide-error').style.display = '';
+  }
+
+  loadFieldGuide();
+</script>
+</html>

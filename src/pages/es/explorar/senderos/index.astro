@@ -1,0 +1,13 @@
+---
+import BaseLayout from '../../../../layouts/BaseLayout.astro';
+import TrailsView from '../../../../components/TrailsView.astro';
+
+const lang = 'es';
+---
+<BaseLayout
+  title="Senderos de biodiversidad — Rastrum"
+  description="Crea y explora senderos de biodiversidad con puntos GPS y observaciones de especies."
+  lang={lang}
+>
+  <TrailsView lang={lang} />
+</BaseLayout>
