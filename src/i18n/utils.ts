@@ -177,7 +177,7 @@ export const routeTree: Record<string, RouteNode> = {
   leaderboard:        { labels: { en: 'Leaderboard', es: 'Tabla de líderes' }, parent: 'community' },
   communityDonate:    { labels: { en: 'Donate',      es: 'Donar' },            parent: 'community' },
   // Personalized discover feed (#865)
-  discover:    { labels: { en: 'Discover',      es: 'Descubrir' }, parent: null },
+  discover:    { labels: { en: 'Discover',      es: 'Descubrir' } },
   about:       { labels: { en: 'About',         es: 'Acerca' } },
   docs:        { labels: { en: 'Docs',          es: 'Docs' } },
   signIn:      { labels: { en: 'Sign in',       es: 'Ingresar' } },
