@@ -12514,3 +12514,47 @@ CREATE OR REPLACE VIEW public.user_active_affiliations AS
   WHERE ia.valid_to IS NULL OR ia.valid_to > CURRENT_DATE;
 
 GRANT SELECT ON public.user_active_affiliations TO authenticated, anon;
+
+-- ============================================================
+-- #734: WEEKLY EXPERT-ID LOTTERY (Principle of Reciprocity)
+-- ============================================================
+
+-- Ledger of weekly lottery winners
+CREATE TABLE IF NOT EXISTS public.weekly_validator_rewards (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  week_iso      text NOT NULL,                    -- e.g. '2026-W20'
+  user_id       uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  observation_id uuid REFERENCES public.observations(id) ON DELETE SET NULL,
+  awarded_at    timestamptz NOT NULL DEFAULT now(),
+  claimed_at    timestamptz,
+  UNIQUE (week_iso, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_weekly_validator_rewards_user
+  ON public.weekly_validator_rewards(user_id, awarded_at DESC);
+
+ALTER TABLE public.weekly_validator_rewards ENABLE ROW LEVEL SECURITY;
+
+-- Users can read their own rewards
+DROP POLICY IF EXISTS "validator_rewards_self_read" ON public.weekly_validator_rewards;
+CREATE POLICY "validator_rewards_self_read" ON public.weekly_validator_rewards
+  FOR SELECT TO authenticated USING (auth.uid() = user_id);
+
+GRANT SELECT ON public.weekly_validator_rewards TO authenticated;
+
+-- Extend karma_events.reason CHECK to include lottery win
+-- (applied via ALTER TABLE; the original CREATE TABLE definition can't be
+--  retroactively changed without a migration, so we add a constraint here)
+ALTER TABLE public.karma_events
+  DROP CONSTRAINT IF EXISTS karma_events_reason_check;
+ALTER TABLE public.karma_events
+  ADD CONSTRAINT karma_events_reason_check CHECK (reason IN (
+    'consensus_win','consensus_loss','first_in_rastrum',
+    'observation_synced','comment_reaction','manual_adjust',
+    'expert_id_lottery_win'
+  ));
+
+-- pg_cron: run weekly-expert-lottery every Sunday at 18:00 UTC
+-- SELECT cron.schedule('weekly-expert-lottery','0 18 * * 0',
+--   $$SELECT net.http_post(url:=current_setting('app.supabase_functions_url') || '/weekly-expert-lottery',
+--     headers:='{"x-cron-secret":"<secret>"}'::jsonb)$$);
