@@ -11236,25 +11236,45 @@ BEGIN
 
   -- Notify obs owner (unless they are the commenter)
   IF v_obs_owner IS NOT NULL AND v_obs_owner != NEW.author_id THEN
-    INSERT INTO public.notifications (user_id, kind, payload)
-    VALUES (v_obs_owner, 'comment', jsonb_build_object(
-      'comment_id', NEW.id,
-      'observation_id', NEW.observation_id,
-      'commenter_id', NEW.author_id
-    ));
+    -- Rate-limit: skip if we already sent a 'comment' notification for this
+    -- observation to the owner in the last 30 minutes (#970)
+    IF NOT EXISTS (
+      SELECT 1 FROM public.notifications
+      WHERE user_id = v_obs_owner
+        AND kind = 'comment'
+        AND (payload->>'observation_id')::uuid = NEW.observation_id
+        AND created_at > now() - interval '30 minutes'
+    ) THEN
+      INSERT INTO public.notifications (user_id, kind, payload)
+      VALUES (v_obs_owner, 'comment', jsonb_build_object(
+        'comment_id', NEW.id,
+        'observation_id', NEW.observation_id,
+        'commenter_id', NEW.author_id
+      ));
+    END IF;
   END IF;
 
   -- Notify parent comment author on reply
   IF NEW.parent_id IS NOT NULL THEN
     SELECT author_id INTO v_parent_author FROM public.observation_comments WHERE id = NEW.parent_id;
     IF v_parent_author IS NOT NULL AND v_parent_author != NEW.author_id AND v_parent_author != v_obs_owner THEN
-      INSERT INTO public.notifications (user_id, kind, payload)
-      VALUES (v_parent_author, 'comment', jsonb_build_object(
-        'comment_id', NEW.id,
-        'observation_id', NEW.observation_id,
-        'commenter_id', NEW.author_id,
-        'is_reply', true
-      ));
+      -- Rate-limit: skip if we already sent a 'comment' notification for this
+      -- observation to the parent author in the last 30 minutes (#970)
+      IF NOT EXISTS (
+        SELECT 1 FROM public.notifications
+        WHERE user_id = v_parent_author
+          AND kind = 'comment'
+          AND (payload->>'observation_id')::uuid = NEW.observation_id
+          AND created_at > now() - interval '30 minutes'
+      ) THEN
+        INSERT INTO public.notifications (user_id, kind, payload)
+        VALUES (v_parent_author, 'comment', jsonb_build_object(
+          'comment_id', NEW.id,
+          'observation_id', NEW.observation_id,
+          'commenter_id', NEW.author_id,
+          'is_reply', true
+        ));
+      END IF;
     END IF;
   END IF;
 
