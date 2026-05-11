@@ -16,6 +16,7 @@ import ProfilePokedexLink from './profile/ProfilePokedexLink.astro';
 import ProfileSpeciesListsLink from './profile/ProfileSpeciesListsLink.astro';
 import ProfileBadgesGrid from './profile/ProfileBadgesGrid.astro';
 import ProfileActivityTimeline from './profile/ProfileActivityTimeline.astro';
+import PokedexView from './PokedexView.astro'; // #708: inline Pokédex tab
 
 interface Props {
   lang: 'en' | 'es';
@@ -185,6 +186,24 @@ const ep = (tr as unknown as { profile: { expert_prompt: Record<string, string> 
     <ExpertiseLegendBadge lang={lang} class="mb-2" />
     <ExpertiseCoverageGrid lang={lang} />
     <ProfilePokedexLink lang={lang} viewer="self" />
+    <!-- #708: Inline Pokédex tab embedded in profile -->
+    <section id="profile-pokedex-section" class="mb-6">
+      <details class="group rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+        <summary class="flex items-center justify-between p-4 cursor-pointer select-none list-none bg-white dark:bg-zinc-900/50 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors">
+          <div class="flex items-center gap-2">
+            <span class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
+              {lang === 'es' ? 'Pokédex de Especies' : 'Species Pokédex'}
+            </span>
+            <span id="profile-pdx-count" class="hidden text-[11px] font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded"></span>
+          </div>
+          <span class="text-zinc-400 group-open:rotate-90 transition-transform duration-150 text-sm" aria-hidden="true">▶</span>
+        </summary>
+        <!-- Pokédex renders inside on open; PokedexView bootstraps its own data fetch -->
+        <div class="border-t border-zinc-100 dark:border-zinc-800">
+          <PokedexView lang={lang} />
+        </div>
+      </details>
+    </section>
     <ProfileSpeciesListsLink lang={lang} />
     <ProfileBadgesGrid lang={lang} viewer="self" />
     <ProfileActivityTimeline lang={lang} viewer="self" />
