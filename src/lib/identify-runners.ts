@@ -16,13 +16,20 @@ export type Locale = 'en' | 'es';
 
 // ─────────────── PlantNet ───────────────
 
+/**
+ * Returns the user's BYO PlantNet key, or '' if none is configured.
+ *
+ * NOTE: The operator PlantNet key is server-side only (Edge Function env var
+ * PLANTNET_API_KEY). It was previously also injected into the browser via
+ * window.__RASTRUM_PLANTNET_KEY__ and PUBLIC_PLANTNET_KEY — those paths have
+ * been removed (PR #1037 / fix/plantnet-key-cleanup) because they leaked the
+ * key into browser network traffic and the JS bundle.
+ *
+ * PlantNet identification always works via the Edge Function regardless of
+ * whether this function returns a key. A non-empty return value here only
+ * means the *user* has supplied their own BYO key.
+ */
 export async function resolvePlantNetKey(): Promise<string> {
-  if (typeof window !== 'undefined') {
-    const w = window as unknown as { __RASTRUM_PLANTNET_KEY__?: string };
-    if (w.__RASTRUM_PLANTNET_KEY__) return w.__RASTRUM_PLANTNET_KEY__;
-  }
-  const env = (import.meta.env.PUBLIC_PLANTNET_KEY as string | undefined) ?? '';
-  if (env) return env;
   try {
     const { getKey } = await import('./byo-keys');
     return getKey('plantnet', 'plantnet') ?? '';

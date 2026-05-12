@@ -1322,15 +1322,14 @@ const photoPraiseJson = JSON.stringify(photoPraiseTree);
 
     // Build the runner set based on what's actually available.
     const { runParallelIdentify, filterRunnersByHint } = await import('../lib/identify-cascade-client');
-    const { makePlantNetRunner, makeClaudeRunner, makePhiRunner, makeGemmaRunner, resolvePlantNetKey } = await import('../lib/identify-runners');
+    const { makePlantNetRunner, makeClaudeRunner, makePhiRunner, makeGemmaRunner } = await import('../lib/identify-runners');
     const { claudeAvailable } = await import('../lib/claude-availability');
 
     const runners: Record<string, import('../lib/identify-cascade-client').IdentifierRunner> = {};
     const locale = isEs ? 'es' : 'en';
 
-    if (await resolvePlantNetKey()) {
-      runners.plantnet = makePlantNetRunner(locale);
-    }
+    // PlantNet always works via the Edge Function (operator key server-side).
+    runners.plantnet = makePlantNetRunner(locale);
     if (await claudeAvailable()) {
       runners.claude_haiku = makeClaudeRunner(locale);
     }

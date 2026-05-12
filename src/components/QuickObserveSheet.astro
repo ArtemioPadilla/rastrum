@@ -240,10 +240,11 @@ async function handleFiles(files: File[]) {
     try {
       if (file.kind === 'photo') {
         const { runParallelIdentify } = await import('../lib/identify-cascade-client');
-        const { makePlantNetRunner, makeClaudeRunner, resolvePlantNetKey } = await import('../lib/identify-runners');
+        const { makePlantNetRunner, makeClaudeRunner } = await import('../lib/identify-runners');
         const { claudeAvailable } = await import('../lib/claude-availability');
         const runners: Record<string, import('../lib/identify-cascade-client').IdentifierRunner> = {};
-        if (await resolvePlantNetKey()) runners.plantnet = makePlantNetRunner(lang as 'en' | 'es');
+        // PlantNet always works via the Edge Function (operator key server-side).
+        runners.plantnet = makePlantNetRunner(lang as 'en' | 'es');
         if (await claudeAvailable()) runners.claude_haiku = makeClaudeRunner(lang as 'en' | 'es');
         if (Object.keys(runners).length > 0) {
           const out = await runParallelIdentify(file.file as File, { runners }, new AbortController().signal);

@@ -201,6 +201,9 @@ async function callPlantNet(
   signal?: AbortSignal,
 ): Promise<IDResult | null> {
   const key = clientKey || Deno.env.get('PLANTNET_API_KEY');
+  // TODO(security): rotate PLANTNET_API_KEY — old key 2b10E7bp6hVnxBvvJWc3IGv9ae was exposed
+  // in browser traffic pre-PR#1037 (window.__RASTRUM_PLANTNET_KEY__ / PUBLIC_PLANTNET_KEY).
+  // Rotate via the PlantNet dashboard: https://my.plantnet.org/account/settings
   if (!key) return null;
 
   const form = new FormData();
