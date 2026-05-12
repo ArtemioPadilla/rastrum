@@ -12870,3 +12870,128 @@ COMMENT ON MATERIALIZED VIEW public.mv_user_observation_counts IS
   '#713 Perf: refreshed by recompute-user-stats EF. Replaces live COUNT() on profile pages.';
 COMMENT ON MATERIALIZED VIEW public.mv_recent_species IS
   '#713 Perf: refreshed by recompute-user-stats EF. Drives trending species on explore page.';
+
+
+-- ============================================================
+-- #748: featured_observers — Observer of the month spotlight
+-- ============================================================
+-- One row per month. The UI reads the row for the current month
+-- (month_date = first day of the current month, e.g. '2026-05-01').
+-- Populated manually by operators (or via the admin console).
+
+CREATE TABLE IF NOT EXISTS public.featured_observers (
+  month_date    date        NOT NULL,                          -- first day of the spotlighted month
+  user_id       uuid        NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  headline_es   text        CHECK (char_length(headline_es) <= 280),
+  headline_en   text        CHECK (char_length(headline_en) <= 280),
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (month_date)
+);
+
+-- RLS: anyone can read; only service_role may write.
+ALTER TABLE public.featured_observers ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "featured_observers_public_read" ON public.featured_observers;
+CREATE POLICY "featured_observers_public_read" ON public.featured_observers
+  FOR SELECT USING (true);
+
+GRANT SELECT ON public.featured_observers TO anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.featured_observers TO service_role;
+
+COMMENT ON TABLE public.featured_observers IS
+  '#748 Observer of the month spotlight. One row per month (month_date = first day). '
+  'Read by HomeObservadorDelMes.astro component.';
+
+
+-- ============================================================
+-- #712: nearby_observations() — PostGIS RPC for HomeNearby
+-- ============================================================
+-- Returns up to p_limit synced observations within p_radius_km of
+-- (p_lat, p_lng). Uses location_obscured when available, falls back
+-- to location. Joins identifications (primary) + taxa for names and
+-- media_files for photo_url. distance_m is the PostGIS ST_Distance
+-- result in metres.
+
+CREATE OR REPLACE FUNCTION public.nearby_observations(
+  p_lat       numeric,
+  p_lng       numeric,
+  p_radius_km numeric DEFAULT 10,
+  p_limit     integer DEFAULT 6
+)
+RETURNS TABLE (
+  id              uuid,
+  scientific_name text,
+  common_name_en  text,
+  common_name_es  text,
+  photo_url       text,
+  observed_at     timestamptz,
+  lat             numeric,
+  lng             numeric,
+  distance_m      numeric
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  WITH ref AS (
+    SELECT ST_SetSRID(ST_MakePoint(p_lng, p_lat), 4326)::geography AS pt
+  ),
+  nearby AS (
+    SELECT
+      o.id,
+      o.observed_at,
+      COALESCE(o.location_obscured, o.location) AS geom,
+      ST_Distance(
+        COALESCE(o.location_obscured, o.location),
+        ref.pt
+      ) AS dist_m
+    FROM public.observations o, ref
+    WHERE
+      o.sync_status = 'synced'
+      AND COALESCE(o.location_obscured, o.location) IS NOT NULL
+      AND ST_DWithin(
+            COALESCE(o.location_obscured, o.location),
+            ref.pt,
+            p_radius_km * 1000   -- metres
+          )
+    ORDER BY dist_m ASC
+    LIMIT p_limit
+  )
+  SELECT
+    n.id,
+    i.scientific_name,
+    t.common_name_en,
+    t.common_name_es,
+    mf.url           AS photo_url,
+    n.observed_at,
+    ST_Y(n.geom::geometry)::numeric  AS lat,
+    ST_X(n.geom::geometry)::numeric  AS lng,
+    n.dist_m::numeric                AS distance_m
+  FROM nearby n
+  -- Primary identification (is_primary = true, or most recent)
+  LEFT JOIN LATERAL (
+    SELECT scientific_name, taxon_id
+    FROM   public.identifications
+    WHERE  observation_id = n.id
+    ORDER  BY is_primary DESC, created_at DESC
+    LIMIT  1
+  ) i ON true
+  LEFT JOIN public.taxa t ON t.id = i.taxon_id
+  -- Primary photo
+  LEFT JOIN LATERAL (
+    SELECT url
+    FROM   public.media_files
+    WHERE  observation_id = n.id
+    ORDER  BY is_primary DESC, created_at ASC
+    LIMIT  1
+  ) mf ON true;
+$$;
+
+REVOKE ALL  ON FUNCTION public.nearby_observations(numeric, numeric, numeric, integer) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.nearby_observations(numeric, numeric, numeric, integer)
+  TO anon, authenticated;
+
+COMMENT ON FUNCTION public.nearby_observations IS
+  '#712 Returns nearby synced observations within radius. Used by HomeNearby.astro. '
+  'Uses location_obscured when set; falls back to location. Joins taxa + media_files.';
