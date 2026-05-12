@@ -771,10 +771,24 @@ const sponsoringI18n = {
                 const coords = (feat.geometry as GeoJSON.Point).coordinates as [number, number];
                 const name = props.scientific_name as string;
                 const date = props.date as string;
-                const html = `<div style="font-family:system-ui;padding:6px 8px"><div style="font-size:13px;font-weight:600;font-style:italic;color:${isDark ? '#f1f5f9' : '#18181b'}">${name}</div>${date ? `<div style="font-size:11px;color:${isDark ? '#94a3b8' : '#71717a'};margin-top:2px">${date}</div>` : ''}</div>`;
+                // Build popup via DOM (not setHTML) to avoid XSS from
+                // scientific_name values that contain < > characters
+                // (e.g. author annotations like "Homo <sapiens>").
+                const wrapper = document.createElement('div');
+                wrapper.style.cssText = 'font-family:system-ui;padding:6px 8px';
+                const nameEl = document.createElement('div');
+                nameEl.style.cssText = `font-size:13px;font-weight:600;font-style:italic;color:${isDark ? '#f1f5f9' : '#18181b'}`;
+                nameEl.textContent = name;
+                wrapper.appendChild(nameEl);
+                if (date) {
+                  const dateEl = document.createElement('div');
+                  dateEl.style.cssText = `font-size:11px;color:${isDark ? '#94a3b8' : '#71717a'};margin-top:2px`;
+                  dateEl.textContent = date;
+                  wrapper.appendChild(dateEl);
+                }
                 new maplibregl.Popup({ closeButton: true, maxWidth: '220px', offset: 10 })
                   .setLngLat(coords)
-                  .setHTML(html)
+                  .setDOMContent(wrapper)
                   .addTo(map);
               });
 
