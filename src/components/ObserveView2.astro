@@ -53,6 +53,32 @@ const weathers = WEATHERS;
        action wins the first fold (#942 PR5 redo, Fogg ability lever). -->
   <DropZone lang={lang} />
 
+  <!-- Quick taxon hint chips — below drop zone, above capability caption.
+       Single-select; tapping the same chip deselects. Primes the cascade
+       runner filter so e.g. Bird skips PlantNet. (#ux-quick-taxon-chips) -->
+  <div id="obs2-taxon-chips" class="flex flex-wrap gap-2">
+    <button type="button" data-hint="Plantae"
+      class="obs2-taxon-chip flex items-center gap-1.5 rounded-full border border-zinc-300 dark:border-zinc-600 px-3 py-1 text-sm text-zinc-600 dark:text-zinc-400 transition-colors hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-400">
+      🌿 {isEs ? 'Planta' : 'Plant'}
+    </button>
+    <button type="button" data-hint="Animalia.Aves"
+      class="obs2-taxon-chip flex items-center gap-1.5 rounded-full border border-zinc-300 dark:border-zinc-600 px-3 py-1 text-sm text-zinc-600 dark:text-zinc-400 transition-colors hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-400">
+      🐦 {isEs ? 'Ave' : 'Bird'}
+    </button>
+    <button type="button" data-hint="Animalia.Mammalia"
+      class="obs2-taxon-chip flex items-center gap-1.5 rounded-full border border-zinc-300 dark:border-zinc-600 px-3 py-1 text-sm text-zinc-600 dark:text-zinc-400 transition-colors hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-400">
+      🐾 {isEs ? 'Mamífero' : 'Mammal'}
+    </button>
+    <button type="button" data-hint="Animalia.Insecta"
+      class="obs2-taxon-chip flex items-center gap-1.5 rounded-full border border-zinc-300 dark:border-zinc-600 px-3 py-1 text-sm text-zinc-600 dark:text-zinc-400 transition-colors hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-400">
+      🐛 {isEs ? 'Insecto' : 'Insect'}
+    </button>
+    <button type="button" data-hint="Fungi"
+      class="obs2-taxon-chip flex items-center gap-1.5 rounded-full border border-zinc-300 dark:border-zinc-600 px-3 py-1 text-sm text-zinc-600 dark:text-zinc-400 transition-colors hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-400">
+      🍄 {isEs ? 'Hongo' : 'Fungus'}
+    </button>
+  </div>
+
   <!-- AI capability caption — single positive line, replaces the prior
        multi-line banner with 4❌ (#942 PR5 redo). JS rewrites the inner
        text once detectRunners() resolves. Hidden until then to avoid
@@ -388,6 +414,38 @@ const isEs = lang === 'es';
 let pipelineState: PipelineState | null = null;
 let location: { lat: number; lng: number; accuracyM: number; altitudeM: number | null } | null = null;
 let bestResult: { scientific_name: string; common_name_en: string | null; confidence: number; source: string } | null = null;
+
+// ── Taxon hint chips (#ux-quick-taxon-chips) ──────────────────────────────
+import type { TaxonHint } from '../lib/identify-cascade-client';
+let selectedTaxonHint: TaxonHint | null = null;
+
+const taxonChips = document.querySelectorAll<HTMLButtonElement>('.obs2-taxon-chip');
+taxonChips.forEach(chip => {
+  chip.addEventListener('click', () => {
+    const hint = chip.dataset.hint as TaxonHint;
+    if (selectedTaxonHint === hint) {
+      // Deselect
+      selectedTaxonHint = null;
+      applyChipStyles(null);
+    } else {
+      selectedTaxonHint = hint;
+      applyChipStyles(hint);
+    }
+  });
+});
+
+function applyChipStyles(active: TaxonHint | null): void {
+  taxonChips.forEach(chip => {
+    const isActive = chip.dataset.hint === active;
+    chip.classList.toggle('bg-emerald-600', isActive);
+    chip.classList.toggle('text-white', isActive);
+    chip.classList.toggle('border-emerald-600', isActive);
+    chip.classList.toggle('border-zinc-300', !isActive);
+    chip.classList.toggle('dark:border-zinc-600', !isActive);
+    chip.classList.toggle('text-zinc-600', !isActive);
+    chip.classList.toggle('dark:text-zinc-400', !isActive);
+  });
+}
 
 // DOM refs
 const pipelineSection  = document.getElementById('obs2-pipeline-section');
@@ -835,7 +893,7 @@ async function runPipeline(state: PipelineState) {
           setNodeState(state, node.id, 'skipped', undefined, 'No runner available');
         } else {
           const abort = new AbortController();
-          const out = await runParallelIdentify(pf.file as File, { runners }, abort.signal);
+          const out = await runParallelIdentify(pf.file as File, { runners, taxonHint: selectedTaxonHint }, abort.signal);
           if (out.kind === 'winner' || out.kind === 'uncertain') {
             const r = out.result;
             setNodeState(state, node.id, 'done', {
@@ -1219,6 +1277,9 @@ document.getElementById('obs2-new-btn')?.addEventListener('click', () => {
   location = null;
   bestResult = null;
   pipelineState = null;
+  // Reset taxon hint chip selection
+  selectedTaxonHint = null;
+  applyChipStyles(null);
   pipelineSection?.classList.add('hidden');
   postForm?.classList.add('hidden');
   successEl?.classList.add('hidden');
