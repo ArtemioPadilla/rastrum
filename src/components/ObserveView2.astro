@@ -146,7 +146,7 @@ const weathers = WEATHERS;
             <p id="obs2-species" class="font-semibold italic text-zinc-900 dark:text-zinc-100"></p>
             <p id="obs2-common" class="text-sm text-zinc-500 dark:text-zinc-400"></p>
           </div>
-          <span id="obs2-conf" class="text-xs font-mono text-emerald-600 dark:text-emerald-400 shrink-0"></span>
+          <span id="obs2-conf" class="shrink-0"></span>
         </div>
         <!-- obs2-id-edit removed (#942 PR7 redo): manual input is always
              visible directly below; toggle was redundant. -->
@@ -590,6 +590,29 @@ const speciesEl       = document.getElementById('obs2-species');
 const commonEl        = document.getElementById('obs2-common');
 const confEl          = document.getElementById('obs2-conf');
 
+/**
+ * Render an SVG confidence ring (replaces the old % text pill).
+ * Mirrors src/components/ConfidenceRing.astro — same color thresholds:
+ * emerald ≥ 0.85, amber 0.50–0.85, red < 0.50.
+ */
+function renderConfidenceRing(confidence: number): string {
+  const c = Math.max(0, Math.min(1, Number.isFinite(confidence) ? confidence : 0));
+  const size = 32, stroke = 3;
+  const r = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * r;
+  const dash = (circumference * c).toFixed(2);
+  const gap  = (circumference - circumference * c).toFixed(2);
+  const colorClass = c >= 0.85 ? 'text-emerald-500' : c >= 0.5 ? 'text-amber-500' : 'text-red-500';
+  const pct = Math.round(c * 100);
+  return `<span class="relative inline-flex items-center justify-center ${colorClass}" style="width:${size}px;height:${size}px" role="img" aria-label="${pct}% confidence">
+    <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" class="absolute inset-0 -rotate-90" aria-hidden="true">
+      <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="currentColor" stroke-opacity="0.15" stroke-width="${stroke}"/>
+      <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="currentColor" stroke-width="${stroke}" stroke-linecap="round" stroke-dasharray="${dash} ${gap}"/>
+    </svg>
+    <span class="relative text-[9px] font-semibold tabular-nums leading-none">${pct}</span>
+  </span>`;
+}
+
 // ── Resume banner ──────────────────────────────────────────────────────────
 (async () => {
   try {
@@ -1018,7 +1041,7 @@ function showPostForm() {
     document.getElementById('obs2-id-result')?.classList.remove('hidden');
     if (speciesEl) speciesEl.textContent = bestResult.scientific_name;
     if (commonEl) commonEl.textContent = bestResult.common_name_en ?? '';
-    if (confEl) confEl.textContent = `${Math.round(bestResult.confidence * 100)}%`;
+    if (confEl) confEl.innerHTML = renderConfidenceRing(bestResult.confidence);
     // Pre-fill manual input with AI result; user can override
     const taxonInputEl = document.getElementById('obs2-taxon-input') as HTMLInputElement | null;
     if (taxonInputEl && !taxonInputEl.value) taxonInputEl.value = bestResult.scientific_name;
