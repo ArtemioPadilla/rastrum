@@ -90,7 +90,7 @@ const isEs = lang === "es";
       <div>
         <p id="quick-species" class="font-semibold italic text-zinc-900 dark:text-zinc-100"></p>
         <p id="quick-common" class="text-sm text-zinc-500 dark:text-zinc-400"></p>
-        <p id="quick-conf" class="text-xs font-mono text-emerald-600 dark:text-emerald-400 mt-0.5"></p>
+        <span id="quick-conf" class="mt-0.5 inline-block"></span>
       </div>
       <p id="quick-loc" class="text-xs text-zinc-500 dark:text-zinc-400">
         {isEs ? "Obteniendo ubicación..." : "Acquiring location..."}
@@ -147,6 +147,28 @@ const confirmCard= document.getElementById('quick-confirm-card');
 const speciesEl  = document.getElementById('quick-species');
 const commonEl   = document.getElementById('quick-common');
 const confEl     = document.getElementById('quick-conf');
+
+/**
+ * Render an SVG confidence ring (replaces the old % text pill).
+ * Mirrors src/components/ConfidenceRing.astro — same color thresholds.
+ */
+function renderConfidenceRing(confidence: number): string {
+  const c = Math.max(0, Math.min(1, Number.isFinite(confidence) ? confidence : 0));
+  const size = 32, stroke = 3;
+  const r = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * r;
+  const dash = (circumference * c).toFixed(2);
+  const gap  = (circumference - circumference * c).toFixed(2);
+  const colorClass = c >= 0.85 ? 'text-emerald-500' : c >= 0.5 ? 'text-amber-500' : 'text-red-500';
+  const pct = Math.round(c * 100);
+  return `<span class="relative inline-flex items-center justify-center ${colorClass}" style="width:${size}px;height:${size}px" role="img" aria-label="${pct}% confidence">
+    <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" class="absolute inset-0 -rotate-90" aria-hidden="true">
+      <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="currentColor" stroke-opacity="0.15" stroke-width="${stroke}"/>
+      <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="currentColor" stroke-width="${stroke}" stroke-linecap="round" stroke-dasharray="${dash} ${gap}"/>
+    </svg>
+    <span class="relative text-[9px] font-semibold tabular-nums leading-none">${pct}</span>
+  </span>`;
+}
 const locEl      = document.getElementById('quick-loc');
 const saveBtn    = document.getElementById('quick-save-btn') as HTMLButtonElement | null;
 const editBtn    = document.getElementById('quick-edit-btn');
@@ -247,7 +269,7 @@ async function handleFiles(files: File[]) {
   if (bestResult) {
     if (speciesEl) speciesEl.textContent = bestResult.scientific_name;
     if (commonEl)  commonEl.textContent  = bestResult.common_name_en ?? '';
-    if (confEl)    confEl.textContent    = `${Math.round(bestResult.confidence * 100)}%`;
+    if (confEl)    confEl.innerHTML     = renderConfidenceRing(bestResult.confidence);
   } else {
     if (speciesEl) speciesEl.textContent = isEs ? 'Sin identificar' : 'Unidentified';
   }
