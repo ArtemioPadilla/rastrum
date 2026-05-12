@@ -219,40 +219,58 @@ const communityHref = `/${lang}/${lang === 'es' ? 'comunidad/observadores' : 'co
 
   async function loadFollowedObservations(sb: ReturnType<typeof getSupabase>, userId: string): Promise<FollowedObs[]> {
     const since24h = new Date(Date.now() - 24 * 60 * 60 * 1_000).toISOString();
-    // Get followed user IDs
+    // Get followed user IDs — column is followee_id (not following_id)
     const { data: follows } = await sb
       .from('follows')
-      .select('following_id')
+      .select('followee_id')
       .eq('follower_id', userId)
       .limit(200);
-    const followedIds = (follows ?? []).map((f: { following_id: string }) => f.following_id);
+    const followedIds = (follows ?? []).map((f: { followee_id: string }) => f.followee_id);
     if (!followedIds.length) return [];
 
-    const { data } = await sb
+    // Fetch observations + join identifications (scientific_name) and media_files (photo_url)
+    const { data: obsRows } = await sb
       .from('observations')
-      .select(`
-        id,
-        observer_id,
-        scientific_name,
-        common_name,
-        photo_url,
-        observed_at,
-        users!observer_id ( username, avatar_url )
-      `)
+      .select('id, observer_id, observed_at, users:observer_id ( username, avatar_url )')
       .in('observer_id', followedIds)
       .gte('observed_at', since24h)
       .eq('sync_status', 'synced')
       .order('observed_at', { ascending: false })
       .limit(12);
 
-    return (data ?? []).map((r: Record<string, unknown>) => {
+    if (!obsRows?.length) return [];
+    const obsIds = (obsRows as Array<{ id: string }>).map(o => o.id);
+
+    const [{ data: idRows }, { data: mediaRows }] = await Promise.all([
+      sb.from('identifications')
+        .select('observation_id, scientific_name, is_primary, taxa(common_name_en, common_name_es)')
+        .in('observation_id', obsIds)
+        .eq('is_primary', true),
+      sb.from('media_files')
+        .select('observation_id, url, is_primary')
+        .in('observation_id', obsIds),
+    ]);
+
+    const sciByObs    = new Map<string, { sci: string | null; common: string | null }>();
+    const photoByObs  = new Map<string, string>();
+    for (const r of (idRows ?? []) as Array<{ observation_id: string; scientific_name?: string | null; taxa?: { common_name_en?: string | null; common_name_es?: string | null } | null }>) {
+      const common = r.taxa?.common_name_en ?? r.taxa?.common_name_es ?? null;
+      sciByObs.set(r.observation_id, { sci: r.scientific_name ?? null, common });
+    }
+    for (const m of (mediaRows ?? []) as Array<{ observation_id: string; url?: string | null; is_primary?: boolean }>) {
+      if (!m.url) continue;
+      if (m.is_primary || !photoByObs.has(m.observation_id)) photoByObs.set(m.observation_id, m.url);
+    }
+
+    return (obsRows as Array<Record<string, unknown>>).map(r => {
       const u = (r.users as Record<string, string> | null) ?? {};
+      const id = r.id as string;
       return {
-        id: r.id as string,
+        id,
         observer_id: r.observer_id as string,
-        scientific_name: r.scientific_name as string | null,
-        common_name: r.common_name as string | null,
-        photo_url: r.photo_url as string | null,
+        scientific_name: sciByObs.get(id)?.sci ?? null,
+        common_name: sciByObs.get(id)?.common ?? null,
+        photo_url: photoByObs.get(id) ?? null,
         observed_at: r.observed_at as string,
         observer_username: u.username ?? null,
         observer_avatar_url: u.avatar_url ?? null,
@@ -261,31 +279,36 @@ const communityHref = `/${lang}/${lang === 'es' ? 'comunidad/observadores' : 'co
   }
 
   async function loadNearbySpecies(sb: ReturnType<typeof getSupabase>, userId: string): Promise<SpeciesTip[]> {
-    // Get user's dex (observed taxa)
+    // Get user's dex (observed taxa) — scientific_name lives in identifications, not observations
     const { data: dex } = await sb
-      .from('observations')
-      .select('scientific_name')
-      .eq('observer_id', userId)
+      .from('identifications')
+      .select('scientific_name, observations!inner(observer_id)')
+      .eq('observations.observer_id', userId)
+      .eq('is_primary', true)
       .not('scientific_name', 'is', null);
-    const observed = new Set<string>((dex ?? []).map((o: { scientific_name: string }) => o.scientific_name));
+    const observed = new Set<string>(
+      (dex ?? []).map((o: { scientific_name: string }) => o.scientific_name).filter(Boolean)
+    );
 
-    // Get trending nearby as proxy for "probable_taxa_at" (function may not exist in all envs)
+    // Get recent synced primary IDs as proxy for "probable nearby taxa"
     const { data: nearby } = await sb
-      .from('observations')
-      .select('scientific_name, common_name')
-      .eq('sync_status', 'synced')
+      .from('identifications')
+      .select('scientific_name, taxa(common_name_en, common_name_es), observations!inner(sync_status, observed_at)')
+      .eq('is_primary', true)
+      .eq('observations.sync_status', 'synced')
       .not('scientific_name', 'is', null)
-      .order('observed_at', { ascending: false })
+      .order('created_at', { ascending: false })
       .limit(100);
 
     const seen = new Set<string>();
     const result: SpeciesTip[] = [];
-    for (const r of (nearby ?? []) as Array<{ scientific_name: string; common_name: string | null }>) {
+    for (const r of (nearby ?? []) as Array<{ scientific_name: string; taxa?: { common_name_en?: string | null; common_name_es?: string | null } | null }>) {
       if (!r.scientific_name) continue;
       if (observed.has(r.scientific_name)) continue;
       if (seen.has(r.scientific_name)) continue;
       seen.add(r.scientific_name);
-      result.push({ taxon_name: r.scientific_name, common_name: r.common_name });
+      const common = r.taxa?.common_name_en ?? r.taxa?.common_name_es ?? null;
+      result.push({ taxon_name: r.scientific_name, common_name: common });
       if (result.length >= 10) break;
     }
     return result;
@@ -293,21 +316,26 @@ const communityHref = `/${lang}/${lang === 'es' ? 'comunidad/observadores' : 'co
 
   async function loadTrendingSpecies(sb: ReturnType<typeof getSupabase>): Promise<SpeciesTip[]> {
     const since7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1_000).toISOString();
+    // scientific_name and common_name live in identifications/taxa, not observations
     const { data } = await sb
-      .from('observations')
-      .select('scientific_name, common_name')
-      .eq('sync_status', 'synced')
+      .from('identifications')
+      .select('scientific_name, taxa(common_name_en, common_name_es), observations!inner(sync_status, observed_at)')
+      .eq('is_primary', true)
+      .eq('observations.sync_status', 'synced')
       .not('scientific_name', 'is', null)
-      .gte('observed_at', since7d)
-      .order('observed_at', { ascending: false })
+      .gte('observations.observed_at', since7d)
+      .order('created_at', { ascending: false })
       .limit(200);
 
     const counts = new Map<string, { common_name: string | null; count: number }>();
-    for (const r of (data ?? []) as Array<{ scientific_name: string; common_name: string | null }>) {
+    for (const r of (data ?? []) as Array<{ scientific_name: string; taxa?: { common_name_en?: string | null; common_name_es?: string | null } | null }>) {
       if (!r.scientific_name) continue;
       const entry = counts.get(r.scientific_name);
       if (entry) { entry.count++; }
-      else { counts.set(r.scientific_name, { common_name: r.common_name, count: 1 }); }
+      else {
+        const common = r.taxa?.common_name_en ?? r.taxa?.common_name_es ?? null;
+        counts.set(r.scientific_name, { common_name: common, count: 1 });
+      }
     }
     return Array.from(counts.entries())
       .sort((a, b) => b[1].count - a[1].count)
