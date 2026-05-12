@@ -202,7 +202,18 @@ const sponsoringI18n = {
       <h2 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-3">
         {lang === 'es' ? 'Mapa de observaciones' : 'Observation map'}
       </h2>
-      <p data-pp-map-summary class="text-xs text-zinc-500 dark:text-zinc-400"></p>
+      <!-- Map container — populated by JS after profile loads -->
+      <div
+        data-pp-map-container
+        class="w-full h-[280px] md:h-[320px] rounded-xl overflow-hidden bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 relative"
+      >
+        <!-- Skeleton shown while map loads -->
+        <div data-pp-map-skeleton class="absolute inset-0 animate-pulse bg-zinc-200 dark:bg-zinc-800 rounded-xl"></div>
+      </div>
+      <!-- Shown when observer has 0 mapped pins -->
+      <p data-pp-map-empty class="hidden text-sm text-zinc-500 dark:text-zinc-400 mt-3">
+        {lang === 'es' ? 'Aún no hay observaciones mapeadas.' : 'No mapped observations yet.'}
+      </p>
       <p data-pp-map-owner-only data-owner-only-badge class="hidden mt-2 text-[10px] uppercase tracking-wider text-amber-700 dark:text-amber-400"></p>
     </section>
 
@@ -231,6 +242,8 @@ const sponsoringI18n = {
     <div id="pp-expertise-mount" class="mb-8"></div>
   </article>
 </div>
+
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.css" />
 
 <script type="application/json" id="public-profile-i18n" set:html={JSON.stringify(sponsoringI18n)}></script>
 
@@ -620,15 +633,170 @@ const sponsoringI18n = {
     // Map
     if (showMap) {
       show(root.querySelector('[data-pp-map-section]'));
-      const summary = root.querySelector<HTMLElement>('[data-pp-map-summary]');
-      if (summary) {
-        summary.textContent = lang === 'es'
-          ? `${mapCount ?? 0} observaciones mapeadas. (Mapa interactivo en v1.2.1.)`
-          : `${mapCount ?? 0} mapped observations. (Interactive map in v1.2.1.)`;
-      }
       if (isOwner && facets.observation_map === false) {
         const badge = root.querySelector<HTMLElement>('[data-pp-map-owner-only]');
         if (badge) { badge.textContent = ownerLabel; badge.classList.remove('hidden'); }
+      }
+
+      // Only render the map if there are actual pins
+      if ((mapCount ?? 0) === 0) {
+        // No pins: hide container, show empty state
+        const container = root.querySelector<HTMLElement>('[data-pp-map-container]');
+        if (container) container.style.display = 'none';
+        const empty = root.querySelector<HTMLElement>('[data-pp-map-empty]');
+        if (empty) empty.classList.remove('hidden');
+      } else {
+        // Lazy-load MapLibre only when the map section enters the viewport
+        const mapSection = root.querySelector<HTMLElement>('[data-pp-map-section]');
+        const mapContainer = root.querySelector<HTMLElement>('[data-pp-map-container]');
+        if (mapSection && mapContainer) {
+          const profileId = profile.id;
+          const profileLang = lang;
+          const isDark = document.documentElement.classList.contains('dark');
+          const STYLE_LIGHT = 'https://tiles.openfreemap.org/styles/liberty';
+          const STYLE_DARK  = 'https://tiles.openfreemap.org/styles/dark';
+
+          const initProfileMap = async () => {
+            const maplibregl = (await import('maplibre-gl')).default;
+
+            // Assign a unique id so MapLibre can find the container
+            const containerId = `pp-map-${profileId.replace(/-/g, '')}`;
+            mapContainer.id = containerId;
+
+            const map = new maplibregl.Map({
+              container: containerId,
+              style: isDark ? STYLE_DARK : STYLE_LIGHT,
+              zoom: 2,
+              center: [0, 20],
+              attributionControl: { compact: true },
+              scrollZoom: false,         // disable scroll-zoom (mobile-friendly)
+            });
+
+            // Hide skeleton once map tiles load
+            const skeleton = mapContainer.querySelector<HTMLElement>('[data-pp-map-skeleton]');
+            map.on('load', async () => {
+              if (skeleton) skeleton.classList.add('hidden');
+
+              // Fetch pins from the privacy-respecting view
+              const supabase = getSupabase();
+              const { data: pins, error } = await supabase
+                .from('profile_observation_pins')
+                .select('observation_id, location, scientific_name, is_research_grade, observed_at')
+                .eq('observer_id', profileId)
+                .limit(500);
+
+              if (error || !pins?.length) {
+                // No pins visible to this viewer — show empty state
+                map.remove();
+                if (mapContainer) mapContainer.style.display = 'none';
+                const empty = root.querySelector<HTMLElement>('[data-pp-map-empty]');
+                if (empty) empty.classList.remove('hidden');
+                return;
+              }
+
+              const isEs = profileLang === 'es';
+
+              // Build GeoJSON features from PostgREST geography column
+              // PostgREST returns geography(Point) as EWKB hex or GeoJSON depending on version.
+              // Use the parseLocationToGeoJSON helper like ExploreMap does.
+              const { parseLocationToGeoJSON } = await import('../lib/geo');
+
+              const features: GeoJSON.Feature[] = [];
+              const bounds = new maplibregl.LngLatBounds();
+
+              for (const pin of pins) {
+                const parsed = parseLocationToGeoJSON((pin as Record<string, unknown>).location);
+                if (!parsed?.coordinates) continue;
+                const [lng, lat] = parsed.coordinates as [number, number];
+                bounds.extend([lng, lat]);
+                const dateStr = pin.observed_at
+                  ? new Date(pin.observed_at).toLocaleDateString(isEs ? 'es-MX' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+                  : '';
+                features.push({
+                  type: 'Feature',
+                  geometry: { type: 'Point', coordinates: [lng, lat] },
+                  properties: {
+                    id: pin.observation_id,
+                    scientific_name: pin.scientific_name ?? (isEs ? 'Sin identificar' : 'Unidentified'),
+                    is_research_grade: pin.is_research_grade ?? false,
+                    date: dateStr,
+                  },
+                });
+              }
+
+              if (!features.length) {
+                map.remove();
+                if (mapContainer) mapContainer.style.display = 'none';
+                const empty = root.querySelector<HTMLElement>('[data-pp-map-empty]');
+                if (empty) empty.classList.remove('hidden');
+                return;
+              }
+
+              map.addSource('profile-pins', {
+                type: 'geojson',
+                data: { type: 'FeatureCollection', features },
+              });
+
+              // Research-grade pins: emerald; non-RG: zinc
+              map.addLayer({
+                id: 'profile-pins-layer',
+                type: 'circle',
+                source: 'profile-pins',
+                paint: {
+                  'circle-color': [
+                    'case',
+                    ['==', ['get', 'is_research_grade'], true], '#10b981',
+                    '#a1a1aa',
+                  ],
+                  'circle-radius': [
+                    'case',
+                    ['==', ['get', 'is_research_grade'], true], 5,
+                    4,
+                  ],
+                  'circle-stroke-width': 1.5,
+                  'circle-stroke-color': isDark ? '#0f172a' : '#ffffff',
+                },
+              });
+
+              // Fit map to pin bounds
+              if (!bounds.isEmpty()) {
+                map.fitBounds(bounds, { padding: 32, maxZoom: 12, duration: 0 });
+              }
+
+              // Popup on pin click
+              map.on('click', 'profile-pins-layer', (e) => {
+                const feat = e.features?.[0];
+                if (!feat) return;
+                const props = feat.properties as Record<string, string | boolean>;
+                const coords = (feat.geometry as GeoJSON.Point).coordinates as [number, number];
+                const name = props.scientific_name as string;
+                const date = props.date as string;
+                const html = `<div style="font-family:system-ui;padding:6px 8px"><div style="font-size:13px;font-weight:600;font-style:italic;color:${isDark ? '#f1f5f9' : '#18181b'}">${name}</div>${date ? `<div style="font-size:11px;color:${isDark ? '#94a3b8' : '#71717a'};margin-top:2px">${date}</div>` : ''}</div>`;
+                new maplibregl.Popup({ closeButton: true, maxWidth: '220px', offset: 10 })
+                  .setLngLat(coords)
+                  .setHTML(html)
+                  .addTo(map);
+              });
+
+              map.on('mouseenter', 'profile-pins-layer', () => { map.getCanvas().style.cursor = 'pointer'; });
+              map.on('mouseleave', 'profile-pins-layer', () => { map.getCanvas().style.cursor = ''; });
+            });
+          };
+
+          // Use IntersectionObserver to lazy-load MapLibre only when visible
+          const observer = new IntersectionObserver((entries) => {
+            if (entries.some(e => e.isIntersecting)) {
+              observer.disconnect();
+              initProfileMap().catch(() => {
+                // On error, hide map container gracefully
+                if (mapContainer) mapContainer.style.display = 'none';
+                const empty = root.querySelector<HTMLElement>('[data-pp-map-empty]');
+                if (empty) empty.classList.remove('hidden');
+              });
+            }
+          }, { threshold: 0.1 });
+          observer.observe(mapSection);
+        }
       }
     }
 
