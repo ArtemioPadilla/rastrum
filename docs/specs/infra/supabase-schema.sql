@@ -12101,7 +12101,8 @@ ALTER TABLE public.taxa
 DO $do$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
-    PERFORM cron.unschedule('refresh-conservation-status');
+    PERFORM cron.unschedule('refresh-conservation-status')
+      WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'refresh-conservation-status');
     PERFORM cron.schedule(
       'refresh-conservation-status',
       '0 3 1 * *',
