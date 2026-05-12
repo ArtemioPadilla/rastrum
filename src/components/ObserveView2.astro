@@ -1166,9 +1166,9 @@ postForm?.addEventListener('submit', async (e) => {
           });
           if (!ran) {
             // Lock was busy (e.g. another tab syncing). Wait 3 s then
-            // run normally — the lock will have been released by then.
+            // acquire the lock properly — so two tabs can't double-sync.
             await new Promise<void>(r => setTimeout(r, 3000));
-            await syncFn();
+            await locks.request('rastrum-sync-outbox', async () => syncFn());
           }
         } else {
           await syncFn();
