@@ -4,7 +4,7 @@
 > Source of truth for both surfaces; renders the live page at
 > [/docs/tasks/](https://rastrum.org/en/docs/tasks/).
 > 
-> **Updated:** 2026-05-09 (v1.1.5 Persuasive Tech Audit — Tier S + Tier A + Ola 2b complete, all 16 Fogg principles shipped including #771 peer norms. v1.2 research workflow — M28 community discovery, M29 projects, M30 CLI batch import, M31 camera stations, M32 multi-provider vision, obs-detail redesign, admin console PR16 entity browsers; subtask granularity deepened for 53 roadmap items per #180).
+> **Updated:** 2026-05-12 (marked ux-confidence-ring #1042, ux-quick-taxon-chips #1040, smoke-test-nightly #1041, ux-streak-push as done; featured_observers table + nearby_observations RPC shipped in PR #1034).
 
 ---
 
@@ -16,8 +16,8 @@
 | v0.3 | Offline intelligence + activity | done | 11 / 11 |
 | v0.5 | Beta | shipped (partial) | 11 / 13 |
 | v1.0 | Public Launch | shipped (partial) | 18 / 21 |
-| v1.0.x | Post-launch polish | in_progress | 9 / 25 |
-| v1.1 | UX polish + admin console + M22/M26/M27 | shipped (mostly) | 39 / 44 |
+| v1.0.x | Post-launch polish | in_progress | 12 / 26 |
+| v1.1 | UX polish + admin console + M22/M26/M27 | shipped (mostly) | 40 / 44 |
 | v1.2 | Research workflow (M28-M32 + obs-detail + privacy) | shipped 2026-04-30 | 17 / 17 |
 | v1.1.5 | Persuasive Tech Audit (Fogg principles) | complete — Tier S+A+Ola 2b all merged | 16 / 16 |
 | **v0.1 → v1.0** | **Public launch** | **shipped 2026-04-26** | **54 / 59** |
@@ -78,7 +78,7 @@ Remaining:
 - `tasks-json-deepfill` — Deepen tasks.json subtask granularity where 3-subtask backfill is thin (esp. v1.0 social + tokens items)  _(· in_progress — 53 items expanded from ≤3 to 5–7 specific subtasks per #180)_
 - `issue-5-gps-retest` — GPS auto-fill retest on Eugenio's Android device — fix shipped, awaiting confirmation  _(! blocked: Awaits real-device retest — see GitHub issue #5)_
 - `issue-18-camera-retest` — 'Tomar foto' retest on Eugenio's Android — Android-specific hint shipped, awaiting confirmation  _(! blocked: Awaits real-device retest — see GitHub issue #18)_
-- `smoke-test-nightly` — Nightly cron-fired Playwright smoke test against production rastrum.org (currently only PR-triggered)  _(· planned)_
+- `smoke-test-nightly` — Nightly cron-fired Playwright smoke test against production rastrum.org  _(✓ done — PR #1041, 2026-05-12)_
 - `license-per-record-ui` — UI for per-observation license selection (CC-BY default; CC0, CC-BY-NC, all-rights-reserved options)  _(· planned)_
 - `docs-toc-mobile` — Sticky scrollspy TOC pill row on mobile doc pages (auto-extracts h2s, IntersectionObserver active state)  _(! blocked: Open PR #23 — pending rebase + aria-current fix; reviewed and approved-with-comments)_
 
@@ -103,7 +103,7 @@ Cross-cutting shipments (2026-04-27/28):
 Remaining:
 
 - `ux-indigenous-taxa-search` — Indigenous-language taxon search (Zapoteco / Náhuatl / Maya / Mixteco / Tseltal → scientific name); requires corpus + governance per local-contexts  _(! blocked: Needs corpus partnership (CONABIO + community Co-PIs) and governance review before code lands)_
-- `ux-streak-push` — Web Push notification at 8 PM local when a streak is 1 day from breaking — opt-in only, single nightly notification  _(· planned)_
+- `ux-streak-push` — Web Push notification at 8 PM local when a streak is 1 day from breaking — opt-in only, single nightly notification  _(✓ done — 2026-05-12)_
 
 ## v1.2 — Profile privacy & public profile — shipped 2026-04-28
 

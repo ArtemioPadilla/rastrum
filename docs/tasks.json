@@ -1,5 +1,5 @@
 {
-  "updated": "2026-04-30",
+  "updated": "2026-05-12",
   "schema_version": 1,
   "notes_en": "Per-item task breakdown. Each entry mirrors docs/tasks.md. Subtasks: 'done'|'in_progress'|'blocked'|'planned'. The page at /{lang}/docs/tasks/ renders this with progress bars + commit/spec links.",
   "notes_es": "Desglose por ítem. Cada entrada refleja docs/tasks.md. Subtareas: 'done'|'in_progress'|'blocked'|'planned'. La página /{lang}/docs/tasks/ la renderiza con barras de progreso y enlaces a commits y specs.",
@@ -3508,7 +3508,9 @@
       "phase": "v1.1",
       "title_en": "Chat v1.1: Gemma 4 text + entity context + 5 typed tools",
       "title_es": "Chat v1.1: Gemma 4 texto + contexto por entidad + 5 herramientas tipadas",
-      "modules": ["20-chat"],
+      "modules": [
+        "20-chat"
+      ],
       "subtasks": [
         {
           "label_en": "loadGemmaTextEngine: reuse Gemma 4 E2B vision weights via transformers.js for text-only generation (no second download)",
@@ -3852,39 +3854,40 @@
         {
           "label_en": "Add GitHub Actions workflow with schedule cron firing nightly at 06:00 UTC",
           "label_es": "Agregar workflow de GitHub Actions con schedule cron disparando cada noche a las 06:00 UTC",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "Smoke test covers: home loads, nav links resolve, observe form renders, /docs/* accessible",
           "label_es": "La prueba humo cubre: carga de inicio, links de nav resuelven, formulario observe renderiza, /docs/* accesibles",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "Notify on failure via GitHub issue creation using actions/github-script",
           "label_es": "Notificar en fallo via creacion de issue de GitHub usando actions/github-script",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "Smoke test: home page loads with correct title and meta tags",
           "label_es": "Smoke test: pagina de inicio carga con titulo y meta tags correctos",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "Smoke test: nav links resolve (observe, explore, chat, about, docs)",
           "label_es": "Smoke test: links de navegacion resuelven correctamente",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "Smoke test: observe form renders with GPS and photo upload controls",
           "label_es": "Smoke test: formulario de observacion renderiza con controles GPS y foto",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "Smoke test: /docs/* pages accessible and render content",
           "label_es": "Smoke test: paginas /docs/* accesibles y renderizan contenido",
-          "status": "planned"
+          "status": "done"
         }
-      ]
+      ],
+      "done_at": "2026-05-12"
     },
     "license-per-record-ui": {
       "phase": "v1.0.x",
@@ -6054,7 +6057,8 @@
           "label_es": "Test snapshot Vitest para renderizado en valores limite",
           "status": "done"
         }
-      ]
+      ],
+      "done_at": "2026-05-12"
     },
     "ux-quick-taxon-chips": {
       "phase": "v1.1",
@@ -6094,7 +6098,8 @@
           "label_es": "Targets tactiles movil (min 44px) con scroll horizontal en pantallas angostas",
           "status": "done"
         }
-      ]
+      ],
+      "done_at": "2026-05-12"
     },
     "ux-photo-compression": {
       "phase": "v1.1",
@@ -6581,34 +6586,35 @@
         {
           "label_en": "Web Push notification at 8 PM local when a streak is 1 day from breaking — opt-in only, single nightly notification",
           "label_es": "Notificación push a las 20:00 hora local cuando una racha está a 1 día de romperse — opcional, una notificación nocturna",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "Web Push subscription opt-in UI in profile notification preferences",
           "label_es": "UI de opt-in para suscripcion Web Push en preferencias de notificacion del perfil",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "Edge Function to check streaks at risk (1 day from breaking) nightly",
           "label_es": "Edge Function para verificar rachas en riesgo (1 dia de romperse) cada noche",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "Push notification payload with streak count and motivational message (EN + ES)",
           "label_es": "Payload de notificacion push con conteo de racha y mensaje motivacional",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "Respect user timezone for 8 PM local delivery via timezone column on users table",
           "label_es": "Respetar zona horaria del usuario para entrega a las 8 PM local",
-          "status": "planned"
+          "status": "done"
         },
         {
           "label_en": "Rate limit: maximum one push notification per user per day",
           "label_es": "Limite de tasa: maximo una notificacion push por usuario por dia",
-          "status": "planned"
+          "status": "done"
         }
-      ]
+      ],
+      "done_at": "2026-05-12"
     },
     "delete-observation-atomic": {
       "phase": "v1.1",
@@ -6984,7 +6990,9 @@
       "phase": "v1.1.5",
       "title_en": "Social Facilitation — active-observers banner on /observe",
       "title_es": "Facilitación social — banner de observadores activos en /observar",
-      "modules": ["28-community-discovery.md"],
+      "modules": [
+        "28-community-discovery.md"
+      ],
       "subtasks": [
         {
           "label_en": "community_active_observers_today(p_country) RPC — same eligibility predicate as community_observers (hide_from_leaderboards = false); never reads centroid view",
@@ -7012,7 +7020,10 @@
       "phase": "v1.1.5",
       "title_en": "Self-monitoring — falta-dex 'Show missing' Pokédex toggle",
       "title_es": "Auto-monitoreo — toggle 'Mostrar faltantes' en Pokédex",
-      "modules": ["08-profile.md", "23-karma-reputation.md"],
+      "modules": [
+        "08-profile.md",
+        "23-karma-reputation.md"
+      ],
       "subtasks": [
         {
           "label_en": "profile_pokedex_with_missing(p_user_id, p_region_country, p_missing_limit) SECURITY INVOKER RPC returning observed + silhouette rows in one call",
@@ -7205,7 +7216,10 @@
       "phase": "v1.1.5",
       "title_en": "Normative Influence — peer norms on license / privacy",
       "title_es": "Influencia normativa — normas de pares en licencia / privacidad",
-      "modules": ["07-licensing.md", "25-profile-privacy.md"],
+      "modules": [
+        "07-licensing.md",
+        "25-profile-privacy.md"
+      ],
       "subtasks": [
         {
           "label_en": "license_norm + privacy_norm materialised views; refresh-norms-weekly pg_cron (Mon 06:00 UTC)",
@@ -7347,7 +7361,9 @@
       "phase": "v1.1.5",
       "title_en": "Kairos / Right-Time Prompts — golden-hour push (v1)",
       "title_es": "Kairos / Avisos al momento justo — push de hora dorada (v1)",
-      "modules": ["34-kairos-prompts.md"],
+      "modules": [
+        "34-kairos-prompts.md"
+      ],
       "subtasks": [
         {
           "label_en": "Schema: kairos_subscriptions(user_id, kind PK) with RLS own-row read/insert/update/delete; idempotent CREATE TABLE IF NOT EXISTS",
