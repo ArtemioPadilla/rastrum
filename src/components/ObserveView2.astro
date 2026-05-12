@@ -840,7 +840,7 @@ async function detectRunners() {
 // ── Pipeline runner ────────────────────────────────────────────────────────
 async function runPipeline(state: PipelineState) {
   const { runParallelIdentify } = await import('../lib/identify-cascade-client');
-  const { makePlantNetRunner, makeClaudeRunner, makePhiRunner, resolvePlantNetKey } = await import('../lib/identify-runners');
+  const { makePlantNetRunner, makeClaudeRunner, makePhiRunner } = await import('../lib/identify-runners');
   const { hasAnthropicKey } = await import('../lib/anthropic-key');
   const { claudeAvailable } = await import('../lib/claude-availability');
 
@@ -867,12 +867,14 @@ async function runPipeline(state: PipelineState) {
       if (pf.kind === 'photo') {
         if (aiMode === 'local') { setNodeState(state, node.id, 'skipped', undefined, 'Local-only mode'); continue; }
         const runners: Record<string, import('../lib/identify-cascade-client').IdentifierRunner> = {};
+        // PlantNet always works via the Edge Function (operator key server-side);
+        // include it unconditionally. A BYO key (if present) is forwarded to the
+        // EF as client_keys.plantnet for user's own quota, but is not required.
+        runners.plantnet = makePlantNetRunner(lang as 'en' | 'es');
         if (aiMode === 'own-key') {
           const { hasKeysForPlugin } = await import('../lib/byo-keys');
-          if (hasKeysForPlugin('plantnet') && await resolvePlantNetKey()) runners.plantnet = makePlantNetRunner(lang as 'en' | 'es');
           if (hasKeysForPlugin('claude_haiku') && await hasAnthropicKey()) runners.claude_haiku = makeClaudeRunner(lang as 'en' | 'es');
         } else {
-          if (await resolvePlantNetKey()) runners.plantnet = (await import('../lib/identify-runners')).makePlantNetRunner(lang as 'en' | 'es');
           // Sponsored mode: BYO key OR server-side sponsor/pool unlocks Claude.
           if (await claudeAvailable()) runners.claude_haiku = makeClaudeRunner(lang as 'en' | 'es');
         }

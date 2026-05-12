@@ -10,7 +10,8 @@ interface ImportMetaEnv {
   readonly PUBLIC_ONNX_BASE_URL?: string;
   readonly PUBLIC_PMTILES_MX_URL?: string;
   readonly PUBLIC_MEGADETECTOR_ENDPOINT?: string;
-  readonly PUBLIC_PLANTNET_KEY?: string;
+  // PUBLIC_PLANTNET_KEY removed — key is server-side only (Edge Function env var).
+  // See fix/plantnet-key-cleanup PR.
   readonly PUBLIC_ANTHROPIC_KEY?: string;
   readonly PUBLIC_VAPID_PUBLIC_KEY?: string;
   readonly PUBLIC_POSTHOG_PROJECT_TOKEN?: string;
