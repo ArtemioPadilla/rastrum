@@ -36,15 +36,15 @@ const ownerPill = (tr as unknown as { privacy?: { owner_only_badge?: string } })
     {lang === 'es' ? 'Sin observaciones en los últimos 12 meses.' : 'No observations in the last 12 months.'}
   </p>
 
-  <div class="overflow-x-auto">
+  <div class="w-full">
     <svg
       data-grid
-      width="720"
-      height="112"
+      width="100%"
       viewBox="0 0 720 112"
+      preserveAspectRatio="xMinYMin meet"
       role="img"
       aria-label={heading}
-      class="block min-w-full"
+      class="block"
     ></svg>
   </div>
 </section>
