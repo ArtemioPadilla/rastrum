@@ -108,7 +108,7 @@ const isEs = lang === 'es';
       .from('featured_observers')
       .select(`
         month_date, user_id, headline_es, headline_en,
-        users ( username, display_name, avatar_url )
+        users!user_id ( username, display_name, avatar_url )
       `)
       .eq('month_date', monthDate)
       .maybeSingle<FeaturedObserver>();
