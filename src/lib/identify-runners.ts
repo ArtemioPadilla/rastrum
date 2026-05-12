@@ -44,32 +44,59 @@ interface PlantNetMatch {
 
 export function makePlantNetRunner(locale: Locale): IdentifierRunner {
   return async (file, signal) => {
-    const key = await resolvePlantNetKey();
-    if (!key) throw new Error('No PlantNet key');
-    const form = new FormData();
-    form.append('images', file);
-    form.append('organs', 'auto');
-    const url = `https://my-api.plantnet.org/v2/identify/all?api-key=${encodeURIComponent(key)}&lang=${locale}&nb-results=5`;
-    const res = await fetch(url, { method: 'POST', body: form, signal });
-    // Soft-fail on the well-known "skip this runner" responses:
-    //   403 → key revoked / origin not allowed (key needs config; not fatal here)
-    //   404 → PlantNet's "not a plant" or unknown key — no winner from us
-    //   429 → daily quota exhausted (shared key shipped 500/day; the operator
-    //         hit the cap, but Claude / Phi can still answer)
-    // Soft-fail codes: skip this runner, let others continue
-    // 400 → malformed image / unsupported format / no organ detected → not fatal
-    // 403 → key revoked or origin not allowed
-    // 404 → PlantNet's "not a plant" or unknown taxon
-    // 429 → daily quota exhausted
-    if (res.status === 400 || res.status === 403 || res.status === 404 || res.status === 429) return null;
-    if (!res.ok) throw new Error(`PlantNet HTTP ${res.status}`);
-    const data = await res.json() as { results?: PlantNetMatch[] };
-    const results = data.results ?? [];
+    // ⚠️  Never call PlantNet directly from the browser — the API key would be
+    // visible in the network panel and in the built JS bundle. Route through
+    // the `identify` Edge Function which holds the key server-side.
+    // The EF already supports force_provider:'plantnet' and accepts an
+    // image_url OR a base64 data-URL via the `image_data` field.
+    //
+    // Additionally, PlantNet v2 only accepts JPEG/PNG. Convert the file
+    // to a JPEG data-URL so HEIC / WebP / AVIF photos don't get a 400.
+    const { getSupabase } = await import('./supabase');
+    const { getKey } = await import('./byo-keys');
+
+    // Encode file as JPEG via canvas (handles HEIC/WebP/AVIF → JPEG)
+    let imageDataUrl: string;
+    try {
+      imageDataUrl = await fileToJpegDataUrl(file);
+    } catch {
+      // Canvas not available (e.g. test env) — fall back to raw base64
+      imageDataUrl = await fileToDataUrl(file);
+    }
+
+    const supabase = getSupabase();
+    const userKey = getKey('plantnet', 'plantnet') ?? undefined;
+    const { data, error } = await supabase.functions.invoke('identify', {
+      body: {
+        observation_id: 'cascade-only',
+        image_data: imageDataUrl,   // EF re-fetches or decodes this server-side
+        force_provider: 'plantnet',
+        lang: locale,
+        client_keys: userKey ? { plantnet: userKey } : undefined,
+      },
+      ...(signal ? { signal } : {}),
+    });
+    if (error) throw error;
+    const r = data as Partial<UnifiedIdResult> & { error?: string; results?: PlantNetMatch[] };
+    if (r.error) throw new Error(r.error);
+    // EF may return a normalised IDResult or raw PlantNet results
+    if (r.scientific_name) {
+      return {
+        source: 'plantnet',
+        scientific_name: r.scientific_name,
+        common_name: r.common_name ?? null,
+        confidence: r.confidence ?? 0,
+        alternates: r.alternates ?? [],
+        raw: r.raw,
+      } satisfies UnifiedIdResult;
+    }
+    // Fallback: parse raw PlantNet results if EF forwarded them
+    const results = r.results ?? [];
     if (results.length === 0) return null;
     const top = results[0];
     const sci = top.species?.scientificNameWithoutAuthor ?? top.species?.scientificName ?? '';
     if (!sci) return null;
-    const out: UnifiedIdResult = {
+    return {
       source: 'plantnet',
       scientific_name: sci,
       common_name: top.species?.commonNames?.[0] ?? null,
@@ -79,10 +106,32 @@ export function makePlantNetRunner(locale: Locale): IdentifierRunner {
         common_name: r.species?.commonNames?.[0] ?? null,
         score: r.score ?? 0,
       })),
-      raw: data,
-    };
-    return out;
+      raw: r,
+    } satisfies UnifiedIdResult;
   };
+}
+
+/** Convert any image File to a JPEG data-URL via an off-screen canvas. */
+async function fileToJpegDataUrl(file: File): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const canvas = document.createElement('canvas');
+      // Cap at 1600px on the long edge — PlantNet works well at this res
+      const MAX = 1600;
+      const scale = Math.min(1, MAX / Math.max(img.naturalWidth, img.naturalHeight));
+      canvas.width  = Math.round(img.naturalWidth  * scale);
+      canvas.height = Math.round(img.naturalHeight * scale);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { reject(new Error('no 2d context')); return; }
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', 0.88));
+    };
+    img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error('img load failed')); };
+    img.src = objectUrl;
+  });
 }
 
 // ─────────────── Claude Haiku (vision) ───────────────

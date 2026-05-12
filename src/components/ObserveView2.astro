@@ -1146,9 +1146,10 @@ postForm?.addEventListener('submit', async (e) => {
       vitalStatus: (vitalStatusVal || null) as import('../lib/observe').ObservationDraft['vitalStatus'],
     });
 
-    // Fire sync without blocking success UX. Use ifAvailable so we don't
-    // stall on an existing lock held by a background sync — the pending row
-    // will be picked up by the next sync cycle regardless.
+    // Fire sync without blocking success UX. Try immediately; if the
+    // exclusive sync lock is held by a concurrent tab, retry once after
+    // 3 s instead of abandoning silently (ifAvailable:true was causing
+    // the pending pill to appear on every save when gotrue held a lock).
     void (async () => {
       try {
         const { syncOutbox: syncFn } = await import('../lib/sync');
@@ -1156,10 +1157,19 @@ postForm?.addEventListener('submit', async (e) => {
           ? (navigator as Navigator & { locks?: LockManager }).locks
           : undefined);
         if (locks?.request) {
+          // First attempt: grab immediately if free
+          let ran = false;
           await locks.request('rastrum-sync-outbox', { ifAvailable: true }, async (lock: Lock | null) => {
-            if (!lock) return; // another sync already in flight — it will flush the new row
+            if (!lock) return; // lock held — fall through to retry
+            ran = true;
             return syncFn();
           });
+          if (!ran) {
+            // Lock was busy (e.g. another tab syncing). Wait 3 s then
+            // acquire the lock properly — so two tabs can't double-sync.
+            await new Promise<void>(r => setTimeout(r, 3000));
+            await locks.request('rastrum-sync-outbox', async () => syncFn());
+          }
         } else {
           await syncFn();
         }

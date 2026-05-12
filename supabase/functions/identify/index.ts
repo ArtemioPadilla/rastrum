@@ -54,7 +54,19 @@ import { checkAnonRateLimit } from '../_shared/anon-rate-limit.ts';
 
 type IdentifyRequest = {
   observation_id: string;
-  image_url: string;
+  /**
+   * Public URL of the image to identify. Mutually exclusive with image_data.
+   * The function fetches the image server-side so the client never needs
+   * to expose provider keys.
+   */
+  image_url?: string;
+  /**
+   * Base64 data-URL (e.g. "data:image/jpeg;base64,...") sent directly from
+   * the client. Use this when the image is not yet publicly accessible
+   * (e.g. before it has been uploaded to storage). Mutually exclusive with
+   * image_url; image_data takes precedence when both are provided.
+   */
+  image_data?: string;
   user_hint?: 'plant' | 'animal' | 'fungi' | 'unknown';
   location?: { lat: number; lng: number };
   /**
@@ -471,11 +483,21 @@ serve(async (req) => {
     return corsResponse('Invalid JSON', { status: 400 });
   }
 
-  if (!body.observation_id || !body.image_url) {
-    return corsResponse('Missing observation_id or image_url', { status: 400 });
+  if (!body.observation_id || (!body.image_url && !body.image_data)) {
+    return corsResponse('Missing observation_id and image_url or image_data', { status: 400 });
   }
 
-  const imageBytes = await fetchImageAsBytes(body.image_url);
+  // Resolve image bytes — prefer image_data (already on the wire) over image_url
+  let imageBytes: Uint8Array;
+  if (body.image_data) {
+    // Strip the data-URL prefix ("data:image/jpeg;base64,") and decode
+    const base64 = body.image_data.replace(/^data:[^;]+;base64,/, '');
+    const binary = atob(base64);
+    imageBytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) imageBytes[i] = binary.charCodeAt(i);
+  } else {
+    imageBytes = await fetchImageAsBytes(body.image_url!);
+  }
   const mimeType = 'image/jpeg';
 
   const byoPlantnet = body.client_keys?.plantnet;

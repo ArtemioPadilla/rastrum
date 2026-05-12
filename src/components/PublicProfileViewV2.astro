@@ -573,13 +573,34 @@ const sponsoringI18n = {
       });
     }
 
+    // Stats, map, validation — no inter-dependencies: fire in parallel
+    const [statsRow, mapCount, idCount] = await Promise.all([
+      showStats
+        ? supabase
+            .from('profile_stats_counts')
+            .select('total_observations, research_grade_count, kingdoms_validated')
+            .eq('owner_id', profile.id)
+            .maybeSingle<{ total_observations: number; research_grade_count: number; kingdoms_validated: number }>()
+            .then(r => r.data)
+        : Promise.resolve(null),
+      showMap
+        ? supabase
+            .from('profile_observation_pins')
+            .select('observation_id', { count: 'exact', head: true })
+            .eq('observer_id', profile.id)
+            .then(r => r.count)
+        : Promise.resolve(null),
+      showValidation
+        ? supabase
+            .from('identifications')
+            .select('id', { count: 'exact', head: true })
+            .eq('validated_by', profile.id)
+            .then(r => r.count)
+        : Promise.resolve(null),
+    ]);
+
     // Stats
     if (showStats) {
-      const { data: statsRow } = await supabase
-        .from('profile_stats_counts')
-        .select('total_observations, research_grade_count, kingdoms_validated')
-        .eq('owner_id', profile.id)
-        .maybeSingle<{ total_observations: number; research_grade_count: number; kingdoms_validated: number }>();
       const statsEl = root.querySelector<HTMLElement>('[data-pp-stats]');
       statsEl?.classList.remove('hidden');
       if (statsRow) {
@@ -596,18 +617,14 @@ const sponsoringI18n = {
       }
     }
 
-    // Map (lightweight summary only in v1.2.0; real MapLibre comes in v1.2.1)
+    // Map
     if (showMap) {
-      const { count } = await supabase
-        .from('profile_observation_pins')
-        .select('observation_id', { count: 'exact', head: true })
-        .eq('observer_id', profile.id);
       show(root.querySelector('[data-pp-map-section]'));
       const summary = root.querySelector<HTMLElement>('[data-pp-map-summary]');
       if (summary) {
         summary.textContent = lang === 'es'
-          ? `${count ?? 0} observaciones mapeadas. (Mapa interactivo en v1.2.1.)`
-          : `${count ?? 0} mapped observations. (Interactive map in v1.2.1.)`;
+          ? `${mapCount ?? 0} observaciones mapeadas. (Mapa interactivo en v1.2.1.)`
+          : `${mapCount ?? 0} mapped observations. (Interactive map in v1.2.1.)`;
       }
       if (isOwner && facets.observation_map === false) {
         const badge = root.querySelector<HTMLElement>('[data-pp-map-owner-only]');
@@ -617,10 +634,6 @@ const sponsoringI18n = {
 
     // Validation reputation
     if (showValidation) {
-      const { count: idCount } = await supabase
-        .from('identifications')
-        .select('id', { count: 'exact', head: true })
-        .eq('validated_by', profile.id);
       show(root.querySelector('[data-pp-validation-section]'));
       const body = root.querySelector<HTMLElement>('[data-pp-validation-body]');
       if (body) {
