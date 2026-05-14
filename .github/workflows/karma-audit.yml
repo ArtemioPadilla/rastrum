@@ -1,0 +1,112 @@
+name: karma-audit
+
+# Phase 1 health check for module 23 (karma + expertise + rarity).
+# Runs five diagnostic queries against the production Postgres and
+# prints the result tables to the action log for human review.
+#
+# Required secret: SUPABASE_DB_URL (same one used by db-apply.yml).
+# Fire manually after ~2 weeks of production traffic to assess whether
+# karma is accruing as designed before starting Phase 2.
+
+on:
+  workflow_dispatch:
+
+# Only one audit at a time — concurrent runs against the same prod DB
+# would duplicate output without adding signal.
+concurrency:
+  group: karma-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    # Restrict to main so the workflow can't be dispatched from arbitrary
+    # branches that might have tampered with the queries.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      PGCONNECT_TIMEOUT: 15
+    steps:
+      - name: "(a) Weekly consensus event breakdown"
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          echo "::group::Weekly consensus_win / consensus_loss counts"
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 \
+            --pset=border=2 --pset=format=aligned \
+            -c "SELECT date_trunc('week', created_at) AS week,
+                       reason,
+                       count(*)
+                FROM public.karma_events
+               WHERE reason IN ('consensus_win','consensus_loss')
+               GROUP BY 1,2
+               ORDER BY 1,2;"
+          echo "::endgroup::"
+
+      - name: "(b) Average karma delta per rarity bucket (wins only)"
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          echo "::group::Avg win delta by rarity_bucket"
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 \
+            --pset=border=2 --pset=format=aligned \
+            -c "SELECT rarity_bucket,
+                       round(avg(delta), 2) AS avg_delta,
+                       count(*)
+                FROM public.karma_events
+               WHERE reason = 'consensus_win'
+               GROUP BY 1
+               ORDER BY 1;"
+          echo "::endgroup::"
+
+      - name: "(c) Grace-period cohort split"
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          echo "::group::Users in grace vs exited grace"
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 \
+            --pset=border=2 --pset=format=aligned \
+            -c "SELECT count(*) FILTER (WHERE grace_until > now())           AS in_grace,
+                       count(*) FILTER (WHERE grace_until <= now()
+                                           OR grace_until IS NULL)           AS exited_grace
+                FROM public.users;"
+          echo "::endgroup::"
+
+      - name: "(d) Top-5 karma users + top-5 expertise taxa"
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          echo "::group::Top-5 users by karma_total"
+          # User IDs are redacted to 8-char prefixes — the full UUID is not
+          # needed for "is karma concentrating at the top?" analysis and
+          # keeps prod identifiers out of CI logs (which would be indexed
+          # if the repo is ever made public).
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 \
+            --pset=border=2 --pset=format=aligned \
+            -c "SELECT left(id::text, 8) || '…' AS id_prefix, karma_total
+                FROM public.users
+               ORDER BY karma_total DESC
+               LIMIT 5;"
+          echo "::endgroup::"
+
+          echo "::group::Top-5 taxa by user_expertise coverage"
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 \
+            --pset=border=2 --pset=format=aligned \
+            -c "SELECT taxon_id, count(*) AS users
+                FROM public.user_expertise
+               GROUP BY 1
+               ORDER BY users DESC
+               LIMIT 5;"
+          echo "::endgroup::"
+
+      - name: "(e) Users with negative karma_total"
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          echo "::group::Negative-karma user count"
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 \
+            --pset=border=2 --pset=format=aligned \
+            -c "SELECT count(*) AS negative_karma_users
+                FROM public.users
+               WHERE karma_total < 0;"
+          echo "::endgroup::"

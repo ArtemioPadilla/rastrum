@@ -207,8 +207,8 @@ const copy = {
 
   /** Build the deep-link URL for a PIT slug. */
   function pitDeepLink(slug: string): string {
-    const pitBase = isEs ? `/${lang}/explorar/pits/` : `/${lang}/explore/pits/`;
-    return `${SITE_ORIGIN}${pitBase}${slug}`;
+    const pitBase = isEs ? `/${lang}/explorar/pits/?slug=` : `/${lang}/explore/pits/?slug=`;
+    return `${SITE_ORIGIN}${pitBase}${encodeURIComponent(slug)}`;
   }
 
   function escapeHtml(str: string): string {
@@ -226,7 +226,7 @@ const copy = {
   }): string {
     const deepLink = pitDeepLink(pit.slug);
     const qr = qrUrl(pit.qr_payload || deepLink, 120);
-    const pitBase = isEs ? `/${lang}/explorar/pits/` : `/${lang}/explore/pits/`;
+    const pitBase = isEs ? `/${lang}/explorar/pits/?slug=` : `/${lang}/explore/pits/?slug=`;
 
     return `
       <article
@@ -254,7 +254,7 @@ const copy = {
             📍 ${Number(pit.lat).toFixed(5)}, ${Number(pit.lng).toFixed(5)}
           </p>
           <a
-            href="${pitBase}${escapeHtml(pit.slug)}"
+            href="${pitBase}${encodeURIComponent(pit.slug)}"
             class="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:underline"
           >
             ${isEs ? 'Ver PIT' : 'View PIT'} →

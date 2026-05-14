@@ -1,20 +1,18 @@
 ---
 /**
- * Species list detail page — EN variant.
- * Route: /en/profile/u/[username]/lists/[slug]/
- * Issue #875.
+ * Species list detail page — ES variant.
+ * Route: /es/perfil/u/listas/?username=<u>&slug=<s>
+ * Issue #1047 — query-string routing (was missing entirely; EN side was
+ * /en/profile/u/[username]/lists/[slug]/ which 404'd anyway).
  */
-import BaseLayout from '../../../../../../layouts/BaseLayout.astro';
+import BaseLayout from '../../../../../layouts/BaseLayout.astro';
 
-export function getStaticPaths() { return []; }
-
-const lang = 'en' as const;
-const { username, slug } = Astro.params as { username: string; slug: string };
+const lang = 'es' as const;
 ---
 
 <BaseLayout
-  title={`Species list — Rastrum`}
-  description="A user-curated species list on Rastrum."
+  title={`Lista de especies — Rastrum`}
+  description="Una lista de especies curada por una persona usuaria de Rastrum."
   lang={lang}
   robots="noindex,nofollow"
 >
@@ -22,43 +20,41 @@ const { username, slug } = Astro.params as { username: string; slug: string };
     id="list-detail-root"
     class="max-w-3xl mx-auto pb-28 sm:pb-6"
     data-lang={lang}
-    data-username={username}
-    data-slug={slug}
   >
     <!-- Loading state -->
-    <div id="ld-loading" class="py-16 text-center text-sm text-zinc-500 dark:text-zinc-400">Loading…</div>
+    <div id="ld-loading" class="py-16 text-center text-sm text-zinc-500 dark:text-zinc-400">Cargando…</div>
 
     <!-- Not found -->
     <div id="ld-not-found" class="hidden py-16 text-center">
-      <p class="text-zinc-500 dark:text-zinc-400">List not found.</p>
-      <a href={`/en/u/?username=${encodeURIComponent(username)}`} class="mt-4 inline-block text-sm text-emerald-700 dark:text-emerald-400 hover:underline">← Back to profile</a>
+      <p class="text-zinc-500 dark:text-zinc-400">Lista no encontrada.</p>
+      <a id="ld-not-found-back" href="#" class="mt-4 inline-block text-sm text-emerald-700 dark:text-emerald-400 hover:underline">← Volver al perfil</a>
     </div>
 
     <!-- Content -->
     <div id="ld-content" class="hidden">
       <!-- Header -->
       <header class="mb-6">
-        <a id="ld-back" href="#" class="text-xs text-zinc-500 hover:underline">← Back to profile</a>
+        <a id="ld-back" href="#" class="text-xs text-zinc-500 hover:underline">← Volver al perfil</a>
         <h1 id="ld-title" class="mt-2 text-2xl md:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">—</h1>
         <p id="ld-desc" class="mt-1 text-sm text-zinc-600 dark:text-zinc-400 hidden"></p>
         <div class="mt-2 flex items-center gap-3">
           <span id="ld-count" class="text-xs text-zinc-400 dark:text-zinc-500"></span>
-          <span id="ld-private-badge" class="hidden rounded-full bg-zinc-200 dark:bg-zinc-700 px-2 py-0.5 text-xs text-zinc-600 dark:text-zinc-300">Private</span>
+          <span id="ld-private-badge" class="hidden rounded-full bg-zinc-200 dark:bg-zinc-700 px-2 py-0.5 text-xs text-zinc-600 dark:text-zinc-300">Privada</span>
         </div>
       </header>
 
       <!-- Add species (own list only) -->
       <div id="ld-add-section" class="hidden mb-6 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4">
-        <p class="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">Add species</p>
+        <p class="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">Agregar especie</p>
         <div class="flex gap-2">
           <input
             id="ld-taxon-input"
             type="text"
-            placeholder="Search by scientific or common name…"
+            placeholder="Busca por nombre científico o común…"
             autocomplete="off"
             class="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
           />
-          <button id="ld-add-btn" type="button" class="hidden rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-2 text-sm font-semibold text-white transition-colors">Add</button>
+          <button id="ld-add-btn" type="button" class="hidden rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-2 text-sm font-semibold text-white transition-colors">Agregar</button>
         </div>
         <div id="ld-suggestions" class="mt-1 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-md hidden"></div>
         <p id="ld-add-error" class="hidden mt-1 text-xs text-red-600 dark:text-red-400"></p>
@@ -66,7 +62,7 @@ const { username, slug } = Astro.params as { username: string; slug: string };
 
       <!-- Taxa grid -->
       <div id="ld-taxa-empty" class="hidden rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-8 text-center">
-        <p class="text-sm text-zinc-500 dark:text-zinc-400">No species in this list yet.</p>
+        <p class="text-sm text-zinc-500 dark:text-zinc-400">Esta lista aún no tiene especies.</p>
       </div>
       <div id="ld-taxa-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3"></div>
     </div>
@@ -74,16 +70,19 @@ const { username, slug } = Astro.params as { username: string; slug: string };
 </BaseLayout>
 
 <script>
-  import { getCachedUser, getSupabase } from '../../../../../../lib/supabase';
+  import { getCachedUser, getSupabase } from '../../../../../lib/supabase';
 
   const root = document.getElementById('list-detail-root') as HTMLDivElement;
   const lang = root.dataset.lang as 'en' | 'es';
-  const username = root.dataset.username ?? '';
-  const slug = root.dataset.slug ?? '';
   const isEs = lang === 'es';
+
+  const params = new URLSearchParams(window.location.search);
+  const username = params.get('username') ?? '';
+  const slug = params.get('slug') ?? '';
 
   const loadingEl  = document.getElementById('ld-loading') as HTMLElement;
   const notFound   = document.getElementById('ld-not-found') as HTMLElement;
+  const notFoundBack = document.getElementById('ld-not-found-back') as HTMLAnchorElement;
   const content    = document.getElementById('ld-content') as HTMLElement;
   const titleEl    = document.getElementById('ld-title') as HTMLElement;
   const descEl     = document.getElementById('ld-desc') as HTMLElement;
@@ -97,6 +96,10 @@ const { username, slug } = Astro.params as { username: string; slug: string };
   const addError   = document.getElementById('ld-add-error') as HTMLElement;
   const taxaEmpty  = document.getElementById('ld-taxa-empty') as HTMLElement;
   const taxaGrid   = document.getElementById('ld-taxa-grid') as HTMLElement;
+
+  const profileHref = `/${lang}/u/?username=${encodeURIComponent(username)}`;
+  backLink.href = profileHref;
+  notFoundBack.href = profileHref;
 
   type TaxonRow = {
     taxon_id: string;
@@ -135,7 +138,9 @@ const { username, slug } = Astro.params as { username: string; slug: string };
       return;
     }
     taxaEmpty.classList.add('hidden');
-    const speciesPath = (slug: string) => isEs ? `/es/explorar/especies/${slug}/` : `/en/explore/species/${slug}/`;
+    const speciesPath = (s: string) => isEs
+      ? `/es/explorar/especies/?slug=${encodeURIComponent(s)}`
+      : `/en/explore/species/?slug=${encodeURIComponent(s)}`;
     taxaGrid.innerHTML = items.map(row => {
       const t = row.taxa;
       if (!t) return '';
@@ -157,7 +162,6 @@ const { username, slug } = Astro.params as { username: string; slug: string };
     }).join('');
   }
 
-  // Taxon autocomplete
   let debounceTimer: ReturnType<typeof setTimeout>;
   taxonInput.addEventListener('input', () => {
     clearTimeout(debounceTimer);
@@ -217,7 +221,6 @@ const { username, slug } = Astro.params as { username: string; slug: string };
       addError.classList.remove('hidden');
       return;
     }
-    // Reload items
     taxonInput.value = '';
     addBtn.classList.add('hidden');
     selectedTaxon = null;
@@ -237,10 +240,15 @@ const { username, slug } = Astro.params as { username: string; slug: string };
   }
 
   async function run() {
+    if (!username || !slug) {
+      loadingEl.classList.add('hidden');
+      notFound.classList.remove('hidden');
+      return;
+    }
+
     const supabase = getSupabase();
     const user = await getCachedUser();
 
-    // Fetch list owner's user record by username
     const { data: ownerRow } = await supabase
       .from('users')
       .select('id')
@@ -256,7 +264,6 @@ const { username, slug } = Astro.params as { username: string; slug: string };
     const ownerId = (ownerRow as { id: string }).id;
     isOwner = user?.id === ownerId;
 
-    // Fetch list
     const { data: listRow } = await supabase
       .from('species_lists')
       .select('id, name_en, name_es, description_en, description_es, visibility, slug')
@@ -279,10 +286,6 @@ const { username, slug } = Astro.params as { username: string; slug: string };
 
     listId = l.id;
 
-    // Back link
-    backLink.href = `/en/u/?username=${encodeURIComponent(username)}`;
-
-    // Title & description
     titleEl.textContent = (isEs ? l.name_es : l.name_en) || l.name_en || l.name_es || slug;
     document.title = `${titleEl.textContent} — Rastrum`;
     const desc = (isEs ? l.description_es : l.description_en) || '';
@@ -294,7 +297,6 @@ const { username, slug } = Astro.params as { username: string; slug: string };
       privateBadge.classList.remove('hidden');
     }
 
-    // Show add section if owner
     if (isOwner) {
       addSection.classList.remove('hidden');
     }
