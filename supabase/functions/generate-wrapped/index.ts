@@ -48,7 +48,7 @@ serve(async (req) => {
     return new Response('Missing year or user_id', { status: 400 });
   }
   const year = parseInt(yearStr, 10);
-  if (isNaN(year) || year < 2020 || year > new Date().getFullYear()) {
+  if (isNaN(year) || year < 2020 || year > new Date().getUTCFullYear()) {
     return new Response('Invalid year', { status: 400 });
   }
 
