@@ -21,7 +21,7 @@ import { describe, it, expect } from 'vitest';
 function buildMonthCounts(observedAtDates: string[]): number[] {
   const months = new Array(12).fill(0);
   for (const d of observedAtDates) {
-    const month = new Date(d).getMonth();
+    const month = new Date(d).getUTCMonth();
     if (month >= 0 && month < 12) months[month]++;
   }
   return months;
