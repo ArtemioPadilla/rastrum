@@ -21,7 +21,7 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-Deno.serve(async (req) => {
+export async function handler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
 
@@ -90,4 +90,6 @@ Deno.serve(async (req) => {
   }
 
   return json({ ok: true, id: inserted.id });
-});
+}
+
+Deno.serve(handler);
