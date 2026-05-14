@@ -24,6 +24,8 @@ export default defineConfig({
     baseURL: BASE_URL,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
+    locale: 'en-US',
+    timezoneId: 'UTC',
   },
   expect: {
     timeout: 7_000,
