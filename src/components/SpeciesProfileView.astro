@@ -571,7 +571,7 @@ const shareBase = '/share/obs/';
       const months = new Array(12).fill(0);
       for (const o of allObs) {
         if (o.observed_at) {
-          const m = new Date(o.observed_at).getMonth();
+          const m = new Date(o.observed_at).getUTCMonth();
           months[m]++;
         }
       }
