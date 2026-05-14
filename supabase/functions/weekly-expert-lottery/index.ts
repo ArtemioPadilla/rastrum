@@ -116,8 +116,8 @@ serve(async (req) => {
 function getIsoWeek(): string {
   const d = new Date();
   const thursday = new Date(d);
-  thursday.setDate(d.getDate() - (d.getDay() + 6) % 7 + 3);
-  const jan4 = new Date(thursday.getFullYear(), 0, 4);
+  thursday.setUTCDate(d.getUTCDate() - (d.getUTCDay() + 6) % 7 + 3);
+  const jan4 = new Date(Date.UTC(thursday.getUTCFullYear(), 0, 4));
   const week = Math.ceil(((thursday.getTime() - jan4.getTime()) / 86_400_000 + 1) / 7);
-  return `${thursday.getFullYear()}-W${String(week).padStart(2, '0')}`;
+  return `${thursday.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
 }
