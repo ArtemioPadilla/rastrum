@@ -25,7 +25,7 @@ const MIN_AGE_MINUTES = 10;
 const SKIP_ACTIVE_USER_DAYS = 7;
 const MAX_AGE_DAYS = 30;
 
-serve(async (req) => {
+export async function handler(req: Request): Promise<Response> {
   if (req.method !== 'POST') {
     return new Response('Method Not Allowed', { status: 405 });
   }
@@ -126,4 +126,6 @@ serve(async (req) => {
   return new Response(JSON.stringify({ queued, abandoned, skipped_active: skippedActive, total_found: obs.length }), {
     headers: { 'content-type': 'application/json' },
   });
-});
+}
+
+serve(handler);
