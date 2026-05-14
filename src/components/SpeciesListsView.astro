@@ -195,8 +195,8 @@ const labels = {
   }
 
   function buildListDetailPath(username: string, slug: string): string {
-    const base = lang === 'es' ? '/es/perfil/u' : '/en/profile/u';
-    return `${base}/${encodeURIComponent(username)}/lists/${encodeURIComponent(slug)}/`;
+    const base = lang === 'es' ? '/es/perfil/u/listas/' : '/en/profile/u/lists/';
+    return `${base}?username=${encodeURIComponent(username)}&slug=${encodeURIComponent(slug)}`;
   }
 
   function escAttr(s: string): string {

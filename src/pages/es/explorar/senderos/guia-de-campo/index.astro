@@ -1,19 +1,17 @@
 ---
 /**
- * Field guide page — /es/explorar/senderos/[slug]/guia-de-campo
+ * Field guide page — /es/explorar/senderos/guia-de-campo/?slug=<id>
  *
- * Print-ready field guide view for a biodiversity trail.
- * Opens as a standalone page with print CSS pre-loaded.
- * User prints (Ctrl/Cmd+P) → "Save as PDF" in browser.
+ * Vista imprimible de la guía de campo de un sendero (issue #1047 —
+ * el enrutamiento por query string reemplaza la ruta dinámica
+ * `[slug]/guia-de-campo`).
  *
- * getStaticPaths returns [] (runtime routing).
+ * Se abre como página independiente con CSS de impresión precargado.
+ * El usuario imprime (Ctrl/Cmd+P) → "Guardar como PDF".
+ *
+ * El slug se lee de `?slug=` en cliente.
  */
-export function getStaticPaths() {
-  return [];
-}
-
-const { slug } = Astro.params as { slug: string };
-const lang = 'es';
+const slug = Astro.url.searchParams.get('slug') ?? '';
 ---
 <!DOCTYPE html>
 <html lang="es">
@@ -88,7 +86,7 @@ const lang = 'es';
       🖨️ Imprimir / Guardar como PDF
     </button>
     <a
-      href={`/es/explorar/senderos/${slug}`}
+      href={`/es/explorar/senderos/?slug=${encodeURIComponent(slug)}`}
       style="font-size: 9.5pt; color: #1a5c1a; text-decoration: none;"
     >
       ← Volver al sendero
@@ -101,7 +99,7 @@ const lang = 'es';
 
 </body>
 <script>
-  const slug = window.location.pathname.split('/').filter(Boolean).slice(-2)[0] ?? '';
+  const slug = new URLSearchParams(window.location.search).get('slug') ?? '';
 
   async function loadFieldGuide() {
     if (!slug) { showError(); return; }

@@ -285,10 +285,10 @@ const { lang } = Astro.props;
     const list = document.getElementById('species-list')!;
     const empty = document.getElementById('species-empty')!;
     if (!data || data.length === 0) { empty.textContent = tr.no_species; empty.classList.remove('hidden'); return; }
-    const speciesBase = lang === 'es' ? '/es/explorar/especies/' : '/en/explore/species/';
+    const speciesBase = lang === 'es' ? '/es/explorar/especies/?slug=' : '/en/explore/species/?slug=';
     list.innerHTML = data.map((s: { slug: string; scientific_name: string; common_name_es: string; obs_count: number }, i: number) =>
       `<li class="flex items-center justify-between py-1.5 border-b border-zinc-100 dark:border-zinc-800 last:border-0">
-        <a href="${speciesBase}${s.slug}/" class="text-sm text-zinc-800 dark:text-zinc-200 hover:text-emerald-600">
+        <a href="${speciesBase}${encodeURIComponent(s.slug)}" class="text-sm text-zinc-800 dark:text-zinc-200 hover:text-emerald-600">
           <span class="text-zinc-400 mr-2">${i + 1}.</span>
           <em>${s.scientific_name}</em>${s.common_name_es ? ` — ${s.common_name_es}` : ''}
         </a>
@@ -327,7 +327,7 @@ const { lang } = Astro.props;
     if (!places || places.length === 0) return;
     const base = lang === 'es' ? '/es/explorar/lugares/?slug=' : '/en/explore/places/?slug=';
     list.innerHTML = places.map((p: { slug: string; name: string; obs_count: number }) =>
-      `<a href="${base}${p.slug}/" class="flex items-center justify-between py-2 border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:text-emerald-600">
+      `<a href="${base}${encodeURIComponent(p.slug)}" class="flex items-center justify-between py-2 border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:text-emerald-600">
         <span class="text-sm">📍 ${p.name}</span>
         <span class="text-xs text-zinc-400">${tr.obs_label(p.obs_count)}</span>
       </a>`

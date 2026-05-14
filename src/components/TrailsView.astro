@@ -193,7 +193,7 @@ const copy = {
     waypoints: { lat: number; lng: number; name?: string; obs_count?: number }[];
     distance_km?: number | null;
   }): string {
-    const trailBase = isEs ? `/${lang}/explorar/senderos/` : `/${lang}/explore/trails/`;
+    const trailBase = isEs ? `/${lang}/explorar/senderos/?slug=` : `/${lang}/explore/trails/?slug=`;
     const waypointCount = Array.isArray(trail.waypoints) ? trail.waypoints.length : 0;
     const distance = trail.distance_km != null
       ? `<span class="flex items-center gap-1"><span>📏</span>${Number(trail.distance_km).toFixed(1)} ${tr.km}</span>`
@@ -213,7 +213,7 @@ const copy = {
           ${distance}
         </div>
         <a
-          href="${trailBase}${trail.id}"
+          href="${trailBase}${encodeURIComponent(trail.id)}"
           class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:underline"
         >
           ${tr.viewTrail} →
@@ -337,8 +337,8 @@ const copy = {
       closeModal();
 
       // Navigate to the new trail page
-      const trailBase = isEs ? `/${lang}/explorar/senderos/` : `/${lang}/explore/trails/`;
-      window.location.href = `${trailBase}${data.id}`;
+      const trailBase = isEs ? `/${lang}/explorar/senderos/?slug=` : `/${lang}/explore/trails/?slug=`;
+      window.location.href = `${trailBase}${encodeURIComponent(data.id)}`;
     } catch (err) {
       console.error('[TrailsView] create error', err);
       errorEl.textContent = tr.errorSave;
