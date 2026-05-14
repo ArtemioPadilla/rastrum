@@ -98,7 +98,8 @@ export async function recordUsage(
   });
   if (insErr) throw new Error(`recordUsage insert failed: ${insErr.message}`);
 
-  const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+  const now = new Date();
+  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
   const { count: usedThisMonth, error: cntErr } = await supabase
     .from('ai_usage')
     .select('id', { count: 'exact', head: true })
@@ -129,7 +130,8 @@ export async function maybeNotifyThreshold(
   const threshold = pickThreshold(pctUsed);
   if (!threshold) return;
 
-  const yearMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+  const now = new Date();
+  const yearMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
     .toISOString().slice(0, 10);
 
   const { error: insErr } = await supabase

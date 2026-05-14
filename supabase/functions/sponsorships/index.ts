@@ -543,7 +543,8 @@ serve(async (req) => {
         .order('year_month', { ascending: false })
         .limit(12);
 
-      const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+      const now = new Date();
+      const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
       const { data: currentMonth } = await supabase
         .from('ai_usage')
         .select('occurred_at, tokens_in, tokens_out')
