@@ -673,6 +673,12 @@ runbooks (`docs/runbooks/falta-dex.md`, `docs/runbooks/contextual-suggestions.md
 |---|---|---|
 | Dynamic `await import('../lib/foo')` 404s as `/<page-path>/lib/foo` (not `/_astro/...`) | `<script define:vars={...}>` implicitly sets `is:inline=true` → no bundling, so the dynamic import ships as raw text and resolves against the page URL | Drop `define:vars`; read state from the DOM (`document.documentElement.lang`) or `data-*` attributes on a wrapper element. CI guard: `scripts/check-define-vars-imports.sh` (wired in `.github/workflows/ci.yml`). Pattern fixed in PRs #825 (kairos/streak-push) and the follow-up (surprises/pool-donate). |
 
+### Pitfalls discovered 2026-05-13 — TZ-determinism in tests
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Unit tests fail locally (CST) but pass in CI (UTC) | Code calls `.getMonth()` / `.getFullYear()` / `.getDate()` on Dates parsed from UTC ISO strings — these are local-TZ accessors. ISO weeks, phenology histograms, and cohort math silently drift by a week/month at year/month boundaries. | Use `.getUTC*()` for any computation meant to be timezone-invariant (ISO weeks, phenology histograms, cohort math, day-of-year). User-facing surfaces (date pickers, seasonal greetings, `todayKey()` for daily caps, `pickSeasonalTheme()`) intentionally use local. Test suite pins `TZ=UTC` via `vitest.config.ts` and Playwright pins `timezoneId: 'UTC'` so future regressions of the same class fail in CI the same way they fail locally. |
+
 ### Pitfalls discovered 2026-05-11 — db-validate gate restoration
 
 These three lessons came out of a single multi-hour session that restored the silently-broken `db-validate` workflow (#1015) and the cascading e2e debt it had hidden (#1018, #1019, #999).
