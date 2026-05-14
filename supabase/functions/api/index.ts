@@ -50,7 +50,7 @@ async function verifyToken(
   return { user_id: data.user_id, scopes: data.scopes };
 }
 
-Deno.serve(async (req: Request) => {
+export async function handler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
 
@@ -315,7 +315,9 @@ Deno.serve(async (req: Request) => {
     console.error('[api] unhandled error', e);
     return json({ error: 'internal_error', detail: (e as Error).message }, 500);
   }
-});
+}
+
+Deno.serve(handler);
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {

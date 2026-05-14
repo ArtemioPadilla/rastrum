@@ -68,7 +68,7 @@ function json(body: unknown, status = 200, req: Request): Response {
   });
 }
 
-serve(async (req) => {
+export async function handler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders(req) });
   if (req.method !== 'POST') return json({ error: 'method not allowed' }, 405, req);
 
@@ -158,4 +158,6 @@ serve(async (req) => {
     await reportFunctionError(admin, 'admin', 'handler_exception', actorId, { op: action }, err);
     return json({ error: (err as Error).message }, 500, req);
   }
-});
+}
+
+serve(handler);
