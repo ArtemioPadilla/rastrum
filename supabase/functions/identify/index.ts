@@ -438,7 +438,7 @@ function corsResponse(body: BodyInit | null, init: ResponseInit = {}): Response 
   return new Response(body, { ...init, headers });
 }
 
-serve(async (req) => {
+export async function handler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
   }
@@ -988,4 +988,6 @@ serve(async (req) => {
   return corsResponse(JSON.stringify(responsePayload), {
     headers: { 'content-type': 'application/json' },
   });
-});
+}
+
+serve(handler);
