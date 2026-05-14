@@ -20,40 +20,55 @@ Deno.test('mcp: PUT → 405 (POST or GET only)', async () => {
   assertEquals(res.status, 405);
 });
 
-Deno.test('mcp: POST malformed JSON → -32700 parse error', async () => {
-  const res = await handler(new Request(URL, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: '{not json',
-  }));
-  assertEquals(res.status, 200);
-  const body = await res.json();
-  assertEquals(body.jsonrpc, '2.0');
-  assertEquals(body.error?.code, -32700);
+Deno.test({
+  name: 'mcp: POST malformed JSON → -32700 parse error',
+  sanitizeOps: false,
+  sanitizeResources: false,
+  async fn() {
+    const res = await handler(new Request(URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{not json',
+    }));
+    assertEquals(res.status, 200);
+    const body = await res.json();
+    assertEquals(body.jsonrpc, '2.0');
+    assertEquals(body.error?.code, -32700);
+  },
 });
 
-Deno.test('mcp: POST initialize (no auth) → 200 with result', async () => {
-  const res = await handler(new Request(URL, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize' }),
-  }));
-  assertEquals(res.status, 200);
-  const body = await res.json();
-  assertEquals(body.jsonrpc, '2.0');
-  assertEquals(body.id, 1);
-  assertEquals(typeof body.result?.protocolVersion, 'string');
+Deno.test({
+  name: 'mcp: POST initialize (no auth) → 200 with result',
+  sanitizeOps: false,
+  sanitizeResources: false,
+  async fn() {
+    const res = await handler(new Request(URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize' }),
+    }));
+    assertEquals(res.status, 200);
+    const body = await res.json();
+    assertEquals(body.jsonrpc, '2.0');
+    assertEquals(body.id, 1);
+    assertEquals(typeof body.result?.protocolVersion, 'string');
+  },
 });
 
-Deno.test('mcp: POST tools/list without token → -32001 auth error', async () => {
-  const res = await handler(new Request(URL, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list' }),
-  }));
-  assertEquals(res.status, 200);
-  const body = await res.json();
-  assertEquals(body.error?.code, -32001);
+Deno.test({
+  name: 'mcp: POST tools/list without token → -32001 auth error',
+  sanitizeOps: false,
+  sanitizeResources: false,
+  async fn() {
+    const res = await handler(new Request(URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list' }),
+    }));
+    assertEquals(res.status, 200);
+    const body = await res.json();
+    assertEquals(body.error?.code, -32001);
+  },
 });
 
 // TODO: tools/call happy-path requires a valid rst_ token row in

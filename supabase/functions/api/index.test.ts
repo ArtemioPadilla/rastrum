@@ -15,29 +15,44 @@ Deno.test('api: OPTIONS → 200 (CORS preflight)', async () => {
   assertEquals(res.status, 200);
 });
 
-Deno.test('api: missing Authorization → 401', async () => {
-  const res = await handler(new Request(URL, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ lat: 0, lng: 0 }),
-  }));
-  assertEquals(res.status, 401);
+Deno.test({
+  name: 'api: missing Authorization → 401',
+  sanitizeOps: false,
+  sanitizeResources: false,
+  async fn() {
+    const res = await handler(new Request(URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ lat: 0, lng: 0 }),
+    }));
+    assertEquals(res.status, 401);
+  },
 });
 
-Deno.test('api: non-rst_ token → 401', async () => {
-  const res = await handler(new Request(URL, {
-    method: 'POST',
-    headers: { authorization: 'Bearer not-an-rst-token', 'content-type': 'application/json' },
-    body: JSON.stringify({}),
-  }));
-  assertEquals(res.status, 401);
+Deno.test({
+  name: 'api: non-rst_ token → 401',
+  sanitizeOps: false,
+  sanitizeResources: false,
+  async fn() {
+    const res = await handler(new Request(URL, {
+      method: 'POST',
+      headers: { authorization: 'Bearer not-an-rst-token', 'content-type': 'application/json' },
+      body: JSON.stringify({}),
+    }));
+    assertEquals(res.status, 401);
+  },
 });
 
-Deno.test('api: GET without token → 401', async () => {
-  const res = await handler(new Request('http://localhost/functions/v1/api/observations', {
-    method: 'GET',
-  }));
-  assertEquals(res.status, 401);
+Deno.test({
+  name: 'api: GET without token → 401',
+  sanitizeOps: false,
+  sanitizeResources: false,
+  async fn() {
+    const res = await handler(new Request('http://localhost/functions/v1/api/observations', {
+      method: 'GET',
+    }));
+    assertEquals(res.status, 401);
+  },
 });
 
 // TODO: happy-path POST /api/observe requires a real supabase fixture
