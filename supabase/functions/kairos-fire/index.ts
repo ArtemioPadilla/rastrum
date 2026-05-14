@@ -157,7 +157,7 @@ function pickLunarEvent(params: {
 }
 
 
-serve(async (req) => {
+export async function handler(req: Request): Promise<Response> {
   const denied = requireCronSecret(req);
   if (denied) return denied;
 
@@ -430,4 +430,6 @@ if (anyOk) {
   return new Response(JSON.stringify({ sent, candidates, errored, total: subs.length, day3_sent: day3Sent, day3_candidates: day3Candidates }), {
     headers: { 'content-type': 'application/json' },
   });
-});
+}
+
+serve(handler);
