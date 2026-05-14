@@ -1,0 +1,223 @@
+---
+/**
+ * Shared body for the PIT landing page — /{en,es}/{explore,explorar}/pits/?slug=<slug>
+ *
+ * Renders one of two modes:
+ *  - detail-shell: when `slug` is non-empty. A client `<script>` block fetches
+ *    the row from `pits` and paints the QR + CTA card.
+ *  - no-slug placeholder: when `slug` is empty (someone landed here directly).
+ *
+ * Both modes are wrapped by the page-level `BaseLayout`; this component owns
+ * only the body markup + client script.
+ */
+import { t } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+  slug: string;
+}
+const { lang, slug } = Astro.props;
+
+type PitLandingTree = {
+  not_found: string;
+  back_to_explore: string;
+  no_slug_heading: string;
+  no_slug_body: string;
+};
+const tr = t(lang) as { pit_landing: PitLandingTree };
+const v = tr.pit_landing;
+---
+{slug ? (
+  <div
+    id="pit-landing-root"
+    data-lang={lang}
+    data-slug={slug}
+    class="max-w-lg mx-auto space-y-6 py-8"
+  >
+    <!-- Loading -->
+    <div id="pit-landing-loading" class="space-y-4 animate-pulse">
+      <div class="h-8 bg-zinc-200 dark:bg-zinc-700 rounded w-2/3"></div>
+      <div class="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-1/2"></div>
+      <div class="h-24 bg-zinc-200 dark:bg-zinc-700 rounded"></div>
+    </div>
+
+    <!-- Content -->
+    <div id="pit-landing-content" class="hidden space-y-6"></div>
+
+    <!-- Error -->
+    <div id="pit-landing-error" class="hidden">
+      <div class="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-4 text-center">
+        <p class="text-sm text-red-600 dark:text-red-400">{v.not_found}</p>
+        <a
+          href={lang === 'es' ? '/es/explorar/' : '/en/explore/'}
+          class="mt-2 inline-block text-xs text-emerald-600 dark:text-emerald-400 hover:underline"
+        >
+          ← {v.back_to_explore}
+        </a>
+      </div>
+    </div>
+  </div>
+) : (
+  <div class="max-w-lg mx-auto py-12 px-4 text-center space-y-4">
+    <h1 class="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
+      {v.no_slug_heading}
+    </h1>
+    <p class="text-sm text-zinc-600 dark:text-zinc-400">
+      {v.no_slug_body}
+    </p>
+    <a
+      href={lang === 'es' ? '/es/explorar/' : '/en/explore/'}
+      class="inline-block text-sm text-emerald-600 dark:text-emerald-400 hover:underline"
+    >
+      ← {v.back_to_explore}
+    </a>
+  </div>
+)}
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+
+  const root = document.getElementById('pit-landing-root');
+  if (root) {
+    const slug = root.dataset.slug ?? '';
+    const lang = root.dataset.lang ?? 'en';
+    const isEs = lang === 'es';
+
+    const loading = document.getElementById('pit-landing-loading')!;
+    const content = document.getElementById('pit-landing-content')!;
+    const errorEl = document.getElementById('pit-landing-error')!;
+
+    function escapeHtml(str: string): string {
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function qrUrl(data: string, size = 200): string {
+      return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(data)}`;
+    }
+
+    async function loadPit(): Promise<void> {
+      if (!slug) { showError(); return; }
+
+      try {
+        const sb = getSupabase();
+        const { data: pit, error } = await sb
+          .from('pits')
+          .select('id,slug,name,name_es,lat,lng,qr_payload,trail_id,created_at')
+          .eq('slug', slug)
+          .single();
+
+        if (error || !pit) { showError(); return; }
+
+        renderPit(pit);
+      } catch (err) {
+        console.error('[PIT landing] error', err);
+        showError();
+      }
+    }
+
+    function showError(): void {
+      loading.classList.add('hidden');
+      errorEl.classList.remove('hidden');
+    }
+
+    function renderPit(pit: {
+      id: string;
+      slug: string;
+      name: string;
+      name_es?: string;
+      lat: number;
+      lng: number;
+      qr_payload: string;
+      trail_id?: string | null;
+      created_at: string;
+    }): void {
+      const displayName = isEs && pit.name_es ? pit.name_es : pit.name;
+      const observeBase = isEs ? `/${lang}/observar/` : `/${lang}/observe/`;
+      const observeUrl = `${observeBase}?lat=${pit.lat}&lng=${pit.lng}&pit=${encodeURIComponent(pit.slug)}`;
+      const trailUrl = pit.trail_id
+        ? (isEs ? `/${lang}/explorar/senderos/${pit.trail_id}` : `/${lang}/explore/trails/${pit.trail_id}`)
+        : null;
+      const qr = qrUrl(pit.qr_payload || window.location.href, 200);
+
+      content.innerHTML = `
+        <!-- PIT badge -->
+        <div class="text-center space-y-1">
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 text-xs font-medium">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+            ${isEs ? 'Punto de Información Territorial' : 'Territorial Information Point'}
+          </div>
+          <h1 class="text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 pt-2">
+            ${escapeHtml(displayName)}
+          </h1>
+          <p class="text-sm font-mono text-zinc-400">/${escapeHtml(pit.slug)}</p>
+          <p class="text-xs text-zinc-500">
+            📍 ${Number(pit.lat).toFixed(5)}, ${Number(pit.lng).toFixed(5)}
+          </p>
+        </div>
+
+        <!-- QR code -->
+        <div class="flex flex-col items-center gap-3">
+          <img
+            src="${escapeHtml(qr)}"
+            alt="QR ${escapeHtml(displayName)}"
+            width="200"
+            height="200"
+            class="rounded-xl border-2 border-zinc-200 dark:border-zinc-700 shadow-md"
+          />
+          <a
+            href="${escapeHtml(qr)}"
+            download="qr-${escapeHtml(pit.slug)}.png"
+            class="text-xs text-emerald-600 dark:text-emerald-400 hover:underline"
+          >
+            ${isEs ? '⬇ Descargar QR' : '⬇ Download QR'}
+          </a>
+        </div>
+
+        <!-- CTA: Record an observation here -->
+        <div class="rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 p-5 text-center space-y-3">
+          <p class="text-sm text-emerald-700 dark:text-emerald-300 font-medium">
+            ${isEs ? '¿Viste algo interesante aquí?' : 'Did you spot something interesting here?'}
+          </p>
+          <a
+            href="${escapeHtml(observeUrl)}"
+            class="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm transition-colors shadow-sm"
+          >
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+            </svg>
+            ${isEs ? 'Registrar observación' : 'Record observation'}
+          </a>
+        </div>
+
+        <!-- Trail link if attached -->
+        ${trailUrl ? `
+        <div class="text-center">
+          <a
+            href="${trailUrl}"
+            class="inline-flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+          >
+            🗺️ ${isEs ? 'Ver el sendero completo →' : 'View full trail →'}
+          </a>
+        </div>` : ''}
+
+        <!-- Back to explore -->
+        <div class="text-center pt-2">
+          <a
+            href="/${lang}/${isEs ? 'explorar' : 'explore'}/"
+            class="text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+          >
+            ← ${isEs ? 'Explorar Rastrum' : 'Explore Rastrum'}
+          </a>
+        </div>
+      `;
+
+      loading.classList.add('hidden');
+      content.classList.remove('hidden');
+    }
+
+    loadPit();
+  }
+</script>

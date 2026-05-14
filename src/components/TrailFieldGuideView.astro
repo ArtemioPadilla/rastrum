@@ -1,0 +1,273 @@
+---
+/**
+ * TrailFieldGuideView — shared standalone print page for trail field guides.
+ *
+ * Renders the full HTML document (doctype, html, head, body, inline script)
+ * for `/{en,es}/{explore,explorar}/{trails,senderos}/{field-guide,guia-de-campo}/?slug=<id>`.
+ *
+ * Both EN + ES pages are thin wrappers that just render `<TrailFieldGuideView lang slug />`.
+ * All user-visible strings come from `tr.field_guide.*` to enforce EN/ES parity.
+ */
+import { t } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+  slug: string;
+}
+
+const { lang, slug } = Astro.props;
+
+type FieldGuideTree = {
+  page_title: string;
+  print_button: string;
+  back_link: string;
+  loading: string;
+  not_found: string;
+  subtitle: string;
+  created: string;
+  species: string;
+  observations: string;
+  waypoints: string;
+  km: string;
+  waypoints_heading: string;
+  notes_heading: string;
+  col_num: string;
+  col_name: string;
+  col_lat: string;
+  col_lng: string;
+  col_obs: string;
+  no_waypoints: string;
+  footer_generated: string;
+  footer_suffix: string;
+  title_suffix: string;
+};
+const tr = t(lang) as { field_guide: FieldGuideTree };
+const fg = tr.field_guide;
+
+const trailHref = lang === 'es'
+  ? `/es/explorar/senderos/?slug=${encodeURIComponent(slug)}`
+  : `/en/explore/trails/?slug=${encodeURIComponent(slug)}`;
+
+const dateLocale = lang === 'es' ? 'es-MX' : 'en-US';
+---
+<!DOCTYPE html>
+<html lang={lang}>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>{fg.page_title}</title>
+  <style>
+    /* ── Base ── */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Georgia', 'Times New Roman', serif;
+      font-size: 11pt;
+      line-height: 1.55;
+      color: #1a1a1a;
+      background: #fff;
+      padding: 2cm 2.5cm;
+      max-width: 21cm;
+      margin: 0 auto;
+    }
+    h1 { font-size: 22pt; margin-bottom: 4pt; }
+    h2 { font-size: 13pt; border-bottom: 1px solid #ccc; padding-bottom: 4pt; margin: 20pt 0 8pt; color: #1a3a1a; }
+    p  { margin-bottom: 6pt; }
+    .field-guide-header {
+      border: 2px solid #1a3a1a;
+      border-radius: 4px;
+      padding: 16pt 20pt;
+      margin-bottom: 20pt;
+    }
+    .field-guide-header .subtitle {
+      font-size: 9pt;
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 6pt;
+    }
+    .field-guide-header .meta { font-size: 9.5pt; color: #444; margin-top: 10pt; }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(100pt, 1fr));
+      gap: 8pt;
+      margin-bottom: 20pt;
+    }
+    .stat-box { border: 1px solid #ccc; border-radius: 4px; padding: 8pt; text-align: center; }
+    .stat-box .value { font-size: 18pt; font-weight: bold; color: #1a5c1a; }
+    .stat-box .label { font-size: 8.5pt; color: #666; text-transform: uppercase; letter-spacing: 0.04em; }
+    table { width: 100%; border-collapse: collapse; font-size: 9.5pt; }
+    th { background: #1a3a1a; color: #fff; padding: 5pt 7pt; text-align: left; font-size: 8.5pt; text-transform: uppercase; letter-spacing: 0.04em; }
+    td { padding: 5pt 7pt; border-bottom: 1px solid #e5e5e5; }
+    tr:nth-child(even) td { background: #f8f8f4; }
+    .mono { font-family: 'Courier New', monospace; font-size: 8.5pt; }
+    .notes-lines .line { border-bottom: 1px dotted #bbb; height: 20pt; }
+    .field-guide-footer { margin-top: 24pt; padding-top: 10pt; border-top: 1px solid #ccc; font-size: 8pt; color: #888; text-align: center; }
+    #loading { padding: 40pt; text-align: center; color: #888; font-style: italic; }
+
+    /* ── Print ── */
+    @media print {
+      body { padding: 1.5cm 2cm; }
+      .no-print { display: none !important; }
+      h2 { page-break-after: avoid; }
+      table { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body
+  data-lang={lang}
+  data-date-locale={dateLocale}
+  data-subtitle={fg.subtitle}
+  data-created={fg.created}
+  data-species={fg.species}
+  data-observations={fg.observations}
+  data-waypoints={fg.waypoints}
+  data-km={fg.km}
+  data-waypoints-heading={fg.waypoints_heading}
+  data-notes-heading={fg.notes_heading}
+  data-col-num={fg.col_num}
+  data-col-name={fg.col_name}
+  data-col-lat={fg.col_lat}
+  data-col-lng={fg.col_lng}
+  data-col-obs={fg.col_obs}
+  data-no-waypoints={fg.no_waypoints}
+  data-footer-generated={fg.footer_generated}
+  data-footer-suffix={fg.footer_suffix}
+  data-title-suffix={fg.title_suffix}
+>
+
+  <div class="no-print" style="text-align:right; margin-bottom: 12pt;">
+    <button
+      onclick="window.print()"
+      style="padding: 6pt 14pt; background: #1a5c1a; color: #fff; border: none; border-radius: 4px; font-size: 10pt; cursor: pointer; margin-right: 8pt;"
+    >
+      🖨️ {fg.print_button}
+    </button>
+    <a
+      href={trailHref}
+      style="font-size: 9.5pt; color: #1a5c1a; text-decoration: none;"
+    >
+      ← {fg.back_link}
+    </a>
+  </div>
+
+  <div id="loading">{fg.loading}</div>
+  <div id="field-guide-content" style="display:none;"></div>
+  <div id="field-guide-error" style="display:none; color: #c00;">{fg.not_found}</div>
+
+</body>
+<script>
+  const slug = new URLSearchParams(window.location.search).get('slug') ?? '';
+  const body = document.body;
+  const lang = body.dataset.lang ?? 'en';
+  const dateLocale = body.dataset.dateLocale ?? 'en-US';
+  const L = {
+    subtitle:          body.dataset.subtitle          ?? '',
+    created:           body.dataset.created           ?? '',
+    species:           body.dataset.species           ?? '',
+    observations:      body.dataset.observations      ?? '',
+    waypoints:         body.dataset.waypoints         ?? '',
+    km:                body.dataset.km                ?? '',
+    waypointsHeading:  body.dataset.waypointsHeading  ?? '',
+    notesHeading:      body.dataset.notesHeading      ?? '',
+    colNum:            body.dataset.colNum            ?? '',
+    colName:           body.dataset.colName           ?? '',
+    colLat:            body.dataset.colLat            ?? '',
+    colLng:            body.dataset.colLng            ?? '',
+    colObs:            body.dataset.colObs            ?? '',
+    noWaypoints:       body.dataset.noWaypoints       ?? '',
+    footerGenerated:   body.dataset.footerGenerated   ?? '',
+    footerSuffix:      body.dataset.footerSuffix      ?? '',
+    titleSuffix:       body.dataset.titleSuffix       ?? '',
+  };
+
+  type Waypoint = { name?: string | null; lat: number | string; lng: number | string; obs_count?: number };
+  type Trail = {
+    name: string;
+    name_es?: string | null;
+    created_at: string;
+    distance_km?: number | null;
+    total_species: number;
+    total_observations: number;
+    waypoints?: Waypoint[];
+  };
+
+  async function loadFieldGuide() {
+    if (!slug) { showError(); return; }
+    try {
+      const { getSupabase } = await import('../lib/supabase');
+      const sb = getSupabase();
+      const { data: trail, error } = await sb
+        .from('trails')
+        .select('*')
+        .eq('id', slug)
+        .single();
+      if (error || !trail) { showError(); return; }
+      renderFieldGuide(trail as Trail);
+    } catch (err) {
+      console.error(err);
+      window.location.href = `/functions/v1/export-trail-pdf?trail_id=${encodeURIComponent(slug)}&lang=${lang}`;
+    }
+  }
+
+  function escHtml(str: unknown): string {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function renderFieldGuide(trail: Trail) {
+    const waypoints = Array.isArray(trail.waypoints) ? trail.waypoints : [];
+    const date = new Date(trail.created_at).toLocaleDateString(dateLocale, { year:'numeric', month:'long', day:'numeric' });
+    const displayName = (lang === 'es' ? (trail.name_es ?? trail.name) : trail.name);
+    const waypointRows = waypoints.map((wp, i) => `
+      <tr>
+        <td>${i+1}</td>
+        <td>${escHtml(wp.name ?? 'WP '+(i+1))}</td>
+        <td class="mono">${Number(wp.lat).toFixed(5)}</td>
+        <td class="mono">${Number(wp.lng).toFixed(5)}</td>
+        <td>${wp.obs_count ?? 0}</td>
+      </tr>
+    `).join('');
+
+    const contentEl = document.getElementById('field-guide-content');
+    if (!contentEl) return;
+    contentEl.innerHTML = `
+      <div class="field-guide-header">
+        <div class="subtitle">${escHtml(L.subtitle)}</div>
+        <h1>${escHtml(displayName)}</h1>
+        <div class="meta">${escHtml(L.created)}: ${date}${trail.distance_km != null ? ` · ${Number(trail.distance_km).toFixed(1)} ${escHtml(L.km)}` : ''}</div>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-box"><div class="value">${trail.total_species}</div><div class="label">${escHtml(L.species)}</div></div>
+        <div class="stat-box"><div class="value">${trail.total_observations}</div><div class="label">${escHtml(L.observations)}</div></div>
+        <div class="stat-box"><div class="value">${waypoints.length}</div><div class="label">${escHtml(L.waypoints)}</div></div>
+        ${trail.distance_km != null ? `<div class="stat-box"><div class="value">${Number(trail.distance_km).toFixed(1)}</div><div class="label">${escHtml(L.km)}</div></div>` : ''}
+      </div>
+      <h2>${escHtml(L.waypointsHeading)}</h2>
+      ${waypoints.length > 0 ? `
+      <table>
+        <thead><tr><th>${escHtml(L.colNum)}</th><th>${escHtml(L.colName)}</th><th>${escHtml(L.colLat)}</th><th>${escHtml(L.colLng)}</th><th>${escHtml(L.colObs)}</th></tr></thead>
+        <tbody>${waypointRows}</tbody>
+      </table>` : `<p style="color:#888;font-style:italic;">${escHtml(L.noWaypoints)}</p>`}
+      <div class="notes-section" style="margin-top:24pt;">
+        <h2>${escHtml(L.notesHeading)}</h2>
+        <div class="notes-lines">${Array(10).fill('<div class="line"></div>').join('')}</div>
+      </div>
+      <div class="field-guide-footer">
+        ${escHtml(L.footerGenerated)} ${new Date().toLocaleDateString(dateLocale)} ${escHtml(L.footerSuffix)}
+      </div>
+    `;
+
+    document.getElementById('loading')!.style.display = 'none';
+    contentEl.style.display = '';
+    document.title = `${displayName} ${L.titleSuffix}`;
+  }
+
+  function showError() {
+    const loadingEl = document.getElementById('loading');
+    if (loadingEl) loadingEl.style.display = 'none';
+    const errEl = document.getElementById('field-guide-error');
+    if (errEl) errEl.style.display = '';
+  }
+
+  loadFieldGuide();
+</script>
+</html>

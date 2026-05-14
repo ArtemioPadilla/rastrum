@@ -1,0 +1,233 @@
+---
+/**
+ * TrailDetailView.astro — Biodiversity trail detail shell (issue #1050).
+ *
+ * Consumed by both:
+ *   - /en/explore/trails/?slug=<id>
+ *   - /es/explorar/senderos/?slug=<id>
+ *
+ * The detail body is fetched client-side from `public.trails` and rendered
+ * into `#trail-detail-content`. Labels are passed to the client script via
+ * `data-l-*` attributes on the root element so the script stays
+ * locale-agnostic (no `define:vars` — see CLAUDE.md 2026-05-09 pitfall).
+ */
+import { t } from '../i18n/utils';
+
+interface Props {
+  lang: 'en' | 'es';
+  slug: string;
+}
+
+const { lang, slug } = Astro.props;
+
+type TrailDetailTree = {
+  not_found: string;
+  created: string;
+  public: string;
+  private: string;
+  species: string;
+  observations: string;
+  waypoints_stat: string;
+  name: string;
+  obs: string;
+  no_waypoints: string;
+  field_guide: string;
+};
+const tr = t(lang) as { trail_detail: TrailDetailTree };
+const td = tr.trail_detail;
+---
+
+<div
+  id="trail-detail-root"
+  data-lang={lang}
+  data-slug={slug}
+  data-l-created={td.created}
+  data-l-public={td.public}
+  data-l-private={td.private}
+  data-l-species={td.species}
+  data-l-observations={td.observations}
+  data-l-waypoints-stat={td.waypoints_stat}
+  data-l-name={td.name}
+  data-l-obs={td.obs}
+  data-l-no-waypoints={td.no_waypoints}
+  data-l-field-guide={td.field_guide}
+  class="space-y-6"
+>
+
+  <!-- Loading state -->
+  <div id="trail-detail-loading">
+    <div class="animate-pulse space-y-4">
+      <div class="h-8 bg-zinc-200 dark:bg-zinc-700 rounded w-1/2"></div>
+      <div class="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-1/3"></div>
+      <div class="h-32 bg-zinc-200 dark:bg-zinc-700 rounded"></div>
+    </div>
+  </div>
+
+  <!-- Content rendered by client script -->
+  <div id="trail-detail-content" class="hidden space-y-6"></div>
+
+  <!-- Error state -->
+  <div id="trail-detail-error" class="hidden">
+    <p class="text-sm text-red-500">{td.not_found}</p>
+  </div>
+
+</div>
+
+<script>
+  import { getSupabase } from '../lib/supabase';
+
+  const root = document.getElementById('trail-detail-root');
+  if (root) {
+    const slug = root.dataset.slug ?? '';
+    const lang = root.dataset.lang ?? 'en';
+    const isEs = lang === 'es';
+
+    const L = {
+      created:      root.dataset.lCreated      ?? 'Created',
+      public:       root.dataset.lPublic       ?? 'Public',
+      private:      root.dataset.lPrivate      ?? 'Private',
+      species:      root.dataset.lSpecies      ?? 'Species',
+      observations: root.dataset.lObservations ?? 'Observations',
+      waypointsStat:root.dataset.lWaypointsStat?? 'Waypoints',
+      name:         root.dataset.lName         ?? 'Name',
+      obs:          root.dataset.lObs          ?? 'Obs',
+      noWaypoints:  root.dataset.lNoWaypoints  ?? 'No waypoints recorded yet.',
+      fieldGuide:   root.dataset.lFieldGuide   ?? 'Field Guide',
+    };
+
+    const loading = document.getElementById('trail-detail-loading')!;
+    const content = document.getElementById('trail-detail-content')!;
+    const errorEl = document.getElementById('trail-detail-error')!;
+
+    async function loadTrail(): Promise<void> {
+      if (!slug) {
+        showError();
+        return;
+      }
+
+      try {
+        const sb = getSupabase();
+        const { data: trail, error } = await sb
+          .from('trails')
+          .select('*')
+          .eq('id', slug)
+          .single();
+
+        if (error || !trail) {
+          showError();
+          return;
+        }
+
+        renderTrail(trail);
+      } catch (err) {
+        console.error('[TrailDetail] load error', err);
+        showError();
+      }
+    }
+
+    function showError(): void {
+      loading.classList.add('hidden');
+      errorEl.classList.remove('hidden');
+    }
+
+    function escapeHtml(str: string): string {
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function renderTrail(trail: {
+      id: string;
+      name: string;
+      name_es?: string;
+      total_species: number;
+      total_observations: number;
+      waypoints: { lat: number; lng: number; name?: string; obs_count?: number }[];
+      distance_km?: number | null;
+      created_at: string;
+      visibility: string;
+    }): void {
+      const displayName = isEs && trail.name_es ? trail.name_es : trail.name;
+      const waypoints = Array.isArray(trail.waypoints) ? trail.waypoints : [];
+      const fieldGuideBase = isEs ? `/${lang}/explorar/senderos/guia-de-campo/?slug=` : `/${lang}/explore/trails/field-guide/?slug=`;
+      const fieldGuideHref = `${fieldGuideBase}${encodeURIComponent(trail.id)}`;
+
+      const waypointRows = waypoints.map((wp, i) => `
+        <tr class="border-t border-zinc-100 dark:border-zinc-800">
+          <td class="py-2 px-3 text-xs text-zinc-500">${i + 1}</td>
+          <td class="py-2 px-3 text-xs text-zinc-700 dark:text-zinc-300">${escapeHtml(wp.name ?? `WP ${i + 1}`)}</td>
+          <td class="py-2 px-3 text-xs font-mono text-zinc-500">${Number(wp.lat).toFixed(5)}</td>
+          <td class="py-2 px-3 text-xs font-mono text-zinc-500">${Number(wp.lng).toFixed(5)}</td>
+          <td class="py-2 px-3 text-xs text-zinc-500">${wp.obs_count ?? 0}</td>
+        </tr>
+      `).join('');
+
+      content.innerHTML = `
+        <!-- Trail header -->
+        <div class="space-y-1">
+          <h1 class="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+            ${escapeHtml(displayName)}
+          </h1>
+          <p class="text-xs text-zinc-400">
+            ${L.created} ${new Date(trail.created_at).toLocaleDateString(isEs ? 'es-MX' : 'en-US')}
+            · ${trail.visibility === 'public' ? L.public : L.private}
+          </p>
+        </div>
+
+        <!-- Stats row -->
+        <div class="flex flex-wrap gap-4">
+          <div class="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-4 py-3 text-center min-w-[80px]">
+            <p class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">${trail.total_species}</p>
+            <p class="text-xs text-zinc-500 mt-0.5">${L.species}</p>
+          </div>
+          <div class="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-4 py-3 text-center min-w-[80px]">
+            <p class="text-2xl font-bold text-blue-600 dark:text-blue-400">${trail.total_observations}</p>
+            <p class="text-xs text-zinc-500 mt-0.5">${L.observations}</p>
+          </div>
+          <div class="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-4 py-3 text-center min-w-[80px]">
+            <p class="text-2xl font-bold text-zinc-700 dark:text-zinc-200">${waypoints.length}</p>
+            <p class="text-xs text-zinc-500 mt-0.5">${L.waypointsStat}</p>
+          </div>
+          ${trail.distance_km != null ? `
+          <div class="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-4 py-3 text-center min-w-[80px]">
+            <p class="text-2xl font-bold text-zinc-700 dark:text-zinc-200">${Number(trail.distance_km).toFixed(1)}</p>
+            <p class="text-xs text-zinc-500 mt-0.5">km</p>
+          </div>` : ''}
+        </div>
+
+        <!-- Waypoints table -->
+        ${waypoints.length > 0 ? `
+        <div class="rounded-xl border border-zinc-200 dark:border-zinc-700 overflow-hidden">
+          <table class="w-full text-left">
+            <thead class="bg-zinc-50 dark:bg-zinc-800">
+              <tr>
+                <th class="py-2 px-3 text-[11px] font-semibold text-zinc-500 uppercase tracking-wide">#</th>
+                <th class="py-2 px-3 text-[11px] font-semibold text-zinc-500 uppercase tracking-wide">${L.name}</th>
+                <th class="py-2 px-3 text-[11px] font-semibold text-zinc-500 uppercase tracking-wide">Lat</th>
+                <th class="py-2 px-3 text-[11px] font-semibold text-zinc-500 uppercase tracking-wide">Lng</th>
+                <th class="py-2 px-3 text-[11px] font-semibold text-zinc-500 uppercase tracking-wide">${L.obs}</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${waypointRows}
+            </tbody>
+          </table>
+        </div>` : `<p class="text-sm text-zinc-400">${L.noWaypoints}</p>`}
+
+        <!-- Actions -->
+        <div class="flex flex-wrap gap-3">
+          <a
+            href="${fieldGuideHref}"
+            class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+          >
+            <span>📋</span>
+            ${L.fieldGuide}
+          </a>
+        </div>
+      `;
+
+      loading.classList.add('hidden');
+      content.classList.remove('hidden');
+    }
+
+    loadTrail();
+  }
+</script>
