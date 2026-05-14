@@ -20,21 +20,36 @@ Deno.test('tokens: OPTIONS preflight → 200 with CORS', async () => {
   assertEquals(res.headers.get('Access-Control-Allow-Origin'), '*');
 });
 
-Deno.test('tokens: GET without Authorization → 401', async () => {
-  const res = await handler(new Request('http://localhost/tokens', { method: 'GET' }));
-  assertEquals(res.status, 401);
-  const body = await res.json();
-  assertEquals(body.error, 'Missing Authorization header');
+Deno.test({
+  name: 'tokens: GET without Authorization → 401',
+  sanitizeOps: false,
+  sanitizeResources: false,
+  async fn() {
+    const res = await handler(new Request('http://localhost/tokens', { method: 'GET' }));
+    assertEquals(res.status, 401);
+    const body = await res.json();
+    assertEquals(body.error, 'Missing Authorization header');
+  },
 });
 
-Deno.test('tokens: POST without Authorization → 401', async () => {
-  const res = await handler(new Request('http://localhost/tokens', { method: 'POST', body: '{}' }));
-  assertEquals(res.status, 401);
+Deno.test({
+  name: 'tokens: POST without Authorization → 401',
+  sanitizeOps: false,
+  sanitizeResources: false,
+  async fn() {
+    const res = await handler(new Request('http://localhost/tokens', { method: 'POST', body: '{}' }));
+    assertEquals(res.status, 401);
+  },
 });
 
-Deno.test('tokens: DELETE without Authorization → 401', async () => {
-  const res = await handler(new Request('http://localhost/tokens/abc', { method: 'DELETE' }));
-  assertEquals(res.status, 401);
+Deno.test({
+  name: 'tokens: DELETE without Authorization → 401',
+  sanitizeOps: false,
+  sanitizeResources: false,
+  async fn() {
+    const res = await handler(new Request('http://localhost/tokens/abc', { method: 'DELETE' }));
+    assertEquals(res.status, 401);
+  },
 });
 
 Deno.test.ignore('tokens: POST with valid JWT creates rst_* token', () => {
