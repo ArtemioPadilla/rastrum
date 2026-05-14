@@ -32,7 +32,7 @@ function buildProfileUrl(
 
 /** Get month_date string for a given date (first day of month). */
 function getMonthDate(d: Date = new Date()): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-01`;
 }
 
 /** Resolve display name: prefer display_name, fallback to username. */
