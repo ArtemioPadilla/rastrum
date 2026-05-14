@@ -18,7 +18,7 @@
  */
 export function cohortWeek(date: Date = new Date()): string {
   // ISO week: Monday=1 … Sunday=7
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
   const dayNum = d.getUTCDay() || 7; // 0 (Sun) → 7
   d.setUTCDate(d.getUTCDate() + 4 - dayNum); // shift to Thursday of same week
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
