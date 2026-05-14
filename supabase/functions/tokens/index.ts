@@ -31,7 +31,7 @@ function generateToken(): string {
   return `rst_${hex}`;
 }
 
-Deno.serve(async (req: Request) => {
+export async function handler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -119,7 +119,9 @@ Deno.serve(async (req: Request) => {
   }
 
   return json({ error: 'Not found' }, 404);
-});
+}
+
+Deno.serve(handler);
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
