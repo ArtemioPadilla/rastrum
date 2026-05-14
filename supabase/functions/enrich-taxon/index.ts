@@ -126,7 +126,7 @@ async function enrichOne(db: SupabaseClient, row: TaxaRow): Promise<{ ok: boolea
 
 async function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 
-serve(async (req) => {
+export async function handler(req: Request): Promise<Response> {
   if (!authOk(req)) return new Response('forbidden', { status: 403 });
 
   const url = Deno.env.get('SUPABASE_URL');
@@ -177,4 +177,6 @@ serve(async (req) => {
     enriched,
     errors: errors.length ? errors.slice(0, 20) : undefined,
   }), { headers: { 'content-type': 'application/json' } });
-});
+}
+
+serve(handler);
