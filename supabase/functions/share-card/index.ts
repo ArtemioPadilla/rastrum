@@ -31,7 +31,7 @@ function withCors(headers: HeadersInit = {}): HeadersInit {
   return out;
 }
 
-serve(async (req) => {
+export async function handler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
   }
@@ -181,4 +181,6 @@ serve(async (req) => {
       headers: { 'content-type': 'application/json', ...CORS_HEADERS },
     });
   }
-});
+}
+
+serve(handler);
