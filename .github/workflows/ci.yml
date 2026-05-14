@@ -40,6 +40,20 @@ jobs:
       - name: Unit tests (Vitest)
         run: npm test
 
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v1.x
+
+      - name: Edge Function contract tests (Deno)
+        # --no-check because EF files import from `npm:` and remote URLs
+        # whose types we don't ship locally; typechecking them would force
+        # network fetches at test time. The contract tests assert
+        # request-shape behaviour at the handler boundary — type
+        # correctness is enforced by tsc on the PWA side and by deploy
+        # smoke on the EF side (issue #1031 Tier 1a).
+        run: npm run test:functions
+
       - name: CLI build + tests (cli/, M30)
         # Skipped if cli/ is missing on the branch; otherwise installs,
         # builds, and runs the Node native test runner. Matches what
