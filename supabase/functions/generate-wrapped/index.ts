@@ -29,7 +29,7 @@ interface WrappedPayload {
   generated_at: string;
 }
 
-serve(async (req) => {
+export async function handler(req: Request): Promise<Response> {
   // Auth: the caller must be authenticated (JWT checked by Supabase gateway)
   const authHeader = req.headers.get('Authorization');
   if (!authHeader?.startsWith('Bearer ')) {
@@ -245,4 +245,6 @@ serve(async (req) => {
   return new Response(JSON.stringify(payload), {
     headers: { 'content-type': 'application/json', 'x-cache': 'MISS' },
   });
-});
+}
+
+serve(handler);

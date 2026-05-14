@@ -46,7 +46,7 @@ type StripeEvent = {
   data: { object: Record<string, unknown> };
 };
 
-serve(async (req) => {
+export async function handler(req: Request): Promise<Response> {
   if (req.method !== 'POST') return new Response('method not allowed', { status: 405 });
   const secret = Deno.env.get('STRIPE_WEBHOOK_SECRET');
   if (!secret) return new Response('not configured', { status: 503 });
@@ -91,4 +91,6 @@ serve(async (req) => {
 
   // Unhandled event type — Stripe expects 2xx so we don't get retried.
   return new Response('ignored', { status: 200 });
-});
+}
+
+serve(handler);
