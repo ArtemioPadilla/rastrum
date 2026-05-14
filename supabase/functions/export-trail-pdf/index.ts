@@ -26,7 +26,7 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'authorization, content-type',
 };
 
-serve(async (req: Request) => {
+export async function handler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: CORS_HEADERS });
   }
@@ -80,7 +80,9 @@ serve(async (req: Request) => {
       'Cache-Control': 'no-store',
     },
   });
-});
+}
+
+serve(handler);
 
 // ---------------------------------------------------------------------------
 // HTML builder

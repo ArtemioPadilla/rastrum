@@ -70,7 +70,7 @@ function textResponse(body: string, status: number): Response {
   });
 }
 
-serve(async (req) => {
+export async function handler(req: Request): Promise<Response> {
   // Preflight — must return CORS headers and a 2xx status BEFORE the
   // browser will dispatch the actual POST.
   if (req.method === 'OPTIONS') {
@@ -150,4 +150,6 @@ serve(async (req) => {
   const publicUrl = `${env('R2_PUBLIC_URL')!.replace(/\/$/, '')}/${safe}`;
 
   return jsonResponse({ uploadUrl: signedUrl, publicUrl, expiresIn: 300 });
-});
+}
+
+serve(handler);
