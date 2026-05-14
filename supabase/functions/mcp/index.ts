@@ -373,7 +373,7 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-Deno.serve(async (req: Request) => {
+export async function handler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   // ── SSE keep-alive for clients that require GET-based SSE transport ──────
@@ -512,4 +512,6 @@ Deno.serve(async (req: Request) => {
   }
 
   return rpcError(body.id, -32601, `Method not found: ${body.method}`);
-});
+}
+
+Deno.serve(handler);
