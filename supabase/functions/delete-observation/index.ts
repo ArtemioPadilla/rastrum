@@ -64,7 +64,7 @@ function urlToKey(url: string, publicBase: string | null): string | null {
   }
 }
 
-serve(async (req) => {
+export async function handler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
   }
@@ -176,4 +176,6 @@ serve(async (req) => {
     r2_deleted: r2Deleted,
     r2_errors: r2Errors,
   });
-});
+}
+
+serve(handler);

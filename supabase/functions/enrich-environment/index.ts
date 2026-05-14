@@ -49,12 +49,17 @@ function corsResponse(body: BodyInit | null, init: ResponseInit = {}): Response 
   return new Response(body, { ...init, headers });
 }
 
-serve(async (req) => {
+export async function handler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
   }
   if (req.method !== 'POST') return corsResponse('Method not allowed', { status: 405 });
-  const body = await req.json() as Req;
+  let body: Req;
+  try {
+    body = (await req.json()) as Req;
+  } catch {
+    return corsResponse('Invalid JSON', { status: 400 });
+  }
   if (!body?.observation_id) return corsResponse('Missing observation_id', { status: 400 });
 
   const url = Deno.env.get('SUPABASE_URL');
@@ -112,4 +117,6 @@ serve(async (req) => {
   return corsResponse(JSON.stringify({ ok: true, lunar, precip24, tempMean }), {
     headers: { 'content-type': 'application/json' },
   });
-});
+}
+
+serve(handler);

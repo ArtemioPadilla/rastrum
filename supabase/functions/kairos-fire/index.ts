@@ -157,7 +157,7 @@ function pickLunarEvent(params: {
 }
 
 
-serve(async (req) => {
+export async function handler(req: Request): Promise<Response> {
   const denied = requireCronSecret(req);
   if (denied) return denied;
 
@@ -396,7 +396,7 @@ if (anyOk) {
           : { title: 'After the rain 🌿', body: 'Time to see what emerged.', url: '/en/observe/' })
       : (tz.startsWith('America')
           ? { title: 'Evento lunar esta noche 🌕', body: '¿Qué está activo en la oscuridad?', url: '/es/observar/' }
-          : { title: 'Lunar event tonight 🌕', body: 'What's active in the dark?', url: '/en/observe/' });
+          : { title: 'Lunar event tonight 🌕', body: "What's active in the dark?", url: '/en/observe/' });
 
     for (const p of userPushes) {
       try {
@@ -430,4 +430,6 @@ if (anyOk) {
   return new Response(JSON.stringify({ sent, candidates, errored, total: subs.length, day3_sent: day3Sent, day3_candidates: day3Candidates }), {
     headers: { 'content-type': 'application/json' },
   });
-});
+}
+
+serve(handler);
