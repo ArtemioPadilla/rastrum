@@ -1,17 +1,16 @@
 /**
  * #464 — Species Explorer Phase 3
  *
- * Tests for community hero photo voting, ID leaderboards, and phenology charts
- * on the species profile page.
- *
- * Pure-logic tests:
+ * Pure-logic tests for community hero photo voting features:
  * - Phenology month-aggregation from observation dates
  * - ID leaderboard grouping and sorting
- * - HTML structure of SpeciesProfileView
+ *
+ * (HTML-structure assertions for the standalone SpeciesProfileView component
+ * were removed when the component was deleted as part of #1047 — the species
+ * detail surface is now served by ExploreSpeciesView's client-side mode-switch
+ * on `?slug=`.)
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'fs';
-import { resolve } from 'path';
 
 // ── Phenology aggregation helper (re-implemented from SpeciesProfileView) ──
 
@@ -122,40 +121,5 @@ describe('#464 — ID leaderboard', () => {
     const board = buildLeaderboard(rows);
     expect(board).toHaveLength(1);
     expect(board[0].count).toBe(10);
-  });
-});
-
-// ── HTML structure checks for SpeciesProfileView ─────────────────────────
-const speciesSrc = readFileSync(
-  resolve(process.cwd(), 'src/components/SpeciesProfileView.astro'),
-  'utf-8',
-);
-
-describe('#464 — SpeciesProfileView structure', () => {
-  it('has phenology chart section', () => {
-    expect(speciesSrc).toContain('id="sp-phenology-section"');
-    expect(speciesSrc).toContain('id="sp-phenology-chart"');
-  });
-
-  it('renders phenology as SVG', () => {
-    expect(speciesSrc).toContain('createElementNS');
-    expect(speciesSrc).toContain("'svg'");
-  });
-
-  it('has ID leaderboard section', () => {
-    expect(speciesSrc).toContain('id="sp-id-leaderboard-section"');
-    expect(speciesSrc).toContain('id="sp-id-leaderboard"');
-  });
-
-  it('queries identifications for leaderboard', () => {
-    expect(speciesSrc).toContain("'identifications'");
-  });
-
-  it('has best-shot nomination section', () => {
-    expect(speciesSrc).toContain('id="sp-best-shot-section"');
-  });
-
-  it('leaderboard shows top 5', () => {
-    expect(speciesSrc).toContain('.slice(0, 5)');
   });
 });
