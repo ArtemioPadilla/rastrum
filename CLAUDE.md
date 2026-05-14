@@ -887,3 +887,7 @@ scope (auth flows, identifier cascade, real SW caching).
 
 The Playwright preview server uses port `4329` to avoid colliding with a
 stray `astro dev` on `4321`. Override with `E2E_PORT=…` if needed.
+
+CI time budgets, retry rules per layer, the flake-quarantine convention
+(`*.flaky.spec.ts` / `*.flaky.test.ts`), and the current required-vs-informational
+check matrix live in [`docs/qa-policy.md`](docs/qa-policy.md).
