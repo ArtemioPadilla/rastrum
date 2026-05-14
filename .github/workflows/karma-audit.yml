@@ -11,8 +11,17 @@ name: karma-audit
 on:
   workflow_dispatch:
 
+# Only one audit at a time — concurrent runs against the same prod DB
+# would duplicate output without adding signal.
+concurrency:
+  group: karma-audit
+  cancel-in-progress: false
+
 jobs:
   audit:
+    # Restrict to main so the workflow can't be dispatched from arbitrary
+    # branches that might have tampered with the queries.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
@@ -68,9 +77,13 @@ jobs:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           echo "::group::Top-5 users by karma_total"
+          # User IDs are redacted to 8-char prefixes — the full UUID is not
+          # needed for "is karma concentrating at the top?" analysis and
+          # keeps prod identifiers out of CI logs (which would be indexed
+          # if the repo is ever made public).
           psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 \
             --pset=border=2 --pset=format=aligned \
-            -c "SELECT id, karma_total
+            -c "SELECT left(id::text, 8) || '…' AS id_prefix, karma_total
                 FROM public.users
                ORDER BY karma_total DESC
                LIMIT 5;"
