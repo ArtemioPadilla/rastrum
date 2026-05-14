@@ -1,0 +1,310 @@
+---
+/**
+ * Species list detail page — EN variant.
+ * Route: /en/profile/u/lists/?username=<u>&slug=<s>
+ * Issue #1047 — query-string routing (was /en/profile/u/[username]/lists/[slug]/
+ * which 404'd in static hosting because the parent [username] dynamic segment
+ * had no getStaticPaths rows).
+ */
+import BaseLayout from '../../../../../layouts/BaseLayout.astro';
+
+const lang = 'en' as const;
+---
+
+<BaseLayout
+  title={`Species list — Rastrum`}
+  description="A user-curated species list on Rastrum."
+  lang={lang}
+  robots="noindex,nofollow"
+>
+  <div
+    id="list-detail-root"
+    class="max-w-3xl mx-auto pb-28 sm:pb-6"
+    data-lang={lang}
+  >
+    <!-- Loading state -->
+    <div id="ld-loading" class="py-16 text-center text-sm text-zinc-500 dark:text-zinc-400">Loading…</div>
+
+    <!-- Not found -->
+    <div id="ld-not-found" class="hidden py-16 text-center">
+      <p class="text-zinc-500 dark:text-zinc-400">List not found.</p>
+      <a id="ld-not-found-back" href="#" class="mt-4 inline-block text-sm text-emerald-700 dark:text-emerald-400 hover:underline">← Back to profile</a>
+    </div>
+
+    <!-- Content -->
+    <div id="ld-content" class="hidden">
+      <!-- Header -->
+      <header class="mb-6">
+        <a id="ld-back" href="#" class="text-xs text-zinc-500 hover:underline">← Back to profile</a>
+        <h1 id="ld-title" class="mt-2 text-2xl md:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">—</h1>
+        <p id="ld-desc" class="mt-1 text-sm text-zinc-600 dark:text-zinc-400 hidden"></p>
+        <div class="mt-2 flex items-center gap-3">
+          <span id="ld-count" class="text-xs text-zinc-400 dark:text-zinc-500"></span>
+          <span id="ld-private-badge" class="hidden rounded-full bg-zinc-200 dark:bg-zinc-700 px-2 py-0.5 text-xs text-zinc-600 dark:text-zinc-300">Private</span>
+        </div>
+      </header>
+
+      <!-- Add species (own list only) -->
+      <div id="ld-add-section" class="hidden mb-6 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-4">
+        <p class="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">Add species</p>
+        <div class="flex gap-2">
+          <input
+            id="ld-taxon-input"
+            type="text"
+            placeholder="Search by scientific or common name…"
+            autocomplete="off"
+            class="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          />
+          <button id="ld-add-btn" type="button" class="hidden rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-2 text-sm font-semibold text-white transition-colors">Add</button>
+        </div>
+        <div id="ld-suggestions" class="mt-1 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-md hidden"></div>
+        <p id="ld-add-error" class="hidden mt-1 text-xs text-red-600 dark:text-red-400"></p>
+      </div>
+
+      <!-- Taxa grid -->
+      <div id="ld-taxa-empty" class="hidden rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-8 text-center">
+        <p class="text-sm text-zinc-500 dark:text-zinc-400">No species in this list yet.</p>
+      </div>
+      <div id="ld-taxa-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3"></div>
+    </div>
+  </div>
+</BaseLayout>
+
+<script>
+  import { getCachedUser, getSupabase } from '../../../../../lib/supabase';
+
+  const root = document.getElementById('list-detail-root') as HTMLDivElement;
+  const lang = root.dataset.lang as 'en' | 'es';
+  const isEs = lang === 'es';
+
+  const params = new URLSearchParams(window.location.search);
+  const username = params.get('username') ?? '';
+  const slug = params.get('slug') ?? '';
+
+  const loadingEl  = document.getElementById('ld-loading') as HTMLElement;
+  const notFound   = document.getElementById('ld-not-found') as HTMLElement;
+  const notFoundBack = document.getElementById('ld-not-found-back') as HTMLAnchorElement;
+  const content    = document.getElementById('ld-content') as HTMLElement;
+  const titleEl    = document.getElementById('ld-title') as HTMLElement;
+  const descEl     = document.getElementById('ld-desc') as HTMLElement;
+  const countEl    = document.getElementById('ld-count') as HTMLElement;
+  const privateBadge = document.getElementById('ld-private-badge') as HTMLElement;
+  const backLink   = document.getElementById('ld-back') as HTMLAnchorElement;
+  const addSection = document.getElementById('ld-add-section') as HTMLElement;
+  const taxonInput = document.getElementById('ld-taxon-input') as HTMLInputElement;
+  const addBtn     = document.getElementById('ld-add-btn') as HTMLButtonElement;
+  const suggestions = document.getElementById('ld-suggestions') as HTMLElement;
+  const addError   = document.getElementById('ld-add-error') as HTMLElement;
+  const taxaEmpty  = document.getElementById('ld-taxa-empty') as HTMLElement;
+  const taxaGrid   = document.getElementById('ld-taxa-grid') as HTMLElement;
+
+  const profileHref = `/${lang}/u/?username=${encodeURIComponent(username)}`;
+  backLink.href = profileHref;
+  notFoundBack.href = profileHref;
+
+  type TaxonRow = {
+    taxon_id: string;
+    added_at: string;
+    note: string | null;
+    taxa: {
+      id: string;
+      scientific_name: string;
+      name_en: string | null;
+      name_es: string | null;
+      slug: string | null;
+      hero_media_id: string | null;
+    } | null;
+  };
+
+  type SuggestTaxon = {
+    id: string;
+    scientific_name: string;
+    name_en: string | null;
+    name_es: string | null;
+  };
+
+  function escAttr(s: string) {
+    return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  let listId = '';
+  let isOwner = false;
+  let items: TaxonRow[] = [];
+  let selectedTaxon: SuggestTaxon | null = null;
+
+  function renderTaxa() {
+    if (!items.length) {
+      taxaEmpty.classList.remove('hidden');
+      taxaGrid.innerHTML = '';
+      return;
+    }
+    taxaEmpty.classList.add('hidden');
+    const speciesPath = (s: string) => isEs
+      ? `/es/explorar/especies/?slug=${encodeURIComponent(s)}`
+      : `/en/explore/species/?slug=${encodeURIComponent(s)}`;
+    taxaGrid.innerHTML = items.map(row => {
+      const t = row.taxa;
+      if (!t) return '';
+      const name = escAttr(t.scientific_name);
+      const common = escAttr((isEs ? t.name_es : t.name_en) || '');
+      const href = t.slug ? escAttr(speciesPath(t.slug)) : '#';
+      return `
+        <a href="${href}" class="block rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 overflow-hidden hover:border-emerald-400 dark:hover:border-emerald-700 transition-colors">
+          <div class="aspect-square bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
+            <svg aria-hidden="true" class="w-10 h-10 text-zinc-300 dark:text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9-4.03-9-9-9z"/>
+            </svg>
+          </div>
+          <div class="p-2">
+            <p class="text-xs italic font-medium text-zinc-900 dark:text-zinc-100 truncate">${name}</p>
+            ${common ? `<p class="text-xs text-zinc-500 dark:text-zinc-400 truncate">${common}</p>` : ''}
+          </div>
+        </a>`;
+    }).join('');
+  }
+
+  let debounceTimer: ReturnType<typeof setTimeout>;
+  taxonInput.addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    selectedTaxon = null;
+    addBtn.classList.add('hidden');
+    const q = taxonInput.value.trim();
+    if (q.length < 2) { suggestions.classList.add('hidden'); return; }
+    debounceTimer = setTimeout(() => fetchSuggestions(q), 250);
+  });
+
+  async function fetchSuggestions(q: string) {
+    const supabase = getSupabase();
+    const { data } = await supabase
+      .from('taxa')
+      .select('id, scientific_name, name_en, name_es')
+      .or(`scientific_name.ilike.%${q}%,name_en.ilike.%${q}%,name_es.ilike.%${q}%`)
+      .limit(8);
+    const rows = (data ?? []) as SuggestTaxon[];
+    if (!rows.length) { suggestions.classList.add('hidden'); return; }
+    suggestions.innerHTML = rows.map(r => {
+      const n = escAttr(r.scientific_name);
+      const c = escAttr((isEs ? r.name_es : r.name_en) || '');
+      return `<button type="button" class="ld-sug-item w-full text-left px-3 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-sm" data-id="${escAttr(r.id)}" data-sci="${n}" data-name-en="${escAttr(r.name_en ?? '')}" data-name-es="${escAttr(r.name_es ?? '')}"><span class="italic">${n}</span>${c ? ` <span class="text-zinc-400">${c}</span>` : ''}</button>`;
+    }).join('');
+    suggestions.classList.remove('hidden');
+
+    suggestions.querySelectorAll<HTMLButtonElement>('.ld-sug-item').forEach(btn => {
+      btn.addEventListener('click', () => {
+        selectedTaxon = {
+          id: btn.dataset.id!,
+          scientific_name: btn.dataset.sci!,
+          name_en: btn.dataset.nameEn || null,
+          name_es: btn.dataset.nameEs || null,
+        };
+        taxonInput.value = btn.dataset.sci!;
+        suggestions.classList.add('hidden');
+        addBtn.classList.remove('hidden');
+      });
+    });
+  }
+
+  document.addEventListener('click', (e) => {
+    if (!suggestions.contains(e.target as Node) && e.target !== taxonInput) {
+      suggestions.classList.add('hidden');
+    }
+  });
+
+  addBtn.addEventListener('click', async () => {
+    if (!selectedTaxon) return;
+    addError.classList.add('hidden');
+    const supabase = getSupabase();
+    const { error } = await supabase
+      .from('species_list_items')
+      .insert({ list_id: listId, taxon_id: selectedTaxon.id });
+    if (error) {
+      addError.textContent = isEs ? 'Error al agregar especie.' : 'Failed to add species.';
+      addError.classList.remove('hidden');
+      return;
+    }
+    taxonInput.value = '';
+    addBtn.classList.add('hidden');
+    selectedTaxon = null;
+    await loadItems();
+  });
+
+  async function loadItems() {
+    const supabase = getSupabase();
+    const { data } = await supabase
+      .from('species_list_items')
+      .select('taxon_id, added_at, note, taxa:taxon_id(id, scientific_name, name_en, name_es, slug, hero_media_id)')
+      .eq('list_id', listId)
+      .order('added_at', { ascending: false });
+    items = (data ?? []) as TaxonRow[];
+    countEl.textContent = `${items.length} ${isEs ? 'especies' : 'species'}`;
+    renderTaxa();
+  }
+
+  async function run() {
+    if (!username || !slug) {
+      loadingEl.classList.add('hidden');
+      notFound.classList.remove('hidden');
+      return;
+    }
+
+    const supabase = getSupabase();
+    const user = await getCachedUser();
+
+    const { data: ownerRow } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', username)
+      .maybeSingle();
+
+    if (!ownerRow) {
+      loadingEl.classList.add('hidden');
+      notFound.classList.remove('hidden');
+      return;
+    }
+
+    const ownerId = (ownerRow as { id: string }).id;
+    isOwner = user?.id === ownerId;
+
+    const { data: listRow } = await supabase
+      .from('species_lists')
+      .select('id, name_en, name_es, description_en, description_es, visibility, slug')
+      .eq('user_id', ownerId)
+      .eq('slug', slug)
+      .maybeSingle();
+
+    loadingEl.classList.add('hidden');
+
+    if (!listRow) {
+      notFound.classList.remove('hidden');
+      return;
+    }
+
+    const l = listRow as {
+      id: string; name_en: string | null; name_es: string | null;
+      description_en: string | null; description_es: string | null;
+      visibility: string; slug: string;
+    };
+
+    listId = l.id;
+
+    titleEl.textContent = (isEs ? l.name_es : l.name_en) || l.name_en || l.name_es || slug;
+    document.title = `${titleEl.textContent} — Rastrum`;
+    const desc = (isEs ? l.description_es : l.description_en) || '';
+    if (desc) {
+      descEl.textContent = desc;
+      descEl.classList.remove('hidden');
+    }
+    if (l.visibility === 'private') {
+      privateBadge.classList.remove('hidden');
+    }
+
+    if (isOwner) {
+      addSection.classList.remove('hidden');
+    }
+
+    content.classList.remove('hidden');
+    await loadItems();
+  }
+
+  run().catch(console.error);
+</script>

@@ -1,19 +1,16 @@
 ---
 /**
- * Field guide page — /en/explore/trails/[slug]/field-guide
+ * Field guide page — /en/explore/trails/field-guide/?slug=<id>
  *
- * Print-ready field guide view for a biodiversity trail.
+ * Print-ready field guide view for a biodiversity trail (issue #1047 —
+ * query-string routing replaces the old `[slug]/field-guide` dynamic route).
+ *
  * Opens as a standalone page with print CSS pre-loaded.
  * User prints (Ctrl/Cmd+P) → "Save as PDF" in browser.
  *
- * getStaticPaths returns [] (runtime routing).
+ * The slug is read from `?slug=` client-side.
  */
-export function getStaticPaths() {
-  return [];
-}
-
-const { slug } = Astro.params as { slug: string };
-const lang = 'en';
+const slug = Astro.url.searchParams.get('slug') ?? '';
 ---
 <!DOCTYPE html>
 <html lang="en">
@@ -88,7 +85,7 @@ const lang = 'en';
       🖨️ Print / Save as PDF
     </button>
     <a
-      href={`/en/explore/trails/${slug}`}
+      href={`/en/explore/trails/?slug=${encodeURIComponent(slug)}`}
       style="font-size: 9.5pt; color: #1a5c1a; text-decoration: none;"
     >
       ← Back to trail
@@ -101,7 +98,7 @@ const lang = 'en';
 
 </body>
 <script>
-  const slug = window.location.pathname.split('/').filter(Boolean).slice(-2)[0] ?? '';
+  const slug = new URLSearchParams(window.location.search).get('slug') ?? '';
 
   async function loadFieldGuide() {
     if (!slug) { showError(); return; }
@@ -163,7 +160,7 @@ const lang = 'en';
         <div class="notes-lines">${Array(10).fill('<div class="line"></div>').join('')}</div>
       </div>
       <div class="field-guide-footer">
-        Rastrum · Field guide generated ${new Date().toLocaleDateString('en-US')} · rastrum.app
+        Rastrum · Field guide generated ${new Date().toLocaleDateString('en-US')} · rastrum.org
       </div>
     `;
 
