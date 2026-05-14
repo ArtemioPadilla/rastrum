@@ -12,6 +12,14 @@
  */
 
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
+
+// tokens/index.ts constructs the supabase client inside each handler
+// invocation (not at module top), so the pin needs to be in place
+// before any handler call — not just before import.
+Deno.env.set('SUPABASE_URL', 'http://localhost:54321');
+Deno.env.set('SUPABASE_SERVICE_ROLE_KEY', 'test-service-role');
+Deno.env.set('SUPABASE_ANON_KEY', 'test-anon-key');
+
 import { handler } from './index.ts';
 
 Deno.test('tokens: OPTIONS preflight → 200 with CORS', async () => {
