@@ -91,7 +91,7 @@ async function probeCredential(kind: string, secret: string, model: string): Pro
   }
 }
 
-serve(async (req) => {
+export async function handler(req: Request): Promise<Response> {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
@@ -916,4 +916,6 @@ serve(async (req) => {
     console.error('[sponsorships] unhandled error', e);
     return jsonResponse(500, { error: 'internal_error', detail: (e as Error).message });
   }
-});
+}
+
+serve(handler);
