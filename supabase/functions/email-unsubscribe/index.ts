@@ -91,7 +91,7 @@ function htmlPage(lang: string, success: boolean): string {
 // Handler
 // ---------------------------------------------------------------------------
 
-serve(async (req) => {
+export async function handler(req: Request): Promise<Response> {
   const reqUrl = new URL(req.url);
   const token = reqUrl.searchParams.get('token') ?? '';
   const uid = reqUrl.searchParams.get('uid') ?? '';
@@ -152,4 +152,6 @@ serve(async (req) => {
     status: 302,
     headers: { Location: redirectUrl },
   });
-});
+}
+
+serve(handler);
