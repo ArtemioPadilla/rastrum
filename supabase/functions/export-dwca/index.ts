@@ -289,7 +289,7 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
 
-serve(async (req) => {
+export async function handler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'GET' && req.method !== 'POST') {
     return new Response('Method not allowed', { status: 405, headers: corsHeaders });
@@ -514,4 +514,6 @@ serve(async (req) => {
       'X-Rastrum-Multimedia': String(multimediaRows.length),
     },
   });
-});
+}
+
+serve(handler);
