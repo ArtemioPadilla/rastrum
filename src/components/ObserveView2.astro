@@ -382,6 +382,23 @@ const weathers = WEATHERS;
     </div>
   </div>
 
+  <!-- Identification failed — show the actual reason (#identify-reliability) -->
+  <div id="obs2-identify-error" class="hidden rounded-xl border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/30 p-4 space-y-3">
+    <div class="flex items-start gap-3">
+      <span class="text-2xl shrink-0">⚠️</span>
+      <div class="space-y-1">
+        <p class="font-semibold text-red-800 dark:text-red-300 text-sm">
+          {isEs ? "No se pudo identificar" : "Couldn't identify"}
+        </p>
+        <p id="obs2-identify-error-msg" class="text-xs text-zinc-600 dark:text-zinc-400"></p>
+      </div>
+    </div>
+    <button type="button" id="obs2-identify-error-continue"
+      class="min-h-[40px] rounded-xl border border-zinc-300 dark:border-zinc-700 text-xs px-4 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors">
+      {isEs ? "Continuar sin identificar →" : "Continue without ID →"}
+    </button>
+  </div>
+
   <!-- Success state -->
   <div id="obs2-success" class="hidden rounded-xl border border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 p-6 text-center space-y-3">
     <div class="text-4xl">✅</div>
@@ -414,6 +431,7 @@ const isEs = lang === 'es';
 let pipelineState: PipelineState | null = null;
 let location: { lat: number; lng: number; accuracyM: number; altitudeM: number | null } | null = null;
 let bestResult: { scientific_name: string; common_name_en: string | null; confidence: number; source: string } | null = null;
+let identifyErrorReason: string | null = null;
 
 // ── Taxon hint chips (#ux-quick-taxon-chips) ──────────────────────────────
 import type { TaxonHint } from '../lib/identify-cascade-client';
@@ -839,6 +857,7 @@ async function detectRunners() {
 
 // ── Pipeline runner ────────────────────────────────────────────────────────
 async function runPipeline(state: PipelineState) {
+  identifyErrorReason = null;
   const { runParallelIdentify } = await import('../lib/identify-cascade-client');
   const { makePlantNetRunner, makeClaudeRunner, makePhiRunner } = await import('../lib/identify-runners');
   const { hasAnthropicKey } = await import('../lib/anthropic-key');
@@ -931,7 +950,14 @@ async function runPipeline(state: PipelineState) {
               bestResult = { scientific_name: r.scientific_name, common_name_en: r.common_name_en ?? null, confidence: r.confidence, source: r.source };
             }
           } else {
-            setNodeState(state, node.id, 'failed', undefined, 'No identification result');
+            // Surface the actual reason (e.g. unsupported photo format,
+            // PlantNet rejected the image) instead of a blank "failed".
+            // Prefer the always-on PlantNet runner's message.
+            const errs = (out as { errors?: Record<string, string> }).errors ?? {};
+            const reason = errs.plantnet ?? errs.claude_haiku ?? Object.values(errs)[0]
+              ?? (isEs ? 'Sin resultado de identificación' : 'No identification result');
+            identifyErrorReason = reason;
+            setNodeState(state, node.id, 'failed', undefined, reason);
           }
         }
       } else if (pf.kind === 'audio') {
@@ -1008,6 +1034,21 @@ async function runPipeline(state: PipelineState) {
     noRunnersEl?.classList.add('hidden');
     document.getElementById('obs2-audio-skip-continue')?.addEventListener('click', () => {
       audioWarnEl?.classList.add('hidden');
+      showPostForm();
+    }, { once: true });
+  } else if (identifyErrorReason && !bestResult) {
+    // Every runner failed and nothing else got identified (e.g. unsupported
+    // photo format). Show the reason instead of dropping the user into the
+    // post-form with no explanation. If some other photo did get an ID
+    // (bestResult set) we fall through — the stepper ✕ + popover shows why.
+    noRunnersEl?.classList.add('hidden');
+    audioWarnEl?.classList.add('hidden');
+    const errEl = document.getElementById('obs2-identify-error');
+    const msgEl = document.getElementById('obs2-identify-error-msg');
+    if (msgEl) msgEl.textContent = identifyErrorReason;
+    errEl?.classList.remove('hidden');
+    document.getElementById('obs2-identify-error-continue')?.addEventListener('click', () => {
+      errEl?.classList.add('hidden');
       showPostForm();
     }, { once: true });
   } else {
@@ -1307,6 +1348,7 @@ postForm?.addEventListener('submit', async (e) => {
 document.getElementById('obs2-new-btn')?.addEventListener('click', () => {
   location = null;
   bestResult = null;
+  identifyErrorReason = null;
   pipelineState = null;
   // Reset taxon hint chip selection
   selectedTaxonHint = null;
