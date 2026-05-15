@@ -505,16 +505,34 @@ export async function handler(req: Request): Promise<Response> {
     return corsResponse('Missing observation_id and image_url or image_data', { status: 400 });
   }
 
-  // Resolve image bytes — prefer image_data (already on the wire) over image_url
+  // Resolve image bytes — prefer image_data (already on the wire) over
+  // image_url. Both paths can throw (malformed base64, non-OK fetch); a
+  // bad image is a client/input problem, not a server fault — return a
+  // clean 422 JSON instead of an opaque 500 so the caller can show why.
   let imageBytes: Uint8Array;
-  if (body.image_data) {
-    // Strip the data-URL prefix ("data:image/jpeg;base64,") and decode
-    const base64 = body.image_data.replace(/^data:[^;]+;base64,/, '');
-    const binary = atob(base64);
-    imageBytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) imageBytes[i] = binary.charCodeAt(i);
-  } else {
-    imageBytes = await fetchImageAsBytes(body.image_url!);
+  try {
+    if (body.image_data) {
+      const base64 = body.image_data.replace(/^data:[^;]+;base64,/, '');
+      const binary = atob(base64);
+      imageBytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) imageBytes[i] = binary.charCodeAt(i);
+    } else {
+      imageBytes = await fetchImageAsBytes(body.image_url!);
+    }
+  } catch (e) {
+    return corsResponse(
+      JSON.stringify({
+        error: 'image_unreadable',
+        hint: `Could not read the image (${e instanceof Error ? e.message : 'decode failed'}). Re-upload a JPEG or PNG.`,
+      }),
+      { status: 422, headers: { 'content-type': 'application/json' } },
+    );
+  }
+  if (imageBytes.byteLength === 0) {
+    return corsResponse(
+      JSON.stringify({ error: 'image_unreadable', hint: 'The image was empty. Re-upload a JPEG or PNG.' }),
+      { status: 422, headers: { 'content-type': 'application/json' } },
+    );
   }
   const mimeType = 'image/jpeg';
 
@@ -907,14 +925,24 @@ export async function handler(req: Request): Promise<Response> {
   }
 
   if (!result) {
-    const errorPayload: Record<string, unknown> = {
-      error: hasAnyCred ? 'identification_failed' : 'no_id_engine_available',
-      hint: hasAnyCred
-        ? 'PlantNet returned nothing and Claude failed to parse the response.'
-        : sponsorshipSkipReason
-          ? `Claude skipped (${sponsorshipSkipReason}). Supply a BYO key, accept a sponsorship, or wait for the rate-limit window to reset.`
-          : 'No Claude credential available. Supply a BYO key (client_keys.anthropic) or accept a sponsorship; the operator no longer provides a fallback key.',
-    };
+    // force_provider:'plantnet' callers (the PWA's PlantNet runner) get a
+    // PlantNet-specific message. The generic Claude-centric hints below are
+    // nonsensical for a forced single-provider call and previously surfaced
+    // verbatim to the user. The exact PlantNet HTTP failure is in the
+    // function logs (callPlantNet warn, #1059).
+    const errorPayload: Record<string, unknown> = body.force_provider === 'plantnet'
+      ? {
+          error: 'plantnet_no_result',
+          hint: 'PlantNet could not identify this photo. Try a sharper photo of the whole plant (leaves, flowers, or fruit), or a different angle.',
+        }
+      : {
+          error: hasAnyCred ? 'identification_failed' : 'no_id_engine_available',
+          hint: hasAnyCred
+            ? 'PlantNet returned nothing and Claude failed to parse the response.'
+            : sponsorshipSkipReason
+              ? `Claude skipped (${sponsorshipSkipReason}). Supply a BYO key, accept a sponsorship, or wait for the rate-limit window to reset.`
+              : 'No Claude credential available. Supply a BYO key (client_keys.anthropic) or accept a sponsorship; the operator no longer provides a fallback key.',
+        };
     if (cascadeAttempts) {
       errorPayload.cascade_attempts = cascadeAttempts;
     }
