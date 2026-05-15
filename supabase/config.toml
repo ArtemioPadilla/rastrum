@@ -11,7 +11,14 @@ verify_jwt = true
 
 [functions.identify]
 enabled = true
-verify_jwt = true
+# verify_jwt = false: identify self-gates auth (resolves the JWT via
+# auth.getUser when present, falls back to anon IP rate-limiting otherwise —
+# index.ts:451-534). Edge-layer verify_jwt rejects the sb_publishable_* key
+# as a non-JWT before the function runs, so anon + session-lock-fallback
+# calls 401 with UNAUTHORIZED_INVALID_JWT_FORMAT and never reach the code.
+# Mirrors api/mcp/share-card. Must also be in OTHER_NO_JWT in
+# .github/workflows/deploy-functions.yml or the deploy re-enables it.
+verify_jwt = false
 
 [functions.enrich-environment]
 enabled = true
