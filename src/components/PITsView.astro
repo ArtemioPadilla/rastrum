@@ -192,7 +192,7 @@ const copy = {
 </div>
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import {getCachedUser, getSupabase} from '../lib/supabase';
 
   const root = document.getElementById('pits-view-root')!;
   const lang = root.dataset.lang ?? 'en';
@@ -379,7 +379,7 @@ const copy = {
 
     try {
       const sb = getSupabase();
-      const { data: { user } } = await sb.auth.getUser();
+      const user = await getCachedUser();
       if (!user) {
         errorEl.textContent = isEs ? 'Inicia sesión para crear PITs.' : 'Sign in to create PITs.';
         errorEl.classList.remove('hidden');

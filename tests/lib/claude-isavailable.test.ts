@@ -18,8 +18,8 @@ const mockSession = vi.fn();
 const mockRpc = vi.fn();
 
 vi.mock('../../src/lib/supabase', () => ({
+  getCachedSession: () => mockSession().then((r: any) => r?.data?.session ?? null),
   getSupabase: () => ({
-    auth: { getSession: () => mockSession() },
     rpc: (...args: unknown[]) => mockRpc(...args),
   }),
 }));

@@ -12,7 +12,7 @@
  * We do NOT generate VAPID keys on the client — that's an operator
  * step documented in `docs/runbooks/rotate-secret.md` (VAPID setup).
  */
-import { getSupabase } from './supabase';
+import {getCachedUser, getSupabase} from './supabase';
 
 export interface PushSetupResult {
   ok: boolean;
@@ -72,7 +72,7 @@ export async function enableStreakPush(): Promise<PushSetupResult> {
   });
 
   const supabase = getSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getCachedUser();
   if (!user) return { ok: false, reason: 'no_user' };
 
   const subJson = sub.toJSON();
@@ -108,7 +108,7 @@ export async function disableStreakPush(): Promise<PushSetupResult> {
     if (sub) await sub.unsubscribe();
     if (endpoint) {
       const supabase = getSupabase();
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getCachedUser();
       if (user) {
         await supabase.from('push_subscriptions').delete()
           .eq('user_id', user.id).eq('endpoint', endpoint);

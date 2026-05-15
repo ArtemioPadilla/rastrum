@@ -10,8 +10,9 @@ vi.mock('../../src/lib/supabase', () => {
     update: vi.fn(() => eq),
   };
   const from = vi.fn(() => builder);
-  const client = { from, functions: { invoke: vi.fn() }, auth: { getUser: vi.fn() } };
+  const client = { from, functions: { invoke: vi.fn() } };
   return {
+    getCachedUser: vi.fn().mockResolvedValue({ id: 'user-123' }),
     getSupabase: () => client,
   };
 });

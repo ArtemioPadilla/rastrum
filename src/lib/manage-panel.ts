@@ -9,7 +9,7 @@
 // client only issues plain `update(...)` calls - no application-side
 // flagging is needed.
 
-import { getSupabase } from './supabase';
+import {getCachedUser, getSupabase} from './supabase';
 import { willDemote, type PhotoForDeletion } from './photo-deletion';
 import { resizeImage, uploadMedia } from './upload';
 import { escapeHtml as escAttr } from './escape';
@@ -229,7 +229,7 @@ export async function wireManagePanelDetails(
         // Ensure the session JWT is fresh before mutating. A stale
         // auth.uid() causes RLS to silently filter every UPDATE to 0
         // rows, making the save appear to do nothing (#445).
-        const { data: { user: viewer } } = await supabase.auth.getUser();
+        const viewer = await getCachedUser();
         if (!viewer) {
           throw new Error(
             lang === 'es'

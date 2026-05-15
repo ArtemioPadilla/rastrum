@@ -27,7 +27,7 @@ const lang = 'en';
 </ConsoleLayout>
 
 <script>
-  import { getSupabase } from '../../../lib/supabase';
+  import {getCachedUser, getSupabase} from '../../../lib/supabase';
   import { getUserRoles } from '../../../lib/user-roles';
   import { rolePillsFor } from '../../../lib/console-tabs';
 
@@ -39,7 +39,7 @@ const lang = 'en';
 
   async function init() {
     const supabase = getSupabase();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCachedUser();
     if (!user) {
       gate.textContent = 'Sign in required.';
       gate.classList.remove('hidden');

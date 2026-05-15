@@ -166,7 +166,7 @@ const copy = {
 </div>
 
 <script>
-  import { getSupabase } from '../lib/supabase';
+  import {getCachedUser, getSupabase} from '../lib/supabase';
 
   const lang = document.getElementById('trails-view-root')?.dataset.lang ?? 'en';
   const isEs = lang === 'es';
@@ -234,7 +234,7 @@ const copy = {
     const nearbyList = document.getElementById('nearby-trails-list')!;
 
     try {
-      const { data: { user } } = await sb.auth.getUser();
+      const user = await getCachedUser();
 
       // My trails
       if (user) {
@@ -319,7 +319,7 @@ const copy = {
 
     try {
       const sb = getSupabase();
-      const { data: { user } } = await sb.auth.getUser();
+      const user = await getCachedUser();
       if (!user) {
         errorEl.textContent = tr.signInRequired;
         errorEl.classList.remove('hidden');

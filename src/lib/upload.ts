@@ -10,7 +10,7 @@
  * is the same one the v0.1 sync engine has been using; the migration is
  * controlled by the presence of PUBLIC_R2_MEDIA_URL.
  */
-import { getSupabase } from './supabase';
+import {getCachedSession, getSupabase} from './supabase';
 
 const R2_PUBLIC_URL = import.meta.env.PUBLIC_R2_MEDIA_URL;
 
@@ -92,7 +92,7 @@ async function uploadToR2(
   opts: UploadOptions,
 ): Promise<string> {
   const supabase = getSupabase();
-  const { data: { session } } = await supabase.auth.getSession();
+  const session = await getCachedSession();
   if (!session) throw new Error('Not signed in — cannot upload to R2');
 
   // Adding a custom header here means the CORS preflight cache key

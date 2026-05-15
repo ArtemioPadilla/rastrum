@@ -60,7 +60,7 @@ const isEs = lang === 'es';
 </section>
 
 <script>
-  import { getCachedSession, getSupabase } from '../../lib/supabase';
+  import {getCachedSession, getCachedUser, getSupabase} from '../../lib/supabase';
   import { escapeHtml } from '../../lib/escape';
   const isEs = document.documentElement.lang === 'es';
   const shell = document.getElementById('ea-shell');
@@ -147,7 +147,7 @@ const isEs = lang === 'es';
 
   (async () => {
     const sb = getSupabase();
-    const { data: { user } } = await sb.auth.getUser();
+    const user = await getCachedUser();
     if (!user) { notAuth?.classList.remove('hidden'); return; }
     const { data: roles } = await sb.from('user_roles').select('role').eq('user_id', user.id).eq('role', 'admin');
     if (!roles?.length) { notAuth?.classList.remove('hidden'); return; }
