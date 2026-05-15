@@ -133,7 +133,7 @@ async function fetchSuggestions(
 /** Query Rastrum `taxa` table via Supabase client. Enriches `inUserHistory` from observations. */
 async function fetchFromRastrum(query: string): Promise<TaxonSuggestion[]> {
   // Lazy import to keep this module usable outside Astro SSR
-  const { getSupabase } = await import('./supabase');
+  const { getSupabase, getCachedUser } = await import('./supabase');
   const supabase = getSupabase();
   if (!supabase) return [];
 
