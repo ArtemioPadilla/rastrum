@@ -204,7 +204,13 @@ async function callPlantNet(
   // TODO(security): rotate PLANTNET_API_KEY — old key 2b10E7bp6hVnxBvvJWc3IGv9ae was exposed
   // in browser traffic pre-PR#1037 (window.__RASTRUM_PLANTNET_KEY__ / PUBLIC_PLANTNET_KEY).
   // Rotate via the PlantNet dashboard: https://my.plantnet.org/account/settings
-  if (!key) return null;
+  if (!key) {
+    // Why: a missing key returns null silently, which presents to the user
+    // as "no plant suggestion" indistinguishable from "PlantNet found nothing".
+    // Surface the misconfig so an operator grepping function logs sees it.
+    console.warn(`[identify] callPlantNet skipped: no key (clientKey=${clientKey ? 'set' : 'unset'}, env=unset)`);
+    return null;
+  }
 
   const form = new FormData();
   form.append('images', new Blob([imageBytes], { type: 'image/jpeg' }), 'photo.jpg');
@@ -214,7 +220,16 @@ async function callPlantNet(
     `https://my-api.plantnet.org/v2/identify/all?api-key=${encodeURIComponent(key)}&lang=es&nb-results=5`,
     { method: 'POST', body: form, signal },
   );
-  if (!res.ok) return null;
+  if (!res.ok) {
+    // Why: PlantNet failures (401 revoked key, 403 IP allowlist, 429 quota
+    // exhausted, 5xx upstream) previously returned null silently. Log status
+    // + body snippet so operators can distinguish the cases. Key itself is
+    // never logged — only whether the call used a BYO or operator key.
+    let bodySnippet = '';
+    try { bodySnippet = (await res.text()).slice(0, 200); } catch { /* ignore */ }
+    console.warn(`[identify] callPlantNet failed: HTTP ${res.status} ${res.statusText}, body=${bodySnippet}, key_source=${clientKey ? 'byo' : 'operator'}`);
+    return null;
+  }
   const json = await res.json() as {
     results: Array<{
       score: number;
