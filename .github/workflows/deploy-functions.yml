@@ -227,10 +227,13 @@ jobs:
           # 2. Other no-JWT functions — public or token-gated, not cron:
           #    share-card  — OG scrapers fetch anonymously
           #    mcp / api   — gate internally on rst_ tokens (not JWTs)
+          #    identify    — self-gates: auth.getUser when JWT present, else
+          #                  anon IP rate-limit. Edge verify_jwt rejected the
+          #                  sb_publishable_* key as a non-JWT (config.toml).
           #
           # Module 26 functions (follow / react / report) DO verify JWT.
           CRON_ONLY="${{ steps.classify.outputs.cron_only }}"
-          OTHER_NO_JWT="share-card mcp api"
+          OTHER_NO_JWT="share-card mcp api identify"
           for fn in ${{ steps.targets.outputs.fns }}; do
             EXTRA_FLAGS=""
             if echo " $CRON_ONLY " | grep -q " $fn "; then
