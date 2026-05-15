@@ -2,9 +2,8 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { detectKind } from '../../src/lib/sponsorships';
 
 vi.mock('../../src/lib/supabase', () => ({
-  getSupabase: () => ({
-    auth: { getSession: () => Promise.resolve({ data: { session: { access_token: 'fake-token' } } }) },
-  }),
+  getCachedSession: () => Promise.resolve({ access_token: 'fake-token' }),
+  getSupabase: () => ({}),
 }));
 
 interface FetchCall { url: string; method: string; body: string | null }

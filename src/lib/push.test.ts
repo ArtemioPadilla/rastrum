@@ -37,10 +37,11 @@ if (typeof globalThis.Notification === 'undefined') {
 // ── Mock supabase client ──
 const mockDelete = vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }) });
 const mockFrom = vi.fn().mockReturnValue({ delete: mockDelete });
-const mockGetUser = vi.fn().mockResolvedValue({ data: { user: { id: 'user-123' } } });
-const mockSupabase = { from: mockFrom, auth: { getUser: mockGetUser } };
+const mockGetUser = vi.fn().mockResolvedValue({ id: 'user-123' });
+const mockSupabase = { from: mockFrom };
 
 vi.mock('./supabase', () => ({
+  getCachedUser: () => mockGetUser(),
   getSupabase: () => mockSupabase,
 }));
 
