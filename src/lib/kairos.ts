@@ -13,14 +13,14 @@
  * permission prompt and DB upsert as the streak path. Devices already
  * subscribed for streak reminders just flip the kairos row.
  */
-import { getSupabase } from './supabase';
+import { getSupabase, getCachedUser } from './supabase';
 import { enableStreakPush, disableStreakPush, type PushSetupResult } from './push';
 
 export type KairosKind = 'golden_hour' | 'after_rain' | 'migration_window' | 'lunar_event';
 
 export async function isKairosOptIn(kind: KairosKind): Promise<boolean> {
   const supabase = getSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getCachedUser();
   if (!user) return false;
   const { data } = await supabase
     .from('kairos_subscriptions')
@@ -42,7 +42,7 @@ export async function enableKairos(kind: KairosKind): Promise<PushSetupResult> {
   if (!sub.ok) return sub;
 
   const supabase = getSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getCachedUser();
   if (!user) return { ok: false, reason: 'no_user' };
 
   const { error } = await supabase
@@ -66,7 +66,7 @@ export async function enableKairos(kind: KairosKind): Promise<PushSetupResult> {
  */
 export async function disableKairos(kind: KairosKind): Promise<PushSetupResult> {
   const supabase = getSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getCachedUser();
   if (!user) return { ok: false, reason: 'no_user' };
 
   const { error } = await supabase
@@ -91,7 +91,7 @@ export async function disableKairos(kind: KairosKind): Promise<PushSetupResult> 
  */
 export async function unsubscribeAllPush(): Promise<PushSetupResult> {
   const supabase = getSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getCachedUser();
   if (user) {
     await supabase.from('kairos_subscriptions')
       .update({ opt_in: false, updated_at: new Date().toISOString() })
