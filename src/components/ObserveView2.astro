@@ -1040,14 +1040,20 @@ function updatePipelineUI() {
   if (!pipelineState) return;
   document.dispatchEvent(new CustomEvent('rastrum:pipeline-update', { detail: { nodes: pipelineState.nodes } }));
 
-  // Status text
+  // Status text — count uploaded files (one input node per file), not raw
+  // graph nodes. The 3-step stepper is the phase indicator; this is the
+  // per-file tally, so the denominator matches what the user uploaded
+  // instead of the internal node count (which read e.g. "2/5" for 1 photo).
   const running = pipelineState.nodes.filter(n => n.state === 'running').length;
-  const done    = pipelineState.nodes.filter(n => n.state === 'done').length;
-  const total   = pipelineState.nodes.length;
+  const total   = pipelineState.nodes.filter(n => n.kind === 'input').length;
+  const done    = pipelineState.nodes.filter(
+    n => n.kind === 'identify' && (n.state === 'done' || n.state === 'skipped'),
+  ).length;
   if (pipelineStatus) {
+    const count = total > 0 ? ` (${done}/${total})` : '';
     pipelineStatus.textContent = running > 0
-      ? (isEs ? `Procesando... (${done}/${total})` : `Processing... (${done}/${total})`)
-      : (isEs ? `Listo (${done}/${total})` : `Ready (${done}/${total})`);
+      ? (isEs ? `Procesando...${count}` : `Processing...${count}`)
+      : (isEs ? `Listo${count}` : `Ready${count}`);
   }
 }
 
