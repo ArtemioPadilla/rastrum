@@ -40,6 +40,13 @@ const USER_CACHE_TTL_MS = 30_000; // 30s — enough to cover a full page hydrati
 let _sessionCache: { session: import('@supabase/supabase-js').Session | null; resolvedAt: number } | null = null;
 const SESSION_CACHE_TTL_MS = 30_000;
 
+// In-flight promise deduplication: if N components call getCachedUser/getCachedSession
+// simultaneously on a cold start (cache empty), they all share the same single network
+// request instead of each firing their own. This is the main fix for the fan-out
+// "Failed to fetch" storm seen on Android Chrome when 5+ home widgets mount at once.
+let _userFlight: Promise<import('@supabase/supabase-js').User | null> | null = null;
+let _sessionFlight: Promise<import('@supabase/supabase-js').Session | null> | null = null;
+
 if (typeof document !== 'undefined') {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') {
@@ -77,9 +84,17 @@ export async function getCachedSession() {
   if (_sessionCache && (now - _sessionCache.resolvedAt) < SESSION_CACHE_TTL_MS) {
     return _sessionCache.session;
   }
-  const { data: { session } } = await getSupabase().auth.getSession();
-  _sessionCache = { session, resolvedAt: now };
-  return session;
+  // Dedup concurrent callers: all share one in-flight request.
+  if (!_sessionFlight) {
+    _sessionFlight = getSupabase().auth.getSession()
+      .then(({ data: { session } }) => {
+        _sessionCache = { session, resolvedAt: Date.now() };
+        return session;
+      })
+      .catch(() => null)  // Network failure — return null, don't crash callers.
+      .finally(() => { _sessionFlight = null; });
+  }
+  return _sessionFlight;
 }
 
 /**
@@ -93,9 +108,17 @@ export async function getCachedUser() {
   if (_userCache && (now - _userCache.resolvedAt) < USER_CACHE_TTL_MS) {
     return _userCache.user;
   }
-  const { data: { user } } = await getSupabase().auth.getUser();
-  _userCache = { user, resolvedAt: now };
-  return user;
+  // Dedup concurrent callers: all share one in-flight request.
+  if (!_userFlight) {
+    _userFlight = getSupabase().auth.getUser()
+      .then(({ data: { user } }) => {
+        _userCache = { user, resolvedAt: Date.now() };
+        return user;
+      })
+      .catch(() => null)  // Network failure — return null, don't crash callers.
+      .finally(() => { _userFlight = null; });
+  }
+  return _userFlight;
 }
 
 /**

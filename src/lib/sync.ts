@@ -9,7 +9,7 @@
  * PUBLIC_R2_MEDIA_URL is set) or Supabase Storage (fallback). See module 10.
  */
 import { getDB, type ObservationRecord } from './db';
-import { getSupabase } from './supabase';
+import { getSupabase, getCachedSession, getCachedUser } from './supabase';
 import { uploadMedia, resizeImage, r2Enabled } from './upload';
 import type { Observation } from './types';
 import {
@@ -82,7 +82,7 @@ async function syncOne(record: ObservationRecord): Promise<void> {
   let observerRef = obs.observerRef;
   if (observerRef.kind !== 'user') {
     try {
-      const { data: { session } } = await getSupabase().auth.getSession();
+      const session = await getCachedSession();
       if (session?.user?.id) {
         observerRef = { kind: 'user', id: session.user.id };
         const db = await getDB();
@@ -565,15 +565,9 @@ async function syncOutboxInner(): Promise<SyncResult> {
   // Auth guard: bail early when there's no valid session. Without this,
   // Supabase queries fail silently with an expired/missing JWT and the
   // UI stays in a loading state indefinitely (#342).
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      const noAuth: SyncResult = { synced: 0, failed: 0, skipped_guest: 0, last_error: 'no_session' };
-      emit<SyncDoneDetail>(SYNC_EVENTS.done, noAuth);
-      return noAuth;
-    }
-  } catch {
-    const noAuth: SyncResult = { synced: 0, failed: 0, skipped_guest: 0, last_error: 'session_check_failed' };
+  const session = await getCachedSession();
+  if (!session) {
+    const noAuth: SyncResult = { synced: 0, failed: 0, skipped_guest: 0, last_error: 'no_session' };
     emit<SyncDoneDetail>(SYNC_EVENTS.done, noAuth);
     return noAuth;
   }
@@ -605,7 +599,7 @@ async function syncOutboxInner(): Promise<SyncResult> {
     // saved offline before login never synced even after the user logged in.
     if (rec.observer_kind === 'guest') {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const session = await getCachedSession();
         if (session?.user?.id) {
           const upgradedData: Observation = {
             ...(rec.data as Observation),
@@ -733,7 +727,7 @@ async function sendSyncErrorBeacon(opts: { message: string; blob_count: number }
   if (typeof navigator === 'undefined') return;
   try {
     const supabase = getSupabase();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCachedUser();
     const supabaseUrl = (import.meta.env.PUBLIC_SUPABASE_URL as string | undefined) ?? '';
     if (!supabaseUrl) return;
     const url = `${supabaseUrl.replace(/\/$/, '')}/functions/v1/sync-error`;

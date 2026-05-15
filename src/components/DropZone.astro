@@ -105,7 +105,22 @@ const editPhotoLabel = isEs ? 'Editar foto' : 'Edit photo';
   </div>
 
   <!-- Preview thumbnails (populated by JS) -->
-  <div id="dz-previews" class="hidden px-4 pb-4 flex flex-wrap gap-2"></div>
+  <div id="dz-previews" class="hidden px-4 pb-4 flex flex-wrap gap-2">
+    <!-- "+ add more" tile — always kept as last child by JS -->
+    <button
+      id="dz-add-more-btn"
+      type="button"
+      class="hidden w-16 h-16 rounded-lg border-2 border-dashed border-zinc-300 dark:border-zinc-600
+             flex items-center justify-center text-zinc-400 hover:border-emerald-500
+             hover:text-emerald-500 dark:hover:border-emerald-400 dark:hover:text-emerald-400
+             transition-colors shrink-0"
+      aria-label={isEs ? 'Agregar más archivos' : 'Add more files'}
+    >
+      <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+      </svg>
+    </button>
+  </div>
 </div>
 
 <script>
@@ -119,11 +134,14 @@ const audBtn    = document.getElementById('dz-audio-btn');
 const capInput  = document.getElementById('dz-capture-input') as HTMLInputElement | null;
 const galInput  = document.getElementById('dz-gallery-input') as HTMLInputElement | null;
 const audInput  = document.getElementById('dz-audio-input')   as HTMLInputElement | null;
+const addMoreBtn = document.getElementById('dz-add-more-btn') as HTMLButtonElement | null;
 
 // ── Button → input wiring ──────────────────────────────────────────────────
 capBtn?.addEventListener('click', () => capInput?.click());
 galBtn?.addEventListener('click', () => galInput?.click());
 audBtn?.addEventListener('click', () => audInput?.click());
+// "+ add more" tile — opens gallery so the user can append more files after an initial drop
+addMoreBtn?.addEventListener('click', () => galInput?.click());
 
 function onInputChange(input: HTMLInputElement | null) {
   return () => {
@@ -171,6 +189,8 @@ function showPreviews(files: File[]) {
   defaultEl.classList.add('hidden');
   previews.classList.remove('hidden');
   previews.classList.add('flex');
+  // Keep the "+" tile visible and pinned to the end
+  addMoreBtn?.classList.remove('hidden');
 
   for (const file of files) {
     const thumb = document.createElement('div');
@@ -221,7 +241,12 @@ function showPreviews(files: File[]) {
       thumb.innerHTML = '<div class="w-full h-full flex items-center justify-center text-2xl">📄</div>';
     }
 
-    previews.appendChild(thumb);
+    // Insert before the "+" tile so it stays last
+    if (addMoreBtn && previews.contains(addMoreBtn)) {
+      previews.insertBefore(thumb, addMoreBtn);
+    } else {
+      previews.appendChild(thumb);
+    }
   }
 }
 </script>
