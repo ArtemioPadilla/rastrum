@@ -20,7 +20,7 @@ test.describe('J: photo-ID cascade', () => {
       .toBeGreaterThan(0);
     expect(await page.locator('#pipeline-stepper, #obs2-pipeline-section').count())
       .toBeGreaterThan(0);
-    expect(await page.locator('#obs2-error').count()).toBeGreaterThan(0);
+    expect(await page.locator('#obs2-identify-error').count()).toBeGreaterThan(0);
 
     expect(errs).toEqual([]);
   });
@@ -29,7 +29,7 @@ test.describe('J: photo-ID cascade', () => {
     const errs = collectPageErrors(page);
     await page.goto('/es/observar/');
     await expect(page.locator('main').first()).toBeVisible();
-    expect(await page.locator('#obs2-error').count()).toBeGreaterThan(0);
+    expect(await page.locator('#obs2-identify-error').count()).toBeGreaterThan(0);
     expect(errs).toEqual([]);
   });
 });
