@@ -20,8 +20,8 @@ test.describe('J: magic-link PKCE callback', () => {
     const resp = await page.goto('/en/auth/callback/');
     expect(resp?.status() ?? 200).toBeGreaterThanOrEqual(400);
 
-    // "supabaseUrl is required." is expected in static-preview builds (no real env vars).
-    const realErrs = errs.filter(e => !/supabase/i.test(e));
+    // "supabaseUrl is required." is the known pageerror in static-preview builds (no real env vars).
+    const realErrs = errs.filter(e => !e.includes('supabaseUrl is required'));
     expect(realErrs).toEqual([]);
   });
 });
