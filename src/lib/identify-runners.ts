@@ -62,13 +62,18 @@ export function makePlantNetRunner(locale: Locale): IdentifierRunner {
     const { getSupabase } = await import('./supabase');
     const { getKey } = await import('./byo-keys');
 
-    // Encode file as JPEG via canvas (handles HEIC/WebP/AVIF → JPEG)
+    // PlantNet only accepts JPEG/PNG. Transcode to JPEG. The old code fell
+    // back to shipping raw bytes on decode failure, which sent un-decodable
+    // HEIC straight to PlantNet → opaque 400 + a stalled pipeline. Now a
+    // genuine decode failure surfaces a localized, actionable message.
     let imageDataUrl: string;
     try {
       imageDataUrl = await fileToJpegDataUrl(file);
-    } catch {
-      // Canvas not available (e.g. test env) — fall back to raw base64
-      imageDataUrl = await fileToDataUrl(file);
+    } catch (e) {
+      if (e instanceof ImageDecodeError) {
+        throw new Error(locale === 'es' ? e.userMessageEs : e.userMessage);
+      }
+      throw e;
     }
 
     const supabase = getSupabase();
@@ -84,8 +89,10 @@ export function makePlantNetRunner(locale: Locale): IdentifierRunner {
       ...(signal ? { signal } : {}),
     });
     if (error) throw error;
-    const r = data as Partial<UnifiedIdResult> & { error?: string; results?: PlantNetMatch[] };
-    if (r.error) throw new Error(r.error);
+    const r = data as Partial<UnifiedIdResult> & { error?: string; hint?: string; results?: PlantNetMatch[] };
+    // Surface the human-readable hint, not the machine error code — the
+    // cascade flattens this to the message the pipeline shows the user.
+    if (r.error) throw new Error(r.hint ?? r.error);
     // EF may return a normalised IDResult or raw PlantNet results
     if (r.scientific_name) {
       return {
@@ -118,25 +125,70 @@ export function makePlantNetRunner(locale: Locale): IdentifierRunner {
   };
 }
 
-/** Convert any image File to a JPEG data-URL via an off-screen canvas. */
+/**
+ * Thrown when a photo cannot be decoded to a JPEG in-browser — typically
+ * an HEIC/HEIF capture from an Android/iOS camera that no browser engine
+ * (except Safari) can decode. The cascade surfaces `.userMessage` so the
+ * pipeline shows an actionable reason instead of stalling.
+ */
+export class ImageDecodeError extends Error {
+  readonly userMessage: string;
+  readonly userMessageEs: string;
+  constructor() {
+    super('image decode failed');
+    this.name = 'ImageDecodeError';
+    this.userMessage = 'This photo’s format (often HEIC) can’t be processed in your browser. Switch your camera to "Most compatible / JPEG", or pick a JPEG/PNG.';
+    this.userMessageEs = 'El formato de esta foto (suele ser HEIC) no se puede procesar en tu navegador. Cambia tu cámara a "Más compatible / JPEG", o elige un JPEG/PNG.';
+  }
+}
+
+const MAX_EDGE = 1600;   // PlantNet works well at this res
+
+function canvasToJpegDataUrl(w: number, h: number, draw: (ctx: CanvasRenderingContext2D, cw: number, ch: number) => void): string {
+  const scale = Math.min(1, MAX_EDGE / Math.max(w, h));
+  const canvas = document.createElement('canvas');
+  canvas.width  = Math.round(w * scale);
+  canvas.height = Math.round(h * scale);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new ImageDecodeError();
+  draw(ctx, canvas.width, canvas.height);
+  return canvas.toDataURL('image/jpeg', 0.88);
+}
+
+/**
+ * Convert any image File to a JPEG data-URL.
+ *
+ * Tries `createImageBitmap` first — on Android Chrome it can decode some
+ * formats `<img>` cannot (it goes through the platform image codecs). Falls
+ * back to the `<img>` path for environments where createImageBitmap is
+ * absent or rejects. If BOTH fail the file is genuinely un-decodable here
+ * (true HEIC) → throw ImageDecodeError so the caller can tell the user.
+ */
 async function fileToJpegDataUrl(file: File): Promise<string> {
+  if (typeof createImageBitmap === 'function') {
+    try {
+      const bmp = await createImageBitmap(file);
+      try {
+        return canvasToJpegDataUrl(bmp.width, bmp.height, (ctx, cw, ch) => ctx.drawImage(bmp, 0, 0, cw, ch));
+      } finally {
+        bmp.close?.();
+      }
+    } catch {
+      /* fall through to the <img> path */
+    }
+  }
   return new Promise<string>((resolve, reject) => {
     const img = new Image();
     const objectUrl = URL.createObjectURL(file);
     img.onload = () => {
       URL.revokeObjectURL(objectUrl);
-      const canvas = document.createElement('canvas');
-      // Cap at 1600px on the long edge — PlantNet works well at this res
-      const MAX = 1600;
-      const scale = Math.min(1, MAX / Math.max(img.naturalWidth, img.naturalHeight));
-      canvas.width  = Math.round(img.naturalWidth  * scale);
-      canvas.height = Math.round(img.naturalHeight * scale);
-      const ctx = canvas.getContext('2d');
-      if (!ctx) { reject(new Error('no 2d context')); return; }
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      resolve(canvas.toDataURL('image/jpeg', 0.88));
+      try {
+        resolve(canvasToJpegDataUrl(img.naturalWidth, img.naturalHeight, (ctx, cw, ch) => ctx.drawImage(img, 0, 0, cw, ch)));
+      } catch (e) {
+        reject(e instanceof ImageDecodeError ? e : new ImageDecodeError());
+      }
     };
-    img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error('img load failed')); };
+    img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new ImageDecodeError()); };
     img.src = objectUrl;
   });
 }

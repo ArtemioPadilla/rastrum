@@ -160,6 +160,9 @@ const labels = {
     save: 1500,
   };
 
+  const escapeHtml = (s: string) => s.replace(/[&<>"]/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
+
   // ── DOM ────────────────────────────────────────────────────────────────
   const stepper = document.getElementById('pipeline-stepper');
   if (!stepper) throw new Error('pipeline-stepper not found');
@@ -238,10 +241,12 @@ const labels = {
     if (detailEl) {
       detailEl.innerHTML = nodes.map(n => {
         const stateIcon = n.state === 'done' ? '✓' : n.state === 'running' ? '⟳' : n.state === 'failed' ? '✕' : '○';
-        const output = n.output as { provider?: string; error?: string } | undefined;
+        const output = n.output as { provider?: string } | undefined;
         const provider = output?.provider ? ` · ${output.provider}` : '';
-        const error = n.state === 'failed' && output?.error
-          ? `<br><span class="text-red-500">${output.error}</span>`
+        // setNodeState writes the reason to node.error, not node.output.error
+        // — reading the wrong field meant every failure rendered blank.
+        const error = n.state === 'failed' && n.error
+          ? `<br><span class="text-red-500">${escapeHtml(n.error)}</span>`
           : '';
         return `<div class="flex items-start gap-1.5">
           <span class="shrink-0 ${n.state === 'done' ? 'text-emerald-500' : n.state === 'failed' ? 'text-red-500' : 'text-zinc-400'}">${stateIcon}</span>

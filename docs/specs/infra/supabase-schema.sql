@@ -12996,3 +12996,71 @@ GRANT EXECUTE ON FUNCTION public.nearby_observations(numeric, numeric, numeric, 
 COMMENT ON FUNCTION public.nearby_observations IS
   '#712 Returns nearby synced observations within radius. Used by HomeNearby.astro. '
   'Uses location_obscured when set; falls back to location. Joins taxa + media_files.';
+
+-- ============================================================
+-- taxa.scientific_name UNIQUE — the identify EF upserts taxa with
+-- ON CONFLICT (scientific_name) but only a non-unique index existed,
+-- so every upsert failed: "no unique or exclusion constraint matching
+-- the ON CONFLICT specification" → identified taxa were never persisted.
+-- The whole codebase already treats scientific_name as the natural key
+-- (every trigger does WHERE scientific_name = X LIMIT 1). This aligns
+-- the schema with that intent.
+--
+-- Idempotent: the dedup is a no-op once there are no duplicates, and the
+-- unique index uses IF NOT EXISTS. The FK repoint is driven dynamically
+-- from pg_constraint so no referencing table can be missed (incl. taxa's
+-- own parent_id / current_accepted_id self-references).
+-- ============================================================
+DO $taxa_dedup$
+DECLARE
+  dup        RECORD;
+  fk         RECORD;
+  ref_schema text;
+  ref_table  text;
+  ref_col    text;
+BEGIN
+  -- Repoint every FK that references public.taxa(id) from each duplicate
+  -- row to the keeper (oldest by created_at, tiebreak smallest id), then
+  -- delete the duplicates.
+  FOR dup IN
+    SELECT t.id AS dup_id, k.keeper_id
+    FROM (
+      SELECT id, scientific_name,
+             first_value(id) OVER (
+               PARTITION BY scientific_name
+               ORDER BY created_at ASC, id ASC
+             ) AS keeper_id
+      FROM public.taxa
+    ) k
+    JOIN public.taxa t ON t.id = k.id
+    WHERE k.id <> k.keeper_id
+    GROUP BY t.id, k.keeper_id
+  LOOP
+    FOR fk IN
+      SELECT con.conrelid::regclass::text AS rel,
+             att.attname                  AS col,
+             ns.nspname                   AS nsp,
+             cl.relname                   AS tbl
+      FROM pg_constraint con
+      JOIN pg_class    cl ON cl.oid = con.conrelid
+      JOIN pg_namespace ns ON ns.oid = cl.relnamespace
+      JOIN pg_attribute att
+        ON att.attrelid = con.conrelid
+       AND att.attnum   = con.conkey[1]
+      WHERE con.contype = 'f'
+        AND con.confrelid = 'public.taxa'::regclass
+        AND array_length(con.conkey, 1) = 1
+    LOOP
+      EXECUTE format(
+        'UPDATE %I.%I SET %I = $1 WHERE %I = $2',
+        fk.nsp, fk.tbl, fk.col, fk.col
+      ) USING dup.keeper_id, dup.dup_id;
+    END LOOP;
+
+    DELETE FROM public.taxa WHERE id = dup.dup_id;
+  END LOOP;
+END
+$taxa_dedup$;
+
+CREATE UNIQUE INDEX IF NOT EXISTS taxa_scientific_name_key
+  ON public.taxa (scientific_name);
