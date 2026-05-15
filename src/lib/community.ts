@@ -10,7 +10,7 @@
  * view, so the SQL-layer authentication gate (no GRANT to anon)
  * fires regardless of the UI sign-in check.
  */
-import { getSupabase } from './supabase';
+import {getCachedUser, getSupabase} from './supabase';
 import type { CommunityFilters, CommunitySort } from './community-url';
 
 export interface CommunityObserver {
@@ -135,7 +135,7 @@ export async function loadCommunityNearbyAt(
  */
 export async function viewerHasCentroid(): Promise<boolean> {
   const supabase = getSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getCachedUser();
   if (!user) return false;
   const { data } = await supabase
     .from('community_observers_with_centroid')
@@ -158,7 +158,7 @@ export interface ViewerCommunityMeta {
 export async function loadViewerCommunityMeta(): Promise<ViewerCommunityMeta> {
   try {
     const supabase = getSupabase();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCachedUser();
     if (!user) return { signedIn: false, profilePublic: null, countryCode: null };
     // TODO(#251): migrate to profile_privacy matrix check (v1.1)
     const { data } = await supabase
@@ -194,7 +194,7 @@ export interface ViewerRegion {
 export async function loadViewerRegion(): Promise<ViewerRegion> {
   try {
     const supabase = getSupabase();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCachedUser();
     if (!user) return { countryCode: null, regionPrimary: null };
     const { data } = await supabase
       .from('users')

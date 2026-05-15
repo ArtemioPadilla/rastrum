@@ -91,14 +91,14 @@ const tr = t(lang) as any;
 </BaseLayout>
 
 <script>
-  import { getSupabase } from '../../../lib/supabase';
+  import {getCachedSession, getSupabase} from '../../../lib/supabase';
   const supabase = getSupabase();
 
   const TOKENS_URL = `${import.meta.env.PUBLIC_SUPABASE_URL}/functions/v1/tokens`;
 
   async function getAuthHeader() {
-    const { data } = await supabase.auth.getSession();
-    return `Bearer ${data.session?.access_token ?? ''}`;
+    const session = await getCachedSession();
+    return `Bearer ${session?.access_token ?? ''}`;
   }
 
   function buildTokenRow(t: Record<string, any>): HTMLElement {

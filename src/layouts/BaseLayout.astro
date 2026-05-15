@@ -383,7 +383,7 @@ const resolvedOgImage = ogImage ?? `${SITE_URL}/og/${ogLang}/${ogSlugForPath(cur
     <WhyAmISeeingThisDialog lang={installLang} />
     <SurpriseOverlay lang={installLang} />
     <script>
-      import { getSupabase } from '../lib/supabase';
+      import {getCachedSession, getSupabase} from '../lib/supabase';
       import { subscribeToKarmaEvents } from '../lib/karma-toast';
 
       let cleanup: (() => void) | null = null;
@@ -391,8 +391,8 @@ const resolvedOgImage = ogImage ?? `${SITE_URL}/og/${ogLang}/${ogSlugForPath(cur
       async function start() {
         try {
           const supabase = getSupabase();
-          const { data } = await supabase.auth.getSession();
-          const userId = data.session?.user?.id;
+          const session = await getCachedSession();
+          const userId = session?.user?.id;
           if (!userId) return;
           cleanup = subscribeToKarmaEvents(userId, supabase);
         } catch {

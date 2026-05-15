@@ -8,7 +8,7 @@
  * See docs/specs/modules/08-profile-activity-gamification.md for the
  * social schema. RLS is enforced server-side; we never gate on the client.
  */
-import { getSupabase } from './supabase';
+import {getCachedUser, getSupabase} from './supabase';
 import type {
   ReactionTarget, ReactionKind, ReportTarget, ReportReason, FollowTier,
 } from './types.social';
@@ -280,7 +280,7 @@ export async function followUser(targetUserId: string, tier: FollowTier = 'follo
   // Onboarding: fire first_follow if this is the user's first follow.
   void (async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getCachedUser();
       if (!user) return;
       // All follows (including pending) are counted here: the funnel measures
       // engagement (follow was attempted), not whether the connection was accepted.
@@ -362,13 +362,13 @@ export async function blockUser(targetUserId: string) {
   const sb = getSupabase();
   const { error } = await sb
     .from('blocks')
-    .insert({ blocker_id: (await sb.auth.getUser()).data.user?.id, blocked_id: targetUserId });
+    .insert({ blocker_id: (await getCachedUser())?.id, blocked_id: targetUserId });
   if (error) throw error;
 }
 
 export async function unblockUser(targetUserId: string) {
   const sb = getSupabase();
-  const me = (await sb.auth.getUser()).data.user?.id;
+  const me = (await getCachedUser())?.id;
   const { error } = await sb
     .from('blocks')
     .delete()

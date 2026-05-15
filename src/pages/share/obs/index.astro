@@ -28,7 +28,7 @@ const lang: 'en' | 'es' = 'en';
   <ShareObsView lang={lang} />
 
   <script>
-    import { getSupabase, getSupabaseUrl } from '../../../lib/supabase';
+    import {getCachedUser, getSupabase, getSupabaseUrl} from '../../../lib/supabase';
     import { labelFor } from '../../../lib/observation-enums';
     import { wireManagePanelDetails, wireManagePanelLocation, wireManagePanelPhotos } from '../../../lib/manage-panel';
     import { t } from '../../../i18n/utils';
@@ -188,7 +188,7 @@ const lang: 'en' | 'es' = 'en';
       const isPublic = user?.profile_public;
       let viewerIsObserver = false;
       try {
-        const { data: { user: viewer } } = await supabase.auth.getUser();
+        const viewer = await getCachedUser();
         viewerIsObserver = !!(viewer?.id && obs.observer_id && viewer.id === obs.observer_id);
       } catch { /* signed out viewer */ }
       const fallback = (document.documentElement.lang === 'es') ? 'Anónimo' : 'Anonymous';
@@ -458,7 +458,7 @@ const lang: 'en' | 'es' = 'en';
               // Get current viewer
               let currentViewer: { id?: string } | null = null;
               try {
-                const { data: { user: v } } = await supabase.auth.getUser();
+                const v = await getCachedUser();
                 currentViewer = v;
               } catch { /* signed out */ }
 
@@ -571,7 +571,7 @@ const lang: 'en' | 'es' = 'en';
       const ownerNote = document.getElementById('ci-owner-note');
       if (!section || !listEl) return;
 
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getCachedUser();
       const isEs = document.documentElement.lang === 'es';
       if (viewerIsObserver) {
         ownerNote?.classList.remove('hidden');

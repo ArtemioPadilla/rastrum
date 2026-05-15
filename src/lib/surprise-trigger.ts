@@ -11,7 +11,7 @@
  * surprise is invisible by definition. We never block sync.
  */
 
-import { getSupabase } from './supabase';
+import {getCachedUser, getSupabase} from './supabase';
 import {
   pickSurprise,
   dailyCapReached,
@@ -47,7 +47,7 @@ function currentLang(prefs: UserPrefs | null): 'en' | 'es' {
 async function fetchUserPrefs(): Promise<UserPrefs | null> {
   const supabase = getSupabase();
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCachedUser();
     if (!user) return null;
     const { data } = await supabase
       .from('users')

@@ -109,7 +109,7 @@ const year = Astro.url.searchParams.get('year') ?? new Date().getFullYear().toSt
 </BaseLayout>
 
 <script>
-  import { getCachedUser, getSupabase } from '../../../../lib/supabase';
+  import {getCachedSession, getCachedUser, getSupabase} from '../../../../lib/supabase';
 
   interface WrappedPayload {
     year: number;
@@ -148,7 +148,7 @@ const year = Astro.url.searchParams.get('year') ?? new Date().getFullYear().toSt
       });
       // Pass year + user_id as query params via URL construction
       const fnUrl = `${(import.meta.env.PUBLIC_SUPABASE_URL as string)}/functions/v1/generate-wrapped?year=${year}&user_id=${user.id}`;
-      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      const token = (await getCachedSession())?.access_token;
       const res = await fetch(fnUrl, { headers: { Authorization: `Bearer ${token ?? ''}` } });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data: WrappedPayload = await res.json();

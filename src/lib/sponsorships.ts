@@ -1,4 +1,4 @@
-import { getSupabase } from './supabase';
+import {getCachedSession, getSupabase} from './supabase';
 import type { SponsorCredential, Sponsorship, SponsorshipRequest, SponsorshipUsage } from './types.sponsorship';
 
 const FN_BASE = `${import.meta.env.PUBLIC_SUPABASE_URL}/functions/v1/sponsorships`;
@@ -43,7 +43,7 @@ export interface CreateCredentialArgs {
 }
 
 async function authedFetch(path: string, init?: RequestInit): Promise<Response> {
-  const { data: { session } } = await getSupabase().auth.getSession();
+  const session = await getCachedSession();
   if (!session) throw new Error('not_authenticated');
   // Belt-and-braces: a corrupted/persisted session can produce a token
   // with non-ByteString characters which makes fetch() reject at
@@ -140,7 +140,7 @@ export async function createPool(input: {
   monthly_reset?: boolean;
 }): Promise<string> {
   const sb = getSupabase();
-  const { data: { session } } = await sb.auth.getSession();
+  const session = await getCachedSession();
   if (!session?.user) throw new Error('not_authenticated');
   const { data, error } = await sb
     .from('sponsor_pools')

@@ -140,7 +140,7 @@ async function fetchFromRastrum(query: string): Promise<TaxonSuggestion[]> {
   const q = query.trim();
 
   // Resolve current user (may be null for guests)
-  const { data: { user } } = await supabase.auth.getUser().catch(() => ({ data: { user: null } }));
+  const user = await getCachedUser();
 
   // Two queries in parallel:
   // 1. Prefix match on scientific_name (catches "Alamania pu...")

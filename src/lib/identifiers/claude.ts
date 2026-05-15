@@ -10,7 +10,7 @@
  * The operator-key fallback (Deno.env.ANTHROPIC_API_KEY) was removed
  * intentionally — see supabase/functions/identify/index.ts file header.
  */
-import { getSupabase } from '../supabase';
+import {getCachedSession, getSupabase} from '../supabase';
 import { getKey } from '../byo-keys';
 import type { Identifier, IDResult, IdentifyInput } from './types';
 
@@ -76,7 +76,7 @@ export const claudeIdentifier: Identifier = {
     }
     try {
       const supabase = getSupabase();
-      const { data: { session } } = await supabase.auth.getSession();
+      const session = await getCachedSession();
       if (!session) {
         writeSponsorshipCache(false);
         return { ready: false, reason: 'needs_key' };
