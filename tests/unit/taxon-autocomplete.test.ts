@@ -29,10 +29,9 @@ function makeQueryStub(resolveWith: any) {
 }
 
 vi.mock('../../src/lib/supabase', () => ({
+  // getCachedUser replaces the direct auth.getUser() call in taxon-autocomplete
+  getCachedUser: () => Promise.resolve({ id: 'user-123' }),
   getSupabase: () => ({
-    auth: {
-      getUser: () => Promise.resolve({ data: { user: { id: 'user-123' } } }),
-    },
     from: (table: string) => {
       if (table === 'taxa') {
         return makeQueryStub({
