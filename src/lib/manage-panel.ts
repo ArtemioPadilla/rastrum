@@ -15,13 +15,13 @@ import { resizeImage, uploadMedia } from './upload';
 import { escapeHtml as escAttr } from './escape';
 import { t } from '../i18n/utils';
 import { openConfirmDialog } from './confirm-dialog';
+import { createDeleteConfirmController } from './delete-confirm';
 import { correctIdentificationName } from './taxonomy-synonyms';
 
 type Ident = { scientific_name?: string; is_primary?: boolean } | undefined;
 
 type SaveCopy = {
   saving: string;
-  delete_confirm: string;
 };
 
 /**
@@ -102,14 +102,8 @@ export async function wireManagePanelDetails(
 
   const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
   const copy: SaveCopy = lang === 'es'
-    ? {
-        saving: 'Guardando...',
-        delete_confirm: '¿Eliminar esta observación? Esta acción no se puede deshacer. Las fotos, identificaciones y metadatos se eliminarán.',
-      }
-    : {
-        saving: 'Saving...',
-        delete_confirm: 'Delete this observation? This cannot be undone. Photos, identifications, and metadata will all be removed.',
-      };
+    ? { saving: 'Guardando...' }
+    : { saving: 'Saving...' };
 
   const sciInput   = document.getElementById('m-sci')           as HTMLInputElement | null;
   const notesEl    = document.getElementById('m-notes')         as HTMLTextAreaElement | null;
@@ -317,10 +311,18 @@ export async function wireManagePanelDetails(
     }
   });
 
-  deleteBtn?.addEventListener('click', async () => {
-    const confirmed = window.confirm(copy.delete_confirm);
-    if (!confirmed) return;
-    deleteBtn.disabled = true;
+  const confirmRow    = document.getElementById('m-delete-confirm');
+  const confirmYesBtn = document.getElementById('m-delete-confirm-yes')    as HTMLButtonElement | null;
+  const confirmNoBtn  = document.getElementById('m-delete-confirm-cancel') as HTMLButtonElement | null;
+  const actionRow     = document.getElementById('m-action-row');
+
+  // Native window.confirm() blocked automation / e2e and is poor UX
+  // (#1093). The gate is now an in-panel two-step confirm; the
+  // delete-observation Edge Function call below is byte-for-byte the
+  // same as the pre-#1093 confirm() path.
+  async function runDelete(): Promise<void> {
+    if (confirmYesBtn) confirmYesBtn.disabled = true;
+    errEl?.classList.add('hidden');
     try {
       const { data, error: invokeErr } = await supabase.functions.invoke<{
         ok: boolean; r2_deleted?: number; r2_errors?: unknown[]; error?: string;
@@ -340,9 +342,22 @@ export async function wireManagePanelDetails(
         errEl.textContent = msg;
         errEl.classList.remove('hidden');
       }
-      deleteBtn.disabled = false;
+      if (confirmYesBtn) confirmYesBtn.disabled = false;
     }
-  });
+  }
+
+  if (deleteBtn && confirmRow && confirmYesBtn && confirmNoBtn && actionRow) {
+    createDeleteConfirmController(
+      {
+        trigger:    deleteBtn,
+        idleRow:    actionRow,
+        confirmRow,
+        confirmBtn: confirmYesBtn,
+        cancelBtn:  confirmNoBtn,
+      },
+      runDelete,
+    );
+  }
 }
 
 type PhotoRow = PhotoForDeletion & {

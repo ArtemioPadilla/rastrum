@@ -210,6 +210,7 @@ const distancePage = page as unknown as Record<string, string>;
 <script>
   import { getSupabase } from '../lib/supabase';
   import { getCachedUser } from '../lib/supabase';
+  import { pickCardImageUrl } from '../lib/media-url';
   import { formatTimeAgo } from '../lib/social';
   import { wireOverflowMenu } from '../lib/overflow-menu';
   import {
@@ -229,7 +230,7 @@ const distancePage = page as unknown as Record<string, string>;
     taxa: { common_name_es: string | null; common_name_en: string | null } | null;
   };
 
-  type Media = { url: string | null; is_primary: boolean | null; media_type: string | null };
+  type Media = { url: string | null; thumbnail_url: string | null; is_primary: boolean | null; media_type: string | null; deleted_at: string | null };
 
   type Observer = {
     id: string;
@@ -298,10 +299,13 @@ const distancePage = page as unknown as Record<string, string>;
       ? (ident?.taxa?.common_name_es ?? ident?.taxa?.common_name_en ?? '')
       : (ident?.taxa?.common_name_en ?? ident?.taxa?.common_name_es ?? '');
     const confidence = typeof ident?.confidence === 'number' ? Math.max(0, Math.min(1, ident.confidence)) : null;
-    const photoMedia = (r.media_files ?? []).filter(m => !m?.media_type || m.media_type === 'photo');
-    const audioMedia = (r.media_files ?? []).filter(m => m?.media_type === 'audio');
-    const videoMedia = (r.media_files ?? []).filter(m => m?.media_type === 'video');
-    const photo = photoMedia.find(m => m?.is_primary)?.url ?? photoMedia.find(m => !!m?.url)?.url ?? '';
+    const liveMedia = (r.media_files ?? []).filter(m => m?.deleted_at == null);
+    const photoMedia = liveMedia.filter(m => !m?.media_type || m.media_type === 'photo');
+    const audioMedia = liveMedia.filter(m => m?.media_type === 'audio');
+    const videoMedia = liveMedia.filter(m => m?.media_type === 'video');
+    const photo = pickCardImageUrl(photoMedia.find(m => m?.is_primary))
+      ?? pickCardImageUrl(photoMedia.find(m => pickCardImageUrl(m)))
+      ?? '';
     const hasVideoOnly = !photo && videoMedia.length > 0 && audioMedia.length === 0;
     const hasAudioOnly = !photo && !hasVideoOnly && audioMedia.length > 0;
     const firstAudioUrl = hasAudioOnly ? (audioMedia[0]?.url ?? '') : '';
@@ -375,7 +379,7 @@ const distancePage = page as unknown as Record<string, string>;
     // --- Media count / type badge ---
     // Shown bottom-right on the thumbnail. Multi-photo shows camera + count;
     // audio-only shows a mic badge; single photo → no badge (clean).
-    const totalMediaCount = (r.media_files ?? []).length;
+    const totalMediaCount = liveMedia.length;
     let mediaBadgeHtml = '';
     if (hasAudioOnly) {
       mediaBadgeHtml = `<span class="er-media-badge absolute bottom-2 right-2 z-10 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-semibold text-white backdrop-blur-sm" aria-label="Audio observation"><svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg><span>Audio</span></span>`;
@@ -605,10 +609,12 @@ const distancePage = page as unknown as Record<string, string>;
       const common = lang === 'es'
         ? (ident?.taxa?.common_name_es ?? ident?.taxa?.common_name_en ?? '')
         : (ident?.taxa?.common_name_en ?? ident?.taxa?.common_name_es ?? '');
-      const photoMedia = (r.media_files ?? []).filter(m => !m?.media_type || m.media_type === 'photo');
-      const audioMedia = (r.media_files ?? []).filter(m => m?.media_type === 'audio');
-      const photo = photoMedia.find(m => m?.is_primary)?.url
-        ?? photoMedia.find(m => !!m?.url)?.url ?? '';
+      const liveMedia = (r.media_files ?? []).filter(m => m?.deleted_at == null);
+      const photoMedia = liveMedia.filter(m => !m?.media_type || m.media_type === 'photo');
+      const audioMedia = liveMedia.filter(m => m?.media_type === 'audio');
+      const photo = pickCardImageUrl(photoMedia.find(m => m?.is_primary))
+        ?? pickCardImageUrl(photoMedia.find(m => pickCardImageUrl(m)))
+        ?? '';
       const hasAudioOnly = !photo && audioMedia.length > 0;
       const ago = formatTimeAgo(r.observed_at, lang);
       const isPublic = canShowRealName(observer, viewerAuthed);
@@ -638,7 +644,7 @@ const distancePage = page as unknown as Record<string, string>;
           ? `<span class="absolute bottom-1 right-1 inline-flex items-center rounded bg-black/60 px-1 py-0.5 text-[9px] text-white font-semibold">📷${photoMedia.length}</span>`
           : '';
       const thumb = photo
-        ? `<div class="relative w-14 h-14 shrink-0"><img src="${escapeText(photo)}" alt="${escapeText(sciText)}" loading="lazy" class="w-14 h-14 object-cover rounded-lg" />${mediaBadge}</div>`
+        ? `<div class="relative w-14 h-14 shrink-0 overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-800"><img src="${escapeText(photo)}" alt="${escapeText(sciText)}" loading="lazy" class="w-full h-full object-cover" />${mediaBadge}</div>`
         : hasAudioOnly
           ? `<div class="relative w-14 h-14 rounded-lg shrink-0 bg-zinc-800 flex items-center justify-center"><svg class="w-5 h-5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg></div>`
           : `<div class="w-14 h-14 rounded-lg shrink-0 bg-zinc-100 dark:bg-zinc-800"></div>`;
@@ -818,7 +824,7 @@ const distancePage = page as unknown as Record<string, string>;
         .select(`
           id, observed_at, state_province, observer_id,
           identifications(scientific_name, is_primary, is_research_grade, confidence, taxa(common_name_es, common_name_en)),
-          media_files(url, is_primary, media_type),
+          media_files(url, thumbnail_url, is_primary, media_type, deleted_at),
           users:observer_id(id, username, display_name, profile_public, profile_privacy, avatar_url, karma_total)
         `)
         .eq('sync_status', 'synced')
