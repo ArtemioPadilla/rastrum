@@ -45,6 +45,17 @@ const wDelivTestDoneTmpl = (wDeliv?.testDeliveryDone as string) ?? 'Test deliver
 const wDelivTestFailedTmpl = (wDeliv?.testDeliveryFailed as string) ?? 'Test delivery failed: {error}';
 const labelDeliveriesBtn = (wActions?.deliveries as string) ?? 'Deliveries';
 const labelHideDeliveriesBtn = (wActions?.hideDeliveries as string) ?? 'Hide deliveries';
+const wSlide = (wNs?.slideOver as Record<string, string>) ?? {};
+const wsEnableTitle = wSlide.enableTitle ?? 'Enable webhook';
+const wsDisableTitle = wSlide.disableTitle ?? 'Disable webhook';
+const wsDeleteTitle = wSlide.deleteTitle ?? 'Delete webhook';
+const wsReplayTitle = wSlide.replayTitle ?? 'Replay last delivery';
+const wsReasonRoutine = wSlide.reasonRoutineMaintenance ?? 'Routine maintenance';
+const wsReasonMigration = wSlide.reasonEndpointMigration ?? 'Endpoint migration';
+const wsReasonNoLonger = wSlide.reasonNoLongerNeeded ?? 'No longer needed';
+const wsReasonMisconfigured = wSlide.reasonMisconfigured ?? 'Misconfigured subscription';
+const wsReasonRetry = wSlide.reasonRetryFailedDelivery ?? 'Retry failed delivery';
+const customReason = c.quick_reason_custom ?? 'Custom…';
 const eventKeys: Array<keyof typeof wEvents> = [
   'anomaly_created', 'user_banned', 'user_unbanned', 'role_granted', 'role_revoked',
 ];
@@ -83,6 +94,10 @@ const eventKeys: Array<keyof typeof wEvents> = [
   data-label-col-time={wDeliv.time ?? 'Time'}
   data-label-col-error={wDeliv.error ?? 'Error'}
   data-label-col-nonce="Nonce"
+  data-label-slide-enable-title={wsEnableTitle}
+  data-label-slide-disable-title={wsDisableTitle}
+  data-label-slide-delete-title={wsDeleteTitle}
+  data-label-slide-replay-title={wsReplayTitle}
 >
   <header>
     <h1 class="text-xl font-semibold mb-1">{wTitle}</h1>
@@ -196,8 +211,38 @@ const eventKeys: Array<keyof typeof wEvents> = [
 
 <ConsoleSlideOver
   lang={lang}
-  id="console-slideover-webhook-action"
-  titleKey="Webhook action"
+  id="console-slideover-webhook-toggle"
+  titleKey={wsEnableTitle}
+  reasonTemplates={[
+    wsReasonRoutine,
+    wsReasonMigration,
+    wsReasonMisconfigured,
+    customReason,
+  ]}
+/>
+
+<ConsoleSlideOver
+  lang={lang}
+  id="console-slideover-webhook-delete"
+  titleKey={wsDeleteTitle}
+  irreversible={true}
+  reasonTemplates={[
+    wsReasonNoLonger,
+    wsReasonMisconfigured,
+    wsReasonMigration,
+    customReason,
+  ]}
+/>
+
+<ConsoleSlideOver
+  lang={lang}
+  id="console-slideover-webhook-replay"
+  titleKey={wsReplayTitle}
+  reasonTemplates={[
+    wsReasonRetry,
+    wsReasonRoutine,
+    customReason,
+  ]}
 />
 
 <script>
@@ -205,7 +250,6 @@ const eventKeys: Array<keyof typeof wEvents> = [
   import { getUserRoles } from '../lib/user-roles';
   import { adminClient, AdminClientError } from '../lib/admin-client';
   import { showToast } from '../lib/toast';
-  import { openConfirmDialog } from '../lib/confirm-dialog';
 
   type WebhookRow = {
     id: string;
@@ -260,6 +304,10 @@ const eventKeys: Array<keyof typeof wEvents> = [
   const labelColTime = sectionEl?.dataset.labelColTime ?? 'Time';
   const labelColError = sectionEl?.dataset.labelColError ?? 'Error';
   const labelColNonce = sectionEl?.dataset.labelColNonce ?? 'Nonce';
+  const labelSlideEnableTitle = sectionEl?.dataset.labelSlideEnableTitle ?? 'Enable webhook';
+  const labelSlideDisableTitle = sectionEl?.dataset.labelSlideDisableTitle ?? 'Disable webhook';
+  const labelSlideDeleteTitle = sectionEl?.dataset.labelSlideDeleteTitle ?? 'Delete webhook';
+  const labelSlideReplayTitle = sectionEl?.dataset.labelSlideReplayTitle ?? 'Replay last delivery';
 
   let allWebhooks: WebhookRow[] = [];
   let allDeliveries: DeliveryRow[] = [];
@@ -586,31 +634,26 @@ const eventKeys: Array<keyof typeof wEvents> = [
         if (reconcileInFlight) return;
         const id = toggleEl.dataset.toggleId!;
         const enabled = toggleEl.dataset.toggleTo === 'true';
-        const reason = prompt(`Reason for ${enabled ? 'enabling' : 'disabling'} this webhook?`);
-        if (!reason || reason.length < 5) return;
-        reconcileInFlight = true;
-        try {
-          await adminClient.webhook.update({ webhookId: id, enabled }, reason, jwt);
-          await loadAll();
-        } finally { reconcileInFlight = false; }
+        document.dispatchEvent(new CustomEvent('console:slideover-open', {
+          detail: {
+            id: 'console-slideover-webhook-toggle',
+            title: enabled ? labelSlideEnableTitle : labelSlideDisableTitle,
+            action: 'webhook.update',
+            payload: { webhookId: id, enabled },
+          },
+        }));
         return;
       }
       if (deleteId) {
         if (reconcileInFlight) return;
-        if (!(await openConfirmDialog({
-          title: labelDeleteConfirmTitle,
-          message: labelDeleteConfirm,
-          variant: 'danger',
-          confirmLabel: labelDelete,
-          cancelLabel: labelCancel,
-        }))) return;
-        const reason = prompt('Reason for deletion?');
-        if (!reason || reason.length < 5) return;
-        reconcileInFlight = true;
-        try {
-          await adminClient.webhook.delete({ webhookId: deleteId }, reason, jwt);
-          await loadAll();
-        } finally { reconcileInFlight = false; }
+        document.dispatchEvent(new CustomEvent('console:slideover-open', {
+          detail: {
+            id: 'console-slideover-webhook-delete',
+            title: labelSlideDeleteTitle,
+            action: 'webhook.delete',
+            payload: { webhookId: deleteId },
+          },
+        }));
         return;
       }
       if (deliveriesId) {
@@ -678,24 +721,14 @@ const eventKeys: Array<keyof typeof wEvents> = [
         const state = drilldown.get(replayLastId);
         const last = state?.perWebhookRows[0];
         if (!last) return;
-        const reason = prompt(labelDelivReplayConfirm);
-        if (!reason || reason.length < 5) return;
-        reconcileInFlight = true;
-        try {
-          const res = await adminClient.webhook.replayDelivery({ deliveryId: last.id }, reason, jwt);
-          const code = res.result?.statusCode;
-          if (code !== null && code !== undefined) {
-            showActionToast(labelDelivReplayDoneTmpl.replace('{status}', String(code)), true);
-          } else {
-            showActionToast(labelDelivReplayFailedTmpl.replace('{error}', res.result?.error ?? 'unknown'), false);
-          }
-          await loadDrilldown(replayLastId);
-          await loadAll();
-          renderWebhooks();
-        } catch (err) {
-          const msg = err instanceof AdminClientError ? err.message : (err as Error).message;
-          showActionToast(labelDelivReplayFailedTmpl.replace('{error}', msg), false);
-        } finally { reconcileInFlight = false; }
+        document.dispatchEvent(new CustomEvent('console:slideover-open', {
+          detail: {
+            id: 'console-slideover-webhook-replay',
+            title: labelSlideReplayTitle,
+            action: 'webhook.replayDelivery',
+            payload: { deliveryId: last.id, webhookId: replayLastId },
+          },
+        }));
         return;
       }
       if (copyNonce) {
@@ -713,6 +746,79 @@ const eventKeys: Array<keyof typeof wEvents> = [
         e.textContent = err instanceof AdminClientError ? err.message : (err as Error).message;
         e.classList.remove('hidden');
       }
+    }
+  });
+
+  document.addEventListener('console:slideover-submit', async (ev) => {
+    const { id, action, payload, reason } = (ev as CustomEvent<{
+      id: string;
+      action: string;
+      payload: Record<string, unknown>;
+      reason: string;
+    }>).detail;
+
+    if (
+      id !== 'console-slideover-webhook-toggle' &&
+      id !== 'console-slideover-webhook-delete' &&
+      id !== 'console-slideover-webhook-replay'
+    ) return;
+
+    if (!jwt) {
+      document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id, ok: false, error: 'Session expired.' } }));
+      return;
+    }
+    if (reconcileInFlight) {
+      document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id, ok: false, error: 'Another action is in flight.' } }));
+      return;
+    }
+
+    reconcileInFlight = true;
+    try {
+      if (action === 'webhook.update') {
+        await adminClient.webhook.update(
+          { webhookId: payload.webhookId as string, enabled: payload.enabled as boolean },
+          reason,
+          jwt,
+        );
+        document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id, ok: true } }));
+        await loadAll();
+        return;
+      }
+
+      if (action === 'webhook.delete') {
+        await adminClient.webhook.delete({ webhookId: payload.webhookId as string }, reason, jwt);
+        document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id, ok: true } }));
+        await loadAll();
+        return;
+      }
+
+      if (action === 'webhook.replayDelivery') {
+        const webhookId = payload.webhookId as string;
+        const res = await adminClient.webhook.replayDelivery(
+          { deliveryId: payload.deliveryId as string },
+          reason,
+          jwt,
+        );
+        const code = res.result?.statusCode;
+        if (code !== null && code !== undefined) {
+          showActionToast(labelDelivReplayDoneTmpl.replace('{status}', String(code)), true);
+        } else {
+          showActionToast(labelDelivReplayFailedTmpl.replace('{error}', res.result?.error ?? 'unknown'), false);
+        }
+        document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id, ok: true } }));
+        await loadDrilldown(webhookId);
+        await loadAll();
+        renderWebhooks();
+        return;
+      }
+    } catch (err) {
+      const msg = err instanceof AdminClientError ? err.message : (err as Error).message;
+      if (action === 'webhook.replayDelivery') {
+        showActionToast(labelDelivReplayFailedTmpl.replace('{error}', msg), false);
+      }
+      document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id, ok: false, error: msg } }));
+    } finally {
+      reconcileInFlight = false;
     }
   });
 
