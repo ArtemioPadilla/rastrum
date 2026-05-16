@@ -17,6 +17,8 @@ const tr = t(lang) as any;
     data-label-revoke-confirm-title={tr.tokens.revoke_confirm_title}
     data-label-revoke-confirm={tr.tokens.revoke_confirm}
     data-label-cancel={tr.tokens.cancel}
+    data-label-revoke-failed={tr.tokens.revoke_failed}
+    data-label-create-failed-tmpl={tr.tokens.create_failed_tmpl}
   >
     <h1 class="text-2xl font-bold mb-1">{tr.tokens.title}</h1>
     <p class="text-sm text-gray-500 mb-8">{tr.tokens.desc}</p>
@@ -99,6 +101,7 @@ const tr = t(lang) as any;
 <script>
   import {getCachedSession, getSupabase} from '../../../lib/supabase';
   import { openConfirmDialog } from '../../../lib/confirm-dialog';
+  import { showToast } from '../../../lib/toast';
   const supabase = getSupabase();
 
   const TOKENS_URL = `${import.meta.env.PUBLIC_SUPABASE_URL}/functions/v1/tokens`;
@@ -108,6 +111,8 @@ const tr = t(lang) as any;
     revokeConfirmTitle: mainEl?.dataset.labelRevokeConfirmTitle ?? '¿Revocar token?',
     revokeConfirm: mainEl?.dataset.labelRevokeConfirm ?? '¿Revocar este token? Esta acción no se puede deshacer.',
     cancel: mainEl?.dataset.labelCancel ?? 'Cancelar',
+    revokeFailed: mainEl?.dataset.labelRevokeFailed ?? 'No se pudo revocar el token.',
+    createFailedTmpl: mainEl?.dataset.labelCreateFailedTmpl ?? 'No se pudo crear el token: {msg}',
   };
 
   async function getAuthHeader() {
@@ -159,7 +164,7 @@ const tr = t(lang) as any;
         method: 'DELETE',
         headers: { Authorization: await getAuthHeader() },
       });
-      if (!r.ok) { alert('Error al revocar el token.'); return; }
+      if (!r.ok) { showToast({ message: L.revokeFailed, variant: 'error' }); return; }
       loadTokens();
     });
 
@@ -224,7 +229,7 @@ const tr = t(lang) as any;
       (document.getElementById('token-name') as HTMLInputElement).value = '';
       loadTokens();
     } catch (err) {
-      alert(`Error al crear el token: ${err instanceof Error ? err.message : err}`);
+      showToast({ message: L.createFailedTmpl.replace('{msg}', String(err instanceof Error ? err.message : err)), variant: 'error' });
     } finally {
       if (btn) { btn.disabled = false; btn.textContent = 'Crear token'; }
     }
