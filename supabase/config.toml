@@ -20,17 +20,38 @@ enabled = true
 # .github/workflows/deploy-functions.yml or the deploy re-enables it.
 verify_jwt = false
 
+# enrich-environment is NOT cron-only — it is invoked from the sync pipeline
+# with a real user JWT, so Edge-layer JWT verification stays on.
 [functions.enrich-environment]
 enabled = true
 verify_jwt = true
 
+# Cron-only functions self-gate on X-Cron-Secret via _shared/cron-auth.ts
+# (requireCronSecret). pg_cron calls them with no Authorization bearer, so
+# Edge-layer verify_jwt would 401 at the gateway before the function code
+# (and the X-Cron-Secret check) ever runs. These MUST be verify_jwt = false
+# here AND listed in CRON_ONLY in .github/workflows/deploy-functions.yml —
+# the deploy flag is authoritative in prod, but both sites must agree or a
+# config-driven deploy / local serve silently re-enables JWT.
 [functions.recompute-streaks]
 enabled = true
-verify_jwt = true
+verify_jwt = false
 
 [functions.award-badges]
 enabled = true
-verify_jwt = true
+verify_jwt = false
+
+[functions.kairos-fire]
+enabled = true
+verify_jwt = false
+
+[functions.recompute-taxa-cache]
+enabled = true
+verify_jwt = false
+
+[functions.weekly-digest]
+enabled = true
+verify_jwt = false
 
 [functions.share-card]
 enabled = true

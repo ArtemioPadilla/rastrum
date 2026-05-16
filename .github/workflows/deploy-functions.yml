@@ -211,7 +211,7 @@ jobs:
           # anon key, which Edge Functions reject when JWT verification is
           # enabled. These MUST be deployed with --no-verify-jwt.
           # Update this list when adding new cron-triggered functions.
-          CRON_ONLY="recompute-streaks award-badges gc-orphan-media plantnet-monitor recompute-user-stats streak-push retry-unidentified enrich-taxon refresh-taxon-ranges"
+          CRON_ONLY="recompute-streaks award-badges gc-orphan-media plantnet-monitor recompute-user-stats streak-push retry-unidentified enrich-taxon refresh-taxon-ranges kairos-fire recompute-taxa-cache weekly-digest"
           echo "cron_only=$CRON_ONLY" >> "$GITHUB_OUTPUT"
 
       - name: Deploy
