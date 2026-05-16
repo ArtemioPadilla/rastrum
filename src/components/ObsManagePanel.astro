@@ -44,6 +44,9 @@ type ObsDetailTree = {
   edit_location: string;
   save_changes: string;
   saved: string;
+  delete_obs_confirm: string;
+  delete_obs_confirm_yes: string;
+  delete_obs_confirm_cancel: string;
   edited_badge: string;
   manage_tab_location_placeholder: string;
   manage_tab_photos_placeholder: string;
@@ -208,7 +211,7 @@ const observe = tr.observe;
       <p id="m-error" class="hidden text-xs text-red-600 dark:text-red-400" role="alert"></p>
       <p id="m-saved" class="hidden text-xs text-emerald-700 dark:text-emerald-400" aria-live="polite">{od.saved}</p>
 
-      <div class="flex flex-wrap items-center gap-2 pt-2">
+      <div id="m-action-row" class="flex flex-wrap items-center gap-2 pt-2">
         <button
           type="submit"
           id="m-save"
@@ -219,6 +222,25 @@ const observe = tr.observe;
           id="m-delete"
           class="rounded-lg border border-red-300 dark:border-red-800 px-4 py-2 text-sm font-medium text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
         >{v.delete_obs}</button>
+      </div>
+
+      <div
+        id="m-delete-confirm"
+        role="group"
+        aria-label={od.delete_obs_confirm}
+        class="hidden flex-wrap items-center gap-2 pt-2 rounded-lg border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-3"
+      >
+        <p class="w-full text-sm font-medium text-red-700 dark:text-red-300">{od.delete_obs_confirm}</p>
+        <button
+          type="button"
+          id="m-delete-confirm-yes"
+          class="rounded-lg bg-red-600 hover:bg-red-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+        >{od.delete_obs_confirm_yes}</button>
+        <button
+          type="button"
+          id="m-delete-confirm-cancel"
+          class="rounded-lg border border-zinc-300 dark:border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500"
+        >{od.delete_obs_confirm_cancel}</button>
       </div>
     </form>
   </div>
