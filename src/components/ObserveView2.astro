@@ -422,6 +422,7 @@ import {
 } from '../lib/pipeline-engine';
 import { saveObservationToOutbox, resolveObserverRef } from '../lib/observe';
 import { syncOutbox } from '../lib/sync';
+import { SYNC_EVENTS, type SyncRowDetail } from '../lib/sync-events';
 import { getObservationDefaults, setObservationDefaults } from '../lib/observation-defaults';
 
 // ── State ──────────────────────────────────────────────────────────────────
@@ -1324,8 +1325,46 @@ postForm?.addEventListener('submit', async (e) => {
     successEl?.classList.remove('hidden');
     const linkEl = document.getElementById('obs2-success-link');
     if (linkEl && obs.id) {
-      const href = `/share/obs/?id=${obs.id}`;
-      linkEl.innerHTML = `<a href="${href}" class="text-emerald-700 dark:text-emerald-400 underline text-sm">${isEs ? 'Ver observaci\u00f3n' : 'View observation'}</a>`;
+      // The /share/obs/?id= page reads from Supabase, so it 404s
+      // ("Observation not found") until the outbox row reaches the
+      // server. Gate the CTA on the existing sync-row-done event
+      // (the same signal the SyncPill uses) instead of dead-linking.
+      const obsId = obs.id;
+      const href = `/share/obs/?id=${obsId}`;
+      const viewLabel = isEs ? 'Ver observaci\u00f3n' : 'View observation';
+      const syncingLabel = isEs ? 'Sincronizando\u2026' : 'Syncing\u2026';
+
+      const showLink = () => {
+        linkEl.innerHTML = `<a href="${href}" class="text-emerald-700 dark:text-emerald-400 underline text-sm">${viewLabel}</a>`;
+      };
+      const showSyncing = () => {
+        linkEl.innerHTML = `<span class="text-zinc-500 dark:text-zinc-400 text-sm" aria-live="polite">${syncingLabel}</span>`;
+      };
+
+      let resolved = false;
+      const resolveOnce = () => {
+        if (resolved) return;
+        resolved = true;
+        window.removeEventListener(SYNC_EVENTS.rowDone, onRowDone as EventListener);
+        showLink();
+      };
+      const onRowDone = (ev: Event) => {
+        const detail = (ev as CustomEvent<SyncRowDetail>).detail;
+        if (detail?.observation_id === obsId) resolveOnce();
+      };
+
+      showSyncing();
+      window.addEventListener(SYNC_EVENTS.rowDone, onRowDone as EventListener);
+
+      // The row may have synced before this listener was attached (fast
+      // online sync). Check Dexie directly; if already synced, resolve now.
+      void (async () => {
+        try {
+          const { getDB } = await import('../lib/db');
+          const rec = await getDB().observations.get(obsId);
+          if (!rec || rec.sync_status === 'synced') resolveOnce();
+        } catch { /* leave the event listener as the fallback */ }
+      })();
     }
     // Toast confirmation
     const toastEl = document.createElement('div');
