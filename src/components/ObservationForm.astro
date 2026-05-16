@@ -679,6 +679,7 @@ const photoPraiseJson = JSON.stringify(photoPraiseTree);
 
 <script>
   import { parse as parseExif } from 'exifr';
+  import { selfHealChunk } from '../lib/chunk-reload';
   import { syncOutbox, registerSyncTriggers } from '../lib/sync';
   import { resolveObserverRef, saveObservationToOutbox } from '../lib/observe';
   import { checkOutlier, formatDistanceKm } from '../lib/outlier-alert';
@@ -1293,6 +1294,7 @@ const photoPraiseJson = JSON.stringify(photoPraiseTree);
         status.classList.add('hidden');
       }
     } catch (err) {
+      if (selfHealChunk(err)) return;
       if (status) status.textContent = err instanceof Error ? err.message : String(err);
     } finally {
       btn.disabled = false;
@@ -1559,6 +1561,7 @@ const photoPraiseJson = JSON.stringify(photoPraiseTree);
         }
       }
     } catch (err) {
+      if (selfHealChunk(err)) return;
       phiProgress?.classList.add('hidden');
       if (idAllFailed) {
         idAllFailed.textContent = err instanceof Error ? err.message : String(err);
@@ -1626,6 +1629,7 @@ const photoPraiseJson = JSON.stringify(photoPraiseTree);
         }
       }
     } catch (err) {
+      if (selfHealChunk(err)) return;
       gemmaProgress?.classList.add('hidden');
       if (idAllFailed) {
         idAllFailed.textContent = err instanceof Error ? err.message : String(err);
