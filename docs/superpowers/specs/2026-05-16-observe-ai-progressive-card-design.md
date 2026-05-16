@@ -53,6 +53,33 @@ asks the human) + **A's adaptive collapse** (high confidence → compact
 "✓ saved" row, zero friction) + **B's provenance strip** (device → cloud →
 community) shown while the ID is unconfirmed.
 
+### Render integration (decided 2026-05-16, visual companion)
+
+**Approach C — restructure: the card subsumes result + taxon + why into
+one cohesive component.** In today's `ObserveView2.astro`, `#obs2-id-card`
+contains `#obs2-id-result` (species + confidence ring + `WhyThisSpecies`)
+**and** an always-visible `#obs2-id-manual` (`TaxonAutocomplete`), with
+`ContextualSpeciesChips` below. Under approach C:
+
+- The progressive card **replaces** `#obs2-id-result` + `#obs2-id-manual`
+  as one unit. There is one mental model, not "result" + "manual entry".
+- The **"✎ No, es otra…" action opens `TaxonAutocomplete` inline** (on
+  demand) — it is the correction path, not a permanently-visible field.
+- `WhyThisSpecies` moves **inside the "ver traza / ¿por qué?" disclosure**
+  (the audit layer), not a separate always-on panel.
+- `ContextualSpeciesChips` stays below the card (anchors the correction
+  flow), unchanged.
+- This touches the submit handler + `bestResult` flow + `showPostForm()`
+  — the headline/affirmation the card produces becomes the persisted
+  identification (via the `observe-card-vm` seam). That coupling is why C
+  is the heaviest slice and must be decomposed (see build order) and
+  grounded against the submit/`bestResult`/`TaxonAutocomplete`/
+  `WhyThisSpecies` internals before planning.
+
+A was offered as a lower-risk first slice; **C was chosen** as the target
+— "neat" requires the single mental model. Incremental delivery toward C
+is fine, but A-as-an-end-state is explicitly rejected.
+
 ### State machine
 
 | State | Trigger | Card |
