@@ -509,18 +509,27 @@ function showModeToast(msg: string): void {
   try {
     const { hasKeysForPlugin } = await import('../lib/byo-keys');
     const { getBirdNETCacheStatus, getBirdNETWeightsBaseUrl } = await import('../lib/identifiers/birdnet-cache');
+    const { getOnnxBaseCacheStatus, getOnnxBaseWeightsBaseUrl } = await import('../lib/identifiers/onnx-base-cache');
     const hasByo = hasKeysForPlugin('claude_haiku') || hasKeysForPlugin('plantnet');
     const hasBirdnet = getBirdNETWeightsBaseUrl() ? await getBirdNETCacheStatus().then(s => s.modelCached && s.labelsCached).catch(() => false) : false;
+    const hasEfficientNet = getOnnxBaseWeightsBaseUrl()
+      ? await getOnnxBaseCacheStatus().then(s => s.modelCached && s.labelsCached).catch(() => false)
+      : false;
+    const hasPhi = await pluginReady('webllm_phi35_vision').catch(() => false);
+    const hasGemma = await pluginReady('onnx_gemma4_vision').catch(() => false);
+    // Local mode is usable if ANY on-device runner is available — BirdNET
+    // for audio OR an on-device photo model (EfficientNet/Phi/Gemma).
+    const hasLocal = hasBirdnet || hasEfficientNet || hasPhi || hasGemma;
     const ownBtn = document.getElementById('obs2-mode-own-key') as HTMLButtonElement | null;
     const locBtn = document.getElementById('obs2-mode-local') as HTMLButtonElement | null;
     if (ownBtn && !hasByo) ownBtn.disabled = true;
-    if (locBtn && !hasBirdnet) locBtn.disabled = true;
+    if (locBtn && !hasLocal) locBtn.disabled = true;
     applyModeStyles(readAiMode());
     // Only reveal the selector when ≥2 modes are usable (#942 PR5 redo).
     // Sponsored is always available; count it plus any of own-key/local
     // that are not disabled. With ≤1 usable mode the selector reads as
     // broken UI ("disabled buttons next to one live button").
-    const usableModes = 1 /* sponsored */ + (hasByo ? 1 : 0) + (hasBirdnet ? 1 : 0);
+    const usableModes = 1 /* sponsored */ + (hasByo ? 1 : 0) + (hasLocal ? 1 : 0);
     if (usableModes >= 2) {
       document.getElementById('obs2-ai-mode-selector')?.classList.remove('hidden');
     }
@@ -908,7 +917,7 @@ async function runPipeline(state: PipelineState) {
         if (aiMode === 'local' && chosen.length === 0) {
           // Nothing on-device for photos — honest fallback to sponsored.
           aiMode = 'sponsored'; writeAiMode('sponsored'); applyModeStyles('sponsored');
-          showModeToast(isEs ? 'Sin modelo on-device para fotos — usando patrocinado.' : 'No on-device photo model — using sponsored.');
+          showModeToast(tr.observe.local_fallback_sponsored);
           chosen = resolveRunnerSet({ aiMode, mediaKind: 'photo', available: avail });
         }
         const runners: Record<string, import('../lib/identify-cascade-client').IdentifierRunner> = {};
