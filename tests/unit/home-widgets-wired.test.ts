@@ -28,3 +28,23 @@ describe('home page includes HomeWidgets (#704 / #925)', () => {
     });
   }
 });
+
+describe("challenge-completed probe is a bounded existence check, not a count HEAD (#1072)", () => {
+  const src = readFileSync(
+    join(process.cwd(), 'src/components/HomeWidgets.astro'),
+    'utf8',
+  );
+
+  it('does not request an exact count or HEAD on the observations probe', () => {
+    // An unbounded RLS `count: 'exact', head: true` over observations
+    // statement-timeouts in the pooler → HTTP 503 on every signed-in home
+    // load. Regression guard: the source must not contain that pattern.
+    expect(src).not.toMatch(/count:\s*'exact'/);
+    expect(src).not.toMatch(/head:\s*true/);
+  });
+
+  it('uses a bounded .limit(1) existence probe for the daily challenge', () => {
+    expect(src).toMatch(/\.gte\('observed_at', todayStart\.toISOString\(\)\)\s*\.limit\(1\)/);
+    expect(src).toMatch(/const completed = !!doneRows && doneRows\.length > 0/);
+  });
+});
