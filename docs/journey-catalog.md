@@ -83,7 +83,7 @@
 | `exploreValidate` | /en/explore/validate | /es/explorar/validar | authed | R+W | — | 2026-05-16 |  |
 | `exploreWatchlist` | /en/explore/watchlist | /es/explorar/seguimiento | authed | R | journey-watchlist-rare-species-alert.spec.ts | never |  |
 | `faq` | /en/faq | /es/preguntas-frecuentes | anon | R | — | never |  |
-| `fieldGuide` | /enfield-guide | /esguia-de-campo | anon | R | — | never |  |
+| `fieldGuide` | /en/explore/trails/field-guide | /es/explorar/senderos/guia-de-campo | anon | R | — | never | #1130 |
 | `home` | /en | /es | anon | R | journey-guest-browse.spec.ts | 2026-05-16 |  |
 | `identify` | /en/observe | /es/observar | anon | R+W | — | never |  |
 | `inbox` | /en/inbox | /es/bandeja | authed | R | — | never |  |
