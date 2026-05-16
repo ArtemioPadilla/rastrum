@@ -50,7 +50,7 @@ const observersMapHref = getLocalizedPath(lang, routes.communityMap[locale] + '/
     getPmtilesCacheStatus,
     getPmtilesMxUrl,
   } from '../lib/offline-map';
-  import { basemapStyleUrl } from '../lib/map-style';
+  import { basemapStyleUrl, installSpriteFallback } from '../lib/map-style';
 
   const isEs = document.documentElement.lang === 'es';
   const isDark = document.documentElement.classList.contains('dark');
@@ -197,6 +197,12 @@ const observersMapHref = getLocalizedPath(lang, routes.communityMap[locale] + '/
     zoom: 6,
     attributionControl: { compact: true },
   });
+
+  // #1113 — the hosted OpenFreeMap style references Maki POI icons
+  // (`circle-11`, …) via a sprite we don't control; register a transparent
+  // fallback so a slow/failed sprite load doesn't spam the console. Our
+  // observation layers are circle-paint and never hit this path.
+  installSpriteFallback(map);
 
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
 
