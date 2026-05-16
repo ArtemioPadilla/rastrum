@@ -67,6 +67,8 @@ const sponsoringI18n = {
   data-label-stat-obs={tr.profile.total_observations}
   data-label-stat-species={tr.profile.species_count}
   data-label-page-title={tr.profile.public_profile_page_title}
+  data-label-blocked={tr.socialgraph.block.blocked_toast}
+  data-label-block-error={tr.socialgraph.block.block_error}
   data-share-obs-base="/share/obs/"
 >
   <div data-pp-loading class="py-12 text-center text-sm text-zinc-500 dark:text-zinc-400">
@@ -250,6 +252,7 @@ const sponsoringI18n = {
 <script>
   import { getCachedUser, getSupabase } from '../lib/supabase';
   import { wireOverflowMenu } from '../lib/overflow-menu';
+  import { showToast } from '../lib/toast';
   import { openConfirmDialog } from '../lib/confirm-dialog';
   import { tierForKarma } from '../lib/karma-frame';
 
@@ -564,9 +567,15 @@ const sponsoringI18n = {
         try {
           const { blockUser } = await import('../lib/social');
           await blockUser(profile.id);
-          alert(lang === 'es' ? 'Usuario bloqueado.' : 'User blocked.');
+          showToast({
+            message: root.dataset.labelBlocked ?? (lang === 'es' ? 'Usuario bloqueado.' : 'User blocked.'),
+            variant: 'success',
+          });
         } catch (err) {
-          alert(lang === 'es' ? 'No se pudo bloquear.' : 'Could not block.');
+          showToast({
+            message: root.dataset.labelBlockError ?? (lang === 'es' ? 'No se pudo bloquear.' : 'Could not block.'),
+            variant: 'error',
+          });
           // eslint-disable-next-line no-console
           console.warn('[profile.block]', err);
         } finally {
