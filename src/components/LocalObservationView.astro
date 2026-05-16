@@ -61,6 +61,7 @@ const retryLabel   = profileStrings.my_observations_retry ?? (lang === 'es' ? 'R
 </div>
 
 <script>
+  import { openConfirmDialog } from '../lib/confirm-dialog';
   type Lang = 'en' | 'es';
   const root = document.querySelector<HTMLElement>('.rastrum-local-obs');
   if (!root) throw new Error('Local observation root missing');
@@ -184,9 +185,15 @@ const retryLabel   = profileStrings.my_observations_retry ?? (lang === 'es' ? 'R
     // Discard → confirm, then delete the Dexie row + its blobs.
     const discardBtn = document.getElementById('local-obs-discard') as HTMLButtonElement | null;
     discardBtn?.addEventListener('click', async () => {
-      const ok = window.confirm(isEs
-        ? '¿Eliminar esta observación de tu dispositivo? Esta acción no se puede deshacer.'
-        : 'Delete this observation from your device? This cannot be undone.');
+      const ok = await openConfirmDialog({
+        title: isEs ? '¿Eliminar observación?' : 'Delete observation?',
+        message: isEs
+          ? '¿Eliminar esta observación de tu dispositivo? Esta acción no se puede deshacer.'
+          : 'Delete this observation from your device? This cannot be undone.',
+        variant: 'danger',
+        confirmLabel: isEs ? 'Eliminar' : 'Delete',
+        cancelLabel: isEs ? 'Cancelar' : 'Cancel',
+      });
       if (!ok) return;
       try {
         await db.mediaBlobs.where('observation_id').equals(id).delete();
