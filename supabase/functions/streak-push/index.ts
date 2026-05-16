@@ -152,7 +152,10 @@ function tzYesterday(tz: string, when = new Date()): string {
 
 // ─────────────── HTTP handler ───────────────
 
-serve(async () => {
+serve(async (req) => {
+  const denied = requireCronSecret(req);
+  if (denied) return denied;
+
   const url = Deno.env.get('SUPABASE_URL');
   const role = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   const vapidPub = Deno.env.get('VAPID_PUBLIC_KEY');
