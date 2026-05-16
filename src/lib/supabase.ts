@@ -96,7 +96,18 @@ function ensureAuthListener() {
  * callback fires once with `('INITIAL_SESSION', <current session>)` on
  * subscribe (via the dedup'd cached session — no extra lock) so callers
  * that paint from the initial session still do, then on every change.
- * Returns an unsubscribe function.
+ *
+ * Returns an unsubscribe function. Today's callers are chrome islands
+ * that live for the whole session, so none call it. But any caller in a
+ * dynamic context (SPA navigation, a conditionally-mounted island, a
+ * component teardown) MUST call it on unmount — otherwise the callback
+ * stays in `_authListeners` and leaks (and keeps firing against dead
+ * DOM):
+ *
+ * ```ts
+ * const off = onAuthChange((event, session) => paint(!!session));
+ * onCleanup(off); // or: element.addEventListener('rastrum:unmount', off)
+ * ```
  */
 export function onAuthChange(cb: AuthChangeCb): () => void {
   ensureAuthListener();
