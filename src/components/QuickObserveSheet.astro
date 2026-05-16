@@ -128,6 +128,7 @@ const isEs = lang === "es";
 import { triageFile, buildGraph, savePipelineState } from '../lib/pipeline-engine';
 import type { PipelineFile, PipelineState } from '../lib/pipeline-engine';
 import { saveObservationToOutbox, resolveObserverRef } from '../lib/observe';
+import { selfHealChunk } from '../lib/chunk-reload';
 import { syncOutbox } from '../lib/sync';
 import { PENDING_OBSERVATION_KEY } from '../lib/chat-attachment-helpers';
 import { showToast } from '../lib/toast';
@@ -326,6 +327,7 @@ saveBtn?.addEventListener('click', async () => {
     document.dispatchEvent(new CustomEvent('rastrum:quick-saved'));
     setTimeout(closeSheet, 1800);
   } catch (err) {
+    if (selfHealChunk(err)) return;
     if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = isEs ? 'Confirmar y guardar' : 'Confirm & save'; }
     showToast({ message: (err as Error).message, variant: 'error' });
   }
