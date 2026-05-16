@@ -173,6 +173,9 @@ finishes wiring it into the `verify` job.
 - `docs/runbooks/ci-smoke-checks.md` — what to do when a smoke job goes red.
 - `.github/workflows/ci.yml`, `db-validate.yml`, `pr-audit.yml` — the
   workflows behind the required checks.
+- [`journey-catalog.md`](journey-catalog.md) — CI-enforced, provably-
+  complete route + journey catalog (the list sweeps run against;
+  `tests/unit/journey-catalog-complete.test.ts` keeps it from rotting).
 
 ---
 
