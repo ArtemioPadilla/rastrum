@@ -23,6 +23,9 @@ const wActions = (wNs?.actions as Record<string, string>) ?? {};
 const wDeliv  = (wNs?.deliveries as Record<string, string>) ?? {};
 const wEmpty  = (wNs?.empty as string) ?? 'No webhooks configured.';
 const wDelivEmpty = (wNs?.deliveriesEmpty as string) ?? 'No deliveries yet.';
+const wDeleteConfirmTitle = (wNs?.deleteConfirmTitle as string) ?? 'Delete webhook?';
+const wDeleteConfirm = (wNs?.deleteConfirm as string) ?? 'Delete this webhook? This cannot be undone.';
+const wCancel = (wNs?.cancel as string) ?? (c.cancel ?? 'Cancel');
 const wDelivPerWebhookHeading = (wDeliv?.perWebhookHeading as string) ?? 'Delivery history';
 const wDelivPerWebhookEmpty = (wDeliv?.perWebhookEmpty as string) ?? 'No deliveries for this webhook yet.';
 const wDelivFilters = {
@@ -51,6 +54,9 @@ const eventKeys: Array<keyof typeof wEvents> = [
   data-label-action-enable={wActions.enable ?? 'Enable'}
   data-label-action-disable={wActions.disable ?? 'Disable'}
   data-label-action-delete={wActions.delete ?? 'Delete'}
+  data-label-delete-confirm-title={wDeleteConfirmTitle}
+  data-label-delete-confirm={wDeleteConfirm}
+  data-label-cancel={wCancel}
   data-label-action-deliveries={labelDeliveriesBtn}
   data-label-action-hide-deliveries={labelHideDeliveriesBtn}
   data-label-deliv-heading={wDelivPerWebhookHeading}
@@ -194,6 +200,7 @@ const eventKeys: Array<keyof typeof wEvents> = [
   import { getCachedSession, getSupabase } from '../lib/supabase';
   import { getUserRoles } from '../lib/user-roles';
   import { adminClient, AdminClientError } from '../lib/admin-client';
+  import { openConfirmDialog } from '../lib/confirm-dialog';
 
   type WebhookRow = {
     id: string;
@@ -221,6 +228,9 @@ const eventKeys: Array<keyof typeof wEvents> = [
   const labelEnable = sectionEl?.dataset.labelActionEnable ?? 'Enable';
   const labelDisable = sectionEl?.dataset.labelActionDisable ?? 'Disable';
   const labelDelete = sectionEl?.dataset.labelActionDelete ?? 'Delete';
+  const labelDeleteConfirmTitle = sectionEl?.dataset.labelDeleteConfirmTitle ?? 'Delete webhook?';
+  const labelDeleteConfirm = sectionEl?.dataset.labelDeleteConfirm ?? 'Delete this webhook? This cannot be undone.';
+  const labelCancel = sectionEl?.dataset.labelCancel ?? 'Cancel';
   const labelDeliveries = sectionEl?.dataset.labelActionDeliveries ?? 'Deliveries';
   const labelHideDeliveries = sectionEl?.dataset.labelActionHideDeliveries ?? 'Hide deliveries';
   const labelDelivHeading = sectionEl?.dataset.labelDelivHeading ?? 'Delivery history';
@@ -578,7 +588,13 @@ const eventKeys: Array<keyof typeof wEvents> = [
       }
       if (deleteId) {
         if (reconcileInFlight) return;
-        if (!confirm('Delete this webhook? This cannot be undone.')) return;
+        if (!(await openConfirmDialog({
+          title: labelDeleteConfirmTitle,
+          message: labelDeleteConfirm,
+          variant: 'danger',
+          confirmLabel: labelDelete,
+          cancelLabel: labelCancel,
+        }))) return;
         const reason = prompt('Reason for deletion?');
         if (!reason || reason.length < 5) return;
         reconcileInFlight = true;
