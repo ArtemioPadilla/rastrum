@@ -173,3 +173,47 @@ finishes wiring it into the `verify` job.
 - `docs/runbooks/ci-smoke-checks.md` — what to do when a smoke job goes red.
 - `.github/workflows/ci.yml`, `db-validate.yml`, `pr-audit.yml` — the
   workflows behind the required checks.
+
+---
+
+## 8. Chat / "Ask Rastrum" AI answer path — coverage decision
+
+Tracked from the 2026-05-15 journey audit
+([`journey-audit-2026-05-15.md`](journey-audit-2026-05-15.md) §4) and
+issue #1106.
+
+**Correction to the original framing.** #1106 was filed assuming the
+chat answer path needs a BYO key / sponsorship / platform-pool slot and
+therefore "costs model spend / is untestable without spend." That is
+**wrong**. Production verification (2026-05-16) confirmed Rastrum
+**Chat / "Ask Rastrum" runs entirely on-device** (WebLLM — Gemma 4 E2B
+~500 MB, or Llama 3.2 1B ~880 MB; *"tus mensajes nunca salen del
+navegador"*). There is **no operator cost and no API key** for the chat
+path. The paid path is the *separate* "Ask my AI" identify cascade
+(server EF + BYO/pool/sponsorship, M32), which the photo-ID journey
+already exercises.
+
+**What is verified in production (no cost):**
+- The `AskRastrumButton` deep-link `/{lang}/chat/?attach=<kind>:<id>`
+  resolves to the chat page (no 404 / no crash) — the
+  `journey-chat-find-species-and-observe.spec.ts` contract holds live.
+- The model gate is honest UX: explicit on-device model picker, privacy
+  note, and a "Profile → AI settings" link. No silent failure when no
+  model is downloaded yet.
+
+**Why the e2e spec mocks the model.** `mockChatModelCached` exists
+because the real WebLLM model is **~500 MB + WebGPU** — impractical to
+download/run in CI — **not** because of cost. This is the same class of
+constraint as `phi-vision.ts` (mocked at the module boundary; see
+CLAUDE.md "Known pitfalls").
+
+**Decision (defer-with-rationale).** We do **not** add a real-model chat
+e2e variant. Justification: the only uncovered behaviour is on-device
+WebLLM inference producing a grounded answer with the attached entity —
+a one-time **manual on-device smoke**, not a regression-prone surface
+and not CI-feasible (model size + WebGPU). The mocked journey spec
+guards the shell + deep-link + attach contract on every PR; the
+remaining gap is a release-time manual check, owned by the operator,
+documented here. If a future change makes on-device chat brittle, revisit
+by adding a `@manual`-tagged Playwright spec a human runs locally with a
+pre-downloaded model — never a required CI gate.
