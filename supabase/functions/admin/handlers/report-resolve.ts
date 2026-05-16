@@ -10,7 +10,17 @@ export const reportResolveHandler: ActionHandler<Payload> = {
   payloadSchema: Payload,
   async execute(admin, payload, _actor, _reason) {
     const { data: before } = await admin.from('reports').select('*').eq('id', payload.report_id).single();
-    if (!before) throw new Error('report.resolve: target not found');
+    // Report already gone (cascade-deleted with its target, or previously purged).
+    // Treat as already resolved — write the audit row so the action is on record
+    // and return success rather than throwing into function_errors.
+    if (!before) {
+      return {
+        before: null,
+        after: null,
+        target: { type: 'report', id: payload.report_id },
+        result: { note: 'report not found; treated as already resolved' },
+      };
+    }
     const { error } = await admin.from('reports').update({ status: 'resolved' }).eq('id', payload.report_id);
     if (error) throw new Error(`report.resolve: ${error.message}`);
     const { data: after } = await admin.from('reports').select('*').eq('id', payload.report_id).single();
