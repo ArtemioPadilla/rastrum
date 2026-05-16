@@ -130,6 +130,7 @@ import type { PipelineFile, PipelineState } from '../lib/pipeline-engine';
 import { saveObservationToOutbox, resolveObserverRef } from '../lib/observe';
 import { syncOutbox } from '../lib/sync';
 import { PENDING_OBSERVATION_KEY } from '../lib/chat-attachment-helpers';
+import { showToast } from '../lib/toast';
 
 const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
 const isEs = lang === 'es';
@@ -326,7 +327,7 @@ saveBtn?.addEventListener('click', async () => {
     setTimeout(closeSheet, 1800);
   } catch (err) {
     if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = isEs ? 'Confirmar y guardar' : 'Confirm & save'; }
-    alert((err as Error).message);
+    showToast({ message: (err as Error).message, variant: 'error' });
   }
 });
 

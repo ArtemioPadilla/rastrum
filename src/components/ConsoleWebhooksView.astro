@@ -23,6 +23,9 @@ const wActions = (wNs?.actions as Record<string, string>) ?? {};
 const wDeliv  = (wNs?.deliveries as Record<string, string>) ?? {};
 const wEmpty  = (wNs?.empty as string) ?? 'No webhooks configured.';
 const wDelivEmpty = (wNs?.deliveriesEmpty as string) ?? 'No deliveries yet.';
+const wDeleteConfirmTitle = (wNs?.deleteConfirmTitle as string) ?? 'Delete webhook?';
+const wDeleteConfirm = (wNs?.deleteConfirm as string) ?? 'Delete this webhook? This cannot be undone.';
+const wCancel = (wNs?.cancel as string) ?? (c.cancel ?? 'Cancel');
 const wDelivPerWebhookHeading = (wDeliv?.perWebhookHeading as string) ?? 'Delivery history';
 const wDelivPerWebhookEmpty = (wDeliv?.perWebhookEmpty as string) ?? 'No deliveries for this webhook yet.';
 const wDelivFilters = {
@@ -38,8 +41,21 @@ const wDelivReplayDoneTmpl = (wDeliv?.replayDone as string) ?? 'Replay sent (HTT
 const wDelivReplayFailedTmpl = (wDeliv?.replayFailed as string) ?? 'Replay failed: {error}';
 const wDelivNonceCopied = (wDeliv?.nonceCopied as string) ?? 'Nonce copied.';
 const wDelivLoadFailedTmpl = (wDeliv?.loadFailed as string) ?? 'Could not load deliveries: {error}';
+const wDelivTestDoneTmpl = (wDeliv?.testDeliveryDone as string) ?? 'Test delivery: HTTP {status}.';
+const wDelivTestFailedTmpl = (wDeliv?.testDeliveryFailed as string) ?? 'Test delivery failed: {error}';
 const labelDeliveriesBtn = (wActions?.deliveries as string) ?? 'Deliveries';
 const labelHideDeliveriesBtn = (wActions?.hideDeliveries as string) ?? 'Hide deliveries';
+const wSlide = (wNs?.slideOver as Record<string, string>) ?? {};
+const wsEnableTitle = wSlide.enableTitle ?? 'Enable webhook';
+const wsDisableTitle = wSlide.disableTitle ?? 'Disable webhook';
+const wsDeleteTitle = wSlide.deleteTitle ?? 'Delete webhook';
+const wsReplayTitle = wSlide.replayTitle ?? 'Replay last delivery';
+const wsReasonRoutine = wSlide.reasonRoutineMaintenance ?? 'Routine maintenance';
+const wsReasonMigration = wSlide.reasonEndpointMigration ?? 'Endpoint migration';
+const wsReasonNoLonger = wSlide.reasonNoLongerNeeded ?? 'No longer needed';
+const wsReasonMisconfigured = wSlide.reasonMisconfigured ?? 'Misconfigured subscription';
+const wsReasonRetry = wSlide.reasonRetryFailedDelivery ?? 'Retry failed delivery';
+const customReason = c.quick_reason_custom ?? 'Custom…';
 const eventKeys: Array<keyof typeof wEvents> = [
   'anomaly_created', 'user_banned', 'user_unbanned', 'role_granted', 'role_revoked',
 ];
@@ -51,6 +67,9 @@ const eventKeys: Array<keyof typeof wEvents> = [
   data-label-action-enable={wActions.enable ?? 'Enable'}
   data-label-action-disable={wActions.disable ?? 'Disable'}
   data-label-action-delete={wActions.delete ?? 'Delete'}
+  data-label-delete-confirm-title={wDeleteConfirmTitle}
+  data-label-delete-confirm={wDeleteConfirm}
+  data-label-cancel={wCancel}
   data-label-action-deliveries={labelDeliveriesBtn}
   data-label-action-hide-deliveries={labelHideDeliveriesBtn}
   data-label-deliv-heading={wDelivPerWebhookHeading}
@@ -68,11 +87,17 @@ const eventKeys: Array<keyof typeof wEvents> = [
   data-label-deliv-replay-failed-tmpl={wDelivReplayFailedTmpl}
   data-label-deliv-nonce-copied={wDelivNonceCopied}
   data-label-deliv-load-failed-tmpl={wDelivLoadFailedTmpl}
+  data-label-test-done-tmpl={wDelivTestDoneTmpl}
+  data-label-test-failed-tmpl={wDelivTestFailedTmpl}
   data-label-col-event={wDeliv.event ?? 'Event'}
   data-label-col-status={wDeliv.status ?? 'Status'}
   data-label-col-time={wDeliv.time ?? 'Time'}
   data-label-col-error={wDeliv.error ?? 'Error'}
   data-label-col-nonce="Nonce"
+  data-label-slide-enable-title={wsEnableTitle}
+  data-label-slide-disable-title={wsDisableTitle}
+  data-label-slide-delete-title={wsDeleteTitle}
+  data-label-slide-replay-title={wsReplayTitle}
 >
   <header>
     <h1 class="text-xl font-semibold mb-1">{wTitle}</h1>
@@ -186,14 +211,45 @@ const eventKeys: Array<keyof typeof wEvents> = [
 
 <ConsoleSlideOver
   lang={lang}
-  id="console-slideover-webhook-action"
-  titleKey="Webhook action"
+  id="console-slideover-webhook-toggle"
+  titleKey={wsEnableTitle}
+  reasonTemplates={[
+    wsReasonRoutine,
+    wsReasonMigration,
+    wsReasonMisconfigured,
+    customReason,
+  ]}
+/>
+
+<ConsoleSlideOver
+  lang={lang}
+  id="console-slideover-webhook-delete"
+  titleKey={wsDeleteTitle}
+  irreversible={true}
+  reasonTemplates={[
+    wsReasonNoLonger,
+    wsReasonMisconfigured,
+    wsReasonMigration,
+    customReason,
+  ]}
+/>
+
+<ConsoleSlideOver
+  lang={lang}
+  id="console-slideover-webhook-replay"
+  titleKey={wsReplayTitle}
+  reasonTemplates={[
+    wsReasonRetry,
+    wsReasonRoutine,
+    customReason,
+  ]}
 />
 
 <script>
   import { getCachedSession, getSupabase } from '../lib/supabase';
   import { getUserRoles } from '../lib/user-roles';
   import { adminClient, AdminClientError } from '../lib/admin-client';
+  import { showToast } from '../lib/toast';
 
   type WebhookRow = {
     id: string;
@@ -221,6 +277,9 @@ const eventKeys: Array<keyof typeof wEvents> = [
   const labelEnable = sectionEl?.dataset.labelActionEnable ?? 'Enable';
   const labelDisable = sectionEl?.dataset.labelActionDisable ?? 'Disable';
   const labelDelete = sectionEl?.dataset.labelActionDelete ?? 'Delete';
+  const labelDeleteConfirmTitle = sectionEl?.dataset.labelDeleteConfirmTitle ?? 'Delete webhook?';
+  const labelDeleteConfirm = sectionEl?.dataset.labelDeleteConfirm ?? 'Delete this webhook? This cannot be undone.';
+  const labelCancel = sectionEl?.dataset.labelCancel ?? 'Cancel';
   const labelDeliveries = sectionEl?.dataset.labelActionDeliveries ?? 'Deliveries';
   const labelHideDeliveries = sectionEl?.dataset.labelActionHideDeliveries ?? 'Hide deliveries';
   const labelDelivHeading = sectionEl?.dataset.labelDelivHeading ?? 'Delivery history';
@@ -238,11 +297,17 @@ const eventKeys: Array<keyof typeof wEvents> = [
   const labelDelivReplayFailedTmpl = sectionEl?.dataset.labelDelivReplayFailedTmpl ?? 'Replay failed: {error}';
   const labelDelivNonceCopied = sectionEl?.dataset.labelDelivNonceCopied ?? 'Nonce copied.';
   const labelDelivLoadFailedTmpl = sectionEl?.dataset.labelDelivLoadFailedTmpl ?? 'Could not load deliveries: {error}';
+  const labelTestDoneTmpl = sectionEl?.dataset.labelTestDoneTmpl ?? 'Test delivery: HTTP {status}.';
+  const labelTestFailedTmpl = sectionEl?.dataset.labelTestFailedTmpl ?? 'Test delivery failed: {error}';
   const labelColEvent = sectionEl?.dataset.labelColEvent ?? 'Event';
   const labelColStatus = sectionEl?.dataset.labelColStatus ?? 'Status';
   const labelColTime = sectionEl?.dataset.labelColTime ?? 'Time';
   const labelColError = sectionEl?.dataset.labelColError ?? 'Error';
   const labelColNonce = sectionEl?.dataset.labelColNonce ?? 'Nonce';
+  const labelSlideEnableTitle = sectionEl?.dataset.labelSlideEnableTitle ?? 'Enable webhook';
+  const labelSlideDisableTitle = sectionEl?.dataset.labelSlideDisableTitle ?? 'Disable webhook';
+  const labelSlideDeleteTitle = sectionEl?.dataset.labelSlideDeleteTitle ?? 'Delete webhook';
+  const labelSlideReplayTitle = sectionEl?.dataset.labelSlideReplayTitle ?? 'Replay last delivery';
 
   let allWebhooks: WebhookRow[] = [];
   let allDeliveries: DeliveryRow[] = [];
@@ -558,7 +623,9 @@ const eventKeys: Array<keyof typeof wEvents> = [
         try {
           const res = await adminClient.webhook.test({ webhookId: testId }, 'manual webhook test', jwt);
           const code = res.result?.statusCode;
-          alert(code ? `Test delivery: HTTP ${code}` : `Test delivery failed: ${res.result?.error ?? 'unknown'}`);
+          showToast(code
+            ? { message: labelTestDoneTmpl.replace('{status}', String(code)), variant: 'success' }
+            : { message: labelTestFailedTmpl.replace('{error}', res.result?.error ?? 'unknown'), variant: 'error' });
           await loadAll();
         } finally { reconcileInFlight = false; }
         return;
@@ -567,25 +634,26 @@ const eventKeys: Array<keyof typeof wEvents> = [
         if (reconcileInFlight) return;
         const id = toggleEl.dataset.toggleId!;
         const enabled = toggleEl.dataset.toggleTo === 'true';
-        const reason = prompt(`Reason for ${enabled ? 'enabling' : 'disabling'} this webhook?`);
-        if (!reason || reason.length < 5) return;
-        reconcileInFlight = true;
-        try {
-          await adminClient.webhook.update({ webhookId: id, enabled }, reason, jwt);
-          await loadAll();
-        } finally { reconcileInFlight = false; }
+        document.dispatchEvent(new CustomEvent('console:slideover-open', {
+          detail: {
+            id: 'console-slideover-webhook-toggle',
+            title: enabled ? labelSlideEnableTitle : labelSlideDisableTitle,
+            action: 'webhook.update',
+            payload: { webhookId: id, enabled },
+          },
+        }));
         return;
       }
       if (deleteId) {
         if (reconcileInFlight) return;
-        if (!confirm('Delete this webhook? This cannot be undone.')) return;
-        const reason = prompt('Reason for deletion?');
-        if (!reason || reason.length < 5) return;
-        reconcileInFlight = true;
-        try {
-          await adminClient.webhook.delete({ webhookId: deleteId }, reason, jwt);
-          await loadAll();
-        } finally { reconcileInFlight = false; }
+        document.dispatchEvent(new CustomEvent('console:slideover-open', {
+          detail: {
+            id: 'console-slideover-webhook-delete',
+            title: labelSlideDeleteTitle,
+            action: 'webhook.delete',
+            payload: { webhookId: deleteId },
+          },
+        }));
         return;
       }
       if (deliveriesId) {
@@ -653,24 +721,14 @@ const eventKeys: Array<keyof typeof wEvents> = [
         const state = drilldown.get(replayLastId);
         const last = state?.perWebhookRows[0];
         if (!last) return;
-        const reason = prompt(labelDelivReplayConfirm);
-        if (!reason || reason.length < 5) return;
-        reconcileInFlight = true;
-        try {
-          const res = await adminClient.webhook.replayDelivery({ deliveryId: last.id }, reason, jwt);
-          const code = res.result?.statusCode;
-          if (code !== null && code !== undefined) {
-            showActionToast(labelDelivReplayDoneTmpl.replace('{status}', String(code)), true);
-          } else {
-            showActionToast(labelDelivReplayFailedTmpl.replace('{error}', res.result?.error ?? 'unknown'), false);
-          }
-          await loadDrilldown(replayLastId);
-          await loadAll();
-          renderWebhooks();
-        } catch (err) {
-          const msg = err instanceof AdminClientError ? err.message : (err as Error).message;
-          showActionToast(labelDelivReplayFailedTmpl.replace('{error}', msg), false);
-        } finally { reconcileInFlight = false; }
+        document.dispatchEvent(new CustomEvent('console:slideover-open', {
+          detail: {
+            id: 'console-slideover-webhook-replay',
+            title: labelSlideReplayTitle,
+            action: 'webhook.replayDelivery',
+            payload: { deliveryId: last.id, webhookId: replayLastId },
+          },
+        }));
         return;
       }
       if (copyNonce) {
@@ -688,6 +746,79 @@ const eventKeys: Array<keyof typeof wEvents> = [
         e.textContent = err instanceof AdminClientError ? err.message : (err as Error).message;
         e.classList.remove('hidden');
       }
+    }
+  });
+
+  document.addEventListener('console:slideover-submit', async (ev) => {
+    const { id, action, payload, reason } = (ev as CustomEvent<{
+      id: string;
+      action: string;
+      payload: Record<string, unknown>;
+      reason: string;
+    }>).detail;
+
+    if (
+      id !== 'console-slideover-webhook-toggle' &&
+      id !== 'console-slideover-webhook-delete' &&
+      id !== 'console-slideover-webhook-replay'
+    ) return;
+
+    if (!jwt) {
+      document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id, ok: false, error: 'Session expired.' } }));
+      return;
+    }
+    if (reconcileInFlight) {
+      document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id, ok: false, error: 'Another action is in flight.' } }));
+      return;
+    }
+
+    reconcileInFlight = true;
+    try {
+      if (action === 'webhook.update') {
+        await adminClient.webhook.update(
+          { webhookId: payload.webhookId as string, enabled: payload.enabled as boolean },
+          reason,
+          jwt,
+        );
+        document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id, ok: true } }));
+        await loadAll();
+        return;
+      }
+
+      if (action === 'webhook.delete') {
+        await adminClient.webhook.delete({ webhookId: payload.webhookId as string }, reason, jwt);
+        document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id, ok: true } }));
+        await loadAll();
+        return;
+      }
+
+      if (action === 'webhook.replayDelivery') {
+        const webhookId = payload.webhookId as string;
+        const res = await adminClient.webhook.replayDelivery(
+          { deliveryId: payload.deliveryId as string },
+          reason,
+          jwt,
+        );
+        const code = res.result?.statusCode;
+        if (code !== null && code !== undefined) {
+          showActionToast(labelDelivReplayDoneTmpl.replace('{status}', String(code)), true);
+        } else {
+          showActionToast(labelDelivReplayFailedTmpl.replace('{error}', res.result?.error ?? 'unknown'), false);
+        }
+        document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id, ok: true } }));
+        await loadDrilldown(webhookId);
+        await loadAll();
+        renderWebhooks();
+        return;
+      }
+    } catch (err) {
+      const msg = err instanceof AdminClientError ? err.message : (err as Error).message;
+      if (action === 'webhook.replayDelivery') {
+        showActionToast(labelDelivReplayFailedTmpl.replace('{error}', msg), false);
+      }
+      document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id, ok: false, error: msg } }));
+    } finally {
+      reconcileInFlight = false;
     }
   });
 

@@ -6,7 +6,13 @@ const { lang } = Astro.props;
 const tr = t(lang);
 ---
 
-<section class="max-w-6xl">
+<section
+  class="max-w-6xl"
+  data-label-recompute-confirm-title={tr.console.taxa_recompute_confirm_title}
+  data-label-recompute-confirm={tr.console.taxa_recompute_confirm}
+  data-label-recompute-btn={tr.console.taxa_recompute_btn}
+  data-label-cancel={tr.console.cancel}
+>
   <p class="mb-4 text-sm text-zinc-600 dark:text-zinc-400">{tr.console.taxa_intro}</p>
 
   <div id="taxa-not-auth" class="hidden rounded border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-900 dark:text-amber-100">
@@ -132,6 +138,15 @@ const tr = t(lang);
   import { getCachedSession, getSupabase } from '../lib/supabase';
   import { getUserRoles } from '../lib/user-roles';
   import { adminClient } from '../lib/admin-client';
+  import { openConfirmDialog } from '../lib/confirm-dialog';
+
+  const taxaSection = document.querySelector<HTMLElement>('section[data-label-recompute-confirm]');
+  const TAXA_L = {
+    recomputeConfirmTitle: taxaSection?.dataset.labelRecomputeConfirmTitle ?? 'Recompute rarity scores?',
+    recomputeConfirm: taxaSection?.dataset.labelRecomputeConfirm ?? 'Recompute rarity scores for all taxa? This may take a moment.',
+    recomputeBtn: taxaSection?.dataset.labelRecomputeBtn ?? 'Recompute rarity',
+    cancel: taxaSection?.dataset.labelCancel ?? 'Cancel',
+  };
 
   type TaxonRow = {
     id: string;
@@ -307,7 +322,13 @@ const tr = t(lang);
 
     document.getElementById('taxa-btn-recompute')?.addEventListener('click', async () => {
       if (!sessionToken) return;
-      if (!confirm('Recompute rarity scores for all taxa? This may take a moment.')) return;
+      if (!(await openConfirmDialog({
+        title: TAXA_L.recomputeConfirmTitle,
+        message: TAXA_L.recomputeConfirm,
+        variant: 'danger',
+        confirmLabel: TAXA_L.recomputeBtn,
+        cancelLabel: TAXA_L.cancel,
+      }))) return;
       const btn = document.getElementById('taxa-btn-recompute') as HTMLButtonElement;
       btn.disabled = true;
       try {

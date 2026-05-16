@@ -118,6 +118,7 @@ const proj = (tr as unknown as { projects: Record<string, string> }).projects;
 
 <script>
   import { getProjectBySlug, countProjectObservations } from '../lib/projects';
+  import { openConfirmDialog } from '../lib/confirm-dialog';
 
   const params = new URLSearchParams(window.location.search);
   const slug = params.get('slug') ?? '';
@@ -229,6 +230,8 @@ const proj = (tr as unknown as { projects: Record<string, string> }).projects;
         notes:         lang === 'es' ? 'Notas'                                                         : 'Notes',
         closeBtn:      lang === 'es' ? 'Cerrar periodo'                                                : 'Close period',
         closeConfirm:  lang === 'es' ? '¿Cerrar este periodo? La fecha de fin se establecerá a hoy.'   : 'Close this period? End date will be set to today.',
+        closeConfirmTitle: lang === 'es' ? '¿Cerrar periodo?'                                          : 'Close period?',
+        cancel:        lang === 'es' ? 'Cancelar'                                                      : 'Cancel',
         openBtn:       lang === 'es' ? 'Abrir nuevo periodo'                                           : 'Open new period',
         openSuccess:   lang === 'es' ? 'Periodo abierto.'                                              : 'Period opened.',
         closeSuccess:  lang === 'es' ? 'Periodo cerrado.'                                              : 'Period closed.',
@@ -396,7 +399,13 @@ const proj = (tr as unknown as { projects: Record<string, string> }).projects;
       }
 
       async function handleClosePeriod(periodId: string, stationId: string, container: HTMLElement) {
-        if (!confirm(i18nPeriods.closeConfirm)) return;
+        if (!(await openConfirmDialog({
+          title: i18nPeriods.closeConfirmTitle,
+          message: i18nPeriods.closeConfirm,
+          variant: 'danger',
+          confirmLabel: i18nPeriods.closeBtn,
+          cancelLabel: i18nPeriods.cancel,
+        }))) return;
         const today = new Date().toISOString().slice(0, 10);
         const statusEl = container.querySelector<HTMLElement>(`[data-period-status="${stationId}"]`);
         try {

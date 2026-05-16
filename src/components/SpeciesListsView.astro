@@ -27,6 +27,7 @@ const labels = {
   edit:           isEs ? 'Editar' : 'Edit',
   items:          isEs ? 'especies' : 'species',
   confirm_delete: isEs ? '¿Eliminar esta lista?' : 'Delete this list?',
+  confirm_delete_title: isEs ? '¿Eliminar lista?' : 'Delete list?',
   loading:        isEs ? 'Cargando…' : 'Loading…',
   sign_in:        isEs ? 'Inicia sesión para ver tus listas.' : 'Sign in to see your lists.',
   private_badge:  isEs ? 'Privada' : 'Private',
@@ -147,6 +148,8 @@ const labels = {
 
 <script>
   import { getCachedUser, getSupabase } from '../lib/supabase';
+  import { openConfirmDialog } from '../lib/confirm-dialog';
+  import { showToast } from '../lib/toast';
 
   const root = document.getElementById('species-lists-view') as HTMLDivElement | null;
   if (!root) throw new Error('species-lists-view root not found');
@@ -272,10 +275,16 @@ const labels = {
   }
 
   async function deleteList(id: string) {
-    if (!confirm(labels.confirm_delete)) return;
+    if (!(await openConfirmDialog({
+      title: labels.confirm_delete_title,
+      message: labels.confirm_delete,
+      variant: 'danger',
+      confirmLabel: labels.delete,
+      cancelLabel: labels.cancel,
+    }))) return;
     const supabase = getSupabase();
     const { error } = await supabase.from('species_lists').delete().eq('id', id).eq('user_id', userId);
-    if (error) { alert(labels.error_delete); return; }
+    if (error) { showToast({ message: labels.error_delete, variant: 'error' }); return; }
     lists = lists.filter(l => l.id !== id);
     const username = await fetchUsername();
     renderGrid(username);

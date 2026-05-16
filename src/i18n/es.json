@@ -1464,6 +1464,7 @@
     "edited": "editado",
     "delete": "Eliminar",
     "delete_confirm": "¿Eliminar este comentario? No se puede deshacer.",
+    "delete_confirm_title": "¿Eliminar comentario?",
     "comment_deleted": "Comentario eliminado.",
     "empty_comments": "Sin comentarios aún — sé la primera persona en opinar.",
     "thread_locked_banner": "Esta conversación fue cerrada por un moderador.",
@@ -1547,7 +1548,9 @@
       "button": "Bloquear",
       "unblock": "Desbloquear",
       "blocked_users": "Usuarios bloqueados",
-      "empty": "No has bloqueado a nadie."
+      "empty": "No has bloqueado a nadie.",
+      "blocked_toast": "Usuario bloqueado.",
+      "block_error": "No se pudo bloquear."
     },
     "list": {
       "followers": "Seguidores",
@@ -1558,6 +1561,7 @@
     "cards": {
       "more_actions": "Más acciones",
       "block_user_confirm": "¿Bloquear a @{{handle}}? Desaparecerá de tus feeds y no verán sus reacciones mutuas. Puedes deshacerlo en Ajustes → Privacidad.",
+      "block_user_confirm_title": "¿Bloquear a este usuario?",
       "block_user_success": "Usuario bloqueado.",
       "block_user_error": "No se pudo bloquear. Intenta de nuevo.",
       "report_observation_aria": "Reportar esta observación",
@@ -1572,6 +1576,11 @@
     "credentials_section": "Mis credenciales",
     "credentials_empty": "Aún no tienes credenciales. Agrega una para empezar a patrocinar.",
     "add_credential": "Agregar credencial",
+    "error_prefix_tmpl": "Error: {msg}",
+    "creds_load_failed": "No se pudieron cargar las credenciales.",
+    "add_credential_first": "Agrega una credencial primero.",
+    "three_strike_msg": "Tres strikes: revoca y vuelve a crear.",
+    "report_dialog_unavailable": "Diálogo de reporte no disponible — recarga la página.",
     "credential_label": "Etiqueta",
     "credential_label_help": "Un nombre amigable para reconocer esta credencial.",
     "credential_secret": "API key o token de larga duración",
@@ -2079,7 +2088,13 @@
     "no_expiry": "Sin expiración",
     "days": "días",
     "year": "año",
-    "create": "Crear token"
+    "create": "Crear token",
+    "revoke": "Revocar",
+    "revoke_confirm_title": "¿Revocar token?",
+    "revoke_confirm": "¿Revocar este token? Esta acción no se puede deshacer.",
+    "cancel": "Cancelar",
+    "revoke_failed": "No se pudo revocar el token.",
+    "create_failed_tmpl": "No se pudo crear el token: {msg}"
   },
   "explore_pages": {
     "recent": {
@@ -2940,6 +2955,7 @@
     "taxa_recompute_coming": "Recomputar puntajes de rareza para todos los taxa",
     "taxa_actions_coming": "",
     "taxa_recompute_confirm": "¿Recomputar rareza para todos los taxa? Esto puede tardar un momento.",
+    "taxa_recompute_confirm_title": "¿Recomputar puntajes de rareza?",
     "taxa_recompute_success": "Recomputo de rareza iniciado correctamente.",
     "taxa_recompute_error": "Error al recomputar rareza: ",
     "taxa_flag_slide_heading": "Editar bandera de conservación",
@@ -3211,6 +3227,9 @@
         "deliveries": "Entregas",
         "hideDeliveries": "Ocultar entregas"
       },
+      "deleteConfirmTitle": "¿Eliminar webhook?",
+      "deleteConfirm": "¿Eliminar este webhook? Esta acción no se puede deshacer.",
+      "cancel": "Cancelar",
       "deliveries": {
         "heading": "Entregas recientes (últimas 20)",
         "event": "Evento",
@@ -3227,12 +3246,25 @@
         "replayConfirmReason": "¿Razón para reenviar esta entrega?",
         "replayDone": "Reenvío realizado (HTTP {status}).",
         "replayFailed": "Reenvío falló: {error}",
+        "testDeliveryDone": "Entrega de prueba: HTTP {status}.",
+        "testDeliveryFailed": "Entrega de prueba falló: {error}",
         "nonceCopied": "Nonce copiado.",
         "loadFailed": "No se pudieron cargar las entregas: {error}",
         "perWebhookEmpty": "Aún no hay entregas para este webhook."
       },
       "empty": "No hay webhooks configurados.",
-      "deliveriesEmpty": "Aún no hay entregas."
+      "deliveriesEmpty": "Aún no hay entregas.",
+      "slideOver": {
+        "enableTitle": "Activar webhook",
+        "disableTitle": "Desactivar webhook",
+        "deleteTitle": "Eliminar webhook",
+        "replayTitle": "Reenviar última entrega",
+        "reasonRoutineMaintenance": "Mantenimiento rutinario",
+        "reasonEndpointMigration": "Migración de endpoint",
+        "reasonNoLongerNeeded": "Ya no se necesita",
+        "reasonMisconfigured": "Suscripción mal configurada",
+        "reasonRetryFailedDelivery": "Reintentar entrega fallida"
+      }
     },
     "plantnetQuota": {
       "title": "Cuota PlantNet",
@@ -3627,6 +3659,9 @@
     "default_confirm": "Confirmar",
     "default_cancel": "Cancelar",
     "aria_dialog_label": "Diálogo de confirmación"
+  },
+  "toast": {
+    "dismiss": "Descartar"
   },
   "observe2": {
     "heading": "Registrar observación",

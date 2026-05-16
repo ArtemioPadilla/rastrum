@@ -56,6 +56,8 @@ const distancePage = page as unknown as Record<string, string>;
   data-label-block={sgBlock}
   data-label-report={sgReport}
   data-label-block-confirm={sgCards.block_user_confirm}
+  data-label-block-confirm-title={sgCards.block_user_confirm_title}
+  data-label-cancel={tr.social.cancel}
   data-label-block-success={sgCards.block_user_success}
   data-label-block-error={sgCards.block_user_error}
   data-label-report-aria={sgCards.report_observation_aria}
@@ -213,6 +215,8 @@ const distancePage = page as unknown as Record<string, string>;
   import { pickCardImageUrl } from '../lib/media-url';
   import { formatTimeAgo } from '../lib/social';
   import { wireOverflowMenu } from '../lib/overflow-menu';
+  import { showToast } from '../lib/toast';
+  import { openConfirmDialog } from '../lib/confirm-dialog';
   import {
     RECENTS_VIEW_MODE_KEY,
     DEFAULT_VIEW_MODE,
@@ -435,6 +439,8 @@ const distancePage = page as unknown as Record<string, string>;
       block: root.dataset.labelBlock ?? 'Block',
       report: root.dataset.labelReport ?? 'Report',
       blockConfirm: root.dataset.labelBlockConfirm ?? 'Block @{{handle}}?',
+      blockConfirmTitle: root.dataset.labelBlockConfirmTitle ?? 'Block this user?',
+      cancel: root.dataset.labelCancel ?? 'Cancel',
       blockSuccess: root.dataset.labelBlockSuccess ?? 'Blocked.',
       blockError: root.dataset.labelBlockError ?? 'Could not block.',
       reportAria: root.dataset.labelReportAria ?? 'Report this observation',
@@ -948,19 +954,25 @@ const distancePage = page as unknown as Record<string, string>;
           const observerId = wrap.dataset.observerId ?? '';
           if (!observerId) return;
           const confirmCopy = labels.blockConfirm.replace('{{handle}}', handle || '?');
-          if (!confirm(confirmCopy)) return;
+          if (!(await openConfirmDialog({
+            title: labels.blockConfirmTitle,
+            message: confirmCopy,
+            variant: 'danger',
+            confirmLabel: labels.block,
+            cancelLabel: labels.cancel,
+          }))) return;
           if (blockBtn) blockBtn.disabled = true;
           try {
             const { blockUser } = await import('../lib/social');
             await blockUser(observerId);
-            alert(labels.blockSuccess);
+            showToast({ message: labels.blockSuccess, variant: 'success' });
             // Hide all cards by this observer in the current list.
             root.querySelectorAll<HTMLElement>(`.er-overflow[data-observer-id="${CSS.escape(observerId)}"]`).forEach((w) => {
               const li = w.closest('li');
               li?.classList.add('hidden');
             });
           } catch (err) {
-            alert(labels.blockError);
+            showToast({ message: labels.blockError, variant: 'error' });
             // eslint-disable-next-line no-console
             console.warn('[er.block]', err);
           } finally {

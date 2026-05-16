@@ -30,6 +30,7 @@ const i18nBag = {
   request_status_rejected:     tr.sponsoring.request_status_rejected,
   request_status_withdrawn:    tr.sponsoring.request_status_withdrawn,
   confirm_withdraw_request:    lang === 'es' ? '¿Retirar esta solicitud?' : 'Withdraw this request?',
+  error_prefix_tmpl:           tr.sponsoring.error_prefix_tmpl,
 };
 ---
 
@@ -93,6 +94,7 @@ const i18nBag = {
 
 <script>
   import { listSponsorships, getUsage, patchSponsorship, revokeSponsorship } from '../lib/sponsorships';
+  import { showToast } from '../lib/toast';
 
   const escHtml = (s: string): string => s
     .replace(/&/g, '&amp;')
@@ -127,6 +129,7 @@ const i18nBag = {
     request_status_rejected: string;
     request_status_withdrawn: string;
     confirm_withdraw_request: string;
+    error_prefix_tmpl: string;
   };
 
   function showConfirm(message: string): Promise<boolean> {
@@ -212,7 +215,7 @@ const i18nBag = {
     const target = e.target as HTMLInputElement;
     if (target.dataset.togglePublic) {
       try { await patchSponsorship(target.dataset.togglePublic, { beneficiary_public: target.checked }); }
-      catch (err) { alert(`Error: ${(err as Error).message}`); }
+      catch (err) { showToast({ message: (i18nBag.error_prefix_tmpl ?? 'Error: {msg}').replace('{msg}', (err as Error).message), variant: 'error' }); }
     }
   });
 
@@ -221,7 +224,7 @@ const i18nBag = {
     if (target.dataset.decline) {
       if (await showConfirm(i18nBag.decline_confirm ?? 'Decline this sponsorship?')) {
         try { await revokeSponsorship(target.dataset.decline); await refresh(); }
-        catch (err) { alert(`Error: ${(err as Error).message}`); }
+        catch (err) { showToast({ message: (i18nBag.error_prefix_tmpl ?? 'Error: {msg}').replace('{msg}', (err as Error).message), variant: 'error' }); }
       }
     }
   });
@@ -293,7 +296,7 @@ const i18nBag = {
       (document.getElementById('req-message-input') as HTMLTextAreaElement).value = '';
       (document.getElementById('request-dialog') as HTMLDialogElement | null)?.close();
       await refreshMyRequests();
-    } catch (err) { alert((err as Error).message); }
+    } catch (err) { showToast({ message: (err as Error).message, variant: 'error' }); }
   });
   document.getElementById('my-requests-list')?.addEventListener('click', async (e) => {
     const target = e.target as HTMLElement;
