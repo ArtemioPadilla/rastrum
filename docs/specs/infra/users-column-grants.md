@@ -55,14 +55,24 @@ from `authenticated` is denied.
 | `id` | `auth.users` FK | Primary key, immutable |
 | `created_at` / `joined_at` | column DEFAULT now() on INSERT | Audit columns; immutable after creation |
 | `updated_at` | `tg_users_touch_updated_at` BEFORE UPDATE trigger | Audit column; trigger sets `NEW.updated_at = now()` so clients shouldn't touch it (and the GRANT prevents it). Bug surfaced when ProfileEditForm was setting it from the client → 403. |
-| `is_expert` | `expert_applications` admin flow + `is_expert_in()` SQL | Self-elevation would let anyone weight their votes |
-| `credentialed_researcher` / `credentialed_at` / `credentialed_by` | admin grant | Unlocks precise coords on sensitive species |
+| `is_expert` | `expert_applications` admin flow + `is_expert_in()` SQL + `sync_user_role_flags()` trigger (SECURITY DEFINER) | Self-elevation would let anyone weight their votes |
+| `credentialed_researcher` / `credentialed_at` / `credentialed_by` | admin grant + `sync_user_role_flags()` trigger (SECURITY DEFINER) | Unlocks precise coords on sensitive species |
 | `karma_total` / `karma_updated_at` / `vote_count` | karma engine triggers (SECURITY DEFINER) | Self-bump would game leaderboards + vote weighting |
 | `grace_until` | karma onboarding (SECURITY DEFINER) | Backfilled to `created_at + 30 days`; users shouldn't extend their own grace period |
 | `observation_count` | `tg_observation_count` trigger | Denormalised stat; trigger keeps it consistent |
 | `last_observation_at` | `tg_observation_count` trigger | Same |
 | `stats_cached_at` / `stats_json` | nightly stats refresh job | Server-rolled aggregates |
 | `follower_count` / `following_count` | `tg_follows_counter` trigger (SECURITY DEFINER, M26) | Self-bump would inflate social-graph signal |
+
+> **Note (#1071 — service_role column grant):** As of #1071, `service_role`
+> additionally holds `UPDATE (is_expert, credentialed_researcher) ON public.users`
+> via an explicit `GRANT` immediately after the `user_roles_sync_flags` trigger
+> definition. This makes the `sync_user_role_flags()` SECURITY DEFINER path
+> self-healing against function-owner drift (a function's OWNER must hold the
+> column privilege for SECURITY DEFINER to bypass the authenticated REVOKE).
+> This is NOT a privacy regression — `service_role` is the trusted backend role
+> used only by Edge Functions and server-side jobs, never the browser-facing
+> `authenticated` role.
 
 ## Pattern checklist for new triggers / functions
 

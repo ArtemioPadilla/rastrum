@@ -2457,6 +2457,42 @@ CREATE TRIGGER user_roles_sync_flags
 AFTER INSERT OR UPDATE OF revoked_at OR DELETE ON public.user_roles
 FOR EACH ROW EXECUTE FUNCTION public.sync_user_role_flags();
 
+-- Self-healing definer-privilege guarantee for sync_user_role_flags().
+-- The function UPDATEs the locked columns users.is_expert /
+-- .credentialed_researcher, which `REVOKE UPDATE ON public.users FROM
+-- authenticated` (see the locked-columns grants block below) gates out
+-- of the column GRANT. SECURITY DEFINER only bypasses that if the
+-- function's OWNER holds the column privilege — and CREATE OR REPLACE
+-- cannot change an existing function's owner, so a production object
+-- created under a non-owning role keeps failing every db-apply
+-- ("permission denied for table users" from the user_roles_sync_flags
+-- trigger; issue #1071). Reassert SECURITY DEFINER + search_path, force
+-- ownership to the public.users table owner, and explicitly grant the
+-- two locked columns to service_role so the bypass holds even if
+-- ownership drifts again. All statements idempotent / replay-safe.
+ALTER FUNCTION public.sync_user_role_flags()
+  SECURITY DEFINER
+  SET search_path = public, extensions, pg_temp;
+
+DO $sync_role_owner$
+DECLARE
+  tbl_owner text;
+BEGIN
+  SELECT pg_get_userbyid(c.relowner)
+    INTO tbl_owner
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+   WHERE n.nspname = 'public' AND c.relname = 'users';
+  IF tbl_owner IS NOT NULL THEN
+    EXECUTE format(
+      'ALTER FUNCTION public.sync_user_role_flags() OWNER TO %I', tbl_owner);
+  END IF;
+END
+$sync_role_owner$;
+
+GRANT UPDATE (is_expert, credentialed_researcher)
+  ON public.users TO service_role;
+
 -- 7. RLS policies
 DROP POLICY IF EXISTS user_roles_admin_or_self_read ON public.user_roles;
 CREATE POLICY user_roles_admin_or_self_read ON public.user_roles
