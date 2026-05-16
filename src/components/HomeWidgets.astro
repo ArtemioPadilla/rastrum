@@ -119,6 +119,7 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
   import { getSupabase, getCachedUser } from '../lib/supabase';
   import { buildGreeting } from '../lib/home-greeting';
   import { loadStreak } from '../lib/home-loaders';
+  import { startOfLocalDayUTC } from '../lib/home-hero';
   import { fetchSuggestions, type SpeciesSuggestion } from '../lib/suggestions';
 
   type Lang = 'en' | 'es';
@@ -501,17 +502,22 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
       const observeBase = root.dataset.observeHref ?? (lang === 'es' ? '/es/observar/' : '/en/observe/');
       const ctaHref = `${observeBase}?taxon_id=${encodeURIComponent(ch.taxon_id)}`;
 
-      const todayStart = new Date();
-      todayStart.setUTCHours(0, 0, 0, 0);
+      const { data: tzRow } = await supabase
+        .from('users')
+        .select('timezone')
+        .eq('id', userId)
+        .maybeSingle<{ timezone: string | null }>();
+      const todayStart = startOfLocalDayUTC(new Date(), tzRow?.timezone ?? 'UTC');
 
-      const { count } = await supabase
+      const { data: doneRows } = await supabase
         .from('observations')
-        .select('id', { count: 'exact', head: true })
+        .select('id')
         .eq('observer_id', userId)
         .eq('sync_status', 'synced')
-        .gte('observed_at', todayStart.toISOString());
+        .gte('observed_at', todayStart.toISOString())
+        .limit(1);
 
-      const completed = (count ?? 0) > 0;
+      const completed = !!doneRows && doneRows.length > 0;
 
       const thumbHtml = ch.thumbnail_url
         ? `<img src="${escapeText(ch.thumbnail_url)}" alt="${escapeText(ch.scientific_name)}" class="w-14 h-14 rounded-lg object-cover flex-shrink-0" loading="lazy" />`

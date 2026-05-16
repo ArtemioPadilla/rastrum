@@ -50,6 +50,7 @@ const observersMapHref = getLocalizedPath(lang, routes.communityMap[locale] + '/
     getPmtilesCacheStatus,
     getPmtilesMxUrl,
   } from '../lib/offline-map';
+  import { basemapStyleUrl } from '../lib/map-style';
 
   const isEs = document.documentElement.lang === 'es';
   const isDark = document.documentElement.classList.contains('dark');
@@ -79,9 +80,7 @@ const observersMapHref = getLocalizedPath(lang, routes.communityMap[locale] + '/
   const pmProtocol = new Protocol();
   maplibregl.addProtocol('pmtiles', pmProtocol.tile);
 
-  const REMOTE_STYLE_LIGHT = 'https://tiles.openfreemap.org/styles/liberty';
-  const REMOTE_STYLE_DARK  = 'https://tiles.openfreemap.org/styles/dark';
-  const REMOTE_STYLE = isDark ? REMOTE_STYLE_DARK : REMOTE_STYLE_LIGHT;
+  const REMOTE_STYLE = basemapStyleUrl(isDark);
 
   /**
    * Inline minimal pmtiles style spec. We don't pull in

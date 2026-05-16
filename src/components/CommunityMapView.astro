@@ -129,6 +129,7 @@ const stringsJson = JSON.stringify({
 <script>
   import { getCachedUser, getSupabase } from '../lib/supabase';
   import { loadIsoCountries } from '../lib/community';
+  import { basemapStyleUrl } from '../lib/map-style';
 
   interface Strings {
     lang: 'en' | 'es';
@@ -350,7 +351,7 @@ const stringsJson = JSON.stringify({
         const maplibre = (await import('maplibre-gl')).default;
         map = new maplibre.Map({
           container: mapContainer,
-          style: 'https://tiles.openfreemap.org/styles/liberty',
+          style: basemapStyleUrl(),
           center: [-99.1, 19.4], // CDMX default
           zoom: 4,
           attributionControl: { compact: true },

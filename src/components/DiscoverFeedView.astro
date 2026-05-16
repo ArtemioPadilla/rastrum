@@ -128,6 +128,7 @@ const communityHref = `/${lang}/${lang === 'es' ? 'comunidad/observadores' : 'co
 
 <script>
   import { getCachedUser, getSupabase } from '../lib/supabase';
+  import { pickCardImageUrl } from '../lib/media-url';
 
   // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -247,7 +248,7 @@ const communityHref = `/${lang}/${lang === 'es' ? 'comunidad/observadores' : 'co
         .in('observation_id', obsIds)
         .eq('is_primary', true),
       sb.from('media_files')
-        .select('observation_id, url, is_primary')
+        .select('observation_id, url, thumbnail_url, is_primary, deleted_at')
         .in('observation_id', obsIds),
     ]);
 
@@ -257,9 +258,11 @@ const communityHref = `/${lang}/${lang === 'es' ? 'comunidad/observadores' : 'co
       const common = r.taxa?.common_name_en ?? r.taxa?.common_name_es ?? null;
       sciByObs.set(r.observation_id, { sci: r.scientific_name ?? null, common });
     }
-    for (const m of (mediaRows ?? []) as Array<{ observation_id: string; url?: string | null; is_primary?: boolean }>) {
-      if (!m.url) continue;
-      if (m.is_primary || !photoByObs.has(m.observation_id)) photoByObs.set(m.observation_id, m.url);
+    for (const m of (mediaRows ?? []) as Array<{ observation_id: string; url?: string | null; thumbnail_url?: string | null; is_primary?: boolean; deleted_at?: string | null }>) {
+      if (m.deleted_at != null) continue;
+      const src = pickCardImageUrl(m);
+      if (!src) continue;
+      if (m.is_primary || !photoByObs.has(m.observation_id)) photoByObs.set(m.observation_id, src);
     }
 
     return (obsRows as Array<Record<string, unknown>>).map(r => {
