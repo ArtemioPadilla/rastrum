@@ -425,6 +425,7 @@ import { syncOutbox } from '../lib/sync';
 import { SYNC_EVENTS, type SyncRowDetail } from '../lib/sync-events';
 import { getObservationDefaults, setObservationDefaults } from '../lib/observation-defaults';
 import { selfHealChunk } from '../lib/chunk-reload';
+import { resolveRunnerSet, type RunnerAvailability } from '../lib/observe-runner-set';
 
 // ── State ──────────────────────────────────────────────────────────────────
 const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
@@ -508,18 +509,27 @@ function showModeToast(msg: string): void {
   try {
     const { hasKeysForPlugin } = await import('../lib/byo-keys');
     const { getBirdNETCacheStatus, getBirdNETWeightsBaseUrl } = await import('../lib/identifiers/birdnet-cache');
+    const { getOnnxBaseCacheStatus, getOnnxBaseWeightsBaseUrl } = await import('../lib/identifiers/onnx-base-cache');
     const hasByo = hasKeysForPlugin('claude_haiku') || hasKeysForPlugin('plantnet');
     const hasBirdnet = getBirdNETWeightsBaseUrl() ? await getBirdNETCacheStatus().then(s => s.modelCached && s.labelsCached).catch(() => false) : false;
+    const hasEfficientNet = getOnnxBaseWeightsBaseUrl()
+      ? await getOnnxBaseCacheStatus().then(s => s.modelCached && s.labelsCached).catch(() => false)
+      : false;
+    const hasPhi = await pluginReady('webllm_phi35_vision').catch(() => false);
+    const hasGemma = await pluginReady('onnx_gemma4_vision').catch(() => false);
+    // Local mode is usable if ANY on-device runner is available — BirdNET
+    // for audio OR an on-device photo model (EfficientNet/Phi/Gemma).
+    const hasLocal = hasBirdnet || hasEfficientNet || hasPhi || hasGemma;
     const ownBtn = document.getElementById('obs2-mode-own-key') as HTMLButtonElement | null;
     const locBtn = document.getElementById('obs2-mode-local') as HTMLButtonElement | null;
     if (ownBtn && !hasByo) ownBtn.disabled = true;
-    if (locBtn && !hasBirdnet) locBtn.disabled = true;
+    if (locBtn && !hasLocal) locBtn.disabled = true;
     applyModeStyles(readAiMode());
     // Only reveal the selector when ≥2 modes are usable (#942 PR5 redo).
     // Sponsored is always available; count it plus any of own-key/local
     // that are not disabled. With ≤1 usable mode the selector reads as
     // broken UI ("disabled buttons next to one live button").
-    const usableModes = 1 /* sponsored */ + (hasByo ? 1 : 0) + (hasBirdnet ? 1 : 0);
+    const usableModes = 1 /* sponsored */ + (hasByo ? 1 : 0) + (hasLocal ? 1 : 0);
     if (usableModes >= 2) {
       document.getElementById('obs2-ai-mode-selector')?.classList.remove('hidden');
     }
@@ -875,10 +885,6 @@ async function runPipeline(state: PipelineState) {
       aiMode = 'sponsored'; writeAiMode('sponsored'); applyModeStyles('sponsored');
       showModeToast(isEs ? 'Modo de IA no disponible — usando patrocinado.' : 'Selected AI mode unavailable — using sponsored.');
     }
-  } else if (aiMode === 'local') {
-    const { getBirdNETCacheStatus, getBirdNETWeightsBaseUrl } = await import('../lib/identifiers/birdnet-cache');
-    const ok = getBirdNETWeightsBaseUrl() ? await getBirdNETCacheStatus().then(s => s.modelCached && s.labelsCached).catch(() => false) : false;
-    if (!ok) { aiMode = 'sponsored'; writeAiMode('sponsored'); applyModeStyles('sponsored'); showModeToast(isEs ? 'Modo de IA no disponible — usando patrocinado.' : 'Selected AI mode unavailable — using sponsored.'); }
   }
 
   for (const node of state.nodes) {
@@ -888,43 +894,46 @@ async function runPipeline(state: PipelineState) {
     setNodeState(state, node.id, 'running');
     try {
       if (pf.kind === 'photo') {
-        if (aiMode === 'local') { setNodeState(state, node.id, 'skipped', undefined, 'Local-only mode'); continue; }
-        const runners: Record<string, import('../lib/identify-cascade-client').IdentifierRunner> = {};
-        // PlantNet always works via the Edge Function (operator key server-side);
-        // include it unconditionally. A BYO key (if present) is forwarded to the
-        // EF as client_keys.plantnet for user's own quota, but is not required.
-        runners.plantnet = makePlantNetRunner(lang as 'en' | 'es');
-        if (aiMode === 'own-key') {
-          const { hasKeysForPlugin } = await import('../lib/byo-keys');
-          if (hasKeysForPlugin('claude_haiku') && await hasAnthropicKey()) runners.claude_haiku = makeClaudeRunner(lang as 'en' | 'es');
-        } else {
-          // Sponsored mode: BYO key OR server-side sponsor/pool unlocks Claude.
-          if (await claudeAvailable()) runners.claude_haiku = makeClaudeRunner(lang as 'en' | 'es');
+        const { hasKeysForPlugin } = await import('../lib/byo-keys');
+        const { getOnnxBaseCacheStatus, getOnnxBaseWeightsBaseUrl } = await import('../lib/identifiers/onnx-base-cache');
+        const efficientNetCached = getOnnxBaseWeightsBaseUrl()
+          ? await getOnnxBaseCacheStatus().then(s => s.modelCached && s.labelsCached).catch(() => false)
+          : false;
+        const avail: RunnerAvailability = {
+          // PlantNet is always reachable via the EF operator key when online.
+          plantnet: true,
+          claude: aiMode === 'own-key'
+            ? (hasKeysForPlugin('claude_haiku') && await hasAnthropicKey())
+            : await claudeAvailable(),
+          phi: await pluginReady('webllm_phi35_vision').catch(() => false),
+          gemma: await pluginReady('onnx_gemma4_vision').catch(() => false),
+          efficientNet: efficientNetCached,
+          // MegaDetector pre-filter wiring is a later card-spec task.
+          megaDetector: false,
+          // Audio (BirdNET) is handled by the non-photo branch.
+          birdnet: false,
+        };
+        let chosen = resolveRunnerSet({ aiMode, mediaKind: 'photo', available: avail });
+        if (aiMode === 'local' && chosen.length === 0) {
+          // Nothing on-device for photos — honest fallback to sponsored.
+          aiMode = 'sponsored'; writeAiMode('sponsored'); applyModeStyles('sponsored');
+          showModeToast(tr.observe.local_fallback_sponsored);
+          chosen = resolveRunnerSet({ aiMode, mediaKind: 'photo', available: avail });
         }
-
-        // Phi vision (opt-in): runs in parallel as an additional on-device runner.
-        try {
-          if (await pluginReady('webllm_phi35_vision')) {
-            runners.webllm_phi35_vision = makePhiRunner(lang as 'en' | 'es');
-          }
-        } catch { /* WebLLM unavailable, skip */ }
-
-        // Gemma 4 vision (opt-in, parallel runtime to Phi).
-        try {
-          if (await pluginReady('onnx_gemma4_vision')) {
+        const runners: Record<string, import('../lib/identify-cascade-client').IdentifierRunner> = {};
+        if (chosen.includes('plantnet')) runners.plantnet = makePlantNetRunner(lang as 'en' | 'es');
+        if (chosen.includes('claude')) runners.claude_haiku = makeClaudeRunner(lang as 'en' | 'es');
+        if (chosen.includes('phi')) {
+          try { runners.webllm_phi35_vision = makePhiRunner(lang as 'en' | 'es'); } catch { /* WebLLM unavailable, skip */ }
+        }
+        if (chosen.includes('gemma')) {
+          try {
             const { makeGemmaRunner } = await import('../lib/identify-runners');
             runners.onnx_gemma4_vision = makeGemmaRunner(lang as 'en' | 'es');
-          }
-        } catch { /* transformers.js unavailable, skip */ }
-
-        // EfficientNet-Lite0: always add as fallback if downloaded (~2.8 MB, no key needed).
-        // It runs in-parallel as a zero-cost fallback alongside cloud runners.
-        try {
-          const { getOnnxBaseCacheStatus, getOnnxBaseWeightsBaseUrl } = await import('../lib/identifiers/onnx-base-cache');
-          const enCached = getOnnxBaseWeightsBaseUrl()
-            ? await getOnnxBaseCacheStatus().then(s => s.modelCached && s.labelsCached).catch(() => false)
-            : false;
-          if (enCached) {
+          } catch { /* transformers.js unavailable, skip */ }
+        }
+        if (chosen.includes('efficientNet')) {
+          try {
             const { onnxBaseIdentifier } = await import('../lib/identifiers/onnx-base');
             runners.onnx_efficientnet_lite0 = async (file: File) => {
               const result = await onnxBaseIdentifier.identify({
@@ -934,8 +943,8 @@ async function runPipeline(state: PipelineState) {
               });
               return result;
             };
-          }
-        } catch { /* EfficientNet unavailable, skip */ }
+          } catch { /* EfficientNet unavailable, skip */ }
+        }
 
         if (Object.keys(runners).length === 0) {
           setNodeState(state, node.id, 'skipped', undefined, 'No runner available');
