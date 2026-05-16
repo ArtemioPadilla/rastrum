@@ -56,4 +56,14 @@ describe('resolveRunnerSet — local-first invariants', () => {
   it('unknown / unsupported media returns []', () => {
     expect(resolveRunnerSet({ aiMode: 'local', mediaKind: 'unknown', available: { ...none, efficientNet: true } })).toEqual([]);
   });
+
+  it('REGRESSION: local + photo with a cached on-device model never returns [] (no skip)', () => {
+    const r = resolveRunnerSet({
+      aiMode: 'local', mediaKind: 'photo',
+      available: { plantnet: true, claude: true, phi: false, gemma: false,
+        efficientNet: true, megaDetector: false, birdnet: false },
+    });
+    expect(r.length).toBeGreaterThan(0);
+    expect(r).not.toContain('plantnet');
+  });
 });
