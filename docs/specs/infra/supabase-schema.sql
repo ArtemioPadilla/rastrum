@@ -586,6 +586,24 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
   GRANT USAGE, SELECT ON SEQUENCES TO authenticated;
 
+-- Service role (trusted backend / Edge Functions) — full access; it bypasses
+-- RLS by design and is never exposed to the browser. The block above grants
+-- anon/authenticated in bulk but omitted service_role, so any table without
+-- a piecemeal per-table grant (kairos_subscriptions, push_subscriptions,
+-- observations writes, …) returned "permission denied for table" to cron
+-- Edge Functions using the service_role key. Blanket + default privileges so
+-- current AND future tables are covered idempotently on every db-apply,
+-- instead of relying on someone remembering a per-table grant.
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES    IN SCHEMA public TO service_role;
+GRANT USAGE,  SELECT                  ON ALL SEQUENCES IN SCHEMA public TO service_role;
+GRANT EXECUTE                         ON ALL FUNCTIONS IN SCHEMA public TO service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT USAGE, SELECT ON SEQUENCES TO service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT EXECUTE ON FUNCTIONS TO service_role;
+
 -- Defensive: revoke privileges that Supabase's legacy project init may have
 -- granted to anon. None are reachable via PostgREST today, but minimal
 -- privilege is a basic hygiene principle.
