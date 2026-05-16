@@ -323,12 +323,29 @@ export async function wireManagePanelDetails(
   async function runDelete(): Promise<void> {
     if (confirmYesBtn) confirmYesBtn.disabled = true;
     errEl?.classList.add('hidden');
+    // The invoke can hang indefinitely (e.g. the gotrue auth-lock steal —
+    // #1076/#1098): without a bound the try never settles, the catch never
+    // fires and the confirm button stays disabled forever with no feedback.
+    // Race it against a timeout and always re-enable in finally so a hang
+    // becomes a visible, retryable error (the confirm row stays open so the
+    // user can just click Delete again; the EF soft-delete is idempotent).
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      const { data, error: invokeErr } = await supabase.functions.invoke<{
-        ok: boolean; r2_deleted?: number; r2_errors?: unknown[]; error?: string;
-      }>('delete-observation', {
-        body: { observation_id: obsId },
-      });
+      const result = await Promise.race([
+        supabase.functions.invoke<{
+          ok: boolean; r2_deleted?: number; r2_errors?: unknown[]; error?: string;
+        }>('delete-observation', {
+          body: { observation_id: obsId },
+        }),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error(
+            lang === 'es'
+              ? 'La eliminación tardó demasiado. Revisa tu conexión e inténtalo de nuevo.'
+              : 'Delete timed out. Check your connection and try again.',
+          )), 15000);
+        }),
+      ]);
+      const { data, error: invokeErr } = result;
       if (invokeErr) throw invokeErr;
       if (data && !data.ok) throw new Error(data.error ?? 'Delete failed');
       window.location.href = `/${lang}/${lang === 'es' ? 'perfil/observaciones' : 'profile/observations'}/`;
@@ -342,6 +359,11 @@ export async function wireManagePanelDetails(
         errEl.textContent = msg;
         errEl.classList.remove('hidden');
       }
+    } finally {
+      if (timer) clearTimeout(timer);
+      // Always re-enable — harmless on the success path (page is navigating
+      // away); critical on every failure/timeout path so the button is
+      // never left silently stuck disabled.
       if (confirmYesBtn) confirmYesBtn.disabled = false;
     }
   }

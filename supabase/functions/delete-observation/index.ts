@@ -131,22 +131,36 @@ export async function handler(req: Request): Promise<Response> {
   });
   let r2Deleted = 0;
   let r2Errors: Array<{ Key?: string; Code?: string; Message?: string }> = [];
+  let r2Deferred = false;
   if (r2Keys.length > 0) {
+    // The esm.sh @aws-sdk/client-s3 client can *hang* (not throw) inside
+    // the Deno edge runtime if R2 is slow/unreachable. A bare try/catch
+    // does not catch a hang, so an unbounded `r2.send` stalls the whole
+    // function and the DB soft-delete below never runs (observed in prod
+    // — issue #1098). Bound it with an AbortController so a hang aborts
+    // and we still proceed: leaving orphan blobs is acceptable here
+    // (gc-orphan-media is the v1.1 sweep, per the obs-detail runbook),
+    // whereas leaving the metadata row is worse.
+    const r2Ac = new AbortController();
+    const r2Timer = setTimeout(() => r2Ac.abort(), 8000);
     try {
       const out = await r2.send(new DeleteObjectsCommand({
         Bucket: env('R2_BUCKET_NAME')!,
         Delete: { Objects: r2Keys.map(Key => ({ Key })), Quiet: false },
-      }));
+      }), { abortSignal: r2Ac.signal });
       r2Deleted = (out.Deleted ?? []).length;
       r2Errors  = (out.Errors  ?? []) as typeof r2Errors;
     } catch (err) {
-      // R2 deletion failure is non-fatal for the DB delete — we
+      // R2 deletion failure/timeout is non-fatal for the DB delete — we
       // surface the error in the response body so the caller knows
       // the orphan situation, but we still proceed with the DB
       // delete because leaving the metadata row + R2 blobs is worse
       // than just leaving the R2 blobs.
-      console.warn('[delete-observation] R2 delete failed', err);
+      console.warn('[delete-observation] R2 delete failed or timed out', err);
+      r2Deferred = true;
       r2Errors = [{ Code: 'r2_request_failed', Message: err instanceof Error ? err.message : String(err) }];
+    } finally {
+      clearTimeout(r2Timer);
     }
   }
 
@@ -175,6 +189,7 @@ export async function handler(req: Request): Promise<Response> {
     observation_id: obsId,
     r2_deleted: r2Deleted,
     r2_errors: r2Errors,
+    r2_cleanup: r2Deferred ? 'deferred' : 'done',
   });
 }
 
