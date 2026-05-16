@@ -2,7 +2,11 @@
 
 > Operational policy for the CI gate on Rastrum. Parent issue:
 > [#1031](https://github.com/ArtemioPadilla/rastrum/issues/1031) Tier 1e.
-> For the per-suite mechanics, see CLAUDE.md "Audit / E2E".
+> For the per-suite mechanics, see CLAUDE.md "Audit / E2E". For the
+> 2026-05-15 manual production walkthrough — the bugs it found, the
+> journey→fix→regression-spec traceability, and the documented chat /
+> "Ask Rastrum" AI-round-trip coverage gap — see
+> [`journey-audit-2026-05-15.md`](journey-audit-2026-05-15.md).
 
 This doc is the single source of truth for:
 
