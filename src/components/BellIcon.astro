@@ -38,7 +38,7 @@ const ariaLabel = lang === 'es' ? 'Bandeja' : 'Inbox';
 </a>
 
 <script>
-  import { getCachedUser, getSupabase } from '../lib/supabase';
+  import { getCachedUser, getSupabase, onAuthChange } from '../lib/supabase';
 
   const POLL_MS = 60_000;
 
@@ -93,7 +93,7 @@ const ariaLabel = lang === 'es' ? 'Bandeja' : 'Inbox';
     if (document.visibilityState === 'visible') start();
 
     try {
-      getSupabase().auth.onAuthStateChange(() => { tick().catch(() => {}); });
+      onAuthChange(() => { tick().catch(() => {}); });
     } catch { /* env not set */ }
   }
 </script>

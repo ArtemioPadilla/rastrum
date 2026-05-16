@@ -205,7 +205,7 @@ const discoverActive  = isActiveSection(currentPath, 'discover',     lang);
   another tab, etc.) so the bar stays in sync.
 -->
 <script>
-  import { getCachedUser, getSupabase } from '../lib/supabase';
+  import { getCachedUser, onAuthChange } from '../lib/supabase';
 
   const authed = document.getElementById('mbb-authed');
   const anon   = document.getElementById('mbb-anon');
@@ -220,7 +220,7 @@ const discoverActive  = isActiveSection(currentPath, 'discover',     lang);
     try {
       const user = await getCachedUser();
       paint(!!user);
-      getSupabase().auth.onAuthStateChange((_e, s) => paint(!!s));
+      onAuthChange((_e, s) => paint(!!s));
     } catch { /* env not set; leave anon visible */ }
   })();
 </script>

@@ -56,18 +56,55 @@ if (typeof document !== 'undefined') {
   });
 }
 
-// Invalidate cache on sign-out so components reflect signed-out state immediately.
-// We attach this lazily (first getCachedUser() call) to avoid circular initialization.
+// Single shared gotrue subscription, fanned out to in-process listeners.
+// Each direct `supabase.auth.onAuthStateChange()` registers a gotrue
+// subscription whose INITIAL_SESSION replay + internal `_useSession`
+// path acquires the single navigator lock (`lock:rastrum-auth-v1`).
+// Five chrome islands (Header/MobileBottomBar/MobileDrawer/BellIcon/
+// BanBanner) each subscribing → lock contention → "Lock not released
+// within 5000ms" → an in-flight destructive call's auth gets stolen
+// (`AbortError: Lock broken … 'steal'`), which is the delete-hang in
+// #1098. Collapsing every subscriber onto ONE shared gotrue listener +
+// a lightweight callback registry leaves a single lock acquirer. The
+// SIGNED_OUT cache-invalidation semantics (#1064) are unchanged.
+type AuthChangeCb = (
+  event: string,
+  session: import('@supabase/supabase-js').Session | null,
+) => void;
+const _authListeners = new Set<AuthChangeCb>();
+
 let _authListenerAttached = false;
 function ensureAuthListener() {
   if (_authListenerAttached) return;
   _authListenerAttached = true;
-  getSupabase().auth.onAuthStateChange((event) => {
+  getSupabase().auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_OUT') {
       _userCache = null;
       _sessionCache = null;
     }
+    for (const cb of _authListeners) {
+      try { cb(event, session); } catch { /* one listener must not break the rest */ }
+    }
   });
+}
+
+/**
+ * Subscribe to auth-state changes through the single shared gotrue
+ * listener instead of calling `getSupabase().auth.onAuthStateChange()`
+ * directly (each direct call adds a navigator-lock acquirer — the
+ * lock-steal root cause of #1076/#1098). Mirrors gotrue's contract: the
+ * callback fires once with `('INITIAL_SESSION', <current session>)` on
+ * subscribe (via the dedup'd cached session — no extra lock) so callers
+ * that paint from the initial session still do, then on every change.
+ * Returns an unsubscribe function.
+ */
+export function onAuthChange(cb: AuthChangeCb): () => void {
+  ensureAuthListener();
+  _authListeners.add(cb);
+  getCachedSession()
+    .then((session) => { if (_authListeners.has(cb)) cb('INITIAL_SESSION', session); })
+    .catch(() => { /* offline / no session — skip the initial fire */ });
+  return () => { _authListeners.delete(cb); };
 }
 
 /**

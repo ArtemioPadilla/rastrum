@@ -1,4 +1,4 @@
-import { getSupabase } from './supabase';
+import { getSupabase, onAuthChange } from './supabase';
 import type { UserRole } from './types';
 
 const ROLES_CACHE_TTL_MS = 30_000;
@@ -10,7 +10,7 @@ function ensureRolesAuthListener() {
   if (_rolesListenerAttached) return;
   _rolesListenerAttached = true;
   try {
-    getSupabase().auth.onAuthStateChange((event) => {
+    onAuthChange((event) => {
       if (event === 'SIGNED_OUT') {
         _rolesCache = null;
         _rolesFlight = null;
