@@ -67,6 +67,7 @@ const labels = {
   data-lang={lang}
   data-scientific-name=""
   data-trait-prompt=""
+  data-label-max-photos={labels.maxPhotos}
   class="hidden rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4 space-y-4"
 >
   <!-- Header -->
@@ -118,6 +119,7 @@ const labels = {
 <script>
   import { getSupabase } from '../lib/supabase';
   import { resolveTaxonId } from '../lib/why-this-species';
+  import { showToast } from '../lib/toast';
 
   const MAX_PHOTOS = 3;
 
@@ -337,8 +339,8 @@ const labels = {
           input.addEventListener('change', () => {
             if (!input.files || input.files.length === 0) return;
             if (selectedFiles.length >= MAX_PHOTOS) {
-              const msg = lang === 'es' ? 'Máximo 3 fotos' : 'Maximum 3 photos';
-              alert(msg);
+              const msg = root.dataset.labelMaxPhotos ?? (lang === 'es' ? 'Máximo 3 fotos' : 'Maximum 3 photos');
+              showToast({ message: msg, variant: 'error' });
               return;
             }
             const traitHint  = input.dataset.traitHint ?? 'unknown';
