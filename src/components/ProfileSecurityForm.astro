@@ -68,6 +68,7 @@ const onb = (tr as unknown as { onboarding: Record<string, string> }).onboarding
 </div>
 
 <script>
+  import { openConfirmDialog } from '../lib/confirm-dialog';
   const isEsLang = document.documentElement.lang === 'es';
 
   // ── Security: passkey + sign-out-everywhere ──
@@ -123,7 +124,16 @@ const onb = (tr as unknown as { onboarding: Record<string, string> }).onboarding
 
   soBtn?.addEventListener('click', async () => {
     if (!soBtn || !soLabel) return;
-    if (!confirm(isEsLang ? '¿Cerrar sesión en todos los dispositivos?' : 'Sign out from all devices?')) return;
+    const soOk = await openConfirmDialog({
+      title: isEsLang ? '¿Cerrar sesión en todos lados?' : 'Sign out everywhere?',
+      message: isEsLang
+        ? '¿Cerrar sesión en todos los dispositivos? Tendrás que volver a iniciar sesión en cada uno.'
+        : 'Sign out from all devices? You will need to sign in again on each one.',
+      variant: 'danger',
+      confirmLabel: isEsLang ? 'Cerrar sesión en todos' : 'Sign out everywhere',
+      cancelLabel: isEsLang ? 'Cancelar' : 'Cancel',
+    });
+    if (!soOk) return;
     soBtn.disabled = true;
     soLabel.textContent = SO_BUSY;
     const { signOutEverywhere } = await import('../lib/auth');
