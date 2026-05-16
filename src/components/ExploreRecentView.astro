@@ -215,6 +215,7 @@ const distancePage = page as unknown as Record<string, string>;
   import { pickCardImageUrl } from '../lib/media-url';
   import { formatTimeAgo } from '../lib/social';
   import { wireOverflowMenu } from '../lib/overflow-menu';
+  import { showToast } from '../lib/toast';
   import { openConfirmDialog } from '../lib/confirm-dialog';
   import {
     RECENTS_VIEW_MODE_KEY,
@@ -964,14 +965,14 @@ const distancePage = page as unknown as Record<string, string>;
           try {
             const { blockUser } = await import('../lib/social');
             await blockUser(observerId);
-            alert(labels.blockSuccess);
+            showToast({ message: labels.blockSuccess, variant: 'success' });
             // Hide all cards by this observer in the current list.
             root.querySelectorAll<HTMLElement>(`.er-overflow[data-observer-id="${CSS.escape(observerId)}"]`).forEach((w) => {
               const li = w.closest('li');
               li?.classList.add('hidden');
             });
           } catch (err) {
-            alert(labels.blockError);
+            showToast({ message: labels.blockError, variant: 'error' });
             // eslint-disable-next-line no-console
             console.warn('[er.block]', err);
           } finally {

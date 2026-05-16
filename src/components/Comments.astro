@@ -124,6 +124,7 @@ const sgReportLabel = sgTree.socialgraph.report.button;
   import { getCachedUser, getSupabase } from '../lib/supabase';
   import { buildCommentTree, formatTimeAgo, sanitizeCommentBody, type CommentRow, type CommentNode } from '../lib/social';
   import { wireOverflowMenu } from '../lib/overflow-menu';
+  import { showToast } from '../lib/toast';
   import { tierForKarma } from '../lib/karma-frame';
   import { openConfirmDialog } from '../lib/confirm-dialog';
 
@@ -360,13 +361,13 @@ const sgReportLabel = sgTree.socialgraph.report.button;
           try {
             const { blockUser } = await import('../lib/social');
             await blockUser(authorId);
-            alert(labels.blockSuccess);
+            showToast({ message: labels.blockSuccess, variant: 'success' });
             // Remove that author's comments from this thread immediately.
             listEl?.querySelectorAll<HTMLElement>(`.comment-overflow[data-author-id="${CSS.escape(authorId)}"]`).forEach(w => {
               w.closest('.comment-item')?.remove();
             });
           } catch (err) {
-            alert(labels.blockError);
+            showToast({ message: labels.blockError, variant: 'error' });
             // eslint-disable-next-line no-console
             console.warn('[comments.block]', err);
           } finally {
