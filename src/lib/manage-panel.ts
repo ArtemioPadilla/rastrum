@@ -348,7 +348,7 @@ export async function wireManagePanelDetails(
       const { data, error: invokeErr } = result;
       if (invokeErr) throw invokeErr;
       if (data && !data.ok) throw new Error(data.error ?? 'Delete failed');
-      window.location.href = `/${lang}/${lang === 'es' ? 'perfil/observaciones' : 'profile/observations'}/`;
+      window.location.href = `/${lang}/${lang === 'es' ? 'perfil/observaciones' : 'profile/observations'}/?deleted=1`;
     } catch (err) {
       if (errEl) {
         const msg = err instanceof Error

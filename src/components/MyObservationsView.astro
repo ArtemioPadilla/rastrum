@@ -256,6 +256,21 @@ const tabs = [
   const lang: Lang = root?.dataset.lang === 'es' ? 'es' : 'en';
   const shareBase = root?.dataset.shareObsBase ?? '/share/obs/';
 
+  // Positive confirmation after a delete: ObsManagePanel redirects here
+  // with ?deleted=1 so the user gets explicit feedback instead of
+  // silently landing on the list unsure whether it worked, or — if the
+  // success redirect raced a hang — ever on the bare not-found page
+  // (#1098 follow-up). Strip the param so reload/back doesn't re-toast.
+  try {
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get('deleted') === '1') {
+      showToast(lang === 'es' ? 'Observación eliminada.' : 'Observation deleted.', 'ok');
+      sp.delete('deleted');
+      const qs = sp.toString();
+      window.history.replaceState({}, '', window.location.pathname + (qs ? `?${qs}` : '') + window.location.hash);
+    }
+  } catch { /* URL/history unavailable — non-fatal */ }
+
   let currentTab: SyncFilter = 'all';
   let offset = 0;
   let exhausted = false;
