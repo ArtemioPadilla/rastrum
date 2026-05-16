@@ -156,6 +156,8 @@ const placesIndexBase = `/${lang}/${lang === 'es' ? 'explorar/lugares' : 'explor
   };
 
   const placesBase = root.dataset.placesBase!;
+  const lang = (root.dataset.lang === 'es' ? 'es' : 'en') as 'en' | 'es';
+  const isEs = lang === 'es';
 
   // Elements
   const indexEl      = document.getElementById('places-index')!;
