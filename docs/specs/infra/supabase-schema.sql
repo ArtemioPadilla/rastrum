@@ -11634,14 +11634,20 @@ COMMENT ON COLUMN public.users.last_digest_sent_at IS
 
 -- pg_cron: fire every hour; the Edge Function computes the per-timezone
 -- recipient set so each user receives the email at ~14:00 local time.
+-- Canonical cron→EF call shape: hardcoded function URL + X-Cron-Secret
+-- read from the Vault at query time (matches cron-schedules.sql). The
+-- old current_setting('app.supabase_url')/('app.cron_secret') GUCs were
+-- never set, so this job failed every hour with
+-- "unrecognized configuration parameter". The EF gates on the
+-- X-Cron-Secret header (requireCronSecret), not Authorization Bearer.
 SELECT cron.schedule(
   'weekly-digest',
   '0 * * * *',
   $$SELECT net.http_post(
-    url     := current_setting('app.supabase_url') || '/functions/v1/weekly-digest',
-    headers := jsonb_build_object(
-      'Authorization', 'Bearer ' || current_setting('app.cron_secret')
-    ),
+    url     := 'https://reppvlqejgoqvitturxp.supabase.co/functions/v1/weekly-digest',
+    headers := ('{"Content-Type":"application/json","X-Cron-Secret":"'
+                 || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'cron_secret')
+                 || '"}')::jsonb,
     body    := '{}'::jsonb
   )$$
 );
@@ -12124,9 +12130,14 @@ BEGIN
     PERFORM cron.schedule(
       'refresh-conservation-status',
       '0 3 1 * *',
+      -- Canonical shape: hardcoded URL + X-Cron-Secret from the Vault.
+      -- The old current_setting('app.*') GUCs were never set, so this
+      -- monthly job errored with "unrecognized configuration parameter".
       $cron$SELECT net.http_post(
-          url    := current_setting('app.supabase_url') || '/functions/v1/refresh-conservation-status',
-          headers := json_build_object('x-cron-secret', current_setting('app.cron_secret'))::jsonb,
+          url    := 'https://reppvlqejgoqvitturxp.supabase.co/functions/v1/refresh-conservation-status',
+          headers := ('{"Content-Type":"application/json","X-Cron-Secret":"'
+                       || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'cron_secret')
+                       || '"}')::jsonb,
           body   := '{}'::jsonb
       )$cron$
     );
