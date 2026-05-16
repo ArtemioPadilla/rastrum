@@ -194,7 +194,7 @@ const getDocLabel = (key: string) => (tr.docs.sections as Record<string, string>
 </aside>
 
 <script>
-  import { getCachedUser, getSupabase } from '../lib/supabase';
+  import { getCachedUser, onAuthChange } from '../lib/supabase';
   import { signOut, SUPABASE_AUTH_STORAGE_KEY, HEADER_AVATAR_CACHE_KEY, HEADER_AVATAR_NAME_KEY } from '../lib/auth';
   import { getUserRoles } from '../lib/user-roles';
 
@@ -244,7 +244,7 @@ const getDocLabel = (key: string) => (tr.docs.sections as Record<string, string>
       const user = await getCachedUser();
       paintAuth(!!user);
       if (user) await maybeShowConsoleLink(user.id);
-      getSupabase().auth.onAuthStateChange(async (_e, s) => {
+      onAuthChange(async (_e, s) => {
         paintAuth(!!s);
         if (s?.user) await maybeShowConsoleLink(s.user.id);
       });

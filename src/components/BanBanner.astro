@@ -41,7 +41,7 @@ const appealPath = getLocalizedPath(
 </div>
 
 <script>
-  import { getCachedUser, getSupabase } from '../lib/supabase';
+  import { getCachedUser, getSupabase, onAuthChange } from '../lib/supabase';
   import { getActiveBanForUser } from '../lib/check-ban-status';
 
   async function paintBanBanner() {
@@ -82,8 +82,7 @@ const appealPath = getLocalizedPath(
   // Run on page load and on auth state changes.
   paintBanBanner().catch(() => { /* env not configured */ });
   try {
-    const supabase = getSupabase();
-    supabase.auth.onAuthStateChange(() => {
+    onAuthChange(() => {
       paintBanBanner().catch(() => { /* noop */ });
     });
   } catch { /* env not configured */ }
