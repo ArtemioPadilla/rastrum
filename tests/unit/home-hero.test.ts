@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveHeroState, type HeroInputs } from '../../src/lib/home-hero';
+import { resolveHeroState, startOfLocalDayUTC, type HeroInputs } from '../../src/lib/home-hero';
 
 const baseInputs: HeroInputs = {
   streak: null,
@@ -122,5 +122,31 @@ describe('resolveHeroState', () => {
       now: new Date('2026-05-09T20:00:00Z'),
     });
     expect(r.kind).toBe('streak_at_risk');
+  });
+});
+
+describe('startOfLocalDayUTC', () => {
+  it('returns user-local midnight as a UTC instant, distinct from UTC midnight', () => {
+    // 2026-05-09T03:00:00Z is still 2026-05-08 21:00 in Mexico City (UTC-6).
+    // UTC midnight would be 2026-05-09T00:00:00Z; the user-local day start
+    // must be 2026-05-08T06:00:00Z (00:00 local on the 8th).
+    const now = new Date('2026-05-09T03:00:00Z');
+    const utcMidnight = new Date(now);
+    utcMidnight.setUTCHours(0, 0, 0, 0);
+
+    const localStart = startOfLocalDayUTC(now, 'America/Mexico_City');
+
+    expect(localStart.toISOString()).not.toBe(utcMidnight.toISOString());
+    expect(localStart.toISOString()).toBe('2026-05-08T06:00:00.000Z');
+  });
+
+  it('matches UTC midnight for the UTC timezone', () => {
+    const now = new Date('2026-05-09T15:30:00Z');
+    expect(startOfLocalDayUTC(now, 'UTC').toISOString()).toBe('2026-05-09T00:00:00.000Z');
+  });
+
+  it('falls back to UTC midnight for an unparseable timezone', () => {
+    const now = new Date('2026-05-09T15:30:00Z');
+    expect(startOfLocalDayUTC(now, 'Not/AZone').toISOString()).toBe('2026-05-09T00:00:00.000Z');
   });
 });

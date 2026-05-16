@@ -119,6 +119,7 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
   import { getSupabase, getCachedUser } from '../lib/supabase';
   import { buildGreeting } from '../lib/home-greeting';
   import { loadStreak } from '../lib/home-loaders';
+  import { startOfLocalDayUTC } from '../lib/home-hero';
   import { fetchSuggestions, type SpeciesSuggestion } from '../lib/suggestions';
 
   type Lang = 'en' | 'es';
@@ -501,8 +502,12 @@ const profileHref = lang === 'es' ? '/es/perfil/' : '/en/profile/';
       const observeBase = root.dataset.observeHref ?? (lang === 'es' ? '/es/observar/' : '/en/observe/');
       const ctaHref = `${observeBase}?taxon_id=${encodeURIComponent(ch.taxon_id)}`;
 
-      const todayStart = new Date();
-      todayStart.setUTCHours(0, 0, 0, 0);
+      const { data: tzRow } = await supabase
+        .from('users')
+        .select('timezone')
+        .eq('id', userId)
+        .maybeSingle<{ timezone: string | null }>();
+      const todayStart = startOfLocalDayUTC(new Date(), tzRow?.timezone ?? 'UTC');
 
       const { count } = await supabase
         .from('observations')

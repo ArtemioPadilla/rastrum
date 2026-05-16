@@ -31,6 +31,40 @@ function localParts(d: Date, tz: string): { hour: number; minute: number; isoDay
   }
 }
 
+/**
+ * The UTC instant corresponding to 00:00 of `now`'s calendar day in the
+ * user's timezone `tz`. Used for "did the user observe *today*?" probes —
+ * `observations.observed_at` is a UTC timestamp, so the boundary must be
+ * the user's local midnight expressed as a UTC instant, not UTC midnight
+ * (which misattributes daytime observations for the Americas). Falls back
+ * to UTC midnight if the timezone is unparseable.
+ */
+export function startOfLocalDayUTC(now: Date, tz: string): Date {
+  try {
+    const { isoDay } = localParts(now, tz);
+    // Offset (minutes) of `tz` at `now`: difference between the wall-clock
+    // time the formatter reports and the same instant read as if it were UTC.
+    const fmt = new Intl.DateTimeFormat('en-CA', {
+      timeZone: tz,
+      hour12: false,
+      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
+    });
+    const p = Object.fromEntries(fmt.formatToParts(now).map(x => [x.type, x.value]));
+    const asUTC = Date.UTC(
+      Number(p.year), Number(p.month) - 1, Number(p.day),
+      Number(p.hour === '24' ? '0' : p.hour), Number(p.minute), Number(p.second),
+    );
+    const offsetMs = asUTC - (Math.floor(now.getTime() / 1000) * 1000);
+    const [y, m, d] = isoDay.split('-').map(Number);
+    const localMidnightAsUTC = Date.UTC(y, m - 1, d, 0, 0, 0);
+    return new Date(localMidnightAsUTC - offsetMs);
+  } catch {
+    const fallback = new Date(now);
+    fallback.setUTCHours(0, 0, 0, 0);
+    return fallback;
+  }
+}
+
 export function resolveHeroState(inputs: HeroInputs): HeroState {
   const { hour, minute, isoDay } = localParts(inputs.now, inputs.userTimezone);
 
