@@ -47,10 +47,12 @@ const sgReportLabel = sgTree.socialgraph.report.button;
   data-label-edited={tr.social.edited}
   data-label-deleted={tr.social.comment_deleted}
   data-label-confirm-delete={tr.social.delete_confirm}
+  data-label-confirm-delete-title={tr.social.delete_confirm_title}
   data-label-more-actions={sgCards.more_actions}
   data-label-block={sgBlockLabel}
   data-label-report={sgReportLabel}
   data-label-block-confirm={sgCards.block_user_confirm}
+  data-label-block-confirm-title={sgCards.block_user_confirm_title}
   data-label-block-success={sgCards.block_user_success}
   data-label-block-error={sgCards.block_user_error}
   data-label-report-comment-aria={sgCards.report_comment_aria}
@@ -123,6 +125,7 @@ const sgReportLabel = sgTree.socialgraph.report.button;
   import { buildCommentTree, formatTimeAgo, sanitizeCommentBody, type CommentRow, type CommentNode } from '../lib/social';
   import { wireOverflowMenu } from '../lib/overflow-menu';
   import { tierForKarma } from '../lib/karma-frame';
+  import { openConfirmDialog } from '../lib/confirm-dialog';
 
   const PAGE_SIZE = 20;
 
@@ -228,11 +231,13 @@ const sgReportLabel = sgTree.socialgraph.report.button;
       edited: root.dataset.labelEdited ?? 'edited',
       deleted: root.dataset.labelDeleted ?? 'deleted',
       confirmDelete: root.dataset.labelConfirmDelete ?? 'Delete this comment?',
+      confirmDeleteTitle: root.dataset.labelConfirmDeleteTitle ?? 'Delete comment?',
       empty: root.dataset.labelEmpty ?? 'No comments yet.',
       moreActions: root.dataset.labelMoreActions ?? 'More actions',
       block: root.dataset.labelBlock ?? 'Block',
       report: root.dataset.labelReport ?? 'Report',
       blockConfirm: root.dataset.labelBlockConfirm ?? 'Block @{{handle}}?',
+      blockConfirmTitle: root.dataset.labelBlockConfirmTitle ?? 'Block this user?',
       blockSuccess: root.dataset.labelBlockSuccess ?? 'User blocked.',
       blockError: root.dataset.labelBlockError ?? 'Could not block.',
       reportCommentAria: root.dataset.labelReportCommentAria ?? 'Report this comment',
@@ -344,7 +349,13 @@ const sgReportLabel = sgTree.socialgraph.report.button;
           const authorId = wrap.dataset.authorId ?? '';
           const handle = wrap.dataset.authorHandle ?? '';
           if (!authorId) return;
-          if (!confirm(labels.blockConfirm.replace('{{handle}}', handle || '?'))) return;
+          if (!(await openConfirmDialog({
+            title: labels.blockConfirmTitle,
+            message: labels.blockConfirm.replace('{{handle}}', handle || '?'),
+            variant: 'danger',
+            confirmLabel: labels.block,
+            cancelLabel: labels.cancel,
+          }))) return;
           if (blockBtn) blockBtn.disabled = true;
           try {
             const { blockUser } = await import('../lib/social');
@@ -417,7 +428,13 @@ const sgReportLabel = sgTree.socialgraph.report.button;
     }
 
     async function doDelete(id: string) {
-      if (!confirm(labels.confirmDelete)) return;
+      if (!(await openConfirmDialog({
+        title: labels.confirmDeleteTitle,
+        message: labels.confirmDelete,
+        variant: 'danger',
+        confirmLabel: labels.delete,
+        cancelLabel: labels.cancel,
+      }))) return;
       const { error } = await supabase
         .from('observation_comments')
         .update({ deleted_at: new Date().toISOString() })
