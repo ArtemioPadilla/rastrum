@@ -7,6 +7,11 @@
 > regression. Companion to [`qa-policy.md`](qa-policy.md) (test policy)
 > and [`fogg-audit.md`](fogg-audit.md) (v1.1.5 persuasive-tech audit).
 
+> **Living successor:** completeness is now owned by the CI-enforced
+> [`journey-catalog.md`](journey-catalog.md). This file remains the
+> immutable 2026-05-15/16 audit record; for "is every route covered"
+> consult the catalog, not this snapshot.
+
 ---
 
 ## 1. Two journey systems — reconciled
