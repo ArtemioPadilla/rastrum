@@ -47,6 +47,11 @@ const i18nBag = {
   personal_enabled_toast:     tr.ai_personal_credential.enabled_toast,
   personal_disabled_toast:    tr.ai_personal_credential.disabled_toast,
   personal_error:             tr.ai_personal_credential.error,
+  error_prefix_tmpl:          tr.sponsoring.error_prefix_tmpl,
+  creds_load_failed:          tr.sponsoring.creds_load_failed,
+  add_credential_first:       tr.sponsoring.add_credential_first,
+  three_strike_msg:           tr.sponsoring.three_strike_msg,
+  report_dialog_unavailable:  tr.sponsoring.report_dialog_unavailable,
   paused_reason: {
     rate_limit:         tr.sponsoring.paused_reason_rate_limit,
     cred_invalid:       tr.sponsoring.paused_reason_cred_invalid,
@@ -401,6 +406,7 @@ const langJson = JSON.stringify(lang);
     listMyPools, createPool, setPoolStatus, updatePool, deletePool,
     listPoolBeneficiaries,
   } from '../lib/sponsorships';
+  import { showToast } from '../lib/toast';
 
   type I18nBag = {
     below_engagement_threshold: string;
@@ -438,6 +444,11 @@ const langJson = JSON.stringify(lang);
     personal_enabled_toast: string;
     personal_disabled_toast: string;
     personal_error: string;
+    error_prefix_tmpl: string;
+    creds_load_failed: string;
+    add_credential_first: string;
+    three_strike_msg: string;
+    report_dialog_unavailable: string;
     paused_reason: {
       rate_limit: string;
       cred_invalid: string;
@@ -798,7 +809,7 @@ const langJson = JSON.stringify(lang);
         errEl.textContent = `Error: ${msg}`;
         errEl.classList.remove('hidden');
       } else {
-        alert(`Error: ${msg}`);
+        showToast({ message: (tr.error_prefix_tmpl ?? 'Error: {msg}').replace('{msg}', msg), variant: 'error' });
       }
     } finally {
       if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = originalSubmitText; }
@@ -818,7 +829,7 @@ const langJson = JSON.stringify(lang);
       (document.getElementById('rotate-secret-input') as HTMLInputElement).value = '';
       rotateDialog?.close();
       await refreshCreds();
-    } catch (err) { alert(`Error: ${(err as Error).message}`); }
+    } catch (err) { showToast({ message: (tr.error_prefix_tmpl ?? 'Error: {msg}').replace('{msg}', (err as Error).message), variant: 'error' }); }
   });
 
   // ── M32 (#152): platform pool wiring ───────────────────────────────
@@ -826,7 +837,7 @@ const langJson = JSON.stringify(lang);
   document.getElementById('pool-add-btn')?.addEventListener('click', async () => {
     // Populate the credential dropdown with the sponsor's active creds.
     let creds: Awaited<ReturnType<typeof listCredentials>> = [];
-    try { creds = await listCredentials(); } catch { alert('Could not load credentials.'); return; }
+    try { creds = await listCredentials(); } catch { showToast({ message: tr.creds_load_failed ?? 'Could not load credentials.', variant: 'error' }); return; }
     creds = creds.filter(c => !c.revoked_at);
     const sel = document.getElementById('pool-cred-select') as HTMLSelectElement | null;
     if (!sel) return;
@@ -861,7 +872,7 @@ const langJson = JSON.stringify(lang);
       await createPool({ credential_id: credentialId, total_cap: totalCap, preferred_model: model, daily_user_cap: dailyCap, monthly_reset: monthlyReset });
       poolDialog?.close();
       await refreshPools();
-    } catch (err) { alert(`Error: ${(err as Error).message}`); }
+    } catch (err) { showToast({ message: (tr.error_prefix_tmpl ?? 'Error: {msg}').replace('{msg}', (err as Error).message), variant: 'error' }); }
   });
 
   async function refreshPools() {
@@ -937,7 +948,7 @@ const langJson = JSON.stringify(lang);
       } else if (target.dataset.poolBens) {
         await openPoolBeneficiariesDialog(target.dataset.poolBens);
       }
-    } catch (err) { alert(`Error: ${(err as Error).message}`); }
+    } catch (err) { showToast({ message: (tr.error_prefix_tmpl ?? 'Error: {msg}').replace('{msg}', (err as Error).message), variant: 'error' }); }
   });
 
   // ── #468: Edit pool dialog ────────────────────────────────────────
@@ -1115,7 +1126,7 @@ const langJson = JSON.stringify(lang);
     } catch (err) {
       checkbox.checked = previous;
       const detail = err instanceof Error ? err.message : String(err);
-      alert(`${tr.personal_error} (${detail})`);
+      showToast({ message: `${tr.personal_error} (${detail})`, variant: 'error' });
     } finally {
       checkbox.disabled = false;
     }
@@ -1211,8 +1222,8 @@ const langJson = JSON.stringify(lang);
   const addBenDialog = document.getElementById('add-ben-dialog') as HTMLDialogElement | null;
   document.getElementById('add-ben-btn')?.addEventListener('click', async () => {
     let creds: Awaited<ReturnType<typeof listCredentials>> = [];
-    try { creds = await listCredentials(); } catch { alert('Could not load credentials.'); return; }
-    if (creds.length === 0) { alert('Add a credential first.'); return; }
+    try { creds = await listCredentials(); } catch { showToast({ message: tr.creds_load_failed ?? 'Could not load credentials.', variant: 'error' }); return; }
+    if (creds.length === 0) { showToast({ message: tr.add_credential_first ?? 'Add a credential first.', variant: 'error' }); return; }
     const select = document.getElementById('ben-cred-select') as HTMLSelectElement | null;
     if (select) {
       select.innerHTML = creds.filter(c => !c.revoked_at).map(c =>
@@ -1235,14 +1246,14 @@ const langJson = JSON.stringify(lang);
       (document.getElementById('ben-username-input') as HTMLInputElement).value = '';
       addBenDialog?.close();
       await refreshBens();
-    } catch (err) { alert(`Error: ${(err as Error).message}`); }
+    } catch (err) { showToast({ message: (tr.error_prefix_tmpl ?? 'Error: {msg}').replace('{msg}', (err as Error).message), variant: 'error' }); }
   });
 
   document.getElementById('bens-tbody')?.addEventListener('click', async (e) => {
     const target = e.target as HTMLElement;
     if (target.dataset.unpause) {
       const r = await unpauseSponsorship(target.dataset.unpause);
-      if (r.error === 'three_strike') alert('Three-strike: revoke and recreate.');
+      if (r.error === 'three_strike') showToast({ message: tr.three_strike_msg ?? 'Three-strike: revoke and recreate.', variant: 'error' });
       await refreshBens();
     } else if (target.dataset.revokeSpons) {
       if (await showConfirm('Revoke?')) {
@@ -1258,7 +1269,7 @@ const langJson = JSON.stringify(lang);
         dialog.classList.remove('hidden');
       } else {
         console.warn('[sponsoring] #rastrum-report-dialog not in DOM — report dialog unavailable');
-        alert('Report dialog unavailable — please reload the page.');
+        showToast({ message: tr.report_dialog_unavailable ?? 'Report dialog unavailable — please reload the page.', variant: 'error' });
       }
     }
   });
@@ -1410,15 +1421,15 @@ const langJson = JSON.stringify(lang);
     if (target.dataset.approve) {
       const { approveRequest, listCredentials } = await import('../lib/sponsorships');
       let creds: Awaited<ReturnType<typeof listCredentials>> = [];
-      try { creds = await listCredentials(); } catch { alert('Could not load credentials.'); return; }
+      try { creds = await listCredentials(); } catch { showToast({ message: tr.creds_load_failed ?? 'Could not load credentials.', variant: 'error' }); return; }
       const activeCreds = creds.filter(c => !c.revoked_at);
-      if (activeCreds.length === 0) { alert(tr.add_credential ?? 'Add a credential first.'); return; }
+      if (activeCreds.length === 0) { showToast({ message: tr.add_credential_first ?? tr.add_credential ?? 'Add a credential first.', variant: 'error' }); return; }
       try {
         await approveRequest(target.dataset.approve, { credential_id: activeCreds[0].id, monthly_call_cap: 200 });
         await refreshRequests();
         await refreshBens();
       } catch (err) {
-        alert(`Error: ${(err as Error).message}`);
+        showToast({ message: (tr.error_prefix_tmpl ?? 'Error: {msg}').replace('{msg}', (err as Error).message), variant: 'error' });
       }
     } else if (target.dataset.reject) {
       const { rejectRequest } = await import('../lib/sponsorships');
@@ -1427,7 +1438,7 @@ const langJson = JSON.stringify(lang);
           await rejectRequest(target.dataset.reject);
           await refreshRequests();
         } catch (err) {
-          alert(`Error: ${(err as Error).message}`);
+          showToast({ message: (tr.error_prefix_tmpl ?? 'Error: {msg}').replace('{msg}', (err as Error).message), variant: 'error' });
         }
       }
     }
