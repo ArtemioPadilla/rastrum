@@ -384,6 +384,7 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
 <script>
   import { getCachedUser, getSupabase } from '../lib/supabase';
   import { shouldShowInferredCountryBadge, buildCommunityDiscoveryPayload } from '../lib/profile-edit';
+  import { openConfirmDialog } from '../lib/confirm-dialog';
   import type { UserProfile } from '../lib/types';
 
   const form = document.getElementById('edit-form') as HTMLFormElement | null;
@@ -703,7 +704,16 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
 
   soBtn?.addEventListener('click', async () => {
     if (!soBtn || !soLabel) return;
-    if (!confirm(isEsLang ? '¿Cerrar sesión en todos los dispositivos?' : 'Sign out from all devices?')) return;
+    const soOk = await openConfirmDialog({
+      title: isEsLang ? '¿Cerrar sesión en todos lados?' : 'Sign out everywhere?',
+      message: isEsLang
+        ? '¿Cerrar sesión en todos los dispositivos? Tendrás que volver a iniciar sesión en cada uno.'
+        : 'Sign out from all devices? You will need to sign in again on each one.',
+      variant: 'danger',
+      confirmLabel: isEsLang ? 'Cerrar sesión en todos' : 'Sign out everywhere',
+      cancelLabel: isEsLang ? 'Cancelar' : 'Cancel',
+    });
+    if (!soOk) return;
     soBtn.disabled = true;
     soLabel.textContent = SO_BUSY;
     const { signOutEverywhere } = await import('../lib/auth');
