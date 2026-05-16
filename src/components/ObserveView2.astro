@@ -424,27 +424,7 @@ import { saveObservationToOutbox, resolveObserverRef } from '../lib/observe';
 import { syncOutbox } from '../lib/sync';
 import { SYNC_EVENTS, type SyncRowDetail } from '../lib/sync-events';
 import { getObservationDefaults, setObservationDefaults } from '../lib/observation-defaults';
-import { recoverFromChunkLoadError } from '../lib/chunk-reload';
-
-// A stale dynamic-import after a deploy ("Failed to fetch dynamically
-// imported module") would otherwise degrade the pipeline silently to an
-// empty stepper. Self-heal with a single guarded reload that pulls a
-// fresh SW + shell; returns true when it took over (caller must `return`
-// and NOT mark the pipeline failed, so the post-reload resume retries
-// with the fresh chunk graph). Second occurrence falls through to the
-// normal degraded fallback so a real build inconsistency can't loop.
-function maybeSelfHealChunk(err: unknown): boolean {
-  return recoverFromChunkLoadError(err, {
-    storage: sessionStorage,
-    reload: () => {
-      navigator.serviceWorker
-        ?.getRegistration()
-        .then((r) => r?.update())
-        .catch(() => {})
-        .finally(() => location.reload());
-    },
-  });
-}
+import { selfHealChunk } from '../lib/chunk-reload';
 
 // ── State ──────────────────────────────────────────────────────────────────
 const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
@@ -753,7 +733,7 @@ document.addEventListener('rastrum:photo-edited', (e: Event) => {
     pipelineSection?.classList.remove('hidden');
     updatePipelineUI();
     runPipeline(pipelineState).catch(err => {
-      if (maybeSelfHealChunk(err)) return;
+      if (selfHealChunk(err)) return;
       console.error('[rastrum] re-run after edit failed', err);
       showPostForm();
     });
@@ -812,7 +792,7 @@ document.addEventListener('rastrum:files-dropped', async (e: Event) => {
   try {
     await runPipeline(pipelineState);
   } catch (err) {
-    if (maybeSelfHealChunk(err)) return;
+    if (selfHealChunk(err)) return;
     console.error('[rastrum] pipeline error — showing post-form as fallback', err);
     pipelineState.status = 'failed';
     await savePipelineState(pipelineState).catch(() => {});
@@ -1442,7 +1422,7 @@ async function resumePipeline(state: PipelineState) {
     try {
       await runPipeline(state);
     } catch (err) {
-      if (maybeSelfHealChunk(err)) return;
+      if (selfHealChunk(err)) return;
       console.error('[rastrum] resume pipeline error — showing post-form as fallback', err);
       state.status = 'failed';
       await savePipelineState(state).catch(() => {});

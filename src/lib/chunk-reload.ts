@@ -51,3 +51,23 @@ export function recoverFromChunkLoadError(err: unknown, deps: ChunkReloadDeps): 
   deps.reload();
   return true;
 }
+
+/**
+ * Browser-bound convenience wrapper around {@link recoverFromChunkLoadError}.
+ * Thin glue (the decision logic is unit-tested via the injected-deps form):
+ * uses `sessionStorage` for the one-shot guard and, before reloading, nudges
+ * the service worker to update so the fresh asset graph wins the reload.
+ * Call it first in any dynamic-import catch: `if (selfHealChunk(err)) return;`
+ */
+export function selfHealChunk(err: unknown): boolean {
+  return recoverFromChunkLoadError(err, {
+    storage: sessionStorage,
+    reload: () => {
+      navigator.serviceWorker
+        ?.getRegistration()
+        .then((r) => r?.update())
+        .catch(() => {})
+        .finally(() => location.reload());
+    },
+  });
+}
