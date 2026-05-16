@@ -61,6 +61,20 @@ verify_jwt = false
 enabled = true
 verify_jwt = false
 
+# delete-observation self-gates auth in-handler: extracts the Authorization
+# header, calls auth.getUser(), and returns 401 itself (index.ts:82-88).
+# With Edge-layer verify_jwt = true (the default), the Supabase gateway
+# rejects both the OPTIONS preflight and the POST before the function code
+# runs → the browser sees "Failed to fetch" / "Failed to send a request to
+# the Edge Function". Disabling Edge-layer verification here does NOT
+# weaken security — the handler enforces ownership (observer_id check) and
+# uses service_role only after that gate passes. Must also be in
+# OTHER_NO_JWT in .github/workflows/deploy-functions.yml (deploy flag wins
+# in prod; both sites kept in sync). Ref #1093.
+[functions.delete-observation]
+enabled = true
+verify_jwt = false
+
 # sponsorships self-gates both paths: a user JWT via auth.getUser for the
 # SponsoringView UI calls, and a Bearer cron token for the weekly
 # ai_credentials_heartbeat job. The cron token is not a JWT, so edge-layer

@@ -235,10 +235,14 @@ jobs:
           #                  weekly ai_credentials_heartbeat job. The cron
           #                  token is not a JWT, so edge verify_jwt 401'd the
           #                  heartbeat at the gateway before code ran.
+          #    delete-observation — self-gates: extracts Authorization header,
+          #                  calls auth.getUser(), returns 401 itself. Edge
+          #                  verify_jwt gated the OPTIONS preflight before code
+          #                  ran → browser "Failed to fetch" (#1093).
           #
           # Module 26 functions (follow / react / report) DO verify JWT.
           CRON_ONLY="${{ steps.classify.outputs.cron_only }}"
-          OTHER_NO_JWT="share-card mcp api identify sponsorships"
+          OTHER_NO_JWT="share-card mcp api identify sponsorships delete-observation"
           for fn in ${{ steps.targets.outputs.fns }}; do
             EXTRA_FLAGS=""
             if echo " $CRON_ONLY " | grep -q " $fn "; then
