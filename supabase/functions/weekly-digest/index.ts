@@ -104,16 +104,13 @@ serve(async (req) => {
   const db = createClient(url, role);
   const currentUtcHour = new Date().getUTCHours();
 
-  // Fetch all eligible users and bucket by timezone
-  const { data: users, error: usersError } = await db
-    .from('users')
-    .select('id, display_name, email, preferred_language, country_code, timezone')
-    .eq('email_notifications_enabled', true)
-    .lt('last_observation_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
-    .not('email', 'is', null);
+  // Fetch all eligible users and bucket by timezone. Email lives in
+  // auth.users (not denormalised into public.users), so the eligibility
+  // filter + join are done server-side by the digest_recipients() RPC.
+  const { data: users, error: usersError } = await db.rpc('digest_recipients');
 
   if (usersError) {
-    console.error('[weekly-digest] users query error:', usersError.message);
+    console.error('[weekly-digest] digest_recipients RPC error:', usersError.message);
     return new Response(JSON.stringify({ error: usersError.message }), { status: 500 });
   }
 

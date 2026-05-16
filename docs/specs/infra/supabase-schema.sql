@@ -11652,6 +11652,41 @@ SELECT cron.schedule(
   )$$
 );
 
+-- weekly-digest recipient set. Email lives in auth.users and is
+-- deliberately NOT denormalised into public.users, so the Edge Function
+-- cannot select it from public.users (that selected a non-existent
+-- users.email and 500'd every run). This SECURITY DEFINER RPC joins the
+-- two tables and applies the eligibility filter in one place. preferred_lang
+-- is aliased to preferred_language to match the EF's existing row shape.
+CREATE OR REPLACE FUNCTION public.digest_recipients()
+RETURNS TABLE (
+  id                 uuid,
+  display_name       text,
+  email              text,
+  preferred_language text,
+  country_code       text,
+  timezone           text
+)
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public, auth, pg_temp
+AS $$
+  SELECT u.id,
+         u.display_name,
+         au.email::text,
+         u.preferred_lang AS preferred_language,
+         u.country_code,
+         u.timezone
+  FROM public.users u
+  JOIN auth.users au ON au.id = u.id
+  WHERE u.email_notifications_enabled = true
+    AND u.last_observation_at < now() - interval '7 days'
+    AND au.email IS NOT NULL
+$$;
+
+REVOKE ALL    ON FUNCTION public.digest_recipients() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.digest_recipients() TO service_role;
+
 -- ============================================================
 -- #866 — Streak freeze / skip-day mechanic
 -- ============================================================
