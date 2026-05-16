@@ -257,6 +257,48 @@ jobs:
             supabase functions deploy "$fn" --project-ref "$PROJECT_REF" $EXTRA_FLAGS
           done
 
+      - name: Verify runtime serves every deployed function
+        if: ${{ steps.targets.outputs.fns != '' }}
+        run: |
+          set -euo pipefail
+          # The Supabase CLI prints "Deployed Functions on project ...: X" even
+          # when it SKIPPED the upload ("No change found in Function: X"). If the
+          # Edge serving layer has dropped a function (ACTIVE in the control
+          # plane but 404 at the gateway — incident 2026-05-16, see
+          # docs/runbooks/ef-serving-layer-recovery.md), a plain redeploy is a
+          # silent no-op and this workflow stays green while production is down.
+          # This gate makes that class fail loudly: every just-deployed function
+          # MUST answer its OPTIONS preflight with a non-404 status. A CORS
+          # preflight is auth-exempt (no apikey/JWT needed), so HTTP 404 with
+          # `sb-error-code: NOT_FOUND` unambiguously means "runtime not serving".
+          base="https://${PROJECT_REF}.supabase.co/functions/v1"
+          failed=""
+          for fn in ${{ steps.targets.outputs.fns }}; do
+            code=""
+            for attempt in 1 2 3 4 5 6; do
+              code=$(curl -s -o /dev/null -w "%{http_code}" -X OPTIONS \
+                "$base/$fn" \
+                -H "Origin: https://rastrum.org" \
+                -H "Access-Control-Request-Method: POST" \
+                -H "Access-Control-Request-Headers: authorization,apikey,content-type" \
+                --max-time 15 || echo 000)
+              if [ "$code" != "404" ] && [ "$code" != "000" ]; then break; fi
+              echo "  $fn -> $code (attempt $attempt/6), waiting for propagation..."
+              sleep 10
+            done
+            if [ "$code" = "404" ] || [ "$code" = "000" ]; then
+              echo "  MISSING $fn -> $code (runtime does NOT serve this function)"
+              failed="$failed $fn"
+            else
+              echo "  ok      $fn -> $code"
+            fi
+          done
+          if [ -n "$failed" ]; then
+            echo "::error::Edge runtime does not serve:$failed -- the CLI reported success but these functions are 404 at the gateway (a 'No change found' silent no-op over a Supabase serving-layer drop). Bust the bundle hash to force a real re-upload; see docs/runbooks/ef-serving-layer-recovery.md"
+            exit 1
+          fi
+          echo "All deployed functions are served by the runtime."
+
       - name: Audit CORS on every browser-facing function
         if: ${{ steps.targets.outputs.fns != '' }}
         run: |
