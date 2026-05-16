@@ -11,7 +11,13 @@ const tr = t(lang) as any;
 ---
 
 <BaseLayout title={tr.tokens.title} description="Personal API tokens for the Rastrum REST API and MCP server. Use these to integrate Rastrum into agents, scripts, and external tooling." lang={lang}>
-  <main class="mx-auto max-w-2xl px-4 py-10">
+  <main
+    class="mx-auto max-w-2xl px-4 py-10"
+    data-label-revoke={tr.tokens.revoke}
+    data-label-revoke-confirm-title={tr.tokens.revoke_confirm_title}
+    data-label-revoke-confirm={tr.tokens.revoke_confirm}
+    data-label-cancel={tr.tokens.cancel}
+  >
     <h1 class="text-2xl font-bold mb-1">{tr.tokens.title}</h1>
     <p class="text-sm text-gray-500 mb-8">{tr.tokens.desc}</p>
 
@@ -67,8 +73,16 @@ const tr = t(lang) as any;
 
 <script>
   import {getCachedSession, getSupabase} from '../../../lib/supabase';
+  import { openConfirmDialog } from '../../../lib/confirm-dialog';
   const supabase = getSupabase();
   const TOKENS_URL = `${import.meta.env.PUBLIC_SUPABASE_URL}/functions/v1/tokens`;
+  const mainEl = document.querySelector<HTMLElement>('main');
+  const L = {
+    revoke: mainEl?.dataset.labelRevoke ?? 'Revoke',
+    revokeConfirmTitle: mainEl?.dataset.labelRevokeConfirmTitle ?? 'Revoke token?',
+    revokeConfirm: mainEl?.dataset.labelRevokeConfirm ?? 'Revoke this token? This cannot be undone.',
+    cancel: mainEl?.dataset.labelCancel ?? 'Cancel',
+  };
 
   async function getAuthHeader() {
     const session = await getCachedSession();
@@ -98,9 +112,15 @@ const tr = t(lang) as any;
     const btn = document.createElement('button');
     btn.dataset.id = t.id ?? '';
     btn.className = 'revoke-btn shrink-0 rounded border px-3 py-1.5 text-xs text-red-600 border-red-200 hover:bg-red-50';
-    btn.textContent = 'Revoke';
+    btn.textContent = L.revoke;
     btn.addEventListener('click', async () => {
-      if (!confirm('Revoke this token? This cannot be undone.')) return;
+      if (!(await openConfirmDialog({
+        title: L.revokeConfirmTitle,
+        message: L.revokeConfirm,
+        variant: 'danger',
+        confirmLabel: L.revoke,
+        cancelLabel: L.cancel,
+      }))) return;
       const r = await fetch(`${TOKENS_URL}/${t.id}`, { method: 'DELETE', headers: { Authorization: await getAuthHeader() } });
       if (!r.ok) { alert('Failed to revoke token.'); return; }
       loadTokens();
