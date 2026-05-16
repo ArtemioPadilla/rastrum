@@ -398,9 +398,11 @@ Failure modes + fixes in [`docs/runbooks/ci-smoke-checks.md`](docs/runbooks/ci-s
 The Explore MegaMenu is split into two columns: **Biodiversity** (the
 existing flat dropdown — Map / Recent / Watchlist / Species / Validate)
 and **Community** (Observers / Top / Nearby / Experts by taxon / By
-country). All Community items land on `/{en,es}/{community,comunidad}/observers/`
-with composable filter chips; the MegaMenu items just preset different
-URL params.
+country). Community items land on locale-paired routes with composable filter
+chips; the MegaMenu items just preset different URL params. Slug pairs:
+`/community/observers/` ↔ `/comunidad/observadores/`,
+`/community/leaderboard/` ↔ `/comunidad/tabla-de-lideres/`,
+`/community/map/` ↔ `/comunidad/mapa/`.
 
 Three load-bearing rules:
 
