@@ -118,7 +118,7 @@ mocked** — they do not exercise a real AI round-trip.
   (model selection → vision-provider dispatch → streamed reply →
   attach-context grounding) was not manually walked.
 
-### Recommended follow-up (not yet filed)
+### Recommended follow-up (filed: #1106)
 
 A scoped manual pass with a throwaway BYO key (or a pool slot on a test
 beneficiary), walking: Ask-Rastrum-from-observation →
@@ -199,9 +199,9 @@ data without explicit per-item user approval).
 
 1. **#1101** — auto-merge armed; merges when its `audit`+`test` e2e
    gate (the #1064/#1065 first-paint-pill regression gate) goes green.
-2. **Chat AI round-trip** — file the scoped manual-pass follow-up in §4
-   or defer-with-rationale in `qa-policy.md`. Currently untested in
-   production.
+2. **Chat AI round-trip** — tracked in **#1106**. Until that pass runs
+   (or is defer-with-rationale'd in `qa-policy.md`), the live-model
+   answer path is untested in production.
 3. **Production data residue** — run the §6 checklist with the user.
 4. Worktrees `fix-1025-places` / `fix-1026-lint-test` are unrelated
    active dev (not from this audit) — left untouched.
