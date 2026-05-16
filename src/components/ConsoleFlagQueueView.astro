@@ -83,6 +83,19 @@ const tr = t(lang);
           <dd id="flagq-detail-target" class="font-medium text-zinc-800 dark:text-zinc-200"></dd>
         </dl>
 
+        <p id="flagq-preview-loading" class="hidden text-xs text-zinc-400 italic">{tr.console.flagq_preview_loading}</p>
+        <div id="flagq-detail-preview" class="hidden rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+          <a id="flagq-preview-link" href="#" target="_blank" rel="noopener" class="flex gap-3 p-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
+            <img id="flagq-preview-thumb" class="hidden h-20 w-20 rounded object-cover bg-zinc-100 dark:bg-zinc-800 shrink-0" loading="lazy" alt="" />
+            <span class="min-w-0 flex-1">
+              <span id="flagq-preview-title" class="block text-sm font-medium text-zinc-800 dark:text-zinc-200 break-words"></span>
+              <span id="flagq-preview-sub" class="block text-xs text-zinc-500 dark:text-zinc-400 mt-0.5"></span>
+              <span id="flagq-preview-snippet" class="hidden text-xs text-zinc-600 dark:text-zinc-300 mt-1 italic break-words"></span>
+            </span>
+          </a>
+        </div>
+        <p id="flagq-preview-unavailable" class="hidden text-xs text-zinc-400 dark:text-zinc-600 italic">{tr.console.flagq_preview_unavailable}</p>
+
         <div id="flagq-detail-note-row" class="hidden text-sm">
           <span class="text-zinc-500">{tr.console.flagq_note_label}: </span>
           <span id="flagq-detail-note" class="text-zinc-700 dark:text-zinc-300 italic"></span>
@@ -278,13 +291,7 @@ const tr = t(lang);
       noteRow.classList.add('hidden');
     }
 
-    const viewLink = document.getElementById('flagq-view-target') as HTMLAnchorElement | null;
-    if (viewLink && r.target_type === 'observation') {
-      viewLink.href = `/share/obs/?id=${r.target_id}`;
-      viewLink.classList.remove('hidden');
-    } else if (viewLink) {
-      viewLink.classList.add('hidden');
-    }
+    void renderTargetPreview(r);
 
     // Show/hide action chips based on current status
     const triageBtn = document.getElementById('flagq-action-triage')!;
@@ -294,6 +301,132 @@ const tr = t(lang);
     triageBtn.classList.toggle('hidden', r.status !== 'open');
     resolveBtn.classList.toggle('hidden', r.status === 'resolved' || r.status === 'dismissed');
     dismissBtn.classList.toggle('hidden', r.status === 'resolved' || r.status === 'dismissed');
+  }
+
+  function setTargetLinks(href: string) {
+    const a = document.getElementById('flagq-view-target') as HTMLAnchorElement | null;
+    const cardA = document.getElementById('flagq-preview-link') as HTMLAnchorElement | null;
+    if (href) {
+      if (a) { a.href = href; a.classList.remove('hidden'); }
+      if (cardA) cardA.href = href;
+    } else {
+      if (a) a.classList.add('hidden');
+      if (cardA) cardA.removeAttribute('href');
+    }
+  }
+
+  async function renderTargetPreview(r: ReportRow) {
+    const thumb = document.getElementById('flagq-preview-thumb') as HTMLImageElement;
+    const snippetEl = document.getElementById('flagq-preview-snippet')!;
+    hide('flagq-detail-preview');
+    hide('flagq-preview-unavailable');
+    thumb.classList.add('hidden');
+    thumb.removeAttribute('src');
+    snippetEl.classList.add('hidden');
+    snippetEl.textContent = '';
+    document.getElementById('flagq-preview-title')!.textContent = '';
+    document.getElementById('flagq-preview-sub')!.textContent = '';
+    setTargetLinks('');
+    show('flagq-preview-loading');
+
+    let title = '';
+    let sub = '';
+    let snip = '';
+    let img = '';
+    let href = '';
+
+    try {
+      if (r.target_type === 'observation') {
+        const { data } = await supabase
+          .from('observations')
+          .select('id, observed_at, state_province, users:observer_id(username, display_name), identifications(scientific_name, is_primary)')
+          .eq('id', r.target_id)
+          .maybeSingle();
+        const obs = data as unknown as {
+          id: string; observed_at: string | null; state_province: string | null;
+          users: { username: string | null; display_name: string | null } | null;
+          identifications: { scientific_name: string | null; is_primary: boolean }[] | null;
+        } | null;
+        if (obs) {
+          const prim = obs.identifications?.find(i => i.is_primary) ?? obs.identifications?.[0];
+          title = prim?.scientific_name ?? '—';
+          const who = obs.users?.username ? `@${obs.users.username}` : '';
+          const when = obs.observed_at ? fmtDate(obs.observed_at) : '';
+          sub = [who, when, obs.state_province ?? ''].filter(Boolean).join(' · ');
+          href = `/share/obs/?id=${obs.id}`;
+          const { data: m } = await supabase
+            .from('media_files')
+            .select('url, thumbnail_url, is_primary, sort_order, media_type, deleted_at')
+            .eq('observation_id', r.target_id)
+            .is('deleted_at', null)
+            .order('is_primary', { ascending: false })
+            .order('sort_order', { ascending: true })
+            .limit(1);
+          const mf = (m as unknown as { url: string | null; thumbnail_url: string | null; media_type: string | null }[] | null)?.[0];
+          if (mf && mf.media_type === 'photo') img = mf.thumbnail_url ?? mf.url ?? '';
+        }
+      } else if (r.target_type === 'photo') {
+        const { data } = await supabase
+          .from('media_files')
+          .select('url, thumbnail_url, observation_id, media_type')
+          .eq('id', r.target_id)
+          .maybeSingle();
+        const mf = data as unknown as { url: string | null; thumbnail_url: string | null; observation_id: string | null; media_type: string | null } | null;
+        if (mf) {
+          title = r.target_type;
+          if (mf.media_type === 'photo') img = mf.thumbnail_url ?? mf.url ?? '';
+          if (mf.observation_id) href = `/share/obs/?id=${mf.observation_id}`;
+        }
+      } else if (r.target_type === 'identification') {
+        const { data } = await supabase
+          .from('identifications')
+          .select('scientific_name, observation_id')
+          .eq('id', r.target_id)
+          .maybeSingle();
+        const idn = data as unknown as { scientific_name: string | null; observation_id: string | null } | null;
+        if (idn) {
+          title = idn.scientific_name ?? '—';
+          if (idn.observation_id) href = `/share/obs/?id=${idn.observation_id}`;
+        }
+      } else if (r.target_type === 'comment') {
+        const { data } = await supabase
+          .from('observation_comments')
+          .select('body, observation_id, deleted_at')
+          .eq('id', r.target_id)
+          .maybeSingle();
+        const c = data as unknown as { body: string | null; observation_id: string | null; deleted_at: string | null } | null;
+        if (c) {
+          title = r.target_type;
+          snip = (c.body ?? '').slice(0, 280);
+          if (c.observation_id) href = `/share/obs/?id=${c.observation_id}`;
+        }
+      } else if (r.target_type === 'user') {
+        const { data } = await supabase
+          .from('users')
+          .select('username, display_name, avatar_url')
+          .eq('id', r.target_id)
+          .maybeSingle();
+        const u = data as unknown as { username: string | null; display_name: string | null; avatar_url: string | null } | null;
+        if (u) {
+          title = u.display_name ?? (u.username ? `@${u.username}` : '—');
+          sub = u.username ? `@${u.username}` : '';
+          img = u.avatar_url ?? '';
+          if (u.username) href = `/u/?username=${encodeURIComponent(u.username)}`;
+        }
+      }
+    } catch { /* RLS / network — fall through to the unavailable state */ }
+
+    if (selectedId !== r.id) return;
+    hide('flagq-preview-loading');
+    setTargetLinks(href);
+
+    if (!title && !snip && !img) { show('flagq-preview-unavailable'); return; }
+
+    document.getElementById('flagq-preview-title')!.textContent = title || r.target_type;
+    document.getElementById('flagq-preview-sub')!.textContent = sub;
+    if (snip) { snippetEl.textContent = snip; snippetEl.classList.remove('hidden'); }
+    if (img) { thumb.src = img; thumb.classList.remove('hidden'); }
+    show('flagq-detail-preview');
   }
 
   async function refreshSelected() {
