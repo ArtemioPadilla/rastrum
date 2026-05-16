@@ -1,8 +1,9 @@
 # Observe AI — progressive result card (design)
 
 > Status: design approved via brainstorming 2026-05-16. Spine of the
-> observe AI UX redesign. Child specs (gate split, downloads UX, consensus
-> hardening R1–R3, review-request queue) are referenced, not specified here.
+> observe AI UX redesign. Child specs (on-device-first photo runners,
+> downloads UX, consensus hardening R1–R3, review-request queue) are
+> referenced, not specified here.
 
 ## Problem
 
@@ -13,8 +14,15 @@ toggle. The interactive pipeline depends on the `identify` Edge Function
 for cloud runners; an EF outage (incident 2026-05-16) dead-ended identify
 with an empty stepper. The product is local-first for capture + storage
 but **not** for identification: high-accuracy identifiers are inherently
-cloud, on-device options are narrower/weaker and capped, and the
-`localAISupported()` gate blocks the lightweight WASM path on phones.
+cloud, on-device options are narrower/weaker and capped, and **there is
+no path where on-device photo identification runs without the cloud and
+first**: `ObserveView2.astro:891` hard-skips photo ID in `local` mode
+("Local-only mode" → only BirdNET audio runs), and the other modes add
+on-device photo runners only *in parallel with* the cloud (cloud-primary,
+on-device as a co-runner). (`localAISupported()` is a separate WebGPU/≥6 GB
+gate used only by the heavy WebLLM models — Phi/Gemma/Llama — and does
+**not** gate the lightweight ONNX/WASM identifiers, which self-gate on
+cache status.)
 
 The user must currently never think about *which* model. The roster is a
 capability graph the app orchestrates, not a menu the user navigates.
@@ -119,9 +127,12 @@ confidence-adaptive collapse; sovereignty resolver; audit-trace UI over
 existing `identifications` data; wiring to save/sync. EN/ES parity.
 
 **Consumed, not owned (child specs, interface contracts only):**
-- Split `localAISupported()` so the lightweight WASM path
-  (EfficientNet/SpeciesNet/BirdNET/MegaDetector) is not gated by
-  WebGPU/≥6 GB — structural foundation; first build slice.
+- On-device-first photo identification: remove the `local`-mode photo
+  hard-skip (`ObserveView2.astro:891`) and introduce a runner-set
+  resolver so on-device photo runners run without (and before) the cloud
+  — structural foundation; first build slice. (NOT a `localAISupported()`
+  gate split — verified 2026-05-16 that the gate does not block the
+  lightweight path; the photo-skip + cloud-primary runner wiring does.)
 - User-controlled downloads (capability chooser) — card degrades per the
   capability graph.
 - R1 (kill `?? 'human'`), R2 (preserve confidence cap end-to-end),
@@ -147,7 +158,8 @@ existing e2e smoke patterns per `docs/qa-policy.md`.
 
 ## Recommended build order
 
-1. Child spec **gate split + R1 + R2** (foundation, low risk, TDD).
+1. Child spec **on-device-first photo runners (remove `:891` skip +
+   runner-set resolver) + R1 + R2** (foundation, low risk, TDD).
 2. **This card spec** (state machine + sovereignty + audit UI).
 3. Downloads UX (capability chooser).
 4. R3 + review-request queue routing.
