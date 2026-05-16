@@ -38,9 +38,16 @@ pass* that produced #1070–#1098. This doc closes the loop between them.
   auto-dismissed by automation (this itself surfaced #1093/#1095/#1096);
   AI model round-trips **not** exercised (cost / BYO-key — see §4).
 - **Step-trace caveat:** no contemporaneous per-step log was kept during
-  the walkthrough. The per-journey findings below are reconstructed from
-  the filed issues and the fix PRs, which are authoritative. Treat the
-  "walked" column as the journey class exercised, not a verbatim script.
+  the *original discovery* walkthrough. The §3 per-journey findings are
+  reconstructed from the filed issues and the fix PRs, which are
+  authoritative. Treat the "walked" column as the journey class
+  exercised, not a verbatim script.
+- **Superseded for verification by §8.** On **2026-05-16** a *fresh,
+  contemporaneous* Claude-in-Chrome sweep was run against production
+  with live console + network error capture (signed-in admin). §8 is
+  the real route-by-route matrix — it confirms the §3 fixes hold in
+  prod **and** found two bugs (#1112, #1113) the reconstruction missed.
+  Where §8 and §5 disagree, §8 (verified) wins.
 
 ---
 
@@ -118,16 +125,22 @@ mocked** — they do not exercise a real AI round-trip.
   (model selection → vision-provider dispatch → streamed reply →
   attach-context grounding) was not manually walked.
 
-### Recommended follow-up (not yet filed)
+### Resolution (filed #1106 → resolved by PR #1109)
 
-A scoped manual pass with a throwaway BYO key (or a pool slot on a test
-beneficiary), walking: Ask-Rastrum-from-observation →
-attach chip present → ask a grounded question → streamed answer cites
-the attached entity → "observe this" CTA round-trips. Capture findings
-as a normal issue and add a real-model variant guarded behind a CI
-secret (mirroring the smoke-model-assets pattern), or explicitly defer
-with rationale in `qa-policy.md`. **Until then, treat the AI answer
-path as untested in production.**
+**Premise corrected.** The 2026-05-16 sweep (§8) verified that
+"Ask Rastrum" / Chat runs **entirely on-device** (WebLLM — Gemma 4 E2B
+~500 MB / Llama 3.2 1B; *"tus mensajes nunca salen del navegador"*).
+There is **no operator cost and no API key** for the chat path — the
+paid path is the *separate* "Ask my AI" identify cascade (M32), already
+covered by the photo-ID journey. So the original "needs BYO key / costs
+spend / untestable" framing was wrong.
+
+Decision (recorded in `qa-policy.md` §8, merged): **defer-with-rationale**.
+Verified free in prod: the `?attach=` deep-link resolves (no 404/crash)
+and the model gate is honest UX. The e2e spec mocks the model because
+it is ~500 MB + WebGPU (CI-infeasible) — *not* cost. The only residual
+is a one-time manual on-device inference smoke, operator-owned, not a
+required CI gate. Issue #1106 **closed**.
 
 ---
 
@@ -175,36 +188,102 @@ Every manually-audited journey has a structural regression spec. The
 
 ## 6. Production write-test-data cleanup
 
-The audit exercised write paths on the real account. Confirmed cleaned:
-- Test observation `aade1627…` — deleted via the `delete-observation`
-  EF and verified gone after #1099.
+Read-only sweep completed **2026-05-16** against the live signed-in
+account. Result: **clean of this audit's write-residue.**
 
-**Not yet audited for residue** (potential leftover on the live
-account from write-journey testing):
+- [x] Observations — all 6 live obs predate the audit; the only
+  audit-day obs (`aade1627…`) was already deleted via `delete-observation`
+  after #1099 and is gone.
+- [x] Follows — 0 outbound test follows (the one follow on record is
+  inbound, ~2 wk pre-audit).
+- [x] Reactions — none in inbox; none detectable.
+- [x] Watchlist — no test species/place subscriptions.
+- [x] Profile diffs — legitimate values only, no test strings.
+- [x] Projects / camera-stations / identifications — none (activity
+  feed 100% `observation_created`).
+- [x] Reports — 2 stale false-spam reports (`user/spam` 28 Apr;
+  `observation/spam` 9 May, both self-filed by `@art`, targets not
+  spam) were **dismissed** as "No es una violación" with audit-logged
+  rationale (2026-05-16). Dashboard "Reportes abiertos" → 0.
 
-- [ ] Follows created during social-engage testing
-- [ ] Reactions left on observations/species
-- [ ] Reports filed (report.resolve testing for #1082)
-- [ ] Watchlist entries added
-- [ ] Profile-edit diffs (bio/country/timezone) not reverted
-- [ ] Any project / camera-station / identification created
-
-These need a pass against the live account with per-item confirmation
-before deletion (deletions are irreversible — never bulk-delete account
-data without explicit per-item user approval).
+No deletions of real data were performed. The only artifact this audit
+created (one test observation) was already removed.
 
 ---
 
 ## 7. Open items
 
-1. **#1101** — auto-merge armed; merges when its `audit`+`test` e2e
-   gate (the #1064/#1065 first-paint-pill regression gate) goes green.
-2. **Chat AI round-trip** — file the scoped manual-pass follow-up in §4
-   or defer-with-rationale in `qa-policy.md`. Currently untested in
-   production.
-3. **Production data residue** — run the §6 checklist with the user.
-4. Worktrees `fix-1025-places` / `fix-1026-lint-test` are unrelated
+1. **#1101** (auth lock-steal root cause) — ✅ MERGED; e2e gate passed
+   (no first-paint-pill regression).
+2. **Chat AI round-trip** (#1106) — ✅ resolved by PR #1109
+   (defer-with-rationale in `qa-policy.md` §8). See §4 resolution.
+3. **Production data residue** — ✅ swept 2026-05-16 (§6): account
+   clean; 2 stale false reports dismissed.
+4. **#1108** flag-queue triage preview, **#1112** console-observaciones
+   embed (PR #1114, merged), **#1113** map sprite warning (PR #1116) —
+   all surfaced by §8's fresh sweep; see §8.
+5. Worktrees `fix-1025-places` / `fix-1026-lint-test` are unrelated
    active dev (not from this audit) — left untouched.
+
+---
+
+## 8. 2026-05-16 Chrome verification sweep (real, not reconstructed)
+
+Unlike §3 (reconstructed from issues), this is a **fresh
+contemporaneous** Claude-in-Chrome pass on production `rastrum.org`,
+signed in as admin `@art`, **read-only** (no writes), with **live
+console + network error capture** per route (the method that catches
+in-page/PostgREST errors automated specs miss — exactly how #1112 was
+found).
+
+### Route-by-route result
+
+| Journey / route | Result |
+|---|---|
+| Home `/es/` | ✅ no console errors |
+| Explore hub `/es/explorar/` | ✅ **single "Lugares" tile — #1077 fix confirmed live** |
+| Places `/es/explorar/lugares/` | ✅ **fully functional — #1070 fix confirmed live** (was the dead "lang is not defined" page) |
+| Recent `/es/explorar/recientes/` | ✅ media 200, photo thumbnails render (**#1075 core fixed**); ⚠️ nit: photo-less obs show a large unstyled grey box |
+| Species `/es/explorar/especies/` | ✅ no errors |
+| Observe form `/es/observar/` | ✅ dropzone + capture + taxon chips + cloud-AI ready |
+| Map `/es/explorar/mapa/` | ✅ basemap renders (slow ~10 s first load); 🟡 **#1113** `circle-11` styleimagemissing (external basemap sprite — obs layers are circle-paint, *not* missing). PR #1116 |
+| Public profile (self) `/es/u/?username=art` | ✅ followers/following/karma/dex |
+| Projects `/es/proyectos/` | ✅ new-project + empty states |
+| Export `/es/perfil/exportar/` | ✅ DwC / SNIB / CONANP + DwC-A ZIP form |
+| Pokédex `/es/perfil/dex/` | ✅ no errors |
+| Validate `/es/explorar/validar/` | ✅ 17 obs; correct self-validation guard |
+| Profile not-found `/es/u/?username=Eugenio_P` | ✅ friendly not-found (expected — display name ≠ username; **not a bug**) |
+| Chat / Ask Rastrum `/es/chat/?attach=` | ✅ deep-link resolves; on-device model gate honest (#1106 / §4) |
+| Console → flag-queue | ✅ exercised (2 reports dismissed + new target-preview #1108) |
+| Console → usuarios / salud / errores | ✅ render; *errores* shows 6 **stale** `handler_exception` from already-fixed #1071/#1082 (predate the fixes — noise) |
+| Console → **observaciones** | 🔴 **#1112**: PostgREST ambiguous `observations↔taxa` embed → list never loaded. **Fixed, PR #1114 merged.** |
+
+### Bugs the reconstruction + automated specs both missed
+
+- 🔴 **#1112** Console Observaciones browser non-functional — fixed (PR
+  #1114, merged): disambiguated to `taxa!primary_taxon_id`.
+- 🟡 **#1113** Explore map `styleimagemissing` for the external basemap
+  sprite — fixed (PR #1116): `installSpriteFallback` handler + tests.
+  (Premise corrected: obs markers were never actually missing.)
+
+### Explicitly NOT re-run with Chrome this pass (honest scope)
+
+Still **automated-spec-only**, not manually re-walked 2026-05-16:
+onboarding tour replay, offline/PWA, mobile-viewport chrome, and social
+**write** actions (follow / react / report-submit — kept read-only).
+These remain covered by their `journey-*.spec.ts` only; no manual prod
+claim is made for them.
+
+### Completeness statement
+
+This sweep covers every primary public + signed-in + console-read
+route reachable from the IA (header/MegaMenu/console sidebar). It is
+**not** a provably-exhaustive enumeration against the full route
+manifest, and it deliberately excludes destructive/write flows and the
+automated-only set above. Within that scope it is real (Chrome-verified
+with error capture), current, and supersedes §5's reconstructed matrix.
+
+---
 
 [`reference_ci_quirks`]: ../.claude — see agent memory; GitHub
 auto-links only the first issue in a comma-list `Closes:`.
