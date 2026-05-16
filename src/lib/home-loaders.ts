@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { HeroInputs } from './home-hero';
+import { pickCardImageUrl } from './media-url';
 
 type Client = SupabaseClient;
 
@@ -115,7 +116,7 @@ export async function loadRecent(
     observer:users!observer_id!inner(country_code),
     identifications(scientific_name, is_primary, confidence,
                     taxa(common_name_es, common_name_en)),
-    media_files(url, is_primary, media_type)
+    media_files(url, thumbnail_url, is_primary, media_type, deleted_at)
   `;
   let usedLocalScope = false;
   let rows: RecentObs[] = [];
@@ -150,15 +151,19 @@ interface RawObs {
   id: string; observed_at: string; state_province: string | null;
   observer: { country_code: string | null } | null;
   identifications: Array<{ scientific_name: string | null; is_primary: boolean | null; confidence: number | null; taxa: { common_name_en: string | null; common_name_es: string | null } | null }> | null;
-  media_files: Array<{ url: string | null; is_primary: boolean | null; media_type: string | null }> | null;
+  media_files: Array<{ url: string | null; thumbnail_url: string | null; is_primary: boolean | null; media_type: string | null; deleted_at: string | null }> | null;
 }
 
 function toRecent(lang: 'en' | 'es') {
   return (r: RawObs): RecentObs => {
     const idents = r.identifications ?? [];
     const primary = idents.find(i => i.is_primary) ?? [...idents].sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0))[0];
-    const photoMedia = (r.media_files ?? []).filter(m => !m.media_type || m.media_type === 'photo');
-    const photo = photoMedia.find(m => m.is_primary)?.url ?? photoMedia.find(m => !!m.url)?.url ?? null;
+    const photoMedia = (r.media_files ?? []).filter(
+      m => m.deleted_at == null && (!m.media_type || m.media_type === 'photo'),
+    );
+    const photo = pickCardImageUrl(photoMedia.find(m => m.is_primary))
+      ?? pickCardImageUrl(photoMedia.find(m => pickCardImageUrl(m)))
+      ?? null;
     return {
       id: r.id,
       observedAt: r.observed_at,
