@@ -26,6 +26,7 @@
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
+import { requireCronSecret } from '../_shared/cron-auth.ts';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -202,7 +203,10 @@ function chunk<T>(arr: T[], size: number): T[][] {
 
 // ── Edge Function handler ─────────────────────────────────────────────────────
 
-Deno.serve(async (_req) => {
+Deno.serve(async (req) => {
+  const denied = requireCronSecret(req);
+  if (denied) return denied;
+
   const startTime = Date.now();
 
   // Kill-switch
@@ -219,7 +223,7 @@ Deno.serve(async (_req) => {
   const cutoff = new Date(Date.now() - minAgeMs);
 
   const cfg: R2Config = {
-    accountId:       Deno.env.get('R2_ACCOUNT_ID') ?? '',
+    accountId:       Deno.env.get('R2_ACCOUNT_ID') ?? Deno.env.get('CF_ACCOUNT_ID') ?? '',
     accessKeyId:     Deno.env.get('R2_ACCESS_KEY_ID') ?? '',
     secretAccessKey: Deno.env.get('R2_SECRET_ACCESS_KEY') ?? '',
     bucketName:      Deno.env.get('R2_BUCKET_NAME') ?? '',
