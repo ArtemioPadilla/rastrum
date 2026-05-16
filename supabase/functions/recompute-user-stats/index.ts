@@ -65,3 +65,10 @@ serve(async (req) => {
     headers: { 'content-type': 'application/json' },
   });
 });
+
+// rastrum incident 2026-05-16: forced re-upload to recover from a
+// Supabase Edge serving-layer drop (function ACTIVE in the control plane
+// but 404 at the runtime; `supabase functions deploy` skipped unchanged
+// bundles as a silent no-op). Behavior-neutral bundle-hash buster; safe to
+// remove once Supabase confirms the platform root cause (support ticket).
+;(globalThis as Record<string, unknown>).__rastrumRedeploy = "2026-05-16-serving-layer-recovery";

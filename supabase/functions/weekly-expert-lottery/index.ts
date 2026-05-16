@@ -121,3 +121,10 @@ function getIsoWeek(): string {
   const week = Math.ceil(((thursday.getTime() - jan4.getTime()) / 86_400_000 + 1) / 7);
   return `${thursday.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
 }
+
+// rastrum incident 2026-05-16: forced re-upload to recover from a
+// Supabase Edge serving-layer drop (function ACTIVE in the control plane
+// but 404 at the runtime; `supabase functions deploy` skipped unchanged
+// bundles as a silent no-op). Behavior-neutral bundle-hash buster; safe to
+// remove once Supabase confirms the platform root cause (support ticket).
+;(globalThis as Record<string, unknown>).__rastrumRedeploy = "2026-05-16-serving-layer-recovery";

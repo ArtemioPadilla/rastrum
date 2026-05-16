@@ -79,6 +79,7 @@ high-level system view.
 | [`posthog.md`](posthog.md) | PostHog snippet wiring, captured events, reverse-proxy verification, token rotation. |
 | [`themes.md`](themes.md) | Seasonal + regional theme variants (`monarca` / `lluvias` / `secas` / `default`) — auto-resolution, manual override, and how to add a new season. |
 | [`ci-smoke-checks.md`](ci-smoke-checks.md) | `infra/smoke-model-assets.sh` post-deploy + nightly probe. |
+| [`ef-serving-layer-recovery.md`](ef-serving-layer-recovery.md) | Edge Function 404 despite ACTIVE — Supabase serving-layer drop, the CLI `No change found` no-op trap, bundle-hash-bust recovery + post-deploy runtime gate. |
 | [`sw-cache.md`](sw-cache.md) | Service-worker cache layout, invalidation, debugging stale assets. |
 | [`resend-smtp.md`](resend-smtp.md) | Custom SMTP setup (Resend) for magic-link + sponsor threshold emails. |
 | [`rotate-secret.md`](rotate-secret.md) | Secret rotation playbook — Supabase, R2, sponsor pool credentials. |
