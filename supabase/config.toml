@@ -60,3 +60,13 @@ verify_jwt = false
 [functions.share-card]
 enabled = true
 verify_jwt = false
+
+# sponsorships self-gates both paths: a user JWT via auth.getUser for the
+# SponsoringView UI calls, and a Bearer cron token for the weekly
+# ai_credentials_heartbeat job. The cron token is not a JWT, so edge-layer
+# verify_jwt 401'd the heartbeat at the gateway. Must also be in
+# OTHER_NO_JWT in .github/workflows/deploy-functions.yml (deploy flag wins
+# in prod; both sites kept in sync).
+[functions.sponsorships]
+enabled = true
+verify_jwt = false

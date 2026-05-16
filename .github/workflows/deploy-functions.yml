@@ -230,10 +230,15 @@ jobs:
           #    identify    — self-gates: auth.getUser when JWT present, else
           #                  anon IP rate-limit. Edge verify_jwt rejected the
           #                  sb_publishable_* key as a non-JWT (config.toml).
+          #    sponsorships— self-gates: validates a user JWT via auth.getUser
+          #                  for the UI paths AND a Bearer cron token for the
+          #                  weekly ai_credentials_heartbeat job. The cron
+          #                  token is not a JWT, so edge verify_jwt 401'd the
+          #                  heartbeat at the gateway before code ran.
           #
           # Module 26 functions (follow / react / report) DO verify JWT.
           CRON_ONLY="${{ steps.classify.outputs.cron_only }}"
-          OTHER_NO_JWT="share-card mcp api identify"
+          OTHER_NO_JWT="share-card mcp api identify sponsorships"
           for fn in ${{ steps.targets.outputs.fns }}; do
             EXTRA_FLAGS=""
             if echo " $CRON_ONLY " | grep -q " $fn "; then
