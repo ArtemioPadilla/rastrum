@@ -17,6 +17,7 @@ import { t, getLocalizedPath, routes } from '../i18n/utils';
 import ConsoleOnboarding from './console/ConsoleOnboarding.astro';
 import ReportIssueButton from './ReportIssueButton.astro';
 import ConfirmDialog from './ConfirmDialog.astro';
+import Toast from './Toast.astro';
 
 interface Props {
   lang: 'en' | 'es';
@@ -463,5 +464,6 @@ const knownPills: Set<UserRole> | null = allRoles ?? null;
     <ReportIssueButton lang={lang} />
     <ConsoleOnboarding lang={lang} />
     <ConfirmDialog lang={lang} />
+    <Toast lang={lang} />
   </body>
 </html>

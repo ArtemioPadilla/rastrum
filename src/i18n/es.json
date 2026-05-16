@@ -1548,7 +1548,9 @@
       "button": "Bloquear",
       "unblock": "Desbloquear",
       "blocked_users": "Usuarios bloqueados",
-      "empty": "No has bloqueado a nadie."
+      "empty": "No has bloqueado a nadie.",
+      "blocked_toast": "Usuario bloqueado.",
+      "block_error": "No se pudo bloquear."
     },
     "list": {
       "followers": "Seguidores",
@@ -1574,6 +1576,11 @@
     "credentials_section": "Mis credenciales",
     "credentials_empty": "Aún no tienes credenciales. Agrega una para empezar a patrocinar.",
     "add_credential": "Agregar credencial",
+    "error_prefix_tmpl": "Error: {msg}",
+    "creds_load_failed": "No se pudieron cargar las credenciales.",
+    "add_credential_first": "Agrega una credencial primero.",
+    "three_strike_msg": "Tres strikes: revoca y vuelve a crear.",
+    "report_dialog_unavailable": "Diálogo de reporte no disponible — recarga la página.",
     "credential_label": "Etiqueta",
     "credential_label_help": "Un nombre amigable para reconocer esta credencial.",
     "credential_secret": "API key o token de larga duración",
@@ -2085,7 +2092,9 @@
     "revoke": "Revocar",
     "revoke_confirm_title": "¿Revocar token?",
     "revoke_confirm": "¿Revocar este token? Esta acción no se puede deshacer.",
-    "cancel": "Cancelar"
+    "cancel": "Cancelar",
+    "revoke_failed": "No se pudo revocar el token.",
+    "create_failed_tmpl": "No se pudo crear el token: {msg}"
   },
   "explore_pages": {
     "recent": {
@@ -3237,6 +3246,8 @@
         "replayConfirmReason": "¿Razón para reenviar esta entrega?",
         "replayDone": "Reenvío realizado (HTTP {status}).",
         "replayFailed": "Reenvío falló: {error}",
+        "testDeliveryDone": "Entrega de prueba: HTTP {status}.",
+        "testDeliveryFailed": "Entrega de prueba falló: {error}",
         "nonceCopied": "Nonce copiado.",
         "loadFailed": "No se pudieron cargar las entregas: {error}",
         "perWebhookEmpty": "Aún no hay entregas para este webhook."
@@ -3637,6 +3648,9 @@
     "default_confirm": "Confirmar",
     "default_cancel": "Cancelar",
     "aria_dialog_label": "Diálogo de confirmación"
+  },
+  "toast": {
+    "dismiss": "Descartar"
   },
   "observe2": {
     "heading": "Registrar observación",

@@ -1548,7 +1548,9 @@
       "button": "Block",
       "unblock": "Unblock",
       "blocked_users": "Blocked users",
-      "empty": "You haven't blocked anyone."
+      "empty": "You haven't blocked anyone.",
+      "blocked_toast": "User blocked.",
+      "block_error": "Could not block."
     },
     "list": {
       "followers": "Followers",
@@ -1574,6 +1576,11 @@
     "credentials_section": "My credentials",
     "credentials_empty": "No credentials yet. Add one to start sponsoring.",
     "add_credential": "Add credential",
+    "error_prefix_tmpl": "Error: {msg}",
+    "creds_load_failed": "Could not load credentials.",
+    "add_credential_first": "Add a credential first.",
+    "three_strike_msg": "Three-strike: revoke and recreate.",
+    "report_dialog_unavailable": "Report dialog unavailable — please reload the page.",
     "credential_label": "Label",
     "credential_label_help": "A friendly name to recognize this credential later.",
     "credential_secret": "API key or long-lived token",
@@ -2085,7 +2092,9 @@
     "revoke": "Revoke",
     "revoke_confirm_title": "Revoke token?",
     "revoke_confirm": "Revoke this token? This cannot be undone.",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "revoke_failed": "Failed to revoke token.",
+    "create_failed_tmpl": "Failed to create token: {msg}"
   },
   "explore_pages": {
     "recent": {
@@ -3237,6 +3246,8 @@
         "replayConfirmReason": "Reason for replaying this delivery?",
         "replayDone": "Replay sent (HTTP {status}).",
         "replayFailed": "Replay failed: {error}",
+        "testDeliveryDone": "Test delivery: HTTP {status}.",
+        "testDeliveryFailed": "Test delivery failed: {error}",
         "nonceCopied": "Nonce copied.",
         "loadFailed": "Could not load deliveries: {error}",
         "perWebhookEmpty": "No deliveries for this webhook yet."
@@ -3637,6 +3648,9 @@
     "default_confirm": "Confirm",
     "default_cancel": "Cancel",
     "aria_dialog_label": "Confirmation dialog"
+  },
+  "toast": {
+    "dismiss": "Dismiss"
   },
   "observe2": {
     "heading": "Log observation",

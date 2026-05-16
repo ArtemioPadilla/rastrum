@@ -13,6 +13,7 @@ import SwUpdateToast from '../components/SwUpdateToast.astro';
 import OfflineBanner from '../components/OfflineBanner.astro';
 import ReportDialog from '../components/ReportDialog.astro';
 import ConfirmDialog from '../components/ConfirmDialog.astro';
+import Toast from '../components/Toast.astro';
 import PhotoCropModal from '../components/PhotoCropModal.astro';
 import WhyAmISeeingThisDialog from '../components/WhyAmISeeingThisDialog.astro';
 import SurpriseOverlay from '../components/SurpriseOverlay.astro';
@@ -379,6 +380,7 @@ const resolvedOgImage = ogImage ?? `${SITE_URL}/og/${ogLang}/${ogSlugForPath(cur
     <SwUpdateToast lang={lang} />
     <ReportDialog lang={installLang} />
     <ConfirmDialog lang={installLang} />
+    <Toast lang={installLang} />
     <PhotoCropModal lang={installLang} />
     <WhyAmISeeingThisDialog lang={installLang} />
     <SurpriseOverlay lang={installLang} />
