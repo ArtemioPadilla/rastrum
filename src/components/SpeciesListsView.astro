@@ -149,6 +149,7 @@ const labels = {
 <script>
   import { getCachedUser, getSupabase } from '../lib/supabase';
   import { openConfirmDialog } from '../lib/confirm-dialog';
+  import { showToast } from '../lib/toast';
 
   const root = document.getElementById('species-lists-view') as HTMLDivElement | null;
   if (!root) throw new Error('species-lists-view root not found');
@@ -283,7 +284,7 @@ const labels = {
     }))) return;
     const supabase = getSupabase();
     const { error } = await supabase.from('species_lists').delete().eq('id', id).eq('user_id', userId);
-    if (error) { alert(labels.error_delete); return; }
+    if (error) { showToast({ message: labels.error_delete, variant: 'error' }); return; }
     lists = lists.filter(l => l.id !== id);
     const username = await fetchUsername();
     renderGrid(username);
