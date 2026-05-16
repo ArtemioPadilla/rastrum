@@ -175,23 +175,42 @@ Every manually-audited journey has a structural regression spec. The
 
 ## 6. Production write-test-data cleanup
 
-The audit exercised write paths on the real account. Confirmed cleaned:
-- Test observation `aade1627…` — deleted via the `delete-observation`
-  EF and verified gone after #1099.
+The audit exercised write paths on the real account. A read-only
+sweep of the live signed-in account was completed 2026-05-16:
 
-**Not yet audited for residue** (potential leftover on the live
-account from write-journey testing):
+- [x] **Observations** — all 6 live obs predate the audit
+  (27/4–6/5/2026). The only audit-day observation (`aade1627…`,
+  15/5) was already deleted via the `delete-observation` EF after
+  #1099 and is gone from the list; only its activity-log event
+  persists (activity log is not purged on soft-delete). **No
+  residue.**
+- [x] **Follows** — profile "Seguimiento: 0"; the only follow on
+  record is *inbound* (Pamela Ruiz, ~2 weeks pre-audit). No
+  outbound test follows. **Clean.**
+- [x] **Reactions** — no reaction notifications in the inbox; no
+  reaction residue detectable from the account surfaces. **No
+  evidence of any.**
+- [x] **Watchlist** — feed shows only own-observation activity; no
+  test species/place subscriptions. **Clean.**
+- [x] **Profile diffs** — legitimate values only (Artemio Padilla,
+  @art, MX, member since 24/4/2026). No test strings. **Clean.**
+- [x] **Projects / camera-stations / identifications** — activity
+  feed is 100% `observation_created`; the lone ID badge (Canis
+  familiaris, 6/5) predates the audit. **No residue.**
+- [⚠] **Reports** — 2 open reports exist (`user/spam` 28 Apr;
+  `observation/spam` 9 May). **Both predate the 15/5 walkthrough**,
+  so neither is residue from *this* audit; provenance (earlier test
+  fixtures vs. real community reports) is indeterminate from the UI.
+  **Left untouched** — triaging them is a moderation write action
+  that requires explicit per-item operator decision; surfaced here
+  rather than acted on.
 
-- [ ] Follows created during social-engage testing
-- [ ] Reactions left on observations/species
-- [ ] Reports filed (report.resolve testing for #1082)
-- [ ] Watchlist entries added
-- [ ] Profile-edit diffs (bio/country/timezone) not reverted
-- [ ] Any project / camera-station / identification created
-
-These need a pass against the live account with per-item confirmation
-before deletion (deletions are irreversible — never bulk-delete account
-data without explicit per-item user approval).
+**Net: the account is clean of write-residue from this audit.** The
+single test observation it created is the only artifact, and it was
+already deleted. No deletions were performed during this sweep
+(deletions are irreversible — never bulk-delete account data without
+explicit per-item user approval; the 2 pre-existing reports are the
+operator's call).
 
 ---
 
@@ -202,7 +221,9 @@ data without explicit per-item user approval).
 2. **Chat AI round-trip** — tracked in **#1106**. Until that pass runs
    (or is defer-with-rationale'd in `qa-policy.md`), the live-model
    answer path is untested in production.
-3. **Production data residue** — run the §6 checklist with the user.
+3. **Production data residue** — ✅ swept 2026-05-16 (§6): account
+   clean of this audit's write-residue; 2 pre-audit reports surfaced
+   for operator triage, left untouched.
 4. Worktrees `fix-1025-places` / `fix-1026-lint-test` are unrelated
    active dev (not from this audit) — left untouched.
 
