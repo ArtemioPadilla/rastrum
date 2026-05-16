@@ -92,11 +92,20 @@ export function filterRunnersByHint(
   return out;
 }
 
+export interface IdentifyAttempt {
+  /** Runner/plugin id. */
+  source: string;
+  scientific_name: string | null;
+  confidence: number;
+  /** Set only when this runner threw / errored. */
+  error?: string;
+}
+
 export type ParallelIdentifyOutcome =
-  | { kind: 'winner'; result: UnifiedIdResult; uncertain: false }
-  | { kind: 'uncertain'; result: UnifiedIdResult; uncertain: true }
-  | { kind: 'provisional'; result: UnifiedIdResult; uncertain: false; awaitingConfirmation: true }
-  | { kind: 'all_failed'; errors: Record<string, string> };
+  | { kind: 'winner'; result: UnifiedIdResult; uncertain: false; attempts: IdentifyAttempt[] }
+  | { kind: 'uncertain'; result: UnifiedIdResult; uncertain: true; attempts: IdentifyAttempt[] }
+  | { kind: 'provisional'; result: UnifiedIdResult; uncertain: false; awaitingConfirmation: true; attempts: IdentifyAttempt[] }
+  | { kind: 'all_failed'; errors: Record<string, string>; attempts: IdentifyAttempt[] };
 
 /**
  * Run every supplied identifier in parallel.
@@ -128,7 +137,7 @@ export async function runParallelIdentify(
   const filteredRunners = filterRunnersByHint(opts.runners, opts.taxonHint ?? null);
   const entries = Object.entries(filteredRunners);
   if (entries.length === 0) {
-    return { kind: 'all_failed', errors: { _: 'no runners' } };
+    return { kind: 'all_failed', errors: { _: 'no runners' }, attempts: [] };
   }
 
   const internalCtrl = new AbortController();
@@ -163,22 +172,37 @@ export async function runParallelIdentify(
     if (external) external.removeEventListener('abort', onExternalAbort);
   }
 
+  const buildAttempts = (): IdentifyAttempt[] => {
+    const out: IdentifyAttempt[] = [];
+    if (winner) {
+      const w = winner as { id: string; result: UnifiedIdResult };
+      out.push({ source: w.id, scientific_name: w.result.scientific_name, confidence: w.result.confidence });
+    }
+    for (const { id, result } of results) {
+      out.push({ source: id, scientific_name: result.scientific_name, confidence: result.confidence });
+    }
+    for (const [id, message] of Object.entries(errors)) {
+      out.push({ source: id, scientific_name: null, confidence: 0, error: message });
+    }
+    return out;
+  };
+
   if (winner) {
     const winResult = (winner as { id: string; result: UnifiedIdResult }).result;
     // If this win is only because the new-user lower threshold was applied
     // AND confidence is below the standard threshold, mark it as provisional.
     if (isNewUser && winResult.confidence < 0.5) {
-      return { kind: 'provisional', result: winResult, uncertain: false, awaitingConfirmation: true };
+      return { kind: 'provisional', result: winResult, uncertain: false, awaitingConfirmation: true, attempts: buildAttempts() };
     }
-    return { kind: 'winner', result: winResult, uncertain: false };
+    return { kind: 'winner', result: winResult, uncertain: false, attempts: buildAttempts() };
   }
 
   if (results.length > 0) {
     results.sort((a, b) => b.result.confidence - a.result.confidence);
-    return { kind: 'uncertain', result: results[0].result, uncertain: true };
+    return { kind: 'uncertain', result: results[0].result, uncertain: true, attempts: buildAttempts() };
   }
 
-  return { kind: 'all_failed', errors };
+  return { kind: 'all_failed', errors, attempts: buildAttempts() };
 }
 
 // ─────────────── JSON parsing helpers (shared with vision fallback) ───────────────

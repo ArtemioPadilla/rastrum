@@ -6,6 +6,7 @@ import {
   filterRunnersByHint,
   type IdentifierRunner,
   type UnifiedIdResult,
+  type IdentifyAttempt,
 } from './identify-cascade-client';
 
 const fakeFile = new File([new Uint8Array([0])], 'test.jpg', { type: 'image/jpeg' });
@@ -203,6 +204,60 @@ describe('extractJsonObject', () => {
   it('returns null on empty/garbage', () => {
     expect(extractJsonObject('')).toBeNull();
     expect(extractJsonObject('no json here')).toBeNull();
+  });
+});
+
+describe('runParallelIdentify attempts', () => {
+  it('winner case: attempts contains both winner and loser sources', async () => {
+    const plantnet: IdentifierRunner = vi.fn(async () =>
+      makeResult({ source: 'plantnet', scientific_name: 'Quercus ilex', confidence: 0.9 }),
+    );
+    const claude: IdentifierRunner = vi.fn(async () =>
+      makeResult({ source: 'claude_haiku', scientific_name: 'Quercus robur', confidence: 0.4 }),
+    );
+    const out = await runParallelIdentify(fakeFile, { runners: { plantnet, claude_haiku: claude } });
+    expect(out.kind).toBe('winner');
+    expect(out.attempts).toBeDefined();
+    expect(out.attempts).toHaveLength(2);
+    const sources = out.attempts.map((a) => a.source);
+    expect(sources).toContain('plantnet');
+    expect(sources).toContain('claude_haiku');
+    const winner = out.attempts.find((a) => a.source === 'plantnet');
+    expect(winner?.scientific_name).toBe('Quercus ilex');
+    expect(winner?.confidence).toBe(0.9);
+    const loser = out.attempts.find((a) => a.source === 'claude_haiku');
+    expect(loser?.scientific_name).toBe('Quercus robur');
+    expect(loser?.confidence).toBe(0.4);
+  });
+
+  it('uncertain case: attempts length is 2 with both sources', async () => {
+    const plantnet: IdentifierRunner = vi.fn(async () =>
+      makeResult({ source: 'plantnet', scientific_name: 'Quercus ilex', confidence: 0.4 }),
+    );
+    const claude: IdentifierRunner = vi.fn(async () =>
+      makeResult({ source: 'claude_haiku', scientific_name: 'Quercus robur', confidence: 0.3 }),
+    );
+    const out = await runParallelIdentify(fakeFile, { runners: { plantnet, claude_haiku: claude } });
+    expect(out.kind).toBe('uncertain');
+    expect(out.attempts).toBeDefined();
+    expect(out.attempts).toHaveLength(2);
+    const sources = out.attempts.map((a) => a.source);
+    expect(sources).toContain('plantnet');
+    expect(sources).toContain('claude_haiku');
+  });
+
+  it('all_failed case: attempts contains one entry with error and confidence 0', async () => {
+    const plantnet: IdentifierRunner = vi.fn(async () => {
+      throw new Error('PlantNet network error');
+    });
+    const out = await runParallelIdentify(fakeFile, { runners: { plantnet } });
+    expect(out.kind).toBe('all_failed');
+    expect(out.attempts).toBeDefined();
+    expect(out.attempts).toHaveLength(1);
+    expect(out.attempts[0].source).toBe('plantnet');
+    expect(out.attempts[0].confidence).toBe(0);
+    expect(out.attempts[0].error).toBeTruthy();
+    expect(typeof out.attempts[0].error).toBe('string');
   });
 });
 
