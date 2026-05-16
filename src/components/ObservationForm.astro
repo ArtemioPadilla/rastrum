@@ -3226,9 +3226,14 @@ const photoPraiseJson = JSON.stringify(photoPraiseTree);
 
     let mode: 'replace' | 'append' = 'replace';
     if (notesEl.value.trim()) {
-      const ok = window.confirm(isEsAi
-        ? 'Ya hay una nota. ¿Reemplazarla por la generada?\nAceptar = Reemplazar · Cancelar = Añadir'
-        : 'There is already a note. Replace it with the generated one?\nOK = Replace · Cancel = Append');
+      const ok = await openConfirmDialog({
+        title: isEsAi ? 'Ya hay una nota' : 'There is already a note',
+        message: isEsAi
+          ? '¿Reemplazarla por la generada, o añadir la generada al final?'
+          : 'Replace it with the generated one, or append the generated one?',
+        confirmLabel: isEsAi ? 'Reemplazar' : 'Replace',
+        cancelLabel: isEsAi ? 'Añadir' : 'Append',
+      });
       mode = ok ? 'replace' : 'append';
     }
 
