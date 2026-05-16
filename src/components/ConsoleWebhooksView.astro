@@ -41,6 +41,8 @@ const wDelivReplayDoneTmpl = (wDeliv?.replayDone as string) ?? 'Replay sent (HTT
 const wDelivReplayFailedTmpl = (wDeliv?.replayFailed as string) ?? 'Replay failed: {error}';
 const wDelivNonceCopied = (wDeliv?.nonceCopied as string) ?? 'Nonce copied.';
 const wDelivLoadFailedTmpl = (wDeliv?.loadFailed as string) ?? 'Could not load deliveries: {error}';
+const wDelivTestDoneTmpl = (wDeliv?.testDeliveryDone as string) ?? 'Test delivery: HTTP {status}.';
+const wDelivTestFailedTmpl = (wDeliv?.testDeliveryFailed as string) ?? 'Test delivery failed: {error}';
 const labelDeliveriesBtn = (wActions?.deliveries as string) ?? 'Deliveries';
 const labelHideDeliveriesBtn = (wActions?.hideDeliveries as string) ?? 'Hide deliveries';
 const eventKeys: Array<keyof typeof wEvents> = [
@@ -74,6 +76,8 @@ const eventKeys: Array<keyof typeof wEvents> = [
   data-label-deliv-replay-failed-tmpl={wDelivReplayFailedTmpl}
   data-label-deliv-nonce-copied={wDelivNonceCopied}
   data-label-deliv-load-failed-tmpl={wDelivLoadFailedTmpl}
+  data-label-test-done-tmpl={wDelivTestDoneTmpl}
+  data-label-test-failed-tmpl={wDelivTestFailedTmpl}
   data-label-col-event={wDeliv.event ?? 'Event'}
   data-label-col-status={wDeliv.status ?? 'Status'}
   data-label-col-time={wDeliv.time ?? 'Time'}
@@ -200,6 +204,7 @@ const eventKeys: Array<keyof typeof wEvents> = [
   import { getCachedSession, getSupabase } from '../lib/supabase';
   import { getUserRoles } from '../lib/user-roles';
   import { adminClient, AdminClientError } from '../lib/admin-client';
+  import { showToast } from '../lib/toast';
   import { openConfirmDialog } from '../lib/confirm-dialog';
 
   type WebhookRow = {
@@ -248,6 +253,8 @@ const eventKeys: Array<keyof typeof wEvents> = [
   const labelDelivReplayFailedTmpl = sectionEl?.dataset.labelDelivReplayFailedTmpl ?? 'Replay failed: {error}';
   const labelDelivNonceCopied = sectionEl?.dataset.labelDelivNonceCopied ?? 'Nonce copied.';
   const labelDelivLoadFailedTmpl = sectionEl?.dataset.labelDelivLoadFailedTmpl ?? 'Could not load deliveries: {error}';
+  const labelTestDoneTmpl = sectionEl?.dataset.labelTestDoneTmpl ?? 'Test delivery: HTTP {status}.';
+  const labelTestFailedTmpl = sectionEl?.dataset.labelTestFailedTmpl ?? 'Test delivery failed: {error}';
   const labelColEvent = sectionEl?.dataset.labelColEvent ?? 'Event';
   const labelColStatus = sectionEl?.dataset.labelColStatus ?? 'Status';
   const labelColTime = sectionEl?.dataset.labelColTime ?? 'Time';
@@ -568,7 +575,9 @@ const eventKeys: Array<keyof typeof wEvents> = [
         try {
           const res = await adminClient.webhook.test({ webhookId: testId }, 'manual webhook test', jwt);
           const code = res.result?.statusCode;
-          alert(code ? `Test delivery: HTTP ${code}` : `Test delivery failed: ${res.result?.error ?? 'unknown'}`);
+          showToast(code
+            ? { message: labelTestDoneTmpl.replace('{status}', String(code)), variant: 'success' }
+            : { message: labelTestFailedTmpl.replace('{error}', res.result?.error ?? 'unknown'), variant: 'error' });
           await loadAll();
         } finally { reconcileInFlight = false; }
         return;
