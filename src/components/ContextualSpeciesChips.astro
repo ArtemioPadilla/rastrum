@@ -57,6 +57,7 @@ const filterAllLabel = (ctx as any).filter_all ?? (isEs ? 'Ver todas' : 'Show al
   class="hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/40 p-4 space-y-3"
   data-lang={lang}
   data-target-input={targetInputId}
+  data-not-in-dex={notInDexText}
   aria-label={headingText}
 >
   <div class="flex items-start justify-between gap-3">
@@ -191,6 +192,13 @@ const filterAllLabel = (ctx as any).filter_all ?? (isEs ? 'Ver todas' : 'Show al
     white-space: nowrap;
   }
   .dark .ctx-chip-pill { background: rgb(63 63 70); color: rgb(161 161 170); }
+  .ctx-chip-sep {
+    font-size: 0.625rem;
+    color: rgb(161 161 170);
+    line-height: 1;
+    user-select: none;
+  }
+  .dark .ctx-chip-sep { color: rgb(113 113 122); }
   .ctx-chip-pill-missing {
     background: rgb(254 243 199);
     color: rgb(146 64 14);
@@ -315,7 +323,7 @@ const filterAllLabel = (ctx as any).filter_all ?? (isEs ? 'Ver todas' : 'Show al
       listEl!.classList.remove('hidden');
       listEl!.innerHTML = '';
 
-      const notInDexLabel = lang === 'es' ? 'aún no en tu dex' : 'not in your dex yet';
+      const notInDexLabel = container.dataset.notInDex ?? (lang === 'es' ? 'aún no en tu dex' : 'not in your dex yet');
       const useLabelTpl = lang === 'es' ? 'Usar {name} como identificación' : 'Use {name} as identification';
 
       for (const r of rows) {
@@ -376,6 +384,13 @@ const filterAllLabel = (ctx as any).filter_all ?? (isEs ? 'Ver todas' : 'Show al
         }
 
         if (r.has_observed_by_viewer === false) {
+          if (distLabel) {
+            const sep = document.createElement('span');
+            sep.className = 'ctx-chip-sep';
+            sep.setAttribute('aria-hidden', 'true');
+            sep.textContent = '·';
+            meta.appendChild(sep);
+          }
           const pill = document.createElement('span');
           pill.className = 'ctx-chip-pill ctx-chip-pill-missing';
           pill.textContent = notInDexLabel;
