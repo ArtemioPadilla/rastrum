@@ -154,13 +154,14 @@ const initialLng  = initialCoords?.lng ?? '';
 
 <script>
   import { MEXICO_DEFAULT_CENTER, isValidLatLng } from '../lib/media-helpers';
+  import { basemapStyleUrl } from '../lib/map-style';
 
   type Coords = { lat: number; lng: number };
   type MapLibreMap = import('maplibre-gl').Map;
   type MapLibreMarker = import('maplibre-gl').Marker;
   type StyleSpec = import('maplibre-gl').StyleSpecification;
 
-  const MAP_STYLE_STREET = 'https://tiles.openfreemap.org/styles/liberty';
+  const MAP_STYLE_STREET = basemapStyleUrl();
   // ESRI World Imagery — free, no API key required.
   const MAP_STYLE_SAT: StyleSpec = {
     version: 8,
