@@ -7449,6 +7449,43 @@
           "status": "done"
         }
       ]
+    },
+    "observe-ai-progressive-card": {
+      "phase": "v1.0.x",
+      "title_en": "Observe AI progressive result card (epic #1129)",
+      "title_es": "Tarjeta de resultado progresiva de Observar (épica #1129)",
+      "modules": [
+        "02",
+        "03",
+        "13"
+      ],
+      "subtasks": [
+        {
+          "label_en": "Pure foundation: observe-card-{state,sovereignty,audit-trace,vm,vm-input,render,actions}.ts + identification-source.ts (R1) — TDD",
+          "label_es": "Base pura: observe-card-{state,sovereignty,audit-trace,vm,vm-input,render,actions}.ts + identification-source.ts (R1) — TDD",
+          "done": true
+        },
+        {
+          "label_en": "Render C-1/C-2/C-3/C-4 in ObserveView2: pipeline→CardViewModel seam, six card states, Sí/No-otra/No-sé + sovereignty wiring, ver-traza panel + WhyThisSpecies relocation, cardV2 flag removed (#1122–#1125, PRs #1135/#1139/#1142/#1143)",
+          "label_es": "Render C-1/C-2/C-3/C-4 en ObserveView2: costura pipeline→CardViewModel, seis estados, Sí/No-otra/No-sé + soberanía, panel ver-traza + reubicación de WhyThisSpecies, bandera cardV2 eliminada (#1122–#1125, PRs #1135/#1139/#1142/#1143)",
+          "done": true
+        },
+        {
+          "label_en": "review_requested: schema column + RLS, card write-path, validation_queue surfacing + kingdom routing via users.expert_taxa, opt-in expertise filter (#1126, PRs #1140/#1144)",
+          "label_es": "review_requested: columna de esquema + RLS, ruta de escritura de la tarjeta, exposición en validation_queue + ruteo por reino vía users.expert_taxa, filtro de experticia opt-in (#1126, PRs #1140/#1144)",
+          "done": true
+        },
+        {
+          "label_en": "Consensus hardening R1 (never write machine as human, #1141), R2 (capConfidence end-to-end at both upsert sites), R3 (source-trust queue ordering) — recompute_consensus + RG floor proven unchanged (#1128, PRs #1141/#1145)",
+          "label_es": "Endurecimiento de consenso R1 (nunca escribir máquina como humano, #1141), R2 (capConfidence extremo-a-extremo en ambos upsert), R3 (orden de cola por confianza-fuente) — recompute_consensus + piso RG probados sin cambios (#1128, PRs #1141/#1145)",
+          "done": true
+        },
+        {
+          "label_en": "Downloads-by-capability chooser (DownloadChooser.astro + download-capabilities.ts), power panel relocated behind Advanced <details>; prefix-sync + consensus-untouched + observe-card e2e guards (#1127, PR #1146)",
+          "label_es": "Selector de descargas por capacidad (DownloadChooser.astro + download-capabilities.ts), panel reubicado tras <details> Avanzado; guardas prefix-sync + consensus-untouched + e2e observe-card (#1127, PR #1146)",
+          "done": true
+        }
+      ]
     }
   }
 }

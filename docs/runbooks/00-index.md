@@ -41,6 +41,7 @@ high-level system view.
 | Runbook | Covers |
 |---|---|
 | [`obs-detail-redesign.md`](obs-detail-redesign.md) | Two-column layout, manage panel, atomic photo delete via `delete_photo_atomic` RPC. |
+| [`observe-progressive-card.md`](observe-progressive-card.md) | Epic #1129 — progressive result card (S0–S3/S2′), sovereignty + R1–R3 consensus invariants, `review_requested` queue routing, downloads-by-capability chooser. |
 
 ## Identifier registry (Module 13)
 
