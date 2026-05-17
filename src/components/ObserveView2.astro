@@ -179,6 +179,8 @@ const weathers = WEATHERS;
         <!-- "Why this species?" — issue #736 — curated marks + reference photos -->
         <WhyThisSpecies lang={lang} />
       </div>
+      <!-- #1123 C-2: progressive card v2 (flag-gated; hidden until rastrum:card-vm fires AND ?card=v2 / localStorage rastrum.obs2.cardV2) -->
+      <div id="obs2-card-v2" class="hidden"></div>
       <!-- Manual entry — always visible so user can enter species even when AI returns nothing -->
       <div id="obs2-id-manual" class="mt-2">
         <label for="obs2-taxon-input" id="obs2-taxon-label" class="block text-xs text-zinc-500 dark:text-zinc-400 mb-1">
@@ -428,6 +430,7 @@ import { selfHealChunk } from '../lib/chunk-reload';
 import { resolveRunnerSet, type RunnerAvailability } from '../lib/observe-runner-set';
 import { attemptsToCardVmInput } from '../lib/observe-card-vm-input';
 import { buildCardViewModel } from '../lib/observe-card-vm';
+import { renderProgressiveCardHtml, type CardStrings } from '../lib/observe-card-render';
 
 // ── State ──────────────────────────────────────────────────────────────────
 const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
@@ -438,6 +441,34 @@ let location: { lat: number; lng: number; accuracyM: number; altitudeM: number |
 let bestResult: { scientific_name: string; common_name_en: string | null; confidence: number; source: string } | null = null;
 let identifyErrorReason: string | null = null;
 let cardAttempts: import('../lib/identify-cascade-client').IdentifyAttempt[] = [];
+
+// #1123 C-2 — progressive card, flag-gated. OFF ⇒ zero behavior change.
+const cardV2Enabled =
+  new URLSearchParams(window.location.search).get('card') === 'v2' ||
+  localStorage.getItem('rastrum.obs2.cardV2') === '1';
+const cardStrings: CardStrings = {
+  analyzing: tr.observe.card.analyzing,
+  savedPrefix: tr.observe.card.saved,
+  bestGuess: tr.observe.card.best_guess,
+  lowConfidence: tr.observe.card.low_confidence,
+  improvedByCloud: tr.observe.card.improved_by_cloud,
+  yourId: tr.observe.card.your_id,
+  cloudSuggests: tr.observe.card.cloud_suggests,
+  unidentified: tr.observe.card.unidentified,
+  willIdentifyOnSync: tr.observe.card.will_identify_on_sync,
+  viewTrace: tr.observe.card.view_trace,
+  provenanceDevice: tr.observe.card.prov_device,
+  provenanceCloud: tr.observe.card.prov_cloud,
+  provenanceCommunity: tr.observe.card.prov_community,
+};
+document.addEventListener('rastrum:card-vm', (e) => {
+  if (!cardV2Enabled) return;
+  const el = document.getElementById('obs2-card-v2');
+  if (!el) return;
+  el.innerHTML = renderProgressiveCardHtml((e as CustomEvent).detail, cardStrings);
+  el.classList.remove('hidden');
+  document.getElementById('obs2-id-result')?.classList.add('hidden');
+});
 
 // ── Taxon hint chips (#ux-quick-taxon-chips) ──────────────────────────────
 import type { TaxonHint } from '../lib/identify-cascade-client';
