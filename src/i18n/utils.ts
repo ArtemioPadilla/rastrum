@@ -34,7 +34,7 @@ export const routes: Record<string, Record<Locale, string>> = {
   exploreSpeciesDetail: { en: '/explore/species', es: '/explorar/especies' },
   exploreTrails:    { en: '/explore/trails', es: '/explorar/senderos' },
   explorePits:      { en: '/explore/pits',   es: '/explorar/pits' },
-  fieldGuide:       { en: 'field-guide',     es: 'guia-de-campo' },
+  fieldGuide:       { en: '/explore/trails/field-guide', es: '/explorar/senderos/guia-de-campo' },
   exploreValidate: { en: '/explore/validate', es: '/explorar/validar' },
   observe: { en: '/observe', es: '/observar' },
   about: { en: '/about', es: '/acerca' },
