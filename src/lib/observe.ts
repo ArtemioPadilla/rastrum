@@ -62,6 +62,8 @@ export interface ObservationDraft {
    * #941 — Vital status of the observed individual. Optional.
    */
   vitalStatus?: 'alive' | 'dead' | 'injured' | 'unknown' | null;
+  /** #1124/#1126 — observer asked for community review. */
+  reviewRequested?: boolean;
   appVersion?: string;
   deviceOs?: string | null;
   /**
@@ -110,6 +112,7 @@ export function buildObservation(draft: ObservationDraft): Observation {
     isRangeExtension: draft.isRangeExtension ?? false,
     lifeStage: draft.lifeStage ?? null,
     vitalStatus: draft.vitalStatus ?? null,
+    reviewRequested: draft.reviewRequested ?? false,
     moonPhase: null,
     moonIllumination: null,
     precipitation24hMm: null,
