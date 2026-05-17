@@ -44,6 +44,10 @@ const sharePathBase = '/share/obs/';
   data-label-signin-prompt={v.validate_signin_prompt}
   data-label-subtitle-tpl={v.queue_subtitle}
   data-label-submission-received={v.submission_received}
+  data-label-review-requested={v.queue_review_requested_badge}
+  data-label-expertise={v.queue_expertise_badge}
+  data-label-filter-mine={v.queue_filter_my_expertise}
+  data-label-filter-all={v.queue_filter_show_all}
   data-signin-href={signInPath}
   data-share-base={sharePathBase}
 >
@@ -59,6 +63,15 @@ const sharePathBase = '/share/obs/';
     <a href={signInPath} class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 text-xs font-semibold text-white">
       {v.validate_signin_btn}
     </a>
+  </div>
+
+  <div id="vq-filterbar" class="hidden mb-4">
+    <button
+      id="vq-filter-mine"
+      type="button"
+      aria-pressed="false"
+      class="rounded-full border border-zinc-300 dark:border-zinc-700 px-3 py-1 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+    ></button>
   </div>
 
   <ul id="vq-list" class="space-y-3"></ul>
@@ -79,10 +92,23 @@ const sharePathBase = '/share/obs/';
   if (root) {
     const lang = root.dataset.lang === 'es' ? 'es' : 'en';
     const isEs = lang === 'es';
-    const labels = root.dataset;
+    const labels = {
+      ...root.dataset,
+      labelReviewRequested: root.dataset.labelReviewRequested ?? 'Review requested',
+      labelExpertise: root.dataset.labelExpertise ?? 'Your expertise',
+      labelFilterMine: root.dataset.labelFilterMine ?? 'Only my expertise',
+      labelFilterAll: root.dataset.labelFilterAll ?? 'Show all',
+    };
 
     let userId: string | null = null;
     let rows: ValidationQueueRow[] = [];
+    let myExpertTaxa: string[] = [];
+    let filterMine = false;
+    let mediaByObs: Record<string, { url: string; type: string }> = {};
+    let observerById: Record<string, string> = {};
+
+    const inMyExpertise = (r: ValidationQueueRow) =>
+      myExpertTaxa.length > 0 && !!r.current_kingdom && myExpertTaxa.includes(r.current_kingdom);
 
     function escapeText(s: string): string {
       // Escape `&` first to avoid double-escaping the entities below.
@@ -126,6 +152,13 @@ const sharePathBase = '/share/obs/';
             : (labels.labelVotesOther ?? '{n}').replace('{n}', String(r.suggestion_count)))
         : '';
 
+      const reviewBadge = r.review_requested
+        ? `<span class="inline-block rounded bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 text-[10px] px-1.5 py-0.5 mr-1">${escapeText(labels.labelReviewRequested)}</span>`
+        : '';
+      const expertiseBadge = inMyExpertise(r)
+        ? `<span class="inline-block rounded bg-sky-100 dark:bg-sky-900/40 text-sky-800 dark:text-sky-200 text-[10px] px-1.5 py-0.5 mr-1">${escapeText(labels.labelExpertise)}</span>`
+        : '';
+
       let cta = '';
       if (!userId) {
         cta = `<a href="${labels.signinHref ?? '/'}" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 text-xs font-semibold text-white">${labels.labelSignin ?? 'Sign in'}</a>`;
@@ -150,7 +183,7 @@ const sharePathBase = '/share/obs/';
               ${hasId ? escapeText(r.current_scientific_name!) : (labels.labelNoId ?? '')}
               ${conf !== null ? `<span class="not-italic font-normal text-xs text-zinc-500 ml-1">${conf}%</span>` : ''}
             </p>
-            <p class="text-xs text-zinc-500 truncate">${date}${region}</p>
+            <p class="text-xs text-zinc-500 truncate">${reviewBadge}${expertiseBadge}${date}${region}</p>
             <p class="text-xs text-zinc-400">${observer}${votes ? ' · ' + votes : ''}</p>
           </div>
         </div>
@@ -169,6 +202,80 @@ const sharePathBase = '/share/obs/';
       setTimeout(() => el.classList.add('hidden'), 4000);
     }
 
+    function visibleRows(): ValidationQueueRow[] {
+      if (!filterMine) return rows;
+      return rows.filter(r => inMyExpertise(r) || r.review_requested);
+    }
+
+    function renderList() {
+      const list = document.getElementById('vq-list');
+      if (!list) return;
+      list.innerHTML = visibleRows().map(r => rowMarkup(
+        r,
+        mediaByObs[r.observation_id]?.url ?? null,
+        mediaByObs[r.observation_id]?.type ?? null,
+        observerById[r.observer_id] ?? null,
+      )).join('');
+      // Hydrate media thumbnails (audio + video).
+      list.querySelectorAll<HTMLElement>('.media-player-mount:not([data-mounted])').forEach(el => {
+        el.dataset.mounted = '1';
+        const url = el.dataset.mediaUrl;
+        const kind = (el.dataset.mediaKind === 'video' ? 'video' : 'audio') as 'audio' | 'video';
+        if (url) {
+          import('../lib/media-player').then(({ mountMediaPlayer }) => {
+            mountMediaPlayer(el, url, { kind, size: 'xs', lang: isEs ? 'es' : 'en' });
+          });
+        }
+      });
+      // Wire CTA buttons to the modal.
+      list.querySelectorAll<HTMLButtonElement>('button[data-action="suggest"], button[data-action="confirm"]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const obsId = btn.dataset.obs!;
+          const observer = btn.dataset.observer || null;
+          const opener = (window as unknown as { __rastrumOpenSuggestId?: (id: string, name: string | null) => void }).__rastrumOpenSuggestId;
+          if (typeof opener === 'function') {
+            opener(obsId, observer);
+            // If "confirm" — pre-fill the scientific name field.
+            const name = btn.dataset.name;
+            if (name) {
+              const inp = document.getElementById('sid-name') as HTMLInputElement | null;
+              if (inp) inp.value = name;
+            }
+          }
+        });
+      });
+    }
+
+    function setupFilterBar() {
+      // Opt-in only — render the chip exclusively when the user has
+      // declared expertise. Default OFF (show everything; no hidden
+      // profiling). The chip narrows to expertise + review-requested.
+      const bar = document.getElementById('vq-filterbar');
+      const btn = document.getElementById('vq-filter-mine') as HTMLButtonElement | null;
+      if (!bar || !btn) return;
+      if (myExpertTaxa.length === 0) {
+        bar.classList.add('hidden');
+        return;
+      }
+      bar.classList.remove('hidden');
+      const paint = () => {
+        btn.textContent = filterMine ? labels.labelFilterAll : labels.labelFilterMine;
+        btn.setAttribute('aria-pressed', filterMine ? 'true' : 'false');
+        btn.classList.toggle('bg-sky-600', filterMine);
+        btn.classList.toggle('text-white', filterMine);
+        btn.classList.toggle('border-sky-600', filterMine);
+      };
+      if (!btn.dataset.wired) {
+        btn.dataset.wired = '1';
+        btn.addEventListener('click', () => {
+          filterMine = !filterMine;
+          paint();
+          renderList();
+        });
+      }
+      paint();
+    }
+
     async function load() {
       document.getElementById('vq-loading')?.classList.remove('hidden');
       document.getElementById('vq-empty')?.classList.add('hidden');
@@ -181,13 +288,36 @@ const sharePathBase = '/share/obs/';
         userId = user?.id ?? null;
         if (!userId) document.getElementById('vq-signin')?.classList.remove('hidden');
 
+        if (userId) {
+          const { data: me } = await supabase.from('users').select('expert_taxa').eq('id', userId).maybeSingle();
+          myExpertTaxa = ((me as { expert_taxa?: string[] | null } | null)?.expert_taxa as string[] | null) ?? [];
+        }
+
         const { data, error } = await supabase
           .from('validation_queue')
           .select('*')
+          .order('review_requested', { ascending: false })
           .order('observed_at', { ascending: false })
           .limit(50);
         if (error) throw error;
         rows = (data ?? []) as ValidationQueueRow[];
+
+        // Stable client sort: keep server order (observed_at desc) but
+        // lift review_requested first, then (when the user has declared
+        // expertise) kingdom-matching rows. Index tiebreak preserves the
+        // server band order — no hidden reranking.
+        rows = rows
+          .map((r, idx) => ({ r, idx }))
+          .sort((a, b) => {
+            const ar = a.r.review_requested ? 0 : 1;
+            const br = b.r.review_requested ? 0 : 1;
+            if (ar !== br) return ar - br;
+            const ae = inMyExpertise(a.r) ? 0 : 1;
+            const be = inMyExpertise(b.r) ? 0 : 1;
+            if (ae !== be) return ae - be;
+            return a.idx - b.idx;
+          })
+          .map((x) => x.r);
 
         // Subtitle count via i18n template ("{n} observations need help").
         const countEl = document.getElementById('vq-count');
@@ -206,7 +336,7 @@ const sharePathBase = '/share/obs/';
           supabase.from('media_files').select('observation_id, url, is_primary, media_type').in('observation_id', obsIds),
           supabase.from('users').select('id, username, display_name').in('id', observerIds),
         ]);
-        const mediaByObs: Record<string, { url: string; type: string }> = {};
+        mediaByObs = {};
         for (const m of (media ?? [])) {
           const k = (m as { observation_id: string }).observation_id;
           if (!mediaByObs[k] || (m as { is_primary?: boolean }).is_primary) {
@@ -216,7 +346,7 @@ const sharePathBase = '/share/obs/';
             };
           }
         }
-        const observerById: Record<string, string> = {};
+        observerById = {};
         for (const u of (users ?? [])) {
           const id = (u as { id: string }).id;
           observerById[id] = (u as { display_name?: string; username?: string }).display_name
@@ -224,43 +354,8 @@ const sharePathBase = '/share/obs/';
                           ?? '?';
         }
 
-        const list = document.getElementById('vq-list');
-        if (list) {
-          list.innerHTML = rows.map(r => rowMarkup(
-            r,
-            mediaByObs[r.observation_id]?.url ?? null,
-            mediaByObs[r.observation_id]?.type ?? null,
-            observerById[r.observer_id] ?? null,
-          )).join('');
-          // Hydrate media thumbnails (audio + video).
-          list.querySelectorAll<HTMLElement>('.media-player-mount:not([data-mounted])').forEach(el => {
-            el.dataset.mounted = '1';
-            const url = el.dataset.mediaUrl;
-            const kind = (el.dataset.mediaKind === 'video' ? 'video' : 'audio') as 'audio' | 'video';
-            if (url) {
-              import('../lib/media-player').then(({ mountMediaPlayer }) => {
-                mountMediaPlayer(el, url, { kind, size: 'xs', lang: isEs ? 'es' : 'en' });
-              });
-            }
-          });
-          // Wire CTA buttons to the modal.
-          list.querySelectorAll<HTMLButtonElement>('button[data-action="suggest"], button[data-action="confirm"]').forEach(btn => {
-            btn.addEventListener('click', () => {
-              const obsId = btn.dataset.obs!;
-              const observer = btn.dataset.observer || null;
-              const opener = (window as unknown as { __rastrumOpenSuggestId?: (id: string, name: string | null) => void }).__rastrumOpenSuggestId;
-              if (typeof opener === 'function') {
-                opener(obsId, observer);
-                // If "confirm" — pre-fill the scientific name field.
-                const name = btn.dataset.name;
-                if (name) {
-                  const inp = document.getElementById('sid-name') as HTMLInputElement | null;
-                  if (inp) inp.value = name;
-                }
-              }
-            });
-          });
-        }
+        setupFilterBar();
+        renderList();
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         const errEl = document.getElementById('vq-error');
