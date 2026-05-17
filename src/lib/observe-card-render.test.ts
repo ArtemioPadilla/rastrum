@@ -22,6 +22,20 @@ const S: CardStrings = {
   actionAdopt: 'adopt',
   actionDismiss: 'dismiss',
   reviewRequestedAck: 'review requested',
+  traceColSource: 'Source',
+  traceColWhere: 'Where',
+  traceColPrediction: 'Prediction',
+  traceColConfidence: 'Confidence',
+  traceColOutcome: 'Outcome',
+  traceWhereDevice: 'device',
+  traceWhereCloud: 'cloud',
+  traceOutcomePrefilter: 'pre-filter',
+  traceOutcomePrimary: 'primary',
+  traceOutcomeNonprimary: 'non-primary',
+  traceCapped: 'capped floor',
+  traceConsensusPending: 'awaiting community validation',
+  traceExportJson: 'Export JSON',
+  traceNoAttempts: 'no identification attempts yet',
 };
 const vm = (o: Partial<CardViewModel>): CardViewModel => ({
   state: 'S0', sovereignty: 'none', reviewRequested: false, trace: [], headline: null, sourceLabel: null, ...o,
@@ -87,6 +101,27 @@ describe('renderProgressiveCardHtml', () => {
   it('S0 and S1a render no actions row', () => {
     expect(renderProgressiveCardHtml(vm({ state: 'S0' }), S)).not.toContain('data-card-actions');
     expect(renderProgressiveCardHtml(vm({ state: 'S1a', headline: 'X', sourceLabel: 'p · 9%' }), S)).not.toContain('data-card-actions');
+  });
+  it('renders a trace panel with one entry on S1b', () => {
+    const h = renderProgressiveCardHtml(vm({
+      state: 'S1b', headline: 'Quercus sp.',
+      trace: [{ source: 'plantnet', where: 'cloud', scientificName: 'Quercus sp.', confidence: 0.6, outcome: 'primary', capped: false, createdAt: '2026-05-16T00:00:00Z' }],
+    }), S);
+    expect(h).toContain('data-card-trace-panel');
+    expect(h).toContain('data-card-trace-json');
+    expect(h).toContain('plantnet');
+    expect(h).toContain('awaiting community validation');
+  });
+  it('flags a capped entry in the trace panel', () => {
+    const h = renderProgressiveCardHtml(vm({
+      state: 'S1b', headline: 'Quercus sp.',
+      trace: [{ source: 'phi_vision', where: 'device', scientificName: 'Quercus sp.', confidence: 0.3, outcome: 'non-primary', capped: true, createdAt: '2026-05-16T00:00:00Z' }],
+    }), S);
+    expect(h).toContain('capped floor');
+  });
+  it('shows the no-attempts fallback when trace is empty', () => {
+    const h = renderProgressiveCardHtml(vm({ state: 'S1b', headline: 'Quercus sp.', trace: [] }), S);
+    expect(h).toContain('no identification attempts yet');
   });
   it('escapes HTML in headline/sourceLabel (no injection)', () => {
     const h = renderProgressiveCardHtml(vm({ state: 'S1a', headline: '<img src=x onerror=1>', sourceLabel: 'a&b' }), S);

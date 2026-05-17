@@ -165,24 +165,14 @@ const weathers = WEATHERS;
 
     <!-- Identification result card -->
     <div id="obs2-id-card" class="rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 p-4">
-      <!-- AI result (hidden when no bestResult) -->
-      <div id="obs2-id-result" class="hidden">
-        <div class="flex items-start justify-between gap-2">
-          <div>
-            <p id="obs2-species" class="font-semibold italic text-zinc-900 dark:text-zinc-100"></p>
-            <p id="obs2-common" class="text-sm text-zinc-500 dark:text-zinc-400"></p>
-          </div>
-          <span id="obs2-conf" class="shrink-0"></span>
-        </div>
-        <!-- obs2-id-edit removed (#942 PR7 redo): manual input is always
-             visible directly below; toggle was redundant. -->
-        <!-- "Why this species?" — issue #736 — curated marks + reference photos -->
-        <WhyThisSpecies lang={lang} />
-      </div>
-      <!-- #1123 C-2: progressive card v2 (flag-gated; hidden until rastrum:card-vm fires AND ?card=v2 / localStorage rastrum.obs2.cardV2) -->
+      <!-- #1125 C-4: the progressive card is the only identification surface. -->
       <div id="obs2-card-v2" class="hidden"></div>
-      <!-- Manual entry — always visible so user can enter species even when AI returns nothing -->
-      <div id="obs2-id-manual" class="mt-2">
+      <!-- "Why this species?" (issue #736) — relocated inside the card's
+           audit disclosure (#1125 C-4). Hidden until "ver traza" opens. -->
+      <WhyThisSpecies lang={lang} />
+      <!-- Manual entry — on-demand only; revealed by the card's
+           "✎ No, es otra…" action or the WhyThisSpecies report button. -->
+      <div id="obs2-id-manual" class="mt-2 hidden">
         <label for="obs2-taxon-input" id="obs2-taxon-label" class="block text-xs text-zinc-500 dark:text-zinc-400 mb-1">
           {isEs ? "Nombre científico (opcional)" : "Scientific name (optional)"}
         </label>
@@ -452,10 +442,6 @@ let observerAffirmed = false;
 let observerAffirmedTaxon: string | null = null;
 let reviewRequested = false;
 
-// #1123 C-2 — progressive card, flag-gated. OFF ⇒ zero behavior change.
-const cardV2Enabled =
-  new URLSearchParams(window.location.search).get('card') === 'v2' ||
-  localStorage.getItem('rastrum.obs2.cardV2') === '1';
 const cardStrings: CardStrings = {
   analyzing: tr.observe.card.analyzing,
   savedPrefix: tr.observe.card.saved,
@@ -476,6 +462,20 @@ const cardStrings: CardStrings = {
   actionAdopt: tr.observe.card.action_adopt,
   actionDismiss: tr.observe.card.action_dismiss,
   reviewRequestedAck: tr.observe.card.review_requested_ack,
+  traceColSource: tr.observe.trace.col_source,
+  traceColWhere: tr.observe.trace.col_where,
+  traceColPrediction: tr.observe.trace.col_prediction,
+  traceColConfidence: tr.observe.trace.col_confidence,
+  traceColOutcome: tr.observe.trace.col_outcome,
+  traceWhereDevice: tr.observe.trace.where_device,
+  traceWhereCloud: tr.observe.trace.where_cloud,
+  traceOutcomePrefilter: tr.observe.trace.outcome_prefilter,
+  traceOutcomePrimary: tr.observe.trace.outcome_primary,
+  traceOutcomeNonprimary: tr.observe.trace.outcome_nonprimary,
+  traceCapped: tr.observe.trace.capped,
+  traceConsensusPending: tr.observe.trace.consensus_pending,
+  traceExportJson: tr.observe.trace.export_json,
+  traceNoAttempts: tr.observe.trace.no_attempts,
 };
 
 function redispatchCardVm() {
@@ -497,13 +497,11 @@ function redispatchCardVm() {
 }
 
 document.addEventListener('rastrum:card-vm', (e) => {
-  if (!cardV2Enabled) return;
   const el = document.getElementById('obs2-card-v2');
   if (!el) return;
   const vm = (e as CustomEvent).detail as import('../lib/observe-card-vm').CardViewModel;
   el.innerHTML = renderProgressiveCardHtml(vm, cardStrings);
   el.classList.remove('hidden');
-  document.getElementById('obs2-id-result')?.classList.add('hidden');
   // approach C: manual entry becomes on-demand (revealed by "No, es otra…").
   document.getElementById('obs2-id-manual')?.classList.add('hidden');
   el.querySelectorAll<HTMLButtonElement>('[data-card-action]').forEach((btn) => {
@@ -531,6 +529,21 @@ document.addEventListener('rastrum:card-vm', (e) => {
         el.querySelector('[data-card-actions]')?.classList.add('hidden');
       }
     });
+  });
+  const tracePanel = el.querySelector('[data-card-trace-panel]');
+  el.querySelector('[data-card-trace]')?.addEventListener('click', () => {
+    if (!tracePanel) return;
+    const wasHidden = tracePanel.hasAttribute('hidden');
+    if (wasHidden) tracePanel.removeAttribute('hidden');
+    else tracePanel.setAttribute('hidden', '');
+    const wts = document.getElementById('why-this-species');
+    if (wts && wasHidden) {
+      if (vm.headline) wts.dataset.scientificName = vm.headline;
+      wts.classList.remove('hidden');
+    }
+  });
+  el.querySelector('[data-card-trace-json]')?.addEventListener('click', () => {
+    try { void navigator.clipboard?.writeText(JSON.stringify(vm.trace, null, 2)); } catch { /* clipboard denied */ }
   });
 });
 
@@ -772,32 +785,6 @@ if (!localStorage.getItem(SKIP_SAVE_MIGRATION_KEY) && !identifyMode) {
   setTimeout(() => { notice.style.opacity = '0'; notice.style.transition = 'opacity 0.3s'; setTimeout(() => notice.remove(), 350); }, 6000);
 }
 const idCard          = document.getElementById('obs2-id-card');
-const speciesEl       = document.getElementById('obs2-species');
-const commonEl        = document.getElementById('obs2-common');
-const confEl          = document.getElementById('obs2-conf');
-
-/**
- * Render an SVG confidence ring (replaces the old % text pill).
- * Mirrors src/components/ConfidenceRing.astro — same color thresholds:
- * emerald ≥ 0.85, amber 0.50–0.85, red < 0.50.
- */
-function renderConfidenceRing(confidence: number): string {
-  const c = Math.max(0, Math.min(1, Number.isFinite(confidence) ? confidence : 0));
-  const size = 32, stroke = 3;
-  const r = (size - stroke) / 2;
-  const circumference = 2 * Math.PI * r;
-  const dash = (circumference * c).toFixed(2);
-  const gap  = (circumference - circumference * c).toFixed(2);
-  const colorClass = c >= 0.85 ? 'text-emerald-500' : c >= 0.5 ? 'text-amber-500' : 'text-red-500';
-  const pct = Math.round(c * 100);
-  return `<span class="relative inline-flex items-center justify-center ${colorClass}" style="width:${size}px;height:${size}px" role="img" aria-label="${pct}% confidence">
-    <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" class="absolute inset-0 -rotate-90" aria-hidden="true">
-      <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="currentColor" stroke-opacity="0.15" stroke-width="${stroke}"/>
-      <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="currentColor" stroke-width="${stroke}" stroke-linecap="round" stroke-dasharray="${dash} ${gap}"/>
-    </svg>
-    <span class="relative text-[9px] font-semibold tabular-nums leading-none">${pct}</span>
-  </span>`;
-}
 
 // ── Resume banner ──────────────────────────────────────────────────────────
 (async () => {
@@ -1260,26 +1247,14 @@ function showPostForm() {
   postForm?.classList.remove('hidden');
   // id card is always shown so user can always enter/edit species
   if (bestResult) {
-    if (!cardV2Enabled) {
-      document.getElementById('obs2-id-result')?.classList.remove('hidden');
-      if (speciesEl) speciesEl.textContent = bestResult.scientific_name;
-      if (commonEl) commonEl.textContent = bestResult.common_name_en ?? '';
-      if (confEl) confEl.innerHTML = renderConfidenceRing(bestResult.confidence);
-      const labelEl = document.getElementById('obs2-taxon-label');
-      if (labelEl) labelEl.textContent = isEs ? 'Editar identificación' : 'Edit identification';
-    }
     const taxonInputEl = document.getElementById('obs2-taxon-input') as HTMLInputElement | null;
     if (taxonInputEl && !taxonInputEl.value) taxonInputEl.value = bestResult.scientific_name;
     const wts = document.getElementById('why-this-species');
     if (wts) {
       wts.dataset.source = bestResult.source;
       wts.dataset.scientificName = bestResult.scientific_name;
-      if (!cardV2Enabled) wts.classList.remove('hidden');
     }
   }
-
-  // obs2-id-edit handler removed (#942 PR7 redo) — manual input is always
-  // visible directly below the AI result; toggle was redundant.
 }
 
 // "Report incorrect" from the WhyThisSpecies panel (issue #736).
@@ -1369,9 +1344,7 @@ postForm?.addEventListener('submit', async (e) => {
     }));
 
     const machineName = bestResult?.scientific_name || '';
-    const observerOwned = cardV2Enabled && (
-      observerAffirmed || (!!taxonInput && taxonInput !== machineName)
-    );
+    const observerOwned = observerAffirmed || (!!taxonInput && taxonInput !== machineName);
     const identifiedSpecies = taxonInput || observerAffirmedTaxon || machineName;
 
     const obs = await saveObservationToOutbox({
@@ -1391,7 +1364,7 @@ postForm?.addEventListener('submit', async (e) => {
       license: licenseTyped,
       lifeStage: (lifeStageVal || null) as import('../lib/observe').ObservationDraft['lifeStage'],
       vitalStatus: (vitalStatusVal || null) as import('../lib/observe').ObservationDraft['vitalStatus'],
-      reviewRequested: cardV2Enabled ? reviewRequested : undefined,
+      reviewRequested,
     });
 
     // Fire sync without blocking success UX. Try immediately; if the
@@ -1518,12 +1491,12 @@ document.getElementById('obs2-new-btn')?.addEventListener('click', () => {
   pipelineSection?.classList.add('hidden');
   postForm?.classList.add('hidden');
   successEl?.classList.add('hidden');
-  // Reset id card: hide the AI result section, clear taxon input, restore label
-  document.getElementById('obs2-id-result')?.classList.add('hidden');
+  // Reset id card: clear taxon input, restore label, re-hide manual entry
   const taxonReset = document.getElementById('obs2-taxon-input') as HTMLInputElement | null;
   if (taxonReset) taxonReset.value = '';
   const labelReset = document.getElementById('obs2-taxon-label');
   if (labelReset) labelReset.textContent = isEs ? 'Nombre científico (opcional)' : 'Scientific name (optional)';
+  document.getElementById('obs2-id-manual')?.classList.add('hidden');
   window.scrollTo(0, 0);
 });
 
