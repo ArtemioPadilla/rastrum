@@ -7,18 +7,7 @@ import type { IdentifyAttempt } from './identify-cascade-client';
 import type { CardVmInput } from './observe-card-vm';
 import type { IdResult } from './observe-card-state';
 import type { IdAttempt } from './observe-audit-trace';
-
-const CEILING: Record<string, number> = {
-  onnx_efficientnet_lite0: 0.4,
-  camera_trap_megadetector: 0.4,
-  webllm_phi35_vision: 0.35,
-  phi_vision: 0.35,
-  onnx_gemma4_vision: 0.35,
-  speciesnet: 0.85,
-};
-function ceilingFor(source: string): number {
-  return CEILING[source] ?? 1; // cloud / uncapped / unknown
-}
+import { ceilingForSource } from './confidence-ceiling';
 
 const CLOUD_SOURCES = new Set<string>(['plantnet', 'claude_haiku', 'claude_sonnet']);
 function isCloud(source: string): boolean {
@@ -47,7 +36,7 @@ export function attemptsToCardVmInput(
       scientificName: b.scientific_name as string,
       confidence: b.confidence,
       source: b.source,
-      confidenceCeiling: ceilingFor(b.source),
+      confidenceCeiling: ceilingForSource(b.source),
     };
   };
   const provisional = bestOf((s) => !isCloud(s));

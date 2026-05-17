@@ -17,6 +17,7 @@ import {
   type SyncDoneDetail, type SyncProgressDetail, type SyncRowDetail,
 } from './sync-events';
 import { resolveIdentificationSource } from './identification-source';
+import { capConfidence } from './confidence-ceiling';
 
 export interface SyncResult {
   synced: number;
@@ -277,12 +278,13 @@ async function syncOne(record: ObservationRecord): Promise<void> {
     // fire — the observation button stays "Guardando…" forever.
     let clientIdErr: unknown = null;
     try {
+      const resolvedSource = resolveIdentificationSource({ machineSource: clientId.source, hasMachineResult: !!clientId.source && clientId.source !== 'human' });
       const rpcPromise = supabase.rpc('upsert_primary_identification', {
         p_observation_id: record.id,
         p_scientific_name: clientId.scientificName,
         p_taxon_id: taxonId,
-        p_confidence: Math.max(0, Math.min(1, clientId.confidence ?? 0)),
-        p_source: resolveIdentificationSource({ machineSource: clientId.source, hasMachineResult: !!clientId.source && clientId.source !== 'human' }),
+        p_confidence: capConfidence(resolvedSource, clientId.confidence ?? 0),
+        p_source: resolvedSource,
         p_raw_response: {
           common_name_en: clientId.commonNameEn,
           common_name_es: clientId.commonNameEs,
@@ -461,7 +463,7 @@ async function triggerIdentify(observationId: string): Promise<void> {
       p_observation_id: observationId,
       p_scientific_name: correctedName,
       p_taxon_id: null,
-      p_confidence: r.confidence,
+      p_confidence: capConfidence(r.source, r.confidence),
       p_source: r.source,
       p_raw_response: trace as unknown as object,
     });
