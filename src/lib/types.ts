@@ -199,11 +199,16 @@ export interface ValidationQueueRow {
   habitat: string | null;
   obscure_level: 'none' | '0.1deg' | '0.2deg' | '5km' | 'full';
   primary_id_id: string | null;
+  current_taxon_id: string | null;
   current_scientific_name: string | null;
   current_confidence: number | null;
   is_research_grade: boolean | null;
   suggestion_count: number;
   distinct_voter_count: number;
+  /** #1126 — observer explicitly asked for community review. */
+  review_requested: boolean;
+  /** #1126 — kingdom of the current primary ID's taxon (NULL when no ID). Used for expert kingdom pre-routing. */
+  current_kingdom: string | null;
 }
 
 export type UserRole = 'admin' | 'moderator' | 'expert' | 'researcher';

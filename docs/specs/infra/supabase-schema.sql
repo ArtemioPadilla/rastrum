@@ -1608,7 +1608,8 @@ GRANT SELECT ON public.sync_failures TO authenticated;
 -- rows whose confidence happens to sit between 0.4 and 0.5.
 --
 -- DROP VIEW first because the column shape evolved (PR #258 reordered
--- columns to add `current_taxon_id` before `current_scientific_name`)
+-- columns to add `current_taxon_id` before `current_scientific_name`;
+-- #1126 appended `review_requested` + `current_kingdom` last)
 -- and Postgres CREATE OR REPLACE VIEW does not permit column renames /
 -- reordering. Without this DROP, db-apply.yml fails on existing DBs
 -- with "cannot change name of view column …". Idempotent: IF EXISTS
@@ -1634,16 +1635,21 @@ SELECT
   (SELECT count(DISTINCT x.validated_by)
      FROM public.identifications x
     WHERE x.observation_id = o.id
-      AND x.validated_by IS NOT NULL)         AS distinct_voter_count
+      AND x.validated_by IS NOT NULL)         AS distinct_voter_count,
+  o.review_requested                          AS review_requested,
+  t.kingdom                                   AS current_kingdom
 FROM public.observations o
 LEFT JOIN public.identifications i
        ON i.observation_id = o.id AND i.is_primary = true
+LEFT JOIN public.taxa t
+       ON t.id = i.taxon_id
 WHERE o.sync_status = 'synced'
   AND o.obscure_level IN ('none','0.1deg','0.2deg','5km')
   AND COALESCE(i.is_research_grade, false) = false
   AND (
        i.id IS NULL
     OR COALESCE(i.confidence, 0) < 0.5
+    OR o.review_requested = true
   );
 
 GRANT SELECT ON public.validation_queue TO authenticated, anon;
