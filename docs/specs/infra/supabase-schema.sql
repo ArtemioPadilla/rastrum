@@ -1637,7 +1637,8 @@ SELECT
     WHERE x.observation_id = o.id
       AND x.validated_by IS NOT NULL)         AS distinct_voter_count,
   o.review_requested                          AS review_requested,
-  t.kingdom                                   AS current_kingdom
+  t.kingdom                                   AS current_kingdom,
+  i.source                                    AS current_source
 FROM public.observations o
 LEFT JOIN public.identifications i
        ON i.observation_id = o.id AND i.is_primary = true

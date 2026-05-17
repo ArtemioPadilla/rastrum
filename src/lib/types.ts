@@ -209,6 +209,8 @@ export interface ValidationQueueRow {
   review_requested: boolean;
   /** #1126 — kingdom of the current primary ID's taxon (NULL when no ID). Used for expert kingdom pre-routing. */
   current_kingdom: string | null;
+  /** #1128 R3 — source of the current primary ID (NULL when no ID). Drives source-trust queue ordering. */
+  current_source: string | null;
 }
 
 export type UserRole = 'admin' | 'moderator' | 'expert' | 'researcher';
