@@ -448,6 +448,9 @@ let location: { lat: number; lng: number; accuracyM: number; altitudeM: number |
 let bestResult: { scientific_name: string; common_name_en: string | null; confidence: number; source: string } | null = null;
 let identifyErrorReason: string | null = null;
 let cardAttempts: import('../lib/identify-cascade-client').IdentifyAttempt[] = [];
+let observerAffirmed = false;
+let observerAffirmedTaxon: string | null = null;
+let reviewRequested = false;
 
 // #1123 C-2 — progressive card, flag-gated. OFF ⇒ zero behavior change.
 const cardV2Enabled =
@@ -467,14 +470,68 @@ const cardStrings: CardStrings = {
   provenanceDevice: tr.observe.card.prov_device,
   provenanceCloud: tr.observe.card.prov_cloud,
   provenanceCommunity: tr.observe.card.prov_community,
+  actionAffirm: tr.observe.card.action_affirm,
+  actionOther: tr.observe.card.action_other,
+  actionReview: tr.observe.card.action_review,
+  actionAdopt: tr.observe.card.action_adopt,
+  actionDismiss: tr.observe.card.action_dismiss,
+  reviewRequestedAck: tr.observe.card.review_requested_ack,
 };
+
+function redispatchCardVm() {
+  try {
+    const hasOnDeviceModel = cardAttempts.some(
+      (a) => !['plantnet', 'claude_haiku', 'claude_sonnet'].includes(a.source),
+    );
+    const cardVm = buildCardViewModel(
+      attemptsToCardVmInput(cardAttempts, {
+        observerAffirmed,
+        reviewRequested,
+        online: navigator.onLine,
+        hasOnDeviceModel,
+        now: new Date().toISOString(),
+      }),
+    );
+    document.dispatchEvent(new CustomEvent('rastrum:card-vm', { detail: cardVm }));
+  } catch { /* VM seam is additive — never block the form */ }
+}
+
 document.addEventListener('rastrum:card-vm', (e) => {
   if (!cardV2Enabled) return;
   const el = document.getElementById('obs2-card-v2');
   if (!el) return;
-  el.innerHTML = renderProgressiveCardHtml((e as CustomEvent).detail, cardStrings);
+  const vm = (e as CustomEvent).detail as import('../lib/observe-card-vm').CardViewModel;
+  el.innerHTML = renderProgressiveCardHtml(vm, cardStrings);
   el.classList.remove('hidden');
   document.getElementById('obs2-id-result')?.classList.add('hidden');
+  // approach C: manual entry becomes on-demand (revealed by "No, es otra…").
+  document.getElementById('obs2-id-manual')?.classList.add('hidden');
+  el.querySelectorAll<HTMLButtonElement>('[data-card-action]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const action = btn.dataset.cardAction;
+      if (action === 'affirm') {
+        observerAffirmed = true;
+        observerAffirmedTaxon = vm.headline;
+        redispatchCardVm();
+      } else if (action === 'other') {
+        const manual = document.getElementById('obs2-id-manual');
+        manual?.classList.remove('hidden');
+        const input = document.getElementById('obs2-taxon-input') as HTMLInputElement | null;
+        input?.focus();
+        input?.select();
+      } else if (action === 'review') {
+        reviewRequested = true;
+        redispatchCardVm();
+      } else if (action === 'adopt') {
+        observerAffirmed = false;
+        observerAffirmedTaxon = null;
+        redispatchCardVm();
+      } else if (action === 'dismiss') {
+        el.querySelector('[data-card-cloud-suggestion]')?.classList.add('hidden');
+        el.querySelector('[data-card-actions]')?.classList.add('hidden');
+      }
+    });
+  });
 });
 
 // ── Taxon hint chips (#ux-quick-taxon-chips) ──────────────────────────────
@@ -1199,40 +1256,25 @@ function showPostForm() {
   pipelineEscape?.classList.add('hidden');
   // #1122 — additive: expose the progressive-card view model. No DOM
   // change yet (consumers wire in #1123). Never blocks the form.
-  try {
-    const hasOnDeviceModel = cardAttempts.some(
-      (a) => !['plantnet', 'claude_haiku', 'claude_sonnet'].includes(a.source),
-    );
-    const cardVm = buildCardViewModel(
-      attemptsToCardVmInput(cardAttempts, {
-        observerAffirmed: false,
-        online: navigator.onLine,
-        hasOnDeviceModel,
-        now: new Date().toISOString(),
-      }),
-    );
-    document.dispatchEvent(new CustomEvent('rastrum:card-vm', { detail: cardVm }));
-  } catch { /* VM seam is additive — never block the form */ }
+  redispatchCardVm();
   postForm?.classList.remove('hidden');
   // id card is always shown so user can always enter/edit species
   if (bestResult) {
-    document.getElementById('obs2-id-result')?.classList.remove('hidden');
-    if (speciesEl) speciesEl.textContent = bestResult.scientific_name;
-    if (commonEl) commonEl.textContent = bestResult.common_name_en ?? '';
-    if (confEl) confEl.innerHTML = renderConfidenceRing(bestResult.confidence);
-    // Pre-fill manual input with AI result; user can override
+    if (!cardV2Enabled) {
+      document.getElementById('obs2-id-result')?.classList.remove('hidden');
+      if (speciesEl) speciesEl.textContent = bestResult.scientific_name;
+      if (commonEl) commonEl.textContent = bestResult.common_name_en ?? '';
+      if (confEl) confEl.innerHTML = renderConfidenceRing(bestResult.confidence);
+      const labelEl = document.getElementById('obs2-taxon-label');
+      if (labelEl) labelEl.textContent = isEs ? 'Editar identificación' : 'Edit identification';
+    }
     const taxonInputEl = document.getElementById('obs2-taxon-input') as HTMLInputElement | null;
     if (taxonInputEl && !taxonInputEl.value) taxonInputEl.value = bestResult.scientific_name;
-    const labelEl = document.getElementById('obs2-taxon-label');
-    if (labelEl) labelEl.textContent = isEs ? 'Editar identificación' : 'Edit identification';
-
-    // "Why this species?" panel (issue #736). Feed dataset so it can
-    // resolve traits + reference photos when the user opens it.
     const wts = document.getElementById('why-this-species');
     if (wts) {
       wts.dataset.source = bestResult.source;
       wts.dataset.scientificName = bestResult.scientific_name;
-      wts.classList.remove('hidden');
+      if (!cardV2Enabled) wts.classList.remove('hidden');
     }
   }
 
@@ -1326,7 +1368,11 @@ postForm?.addEventListener('submit', async (e) => {
       mediaType: pf.kind === 'audio' ? 'audio' as const : pf.kind === 'video' ? 'video' as const : 'photo' as const,
     }));
 
-    const identifiedSpecies = taxonInput || bestResult?.scientific_name || '';
+    const machineName = bestResult?.scientific_name || '';
+    const observerOwned = cardV2Enabled && (
+      observerAffirmed || (!!taxonInput && taxonInput !== machineName)
+    );
+    const identifiedSpecies = taxonInput || observerAffirmedTaxon || machineName;
 
     const obs = await saveObservationToOutbox({
       observerRef,
@@ -1334,8 +1380,8 @@ postForm?.addEventListener('submit', async (e) => {
       location: location ?? { lat: 0, lng: 0, accuracyM: 0, altitudeM: null, capturedFrom: 'gps' },
       identification: identifiedSpecies ? {
         scientificName: identifiedSpecies,
-        confidence: bestResult?.confidence ?? 0,
-        source: resolveIdentificationSource({ machineSource: bestResult?.source, hasMachineResult: !!bestResult }) as never,
+        confidence: observerOwned ? 0 : (bestResult?.confidence ?? 0),
+        source: resolveIdentificationSource({ machineSource: bestResult?.source, hasMachineResult: !!bestResult && !observerOwned }) as never,
         status: 'accepted',
       } : undefined,
       habitat: habitatVal as never,
@@ -1345,6 +1391,7 @@ postForm?.addEventListener('submit', async (e) => {
       license: licenseTyped,
       lifeStage: (lifeStageVal || null) as import('../lib/observe').ObservationDraft['lifeStage'],
       vitalStatus: (vitalStatusVal || null) as import('../lib/observe').ObservationDraft['vitalStatus'],
+      reviewRequested: cardV2Enabled ? reviewRequested : undefined,
     });
 
     // Fire sync without blocking success UX. Try immediately; if the
@@ -1459,6 +1506,11 @@ document.getElementById('obs2-new-btn')?.addEventListener('click', () => {
   bestResult = null;
   identifyErrorReason = null;
   cardAttempts = [];
+  observerAffirmed = false;
+  observerAffirmedTaxon = null;
+  reviewRequested = false;
+  const cardV2El = document.getElementById('obs2-card-v2');
+  if (cardV2El) { cardV2El.innerHTML = ''; cardV2El.classList.add('hidden'); }
   pipelineState = null;
   // Reset taxon hint chip selection
   selectedTaxonHint = null;

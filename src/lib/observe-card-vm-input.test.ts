@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { attemptsToCardVmInput } from './observe-card-vm-input';
 import type { IdentifyAttempt } from './identify-cascade-client';
 
-const ctx = { observerAffirmed: false, online: true, hasOnDeviceModel: true, now: '2026-05-17T00:00:00Z' };
+const ctx = { observerAffirmed: false, reviewRequested: false, online: true, hasOnDeviceModel: true, now: '2026-05-17T00:00:00Z' };
 
 describe('attemptsToCardVmInput', () => {
   it('picks best on-device as provisional and best cloud as cloud', () => {
@@ -48,6 +48,11 @@ describe('attemptsToCardVmInput', () => {
     expect(vm.provisional).toBeNull();
     expect(vm.cloud).toBeNull();
     expect(vm.attempts).toHaveLength(1);
+  });
+
+  it('carries reviewRequested from ctx into the vm input', () => {
+    const vm = attemptsToCardVmInput([], { ...ctx, reviewRequested: true });
+    expect(vm.reviewRequested).toBe(true);
   });
 
   it('phi/gemma/megadetector/speciesnet ceilings are correct; provisional is highest-confidence device', () => {

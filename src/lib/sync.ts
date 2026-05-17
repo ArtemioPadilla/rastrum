@@ -117,6 +117,7 @@ async function syncOne(record: ObservationRecord): Promise<void> {
     // #941: life stage + vital status
     life_stage:  obs.lifeStage  ?? null,
     vital_status: obs.vitalStatus ?? null,
+    review_requested: obs.reviewRequested ?? false,
     sync_status:     'synced' as const,
     app_version:     obs.appVersion,
     device_os:       obs.deviceOs,

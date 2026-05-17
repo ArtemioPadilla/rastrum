@@ -36,6 +36,13 @@ describe('buildObservation', () => {
     expect(obs.syncStatus).toBe('pending');
   });
 
+  it('defaults reviewRequested to false and honours an explicit true', () => {
+    const off = buildObservation({ observerRef: userRef, media: baseMedia, location: baseLoc });
+    expect(off.reviewRequested).toBe(false);
+    const on = buildObservation({ observerRef: userRef, media: baseMedia, location: baseLoc, reviewRequested: true });
+    expect(on.reviewRequested).toBe(true);
+  });
+
   it('respects an explicit id and createdAt', () => {
     const obs = buildObservation({
       id: 'fixed-id',

@@ -12,6 +12,7 @@ export interface CardVmInput {
   provisional: IdResult | null;
   cloud: IdResult | null;
   observerAffirmed: boolean;
+  reviewRequested: boolean;
   online: boolean;
   hasOnDeviceModel: boolean;
   attempts: IdAttempt[];
@@ -20,6 +21,7 @@ export interface CardVmInput {
 export interface CardViewModel {
   state: CardState;
   sovereignty: SovereigntyAction;
+  reviewRequested: boolean;
   trace: TraceEntry[];
   /** Scientific name the card displays, or null when nothing resolved. */
   headline: string | null;
@@ -53,6 +55,7 @@ export function buildCardViewModel(input: CardVmInput): CardViewModel {
   return {
     state,
     sovereignty,
+    reviewRequested: input.reviewRequested,
     trace,
     headline: primary ? primary.scientificName : null,
     sourceLabel: primary ? labelFor(primary) : null,

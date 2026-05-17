@@ -123,6 +123,13 @@ export interface Observation {
    */
   vitalStatus?: 'alive' | 'dead' | 'injured' | 'unknown' | null;
 
+  /**
+   * #1124/#1126 — observer-set "ask for community review" flag. Persists
+   * to observations.review_requested and routes into the validate/expert
+   * queue (#1126). Does NOT affect consensus weighting.
+   */
+  reviewRequested?: boolean;
+
   syncStatus: SyncStatus;
   syncedAt: string | null;
   appVersion: string;
