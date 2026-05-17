@@ -1,4 +1,5 @@
 import type { CardViewModel } from './observe-card-vm';
+import type { TraceEntry } from './observe-audit-trace';
 import { cardActions, type CardAction } from './observe-card-actions';
 
 export interface CardStrings {
@@ -21,6 +22,20 @@ export interface CardStrings {
   actionAdopt: string;
   actionDismiss: string;
   reviewRequestedAck: string;
+  traceColSource: string;
+  traceColWhere: string;
+  traceColPrediction: string;
+  traceColConfidence: string;
+  traceColOutcome: string;
+  traceWhereDevice: string;
+  traceWhereCloud: string;
+  traceOutcomePrefilter: string;
+  traceOutcomePrimary: string;
+  traceOutcomeNonprimary: string;
+  traceCapped: string;
+  traceConsensusPending: string;
+  traceExportJson: string;
+  traceNoAttempts: string;
 }
 
 function esc(raw: string | null): string {
@@ -104,6 +119,25 @@ function renderS3(s: CardStrings): string {
 <p class="text-xs text-zinc-500 dark:text-zinc-400">${s.willIdentifyOnSync}</p>`;
 }
 
+function traceRow(e: TraceEntry, s: CardStrings): string {
+  const where = e.where === 'cloud' ? s.traceWhereCloud : s.traceWhereDevice;
+  const outcome =
+    e.outcome === 'pre-filter' ? s.traceOutcomePrefilter :
+    e.outcome === 'primary'    ? s.traceOutcomePrimary :
+    s.traceOutcomeNonprimary;
+  const pred = e.scientificName ? `<span class="italic">${esc(e.scientificName)}</span>` : '—';
+  const conf = `${Math.round(e.confidence * 100)}%`;
+  const cap = e.capped ? ` <span class="text-amber-700 dark:text-amber-400">⚠ ${esc(s.traceCapped)}</span>` : '';
+  return `<tr class="border-t border-zinc-100 dark:border-zinc-800"><td class="py-1 pr-2">${esc(e.source)}</td><td class="py-1 pr-2">${esc(where)}</td><td class="py-1 pr-2">${pred}</td><td class="py-1 pr-2">${conf}</td><td class="py-1">${esc(outcome)}${cap}</td></tr>`;
+}
+
+function renderTracePanel(vm: CardViewModel, s: CardStrings): string {
+  const rows = vm.trace.length
+    ? vm.trace.map((e) => traceRow(e, s)).join('')
+    : `<tr><td colspan="5" class="py-2 text-zinc-500 dark:text-zinc-400">${esc(s.traceNoAttempts)}</td></tr>`;
+  return `<div data-card-trace-panel hidden class="mt-3 pt-3 border-t border-zinc-200 dark:border-zinc-700"><table class="w-full text-xs text-left"><thead class="text-zinc-500 dark:text-zinc-400"><tr><th class="py-1 pr-2 font-medium">${esc(s.traceColSource)}</th><th class="py-1 pr-2 font-medium">${esc(s.traceColWhere)}</th><th class="py-1 pr-2 font-medium">${esc(s.traceColPrediction)}</th><th class="py-1 pr-2 font-medium">${esc(s.traceColConfidence)}</th><th class="py-1 font-medium">${esc(s.traceColOutcome)}</th></tr></thead><tbody>${rows}</tbody></table><p class="text-xs text-zinc-500 dark:text-zinc-400 mt-2">${esc(s.traceConsensusPending)}</p><button type="button" data-card-trace-json class="mt-2 underline text-xs">${esc(s.traceExportJson)}</button></div>`;
+}
+
 export function renderProgressiveCardHtml(vm: CardViewModel, s: CardStrings): string {
   let inner: string;
   switch (vm.state) {
@@ -115,5 +149,6 @@ export function renderProgressiveCardHtml(vm: CardViewModel, s: CardStrings): st
     case 'S3':      inner = renderS3(s); break;
   }
   const actions = actionsRow(vm, s);
-  return `<div data-card-state="${vm.state}" class="observe-card p-3 rounded-lg bg-white dark:bg-zinc-800 shadow-sm">${inner}${actions}</div>`;
+  const trace = renderTracePanel(vm, s);
+  return `<div data-card-state="${vm.state}" class="observe-card p-3 rounded-lg bg-white dark:bg-zinc-800 shadow-sm">${inner}${actions}${trace}</div>`;
 }
