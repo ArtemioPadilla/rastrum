@@ -115,6 +115,11 @@ const communityEmptyLabel = lang === 'es'
   );
   const effectiveLabel = document.getElementById('season-effective-label');
 
+  // Declared before paint()'s first call below — paint() reads this in its
+  // community-deselect loop, so it must be initialized before module-eval
+  // reaches `paint(readStoredChoice())` (TDZ guard, issue #1149).
+  let communityButtons: HTMLButtonElement[] = [];
+
   function effectiveText(choice: SeasonalThemeChoice): string {
     if (choice !== 'auto') return '';
     const auto = pickSeasonalTheme();
@@ -157,7 +162,6 @@ const communityEmptyLabel = lang === 'es'
 
   const communityList = document.getElementById('community-themes-list');
   const communityEmpty = document.getElementById('community-themes-empty');
-  let communityButtons: HTMLButtonElement[] = [];
 
   function applyCommunityTheme(theme: CommunityTheme) {
     // Write the slug as the stored choice (prefixed) so it survives reload
