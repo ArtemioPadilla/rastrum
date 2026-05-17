@@ -28,6 +28,15 @@ const ES_AI_URL = '/es/perfil/ajustes/ai/';
 
 /** Wait until #identifier-list has rendered at least one card (not the loading placeholder). */
 async function waitForRegistry(page: import('@playwright/test').Page) {
+  // #1127: the identifier registry ("power panel") now lives behind the
+  // collapsed "Identificación · Avanzado" <details>. Open it so the
+  // registry content is visible for the assertions below — the registry
+  // itself is unchanged, only relocated behind the disclosure. Idempotent
+  // and safe pre-paint (the <details> is server-rendered static markup).
+  await page.evaluate(() => {
+    const d = document.getElementById('ai-advanced') as HTMLDetailsElement | null;
+    if (d) d.open = true;
+  });
   await page.waitForFunction(() => {
     const list = document.getElementById('identifier-list');
     if (!list) return false;
