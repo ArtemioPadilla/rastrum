@@ -86,6 +86,7 @@ const sharePathBase = '/share/obs/';
 
 <script>
   import { getCachedUser, getSupabase } from '../lib/supabase';
+  import { sourceTrustRank } from '../lib/source-trust';
   import type { ValidationQueueRow } from '../lib/types';
 
   const root = document.querySelector<HTMLElement>('.rastrum-validation-queue');
@@ -158,6 +159,9 @@ const sharePathBase = '/share/obs/';
       const expertiseBadge = inMyExpertise(r)
         ? `<span class="inline-block rounded bg-sky-100 dark:bg-sky-900/40 text-sky-800 dark:text-sky-200 text-[10px] px-1.5 py-0.5 mr-1">${escapeText(labels.labelExpertise)}</span>`
         : '';
+      const sourceBadge = r.current_source
+        ? `<span class="inline-block rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 text-[10px] px-1.5 py-0.5 mr-1">${escapeText(r.current_source)}</span>`
+        : '';
 
       let cta = '';
       if (!userId) {
@@ -183,7 +187,7 @@ const sharePathBase = '/share/obs/';
               ${hasId ? escapeText(r.current_scientific_name!) : (labels.labelNoId ?? '')}
               ${conf !== null ? `<span class="not-italic font-normal text-xs text-zinc-500 ml-1">${conf}%</span>` : ''}
             </p>
-            <p class="text-xs text-zinc-500 truncate">${reviewBadge}${expertiseBadge}${date}${region}</p>
+            <p class="text-xs text-zinc-500 truncate">${reviewBadge}${expertiseBadge}${sourceBadge}${date}${region}</p>
             <p class="text-xs text-zinc-400">${observer}${votes ? ' · ' + votes : ''}</p>
           </div>
         </div>
@@ -315,6 +319,9 @@ const sharePathBase = '/share/obs/';
             const ae = inMyExpertise(a.r) ? 0 : 1;
             const be = inMyExpertise(b.r) ? 0 : 1;
             if (ae !== be) return ae - be;
+            const at = sourceTrustRank(a.r.current_source);
+            const bt = sourceTrustRank(b.r.current_source);
+            if (at !== bt) return at - bt;
             return a.idx - b.idx;
           })
           .map((x) => x.r);
