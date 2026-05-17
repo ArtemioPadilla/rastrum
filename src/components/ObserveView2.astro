@@ -431,10 +431,16 @@ import { resolveRunnerSet, type RunnerAvailability } from '../lib/observe-runner
 import { attemptsToCardVmInput } from '../lib/observe-card-vm-input';
 import { buildCardViewModel } from '../lib/observe-card-vm';
 import { renderProgressiveCardHtml, type CardStrings } from '../lib/observe-card-render';
+import { t } from '../i18n/utils';
 
 // ── State ──────────────────────────────────────────────────────────────────
 const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
 const isEs = lang === 'es';
+// Client-<script> i18n tree. The frontmatter `tr` (top of file) is
+// server-only; the browser script has its own scope, so declare it here.
+// Fixes "tr is not defined" and also makes the pre-existing
+// tr.observe.local_fallback_sponsored reference resolve.
+const tr = t(lang);
 
 let pipelineState: PipelineState | null = null;
 let location: { lat: number; lng: number; accuracyM: number; altitudeM: number | null } | null = null;
