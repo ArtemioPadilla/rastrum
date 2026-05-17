@@ -6,6 +6,7 @@ const base: CardVmInput = {
   provisional: null,
   cloud: null,
   observerAffirmed: false,
+  reviewRequested: false,
   online: true,
   hasOnDeviceModel: true,
   attempts: [],
@@ -62,6 +63,11 @@ describe('buildCardViewModel', () => {
     ];
     const vm = buildCardViewModel({ ...base, cloud: { scientificName: 'Quercus rugosa', confidence: 0.94, source: 'plantnet', confidenceCeiling: 1 }, attempts });
     expect(vm.trace.map(e => e.source)).toEqual(['onnx_efficientnet_lite0', 'plantnet']);
+  });
+
+  it('threads reviewRequested through to the view model', () => {
+    const vm = buildCardViewModel({ ...base, reviewRequested: true });
+    expect(vm.reviewRequested).toBe(true);
   });
 
   it('sourceLabel rounds confidence to whole percent', () => {

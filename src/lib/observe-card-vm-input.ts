@@ -27,6 +27,7 @@ function isCloud(source: string): boolean {
 
 export interface AttemptsToVmContext {
   observerAffirmed: boolean;
+  reviewRequested: boolean;
   online: boolean;
   hasOnDeviceModel: boolean;
   /** ISO timestamp applied to every trace row (cascade has no per-attempt time). */
@@ -66,6 +67,7 @@ export function attemptsToCardVmInput(
     provisional,
     cloud,
     observerAffirmed: ctx.observerAffirmed,
+    reviewRequested: ctx.reviewRequested,
     online: ctx.online,
     hasOnDeviceModel: ctx.hasOnDeviceModel,
     attempts: trace,

@@ -16,9 +16,15 @@ const S: CardStrings = {
   provenanceDevice: 'device',
   provenanceCloud: 'cloud',
   provenanceCommunity: 'community',
+  actionAffirm: 'yes that is it',
+  actionOther: 'no it is another',
+  actionReview: 'ask for review',
+  actionAdopt: 'adopt',
+  actionDismiss: 'dismiss',
+  reviewRequestedAck: 'review requested',
 };
 const vm = (o: Partial<CardViewModel>): CardViewModel => ({
-  state: 'S0', sovereignty: 'none', trace: [], headline: null, sourceLabel: null, ...o,
+  state: 'S0', sovereignty: 'none', reviewRequested: false, trace: [], headline: null, sourceLabel: null, ...o,
 });
 
 describe('renderProgressiveCardHtml', () => {
@@ -60,6 +66,27 @@ describe('renderProgressiveCardHtml', () => {
     const h = renderProgressiveCardHtml(vm({ state: 'S3' }), S);
     expect(h).toContain('Unidentified');
     expect(h).toContain('will identify on sync');
+  });
+  it('S1b renders affirm/other/review action buttons', () => {
+    const h = renderProgressiveCardHtml(vm({ state: 'S1b', headline: 'Quercus sp.' }), S);
+    expect(h).toContain('data-card-action="affirm"');
+    expect(h).toContain('data-card-action="other"');
+    expect(h).toContain('data-card-action="review"');
+    expect(h).toContain('data-card-actions');
+  });
+  it('S2prime renders adopt/dismiss action buttons', () => {
+    const h = renderProgressiveCardHtml(vm({ state: 'S2prime', headline: 'Quercus crassifolia' }), S);
+    expect(h).toContain('data-card-action="adopt"');
+    expect(h).toContain('data-card-action="dismiss"');
+  });
+  it('reviewRequested swaps the review button for an ack on S1b', () => {
+    const h = renderProgressiveCardHtml(vm({ state: 'S1b', headline: 'Quercus sp.', reviewRequested: true }), S);
+    expect(h).toContain('data-card-review-ack');
+    expect(h).not.toContain('data-card-action="review"');
+  });
+  it('S0 and S1a render no actions row', () => {
+    expect(renderProgressiveCardHtml(vm({ state: 'S0' }), S)).not.toContain('data-card-actions');
+    expect(renderProgressiveCardHtml(vm({ state: 'S1a', headline: 'X', sourceLabel: 'p · 9%' }), S)).not.toContain('data-card-actions');
   });
   it('escapes HTML in headline/sourceLabel (no injection)', () => {
     const h = renderProgressiveCardHtml(vm({ state: 'S1a', headline: '<img src=x onerror=1>', sourceLabel: 'a&b' }), S);
