@@ -561,6 +561,13 @@ const eFilterByCode = (errorsNs?.filterByCode as string) ?? 'Filter by code';
     ['errors-fn', 'errors-code', 'errors-from', 'errors-to', 'errors-actor'].forEach(id => {
       document.getElementById(id)?.addEventListener('change', () => { void refresh(); });
     });
+    // The filter controls live in a <form> only for layout/semantics —
+    // it must never submit (a native submit reloads/clears the runtime
+    // <option>s populated by populateDistincts(), resetting Function/Code
+    // to "— any —"). Belt-and-braces alongside the per-button type=button.
+    document.getElementById('errors-filters')?.addEventListener('submit', (ev) => {
+      ev.preventDefault();
+    });
     document.getElementById('errors-clear')?.addEventListener('click', (ev) => {
       // reset is the form's job; we just refresh after it.
       setTimeout(() => { void refresh(); }, 0);
@@ -568,7 +575,16 @@ const eFilterByCode = (errorsNs?.filterByCode as string) ?? 'Filter by code';
     document.getElementById('errors-auto-refresh')?.addEventListener('change', (ev) => {
       setAutoRefresh((ev.target as HTMLInputElement).checked);
     });
-    document.getElementById('errors-bulk-ack')?.addEventListener('click', () => {
+    document.getElementById('errors-bulk-ack')?.addEventListener('click', (ev) => {
+      // Hard-stop any chance of a native form submit/reset eating the
+      // click (the #1133 symptom: no slide-over + filters reset to
+      // "— any —"). preventDefault + stopPropagation keep the form
+      // controls exactly as the operator set them.
+      ev.preventDefault();
+      ev.stopPropagation();
+      // Persist current filters to the URL up-front so nothing that
+      // happens during the bulk flow can lose the operator's scope.
+      persistFilters();
       const f = readFilters();
       const summary = document.getElementById('error-ack-bulk-summary');
       const notesEl = document.getElementById('error-ack-bulk-notes') as HTMLTextAreaElement | null;
@@ -578,6 +594,10 @@ const eFilterByCode = (errorsNs?.filterByCode as string) ?? 'Filter by code';
       if (f.code) pieces.push(`code=${f.code}`);
       if (f.from) pieces.push(`from=${f.from}`);
       if (f.to) pieces.push(`to=${f.to}`);
+      // actor is intentionally omitted — ErrorAcknowledgeBulkFilters has no
+      // actorId; the bulk call is NOT actor-scoped, so showing actor here
+      // would misrepresent the real server-side scope.
+      pieces.push(`state=${stateUnackOnly ? 'unack' : 'all'}`);
       if (summary) summary.textContent = pieces.length ? `Filters: ${pieces.join(' · ')}` : 'No filters set — will scope to ALL unacknowledged rows.';
       document.dispatchEvent(new CustomEvent('console:slideover-open', {
         detail: {
@@ -628,6 +648,10 @@ const eFilterByCode = (errorsNs?.filterByCode as string) ?? 'Filter by code';
         const count = res.result?.count ?? 0;
         const capHit = res.result?.capHit ?? false;
         await refresh();
+        // Self-heal the filter form from the persisted URL state so the
+        // operator's scope (Function/Code/Actor/dates/state) survives the
+        // bulk action verbatim — #1133 regression guard.
+        restoreFilters();
         const msg = bulkDoneTmpl.replace('{count}', String(count)) + (capHit ? ' ' + bulkCapHit : '');
         showToast(msg, true);
         document.dispatchEvent(new CustomEvent('console:slideover-done', { detail: { id: detail.id, ok: true } }));
