@@ -426,6 +426,8 @@ import { SYNC_EVENTS, type SyncRowDetail } from '../lib/sync-events';
 import { getObservationDefaults, setObservationDefaults } from '../lib/observation-defaults';
 import { selfHealChunk } from '../lib/chunk-reload';
 import { resolveRunnerSet, type RunnerAvailability } from '../lib/observe-runner-set';
+import { attemptsToCardVmInput } from '../lib/observe-card-vm-input';
+import { buildCardViewModel } from '../lib/observe-card-vm';
 
 // ── State ──────────────────────────────────────────────────────────────────
 const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
@@ -435,6 +437,7 @@ let pipelineState: PipelineState | null = null;
 let location: { lat: number; lng: number; accuracyM: number; altitudeM: number | null } | null = null;
 let bestResult: { scientific_name: string; common_name_en: string | null; confidence: number; source: string } | null = null;
 let identifyErrorReason: string | null = null;
+let cardAttempts: import('../lib/identify-cascade-client').IdentifyAttempt[] = [];
 
 // ── Taxon hint chips (#ux-quick-taxon-chips) ──────────────────────────────
 import type { TaxonHint } from '../lib/identify-cascade-client';
@@ -951,6 +954,7 @@ async function runPipeline(state: PipelineState) {
         } else {
           const abort = new AbortController();
           const out = await runParallelIdentify(pf.file as File, { runners, taxonHint: selectedTaxonHint }, abort.signal);
+          cardAttempts = cardAttempts.concat(out.attempts ?? []);
           if (out.kind === 'winner' || out.kind === 'uncertain') {
             const r = out.result;
             setNodeState(state, node.id, 'done', {
@@ -1155,6 +1159,22 @@ function startGPS() {
 function showPostForm() {
   // Hide the escape hatch once we get to the post-form.
   pipelineEscape?.classList.add('hidden');
+  // #1122 — additive: expose the progressive-card view model. No DOM
+  // change yet (consumers wire in #1123). Never blocks the form.
+  try {
+    const hasOnDeviceModel = cardAttempts.some(
+      (a) => !['plantnet', 'claude_haiku', 'claude_sonnet'].includes(a.source),
+    );
+    const cardVm = buildCardViewModel(
+      attemptsToCardVmInput(cardAttempts, {
+        observerAffirmed: false,
+        online: navigator.onLine,
+        hasOnDeviceModel,
+        now: new Date().toISOString(),
+      }),
+    );
+    document.dispatchEvent(new CustomEvent('rastrum:card-vm', { detail: cardVm }));
+  } catch { /* VM seam is additive — never block the form */ }
   postForm?.classList.remove('hidden');
   // id card is always shown so user can always enter/edit species
   if (bestResult) {
@@ -1400,6 +1420,7 @@ document.getElementById('obs2-new-btn')?.addEventListener('click', () => {
   location = null;
   bestResult = null;
   identifyErrorReason = null;
+  cardAttempts = [];
   pipelineState = null;
   // Reset taxon hint chip selection
   selectedTaxonHint = null;
