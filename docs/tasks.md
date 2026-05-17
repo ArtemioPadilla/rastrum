@@ -61,7 +61,7 @@ Remaining:
 
 ## v1.0.x — Post-launch polish — in_progress
 
-**9 of 25 items done.** (Latest done: `posthog-analytics` 2026-05-08 — reverse-proxy snippet + 14 capture sites + exception autocapture + identify/reset on auth + drift CI guards + runbook. See `docs/runbooks/posthog.md`.)
+**10 of 27 items done.** (Latest done: `observe-ai-progressive-card` 2026-05-17 — epic #1129, PRs #1142–#1146: one progressive result card S0–S3/S2′ replacing result+manual+why, observer-sovereignty resolver, ver-traza audit panel, `review_requested` kingdom-routed queue, consensus hardening R1–R3, downloads-by-capability chooser. See `docs/runbooks/observe-progressive-card.md`.)
 
 Remaining:
 
@@ -81,6 +81,7 @@ Remaining:
 - `smoke-test-nightly` — Nightly cron-fired Playwright smoke test against production rastrum.org  _(✓ done — PR #1041, 2026-05-12)_
 - `license-per-record-ui` — UI for per-observation license selection (CC-BY default; CC0, CC-BY-NC, all-rights-reserved options)  _(· planned)_
 - `docs-toc-mobile` — Sticky scrollspy TOC pill row on mobile doc pages (auto-extracts h2s, IntersectionObserver active state)  _(! blocked: Open PR #23 — pending rebase + aria-current fix; reviewed and approved-with-comments)_
+- `observe-ai-progressive-card` — Epic #1129: progressive result card (S0–S3/S2′) replacing result+manual+why; observer-sovereignty resolver; ver-traza audit panel; `review_requested` flag + kingdom-routed queue; consensus hardening R1–R3 (machine source preserved, confidence capped end-to-end, source-trust queue ordering); downloads-by-capability chooser (power panel → Advanced)  _(✓ done — PRs #1142–#1146, 2026-05-17; runbook `docs/runbooks/observe-progressive-card.md`)_
 
 ## v1.1 — UX polish (post-launch brainstorm) — shipped (mostly)
 

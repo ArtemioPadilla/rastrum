@@ -3,8 +3,10 @@
 > Briefing for AI coding agents (Claude Code, Copilot, Cursor, Codex, …)
 > working in this repo. Read this before making changes.
 >
-> **Last full doc sync:** 2026-05-08 (v1.1.5 Persuasive Tech Audit + schema
-> security invariants — see "Schema security invariants" section below).
+> **Last full doc sync:** 2026-05-17 (epic #1129 Observe AI progressive
+> card — PRs #1142–#1146; see "Observe AI progressive card" section below).
+> Prior sync: 2026-05-08 (v1.1.5 Persuasive Tech Audit + schema security
+> invariants — see "Schema security invariants" section below).
 > Prior sync: 2026-05-01 (v1.2 + 42 field-bug/admin/docs PRs).
 
 ---
@@ -625,6 +627,55 @@ to existing surfaces. Two patterns are now load-bearing across the codebase:
 Full per-PR context: `docs/progress.json` v1.1.5 phase + the per-PR
 runbooks (`docs/runbooks/falta-dex.md`, `docs/runbooks/contextual-suggestions.md`,
 `docs/runbooks/themes.md` once #769 lands).
+
+### Observe AI progressive card (epic #1129)
+
+`#obs2-card-v2` in `ObserveView2.astro` is the **only** identification
+surface — the legacy `#obs2-id-result` block and the `cardV2Enabled`
+flag are gone (C-4). One card morphs through six states (S0/S1a/S1b/
+S2/S2′/S3); the observer's explicit affirmation is sovereign over a
+later cloud upgrade. Five load-bearing rules:
+
+1. **Pure logic stays pure + TDD'd.** `observe-card-{state,sovereignty,
+   audit-trace,vm,vm-input,render,actions}.ts` are DOM-free. Add a card
+   state ⇒ extend `observe-card-actions.ts` (the pure selector), never
+   hand-roll buttons in the renderer. `data-card-state` /
+   `data-card-action` / `data-card-trace[-panel]` are the wiring
+   contract the `<script>` binds to.
+2. **R1–R3 are the consensus firewall — don't regress them.** R1: a
+   machine result is NEVER written `source='human'` (`identification-
+   source.ts`). R2: `capConfidence(source, c)` from the single-source
+   `confidence-ceiling.ts` is applied at **both** `upsert_primary_
+   identification` sites in `sync.ts` (capped sources stay below the
+   ≥0.4 RG floor). R3: the validate/expert queue orders by
+   `source-trust.ts` (human < cloud < capped on-device).
+   `recompute_consensus` + the RG floor are byte-frozen by
+   `tests/unit/consensus-untouched.test.ts`.
+3. **`validation_queue` columns are append-only.** `review_requested`,
+   `current_kingdom`, `current_source` were appended last (CREATE OR
+   REPLACE VIEW rule); the `sync_status`/`obscure_level`/RG gates are
+   unchanged. Queue routing is pure visibility — it must not touch
+   consensus.
+4. **Downloads default to the curated chooser.** `DownloadChooser.astro`
+   (built from pure `download-capabilities.ts`) is the default; the raw
+   9-identifier registry is behind the collapsed `#ai-advanced`
+   `<details>`. "Download selected" clicks the **existing**
+   `#${prefix}-download` controls — `prefixByTarget` must stay in sync
+   with `ON_DEVICE_DL_PREFIX` (`identifier-card-html.ts`), enforced by
+   `tests/unit/download-chooser-prefix-sync.test.ts`. An e2e spec that
+   asserts registry visibility must open `#ai-advanced` first.
+5. **`ObserveView2`'s client `<script>` is e2e-gated.** `tsc`/`vitest`/
+   `build` don't run the page in a browser (the `tr is not defined`
+   class). `tests/e2e/observe-card.spec.ts` drives the card seam
+   deterministically; the CI `test` job (Playwright) is the real gate.
+   `bash scripts/e2e-for-changed.sh` maps a diff → the specs that cover
+   it; local `/profile/*` e2e needs `.env.local` copied into the
+   worktree + a rebuild or it false-fails on `supabaseUrl is required`.
+
+i18n namespaces: `observe.card.*` / `observe.trace.*` /
+`observe.downloads.*` / `validation.*` (EN/ES parity per namespace).
+Full context: `docs/runbooks/observe-progressive-card.md` + the spec
+`docs/superpowers/specs/2026-05-16-observe-ai-progressive-card-design.md`.
 
 ---
 
