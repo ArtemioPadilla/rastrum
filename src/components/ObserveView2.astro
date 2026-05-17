@@ -432,6 +432,7 @@ import { attemptsToCardVmInput } from '../lib/observe-card-vm-input';
 import { buildCardViewModel } from '../lib/observe-card-vm';
 import { renderProgressiveCardHtml, type CardStrings } from '../lib/observe-card-render';
 import { t } from '../i18n/utils';
+import { resolveIdentificationSource } from '../lib/identification-source';
 
 // ── State ──────────────────────────────────────────────────────────────────
 const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
@@ -1334,7 +1335,7 @@ postForm?.addEventListener('submit', async (e) => {
       identification: identifiedSpecies ? {
         scientificName: identifiedSpecies,
         confidence: bestResult?.confidence ?? 0,
-        source: (bestResult?.source ?? 'human') as never,
+        source: resolveIdentificationSource({ machineSource: bestResult?.source, hasMachineResult: !!bestResult }) as never,
         status: 'accepted',
       } : undefined,
       habitat: habitatVal as never,

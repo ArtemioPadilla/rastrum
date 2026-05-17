@@ -16,6 +16,7 @@ import {
   SYNC_EVENTS, emit, setLastSyncAt, announcePendingCount,
   type SyncDoneDetail, type SyncProgressDetail, type SyncRowDetail,
 } from './sync-events';
+import { resolveIdentificationSource } from './identification-source';
 
 export interface SyncResult {
   synced: number;
@@ -280,7 +281,7 @@ async function syncOne(record: ObservationRecord): Promise<void> {
         p_scientific_name: clientId.scientificName,
         p_taxon_id: taxonId,
         p_confidence: Math.max(0, Math.min(1, clientId.confidence ?? 0)),
-        p_source: clientId.source ?? 'human',
+        p_source: resolveIdentificationSource({ machineSource: clientId.source, hasMachineResult: !!clientId.source && clientId.source !== 'human' }),
         p_raw_response: {
           common_name_en: clientId.commonNameEn,
           common_name_es: clientId.commonNameEs,
