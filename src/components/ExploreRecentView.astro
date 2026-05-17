@@ -408,7 +408,9 @@ const distancePage = page as unknown as Record<string, string>;
               ? `<div class="w-full h-full media-player-mount" data-media-url="${escapeText(firstAudioUrl)}" data-media-kind="audio"></div>`
               : hasVideoOnly
                 ? `<div class="w-full h-full media-player-mount" data-media-url="${escapeText(firstVideoUrl)}" data-media-kind="video"></div>`
-                : ''}
+                : audioMedia.length > 0
+                  ? `<div class="w-full h-full flex items-center justify-center text-zinc-400 dark:text-zinc-500" role="img" aria-label="Audio observation"><svg class="w-12 h-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></div>`
+                  : `<div class="w-full h-full flex items-center justify-center text-zinc-400 dark:text-zinc-500" role="img" aria-label="No photo"><svg class="w-12 h-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22c4.97 0 9-4.03 9-9 0-3.5-2-6.5-5-8 .5 3-1.5 4.5-3.5 6S9 14 9.5 17C7.5 16 6 13.5 6 11c0 0-2 2-2 5 0 3.31 3.58 6 8 6z"/></svg></div>`}
           ${mediaBadgeHtml}
         </div>
         <div class="p-3 space-y-1">
@@ -652,8 +654,8 @@ const distancePage = page as unknown as Record<string, string>;
       const thumb = photo
         ? `<div class="relative w-14 h-14 shrink-0 overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-800"><img src="${escapeText(photo)}" alt="${escapeText(sciText)}" loading="lazy" class="w-full h-full object-cover" />${mediaBadge}</div>`
         : hasAudioOnly
-          ? `<div class="relative w-14 h-14 rounded-lg shrink-0 bg-zinc-800 flex items-center justify-center"><svg class="w-5 h-5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg></div>`
-          : `<div class="w-14 h-14 rounded-lg shrink-0 bg-zinc-100 dark:bg-zinc-800"></div>`;
+          ? `<div class="relative w-14 h-14 rounded-lg shrink-0 bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center" role="img" aria-label="Audio observation"><svg class="w-5 h-5 text-zinc-400 dark:text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg></div>`
+          : `<div class="w-14 h-14 rounded-lg shrink-0 bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-400 dark:text-zinc-500" role="img" aria-label="No photo"><svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22c4.97 0 9-4.03 9-9 0-3.5-2-6.5-5-8 .5 3-1.5 4.5-3.5 6S9 14 9.5 17C7.5 16 6 13.5 6 11c0 0-2 2-2 5 0 3.31 3.58 6 8 6z"/></svg></div>`;
       return `<a href="${shareBase}?id=${encodeURIComponent(r.id)}" class="flex items-center gap-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 hover:border-emerald-400 dark:hover:border-emerald-700 transition-colors px-3 py-2">
         ${thumb}
         <div class="min-w-0 flex-1">
