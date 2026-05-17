@@ -1,5 +1,6 @@
 ---
 import { t, routes } from '../i18n/utils';
+import DownloadChooser from "./DownloadChooser.astro";
 
 interface Props {
   lang: 'en' | 'es';
@@ -279,12 +280,19 @@ const speciesnetHosted = Boolean(import.meta.env.PUBLIC_SPECIESNET_WEIGHTS_URL);
       <span id="pipeline-flow-items" class="italic">{lang === 'es' ? 'Cargando…' : 'Loading…'}</span>
     </div>
 
+    <DownloadChooser lang={lang} />
+
     <!-- Registry: lists every Identifier plugin with enable/disable toggles -->
+    <details id="ai-advanced" class="mb-6 group">
+      <summary class="cursor-pointer text-sm font-semibold text-zinc-700 dark:text-zinc-300 select-none">{isEs ? 'Identificación · Avanzado' : 'Identification · Advanced'}</summary>
+      <div class="mt-3">
     <div class="mb-6">
       <ul id="identifier-list" class="space-y-2">
         <li class="text-sm text-zinc-500 italic">{lang === 'es' ? 'Cargando…' : 'Loading…'}</li>
       </ul>
     </div>
+      </div>
+    </details>
 
     <!-- Cross-link to sponsorships surface (issue #656) -->
     <aside class="mb-6 border-l-2 border-emerald-300 dark:border-emerald-700/60 pl-3 py-1 text-xs text-zinc-600 dark:text-zinc-400">

@@ -1,0 +1,279 @@
+---
+import { t } from '../i18n/utils';
+import { CAPABILITY_CATALOG } from '../lib/download-capabilities';
+
+interface Props {
+  lang: 'en' | 'es';
+}
+const { lang } = Astro.props;
+const tr = t(lang);
+const dl = tr.observe.downloads;
+const isEs = lang === 'es';
+
+const catalogJson = JSON.stringify(CAPABILITY_CATALOG);
+const i18nJson = JSON.stringify(dl);
+---
+
+<section
+  id="download-chooser"
+  data-lang={lang}
+  class="mb-6 rounded-xl border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/40 dark:bg-emerald-900/10 p-4"
+>
+  <h3 class="text-sm font-semibold text-emerald-800 dark:text-emerald-300">{dl.heading}</h3>
+  <p class="mt-1 text-xs text-zinc-600 dark:text-zinc-400">{dl.hint}</p>
+
+  <ul id="dc-items" class="mt-3 space-y-2">
+    <li class="text-xs text-zinc-500 italic">{isEs ? 'Cargando…' : 'Loading…'}</li>
+  </ul>
+
+  <details id="dc-advanced" class="mt-3 hidden group">
+    <summary class="cursor-pointer text-xs font-semibold text-zinc-700 dark:text-zinc-300 select-none">
+      {dl.advanced_group}
+    </summary>
+    <p class="mt-2 text-[11px] text-amber-700 dark:text-amber-400">{dl.advanced_note}</p>
+    <ul id="dc-advanced-items" class="mt-2 space-y-2"></ul>
+  </details>
+
+  <div class="mt-4 flex items-center justify-between gap-3 flex-wrap">
+    <p class="text-xs text-zinc-600 dark:text-zinc-400">
+      <span class="font-semibold">{dl.total_label}:</span>
+      <span id="dc-total" class="font-mono">0 MB</span>
+    </p>
+    <button
+      type="button"
+      id="dc-download"
+      class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-sm font-semibold text-white"
+    ></button>
+  </div>
+  <p id="dc-started" class="mt-2 hidden text-[11px] text-emerald-700 dark:text-emerald-400"></p>
+
+  <script type="application/json" id="dc-catalog" set:html={catalogJson}></script>
+  <script type="application/json" id="dc-i18n" set:html={i18nJson}></script>
+</section>
+
+<script>
+  (() => {
+    const root = document.getElementById('download-chooser');
+    if (!root) return;
+
+    type Item = {
+      id: string;
+      target: string;
+      labelEn: string;
+      labelEs: string;
+      capabilityEn: string;
+      capabilityEs: string;
+      sizeMb: number;
+      defaultChecked: boolean;
+      advanced: boolean;
+    };
+
+    const isEs = root.getAttribute('data-lang') === 'es';
+    const STORAGE_KEY = 'rastrum.downloads.selected';
+    const LARGE_ITEM_MB = 100;
+
+    function readJson<T>(id: string, fallback: T): T {
+      try {
+        const el = document.getElementById(id);
+        return el && el.textContent ? (JSON.parse(el.textContent) as T) : fallback;
+      } catch {
+        return fallback;
+      }
+    }
+
+    const catalog = readJson<Item[]>('dc-catalog', []);
+    const i18n = readJson<Record<string, string>>('dc-i18n', {});
+
+    function formatSize(mb: number): string {
+      return mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${Math.round(mb)} MB`;
+    }
+
+    function loadSelection(): string[] | null {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed.filter((x) => typeof x === 'string') : null;
+      } catch {
+        return null;
+      }
+    }
+
+    function saveSelection(ids: string[]): void {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(ids));
+      } catch {
+        /* storage unavailable — selection is in-memory only */
+      }
+    }
+
+    function selectedIds(): string[] {
+      return Array.from(
+        root!.querySelectorAll<HTMLInputElement>('input[data-dc-item]:checked')
+      ).map((c) => c.getAttribute('data-dc-item') || '');
+    }
+
+    function refreshTotal(): void {
+      const sel = new Set(selectedIds());
+      const total = catalog.reduce(
+        (sum, c) => (sel.has(c.id) ? sum + c.sizeMb : sum),
+        0
+      );
+      const totalEl = document.getElementById('dc-total');
+      if (totalEl) totalEl.textContent = formatSize(total);
+      const btn = document.getElementById('dc-download');
+      if (btn) {
+        const tmpl = i18n.download_selected || 'Download selected ({total})';
+        btn.textContent = tmpl.replace('{total}', formatSize(total));
+        (btn as HTMLButtonElement).disabled = sel.size === 0;
+        btn.classList.toggle('opacity-50', sel.size === 0);
+      }
+    }
+
+    function itemRow(c: Item, checked: boolean): HTMLLIElement {
+      const li = document.createElement('li');
+      li.className =
+        'rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3';
+      const label = isEs ? c.labelEs : c.labelEn;
+      const cap = isEs ? c.capabilityEs : c.capabilityEn;
+      const warn =
+        c.sizeMb >= LARGE_ITEM_MB
+          ? `<span class="ml-2 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 px-2 py-0.5 text-[10px] font-medium">${i18n.data_warning || ''}</span>`
+          : '';
+      li.innerHTML = `
+        <label class="flex items-start gap-3 cursor-pointer">
+          <input type="checkbox" data-dc-item="${c.id}" class="mt-1 h-4 w-4 accent-emerald-700" ${checked ? 'checked' : ''} />
+          <span class="min-w-0 flex-1">
+            <span class="flex items-center flex-wrap gap-x-2">
+              <span class="text-sm font-medium text-zinc-900 dark:text-zinc-100">${label}</span>
+              <span class="text-[11px] font-mono text-zinc-500 dark:text-zinc-400">${formatSize(c.sizeMb)}</span>
+              ${warn}
+            </span>
+            <span class="block text-xs text-zinc-600 dark:text-zinc-400 mt-0.5">${cap}</span>
+          </span>
+        </label>`;
+      const input = li.querySelector<HTMLInputElement>('input[data-dc-item]');
+      if (input) {
+        input.addEventListener('change', () => {
+          saveSelection(selectedIds());
+          refreshTotal();
+        });
+      }
+      return li;
+    }
+
+    function findDownloadControl(item: Item): HTMLElement | null {
+      const list = document.getElementById('identifier-list');
+      if (!list) return null;
+      const prefixByTarget: Record<string, string> = {
+        webllm_phi35_vision: 'vision',
+        onnx_gemma4_vision: 'gemma-vision',
+        birdnet_lite: 'birdnet',
+        onnx_efficientnet_lite0: 'onnx-base',
+        camera_trap_megadetector: 'megadetector',
+        speciesnet_distilled: 'speciesnet',
+        'offline-map': 'pmtiles',
+      };
+      const prefix = prefixByTarget[item.target];
+      if (!prefix) return null;
+      return list.querySelector<HTMLElement>(`#${prefix}-download`);
+    }
+
+    function startDownloads(): void {
+      const sel = selectedIds();
+      if (!sel.length) return;
+      const advanced = document.getElementById('ai-advanced') as HTMLDetailsElement | null;
+      if (advanced) {
+        advanced.open = true;
+        try {
+          advanced.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } catch {
+          /* scroll unsupported — non-fatal */
+        }
+      }
+      const byId = new Map(catalog.map((c) => [c.id, c]));
+      // Defer the clicks so the registry list has a tick to (re)paint.
+      window.setTimeout(() => {
+        for (const id of sel) {
+          const item = byId.get(id);
+          if (!item) continue;
+          try {
+            const ctrl = findDownloadControl(item);
+            if (ctrl) ctrl.click();
+          } catch {
+            /* capability-graph degrade — skip this item silently */
+          }
+        }
+      }, 120);
+      const started = document.getElementById('dc-started');
+      if (started) {
+        started.textContent = i18n.started || '';
+        started.classList.remove('hidden');
+      }
+    }
+
+    async function init(): Promise<void> {
+      const normalList = document.getElementById('dc-items');
+      const advList = document.getElementById('dc-advanced-items');
+      const advWrap = document.getElementById('dc-advanced');
+      if (!normalList) return;
+
+      let availableTargets = new Set<string>();
+      try {
+        const [{ bootstrapIdentifiers }] = await Promise.all([
+          import('../lib/identifiers'),
+        ]);
+        const reg = bootstrapIdentifiers();
+        const plugins = reg.list();
+        const checks = await Promise.all(
+          plugins.map(async (p) => {
+            try {
+              const av = await p.isAvailable();
+              return [p.id, av && av.reason !== 'model_not_bundled'] as const;
+            } catch {
+              return [p.id, false] as const;
+            }
+          })
+        );
+        availableTargets = new Set(
+          checks.filter(([, ok]) => ok).map(([id]) => id)
+        );
+      } catch {
+        availableTargets = new Set();
+      }
+
+      const visible = catalog.filter(
+        (c) => c.target === 'offline-map' || availableTargets.has(c.target)
+      );
+
+      const persisted = loadSelection();
+      const isChecked = (c: Item): boolean =>
+        persisted ? persisted.includes(c.id) : c.defaultChecked;
+
+      normalList.innerHTML = '';
+      const advItems: Item[] = [];
+      for (const c of visible) {
+        if (c.advanced) {
+          advItems.push(c);
+          continue;
+        }
+        normalList.appendChild(itemRow(c, isChecked(c)));
+      }
+
+      if (advItems.length && advList && advWrap) {
+        advWrap.classList.remove('hidden');
+        advList.innerHTML = '';
+        for (const c of advItems) advList.appendChild(itemRow(c, isChecked(c)));
+      }
+
+      const btn = document.getElementById('dc-download');
+      if (btn) btn.addEventListener('click', () => startDownloads());
+
+      refreshTotal();
+    }
+
+    init().catch(() => {
+      /* never throw from the chooser — page must not console-error */
+    });
+  })();
+</script>
