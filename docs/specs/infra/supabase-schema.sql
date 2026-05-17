@@ -307,6 +307,17 @@ ALTER TABLE public.observations ADD COLUMN IF NOT EXISTS content_sensitive boole
 -- Idempotent column add for existing databases (v1.0.x)
 ALTER TABLE public.observations ADD COLUMN IF NOT EXISTS license text CHECK (license IN ('CC BY 4.0','CC BY-NC 4.0','CC0'));
 
+-- #1126 — observer-set "please have the community review this ID" flag.
+-- Distinct from the system-set identifications.needs_review: this is an
+-- explicit observer intent (the card's "I don't know — ask for review"
+-- action). Pure routing/visibility — it does NOT participate in
+-- recompute_consensus nor the research-grade floor. Owner write is
+-- covered by the existing "obs_owner" FOR ALL policy; reads by the
+-- existing obs_public_read / obs_credentialed_read policies.
+ALTER TABLE public.observations ADD COLUMN IF NOT EXISTS review_requested boolean NOT NULL DEFAULT false;
+CREATE INDEX IF NOT EXISTS idx_obs_review_requested
+  ON public.observations(review_requested) WHERE review_requested = true;
+
 -- ============================================================
 -- IDENTIFICATIONS
 -- ============================================================
