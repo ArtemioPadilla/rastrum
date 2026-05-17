@@ -20,6 +20,23 @@ import type { Identifier } from './identifiers/types';
 import type { ModelCacheStatus } from './local-ai';
 import type { CardState } from './identifier-state';
 
+/**
+ * Registry plugin id → DOM id prefix for its download/delete/status/
+ * progress controls. The single source of truth for the
+ * `${prefix}-download` contract. `DownloadChooser`'s `prefixByTarget`
+ * map drives the curated chooser's clicks against these ids; the
+ * `tests/unit/download-chooser-prefix-sync.test.ts` guard fails the
+ * build if the two ever drift (a silent no-op otherwise — #1127).
+ */
+export const ON_DEVICE_DL_PREFIX: Readonly<Record<string, string>> = {
+  webllm_phi35_vision: 'vision',
+  onnx_gemma4_vision: 'gemma-vision',
+  birdnet_lite: 'birdnet',
+  onnx_efficientnet_lite0: 'onnx-base',
+  camera_trap_megadetector: 'megadetector',
+  speciesnet_distilled: 'speciesnet',
+};
+
 export interface ActiveSponsorship {
   sponsor_handle: string;
   daily_limit: number | null;
@@ -122,15 +139,7 @@ function pillFor(state: CardState, t: Strings): string {
 
 function actionsFor(p: PluginCardProps, t: Strings): string {
   const id = escape(p.plugin.id);
-  const onDeviceIds: Record<string, string> = {
-    webllm_phi35_vision: 'vision',
-    onnx_gemma4_vision: 'gemma-vision',
-    birdnet_lite: 'birdnet',
-    onnx_efficientnet_lite0: 'onnx-base',
-    camera_trap_megadetector: 'megadetector',
-    speciesnet_distilled: 'speciesnet',
-  };
-  const dlPrefix = onDeviceIds[p.plugin.id];
+  const dlPrefix = ON_DEVICE_DL_PREFIX[p.plugin.id];
 
   const primaryBtn = (label: string, dataAttr: string, value: string) =>
     `<button type="button" ${escape(dataAttr)}="${escape(value)}" class="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 text-xs font-semibold text-white">${label}</button>`;
