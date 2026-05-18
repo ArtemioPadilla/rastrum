@@ -5,9 +5,11 @@ import { t } from '../../../i18n/utils';
 
 const lang = 'es';
 const tr = t(lang);
-const sp = (tr as unknown as { sponsoring: { donate_title: string; donate_subtitle: string } }).sponsoring;
+const sp = (tr as unknown as { sponsoring: { donate_title?: string; donate_subtitle?: string } }).sponsoring;
+const pageTitle = sp.donate_title ?? 'Donar a un fondo de la plataforma';
+const pageDesc = sp.donate_subtitle ?? 'Patrocina identificaciones con IA para toda la comunidad.';
 ---
 
-<BaseLayout title={`${sp.donate_title} — Rastrum`} description={sp.donate_subtitle} lang={lang}>
+<BaseLayout title={`${pageTitle} — Rastrum`} description={pageDesc} lang={lang}>
   <PoolDonateView lang={lang} />
 </BaseLayout>
