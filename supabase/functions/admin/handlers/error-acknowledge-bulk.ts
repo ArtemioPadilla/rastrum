@@ -6,6 +6,7 @@ const FiltersSchema = z.object({
   code: z.string().max(120).optional(),
   from: z.string().datetime().optional(),
   to: z.string().datetime().optional(),
+  actorId: z.string().uuid().optional(),
 });
 
 const Payload = z.object({
@@ -46,6 +47,9 @@ export const errorAcknowledgeBulkHandler: ActionHandler<Payload> = {
     if (filters.to) {
       candidateQuery = candidateQuery.lte('created_at', filters.to);
     }
+    if (filters.actorId) {
+      candidateQuery = candidateQuery.eq('actor_id', filters.actorId);
+    }
 
     const { data: candidates, error: selectErr } = await candidateQuery;
     if (selectErr) throw new Error(`error.acknowledge_bulk select: ${selectErr.message}`);
@@ -60,7 +64,7 @@ export const errorAcknowledgeBulkHandler: ActionHandler<Payload> = {
       };
     }
 
-    const { error: updateErr, count } = await admin
+    let updateQuery = admin
       .from('function_errors')
       .update({
         acknowledged_at: acknowledgedAt,
@@ -69,6 +73,11 @@ export const errorAcknowledgeBulkHandler: ActionHandler<Payload> = {
       }, { count: 'exact' })
       .in('id', ids)
       .is('acknowledged_at', null);
+    if (filters.actorId) {
+      updateQuery = updateQuery.eq('actor_id', filters.actorId);
+    }
+
+    const { error: updateErr, count } = await updateQuery;
 
     if (updateErr) throw new Error(`error.acknowledge_bulk update: ${updateErr.message}`);
 

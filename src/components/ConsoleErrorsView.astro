@@ -575,7 +575,7 @@ const eFilterByCode = (errorsNs?.filterByCode as string) ?? 'Filter by code';
     document.getElementById('errors-auto-refresh')?.addEventListener('change', (ev) => {
       setAutoRefresh((ev.target as HTMLInputElement).checked);
     });
-    document.getElementById('errors-bulk-ack')?.addEventListener('click', (ev) => {
+    document.getElementById('errors-bulk-ack')?.addEventListener('click', async (ev) => {
       // Hard-stop any chance of a native form submit/reset eating the
       // click (the #1133 symptom: no slide-over + filters reset to
       // "— any —"). preventDefault + stopPropagation keep the form
@@ -589,14 +589,23 @@ const eFilterByCode = (errorsNs?.filterByCode as string) ?? 'Filter by code';
       const summary = document.getElementById('error-ack-bulk-summary');
       const notesEl = document.getElementById('error-ack-bulk-notes') as HTMLTextAreaElement | null;
       if (notesEl) notesEl.value = '';
+      // Resolve the free-text actor input (uuid OR username) to the
+      // function_errors.actor_id uuid exactly as the table query does
+      // (loadRows → resolveActorId). Both the summary and the payload
+      // use this resolved id so the slide-over scope matches what the
+      // server-side bulk handler will actually narrow by.
+      const actorId = f.actor ? await resolveActorId(f.actor) : undefined;
       const pieces: string[] = [];
       if (f.fn) pieces.push(`fn=${f.fn}`);
       if (f.code) pieces.push(`code=${f.code}`);
       if (f.from) pieces.push(`from=${f.from}`);
       if (f.to) pieces.push(`to=${f.to}`);
-      // actor is intentionally omitted — ErrorAcknowledgeBulkFilters has no
-      // actorId; the bulk call is NOT actor-scoped, so showing actor here
-      // would misrepresent the real server-side scope.
+      // actor is now forwarded to ErrorAcknowledgeBulkFilters.actorId and
+      // scoped server-side (handler .eq('actor_id', …)), so showing it
+      // here accurately reflects the real bulk scope (#1137). When the
+      // free-text input can't be resolved to a uuid the payload carries
+      // no actor scope, so we say so rather than misrepresent it.
+      if (f.actor) pieces.push(actorId ? `actor=${actorId}` : `actor=${f.actor} (unresolved — NOT scoped)`);
       pieces.push(`state=${stateUnackOnly ? 'unack' : 'all'}`);
       if (summary) summary.textContent = pieces.length ? `Filters: ${pieces.join(' · ')}` : 'No filters set — will scope to ALL unacknowledged rows.';
       document.dispatchEvent(new CustomEvent('console:slideover-open', {
@@ -604,7 +613,7 @@ const eFilterByCode = (errorsNs?.filterByCode as string) ?? 'Filter by code';
           id: 'console-slideover-error-ack-bulk',
           title: 'Acknowledge all matching errors',
           action: 'error.acknowledge_bulk',
-          payload: { filters: { functionName: f.fn, code: f.code, from: f.from, to: f.to } },
+          payload: { filters: { functionName: f.fn, code: f.code, from: f.from, to: f.to, actorId } },
         },
       }));
     });

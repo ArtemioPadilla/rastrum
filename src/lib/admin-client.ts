@@ -107,6 +107,7 @@ export interface ErrorAcknowledgeBulkFilters {
   code?: string;
   from?: string;
   to?: string;
+  actorId?: string;
 }
 interface ErrorAcknowledgeBulkPayload {
   filters: ErrorAcknowledgeBulkFilters;
