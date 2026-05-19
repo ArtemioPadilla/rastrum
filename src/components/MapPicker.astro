@@ -154,7 +154,7 @@ const initialLng  = initialCoords?.lng ?? '';
 
 <script>
   import { MEXICO_DEFAULT_CENTER, isValidLatLng } from '../lib/media-helpers';
-  import { basemapStyleUrl } from '../lib/map-style';
+  import { basemapStyleUrl, installSpriteFallback } from '../lib/map-style';
 
   type Coords = { lat: number; lng: number };
   type MapLibreMap = import('maplibre-gl').Map;
@@ -246,6 +246,7 @@ const initialLng  = initialCoords?.lng ?? '';
           setSelected(state, e.lngLat.lat, e.lngLat.lng);
         });
         state.map.on('load', () => setStatus(state, null));
+        installSpriteFallback(state.map);
 
         state.satToggle?.addEventListener('click', () => {
           if (!state.map) return;
@@ -399,6 +400,7 @@ const initialLng  = initialCoords?.lng ?? '';
         attributionControl: { compact: true },
       });
       const marker = new maplibre.Marker({ color: '#047857' }).setLngLat([lng, lat]).addTo(map);
+      installSpriteFallback(map);
       const id = el.dataset.mappickerId ?? '';
       if (id) viewPickerMaps.set(id, { map, marker });
     } catch {

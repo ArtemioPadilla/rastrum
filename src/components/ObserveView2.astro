@@ -413,7 +413,7 @@ import {
   triageFile, buildGraph, savePipelineState, loadPipelineState,
 } from '../lib/pipeline-engine';
 import { saveObservationToOutbox, resolveObserverRef } from '../lib/observe';
-import { syncOutbox } from '../lib/sync';
+import { syncOutbox, registerSyncTriggers } from '../lib/sync';
 import { SYNC_EVENTS, type SyncRowDetail } from '../lib/sync-events';
 import { getObservationDefaults, setObservationDefaults } from '../lib/observation-defaults';
 import { selfHealChunk } from '../lib/chunk-reload';
@@ -670,6 +670,12 @@ const capCaption  = document.getElementById('obs2-capability-caption');
 const capText     = document.getElementById('obs2-capability-text');
 const setupLink   = document.getElementById('obs2-setup-link');
 const fileHint    = document.getElementById('obs2-file-hint');
+
+// ── Sync triggers ─────────────────────────────────────────────────────────
+// Register online / visibilitychange listeners so the outbox flushes
+// automatically when the network returns — without this, the user had to
+// tap the sync button manually after saving.
+registerSyncTriggers();
 
 // ── Observation defaults memory (#942) ────────────────────────────────────
 // Pre-fill advanced fields (habitat/weather/license) from last saved values.
