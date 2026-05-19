@@ -11,7 +11,7 @@
  * Part of #942 PR3/7 — Observation form redesign.
  */
 
-import { getSupabase, getCachedUser } from './supabase';
+import { getSupabase, getCachedUser, getCachedSession } from './supabase';
 
 export interface ObservationDefaults {
   habitat?: string;
@@ -68,8 +68,12 @@ export async function setObservationDefaults(
   ) return;
 
   try {
-    const user = await getCachedUser();
-    if (!user) return;
+    // Warm the session first so the Supabase client has the JWT loaded before
+    // making the PATCH — avoids 403s on mobile where the client may be freshly
+    // initialized (e.g. Astro page navigation) and hasn't rehydrated from storage.
+    const session = await getCachedSession();
+    if (!session) return;
+    const user = session.user;
 
     // Build a partial object — only persist non-empty values.
     const patch: Record<string, string | null> = {};
