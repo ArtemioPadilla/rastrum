@@ -129,7 +129,7 @@ const stringsJson = JSON.stringify({
 <script>
   import { getCachedUser, getSupabase } from '../lib/supabase';
   import { loadIsoCountries } from '../lib/community';
-  import { basemapStyleUrl } from '../lib/map-style';
+  import { basemapStyleUrl, installSpriteFallback } from '../lib/map-style';
 
   interface Strings {
     lang: 'en' | 'es';
@@ -357,6 +357,7 @@ const stringsJson = JSON.stringify({
           attributionControl: { compact: true },
         });
         map.addControl(new maplibre.NavigationControl({ showCompass: false }), 'top-right');
+        installSpriteFallback(map);
 
         await new Promise<void>((resolve) => {
           map!.on('load', () => resolve());

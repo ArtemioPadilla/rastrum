@@ -310,7 +310,7 @@ async function syncOne(record: ObservationRecord): Promise<void> {
           detail: { observationId: record.id, taxonGroup: null },
         }));
       }
-      triggerEnvEnrichment(record.id).catch(err => console.warn('[rastrum] enrich failed', err));
+      triggerEnvEnrichment(record).catch(err => console.warn('[rastrum] enrich failed', err));
       return;
     }
   }
@@ -330,13 +330,19 @@ async function syncOne(record: ObservationRecord): Promise<void> {
   triggerIdentify(record.id).catch(err => console.warn('[rastrum] identify failed', err));
 
   // 6. Trigger environmental enrichment (lunar / weather). Also fire-and-forget.
-  triggerEnvEnrichment(record.id).catch(err => console.warn('[rastrum] enrich failed', err));
+  //    Skip if the observation has no location — the EF returns 422 in that case.
+  triggerEnvEnrichment(record).catch(err => console.warn('[rastrum] enrich failed', err));
 }
 
-async function triggerEnvEnrichment(observationId: string): Promise<void> {
+async function triggerEnvEnrichment(record: ObservationRecord): Promise<void> {
+  // Guard: skip enrichment when the observation has no GPS coordinates.
+  // The edge function requires a location and returns 422 otherwise.
+  const loc = record.data?.location;
+  if (!loc || !Number.isFinite(loc.lat) || !Number.isFinite(loc.lng)) return;
+
   const supabase = getSupabase();
   await supabase.functions.invoke('enrich-environment', {
-    body: { observation_id: observationId },
+    body: { observation_id: record.id },
   });
 }
 
