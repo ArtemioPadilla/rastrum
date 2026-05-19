@@ -9,6 +9,7 @@ let mockedUser: { id: string } | null;
 
 vi.mock('../../src/lib/supabase', () => ({
   getCachedUser: () => Promise.resolve(mockedUser),
+  getCachedSession: () => Promise.resolve(mockedUser ? { user: mockedUser } : null),
   getSupabase: () => ({
     from: (table: string) => ({
       select: (_cols: string) => ({
