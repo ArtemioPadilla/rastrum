@@ -22,6 +22,7 @@ high-level system view.
 | [`admin-two-person-rule.md`](admin-two-person-rule.md) | `admin_action_proposals` table + `enforce_two_person_irreversible` flag. |
 | [`admin-webhooks.md`](admin-webhooks.md) | Outbound HMAC-SHA256 webhooks + `_meta` envelope replay protection + reconcile cron. |
 | [`role-model.md`](role-model.md) | `has_role()` RLS predicate + admin/moderator/expert hierarchy. |
+| [`admin-chrome-rendering.md`](admin-chrome-rendering.md) | Why every `/console/*` and `/consola/*` page MUST use `ConsoleLayout` (sidebar + role pills + keybindings invariant). |
 
 ## Research workflow (Modules 28-32, v1.2)
 
@@ -35,6 +36,9 @@ high-level system view.
 | [`sponsor-pools.md`](sponsor-pools.md) | M27/M32 — platform-wide call pool + `consume_pool_slot` RPC. |
 | [`taxa-enrichment.md`](taxa-enrichment.md) | `enrich-taxon` EF + GBIF lineage backfill (kingdom→genus). |
 | [`range-outlier-alert.md`](range-outlier-alert.md) | M35 — submit-time outlier alert, `taxon_range_index`, weekly `refresh-taxon-ranges` cron, modal copy. |
+| [`vision-providers-secrets.md`](vision-providers-secrets.md) | M32 — `vision-providers-smoke.yml` workflow: which secrets the six providers need and where to set them. |
+| [`taxonomy-references.md`](taxonomy-references.md) | Authoritative taxonomy sources for Mexico (CONABIO/GBIF/NOM-059/CITES) and how Rastrum reconciles them (#347). |
+| [`conservation-status-etl.md`](conservation-status-etl.md) | `refresh-conservation-status` EF + `backfill-conservation-status.mjs` — NOM-059/IUCN/CITES ingestion (#550). |
 
 ## Observation flow (Modules 02 / 03)
 
@@ -51,6 +55,7 @@ high-level system view.
 | [`on-device-vision-fallback.md`](on-device-vision-fallback.md) | Phi (MLC) + Gemma (transformers.js) dual-runtime resilience story; opt-in flags; what to do when one crashes. |
 | [`contextual-suggestions.md`](contextual-suggestions.md) | Issue #723 — `probable_taxa_at()` RPC + chip strip on `/observe`. |
 | [`chat-improvements.md`](chat-improvements.md) | M01 chat redesign — Gemma 4 text backbone + entity-context (observation/species/project/camera_station/observer/self_profile) + 5 read-only tools + 1-round tool-call loop. |
+| [`phi-gemma3-evaluation.md`](phi-gemma3-evaluation.md) | Evaluation of swapping Phi-3.5-vision for Gemma 4 E2B as the on-device vision backbone (#638) — recommendation: adopt Gemma 4 (already deployed). |
 
 ## Karma + reputation (Module 23)
 
@@ -58,12 +63,14 @@ high-level system view.
 |---|---|
 | [`karma-phase-1-post-merge-verification.md`](karma-phase-1-post-merge-verification.md) | Phase 1 deploy verification — schema + cache + recompute cron. |
 | [`falta-dex.md`](falta-dex.md) | M08 — taxonomic gaps panel + region pool baseline (Option A: own data) + showMissing localStorage. |
+| [`streak-freezes.md`](streak-freezes.md) | Auto-consumed credits that preserve streaks on missed days (+1 per 7-day milestone, hard cap 2) (#866). |
 
 ## Social graph (Module 26)
 
 | Runbook | Covers |
 |---|---|
 | [`social-features.md`](social-features.md) | Inbox polling, reactions self-hydration, ReportDialog, FollowButton states. |
+| [`deprecate-profile-public.md`](deprecate-profile-public.md) | Deprecation plan for the legacy `users.profile_public` boolean superseded by the M25 `profile_privacy` matrix (#251). |
 
 ## Notifications (Modules ux-streak-push + 34)
 
@@ -71,6 +78,19 @@ high-level system view.
 |---|---|
 | [`kairos-prompts.md`](kairos-prompts.md) | M34 — golden-hour push, `kairos-fire` 15-min cron, hard 1-per-day cap, manual fire instructions, VAPID prod-deploy checklist. |
 | [`vapid-keys-deploy.md`](vapid-keys-deploy.md) | VAPID keys standalone runbook — what they are, one-time setup (4 steps), key rotation, SW registration, failure modes, secrets inventory. Closes #815. |
+| [`weekly-digest.md`](weekly-digest.md) | `weekly-digest` + `email-unsubscribe` Edge Functions — Monday digest schedule, opt-out flow, secrets (#868). |
+
+## Security audit + hardening
+
+| Runbook | Covers |
+|---|---|
+| [`accepted-advisor-findings.md`](accepted-advisor-findings.md) | Rationale + suppression list for Supabase Database Advisor findings we accept (post #828/#829). |
+| [`anon-rate-limit.md`](anon-rate-limit.md) | Postgres-backed per-IP rate limit for unauthenticated Edge Function callers (replaces the in-memory `globalThis` map). |
+| [`leaked-password-protection.md`](leaked-password-protection.md) | Enabling Supabase Auth HIBP breach-detection for sign-up + password change. |
+| [`per-function-grant-audit.md`](per-function-grant-audit.md) | Per-`SECURITY DEFINER`-function grant audit replacing the blanket grant (#834). |
+| [`security-smoke-test.md`](security-smoke-test.md) | Production smoke test for the Security Advisor remediation (#828 view flips + #829 grants). |
+| [`storage-security.md`](storage-security.md) | RLS on the `media` bucket — preventing anonymous bulk LIST while keeping signed reads working. |
+| [`supabase-spatial-ref-sys-ticket.md`](supabase-spatial-ref-sys-ticket.md) | Open Supabase support ticket — `spatial_ref_sys` RLS false-positive in the advisor (#839). |
 
 ## Operator hygiene + ops
 
@@ -88,3 +108,8 @@ high-level system view.
 | [`stripe-pro-tier.md`](stripe-pro-tier.md) | (Future) Stripe pro tier — design notes, deferred to v2.0. |
 | [`tauri-android.md`](tauri-android.md) | Tauri v2 Android wrapper — local toolchain prereqs, dev/build workflow, signing keystore, Play Store internal-track upload. |
 | [`ux-backlog.md`](ux-backlog.md) | Per-item rationale for v1.1 UX polish items. |
+| [`cron-secret-rotation.md`](cron-secret-rotation.md) | `CRON_SECRET` rotation playbook — Vault first, then GitHub Secret, then re-run `db-apply`. |
+| [`mcp-proxy.md`](mcp-proxy.md) | `mcp.rastrum.org` Cloudflare routing for the MCP Edge Function (header + path manipulation, no Worker runtime). |
+| [`onboarding-funnel.md`](onboarding-funnel.md) | First-30-days onboarding-funnel telemetry — drop-off cliffs + retention interventions (#878). |
+| [`performance-audit.md`](performance-audit.md) | Cache + performance optimization workflow — `npm run analyze` bundle visualiser, Lighthouse budgets (#713). |
+| [`sw-pmtiles-verification.md`](sw-pmtiles-verification.md) | Post-deploy verification that SW pmtiles caching works in the browser (#639). |
