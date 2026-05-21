@@ -24,6 +24,13 @@ high-level system view.
 | [`role-model.md`](role-model.md) | `has_role()` RLS predicate + admin/moderator/expert hierarchy. |
 | [`admin-chrome-rendering.md`](admin-chrome-rendering.md) | Why every `/console/*` and `/consola/*` page MUST use `ConsoleLayout` (sidebar + role pills + keybindings invariant). |
 
+## Auth (Module 04)
+
+| Runbook | Covers |
+|---|---|
+| [`auth.md`](auth.md) | Magic link, Google/GitHub OAuth, email OTP, passkey, sign-out-everywhere — supported methods table + load-bearing invariants (`flowType:'pkce'`, `resolveObserverRef()`, `onAuthChange`) + cross-refs to known pitfalls. |
+| [`resend-smtp.md`](resend-smtp.md) | Custom SMTP setup (Resend) for magic-link + sponsor threshold emails (also indexed under Operator hygiene). |
+
 ## Research workflow (Modules 28-32, v1.2)
 
 | Runbook | Covers |
@@ -46,6 +53,12 @@ high-level system view.
 |---|---|
 | [`obs-detail-redesign.md`](obs-detail-redesign.md) | Two-column layout, manage panel, atomic photo delete via `delete_photo_atomic` RPC. |
 | [`observe-progressive-card.md`](observe-progressive-card.md) | Epic #1129 — progressive result card (S0–S3/S2′), sovereignty + R1–R3 consensus invariants, `review_requested` queue routing, downloads-by-capability chooser. |
+
+## Explore + browsing
+
+| Runbook | Covers |
+|---|---|
+| [`explore-ui.md`](explore-ui.md) | `/explore/{recent,species,watchlist}/` surfaces — components, locale-pair invariants, locale-neutral `share/obs/?id=` rule, `mv_recent_species` column-name pitfall, sign-in gating, MegaMenu wiring. |
 
 ## Identifier registry (Module 13)
 
@@ -96,6 +109,7 @@ high-level system view.
 
 | Runbook | Covers |
 |---|---|
+| [`roadmap-id-map.md`](roadmap-id-map.md) | Bridge from `progress.json` ids → the primary doc/runbook/spec/CLAUDE.md section that covers them. The single-hop lookup for "where is the doc for feature X?". |
 | [`onboarding-events.md`](onboarding-events.md) | DOM events + Anthropic-key probe + first-run telemetry. |
 | [`posthog.md`](posthog.md) | PostHog snippet wiring, captured events, reverse-proxy verification, token rotation. |
 | [`themes.md`](themes.md) | Seasonal + regional theme variants (`monarca` / `lluvias` / `secas` / `default`) — auto-resolution, manual override, and how to add a new season. |
