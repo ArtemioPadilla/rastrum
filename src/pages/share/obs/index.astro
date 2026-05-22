@@ -629,7 +629,9 @@ const lang: 'en' | 'es' = 'en';
           const noResultLabel = askAiBtn.dataset.labelNoResult ?? 'AI could not identify.';
 
           const heroImg = document.querySelector<HTMLImageElement>('[data-photo-hero] img');
-          if (!heroImg?.src) {
+          // Guard: no src, or image failed to load (broken img — naturalWidth === 0
+          // when the network request errored, e.g. ERR Failed to fetch from media CDN).
+          if (!heroImg?.src || (heroImg.complete && heroImg.naturalWidth === 0)) {
             askAiBtn.textContent = noPhotoLabel;
             setTimeout(() => { askAiBtn.textContent = idleLabel; }, 3000);
             return;
