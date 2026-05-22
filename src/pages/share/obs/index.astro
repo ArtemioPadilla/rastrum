@@ -629,7 +629,12 @@ const lang: 'en' | 'es' = 'en';
           const noResultLabel = askAiBtn.dataset.labelNoResult ?? 'AI could not identify.';
 
           const heroImg = document.querySelector<HTMLImageElement>('[data-photo-hero] img');
-          if (!heroImg?.src) {
+          // Guard: no src, or image definitively failed to load.
+          // We only treat it as broken when complete===true AND naturalWidth===0,
+          // which means the browser finished attempting to load and got nothing.
+          // If complete===false the image is still in-flight (slow connection) —
+          // let the fetch() attempt proceed; it may succeed or surface a real error.
+          if (!heroImg?.src || (heroImg.complete && heroImg.naturalWidth === 0)) {
             askAiBtn.textContent = noPhotoLabel;
             setTimeout(() => { askAiBtn.textContent = idleLabel; }, 3000);
             return;
