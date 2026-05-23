@@ -33,6 +33,12 @@ interface Props {
    * M28 Explore mega-menu uses 2 (Biodiversity + Community).
    */
   cols?: 2 | 3;
+  /**
+   * Optional onboarding-tour marker. When set, forwarded as
+   * `data-tour={dataTour}` on the trigger button so the spotlight
+   * helper can resolve to it.
+   */
+  dataTour?: string;
 }
 const {
   lang,
@@ -42,6 +48,7 @@ const {
   active = false,
   accent = 'stone',
   cols = 3,
+  dataTour,
 } = Astro.props;
 const safeTriggerId = trigger
   .normalize('NFKD')
@@ -56,6 +63,7 @@ const id = `megamenu-${safeTriggerId || 'menu'}`;
   <button
     id={`${id}-btn`}
     type="button"
+    data-tour={dataTour}
     class:list={[
       'relative flex items-center gap-1 pb-1 transition-colors',
       'after:content-[""] after:absolute after:left-0 after:right-0 after:-bottom-3 after:h-[2px] after:rounded after:transition-transform after:origin-left',

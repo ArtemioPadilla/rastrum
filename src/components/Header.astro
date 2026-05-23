@@ -169,6 +169,7 @@ const docColumns = [
         active={expActive}
         accent="teal"
         cols={2}
+        dataTour="explore-nav"
       />
 
       <a href={getLocalizedPath(lang, routes.chat[locale] + '/')}
@@ -226,7 +227,7 @@ const docColumns = [
       <SyncPill lang={locale} />
       <BellIcon lang={locale} />
       <div id="avatar-wrap" class="hidden relative shrink-0">
-        <button id="avatar-btn" aria-label="Account menu" class="block rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500">
+        <button id="avatar-btn" data-tour="avatar-btn" aria-label="Account menu" class="block rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500">
           <span
             id="header-avatar-frame"
             class="inline-block rounded-full ring-offset-2 ring-offset-white dark:ring-offset-zinc-900"
