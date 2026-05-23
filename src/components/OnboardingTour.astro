@@ -183,7 +183,7 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
     {
       title: stepsData.quick_id.title,
       body: stepsData.quick_id.body,
-      target: '[data-tour="fab"]',
+      target: '[data-tour="fab"],[data-tour="observe-nav"]',
     },
     {
       title: firstObsDemoStep.title,
@@ -212,6 +212,7 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
 
 <script>
   import { getCachedUser, getSupabase } from '../lib/supabase';
+  import { resolveFirstVisible } from '../lib/onboarding-target';
 
   type StepDef = { title: string; body: string; target: string | null; kind?: 'privacy_preset' | 'first_observation_demo' };
 
@@ -289,12 +290,7 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
 
   function resolveTarget(selector: string | null): Element | null {
     if (!selector) return null;
-    const parts = selector.split(',').map(s => s.trim());
-    for (const sel of parts) {
-      const el = document.querySelector(sel);
-      if (el) return el;
-    }
-    return null;
+    return resolveFirstVisible(selector);
   }
 
   function getSpotlightRect(el: Element): DOMRect {
