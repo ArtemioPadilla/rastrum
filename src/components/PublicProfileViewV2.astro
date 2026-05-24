@@ -255,6 +255,7 @@ const sponsoringI18n = {
   import { showToast } from '../lib/toast';
   import { openConfirmDialog } from '../lib/confirm-dialog';
   import { tierForKarma } from '../lib/karma-frame';
+  import { basemapStyleUrl, installSpriteFallback } from '../lib/map-style';
 
   type Lang = 'en' | 'es';
 
@@ -662,8 +663,6 @@ const sponsoringI18n = {
           const profileId = profile.id;
           const profileLang = lang;
           const isDark = document.documentElement.classList.contains('dark');
-          const STYLE_LIGHT = 'https://tiles.openfreemap.org/styles/liberty';
-          const STYLE_DARK  = 'https://tiles.openfreemap.org/styles/dark';
 
           const initProfileMap = async () => {
             const maplibregl = (await import('maplibre-gl')).default;
@@ -674,12 +673,18 @@ const sponsoringI18n = {
 
             const map = new maplibregl.Map({
               container: containerId,
-              style: isDark ? STYLE_DARK : STYLE_LIGHT,
+              style: basemapStyleUrl(isDark),
               zoom: 2,
               center: [0, 20],
               attributionControl: { compact: true },
               scrollZoom: false,         // disable scroll-zoom (mobile-friendly)
             });
+
+            // #1166 — parity with ExploreMap / MapPicker / CommunityMapView:
+            // register a 1x1 transparent fallback for any basemap sprite icon
+            // that fails to load, so a slow/blocked sprite doesn't spam the
+            // console with `circle-11` missing warnings.
+            installSpriteFallback(map);
 
             // Hide skeleton once map tiles load
             const skeleton = mapContainer.querySelector<HTMLElement>('[data-pp-map-skeleton]');
