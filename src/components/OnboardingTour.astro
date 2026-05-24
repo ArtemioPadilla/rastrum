@@ -211,7 +211,7 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
 />
 
 <script>
-  import { getCachedUser, getSupabase } from '../lib/supabase';
+  import { getCachedSession, getCachedUser, getSupabase } from '../lib/supabase';
   import { resolveFirstVisible } from '../lib/onboarding-target';
 
   type StepDef = { title: string; body: string; target: string | null; kind?: 'privacy_preset' | 'first_observation_demo' };
@@ -282,9 +282,12 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
     let sb;
     try { sb = getSupabase(); } catch { return; }
     try {
-      const user = await getCachedUser();
-      if (!user) return;
-      await sb.from('users').update({ onboarding_completed_at: new Date().toISOString() }).eq('id', user.id);
+      // Warm the session before PATCH — getCachedUser() alone returns the
+      // user object but doesn't guarantee the supabase client has rehydrated
+      // its JWT from storage. Same fix shape as #1155 for observation-defaults.
+      const session = await getCachedSession();
+      if (!session) return;
+      await sb.from('users').update({ onboarding_completed_at: new Date().toISOString() }).eq('id', session.user.id);
     } catch { /* env not configured / column missing — fail closed */ }
   }
 
@@ -406,9 +409,10 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
     let sb;
     try { sb = getSupabase(); } catch { return; }
     try {
-      const user = await getCachedUser();
-      if (!user) return;
-      await sb.from('users').update({ profile_privacy: PRESET_DEFS[preset] }).eq('id', user.id);
+      // Warm the session before PATCH (#1155 pattern).
+      const session = await getCachedSession();
+      if (!session) return;
+      await sb.from('users').update({ profile_privacy: PRESET_DEFS[preset] }).eq('id', session.user.id);
       persistOnboardingDone().catch(() => { /* env not configured */ });
     } catch { /* env not configured / column missing — fail closed */ }
   }
