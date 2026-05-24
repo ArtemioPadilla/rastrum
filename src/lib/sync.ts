@@ -242,29 +242,11 @@ async function syncOne(record: ObservationRecord): Promise<void> {
   } else if (hasIdentification && (clientId.status === 'accepted' || clientId.status === 'needs_review')) {
     const supabase = getSupabase();
 
-    // Upsert taxa row so observations.primary_taxon_id can be resolved by
-    // the sync_primary_identification trigger. On conflict (scientific_name
-    // already exists) update common names only — kingdom/family come from
-    // authoritative upstream sources.
-    let taxonId: string | null = null;
-    if (clientId.scientificName) {
-      try {
-        const taxonPayload: Record<string, unknown> = {
-          scientific_name: clientId.scientificName,
-          common_name_es: clientId.commonNameEs ?? null,
-          common_name_en: clientId.commonNameEn ?? null,
-          taxon_rank: 'species',
-        };
-        const { data: taxonRow } = await supabase
-          .from('taxa')
-          .upsert(taxonPayload, { onConflict: 'scientific_name', ignoreDuplicates: false })
-          .select('id')
-          .maybeSingle();
-        if (taxonRow?.id) taxonId = taxonRow.id as string;
-      } catch {
-        // taxa upsert is non-fatal — trigger fallback handles scientific_name lookup
-      }
-    }
+    // taxa rows are written by service_role only — RLS denies client writes
+    // (only `taxa_public_read` SELECT policy exists). `upsert_primary_identification`
+    // accepts a null `p_taxon_id` and the `sync_primary_identification` trigger
+    // resolves it from `scientific_name` server-side. Closes #1164.
+    const taxonId: string | null = null;
 
     // Route through upsert_primary_identification RPC (#589) which honors
     // the UNIQUE(observation_id) WHERE is_primary partial index — demoting
@@ -337,8 +319,12 @@ async function syncOne(record: ObservationRecord): Promise<void> {
 async function triggerEnvEnrichment(record: ObservationRecord): Promise<void> {
   // Guard: skip enrichment when the observation has no GPS coordinates.
   // The edge function requires a location and returns 422 otherwise.
+  // Also reject (0,0) null-island — matches the CLI batch import contract
+  // and catches uninitialized lat/lng that slipped past Number.isFinite.
+  // Closes #1164 (partial — full root cause needs a reproducing obs_id).
   const loc = record.data?.location;
   if (!loc || !Number.isFinite(loc.lat) || !Number.isFinite(loc.lng)) return;
+  if (loc.lat === 0 && loc.lng === 0) return;
 
   const supabase = getSupabase();
   await supabase.functions.invoke('enrich-environment', {
