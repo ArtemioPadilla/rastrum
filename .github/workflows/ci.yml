@@ -40,6 +40,31 @@ jobs:
       - name: Unit tests (Vitest)
         run: npm test
 
+      - name: Coverage floor (#1174)
+        # Re-runs the unit suite with v8 coverage, parses
+        # coverage/coverage-summary.json, compares against
+        # tests/coverage-floor.txt, fails when current < floor.
+        # The json-summary reporter is wired into vitest.config.ts's
+        # coverage.reporter array — do NOT pass --reporter=json-summary
+        # to vitest itself (that's the *test* reporter, not the
+        # coverage reporter, and it 404s the loader).
+        run: |
+          set -euo pipefail
+          npm run test:coverage 2>&1 | tail -5
+          CURRENT=$(jq -r '.total.lines.pct' coverage/coverage-summary.json)
+          FLOOR=$(grep -v '^#' tests/coverage-floor.txt | tail -n1)
+          DELTA=$(awk -v c="$CURRENT" -v f="$FLOOR" 'BEGIN{printf "%.2f", c-f}')
+          {
+            echo "## Coverage report"
+            echo ""
+            echo "Lines coverage: ${CURRENT}% (floor: ${FLOOR}%, delta: ${DELTA}%)"
+            echo ""
+            echo "| current | floor | delta |"
+            echo "|---:|---:|---:|"
+            echo "| ${CURRENT}% | ${FLOOR}% | ${DELTA}% |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          awk -v c="$CURRENT" -v f="$FLOOR" 'BEGIN{exit (c<f)?1:0}'
+
       - name: Setup Deno
         uses: denoland/setup-deno@v2
         with:

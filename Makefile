@@ -139,7 +139,7 @@ db-backfill-taxon-id: ## One-time backfill: resolve primary_taxon_id on observat
 	@echo "Done. Verify with: make db-tables"
 
 ## Docs & checks
-.PHONY: lint typecheck test docs-check
+.PHONY: lint typecheck test docs-check coverage-update
 lint: ## (Placeholder — wire up eslint once code lands)
 	@echo "TODO: eslint in v0.1. No app code yet."
 
@@ -151,6 +151,15 @@ test: ## Run unit tests (vitest)
 
 test-coverage: ## Run unit tests with coverage report
 	npm run test:coverage
+
+coverage-update: ## Suggest new coverage floor (raise after refactors)
+	@npm run test:coverage > /dev/null 2>&1
+	@CURRENT=$$(jq -r '.total.lines.pct' coverage/coverage-summary.json); \
+	 FLOOR=$$(grep -v '^#' tests/coverage-floor.txt | tail -n1); \
+	 NEW=$$(awk -v c=$$CURRENT 'BEGIN{printf "%d", c-5}'); \
+	 echo "Current: $$CURRENT% — Current floor: $$FLOOR%"; \
+	 echo "Suggested new floor (current - 5): $$NEW%"; \
+	 echo "If raising the floor, edit tests/coverage-floor.txt and refresh the captured-on header."
 
 docs-check: ## Verify module index lists every module spec present on disk
 	@echo "Specs on disk:"

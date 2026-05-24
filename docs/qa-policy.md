@@ -109,6 +109,7 @@ Snapshot as of 2026-05-13 (`main` branch protection):
 | `test`    | `ci.yml` → `test` job    | Vitest unit suite. |
 | `validate`| `db-validate.yml`        | Idempotent SQL apply twice against Postgres 17 + PostGIS 3.4. |
 | `verify`  | `ci.yml` → `verify` job  | Typecheck, build, search-index drift, `define:vars` check, bundle-size baseline. Deno EF contract tests join once Tier 1a lands. |
+| `coverage` | `ci.yml` → `verify` job step "Coverage floor (#1174)" | `npm run test:coverage`; floor in `tests/coverage-floor.txt`; -5% vs baseline. |
 | `CodeQL`                       | GitHub default | Security scan parent. |
 | `Analyze (javascript-typescript)` | GitHub default | CodeQL sub-job. |
 | `GitGuardian Security Checks`  | GitGuardian app | Secret scanning. |
@@ -162,6 +163,32 @@ failure (issue auto-open, email, Slack — pick one). Do not gate PRs on it.
 
 The Deno EF contract suite is on track to clear all four once Tier 1a
 finishes wiring it into the `verify` job.
+
+### Coverage floor (#1174)
+
+The `coverage` step is the cheapest possible quality gate: it captures
+today's line-coverage number and trips when a PR drops more than 5
+percentage points below it. The floor lives in
+[`tests/coverage-floor.txt`](../tests/coverage-floor.txt) as a single
+number plus a header comment naming the capture date and SHA.
+
+The floor **stays put** between PRs — improvements happen organically,
+and we don't push for *more* coverage on every change.
+
+A PR can **raise the floor in the same PR** when a refactor genuinely
+removes branches (so coverage % rises without adding tests). Procedure:
+
+1. Run `make coverage-update` locally — prints current %, current
+   floor, and the suggested new floor (current − 5).
+2. Bump the number in `tests/coverage-floor.txt` and refresh the
+   `# Captured <date> on main @ <sha>` header.
+3. Commit both files in the same PR that did the refactor; the CI step
+   will validate against the new floor.
+
+Do **not** lower the floor to make a red CI green. If a PR drops
+coverage by more than 5 points, the right move is to add a happy-path
+test for the new code; if that's truly out of scope, fall back to the
+§5 override procedure and file the follow-up issue.
 
 ---
 
