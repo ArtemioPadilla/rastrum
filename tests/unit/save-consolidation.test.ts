@@ -41,17 +41,22 @@ const SRC = readFileSync(
 
 // Strip Astro comments and HTML comments so they don't generate false
 // positives when an id is mentioned inside a "removed by PR #N" note.
+function stripBlock(s: string, open: string, close: string): string {
+  let result = s;
+  let i = result.indexOf(open);
+  while (i !== -1) {
+    const end = result.indexOf(close, i + open.length);
+    if (end === -1) break;
+    result = result.slice(0, i) + result.slice(end + close.length);
+    i = result.indexOf(open);
+  }
+  return result;
+}
+
 function stripComments(s: string): string {
-  let prev: string;
-  let next = s;
-  do {
-    prev = next;
-    next = next
-      .replace(/<!--[\s\S]*?-->/g, '')
-      .replace(/\/\*[\s\S]*?\*\//g, '')
-      .replace(/(^|[^:])\/\/.*$/gm, '$1');
-  } while (next !== prev);
-  return next;
+  let result = stripBlock(s, '<!--', '-->');
+  result = stripBlock(result, '/*', '*/');
+  return result.replace(/(^|[^:])\/\/.*$/gm, '$1');
 }
 
 const SRC_NO_COMMENTS = stripComments(SRC);
