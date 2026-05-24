@@ -319,9 +319,13 @@ const labels = {
   });
 
   // ── Pipeline event listener ──────────────────────────────────────────────
+  // Event detail shape matches the dispatcher in ObserveView2.astro (#942):
+  // `{ nodes: PipelineNode[] }`. The previous code expected a `state` envelope
+  // that ObserveView2 never emitted, so this listener silently no-op'd and
+  // every step popover stayed empty in production. Aligns with PipelineGraph.
   document.addEventListener('rastrum:pipeline-update', (e: Event) => {
-    const event = e as CustomEvent<{ state: PipelineState }>;
-    const { state } = event.detail;
-    if (state?.nodes) render(state.nodes);
+    const event = e as CustomEvent<{ nodes: PipelineState['nodes'] }>;
+    const { nodes } = event.detail;
+    if (nodes) render(nodes);
   });
 </script>
