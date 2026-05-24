@@ -242,6 +242,18 @@ moving it post-install requires rewriting every geometry/geography
 column reference. The advisor's "Extension in Public" warning for
 `postgis` is accepted with that rationale.
 
+**RLS policy-coverage gate (#1172).** Every `CREATE POLICY` in
+`supabase-schema.sql` must be paired with an assertion in
+`tests/sql/rls.sql` — at minimum, any reference to the policy's
+`<schema>.<table>` in the test file counts; an explicit
+`-- policy:<schema>.<table>.<name>` marker is preferred for precision.
+`scripts/check-rls-coverage.sh` (wired into `db-validate.yml`)
+enforces this on every PR. When testing a policy is genuinely out of
+scope for a PR, append the entry to `tests/sql/rls-coverage-allowlist.txt`
+with a `# justification:` comment — this is the deferral mechanism, not
+a free pass. When *touching* a policy that has an allowlist entry,
+prefer migrating it to a real assertion so the backlog drains over time.
+
 ### Module spec convention
 - Implementation specs live at `docs/specs/modules/NN-*.md`, numbered
   sequentially. **The module spec wins** when it disagrees with

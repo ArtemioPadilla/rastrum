@@ -1,0 +1,209 @@
+# tests/sql/rls-coverage-allowlist.txt
+#
+# Allowlist of CREATE POLICY entries that have no paired assertion in
+# tests/sql/rls.sql today. The check-rls-coverage.sh gate (wired into
+# .github/workflows/db-validate.yml) treats anything here as "tested by
+# convention" so the gate is green on day one without a 100-hour backfill.
+#
+# Format: one entry per line.
+#   <schema>.<table>.<policy_name>
+# Optional trailing `# justification: …` comment.
+#
+# When adding a new RLS policy in docs/specs/infra/supabase-schema.sql:
+#   1. PREFERRED: add an assertion in tests/sql/rls.sql (the policy's
+#      bare name must appear somewhere in the file — an explicit
+#      `-- policy:<schema>.<table>.<name>` marker is best).
+#   2. If testing is genuinely out of scope for this PR, append the
+#      `<schema>.<table>.<policy>` entry here with a `# justification:`
+#      comment explaining why.
+#
+# When touching an existing policy in a PR, prefer migrating its allowlist
+# entry to a real assertion — this is how we drain the backlog over time.
+# Per issue #1172 + epic #1031 Tier 2a.
+#
+# Initial seed: 2026-05-24 — see PR closing #1172.
+
+public.activity_events.activity_public_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.activity_events.activity_self_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.activity_events.activity_self_update  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.admin_action_proposals.admin_action_proposals_admin_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.admin_action_proposals.admin_action_proposals_no_client_write  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.admin_anomalies.admin_anomalies_admin_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.admin_anomalies.admin_anomalies_no_client_write  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.admin_audit.admin_audit_admin_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.admin_audit.admin_audit_no_client_write  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.admin_health_digests.admin_health_digests_admin_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.admin_health_digests.admin_health_digests_no_client_write  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.admin_webhook_deliveries.admin_webhook_deliveries_admin_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.admin_webhook_deliveries.admin_webhook_deliveries_no_client_write  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.admin_webhooks.admin_webhooks_admin_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.admin_webhooks.admin_webhooks_no_client_write  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.ai_errors_log.ai_errors_log_party_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.ai_rate_limits.ai_rate_limits_no_client_delete  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.ai_rate_limits.ai_rate_limits_no_client_insert  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.ai_rate_limits.ai_rate_limits_no_client_update  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.ai_usage_monthly.ai_usage_monthly_no_client_delete  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.ai_usage_monthly.ai_usage_monthly_no_client_insert  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.ai_usage_monthly.ai_usage_monthly_no_client_update  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.ai_usage_monthly.ai_usage_monthly_party_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.ai_usage.ai_usage_no_client_delete  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.ai_usage.ai_usage_no_client_insert  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.ai_usage.ai_usage_no_client_update  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.ai_usage.ai_usage_party_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.anon_rate_limit.anon_rate_limit_service_only  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.api_usage.api_usage_admin_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.api_usage.api_usage_read_admin  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.app_feature_flags.feature_flags_no_client_delete  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.app_feature_flags.feature_flags_no_client_update  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.app_feature_flags.feature_flags_no_client_write  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.app_feature_flags.feature_flags_public_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.badges.badges_public_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.ban_appeals.ban_appeals_mod_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.ban_appeals.ban_appeals_no_client_delete  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.ban_appeals.ban_appeals_no_client_update  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.ban_appeals.ban_appeals_self_insert  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.ban_appeals.ban_appeals_self_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.blocks.blocks_owner_delete  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.blocks.blocks_owner_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.blocks.blocks_owner_write  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.camera_station_periods.camera_station_periods_owner_write  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.camera_station_periods.camera_station_periods_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.camera_stations.camera_stations_owner_delete  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.camera_stations.camera_stations_owner_update  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.camera_stations.camera_stations_owner_write  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.camera_stations.camera_stations_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.community_themes.community_themes_owner_write  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.community_themes.community_themes_public_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.community_themes.community_themes_self_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.dwc_export_log.dwc_export_log_owner_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.dwc_export_log.dwc_export_log_service_insert  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.events.events_public_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.expert_applications.expert_apps_insert_own  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.expert_applications.expert_apps_read_admin  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.expert_applications.expert_apps_read_own  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.featured_observers.featured_observers_public_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.follows.follows_followee_update  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.follows.follows_owner_delete  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.follows.follows_owner_write  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.follows.follows_public_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.follows.follows_self_manage  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.function_errors.function_errors_admin_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.function_errors.function_errors_no_client_write  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.gc_orphan_media_log.gc_orphan_media_log_admin_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.identification_reactions.idreact_delete  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.identification_reactions.idreact_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.identification_reactions.idreact_write  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.identifications.id_owner  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.identifications.id_public_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.identifications.id_validator_delete  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.identifications.id_validator_insert  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.identifications.id_validator_update  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.institutional_affiliations.affiliations_public_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.institutions.institutions_public_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.iso_countries.iso_countries_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.kairos_subscriptions.kairos_subs_delete_own  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.kairos_subscriptions.kairos_subs_insert_own  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.kairos_subscriptions.kairos_subs_select_own  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.kairos_subscriptions.kairos_subs_update_own  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.karma_config.karma_config_public_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.karma_events.karma_events_admin_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.karma_events.karma_events_self_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.karma_milestones.karma_milestones_public_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.karma_rarity_multipliers.karma_rarity_multipliers_public_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.karma_thresholds.karma_thresholds_public_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.media_files.media_owner  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.media_files.media_public_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.migration_windows.migration_windows_public_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.notifications_sent.notifications_sent_no_client_delete  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.notifications_sent.notifications_sent_no_client_insert  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.notifications_sent.notifications_sent_no_client_update  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.notifications.notif_admin_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.notifications.notif_no_client_insert  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.notifications.notif_owner_delete  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.notifications.notif_owner_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.notifications.notif_owner_update  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.observation_comments.comments_authenticated_insert  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.observation_comments.comments_mod_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.observation_comments.comments_public_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.observation_comments.comments_self_update  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.observation_reactions.obsreact_delete  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.observation_reactions.obsreact_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.observation_reactions.obsreact_write  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.observations.obs_collaborator_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.observations.obs_credentialed_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.photo_reactions.photoreact_delete  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.photo_reactions.photoreact_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.photo_reactions.photoreact_write  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.pits.pits_authenticated_write  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.pits.pits_public_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.places.places_owner_update  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.places.places_public_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.places.places_user_insert  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.pool_consumption.pool_consumption_self_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.pool_usage_daily.pool_usage_daily_owner_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.pool_user_usage.pool_user_usage_owner_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.project_members.project_members_owner_delete  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.project_members.project_members_owner_write  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.projects.projects_owner_delete  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.projects.projects_owner_insert  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.projects.projects_owner_update  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.projects.projects_public_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.push_subscriptions.push_subs_delete_own  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.push_subscriptions.push_subs_insert_own  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.push_subscriptions.push_subs_select_own  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.rate_limit_buckets.rate_limit_no_client_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.regional_taxa_baseline.regional_baseline_public_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.reports.reports_admin_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.reports.reports_mod_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.reports.reports_owner_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.reports.reports_owner_write  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.spatial_ref_sys.spatial_ref_sys_world_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.species_list_items.species_list_items_owner_write  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.species_list_items.species_list_items_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.species_lists.species_lists_owner_write  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.species_lists.species_lists_public_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.sponsor_credentials.sponsor_credentials_owner_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.sponsor_pools.sponsor_pools_owner_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.sponsor_pools.sponsor_pools_owner_write  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.sponsorship_requests.sponsorship_requests_no_client_delete  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.sponsorship_requests.sponsorship_requests_no_client_insert  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.sponsorship_requests.sponsorship_requests_no_client_update  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.sponsorship_requests.sponsorship_requests_party_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.sponsorships.sponsorships_party_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.sponsorships.sponsorships_public_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.surprise_events.surprise_events_self_insert  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.surprise_events.surprise_events_self_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.sync_failures.sync_failures_admin_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.sync_failures.sync_failures_read_admin  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.taxa.taxa_public_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.taxon_range_index.taxon_range_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.taxon_rarity.taxon_rarity_public_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.taxon_traits.taxon_traits_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.taxon_usage_history.taxon_usage_history_public_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.trails.trails_owner_write  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.trails.trails_public_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.user_api_tokens.tokens_delete_own  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.user_api_tokens.tokens_select_own  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.user_badges.user_badges_public_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.user_badges.user_badges_self_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.user_bans.user_bans_mod_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.user_bans.user_bans_no_client_delete  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.user_bans.user_bans_no_client_insert  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.user_bans.user_bans_no_client_update  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.user_expertise.user_expertise_facet_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.user_expertise.user_expertise_public_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.user_expertise.user_expertise_self_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.user_roles.user_roles_admin_or_self_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.user_roles.user_roles_no_self_write  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.user_streaks.streaks_public_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.user_streaks.streaks_self_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.users.users_self_update  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.users.users_update_self_privacy  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.watchlists.watchlists_admin_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.watchlists.watchlists_self  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.weekly_validator_rewards.validator_rewards_self_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+public.wrapped_cache.wrapped_cache_self_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+storage.objects.media_authenticated_list  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+storage.objects.media_insert_authenticated  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+storage.objects.media_public_read  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched
+storage.objects.media_update_authenticated  # justification: initial seed 2026-05-24; backfill per-PR as policies are touched

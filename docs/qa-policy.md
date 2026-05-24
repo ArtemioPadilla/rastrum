@@ -107,7 +107,7 @@ Snapshot as of 2026-05-13 (`main` branch protection):
 |---|---|---|
 | `audit`   | `pr-audit.yml`           | Karma audit (module 23) — schema invariants, link rot, etc. |
 | `test`    | `ci.yml` → `test` job    | Vitest unit suite. |
-| `validate`| `db-validate.yml`        | Idempotent SQL apply twice against Postgres 17 + PostGIS 3.4. |
+| `validate`| `db-validate.yml`        | Idempotent SQL apply twice against Postgres 17 + PostGIS 3.4. Includes the RLS regression suite, schema security invariants, **and the RLS policy-coverage check** (`scripts/check-rls-coverage.sh`) that fails the PR when a new `CREATE POLICY` ships without a paired assertion in `tests/sql/rls.sql` and no entry in `tests/sql/rls-coverage-allowlist.txt` — see issue #1172. |
 | `verify`  | `ci.yml` → `verify` job  | Typecheck, build, search-index drift, `define:vars` check, bundle-size baseline. Deno EF contract tests join once Tier 1a lands. |
 | `CodeQL`                       | GitHub default | Security scan parent. |
 | `Analyze (javascript-typescript)` | GitHub default | CodeQL sub-job. |
