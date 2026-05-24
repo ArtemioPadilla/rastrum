@@ -1,0 +1,19 @@
+---
+interface Props { lang: "en" | "es"; }
+const { lang } = Astro.props;
+const isEs = lang === "es";
+---
+
+<!-- AI mode selector (#296) — hidden by default; revealed only when
+     ≥2 modes are usable (#942 PR5 redo). A selector with one usable
+     option + disabled siblings reads as broken UI. -->
+<div id="obs2-ai-mode-selector" class="hidden">
+  <div class="flex items-center gap-2 flex-wrap">
+    <span class="text-xs font-medium text-zinc-500 dark:text-zinc-400 shrink-0">{isEs ? "Fuente de IA:" : "AI source:"}</span>
+    <div class="flex rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden text-xs" role="group" aria-label={isEs ? "Fuente de IA" : "AI source"}>
+      <button type="button" id="obs2-mode-sponsored" data-mode="sponsored" class="obs2-mode-btn px-3 py-1.5 font-medium transition-colors">{isEs ? "Patrocinado" : "Sponsored"}</button>
+      <button type="button" id="obs2-mode-own-key" data-mode="own-key" class="obs2-mode-btn px-3 py-1.5 font-medium transition-colors border-l border-zinc-200 dark:border-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed">{isEs ? "Llave propia" : "Own key"}</button>
+      <button type="button" id="obs2-mode-local" data-mode="local" class="obs2-mode-btn px-3 py-1.5 font-medium transition-colors border-l border-zinc-200 dark:border-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed">{isEs ? "Solo local" : "Local only"}</button>
+    </div>
+  </div>
+</div>

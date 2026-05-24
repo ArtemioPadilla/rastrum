@@ -1,0 +1,28 @@
+---
+interface Props { lang: "en" | "es"; }
+const { lang } = Astro.props;
+const isEs = lang === "es";
+---
+
+<!-- Identify-only result (shown when ?mode=identify, pipeline done, user skips save) -->
+<div id="obs2-identify-result" class="hidden rounded-xl border border-emerald-200 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 p-5 space-y-3">
+  <p class="font-semibold text-emerald-800 dark:text-emerald-300 text-center">
+    {isEs ? "Identificación completa" : "Identification complete"}
+  </p>
+  <div id="obs2-identify-species-card" class="space-y-1 text-center"></div>
+  <div class="border-t border-emerald-200 dark:border-emerald-800 pt-3 space-y-2">
+    <p class="text-xs text-zinc-500 dark:text-zinc-400 text-center">
+      {isEs
+        ? "¿Quieres que esta observación ayude a la ciencia?"
+        : "Want this sighting to help science?"}
+    </p>
+    <button type="button" id="obs2-contribute-btn"
+      class="w-full min-h-[44px] rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-sm transition-colors">
+      {isEs ? "Sí, guardar en Rastrum" : "Yes, save to Rastrum"}
+    </button>
+    <button type="button" id="obs2-identify-done-btn"
+      class="w-full text-xs text-zinc-400 hover:text-zinc-600 underline py-1">
+      {isEs ? "No gracias" : "No thanks"}
+    </button>
+  </div>
+</div>

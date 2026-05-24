@@ -1,0 +1,17 @@
+---
+interface Props { lang: "en" | "es"; }
+const { lang } = Astro.props;
+const isEs = lang === "es";
+---
+
+<!-- AI capability caption — single positive line, replaces the prior
+     multi-line banner with 4❌ (#942 PR5 redo). JS rewrites the inner
+     text once detectRunners() resolves. Hidden until then to avoid
+     layout shift. -->
+<p id="obs2-capability-caption" class="hidden text-xs text-zinc-500 dark:text-zinc-400 text-center">
+  <span id="obs2-capability-text">{isEs ? "Verificando modelos…" : "Checking models…"}</span>
+  <a id="obs2-setup-link" href={isEs ? "/es/perfil/editar#on-device-ai-section" : "/en/profile/edit#on-device-ai-section"}
+    class="hidden ml-1 text-emerald-600 dark:text-emerald-400 underline hover:no-underline">
+    {isEs ? "configurar →" : "set up →"}
+  </a>
+</p>
