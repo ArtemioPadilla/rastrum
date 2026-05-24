@@ -1,10 +1,14 @@
 ---
 /**
- * InstallDiscoveryHint — earlier PWA install prompt + iOS Add-to-
+ * InstallDiscoveryHint — value-first PWA install prompt + iOS Add-to-
  * Home-Screen walkthrough.
  *
- * - One-time banner at the top of the page on the user's 2nd visit
- *   (count via `localStorage.rastrum.visitCount`).
+ * - Deferred banner: only shows AFTER the user's first successfully
+ *   synced observation. `src/lib/sync.ts` writes
+ *   `localStorage.rastrum.obs.firstSyncedAt` on `count === 1`; this
+ *   component gates on that key so the prompt arrives when the value
+ *   proposition ("works offline, saves your observations") is already
+ *   demonstrated instead of on a first /observar/ visit.
  * - Android: "Instalar" button triggers the existing
  *   `beforeinstallprompt` flow; the button hides if no prompt
  *   becomes available.
@@ -30,6 +34,7 @@ const pwa = (tr as unknown as { pwa: Record<string, string> }).pwa;
   aria-label={pwa.discovery_title}
   data-visit-key="rastrum.visitCount"
   data-dismissed-key="rastrum.installHintDismissed"
+  data-firstobs-key="rastrum.obs.firstSyncedAt"
   data-ios-label={pwa.discovery_ios_label}
 >
   <div class="max-w-5xl mx-auto px-4 py-3">
@@ -125,6 +130,7 @@ const pwa = (tr as unknown as { pwa: Record<string, string> }).pwa;
   if (root && !isTauri) {
     const VISIT_KEY = root.dataset.visitKey ?? 'rastrum.visitCount';
     const DISMISSED_KEY = root.dataset.dismissedKey ?? 'rastrum.installHintDismissed';
+    const FIRSTOBS_KEY = root.dataset.firstobsKey ?? 'rastrum.obs.firstSyncedAt';
     const cta = document.getElementById('install-hint-cta') as HTMLButtonElement | null;
     const dismiss = document.getElementById('install-hint-dismiss') as HTMLButtonElement | null;
     const iosBlock = document.getElementById('install-hint-ios') as HTMLElement | null;
@@ -143,6 +149,11 @@ const pwa = (tr as unknown as { pwa: Record<string, string> }).pwa;
 
     function isDismissed(): boolean {
       try { return localStorage.getItem(DISMISSED_KEY) === 'true'; }
+      catch { return false; }
+    }
+
+    function hasFirstSyncedObs(): boolean {
+      try { return !!localStorage.getItem(FIRSTOBS_KEY); }
       catch { return false; }
     }
 
@@ -232,7 +243,11 @@ const pwa = (tr as unknown as { pwa: Record<string, string> }).pwa;
       });
       const count = readCount() + 1;
       writeCount(count);
-      if (count < 2) return;
+      // Value-first gate: only surface the install prompt AFTER the user
+      // has saved their first observation successfully. `sync.ts` sets
+      // FIRSTOBS_KEY in the same `count === 1` block that emits the
+      // PostHog `onboarding:first_observation` event.
+      if (!hasFirstSyncedObs()) return;
 
       if (isFirefox()) {
         // Firefox path: no beforeinstallprompt anywhere. Show

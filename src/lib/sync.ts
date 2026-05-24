@@ -142,6 +142,15 @@ async function syncOne(record: ObservationRecord): Promise<void> {
         .eq('sync_status', 'synced');
       if (count === 1) {
         // This was the first synced observation.
+        // Mark the moment so InstallDiscoveryHint can defer the PWA install
+        // prompt until after the value has been demonstrated. Idempotent —
+        // a later sync with count!==1 won't overwrite the timestamp.
+        try {
+          if (typeof localStorage !== 'undefined'
+              && !localStorage.getItem('rastrum.obs.firstSyncedAt')) {
+            localStorage.setItem('rastrum.obs.firstSyncedAt', new Date().toISOString());
+          }
+        } catch { /* private mode / storage disabled — non-fatal */ }
         const { data: userRow } = await supabase
           .from('users')
           .select('created_at')
