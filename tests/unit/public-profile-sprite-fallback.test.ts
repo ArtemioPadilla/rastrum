@@ -36,8 +36,8 @@ describe('PublicProfileViewV2 sprite fallback parity (#1166)', () => {
     expect(src).toMatch(/style:\s*basemapStyleUrl\(\s*isDark\s*\)/);
     // Inline style URL constants from the pre-fix code must be gone so
     // the shared helper remains the single source of truth.
-    expect(src).not.toMatch(/https:\/\/tiles\.openfreemap\.org\/styles\/liberty/);
-    expect(src).not.toMatch(/https:\/\/tiles\.openfreemap\.org\/styles\/dark/);
+    expect(src).not.toContain('https://tiles.openfreemap.org/styles/liberty');
+    expect(src).not.toContain('https://tiles.openfreemap.org/styles/dark');
   });
 
   it('installs the sprite fallback on the map instance', () => {
