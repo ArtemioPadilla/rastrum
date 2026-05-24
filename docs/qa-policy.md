@@ -108,8 +108,9 @@ Snapshot as of 2026-05-13 (`main` branch protection):
 | `audit`   | `pr-audit.yml`           | Karma audit (module 23) — schema invariants, link rot, etc. |
 | `test`    | `ci.yml` → `test` job    | Vitest unit suite. |
 | `validate`| `db-validate.yml`        | Idempotent SQL apply twice against Postgres 17 + PostGIS 3.4. Includes the RLS regression suite, schema security invariants, **and the RLS policy-coverage check** (`scripts/check-rls-coverage.sh`) that fails the PR when a new `CREATE POLICY` ships without a paired assertion in `tests/sql/rls.sql` and no entry in `tests/sql/rls-coverage-allowlist.txt` — see issue #1172. |
-| `verify`  | `ci.yml` → `verify` job  | Typecheck, build, search-index drift, `define:vars` check, bundle-size baseline. Deno EF contract tests join once Tier 1a lands. |
+| `verify`  | `ci.yml` → `verify` job  | Typecheck, build, search-index drift, `define:vars` check, per-route JS bundle budgets (`bundle-budgets` step — see below). Deno EF contract tests join once Tier 1a lands. |
 | `coverage` | `ci.yml` → `verify` job step "Coverage floor (#1174)" | `npm run test:coverage`; floor in `tests/coverage-floor.txt`; -5% vs baseline. |
+| `bundle-budgets` | `ci.yml` → `verify` → "Bundle budgets (size-limit)" step | Per-route brotli-compressed JS budgets enforced by `size-limit` (config: `.size-limit.cjs`; rationale: `.size-limit.md`). Five routes covered v1: home, observe, console, species, chat. Exits non-zero when any route's chunks exceed budget; emits a markdown table to `$GITHUB_STEP_SUMMARY`. |
 | `CodeQL`                       | GitHub default | Security scan parent. |
 | `Analyze (javascript-typescript)` | GitHub default | CodeQL sub-job. |
 | `GitGuardian Security Checks`  | GitGuardian app | Secret scanning. |
@@ -189,6 +190,25 @@ Do **not** lower the floor to make a red CI green. If a PR drops
 coverage by more than 5 points, the right move is to add a happy-path
 test for the new code; if that's truly out of scope, fall back to the
 §5 override procedure and file the follow-up issue.
+
+### Bundle-budget override knob (#1173)
+
+The `bundle-budgets` step gates PRs on per-route JS size. When a route
+**legitimately** needs more headroom (real new feature, not a regression
+from a drive-by import), raise the budget in the same PR:
+
+1. Edit the relevant `limit` in [`.size-limit.cjs`](../.size-limit.cjs).
+   The file lives at the repo root and lists one entry per route.
+2. **One-line justification in the PR description**, e.g.:
+   > Raises `chat` budget 50 → 60 kB: ships voice-input dictation
+   > (#1234). Brotli baseline now 54.1 kB.
+3. **Never** raise via `gh run rerun`. The gate exists so this
+   conversation happens before merge; treating a failure as flake
+   defeats the gate's purpose.
+
+If a budget grows without a feature attached, revert the offending
+import instead of raising. The per-route rationale lives in
+[`.size-limit.md`](../.size-limit.md).
 
 ---
 

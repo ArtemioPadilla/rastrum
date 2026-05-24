@@ -114,16 +114,40 @@ jobs:
             exit 1
           fi
 
-      - name: Report bundle size
+      - name: Bundle budgets (size-limit)
+        # Per-route brotli budgets — config at `.size-limit.cjs`,
+        # rationale at `.size-limit.md`. Exits non-zero when any route's
+        # JS chunks exceed its budget; the JSON output is rendered as a
+        # markdown table in $GITHUB_STEP_SUMMARY for at-a-glance review.
         run: |
-          echo "## Build size" >> $GITHUB_STEP_SUMMARY
-          du -sh dist >> $GITHUB_STEP_SUMMARY
+          set -euo pipefail
+          echo "## Bundle budgets" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Largest files" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          find dist -type f \( -name '*.js' -o -name '*.css' -o -name '*.html' \) \
-            -exec du -h {} + | sort -rh | head -20 >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          # Run twice: once for the human-readable terminal output the job
+          # log shows, once with --json so we can build a Step Summary
+          # table. Both invocations read the same config and dist/.
+          npx size-limit | tee size-limit.txt || gate_status=$?
+          gate_status="${gate_status:-0}"
+          npx size-limit --json > size-limit.json 2>/dev/null || true
+          if [ -s size-limit.json ]; then
+            echo "| Route | Size (brotli) | Budget | Status |" >> $GITHUB_STEP_SUMMARY
+            echo "|---|---:|---:|:---:|" >> $GITHUB_STEP_SUMMARY
+            node -e '
+              const rows = JSON.parse(require("fs").readFileSync("size-limit.json", "utf8"));
+              const kb = (n) => (n / 1024).toFixed(2) + " kB";
+              const lines = rows.map(r => {
+                const pct = ((r.size / r.sizeLimit) * 100).toFixed(0);
+                const icon = r.passed ? "PASS" : "FAIL";
+                return `| ${r.name} | ${kb(r.size)} (${pct}%) | ${kb(r.sizeLimit)} | ${icon} |`;
+              });
+              console.log(lines.join("\n"));
+            ' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "_(size-limit JSON unavailable — see job log)_" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "_See [\`.size-limit.md\`](../blob/main/.size-limit.md) for per-route rationale and override convention._" >> $GITHUB_STEP_SUMMARY
+          exit "$gate_status"
 
   # TODO (v0.1 module scope): unit + RLS + e2e tests once docs/specs/infra/testing.md is implemented.
   # test:
