@@ -326,6 +326,17 @@ export interface ClaudeEligibility {
 }
 
 export async function getClaudeEligibility(): Promise<ClaudeEligibility> {
+  // Gate on a hydrated session before calling the RPC. The function has
+  // `GRANT EXECUTE TO authenticated` only — PostgREST 401s for anon, and
+  // even for authenticated callers a cold page load can fire the RPC
+  // before the Supabase client has loaded the JWT from storage. Both
+  // paths look the same on the wire and spammed the console with 401s
+  // (issue #1167). The SQL function's `IF v_uid IS NULL THEN RETURN
+  // defaults` branch returns the same shape, so anon callers get the
+  // same answer without the round trip.
+  // Same fix shape as #1155 (PATCH users 403 → getCachedSession() first).
+  const session = await getCachedSession();
+  if (!session) return { has_sponsor: false, has_pool: false, pool_used_today: 0, pool_cap_today: 0 };
   const sb = getSupabase();
   const { data, error } = await sb.rpc('claude_eligibility');
   if (error) throw new Error(error.message);
