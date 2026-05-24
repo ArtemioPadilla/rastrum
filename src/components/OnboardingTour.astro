@@ -104,10 +104,23 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
   <!-- Spotlight ring (visible border around the highlighted element) -->
   <div
     id="onb-spotlight-ring"
-    class="absolute pointer-events-none rounded-xl border-2 border-emerald-400 transition-all duration-200 hidden"
+    class="onb-spotlight-ring absolute pointer-events-none rounded-xl border-2 border-emerald-400 transition-all duration-200 hidden"
     style="box-shadow: 0 0 0 4px rgba(52,211,153,0.25);"
     aria-hidden="true"
   ></div>
+
+  <style>
+    @keyframes onb-spotlight-pulse {
+      0%, 100% { box-shadow: 0 0 0 4px rgba(52, 211, 153, 0.25); }
+      50%      { box-shadow: 0 0 0 10px rgba(52, 211, 153, 0.10); }
+    }
+    .onb-spotlight-ring.onb-pulse {
+      animation: onb-spotlight-pulse 1.8s ease-in-out infinite;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .onb-spotlight-ring.onb-pulse { animation: none; }
+    }
+  </style>
 
   <!-- Tooltip card -->
   <div
@@ -313,6 +326,7 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
       tooltip.style.top    = '50%';
       tooltip.style.transform = 'translate(-50%, -50%)';
       ring.classList.add('hidden');
+      ring.classList.remove('onb-pulse');
       backdrop.style.clipPath = 'none';
       return;
     }
@@ -321,12 +335,15 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
     const vw = window.innerWidth;
     const vh = window.innerHeight;
 
-    // Spotlight ring
+    // Spotlight ring — pulse hint helps the eye find the target on dense
+    // mobile chrome (the bottom-bar FAB in particular). prefers-reduced-motion
+    // is honoured by the CSS rule.
     ring.style.left   = `${tr.left}px`;
     ring.style.top    = `${tr.top  + window.scrollY}px`;
     ring.style.width  = `${tr.width}px`;
     ring.style.height = `${tr.height}px`;
     ring.classList.remove('hidden');
+    ring.classList.add('onb-pulse');
 
     // Backdrop with circular hole (polygon with outer box + inner rect)
     if (!reduced) {
@@ -592,6 +609,7 @@ const presetPrivate = onb.preset_private_observer ?? 'Private observer';
   function hide(): void {
     dialog.classList.add('hidden');
     ring.classList.add('hidden');
+    ring.classList.remove('onb-pulse');
     backdrop.style.clipPath = 'none';
     unlockScroll();
     markSeen();
