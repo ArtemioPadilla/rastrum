@@ -36,7 +36,11 @@ export const journeyGuides: JourneyGuide[] = [
     id: 'guide-observe',
     triggerRoute: /\/(en\/observe|es\/observar)\/?$/,
     storageKey: 'rastrum.guide.observe',
-    activation: 'first-visit',
+    // 'manual-only' until redesigned for the progressive-disclosure flow —
+    // the s1-s4 targets are revealed by the obs2-card-v2 state machine
+    // AFTER the user posts a photo, so auto-firing on first-visit misses
+    // them all (audited 2026-05-23, see docs/runbooks/tours.md).
+    activation: 'manual-only',
     steps: [
       {
         target: '#obs2-post-form, input[type="file"], [data-dropzone]',
@@ -64,7 +68,10 @@ export const journeyGuides: JourneyGuide[] = [
     id: 'guide-explore',
     triggerRoute: /\/(en\/explore|es\/explorar)\/?$/,
     storageKey: 'rastrum.guide.explore',
-    activation: 'first-visit',
+    // 'manual-only' until retargeted — the current Explore page is a hub
+    // of cards, not a tabbed surface, so the s1 (tabs) and s3 (filters)
+    // selectors don't match. Re-design tracked in tours-backlog.md.
+    activation: 'manual-only',
     steps: [
       {
         target: '[data-explore-tabs], .explore-tabs, main nav, nav[role="tablist"]',
@@ -87,6 +94,9 @@ export const journeyGuides: JourneyGuide[] = [
     id: 'guide-validate',
     triggerRoute: /\/(en\/explore\/validate|es\/explorar\/validar)\/?$/,
     storageKey: 'rastrum.guide.validate',
+    // first-visit, auth-gated — when no targets resolve within
+    // waitForTarget's 4s budget the guide silently no-ops. Signed-in
+    // selector audit tracked in tours-backlog.md.
     activation: 'first-visit',
     steps: [
       {
@@ -110,6 +120,9 @@ export const journeyGuides: JourneyGuide[] = [
     id: 'guide-export',
     triggerRoute: /\/(en\/profile\/export|es\/perfil\/exportar)\/?$/,
     storageKey: 'rastrum.guide.export',
+    // first-visit, auth-gated — when no targets resolve within
+    // waitForTarget's 4s budget the guide silently no-ops. Signed-in
+    // selector audit tracked in tours-backlog.md.
     activation: 'first-visit',
     steps: [
       {
@@ -146,7 +159,7 @@ export const journeyGuides: JourneyGuide[] = [
         bodyKey: 'guides.community.step2_body',
       },
       {
-        target: '[data-follow-btn], #follow-btn, a[href*="/profile/u"]',
+        target: '#community-list a[href*="/profile/u"], [data-observer-card] a',
         titleKey: 'guides.community.step3_title',
         bodyKey: 'guides.community.step3_body',
       },
@@ -167,11 +180,6 @@ export const journeyGuides: JourneyGuide[] = [
         target: '[data-console-health], a[href*="health"], a[href*="salud"]',
         titleKey: 'guides.console.step2_title',
         bodyKey: 'guides.console.step2_body',
-      },
-      {
-        target: '[data-console-keyboard], .keyboard-hint, [data-shortcut]',
-        titleKey: 'guides.console.step3_title',
-        bodyKey: 'guides.console.step3_body',
       },
     ],
   },

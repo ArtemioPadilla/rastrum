@@ -126,5 +126,7 @@ high-level system view.
 | [`mcp-proxy.md`](mcp-proxy.md) | `mcp.rastrum.org` Cloudflare routing for the MCP Edge Function (header + path manipulation, no Worker runtime). |
 | [`onboarding-funnel.md`](onboarding-funnel.md) | First-30-days onboarding-funnel telemetry — drop-off cliffs + retention interventions (#878). |
 | [`onboarding-patterns-audit.md`](onboarding-patterns-audit.md) | 2026-05-22 audit of the current tour against Mobbin's 1000-app onboarding study — strengths, gaps, recommended v1.2 sequencing. |
+| [`tours.md`](tours.md) | All 3 tour surfaces (OnboardingTour, JourneySpotlight + 6 guides, ConsoleOnboarding) — current status, replay events, known issues. |
+| [`tours-backlog.md`](tours-backlog.md) | Surfaces that should have guided tours but don't, ranked by impact. |
 | [`performance-audit.md`](performance-audit.md) | Cache + performance optimization workflow — `npm run analyze` bundle visualiser, Lighthouse budgets (#713). |
 | [`sw-pmtiles-verification.md`](sw-pmtiles-verification.md) | Post-deploy verification that SW pmtiles caching works in the browser (#639). |

@@ -63,6 +63,8 @@ const l = labels[lang] ?? labels.en;
 </div>
 
 <script>
+  import { resolveFirstVisible } from '../lib/onboarding-target';
+
   interface GuideStep {
     target: string;
     title: string;
@@ -96,14 +98,7 @@ const l = labels[lang] ?? labels.en;
     let returnFocus: HTMLElement | null = null;
 
     function resolveTarget(selector: string): Element | null {
-      const parts = selector.split(',').map(s => s.trim());
-      for (const sel of parts) {
-        try {
-          const el = document.querySelector(sel);
-          if (el) return el;
-        } catch { /* invalid selector */ }
-      }
-      return null;
+      return resolveFirstVisible(selector);
     }
 
     function positionTooltip(targetEl: Element | null): void {
