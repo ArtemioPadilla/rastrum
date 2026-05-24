@@ -1,8 +1,7 @@
 <!--
   PipelineStepper.astro — Linear 3-step stepper for Observe 2.0 pipeline visualization.
 
-  Replaces the SVG DAG (PipelineGraph.astro) when PUBLIC_OBSERVE_PIPELINE_GRAPH is unset.
-  Listens for the same `rastrum:pipeline-update` CustomEvent and maps the 5-node graph
+  Listens for the `rastrum:pipeline-update` CustomEvent and maps the 5-node graph
   to 3 human-readable steps:
 
     photo     = input node(s)

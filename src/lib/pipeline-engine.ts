@@ -267,13 +267,13 @@ export async function clearPipelineState(id: string): Promise<void> {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // #592 — startCascadeWithGraph: bridges runCascade's live onAttempt events
-// to PipelineGraph nodes, so the identify column reflects the real cascade
+// to PipelineNode entries, so the identify column reflects the real cascade
 // decision tree instead of pickRunner's hardcoded one-runner-per-file
 // approximation.
 //
 // Each onAttempt event creates or updates a node id `identify-${fileId}-${pluginId}`
 // and dispatches `rastrum:pipeline-update` with the full node array so
-// PipelineGraph re-renders.
+// PipelineStepper re-renders.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { CascadeAttemptEvent } from './identifiers/cascade';
