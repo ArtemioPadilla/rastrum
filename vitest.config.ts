@@ -17,7 +17,7 @@ export default defineConfig({
     // @huggingface/transformers v4 even in browser-only builds). The mock is
     // defined inline in the test file — no exclusion needed here.
     coverage: {
-      reporter: ['text', 'json'],
+      reporter: ['text', 'json', 'json-summary'],
       include: ['src/lib/**/*.ts'],
       exclude: ['**/*.test.ts'],
     },
